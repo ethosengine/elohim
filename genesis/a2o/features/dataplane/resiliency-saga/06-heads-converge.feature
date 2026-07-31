@@ -151,6 +151,18 @@ Feature: Chapter 6 — blobs sync to one head
   #     shem-conductors-signal-hairpin-suspect-dht-silent) — no fabric event has
   #     yet driven a real declared-vs-declared conflict through the fresh-
   #     declaration path end to end.
+  #   Disambiguation: the scenario immediately below exercises a DIFFERENT,
+  #     older mechanism than the R1 rule just decided above — adopt-before-
+  #     author's LOCAL-DHT/PEER-HINT arm, which converges a peer holding NO
+  #     declared head (or an undeclared one) onto an existing declaration. It
+  #     is not the declared-vs-declared conflict-arbitration rule R1 answers
+  #     (both peers ALREADY declared, disagreeing). The 2026-07-29 station
+  #     above already found this scenario's premise (B is headless) does not
+  #     match today's live state (B already holds a conflicting declared
+  #     head), so it is expected red until that live conflict is resolved via
+  #     the fresh-declaration channel — at which point either peer may again
+  #     be genuinely headless (adopt applies) or both converge to the same
+  #     declared value (the assertion holds trivially).
   Scenario: elohim.host adopts alpha-A's declared head after a restart
     Given peer "elohim.host" at "elohim.host"
     Then peer "elohim.host" resolves the declared head for content "elohim-host-landing" equal to peer "alpha-A"

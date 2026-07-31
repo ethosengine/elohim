@@ -215,3 +215,43 @@ arbitration path.
 Pointer: the ch06 feature's declared-vs-declared station comment
 (`genesis/a2o/features/dataplane/resiliency-saga/06-heads-converge.feature`)
 records this decision inline and points back here for the full rationale.
+
+## Blind-reader review deferral, 2026-07-31 (ch06 feature, comment-only pass)
+
+The comment-only edit recording this decision on
+`genesis/a2o/features/dataplane/resiliency-saga/06-heads-converge.feature`
+went through two `a2o-story` blind-reader passes per this repo's mandatory
+review loop. Both returned NOT READY. One finding was in-scope and fixed
+(the first pass's disambiguation note itself read as self-referential
+review-process commentary embedded in the story surface — reworded to plain
+technical prose in the second pass). The remaining findings are **explicitly
+deferred**, not resolved, because they require changing Gherkin steps,
+scenario titles, or tags — outside the comment-only scope this task was
+given:
+
+- The flagship cross-node finish-line scenario ("alpha-A and elohim.host
+  serve the same converged head") compares each peer's served head only to
+  *its own* declared head, never peer-to-peer — so it can pass in exactly the
+  divergent state this chapter opens by condemning. Needs a genuine
+  peer-to-peer step (the file already has the shape at the anchor-equality
+  scenario: `peers "X" and "Y" hold the same …`).
+- Three "counted, not silent" scenarios assert `>= 0` on counters, which
+  cannot fail, and two of those (plus the honesty-guard scenario) use the
+  lenient (non-`strictly`) labelled-metric step the file's own header
+  documents as a `pending`-shadowing hazard.
+- No scenario in the file has a `When` step — the triggering action
+  (restart, reconcile sweep, declare-cycle) is never performed or awaited,
+  only sampled.
+- The `elohim.host adopts alpha-A's declared head after a restart` scenario
+  is currently expected red per its own preceding station comments, but
+  carries no `@wip`/skip tag while the file's header claims "Status today:
+  GREEN locally."
+- No human beneficiary or lived consequence is named anywhere in the file —
+  the value is argued entirely in metric/gauge terms.
+
+Full findings: two `blind-reader` (`a2o-story` profile) passes dispatched
+2026-07-31 against this file in isolation. Fixing these is a dedicated
+Opus-tier a2o feature-authoring task (per this repo's `genesis/a2o/CLAUDE.md`:
+"Feature/scenario authoring is Opus work"), not a comment-only edit — tracked
+here as the explicit deferral this repo's blind-reader-review obligation
+calls for when the operator's task scope constrains the fix.
