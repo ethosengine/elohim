@@ -10,7 +10,7 @@
 import { Given, Then, DataTable } from '@cucumber/cucumber';
 
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { expect } from 'chai';
+import { strict as assert } from 'node:assert';
 
 import {
   DeviceArchetype,
@@ -67,7 +67,7 @@ Then(
   'the device memory should be {float} GB',
   function (this: WorldWithDevice, expectedGb: number) {
     const device = requireDevice(this);
-    expect(device.memoryGb).to.equal(expectedGb);
+    assert.equal(device.memoryGb, expectedGb);
   }
 );
 
@@ -75,39 +75,35 @@ Then(
   'the device capability level should be {int}',
   function (this: WorldWithDevice, expectedLevel: number) {
     const device = requireDevice(this);
-    expect(device.capabilityLevel).to.equal(expectedLevel);
+    assert.equal(device.capabilityLevel, expectedLevel);
   }
 );
 
 Then('the device can steward content', function (this: WorldWithDevice) {
   const device = requireDevice(this);
-  expect(device.canSteward, `Expected ${device.displayName} to have canSteward=true`).to.equal(
-    true
-  );
+  assert.equal(device.canSteward, true, `Expected ${device.displayName} to have canSteward=true`);
 });
 
 Then('the device cannot steward content', function (this: WorldWithDevice) {
   const device = requireDevice(this);
-  expect(device.canSteward, `Expected ${device.displayName} to have canSteward=false`).to.equal(
-    false
-  );
+  assert.equal(device.canSteward, false, `Expected ${device.displayName} to have canSteward=false`);
 });
 
 Then('the device should be always-on', function (this: WorldWithDevice) {
   const device = requireDevice(this);
-  expect(device.alwaysOn, `Expected ${device.displayName} to be always-on`).to.equal(true);
+  assert.equal(device.alwaysOn, true, `Expected ${device.displayName} to be always-on`);
 });
 
 Then('the device should not be always-on', function (this: WorldWithDevice) {
   const device = requireDevice(this);
-  expect(device.alwaysOn, `Expected ${device.displayName} to not be always-on`).to.equal(false);
+  assert.equal(device.alwaysOn, false, `Expected ${device.displayName} to not be always-on`);
 });
 
 Then(
   'the device NAT type should be {string}',
   function (this: WorldWithDevice, expectedNat: string) {
     const device = requireDevice(this);
-    expect(device.natType).to.equal(expectedNat);
+    assert.equal(device.natType, expectedNat);
   }
 );
 
@@ -115,7 +111,7 @@ Then(
   'the device degradation mode should be {string}',
   function (this: WorldWithDevice, expectedMode: string) {
     const device = requireDevice(this);
-    expect(device.degradationMode).to.equal(expectedMode);
+    assert.equal(device.degradationMode, expectedMode);
   }
 );
 
@@ -123,7 +119,7 @@ Then(
   'the device serviceability should be {string}',
   function (this: WorldWithDevice, expectedServiceability: string) {
     const device = requireDevice(this);
-    expect(device.serviceability).to.equal(expectedServiceability);
+    assert.equal(device.serviceability, expectedServiceability);
   }
 );
 
@@ -146,10 +142,7 @@ Then(
     const device = requireDevice(this);
     const expectedSurfaces: string[] = table.rows().map((row: string[]) => row[0]);
     for (const surface of expectedSurfaces) {
-      expect(
-        device.healthSurfaces,
-        `Expected ${device.displayName} to report health surface "${surface}"`
-      ).to.include(surface);
+      assert.ok(device.healthSurfaces.includes(surface), `Expected ${device.displayName} to report health surface "${surface}"`);
     }
   }
 );
@@ -170,10 +163,7 @@ Then('the device should support attestation:', function (this: WorldWithDevice, 
   const device = requireDevice(this);
   const expectedCaps: string[] = table.rows().map((row: string[]) => row[0]);
   for (const cap of expectedCaps) {
-    expect(
-      device.attestationCapabilities,
-      `Expected ${device.displayName} to support attestation capability "${cap}"`
-    ).to.include(cap);
+    assert.ok(device.attestationCapabilities.includes(cap), `Expected ${device.displayName} to support attestation capability "${cap}"`);
   }
 });
 
@@ -191,10 +181,10 @@ Then(
   'there should be at least {int} device at capability level {int}',
   function (this: WorldWithDevice, minCount: number, level: number) {
     const devices = getDevicesByLevel(level);
-    expect(
-      devices.length,
+    assert.ok(
+      devices.length >= minCount,
       `Expected at least ${minCount} device(s) at capability level ${level}, found ${devices.length}`
-    ).to.be.at.least(minCount);
+    );
   }
 );
 
