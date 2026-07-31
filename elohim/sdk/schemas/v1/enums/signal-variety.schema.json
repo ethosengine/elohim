@@ -1,0 +1,28 @@
+{
+  "$id": "epr:schema:enum:signal-variety",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SignalVariety",
+  "description": "What a flow atom REVEALS about the context it was emitted from, independent of its EprKind. The policy-addressable taxonomy for aggregation lanes: adoption-time policy contracts declare, per variety, whether and how signals aggregate upward from private contexts. Design home: genesis/docs/superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md (care-aggregation-adoption-policy-floor-design §3).",
+  "type": "string",
+  "enum": [
+    "completion-count",
+    "engagement-duration",
+    "timing-pattern",
+    "sequence-trace",
+    "content-response",
+    "presence-coincidence"
+  ],
+  "_tiers": {
+    "core": {
+      "values": [
+        "completion-count",
+        "engagement-duration",
+        "timing-pattern",
+        "sequence-trace",
+        "content-response",
+        "presence-coincidence"
+      ],
+      "rationale": "One atom may carry several varieties; the taxonomy exists so lane policy can address each disclosure class separately. completion-count = the fact of completion; engagement-duration = how long; timing-pattern = when (the variety that leaks household rhythm); sequence-trace = in what order; content-response = answer/free-text payloads; presence-coincidence = who was together. Closed set by design — a variety no policy can name is a variety no lane can suppress."
+    }
+  }
+}

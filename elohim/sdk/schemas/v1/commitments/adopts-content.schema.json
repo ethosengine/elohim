@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:adopts-content",
+  "title": "AdoptsContentCommitment",
+  "description": "Payload shape for a Mishpat::Commitment entry with action='adopts-content' — the adoption ceremony's wire contract. Minted at the adopting context's reach when an EPR is pulled into a private context (e.g. a love-map): it pins consent (policy_ref = the adoption-policy atom CID accepted, or absent for bare adoption), the epistemic timestamp (epistemic_digest = content-addressed digest of the claim-state VISIBLE AT THE ADOPTING NODE at adoption — what was known here, when), and the lane configuration (bounds.lanes) the aggregation boundary enforces for this context's flows on this content. Bare adoption (no policy_ref) is a legible posture: every SignalVariety defaults to the 'suppressed' lane — absence of governance aggregates nothing, and is itself recorded evidence. Revocation is future-only via revokes-commitment (target_cid); re-adoption of the same policy_ref is ceremony-free; adoption on MODIFIED terms references a NEW policy atom whose standing starts at the adopting context's reach. Schema-first per the View Schema Contract: the Mishpat DNA commitment_action_requirements arm and the bounds_validator lane check conform to this contract when wired. Design home: genesis/docs/superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md (§4).",
+  "type": "object",
+  "required": ["action", "head_ref", "provider", "epistemic_digest", "signed_at", "bounds"],
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": ["adopts-content"],
+      "description": "Action discriminator."
+    },
+    "head_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID of the adopted content EPR (the aggregation anchor its flows will reference)."
+    },
+    "policy_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID of the adoption-policy atom accepted, verbatim. ABSENT = bare adoption: the content carried no policy (or the adopter declined it) — all varieties default to 'suppressed' and bounds.lanes, if present, may only narrow further (structural check, validator not schema). A policy_ref the adopter altered is NOT this policy's CID — modified terms mint a new policy atom."
+    },
+    "provider": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The adopting context (agent or collective CID) whose flows these lanes govern."
+    },
+    "epistemic_digest": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Content-addressed digest of the claim-state visible at the adopting node at adoption time (may be the empty-set digest). The blameless-hindsight record: proves what had actually reached here — not merely what globally existed — when adoption was consented."
+    },
+    "signed_at": {
+      "type": "string",
+      "minLength": 1,
+      "description": "RFC3339 adoption timestamp."
+    },
+    "bounds": {
+      "type": "object",
+      "required": [],
+      "additionalProperties": false,
+      "properties": {
+        "lanes": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Per-variety lane map. Keys are SignalVariety values, values are AggregationLane values — both inlined (not $ref'd) so the standalone Ajv strict mini-test compiles without addSchema; source of truth: v1/enums/signal-variety.schema.json and v1/enums/aggregation-lane.schema.json. Absent lanes (or absent keys) = 'suppressed' for the missing varieties: the default is always the most-protective lane.",
+          "properties": {
+            "completion-count": {
+              "type": "string",
+              "enum": ["k-anonymous", "count-only", "after-graduation-only", "suppressed"]
+            },
+            "engagement-duration": {
+              "type": "string",
+              "enum": ["k-anonymous", "count-only", "after-graduation-only", "suppressed"]
+            },
+            "timing-pattern": {
+              "type": "string",
+              "enum": ["k-anonymous", "count-only", "after-graduation-only", "suppressed"]
+            },
+            "sequence-trace": {
+              "type": "string",
+              "enum": ["k-anonymous", "count-only", "after-graduation-only", "suppressed"]
+            },
+            "content-response": {
+              "type": "string",
+              "enum": ["k-anonymous", "count-only", "after-graduation-only", "suppressed"]
+            },
+            "presence-coincidence": {
+              "type": "string",
+              "enum": ["k-anonymous", "count-only", "after-graduation-only", "suppressed"]
+            }
+          }
+        }
+      }
+    }
+  }
+}

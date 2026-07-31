@@ -1,0 +1,14 @@
+{
+  "$id": "epr:schema:enum:aggregation-lane",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AggregationLane",
+  "description": "Per-variety aggregation policy mode — the lane a SignalVariety travels (or does not travel) when flows aggregate upward from a private context. Declared by adoption-time policy contracts; enforced at the aggregation boundary (bounds_validator check family), never upstream. Design home: genesis/docs/superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md (§3-4).",
+  "type": "string",
+  "enum": ["k-anonymous", "count-only", "after-graduation-only", "suppressed"],
+  "_tiers": {
+    "core": {
+      "values": ["k-anonymous", "count-only", "after-graduation-only", "suppressed"],
+      "rationale": "k-anonymous = joins threshold-gated rollups (k and window are aggregator config, not lane vocabulary); count-only = magnitude stripped to presence-of-signal before aggregation; after-graduation-only = leaves origin reach only via an explicit graduation ceremony; suppressed = never leaves origin reach. 'suppressed' is the bare-adoption default for every variety — absence of policy aggregates nothing."
+    }
+  }
+}
