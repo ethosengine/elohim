@@ -153,10 +153,11 @@ pub async fn handle_hc_connect(
                 .unwrap_or_else(|| state.args.installed_app_id.clone());
             (cid.clone(), info.admin_url, app_id)
         } else {
-            return json_error(
-                StatusCode::BAD_GATEWAY,
-                &format!("Conductor '{}' not found in registry", cid),
-            );
+            // Unknown conductor_id. If the claim was minted by a sibling
+            // doorway, this is the expected shape of "hosted elsewhere" —
+            // return the honest 409, not the misleading "not found in
+            // registry" 502 (see `unknown_conductor_response`).
+            return unknown_conductor_response(&claims, state.args.doorway_id.as_deref(), cid);
         }
     } else if let Some(entry) = registry.get_conductor_for_agent(&claims.agent_pub_key) {
         // Agent already registered in conductor registry
@@ -506,6 +507,76 @@ pub async fn handle_hc_connect(
 // Helpers
 // =============================================================================
 
+// -----------------------------------------------------------------------
+// Federation identity-fork guard (Task 2.3, doorway-federation-failover)
+// -----------------------------------------------------------------------
+//
+// `AgentProvisioner::find_existing_app` folds `conductor_id` into the
+// deterministic app id (`generate_app_id`), so when a hosted user lands on
+// a doorway that is not their home doorway, this doorway can NEVER find
+// the sibling's existing install — every conductor it checks computes a
+// different app id than the one the sibling actually created. Left
+// unguarded, `auto_provision` silently mints a brand-new, empty hosted
+// identity for an already-hosted human. This guard converts that silent
+// fork into an honest refusal, with zero DHT dependency (it reads only the
+// JWT claims already on hand) — it lands even before cross-doorway JWKS
+// verification exists (Task 2.1) and stays correct after.
+
+/// True when `claims_doorway_id` names a doorway other than
+/// `self_doorway_id` — i.e. the token was minted by a sibling doorway.
+///
+/// Empty/missing `claims_doorway_id` is treated as LOCAL, not foreign:
+/// pre-federation tokens predate the `doorway_id` claim entirely (it was
+/// added to `Claims` later), so an absent or empty value cannot be read as
+/// "minted elsewhere" — it must fall back to today's behavior.
+fn claims_are_foreign(claims_doorway_id: Option<&str>, self_doorway_id: Option<&str>) -> bool {
+    match claims_doorway_id {
+        None => false,
+        Some("") => false,
+        Some(id) => Some(id) != self_doorway_id,
+    }
+}
+
+/// Build the honest-refusal response for a foreign-doorway auto-provision
+/// attempt or an unknown conductor pinned by a foreign-doorway claim:
+/// `409 {"error":"hosted-elsewhere","homeDoorway":"<url-or-id>"}`.
+fn hosted_elsewhere_response(claims: &crate::auth::jwt::Claims) -> Response<Full<Bytes>> {
+    let home_doorway = claims
+        .doorway_url
+        .clone()
+        .or_else(|| claims.doorway_id.clone())
+        .unwrap_or_default();
+    let body = serde_json::json!({
+        "error": "hosted-elsewhere",
+        "homeDoorway": home_doorway,
+    });
+    Response::builder()
+        .status(StatusCode::CONFLICT)
+        .header("Content-Type", "application/json")
+        .body(Full::new(Bytes::from(body.to_string())))
+        .unwrap()
+}
+
+/// Decide the response for a JWT-pinned `conductor_id` this doorway has
+/// never heard of. A foreign-doorway claim means the user is hosted
+/// elsewhere — honest 409, not the misleading "not found in registry" 502.
+/// A local claim (self-minted, or a legacy token with no `doorway_id`)
+/// keeps the existing 502: this doorway lost track of a conductor it
+/// should know about, which is a real registry problem.
+fn unknown_conductor_response(
+    claims: &crate::auth::jwt::Claims,
+    self_doorway_id: Option<&str>,
+    conductor_id: &str,
+) -> Response<Full<Bytes>> {
+    if claims_are_foreign(claims.doorway_id.as_deref(), self_doorway_id) {
+        return hosted_elsewhere_response(claims);
+    }
+    json_error(
+        StatusCode::BAD_GATEWAY,
+        &format!("Conductor '{}' not found in registry", conductor_id),
+    )
+}
+
 /// Resolve a conductor for the user via the idempotent provisioner.
 ///
 /// Returns `(conductor_id, admin_url, installed_app_id)` on success, or a
@@ -523,6 +594,21 @@ async fn auto_provision(
     registry: &Arc<crate::conductor::ConductorRegistry>,
     claims: &crate::auth::jwt::Claims,
 ) -> Result<(String, String, String), Response<Full<Bytes>>> {
+    // Guard: never silently fork a hosted identity for a human whose token
+    // was minted by a sibling doorway. See the module comment above.
+    if claims_are_foreign(
+        claims.doorway_id.as_deref(),
+        state.args.doorway_id.as_deref(),
+    ) {
+        warn!(
+            identifier = %claims.identifier,
+            claims_doorway = ?claims.doorway_id,
+            self_doorway = ?state.args.doorway_id,
+            "Refusing auto-provision: token was minted by a foreign doorway"
+        );
+        return Err(hosted_elsewhere_response(claims));
+    }
+
     let provisioner = AgentProvisioner::new(Arc::clone(registry))
         .with_app_id(state.args.installed_app_id.clone())
         .with_bundle_path(state.args.happ_bundle_path.clone());
@@ -601,7 +687,160 @@ fn json_success<T: Serialize>(status: StatusCode, data: &T) -> Response<Full<Byt
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::auth::jwt::Claims;
+    use crate::auth::PermissionLevel;
     use crate::conductor::registry::{ConductorInfo, ConductorRegistry};
+    use crate::config::Args;
+    use clap::Parser;
+
+    /// Minimal Claims fixture. `doorway_id`/`doorway_url` are the only fields
+    /// the foreign-doorway guard inspects.
+    fn test_claims(doorway_id: Option<&str>, doorway_url: Option<&str>) -> Claims {
+        Claims {
+            human_id: "human-1".into(),
+            agent_pub_key: "uhCAk-test".into(),
+            identifier: "test@example.com".into(),
+            permission_level: PermissionLevel::Authenticated,
+            doorway_operator: None,
+            session_id: None,
+            doorway_id: doorway_id.map(str::to_string),
+            doorway_url: doorway_url.map(str::to_string),
+            conductor_id: None,
+            installed_app_id: None,
+            is_steward: false,
+            has_local_conductor: false,
+            version: 1,
+            iat: 0,
+            exp: u64::MAX,
+        }
+    }
+
+    /// AppState carrying `self_doorway_id` as its own `DOORWAY_ID` and the
+    /// given (possibly empty) conductor registry.
+    fn test_state(self_doorway_id: Option<&str>, registry: ConductorRegistry) -> Arc<AppState> {
+        let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        args.dev_mode = true;
+        args.doorway_id = self_doorway_id.map(str::to_string);
+        let mut state = AppState::new(args);
+        state.conductor_registry = Some(Arc::new(registry));
+        Arc::new(state)
+    }
+
+    async fn body_json(resp: Response<Full<Bytes>>) -> serde_json::Value {
+        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        serde_json::from_slice(&bytes).expect("response body must be JSON")
+    }
+
+    // ---- claims_are_foreign (pure classification) ----
+
+    #[test]
+    fn claims_are_foreign_treats_missing_and_empty_as_local() {
+        assert!(!claims_are_foreign(None, Some("self-doorway")));
+        assert!(!claims_are_foreign(Some(""), Some("self-doorway")));
+    }
+
+    #[test]
+    fn claims_are_foreign_treats_self_id_as_local() {
+        assert!(!claims_are_foreign(
+            Some("self-doorway"),
+            Some("self-doorway")
+        ));
+    }
+
+    #[test]
+    fn claims_are_foreign_flags_sibling_id() {
+        assert!(claims_are_foreign(
+            Some("sibling-doorway"),
+            Some("self-doorway")
+        ));
+    }
+
+    // ---- auto_provision guard (Task 2.3: kill the silent identity fork) ----
+
+    /// Foreign `doorway_id` + unknown user (no agent→conductor mapping) must
+    /// be refused with 409 hosted-elsewhere — never silently provisioned.
+    /// A conductor IS registered here: if the guard did not fire first, the
+    /// call would fall through to `provisioner.provision_agent`, which (with
+    /// no live conductor to actually connect to) would eventually surface as
+    /// 503, never 409. Getting 409 proves the guard short-circuited before
+    /// the provisioner was ever invoked.
+    #[tokio::test]
+    async fn auto_provision_refuses_foreign_doorway_claim() {
+        let registry = ConductorRegistry::new(None).await;
+        registry.register_conductor(ConductorInfo {
+            conductor_id: "conductor-0".into(),
+            conductor_url: "ws://c0:4445".into(),
+            admin_url: "ws://c0:4444".into(),
+            capacity_used: 0,
+            capacity_max: 50,
+        });
+        let state = test_state(Some("self-doorway"), registry);
+        let claims = test_claims(Some("sibling-doorway"), Some("https://sibling.elohim.host"));
+
+        let result =
+            auto_provision(&state, state.conductor_registry.as_ref().unwrap(), &claims).await;
+
+        let resp = result.expect_err("foreign-doorway claim must be refused, not provisioned");
+        assert_eq!(resp.status(), StatusCode::CONFLICT);
+        let body = body_json(resp).await;
+        assert_eq!(body["error"], "hosted-elsewhere");
+        assert_eq!(body["homeDoorway"], "https://sibling.elohim.host");
+    }
+
+    /// Local `doorway_id` + unknown agent must still reach the pre-existing
+    /// provisioning path. No conductors are registered, so a request that
+    /// gets past the guard hits the original "no conductors available"
+    /// error (503) — proving the new guard did not block a local claim.
+    #[tokio::test]
+    async fn auto_provision_proceeds_for_local_doorway_claim() {
+        let registry = ConductorRegistry::new(None).await;
+        let state = test_state(Some("self-doorway"), registry);
+        let claims = test_claims(Some("self-doorway"), None);
+
+        let result =
+            auto_provision(&state, state.conductor_registry.as_ref().unwrap(), &claims).await;
+
+        let resp = result.expect_err("no conductors registered");
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    /// Legacy tokens minted before `doorway_id` existed on Claims carry
+    /// `None`; tokens minted with an explicitly empty string must be treated
+    /// the same way — local, not foreign.
+    #[tokio::test]
+    async fn auto_provision_treats_empty_doorway_id_as_local() {
+        let registry = ConductorRegistry::new(None).await;
+        let state = test_state(Some("self-doorway"), registry);
+        let claims = test_claims(Some(""), None);
+
+        let result =
+            auto_provision(&state, state.conductor_registry.as_ref().unwrap(), &claims).await;
+
+        let resp = result.expect_err("no conductors registered");
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    // ---- unknown_conductor_response (the conductor-pinned 502 vs 409 split) ----
+
+    /// A JWT pinning a `conductor_id` this doorway has never heard of, minted
+    /// by a sibling doorway, means the user is hosted elsewhere — 409, not
+    /// the misleading "Conductor not found in registry" 502.
+    #[test]
+    fn unknown_conductor_with_foreign_doorway_is_409_hosted_elsewhere() {
+        let claims = test_claims(Some("sibling-doorway"), Some("https://sibling.elohim.host"));
+        let resp = unknown_conductor_response(&claims, Some("self-doorway"), "conductor-9");
+        assert_eq!(resp.status(), StatusCode::CONFLICT);
+    }
+
+    /// A JWT pinning an unknown `conductor_id` minted by THIS doorway is a
+    /// real registry problem (e.g. pool composition changed) — stays 502.
+    #[test]
+    fn unknown_conductor_with_local_doorway_stays_502() {
+        let claims = test_claims(Some("self-doorway"), None);
+        let resp = unknown_conductor_response(&claims, Some("self-doorway"), "conductor-9");
+        assert_eq!(resp.status(), StatusCode::BAD_GATEWAY);
+    }
 
     /// Captures the stale-agent-mapping bug class that previously surfaced
     /// as `502 {"error":"Conductor info not found"}` from `/hc/connect`.
