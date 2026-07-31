@@ -6,7 +6,9 @@ import {
   defaultCustodyPairs,
   resolveCustodyBlobDescriptor,
   resolveCustodyPeerIds,
+  seedCapacityPledge,
   seedCustodyCommitments,
+  type CapacityRatioAttestation,
   type CommitmentClient,
   type CustodyPair,
   type CustodyPeerIds,
@@ -647,5 +649,127 @@ describe('defaultCustodyPairs triad fixture', () => {
     );
     expect(body.metadata.fixture).toBe('formation-output');
     expect(body.metadata.retireAt).toBe('ceremony-landing');
+  });
+});
+
+// =============================================================================
+// seedCapacityPledge — fail-soft consent-legibility read + idempotent pledge
+// =============================================================================
+
+describe('seedCapacityPledge (offline, injected mock client)', () => {
+  const RATIOS: CapacityRatioAttestation = {
+    commonsPct: 20,
+    dwellingPct: 40,
+    collectivePct: 25,
+    freePct: 15,
+    effectiveRatioCid: 'bafkrei-effective-ratios',
+  };
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('happy path: posts the attestation verbatim from the GET', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const getCapacityRatios = vi.fn(async () => new Response(JSON.stringify(RATIOS), { status: 200 }));
+    const createCapacityPledge = vi.fn(async () => new Response('{}', { status: 200 }));
+    const client = {
+      getCapacityRatios,
+      createCapacityPledge,
+    } as unknown as CommitmentClient;
+
+    await seedCapacityPledge(client);
+
+    expect(getCapacityRatios).toHaveBeenCalledTimes(1);
+    expect(createCapacityPledge).toHaveBeenCalledTimes(1);
+    const sentBody = createCapacityPledge.mock.calls[0][0] as {
+      variant: string;
+      commonsBytes: number;
+      bounds: { ratePerMinute: number; reachCeiling: string };
+      ratioAttestation: CapacityRatioAttestation;
+    };
+    expect(sentBody.variant).toBe('capacity');
+    expect(sentBody.commonsBytes).toBe(25 * 1024 * 1024 * 1024);
+    expect(sentBody.bounds).toEqual({ ratePerMinute: 12, reachCeiling: 'commons' });
+    // The attestation MUST be exactly what the GET returned — the exact-match
+    // donut check in replicates_commons_validator rejects anything else.
+    expect(sentBody.ratioAttestation).toEqual(RATIOS);
+  });
+
+  it('404 on GET: skips without throwing, never calls the POST', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const getCapacityRatios = vi.fn(async () => new Response('not found', { status: 404 }));
+    const createCapacityPledge = vi.fn();
+    const client = {
+      getCapacityRatios,
+      createCapacityPledge,
+    } as unknown as CommitmentClient;
+
+    await expect(seedCapacityPledge(client)).resolves.toBeUndefined();
+
+    expect(createCapacityPledge).not.toHaveBeenCalled();
+  });
+
+  it('501 on GET: skips without throwing, never calls the POST', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const getCapacityRatios = vi.fn(async () => new Response('not implemented', { status: 501 }));
+    const createCapacityPledge = vi.fn();
+    const client = {
+      getCapacityRatios,
+      createCapacityPledge,
+    } as unknown as CommitmentClient;
+
+    await expect(seedCapacityPledge(client)).resolves.toBeUndefined();
+
+    expect(createCapacityPledge).not.toHaveBeenCalled();
+  });
+
+  it('GET throws (network error): logs and returns without throwing', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const getCapacityRatios = vi.fn(async () => {
+      throw new Error('connect ECONNREFUSED');
+    });
+    const createCapacityPledge = vi.fn();
+    const client = {
+      getCapacityRatios,
+      createCapacityPledge,
+    } as unknown as CommitmentClient;
+
+    await expect(seedCapacityPledge(client)).resolves.toBeUndefined();
+
+    expect(createCapacityPledge).not.toHaveBeenCalled();
+  });
+
+  it('POST failure: logs and does not throw', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const getCapacityRatios = vi.fn(async () => new Response(JSON.stringify(RATIOS), { status: 200 }));
+    const createCapacityPledge = vi.fn(
+      async () => new Response(JSON.stringify({ error: 'donut check failed' }), { status: 400 }),
+    );
+    const client = {
+      getCapacityRatios,
+      createCapacityPledge,
+    } as unknown as CommitmentClient;
+
+    await expect(seedCapacityPledge(client)).resolves.toBeUndefined();
+
+    expect(createCapacityPledge).toHaveBeenCalledTimes(1);
+  });
+
+  it('POST throws (network error): logs and does not throw', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const getCapacityRatios = vi.fn(async () => new Response(JSON.stringify(RATIOS), { status: 200 }));
+    const createCapacityPledge = vi.fn(async () => {
+      throw new Error('connect ECONNREFUSED');
+    });
+    const client = {
+      getCapacityRatios,
+      createCapacityPledge,
+    } as unknown as CommitmentClient;
+
+    await expect(seedCapacityPledge(client)).resolves.toBeUndefined();
   });
 });

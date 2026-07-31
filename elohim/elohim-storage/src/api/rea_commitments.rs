@@ -51,6 +51,13 @@ pub async fn handle(
             handle_create_capacity_pledge(req, pool, ctx, hc_lamad.as_ref()).await
         }
 
+        // GET /api/v1/commitments/capacity/ratios — consent-legibility read:
+        // exposes the server-side `constitutional_ratio_registry::effective_ratios()`
+        // values a caller MUST see before it can construct a `ratioAttestation`
+        // that will pass `replicates_commons_validator`'s exact-match donut
+        // check. Category C operational config, no new DHT entity — no auth.
+        (&Method::GET, "capacity/ratios") => handle_get_effective_ratios(),
+
         // GET /api/v1/commitments/agent/{agent_id}
         (&Method::GET, agent_path) if agent_path.starts_with("agent/") => {
             let agent_id = agent_path.trim_start_matches("agent/");
@@ -78,6 +85,36 @@ pub async fn handle(
             method, path
         ))),
     }
+}
+
+/// GET /api/v1/commitments/capacity/ratios
+///
+/// Consent-legibility read for the capacity-pledge attestation: a caller
+/// building a `POST /api/v1/commitments/capacity` body must attest ratio
+/// values that EXACTLY match the server's
+/// `constitutional_ratio_registry::effective_ratios()` (including the
+/// `effective_ratio_cid == manifest_cid` provenance check —
+/// `replicates_commons_validator::validate_typed_for_creation_commons`
+/// stage 2(d)). Before that consent can be given it must be seen; this
+/// route is what you must SEE, never a new notarized entity, so it stays
+/// Category C operational config — unauthenticated, uncached-by-DHT,
+/// derived from the same manifest-backed registry the write path enforces
+/// against.
+///
+/// Response shape reuses the existing `CommonsRatioAttestation` ts-rs view
+/// (already camelCase, already the exact shape a `ratioAttestation` needs):
+/// `{"commonsPct","dwellingPct","collectivePct","freePct","effectiveRatioCid"}`.
+fn handle_get_effective_ratios() -> Result<Response<Full<Bytes>>, StorageError> {
+    let provenance = crate::services::constitutional_ratio_registry::effective_ratios();
+    let ratios = provenance.ratios;
+    let attestation = elohim_views::replicates_commons::CommonsRatioAttestation {
+        commons_pct: ratios.commons_pct,
+        dwelling_pct: ratios.dwelling_pct,
+        collective_pct: ratios.collective_pct,
+        free_pct: ratios.free_pct,
+        effective_ratio_cid: provenance.manifest_cid,
+    };
+    Ok(response::ok(&attestation))
 }
 
 async fn handle_create_capacity_pledge(
@@ -294,4 +331,45 @@ fn extract_limit(query_str: &str) -> i64 {
     }
     let q: LimitQuery = serde_urlencoded::from_str(query_str).unwrap_or_default();
     q.limit.unwrap_or(100)
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use http_body_util::BodyExt;
+
+    /// GET /api/v1/commitments/capacity/ratios must echo the server's
+    /// `effective_ratios()` verbatim — this is the consent-legibility read a
+    /// caller needs before it can construct a `ratioAttestation` that will
+    /// pass `replicates_commons_validator`'s exact-match donut check.
+    #[tokio::test]
+    async fn effective_ratios_response_matches_registry_and_sums_to_100() {
+        let response = handle_get_effective_ratios().expect("handler must succeed");
+        assert_eq!(response.status(), hyper::StatusCode::OK);
+
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+
+        let provenance = crate::services::constitutional_ratio_registry::effective_ratios();
+        let ratios = provenance.ratios;
+
+        assert_eq!(body["commonsPct"], ratios.commons_pct);
+        assert_eq!(body["dwellingPct"], ratios.dwelling_pct);
+        assert_eq!(body["collectivePct"], ratios.collective_pct);
+        assert_eq!(body["freePct"], ratios.free_pct);
+        assert_eq!(body["effectiveRatioCid"], provenance.manifest_cid);
+
+        let cid = body["effectiveRatioCid"].as_str().unwrap();
+        assert!(!cid.is_empty(), "effectiveRatioCid must be non-empty");
+
+        let sum = body["commonsPct"].as_u64().unwrap()
+            + body["dwellingPct"].as_u64().unwrap()
+            + body["collectivePct"].as_u64().unwrap()
+            + body["freePct"].as_u64().unwrap();
+        assert_eq!(sum, 100, "ratio pcts must sum to 100, got {body:?}");
+    }
 }

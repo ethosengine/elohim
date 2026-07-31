@@ -147,6 +147,26 @@ interface CommitmentBody {
   metadata: Record<string, unknown>;
 }
 
+/** Wire shape of `GET /api/v1/commitments/capacity/ratios` — camelCase,
+ * matches `elohim_views::replicates_commons::CommonsRatioAttestation`. */
+export interface CapacityRatioAttestation {
+  commonsPct: number;
+  dwellingPct: number;
+  collectivePct: number;
+  freePct: number;
+  effectiveRatioCid: string;
+}
+
+/** Wire body for `POST /api/v1/commitments/capacity` (the `ReplicatesContentPayload::Capacity`
+ * variant). `provider` is injected server-side from the storage node's own
+ * conductor cell — this seeder never declares it. */
+export interface CapacityPledgeBody {
+  variant: 'capacity';
+  commonsBytes: number;
+  bounds: { ratePerMinute: number; reachCeiling: string };
+  ratioAttestation: CapacityRatioAttestation;
+}
+
 // =============================================================================
 // Body builder (testable in isolation)
 // =============================================================================
@@ -452,6 +472,22 @@ export class CommitmentClient extends DoorwayClient {
       body: JSON.stringify(metadata ? { state, metadata } : { state }),
     });
   }
+
+  /** Consent-legibility read: the server's effective_ratios(), which a
+   * capacity-pledge ratioAttestation must exact-match. Never throws on a
+   * non-2xx — the caller (seedCapacityPledge) inspects the status itself so
+   * a storage build that predates this endpoint (404/501) can be skipped. */
+  async getCapacityRatios(): Promise<Response> {
+    return this.fetch('/api/v1/commitments/capacity/ratios', { method: 'GET' });
+  }
+
+  async createCapacityPledge(body: CapacityPledgeBody): Promise<Response> {
+    return this.fetch('/api/v1/commitments/capacity', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
 }
 
 // =============================================================================
@@ -616,6 +652,102 @@ export async function activateCustodyCommitments(
 }
 
 // =============================================================================
+// Default capacity pledge (matthew-household dwelling pledges commons capacity)
+// =============================================================================
+
+/**
+ * 25 GiB — the default commons byte-budget pledge seeded for the
+ * matthew-household dwelling's storage node. Matches
+ * `capacity_pledge_author.rs`'s `valid_capacity()` test fixture magnitude
+ * (64 MiB there is a unit-test amount; this is the seeded default).
+ */
+const DEFAULT_CAPACITY_COMMONS_BYTES = 25 * 1024 * 1024 * 1024; // 26_843_545_600
+
+/**
+ * Seed the default commons capacity pledge: the matthew-household dwelling's
+ * storage node explicitly consents to host `DEFAULT_CAPACITY_COMMONS_BYTES`
+ * for the commons tier.
+ *
+ * Rollout-compatible: `GET /api/v1/commitments/capacity/ratios` is the
+ * consent-legibility read this pledge needs to construct a `ratioAttestation`
+ * that exact-matches `constitutional_ratio_registry::effective_ratios()`
+ * (`replicates_commons_validator`'s donut check — see `handle_get_effective_ratios`
+ * doc comment in `elohim/elohim-storage/src/api/rea_commitments.rs`). A
+ * storage build that predates the endpoint (404/501) is a valid deployment
+ * state, not an error — this pledge is skipped, loudly, without failing the
+ * seeder.
+ *
+ * Fail-soft throughout: any failure (network error, non-2xx GET, non-2xx
+ * POST) is logged and returns without throwing. Custody-commitment seeding's
+ * outcome is never affected by a capacity-pledge failure — this MUST run
+ * after `seedCustodyCommitments`, never gate it.
+ *
+ * Idempotent by construction: the POST handler
+ * (`capacity_pledge_author::author_capacity_pledge`) recognizes an
+ * already-live exact pledge (`is_exact_live_pledge`) and returns it instead
+ * of minting a duplicate, so re-running this seeder is safe.
+ */
+export async function seedCapacityPledge(client: CommitmentClient): Promise<void> {
+  console.log('[seed-commitments] Seeding matthew-household commons capacity pledge...');
+
+  let ratiosResponse: Response;
+  try {
+    ratiosResponse = await client.getCapacityRatios();
+  } catch (err) {
+    console.warn(
+      `[seed-commitments] capacity pledge: GET /api/v1/commitments/capacity/ratios failed — ${
+        err instanceof Error ? err.message : String(err)
+      } — skipping.`,
+    );
+    return;
+  }
+
+  if (ratiosResponse.status === 404 || ratiosResponse.status === 501) {
+    console.warn('[seed-commitments] storage predates capacity ratios endpoint — skipping capacity pledge');
+    return;
+  }
+
+  if (!ratiosResponse.ok) {
+    const text = await ratiosResponse.text();
+    console.warn(
+      `[seed-commitments] capacity pledge: GET ratios returned HTTP ${ratiosResponse.status} — skipping. Body: ${text.slice(0, 300)}`,
+    );
+    return;
+  }
+
+  const ratioAttestation = (await ratiosResponse.json()) as CapacityRatioAttestation;
+
+  const body: CapacityPledgeBody = {
+    variant: 'capacity',
+    commonsBytes: DEFAULT_CAPACITY_COMMONS_BYTES,
+    bounds: { ratePerMinute: 12, reachCeiling: 'commons' },
+    ratioAttestation,
+  };
+
+  let response: Response;
+  try {
+    response = await client.createCapacityPledge(body);
+  } catch (err) {
+    console.warn(
+      `[seed-commitments] capacity pledge: POST /api/v1/commitments/capacity failed — ${
+        err instanceof Error ? err.message : String(err)
+      } — continuing (custody seeding outcome is unaffected).`,
+    );
+    return;
+  }
+
+  if (response.ok) {
+    console.log('[seed-commitments] capacity pledge: ok');
+    return;
+  }
+
+  const text = await response.text();
+  console.warn(
+    `[seed-commitments] capacity pledge: POST returned HTTP ${response.status} — continuing (custody seeding outcome is unaffected). Body: ${text.slice(0, 300)}`,
+  );
+}
+
+// =============================================================================
 // Standalone execution
 // =============================================================================
 
@@ -648,5 +780,6 @@ if (isMain) {
   }
 
   await seedCustodyCommitments(client, pairs);
+  await seedCapacityPledge(client);
   process.exit(0);
 }

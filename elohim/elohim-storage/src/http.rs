@@ -12779,6 +12779,19 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .auth_required()
                 .build(),
         )
+        // GET /api/v1/commitments/capacity/ratios — consent-legibility read:
+        // exposes constitutional_ratio_registry::effective_ratios() so a
+        // caller can construct a ratioAttestation that will exact-match the
+        // donut check in replicates_commons_validator (the capacity POST
+        // above rejects any attestation that doesn't). Category C
+        // operational config, no new DHT entity — no auth required (it's
+        // what you must SEE before you can consent).
+        .route(
+            Route::get("/api/v1/commitments/capacity/ratios")
+                .handler("get_effective_ratios")
+                .cache_ttl(60)
+                .build(),
+        )
         .route(
             Route::get("/api/v1/commitments/agent/{agent_id}")
                 .handler("commitments_by_agent")
@@ -14047,6 +14060,10 @@ mod tests {
         assert!(
             paths.contains(&"/api/v1/commitments/capacity"),
             "missing /api/v1/commitments/capacity (capacity pledge consent lever)"
+        );
+        assert!(
+            paths.contains(&"/api/v1/commitments/capacity/ratios"),
+            "missing /api/v1/commitments/capacity/ratios (consent-legibility read for the capacity pledge attestation)"
         );
         // Plural-Mishpat lens market (lens-market S7). Same route-shadow guard
         // discipline as /api/v1/weave: the GET arm is dispatched through

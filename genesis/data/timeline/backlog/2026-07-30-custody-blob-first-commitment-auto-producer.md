@@ -116,3 +116,15 @@ identifier helper. Once a re-upload's successor is active, older live runtime
 pledges for the same provider/content identity are cancelled through the
 existing notarized state-transition path. Focused Rust tests cover exact-address
 construction and artifact-address idempotency.
+
+The stale-pledge cancellation predicate inside `ensure_active_self_custody`
+(`elohim/elohim-storage/src/services/rea_commitment_service.rs`) is now
+extracted to a pure `is_stale_self_custody_pledge` function and unit-tested in
+isolation (exact-content match, wrong content id, missing/unparseable
+metadata, current id, already-retired states, wrong provider/receiver — all
+covered without a conductor). Known coupling: the sweep matches on
+`contentId` alone with no artifact-address discriminator — if SSR-server
+artifacts ever get their own runtime distribution path distinct from the
+browser artifact for the same content id, the sweep will cancel a still-live
+pledge for the sibling artifact; that needs an artifact-address discriminator
+when it arises.

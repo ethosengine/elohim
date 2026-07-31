@@ -95,6 +95,56 @@ pub fn build_custody_blob_input(
     }
 }
 
+/// Pure per-row decision for the stale-pledge cancellation sweep inside
+/// [`ReaCommitmentService::ensure_active_self_custody`].
+///
+/// A row is stale (must be cancelled) iff it is a **live** `custody-blob`
+/// self-pledge (`row_provider == row_receiver == self_agent`) for the
+/// **same** `content_id`, and it is not the commitment just
+/// created/activated (`row_id != current_id`) nor already retired
+/// (`cancelled` / `superseded`). Content-id matching is exact string
+/// equality on `metadata_json.contentId`; missing or unparseable metadata
+/// fails closed (never treated as a match, so an ambiguous row is never
+/// auto-cancelled).
+///
+/// Extracted 2026-07-31 for unit coverage — the enclosing loop needs a live
+/// conductor to exercise end-to-end, so this decision is tested in
+/// isolation. The loop itself is unchanged behavior (extract-and-test only).
+#[allow(clippy::too_many_arguments)]
+fn is_stale_self_custody_pledge(
+    row_action: &str,
+    row_provider: &str,
+    row_receiver: &str,
+    row_state: &str,
+    row_metadata_json: Option<&str>,
+    row_id: &str,
+    self_agent: &str,
+    content_id: &str,
+    current_id: &str,
+) -> bool {
+    if row_action != "custody-blob" {
+        return false;
+    }
+    if row_provider != self_agent || row_receiver != self_agent {
+        return false;
+    }
+    if row_id == current_id {
+        return false;
+    }
+    if matches!(row_state, "cancelled" | "superseded") {
+        return false;
+    }
+    row_metadata_json
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+        .and_then(|metadata| {
+            metadata
+                .get("contentId")
+                .and_then(|value| value.as_str())
+                .map(|candidate| candidate == content_id)
+        })
+        .unwrap_or(false)
+}
+
 impl ReaCommitmentService {
     /// Ensure the FIRST active self-custody commitment for a verified runtime
     /// placement.
@@ -155,6 +205,13 @@ impl ReaCommitmentService {
         // live custody promise for this same provider/content identity through
         // the existing notarized state-transition path. Retrying is safe: the
         // current row is recognized above, then stale cleanup runs again.
+        //
+        // Known coupling (2026-07-31): the stale-pledge sweep matches on
+        // `contentId` alone — it has no artifact-address discriminator. If
+        // SSR-server artifacts ever get their own runtime distribution path
+        // (distinct from the browser artifact for the same content id), this
+        // sweep will cancel a still-live pledge for the sibling artifact. See
+        // genesis/data/timeline/backlog/2026-07-30-custody-blob-first-commitment-auto-producer.md.
         if let Some(content_id) = content_id {
             let query = ReaCommitmentQuery {
                 action: Some("custody-blob".to_string()),
@@ -165,21 +222,17 @@ impl ReaCommitmentService {
             };
             let stale = rea_commitments::list_commitments(conn, ctx, &query)?;
             for row in stale {
-                if row.id == id || matches!(row.state.as_str(), "cancelled" | "superseded") {
-                    continue;
-                }
-                let same_content = row
-                    .metadata_json
-                    .as_deref()
-                    .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
-                    .and_then(|metadata| {
-                        metadata
-                            .get("contentId")
-                            .and_then(|value| value.as_str())
-                            .map(|candidate| candidate == content_id)
-                    })
-                    .unwrap_or(false);
-                if !same_content {
+                if !is_stale_self_custody_pledge(
+                    &row.action,
+                    &row.provider,
+                    &row.receiver,
+                    &row.state,
+                    row.metadata_json.as_deref(),
+                    &row.id,
+                    provider,
+                    content_id,
+                    &id,
+                ) {
                     continue;
                 }
                 let cancel = UpdateReaCommitmentState {
@@ -653,6 +706,178 @@ mod tests {
     use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
     const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+    // -------------------------------------------------------------------
+    // is_stale_self_custody_pledge — pure predicate, no conductor needed
+    // -------------------------------------------------------------------
+
+    const SELF_AGENT: &str = "uhCAk-self";
+    const OTHER_AGENT: &str = "uhCAk-other";
+    const CONTENT_ID: &str = "content-abc123";
+    const CURRENT_ID: &str = "custody-blob-current";
+    const ROW_ID: &str = "custody-blob-older";
+
+    fn metadata_for(content_id: &str) -> String {
+        serde_json::json!({ "contentId": content_id }).to_string()
+    }
+
+    #[test]
+    fn exact_content_match_is_stale() {
+        let meta = metadata_for(CONTENT_ID);
+        assert!(is_stale_self_custody_pledge(
+            "custody-blob",
+            SELF_AGENT,
+            SELF_AGENT,
+            "active",
+            Some(&meta),
+            ROW_ID,
+            SELF_AGENT,
+            CONTENT_ID,
+            CURRENT_ID,
+        ));
+    }
+
+    #[test]
+    fn different_content_id_is_not_stale() {
+        let meta = metadata_for("content-other");
+        assert!(!is_stale_self_custody_pledge(
+            "custody-blob",
+            SELF_AGENT,
+            SELF_AGENT,
+            "active",
+            Some(&meta),
+            ROW_ID,
+            SELF_AGENT,
+            CONTENT_ID,
+            CURRENT_ID,
+        ));
+    }
+
+    #[test]
+    fn missing_metadata_fails_closed() {
+        assert!(!is_stale_self_custody_pledge(
+            "custody-blob",
+            SELF_AGENT,
+            SELF_AGENT,
+            "active",
+            None,
+            ROW_ID,
+            SELF_AGENT,
+            CONTENT_ID,
+            CURRENT_ID,
+        ));
+    }
+
+    #[test]
+    fn unparseable_metadata_fails_closed() {
+        assert!(!is_stale_self_custody_pledge(
+            "custody-blob",
+            SELF_AGENT,
+            SELF_AGENT,
+            "active",
+            Some("not-json{"),
+            ROW_ID,
+            SELF_AGENT,
+            CONTENT_ID,
+            CURRENT_ID,
+        ));
+    }
+
+    #[test]
+    fn current_id_is_never_stale() {
+        let meta = metadata_for(CONTENT_ID);
+        assert!(!is_stale_self_custody_pledge(
+            "custody-blob",
+            SELF_AGENT,
+            SELF_AGENT,
+            "active",
+            Some(&meta),
+            CURRENT_ID,
+            SELF_AGENT,
+            CONTENT_ID,
+            CURRENT_ID,
+        ));
+    }
+
+    #[test]
+    fn already_cancelled_is_not_stale() {
+        let meta = metadata_for(CONTENT_ID);
+        assert!(!is_stale_self_custody_pledge(
+            "custody-blob",
+            SELF_AGENT,
+            SELF_AGENT,
+            "cancelled",
+            Some(&meta),
+            ROW_ID,
+            SELF_AGENT,
+            CONTENT_ID,
+            CURRENT_ID,
+        ));
+    }
+
+    #[test]
+    fn already_superseded_is_not_stale() {
+        let meta = metadata_for(CONTENT_ID);
+        assert!(!is_stale_self_custody_pledge(
+            "custody-blob",
+            SELF_AGENT,
+            SELF_AGENT,
+            "superseded",
+            Some(&meta),
+            ROW_ID,
+            SELF_AGENT,
+            CONTENT_ID,
+            CURRENT_ID,
+        ));
+    }
+
+    #[test]
+    fn different_provider_is_not_stale() {
+        let meta = metadata_for(CONTENT_ID);
+        assert!(!is_stale_self_custody_pledge(
+            "custody-blob",
+            OTHER_AGENT,
+            SELF_AGENT,
+            "active",
+            Some(&meta),
+            ROW_ID,
+            SELF_AGENT,
+            CONTENT_ID,
+            CURRENT_ID,
+        ));
+    }
+
+    #[test]
+    fn different_receiver_is_not_stale() {
+        let meta = metadata_for(CONTENT_ID);
+        assert!(!is_stale_self_custody_pledge(
+            "custody-blob",
+            SELF_AGENT,
+            OTHER_AGENT,
+            "active",
+            Some(&meta),
+            ROW_ID,
+            SELF_AGENT,
+            CONTENT_ID,
+            CURRENT_ID,
+        ));
+    }
+
+    #[test]
+    fn non_custody_blob_action_is_not_stale() {
+        let meta = metadata_for(CONTENT_ID);
+        assert!(!is_stale_self_custody_pledge(
+            "replicates-commons",
+            SELF_AGENT,
+            SELF_AGENT,
+            "active",
+            Some(&meta),
+            ROW_ID,
+            SELF_AGENT,
+            CONTENT_ID,
+            CURRENT_ID,
+        ));
+    }
 
     fn setup_conn() -> diesel::SqliteConnection {
         let mut conn = diesel::SqliteConnection::establish(":memory:").expect("in-memory SQLite");
