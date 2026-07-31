@@ -1,0 +1,24 @@
+{
+  "id": "state-content-elohim-host-landing",
+  "title": "Governance state — elohim-host-landing",
+  "entityType": "content",
+  "entityId": "elohim-host-landing",
+  "status": "auto-approved",
+  "statusBasis": {
+    "method": "automated",
+    "reasoning": "Protocol-surface content published by the genesis and edge pipelines and served at commons reach. It has passed the automated deploy and seed gates only — no community review, council deliberation, or constitutional ratification has taken place. Recorded at this rung so the landing surface's governance standing is legible rather than assumed.",
+    "deciderId": "genesis-pipeline",
+    "deciderType": "algorithm",
+    "decidedAt": "2026-07-31T00:00:00.000000"
+  },
+  "labels": [],
+  "reviews": [],
+  "activeChallenges": [],
+  "resolvedChallenges": [],
+  "restrictions": [],
+  "governingElohim": {
+    "level": "global",
+    "elohimId": "elohim-global"
+  },
+  "lastUpdated": "2026-07-31T00:00:00.000000"
+}

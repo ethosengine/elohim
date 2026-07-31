@@ -360,6 +360,33 @@ export function buildCustodyCommitmentBody(pair: ResolvedCustodyPair, peerIds: C
 // =============================================================================
 
 /**
+ * Self-custody pledge for the saga ch07 carrier content (2026-07-30):
+ * resolved via contentId + the explicit `ssr-server` artifact role, not a
+ * fixture blobHash. The live custody evidence for this saga carrier names
+ * the SSR server-bundle manifest; the browser bundle is a different
+ * artifact and must never be selected by fallback. The deterministic id
+ * derivation from (provider|receiver|resolved-blob) keeps re-runs
+ * idempotent. DRIFT GUARD: a server-bundle re-upload mints a new
+ * serverBlobHash and therefore a NEW commitment id; the old pledge is not
+ * superseded automatically (that reconcile pass remains out of scope).
+ *
+ * Hoisted out of `defaultCustodyPairs()` so it can be read WITHOUT the
+ * CONTENT_BLOB_HASH env (that function hard-exits when the blob env is
+ * missing). seed-epr-atom.ts reads it to assert the landing atom's custody
+ * claim — the claim describes the pledge, never the deploy-time blob hash.
+ */
+export const LANDING_SELF_CUSTODY_PLEDGE: CustodyPair = {
+  providerHumanId: 'human-matthew-manager',
+  providerArchetype: 'desktop',
+  receiverHumanId: 'human-matthew-manager',
+  receiverArchetype: 'desktop',
+  contentId: 'elohim-host-landing',
+  artifactRole: 'ssr-server',
+  // The SSR deployment artifact is distinct from the browser bundle;
+  // keep its measured byte count explicit when production supplies it.
+};
+
+/**
  * Build the default M1 custody pair set (reads env at call time so tests can
  * set process.env before invoking — the function is only called from main or
  * from tests, never at module initialisation).
@@ -422,25 +449,10 @@ export function defaultCustodyPairs(): CustodyPair[] {
       receiverArchetype: 'desktop',
       ...fixture,
     },
-    // Self-custody pledge for the saga ch07 carrier content (2026-07-30):
-    // resolved via contentId + the explicit `ssr-server` artifact role, not a
-    // fixture blobHash. The live custody evidence for this saga carrier names
-    // the SSR server-bundle manifest; the browser bundle is a different
-    // artifact and must never be selected by fallback. The deterministic id
-    // derivation from (provider|receiver|resolved-blob) keeps re-runs
-    // idempotent. DRIFT GUARD: a server-bundle re-upload mints a new
-    // serverBlobHash and therefore a NEW commitment id; the old pledge is not
-    // superseded automatically (that reconcile pass remains out of scope).
-    {
-      providerHumanId: 'human-matthew-manager',
-      providerArchetype: 'desktop',
-      receiverHumanId: 'human-matthew-manager',
-      receiverArchetype: 'desktop',
-      contentId: 'elohim-host-landing',
-      artifactRole: 'ssr-server',
-      // The SSR deployment artifact is distinct from the browser bundle;
-      // keep its measured byte count explicit when production supplies it.
-    },
+    // Self-custody pledge for the saga ch07 carrier content — declared as
+    // LANDING_SELF_CUSTODY_PLEDGE above so seed-epr-atom.ts can read it
+    // without the CONTENT_BLOB_HASH env this function requires.
+    LANDING_SELF_CUSTODY_PLEDGE,
   ];
 }
 

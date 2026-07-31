@@ -644,14 +644,53 @@ export async function deriveContentAnchor(input: {
   return computeCid(bytes);
 }
 
+/**
+ * Canonical content-body serialization for a content seed JSON: a string
+ * `content` is used verbatim; an object `content` is JSON.stringify'd.
+ *
+ * Exported because the body bytes are the FIRST input to `deriveContentAnchor`
+ * — anything computing a content's anchor CID out of band (seed-epr-atom.ts
+ * derives it for the landing atom's knowledge leg) must use this exact rule or
+ * it addresses a CID no seeded row carries. One rule, one place.
+ */
+export function contentBodyFor(json: Pick<ConceptJson, 'content'>): string | undefined {
+  if (!json.content) return undefined;
+  return typeof json.content === 'string' ? json.content : JSON.stringify(json.content);
+}
+
+/**
+ * Build the `deriveContentAnchor` input for a raw content seed JSON, mirroring
+ * exactly what `transformContent` feeds it during a seed run.
+ *
+ * CAVEAT: the live seed path injects `blobHash` from `uploadedContentBlobs`
+ * (see the `transformContent` call site) AFTER building this input; a raw
+ * file can't see that. `deriveContentAnchor` prefers `contentBody`, so this
+ * only matters for a content JSON with NO inline `content` that relies on an
+ * uploaded blob — for such a file this helper's anchor would silently diverge
+ * from the seeded row's `dht_anchor_hash`. Callers (seed-epr-atom.ts) must
+ * only use it for inline-content files, or plumb the blob hash explicitly.
+ */
+export function contentAnchorInput(json: ConceptJson): {
+  id: string;
+  title: string;
+  contentBody?: string;
+  blobHash?: string;
+  blobCid?: string;
+} {
+  return {
+    id: json.id,
+    title: json.title,
+    contentBody: contentBodyFor(json),
+    blobHash: json.blobHash ?? json.blob_hash ?? undefined,
+    blobCid: json.blobCid ?? undefined,
+  };
+}
+
 function transformContent(json: ConceptJson): CreateContentInput {
   // Serialize content body to string
-  let contentBody: string | undefined;
+  const contentBody = contentBodyFor(json);
   let contentSizeBytes: number | undefined;
-  if (json.content) {
-    contentBody = typeof json.content === 'string'
-      ? json.content
-      : JSON.stringify(json.content);
+  if (contentBody !== undefined) {
     contentSizeBytes = Buffer.byteLength(contentBody, 'utf-8');
   }
 

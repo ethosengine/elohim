@@ -72,6 +72,40 @@ interface BulkAllocationResult {
 interface StewardRatio {
   presenceId: string;
   ratio: number;
+  /**
+   * Contribution type for the storage wire enum. Only the AUTHORED path sets
+   * this (derived from the content JSON's declared `role`); the category and
+   * default paths leave it undefined and the caller keeps the historical
+   * `curator` value the a2o scenarios assert on.
+   */
+  contributionType?: ContributionType;
+}
+
+/**
+ * Storage validates `contribution_type` against a fixed enum (db/models.rs):
+ * original_creator | editor | translator | curator | maintainer | inherited.
+ */
+type ContributionType =
+  | 'original_creator'
+  | 'editor'
+  | 'translator'
+  | 'curator'
+  | 'maintainer'
+  | 'inherited';
+
+/** A `stewardedBy` entry as authored on a content JSON in genesis/data/lamad/content. */
+export interface AuthoredStewardEntry {
+  humanId: string;
+  affinity?: number;
+  role?: string;
+}
+
+/** Which source decided a content item's steward set. Recorded in the allocation note. */
+export type StewardshipProvenance = 'authored' | 'category' | 'default';
+
+export interface ResolvedStewardship {
+  stewards: StewardRatio[];
+  provenance: StewardshipProvenance;
 }
 
 /**
@@ -461,32 +495,49 @@ class StewardshipClient extends DoorwayClient {
 // Content Category Reader
 // =============================================================================
 
-/**
- * Build a map of content ID -> category from the seed data files on disk.
- * This avoids needing to parse metadata from the API.
- */
-function buildContentCategoryMap(): Map<string, string> {
-  const categoryMap = new Map<string, string>();
+/** What the seeder reads off each content JSON to decide its stewardship. */
+export interface ContentStewardshipFacts {
+  category?: string;
+  stewardedBy?: AuthoredStewardEntry[];
+}
 
-  if (!fs.existsSync(CONTENT_DIR)) {
-    console.log(`   WARNING: Content directory not found: ${CONTENT_DIR}`);
-    return categoryMap;
+/**
+ * Build a map of content ID -> {category, stewardedBy} from the seed data
+ * files on disk. This avoids needing to parse metadata from the API.
+ *
+ * `stewardedBy` is read here (and honored in `resolveStewardship`) because the
+ * field was previously INERT: it is authored on 3428 content files and no
+ * seeder ever read it, so every declaration fell through to the category map
+ * or the bootstrap default.
+ */
+export function buildContentIndex(contentDir: string = CONTENT_DIR): Map<
+  string,
+  ContentStewardshipFacts
+> {
+  const index = new Map<string, ContentStewardshipFacts>();
+
+  if (!fs.existsSync(contentDir)) {
+    console.log(`   WARNING: Content directory not found: ${contentDir}`);
+    return index;
   }
 
-  const files = fs.readdirSync(CONTENT_DIR).filter((f) => f.endsWith('.json'));
+  const files = fs.readdirSync(contentDir).filter((f) => f.endsWith('.json'));
 
   for (const file of files) {
     try {
-      const data = JSON.parse(fs.readFileSync(path.join(CONTENT_DIR, file), 'utf-8'));
-      if (data.id && data.metadata?.category) {
-        categoryMap.set(data.id, data.metadata.category);
+      const data = JSON.parse(fs.readFileSync(path.join(contentDir, file), 'utf-8'));
+      if (data.id) {
+        index.set(data.id, {
+          category: data.metadata?.category,
+          stewardedBy: Array.isArray(data.stewardedBy) ? data.stewardedBy : undefined,
+        });
       }
     } catch {
       // Skip malformed files
     }
   }
 
-  return categoryMap;
+  return index;
 }
 
 // =============================================================================
@@ -494,23 +545,164 @@ function buildContentCategoryMap(): Map<string, string> {
 // =============================================================================
 
 /**
- * Get the steward allocation for a content item based on its category.
- * Falls back to Matthew as sole steward for unknown categories.
+ * Map a content JSON's declared steward `role` onto the storage
+ * `contribution_type` enum. Unknown/absent roles fall to `curator` (a steward
+ * curates) — the same value the category and default paths use.
  */
-function getStewardAllocations(contentId: string, category: string | undefined): StewardRatio[] {
+export function contributionTypeForRole(role: string | undefined): ContributionType {
+  switch (role) {
+    case 'author':
+      return 'original_creator';
+    case 'steward':
+      return 'maintainer';
+    case 'editor':
+      return 'editor';
+    case 'translator':
+      return 'translator';
+    // 'endorser', 'curator', anything else — an endorsement is a curation act.
+    default:
+      return 'curator';
+  }
+}
+
+/**
+ * Build the humanId → presenceId index from the contributor presence files.
+ *
+ * The mapping is DECLARATIVE, never derived from the slug: each presence JSON
+ * carries `metadata.humanId` naming the canonical human it belongs to
+ * (`human-matthew-manager` → `matthew-dowell`). A content JSON's
+ * `stewardedBy[].humanId` is a humans.json id; allocations are keyed by
+ * presenceId — this index is the only bridge between the two namespaces.
+ */
+export function buildPresenceIdByHumanId(presences: PresenceData[]): Map<string, string> {
+  const index = new Map<string, string>();
+  for (const p of presences) {
+    const humanId = p.metadata?.humanId;
+    if (typeof humanId === 'string' && humanId.length > 0) {
+      index.set(humanId, p.id);
+    }
+  }
+  return index;
+}
+
+/**
+ * Resolve an authored `stewardedBy` array to steward ratios, or `null` when it
+ * cannot be honored.
+ *
+ * FAIL-CLOSED on unresolvable humanIds. A `stewardedBy` entry naming a human
+ * with no contributor presence (e.g. `human-georgina-grocer`, which appears on
+ * 1870 content files with no presence file behind it) would otherwise mint
+ * allocations pointing at a presence that does not exist — dead rows the
+ * stewardship views silently drop. One unresolvable entry disqualifies the
+ * WHOLE array: a partial honor would silently redistribute the missing
+ * steward's affinity to the others, which is a different (and unauthored)
+ * allocation.
+ *
+ * Ratios are the declared affinities normalized to sum 1.0 (the a2o
+ * `@integrity` scenario asserts the per-content sum). Duplicate humanIds are
+ * summed before normalization.
+ */
+export function resolveAuthoredStewards(
+  authored: AuthoredStewardEntry[] | undefined,
+  presenceIdByHumanId: Map<string, string>
+): StewardRatio[] | null {
+  if (!authored || authored.length === 0) return null;
+
+  const affinityByPresence = new Map<string, number>();
+  const roleByPresence = new Map<string, string | undefined>();
+
+  for (const entry of authored) {
+    const presenceId = presenceIdByHumanId.get(entry.humanId);
+    if (!presenceId) return null; // fail-closed — see doc comment
+    const affinity = typeof entry.affinity === 'number' ? entry.affinity : 0;
+    if (!(affinity > 0)) return null; // a zero/negative/absent affinity can't be normalized
+    affinityByPresence.set(presenceId, (affinityByPresence.get(presenceId) ?? 0) + affinity);
+    // First declared role for a presence wins (the strongest relationship is
+    // declared first in the annotated files).
+    if (!roleByPresence.has(presenceId)) roleByPresence.set(presenceId, entry.role);
+  }
+
+  const total = [...affinityByPresence.values()].reduce((a, b) => a + b, 0);
+  if (!(total > 0)) return null;
+
+  return [...affinityByPresence.entries()].map(([presenceId, affinity]) => ({
+    presenceId,
+    ratio: affinity / total,
+    contributionType: contributionTypeForRole(roleByPresence.get(presenceId)),
+  }));
+}
+
+/**
+ * Decide the steward set for one content item, and record WHICH source decided
+ * it (the provenance lands in the allocation note).
+ *
+ * ## Precedence: category → authored → default
+ *
+ * The curated `CATEGORY_STEWARD_MAP` keeps precedence over an authored
+ * `stewardedBy`. That ordering is deliberate and measured, NOT an oversight:
+ *
+ *   - 3428 of 3431 content files carry a `stewardedBy` array, and essentially
+ *     all of them were machine-written by `genesis/scripts/annotate-stewardship.py`
+ *     from a tag→human rule table. They are an annotation pass, not an
+ *     authorial declaration.
+ *   - Letting them win would rewrite the steward set of 3157 content items
+ *     (1276 even after discarding the unresolvable ones) and would silently
+ *     replace the hand-curated affinity graph the six a2o
+ *     `content/stewardship-allocation.feature` scenarios assert on.
+ *
+ * So authored stewardship displaces only the BOOTSTRAP DEFAULT — the
+ * `matthew-dowell @ 1.0` fallback that means "we know nothing about this
+ * item". Where the seeder previously knew nothing, the content's own
+ * declaration is strictly better information. Measured blast radius of that
+ * rule: 50 content items (all currently default-allocated), each gaining a
+ * genuine second steward. `elohim-host-landing` itself keeps the same steward
+ * set (matthew-dowell @ 1.0) and gains `authored` provenance plus the
+ * `original_creator` contribution type its `role: author` declares.
+ *
+ * Promoting authored above the category map is a separate, deliberate
+ * decision about the whole stewardship graph — it needs presence files for
+ * georgina-grocer/terrance-tutor first, and an allocation-supersede pass.
+ */
+export function resolveStewardship(
+  category: string | undefined,
+  authored: AuthoredStewardEntry[] | undefined,
+  presenceIdByHumanId: Map<string, string>
+): ResolvedStewardship {
   if (category && CATEGORY_STEWARD_MAP[category]) {
-    return CATEGORY_STEWARD_MAP[category];
+    return { stewards: CATEGORY_STEWARD_MAP[category], provenance: 'category' };
+  }
+
+  const authoredStewards = resolveAuthoredStewards(authored, presenceIdByHumanId);
+  if (authoredStewards) {
+    return { stewards: authoredStewards, provenance: 'authored' };
   }
 
   // Default: Matthew as bootstrap steward
-  return [{ presenceId: 'matthew-dowell', ratio: 1.0 }];
+  return { stewards: [{ presenceId: 'matthew-dowell', ratio: 1.0 }], provenance: 'default' };
+}
+
+/** Human-readable provenance note stored on each allocation row. */
+export function allocationNote(
+  provenance: StewardshipProvenance,
+  category: string | undefined
+): string {
+  switch (provenance) {
+    case 'authored':
+      return `Authored stewardship declared on the content's stewardedBy field${
+        category ? ` (category: ${category})` : ''
+      }`;
+    case 'category':
+      return `Affinity-based stewardship for ${category} content`;
+    default:
+      return 'Bootstrap steward assignment - uncategorized content';
+  }
 }
 
 // =============================================================================
 // Presence Loader
 // =============================================================================
 
-function loadAllPresences(): PresenceData[] {
+export function loadAllPresences(): PresenceData[] {
   if (!fs.existsSync(PRESENCES_DIR)) {
     console.error(`   ERROR: Presences directory not found: ${PRESENCES_DIR}`);
     process.exit(1);
@@ -554,13 +746,22 @@ async function main() {
 
   // Step 2: Build content category map from seed data
   console.log('Building content category map from seed data...');
-  const categoryMap = buildContentCategoryMap();
-  console.log(`   Mapped ${categoryMap.size} content items to categories`);
+  const contentIndex = buildContentIndex();
+  const presenceIdByHumanId = buildPresenceIdByHumanId(presences);
+  console.log(`   Mapped ${contentIndex.size} content items to categories`);
+  console.log(`   Resolvable humanId -> presenceId bindings: ${presenceIdByHumanId.size}`);
+
+  /** Resolve one content item's steward set from the on-disk facts. */
+  const stewardshipFor = (contentId: string): ResolvedStewardship => {
+    const facts = contentIndex.get(contentId);
+    return resolveStewardship(facts?.category, facts?.stewardedBy, presenceIdByHumanId);
+  };
 
   // Show category distribution
   const categoryStats = new Map<string, number>();
-  for (const cat of categoryMap.values()) {
-    categoryStats.set(cat, (categoryStats.get(cat) || 0) + 1);
+  for (const facts of contentIndex.values()) {
+    if (!facts.category) continue;
+    categoryStats.set(facts.category, (categoryStats.get(facts.category) || 0) + 1);
   }
   const sortedCategories = [...categoryStats.entries()].sort((a, b) => b[1] - a[1]);
   for (const [cat, count] of sortedCategories.slice(0, 10)) {
@@ -577,10 +778,11 @@ async function main() {
     console.log('Allocation preview (dry run):');
     const stewardCounts = new Map<string, number>();
     const stewardTotalRatio = new Map<string, number>();
+    const provenanceCounts = new Map<StewardshipProvenance, number>();
 
-    for (const [contentId] of categoryMap) {
-      const category = categoryMap.get(contentId);
-      const allocations = getStewardAllocations(contentId, category);
+    for (const [contentId] of contentIndex) {
+      const { stewards: allocations, provenance } = stewardshipFor(contentId);
+      provenanceCounts.set(provenance, (provenanceCounts.get(provenance) || 0) + 1);
       for (const alloc of allocations) {
         stewardCounts.set(alloc.presenceId, (stewardCounts.get(alloc.presenceId) || 0) + 1);
         stewardTotalRatio.set(
@@ -605,7 +807,32 @@ async function main() {
     const totalAllocations = [...stewardCounts.values()].reduce((a, b) => a + b, 0);
     console.log();
     console.log(`   Total allocation records: ${totalAllocations}`);
-    console.log(`   Average stewards per item: ${(totalAllocations / categoryMap.size).toFixed(1)}`);
+    console.log(
+      `   Average stewards per item: ${(totalAllocations / contentIndex.size).toFixed(1)}`
+    );
+
+    // Provenance breakdown — the audit surface for the authored-stewardship
+    // path. `authored` counts the items whose steward set now comes from the
+    // content's own stewardedBy declaration instead of the bootstrap default.
+    console.log();
+    console.log('   Provenance breakdown:');
+    for (const p of ['category', 'authored', 'default'] as StewardshipProvenance[]) {
+      console.log(`     ${p.padEnd(9)}: ${provenanceCounts.get(p) ?? 0} content items`);
+    }
+    const authoredIds = [...contentIndex.keys()].filter(
+      (id) => stewardshipFor(id).provenance === 'authored'
+    );
+    if (authoredIds.length > 0) {
+      console.log();
+      console.log('   Content allocated from its authored stewardedBy:');
+      for (const id of authoredIds) {
+        const { stewards } = stewardshipFor(id);
+        const shape = stewards
+          .map((s) => `${s.presenceId}@${s.ratio.toFixed(2)}/${s.contributionType}`)
+          .join(', ');
+        console.log(`     ${id}: ${shape}`);
+      }
+    }
     console.log();
     console.log('Dry run complete. Run without --dry-run to apply.');
     return;
@@ -688,9 +915,14 @@ async function main() {
   // the Step 9 affinity seeding (mirrors the per-steward diff, see below).
   const contentNeedingAllocations: string[] = [];
 
+  // Provenance per content id — reused by the Step 9 affinity seeding.
+  const provenanceByContent = new Map<string, StewardshipProvenance>();
+
   for (const contentId of allContentIds) {
-    const category = categoryMap.get(contentId);
-    const stewards = getStewardAllocations(contentId, category);
+    const facts = contentIndex.get(contentId);
+    const category = facts?.category;
+    const { stewards, provenance } = stewardshipFor(contentId);
+    provenanceByContent.set(contentId, provenance);
 
     const missingStewards = stewards.filter(
       (steward) => !existingAllocations.has(allocationKey(contentId, steward.presenceId))
@@ -710,14 +942,16 @@ async function main() {
         //     affinity-computed by this seeder); 'affinity' is rejected.
         //   contribution_types = original_creator|editor|translator|curator|maintainer|
         //     inherited → 'curator' (a steward curates); 'steward' is rejected.
+        // The AUTHORED path carries the declared role through
+        // contributionTypeForRole (author → original_creator, steward →
+        // maintainer); category/default paths keep 'curator', which the
+        // a2o @affinity and @fallback scenarios assert on.
         // BACKLOG: enrich the storage enums with domain-accurate `affinity`/`steward`
         // (manifesto vocabulary) so the wire values match the story — storage change,
         // edge-rebuild window. See sprint-result backlog.
         allocationMethod: 'computed',
-        contributionType: 'curator',
-        note: category
-          ? `Affinity-based stewardship for ${category} content`
-          : 'Bootstrap steward assignment - uncategorized content',
+        contributionType: steward.contributionType ?? 'curator',
+        note: allocationNote(provenance, category),
       });
     }
   }
@@ -813,11 +1047,30 @@ async function main() {
   }> = [];
 
   for (const contentId of contentNeedingAllocations) {
-    const category = categoryMap.get(contentId);
+    const facts = contentIndex.get(contentId);
+    const category = facts?.category;
+    // Authored allocations carry the DECLARED affinity scores from the content
+    // JSON — the honest source for "how close is this steward to this content".
+    // Everything else keeps the curated category affinity table, then the
+    // bootstrap 0.7.
+    const authoredAffinities =
+      provenanceByContent.get(contentId) === 'authored'
+        ? (facts?.stewardedBy ?? [])
+            .map((s) => ({
+              stewardId: presenceIdByHumanId.get(s.humanId),
+              affinityScore: typeof s.affinity === 'number' ? s.affinity : 0,
+            }))
+            .filter(
+              (e): e is StewardAffinityEntry => typeof e.stewardId === 'string' && e.affinityScore > 0
+            )
+        : null;
+
     const affinityEntries =
-      category && CATEGORY_AFFINITY_MAP[category]
-        ? CATEGORY_AFFINITY_MAP[category]
-        : [{ stewardId: 'matthew-dowell', affinityScore: 0.7 }];
+      authoredAffinities && authoredAffinities.length > 0
+        ? authoredAffinities
+        : category && CATEGORY_AFFINITY_MAP[category]
+          ? CATEGORY_AFFINITY_MAP[category]
+          : [{ stewardId: 'matthew-dowell', affinityScore: 0.7 }];
 
     for (const entry of affinityEntries) {
       affinityInputs.push({
@@ -853,8 +1106,14 @@ async function main() {
   console.log('='.repeat(60));
 }
 
-// Run
-main().catch((error) => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
+// Standalone execution only — guard so importing this module (seed-epr-atom.ts
+// imports the stewardship resolver to build the landing atom's stewardship
+// claim; the unit tests import it too) does NOT run the seeder. Mirrors the
+// isMain pattern in seed-commitments.ts / seed-sqlite.ts.
+const isMain = import.meta.url === `file://${process.argv[1]}`;
+if (isMain) {
+  main().catch((error) => {
+    console.error('Fatal error:', error);
+    process.exit(1);
+  });
+}

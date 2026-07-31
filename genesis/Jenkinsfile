@@ -809,6 +809,51 @@ def seedStewardshipStage() {
 }
 
 /**
+ * Seed EPR Atoms — the `elohim-host-landing` atom family
+ * (genesis/seeder/src/seed-epr-atom.ts).
+ *
+ * Mints five content-addressed atoms in dependency order: the family schema
+ * manifest, the governance-state manifest (payload = the verbatim
+ * genesis/data/lamad/governance/state-content-elohim-host-landing.json), a
+ * stewardship Claim, a custody Claim, and the landing atom itself — whose
+ * governance coupling leg points at the governance atom's real CID and whose
+ * claims array holds the two claim CIDs. Before this stage existed the landing
+ * atom shipped `claims: []` and a governance leg that was
+ * sha256("elohim-host-governance-v1"), a hash of a literal with nothing behind
+ * it — and the seeder was reachable from no pipeline stage at all.
+ *
+ * Runs BEFORE Seed Projections: the projection commitments declare "doorway D
+ * projects EPR elohim-host-landing at /", and the nav-context handler resolves
+ * that slug against epr_atoms.
+ *
+ * Idempotent: atom CIDs are derived from canonical bytes, so a re-run re-PUTs
+ * the same CIDs and the storage layer short-circuits on identical bytes.
+ *
+ * Targets STORAGE_URL (the in-cluster storage pod — PUT /api/v1/epr/{cid} is a
+ * storage route), falling back to the doorway host.
+ *
+ * Body extracted to a helper above pipeline {} for the 64KB CPS method-size limit.
+ */
+def seedEprAtomsStage() {
+    def targetUrl = env.STORAGE_URL ?: env.RESOLVED_DOORWAY_HOST
+    def apiKey = ''
+    try {
+        withCredentials([string(credentialsId: 'storage-api-key-admin', variable: 'ADMIN_KEY')]) {
+            apiKey = env.ADMIN_KEY
+        }
+    } catch (e) {
+        echo "storage-api-key-admin credential not visible — seeding without admin auth (may 401)"
+    }
+    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+        dir('genesis/seeder') {
+            withEnv(["DOORWAY_API_KEY=${apiKey}"]) {
+                sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-epr-atoms.sh' '${targetUrl}'"
+            }
+        }
+    }
+}
+
+/**
  * Seeds the EPR-projection REA commitments — one per (doorway, EPR, urlPath)
  * tuple — that the doorway's EprRouter polls from
  * /api/v1/commitments?action=project-epr and uses to dispatch path-prefix
@@ -1663,6 +1708,15 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                 // asserted on data no stage produced (genesis #1079).
                 container('builder') {
                     script { seedStewardshipStage() }
+                }
+                // Mints the elohim-host-landing EPR atom family (schema ·
+                // governance state · stewardship claim · custody claim ·
+                // landing) so the landing atom's governance leg and claims
+                // resolve to atoms that actually exist. Must precede Seed
+                // Projections — the projection commitments address this EPR by
+                // slug. Body in seedEprAtomsStage() (64KB CPS limit).
+                container('builder') {
+                    script { seedEprAtomsStage() }
                 }
                 // Seeds the EPR-projection REA commitments. Body extracted
                 // to seedProjectionsStage() helper above pipeline {} to stay
