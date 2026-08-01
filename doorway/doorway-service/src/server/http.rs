@@ -2690,21 +2690,26 @@ async fn dispatch_to_projected_epr(
     // sheds WITHOUT calling storage — this is what makes a blocked peer (e.g.
     // adam on alpha-b) fast-fail here too, instead of riding the full
     // dispatch timeout on every visitor request.
-    if state.upstream_breakers.is_open(&storage_url) {
-        tracing::warn!(
-            target: "upstream_shed",
-            counter = "doorway_upstream_breaker_open_total",
-            storage_url = %storage_url,
-            epr_id = %projection.epr_id,
-            "EPR router: upstream circuit OPEN — shedding without calling storage (503 + Retry-After)"
-        );
-        crate::metrics::inc_breaker_open();
-        return epr_dispatch_shed_response(
-            wants_html,
-            crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
-            routes::catching_up::upstream_cause(&state.upstream_breakers, &storage_url),
-        );
-    }
+    // The RAII guard resolves an outcome on every terminal path — including the
+    // one that never runs, when this request future is dropped mid-send.
+    let trial = match state.upstream_breakers.begin(&storage_url) {
+        Some(t) => t,
+        None => {
+            tracing::warn!(
+                target: "upstream_shed",
+                counter = "doorway_upstream_breaker_open_total",
+                storage_url = %storage_url,
+                epr_id = %projection.epr_id,
+                "EPR router: upstream circuit OPEN — shedding without calling storage (503 + Retry-After)"
+            );
+            crate::metrics::inc_breaker_open();
+            return epr_dispatch_shed_response(
+                wants_html,
+                crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+                routes::catching_up::upstream_cause(&state.upstream_breakers, &storage_url),
+            );
+        }
+    };
 
     match state
         .ssr_http_client
@@ -2731,8 +2736,7 @@ async fn dispatch_to_projected_epr(
                     // Record-once terminal outcome (D6, mirrors forward_to_storage):
                     // classify by status — 2xx/4xx (incl. an expected 404 blob/route
                     // miss) never opens the breaker; only 429/5xx counts as failure.
-                    state.upstream_breakers.record(
-                        &storage_url,
+                    trial.record(
                         crate::routes::storage_proxy::ProxyOutcome::classify(status.as_u16())
                             != crate::routes::storage_proxy::ProxyOutcome::Failure,
                     );
@@ -2776,7 +2780,7 @@ async fn dispatch_to_projected_epr(
                     // failed mid-read — still a real upstream failure, so it must
                     // count toward the breaker even though this isn't the
                     // connect/timeout hang this fix targets.
-                    state.upstream_breakers.record(&storage_url, false);
+                    trial.record(false);
                     Response::builder()
                         .status(StatusCode::BAD_GATEWAY)
                         .header("content-type", "application/json")
@@ -2799,7 +2803,7 @@ async fn dispatch_to_projected_epr(
                 error = %e,
                 "EPR router: storage request failed (connect/timeout) — recording breaker failure and shedding"
             );
-            state.upstream_breakers.record(&storage_url, false);
+            trial.record(false);
             epr_dispatch_shed_response(
                 wants_html,
                 crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
@@ -3425,16 +3429,16 @@ async fn compose_render_with_shell(
         .storage_url
         .as_deref()
         .ok_or(SsrFallbackReason::ShellNoProjection)?;
-    // Endpoint key shared with the gate below — is_open() consumes a
-    // half-open trial when it admits one, and whoever consumes a trial MUST
-    // record its outcome on every terminal path or the breaker parks in
-    // HalfOpen forever (no further trial is ever admitted). Do NOT record on
-    // the ShellBreakerOpen return just below — the gate shed the request; no
-    // attempt was made, so there is no outcome to record.
+    // Endpoint key shared with the gate below — `begin()` consumes a half-open
+    // trial when it admits one, and whoever consumes a trial MUST resolve its
+    // outcome on every terminal path or the breaker parks in HalfOpen forever
+    // (no further trial is ever admitted). The returned guard resolves it even
+    // when this future is dropped mid-fetch. The `None` arm records nothing —
+    // the gate shed the request; no attempt was made.
     let endpoint = storage_url.trim_end_matches('/');
-    if state.upstream_breakers.is_open(endpoint) {
+    let Some(trial) = state.upstream_breakers.begin(endpoint) else {
         return Err(SsrFallbackReason::ShellBreakerOpen);
-    }
+    };
     let shell_url = projected_shell_url(storage_url, projection);
     let fetch_started = std::time::Instant::now();
     let shell_html = match state
@@ -3446,7 +3450,7 @@ async fn compose_render_with_shell(
     {
         Ok(resp) if resp.status().is_success() => match resp.text().await {
             Ok(text) => {
-                state.upstream_breakers.record(endpoint, true);
+                trial.record(true);
                 text
             }
             Err(e) => {
@@ -3457,7 +3461,7 @@ async fn compose_render_with_shell(
                     error = %e,
                     "SSR shell fetch: body read failed"
                 );
-                state.upstream_breakers.record(endpoint, false);
+                trial.record(false);
                 return Err(SsrFallbackReason::ShellFetchFailed);
             }
         },
@@ -3469,7 +3473,7 @@ async fn compose_render_with_shell(
                 elapsed_ms = fetch_started.elapsed().as_millis() as u64,
                 "SSR shell fetch: non-success status"
             );
-            state.upstream_breakers.record(endpoint, false);
+            trial.record(false);
             return Err(SsrFallbackReason::ShellFetchFailed);
         }
         Err(e) => {
@@ -3483,7 +3487,7 @@ async fn compose_render_with_shell(
                 error = %e,
                 "SSR shell fetch failed"
             );
-            state.upstream_breakers.record(endpoint, false);
+            trial.record(false);
             return Err(SsrFallbackReason::ShellFetchFailed);
         }
     };

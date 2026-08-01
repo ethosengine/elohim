@@ -83,6 +83,15 @@ fn catching_up_proxy_response(
     )
 }
 
+/// Resolve an optional breaker trial's outcome. `None` is the diagnostic-probe
+/// case (`is_diagnostic_probe`): those bypass the breaker entirely — never
+/// gated, never recorded — so there is nothing to resolve.
+fn record_trial(trial: &Option<crate::routes::upstream_health::BreakerTrial<'_>>, ok: bool) {
+    if let Some(t) = trial {
+        t.record(ok);
+    }
+}
+
 /// Bundle of doorway-resolved context that the forwarder injects as headers on the
 /// outbound request to elohim-storage.
 ///
@@ -227,26 +236,34 @@ where
 
     // Per-upstream breaker (Pillar 2 layer 4): consulted IMMEDIATELY before send
     // so it brackets exactly the upstream probe. The 405/400 early-returns above
-    // never consume a half-open trial, and the send-result match below records
-    // exactly one outcome per terminal path (no double-record, no half-open
-    // wedge). Circuit-open sheds WITHOUT calling storage. Keyed by storage_url
-    // (per-upstream, single-target dispatch).
-    if !diag_probe && breakers.is_open(storage_url) {
-        warn!(
-            target: "upstream_shed",
-            counter = "doorway_upstream_breaker_open_total",
-            storage_url = %storage_url,
-            path = %path,
-            "upstream circuit OPEN — shedding without calling storage (503 + Retry-After)"
-        );
-        crate::metrics::inc_breaker_open();
-        return catching_up_proxy_response(
-            wants_html,
-            crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
-            storage_url,
-            breakers,
-        );
-    }
+    // never consume a half-open trial, and the RAII `trial` guard below resolves
+    // exactly one outcome per terminal path — including the terminal path that
+    // never runs, when this request future is DROPPED mid-send because the
+    // client disconnected. Circuit-open sheds WITHOUT calling storage. Keyed by
+    // storage_url (per-upstream, single-target dispatch).
+    let trial = if diag_probe {
+        None
+    } else {
+        match breakers.begin(storage_url) {
+            Some(t) => Some(t),
+            None => {
+                warn!(
+                    target: "upstream_shed",
+                    counter = "doorway_upstream_breaker_open_total",
+                    storage_url = %storage_url,
+                    path = %path,
+                    "upstream circuit OPEN — shedding without calling storage (503 + Retry-After)"
+                );
+                crate::metrics::inc_breaker_open();
+                return catching_up_proxy_response(
+                    wants_html,
+                    crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+                    storage_url,
+                    breakers,
+                );
+            }
+        }
+    };
 
     match builder.send().await {
         Ok(response) => {
@@ -257,9 +274,7 @@ where
             // catching-up to the browser, preserving the upstream Retry-After
             // (else the breaker cooldown) so the client does not hammer.
             if matches!(status_u16, 429 | 503) {
-                if !diag_probe {
-                    breakers.record(storage_url, false);
-                }
+                record_trial(&trial, false);
                 let upstream_ra = response
                     .headers()
                     .get(reqwest::header::RETRY_AFTER)
@@ -292,12 +307,10 @@ where
                     // readable body — classify it (404/4xx = neutral/ok, 5xx =
                     // failure). 429/503 already recorded+returned in the honor
                     // branch above.
-                    if !diag_probe {
-                        breakers.record(
-                            storage_url,
-                            ProxyOutcome::classify(status_u16) != ProxyOutcome::Failure,
-                        );
-                    }
+                    record_trial(
+                        &trial,
+                        ProxyOutcome::classify(status_u16) != ProxyOutcome::Failure,
+                    );
                     Response::builder()
                         .status(StatusCode::from_u16(status_u16).unwrap_or(StatusCode::OK))
                         .header("Content-Type", content_type)
@@ -307,9 +320,7 @@ where
                 }
                 Err(e) => {
                     warn!(error = %e, "Failed to read storage response body");
-                    if !diag_probe {
-                        breakers.record(storage_url, false);
-                    }
+                    record_trial(&trial, false);
                     catching_up_proxy_response(
                         wants_html,
                         crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
@@ -322,9 +333,7 @@ where
         Err(e) => {
             warn!(error = %e, path = %path, storage_url = %storage_url,
                 "storage forward failed (connect/timeout) — recording breaker failure");
-            if !diag_probe {
-                breakers.record(storage_url, false);
-            }
+            record_trial(&trial, false);
             catching_up_proxy_response(
                 wants_html,
                 crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
@@ -409,25 +418,29 @@ where
 
     // --- Forward to storage ------------------------------------------------------
     // Per-upstream breaker (Pillar 2 layer 4): shed without calling storage if
-    // this endpoint's circuit is open.
-    if breakers.is_open(storage_url) {
-        warn!(
-            target: "upstream_shed",
-            counter = "doorway_upstream_breaker_open_total",
-            storage_url = %storage_url,
-            hash = %hash,
-            "upstream circuit OPEN — shedding blob without calling storage (503 + Retry-After)"
-        );
-        crate::metrics::inc_breaker_open();
-        // Blob fetches are sub-resource requests (img/script/fetch), never a
-        // browser navigation — they keep the JSON shed shape.
-        return catching_up_proxy_response(
-            false,
-            crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
-            storage_url,
-            breakers,
-        );
-    }
+    // this endpoint's circuit is open. The RAII guard resolves an outcome on
+    // every terminal path, including a dropped (cancelled) request future.
+    let trial = match breakers.begin(storage_url) {
+        Some(t) => t,
+        None => {
+            warn!(
+                target: "upstream_shed",
+                counter = "doorway_upstream_breaker_open_total",
+                storage_url = %storage_url,
+                hash = %hash,
+                "upstream circuit OPEN — shedding blob without calling storage (503 + Retry-After)"
+            );
+            crate::metrics::inc_breaker_open();
+            // Blob fetches are sub-resource requests (img/script/fetch), never a
+            // browser navigation — they keep the JSON shed shape.
+            return catching_up_proxy_response(
+                false,
+                crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
+                storage_url,
+                breakers,
+            );
+        }
+    };
 
     let storage_endpoint = format!("{}{}", storage_url.trim_end_matches('/'), path);
     let query = req.uri().query();
@@ -466,7 +479,7 @@ where
             // HONOR upstream backpressure (429/503) — surface catching-up to the
             // client (preserve upstream Retry-After, else cooldown).
             if matches!(status_u16, 429 | 503) {
-                breakers.record(storage_url, false);
+                trial.record(false);
                 let upstream_ra = upstream
                     .headers()
                     .get(reqwest::header::RETRY_AFTER)
@@ -498,10 +511,7 @@ where
                     // Record-once terminal outcome: a non-429/503 status with a
                     // readable body. 404 = Neutral (normal blob miss under
                     // no-fanout) → ok, never opens; 5xx = failure.
-                    breakers.record(
-                        storage_url,
-                        ProxyOutcome::classify(status_u16) != ProxyOutcome::Failure,
-                    );
+                    trial.record(ProxyOutcome::classify(status_u16) != ProxyOutcome::Failure);
                     // --- Stock pantry on clean 200 -----------------------------------
                     let should_cache = status == StatusCode::OK
                         && status != StatusCode::PARTIAL_CONTENT
@@ -550,7 +560,7 @@ where
                 }
                 Err(e) => {
                     warn!(error = %e, hash = %hash, "Failed to read blob response body from storage");
-                    breakers.record(storage_url, false);
+                    trial.record(false);
                     catching_up_proxy_response(
                         false,
                         crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
@@ -563,7 +573,7 @@ where
         Err(e) => {
             warn!(error = %e, hash = %hash, storage_url = %storage_url,
                 "blob forward failed (connect/timeout) — recording breaker failure");
-            breakers.record(storage_url, false);
+            trial.record(false);
             catching_up_proxy_response(
                 false,
                 crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
@@ -758,6 +768,86 @@ mod tests {
         });
 
         (addr, handle)
+    }
+
+    /// Spawn an in-process HTTP server that accepts the connection and then
+    /// never answers — the shape of a storage peer mid-churn (accepting, but
+    /// not responding within the client's patience).
+    async fn spawn_hanging_storage() -> (SocketAddr, tokio::task::JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let io = TokioIo::new(stream);
+                tokio::spawn(async move {
+                    let _ = http1::Builder::new()
+                        .serve_connection(
+                            io,
+                            service_fn(move |_req: Request<hyper::body::Incoming>| async move {
+                                // Never completes.
+                                std::future::pending::<()>().await;
+                                let resp: Result<Response<Full<Bytes>>, Infallible> =
+                                    Ok(Response::new(Full::new(Bytes::new())));
+                                resp
+                            }),
+                        )
+                        .await;
+                });
+            }
+        });
+        (addr, handle)
+    }
+
+    /// REGRESSION (live incident 2026-08-01, both alpha doorways): a request
+    /// that consumed the half-open trial and was then CANCELLED — the client
+    /// gave up on a slow upstream, hyper dropped the connection task, and the
+    /// `builder.send().await` in `forward_to_storage` never resumed — used to
+    /// leave the breaker latched in consumed-HalfOpen. Every later request then
+    /// shed in ~17ms with `upstream circuit OPEN`, and no cooldown ever
+    /// recovered it (process restart only). The RAII trial guard resolves the
+    /// outcome on drop, so the circuit re-opens and recovers.
+    #[tokio::test]
+    async fn cancelled_forward_does_not_latch_halfopen() {
+        let (addr, _handle) = spawn_hanging_storage().await;
+        let storage_url = format!("http://{addr}");
+        // No client timeout: cancellation is the ONLY way out of the send.
+        let client = reqwest::Client::new();
+        let breakers = UpstreamBreakers::new(1, 0); // zero cooldown: immediate half-open
+
+        breakers.record(&storage_url, false); // circuit opens
+        assert_eq!(breakers.snapshot()[0].circuit, "open");
+
+        // This forward consumes the one half-open trial, then is cancelled
+        // mid-send (timeout drops the future — exactly what hyper does to an
+        // in-flight handler when the client disconnects).
+        let forward = forward_to_storage(
+            make_get_request("/db/content/elohim-host-landing"),
+            &storage_url,
+            "/db/content/elohim-host-landing",
+            &client,
+            &breakers,
+            ForwardCtx::default(),
+        );
+        let outcome = tokio::time::timeout(Duration::from_millis(250), forward).await;
+        assert!(
+            outcome.is_err(),
+            "upstream hangs: the request future must be cancelled mid-send"
+        );
+
+        assert_eq!(
+            breakers.snapshot()[0].circuit,
+            "open",
+            "the abandoned trial re-opened the circuit — NOT a permanent half-open latch"
+        );
+        // Recovery: the next gate call admits a fresh trial (the live symptom
+        // was that it never did).
+        assert!(
+            !breakers.is_open(&storage_url),
+            "cooldown elapsed: a fresh trial is admitted after the cancelled one"
+        );
     }
 
     fn make_cache() -> Arc<ContentCache> {
