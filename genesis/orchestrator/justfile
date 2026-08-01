@@ -25,12 +25,11 @@ lint-style:
 lint-fix:
     pnpm exec npm-groovy-lint --path '../..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --fix
 
-# Static Jenkinsfile lints that catch runtime-only failure classes
-# (env-bridge anti-pattern → orchestrator/dev #1024 MissingPropertyException).
-# Fast — no Jenkins required. SCOPED to jenkinsfile-cps-scope.test.mjs only
-# (CPS method-size and env-bridge checks specific to the Jenkinsfile).
+# Static Jenkinsfile lints that catch runtime-only failure classes:
+# env-bridge scope loss and validate-only dispatch/stage drift.
+# Fast — no Jenkins required.
 test-jenkinsfile-lints:
-    node --test jenkinsfile-cps-scope.test.mjs
+    node --test jenkinsfile-cps-scope.test.mjs validate-only-pipeline.test.mjs
 
 # Quality gate: validate Jenkinsfiles against Jenkins itself + run the
 # Jenkinsfile static lints. Pre-push hook calls `just gate` on any

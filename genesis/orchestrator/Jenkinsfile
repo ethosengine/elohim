@@ -544,9 +544,15 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         // Only send FORCE_DEPLOY to pipelines that actually deploy (have a deploymentCheck)
         // Note: local list named `buildParams` to avoid shadowing the pipeline-scope
         // `params` accessor (needed below to forward DEPLOY_ONLY).
-        def buildParams = [booleanParam(name: 'FORCE_BUILD', value: true)]
+        // An isolated edge validation must not arrive carrying the ordinary
+        // force-build/deploy flags. The edge Jenkinsfile also reads the commit
+        // tag directly, but the explicit parameter makes the dispatch contract
+        // visible in Jenkins and keeps the guarantee independent of checkout
+        // history depth.
+        boolean validateOnlyDownstream = name == 'elohim-edge' && env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true'
+        def buildParams = [booleanParam(name: 'FORCE_BUILD', value: !validateOnlyDownstream)]
         if (config.deploymentCheck) {
-            buildParams.add(booleanParam(name: 'FORCE_DEPLOY', value: true))
+            buildParams.add(booleanParam(name: 'FORCE_DEPLOY', value: !validateOnlyDownstream))
         }
         // Propagate DEPLOY_ONLY so downstream pipelines (edge especially) skip
         // their build stages and go straight to deploy. Safe to send to all
@@ -555,6 +561,9 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         // Two activation paths: operator param OR [deploy-only] commit tag.
         def deployOnlyDownstream = (params.DEPLOY_ONLY ?: false) || env.DEPLOY_ONLY_FROM_TAG == 'true'
         buildParams.add(booleanParam(name: 'DEPLOY_ONLY', value: deployOnlyDownstream))
+        if (name == 'elohim-edge') {
+            buildParams.add(booleanParam(name: 'VALIDATE_ONLY', value: validateOnlyDownstream))
+        }
         // CHANGED_PATHS — newline-delimited list of changed source paths
         // from this orchestrator run's changeset. Downstream pipelines that
         // want per-path / per-DNA selectivity (e.g. elohim-holochain's
@@ -1448,6 +1457,15 @@ spec:
                             echo "🔧 [build:*] tags detected — force-including: ${env.FORCE_BUILD_PIPELINES}"
                         }
 
+                        // Safe to honor on replay/timer as well as webhook: this
+                        // mode is read-only against the deployed cluster. The
+                        // build-plan override below guarantees the tag means one
+                        // edge validation job, not the ordinary dependency graph.
+                        if (commitMsg =~ /(?i)\[edge:validate-only\]/) {
+                            env.EDGE_VALIDATE_ONLY_FROM_TAG = 'true'
+                            echo "🧪 [edge:validate-only] detected — isolating dispatch to edge Dataplane Validation"
+                        }
+
                         // [deploy-only] — DELIBERATELY webhook-gated. This tag tells the orchestrator
                         // to bypass changeset analysis and redeploy existing Harbor tags. It is only
                         // meaningful for fresh pushes that intend a deployment; timer/replay reusing
@@ -1553,6 +1571,16 @@ spec:
                             if (!params.SKIP_GENESIS) graphPipelines.add('elohim-genesis')
                             def src = params.DEPLOY_ONLY ? 'param' : 'commit tag'
                             echo "🚀 DEPLOY_ONLY=true (via ${src}): bypassing changeset analysis; dispatching ${graphPipelines.join(', ')}"
+                        }
+
+                        // Recording runs must not inherit accumulated graph work
+                        // or auto-add Genesis: either can perturb the substrate or
+                        // load the doorways while the saga is being measured.
+                        // This intentionally wins over other [build:*] tags on the
+                        // same commit; use a separate push for unrelated builds.
+                        if (env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true') {
+                            graphPipelines = ['elohim-edge']
+                            echo '🧪 EDGE_VALIDATE_ONLY: dispatching elohim-edge only; Genesis and unrelated graph work suppressed'
                         }
 
                         env.PIPELINES_TO_RUN = graphPipelines.join(',')
