@@ -2025,17 +2025,32 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
             }
             steps {
                 container('builder') {
-                    // Substrate seam smoke — one named check per communication
-                    // seam (bootstrap-sharing / signal-bus / peer-store /
-                    // dht-fetch) so a red names ITSELF instead of surfacing as
-                    // an unexplained convergence failure. Advisory while
-                    // scenario 2 stabilizes; flip to --gate after green ×2.
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        sh "bash '${env.WORKSPACE}/scripts/ci/substrate-seam-smoke.sh' https://doorway-alpha.elohim.host https://elohim.host"
-                    }
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        withEnv(["E2E_DOORWAY_ALPHA=https://doorway-alpha.elohim.host"]) {
-                            sh "bash '${env.WORKSPACE}/scripts/ci/run-dataplane-validation.sh'"
+                    script {
+                        // Fleet-quiesce gate: a deploy restarts the whole fleet and the
+                        // reconcile catch-up can run hours long (see fleet-quiesce-gate.sh
+                        // header). Measuring mid-churn records a false red, so this bounded
+                        // wait must pass before either read-side script below is allowed to run.
+                        def quiesceDeadline = isValidateOnly() ? 2700 : 900
+                        def gateRc = 0
+                        withEnv(["QUIESCE_DEADLINE_SECS=${quiesceDeadline}"]) {
+                            gateRc = sh(returnStatus: true, script: "bash '${env.WORKSPACE}/scripts/ci/fleet-quiesce-gate.sh' https://doorway-alpha.elohim.host https://elohim.host elohim-host-landing http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090 http://elohim-adam-alpha.elohim-alpha.svc.cluster.local:8090")
+                        }
+                        if (gateRc == 0) {
+                            // Substrate seam smoke — one named check per communication
+                            // seam (bootstrap-sharing / signal-bus / peer-store /
+                            // dht-fetch) so a red names ITSELF instead of surfacing as
+                            // an unexplained convergence failure. Advisory while
+                            // scenario 2 stabilizes; flip to --gate after green ×2.
+                            catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                                sh "bash '${env.WORKSPACE}/scripts/ci/substrate-seam-smoke.sh' https://doorway-alpha.elohim.host https://elohim.host"
+                            }
+                            catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                                withEnv(["E2E_DOORWAY_ALPHA=https://doorway-alpha.elohim.host"]) {
+                                    sh "bash '${env.WORKSPACE}/scripts/ci/run-dataplane-validation.sh'"
+                                }
+                            }
+                        } else {
+                            unstable('Dataplane Validation skipped — fleet not quiescent (no-measure, not a failure)')
                         }
                     }
                 }

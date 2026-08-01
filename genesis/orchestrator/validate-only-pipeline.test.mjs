@@ -174,4 +174,52 @@ describe("edge validate-only stage allowlist", () => {
     assert.match(validation, /substrate-seam-smoke\.sh/);
     assert.match(validation, /run-dataplane-validation\.sh/);
   });
+
+  test("Dataplane Validation gates both read-side scripts behind the fleet-quiesce gate", () => {
+    const validation = stages.get("Dataplane Validation");
+    assert.match(
+      validation,
+      /fleet-quiesce-gate\.sh/,
+      "stage must invoke fleet-quiesce-gate.sh before measuring",
+    );
+
+    const gateIdx = validation.indexOf("fleet-quiesce-gate.sh");
+    const seamIdx = validation.indexOf("substrate-seam-smoke.sh");
+    const dataplaneIdx = validation.indexOf("run-dataplane-validation.sh");
+    assert.ok(
+      gateIdx !== -1 && seamIdx !== -1 && dataplaneIdx !== -1,
+      "all three script references must be present",
+    );
+    assert.ok(
+      gateIdx < seamIdx && gateIdx < dataplaneIdx,
+      "fleet-quiesce-gate.sh must be invoked before either read-side measurement script",
+    );
+
+    // A skip/guard must tie the gate's result to whether the read-side
+    // scripts run at all — otherwise a churning fleet still gets measured.
+    assert.match(
+      validation,
+      /gateRc/,
+      "stage must reference a gate-result guard variable (e.g. gateRc)",
+    );
+    const guardMatch = validation.match(/if\s*\(\s*gateRc\s*==\s*0\s*\)\s*\{/);
+    assert.ok(
+      guardMatch,
+      "stage must guard the read-side scripts on the gate result (gateRc == 0)",
+    );
+    const guardBody = balancedBlock(
+      validation,
+      guardMatch.index + guardMatch[0].lastIndexOf("{"),
+    );
+    assert.match(
+      guardBody,
+      /substrate-seam-smoke\.sh/,
+      "seam smoke must run only inside the gate-passed branch",
+    );
+    assert.match(
+      guardBody,
+      /run-dataplane-validation\.sh/,
+      "dataplane validation must run only inside the gate-passed branch",
+    );
+  });
 });

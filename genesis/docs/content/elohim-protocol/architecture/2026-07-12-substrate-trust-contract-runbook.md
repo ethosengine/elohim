@@ -31,6 +31,21 @@ live behavior disagree, run the probes — they are the authority.
 | I5 | **A freshly-authored action is not yet fetchable.** DHT publish takes minutes; anything that declares a seconds-old action to a remote peer must retry through the window (the propagation retries `not retrievable` ×4/90s). | `stage-spa-blob.sh` DECLARE_ONLY |
 | I6 | **Restarts churn peer addressing for ~20 min.** Every conductor restart mints new relay-client URLs; peer stores converge after the expiry window. Measurements taken inside the window are churn artifacts, not regressions. | measured 2026-07-11 (5/7 stale → 0/7) |
 
+**Watch-out: I6's ~20min figure is the addressing floor, not the ceiling.**
+When `divergentAnchor` exceeds roughly 200 at the moment of restart, the
+reconcile-projection catch-up is a different, HOURS-scale class — a
+breaker-flap pattern, not a longer version of the same churn. Precedent: the
+2026-07-19 doorway-catching-up incident, and the 2026-08-01 saga-recording
+incident where `divergentAnchor=1763` rode a 2h+ catch-up window before
+`elohim_projection_reconcile_converged` read 1 again. A measurement run fired
+against the 20-min heuristic in this regime records a false red, because the
+fleet is still churning long after I6's window closed. Measurement runs must
+ride the bounded fleet-quiesce gate (`scripts/ci/fleet-quiesce-gate.sh`,
+wired into the edge Dataplane Validation stage) rather than a fixed sleep —
+it polls storage `p2p/status.pull.caughtUp`, the `elohim_projection_reconcile_converged`
+gauge, and doorway content-serving on both sides, and only declares
+quiescence once a fresh reconcile sweep has run and still reads converged.
+
 ## 2. The probes (how each invariant is watched)
 
 | Probe | Surface | Watches |
