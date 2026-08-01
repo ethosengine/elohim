@@ -565,6 +565,24 @@ impl Default for P2PConfig {
     }
 }
 
+/// Concurrent inbound view-federation slice-builds permitted per node.
+///
+/// Moving the inbound arm off the swarm event loop (F-A(ii)) removed the
+/// ACCIDENTAL serialization that used to bound conductor load: previously the
+/// loop could only build one slice at a time — which is exactly what made it
+/// wedge, but also what kept `get_record_for_action` fan-out at one. Unbounded
+/// spawning would trade a head-of-line block for a conductor stampede on the
+/// first reconnect storm, where every peer's opening ask lands at once.
+///
+/// 8 is deliberately small: the only view kind that touches the conductor is
+/// `ContentHeadRecord`, each ask is bounded by
+/// [`view_federation::HEAD_RECORD_CONDUCTOR_TIMEOUT`] (5s), and a per-node
+/// ceiling of 8 in-flight conductor reads sits well inside the read-pool
+/// headroom a saturated conductor still has. Excess asks QUEUE rather than shed:
+/// the requester's own deadline is the shed, and a permit frees within the
+/// responder budget.
+static VIEW_FEDERATION_INBOUND_LIMIT: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(8);
+
 /// P2P Node for elohim-storage
 pub struct P2PNode {
     /// Node identity
@@ -1182,6 +1200,25 @@ pub enum P2PCommand {
         request: crate::p2p::shamir_transport::ShamirShareRequest,
         respond: oneshot::Sender<Result<crate::p2p::shamir_transport::ShamirShareResponse, String>>,
     },
+    /// F-A(ii): deliver a view-federation response whose slice was built OFF the
+    /// swarm event loop.
+    ///
+    /// The inbound arm hands the slice-build to a spawned task so a conductor-
+    /// touching view kind (`ContentHeadRecord`) can never wedge the event loop
+    /// (see that arm for the incident). `Swarm` is not `Sync`, so the spawned
+    /// task cannot hold the swarm handle to answer with — it routes the finished
+    /// response back through the command channel instead, and THIS arm performs
+    /// the synchronous `send_response` with the `&mut Swarm` the command loop
+    /// already owns.
+    ///
+    /// Dropping this command without sending makes libp2p emit
+    /// `InboundFailure::ResponseOmission` here and an `OutboundFailure` at the
+    /// requester — the same honest degradation a signing failure produces.
+    SendViewFederationResponse {
+        peer: libp2p::PeerId,
+        channel: libp2p::request_response::ResponseChannel<crate::views::ViewFederationResponse>,
+        response: Box<crate::views::ViewFederationResponse>,
+    },
 }
 
 /// RAII guard that resumes P2P sync when dropped.
@@ -1356,6 +1393,10 @@ impl P2PHandle {
                             "stub: no P2P swarm in test (RequestShamirShare)".to_string(),
                         ));
                     }
+                    // F-A(ii) stub: no swarm in test. Dropping the channel is the
+                    // same honest degradation the live path takes when signing
+                    // fails — the requester sees an OutboundFailure.
+                    P2PCommand::SendViewFederationResponse { .. } => {}
                 }
             }
         });
@@ -4112,6 +4153,28 @@ impl P2PNode {
                     .insert(request_id, respond);
             }
 
+            // F-A(ii): deliver a slice built OFF the event loop. `send_response`
+            // is synchronous, so this arm never awaits — the whole point of the
+            // detour is that the SLOW half (the slice-build, which may call the
+            // conductor) already happened in a spawned task.
+            P2PCommand::SendViewFederationResponse {
+                peer,
+                channel,
+                response,
+            } => {
+                if let Err(_response) = swarm
+                    .behaviour_mut()
+                    .view_federation
+                    .send_response(channel, *response)
+                {
+                    warn!(
+                        target: "elohim_storage::view_federation",
+                        peer = %peer,
+                        "F-T20: failed to send view-federation response (peer disconnected?)"
+                    );
+                }
+            }
+
             // T20: issue a `/elohim/shamir-share/1.0.0` request to the named peer
             // and store the oneshot sender in `pending_shamir_shares`, keyed by the
             // `OutboundRequestId`. The event arm below resolves it when
@@ -5906,11 +5969,35 @@ impl P2PNode {
                     request, channel, ..
                 } => {
                     // F-T20: real responder — build and sign a ViewFederationResponse,
-                    // then send_response in the same event-loop arm. Awaiting
-                    // build_response_slice (async since T26) happens before the swarm
-                    // write lock is acquired, so the event loop is not blocked on the
-                    // lock during the async slice-build. Mirrors the blob protocol's
-                    // inbound arm pattern.
+                    // then send_response.
+                    //
+                    // OFF-LOOP (F-A(ii), 2026-08-01). This used to `.await` the whole
+                    // slice-build INLINE in the event-loop arm. The old comment reasoned
+                    // about the swarm write LOCK, which was never the hazard: the loop
+                    // body itself awaits `handle_event` to completion before it re-polls
+                    // the swarm, so ANY await here halts every other swarm event —
+                    // inbound requests, outbound response delivery, gossip, identify,
+                    // kad. `ContentHeadRecord` makes that fatal because its slice-build
+                    // asks the conductor, and `HcClient::call_zome` had no timeout of its
+                    // own: one inbound head-record ask wedged the whole loop for up to the
+                    // conductor's ~60s websocket deadline, which is longer than every
+                    // requester's budget. Fleet-wide, that meant adopt-before-author — the
+                    // ONLY path that converges a peer-divergent content head — never
+                    // completed a single fetch, while the resulting timeouts also starved
+                    // the very inventory asks the next sweep depends on.
+                    //
+                    // Same cure the ConnectionEstablished arm already applies (see the
+                    // `TriggerCustodyReconcile` `try_send` above): get the work off the
+                    // event-loop task. EVERY view kind goes through the spawned path —
+                    // not just the conductor-touching one — so a future view kind that
+                    // grows a conductor call cannot silently re-create the block.
+                    //
+                    // `Swarm` is not `Sync`, so the task cannot hold the swarm to answer
+                    // with: it routes the finished slice back through
+                    // `P2PCommand::SendViewFederationResponse`, and the command loop —
+                    // which already owns `&mut Swarm` — performs the synchronous
+                    // `send_response`. The only swarm touch left on THIS task is the
+                    // short peer-set read below.
                     use crate::p2p::view_federation::build_response_slice;
                     debug!(
                         target: "elohim_storage::view_federation",
@@ -5920,59 +6007,90 @@ impl P2PNode {
                         request_id = %request.request_id,
                         "F-T20: received view-federation request"
                     );
-                    let local_agent_cid = self.identity.agent_pubkey().to_string();
-                    let local_peer_id = self.identity.peer_id_string();
-                    let keypair = self.identity.keypair();
-                    let pool_ref = self.db_pool.as_ref();
+                    let identity = self.identity.clone();
+                    let db_pool = self.db_pool.clone();
+                    let hc_registry = self.hc_registry.clone();
+                    let command_tx = self.command_tx.clone();
+                    // Read the peer set HERE, not in the task: `Swarm` is not
+                    // `Sync`, so `Arc<RwLock<Swarm>>` is not `Send` and cannot
+                    // cross a `tokio::spawn`. This read is a short lock hold on
+                    // already-in-memory state — it is not the thing that wedged
+                    // the loop; the conductor call in the slice-build was.
                     let connected_peers: Vec<libp2p::PeerId> = {
                         let swarm = self.swarm.read().await;
                         swarm.connected_peers().cloned().collect()
                     };
-                    let inventory_offset = request.inventory_offset;
-                    match build_response_slice(
-                        request.view_kind,
-                        crate::p2p::view_federation::SliceContext {
-                            agent_cid: request.agent_cid,
-                            request_id: request.request_id,
-                            local_agent_cid: &local_agent_cid,
-                            local_peer_id,
-                            connected_peers: &connected_peers,
-                            keypair,
-                            pool: pool_ref,
-                            inventory_offset,
-                            hc_registry: self.hc_registry.as_deref(),
-                        },
-                    )
-                    .await
-                    {
-                        Ok(response) => {
-                            let mut swarm = self.swarm.write().await;
-                            if let Err(_response) = swarm
-                                .behaviour_mut()
-                                .view_federation
-                                .send_response(channel, response)
-                            {
+                    tokio::spawn(async move {
+                        // Fan-out cap. Moving the slice-build off the event loop
+                        // removed the accidental serialization that used to bound
+                        // conductor load — under a reconnect storm every peer's
+                        // first ask would otherwise become a concurrent
+                        // `get_record_for_action`. Acquiring INSIDE the spawn is
+                        // load-bearing: waiting for a permit on the event-loop task
+                        // would re-create exactly the block this change removes.
+                        // Queued (never shed): the requester's own deadline is the
+                        // shed, and a permit frees within the 5s responder budget.
+                        let _permit = match VIEW_FEDERATION_INBOUND_LIMIT.acquire().await {
+                            Ok(p) => p,
+                            // Only on close, which never happens for a 'static
+                            // semaphore — drop the channel (honest degrade).
+                            Err(_) => return,
+                        };
+                        let local_agent_cid = identity.agent_pubkey().to_string();
+                        let local_peer_id = identity.peer_id_string();
+                        let inventory_offset = request.inventory_offset;
+                        match build_response_slice(
+                            request.view_kind,
+                            crate::p2p::view_federation::SliceContext {
+                                agent_cid: request.agent_cid,
+                                request_id: request.request_id,
+                                local_agent_cid: &local_agent_cid,
+                                local_peer_id,
+                                connected_peers: &connected_peers,
+                                keypair: identity.keypair(),
+                                pool: db_pool.as_ref(),
+                                inventory_offset,
+                                hc_registry: hc_registry.as_deref(),
+                            },
+                        )
+                        .await
+                        {
+                            Ok(response) => {
+                                // Route the finished slice back to the command
+                                // loop, which owns the `&mut Swarm` needed for the
+                                // synchronous `send_response` (see
+                                // `P2PCommand::SendViewFederationResponse`).
+                                if command_tx
+                                    .send(P2PCommand::SendViewFederationResponse {
+                                        peer,
+                                        channel,
+                                        response: Box::new(response),
+                                    })
+                                    .await
+                                    .is_err()
+                                {
+                                    warn!(
+                                        target: "elohim_storage::view_federation",
+                                        peer = %peer,
+                                        "F-T20: command channel closed; dropping view-federation response"
+                                    );
+                                }
+                            }
+                            Err(e) => {
                                 warn!(
                                     target: "elohim_storage::view_federation",
                                     peer = %peer,
-                                    "F-T20: failed to send view-federation response (peer disconnected?)"
+                                    error = %e,
+                                    "F-T20: failed to sign view-federation slice; dropping channel"
                                 );
+                                // Dropping `channel` without calling `send_response` causes
+                                // libp2p to emit InboundFailure::ResponseOmission here and an
+                                // OutboundFailure at the requester. The view-federation
+                                // OutboundFailure arm (below) maps non-Timeout variants to
+                                // FederationError::TransportError, which is the correct outcome.
                             }
                         }
-                        Err(e) => {
-                            warn!(
-                                target: "elohim_storage::view_federation",
-                                peer = %peer,
-                                error = %e,
-                                "F-T20: failed to sign view-federation slice; dropping channel"
-                            );
-                            // Dropping `channel` without calling `send_response` causes
-                            // libp2p to emit InboundFailure::ResponseOmission here and an
-                            // OutboundFailure at the requester. The view-federation
-                            // OutboundFailure arm (below) maps non-Timeout variants to
-                            // FederationError::TransportError, which is the correct outcome.
-                        }
-                    }
+                    });
                 }
             },
             behaviour::ElohimStorageBehaviourEvent::ViewFederation(
@@ -8597,5 +8715,159 @@ impl crate::p2p::gossip_dispatch::InventoryFetch for P2PNode {
                 .command_tx
                 .try_send(P2PCommand::SnapshotRequest { peer_id: pid });
         }
+    }
+}
+
+#[cfg(test)]
+mod view_federation_offloop_tests {
+    //! F-A(ii): the view-federation inbound arm must not do its work ON the
+    //! swarm event loop.
+    //!
+    //! ## The incident these pin (2026-08-01)
+    //!
+    //! `handle_swarm_event` awaits `handle_behaviour_event` to completion before
+    //! the loop re-polls the swarm, so ANY await inside an inbound arm halts
+    //! every other swarm event — inbound requests, outbound response delivery,
+    //! gossip, identify, kad. The `ContentHeadRecord` view kind makes that fatal
+    //! because its slice-build asks the conductor, and `HcClient::call_zome`
+    //! carried no timeout of its own: one inbound head-record ask wedged the
+    //! whole loop for up to ~60s, which is longer than every requester's budget.
+    //! Fleet-wide this meant adopt-before-author — the ONLY path that converges a
+    //! peer-divergent content head — never completed a fetch, while the same
+    //! wedge starved the inventory asks the next sweep depends on.
+    //!
+    //! `Swarm` is not `Sync`, so the spawned task cannot hold the swarm to
+    //! answer with; the finished slice routes back through
+    //! `P2PCommand::SendViewFederationResponse`, which the command loop (which
+    //! already owns `&mut Swarm`) delivers synchronously.
+    //!
+    //! There is no swarm harness in unit tests, so the off-loop property is
+    //! pinned structurally, against stable source markers.
+
+    /// The inbound arm's source text, sliced between two stable anchors.
+    fn inbound_arm_source() -> &'static str {
+        let src = include_str!("mod.rs");
+        let start = src
+            .find("F-T20: received view-federation request")
+            .expect("the inbound view-federation arm's debug! marker must exist");
+        let rest = &src[start..];
+        let end = rest
+            .find("OutboundFailure {")
+            .expect("the OutboundFailure arm must follow the inbound arm");
+        &rest[..end]
+    }
+
+    /// The slice-build must happen inside a spawned task, not inline.
+    ///
+    /// Regression guard: delete the `tokio::spawn` and await
+    /// `build_response_slice` inline (the pre-fix shape) and this fails.
+    #[test]
+    fn the_inbound_arm_builds_its_slice_off_the_event_loop() {
+        let arm = inbound_arm_source();
+        let spawn_at = arm
+            .find("tokio::spawn(")
+            .expect("the inbound view-federation arm must hand its slice-build to a spawned task");
+        let build_at = arm
+            .find("build_response_slice(")
+            .expect("the inbound arm must still build a slice");
+        assert!(
+            spawn_at < build_at,
+            "build_response_slice must be awaited INSIDE the spawned task — awaiting it on the \
+             event-loop task halts every other swarm event for the duration of its conductor call"
+        );
+    }
+
+    /// EVERY view kind takes the spawned path — not just the conductor-touching
+    /// one — so a future view kind that grows a conductor call cannot silently
+    /// re-create the head-of-line block.
+    #[test]
+    fn no_view_kind_is_special_cased_back_onto_the_event_loop() {
+        let arm = inbound_arm_source();
+        assert_eq!(
+            arm.matches("build_response_slice(").count(),
+            1,
+            "exactly ONE slice-build call site keeps every view kind on the spawned path; a \
+             second one is a per-view-kind fast path back onto the event loop"
+        );
+        assert_eq!(
+            arm.matches("tokio::spawn(").count(),
+            1,
+            "one spawn covers the whole arm"
+        );
+    }
+
+    /// The spawned task must NOT capture the swarm handle: `Swarm` is not
+    /// `Sync`, so `Arc<RwLock<Swarm>>` is not `Send` and the spawn would not
+    /// compile — but more importantly, re-acquiring the swarm inside the task is
+    /// how a future edit would smuggle loop-blocking work back in.
+    #[test]
+    fn the_spawned_task_answers_through_the_command_loop_not_the_swarm() {
+        let arm = inbound_arm_source();
+        let spawn_at = arm.find("tokio::spawn(").expect("spawn marker");
+        let spawned_body = &arm[spawn_at..];
+        assert!(
+            spawned_body.contains("P2PCommand::SendViewFederationResponse"),
+            "the spawned task must route its finished slice back through the command loop"
+        );
+        assert!(
+            !spawned_body.contains("swarm.write()") && !spawned_body.contains("swarm.read()"),
+            "the spawned task must never touch the swarm directly"
+        );
+    }
+
+    /// LIVENESS ONLY — this does NOT exercise
+    /// `P2PCommand::SendViewFederationResponse`.
+    ///
+    /// Naming it honestly, because the first version of this test implied
+    /// coverage it never had. `libp2p::request_response::ResponseChannel` has a
+    /// private sender and no public constructor, so the variant cannot be built
+    /// outside a live swarm — there is no way to push one through the stub loop
+    /// from a unit test. What IS covered elsewhere: the variant is handled in
+    /// both `handle_command` and the swarm-less stub drain (a missing arm is a
+    /// compile error, `match cmd` being exhaustive), and the spawned task's use
+    /// of it is pinned by
+    /// `the_spawned_task_answers_through_the_command_loop_not_the_swarm`.
+    /// Genuine delivery coverage needs the integration harness.
+    #[tokio::test]
+    async fn the_swarmless_command_loop_stays_live() {
+        let handle = crate::p2p::P2PHandle::for_testing();
+        let peers = handle.list_peers().await;
+        assert!(
+            peers.is_empty(),
+            "the swarm-less test handle reports no peers"
+        );
+    }
+
+    /// The inbound fan-out cap must exist, be acquired INSIDE the spawned task,
+    /// and stay small.
+    ///
+    /// Acquiring outside the spawn would re-create the exact head-of-line block
+    /// the spawn removes — a permit wait on the event-loop task is no better
+    /// than a conductor call on it.
+    #[test]
+    fn the_inbound_fanout_cap_is_bounded_and_acquired_inside_the_spawn() {
+        use crate::p2p::VIEW_FEDERATION_INBOUND_LIMIT;
+        assert!(
+            VIEW_FEDERATION_INBOUND_LIMIT.available_permits() > 0
+                && VIEW_FEDERATION_INBOUND_LIMIT.available_permits() <= 16,
+            "the cap must be small enough to protect a saturated conductor, and non-zero"
+        );
+        let arm = inbound_arm_source();
+        let spawn_at = arm.find("tokio::spawn(").expect("spawn marker");
+        let acquire_at = arm
+            .find("VIEW_FEDERATION_INBOUND_LIMIT.acquire()")
+            .expect("the spawned task must acquire a fan-out permit");
+        assert!(
+            spawn_at < acquire_at,
+            "the permit must be acquired INSIDE the spawn — waiting for one on the event-loop \
+             task blocks the loop exactly like the conductor call did"
+        );
+        let build_at = arm
+            .find("build_response_slice(")
+            .expect("slice-build marker");
+        assert!(
+            acquire_at < build_at,
+            "the permit must be held ACROSS the slice-build, or it caps nothing"
+        );
     }
 }

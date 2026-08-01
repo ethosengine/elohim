@@ -28,7 +28,13 @@ use crate::services::head_adoption::{CarriedHeadRecord, HeadRecordFetcher};
 use crate::views::{ContentHeadRecordPayload, ViewFederationRequest, ViewKind};
 
 /// One-shot ask; the reconcile sweep is the retry loop.
-const HEAD_RECORD_TIMEOUT: Duration = Duration::from_secs(10);
+///
+/// Public so the responder's own budget
+/// ([`crate::p2p::view_federation::HEAD_RECORD_CONDUCTOR_TIMEOUT`]) can be
+/// asserted strictly below it — the responder must always be the side that gives
+/// up first, or a slow conductor turns into a transport timeout the requester
+/// cannot tell apart from an offline peer.
+pub const HEAD_RECORD_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Fetches a peer's head `Record` over the libp2p view-federation plane.
 pub struct PeerHeadRecordFetcher {

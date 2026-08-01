@@ -246,6 +246,28 @@ lazy_static! {
     )
     .unwrap();
 
+    /// `ContentHeadRecord` answers served WITHOUT their Record bytes — the
+    /// honest-absence degrade (the head hash is still served; only the carried
+    /// bytes are missing). label: cause = "budget_elapsed" | "conductor_error".
+    ///
+    /// `budget_elapsed` is the direct live signal for the responder bound
+    /// (`HEAD_RECORD_CONDUCTOR_TIMEOUT`): it counts the asks a saturated
+    /// conductor could not answer inside the responder's own budget. Before the
+    /// bound existed those same asks were invisible here and surfaced instead as
+    /// `elohim_view_federation_outbound_total{result="timeout"}` at the
+    /// REQUESTER — i.e. as a transport fault indistinguishable from an offline
+    /// peer, which is precisely why fleet-wide adoption failure went undiagnosed.
+    /// A rise here alongside a FALL in requester-side timeouts is the cure
+    /// working; a rise in BOTH means the budget is too tight.
+    pub static ref CONTENT_HEAD_RECORD_DEGRADED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_content_head_record_degraded_total",
+            "ContentHeadRecord answers served hash-only (no carried Record) by cause.",
+        ),
+        &["cause"],
+    )
+    .unwrap();
+
     /// Content heads freshly authored through the conductor by the sweep-driven
     /// witness-bootstrap step — bulk-seeded rows born un-witnessed
     /// (`dht_anchor_hash` NULL) that now carry a notarized head. Counts fresh
@@ -767,6 +789,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(ELOHIM_CUSTODY_CLASS_COUNT.clone()));
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_OUTBOUND.clone()));
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_INBOUND_SERVED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_HEAD_RECORD_DEGRADED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_AUTHORED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_HEAD_ADOPTED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_REAUTHOR_FAILED.clone()));
@@ -915,6 +938,15 @@ pub fn inc_view_federation_outbound(result: &str) {
 /// Record one inbound view-federation request answered with a signed slice.
 pub fn inc_view_federation_inbound_served() {
     VIEW_FEDERATION_INBOUND_SERVED.inc();
+}
+
+/// Record one `ContentHeadRecord` answer served hash-only. `cause` is
+/// "budget_elapsed" (the responder gave up inside its own budget) or
+/// "conductor_error" (the conductor answered, with an error).
+pub fn inc_content_head_record_degraded(cause: &str) {
+    CONTENT_HEAD_RECORD_DEGRADED
+        .with_label_values(&[cause])
+        .inc();
 }
 
 /// Record one sync round initiated by the poll tick.

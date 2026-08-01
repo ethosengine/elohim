@@ -691,6 +691,40 @@ fn timeout_should_route_to_adopt(transient: bool, peer_advertises_declaration: b
     transient && peer_advertises_declaration
 }
 
+/// Should a CONDUCTOR-MISSING row (`resolve_content_head` answered `Ok(None)`)
+/// also be routed to the adopt-before-author arm?
+///
+/// YES whenever a peer advertises a declaration for it. `Ok(None)` means this
+/// node's own conductor holds no chain for an id its projection DOES carry — so
+/// there is nothing local to adopt and, if anyone is to be believed about this
+/// head, it is the peer.
+///
+/// ## The hole this closes (the MISSING class, 2026-08-01)
+///
+/// `Ok(None)` is the LARGEST heal outcome class on a live peer, and until now it
+/// reached adoption only INDIRECTLY, via [`witness_ghost_anchors`] — which first
+/// narrows its candidates with `anchored_content_reaches_for_ids`, i.e. to rows
+/// that already CLAIM an anchor. A conductor-missing row whose
+/// `dht_anchor_hash` is NULL — precisely the `ContentGap::AnchorGap` class that
+/// dominates the content gap set — was filtered straight back out and never saw
+/// the pre-flight at all. It fell instead to [`witness_bootstrap`], which
+/// AUTHORS a fresh root: the exact self-election adopt-before-author exists to
+/// prevent, performed on the one class most likely to have a peer already
+/// holding the crown.
+///
+/// Routing here is precedence-correct because `run_heal` drains
+/// `adopt_deferred_heads` FIRST, before either witness sweep — so an id that
+/// adopts is already declared by the time the authoring paths look at it, and
+/// `try_adopt_canonical_head` returns `Hold` for an already-declared row, so
+/// double-listing an id across the ghost and adopt lists is idempotent, never a
+/// second declare.
+///
+/// The row still stays `mark_failed` (honest: WE did not heal it), exactly as
+/// the timeout route does.
+fn conductor_missing_should_route_to_adopt(peer_advertises_declaration: bool) -> bool {
+    peer_advertises_declaration
+}
+
 /// Outcome of the bounded-retry conductor call for one row: the final result plus
 /// whether any transient retry was taken (so a success-after-retry is countable).
 struct RetryResult<T> {
@@ -943,6 +977,61 @@ pub enum HealAction {
     /// The lamad bridge has not connected yet — the conductor-dependent heal is
     /// deferred. Discovery already ran this tick.
     SkipNoBridge,
+}
+
+/// Fold the per-arm post-heal [`GapCounts`] into ONE sweep-level count.
+///
+/// ## Why this exists (F-D, 2026-08-01)
+///
+/// `publish_sweep` used to receive the **REA arm's** counts alone, so the
+/// operator-facing `converged` — and `elohim_projection_reconcile_converged` —
+/// could not see the content arm AT ALL except through the divergence term. A
+/// content backlog of thousands of un-healed gaps was structurally invisible to
+/// the one gauge an SLO is offered over. Folding is therefore strictly STRICTER
+/// than the previous behaviour: nothing that blocked convergence before stops
+/// blocking it now, and a whole arm that was invisible now counts.
+///
+/// ## What "converged" means after the fold
+///
+/// **No ACTIONABLE work is outstanding on any arm.** Numeric fields sum;
+/// `caught_up` and `converged` are ANDed — a sweep is only over, and a peer only
+/// converged, when EVERY arm says so. `caught_up` is folded rather than left
+/// REA-only on purpose: publishing a summed `pending` beside an un-folded
+/// `caught_up` would let the two disagree on the same surface, which is exactly
+/// the metric/status drift `publish_sweep` writes both fields together to avoid.
+///
+/// ## What is deliberately SET ASIDE (and why that is not a relaxation)
+///
+/// - **Refused-adjudicated divergence** — the row already carries a different
+///   declared head (heal is forbidden to move it), or its cross-sweep budget is
+///   spent. Handled by `publish_sweep`'s `divergent_actionable` subtraction, not
+///   here; it stays visible on `..._divergent` / `..._divergent_refused`.
+/// - **Cross-sweep [`MissLedger`] exhaustion** — already set aside BY
+///   CONSTRUCTION: an `Admission::Exhausted` id is never admitted to a
+///   `GapTracker`, so it cannot appear in any arm's `pending` or `exhausted`.
+///   It stays visible on `..._exhausted`.
+///
+/// Note this is NOT the same number as [`GapCounts::exhausted`], which counts
+/// rows THIS sweep attempted up to `max_retries` and abandoned — genuinely
+/// undone work, and blocking, exactly as it already was for REA. Set-aside is a
+/// property of the ledger, not a licence to stop counting failed attempts.
+fn fold_arm_counts(
+    arms: &[crate::p2p::reconcile_rails::GapCounts],
+) -> crate::p2p::reconcile_rails::GapCounts {
+    let mut folded = crate::p2p::reconcile_rails::GapCounts {
+        caught_up: true,
+        converged: true,
+        ..Default::default()
+    };
+    for arm in arms {
+        folded.pending = folded.pending.saturating_add(arm.pending);
+        folded.completed = folded.completed.saturating_add(arm.completed);
+        folded.failed = folded.failed.saturating_add(arm.failed);
+        folded.exhausted = folded.exhausted.saturating_add(arm.exhausted);
+        folded.caught_up &= arm.caught_up;
+        folded.converged &= arm.converged;
+    }
+    folded
 }
 
 /// Decide the per-tick heal action. Bridge-absence takes precedence over the
@@ -1342,11 +1431,26 @@ pub async fn run_heal(
     // fed by the conductor answers the heal already paid for.
     witness_ghost_anchors(hc, pool, &ghost_candidates, &adopt).await;
 
-    // Publish mirrors the pre-decoupling contract: REA counts + peers_asked, with
-    // the divergent-anchor counter folding in BOTH arms (the one cross-arm signal).
+    // Publish the WHOLE sweep (F-D, 2026-08-01): every arm's post-heal counts
+    // folded, alongside the divergent-anchor counter that already folded across
+    // arms. Before this the published counts were the REA arm's ALONE, so a
+    // content backlog of thousands of un-healed gaps could not move `converged`
+    // in either direction — the arm carrying the fleet's real work was invisible
+    // to the gauge an SLO is offered over. See [`fold_arm_counts`] for what the
+    // fold does and does not set aside.
+    //
+    // Kept under its own name: the `heal complete` log below reports the REA
+    // arm's `counts` beside per-arm content/collectives fields, and silently
+    // folding that field would make an arm-scoped log line read as a sweep-scoped
+    // one.
+    let sweep_counts = fold_arm_counts(&[
+        counts,
+        content_tracker.counts(),
+        collectives_tracker.counts(),
+    ]);
     state
         .publish_sweep(
-            counts,
+            sweep_counts,
             peers_asked,
             rea_divergent + content_divergent,
             rea_divergent_refused + content_divergent_refused,
@@ -2784,7 +2888,20 @@ async fn heal_content(
                 // per-root chain are locally absent. Collect it here rather than
                 // re-probing later: the answer is already paid for.
                 ghost_candidates.push(id.clone());
-                tracing::debug!(content_id = %id, "projection-reconcile[content]: own conductor returned None; retry next sweep");
+                // MISSING → PEER-ADOPTION ROUTING (2026-08-01). The ghost sweep
+                // below narrows this list to rows that already CLAIM an anchor,
+                // so a conductor-missing row with a NULL `dht_anchor_hash` — the
+                // dominant `AnchorGap` class — never saw the adopt pre-flight and
+                // went straight to `witness_bootstrap`'s AUTHOR path instead.
+                // Listing it here gives it the pre-flight FIRST (see
+                // `conductor_missing_should_route_to_adopt`); an already-declared
+                // row simply `Hold`s, so this can never double-declare.
+                let routed_to_adopt =
+                    conductor_missing_should_route_to_adopt(peer_head_hints.contains_key(&id));
+                if routed_to_adopt {
+                    adopt_candidates.push(id.clone());
+                }
+                tracing::debug!(content_id = %id, routed_to_adopt, "projection-reconcile[content]: own conductor returned None; retry next sweep");
                 tracker.mark_failed(&id);
                 crate::metrics::inc_projection_heal_outcome(
                     "content",
@@ -2851,6 +2968,15 @@ async fn heal_content(
         }
     }
 
+    // END-OF-ARM caught_up (mirrors `heal_rea`). `GapTracker::caught_up`
+    // DEFAULTS to false and `enqueue_missing` only ever sets it false — nothing
+    // else in the machine ever flips it true. An arm that never calls this
+    // publishes a structurally-false bit, which `fold_arm_counts` then ANDs into
+    // a permanently-false sweep `caught_up`: `/health`'s `p2p.caughtUp` could
+    // never read true again, and the a2o head-convergence scenario that asserts
+    // it would be unpassable by construction. The fold made an omission that was
+    // previously harmless (only REA was published) load-bearing.
+    tracker.update_caught_up();
     ContentHealOutcome {
         healed,
         conductor_missing,
@@ -3514,6 +3640,9 @@ async fn heal_collectives(
         }
     }
 
+    // END-OF-ARM caught_up — see the same call at the end of `heal_content` for
+    // why an arm that skips this publishes a structurally-false bit.
+    tracker.update_caught_up();
     CollectivesHealOutcome {
         healed,
         conductor_missing,
@@ -4214,6 +4343,327 @@ mod tests {
         // spawn without a conductor); discovery still ran.
         assert_eq!(heal_decision(false, false), HealAction::SkipNoBridge);
         assert_eq!(heal_decision(false, true), HealAction::SkipNoBridge);
+    }
+
+    // ── MISSING-class adoption routing (2026-08-01) ─────────────────────────
+
+    /// A conductor-missing row with a peer-advertised declaration must reach the
+    /// adopt arm; without a hint there is nothing to adopt FROM.
+    #[test]
+    fn a_conductor_missing_row_routes_to_adopt_exactly_when_a_peer_declares() {
+        assert!(
+            conductor_missing_should_route_to_adopt(true),
+            "a peer declaring a head for an id our conductor cannot resolve is precisely the \
+             adopt case — there is nothing local to prefer"
+        );
+        assert!(
+            !conductor_missing_should_route_to_adopt(false),
+            "no peer declaration ⇒ nothing to adopt FROM; the row stays a ghost candidate"
+        );
+    }
+
+    /// The routing predicate must NOT inherit the timeout arm's transience
+    /// condition.
+    ///
+    /// `Ok(None)` is an ANSWER (the conductor looked and holds no chain), not a
+    /// failure to answer — so there is no transient/non-transient axis to gate
+    /// on, and gating on one would silently drop the largest heal-outcome class
+    /// back out of adoption.
+    #[test]
+    fn missing_routing_is_not_gated_on_transience_the_way_timeout_routing_is() {
+        // Timeout routing needs BOTH transience and a hint...
+        assert!(timeout_should_route_to_adopt(true, true));
+        assert!(!timeout_should_route_to_adopt(false, true));
+        // ...missing routing needs only the hint, because the conductor ANSWERED.
+        assert!(conductor_missing_should_route_to_adopt(true));
+    }
+
+    /// Regression guard for the hole itself: the conductor-missing arm must
+    /// actually CALL the routing predicate.
+    ///
+    /// Before this, `Ok(None)` reached adoption only indirectly via
+    /// `witness_ghost_anchors`, which first narrows candidates with
+    /// `anchored_content_reaches_for_ids` — i.e. to rows that already CLAIM an
+    /// anchor (guarded by `content_diesel`'s
+    /// `anchored_content_reaches_for_ids_selects_only_the_ghost_candidate_class`).
+    /// A conductor-missing row with a NULL `dht_anchor_hash` — the dominant
+    /// `ContentGap::AnchorGap` class — was filtered straight back out and went to
+    /// `witness_bootstrap`'s AUTHOR path instead: the exact self-election
+    /// adopt-before-author exists to prevent, on the class most likely to have a
+    /// peer already holding the crown.
+    ///
+    /// Delete the routing call from the arm and this fails.
+    #[test]
+    fn the_conductor_missing_arm_is_wired_to_the_adopt_list() {
+        let src = include_str!("projection_reconcile.rs");
+        let start = src
+            .find("GHOST-ANCHOR CANDIDATE")
+            .expect("the conductor-missing arm's marker comment must exist");
+        let arm = &src[start..];
+        let end = arm
+            .find("HealOutcomeKind::Missing")
+            .expect("the missing arm must still count its outcome");
+        let arm = &arm[..end];
+        assert!(
+            arm.contains("conductor_missing_should_route_to_adopt"),
+            "the conductor-missing arm must consult the adopt-routing predicate"
+        );
+        assert!(
+            arm.contains("adopt_candidates.push"),
+            "a routed conductor-missing row must land on the adopt list, which run_heal drains \
+             BEFORE either authoring sweep"
+        );
+        assert!(
+            arm.contains("tracker.mark_failed"),
+            "routing must not fake a heal — the row stays mark_failed, exactly as the timeout \
+             route does"
+        );
+    }
+
+    // ── caught_up WIRING (the class the hand-rolled arm helper below missed) ─
+
+    /// WIRING test over a REAL [`GapTracker`] driven through the content-heal
+    /// drain: discover → resolve every gap → end-of-arm `update_caught_up()`.
+    ///
+    /// ## The defect this pins
+    ///
+    /// `GapTracker::caught_up` DEFAULTS to false and `enqueue_missing` only ever
+    /// sets it FALSE — `update_caught_up()` is the one and only thing in the
+    /// machine that can set it true. Only `heal_rea` called it. That was
+    /// invisible while `publish_sweep` received the REA arm's counts alone, and
+    /// became load-bearing the moment `fold_arm_counts` started ANDing the other
+    /// arms' bits in: a structurally-false `caught_up` from content/collectives
+    /// would pin the published `caughtUp` false FOREVER — `/health`'s
+    /// `p2p.caughtUp` could never read true again, and the a2o head-convergence
+    /// scenario asserting it would be unpassable by construction.
+    ///
+    /// The F-D tests below build `GapCounts` by hand, which cannot see this:
+    /// a hand-rolled struct sets `caught_up` from a rule the real tracker does
+    /// not implement. Hence a real tracker here.
+    ///
+    /// Regression guard: delete `tracker.update_caught_up()` from the end of
+    /// `heal_content` and the fold assertion at the bottom fails.
+    #[test]
+    fn a_drained_content_arm_reports_caught_up_through_a_real_tracker() {
+        let mut tracker = GapTracker::new(MAX_RETRIES);
+        tracker.discover(vec!["a".into(), "b".into(), "c".into()]);
+        assert!(
+            !tracker.counts().caught_up,
+            "precondition: discovery leaves the arm not-caught-up"
+        );
+
+        // Drive the drain exactly as `heal_content` does: every pending row ends
+        // as either a resolution or a failure.
+        tracker.mark_completed("a"); // Stamped
+        tracker.mark_completed("b"); // Refreshed / SkippedDeclared — resolved in-sweep
+        tracker.mark_failed("c"); // conductor Ok(None) — mark_failed drains pending
+        assert!(
+            !tracker.counts().caught_up,
+            "the flag is still false until the END-OF-ARM update — nothing in \
+             mark_completed/mark_failed sets it"
+        );
+
+        tracker.update_caught_up();
+        let counts = tracker.counts();
+        assert!(
+            counts.caught_up,
+            "a drained arm must report caught_up — this is the ONLY call that can set it true"
+        );
+        assert_eq!(counts.pending, 0);
+
+        // And the fold must carry it through rather than pin it false.
+        let folded = fold_arm_counts(&[counts, counts, counts]);
+        assert!(
+            folded.caught_up,
+            "three drained arms fold to caught_up; if ANY arm skips its end-of-arm update its \
+             structurally-false bit pins the whole sweep false forever"
+        );
+    }
+
+    /// Generic wiring guard: EVERY heal arm must end with the update, including
+    /// arms added later.
+    ///
+    /// Regression guard: delete the call from `heal_content` or
+    /// `heal_collectives` and this names the offending arm.
+    #[test]
+    fn every_heal_arm_ends_with_update_caught_up() {
+        let src = include_str!("projection_reconcile.rs");
+        for arm in ["heal_rea", "heal_content", "heal_collectives"] {
+            let start = src
+                .find(&format!("async fn {arm}("))
+                .unwrap_or_else(|| panic!("{arm} must exist"));
+            // Bound the scan at the arm's own outcome-struct construction, which
+            // is the last statement of every arm.
+            let body = &src[start..];
+            let end = body
+                .find("\n}\n")
+                .unwrap_or_else(|| panic!("{arm} must have a body"));
+            assert!(
+                body[..end].contains("tracker.update_caught_up()"),
+                "{arm} must call tracker.update_caught_up() at end-of-arm — without it the arm \
+                 publishes a structurally-false caught_up that the sweep fold ANDs into a \
+                 permanently-false /health p2p.caughtUp"
+            );
+        }
+    }
+
+    // ── F-D: sweep-level convergence folding ────────────────────────────────
+
+    fn arm_counts(pending: usize, exhausted: usize, completed: usize) -> GapCounts {
+        GapCounts {
+            pending,
+            completed,
+            failed: 0,
+            caught_up: pending == 0,
+            exhausted,
+            converged: pending == 0 && exhausted == 0,
+        }
+    }
+
+    /// The defect F-D closes: `publish_sweep` received the REA arm's counts
+    /// ALONE, so a content backlog of thousands of un-healed gaps could not move
+    /// `converged` in either direction.
+    ///
+    /// Regression guard: fold only the REA arm (the pre-fix shape) and this
+    /// fails — `converged` comes back `true` with content work outstanding.
+    #[test]
+    fn content_pending_blocks_convergence_even_when_rea_is_clean() {
+        let rea = arm_counts(0, 0, 12);
+        let content = arm_counts(2771, 0, 3);
+        let collectives = arm_counts(0, 0, 0);
+
+        let folded = fold_arm_counts(&[rea, content, collectives]);
+
+        assert!(
+            rea.converged,
+            "precondition: the REA arm alone would have reported convergence"
+        );
+        assert!(
+            !folded.converged,
+            "an arm with 2771 pending gaps must defeat convergence — that arm carries the \
+             fleet's real work and was previously invisible to this gauge"
+        );
+        assert_eq!(folded.pending, 2771, "pending sums across arms");
+        assert_eq!(folded.completed, 15, "completed sums across arms");
+        assert!(
+            !folded.caught_up,
+            "the sweep is not over while work remains"
+        );
+    }
+
+    /// Symmetric for the third arm, so collectives cannot be the silent one next.
+    #[test]
+    fn collectives_pending_blocks_convergence_too() {
+        let folded = fold_arm_counts(&[
+            arm_counts(0, 0, 1),
+            arm_counts(0, 0, 1),
+            arm_counts(4, 0, 0),
+        ]);
+        assert!(!folded.converged);
+        assert_eq!(folded.pending, 4);
+    }
+
+    /// Abandoned-at-max-retries rows are genuinely undone work and must keep
+    /// blocking — on EVERY arm, exactly as they already did for REA. This is the
+    /// leg the fold must never relax.
+    #[test]
+    fn per_sweep_exhaustion_still_blocks_convergence_on_every_arm() {
+        let folded = fold_arm_counts(&[
+            arm_counts(0, 0, 5),
+            arm_counts(0, 7, 0),
+            arm_counts(0, 0, 0),
+        ]);
+        assert_eq!(folded.pending, 0, "nothing is still in flight");
+        assert_eq!(folded.exhausted, 7);
+        assert!(
+            !folded.converged,
+            "gaps abandoned at max_retries healed nothing — caught_up, never converged"
+        );
+    }
+
+    /// The SET-ASIDE classes must not block, and the fold gets that for free:
+    /// a cross-sweep `MissLedger` exhaustion is held back at DISCOVERY, so an
+    /// adjudicated id never enters any arm's tracker and cannot appear in
+    /// `pending` or `exhausted`. It stays visible on `..._exhausted` instead.
+    #[test]
+    fn ledger_adjudicated_ids_are_set_aside_and_do_not_block_convergence() {
+        let mut ledger = MissLedger::new();
+        let mut tracker = GapTracker::new(MAX_RETRIES);
+        // Spend the id's budget against unchanged evidence.
+        for _ in 0..MAX_RETRIES {
+            assert_eq!(
+                ledger.admit(PROJECTION_INVENTORY_TABLE_CONTENT, "stuck", "anchor-a"),
+                Admission::Retry
+            );
+        }
+        let verdict = ledger.admit(PROJECTION_INVENTORY_TABLE_CONTENT, "stuck", "anchor-a");
+        assert_eq!(verdict, Admission::Exhausted, "budget spent");
+
+        // Discovery admits ONLY the non-exhausted ids, so the adjudicated one
+        // never reaches the tracker.
+        tracker.discover(vec![]);
+        tracker.update_caught_up();
+        let folded = fold_arm_counts(&[tracker.counts()]);
+        assert_eq!(folded.pending, 0);
+        assert_eq!(folded.exhausted, 0);
+        assert!(
+            folded.converged,
+            "an id the ledger adjudicated is set aside (visible on the exhausted gauge), not \
+             counted as outstanding work"
+        );
+    }
+
+    /// A fully-drained sweep still converges — the fold must not be a one-way
+    /// ratchet to false.
+    #[test]
+    fn a_sweep_with_every_arm_drained_still_converges() {
+        let folded = fold_arm_counts(&[
+            arm_counts(0, 0, 3),
+            arm_counts(0, 0, 900),
+            arm_counts(0, 0, 2),
+        ]);
+        assert!(folded.converged);
+        assert!(folded.caught_up);
+        assert_eq!(folded.completed, 905);
+    }
+
+    /// Folding an empty arm list is the identity (converged), so a sweep that
+    /// somehow ran no arms is not reported as broken.
+    #[test]
+    fn folding_no_arms_is_the_converged_identity() {
+        let folded = fold_arm_counts(&[]);
+        assert!(folded.converged);
+        assert!(folded.caught_up);
+        assert_eq!(folded.pending, 0);
+    }
+
+    /// End-to-end at the published-status level: content pending must reach
+    /// `/p2p/status` and `elohim_projection_reconcile_converged` as a false.
+    #[tokio::test]
+    async fn published_status_reports_content_work_as_unconverged() {
+        let state = ProjectionReconcileState::new();
+        let folded = fold_arm_counts(&[
+            arm_counts(0, 0, 1),
+            arm_counts(2771, 0, 0),
+            arm_counts(0, 0, 0),
+        ]);
+        // No unadjudicated divergence: the ONLY thing left is the content gaps.
+        state.publish_sweep(folded, 6, 1245, 1245).await;
+
+        let status = state.status().await;
+        assert_eq!(
+            status.pending, 2771,
+            "the content arm's work is on the wire"
+        );
+        assert!(
+            !status.converged,
+            "converged must be false while an arm still holds un-healed gaps"
+        );
+        assert!(
+            !status.caught_up,
+            "caught_up follows the same fold — publishing a summed pending beside an un-folded \
+             caught_up would let the two disagree on one surface"
+        );
     }
 
     #[test]

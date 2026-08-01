@@ -50,6 +50,32 @@ use crate::views::{
 /// The `total` field reports the true row count when truncated.
 pub const PROJECTION_INVENTORY_CAP: i64 = 2000;
 
+/// Responder-side budget for the ONE conductor call a
+/// [`ViewKind::ContentHeadRecord`] answer needs (`get_record_for_action`).
+///
+/// MUST stay strictly BELOW the requester's
+/// `head_record_client::HEAD_RECORD_TIMEOUT` (10s) — the responder has to be the
+/// side that gives up first, so the requester always receives a well-formed
+/// answer (hash-only on elapse) instead of a transport timeout it cannot
+/// distinguish from an offline peer. Guarded by
+/// `head_record_responder_budget_is_below_the_requester_deadline`.
+///
+/// `HcClient::call_zome` carries no timeout of its own (its effective bound is
+/// the conductor's ~60s websocket deadline), which is exactly why this exists.
+pub const HEAD_RECORD_CONDUCTOR_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// COMPILE-TIME guard for the ordering above. A future edit that raises the
+/// responder budget past the requester's deadline fails the BUILD, not merely a
+/// test — the ordering is a contract spanning two files, and the failure it
+/// prevents (adoption silently stopping fleet-wide) is invisible in unit tests
+/// of either file alone.
+const _: () = assert!(
+    HEAD_RECORD_CONDUCTOR_TIMEOUT.as_millis()
+        < crate::p2p::head_record_client::HEAD_RECORD_TIMEOUT.as_millis(),
+    "the ContentHeadRecord responder budget must stay strictly below the requester's \
+     HEAD_RECORD_TIMEOUT, so the responder is always the side that gives up first"
+);
+
 /// The REA-commitment projection table (v1 reconciliation stream). The
 /// `ViewKind::ProjectionInventory { table }` discriminator is the seam for
 /// `agreements` / `economic_events` later; an unknown table yields an empty
@@ -425,6 +451,73 @@ pub async fn build_response_slice(
 /// pre-flight only ever asks about ids a peer ADVERTISED, and the inventory that
 /// advertises them is already reach-filtered. The gate is defence in depth
 /// against a hand-crafted request.
+/// Run the ONE conductor call a `ContentHeadRecord` answer needs under
+/// [`HEAD_RECORD_CONDUCTOR_TIMEOUT`], collapsing every non-answer to the honest
+/// absence the payload already models (`record: null`, hash still served).
+///
+/// Split out of [`build_content_head_record_payload`] so the budget is testable
+/// against a fake slow future — the live call needs a conductor, the invariant
+/// does not.
+///
+/// ## The bound is the point (F-A(i), 2026-08-01)
+///
+/// `call_get_record_for_action` awaits `HcClient::call_zome`, which carries NO
+/// timeout of its own: its effective bound is the conductor's ~60s websocket
+/// deadline. The REQUESTER's budget is
+/// [`crate::p2p::head_record_client::HEAD_RECORD_TIMEOUT`] (10s). Unbounded, a
+/// loaded conductor made the responder structurally unable to answer in time, so
+/// every adopt-before-author fetch timed out fleet-wide and adoption — the ONLY
+/// path that converges a peer-divergent content head — never ran.
+///
+/// Serving the hash alone is not a degradation the requester cannot use:
+/// `head_adoption::adopt_peer` falls back to the advertised hash, and the
+/// record-less declare succeeds whenever the requester's own conductor can
+/// retrieve the target. A well-formed absence beats a transport timeout the
+/// requester cannot tell apart from an offline peer.
+async fn bounded_record_b64<F>(content_id: &str, call: F) -> Option<String>
+where
+    F: std::future::Future<
+        Output = Result<
+            Option<crate::services::conductor_writes::CarriedRecordWire>,
+            crate::error::StorageError,
+        >,
+    >,
+{
+    match tokio::time::timeout(HEAD_RECORD_CONDUCTOR_TIMEOUT, call).await {
+        Ok(Ok(Some(carried))) => {
+            Some(base64::engine::general_purpose::STANDARD.encode(&carried.record))
+        }
+        Ok(Ok(None)) => None,
+        Ok(Err(e)) => {
+            crate::metrics::inc_content_head_record_degraded("conductor_error");
+            tracing::debug!(
+                target: "elohim_storage::view_federation",
+                content_id = %content_id,
+                error = %e,
+                "ContentHeadRecord: conductor could not serve the record; \
+                 answering with the head hash alone"
+            );
+            None
+        }
+        Err(_elapsed) => {
+            // The live signal for this bound. Counted HERE rather than left to
+            // the requester's timeout counter, because that one cannot tell a
+            // slow responder apart from an offline peer — the ambiguity that hid
+            // fleet-wide adoption failure in the first place.
+            crate::metrics::inc_content_head_record_degraded("budget_elapsed");
+            tracing::info!(
+                target: "elohim_storage::view_federation",
+                content_id = %content_id,
+                budget_secs = HEAD_RECORD_CONDUCTOR_TIMEOUT.as_secs(),
+                "ContentHeadRecord: conductor record fetch exceeded the responder \
+                 budget; answering with the head hash alone (honest absence) so the \
+                 requester's own deadline is never the thing that fires"
+            );
+            None
+        }
+    }
+}
+
 async fn build_content_head_record_payload(
     pool: Option<&crate::db::DbPool>,
     hc_registry: Option<&crate::hc_client_registry::HcClientRegistry>,
@@ -482,29 +575,28 @@ async fn build_content_head_record_payload(
     // Ask this peer's own conductor for the serialized Record. Without a bridge
     // we still serve the HASH — a requester whose own conductor can retrieve the
     // target does not need the bytes.
+    //
+    // BOUNDED (F-A(i)): `call_get_record_for_action` awaits `HcClient::call_zome`,
+    // which has NO timeout of its own — its effective bound is the conductor's
+    // ~60s websocket timeout. The REQUESTER's budget is
+    // `head_record_client::HEAD_RECORD_TIMEOUT` (10s), so an unbounded responder
+    // could never answer in time on a loaded conductor: every adopt-before-author
+    // fetch timed out fleet-wide, and adoption — the ONLY path that converges a
+    // peer-divergent head — never ran. Timing out here takes the SAME honest-
+    // absence branch a conductor error already takes (hash-only answer), which
+    // the requester can still use: `adopt_peer` falls back to the advertised hash
+    // and the record-less declare succeeds whenever its own conductor can
+    // retrieve the target.
     let record_b64 = match hc_registry.and_then(|r| r.lamad_client()) {
         Some(hc) => {
-            match crate::services::conductor_writes::call_get_record_for_action(
-                &hc,
-                &head_action_hash,
+            bounded_record_b64(
+                content_id,
+                crate::services::conductor_writes::call_get_record_for_action(
+                    &hc,
+                    &head_action_hash,
+                ),
             )
             .await
-            {
-                Ok(Some(carried)) => {
-                    Some(base64::engine::general_purpose::STANDARD.encode(&carried.record))
-                }
-                Ok(None) => None,
-                Err(e) => {
-                    tracing::debug!(
-                        target: "elohim_storage::view_federation",
-                        content_id = %content_id,
-                        error = %e,
-                        "ContentHeadRecord: conductor could not serve the record; \
-                         answering with the head hash alone"
-                    );
-                    None
-                }
-            }
         }
         None => None,
     };
@@ -862,6 +954,100 @@ mod tests {
         assert_eq!(
             ViewFederationProtocol.as_ref(),
             "/elohim/view-federation/1.0.0"
+        );
+    }
+
+    // ── F-A(i): the responder's conductor budget ────────────────────────────
+    //
+    // The fleet-wide failure these pin: an UNBOUNDED responder-side conductor
+    // call (effective bound = the conductor's ~60s websocket deadline) against a
+    // 10s requester budget, so the requester's deadline always fired first and
+    // adopt-before-author never completed a single fetch fleet-wide.
+
+    /// The ordering invariant the whole cure rests on: the RESPONDER must be the
+    /// side that gives up first, so the requester always receives a well-formed
+    /// answer instead of a transport timeout it cannot distinguish from an
+    /// offline peer.
+    #[test]
+    fn head_record_responder_budget_is_below_the_requester_deadline() {
+        assert!(
+            HEAD_RECORD_CONDUCTOR_TIMEOUT < crate::p2p::head_record_client::HEAD_RECORD_TIMEOUT,
+            "responder budget ({HEAD_RECORD_CONDUCTOR_TIMEOUT:?}) must stay STRICTLY below the \
+             requester's HEAD_RECORD_TIMEOUT ({:?}) — otherwise a slow conductor becomes a \
+             transport timeout at the requester and adoption silently stops",
+            crate::p2p::head_record_client::HEAD_RECORD_TIMEOUT,
+        );
+    }
+
+    /// A conductor that never answers must yield HONEST ABSENCE within the
+    /// responder budget — not hang until the requester's deadline.
+    ///
+    /// Regression guard: neuter `bounded_record_b64` by awaiting the call
+    /// directly instead of wrapping it in `tokio::time::timeout` and this test
+    /// hangs past the requester budget (under `start_paused` the clock
+    /// auto-advances, so the assertion on elapsed time is exact, not flaky).
+    #[tokio::test(start_paused = true)]
+    async fn a_wedged_conductor_answers_honest_absence_inside_the_responder_budget() {
+        let started = tokio::time::Instant::now();
+        let never_answers = async {
+            // Longer than the conductor's own ~60s websocket deadline: the
+            // responder must not wait even for THAT.
+            tokio::time::sleep(std::time::Duration::from_secs(120)).await;
+            unreachable!("the responder budget must fire long before this resolves")
+        };
+
+        let record = bounded_record_b64("wedged-id", never_answers).await;
+
+        assert_eq!(
+            record, None,
+            "a wedged conductor must degrade to a hash-only answer, never to a hang"
+        );
+        let elapsed = started.elapsed();
+        assert!(
+            elapsed <= HEAD_RECORD_CONDUCTOR_TIMEOUT,
+            "gave up after {elapsed:?}, past the {HEAD_RECORD_CONDUCTOR_TIMEOUT:?} budget"
+        );
+        assert!(
+            elapsed < crate::p2p::head_record_client::HEAD_RECORD_TIMEOUT,
+            "the responder must give up BEFORE the requester's deadline, not after"
+        );
+    }
+
+    /// The bound must not cost the happy path: a conductor that answers in time
+    /// still carries its Record bytes.
+    #[tokio::test(start_paused = true)]
+    async fn a_prompt_conductor_still_carries_its_record_bytes() {
+        let carried = crate::services::conductor_writes::CarriedRecordWire {
+            action_hash: "uhCkkPROMPT".to_string(),
+            record: vec![1, 2, 3, 4],
+        };
+        let record = bounded_record_b64("prompt-id", async { Ok(Some(carried)) }).await;
+        assert_eq!(
+            record,
+            Some(base64::engine::general_purpose::STANDARD.encode([1u8, 2, 3, 4])),
+            "an in-budget answer must still serve the bytes"
+        );
+    }
+
+    /// An ANSWERED conductor error and an ELAPSED budget are the same honest
+    /// absence on the wire — a requester must not be able to tell them apart
+    /// (both mean "I cannot carry the bytes; here is the hash").
+    #[tokio::test(start_paused = true)]
+    async fn a_conductor_error_and_an_elapsed_budget_are_the_same_honest_absence() {
+        let errored = bounded_record_b64("err-id", async {
+            Err(crate::error::StorageError::Internal("boom".into()))
+        })
+        .await;
+        let elapsed = bounded_record_b64("slow-id", async {
+            tokio::time::sleep(std::time::Duration::from_secs(120)).await;
+            unreachable!()
+        })
+        .await;
+        assert_eq!(errored, None);
+        assert_eq!(elapsed, None);
+        assert_eq!(
+            errored, elapsed,
+            "both degrade to the same hash-only answer"
         );
     }
 
