@@ -19,6 +19,10 @@ const edge = readFileSync(
   new URL("../../elohim/holochain/Jenkinsfile", import.meta.url),
   "utf8",
 );
+const runDataplaneValidation = readFileSync(
+  new URL("../../scripts/ci/run-dataplane-validation.sh", import.meta.url),
+  "utf8",
+);
 
 function balancedBlock(text, openBrace) {
   let depth = 1;
@@ -175,51 +179,53 @@ describe("edge validate-only stage allowlist", () => {
     assert.match(validation, /run-dataplane-validation\.sh/);
   });
 
-  test("Dataplane Validation gates both read-side scripts behind the fleet-quiesce gate", () => {
+  test("dataplane measurement rides the fleet-quiesce gate (in-script, CPS-safe)", () => {
+    // The gate lives INSIDE run-dataplane-validation.sh, not the Jenkinsfile
+    // stage — inflating the stage's CPS method breached the 64KB JVM limit on
+    // edge #1282 (MethodTooLargeException at Jenkinsfile parse; the build died
+    // stageless). The stage's only quiesce responsibility is the deadline env.
+
+    // 1. The runner invokes the gate BEFORE the cucumber suite...
+    const gateIdx = runDataplaneValidation.indexOf("fleet-quiesce-gate.sh");
+    const cucumberIdx = runDataplaneValidation.indexOf("cucumber-js");
+    const reportIdx = runDataplaneValidation.indexOf("build-sprint-report.ts");
+    assert.ok(
+      gateIdx !== -1,
+      "run-dataplane-validation.sh must invoke fleet-quiesce-gate.sh",
+    );
+    assert.ok(
+      cucumberIdx !== -1 && gateIdx < cucumberIdx,
+      "fleet-quiesce-gate.sh must be invoked before the cucumber suite",
+    );
+    assert.ok(
+      reportIdx !== -1 && gateIdx < reportIdx,
+      "fleet-quiesce-gate.sh must be invoked before the sprint report is built",
+    );
+
+    // 2. ...and a gate failure exits without measuring (exit 3 = the
+    // did-not-measure idiom shared with the zero-scenario guard), so no
+    // sprint-report can be generated from a churn window.
+    const guard = runDataplaneValidation.match(
+      /if\s*\[\s*"\$\{QUIESCE_EXIT\}"\s+-ne\s+0\s*\]/,
+    );
+    assert.ok(
+      guard,
+      "runner must guard on the gate's exit code (QUIESCE_EXIT)",
+    );
+    const afterGuard = runDataplaneValidation.slice(guard.index);
+    const exitMatch = afterGuard.match(/^\s*exit 3\s*$/m);
+    assert.ok(
+      exitMatch && afterGuard.indexOf("exit 3") < afterGuard.indexOf("cucumber-js"),
+      "gate failure must exit 3 before any cucumber invocation",
+    );
+
+    // 3. The Jenkinsfile stage supplies the per-path deadline: long bounded
+    // wait for validate-only recording runs, short for post-deploy runs.
     const validation = stages.get("Dataplane Validation");
     assert.match(
       validation,
-      /fleet-quiesce-gate\.sh/,
-      "stage must invoke fleet-quiesce-gate.sh before measuring",
-    );
-
-    const gateIdx = validation.indexOf("fleet-quiesce-gate.sh");
-    const seamIdx = validation.indexOf("substrate-seam-smoke.sh");
-    const dataplaneIdx = validation.indexOf("run-dataplane-validation.sh");
-    assert.ok(
-      gateIdx !== -1 && seamIdx !== -1 && dataplaneIdx !== -1,
-      "all three script references must be present",
-    );
-    assert.ok(
-      gateIdx < seamIdx && gateIdx < dataplaneIdx,
-      "fleet-quiesce-gate.sh must be invoked before either read-side measurement script",
-    );
-
-    // A skip/guard must tie the gate's result to whether the read-side
-    // scripts run at all — otherwise a churning fleet still gets measured.
-    assert.match(
-      validation,
-      /gateRc/,
-      "stage must reference a gate-result guard variable (e.g. gateRc)",
-    );
-    const guardMatch = validation.match(/if\s*\(\s*gateRc\s*==\s*0\s*\)\s*\{/);
-    assert.ok(
-      guardMatch,
-      "stage must guard the read-side scripts on the gate result (gateRc == 0)",
-    );
-    const guardBody = balancedBlock(
-      validation,
-      guardMatch.index + guardMatch[0].lastIndexOf("{"),
-    );
-    assert.match(
-      guardBody,
-      /substrate-seam-smoke\.sh/,
-      "seam smoke must run only inside the gate-passed branch",
-    );
-    assert.match(
-      guardBody,
-      /run-dataplane-validation\.sh/,
-      "dataplane validation must run only inside the gate-passed branch",
+      /QUIESCE_DEADLINE_SECS=\$\{isValidateOnly\(\)\s*\?\s*'2700'\s*:\s*'900'\}/,
+      "stage must set QUIESCE_DEADLINE_SECS via the isValidateOnly() ternary",
     );
   });
 });

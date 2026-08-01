@@ -63,6 +63,36 @@ echo "  Reports : ${REPORTS_DIR}"
 
 mkdir -p "${REPORTS_DIR}"
 
+# Fleet-quiesce gate (2026-08-01, edge #1280 RCA): a deploy restarts the whole
+# fleet and the reconcile catch-up can run hours; measuring mid-churn records a
+# false red the ledger sync can read as a regression. The gate polls until the
+# fleet is calm (pull.caughtUp both sides, converged==1 on A sustained across a
+# fresh sweep, both doorways serving content 200) or the deadline lapses — on
+# deadline we exit 3 ("did not measure", same idiom as the zero-scenario guard
+# below) BEFORE any cucumber run, so no sprint-report exists for a churn window.
+# Lives here, not in the Jenkinsfile stage, per the CPS extraction note above
+# (the stage stays statement-light; inflating it breached the 64KB CPS method
+# limit on edge #1282). QUIESCE_SKIP=1 bypasses for local/manual runs.
+if [ "${QUIESCE_SKIP:-0}" != "1" ]; then
+  QUIESCE_EXIT=0
+  bash "${WORKSPACE}/scripts/ci/fleet-quiesce-gate.sh" \
+    "${DOORWAY}" \
+    "${E2E_DOORWAY_B:-https://elohim.host}" \
+    "${QUIESCE_CONTENT_ID:-elohim-host-landing}" \
+    "${STORAGE_URL}" \
+    "${E2E_STORAGE_URL_B:-http://elohim-adam-alpha.elohim-alpha.svc.cluster.local:8090}" \
+    || QUIESCE_EXIT=$?
+  if [ "${QUIESCE_EXIT}" -ne 0 ]; then
+    echo ""
+    echo "=== Dataplane Validation: DID NOT MEASURE ==="
+    echo "Fleet-quiesce gate exited ${QUIESCE_EXIT} — the fleet is still churning"
+    echo "(or the gate could not read it). Skipping the cucumber suite entirely:"
+    echo "no sprint-report is generated, so recorded saga state cannot move on"
+    echo "this run. This is a no-measure outcome, not a validation failure."
+    exit 3
+  fi
+fi
+
 # Install a2o workspace dependencies (frozen — never mutates pnpm-lock.yaml in CI).
 # Run from WORKSPACE root so the pnpm workspace resolver finds all packages.
 cd "${WORKSPACE}"
