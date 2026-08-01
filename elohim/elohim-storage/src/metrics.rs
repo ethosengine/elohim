@@ -1067,6 +1067,24 @@ pub fn set_projection_reconcile_gauges(
         .set(divergent_refused as i64);
 }
 
+/// Update ONLY the adjudicated-divergence gauge for a stream, leaving the rest of
+/// the stream's last-sweep gauges untouched.
+///
+/// The REA arm adjudicates in TWO places: retry-exhaustion is known at discovery
+/// (published with the rest via [`set_projection_reconcile_gauges`]), but the
+/// dominant class — the own conductor answering with the anchor the local row
+/// already holds — is only knowable from a conductor answer, i.e. after the heal
+/// leg has run. This setter lets the heal leg complete the number without
+/// re-publishing discovery-time gauges the heal has since invalidated.
+///
+/// No new series: this writes the SAME
+/// `elohim_projection_reconcile_divergent_refused{stream=…}` gauge.
+pub fn set_projection_reconcile_divergent_refused(stream: &str, divergent_refused: u64) {
+    PROJECTION_RECONCILE_DIVERGENT_REFUSED
+        .with_label_values(&[stream])
+        .set(divergent_refused as i64);
+}
+
 /// 1 when the peer holds what its peers advertised, 0 otherwise. Pure so the
 /// three-condition rule is testable without a registry — and so it cannot drift
 /// from `GapCounts::converged`, which computes the same rule minus divergence.

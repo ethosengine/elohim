@@ -881,14 +881,24 @@ pub struct ReaDiscovery {
     peers_asked: usize,
     ids_discovered: usize,
     divergent_anchor: usize,
-    /// The ADJUDICATED share of `divergent_anchor` — divergence heal is not
-    /// permitted (or no longer able) to resolve this sweep.
+    /// The DISCOVERY-side adjudicated share of `divergent_anchor` — divergence
+    /// this sweep is no longer able to resolve, and which therefore must not
+    /// defeat convergence.
     ///
-    /// Structurally 0 on this arm today: REA rows carry no declaration-ordering
-    /// column, so there is no "already declared" refusal here, and the ledger's
-    /// exhaustion is counted against absence gaps rather than divergence. Carried
-    /// anyway so both folded arms present the same pair to `publish_sweep` and a
-    /// future REA declaration can only ever ADD to it.
+    /// REA rows carry no declaration-ordering column, so there is no
+    /// "already declared" refusal on this arm (the content arm's dominant class).
+    /// What this counts is the **retry-exhausted** class: a divergent id whose
+    /// cross-sweep [`MissLedger`] budget is spent against unchanged peer
+    /// evidence. It is held back from the tracker, so the heal leg will never
+    /// see it again — counting it as unresolved divergence forever is exactly
+    /// what pinned `elohim_projection_reconcile_converged` at 0.
+    ///
+    /// The arm's OTHER adjudicated class — the own conductor confirming the
+    /// anchor the local row already holds — can only be known from a conductor
+    /// answer, so it is counted heal-side ([`ReaHealOutcome::divergent_refused`])
+    /// and added to this before `publish_sweep`. The two buckets PARTITION the
+    /// divergence set: an exhausted id is never admitted to the tracker, so it
+    /// cannot also be healed.
     divergent_refused: usize,
     /// Gap ids the cross-sweep [`MissLedger`] held back this sweep (retry budget
     /// spent against unchanged evidence). Published on
@@ -1146,6 +1156,7 @@ pub async fn run_discovery(
         rea_ids_discovered = rea.ids_discovered,
         rea_gaps = rea.tracker.counts().pending,
         rea_divergent_anchor = rea.divergent_anchor,
+        rea_divergent_refused = rea.divergent_refused,
         rea_exhausted = rea.exhausted_persistent,
         rea_local_total = rea.local_total,
         content_peers_asked = content.peers_asked,
@@ -1220,7 +1231,20 @@ pub async fn run_heal(
         rea_divergent as u64,
         rea_divergent_refused as u64,
     );
-    let counts = heal_rea(&mut tracker, &discovered_by, hc, pool, &pacing).await;
+    let ReaHealOutcome {
+        counts,
+        divergent_refused: rea_refused_by_conductor,
+    } = heal_rea(&mut tracker, &discovered_by, hc, pool, &pacing).await;
+    // The arm's FULL adjudication: the discovery-side retry-exhausted share plus
+    // the heal-side own-conductor-confirms-the-held-anchor share. The two buckets
+    // partition the divergence set (an exhausted id never reaches the heal leg),
+    // so the sum can never exceed `rea_divergent`.
+    let rea_divergent_refused = rea_divergent_refused.saturating_add(rea_refused_by_conductor);
+    // Re-publish ONLY the refused gauge: the heal leg just learned the second
+    // half of it, and the pre-heal call above could not know it. The other REA
+    // gauges keep their discovery-time values (the heal leg is the thing they
+    // are measured against).
+    crate::metrics::set_projection_reconcile_divergent_refused("rea", rea_divergent_refused as u64);
 
     let ContentDiscovery {
         tracker: mut content_tracker,
@@ -1336,6 +1360,7 @@ pub async fn run_heal(
         healed = counts.completed,
         conductor_missing = counts.failed,
         divergent_anchor = rea_divergent,
+        divergent_refused = rea_divergent_refused,
         local_total,
         caught_up = counts.caught_up,
         content_peers_asked,
@@ -1896,6 +1921,12 @@ async fn discover_rea(
     // (the ~151k-missing-outcomes treadmill). Ids already held locally are
     // forgotten, so a later relapse starts from a clean budget.
     let mut exhausted_persistent = 0usize;
+    // The DIVERGENT share of the exhaustion — the discovery-side half of this
+    // arm's adjudication (mirrors the content arm's `exhausted_divergent`). An
+    // exhausted id is held back from the tracker, so the heal leg can never see
+    // it again; counting it as unresolved divergence every sweep forever is what
+    // pinned `converged` at 0 with a static residue.
+    let mut exhausted_divergent = 0usize;
     let mut admitted: Vec<String> = Vec::new();
     for id in discovered_by.keys() {
         if tracker_local.contains(id) {
@@ -1905,7 +1936,12 @@ async fn discover_rea(
         let evidence = advertised_anchor.get(id).map(String::as_str).unwrap_or("");
         match misses.admit(PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS, id, evidence) {
             Admission::Retry => admitted.push(id.clone()),
-            Admission::Exhausted => exhausted_persistent += 1,
+            Admission::Exhausted => {
+                exhausted_persistent += 1;
+                if divergent_ids.contains(id) {
+                    exhausted_divergent += 1;
+                }
+            }
         }
     }
     tracker.discover(admitted);
@@ -1916,7 +1952,7 @@ async fn discover_rea(
         peers_asked,
         ids_discovered,
         divergent_anchor,
-        divergent_refused: 0,
+        divergent_refused: exhausted_divergent,
         exhausted_persistent,
         local_total,
     }
@@ -1935,8 +1971,11 @@ async fn heal_rea(
     hc: &Arc<HcClient>,
     pool: &DbPool,
     pacing: &HealPacing,
-) -> crate::p2p::reconcile_rails::GapCounts {
+) -> ReaHealOutcome {
     let app_ctx = crate::db::AppContext::default_lamad();
+    // Heal-side half of this arm's divergence adjudication (see
+    // [`ReaDiscovery::divergent_refused`] for the discovery-side half).
+    let mut divergent_refused = 0usize;
 
     // (3+4) Heal each gap from the OWN conductor, bounded by the REA leg budget.
     // REA runs FIRST (in `run_heal`) with its own reserved budget, so a small REA
@@ -1952,7 +1991,7 @@ async fn heal_rea(
         circuit.record(&attempt.result);
         let kind = match attempt.result {
             Ok(Some(output)) => match heal_one(&output, pool, &app_ctx) {
-                Ok(()) => {
+                Ok(ReaAnchorWrite::Advanced) => {
                     tracker.mark_completed(&id);
                     let peer = discovered_by
                         .get(&id)
@@ -1970,6 +2009,25 @@ async fn heal_rea(
                     } else {
                         HealOutcomeKind::Healed
                     }
+                }
+                Ok(ReaAnchorWrite::Refreshed) => {
+                    // The own conductor answered with the anchor this row ALREADY
+                    // holds: the value columns refreshed, but the ANCHOR did not
+                    // move, so the peer-advertised divergence that enqueued this
+                    // row is UNCHANGED. Deliberately NOT logged as HEALED (the
+                    // `Refreshed` discipline the content arm established) and
+                    // ADJUDICATED: heal has done everything it can here, and only
+                    // a canonical channel can converge the two roots. Counting it
+                    // as unresolved divergence every sweep forever is what held
+                    // the fleet's `converged` gauge at 0 against a static residue.
+                    tracker.mark_completed(&id);
+                    divergent_refused += 1;
+                    tracing::info!(
+                        target: "elohim_storage::projection_reconcile",
+                        commitment_id = %id,
+                        "projection-reconcile[rea]: anchor unchanged — refreshed row, divergence NOT resolved (own conductor answered the anchor this row already holds)"
+                    );
+                    HealOutcomeKind::Refreshed
                 }
                 Err(e) => {
                     tracing::warn!(commitment_id = %id, error = %e, "projection-reconcile: upsert failed; retry next sweep");
@@ -2021,16 +2079,65 @@ async fn heal_rea(
     }
 
     tracker.update_caught_up();
-    tracker.counts()
+    ReaHealOutcome {
+        counts: tracker.counts(),
+        divergent_refused,
+    }
+}
+
+/// Heal-side output for the REA arm. Mirrors [`ContentHealOutcome`].
+struct ReaHealOutcome {
+    counts: crate::p2p::reconcile_rails::GapCounts,
+    /// Divergent rows the own conductor ADJUDICATED this sweep by answering with
+    /// the anchor the local row already holds ([`ReaAnchorWrite::Refreshed`]) —
+    /// the heal-side half of this arm's `divergent_refused`, added to
+    /// [`ReaDiscovery::divergent_refused`] before `publish_sweep`.
+    ///
+    /// Disjoint from the discovery-side half by construction: an id the
+    /// [`MissLedger`] exhausted is never admitted to the tracker, so it can never
+    /// reach this leg and be double-counted.
+    divergent_refused: usize,
+}
+
+/// Did the own conductor's answer MOVE this row's anchor, or merely confirm the
+/// anchor it already holds? The REA analog of the content arm's
+/// [`crate::db::content_diesel::StampOutcome`] split.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReaAnchorWrite {
+    /// The row was absent, un-anchored, or carried a DIFFERENT anchor — the
+    /// write advanced it. Real convergence.
+    Advanced,
+    /// The row ALREADY held exactly the anchor the own conductor answered with.
+    /// The write refreshed the value columns, but the ANCHOR did not move — so
+    /// the peer-advertised divergence that enqueued this row is UNCHANGED and
+    /// will re-enqueue next sweep. Not progress, and not a defect: this peer and
+    /// its peers hold genuinely different roots and no amount of own-conductor
+    /// healing can converge them.
+    Refreshed,
+}
+
+/// Pure + total, so the adjudication rule is testable without a conductor or a
+/// database. An EMPTY stored anchor is not a confirmation (the row is
+/// un-anchored — the write fills it, which is a forward move).
+fn classify_rea_anchor_write(existing_anchor: Option<&str>, answered: &str) -> ReaAnchorWrite {
+    match existing_anchor {
+        Some(a) if !a.is_empty() && a == answered => ReaAnchorWrite::Refreshed,
+        _ => ReaAnchorWrite::Advanced,
+    }
 }
 
 /// Project one conductor-read Commitment into local SQL via the SHARED mapping.
 /// Row content comes exclusively from the own conductor's `ReaCommitmentOutput`.
+///
+/// Returns whether the write ADVANCED the row's anchor or merely REFRESHED it
+/// under the anchor it already held — the fact the divergence adjudication in
+/// [`heal_rea`] turns on. The read is taken BEFORE the upsert (which is
+/// idempotent on the anchor, so the after-state cannot tell the two apart).
 fn heal_one(
     output: &shefa_types::ReaCommitmentOutput,
     pool: &DbPool,
     app_ctx: &crate::db::AppContext,
-) -> Result<(), crate::error::StorageError> {
+) -> Result<ReaAnchorWrite, crate::error::StorageError> {
     let c = &output.commitment;
     let action_hash = format!("{}", output.action_hash);
     let input = crate::rea_projection::project_commitment_from_wire(
@@ -2059,8 +2166,16 @@ fn heal_one(
     let mut conn = pool
         .get()
         .map_err(|e| crate::error::StorageError::Internal(format!("pool: {e}")))?;
+    // Read the PRE-write anchor: `upsert_with_anchor` is idempotent on the
+    // anchor column, so after the write "confirmed what we held" and "advanced
+    // to a new head" are indistinguishable.
+    let existing_anchor = crate::db::rea_commitments::get_commitment(&mut conn, app_ctx, &c.id)?
+        .and_then(|row| row.dht_anchor_hash);
     crate::db::rea_commitments::upsert_with_anchor(&mut conn, app_ctx, input, Some(&action_hash))?;
-    Ok(())
+    Ok(classify_rea_anchor_write(
+        existing_anchor.as_deref(),
+        &action_hash,
+    ))
 }
 
 // ============================================================================
@@ -3828,6 +3943,113 @@ mod tests {
         assert!(
             !s.converged,
             "unadjudicated divergence must still defeat convergence"
+        );
+    }
+
+    #[test]
+    fn rea_conductor_confirming_the_held_anchor_is_a_refresh_not_a_heal() {
+        // The live REA shape (matthew, 23:56Z): rea_divergent_anchor=12 against a
+        // heal leg that reports success every sweep. Discovery counts a row
+        // divergent vs a PEER's anchor; the own conductor then answers with the
+        // anchor the row ALREADY holds, so the write moves nothing. Calling that
+        // `healed` is what made a spinning plane read as a working one — and
+        // leaving it unadjudicated is what pinned `converged` at 0 fleet-wide.
+        assert_eq!(
+            classify_rea_anchor_write(
+                Some("uhCkA-peer-disagrees-with-this"),
+                "uhCkA-peer-disagrees-with-this"
+            ),
+            ReaAnchorWrite::Refreshed,
+            "the own conductor confirmed the anchor the row already holds — nothing converged"
+        );
+    }
+
+    #[test]
+    fn rea_anchor_write_that_moves_the_row_is_advanced() {
+        // The honest half: a row with no anchor, an EMPTY anchor, or a genuinely
+        // different one is FILLED / MOVED FORWARD by the write. That is real
+        // convergence and must never be adjudicated away as a refusal.
+        assert_eq!(
+            classify_rea_anchor_write(None, "uhCkA-fresh"),
+            ReaAnchorWrite::Advanced,
+            "an absent row is filled, not refreshed"
+        );
+        assert_eq!(
+            classify_rea_anchor_write(Some(""), "uhCkA-fresh"),
+            ReaAnchorWrite::Advanced,
+            "an un-anchored row is filled, not refreshed"
+        );
+        assert_eq!(
+            classify_rea_anchor_write(Some("uhCkA-old"), "uhCkA-new"),
+            ReaAnchorWrite::Advanced,
+            "a different conductor answer advances the anchor"
+        );
+    }
+
+    #[tokio::test]
+    async fn rea_divergence_the_own_conductor_confirms_does_not_defeat_convergence() {
+        // The REA sibling of
+        // `divergence_heal_is_forbidden_to_move_does_not_defeat_convergence`.
+        // Live residue on the household pods: rea_divergent_anchor=12, static
+        // across many sweeps (7 admitted + 5 ledger-exhausted), with
+        // `divergent_refused{stream="rea"}` hardcoded 0 — so `converged` could
+        // never move no matter how well the heal leg worked. Once the arm
+        // adjudicates BOTH its classes, the same sweep converges.
+        let state = ProjectionReconcileState::new();
+        state
+            .publish_sweep(
+                GapCounts {
+                    pending: 0,
+                    completed: 7,
+                    failed: 0,
+                    caught_up: true,
+                    exhausted: 5,
+                    converged: true,
+                },
+                6,
+                12, // total REA divergence...
+                12, // ...5 retry-exhausted + 7 conductor-confirmed = all of it.
+            )
+            .await;
+
+        let s = state.status().await;
+        assert_eq!(
+            s.divergent_anchor, 12,
+            "the TOTAL stays on the wire — adjudicated divergence must not vanish"
+        );
+        assert!(
+            s.converged,
+            "divergence the own conductor has confirmed is not divergence heal can resolve"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unadjudicated_rea_divergent_row_still_defeats_convergence() {
+        // The guard against the REA split becoming a whitewash: a divergent row
+        // whose conductor answer ADVANCED nothing and which the ledger has not
+        // exhausted is divergence this sweep genuinely did not resolve.
+        let state = ProjectionReconcileState::new();
+        state
+            .publish_sweep(
+                GapCounts {
+                    pending: 0,
+                    completed: 7,
+                    failed: 0,
+                    caught_up: true,
+                    exhausted: 5,
+                    converged: true,
+                },
+                6,
+                12,
+                11, // one row short of fully adjudicated
+            )
+            .await;
+
+        let s = state.status().await;
+        assert_eq!(s.divergent_anchor, 12);
+        assert!(
+            !s.converged,
+            "unadjudicated REA divergence must still defeat convergence"
         );
     }
 
