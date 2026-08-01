@@ -32,9 +32,15 @@
 #
 # A single PASS observation requires ALL of:
 #   1. storage-A /p2p/status: pull.caughtUp === true
-#   2. storage-B /p2p/status: pull.caughtUp === true
-#      (missing/null/unreachable on either side is NOT a pass — keep
-#      waiting; never treat a null/absent field as caught up)
+#      (missing/null/unreachable is NOT a pass — keep waiting; never treat
+#      a null/absent field as caught up)
+#   2. (telemetry only, NOT gating) storage-B pull.caughtUp is read and
+#      printed but does not gate: B's pull queue empty-by-design reads
+#      caughtUp=false (the all-retired/empty guard, observed 2026-07-31 and
+#      live-confirmed constant-False through edge #1283's whole 45-min
+#      window) — gating on it would wedge the pipeline forever, and the
+#      saga asserts nothing about B's pull. B's gating legs are serving
+#      (content 200) only.
 #   3. storage-A /metrics: elohim_projection_reconcile_converged == 1,
 #      matched by an EXACT metric-name boundary (name followed by whitespace
 #      or '{'), never a bare prefix/startswith match — a startswith check
@@ -185,7 +191,8 @@ PYEOF
   pass=1
   reasons=()
   [ "$a_caught_up" = "True" ] || { pass=0; reasons+=("A-not-caughtUp"); }
-  [ "$b_caught_up" = "True" ] || { pass=0; reasons+=("B-not-caughtUp"); }
+  # B-caughtUp deliberately NOT gating (empty-queue-by-design reads false;
+  # see header note 2) — still printed in the summary for telemetry.
   [ "$converged_ok" = "True" ] || { pass=0; reasons+=("A-not-converged(${converged:-null})"); }
   [ "$code_a" = "200" ] || { pass=0; reasons+=("A-content-${code_a}"); }
   [ "$code_b" = "200" ] || { pass=0; reasons+=("B-content-${code_b}"); }

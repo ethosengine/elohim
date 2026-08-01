@@ -100,6 +100,23 @@ manifests. This was never observed post-unification; treat as config drift.
 `bus_mongo.rs` drain/cursor defect or mongo down. All four legs fail →
 relay/ingress problem.
 
+**Content view sheds 503 "catching-up" while `/health` reads healthy.**
+Signature: `GET /db/content/<id>` answers 503 `{"status":"catching-up"}` in
+milliseconds (instant refusal, not a timeout) while the same doorway's
+`/health` shows conductor pools healthy and p2p caughtUp/converged true.
+Disambiguate by counters on `/metrics` (admission-exempt): 
+`doorway_admission_shed_total` climbing → genuine load shed (wait/shed
+storm); `doorway_upstream_breaker_open_total` climbing → the per-upstream
+circuit breaker is refusing without calling storage. If the breaker stays
+open past a few cooldowns (30s each) while the storage upstream answers
+in-cluster probes fine, suspect the **latched half-open class**
+(`upstream_health.rs` test `halfopen_without_record_deadlocks_forever`): a
+caller consumed the half-open trial and never recorded an outcome — the
+breaker never recovers on its own; a doorway restart resets it, the durable
+cure is record-on-every-terminal-path in the caller (first observed live
+2026-08-01 on both doorways at once, /db/content path, after a churn
+window legitimately opened the breakers).
+
 **Deploy failed before kubectl apply, all humans.** Read the render-stage
 console — the validator and ingress-conflict gates run there and fail
 loudly. Gate scripts are bash+coreutils ONLY (the deploy container has no
