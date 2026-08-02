@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:object:answer",
+  "title": "Answer",
+  "description": "The monomorphic wire envelope for a boundary answer whose absence has two provenances (concern class C4, honest absence). Rust is generic (`seam_contracts::Answer<T>`); the wire is NOT — a per-view envelope narrows `value` to that view's payload and inherits the `state`/`reason` discrimination from here, because the repo has no ts-rs generics and a flat generated directory is the wrong place for its first. Emission follows the proven DiversityHint tag/content shape: an adjacent tag (`state`) beside a payload key (`value`) that is simply absent for the non-present states. Authored as a three-branch `oneOf` rather than one object plus conditionals so the generated TypeScript is a genuine discriminated union — a client that checks `state` gets `value` or `reason` narrowed for free, which is the whole point of making C4 survive the boundary. Source of truth for the Rust side: seam_contracts::Answer / AnswerState / AnswerReason (crates/seam-contracts/src/answer.rs).",
+  "oneOf": [
+    {
+      "title": "AnswerPresent",
+      "description": "The answer arrived and carries a value. Takes no `reason`: 'why is it there' is not a question a boundary answers.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "value"],
+      "properties": {
+        "state": { "const": "present" },
+        "value": {
+          "description": "The payload. A per-view envelope narrows this to that view's type; the base envelope leaves it unconstrained on purpose so one schema can govern every adopting view.",
+          "tsType": "unknown"
+        }
+      }
+    },
+    {
+      "title": "AnswerAbsent",
+      "description": "The answer arrived and reports the value does not exist. A POSITIVE claim — absence was observed — so its only legal reason is `observed_absent`, and it never carries a value.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "reason"],
+      "properties": {
+        "state": { "const": "absent" },
+        "reason": { "const": "observed_absent" }
+      }
+    },
+    {
+      "title": "AnswerUnreachable",
+      "description": "No answer arrived; nothing is established in either direction. Always carries a reason — a non-present answer with no reason is exactly the unreadable gauge C8 forbids — and never a value.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "reason"],
+      "properties": {
+        "state": { "const": "unreachable" },
+        "reason": {
+          "enum": ["timeout", "transport_error", "refused", "unverifiable", "not_yet_delivered"]
+        }
+      }
+    }
+  ],
+  "_vocabulary": {
+    "$comment": "The two enum schemas this envelope's `state` and `reason` are drawn from. Referenced here rather than by $ref inside the branches because each branch pins a single const/subset — the enums remain the single source of truth for the full vocabulary, and elohim-storage's schema_contract test asserts the branches stay a partition of them.",
+    "state": "../enums/answer-state.schema.json",
+    "reason": "../enums/answer-reason.schema.json"
+  },
+  "_adoptions": {
+    "$comment": "Existing three-way surfaces whose states map onto this vocabulary WITHOUT changing their behaviour — the proof that the envelope is adequate rather than aspirational (plan task P1.4). Each mapping is total over the source states it names; elohim/elohim-storage/tests/schema_contract.rs asserts every target below is a legal answer-state. These are read-models of code that already exists; adopting the envelope on the wire is a separate, later change.",
+    "epr-pull-status": {
+      "source": "elohim/sdk/schemas/v1/views/epr-pull-status.schema.json",
+      "note": "Documents its own 'tri-state' nullable: `total: null` = the desired set cannot be computed yet, which is NOT zero-desired. Rule 11's type specimen.",
+      "mapping": {
+        "total_integer": "present",
+        "total_null": "unreachable",
+        "caught_up_boolean": "present",
+        "caught_up_null": "unreachable"
+      }
+    },
+    "render-fetch-outcome": {
+      "source": "elohim/elohim-render/src/types.rs (FetchOutcome)",
+      "note": "Already three-way: Arrived{empty} splits truthful-empty from Stalled, and RenderTerminal keeps the same seam. `arrived_empty` is an OBSERVED emptiness — the fetch settled — so it is `absent`, not `unreachable`.",
+      "mapping": {
+        "arrived_nonempty": "present",
+        "arrived_empty": "absent",
+        "stalled": "unreachable",
+        "errored": "unreachable"
+      }
+    },
+    "doorway-reconcile-decision": {
+      "source": "doorway/doorway-service/src/render/registry.rs (ReconcileDecision)",
+      "note": "The third independent derivation of honest absence; `ReconcileDecision::answer_state()` is the live projection of this mapping in Rust. UpToDate and Stale are both PRESENT answers — which head they name is a verdict on top of the answer, not a different kind of answer.",
+      "mapping": {
+        "up_to_date": "present",
+        "stale": "present",
+        "unreachable": "unreachable"
+      }
+    },
+    "storage-local-resolve": {
+      "source": "elohim/elohim-storage/src/services/head_adoption.rs (LocalResolve)",
+      "note": "The first adoption. `Probe` is deliberately outside the triad — 'I have not asked' is an instruction, not an answer.",
+      "mapping": {
+        "resolved_head": "present",
+        "resolved_no_head": "absent",
+        "resolve_unanswered": "unreachable"
+      }
+    }
+  }
+}

@@ -664,7 +664,7 @@ impl HealOutcomeKind {
 /// keys on the authority the write CARRIES — a fallback self-root is the weakest
 /// authority there is, and filling with it while a peer advertises a real
 /// declaration is squatting, not filling absence.
-fn gapfill_would_self_elect(
+pub(crate) fn gapfill_would_self_elect(
     answer_canonical: bool,
     peer_advertises_declaration: bool,
     local_declared: Option<&str>,
@@ -687,7 +687,10 @@ fn gapfill_would_self_elect(
 /// This closes the drop-forever hole: before this, a timed-out row landed in
 /// NEITHER the ghost list (that needs `Ok(None)`) nor the adopt list, so an
 /// unresponsive conductor meant the id was silently re-dropped every sweep.
-fn timeout_should_route_to_adopt(transient: bool, peer_advertises_declaration: bool) -> bool {
+pub(crate) fn timeout_should_route_to_adopt(
+    transient: bool,
+    peer_advertises_declaration: bool,
+) -> bool {
     transient && peer_advertises_declaration
 }
 
@@ -728,7 +731,7 @@ fn timeout_should_route_to_adopt(transient: bool, peer_advertises_declaration: b
 ///   here means the two sides already agree on the head.
 /// - **`!local_has_canonical_election`** — QUIESCENCE. A row obeying an election
 ///   is settled; re-admitting it would re-contest a decided question every sweep.
-fn declared_divergence_should_route_to_contest(
+pub(crate) fn declared_divergence_should_route_to_contest(
     answer_canonical: bool,
     local_declared: bool,
     peer_advertises_different_head: bool,
@@ -770,7 +773,7 @@ fn declared_divergence_should_route_to_contest(
 ///
 /// The row still stays `mark_failed` (honest: WE did not heal it), exactly as
 /// the timeout route does.
-fn conductor_missing_should_route_to_adopt(peer_advertises_declaration: bool) -> bool {
+pub(crate) fn conductor_missing_should_route_to_adopt(peer_advertises_declaration: bool) -> bool {
     peer_advertises_declaration
 }
 
@@ -1770,8 +1773,8 @@ async fn witness_ghost_anchors(
                 );
                 continue;
             }
-            // ADOPT-BEFORE-AUTHOR PRE-FLIGHT. `LocalResolve::Known(None)` — NOT
-            // `Probe`: a ghost candidate is BY CONSTRUCTION an id whose
+            // ADOPT-BEFORE-AUTHOR PRE-FLIGHT. `LocalResolve::observed(None)` —
+            // NOT `Probe`: a ghost candidate is BY CONSTRUCTION an id whose
             // `resolve_content_head` answered `Ok(None)` moments ago in
             // `heal_content`. Re-probing would burn a conductor round-trip per
             // ghost per sweep to re-learn an answer we already hold, and on a
@@ -1785,7 +1788,7 @@ async fn witness_ghost_anchors(
                 pool,
                 &ghost_ctx,
                 id,
-                crate::services::head_adoption::LocalResolve::Known(None),
+                crate::services::head_adoption::LocalResolve::observed(None),
                 adopt,
             )
             .await;
@@ -3054,8 +3057,8 @@ async fn heal_content(
                     timeout_should_route_to_adopt(transient, peer_head_hints.contains_key(&id));
                 if routed_to_adopt {
                     // The conductor never answered — absence was NOT observed.
-                    // `head: None` maps to `LocalResolve::Unresolved`, the
-                    // variant that says exactly that.
+                    // `head: None` maps to `LocalResolve::unresolved()`
+                    // (`Answer::Unreachable`), which says exactly that.
                     adopt_candidates.push(AdoptCandidate {
                         id: id.clone(),
                         head: None,
@@ -3120,15 +3123,16 @@ async fn heal_content(
 ///
 /// Carrying it is not an optimisation — it is what makes `AdoptLocal` reachable
 /// from the adopt arm. This list previously held bare ids and the arm asserted
-/// `LocalResolve::Known(None)` for every one of them, so `conductor_canonical`
-/// was hard-wired false and a DHT-ELECTED canonical head could never be adopted
-/// here no matter what the conductor had just said.
+/// an observed absence for every one of them, so `conductor_canonical` was
+/// hard-wired false and a DHT-ELECTED canonical head could never be adopted here
+/// no matter what the conductor had just said.
 #[derive(Debug, Clone)]
 struct AdoptCandidate {
     id: String,
     /// `Some` when the conductor answered (canonical or fallback); `None` when
-    /// it timed out or reported nothing — mapped to `LocalResolve::Unresolved`,
-    /// which states "absence was not observed" rather than asserting it.
+    /// it timed out or reported nothing — mapped to
+    /// `LocalResolve::unresolved()` (`Answer::Unreachable`), which states
+    /// "absence was not observed" rather than asserting it.
     head: Option<crate::services::conductor_writes::ContentHeadWire>,
 }
 
@@ -3141,23 +3145,26 @@ struct AdoptCandidate {
 /// terminal wrong answer into a terminal absent one. This is what actually
 /// converges them.
 ///
-/// CONTRACT DEVIATION — `candidates` now carries TWO provenances, and
-/// `LocalResolve::Known(None)` is exact for only the first:
+/// PROVENANCE (was a CONTRACT DEVIATION until 2026-08-02) — `candidates` carries
+/// TWO provenances, and each now names itself in the shared C4 vocabulary
+/// instead of sharing one stand-in variant:
 ///
 /// 1. GAPFILL-REFUSED (the original): the own conductor DID answer, but with a
 ///    non-canonical fallback, so there is no canonical head to adopt locally —
-///    precisely what `Known(None)` states. The decision rule then sees
-///    `(canonical=false, peer=true, local=None)` → `AdoptPeer`.
+///    `LocalResolve::observed(..)` (`Answer::Absent` when the head is `None`).
+///    The decision rule then sees `(canonical=false, peer=true, local=None)` →
+///    `AdoptPeer`.
 /// 2. TIMEOUT-ROUTED (2026-07-29, [`timeout_should_route_to_adopt`]): the
 ///    conductor did NOT answer. Absence was not observed, only unestablished —
-///    so here `Known(None)` is a conservative STAND-IN, not an observation.
+///    `LocalResolve::unresolved()` (`Answer::Unreachable`). No stand-in, no
+///    borrowed meaning.
 ///
-/// The stand-in is safe because it can only ever FORECLOSE the `AdoptLocal` arm,
+/// Both are safe because both can only ever FORECLOSE the `AdoptLocal` arm,
 /// never assert absence: both provenances are gated on a peer hint existing, so
-/// the reachable verdicts are `AdoptPeer` / `Hold`. Preserve that. If a future
-/// arm needs to act on "the conductor observed nothing", split the variant (see
-/// the `LocalResolve::Known` doc) rather than letting a timeout read as an
-/// observed absence.
+/// the reachable verdicts are `AdoptPeer` / `Hold`. Preserve that. An arm that
+/// must act on "the conductor observed nothing" now matches
+/// `LocalResolve::Resolved(Answer::Absent)` directly — the distinction is a
+/// type, not a comment.
 ///
 /// Never authors. An `Author` verdict here means the peer's head could not be
 /// declared this sweep (no usable carried record yet); the row keeps its
@@ -3186,17 +3193,18 @@ async fn adopt_deferred_heads(
             let id = &candidate.id;
             // PROVENANCE-EXACT local resolve. The heal leg ALREADY paid the
             // conductor for these answers, so pass what it learned instead of
-            // asserting a blanket `Known(None)`:
-            //   - `Known(Some(head))` — the conductor answered. If that answer
-            //     is CANONICAL the pre-flight can now take `AdoptLocal`, which
-            //     was structurally unreachable from this arm while every
+            // asserting a blanket observed-absence:
+            //   - `observed(Some(head))` — the conductor answered. If that
+            //     answer is CANONICAL the pre-flight can now take `AdoptLocal`,
+            //     which was structurally unreachable from this arm while every
             //     candidate claimed observed-absence. That is the whole point:
             //     an elected head must be adoptable here.
-            //   - `Unresolved` — the conductor timed out or reported nothing.
-            //     Absence was never observed; the variant says so honestly.
+            //   - `unresolved()` (`Answer::Unreachable`) — the conductor timed
+            //     out or reported nothing. Absence was never observed; the
+            //     answer state says so honestly.
             let local_resolve = match &candidate.head {
-                Some(head) => crate::services::head_adoption::LocalResolve::Known(Some(head)),
-                None => crate::services::head_adoption::LocalResolve::Unresolved,
+                Some(head) => crate::services::head_adoption::LocalResolve::observed(Some(head)),
+                None => crate::services::head_adoption::LocalResolve::unresolved(),
             };
             match crate::services::head_adoption::try_adopt_canonical_head(
                 hc,

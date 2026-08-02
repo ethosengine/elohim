@@ -89,3 +89,15 @@ a new build-manifest.json — that changes orchestrator dispatch")
   entry documents the gap; it does not resolve it.
 
 Status: open, unowned.
+
+## Addendum (2026-08-02, Wave B verification): schema_contract has the same shape of gap
+
+The Wave B behavior-neutrality review confirmed a sibling instance: the P1.4 wire-honesty
+guarantees are asserted by `elohim/elohim-storage/tests/schema_contract.rs`, but that
+integration target runs only in the local pre-push `just gate` (`elohim/elohim-storage/
+justfile` -> `cargo test`) — the edge pipeline's storage quality gate (`elohim/
+elohim-storage/Dockerfile` check stage) runs `cargo test --lib` and `schema_contract`
+appears in no Jenkinsfile, Dockerfile, or CI script repo-wide. Pre-existing (the file
+pre-dates this sprint), but any fix here should cover both: the seam-contracts gate AND
+the storage integration-test tier (`schema_contract`, `liveness_contract` filter) need a
+CI backstop, not pre-push-only enforcement.

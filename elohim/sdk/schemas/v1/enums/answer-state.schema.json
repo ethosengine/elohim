@@ -1,0 +1,9 @@
+{
+  "$id": "epr:schema:enum:answer-state",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AnswerState",
+  "description": "The three states a boundary answer can be in, kept apart so absence is never inferred from silence (concern class C4, honest absence). `present` = the answer arrived and carries a value. `absent` = the answer arrived and reports the value does not exist — a positive, OBSERVED claim. `unreachable` = no answer arrived (timeout, transport failure, undelivered gossip, an unverifiable response); nothing is established in either direction. Refusal and unverifiability are reasons, not states — see answer-reason. Rust authority: seam_contracts::AnswerState (crates/seam-contracts/src/answer.rs); agreement is asserted by elohim/elohim-storage/tests/schema_contract.rs.",
+  "type": "string",
+  "enum": ["present", "absent", "unreachable"],
+  "$comment": "Deliberately carries NO _dna metadata: this vocabulary is never validated by any integrity zome, and minting it as a DNA-validated enum would move the DNA hash for something the DHT does not read. It is therefore absent from schema-enums.ts (which is _dna-keyed) and generated only as a TypeScript union in generated-ts/enums/answer-state.ts."
+}

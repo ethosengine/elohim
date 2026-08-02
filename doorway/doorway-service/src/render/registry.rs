@@ -63,6 +63,10 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
 
+// C8: the reconcile outcome vocabulary projects through `ReasonLabel::label`
+// rather than repeating string literals at the call sites.
+use seam_contracts::ReasonLabel as _;
+
 /// Lifecycle status of a served bundle head. Serialized lowercase on the
 /// `servedBundleHeads` health field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -646,7 +650,15 @@ impl RendererRegistry {
         let mut outcomes = Vec::new();
         for (slug, materialized_hash, is_default) in targets {
             let declared = resolve_declared(&ctx.storage_url, &slug).await;
-            match decide_reconcile(&materialized_hash, declared) {
+            let decision = decide_reconcile(&materialized_hash, declared);
+            // The `outcome` string for the two terminal arms comes from the typed
+            // vocabulary rather than a literal — byte-identical today
+            // ("unreachable" / "current"), and a fourth decision arm can no
+            // longer be added without declaring its label. The Stale arm carries
+            // its own richer sub-outcomes (refreshing / refreshed / stale /
+            // failed) and is left as-is.
+            let decision_class = decision.class();
+            match decision {
                 ReconcileDecision::Unreachable(err) => {
                     // Safe-degrade: keep serving current, status unchanged. Never
                     // adopt an unverifiable head.
@@ -658,7 +670,7 @@ impl RendererRegistry {
                     );
                     outcomes.push(SlugOutcome {
                         slug,
-                        outcome: "unreachable".into(),
+                        outcome: decision_class.label().into(),
                         server_blob_hash: Some(materialized_hash),
                         declared_server_blob_hash: None,
                         error: Some(err),
@@ -668,7 +680,7 @@ impl RendererRegistry {
                     self.mark_current(&slug, &declared_hash);
                     outcomes.push(SlugOutcome {
                         slug,
-                        outcome: "current".into(),
+                        outcome: decision_class.label().into(),
                         server_blob_hash: Some(materialized_hash),
                         declared_server_blob_hash: Some(declared_hash),
                         error: None,
@@ -1088,6 +1100,36 @@ fn materialize_and_build(
 
 /// Decision arm of one reconcile check — pure, so the current/stale/safe-degrade
 /// transitions are unit-testable without a storage backend or a V8 isolate.
+///
+/// **Concerns:** C4 (honest absence), C8 (observability-per-decision via
+/// [`ReconcileClass`]).
+///
+/// **Contract test:** [`tests::decide_reconcile_read_failure_is_unreachable_safe_degrade`]
+/// and [`tests::reconcile_states_are_derived_from_the_shared_answer_vocabulary`].
+///
+/// # An independent derivation, now a shared one
+///
+/// This type was the protocol's **third** independent derivation of the
+/// honest-absence shape — after elohim-storage's `LocalResolve` and
+/// steward/node's `ConsensusOutcome`, at a seam none of them share. Nobody
+/// copied anybody; the distinction is simply forced wherever a boundary answer
+/// can fail to arrive. That recurrence is the evidence the whole seam-concern
+/// architecture rests on, and re-deriving it a fourth time is the failure mode
+/// it exists to stop.
+///
+/// So the derivation is now **structural**: [`ReconcileDecision::answer_state`]
+/// projects these arms onto [`seam_contracts::AnswerState`], the one vocabulary
+/// every seam reads the same way. The variants keep their payloads (the
+/// error/hash strings are load-bearing at the call sites) — what changes is that
+/// the C4 classification is no longer this file's private opinion.
+///
+/// `Unreachable` maps to [`AnswerState::Unreachable`]; **both** `UpToDate` and
+/// `Stale` map to [`AnswerState::Present`] — an answer arrived in each case, and
+/// which head it named is a verdict on top of the answer, not a different kind
+/// of answer. `Absent` is deliberately unreachable here: a storage peer that
+/// answers with no declared head at all is not a state this seam can currently
+/// observe (`resolve_declared` folds it into the `Err` arm), and inventing an
+/// `Absent` for it would be a claim we cannot back.
 #[derive(Debug, PartialEq, Eq)]
 pub enum ReconcileDecision {
     /// Declared-head read failed — keep serving current, status unchanged.
@@ -1096,6 +1138,73 @@ pub enum ReconcileDecision {
     UpToDate(String),
     /// Declared head != materialized head — re-materialize + swap.
     Stale(String),
+}
+
+/// The reconcile outcome vocabulary as a countable, fieldless discriminant.
+///
+/// **Concerns:** C8 — the `outcome` strings pushed onto `SlugOutcome` (and read
+/// by `/admin/ssr-bundle/*` consumers) are a contract; a typed vocabulary makes
+/// a fourth outcome impossible to add unannounced.
+///
+/// **Contract test:** [`tests::reconcile_class_labels_are_stable`].
+///
+/// The label strings are pinned BYTE-IDENTICAL to the literals already pushed at
+/// the three call sites (`"unreachable"` / `"current"` / `"stale"`), so no
+/// consumer of the admin JSON sees a change.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ReconcileClass {
+    /// The declared-head read failed.
+    Unreachable,
+    /// The declared head matches what is materialized.
+    Current,
+    /// The declared head differs from what is materialized.
+    Stale,
+}
+
+impl seam_contracts::ReasonLabel for ReconcileClass {
+    const ALL: &'static [Self] = &[
+        ReconcileClass::Unreachable,
+        ReconcileClass::Current,
+        ReconcileClass::Stale,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            ReconcileClass::Unreachable => "unreachable",
+            ReconcileClass::Current => "current",
+            ReconcileClass::Stale => "stale",
+        }
+    }
+}
+
+impl ReconcileDecision {
+    /// This decision's place in the shared honest-absence vocabulary.
+    ///
+    /// **Concerns:** C4 — the mapping is total and is the structural half of the
+    /// adoption described on the type.
+    ///
+    /// **Contract test:** [`tests::reconcile_states_are_derived_from_the_shared_answer_vocabulary`].
+    pub fn answer_state(&self) -> seam_contracts::AnswerState {
+        match self {
+            ReconcileDecision::Unreachable(_) => seam_contracts::AnswerState::Unreachable,
+            ReconcileDecision::UpToDate(_) | ReconcileDecision::Stale(_) => {
+                seam_contracts::AnswerState::Present
+            }
+        }
+    }
+
+    /// This decision's outcome class — the typed source of the `outcome` string.
+    ///
+    /// **Concerns:** C8.
+    ///
+    /// **Contract test:** [`tests::reconcile_class_labels_are_stable`].
+    pub fn class(&self) -> ReconcileClass {
+        match self {
+            ReconcileDecision::Unreachable(_) => ReconcileClass::Unreachable,
+            ReconcileDecision::UpToDate(_) => ReconcileClass::Current,
+            ReconcileDecision::Stale(_) => ReconcileClass::Stale,
+        }
+    }
 }
 
 /// Compare the currently-materialized head against a freshly-resolved declared
@@ -1225,6 +1334,66 @@ mod tests {
         assert_eq!(
             d,
             ReconcileDecision::Unreachable("storage GET failed".to_string())
+        );
+    }
+
+    // ── C4/C8 adoption of the shared seam contracts (plan task P1.2) ─────────
+
+    /// The structural half of the adoption: this seam's honest-absence
+    /// classification is now DERIVED from `seam_contracts::AnswerState` rather
+    /// than being this file's private opinion. A read failure is the only arm
+    /// that is not a present answer — which head was named is a verdict on top
+    /// of an answer, not a different kind of answer.
+    #[test]
+    fn reconcile_states_are_derived_from_the_shared_answer_vocabulary() {
+        use seam_contracts::AnswerState;
+
+        assert_eq!(
+            decide_reconcile("sha256-aaa", Err("boom".into())).answer_state(),
+            AnswerState::Unreachable
+        );
+        assert_eq!(
+            decide_reconcile("sha256-aaa", Ok("sha256-aaa".into())).answer_state(),
+            AnswerState::Present
+        );
+        assert_eq!(
+            decide_reconcile("sha256-aaa", Ok("sha256-bbb".into())).answer_state(),
+            AnswerState::Present
+        );
+
+        // The distinction that matters: an unreachable read must NEVER read as
+        // an absence — nothing about the declared head was established.
+        assert_ne!(
+            decide_reconcile("sha256-aaa", Err("boom".into())).answer_state(),
+            AnswerState::Absent
+        );
+    }
+
+    /// The `outcome` strings on `SlugOutcome` are a contract with every
+    /// `/admin/ssr-bundle/*` consumer. Pinned BYTE-IDENTICAL to the literals
+    /// this vocabulary replaced.
+    #[test]
+    fn reconcile_class_labels_are_stable() {
+        seam_contracts::assert_reason_labels_stable::<ReconcileClass>(&[
+            "unreachable",
+            "current",
+            "stale",
+        ]);
+        seam_contracts::assert_reason_labels_discriminating::<ReconcileClass>();
+
+        // ...and each decision projects onto its own class, so the label pushed
+        // at the call site cannot drift from the decision taken.
+        assert_eq!(
+            decide_reconcile("sha256-aaa", Err("boom".into())).class(),
+            ReconcileClass::Unreachable
+        );
+        assert_eq!(
+            decide_reconcile("sha256-aaa", Ok("sha256-aaa".into())).class(),
+            ReconcileClass::Current
+        );
+        assert_eq!(
+            decide_reconcile("sha256-aaa", Ok("sha256-bbb".into())).class(),
+            ReconcileClass::Stale
         );
     }
 

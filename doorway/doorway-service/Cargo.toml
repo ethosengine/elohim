@@ -142,6 +142,14 @@ did-bridge = { path = "../../bridges/did/did-bridge" }
 # Shared types with DNAs
 doorway-client = { path = "../../crates/doorway-client" }
 
+# Executable seam contracts — Answer<T> (C4 honest absence) + ReasonLabel (C8).
+# doorway's `ReconcileDecision` is an independent THIRD derivation of the
+# honest-absence shape (alongside elohim-storage's LocalResolve and
+# steward/node's ConsensusOutcome); this dep makes that derivation structural
+# rather than parallel. Leaf crate: std-only, zero first-party deps.
+# See genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md
+elohim-seam-contracts = { version = "0.1.0", path = "../../crates/seam-contracts" }
+
 # Shared wire types with imagodei DNA — compiler enforces agreement
 imagodei-types = { path = "../../elohim/sdk/domains/imagodei/types" }
 

@@ -22,7 +22,15 @@ RUN apt-get update && apt-get install -y \
 # Install rustfmt and clippy (not included in slim image)
 RUN rustup component add rustfmt clippy
 
-# Copy manifests and local crates first for dependency caching
+# Copy manifests and local crates first for dependency caching.
+# `COPY crates ./crates` is wholesale, so crates/seam-contracts (the
+# elohim-seam-contracts leaf crate, a path-dep of doorway-service since the
+# 2026-08-02 seam-concern adoption in render/registry.rs) rides along with no
+# separate COPY. It declares its OWN `[workspace]` table, which cargo treats as a
+# separate workspace root rather than auto-membering into /app's — so no
+# `[workspace]` strip and no workspace-field inline are needed (the crate
+# declares every field literally). Only the relative path needs rewriting, in
+# the sed block below.
 COPY doorway/doorway-service/Cargo.toml doorway/doorway-service/Cargo.lock ./
 COPY crates ./crates
 COPY elohim/elohim-compute ./elohim/elohim-compute
@@ -85,6 +93,7 @@ RUN mkdir -p src/bin && \
 
 # Fix the paths to local crates (now relative to /app)
 RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client"|' Cargo.toml && \
+    sed -i 's|path = "../../crates/seam-contracts"|path = "crates/seam-contracts"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/elohim-compute"|path = "elohim/elohim-compute"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/elohim-cache-core"|path = "elohim/elohim-cache-core"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/sdk/domains/imagodei/types"|path = "elohim/sdk/domains/imagodei/types"|' Cargo.toml && \

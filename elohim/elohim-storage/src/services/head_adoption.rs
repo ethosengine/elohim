@@ -169,6 +169,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use seam_contracts::{Answer, ReasonLabel};
+
 use crate::db::content_diesel::{self, StampMode, StampOutcome};
 use crate::db::{AppContext, DbPool};
 use crate::hc_client::HcClient;
@@ -226,58 +228,164 @@ pub struct CarriedHeadRecord {
 /// A trait rather than a `P2PHandle` parameter so this module — and the
 /// `services` layer generally — stays transport-neutral: the libp2p and iroh
 /// adapters both delegate to the same pre-flight.
+///
+/// This is the plan's first **external-facing conformance contract** (Design
+/// surface 7): an implementor outside this repo receives the obligations below
+/// as a type plus this doc, not as prose it must find and obey.
 #[async_trait::async_trait]
 pub trait HeadRecordFetcher: Send + Sync {
-    /// `None` for EVERY failure mode, including "this peer is too old to decode
-    /// the request". Implementations MUST log the degradation explicitly and
-    /// MUST NOT retry-loop — the caller falls through to the author path, and
-    /// the next sweep tries again.
-    async fn fetch(&self, peer_id: &str, content_id: &str) -> Option<CarriedHeadRecord>;
+    /// Ask `peer_id` for its head `Record` for `content_id`.
+    ///
+    /// **Concerns:** C4 (honest absence), C6a (bounded work — the no-retry
+    /// clause below is a budget, and a retry ladder against an uncancellable
+    /// call IS a loop even with no `loop` token).
+    ///
+    /// **Contract test:** [`tests::answer_states_collapse_uniformly_at_every_fetch_site`];
+    /// the transport-level mapping is asserted by
+    /// `p2p::head_record_client::tests::fetch_failures_are_unreachable_not_absent`.
+    ///
+    /// # The contract (was prose above this signature until 2026-08-02)
+    ///
+    /// The previous signature returned `Option<CarriedHeadRecord>` and carried
+    /// this obligation as a comment: *"`None` for EVERY failure mode, including
+    /// 'this peer is too old to decode the request'. Implementations MUST log
+    /// the degradation explicitly and MUST NOT retry-loop — the caller falls
+    /// through to the author path, and the next sweep tries again."*
+    ///
+    /// That comment merged two genuinely different answers into one bit, so it
+    /// is now a type. Implementations MUST map:
+    ///
+    /// - [`Answer::Present`] — the peer answered and served a head. `record` may
+    ///   still be `None` inside it: a peer holding a head whose bytes it cannot
+    ///   retrieve answers hash-only, and that IS an answer.
+    /// - [`Answer::Absent`] — the peer answered and holds **no head** for this
+    ///   id. An observed absence, and the only arm that may claim one.
+    /// - [`Answer::Unreachable`] — no usable answer arrived: transport failure,
+    ///   timeout, an unparseable peer id, an undecodable payload, or a peer too
+    ///   old to decode the request. Nothing is established in either direction.
+    ///
+    /// Unchanged and still binding: implementations MUST log the degradation
+    /// explicitly and **MUST NOT retry-loop**. The reconcile sweep is the retry,
+    /// at its own cadence.
+    ///
+    /// # Behaviour-neutrality of the retrofit
+    ///
+    /// Every call site in this module currently treats `Absent` and
+    /// `Unreachable` identically (both fall through to the record-less path),
+    /// which is what made this retrofit admissible — see the plan's P2.3
+    /// precondition. Each site names that collapse with
+    /// [`Answer::into_option`], so a future arm that needs the distinction can
+    /// find every place it is currently discarded with one grep.
+    async fn fetch(&self, peer_id: &str, content_id: &str) -> Answer<CarriedHeadRecord>;
 }
 
 /// What the pre-flight resolved from the OWN conductor.
 ///
+/// **Concerns:** C4 (honest absence), C0 (plane location — the *subject* of this
+/// question is THIS conductor's resolution, never DHT-wide existence; see the
+/// scope note below).
+///
+/// **Contract test:** [`tests::local_resolve_keeps_observed_absence_apart_from_unresolved`]
+/// and its siblings in this module.
+///
 /// The ghost sweep has ALREADY paid for this answer (`heal_content` collects its
 /// candidates precisely from `resolve_content_head` returning `Ok(None)`), so it
-/// passes [`LocalResolve::Known`] rather than burning a second round-trip on an
-/// answer it holds.
+/// passes [`LocalResolve::Resolved`] rather than burning a second round-trip on
+/// an answer it holds.
+///
+/// # The CONTRACT DEVIATION this type replaced
+///
+/// Until 2026-08-02 the "already known" arm was `Known(Option<&ContentHeadWire>)`
+/// and carried a 40-line `CONTRACT DEVIATION (2026-07-29)` comment: its `None`
+/// had acquired TWO provenances — an OBSERVED absence (the ghost sweep saw
+/// `Ok(None)`) and an UNKNOWN (the heal loop's resolve TIMED OUT, see
+/// `projection_reconcile::timeout_should_route_to_adopt`) — while every caller
+/// kept reading it as the first. The comment ended with an instruction to a
+/// future editor: *split this variant rather than adding behaviour that silently
+/// reads the timeout case as observed absence.*
+///
+/// That split happened (`Known(None)` vs `Unresolved`) and this is its second
+/// half: the split is now expressed in the shared vocabulary
+/// ([`seam_contracts::Answer`]) instead of in two bespoke variants, so the
+/// distinction is a *type* every seam in the protocol reads the same way rather
+/// than a comment each new reader must rediscover. Plan task P1.2; canon row C4.
+///
+/// # Scope — what `Absent` claims here, and what it must never claim
+///
+/// The full-arc law says a conductor's local `get` miss means gossip has not
+/// delivered the record, NOT that the record does not exist — so
+/// [`seam_contracts::Answer::from_local_get`] maps a miss to `Unreachable`. That
+/// law is about **DHT-wide existence**. This type asks a narrower question:
+/// *what did MY conductor resolve for this id?* A `resolve_content_head`
+/// answering `Ok(None)` is an observed fact about this conductor, so it is
+/// honestly [`Answer::Absent`] **at this plane** — which is exactly what the
+/// wave-4 split established and what the first `Answer<T>` adoption is required
+/// not to re-merge.
+///
+/// ASSUMPTION A FUTURE EDITOR MUST PRESERVE (carried forward verbatim in force):
+/// `Absent` here must never become anything AUTHORITATIVE about the DHT — it
+/// must not author, delete, tombstone, or otherwise treat the id as
+/// proven-absent network-wide. Both non-present answers do exactly one thing
+/// today: foreclose the `AdoptLocal` arm, leaving `AdoptPeer` / `ContestPeer` /
+/// `Hold`. Neither asserts network-wide absence.
+#[derive(Debug, Clone, Copy)]
 pub enum LocalResolve<'a> {
     /// Not yet asked — the pre-flight calls `resolve_content_head` itself.
+    ///
+    /// Deliberately NOT an [`Answer`] arm: "I have not asked" is an instruction
+    /// to the pre-flight, not an answer about the world. Folding it into
+    /// `Unreachable` would make an unasked question indistinguishable from an
+    /// unanswered one — the same collapse one level up.
     Probe,
-    /// Already known. `None` means the conductor could not resolve the id at all.
+    /// The conductor was asked and the answer is in hand, with its two absences
+    /// kept apart by the shared vocabulary:
     ///
-    /// CONTRACT DEVIATION (2026-07-29) — `Known(None)` now carries TWO
-    /// provenances, and the second is weaker than this doc implies:
+    /// - [`Answer::Present`] — a head was resolved (canonical or fallback).
+    /// - [`Answer::Absent`] — the conductor answered and holds no head for this
+    ///   id (`Ok(None)`, the ghost class). Observed at THIS conductor; see the
+    ///   scope note on the type.
+    /// - [`Answer::Unreachable`] — the conductor did not answer (timeout class).
+    ///   Absence was never observed, only unestablished.
+    Resolved(Answer<&'a ContentHeadWire>),
+}
+
+impl<'a> LocalResolve<'a> {
+    /// The ghost-sweep constructor: the conductor ANSWERED, with `Some(head)` or
+    /// with a genuine `Ok(None)`.
     ///
-    /// 1. OBSERVED absence — the ghost sweep saw `resolve_content_head` return
-    ///    `Ok(None)`. This is the original, literal meaning.
-    /// 2. UNKNOWN — the heal loop's resolve TIMED OUT (see
-    ///    `projection_reconcile::timeout_should_route_to_adopt`). We never got an
-    ///    answer, so absence was not observed; it is merely not established.
+    /// **Concerns:** C4 — this is [`Answer::observed_absence`], named at the
+    /// call site so the provenance is visible in review.
     ///
-    /// This is safe TODAY only because both provenances lead to the same place:
-    /// `None` forecloses the `AdoptLocal` arm and leaves `AdoptPeer` / `Hold`,
-    /// and the timeout route is gated on a peer hint existing — so a timed-out
-    /// candidate always has a peer to adopt FROM, and can only `AdoptPeer` or
-    /// `Hold`. Neither outcome asserts absence.
+    /// **Contract test:** [`tests::local_resolve_keeps_observed_absence_apart_from_unresolved`].
+    pub fn observed(head: Option<&'a ContentHeadWire>) -> Self {
+        LocalResolve::Resolved(Answer::observed_absence(head))
+    }
+
+    /// The timeout constructor: the conductor was asked and did NOT answer.
     ///
-    /// ASSUMPTION A FUTURE EDITOR MUST PRESERVE: do not make `Known(None)` mean
-    /// anything AUTHORITATIVE — do not let it author, delete, tombstone, or
-    /// otherwise treat the id as proven-absent. If a new arm needs to
-    /// distinguish "observed absent" from "unknown", split this variant
-    /// (e.g. `Known(None)` vs `Unresolved`) rather than adding behaviour that
-    /// silently reads the timeout case as observed absence.
-    Known(Option<&'a ContentHeadWire>),
-    /// The conductor was ASKED and did not answer (timeout), or answered
-    /// `Ok(None)` for an id whose absence we cannot act on.
+    /// **Concerns:** C4 — absence is not established in either direction.
     ///
-    /// Split out from `Known(None)` on 2026-08-02, exactly as the note above
-    /// instructed: absence was NOT observed here, only unestablished. It behaves
-    /// identically today (forecloses `AdoptLocal`, leaves `AdoptPeer` /
-    /// `ContestPeer` / `Hold`), but it no longer LIES about provenance — a
-    /// future arm that needs "the conductor observed nothing" can now
-    /// distinguish the two without re-reading this comment and guessing.
-    Unresolved,
+    /// **Contract test:** [`tests::local_resolve_keeps_observed_absence_apart_from_unresolved`].
+    pub fn unresolved() -> Self {
+        LocalResolve::Resolved(Answer::Unreachable)
+    }
+
+    /// The head this resolve carries, if any — the single place both non-present
+    /// answers collapse, so the collapse is greppable rather than inline.
+    ///
+    /// **Concerns:** C4 — every caller of this method is a place where "the
+    /// conductor holds nothing" and "the conductor never answered" merge. Today
+    /// that merge is correct at every call site (both only foreclose
+    /// `AdoptLocal`); a future arm that needs the distinction matches on
+    /// [`LocalResolve::Resolved`] instead.
+    ///
+    /// **Contract test:** [`tests::both_absences_foreclose_adopt_local_identically`].
+    pub fn head(&self) -> Option<&'a ContentHeadWire> {
+        match self {
+            LocalResolve::Probe => None,
+            LocalResolve::Resolved(answer) => (*answer).into_option(),
+        }
+    }
 }
 
 /// Everything the peer-hint arm needs. Both fields are absent at boot (the
@@ -487,7 +595,7 @@ pub async fn try_adopt_canonical_head(
 
     // (1) LOCAL-DHT ARM. Reuse a resolve the caller already paid for.
     let probed: Option<ContentHeadWire> = match local_resolve {
-        LocalResolve::Known(_) | LocalResolve::Unresolved => None,
+        LocalResolve::Resolved(_) => None,
         LocalResolve::Probe => match conductor_writes::call_resolve_content_head(hc, id).await {
             Ok(head) => head,
             Err(e) => {
@@ -502,11 +610,13 @@ pub async fn try_adopt_canonical_head(
             }
         },
     };
+    // The named C4 collapse: `Absent` (conductor answered, holds nothing) and
+    // `Unreachable` (conductor never answered) both foreclose `AdoptLocal` and
+    // nothing else — identical today, and `LocalResolve::head` is the ONE place
+    // that identity is written down. A future arm that must tell them apart
+    // matches on `LocalResolve::Resolved` rather than calling `head()`.
     let head: Option<&ContentHeadWire> = match local_resolve {
-        LocalResolve::Known(h) => h,
-        // Absence was never observed — the conductor did not answer. Forecloses
-        // `AdoptLocal` and nothing else, exactly as documented.
-        LocalResolve::Unresolved => None,
+        LocalResolve::Resolved(_) => local_resolve.head(),
         LocalResolve::Probe => probed.as_ref(),
     };
     let canonical_head = head.filter(|h| h.canonical);
@@ -630,8 +740,12 @@ async fn adopt_peer(
     // its head. Absent fetcher (boot pass) or an old peer that cannot serve one
     // both degrade to a record-less declare, which succeeds iff this conductor
     // can already retrieve the target itself.
+    // NAMED C4 COLLAPSE (`into_option`): a peer that answered "no head" and a
+    // peer we never reached both degrade to the record-less declare here — the
+    // pre-P2.3 behaviour, preserved exactly. `Answer::Absent` becomes actionable
+    // separately only when an arm exists that should behave differently.
     let carried = match fetcher {
-        Some(f) => f.fetch(&hint.peer_id, id).await,
+        Some(f) => f.fetch(&hint.peer_id, id).await.into_option(),
         None => None,
     };
     // The SERVED hash wins over the advertised one: it is the action the bytes
@@ -693,7 +807,7 @@ async fn adopt_peer(
 /// [`try_obey_visible_election`]). A row that DID get an answer — canonical or
 /// fallback — is already served by the existing arms, so probing it would spend a
 /// conductor round-trip per row per sweep for nothing.
-fn should_probe_election(head_answer_present: bool) -> bool {
+pub(crate) fn should_probe_election(head_answer_present: bool) -> bool {
     !head_answer_present
 }
 
@@ -735,7 +849,14 @@ async fn try_obey_visible_election(
     // (3) Fetch. The peer answers with ITS head for this id; that is only useful
     // if it happens to BE the elected action. A mismatch is not a lie — the peer
     // may simply hold a different head — but it is not the bytes we need.
-    let carried = fetcher.fetch(&hint.peer_id, id).await;
+    // NAMED C4 COLLAPSE (`into_option`): "the peer holds no head" and "we never
+    // reached the peer" both land on the `None` arm below, which holds and
+    // retries next sweep — identical to the pre-P2.3 behaviour. The answer state
+    // is logged so the two are still readable in a trace even though they route
+    // the same way.
+    let answer = fetcher.fetch(&hint.peer_id, id).await;
+    let answer_state = answer.state().label();
+    let carried = answer.into_option();
     let bytes = match &carried {
         Some(c) if c.head_action_hash.trim() == winner.trim() => c.record.clone(),
         Some(c) => {
@@ -756,6 +877,7 @@ async fn try_obey_visible_election(
                 content_id = %id,
                 from_peer = %hint.peer_id,
                 elected = %winner,
+                answer_state,
                 "election-obey: no record served for the elected head; holding, retried next sweep"
             );
             return Some(AdoptOutcome::Held);
@@ -997,8 +1119,12 @@ async fn contest_peer(
     }
 
     let fetcher_present = fetcher.is_some();
+    // NAMED C4 COLLAPSE (`into_option`): `carried_present` below asks "did we get
+    // BYTES?", and both non-present answers mean no. Pre-P2.3 behaviour exactly;
+    // the `fetch_none` / `not_retrievable` split is downstream of the bytes, not
+    // of the answer state.
     let carried = match fetcher {
-        Some(f) => f.fetch(&hint.peer_id, id).await,
+        Some(f) => f.fetch(&hint.peer_id, id).await.into_option(),
         None => None,
     };
     // "Did we get BYTES?" — not "did the peer answer?". A peer holding a row it
@@ -1017,9 +1143,9 @@ async fn contest_peer(
     // distinction is whether we HAD a record to carry. Split here so the two
     // read as different problems on the dashboard.
     let unresolvable_class = if carried_present {
-        "not_retrievable"
+        crate::metrics::ContestFailure::NotRetrievable
     } else {
-        "fetch_none"
+        crate::metrics::ContestFailure::FetchNone
     };
 
     // ARM 1 — PEER-HEAD CANDIDACY.
@@ -1051,7 +1177,7 @@ async fn contest_peer(
             // already carries a declaration, and authoring here is exactly the
             // self-election the module exists to stop.
             if msg.contains(ERR_NO_LOCAL_CHAIN) {
-                crate::metrics::inc_contest_failed("no_local_chain");
+                crate::metrics::inc_contest_failed(crate::metrics::ContestFailure::NoLocalChain);
                 tracing::info!(
                     target: "elohim_storage::head_adoption",
                     content_id = %id,
@@ -1069,7 +1195,7 @@ async fn contest_peer(
             // peer's head action cannot be resolved here. This is exactly the
             // subclass self-candidacy answers.
             if !msg.contains(ERR_NOT_RETRIEVABLE) {
-                crate::metrics::inc_contest_failed("declare_error");
+                crate::metrics::inc_contest_failed(crate::metrics::ContestFailure::DeclareError);
                 tracing::warn!(
                     target: "elohim_storage::head_adoption",
                     content_id = %id,
@@ -1355,6 +1481,139 @@ mod tests {
     /// situations rather than argument lists.
     fn decide(c: bool, p: bool, l: bool, election: bool) -> HeadDecision {
         decide_head_action(c, p, l, election, true)
+    }
+
+    // ── C4 contract: LocalResolve on seam_contracts::Answer (plan P1.2) ──
+    //
+    // The registry recorded this exact gap: "no unit test asserts on
+    // LocalResolve::Known vs LocalResolve::Unresolved directly — decide_head_action's
+    // tests exercise the downstream bool this degrades to, not the enum itself."
+    // These close it.
+
+    /// A minimal `ContentHeadWire` through its real `Deserialize` impl — the
+    /// same path the conductor's answer takes, so the fixture cannot drift from
+    /// the wire shape by construction.
+    fn wire(canonical: bool) -> ContentHeadWire {
+        serde_json::from_value(serde_json::json!({
+            "content_id": "c1",
+            "head_action_hash": "uhCkkContractTestHead0000000000000000000",
+            "declared_at": 1_700_000_000_000_000i64,
+            "canonical": canonical,
+            "content": {
+                "id": "c1",
+                "content_type": "concept",
+                "title": "t",
+                "description": "d",
+                "content_format": "markdown",
+                "reach": "commons",
+            },
+        }))
+        .expect("ContentHeadWire fixture must deserialize")
+    }
+
+    /// The wave-4 split, asserted at the type level: an OBSERVED absence and an
+    /// unanswered resolve are different `Answer` states. If a future edit
+    /// re-merges them, this fails.
+    #[test]
+    fn local_resolve_keeps_observed_absence_apart_from_unresolved() {
+        let observed = LocalResolve::observed(None);
+        let unresolved = LocalResolve::unresolved();
+
+        let observed_state = match observed {
+            LocalResolve::Resolved(a) => a.state(),
+            LocalResolve::Probe => panic!("observed() must not construct Probe"),
+        };
+        let unresolved_state = match unresolved {
+            LocalResolve::Resolved(a) => a.state(),
+            LocalResolve::Probe => panic!("unresolved() must not construct Probe"),
+        };
+
+        assert_eq!(observed_state, seam_contracts::AnswerState::Absent);
+        assert_eq!(unresolved_state, seam_contracts::AnswerState::Unreachable);
+        assert_ne!(
+            observed_state, unresolved_state,
+            "the CONTRACT DEVIATION this type replaced was exactly these two \
+             collapsing into one answer"
+        );
+    }
+
+    /// A conductor that answered WITH a head is `Present` and carries it.
+    #[test]
+    fn an_answered_head_is_present_and_carried() {
+        let head = wire(true);
+        let resolved = LocalResolve::observed(Some(&head));
+        match resolved {
+            LocalResolve::Resolved(a) => {
+                assert_eq!(a.state(), seam_contracts::AnswerState::Present)
+            }
+            LocalResolve::Probe => panic!("observed(Some) must not construct Probe"),
+        }
+        assert!(resolved.head().is_some());
+    }
+
+    /// BEHAVIOUR-NEUTRALITY of the P1.2 adoption: both non-present answers
+    /// degrade to the same `Option` at the one named collapse point, which is
+    /// what makes `AdoptLocal` unreachable from either — and nothing else.
+    #[test]
+    fn both_absences_foreclose_adopt_local_identically() {
+        assert!(LocalResolve::observed(None).head().is_none());
+        assert!(LocalResolve::unresolved().head().is_none());
+        // ...and `Probe` carries nothing either: it is an instruction, not an
+        // answer, so it must never masquerade as one.
+        assert!(LocalResolve::Probe.head().is_none());
+
+        // The downstream input to the decision rule is `canonical_head.is_some()`,
+        // and it is false for every non-present answer — the identity the P1.2
+        // retrofit had to preserve.
+        for resolve in [LocalResolve::observed(None), LocalResolve::unresolved()] {
+            let canonical = resolve.head().filter(|h| h.canonical);
+            assert!(canonical.is_none());
+        }
+    }
+
+    /// `Probe` deliberately sits OUTSIDE the `Answer` triad: "I have not asked"
+    /// is not an answer about the world, and folding it into `Unreachable` would
+    /// make an unasked question indistinguishable from an unanswered one.
+    #[test]
+    fn probe_is_not_an_answer() {
+        assert!(matches!(LocalResolve::Probe, LocalResolve::Probe));
+        assert!(!matches!(LocalResolve::Probe, LocalResolve::Resolved(_)));
+    }
+
+    /// P2.3 precondition, asserted rather than asserted-about: every `Answer`
+    /// state that is not `Present` collapses to the same `None` at a fetch site,
+    /// which is why the `HeadRecordFetcher` retrofit is behaviour-neutral.
+    #[test]
+    fn answer_states_collapse_uniformly_at_every_fetch_site() {
+        let absent: Answer<CarriedHeadRecord> = Answer::Absent;
+        let unreachable: Answer<CarriedHeadRecord> = Answer::Unreachable;
+        assert!(absent.into_option().is_none());
+        assert!(unreachable.into_option().is_none());
+
+        let present = Answer::Present(CarriedHeadRecord {
+            head_action_hash: "uhCkk-head".into(),
+            record: None,
+        });
+        // A hash-only answer is still PRESENT — the peer answered. Reading it as
+        // an absence is the `carried_present` mislabel (`da8975176`).
+        assert!(present.is_present());
+        let carried = present.into_option().expect("present carries a value");
+        assert!(carried.record.is_none());
+    }
+
+    /// P1.3: the `elohim_content_contest_failed_total{class}` label vocabulary is
+    /// a dashboard contract. These four strings are BYTE-IDENTICAL to the raw
+    /// literals they replaced; changing one silently zeroes every panel keyed on
+    /// it.
+    #[test]
+    fn contest_failure_labels_are_stable() {
+        seam_contracts::assert_reason_labels_stable::<crate::metrics::ContestFailure>(&[
+            "no_local_chain",
+            "not_retrievable",
+            "fetch_none",
+            "declare_error",
+        ]);
+        seam_contracts::assert_reason_labels_discriminating::<crate::metrics::ContestFailure>();
     }
 
     /// All branches of the decision rule, named by the situation each one

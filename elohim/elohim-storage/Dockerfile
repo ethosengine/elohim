@@ -63,7 +63,16 @@ RUN apt-get update && apt-get install -y \
 # change (frequent), making upstream flake a spurious gate failure.
 RUN rustup component add rustfmt
 
-# Copy manifests and local crates first for dependency caching
+# Copy manifests and local crates first for dependency caching.
+# `COPY crates ./crates` is wholesale, so crates/seam-contracts (the
+# elohim-seam-contracts leaf crate, a path-dep of elohim-storage since the
+# 2026-08-02 seam-concern adoption) rides along with no separate COPY. It
+# declares its OWN `[workspace]` table (that is what gives it its own Cargo.lock,
+# which its `no_heavy_deps_in_dep_tree` boundary test reads via include_str!) —
+# cargo treats such a path-dep as a separate workspace root rather than
+# auto-membering it, so the flattened /app layout needs no `[workspace]` strip
+# and no workspace-field inline (the crate declares every field literally).
+# Only the relative path needs rewriting, in the sed block below.
 COPY elohim/elohim-storage/Cargo.toml elohim/elohim-storage/Cargo.lock ./
 COPY crates ./crates
 COPY elohim/constitution ./constitution
@@ -117,6 +126,7 @@ COPY elohim/sdk/domains/lamad/types /sdk/domains/lamad/types
 # Fix the paths to local crates (now relative to /app)
 RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client"|' Cargo.toml && \
     sed -i 's|path = "../../crates/elohim-sdk"|path = "crates/elohim-sdk"|' Cargo.toml && \
+    sed -i 's|path = "../../crates/seam-contracts"|path = "crates/seam-contracts"|' Cargo.toml && \
     sed -i 's|path = "../constitution"|path = "constitution"|' Cargo.toml && \
     sed -i 's|path = "../elohim-cache-core"|path = "elohim-cache-core"|' Cargo.toml && \
     sed -i 's|path = "../elohim-compute"|path = "elohim-compute"|' Cargo.toml && \

@@ -207,6 +207,14 @@ pub mod forwarder;
 // Test utilities (public for integration test binaries in tests/)
 pub mod test_util;
 
+// C3 (liveness) contract for the head-election decision surface — the plan's P2.2
+// regression demonstration. Test-only: it drives `decide_head_action` and the
+// crate-private admission predicates over one enumerated state space, so it must
+// live inside the crate rather than in `tests/`. Gated on `p2p` because the
+// admission predicates live in `p2p::projection_reconcile`.
+#[cfg(all(test, feature = "p2p"))]
+mod liveness_contract;
+
 // Re-exports
 pub use blob_store::BlobStore;
 pub use config::Config;

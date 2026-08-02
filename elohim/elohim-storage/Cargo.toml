@@ -10,6 +10,14 @@ license = "AGPL-3.0"
 # EPR canonical codec (Phase 1 — generalized atom)
 elohim-epr = { path = "../epr" }
 
+# Executable seam contracts — the concern canon as compile shapes: Answer<T>
+# (C4 honest absence) and ReasonLabel (C8 observability-per-decision). Leaf
+# crate, zero first-party deps, std-only default. Versioned like the other
+# publishable first-party crates (eprfs-* precedent) because it is published to
+# the `elohim` registry; the path wins for in-tree resolution.
+# See genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md
+elohim-seam-contracts = { version = "0.1.0", path = "../../crates/seam-contracts" }
+
 # SDK boundary types — View types migrate here incrementally from views.rs
 elohim-sdk = { path = "../../crates/elohim-sdk" }
 
@@ -306,6 +314,13 @@ n0-future = "0.1"
 pkarr = { version = "3.10", default-features = false, features = ["signed_packet"] }
 # Benchmark harness for graph traversal (Task 34)
 criterion = { version = "0.5", features = ["html_reports"] }
+# Turns on the default-OFF `harness` feature (the C2/C3/C6b property + table
+# harnesses) on top of the main `elohim-seam-contracts` dependency, for tests
+# only — a runtime build never links them. Same shape as `tokio`'s `test-util`
+# above. Consumed by `src/liveness_contract.rs` (plan task P2.2).
+elohim-seam-contracts = { version = "0.1.0", path = "../../crates/seam-contracts", features = [
+    "harness",
+] }
 
 [[bench]]
 name = "graph_traversal"

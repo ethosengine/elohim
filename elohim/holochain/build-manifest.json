@@ -18,6 +18,7 @@
           "doorway/doorway-service/Cargo.lock",
           "doorway/doorway-service/Dockerfile",
           "crates/doorway-client/**",
+          "crates/seam-contracts/**",
           "elohim/elohim-render/**",
           "elohim/elohim-views/**",
           "elohim/elohim-cache-core/**",

@@ -1,4 +1,6 @@
 export * from './enums/aggregation-lane';
+export * from './enums/answer-reason';
+export * from './enums/answer-state';
 export * from './enums/capacity-model';
 export * from './enums/circularity';
 export * from './enums/closure';
@@ -42,6 +44,7 @@ export * from './enums/step-type';
 export * from './enums/substrate-signal';
 export * from './enums/validation-status';
 export * from './objects/agent-peer-binding';
+export * from './objects/answer';
 export * from './objects/carrying-capacity';
 export * from './objects/coupling';
 export * from './objects/envelope';

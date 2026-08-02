@@ -1248,10 +1248,71 @@ pub fn inc_content_canonical_link_minted(source: &str) {
         .inc();
 }
 
-/// Count a contest attempt that minted nothing, by failure class
-/// (`no_local_chain` | `not_retrievable` | `fetch_none` | `declare_error`).
-pub fn inc_contest_failed(class: &str) {
-    CONTENT_CONTEST_FAILED.with_label_values(&[class]).inc();
+/// Why a contest attempt minted no canonical-head candidate — the label
+/// vocabulary of [`CONTENT_CONTEST_FAILED`], as a closed type.
+///
+/// **Concerns:** C8 (observability-per-decision — a typed reason, never a raw
+/// string), C4 (the `fetch_none` / `not_retrievable` split is an honest-absence
+/// distinction: "we got no bytes" is not "the bytes were rejected").
+///
+/// **Forcing incident:** these four classes were raw `&str` literals at four
+/// call sites in `services::head_adoption` (two inline, two through a
+/// `unresolvable_class` variable) with no test anywhere asserting the set stayed
+/// distinct or stable — so a typo would have minted a fifth, permanently-zero
+/// series and nothing would have gone red. Registered as a known gap in
+/// `elohim/elohim-storage/seam-registry.yaml`; closed by plan task P1.3.
+///
+/// **Contract test:** [`tests::contest_failure_labels_are_stable`] — the label
+/// strings are pinned BYTE-IDENTICAL to the pre-P1.3 literals, because
+/// `elohim_content_contest_failed_total{class}` panels and alerts are keyed on
+/// them. Renaming one silently zeroes every panel that reads it.
+///
+/// Variant order matches the failure-class narrative in
+/// [`CONTENT_CONTEST_FAILED`]'s doc: starved upstream → walled with bytes →
+/// walled without bytes → refused for any other reason.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ContestFailure {
+    /// This conductor holds no chain for the id at all — the target-independent
+    /// first gate. Contest is starved upstream; not fixable in storage.
+    NoLocalChain,
+    /// The chain exists but the peer's head action could not be resolved, AND we
+    /// had carried bytes to offer.
+    NotRetrievable,
+    /// Same wall, but the fetch returned nothing to carry — points at the
+    /// head-record transport rather than the conductor's DHT view.
+    FetchNone,
+    /// Anything else the conductor refused; always paired with a WARN carrying
+    /// the verbatim message.
+    DeclareError,
+}
+
+impl seam_contracts::ReasonLabel for ContestFailure {
+    const ALL: &'static [Self] = &[
+        ContestFailure::NoLocalChain,
+        ContestFailure::NotRetrievable,
+        ContestFailure::FetchNone,
+        ContestFailure::DeclareError,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            ContestFailure::NoLocalChain => "no_local_chain",
+            ContestFailure::NotRetrievable => "not_retrievable",
+            ContestFailure::FetchNone => "fetch_none",
+            ContestFailure::DeclareError => "declare_error",
+        }
+    }
+}
+
+/// Count a contest attempt that minted nothing, by failure class.
+///
+/// **Concerns:** C8 — the class is a [`ContestFailure`], so the counter cannot
+/// grow an unannounced label and a dashboard can enumerate what it may see.
+pub fn inc_contest_failed(class: ContestFailure) {
+    use seam_contracts::ReasonLabel as _;
+    CONTENT_CONTEST_FAILED
+        .with_label_values(&[class.label()])
+        .inc();
 }
 
 /// Count a row moved to the DHT-elected head (`path` = `"carried"`).

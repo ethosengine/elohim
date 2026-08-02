@@ -1,0 +1,984 @@
+//! C3 (liveness) contract for the head-election decision surface — the plan's
+//! P2.2 regression demonstration.
+//!
+//! Design: `genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md`
+//! (canon row C3; Design surface 3; task P2.2). Instrument:
+//! [`seam_contracts::harness::liveness`] (task P2.1).
+//!
+//! ## What this module proves
+//!
+//! One state-space table, three transition sets over it:
+//!
+//! | Leg | Transition set | Expected |
+//! |---|---|---|
+//! | 1 | the **pre-wave-5** predicate set (deadlock cured 2026-08-02) | **FAILS** |
+//! | 2 | the **2026-07-11 over-broad GapFill** guard set (froze convergence) | **FAILS** |
+//! | 3 | the **live** predicates, called directly | **PASSES** |
+//!
+//! Two *independently dated* deadlocks, three weeks apart, at overlapping seams —
+//! caught by one instrument that was written for neither. That is the anti-fitting
+//! requirement: a harness demonstrated against a single incident is indistinguishable
+//! from a harness fitted to it.
+//!
+//! ## The three disciplines this file is written under
+//!
+//! **1. Reconstructions never call live code.** [`pre_wave5_transitions`] and
+//! [`july11_gapfill_transitions`] are plain-data restatements of what the historical
+//! predicate sets *were*, transcribed from the commits cited on each function. They
+//! do not call [`decide_head_action`] or any admission predicate. A reconstruction
+//! that computed its expectation from today's code would be a mirror: it would track
+//! every future edit and could never fail, which is precisely the "a passing contract
+//! test can be measuring the mirror" trap the plan's verification-track note names.
+//!
+//! **2. Leg 3 calls the real functions.** No restatement, no adapter that re-derives
+//! a verdict. The live leg's only adaptation is *shape*: the predicates take booleans
+//! and `Option<&str>`, and [`RowState`] is exactly those booleans given names.
+//!
+//! **3. Transitions model DECISION-LOGIC effects, not environmental luck.** If "the
+//! conductor might integrate the canonical link on some later sweep" counted as a
+//! transition, every state would be trivially live and the table would be an
+//! instrument that agrees with any bug. The single exception is the transient class
+//! ([`OwnAnswer::Timeout`]), which is *defined* as recoverable — and it is modeled
+//! identically in all three legs, so it can never be the thing that separates them.
+//!
+//! ## Scope of the table (stated so the silence is honest — C7)
+//!
+//! This table asks the **cross-node head-election** liveness question: does a row
+//! that is undeclared, or that diverges from a peer, always have an automated path
+//! to a settled declaration? It deliberately does **not** model:
+//!
+//! - **Forward-monotonic refresh of an already-agreed head.** That is
+//!   `canonical_move_verdict`'s question (C2), registered separately in
+//!   `seam-registry.yaml` with its own contract test. It is why `declared ∧ ¬diverging`
+//!   is [`StateClass::Terminal`] here rather than a state with a refresh self-loop.
+//! - **The both-sides-conductor-missing pair.** Neither pod can mint a candidate, so
+//!   no storage arm moves it. That is a *documented open residual* of the 2026-08-02
+//!   shift, not a cured wall, and it gets its own witness test —
+//!   [`tests::both_sides_conductor_missing_is_a_known_open_residual`] — which asserts
+//!   the harness NAMES it rather than hiding it inside a green main table.
+
+use seam_contracts::harness::liveness::{check_liveness, LivenessFailure, StateClass, Transition};
+
+use crate::p2p::projection_reconcile::{
+    conductor_missing_should_route_to_adopt, declared_divergence_should_route_to_contest,
+    gapfill_would_self_elect, timeout_should_route_to_adopt,
+};
+use crate::services::head_adoption::{decide_head_action, should_probe_election, HeadDecision};
+
+/// The `config.contest_two_way_declared` switch as shipped (`default_true()` in
+/// `config.rs`). Leg 3 models the default pod, not a hand-tuned one.
+const CONTEST_ENABLED: bool = true;
+
+/// Stand-in for whatever action hash a declared row carries. Only its
+/// presence/absence is load-bearing — `gapfill_would_self_elect` takes
+/// `Option<&str>` and reads exactly that.
+const LOCAL_HEAD: &str = "uhCkk-local-declared-head";
+
+// ---------------------------------------------------------------------------
+// The state space — ONE table, shared by all three legs.
+// ---------------------------------------------------------------------------
+
+/// What the own conductor answered for this id on this sweep
+/// (`conductor_writes::call_resolve_content_head`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OwnAnswer {
+    /// `Ok(Some(head))` with `canonical == true` — a real election result.
+    Canonical,
+    /// `Ok(Some(head))` with `canonical == false` — the root-author fallback a
+    /// conductor gives while the canonical link has not gossiped in.
+    Fallback,
+    /// `Ok(None)` — this conductor holds no chain for an id the projection carries
+    /// (the MISSING class, the largest live heal outcome).
+    Missing,
+    /// `Err(transient)` — the conductor did not answer. Absence is not established
+    /// in either direction (C4).
+    Timeout,
+}
+
+/// What a peer advertises for this id in `PeerHeadHints`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PeerHint {
+    /// No peer advertises a declaration.
+    Absent,
+    /// A peer advertises the head this row already declares.
+    Agreeing,
+    /// A peer advertises a head this row does not hold.
+    Diverging,
+}
+
+impl PeerHint {
+    /// `peer_head_hints.contains_key(&id)` — the `peer_advertises_declaration`
+    /// input shared by four of the five live predicates.
+    const fn advertises(self) -> bool {
+        !matches!(self, PeerHint::Absent)
+    }
+}
+
+/// One content row at one node, as the reconcile pipeline sees it.
+///
+/// The four fields are exactly the inputs the registered decision points consume,
+/// given names: `conductor` → `answer_canonical` / `transient` / `head_answer_present`,
+/// `peer` → `peer_advertises_declaration` / `peer_advertises_different_head`,
+/// `declared` → `local_declared`, `election` → `local_has_canonical_election`
+/// (`content.canonical_declared_at IS NOT NULL`).
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct RowState {
+    conductor: OwnAnswer,
+    declared: bool,
+    election: bool,
+    peer: PeerHint,
+}
+
+impl RowState {
+    const fn new(conductor: OwnAnswer, declared: bool, election: bool, peer: PeerHint) -> Self {
+        Self {
+            conductor,
+            declared,
+            election,
+            peer,
+        }
+    }
+
+    /// `peer_advertises_different_head`, computed the way the live call site
+    /// computes it (`projection_reconcile.rs`, the declared-divergence admission):
+    /// `declared.as_deref().is_none_or(|d| d.trim() != hint.head_action_hash.trim())`
+    /// — so a hint on an UNDECLARED row differs by construction.
+    const fn peer_differs(self) -> bool {
+        self.peer.advertises() && (!self.declared || matches!(self.peer, PeerHint::Diverging))
+    }
+
+    /// The `local_declared: Option<&str>` argument `gapfill_would_self_elect` takes.
+    const fn declared_head(self) -> Option<&'static str> {
+        if self.declared {
+            Some(LOCAL_HEAD)
+        } else {
+            None
+        }
+    }
+}
+
+/// Compact, greppable rendering — this is what a counterexample prints, so it is
+/// written to be read in a panic message rather than to look like a struct dump.
+impl core::fmt::Debug for RowState {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "{:?}/{}/{}/peer={:?}",
+            self.conductor,
+            if self.declared {
+                "declared"
+            } else {
+                "undeclared"
+            },
+            if self.election {
+                "election"
+            } else {
+                "no-election"
+            },
+            self.peer
+        )
+    }
+}
+
+/// The named corner the 2026-08-02 shift deadlocked on: both sides declare, the own
+/// conductor can only offer its fallback root, and no election stands behind the row.
+const TWO_WAY_DECLARED: RowState =
+    RowState::new(OwnAnswer::Fallback, true, false, PeerHint::Diverging);
+
+/// A dead-end shared by BOTH historical sets: the own conductor answers with a
+/// genuinely CANONICAL head and the row still cannot move (a manual-only exit in
+/// the 2026-07-11 and the 2026-08-02 predicate sets alike). The corner that
+/// actually discriminates the two is `UNDECLARED_WITH_A_DIVERGING_PEER` below.
+const CANONICAL_ANSWER_ON_A_DECLARED_ROW: RowState =
+    RowState::new(OwnAnswer::Canonical, true, false, PeerHint::Diverging);
+
+/// The corner that separates the two historical sets in the other direction: an
+/// UNDECLARED row with a diverging peer. 2026-08-02 could adopt the peer's
+/// declaration (terminal); 2026-07-11 had no adopt arm at all and filled with its
+/// own root instead, trapping the row.
+const UNDECLARED_WITH_A_DIVERGING_PEER: RowState =
+    RowState::new(OwnAnswer::Fallback, false, false, PeerHint::Diverging);
+
+/// The full 4 × 2 × 2 × 3 = 48-state product.
+///
+/// Exhaustive by construction. The harness checks exactly what is enumerated, so a
+/// product is used rather than a hand-picked list: hand-picking is how the one dead
+/// corner goes unlisted, and 48 is far under [`LivenessBudget`]'s 4096 ceiling.
+///
+/// [`LivenessBudget`]: seam_contracts::harness::liveness::LivenessBudget
+fn state_space() -> Vec<RowState> {
+    let mut states = Vec::with_capacity(48);
+    for conductor in [
+        OwnAnswer::Canonical,
+        OwnAnswer::Fallback,
+        OwnAnswer::Missing,
+        OwnAnswer::Timeout,
+    ] {
+        for declared in [false, true] {
+            for election in [false, true] {
+                for peer in [PeerHint::Absent, PeerHint::Agreeing, PeerHint::Diverging] {
+                    states.push(RowState::new(conductor, declared, election, peer));
+                }
+            }
+        }
+    }
+    states
+}
+
+/// The classifier — **shared by all three legs, deliberately**.
+///
+/// Only the transitions differ between legs, because transitions are what a
+/// predicate set determines. If each leg brought its own classifier, a historical
+/// leg could be made to fail (or pass) by reclassifying rather than by its rules,
+/// and the demonstration would prove nothing. Both non-`Live` arms carry the written
+/// justification the harness requires: the classifier is the one place a caller can
+/// defeat this instrument.
+fn classify(s: &RowState) -> StateClass {
+    if !s.declared && s.election {
+        return StateClass::Unreachable(
+            "an election cannot stand behind a declaration that does not exist: \
+             `canonical_declared_at` is written only alongside `declared_head_action_hash`, \
+             and `declared_head_with_election` reads the pair from one row",
+        );
+    }
+    if !s.declared && matches!(s.peer, PeerHint::Agreeing) {
+        return StateClass::Unreachable(
+            "`peer_advertises_different_head` is computed as \
+             `declared.is_none_or(|d| d != hint)`, so a peer hint on an UNDECLARED row is \
+             Diverging by construction — 'agreeing' has no referent until the row declares",
+        );
+    }
+    if s.declared && !matches!(s.peer, PeerHint::Diverging) {
+        return StateClass::Terminal(
+            "the row carries a declaration and no peer advertises a different head — the \
+             head-election pipeline owes nothing further for this id. Forward-monotonic \
+             refresh of an already-agreed head is `canonical_move_verdict`'s question (C2), \
+             registered separately, and is out of this table's scope",
+        );
+    }
+    if !s.declared && matches!(s.peer, PeerHint::Absent) && s.conductor != OwnAnswer::Canonical {
+        return StateClass::Terminal(
+            "no head exists anywhere for this id — this is `decide_head_action`'s Author arm, \
+             and it is an end rather than a stall: under \
+             `HeadElection::PreserveExistingDeclaration` a self-authored root is NOT a \
+             declaration, so a later declaration from any peer at any time wins outright",
+        );
+    }
+    StateClass::Live
+}
+
+// ---------------------------------------------------------------------------
+// LEG 3 — the LIVE predicate set, called directly.
+// ---------------------------------------------------------------------------
+
+/// Drive the live decision surface over the table, at the shipped configuration.
+fn live_transitions(s: &RowState) -> Vec<Transition<RowState>> {
+    live_transitions_with(s, CONTEST_ENABLED)
+}
+
+/// Drive the live decision surface over the table.
+///
+/// Every branch below is decided by a call into production code — no verdict is
+/// restated here. The dispatch ORDER mirrors `try_adopt_canonical_head` and
+/// `heal_content`: transient class, then the election-obey arm, then heal-leg
+/// admission, then the decision rule, then the peer's own automated moves.
+///
+/// `contest_enabled` is the real `config.contest_two_way_declared` switch, threaded
+/// rather than hardcoded so a test can flip the shipped lever and watch the *same
+/// production code* answer differently — see
+/// [`tests::disabling_the_contest_arm_returns_the_live_code_to_the_two_way_declared_deadlock`].
+/// Both the local decision and the peer's read it, because both pods run this rule.
+fn live_transitions_with(s: &RowState, contest_enabled: bool) -> Vec<Transition<RowState>> {
+    if !classify(s).is_live() {
+        return Vec::new();
+    }
+
+    let answer_canonical = s.conductor == OwnAnswer::Canonical;
+    let head_answer_present = matches!(s.conductor, OwnAnswer::Canonical | OwnAnswer::Fallback);
+    let peer_declares = s.peer.advertises();
+
+    // (0) TRANSIENT CLASS. `StorageError::Timeout` is the recoverable class by
+    // construction; the bounded retry ladder plus next-sweep re-enqueue keep the
+    // row in the pipeline. `timeout_should_route_to_adopt` decides WHICH list it
+    // lands on, which is what the label records — and the pre-cure alternative
+    // (the drop-forever hole) is exactly what that predicate closed.
+    if s.conductor == OwnAnswer::Timeout {
+        let routed = timeout_should_route_to_adopt(true, peer_declares);
+        return vec![Transition::automated(if routed {
+            "bounded retry ladder; timeout_should_route_to_adopt keeps the row on the adopt list"
+        } else {
+            "bounded retry ladder; the gap sweep re-discovers the row on the next tick"
+        })
+        .to(RowState {
+            conductor: OwnAnswer::Missing,
+            ..*s
+        })];
+    }
+
+    let mut out = Vec::new();
+
+    // (1b) ELECTION-OBEY ARM. Scoped to the conductor-missing class, and it runs
+    // BEFORE the decision rule: obeying an election the DHT has already settled
+    // beats contesting it again. This is wave 5's cure — `resolve_canonical_election`
+    // reads the election WITHOUT target retrieval, so a pod with no local chain can
+    // still obey.
+    if should_probe_election(head_answer_present) && s.election {
+        out.push(
+            Transition::automated(
+                "try_obey_visible_election: read the visible election without target retrieval \
+                 and adopt the elected head",
+            )
+            .to(RowState {
+                peer: PeerHint::Agreeing,
+                ..*s
+            }),
+        );
+    }
+
+    // (2) HEAL-LEG ADMISSION. Which candidate list does this row reach? The wall
+    // that made the 2026-08-02 deadlock invisible lived here: a declared+divergent
+    // row was refused (`SkippedDeclared`), marked completed, and pushed to NO list.
+    let admitted = match s.conductor {
+        // A canonical answer is the canonical channel's own business
+        // (`StampMode::HealCanonical` → `canonical_move_verdict`); the pre-flight
+        // sees it and answers AdoptLocal.
+        OwnAnswer::Canonical => true,
+        OwnAnswer::Fallback => {
+            gapfill_would_self_elect(answer_canonical, peer_declares, s.declared_head())
+                || declared_divergence_should_route_to_contest(
+                    answer_canonical,
+                    s.declared,
+                    s.peer_differs(),
+                    s.election,
+                )
+        }
+        OwnAnswer::Missing => conductor_missing_should_route_to_adopt(peer_declares),
+        OwnAnswer::Timeout => unreachable!("handled by the transient arm above"),
+    };
+
+    // (3) THE DECISION RULE.
+    if admitted {
+        match decide_head_action(
+            answer_canonical,
+            peer_declares,
+            s.declared,
+            s.election,
+            contest_enabled,
+        ) {
+            HeadDecision::AdoptLocal => out.push(
+                Transition::automated(
+                    "adopt_local: HealCanonical stamp — the answer carries \
+                     canonical_declared_at/canonical_earned, so the stamp records the election \
+                     ordering (wave 2's cure; before it the guard compared a NULLed wall clock)",
+                )
+                .to(RowState {
+                    declared: true,
+                    election: true,
+                    ..*s
+                }),
+            ),
+            HeadDecision::AdoptPeer => out.push(
+                Transition::automated(if s.conductor == OwnAnswer::Missing {
+                    "AuthorThenAdopt: no local chain to hang a declaration on — author a root, \
+                     then declare the peer's verified head"
+                } else {
+                    "adopt_peer: verified fetch of the peer's head record, then declare it \
+                     through the own conductor"
+                })
+                .to(RowState {
+                    declared: true,
+                    peer: PeerHint::Agreeing,
+                    ..*s
+                }),
+            ),
+            HeadDecision::ContestPeer => {
+                // A contest is a source-chain write. A conductor-missing pod has no
+                // chain, so its contest fails `contest_failed{no_local_chain}` (887
+                // in the first live window) — that class is served by the obey arm
+                // above once the chain-holding side supplies the election.
+                if s.conductor != OwnAnswer::Missing {
+                    out.push(
+                        Transition::automated(
+                            "contest_peer: mint a canonical-head candidate naming the peer's \
+                             head — select_canonical_winner finally has a set to elect on",
+                        )
+                        .to(RowState {
+                            election: true,
+                            ..*s
+                        }),
+                    );
+                }
+            }
+            // Hold and Author move nothing on this side by design. Whether that is
+            // a correct refusal or a deadlock is the question this whole table asks,
+            // and it is answered below rather than asserted here.
+            HeadDecision::Hold | HeadDecision::Author => {}
+        }
+    }
+
+    // (4) THE PEER'S OWN AUTOMATED MOVES. C3 asks whether THE FLEET has a move, not
+    // whether this node does — and the peer runs these same predicates. Scope: the
+    // main table assumes the peer holds a chain; both-sides-conductor-missing is the
+    // documented open residual witnessed separately.
+    if s.declared && matches!(s.peer, PeerHint::Diverging) {
+        if s.election {
+            out.push(
+                Transition::automated(
+                    "the peer resolves the SAME DHT election — select_canonical_winner is \
+                     deterministic over one shared anchor — and its own obey arm takes it",
+                )
+                .to(RowState {
+                    peer: PeerHint::Agreeing,
+                    ..*s
+                }),
+            );
+        } else if declared_divergence_should_route_to_contest(false, true, true, false)
+            && decide_head_action(false, true, true, false, contest_enabled)
+                == HeadDecision::ContestPeer
+        {
+            // The peer's own state, run through the peer's own two gates: it is
+            // admitted at the SkippedDeclared refusal site, and its decision rule
+            // answers ContestPeer. Both are the LIVE predicates — a peer runs the
+            // same binary with the same switch.
+            out.push(
+                Transition::automated(
+                    "the chain-holding peer admits its own declared-divergence row at the \
+                     SkippedDeclared refusal site and contests, minting the election",
+                )
+                .to(RowState {
+                    election: true,
+                    ..*s
+                }),
+            );
+        }
+    }
+
+    // The one exit that still exists when every automated arm has refused: R1's
+    // deploy declare-cycle. Appending it only ever turns a `dead_end` finding into a
+    // `manual_only_exit` one — both fail — so it can never launder a hole into a
+    // pass, and it keeps the live leg's report describing the same world the two
+    // historical legs are measured in.
+    if out.is_empty() {
+        out.push(deploy_declare_cycle(s));
+    }
+
+    out
+}
+
+// ---------------------------------------------------------------------------
+// LEG 1 — the pre-wave-5 predicate set, reconstructed as plain data.
+// ---------------------------------------------------------------------------
+
+/// `decide_head_action` **as it stood at `496a4aba8^`** — three inputs, no
+/// `ContestPeer` arm, blind to whether an election stands behind the row.
+///
+/// Transcribed verbatim from the historical source; it calls nothing. The blindness
+/// is the point: the cure keys on a dimension the old rule had no input for.
+///
+/// ```text
+/// if conductor_canonical      { AdoptLocal }
+/// else if peer_declared && !local_declared { AdoptPeer }
+/// else if local_declared      { Hold }
+/// else                        { Author }
+/// ```
+fn pre_wave5_decide(
+    conductor_canonical: bool,
+    peer_declared: bool,
+    local_declared: bool,
+) -> HeadDecision {
+    if conductor_canonical {
+        HeadDecision::AdoptLocal
+    } else if peer_declared && !local_declared {
+        HeadDecision::AdoptPeer
+    } else if local_declared {
+        HeadDecision::Hold
+    } else {
+        HeadDecision::Author
+    }
+}
+
+/// The four stacked walls of the 2026-08-02 deadlock, restated as plain data.
+///
+/// Sources (read, not called): `496a4aba8^` for `head_adoption.rs`,
+/// `projection_reconcile.rs`, and `content_diesel.rs`; the wall numbering and the
+/// live evidence are `genesis/data/timeline/backlog/content-gap-limit-cycle-blocks-convergence.md`
+/// §"RCA v3". Cured by `496a4aba8`, `134331c83`, `da8975176`.
+///
+/// 1. **Supply deadlock** — [`pre_wave5_decide`] answers `Hold` for every declared
+///    row, so `AdoptPeer` (the only automated canonical-link minter) is unreachable
+///    once the local row declares. The `canonical_head` anchor stayed EMPTY for the
+///    whole class and `select_canonical_winner` never ran.
+/// 2. **Consumption wall** — `StampMode::HealCanonical` moved a declared row only
+///    with `provably_newer = matches!((declared_at, stored_declared_at), (Some(i),
+///    Some(s)) if i > s)`, and the deploy PATCH path had NULLed the stored side.
+///    `AdoptLocal` was therefore structurally unreachable on any declared row.
+/// 3. **Declare wall** — a contest/declare on a conductor-missing id failed the
+///    target-independent no-chain gate.
+/// 4. **Admission wall** — `declared_divergence_should_route_to_contest` did not
+///    exist. A declared+divergent row got `SkippedDeclared`, was marked completed,
+///    and reached no candidate list at all.
+fn pre_wave5_transitions(s: &RowState) -> Vec<Transition<RowState>> {
+    if !classify(s).is_live() {
+        return Vec::new();
+    }
+
+    // The transient class behaves the same in every era; modeling it identically
+    // across the legs keeps it from being the thing that separates them.
+    if s.conductor == OwnAnswer::Timeout {
+        return vec![Transition::automated(
+            "bounded retry ladder; the row is re-asked on the next sweep",
+        )
+        .to(RowState {
+            conductor: OwnAnswer::Missing,
+            ..*s
+        })];
+    }
+
+    let answer_canonical = s.conductor == OwnAnswer::Canonical;
+    let peer_declares = s.peer.advertises();
+    let mut out = Vec::new();
+
+    // WALL 4 — ADMISSION. The gapfill route required an UNDECLARED row, and nothing
+    // else admitted a declared one.
+    let admitted = match s.conductor {
+        OwnAnswer::Canonical => true,
+        OwnAnswer::Fallback => !answer_canonical && peer_declares && !s.declared,
+        OwnAnswer::Missing => peer_declares,
+        OwnAnswer::Timeout => unreachable!("handled above"),
+    };
+
+    if admitted {
+        // WALL 1 — SUPPLY.
+        match pre_wave5_decide(answer_canonical, peer_declares, s.declared) {
+            HeadDecision::AdoptLocal => {
+                // WALL 2 — CONSUMPTION. Filling an undeclared row was fine; MOVING a
+                // declared one needed an ordering proof the deploy path had erased.
+                if !s.declared {
+                    out.push(
+                        Transition::automated(
+                            "heal_content_one fills the undeclared row with the conductor's \
+                             canonical answer",
+                        )
+                        .to(RowState {
+                            declared: true,
+                            ..*s
+                        }),
+                    );
+                }
+            }
+            HeadDecision::AdoptPeer => {
+                // WALL 3 — DECLARE.
+                if s.conductor != OwnAnswer::Missing {
+                    out.push(
+                        Transition::automated(
+                            "adopt_peer: fetch and declare the peer's head through the own \
+                             conductor",
+                        )
+                        .to(RowState {
+                            declared: true,
+                            peer: PeerHint::Agreeing,
+                            ..*s
+                        }),
+                    );
+                }
+            }
+            // No ContestPeer arm existed.
+            HeadDecision::ContestPeer | HeadDecision::Hold | HeadDecision::Author => {}
+        }
+    }
+
+    if out.is_empty() {
+        out.push(deploy_declare_cycle(s));
+    }
+    out
+}
+
+// ---------------------------------------------------------------------------
+// LEG 2 — the 2026-07-11 over-broad GapFill guard, reconstructed as plain data.
+// ---------------------------------------------------------------------------
+
+/// The over-broad GapFill guard **as it stood at `8844cd1d6`** (2026-07-11), one
+/// month and one seam-cluster away from leg 1.
+///
+/// Sources (read, not called): `8844cd1d6` — `StampMode` had exactly two variants
+/// (`Declare`, `GapFill`), `StampOutcome` exactly three, and the heal call site in
+/// `projection_reconcile.rs` passed `GapFill` **unconditionally**. There was no
+/// canonical/fallback distinction in the answer (`ContentHeadOutput.canonical`
+/// arrived with `0644132fb` later the same day), no `PeerHeadHints`, and no
+/// adopt-before-author pre-flight at all (`head_adoption.rs` was created
+/// 2026-07-28 by `b91ee0f95`).
+///
+/// The guard itself was correct and necessary: a freshly-restarted conductor falls
+/// through to the root-author election while the canonical link is not yet
+/// retrievable, and stamping that RESURRECTS a superseded head (the live 2026-07-11
+/// 20:42:40 regression). What made it a liveness hole was its breadth — it could not
+/// tell "resurrect a superseded head" from "adopt the newer canonical head", so it
+/// refused both. `0644132fb`'s own commit body names the interaction: *"closes the
+/// interaction where the boot-resurrection guard also blocked forward adoption."*
+///
+/// A different bug from leg 1, three weeks earlier, with a different signature — and
+/// the same instrument catches it.
+fn july11_gapfill_transitions(s: &RowState) -> Vec<Transition<RowState>> {
+    if !classify(s).is_live() {
+        return Vec::new();
+    }
+
+    if s.conductor == OwnAnswer::Timeout {
+        return vec![Transition::automated(
+            "bounded retry ladder; the row is re-asked on the next sweep",
+        )
+        .to(RowState {
+            conductor: OwnAnswer::Missing,
+            ..*s
+        })];
+    }
+
+    let mut out = Vec::new();
+    match s.conductor {
+        // ONE stamp mode for every heal answer. The peer dimension is invisible to
+        // this predicate set: `PeerHeadHints` did not exist yet.
+        OwnAnswer::Canonical | OwnAnswer::Fallback if !s.declared => out.push(
+            Transition::automated("heal GapFill fills the undeclared row").to(RowState {
+                declared: true,
+                ..*s
+            }),
+        ),
+        // THE OVER-BROAD GUARD. A declared row is refused even when the answer is
+        // the genuinely canonical one. Forward adoption is frozen.
+        OwnAnswer::Canonical | OwnAnswer::Fallback => {}
+        // `Ok(None)`: nothing to stamp; re-asked next sweep, and no other arm exists.
+        OwnAnswer::Missing => {}
+        OwnAnswer::Timeout => unreachable!("handled above"),
+    }
+
+    if out.is_empty() {
+        out.push(deploy_declare_cycle(s));
+    }
+    out
+}
+
+/// The one exit both historical sets left standing: the deploy's `DECLARE_ONLY`
+/// propagation, wired 2026-07-11 (`11ea79cb2`) and made load-bearing as R1's labeled
+/// *interim* authority channel.
+///
+/// It is [`Agency::Deploy`], which the C3 law refuses to count: a channel that runs
+/// when CI runs is exactly as unavailable to a fleet at 03:00 as a human hand. That
+/// refusal is the entire finding — both historical sets had a *complete* state
+/// machine, and a transition-counting check would have passed both.
+///
+/// [`Agency::Deploy`]: seam_contracts::harness::liveness::Agency::Deploy
+fn deploy_declare_cycle(s: &RowState) -> Transition<RowState> {
+    Transition::deploy(
+        "deploy declare-cycle (DECLARE_ONLY propagation) — R1's labeled interim authority channel",
+    )
+    .to(RowState {
+        declared: true,
+        election: true,
+        peer: PeerHint::Agreeing,
+        ..*s
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every state a failure names, as rendered.
+    fn violating_states(failure: &LivenessFailure) -> Vec<String> {
+        failure.violations.iter().map(|v| v.state.clone()).collect()
+    }
+
+    fn names(failure: &LivenessFailure, state: RowState) -> bool {
+        violating_states(failure).contains(&format!("{state:?}"))
+    }
+
+    /// The counterexample a historical leg produces, dumped for a reader who asks
+    /// (`cargo test --lib liveness_contract -- --nocapture`). Captured by default, so
+    /// a green run stays quiet — but the demonstration's whole value is *what the
+    /// harness says*, and a report nobody can read is the C8 failure this canon
+    /// names. Deliberately not an assertion: the text is prose and will drift.
+    fn dump(leg: &str, failure: &LivenessFailure) {
+        eprintln!("\n=== {leg} — what the C3 harness reports ===\n{failure}\n");
+    }
+
+    // -----------------------------------------------------------------------
+    // The table itself.
+    // -----------------------------------------------------------------------
+
+    /// The three legs must be comparable, which means the space and the classifier
+    /// are shared and fixed. If a future edit changes these counts, the regression
+    /// demonstration below is measuring a different world and says so here first.
+    #[test]
+    fn the_shared_state_space_has_the_shape_all_three_legs_are_measured_against() {
+        let states = state_space();
+        assert_eq!(
+            states.len(),
+            48,
+            "4 conductor x 2 declared x 2 election x 3 peer"
+        );
+
+        let live = states.iter().filter(|s| classify(s).is_live()).count();
+        let terminal = states.iter().filter(|s| classify(s).is_terminal()).count();
+        let unreachable = states
+            .iter()
+            .filter(|s| classify(s).is_unreachable())
+            .count();
+
+        assert_eq!(live, 13, "reachable states with work still owed");
+        assert_eq!(
+            terminal, 19,
+            "16 settled-declared + 3 nothing-declared-anywhere"
+        );
+        assert_eq!(
+            unreachable, 16,
+            "12 election-without-declaration + 4 agreeing-while-undeclared"
+        );
+        assert_eq!(live + terminal + unreachable, states.len());
+
+        // The corners the demonstration turns on must actually be in the table and
+        // must actually be live — a corner classified away is a corner not checked.
+        for corner in [
+            TWO_WAY_DECLARED,
+            CANONICAL_ANSWER_ON_A_DECLARED_ROW,
+            UNDECLARED_WITH_A_DIVERGING_PEER,
+        ] {
+            assert!(
+                states.contains(&corner),
+                "{corner:?} missing from the table"
+            );
+            assert!(classify(&corner).is_live(), "{corner:?} is not Live");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // LEG 1 — FAILS against the pre-wave-5 predicate set.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn leg1_the_pre_wave5_predicate_set_fails_the_liveness_table() {
+        let states = state_space();
+        let failure = check_liveness(&states, classify, pre_wave5_transitions)
+            .expect_err("the four-wall deadlock must not read as live");
+        dump(
+            "LEG 1 — pre-wave-5 (2026-08-02 four-wall deadlock)",
+            &failure,
+        );
+
+        // The law's exact shape: a COMPLETE state machine whose only exit needs a
+        // hand. Not a dead end — that is what made it survive five serial waves.
+        assert!(
+            failure.has_class(
+                seam_contracts::harness::liveness::LivenessViolationClass::ManualOnlyExit
+            ),
+            "expected manual_only_exit, got:\n{failure}"
+        );
+
+        // The counterexample must NAME the corner the fleet actually deadlocked on.
+        assert!(
+            names(&failure, TWO_WAY_DECLARED),
+            "the two-way-declared corner {TWO_WAY_DECLARED:?} is unnamed:\n{failure}"
+        );
+
+        // …and it must name the whole composition at once, not the first wall. The
+        // deadlock cost five serial production waves precisely because each wall was
+        // only visible after the previous was cured.
+        assert!(
+            failure.total_violations >= 7,
+            "expected the whole stuck class, got {}:\n{failure}",
+            failure.total_violations
+        );
+
+        // The instrument's own honesty: the composition check RAN (it did not
+        // silently skip and read as a pass).
+        assert!(
+            failure.report.progress_checked,
+            "composition check skipped:\n{failure}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // LEG 2 — FAILS against the 2026-07-11 over-broad GapFill guard.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn leg2_the_july11_over_broad_gapfill_guard_fails_the_liveness_table() {
+        let states = state_space();
+        let failure = check_liveness(&states, classify, july11_gapfill_transitions)
+            .expect_err("a guard that refuses forward adoption must not read as live");
+        dump("LEG 2 — 2026-07-11 over-broad GapFill guard", &failure);
+
+        assert!(
+            failure.has_class(
+                seam_contracts::harness::liveness::LivenessViolationClass::ManualOnlyExit
+            ),
+            "expected manual_only_exit, got:\n{failure}"
+        );
+
+        // The signature of THIS bug: the own conductor answers with a genuinely
+        // CANONICAL head and the declared row still cannot move.
+        assert!(
+            names(&failure, CANONICAL_ANSWER_ON_A_DECLARED_ROW),
+            "the frozen-forward-adoption corner {CANONICAL_ANSWER_ON_A_DECLARED_ROW:?} is \
+             unnamed:\n{failure}"
+        );
+
+        assert!(
+            failure.report.progress_checked,
+            "composition check skipped:\n{failure}"
+        );
+    }
+
+    /// The anti-fitting evidence, stated as a claim rather than a hope: the two
+    /// historical sets fail the SAME table with DIFFERENT signatures.
+    ///
+    /// The discriminating corner is an undeclared row with a diverging peer. The
+    /// 2026-08-02 set could adopt the peer's declaration outright and reach a settled
+    /// state; the 2026-07-11 set had no adopt arm at all, filled the row with its own
+    /// root instead, and trapped it. A harness fitted to one deadlock could not
+    /// produce two different verdicts here.
+    #[test]
+    fn the_two_historical_sets_fail_the_same_table_with_different_signatures() {
+        let states = state_space();
+        let leg1 = check_liveness(&states, classify, pre_wave5_transitions).unwrap_err();
+        let leg2 = check_liveness(&states, classify, july11_gapfill_transitions).unwrap_err();
+
+        assert!(
+            !names(&leg1, UNDECLARED_WITH_A_DIVERGING_PEER),
+            "2026-08-02's set could adopt a peer declaration onto an undeclared row:\n{leg1}"
+        );
+        assert!(
+            names(&leg2, UNDECLARED_WITH_A_DIVERGING_PEER),
+            "2026-07-11's set had no adopt arm — the row should be trapped:\n{leg2}"
+        );
+
+        let mut a = violating_states(&leg1);
+        let mut b = violating_states(&leg2);
+        a.sort();
+        b.sort();
+        assert_ne!(
+            a, b,
+            "two different deadlocks must not produce one identical report"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // LEG 3 — PASSES against the live predicate set.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn leg3_the_live_predicate_set_passes_the_liveness_table() {
+        let states = state_space();
+        let report =
+            check_liveness(&states, classify, live_transitions).unwrap_or_else(|failure| {
+                // Not a massage point. If this ever fires, the counterexample below is a
+                // candidate REAL liveness hole in shipped code and belongs in triage, not
+                // in a widened table.
+                panic!(
+                    "LIVE liveness contract (C3) failed — treat as a production finding, \
+                 not a test to relax:\n{failure}"
+                )
+            });
+
+        // A pass is only worth what the instrument measured, so assert the
+        // measurement too (C7 applied to our own green).
+        assert_eq!(report.states_checked, 48);
+        assert_eq!(report.live_states, 13);
+        assert!(
+            report.progress_checked,
+            "per-state legality without the composition check is exactly what four \
+             locally-correct guards each passed: {report}"
+        );
+        assert!(report.transitions_enumerated >= 13, "{report}");
+    }
+
+    /// The cure is load-bearing, not incidental: flip the one shipped switch that
+    /// restores the pre-2026-08-02 behaviour and the same live code deadlocks again.
+    ///
+    /// This is the strongest available statement that leg 3's green comes from the
+    /// contest arm rather than from a generous table — and it is produced by the
+    /// LIVE `decide_head_action`, not by a reconstruction.
+    #[test]
+    fn disabling_the_contest_arm_returns_the_live_code_to_the_two_way_declared_deadlock() {
+        let states = state_space();
+        // The SAME production code, with the shipped switch flipped — no
+        // reconstruction, no filtering of the result. `contest_two_way_declared =
+        // false` collapses ContestPeer back into Hold on both pods, which is exactly
+        // the pre-2026-08-02 behaviour the config comment claims it restores.
+        let failure = check_liveness(&states, classify, |s| live_transitions_with(s, false))
+            .expect_err(
+                "with the contest arm off, the two-way-declared class has no automated exit",
+            );
+
+        assert!(
+            names(&failure, TWO_WAY_DECLARED),
+            "expected the two-way-declared corner back:\n{failure}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // The documented open residual — witnessed, not hidden.
+    // -----------------------------------------------------------------------
+
+    /// **Both-sides-conductor-missing is a KNOWN OPEN residual, and this test asserts
+    /// the harness NAMES it.** It is not a regression and not a new finding.
+    ///
+    /// RCA v3 (`genesis/data/timeline/backlog/content-gap-limit-cycle-blocks-convergence.md`)
+    /// records it verbatim: *"Both-sides-missing pairs — unreachable by any storage
+    /// arm"*, with the operator-facing follow-up being a coordinator-zome decision
+    /// (declare with a validated carried record when no local chain exists).
+    ///
+    /// The main table above scopes it out — it assumes the peer holds a chain — and
+    /// that scoping is only honest if the excluded corner is stated somewhere the
+    /// instrument can see it. Here it is: the exit that exists today is the deploy
+    /// declare-cycle, which C3 refuses to count, so the harness reports
+    /// `manual_only_exit`. When the follow-up lands, this test flips to a pass and
+    /// the corner folds into the main table.
+    #[test]
+    fn both_sides_conductor_missing_is_a_known_open_residual() {
+        #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+        enum BothMissing {
+            /// Two pods, both declared, both diverging, NEITHER holding a source
+            /// chain for the id — so neither can mint a canonical-head candidate.
+            NeitherPodHoldsAChain,
+            /// One elected head, obeyed on both sides.
+            Converged,
+        }
+
+        let failure = check_liveness(
+            &[BothMissing::NeitherPodHoldsAChain, BothMissing::Converged],
+            |s| match s {
+                BothMissing::Converged => {
+                    StateClass::Terminal("both pods obey one elected head; nothing further is owed")
+                }
+                BothMissing::NeitherPodHoldsAChain => StateClass::Live,
+            },
+            |s| match s {
+                BothMissing::Converged => vec![],
+                BothMissing::NeitherPodHoldsAChain => vec![
+                    // conductor_missing_should_route_to_adopt admits the row, and
+                    // decide_head_action answers ContestPeer — but the declare fails
+                    // the no-chain gate on BOTH sides, so nothing is minted and there
+                    // is no election for the obey arm to read.
+                    Transition::deploy(
+                        "deploy declare-cycle, or the operator-facing coordinator-zome \
+                         follow-up (declare with a validated carried record when no local \
+                         chain exists)",
+                    )
+                    .to(BothMissing::Converged),
+                ],
+            },
+        )
+        .expect_err(
+            "the both-sides-missing pair has no automated exit today — if this now passes, \
+             the RCA v3 residual has been cured and this witness should fold into the main \
+             table",
+        );
+
+        assert!(
+            failure.has_class(
+                seam_contracts::harness::liveness::LivenessViolationClass::ManualOnlyExit
+            ),
+            "{failure}"
+        );
+    }
+}

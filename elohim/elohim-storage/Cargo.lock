@@ -2384,6 +2384,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "doorway-client",
+ "elohim-seam-contracts",
  "elohim-storage-client",
  "elohim-views",
  "reqwest",
@@ -2393,6 +2394,10 @@ dependencies = [
  "tokio",
  "tracing",
 ]
+
+[[package]]
+name = "elohim-seam-contracts"
+version = "0.1.0"
 
 [[package]]
 name = "elohim-storage"
@@ -2429,6 +2434,7 @@ dependencies = [
  "elohim-peer-fabric",
  "elohim-render",
  "elohim-sdk",
+ "elohim-seam-contracts",
  "elohim-views",
  "fs4",
  "futures",

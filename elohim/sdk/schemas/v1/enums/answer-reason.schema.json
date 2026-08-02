@@ -1,0 +1,24 @@
+{
+  "$id": "epr:schema:enum:answer-reason",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AnswerReason",
+  "description": "WHY a boundary answer is not `present` — the vocabulary a client renders when it must explain a non-answer (concern class C4; the `unverifiable` arm is C5's may-believe clause: evidence that cannot be evaluated confers nothing, in either direction). Exactly one reason (`observed_absent`) accompanies answerState `absent`; every other reason accompanies `unreachable`. A `present` answer takes no reason. Rust authority: seam_contracts::AnswerReason (crates/seam-contracts/src/answer.rs); agreement is asserted by elohim/elohim-storage/tests/schema_contract.rs.",
+  "type": "string",
+  "enum": [
+    "observed_absent",
+    "timeout",
+    "transport_error",
+    "refused",
+    "unverifiable",
+    "not_yet_delivered"
+  ],
+  "_reasonStates": {
+    "observed_absent": "absent",
+    "timeout": "unreachable",
+    "transport_error": "unreachable",
+    "refused": "unreachable",
+    "unverifiable": "unreachable",
+    "not_yet_delivered": "unreachable"
+  },
+  "$comment": "Deliberately carries NO _dna metadata — same rationale as answer-state. `_reasonStates` is the reason-to-state pairing, declared here so a consumer with no Rust can enforce it; elohim-storage's schema_contract test asserts it agrees with AnswerReason::state(). `not_yet_delivered` is the full-arc law made speakable: on a full-arc holder a local read miss is a fact about gossip delivery, never about existence."
+}

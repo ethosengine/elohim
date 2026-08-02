@@ -50,3 +50,41 @@ status, drain status). Define these as separate schemas in `views/` or
 
 ### 10. File naming
 `{entity-name}.schema.json` in kebab-case matching the `$id` suffix.
+
+### 11. Honest absence — a dual-provenance absence is never a bare nullable
+A field whose absence has **two provenances** MUST NOT be a bare nullable.
+
+Rule 5 gives you `{ "type": ["string", "null"] }`, which is right when `null`
+means exactly one thing. It is wrong the moment `null` can mean *both* "the
+responder answered and there is nothing there" **and** "we never got an answer."
+Those are a fact about the world and a fact about the network; one bit cannot
+carry both, and the collapse is silent — the client cannot tell whether to
+render "nothing here" or to retry.
+
+Ask, for every nullable you add: **can this be null because we could not ask?**
+
+- **No** — one provenance. A bare nullable is correct; say so in the
+  `description` so the next reader does not have to re-derive it.
+- **Yes** — two provenances. Use the answer envelope
+  (`../objects/answer.schema.json`): `state` is `present` / `absent` /
+  `unreachable`, and `reason` says why. `absent` is a *positive claim* — absence
+  was observed — and must never be emitted for an answer that did not arrive.
+
+The Rust side of this is `seam_contracts::Answer<T>` (`crates/seam-contracts`),
+which is generic; the wire stays monomorphic — a per-view envelope narrows
+`value` and inherits `state`/`reason`. Do not add ts-rs generics to satisfy this
+rule.
+
+**This rule is forward-looking, not retroactive.** A majority of existing view
+schemas sit on the bare-nullable surface, and several of their nullables are
+genuinely single-provenance. Rule 11 binds *new* dual-provenance fields and any
+existing one being touched; it does not condemn the whole tree, and there is no
+validator that can tell the two cases apart — the judgement is the author's, at
+design time. Known dual-provenance nullables already documented in prose (e.g.
+`epr-pull-status`'s `total` / `caughtUp` "tri-state") are recorded as adoption
+candidates in `../objects/answer.schema.json`'s `_adoptions` block.
+
+Concern class C4 (honest absence). Forcing incidents: `dd1824e03` (2026-07-22,
+*unreadable ≠ absent*), `d6c88e385` (2026-07-23, *unmeasured ≠ zero*),
+`270dbafac` (2026-07-11, absent-because-misspelled ran the fleet with zero ICE
+servers since inception).

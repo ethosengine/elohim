@@ -15,13 +15,31 @@
 //! `ViewKind` is an externally-tagged enum with no `#[serde(other)]` escape, so
 //! a pre-cure peer FAILS to decode this request and the transport surfaces a
 //! codec/inbound error. That is expected during a rolling deploy and is treated
-//! as a first-class answer: log it once at INFO naming the peer, return `None`,
-//! and let the caller fall through to the author path. Never retry-loop (the
-//! sweep IS the retry, at its own cadence), never panic.
+//! as a first-class answer: log it once at INFO naming the peer, return
+//! [`Answer::Unreachable`], and let the caller fall through to the author path.
+//! Never retry-loop (the sweep IS the retry, at its own cadence), never panic.
+//!
+//! ## The two absences (C4)
+//!
+//! Since 2026-08-02 (plan task P2.3) this client answers with
+//! [`seam_contracts::Answer`] rather than `Option`, and the mapping is the whole
+//! point:
+//!
+//! - **`Unreachable`** — unparseable peer id, transport error, a peer too old to
+//!   decode the request, an undecodable payload. We never learned anything.
+//! - **`Absent`** — the peer answered and reports no head for this id
+//!   (`head_action_hash: None`). An OBSERVED absence, and the only arm entitled
+//!   to claim one.
+//! - **`Present`** — a head was served. `record: None` inside it is still a
+//!   present answer: a peer that holds a head it cannot resolve answers
+//!   hash-only, which is the dominant shape when the advertising peer is itself
+//!   conductor-missing.
 
 use std::time::Duration;
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
+
+use seam_contracts::Answer;
 
 use super::P2PHandle;
 use crate::services::head_adoption::{CarriedHeadRecord, HeadRecordFetcher};
@@ -49,15 +67,16 @@ impl PeerHeadRecordFetcher {
 
 #[async_trait::async_trait]
 impl HeadRecordFetcher for PeerHeadRecordFetcher {
-    async fn fetch(&self, peer_id: &str, content_id: &str) -> Option<CarriedHeadRecord> {
+    async fn fetch(&self, peer_id: &str, content_id: &str) -> Answer<CarriedHeadRecord> {
         let peer = match peer_id.parse::<libp2p::PeerId>() {
             Ok(p) => p,
             Err(e) => {
+                // Unreachable, not Absent: we never asked anyone anything.
                 tracing::debug!(
                     peer = %peer_id, error = %e,
                     "head-record fetch: unparseable peer id; skipping"
                 );
-                return None;
+                return Answer::Unreachable;
             }
         };
 
@@ -89,7 +108,7 @@ impl HeadRecordFetcher for PeerHeadRecordFetcher {
                     "head-record fetch failed (peer offline, or pre-cure and unable to \
                      decode ContentHeadRecord) — falling back to the author path"
                 );
-                return None;
+                return Answer::Unreachable;
             }
         };
 
@@ -104,42 +123,142 @@ impl HeadRecordFetcher for PeerHeadRecordFetcher {
                         error = %e,
                         "head-record payload undecodable — falling back to the author path"
                     );
-                    return None;
+                    return Answer::Unreachable;
                 }
             };
 
-        // Honest absence: the peer answered, but has no head (or cannot retrieve
-        // its record). Not an error — just nothing to carry.
-        let head_action_hash = payload.head_action_hash?;
-        let record = match payload
-            .record
-            .as_deref()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-        {
-            Some(b64) => match STANDARD.decode(b64) {
-                Ok(bytes) => Some(bytes),
-                Err(e) => {
-                    // A malformed record is worse than none: declaring with it
-                    // would be refused. Drop the bytes, keep the hash — the
-                    // declare may still succeed if our own conductor can
-                    // retrieve the target.
-                    tracing::warn!(
-                        target: "elohim_storage::head_adoption",
-                        peer = %peer_id,
-                        content_id = %content_id,
-                        error = %e,
-                        "head-record served malformed base64 — declaring without a carried record"
-                    );
-                    None
-                }
-            },
-            None => None,
-        };
+        classify_payload(payload, peer_id, content_id)
+    }
+}
 
-        Some(CarriedHeadRecord {
-            head_action_hash,
-            record,
-        })
+/// Turn a decoded `ContentHeadRecordPayload` into the answer it actually is.
+///
+/// **Concerns:** C4 (honest absence — this is the ONE place this client may
+/// claim an observed absence), C8 (the malformed-base64 arm degrades loudly
+/// rather than silently).
+///
+/// **Contract test:** [`tests::fetch_failures_are_unreachable_not_absent`] and
+/// its siblings.
+///
+/// Pure and separate from [`PeerHeadRecordFetcher::fetch`] on purpose: the
+/// transport half needs a live swarm to exercise, the classification half is the
+/// part that can get C4 wrong, and only the second one is worth a test. The
+/// `peer_id` / `content_id` arguments are for the degradation log line only —
+/// nothing about the classification depends on them.
+fn classify_payload(
+    payload: ContentHeadRecordPayload,
+    peer_id: &str,
+    content_id: &str,
+) -> Answer<CarriedHeadRecord> {
+    // HONEST ABSENCE, the one place this client may claim one: the peer
+    // ANSWERED and reports no head for this id. `Answer::observed_absence`
+    // names that provenance at the call site (there is deliberately no
+    // blanket `From<Option<T>>`, precisely so this choice stays visible).
+    let head_action_hash = match Answer::observed_absence(payload.head_action_hash) {
+        Answer::Present(h) => h,
+        Answer::Absent => return Answer::Absent,
+        // `observed_absence` never yields this arm; matched rather than
+        // unwrapped so a future refactor cannot turn it into a panic.
+        Answer::Unreachable => return Answer::Unreachable,
+    };
+    let record = match payload
+        .record
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        Some(b64) => match STANDARD.decode(b64) {
+            Ok(bytes) => Some(bytes),
+            Err(e) => {
+                // A malformed record is worse than none: declaring with it
+                // would be refused. Drop the bytes, keep the hash — the
+                // declare may still succeed if our own conductor can
+                // retrieve the target.
+                tracing::warn!(
+                    target: "elohim_storage::head_adoption",
+                    peer = %peer_id,
+                    content_id = %content_id,
+                    error = %e,
+                    "head-record served malformed base64 — declaring without a carried record"
+                );
+                None
+            }
+        },
+        None => None,
+    };
+
+    Answer::Present(CarriedHeadRecord {
+        head_action_hash,
+        record,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use seam_contracts::AnswerState;
+
+    /// Constructed field-by-field (no `..Default::default()`): a new field on the
+    /// wire payload should fail HERE, loudly, rather than default silently — the
+    /// C10 contract-evolution rule applied to a fixture.
+    fn payload(head: Option<&str>, record: Option<&str>) -> ContentHeadRecordPayload {
+        ContentHeadRecordPayload {
+            content_id: "c1".to_string(),
+            head_action_hash: head.map(str::to_string),
+            declared_at: None,
+            record: record.map(str::to_string),
+        }
+    }
+
+    /// The C4 line this client exists to hold: a peer that ANSWERED with no head
+    /// is `Absent`; a peer we could not reach is `Unreachable`. The transport
+    /// arms return `Unreachable` directly (unparseable peer id, view-federate
+    /// error, undecodable payload) and are unreachable from a pure test — what
+    /// IS testable, and what actually got re-merged historically, is that the
+    /// answered-with-nothing case never widens into the unreachable bucket, nor
+    /// the reverse.
+    #[test]
+    fn fetch_failures_are_unreachable_not_absent() {
+        // Peer answered, holds no head → OBSERVED absence.
+        let answered_empty = classify_payload(payload(None, None), "peer", "c1");
+        assert_eq!(answered_empty.state(), AnswerState::Absent);
+        assert_ne!(
+            answered_empty.state(),
+            AnswerState::Unreachable,
+            "an answered 'no head' must not degrade into 'we never heard'"
+        );
+
+        // Peer answered with a head and bytes → Present, bytes carried.
+        let served = classify_payload(payload(Some("uhCkk-head"), Some("aGk=")), "peer", "c1");
+        assert_eq!(served.state(), AnswerState::Present);
+        let carried = served.into_option().unwrap();
+        assert_eq!(carried.head_action_hash, "uhCkk-head");
+        assert_eq!(carried.record.as_deref(), Some(b"hi".as_slice()));
+    }
+
+    /// A hash-only answer is PRESENT, not absent — the peer holds a head it
+    /// cannot resolve. Counting it as an absence is the `carried_present`
+    /// mislabel (`da8975176`), which pointed the dashboard at the wrong remedy.
+    #[test]
+    fn a_hash_only_answer_is_present_not_absent() {
+        let hash_only = classify_payload(payload(Some("uhCkk-head"), None), "peer", "c1");
+        assert_eq!(hash_only.state(), AnswerState::Present);
+        assert!(hash_only.into_option().unwrap().record.is_none());
+    }
+
+    /// Malformed carried bytes drop the RECORD, never the answer: the declare
+    /// may still succeed if our own conductor can retrieve the target.
+    #[test]
+    fn malformed_base64_degrades_to_a_record_less_present_answer() {
+        let malformed = classify_payload(payload(Some("uhCkk-head"), Some("!!!not-b64")), "p", "c");
+        assert_eq!(malformed.state(), AnswerState::Present);
+        assert!(malformed.into_option().unwrap().record.is_none());
+    }
+
+    /// Whitespace-only bytes are not bytes.
+    #[test]
+    fn blank_record_is_no_record() {
+        let blank = classify_payload(payload(Some("uhCkk-head"), Some("   ")), "p", "c");
+        assert!(blank.into_option().unwrap().record.is_none());
     }
 }

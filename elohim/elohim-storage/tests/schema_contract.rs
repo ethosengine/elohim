@@ -5887,3 +5887,298 @@ fn verdict_view_matches_schema() {
         "verdict-view.schema.json",
     );
 }
+
+// ── Answer envelope (C4 honest absence) — plan task P1.4 ─────────────────────
+//
+// What these tests MECHANICALLY enforce, stated plainly so nobody reads more
+// into them than they carry:
+//
+//   1. The `answer-state` / `answer-reason` schema enums on disk agree,
+//      value-for-value AND in order, with the Rust vocabulary in
+//      `seam_contracts`. Two genuinely independent sources (a JSON file read
+//      from disk vs. a Rust type), so this is NOT a mirror test.
+//   2. The reason-to-state pairing declared in `_reasonStates` agrees with
+//      `AnswerReason::state()` — again, file vs. type.
+//   3. Neither enum carries `_dna` metadata (vocabulary the DHT never validates
+//      must not move the DNA hash).
+//   4. The `answer` envelope accepts every legal shape and REJECTS the three
+//      dishonest ones: a present answer with a reason, an absent answer with a
+//      value, and an `absent` carrying a reason that belongs to `unreachable`.
+//   5. Every target named in the envelope's `_adoptions` mapping is a legal
+//      answer-state.
+//
+// What is ADVISORY and NOT enforced here (deliberately, so the report is
+// honest): CONVENTIONS Rule 11 itself. No validator can tell a
+// single-provenance nullable from a dual-provenance one — that judgement is the
+// author's at design time. Likewise, `_adoptions` proves each mapping's TARGETS
+// are legal and that the mapping is total over the states it names; it does not
+// prove those names exhaust the source enum's variants (FetchOutcome lives in
+// another crate that elohim-storage does not link by default).
+
+/// `answer-state` and `answer-reason` on disk vs. the Rust vocabulary.
+#[test]
+fn answer_state_and_reason_schemas_match_the_rust_vocabulary() {
+    use seam_contracts::{AnswerReason, AnswerState, ReasonLabel};
+
+    let state_schema = load_schema("enums/answer-state.schema.json");
+    let observed: Vec<&str> = state_schema["enum"]
+        .as_array()
+        .expect("answer-state must declare an enum array")
+        .iter()
+        .map(|v| v.as_str().expect("enum values are strings"))
+        .collect();
+    let from_rust: Vec<&str> = AnswerState::ALL.iter().map(ReasonLabel::label).collect();
+    assert_eq!(
+        observed, from_rust,
+        "answer-state.schema.json and seam_contracts::AnswerState must agree in value AND order"
+    );
+
+    let reason_schema = load_schema("enums/answer-reason.schema.json");
+    let observed: Vec<&str> = reason_schema["enum"]
+        .as_array()
+        .expect("answer-reason must declare an enum array")
+        .iter()
+        .map(|v| v.as_str().expect("enum values are strings"))
+        .collect();
+    let from_rust: Vec<&str> = AnswerReason::ALL.iter().map(ReasonLabel::label).collect();
+    assert_eq!(
+        observed, from_rust,
+        "answer-reason.schema.json and seam_contracts::AnswerReason must agree in value AND order"
+    );
+
+    // The reason→state pairing, file vs. type.
+    let pairing = reason_schema["_reasonStates"]
+        .as_object()
+        .expect("answer-reason must declare _reasonStates");
+    assert_eq!(
+        pairing.len(),
+        AnswerReason::ALL.len(),
+        "_reasonStates must cover every reason"
+    );
+    for reason in AnswerReason::ALL {
+        let declared = pairing
+            .get(reason.label())
+            .and_then(|v| v.as_str())
+            .unwrap_or_else(|| panic!("_reasonStates is missing `{}`", reason.label()));
+        assert_eq!(
+            declared,
+            reason.state().label(),
+            "`{}` pairs with a different state in the schema than in Rust",
+            reason.label()
+        );
+    }
+
+    // No `_dna`: the DHT never validates this vocabulary, so it must not be
+    // able to move the DNA hash.
+    for (name, schema) in [
+        ("answer-state", &state_schema),
+        ("answer-reason", &reason_schema),
+    ] {
+        assert!(
+            schema.get("_dna").is_none(),
+            "{name} must NOT carry _dna metadata — vocabulary the DHT never validates \
+             must not move the DNA hash"
+        );
+    }
+}
+
+/// The envelope's three branches are a PARTITION of the two enum vocabularies.
+///
+/// The branches pin `state`/`reason` with `const`/`enum` rather than `$ref`ing
+/// the enum schemas (each branch admits one state and a subset of reasons), so
+/// without this test the envelope could silently drift from the vocabulary it
+/// claims to implement — the C7 shape, advertised ≠ served, applied to a schema.
+#[test]
+fn answer_envelope_branches_partition_the_vocabulary() {
+    use seam_contracts::{AnswerReason, AnswerState, ReasonLabel};
+
+    let raw: Value = serde_json::from_str(
+        &fs::read_to_string(schema_dir().join("objects/answer.schema.json")).unwrap(),
+    )
+    .unwrap();
+    let branches = raw["oneOf"]
+        .as_array()
+        .expect("answer.schema.json must be a oneOf");
+    assert_eq!(
+        branches.len(),
+        AnswerState::ALL.len(),
+        "one branch per answer-state, no more and no fewer"
+    );
+
+    let mut states: Vec<String> = Vec::new();
+    let mut reasons: Vec<String> = Vec::new();
+    for branch in branches {
+        let state = branch["properties"]["state"]["const"]
+            .as_str()
+            .expect("each branch must pin its state with a const");
+        states.push(state.to_string());
+
+        let reason_schema = &branch["properties"]["reason"];
+        if let Some(one) = reason_schema["const"].as_str() {
+            reasons.push(one.to_string());
+        } else if let Some(many) = reason_schema["enum"].as_array() {
+            reasons.extend(many.iter().map(|v| v.as_str().unwrap().to_string()));
+        } else {
+            // The `present` branch takes no reason — asserted, not assumed.
+            assert_eq!(
+                state, "present",
+                "only the present branch may omit `reason`; `{state}` omitted it"
+            );
+        }
+
+        assert_eq!(
+            branch["additionalProperties"],
+            serde_json::json!(false),
+            "branch `{state}` must set additionalProperties: false (view CONVENTIONS rule 3)"
+        );
+    }
+
+    states.sort();
+    let mut expected_states: Vec<String> = AnswerState::ALL
+        .iter()
+        .map(|s| s.label().to_string())
+        .collect();
+    expected_states.sort();
+    assert_eq!(
+        states, expected_states,
+        "the envelope's branch states must be exactly the answer-state vocabulary"
+    );
+
+    let before_dedup = reasons.len();
+    reasons.sort();
+    reasons.dedup();
+    assert_eq!(
+        before_dedup,
+        reasons.len(),
+        "two branches admit the same reason — the branches must be DISJOINT, or a \
+         timeout could be reported as an observed absence"
+    );
+    let mut expected_reasons: Vec<String> = AnswerReason::ALL
+        .iter()
+        .map(|r| r.label().to_string())
+        .collect();
+    expected_reasons.sort();
+    assert_eq!(
+        reasons, expected_reasons,
+        "the envelope's branch reasons must EXHAUST the answer-reason vocabulary — \
+         a reason no branch admits is unreachable on the wire"
+    );
+
+    // And the vocabulary paths the envelope names must actually exist.
+    for key in ["state", "reason"] {
+        let rel = raw["_vocabulary"][key]
+            .as_str()
+            .unwrap_or_else(|| panic!("_vocabulary must name the {key} enum schema"));
+        let path = schema_dir().join("objects").join(rel);
+        assert!(
+            path.exists(),
+            "_vocabulary.{key} points at {}, which does not exist",
+            path.display()
+        );
+    }
+}
+
+/// The envelope accepts the honest shapes and rejects the dishonest ones.
+#[test]
+fn answer_envelope_rejects_dishonest_shapes() {
+    let schema = load_schema("objects/answer.schema.json");
+    let validator = jsonschema::validator_for(&schema).expect("answer.schema.json must compile");
+
+    let legal = [
+        serde_json::json!({ "state": "present", "value": { "any": "payload" } }),
+        serde_json::json!({ "state": "present", "value": 0 }),
+        serde_json::json!({ "state": "absent", "reason": "observed_absent" }),
+        serde_json::json!({ "state": "unreachable", "reason": "timeout" }),
+        serde_json::json!({ "state": "unreachable", "reason": "not_yet_delivered" }),
+        serde_json::json!({ "state": "unreachable", "reason": "unverifiable" }),
+    ];
+    for instance in &legal {
+        assert!(
+            validator.is_valid(instance),
+            "should be legal but was rejected: {instance}"
+        );
+    }
+
+    let illegal = [
+        // A present answer explaining itself — "why is it there" is not a
+        // question a boundary answers.
+        serde_json::json!({ "state": "present", "value": 1, "reason": "timeout" }),
+        // A non-present answer with no reason: C8's unreadable gauge.
+        serde_json::json!({ "state": "unreachable" }),
+        serde_json::json!({ "state": "absent" }),
+        // An absence carrying a payload.
+        serde_json::json!({ "state": "absent", "reason": "observed_absent", "value": 1 }),
+        // The whole point of the type: a timeout may NEVER be reported as an
+        // observed absence.
+        serde_json::json!({ "state": "absent", "reason": "timeout" }),
+        // ...and an observed absence is not an unreachable answer.
+        serde_json::json!({ "state": "unreachable", "reason": "observed_absent" }),
+        // A state outside the vocabulary.
+        serde_json::json!({ "state": "maybe", "reason": "timeout" }),
+        // Undeclared fields must not leak through (additionalProperties: false).
+        serde_json::json!({ "state": "unreachable", "reason": "timeout", "extra": true }),
+    ];
+    for instance in &illegal {
+        assert!(
+            !validator.is_valid(instance),
+            "should have been rejected but validated: {instance}"
+        );
+    }
+}
+
+/// Every `_adoptions` mapping target is a legal answer-state, and each mapping
+/// is non-empty — the "proving adoptions" leg of P1.4, scoped honestly.
+#[test]
+fn answer_envelope_adoption_mappings_land_on_legal_states() {
+    use seam_contracts::{AnswerState, ReasonLabel};
+
+    // Read the RAW schema (not `load_schema`, which inlines refs): `_adoptions`
+    // holds plain strings, and we want the file's own bytes.
+    let raw: Value = serde_json::from_str(
+        &fs::read_to_string(schema_dir().join("objects/answer.schema.json")).unwrap(),
+    )
+    .unwrap();
+    let legal: Vec<&str> = AnswerState::ALL.iter().map(ReasonLabel::label).collect();
+
+    let adoptions = raw["_adoptions"]
+        .as_object()
+        .expect("answer.schema.json must declare _adoptions");
+    let mut checked = 0usize;
+    for (name, entry) in adoptions {
+        if name.starts_with('$') {
+            continue; // $comment
+        }
+        let mapping = entry["mapping"]
+            .as_object()
+            .unwrap_or_else(|| panic!("adoption `{name}` must declare a mapping"));
+        assert!(
+            !mapping.is_empty(),
+            "adoption `{name}` declares an empty mapping — a mapping that maps nothing \
+             proves nothing"
+        );
+        for (source_state, target) in mapping {
+            let target = target
+                .as_str()
+                .unwrap_or_else(|| panic!("adoption `{name}`.`{source_state}` must be a string"));
+            assert!(
+                legal.contains(&target),
+                "adoption `{name}` maps `{source_state}` onto `{target}`, which is not an \
+                 answer-state ({legal:?})"
+            );
+        }
+        checked += 1;
+    }
+    assert!(
+        checked >= 4,
+        "expected the four seeded adoptions (epr-pull-status, render FetchOutcome, \
+         doorway ReconcileDecision, storage LocalResolve); found {checked}"
+    );
+
+    // The doorway mapping is the one whose Rust side elohim-storage can NOT
+    // link, so it is pinned here explicitly rather than left implicit: both
+    // "answered" arms are PRESENT answers.
+    let doorway = &adoptions["doorway-reconcile-decision"]["mapping"];
+    assert_eq!(doorway["up_to_date"], "present");
+    assert_eq!(doorway["stale"], "present");
+    assert_eq!(doorway["unreachable"], "unreachable");
+}
