@@ -417,6 +417,100 @@ pub struct DeclareContentHeadInput {
     pub head_action_hash: Option<String>,
 }
 
+/// Mirror of `content_store::CanonicalElectionOutput` — what the DHT elected for
+/// an id, WITHOUT the winner's Content bytes.
+///
+/// This is the answer `resolve_content_head` structurally cannot give: it
+/// collapses "no election" and "election visible but target unretrievable" into
+/// the same `None`, which is why a conductor-missing peer could never act on a
+/// head the DHT had already decided.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CanonicalElectionWire {
+    pub winner_target: HoloHashB64,
+    /// The winning declaration LINK's notarized timestamp — feeds
+    /// `content_diesel::CanonicalOrdering` directly.
+    pub canonical_declared_at: i64,
+    pub canonical_earned: bool,
+}
+
+impl CanonicalElectionWire {
+    /// The election in the shape the stamp guard takes.
+    pub fn ordering(&self) -> crate::db::content_diesel::CanonicalOrdering {
+        (self.canonical_declared_at, self.canonical_earned)
+    }
+}
+
+/// Ask the conductor what the DHT elected for `id`, without needing it to serve
+/// the winner's bytes (`content_store::resolve_canonical_election`).
+///
+/// `Ok(None)` = no election in this conductor's LOCAL view yet — never
+/// authoritative absence.
+pub async fn call_resolve_canonical_election(
+    hc: &Arc<HcClient>,
+    id: &str,
+) -> Result<Option<CanonicalElectionWire>, StorageError> {
+    let payload = rmp_serde::to_vec_named(&id.to_string()).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode resolve_canonical_election id: {e}"
+        ))
+    })?;
+    let bytes = hc
+        .call_zome(ZOME_NAME, "resolve_canonical_election", payload)
+        .await?;
+    let out: Option<CanonicalElectionWire> = rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode CanonicalElectionWire: {e}"
+        ))
+    })?;
+    Ok(out)
+}
+
+/// Caller-input wire shape for `content_store::validate_carried_head_record`.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ValidateCarriedHeadRecordInput {
+    pub id: String,
+    pub expected_action_hash: String,
+    #[serde(with = "serde_bytes")]
+    pub record: Option<Vec<u8>>,
+}
+
+/// Have the ZOME cryptographically validate carried head bytes against an
+/// expected action hash (`content_store::validate_carried_head_record`).
+///
+/// The bytes are NEVER trusted by storage: the wasm side re-derives the
+/// action hash, verifies the author signature, checks the entry↔action binding,
+/// and enforces the target-id gate. Storage only decides what to do with a
+/// PROVEN head.
+///
+/// `Ok(None)` = nothing was carried. `Err` = the bytes failed a proof, which is
+/// a refusal to act, never a reason to stamp anyway.
+pub async fn call_validate_carried_head_record(
+    hc: &Arc<HcClient>,
+    id: &str,
+    expected_action_hash: &str,
+    record: Option<Vec<u8>>,
+) -> Result<Option<ContentHeadWire>, StorageError> {
+    let input = ValidateCarriedHeadRecordInput {
+        id: id.to_string(),
+        expected_action_hash: expected_action_hash.to_string(),
+        record,
+    };
+    let payload = rmp_serde::to_vec_named(&input).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode validate_carried_head_record: {e}"
+        ))
+    })?;
+    let bytes = hc
+        .call_zome(ZOME_NAME, "validate_carried_head_record", payload)
+        .await?;
+    let out: Option<ContentHeadWire> = rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode ContentHeadWire (validate carried): {e}"
+        ))
+    })?;
+    Ok(out)
+}
+
 /// Caller-input wire shape for the `content_store::declare_canonical_content_head`
 /// coordinator: the CROSS-ROOT canonical-head selector (notary-authority
 /// convergence, Model B / Tier-1 STAGING tier). Unlike [`DeclareContentHeadInput`],

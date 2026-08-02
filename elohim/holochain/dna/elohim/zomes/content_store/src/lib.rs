@@ -2966,10 +2966,21 @@ struct CanonicalHeadAnswer {
 /// older earned). The newer earned declaration is the authority's current,
 /// visible choice and supersedes the older; degrading to the root-author election
 /// is partition-correct and converges on the newer target once it gossips in.
-fn gather_canonical_head_record(
-    id: &str,
-    strategy: GetStrategy,
-) -> ExternResult<Option<CanonicalHeadAnswer>> {
+/// Run the election ALONE: gather the canonical-head link set for `id` and
+/// return the winner, WITHOUT retrieving the winner's target Content.
+///
+/// Separating this from [`gather_canonical_head_record`] is what makes
+/// "what did the DHT elect?" answerable independently of "can I serve the
+/// bytes?". Those two questions were fused, and the fusion is a real defect:
+/// `gather_canonical_head_record` returns `Ok(None)` BOTH when no election
+/// exists AND when the election's target has not gossiped in — so a peer that
+/// could plainly see the winner reported the same "nothing" as a peer that had
+/// never heard of it, and had no way to act on an election it was holding.
+///
+/// The link ops are far cheaper to obtain than the target record: they live on
+/// the `canonical_head` StringAnchor authority and gossip as ordinary link ops,
+/// so a conductor missing the CONTENT can still hold the ELECTION.
+fn select_election(id: &str, strategy: GetStrategy) -> ExternResult<Option<CanonicalCandidate>> {
     let anchor = StringAnchor::new(CANONICAL_HEAD_ANCHOR, id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
     let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
@@ -2990,7 +3001,14 @@ fn gather_canonical_head_record(
                 })
         })
         .collect();
-    let winner = match select_canonical_winner(candidates) {
+    Ok(select_canonical_winner(candidates))
+}
+
+fn gather_canonical_head_record(
+    id: &str,
+    strategy: GetStrategy,
+) -> ExternResult<Option<CanonicalHeadAnswer>> {
+    let winner = match select_election(id, strategy)? {
         Some(w) => w,
         None => return Ok(None),
     };
@@ -3800,6 +3818,141 @@ pub fn get_record_for_action(
         action_hash: holo_hash::ActionHashB64::from(action_hash),
         record: bytes,
     }))
+}
+
+/// What the DHT elected for a content id, WITHOUT the winner's Content record.
+///
+/// Hashes are [`holo_hash::ActionHashB64`] for the same string-wire-safety
+/// reason as [`DeclareCanonicalHeadInput`].
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CanonicalElectionOutput {
+    /// The Content action the election chose as canonical head.
+    pub winner_target: holo_hash::ActionHashB64,
+    /// The winning declaration LINK's notarized DHT timestamp — the ordering
+    /// [`select_canonical_winner`] arbitrated on, and the value the storage
+    /// projection's monotonic heal guard keys off.
+    pub canonical_declared_at: Timestamp,
+    /// Whether the winning declaration carried the EARNED provenance marker.
+    pub canonical_earned: bool,
+}
+
+/// Answer "what did the DHT elect for this id?" WITHOUT needing to serve the
+/// winner's bytes — the election read that [`resolve_content_head`] cannot give.
+///
+/// ## Why this exists (the conductor-missing class)
+///
+/// `resolve_content_head` answers `None` in two very different situations: no
+/// election exists, or the election exists but its target has not gossiped in.
+/// A conductor that is MISSING the content but HOLDING the election is stuck in
+/// the second case with no way to say so — it looks identical to total ignorance,
+/// so its projection can never act on a head the DHT has already decided.
+///
+/// Link ops and entry ops travel independently: the canonical-head links live on
+/// the `canonical_head` StringAnchor authority and gossip as ordinary link ops,
+/// while the target Content is a separate entry the conductor may simply not
+/// hold. This extern reports the election as soon as the LINKS arrive, letting a
+/// caller fetch the winner's bytes from a peer and validate them (see
+/// [`validate_carried_head_record`]) instead of waiting on gossip that may be
+/// arbitrarily delayed.
+///
+/// `GetStrategy::Local` — this is a read on the heal path and must never stall
+/// (same rationale as [`resolve_content_head_local`]). `None` here means "no
+/// election in my local view YET", never authoritative absence.
+///
+/// Coordinator-only and read-only: no entries, no links, no commits — so it
+/// ships on the `update_coordinators` hot-swap path with no DNA-hash move.
+#[hdk_extern]
+pub fn resolve_canonical_election(id: String) -> ExternResult<Option<CanonicalElectionOutput>> {
+    let winner = match select_election(&id, GetStrategy::Local)? {
+        Some(w) => w,
+        None => return Ok(None),
+    };
+    Ok(Some(CanonicalElectionOutput {
+        winner_target: holo_hash::ActionHashB64::from(winner.target),
+        canonical_declared_at: winner.timestamp,
+        canonical_earned: winner.is_earned,
+    }))
+}
+
+/// Input for [`validate_carried_head_record`].
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ValidateCarriedHeadRecordInput {
+    /// The content id the record is claimed to be a head for.
+    pub id: String,
+    /// The action the caller expects these bytes to be — normally the
+    /// `winner_target` from [`resolve_canonical_election`].
+    pub expected_action_hash: holo_hash::ActionHashB64,
+    /// `holochain_serialized_bytes`-encoded [`Record`], as served by
+    /// [`get_record_for_action`] on a peer that holds it.
+    #[serde(default, with = "serde_bytes")]
+    pub record: Option<Vec<u8>>,
+}
+
+/// Cryptographically validate a CARRIED head record against an expected action
+/// hash, WITHOUT requiring a local chain for the id.
+///
+/// This is the last-mile of election-obey for a conductor that holds the
+/// election but not the bytes. It runs exactly the same wasm-side proofs the
+/// declare path runs ([`validate_carried_record`]: action-hash binding, author
+/// signature, entry↔action binding) plus the TARGET-ID GATE, and returns the
+/// head it proves.
+///
+/// ## What is deliberately NOT checked, and why that is safe
+///
+/// [`declare_canonical_head_inner`] additionally gates on
+/// `gather_content_chain(id).is_some()` — "this conductor knows the id". That
+/// gate is **target-independent**, and it is precisely what a conductor-missing
+/// peer cannot satisfy; keeping it here would make this extern useless for the
+/// only class it exists to serve. Dropping it is safe because this function
+/// **writes nothing** — no entry, no link, no commit. It is a pure verifier. The
+/// caller learns only "these bytes really are action X, signed by their author,
+/// carrying Content whose id is `id`" — facts re-derived from the bytes
+/// themselves, so a hostile carrier gains nothing.
+///
+/// The TARGET-ID GATE is retained and load-bearing: without it a carrier could
+/// hand over a validly-signed Content authored under a DIFFERENT id and have it
+/// projected as this id's head.
+///
+/// Authority is unchanged and lives elsewhere: the DHT election decides WHICH
+/// action is canonical; this only proves the bytes ARE that action. Returns
+/// `Ok(None)` when no record was carried (honest absence, not an error).
+///
+/// Coordinator-only and read-only → `update_coordinators` hot-swap, no DNA-hash
+/// move.
+#[hdk_extern]
+pub fn validate_carried_head_record(
+    input: ValidateCarriedHeadRecordInput,
+) -> ExternResult<Option<ContentHeadOutput>> {
+    let Some(bytes) = input.record else {
+        return Ok(None);
+    };
+    let target = ActionHash::from(input.expected_action_hash);
+    let record = validate_carried_record(&target, &bytes)?;
+
+    // TARGET-ID GATE — same rule as `declare_canonical_head_inner`, restated
+    // here because this path does not go through that function.
+    let content: Content = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "validate_carried_head_record: carried record for {target:?} carries no Content entry"
+            )))
+        })?;
+    if content.id != input.id {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "validate_carried_head_record: carried record {target:?} carries Content id '{}', \
+             which does not match the requested id '{}'",
+            content.id, input.id
+        ))));
+    }
+
+    // `canonical = true`: these bytes are the DHT-elected head, proven. The
+    // election ordering is NOT attached here — the caller already holds it from
+    // `resolve_canonical_election`, and inventing it from the action timestamp
+    // is exactly the clock confusion the election fields exist to end.
+    Ok(Some(build_content_head_output(&input.id, &record, true)?))
 }
 
 /// Bulk create content entries (for import operations)

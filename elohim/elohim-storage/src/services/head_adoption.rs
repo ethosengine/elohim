@@ -113,6 +113,48 @@
 //! the no-chain gate), not another storage arm. `not_retrievable` / `fetch_none`
 //! ARE storage-fixable, and self-candidacy is their answer.
 //!
+//! ## The second live window, and the composition that closes the loop
+//!
+//! Edge #1291 read: `no_local_chain` 887, `not_retrievable` 1, `declare_error` 3,
+//! **`fetch_none` ZERO**, mints `adopt_peer=1` and no self-head. The zero is the
+//! sharper signal: it means no CHAIN-HOLDING pod ever reached a fetch, i.e. the
+//! holding side was not contesting at all.
+//!
+//! The reason is an admission gap, not a decision bug. A holding pod resolves its
+//! declared rows fine, so they never take the conductor-missing or timeout
+//! routes; and `gapfill_would_self_elect` requires `local_declared.is_none()`, so
+//! a DECLARED row fails that guard too. Those rows landed in the general heal
+//! arm, were honestly refused (`SkippedDeclared`), and were pushed to NO
+//! candidate list — never reaching [`decide_head_action`]. So the election
+//! received a candidate from neither side: the missing side *cannot* declare, and
+//! the holding side was never *asked* to.
+//! `declared_divergence_should_route_to_contest` admits exactly that class.
+//!
+//! **Expected composition once both sides participate:**
+//!
+//! 1. The HOLDING pod admits its declared+divergent rows and contests. Its fetch
+//!    from the missing peer returns hash-only (`record: None`) — verified: a peer
+//!    serves `head_action_hash` from its SQLite row while its conductor cannot
+//!    produce the bytes, so the payload carries the hash and no record.
+//! 2. Declaring the peer's head therefore fails `is not retrievable`, and
+//!    SELF-CANDIDACY mints the holding pod's OWN head. That is the first real
+//!    candidate the election has ever received. (`fetch_none` should now become
+//!    non-zero where self-candidacy does not immediately succeed — its absence
+//!    was the fingerprint of the admission gap.)
+//! 3. An election now EXISTS for the id.
+//! 4. The MISSING pod, which can see the election but not the content, obeys it
+//!    via `try_obey_visible_election`: fetch the winner's bytes from the holding
+//!    peer, have the zome prove them, stamp under the election's ordering.
+//! 5. The HOLDING pod's own row converges through ordinary heal — its conductor
+//!    now answers `canonical == true` with the election ordering, and the Fix-2
+//!    guard authorizes the move.
+//!
+//! **Residual class, out of reach this wave:** ids where BOTH sides are
+//! conductor-missing. Neither can declare (the no-chain gate is
+//! target-independent) and neither can obey (no election can be minted). Closing
+//! it needs the deliberate coordinator-zome decision about that gate, which
+//! touches adopt-before-author semantics and deserves its own review.
+//!
 //! **No admission or budget deny.** Every arm degrades to the author path and
 //! retries on the next sweep. Pacing and yielding are the callers' existing
 //! bounds; nothing here sheds work.
@@ -468,8 +510,26 @@ pub async fn try_adopt_canonical_head(
         LocalResolve::Probe => probed.as_ref(),
     };
     let canonical_head = head.filter(|h| h.canonical);
-
     let hint = adopt.hints.get(id);
+
+    // (1b) ELECTION-OBEY ARM. Scoped to the CONDUCTOR-MISSING class — no head
+    // answer of any kind. Those rows are the ones whose `Ok(None)` may be hiding
+    // a visible election (see `try_obey_visible_election`); a row that DID get an
+    // answer is already served by the arms below, so probing here would spend a
+    // conductor call per row per sweep for nothing.
+    //
+    // Runs BEFORE the decision rule on purpose: obeying an election the DHT has
+    // already settled is strictly better than contesting it again, and a row this
+    // arm moves is left holding the elected head with its ordering recorded — so
+    // the very next sweep sees `canonical_declared_at` set and quiesces.
+    if should_probe_election(head.is_some()) {
+        if let Some(outcome) =
+            try_obey_visible_election(hc, pool, ctx, id, hint, adopt.fetcher).await
+        {
+            return outcome;
+        }
+    }
+
     let decision = decide_head_action(
         canonical_head.is_some(),
         hint.is_some(),
@@ -582,6 +642,223 @@ async fn adopt_peer(
     };
 
     declare_peer_head(hc, pool, ctx, id, &head_action_hash, carried_record, hint).await
+}
+
+/// ELECTION-OBEY: move a row to the head the DHT elected, when this conductor can
+/// SEE the election but cannot resolve the winner's bytes itself.
+///
+/// Returns `None` to mean "not applicable — carry on with the normal decision",
+/// and `Some(outcome)` when this arm took responsibility for the id.
+///
+/// ## The class this closes
+///
+/// `resolve_content_head_local` answers `Ok(None)` for two unrelated reasons, and
+/// the caller cannot tell them apart: no election exists, OR an election exists
+/// whose target has not gossiped in. A pod in the second state is holding the
+/// answer and unable to act on it — the ~24.9k/2h conductor-missing class, which
+/// no amount of contesting can fix because contest SUPPLIES elections and this
+/// class needs to OBEY one.
+///
+/// Link ops and entry ops travel independently: canonical-head links gossip on
+/// the `canonical_head` StringAnchor authority, while the target Content is a
+/// separate entry the conductor may simply not hold. `resolve_canonical_election`
+/// reports the election as soon as the LINKS land; the winner's bytes then come
+/// from a peer.
+///
+/// ## Why this is not "trusting a peer"
+///
+/// Nothing is stamped on a peer's say-so. Two independent gates must BOTH pass:
+///
+/// 1. **The election is read from THIS node's own conductor.** The peer does not
+///    get to say which head is canonical — the DHT already decided, and we read
+///    that decision locally.
+/// 2. **The bytes are proven in wasm.** `validate_carried_head_record` re-derives
+///    the action hash, verifies the author's signature, checks the entry↔action
+///    binding, and enforces the target-id gate. A peer that serves anything other
+///    than the elected action fails.
+///
+/// The peer is a byte courier, never an authority. And the stamp is
+/// `HealCanonical` carrying the ELECTION's ordering, so
+/// [`content_diesel::canonical_move_verdict`] still arbitrates — this arm cannot
+/// move a row that already obeys an equal-or-newer election, and cannot move one
+/// backwards. It never authors, never self-elects, and never widens `Declare`.
+/// Should the election-obey arm be probed for this row?
+///
+/// Pure + total, matching the sibling routing predicates
+/// (`gapfill_would_self_elect`, `conductor_missing_should_route_to_adopt`) — the
+/// scope rule is the part worth testing without a conductor.
+///
+/// YES exactly when the own conductor gave NO head answer at all. That `Ok(None)`
+/// is the state that may be hiding a visible election (see
+/// [`try_obey_visible_election`]). A row that DID get an answer — canonical or
+/// fallback — is already served by the existing arms, so probing it would spend a
+/// conductor round-trip per row per sweep for nothing.
+fn should_probe_election(head_answer_present: bool) -> bool {
+    !head_answer_present
+}
+
+async fn try_obey_visible_election(
+    hc: &Arc<HcClient>,
+    pool: &DbPool,
+    ctx: &AppContext,
+    id: &str,
+    hint: Option<&PeerHeadHint>,
+    fetcher: Option<&dyn HeadRecordFetcher>,
+) -> Option<AdoptOutcome> {
+    // (1) What did the DHT elect? Read from our OWN conductor.
+    let election = match conductor_writes::call_resolve_canonical_election(hc, id).await {
+        Ok(Some(e)) => e,
+        // No election visible — nothing to obey. Behaviour is exactly unchanged
+        // for every id in this state, which is the pre-wave-4 world.
+        Ok(None) => return None,
+        Err(e) => {
+            // A conductor that will not answer is not evidence of anything.
+            // Fall through to the normal decision rather than holding the id.
+            tracing::debug!(
+                content_id = %id, error = %e,
+                "election-obey: could not read the canonical election; continuing with the \
+                 normal decision"
+            );
+            return None;
+        }
+    };
+
+    // (2) Someone has to hand us the bytes. With no peer or no transport this is
+    // not a failure — there is simply nothing to try yet.
+    let (hint, fetcher) = match (hint, fetcher) {
+        (Some(h), Some(f)) => (h, f),
+        _ => return None,
+    };
+
+    let winner = election.winner_target.to_string();
+
+    // (3) Fetch. The peer answers with ITS head for this id; that is only useful
+    // if it happens to BE the elected action. A mismatch is not a lie — the peer
+    // may simply hold a different head — but it is not the bytes we need.
+    let carried = fetcher.fetch(&hint.peer_id, id).await;
+    let bytes = match &carried {
+        Some(c) if c.head_action_hash.trim() == winner.trim() => c.record.clone(),
+        Some(c) => {
+            crate::metrics::inc_election_obey_failed("fetch");
+            tracing::debug!(
+                content_id = %id,
+                from_peer = %hint.peer_id,
+                elected = %winner,
+                peer_served = %c.head_action_hash,
+                "election-obey: this peer holds a different head than the DHT elected — \
+                 no bytes to prove the winner with; holding"
+            );
+            return Some(AdoptOutcome::Held);
+        }
+        None => {
+            crate::metrics::inc_election_obey_failed("fetch");
+            tracing::debug!(
+                content_id = %id,
+                from_peer = %hint.peer_id,
+                elected = %winner,
+                "election-obey: no record served for the elected head; holding, retried next sweep"
+            );
+            return Some(AdoptOutcome::Held);
+        }
+    };
+    if bytes.is_none() {
+        crate::metrics::inc_election_obey_failed("fetch");
+        tracing::debug!(
+            content_id = %id,
+            from_peer = %hint.peer_id,
+            elected = %winner,
+            "election-obey: peer served the elected hash but carried no record bytes; holding"
+        );
+        return Some(AdoptOutcome::Held);
+    }
+
+    // (4) PROVE the bytes in wasm before they can touch a row.
+    let proven =
+        match conductor_writes::call_validate_carried_head_record(hc, id, &winner, bytes).await {
+            Ok(Some(head)) => head,
+            Ok(None) => {
+                crate::metrics::inc_election_obey_failed("validate");
+                return Some(AdoptOutcome::Held);
+            }
+            Err(e) => {
+                crate::metrics::inc_election_obey_failed("validate");
+                tracing::warn!(
+                    target: "elohim_storage::head_adoption",
+                    content_id = %id,
+                    from_peer = %hint.peer_id,
+                    elected = %winner,
+                    error = %e,
+                    "election-obey: a peer served bytes that do NOT prove the elected head — \
+                     refusing them and holding (this is a peer serving something it cannot back)"
+                );
+                return Some(AdoptOutcome::Held);
+            }
+        };
+
+    // (5) Stamp under the ELECTION's ordering. `HealCanonical` + the election
+    // clock means `canonical_move_verdict` still decides: fill, forward-move, or
+    // refuse. Proof of the bytes never becomes a licence to move backwards.
+    let mut conn = match pool.get() {
+        Ok(c) => c,
+        Err(e) => {
+            crate::metrics::inc_election_obey_failed("stamp_refused");
+            tracing::warn!(content_id = %id, error = %e, "election-obey: db conn for stamp");
+            return Some(AdoptOutcome::Held);
+        }
+    };
+    let c = &proven.content;
+    let patch = content_diesel::ContentProjectionPatch {
+        blob_cid: c.blob_cid.clone(),
+        content_size_bytes: c
+            .content_size_bytes
+            .map(|n| i32::try_from(n).unwrap_or(i32::MAX)),
+        title: Some(c.title.clone()),
+        description: Some(c.description.clone()),
+        content_type: Some(c.content_type.clone()),
+        content_format: Some(c.content_format.clone()),
+        reach: Some(c.reach.clone()),
+        metadata_json: Some(c.metadata_json.clone()),
+    };
+    match content_diesel::stamp_declared_head_mode(
+        &mut conn,
+        ctx,
+        id,
+        proven.head_action_hash.to_string().as_str(),
+        Some(proven.declared_at),
+        Some(patch),
+        StampMode::HealCanonical,
+        Some(election.ordering()),
+    ) {
+        Ok(StampOutcome::Stamped) => {
+            crate::metrics::inc_election_obeyed("carried");
+            crate::metrics::inc_content_head_adopted();
+            tracing::warn!(
+                target: "elohim_storage::head_adoption",
+                content_id = %id,
+                head = %winner,
+                from_peer = %hint.peer_id,
+                earned = election.canonical_earned,
+                "election-obey: OBEYED the DHT-elected canonical head — this conductor could \
+                 see the election but not the content, so a peer supplied the bytes and the \
+                 zome proved them; the row now agrees with the fleet"
+            );
+            Some(AdoptOutcome::Adopted)
+        }
+        Ok(other) => {
+            // Already obeying this or a newer/earned election — a correct refusal.
+            crate::metrics::inc_election_obey_failed("stamp_refused");
+            tracing::debug!(
+                content_id = %id, outcome = ?other,
+                "election-obey: the row already obeys an equal-or-newer election; no move"
+            );
+            Some(AdoptOutcome::Held)
+        }
+        Err(e) => {
+            crate::metrics::inc_election_obey_failed("stamp_refused");
+            tracing::warn!(content_id = %id, error = %e, "election-obey: stamp failed");
+            Some(AdoptOutcome::Held)
+        }
+    }
 }
 
 /// Process-local record of ids this node has already SELF-CANDIDATED, keyed by
@@ -724,7 +1001,12 @@ async fn contest_peer(
         Some(f) => f.fetch(&hint.peer_id, id).await,
         None => None,
     };
-    let carried_present = carried.is_some();
+    // "Did we get BYTES?" — not "did the peer answer?". A peer holding a row it
+    // cannot resolve answers hash-only (`record: None`), which is the DOMINANT
+    // shape when the advertising peer is itself conductor-missing. Counting that
+    // as `carried` would label it `not_retrievable` when it is precisely
+    // `fetch_none`, and those two point at different remedies.
+    let carried_present = carried.as_ref().is_some_and(|c| c.record.is_some());
     // The SERVED hash wins over the advertised one (same rule as `adopt_peer`):
     // it is the action the bytes actually prove.
     let (peer_head, carried_record) = match carried {
@@ -1321,6 +1603,108 @@ mod tests {
             HeadDecision::ContestPeer,
             "and before it lands, contest IS reached — which is exactly why the \
              ledger has to hold the line in the meantime"
+        );
+    }
+
+    /// ELECTION-OBEY scope: the arm is probed ONLY for the conductor-missing
+    /// class (no head answer at all). A row that got an answer — canonical or
+    /// fallback — is already served by the existing arms, and probing it would
+    /// spend a conductor round-trip per row per sweep for nothing.
+    ///
+    /// This mirrors the gate in `try_adopt_canonical_head`.
+    #[test]
+    fn election_obey_is_scoped_to_the_conductor_missing_class() {
+        assert!(
+            should_probe_election(false),
+            "no head answer at all is exactly the class that may be hiding a \
+             visible election — probe it"
+        );
+        assert!(
+            !should_probe_election(true),
+            "a row the conductor DID answer for is already served by the adopt/contest \
+             arms; probing it spends a conductor round-trip per row per sweep for nothing"
+        );
+    }
+
+    /// The obey path must stamp under the ELECTION's ordering in `HealCanonical`
+    /// mode — never `Declare`. Proof of the bytes authorizes believing WHAT the
+    /// head is; it never authorizes moving a row backwards. The tempting shortcut
+    /// (bytes are proven, so just `Declare` them) is exactly the 2026-07-12
+    /// backwards-heal regression.
+    ///
+    /// Asserted on the VERDICT function rather than by scanning source text: the
+    /// property that matters is that an obey-shaped stamp is still arbitrated,
+    /// and a source scan for `StampMode::` is both brittle and — as this test
+    /// originally proved — capable of passing by accident when its slice runs
+    /// past the end of the function it meant to check.
+    #[test]
+    fn election_obey_ordering_is_still_arbitrated_not_forced() {
+        use crate::db::content_diesel::{canonical_move_verdict, StaleReason};
+
+        // Forward election ⇒ the obey stamp moves.
+        assert!(canonical_move_verdict(Some((9_000, false)), Some((1_000, false))).is_ok());
+        // Older election ⇒ refused, even though the bytes were cryptographically
+        // proven. Proof of WHAT is not permission to go BACKWARDS.
+        assert_eq!(
+            canonical_move_verdict(Some((1_000, false)), Some((9_000, false))).unwrap_err(),
+            StaleReason::NotNewer,
+        );
+        // Staging election cannot displace an earned one, proven bytes or not.
+        assert_eq!(
+            canonical_move_verdict(Some((9_000, false)), Some((1_000, true))).unwrap_err(),
+            StaleReason::Tier,
+        );
+    }
+
+    /// QUIESCENCE, shape 3 (obeyed rows). Once the obey path stamps, the row
+    /// carries `canonical_declared_at`, so the decision rule Holds — no re-obey
+    /// attempt and, critically, no CONTEST of a question the DHT already settled.
+    #[test]
+    fn an_obeyed_row_neither_re_obeys_nor_contests() {
+        assert_eq!(
+            decide(false, true, true, true),
+            HeadDecision::Hold,
+            "a row that obeyed an election must not then contest it — that would \
+             re-open a settled question every sweep"
+        );
+        // And the obey arm itself refuses a second move: `canonical_move_verdict`
+        // declines an equal election (NotNewer), which the arm counts as
+        // `stamp_refused` rather than treating as progress.
+        assert_eq!(
+            crate::db::content_diesel::canonical_move_verdict(
+                Some((7_000, false)),
+                Some((7_000, false))
+            )
+            .unwrap_err(),
+            crate::db::content_diesel::StaleReason::NotNewer,
+            "re-obeying the SAME election must not read as a move"
+        );
+    }
+
+    /// A no-election answer must leave behaviour EXACTLY as it was — the arm
+    /// returns `None` and the normal decision rule runs. This is what keeps
+    /// wave 4 safe to land before the wave-3 window confirms anything.
+    ///
+    /// Expressed as the decision rule the fall-through lands on: with no election
+    /// visible the obey arm returns `None`, so a conductor-missing row with a peer
+    /// hint reaches exactly the verdict it reached before wave 4.
+    #[test]
+    fn no_visible_election_falls_through_to_the_unchanged_decision() {
+        assert_eq!(
+            decide(false, true, false, false),
+            HeadDecision::AdoptPeer,
+            "undeclared + peer declares ⇒ AdoptPeer, exactly as before wave 4"
+        );
+        assert_eq!(
+            decide(false, true, true, false),
+            HeadDecision::ContestPeer,
+            "two-way declared ⇒ ContestPeer, exactly as before wave 4 — the obey arm \
+             must not silently swallow ids it could not act on"
+        );
+        assert_eq!(
+            decide(false, false, false, false),
+            HeadDecision::Author,
+            "nothing anywhere ⇒ Author, unchanged"
         );
     }
 

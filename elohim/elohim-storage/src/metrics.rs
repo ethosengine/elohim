@@ -411,6 +411,50 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Rows whose head MOVED to obey a DHT election this node could SEE but
+    /// could not resolve locally — the last-mile of convergence for the
+    /// conductor-missing class.
+    ///
+    /// `path="carried"`: the election was read from the own conductor
+    /// (`resolve_canonical_election`), the winner's bytes were fetched from a
+    /// peer, the ZOME proved them against the elected action, and the stamp then
+    /// moved the row under the election's own ordering.
+    ///
+    /// This is the series that answers "is the fleet actually converging?" for
+    /// the ~24.9k/2h conductor-missing class. Contest supplies the election;
+    /// this obeys it. Both must be non-zero for a two-way divergence to close on
+    /// a pod that holds no chain.
+    pub static ref CONTENT_ELECTION_OBEYED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_content_election_obeyed_total",
+            "Rows moved to the DHT-elected canonical head, by obey path.",
+        ),
+        &["path"],
+    )
+    .unwrap();
+
+    /// Election-obey attempts that did NOT move the row, by failure class.
+    ///
+    /// - `fetch` — no peer served bytes for the elected action (no record came
+    ///   back, or the peer served a DIFFERENT head than the one elected).
+    /// - `validate` — bytes came back but the ZOME refused them: hash mismatch,
+    ///   bad author signature, entry↔action mismatch, or the carried Content
+    ///   belongs to another id. Any count here is worth reading the WARN for —
+    ///   it means a peer served bytes that do not prove what they claim.
+    /// - `stamp_refused` — proven bytes, but `canonical_move_verdict` declined
+    ///   the move (the row already obeys an equal-or-newer election, or an
+    ///   earned one). A correct refusal, not an error.
+    ///
+    /// Success is NOT counted here — see `elohim_content_election_obeyed_total`.
+    pub static ref CONTENT_ELECTION_OBEY_FAILED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_content_election_obey_failed_total",
+            "Election-obey attempts that did not move the row, by failure class.",
+        ),
+        &["class"],
+    )
+    .unwrap();
+
     /// Ghost-witness re-author call FAILURES, by class — the two per-row
     /// failure modes minted as saga-06-heads-converge stations (2026-07-26
     /// story-harvest of live Loki evidence, elohim-alpha namespace): previously
@@ -912,6 +956,8 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(PROJECTION_REFUSED_STALE_REASONS.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_CANONICAL_LINKS_MINTED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_FAILED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_ELECTION_OBEYED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_ELECTION_OBEY_FAILED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_REAUTHOR_FAILED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_SWEEP_ABANDONED.clone()));
         // Pre-touch both known `class` combos so both series exist in
@@ -1206,6 +1252,19 @@ pub fn inc_content_canonical_link_minted(source: &str) {
 /// (`no_local_chain` | `not_retrievable` | `fetch_none` | `declare_error`).
 pub fn inc_contest_failed(class: &str) {
     CONTENT_CONTEST_FAILED.with_label_values(&[class]).inc();
+}
+
+/// Count a row moved to the DHT-elected head (`path` = `"carried"`).
+pub fn inc_election_obeyed(path: &str) {
+    CONTENT_ELECTION_OBEYED.with_label_values(&[path]).inc();
+}
+
+/// Count an election-obey attempt that did not move the row
+/// (`fetch` | `validate` | `stamp_refused`).
+pub fn inc_election_obey_failed(class: &str) {
+    CONTENT_ELECTION_OBEY_FAILED
+        .with_label_values(&[class])
+        .inc();
 }
 
 pub fn inc_projection_heal_outcome(stream: &str, outcome: &str) {

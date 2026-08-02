@@ -691,6 +691,55 @@ fn timeout_should_route_to_adopt(transient: bool, peer_advertises_declaration: b
     transient && peer_advertises_declaration
 }
 
+/// Should a DECLARED row whose divergence heal just REFUSED be handed to the
+/// adopt/contest arm?
+///
+/// Pure + total, a sibling of [`gapfill_would_self_elect`] — same reason: this is
+/// candidate ADMISSION, and admission rules belong where they can be read and
+/// tested without a conductor.
+///
+/// ## The dead-end this opens (live evidence, edge #1291)
+///
+/// A CHAIN-HOLDING pod resolves its declared rows successfully, so they never
+/// touch the conductor-missing or timeout routes. And [`gapfill_would_self_elect`]
+/// requires `local_declared.is_none()`, so a DECLARED row fails that guard by
+/// construction too. Such a row therefore lands in the general heal arm, gets
+/// `StampOutcome::SkippedDeclared` ("row already declared — heal left it to the
+/// canonical channels", the ~3.5k/hr class), is marked completed, and is pushed
+/// to NO candidate list. It never reaches `decide_head_action` at all.
+///
+/// The consequence is that the DHT election never receives a candidate from
+/// either side: the conductor-missing side cannot declare (no local chain — 887
+/// `contest_failed{no_local_chain}` in the first window), and the chain-holding
+/// side — which CAN declare — never enters the decision rule. `fetch_none = 0`
+/// was the tell: no holding pod ever got as far as fetching.
+///
+/// Admitting the row changes NO decision logic. It flows into the existing rule
+/// as `(conductor_canonical=false, peer_declared=true, local_declared=true,
+/// election=false)` → `ContestPeer`, which is exactly the branch already built
+/// and tested for it.
+///
+/// Four conditions, all required:
+/// - **`!answer_canonical`** — a canonical answer is already handled by
+///   `HealCanonical` semantics; nothing to contest.
+/// - **`local_declared`** — an undeclared row keeps its existing routes
+///   (`gapfill_would_self_elect` owns that case).
+/// - **`peer_advertises_different_head`** — no divergence, no contest. Equality
+///   here means the two sides already agree on the head.
+/// - **`!local_has_canonical_election`** — QUIESCENCE. A row obeying an election
+///   is settled; re-admitting it would re-contest a decided question every sweep.
+fn declared_divergence_should_route_to_contest(
+    answer_canonical: bool,
+    local_declared: bool,
+    peer_advertises_different_head: bool,
+    local_has_canonical_election: bool,
+) -> bool {
+    !answer_canonical
+        && local_declared
+        && peer_advertises_different_head
+        && !local_has_canonical_election
+}
+
 /// Should a CONDUCTOR-MISSING row (`resolve_content_head` answered `Ok(None)`)
 /// also be routed to the adopt-before-author arm?
 ///
@@ -2863,6 +2912,47 @@ async fn heal_content(
                         "content",
                         HealOutcomeKind::RefusedDeclared.label(),
                     );
+
+                    // DECLARED-DIVERGENCE ADMISSION. Refusing the stamp is
+                    // correct — and, on its own, terminal: this row reached no
+                    // candidate list at all, so the DHT election never got a
+                    // candidate from the one side that CAN declare (it holds the
+                    // chain). Admitting it here is candidate ADMISSION only; the
+                    // decision rule is untouched and answers `ContestPeer`.
+                    //
+                    // The election read is what keeps this from re-admitting a
+                    // settled row every sweep, so a read failure must NOT admit
+                    // (conservative: a spurious admission re-contests a decided
+                    // question, which is the write storm the gate exists to stop).
+                    let (declared, has_election) = pool
+                        .get()
+                        .ok()
+                        .and_then(|mut c| {
+                            crate::db::content_diesel::declared_head_with_election(
+                                &mut c, &app_ctx, &id,
+                            )
+                            .ok()
+                        })
+                        .unwrap_or((None, true));
+                    let peer_differs = peer_head_hints.get(&id).is_some_and(|h| {
+                        declared
+                            .as_deref()
+                            .is_none_or(|d| d.trim() != h.head_action_hash.trim())
+                    });
+                    if declared_divergence_should_route_to_contest(
+                        head.canonical,
+                        declared.is_some(),
+                        peer_differs,
+                        has_election,
+                    ) {
+                        adopt_candidates.push(AdoptCandidate {
+                            id: id.clone(),
+                            // The conductor's own (non-canonical) answer, already
+                            // paid for — so the pre-flight reads `canonical=false`
+                            // from EVIDENCE and routes to contest.
+                            head: Some(head.clone()),
+                        });
+                    }
                 }
                 Ok(crate::db::content_diesel::StampOutcome::SkippedStale) => {
                     // The conductor's CANONICAL answer is not provably newer
@@ -4800,6 +4890,82 @@ mod tests {
              undeclared row while a peer advertises a declaration — that write is \
              terminal and removes the row from every adopt path"
         );
+    }
+
+    /// DECLARED-DIVERGENCE ADMISSION: all four conditions are required. The live
+    /// dead-end (edge #1291) was a declared row on a chain-holding pod reaching
+    /// NO candidate list, so the election got a candidate from neither side.
+    #[test]
+    fn declared_divergence_admission_requires_all_four_conditions() {
+        // The live shape: non-canonical answer, declared row, peer differs, no
+        // election yet ⇒ admit.
+        assert!(
+            declared_divergence_should_route_to_contest(false, true, true, false),
+            "this is the ~3.5k/hr refused-declared class the election never heard from"
+        );
+        // Each condition, negated in turn, must block admission.
+        assert!(
+            !declared_divergence_should_route_to_contest(true, true, true, false),
+            "a canonical answer is HealCanonical's business, not contest's"
+        );
+        assert!(
+            !declared_divergence_should_route_to_contest(false, false, true, false),
+            "an UNDECLARED row keeps its existing routes (gapfill_would_self_elect owns it)"
+        );
+        assert!(
+            !declared_divergence_should_route_to_contest(false, true, false, false),
+            "no peer advertising a DIFFERENT head means there is nothing to contest"
+        );
+        assert!(
+            !declared_divergence_should_route_to_contest(false, true, true, true),
+            "QUIESCENCE: a row already obeying an election must never be re-admitted"
+        );
+    }
+
+    /// Admission and the gapfill guard PARTITION the divergent space: a row is
+    /// eligible for at most one of them, so no row can be double-pushed and no
+    /// row in the class falls through both.
+    #[test]
+    fn admission_and_the_gapfill_guard_never_both_fire() {
+        for canonical in [false, true] {
+            for peer in [false, true] {
+                for declared in [None, Some("uhCkk-local")] {
+                    for election in [false, true] {
+                        let gapfill = gapfill_would_self_elect(canonical, peer, declared);
+                        // Peer "differs" is the meaningful case when a hint exists.
+                        let admit = declared_divergence_should_route_to_contest(
+                            canonical,
+                            declared.is_some(),
+                            peer,
+                            election,
+                        );
+                        assert!(
+                            !(gapfill && admit),
+                            "a row must not be claimed by both routes \
+                             (canonical={canonical}, peer={peer}, declared={declared:?}, \
+                              election={election})"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// The two routes are complementary on the DECLARED axis specifically: the
+    /// gapfill guard covers undeclared rows, admission covers declared ones. That
+    /// split is the whole bug — declared rows had no owner.
+    #[test]
+    fn the_declared_axis_is_now_covered_by_exactly_one_route() {
+        // Undeclared, peer declares, non-canonical ⇒ gapfill guard owns it.
+        assert!(gapfill_would_self_elect(false, true, None));
+        assert!(!declared_divergence_should_route_to_contest(
+            false, false, true, false
+        ));
+        // Declared, peer differs, non-canonical, no election ⇒ admission owns it.
+        assert!(!gapfill_would_self_elect(false, true, Some("uhCkk-local")));
+        assert!(declared_divergence_should_route_to_contest(
+            false, true, true, false
+        ));
     }
 
     #[test]
