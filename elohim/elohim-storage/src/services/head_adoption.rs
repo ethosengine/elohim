@@ -76,6 +76,43 @@
 //! per tick per pod on ~300s sweeps ⇒ contest supply completes in roughly 1-2h
 //! across 7 pods, with election-and-obey draining behind it.
 //!
+//! ## Contest supply: what the first live window taught (2026-08-02)
+//!
+//! The first deploy of the contest arm ran attempts but minted ZERO, failing in
+//! ~0.4s per attempt. Two hypotheses were raised and BOTH disconfirmed in code
+//! before any fix was written — recorded here because each is the kind of theory
+//! that looks obviously right and would have cost a deploy cycle:
+//!
+//! 1. **Reach starvation** (advertise-but-refuse). Disconfirmed: the inventory
+//!    (`list_content_anchor_inventory`) and the head-record responder
+//!    (`is_distribution_safe_reach`) read the SAME `DISTRIBUTION_SAFE_REACH`
+//!    constant, and `community` is a member of it. Scoped rows are excluded from
+//!    BOTH surfaces symmetrically, so no class is advertised yet refused. The
+//!    observed `403 requiredReach:community` on `/db/content` is the *viewer
+//!    standing* gate — a different plane — and actually confirms the contested
+//!    rows are `community`, i.e. distribution-safe.
+//! 2. **Fetcher never wired.** Disconfirmed: `run_heal` constructs
+//!    `PeerHeadRecordFetcher` and passes `fetcher: Some(&…)` in the same
+//!    `AdoptContext` the contest call receives.
+//!
+//! The mechanism is upstream of both. A two-way-declared row is DECLARED, so it
+//! cannot enter `adopt_candidates` through the gapfill-refused route (that
+//! predicate requires `local_declared.is_none()`). It enters only via
+//! conductor-missing (`resolve_content_head_local` → `Ok(None)`) or timeout — and
+//! for the conductor-missing majority the conductor has **no chain for the id**,
+//! which `declare_canonical_head_inner` rejects at its FIRST, target-independent
+//! gate. No candidate shape can pass that gate, and a carried record cannot help:
+//! the gate runs before the carried path is consulted. The 0.4s fast-fail is the
+//! tell — a `Network` `get_links` that truly left the box would block toward the
+//! 60s conductor timeout, so it short-circuited at authority on genuine local
+//! absence.
+//!
+//! Hence the split in `inc_contest_failed`: `no_local_chain` is NOT a storage
+//! bug and self-candidacy cannot fix it. If it dominates the next window, the
+//! remedy is upstream witnessing (or a deliberate coordinator-zome decision about
+//! the no-chain gate), not another storage arm. `not_retrievable` / `fetch_none`
+//! ARE storage-fixable, and self-candidacy is their answer.
+//!
 //! **No admission or budget deny.** Every arm degrades to the author path and
 //! retries on the next sweep. Pacing and yielding are the callers' existing
 //! bounds; nothing here sheds work.
@@ -547,22 +584,119 @@ async fn adopt_peer(
     declare_peer_head(hc, pool, ctx, id, &head_action_hash, carried_record, hint).await
 }
 
-/// CONTEST: mint a canonical-head link naming the PEER's head, adding one
-/// candidate to the DHT election. Never stamps the local row.
+/// Process-local record of ids this node has already SELF-CANDIDATED, keyed by
+/// `(id, target)`.
+///
+/// Self-candidacy names THIS row's own declared head, so — unlike peer
+/// candidacy, whose target changes as peers move — the target is stable across
+/// sweeps. Without a ledger a node would re-mint the identical link every sweep
+/// during the window between minting and the election projecting onto the row.
+/// Keying on `(id, target)` (not `id` alone) keeps a genuinely NEW local head
+/// candidatable: if our head moves, that is a new candidate and must be minted.
+///
+/// Process-local on purpose: it is a de-duplication cache, not a truth store.
+/// The DURABLE quiescence gate is `canonical_declared_at` on the row (see
+/// [`decide_head_action`]) — once the election projects, contest is never
+/// reached at all. This only bounds the transient window, so losing it on
+/// restart costs at most one redundant mint per id.
+static SELF_CANDIDATE_MINTS: std::sync::OnceLock<
+    std::sync::Mutex<std::collections::HashSet<String>>,
+> = std::sync::OnceLock::new();
+
+/// Hard cap on the de-dup ledger. The contested set is ~11.4k ids fleet-wide;
+/// this leaves generous headroom while making unbounded growth impossible on a
+/// pathological corpus. On overflow the ledger CLEARS rather than evicting
+/// selectively — the cost of a clear is at most one redundant mint per id, and a
+/// simple bound is worth more here than a perfect one.
+const SELF_CANDIDATE_LEDGER_CAP: usize = 50_000;
+
+/// Ledger key. Separate fn so the `(id, target)` shape is asserted in one place.
+fn self_candidate_key(id: &str, target: &str) -> String {
+    format!("{id}\u{1}{target}")
+}
+
+/// Claim the right to self-candidate `(id, target)`. Returns `true` on the FIRST
+/// call for a pair and `false` afterwards — so a caller mints at most once per
+/// (id, local head) per process.
+fn claim_self_candidacy(id: &str, target: &str) -> bool {
+    let ledger = SELF_CANDIDATE_MINTS.get_or_init(|| std::sync::Mutex::new(Default::default()));
+    let mut guard = match ledger.lock() {
+        Ok(g) => g,
+        // A poisoned lock must not silently license a re-mint storm; refuse.
+        Err(_) => return false,
+    };
+    if guard.len() >= SELF_CANDIDATE_LEDGER_CAP {
+        guard.clear();
+    }
+    guard.insert(self_candidate_key(id, target))
+}
+
+/// Which candidate a contest attempt named — the label for
+/// `elohim_content_canonical_links_minted_total{source}`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ContestShape {
+    /// Named the PEER's head, carried over view-federation.
+    PeerHead,
+    /// Named THIS row's own declared head, because the peer's could not be
+    /// resolved by our conductor.
+    SelfHead,
+}
+
+impl ContestShape {
+    fn source_label(self) -> &'static str {
+        match self {
+            ContestShape::PeerHead => "contest_peer_head",
+            ContestShape::SelfHead => "contest_self_head",
+        }
+    }
+}
+
+/// CONTEST: add ONE candidate to the DHT election for a two-way declared id.
+/// Never stamps the local row.
 ///
 /// This is the supply half of contest-then-obey (see the module note). The
-/// verified path is identical to [`adopt_peer`]'s — fetch the peer's `Record`
-/// over view-federation, declare it through the OWN conductor with
-/// `carried_record`, and let the zome's `validate_carried_record` prove the
-/// bytes (action-hash binding, author signature, entry↔action binding) before
-/// the link is written. Evidence, not authority: the declare still goes through
-/// the conductor and the DHT still decides the winner.
+/// declare goes through the OWN conductor and the DHT still decides the winner —
+/// evidence, not authority.
+///
+/// ## Two candidate shapes, and why the second exists
+///
+/// **PEER-HEAD (preferred).** Fetch the peer's `Record` over view-federation and
+/// declare it with `carried_record`, which the zome's `validate_carried_record`
+/// proves in wasm (action-hash binding, author signature, entry↔action binding)
+/// before writing the link.
+///
+/// **SELF-HEAD (fallback).** When the conductor answers `is not retrievable` for
+/// the peer's head, declare THIS row's own declared head instead. This is
+/// symmetric candidacy, NOT self-election: nothing is stamped, the peer is hitting
+/// the same wall from its side and will mint ITS head as the competing candidate,
+/// and `select_canonical_winner` then picks deterministically from the resulting
+/// set. Both projections obey the winner through the ordinary canonical heal path.
+///
+/// The fallback is gated on the id being LOCALLY PRESENT, and the gate is free:
+/// `is not retrievable` is returned only AFTER `declare_canonical_head_inner`'s
+/// first gate (`gather_content_chain(id)`) has already passed, so that error is
+/// itself proof that a local chain exists. `no local chain` gets NO fallback —
+/// that first gate is target-INDEPENDENT, so naming a different target would fail
+/// identically. Attempting it would burn a conductor round-trip per id per sweep
+/// to reproduce the same refusal.
+///
+/// ## Reach is not the constraint here (2026-08-02 disconfirmation)
+///
+/// A reach-starvation hypothesis was investigated and DISCONFIRMED in code: the
+/// inventory (`list_content_anchor_inventory`) and the head-record responder
+/// (`is_distribution_safe_reach`) read the SAME `DISTRIBUTION_SAFE_REACH`
+/// constant, and `community` is in it. There is no advertise-but-refuse class.
+/// Scoped rows are excluded symmetrically from BOTH surfaces, so they never
+/// become contest candidates at all.
+///
+/// Self-candidacy is nonetheless the reach-SAFE shape by construction: it moves
+/// no records between peers. It writes a DHT link and calls this node's own
+/// conductor about this node's own head — so even if a scoped row ever reached
+/// this path, no bytes would cross a peer boundary.
 ///
 /// Every failure degrades to [`AdoptOutcome::Held`] — the pre-cure behaviour —
-/// so a peer that cannot serve a record, or a conductor that refuses, costs one
-/// bounded attempt and rides the next sweep. Deliberately no retry loop: the
-/// contest set is ~11.4k ids and a retry ladder inside a 200/tick budget would
-/// starve the tail.
+/// and rides the next sweep. Deliberately no retry loop: the contest set is
+/// ~11.4k ids and a retry ladder inside a 200/tick budget would starve the tail.
 async fn contest_peer(
     hc: &Arc<HcClient>,
     ctx: &AppContext,
@@ -585,63 +719,187 @@ async fn contest_peer(
         return AdoptOutcome::Held;
     }
 
+    let fetcher_present = fetcher.is_some();
     let carried = match fetcher {
         Some(f) => f.fetch(&hint.peer_id, id).await,
         None => None,
     };
+    let carried_present = carried.is_some();
     // The SERVED hash wins over the advertised one (same rule as `adopt_peer`):
     // it is the action the bytes actually prove.
-    let (head_action_hash, carried_record) = match carried {
+    let (peer_head, carried_record) = match carried {
         Some(c) => (c.head_action_hash, c.record),
         None => (hint.head_action_hash.clone(), None),
     };
+    // When the declare fails for want of a resolvable target, the actionable
+    // distinction is whether we HAD a record to carry. Split here so the two
+    // read as different problems on the dashboard.
+    let unresolvable_class = if carried_present {
+        "not_retrievable"
+    } else {
+        "fetch_none"
+    };
 
+    // ARM 1 — PEER-HEAD CANDIDACY.
     match conductor_writes::call_declare_canonical_content_head(
         hc,
         id,
-        head_action_hash.clone(),
+        peer_head.clone(),
         carried_record,
     )
     .await
     {
         Ok(declared) => {
-            crate::metrics::inc_content_canonical_link_minted("contest");
-            tracing::warn!(
-                target: "elohim_storage::head_adoption",
-                content_id = %id,
-                contested_head = %declared.head_action_hash,
-                held_head = %local_declared.unwrap_or(""),
-                from_peer = %hint.peer_id,
-                "adopt-before-author: CONTESTED a two-way declared head — minted a canonical \
-                 declaration naming the peer's head; the DHT election decides, the row is \
-                 unchanged until it does"
+            return contested(
+                ContestShape::PeerHead,
+                id,
+                &declared.head_action_hash,
+                local_declared,
+                hint,
+                carried_present,
+                fetcher_present,
             );
-            AdoptOutcome::Contested
         }
         Err(e) => {
             let msg = e.to_string();
-            // A conductor with no local chain cannot declare, and this arm must
-            // NOT author (the row already has a declaration — authoring would be
-            // the self-election the whole module exists to stop).
-            if msg.contains(ERR_NO_LOCAL_CHAIN) || msg.contains(ERR_NOT_RETRIEVABLE) {
+
+            // NO LOCAL CHAIN — terminal for this sweep. The first gate in
+            // `declare_canonical_head_inner` is target-independent, so no
+            // fallback target can pass it. This arm must NOT author: the row
+            // already carries a declaration, and authoring here is exactly the
+            // self-election the module exists to stop.
+            if msg.contains(ERR_NO_LOCAL_CHAIN) {
+                crate::metrics::inc_contest_failed("no_local_chain");
                 tracing::info!(
+                    target: "elohim_storage::head_adoption",
                     content_id = %id,
                     from_peer = %hint.peer_id,
-                    "adopt-before-author: contest could not be minted (no local chain, or the \
-                     peer's head is not retrievable and no usable carried record) — holding, \
-                     retried next sweep"
+                    carried = carried_present,
+                    fetcher = fetcher_present,
+                    "adopt-before-author: contest could not be minted — this conductor holds no \
+                     chain for the id at all, so no candidate of any shape can be declared; \
+                     holding, retried next sweep"
                 );
-            } else {
+                return AdoptOutcome::Held;
+            }
+
+            // NOT RETRIEVABLE — the chain EXISTS (that gate passed) but the
+            // peer's head action cannot be resolved here. This is exactly the
+            // subclass self-candidacy answers.
+            if !msg.contains(ERR_NOT_RETRIEVABLE) {
+                crate::metrics::inc_contest_failed("declare_error");
                 tracing::warn!(
+                    target: "elohim_storage::head_adoption",
                     content_id = %id,
                     from_peer = %hint.peer_id,
+                    carried = carried_present,
+                    fetcher = fetcher_present,
                     error = %msg,
                     "adopt-before-author: contest declare failed — holding, retried next sweep"
                 );
+                return AdoptOutcome::Held;
             }
+        }
+    }
+
+    // ARM 2 — SELF-HEAD CANDIDACY (the not-retrievable subclass).
+    let Some(own_head) = local_declared.filter(|h| !h.trim().is_empty()) else {
+        // Nothing of our own to nominate. (Unreachable via `decide_head_action`,
+        // which only routes here when the row IS declared — kept explicit rather
+        // than unwrapped so a future caller cannot turn it into a panic.)
+        crate::metrics::inc_contest_failed(unresolvable_class);
+        tracing::info!(
+            target: "elohim_storage::head_adoption",
+            content_id = %id,
+            from_peer = %hint.peer_id,
+            carried = carried_present,
+            fetcher = fetcher_present,
+            "adopt-before-author: contest could not be minted — the peer's head is not \
+             retrievable here and this row names no head of its own to nominate; holding"
+        );
+        return AdoptOutcome::Held;
+    };
+
+    // QUIESCENCE, second shape: we already nominated this exact head. Re-minting
+    // would add an identical candidate every sweep until the election projects.
+    if !claim_self_candidacy(id, own_head) {
+        tracing::debug!(
+            content_id = %id,
+            "adopt-before-author: contest gate — this node already nominated its own head for \
+             this id; awaiting the election"
+        );
+        return AdoptOutcome::Held;
+    }
+
+    match conductor_writes::call_declare_canonical_content_head(hc, id, own_head.to_string(), None)
+        .await
+    {
+        Ok(declared) => contested(
+            ContestShape::SelfHead,
+            id,
+            &declared.head_action_hash,
+            local_declared,
+            hint,
+            carried_present,
+            fetcher_present,
+        ),
+        Err(e) => {
+            crate::metrics::inc_contest_failed(unresolvable_class);
+            tracing::warn!(
+                target: "elohim_storage::head_adoption",
+                content_id = %id,
+                from_peer = %hint.peer_id,
+                carried = carried_present,
+                fetcher = fetcher_present,
+                error = %e,
+                "adopt-before-author: self-candidacy declare failed — this node could not even \
+                 nominate its own declared head; holding, retried next sweep"
+            );
             AdoptOutcome::Held
         }
     }
+}
+
+/// Shared success path for both contest shapes: count the mint and say, in one
+/// human sentence, which candidate was nominated and why.
+#[allow(clippy::too_many_arguments)]
+fn contested(
+    shape: ContestShape,
+    id: &str,
+    minted_head: &crate::signals::HoloHashB64,
+    local_declared: Option<&str>,
+    hint: &PeerHeadHint,
+    carried: bool,
+    fetcher: bool,
+) -> AdoptOutcome {
+    crate::metrics::inc_content_canonical_link_minted(shape.source_label());
+    match shape {
+        ContestShape::PeerHead => tracing::warn!(
+            target: "elohim_storage::head_adoption",
+            content_id = %id,
+            contested_head = %minted_head,
+            held_head = %local_declared.unwrap_or(""),
+            from_peer = %hint.peer_id,
+            carried,
+            fetcher,
+            "adopt-before-author: CONTESTED a two-way declared head — minted a canonical \
+             declaration naming the peer's head; the DHT election decides, the row is \
+             unchanged until it does"
+        ),
+        ContestShape::SelfHead => tracing::warn!(
+            target: "elohim_storage::head_adoption",
+            content_id = %id,
+            contested_head = %minted_head,
+            held_head = %local_declared.unwrap_or(""),
+            from_peer = %hint.peer_id,
+            carried,
+            fetcher,
+            "adopt-before-author: CONTESTED a two-way declared head by nominating THIS node's \
+             own head — the peer's head is not retrievable here, so both sides nominate their \
+             own and the DHT election picks between them; the row is unchanged until it does"
+        ),
+    }
+    AdoptOutcome::Contested
 }
 
 /// Second half of AUTHOR-THEN-ADOPT: call this after the caller's author path
@@ -985,6 +1243,96 @@ mod tests {
         assert!(
             declaration_would_move(Some("uhCkk-LOCAL-ROOT"), "uhCkk-ALPHA-A"),
             "a genuinely different head is a real move and must be allowed"
+        );
+    }
+
+    /// QUIESCENCE, shape 2 (self-candidacy). The durable gate is
+    /// `canonical_declared_at` on the row, but that only closes once the election
+    /// PROJECTS. In the window between minting and projecting, the ledger is what
+    /// stops a node re-nominating the identical head every sweep.
+    #[test]
+    fn self_candidacy_is_claimed_once_per_id_and_head() {
+        let id = "quiescence:self-candidacy";
+        let head = "uhCkk-own-head";
+
+        assert!(
+            claim_self_candidacy(id, head),
+            "the first nomination must be allowed — this is the candidate that \
+             gives the DHT election something to pick"
+        );
+        for sweep in 0..5 {
+            assert!(
+                !claim_self_candidacy(id, head),
+                "sweep {sweep}: re-nominating the SAME head adds an identical candidate \
+                 for no gain — a converged corpus must mint zero"
+            );
+        }
+    }
+
+    /// A genuinely NEW local head is a NEW candidate and must be nominatable —
+    /// keying the ledger on the id alone would freeze a node out of the election
+    /// forever the moment its own head legitimately moved.
+    #[test]
+    fn a_moved_local_head_may_be_nominated_again() {
+        let id = "quiescence:moved-head";
+        assert!(claim_self_candidacy(id, "uhCkk-head-A"));
+        assert!(!claim_self_candidacy(id, "uhCkk-head-A"));
+        assert!(
+            claim_self_candidacy(id, "uhCkk-head-B"),
+            "our head moved; that is a different candidate and the election must see it"
+        );
+    }
+
+    /// The ledger keys two different ids independently — a shared key would let
+    /// one id's nomination silently suppress another's.
+    #[test]
+    fn the_self_candidacy_ledger_does_not_collide_across_ids() {
+        assert!(claim_self_candidacy("quiescence:id-one", "uhCkk-shared"));
+        assert!(
+            claim_self_candidacy("quiescence:id-two", "uhCkk-shared"),
+            "same head hash under a different id is a distinct candidacy"
+        );
+    }
+
+    /// The key is unambiguous: no (id, target) pair can be confused with another
+    /// by concatenation. Uses a separator that cannot occur in either component.
+    #[test]
+    fn self_candidate_keys_are_unambiguous() {
+        assert_ne!(
+            self_candidate_key("a:b", "c"),
+            self_candidate_key("a", "b:c"),
+            "a naive join would collide these two distinct candidacies"
+        );
+    }
+
+    /// QUIESCENCE, shape 1 (the durable gate) — restated against the shapes so
+    /// the two are visibly complementary: the ledger bounds the transient window,
+    /// `canonical_declared_at` closes it permanently.
+    #[test]
+    fn the_durable_gate_supersedes_the_ledger_once_the_election_projects() {
+        assert_eq!(
+            decide(false, true, true, true),
+            HeadDecision::Hold,
+            "once an election stands behind the row, contest is never reached at \
+             all — the ledger is only needed before that lands"
+        );
+        assert_eq!(
+            decide(false, true, true, false),
+            HeadDecision::ContestPeer,
+            "and before it lands, contest IS reached — which is exactly why the \
+             ledger has to hold the line in the meantime"
+        );
+    }
+
+    #[test]
+    fn contest_shape_source_labels_are_distinct_and_stable() {
+        assert_eq!(ContestShape::PeerHead.source_label(), "contest_peer_head");
+        assert_eq!(ContestShape::SelfHead.source_label(), "contest_self_head");
+        assert_ne!(
+            ContestShape::PeerHead.source_label(),
+            ContestShape::SelfHead.source_label(),
+            "the two shapes must be separable on the dashboard — which one \
+             converges the fleet is the open question this metric answers"
         );
     }
 

@@ -356,15 +356,58 @@ lazy_static! {
     /// requires an UNDECLARED local row) never fires and no election is ever
     /// created for the arbiter to run on.
     ///
-    /// Sources today: `adopt_peer` (the adopt-before-author pre-flight) and
-    /// `http` (`POST /db/content/{id}/canonical-head`, i.e. the deploy's
-    /// stage-spa-blob declare). Further sources arrive with the supply fix.
+    /// Sources: `adopt_peer` (the adopt-before-author pre-flight), `http`
+    /// (`POST /db/content/{id}/canonical-head`, i.e. the deploy's stage-spa-blob
+    /// declare), and the two CONTEST shapes —
+    /// - `contest_peer_head` — nominated the peer's head, carried over
+    ///   view-federation and proven in wasm by `validate_carried_record`;
+    /// - `contest_self_head` — nominated THIS node's own declared head because
+    ///   the peer's was not retrievable here (symmetric candidacy: the peer
+    ///   nominates its own from its side and the DHT election picks).
+    ///
+    /// Watching the two contest labels against each other is how we learn WHICH
+    /// shape actually converges the fleet.
     pub static ref CONTENT_CANONICAL_LINKS_MINTED: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_content_canonical_links_minted_total",
             "Canonical-head declaration links minted through this node, by source channel.",
         ),
         &["source"],
+    )
+    .unwrap();
+
+    /// Contest attempts that minted NOTHING, by failure class — the decisive
+    /// discrimination for the two-way-declared class.
+    ///
+    /// The predecessor of this metric was a single log line that merged two
+    /// completely different failures into one sentence, which is precisely why a
+    /// full observation window could not tell them apart:
+    ///
+    /// - `no_local_chain` — this conductor holds no chain for the id AT ALL.
+    ///   `declare_canonical_head_inner`'s first gate is target-independent, so
+    ///   NO candidate shape can pass it. Dominance here means contest is starved
+    ///   upstream (the conductor needs the id witnessed before any election can
+    ///   be supplied) and is the signal that a coordinator-zome gate decision is
+    ///   required — it is NOT fixable in storage.
+    /// - `not_retrievable` — the chain exists but the peer's head action could
+    ///   not be resolved, AND we had carried bytes. Self-candidacy handles this;
+    ///   a count here means even that failed.
+    /// - `fetch_none` — same wall, but we had NO record to carry (the fetch
+    ///   returned nothing). Distinguished from `not_retrievable` because the
+    ///   remedy is different: this points at the head-record transport, that one
+    ///   at the conductor's DHT view.
+    /// - `declare_error` — anything else the conductor refused. Always paired
+    ///   with a WARN carrying the verbatim message.
+    ///
+    /// Success is deliberately NOT counted here — it lives on
+    /// `elohim_content_canonical_links_minted_total`, so the two series can be
+    /// read as attempted-vs-landed without double-counting.
+    pub static ref CONTENT_CONTEST_FAILED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_content_contest_failed_total",
+            "Contest attempts that minted no canonical-head candidate, by failure class.",
+        ),
+        &["class"],
     )
     .unwrap();
 
@@ -868,6 +911,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(CONTENT_CANONICAL_ANSWERS.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_REFUSED_STALE_REASONS.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_CANONICAL_LINKS_MINTED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_FAILED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_REAUTHOR_FAILED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_SWEEP_ABANDONED.clone()));
         // Pre-touch both known `class` combos so both series exist in
@@ -1156,6 +1200,12 @@ pub fn inc_content_canonical_link_minted(source: &str) {
     CONTENT_CANONICAL_LINKS_MINTED
         .with_label_values(&[source])
         .inc();
+}
+
+/// Count a contest attempt that minted nothing, by failure class
+/// (`no_local_chain` | `not_retrievable` | `fetch_none` | `declare_error`).
+pub fn inc_contest_failed(class: &str) {
+    CONTENT_CONTEST_FAILED.with_label_values(&[class]).inc();
 }
 
 pub fn inc_projection_heal_outcome(stream: &str, outcome: &str) {
