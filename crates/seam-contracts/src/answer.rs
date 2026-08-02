@@ -330,6 +330,108 @@ impl crate::ReasonLabel for AnswerState {
     }
 }
 
+/// WHY an answer is not `Present` — the wire-facing reason vocabulary, and the
+/// only reason vocabulary in this crate that a *client* is expected to render.
+///
+/// **Concerns:** C4 (honest absence — the reason is what makes a non-present
+/// answer actionable), C8 (a typed, countable label), C5 (the
+/// [`Unverifiable`](AnswerReason::Unverifiable) arm is the may-believe clause:
+/// evidence that cannot be evaluated confers nothing, in either direction).
+///
+/// **Forcing incident:** the same distinction re-derived at four seams with four
+/// private vocabularies — `LocalResolve`'s observed-vs-timed-out split,
+/// `ReconcileDecision::Unreachable(String)`'s free-text error, the render
+/// family's `Stalled`/`Errored`, and the freshness enum's `unverifiable`. Four
+/// spellings of one idea is what makes a cross-seam dashboard impossible.
+///
+/// **Contract test:** `answer_reason_labels_are_stable` in this module; the
+/// schema half is asserted by
+/// `elohim/elohim-storage/tests/schema_contract.rs::answer_state_and_reason_schemas_match_the_rust_vocabulary`,
+/// which reads `elohim/sdk/schemas/v1/enums/answer-reason.schema.json` from disk
+/// — two genuinely independent sources, so the test cannot be measuring its own
+/// mirror.
+///
+/// # Wire status
+///
+/// Governed by `elohim/sdk/schemas/v1/enums/answer-reason.schema.json`,
+/// deliberately **without `_dna` metadata**: this vocabulary is never validated
+/// by the DHT, and minting it as a DNA-validated enum would move the DNA hash
+/// for something no integrity zome reads.
+///
+/// # Which state each reason belongs to
+///
+/// Exactly one reason ([`ObservedAbsent`](AnswerReason::ObservedAbsent)) belongs
+/// to [`AnswerState::Absent`]; every other reason belongs to
+/// [`AnswerState::Unreachable`]. [`AnswerState::Present`] takes no reason —
+/// "why is it there" is not a question a boundary answers. See
+/// [`AnswerReason::state`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+// Same rationale as `AnswerState`: no `rename_all` / `#[ts(export)]` here, so
+// `answer-reason.schema.json` stays the single wire source of truth.
+pub enum AnswerReason {
+    /// The responder answered and reports the thing does not exist. The ONE
+    /// reason that pairs with [`AnswerState::Absent`].
+    ObservedAbsent,
+    /// No answer arrived within the declared budget.
+    Timeout,
+    /// The request failed at the transport (connection, codec, an unparseable
+    /// address, a peer too old to decode the request).
+    TransportError,
+    /// The responder was reached and declined — authorization, reach, or policy.
+    /// Distinct from absence: something IS there, and we were not shown it.
+    Refused,
+    /// An answer arrived but could not be verified, so it establishes nothing.
+    /// C5: unevaluatable evidence confers nothing, in either direction.
+    Unverifiable,
+    /// A local read missed on a full-arc holder: the record has not been
+    /// delivered yet, which is a fact about gossip, never about existence.
+    NotYetDelivered,
+}
+
+impl AnswerReason {
+    /// The [`AnswerState`] this reason can accompany.
+    ///
+    /// **Concerns:** C4 — the pairing is total and fixed, so a caller cannot
+    /// attach `timeout` to an `absent` answer and quietly assert an absence it
+    /// never observed.
+    ///
+    /// **Contract test:** `only_observed_absent_pairs_with_absent`.
+    pub fn state(&self) -> AnswerState {
+        match self {
+            AnswerReason::ObservedAbsent => AnswerState::Absent,
+            AnswerReason::Timeout
+            | AnswerReason::TransportError
+            | AnswerReason::Refused
+            | AnswerReason::Unverifiable
+            | AnswerReason::NotYetDelivered => AnswerState::Unreachable,
+        }
+    }
+}
+
+impl crate::ReasonLabel for AnswerReason {
+    const ALL: &'static [Self] = &[
+        AnswerReason::ObservedAbsent,
+        AnswerReason::Timeout,
+        AnswerReason::TransportError,
+        AnswerReason::Refused,
+        AnswerReason::Unverifiable,
+        AnswerReason::NotYetDelivered,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            AnswerReason::ObservedAbsent => "observed_absent",
+            AnswerReason::Timeout => "timeout",
+            AnswerReason::TransportError => "transport_error",
+            AnswerReason::Refused => "refused",
+            AnswerReason::Unverifiable => "unverifiable",
+            AnswerReason::NotYetDelivered => "not_yet_delivered",
+        }
+    }
+}
+
 #[cfg(test)]
 mod answer_tests {
     use super::*;
@@ -431,5 +533,43 @@ mod answer_tests {
         crate::assert_reason_labels_conformant::<AnswerState>();
         crate::assert_reason_labels_discriminating::<AnswerState>();
         assert_eq!(AnswerState::ALL.len(), 3);
+    }
+
+    /// Golden label set for the wire reason vocabulary. Mirrored — deliberately,
+    /// independently — by `answer-reason.schema.json`, which
+    /// `elohim-storage/tests/schema_contract.rs` reads from disk and compares
+    /// against these very labels.
+    #[test]
+    fn answer_reason_labels_are_stable() {
+        crate::assert_reason_labels_stable::<AnswerReason>(&[
+            "observed_absent",
+            "timeout",
+            "transport_error",
+            "refused",
+            "unverifiable",
+            "not_yet_delivered",
+        ]);
+        crate::assert_reason_labels_discriminating::<AnswerReason>();
+    }
+
+    /// The pairing that keeps a reason from smuggling in an absence: exactly one
+    /// reason belongs to `Absent`; every other reason belongs to `Unreachable`;
+    /// no reason belongs to `Present`.
+    #[test]
+    fn only_observed_absent_pairs_with_absent() {
+        let absent_reasons: Vec<_> = AnswerReason::ALL
+            .iter()
+            .filter(|r| r.state() == AnswerState::Absent)
+            .collect();
+        assert_eq!(absent_reasons, vec![&AnswerReason::ObservedAbsent]);
+
+        for reason in AnswerReason::ALL {
+            assert_ne!(
+                reason.state(),
+                AnswerState::Present,
+                "{reason:?} must not claim a present answer — 'why is it there' is \
+                 not a question a boundary answers"
+            );
+        }
     }
 }

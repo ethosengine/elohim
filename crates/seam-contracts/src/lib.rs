@@ -16,6 +16,7 @@
 //! | C8 observability-per-decision | [`ReasonLabel`] + its conformance checks |
 //! | C2 monotonic authority | [`harness::arbitrated`] — permutation-invariance + tiebreak determinism |
 //! | C6b idempotent effect | [`harness::quiescent`] — replay against settled state mints nothing |
+//! | C3 liveness | [`harness::liveness`] — every reachable non-terminal state has an automated move |
 //!
 //! Everything here is a **side-effect-free plain-data function or type**.
 //! Services wire them; the crate never reaches for a connection, a socket, or a
@@ -56,9 +57,16 @@
 //! - **No adoption.** Rewiring `LocalResolve`, `head_adoption`,
 //!   `projection_reconcile`, or doorway's `ReconcileDecision` onto these types
 //!   is P1.2/P1.3 — behavior-neutral, separately verified.
-//! - **No liveness table.** The `Liveness` harness (C3) is P2.1; it is the one
-//!   genuinely new artifact and it earns its own regression demonstration
-//!   against two independently-dated historical predicate sets.
+//! - **No historical regression demonstration.** The `Liveness` table harness
+//!   (C3) lives here ([`harness::liveness`]), but the demonstration that it
+//!   *generalizes* — failing against two independently-dated historical
+//!   predicate sets (the pre-wave-5 deadlock and the 2026-07-11 over-broad
+//!   GapFill guard) while passing current — is plan task P2.2 and lives beside
+//!   those predicates, not here. The in-crate fixtures are toys that exercise
+//!   the instrument; they are not evidence about history.
+//! - **No state spaces.** The harness never enumerates a predicate's states for
+//!   you: the table is authored beside the predicate and reviewed with it,
+//!   because what the table omits is exactly what the check cannot see.
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
@@ -68,7 +76,7 @@ pub mod answer;
 pub mod harness;
 pub mod reason;
 
-pub use answer::{Answer, AnswerState};
+pub use answer::{Answer, AnswerReason, AnswerState};
 pub use reason::{
     assert_reason_labels_conformant, assert_reason_labels_discriminating,
     assert_reason_labels_stable, check_reason_labels, ReasonLabel, ReasonLabelViolation,

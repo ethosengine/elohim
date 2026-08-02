@@ -21,13 +21,28 @@
 //! |---|---|---|
 //! | [`arbitrated`] | C2 monotonic authority | permutation-invariance + tiebreak determinism |
 //! | [`quiescent`] | C6b idempotent effect | replay against settled state mints nothing |
+//! | [`liveness`] | C3 liveness | every reachable non-terminal state has an automated move |
+//!
+//! [`liveness`] is a **table** harness rather than a property harness: the
+//! caller enumerates the state space as plain data and the check is exhaustive
+//! over exactly what was enumerated. That is deliberate — a randomized search
+//! that misses the one dead corner reports green, and the corners of a decision
+//! predicate are few and nameable. It needs no `proptest`/`arbitrary`, so the
+//! plan's conditional `-testkit` split (Design surface 7) stays unexercised and
+//! the crate stays a leaf.
 
 pub mod arbitrated;
+pub mod liveness;
 pub mod quiescent;
 
 pub use arbitrated::{
     assert_arbitration, check_arbitration, check_arbitration_with, ArbitrationBudget,
     ArbitrationReport, ArbitrationViolation, ArbitrationViolationClass,
+};
+pub use liveness::{
+    assert_liveness, check_liveness, check_liveness_with, Agency, LivenessBudget, LivenessFailure,
+    LivenessReport, LivenessViolation, LivenessViolationClass, ProgressSkip, StateClass,
+    Transition,
 };
 pub use quiescent::{
     assert_quiescent, check_quiescence, check_quiescence_with, QuiescenceBudget, QuiescenceReport,
