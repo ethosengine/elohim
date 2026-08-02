@@ -508,3 +508,80 @@ decisionPoints:
       - path: elohim/elohim-storage/src/services/head_adoption.rs
         testName: election_obey_is_scoped_to_the_conductor_missing_class
         kind: unit
+
+  - name: backoff_is_active
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/contest_backoff.rs
+      modulePath: services::contest_backoff::backoff_is_active
+      line: 106
+    summary: >
+      Is a contest attempt still held back? Yes iff a configured window is non-zero AND less
+      time has elapsed than that window. The F-B throughput lever's skip decision: a contest
+      that failed the zome's target-independent no-chain gate (or had its own self-head
+      refused) cannot succeed on a later sweep either, so re-attempting it burns budget that
+      contestable ids need. Pure and total; the ledger reads the clock, this decides.
+    concernIds:
+      - id: C3
+        status: answered
+        justification: >
+          The whole point of the predicate's shape. a_backoff_always_expires proves that for
+          EVERY finite window there is an elapsed time at which this returns false, so a
+          backed-off id always becomes eligible again with no intervention — a DELAY, never an
+          exclusion. The liveness harness witnesses the same property as a state table in
+          the_contest_backoff_is_never_a_permanent_exclusion, whose negative-control leg
+          reconstructs the pre-F-B self-candidacy ledger (claim-on-attempt, never released)
+          and FAILS with manual_only_exit — the permanent exclusion this lever replaced. The
+          second automated exit (note_local_chain_arrived, fired when an author path lands a
+          local chain) is asserted by a_local_chain_arrival_clears_the_backoff_immediately and
+          matters within one tick, since adopt_deferred_heads runs BEFORE both witness sweeps.
+      - id: C6a
+        status: answered
+        justification: >
+          Bounded on both axes and both bounds are tested. Memory - CONTEST_BACKOFF_CAP entries,
+          and the overflow FAILS OPEN (the ledger clears rather than evicting), proven by
+          the_ledger_is_bounded_and_fails_open, so the bound can never strand an id. Time -
+          the configured window, with 0 disabling the backoff entirely
+          (a_zero_window_disables_the_backoff). This module adds no loop and no retry ladder;
+          it re-orders what the existing paced-drain budget (200/tick, 25ms spacing, 120s wall
+          clock) is spent on, and that budget stays authoritative.
+      - id: C8
+        status: answered
+        justification: >
+          Every skip is counted through a typed reason (metrics::ContestSkip, a closed
+          ReasonLabel vocabulary distinct from ContestFailure because a skip is not a failure)
+          on elohim_content_contest_skipped_total{reason}. Skips are readable BESIDE failures,
+          which is what makes the lever measurable - failures falling while skips rise is the
+          lever working; skips rising with flat canonical_links_minted_total means the window
+          is too long.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/contest_backoff.rs
+        testName: a_backoff_always_expires
+        kind: unit
+      - path: elohim/elohim-storage/src/services/contest_backoff.rs
+        testName: a_zero_window_disables_the_backoff
+        kind: unit
+      - path: elohim/elohim-storage/src/services/contest_backoff.rs
+        testName: a_recorded_id_is_skipped_with_its_own_class
+        kind: unit
+      - path: elohim/elohim-storage/src/services/contest_backoff.rs
+        testName: a_local_chain_arrival_clears_the_backoff_immediately
+        kind: unit
+      - path: elohim/elohim-storage/src/services/contest_backoff.rs
+        testName: the_ledger_is_bounded_and_fails_open
+        kind: unit
+      - path: elohim/elohim-storage/src/services/contest_backoff.rs
+        testName: re_recording_refreshes_the_window
+        kind: unit
+      - path: elohim/elohim-storage/src/liveness_contract.rs
+        testName: the_contest_backoff_is_never_a_permanent_exclusion
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: a_failed_self_candidacy_releases_its_claim_rather_than_retiring_the_id
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: releasing_one_claim_leaves_every_other_claim_standing
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: releasing_an_unclaimed_pair_is_harmless
+        kind: unit

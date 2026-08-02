@@ -411,6 +411,45 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Contest attempts DECLINED before they were made, because the id is
+    /// serving a backoff for a PREDICTABLE repeat failure
+    /// (`services::contest_backoff`). Read beside
+    /// `elohim_content_contest_failed_total`: failures are budget SPENT proving
+    /// something already known; skips are that budget RECLAIMED.
+    ///
+    /// - `no_local_chain_backoff` — a previous contest hit the zome's
+    ///   target-independent no-chain gate. Cleared early by
+    ///   `contest_backoff::note_local_chain_arrived` when an author path lands a
+    ///   chain, and in every case by window expiry.
+    /// - `self_candidacy_backoff` — the self-head fallback was refused too.
+    ///
+    /// A rising skip series with a FALLING failure series is the F-B lever
+    /// working. A rising skip series with a flat `canonical_links_minted_total`
+    /// means the backoff is holding back ids that would have succeeded — shorten
+    /// the window (`CONTEST_BACKOFF_SECONDS`) or set it to 0 to disable.
+    pub static ref CONTENT_CONTEST_SKIPPED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_content_contest_skipped_total",
+            "Contest attempts skipped without a conductor round-trip, by backoff reason.",
+        ),
+        &["reason"],
+    )
+    .unwrap();
+
+    /// How each adopt-before-author sweep ENDED. The fan-out lever's honesty
+    /// meter: `budget_elapsed` means the 120s wall clock cut the sweep short, so
+    /// the per-tick cap was NOT the binding constraint and raising
+    /// `ADOPT_CONTEST_FANOUT` cannot help until the conductor answers faster.
+    /// `completed` means the sweep drained its candidate slice within budget.
+    pub static ref CONTENT_ADOPT_SWEEP: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_content_adopt_sweep_total",
+            "Adopt-before-author sweeps, by how the sweep ended.",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
     /// Rows whose head MOVED to obey a DHT election this node could SEE but
     /// could not resolve locally — the last-mile of convergence for the
     /// conductor-missing class.
@@ -956,6 +995,8 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(PROJECTION_REFUSED_STALE_REASONS.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_CANONICAL_LINKS_MINTED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_FAILED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_SKIPPED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_ADOPT_SWEEP.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_ELECTION_OBEYED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_ELECTION_OBEY_FAILED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_REAUTHOR_FAILED.clone()));
@@ -1312,6 +1353,89 @@ pub fn inc_contest_failed(class: ContestFailure) {
     use seam_contracts::ReasonLabel as _;
     CONTENT_CONTEST_FAILED
         .with_label_values(&[class.label()])
+        .inc();
+}
+
+/// Why a contest attempt was DECLINED before it was made — the label vocabulary
+/// of [`CONTENT_CONTEST_SKIPPED`], as a closed type.
+///
+/// Deliberately a SEPARATE type from [`ContestFailure`] rather than two more
+/// variants on it: a skip is not a failure. Folding them would make
+/// `contest_failed_total` count work that was never done, and the whole point of
+/// the F-B lever is to watch failures fall while skips rise. Additive by
+/// construction — a new backoff shape adds a variant here; no existing label is
+/// ever renamed (a renamed label silently zeroes a dashboard series).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContestSkip {
+    /// A previous contest for this id hit the zome's target-independent
+    /// no-chain gate. Nothing about a fresh attempt can pass it until this
+    /// conductor holds a chain for the id.
+    NoLocalChainBackoff,
+    /// A previous SELF-head candidacy for this id was refused by the conductor.
+    /// The chain exists; this row's own declared head is what cannot be
+    /// resolved, and that does not change between sweeps either.
+    SelfCandidacyBackoff,
+}
+
+impl seam_contracts::ReasonLabel for ContestSkip {
+    const ALL: &'static [Self] = &[
+        ContestSkip::NoLocalChainBackoff,
+        ContestSkip::SelfCandidacyBackoff,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            ContestSkip::NoLocalChainBackoff => "no_local_chain_backoff",
+            ContestSkip::SelfCandidacyBackoff => "self_candidacy_backoff",
+        }
+    }
+}
+
+/// Count a contest attempt skipped by the backoff ledger, by reason.
+///
+/// **Concerns:** C8 — typed reason, closed vocabulary. C3 — every reason here
+/// names a state with an automated exit (see `services::contest_backoff`), so a
+/// non-zero series can never mean "these ids were abandoned".
+pub fn inc_contest_skipped(reason: ContestSkip) {
+    use seam_contracts::ReasonLabel as _;
+    CONTENT_CONTEST_SKIPPED
+        .with_label_values(&[reason.label()])
+        .inc();
+}
+
+/// How one adopt-before-author sweep ended — the label vocabulary of
+/// [`CONTENT_ADOPT_SWEEP`], as a closed type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AdoptSweepOutcome {
+    /// The sweep drained its candidate slice inside the wall-clock budget.
+    Completed,
+    /// The wall-clock budget elapsed first; the remainder resumes next sweep.
+    BudgetElapsed,
+}
+
+impl seam_contracts::ReasonLabel for AdoptSweepOutcome {
+    const ALL: &'static [Self] = &[
+        AdoptSweepOutcome::Completed,
+        AdoptSweepOutcome::BudgetElapsed,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            AdoptSweepOutcome::Completed => "completed",
+            AdoptSweepOutcome::BudgetElapsed => "budget_elapsed",
+        }
+    }
+}
+
+/// Count one completed adopt sweep by how it ended.
+///
+/// **Concerns:** C8 — both outcomes are counted, so a sweep that runs out of
+/// budget is as visible as one that finishes. A budget-elapsed-dominated series
+/// is the signal that the fan-out is already saturating the conductor.
+pub fn inc_adopt_sweep(outcome: AdoptSweepOutcome) {
+    use seam_contracts::ReasonLabel as _;
+    CONTENT_ADOPT_SWEEP
+        .with_label_values(&[outcome.label()])
         .inc();
 }
 

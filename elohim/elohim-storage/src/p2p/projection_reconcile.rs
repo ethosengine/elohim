@@ -1846,6 +1846,12 @@ async fn witness_ghost_anchors(
             {
                 Ok(_) => {
                     authored += 1;
+                    // CHAIN ARRIVAL — release any contest backoff standing
+                    // against this id. The adopt sweep ran EARLIER in this same
+                    // tick and may have just recorded `no_local_chain` for it;
+                    // that verdict is now false, and the next sweep should
+                    // contest rather than wait out the window.
+                    crate::services::contest_backoff::note_local_chain_arrived(id);
                     // AUTHOR-THEN-ADOPT, second half: the conductor now has a
                     // local chain, so the declaration it refused can land.
                     if let Some((head_action_hash, carried_record, peer_id)) = pending_adopt {
@@ -3172,24 +3178,98 @@ struct AdoptCandidate {
 /// EXPECTED for a timeout-routed candidate (we never confirmed a local chain)
 /// and remains a no-op — never a licence to re-author outside the guarded
 /// sweeps.
+///
+/// # F-B: the throughput lever (2026-08-02)
+///
+/// RCA v3 proved this arm STRUCTURALLY correct but RATE-bound: ~90 elections
+/// minted against ~11k contested ids in the first live hour. Two things were
+/// spending the budget without producing candidates, and F-B fixes both here.
+///
+/// **The budget, stated exactly.** [`WITNESS_MAX_PER_TICK`] (200) candidates,
+/// [`WITNESS_ITEM_DELAY`] (25ms) between items, [`WITNESS_SWEEP_BUDGET`] (120s)
+/// wall clock, on the ~300s reconcile cadence. Sequentially, at the observed
+/// ~0.4s per fast-failing contest, 120s buys ~280 attempt-slots — so the WALL
+/// CLOCK, not the 200 cap, was binding, and a productive contest (fetch +
+/// declare, seconds not milliseconds) crowded out several more.
+///
+/// **Lever 1 — priority, not exclusion.** Candidates whose contest is a known
+/// predictable failure (`services::contest_backoff`) are moved BEHIND the
+/// eligible ones rather than dropped from the slice. Dropping them would be
+/// wrong: a conductor-missing candidate's `try_obey_visible_election` probe —
+/// wave 5's cure, and the ONLY arm that converges that class once a
+/// chain-holding peer supplies an election — runs before the contest arm and
+/// must keep running. Re-ordering starves nothing (the backoff expires, and the
+/// same rows are re-discovered every sweep) while guaranteeing a contestable id
+/// is never displaced by one that provably cannot mint.
+///
+/// **Lever 2 — bounded fan-out.** Candidates are processed with at most
+/// [`crate::config::adopt_contest_fanout`] (default 8) in flight. The 25ms
+/// spacing is kept INSIDE each concurrent task, so a fan-out of 1 reproduces the
+/// old sequential sweep exactly — the knob is its own OFF switch. The
+/// concurrency bound, not the spacing, is now the throttle that matters, and it
+/// is the more honest one: spacing capped the *rate* at 40/s while the conductor
+/// only ever saw ONE concurrent call, whereas this bounds what the conductor
+/// actually experiences (≤ 8 concurrent zome calls, well under its pool).
+///
+/// **The wall-clock budget stays authoritative.** The whole fan-out runs inside
+/// the same `tokio::time::timeout`; on elapse every in-flight future is dropped
+/// (cancelling its conductor call) and the sweep resumes next tick. Partial
+/// progress is reported because the counters are atomics outside the cancelled
+/// future — a budget-elapsed sweep is now as legible as a completed one, on
+/// `elohim_content_adopt_sweep_total{outcome}`.
+///
+/// **Expected effect.** ~8× the attempts per sweep, with the wasted share of
+/// those attempts falling as the backoff fills. See the convergence arithmetic
+/// in the [`crate::services::head_adoption`] module doc.
 async fn adopt_deferred_heads(
     hc: &Arc<HcClient>,
     pool: &DbPool,
     candidates: &[AdoptCandidate],
     adopt: &crate::services::head_adoption::AdoptContext<'_>,
 ) {
+    use futures::stream::StreamExt as _;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     if candidates.is_empty() {
         return;
     }
     let app_ctx = crate::db::AppContext::default_lamad();
     let total = candidates.len();
-    let mut adopted = 0usize;
-    let mut contested = 0usize;
-    let mut held = 0usize;
-    let mut retry = 0usize;
+    let fanout = crate::config::adopt_contest_fanout();
+    let backoff_window = crate::config::contest_backoff_window();
 
-    let sweep = async {
-        for candidate in candidates.iter().take(WITNESS_MAX_PER_TICK as usize) {
+    // PRIORITY PARTITION. `partition` yields (matching, non-matching), so
+    // `deferred` are the backed-off ids and `eligible` the rest. Nothing is
+    // dropped — see the F-B note above on why exclusion would break the
+    // election-obey arm.
+    let (deferred, eligible): (Vec<&AdoptCandidate>, Vec<&AdoptCandidate>) =
+        candidates.iter().partition(|c| {
+            crate::services::contest_backoff::skip_class(&c.id, backoff_window).is_some()
+        });
+    let deferred_count = deferred.len();
+    // bounded-work: the per-tick slice is exactly WITNESS_MAX_PER_TICK (200)
+    // candidates; the concurrency bound is `fanout`; the wall-clock budget is
+    // WITNESS_SWEEP_BUDGET (120s) and remains authoritative over both.
+    let work: Vec<&AdoptCandidate> = eligible
+        .into_iter()
+        .chain(deferred)
+        .take(WITNESS_MAX_PER_TICK as usize)
+        .collect();
+    let attempted = work.len();
+
+    // Atomics, not locals: they live OUTSIDE the future the budget may cancel,
+    // so a budget-elapsed sweep still reports what it managed to do.
+    let adopted = AtomicUsize::new(0);
+    let contested = AtomicUsize::new(0);
+    let held = AtomicUsize::new(0);
+    let retry = AtomicUsize::new(0);
+
+    let app_ctx_ref = &app_ctx;
+    let (adopted_ref, contested_ref, held_ref, retry_ref) = (&adopted, &contested, &held, &retry);
+
+    let sweep = futures::stream::iter(work.iter().copied()).for_each_concurrent(
+        fanout,
+        |candidate| async move {
             let id = &candidate.id;
             // PROVENANCE-EXACT local resolve. The heal leg ALREADY paid the
             // conductor for these answers, so pass what it learned instead of
@@ -3209,19 +3289,27 @@ async fn adopt_deferred_heads(
             match crate::services::head_adoption::try_adopt_canonical_head(
                 hc,
                 pool,
-                &app_ctx,
+                app_ctx_ref,
                 id,
                 local_resolve,
                 adopt,
             )
             .await
             {
-                crate::services::head_adoption::AdoptOutcome::Adopted => adopted += 1,
-                crate::services::head_adoption::AdoptOutcome::Contested => contested += 1,
-                crate::services::head_adoption::AdoptOutcome::Held => held += 1,
-                crate::services::head_adoption::AdoptOutcome::Author => retry += 1,
+                crate::services::head_adoption::AdoptOutcome::Adopted => {
+                    adopted_ref.fetch_add(1, Ordering::Relaxed);
+                }
+                crate::services::head_adoption::AdoptOutcome::Contested => {
+                    contested_ref.fetch_add(1, Ordering::Relaxed);
+                }
+                crate::services::head_adoption::AdoptOutcome::Held => {
+                    held_ref.fetch_add(1, Ordering::Relaxed);
+                }
+                crate::services::head_adoption::AdoptOutcome::Author => {
+                    retry_ref.fetch_add(1, Ordering::Relaxed);
+                }
                 crate::services::head_adoption::AdoptOutcome::AuthorThenAdopt { .. } => {
-                    retry += 1;
+                    retry_ref.fetch_add(1, Ordering::Relaxed);
                     tracing::warn!(
                         content_id = %id,
                         "projection-reconcile[adopt-deferred]: conductor reports no local chain \
@@ -3229,20 +3317,43 @@ async fn adopt_deferred_heads(
                     );
                 }
             }
+            // Per-item spacing, retained INSIDE the concurrent task: at
+            // `fanout = 1` this reproduces the pre-F-B sequential cadence
+            // exactly, so the knob is a true off switch.
             tokio::time::sleep(WITNESS_ITEM_DELAY).await;
-        }
-    };
+        },
+    );
 
-    if tokio::time::timeout(WITNESS_SWEEP_BUDGET, sweep)
+    let budget_elapsed = tokio::time::timeout(WITNESS_SWEEP_BUDGET, sweep)
         .await
-        .is_err()
-    {
+        .is_err();
+    crate::metrics::inc_adopt_sweep(if budget_elapsed {
+        crate::metrics::AdoptSweepOutcome::BudgetElapsed
+    } else {
+        crate::metrics::AdoptSweepOutcome::Completed
+    });
+
+    let (adopted, contested, held, retry) = (
+        adopted.load(Ordering::Relaxed),
+        contested.load(Ordering::Relaxed),
+        held.load(Ordering::Relaxed),
+        retry.load(Ordering::Relaxed),
+    );
+
+    if budget_elapsed {
         tracing::warn!(
             target: "elohim_storage::projection_reconcile",
             budget_secs = WITNESS_SWEEP_BUDGET.as_secs(),
             candidates = total,
+            attempted,
+            fanout,
+            backoff_deferred = deferred_count,
+            adopted,
+            contested,
+            held,
+            retry,
             "projection-reconcile[adopt-deferred]: sweep exceeded wall-clock budget — \
-             abandoned, resumes next sweep"
+             abandoned with partial progress, resumes next sweep"
         );
         return;
     }
@@ -3250,12 +3361,17 @@ async fn adopt_deferred_heads(
     tracing::warn!(
         target: "elohim_storage::projection_reconcile",
         candidates = total,
+        attempted,
+        fanout,
+        backoff_deferred = deferred_count,
         adopted,
         contested,
         held,
         retry,
         "projection-reconcile[adopt-deferred]: adopted peer-declared heads, and contested \
-         two-way declared ones by minting a canonical candidate for the DHT election"
+         two-way declared ones by minting a canonical candidate for the DHT election \
+         (backoff_deferred = candidates whose contest is a known predictable failure, moved \
+         behind the contestable ones rather than dropped)"
     );
 }
 

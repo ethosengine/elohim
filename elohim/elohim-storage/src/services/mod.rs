@@ -39,6 +39,7 @@ pub mod conductor_writes; // 2026-05-26-substrate-rea-replication-fix — facade
 pub mod connectivity; // Phase 4 T6 — libp2p connected-peers snapshot helper
 pub mod constitutional_ratio_registry;
 pub mod content_service;
+pub mod contest_backoff; // F-B throughput lever — hold back contest attempts that are PREDICTABLE repeat failures (bounded, always-expiring)
 pub mod contributor_reflexive_facing; // Wave 2 — "how the network sees a contributor" facing (folds in elohim-facings)
 pub mod custody_facing; // custody-observation loader for the typed custody folds (elohim-facings) + the class gauges
 pub mod demand_autopin; // self-healing opportunity map row 15 — auto-pin on a local content read-miss

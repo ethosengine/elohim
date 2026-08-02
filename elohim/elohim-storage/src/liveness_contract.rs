@@ -916,6 +916,160 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
+    // F-B: the contest backoff, witnessed under the same instrument.
+    // -----------------------------------------------------------------------
+
+    /// **A backed-off id is DELAYED, never excluded** — the C3 obligation the
+    /// F-B throughput lever takes on.
+    ///
+    /// Witnessed separately rather than folded into the main table on purpose.
+    /// Backoff is a *scheduling* dimension, not a head-election one: adding it
+    /// to [`RowState`] would double the 48-state product, force both historical
+    /// legs to model a mechanism that did not exist in 2026-07-11 or
+    /// 2026-08-02, and change the counts the three legs are compared on. The
+    /// main table stays exactly as it was; this witnesses the new state space
+    /// beside it — the same shape as
+    /// [`both_sides_conductor_missing_is_a_known_open_residual`].
+    ///
+    /// Both legs below are driven by LIVE code: leg A calls
+    /// [`crate::services::contest_backoff::backoff_is_active`] and the real
+    /// ledger; leg B is a plain-data reconstruction of the pre-F-B
+    /// self-candidacy ledger (claim-on-attempt, never released) and calls
+    /// nothing — the same reconstruction discipline as legs 1 and 2.
+    #[test]
+    fn the_contest_backoff_is_never_a_permanent_exclusion() {
+        use crate::metrics::ContestSkip;
+        use crate::services::contest_backoff;
+        use std::time::Duration;
+
+        #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+        enum Backoff {
+            /// A contest for this id failed predictably; the id is serving its
+            /// window and the sweep de-prioritises it.
+            Serving,
+            /// Eligible to contest again.
+            Contestable,
+        }
+
+        const WINDOW: Duration = Duration::from_secs(3600);
+
+        fn classify(s: &Backoff) -> StateClass {
+            match s {
+                Backoff::Contestable => StateClass::Terminal(
+                    "the id is contestable — the scheduling question this table asks is \
+                     answered, and whether the contest then SUCCEEDS is the main table's \
+                     question, not this one",
+                ),
+                Backoff::Serving => StateClass::Live,
+            }
+        }
+
+        // EXIT 1 — time expiry, from the live predicate, asked at exactly the
+        // window: if it still held here the backoff would have no finite horizon.
+        let expiry_releases = !contest_backoff::backoff_is_active(WINDOW, WINDOW);
+
+        // EXIT 2 — local chain arrival, exercised against the REAL ledger. This
+        // is the exit that matters inside ONE tick: the adopt sweep runs before
+        // both witness sweeps, so an id can be backed off and authored seconds
+        // apart.
+        //
+        // Exercised ONCE, here, rather than inside the transition closure: the
+        // closure is called per state visit, and taking a mutex inside a
+        // repeatedly-invoked callback is a deadlock waiting for a harness that
+        // ever nests. Serialised against the contest_backoff module's own ledger
+        // tests, which `cargo test` runs in parallel threads of ONE process
+        // (this raced their `reset()` before it was fixed).
+        let arrival_releases = {
+            let _exclusive = contest_backoff::test_exclusive();
+            contest_backoff::note("c3:witness", ContestSkip::NoLocalChainBackoff);
+            let held_before = contest_backoff::skip_class("c3:witness", WINDOW).is_some();
+            contest_backoff::note_local_chain_arrived("c3:witness");
+            let released = contest_backoff::skip_class("c3:witness", WINDOW).is_none();
+            held_before && released
+        };
+
+        // ── LEG A: the live backoff. Both exits driven by production code. ──
+        let report = check_liveness(
+            &[Backoff::Serving, Backoff::Contestable],
+            classify,
+            |s| match s {
+                Backoff::Contestable => vec![],
+                Backoff::Serving => {
+                    let mut out = Vec::new();
+                    if expiry_releases {
+                        out.push(
+                            Transition::automated(
+                                "window expiry: backoff_is_active(elapsed >= window) is false, so \
+                                 the sweep re-admits the id at full priority",
+                            )
+                            .to(Backoff::Contestable),
+                        );
+                    }
+                    if arrival_releases {
+                        out.push(
+                            Transition::automated(
+                                "note_local_chain_arrived: an author path landed a chain, so the \
+                                 no-chain verdict is stale and the entry is cleared at once",
+                            )
+                            .to(Backoff::Contestable),
+                        );
+                    }
+                    out
+                }
+            },
+        )
+        .unwrap_or_else(|failure| {
+            // Not a massage point — same law as leg 3. A backoff with no
+            // automated exit is a production finding.
+            panic!(
+                "the contest backoff has no automated exit — that is a C3 violation in \
+                 shipped code, not a test to relax:\n{failure}"
+            )
+        });
+        assert!(
+            report.transitions_enumerated >= 2,
+            "both exits (expiry AND chain arrival) must be present, not just one: {report}"
+        );
+        assert!(report.progress_checked, "{report}");
+
+        // ── LEG B: the pre-F-B self-candidacy ledger, reconstructed. ──
+        //
+        // Transcribed from `head_adoption.rs` at `da8975176`: the claim was
+        // taken BEFORE the declare and never handed back, so a single failed
+        // self-candidacy retired `(id, own_head)` for the life of the process.
+        // The live fingerprint was `contest_self_head = 4` against
+        // `contest_failed{fetch_none} = 603`. It calls nothing — a
+        // reconstruction that computed its expectation from today's code would
+        // track every future edit and could never fail.
+        let failure = check_liveness(&[Backoff::Serving, Backoff::Contestable], classify, |s| {
+            match s {
+                Backoff::Contestable => vec![],
+                // No expiry, no release, no clear: the only way back was a pod
+                // restart, which is exactly the agency C3 refuses to count.
+                Backoff::Serving => vec![Transition::deploy(
+                    "process restart drops the in-memory ledger — an operator/deploy action, \
+                     never an automated one",
+                )
+                .to(Backoff::Contestable)],
+            }
+        })
+        .expect_err(
+            "claim-on-attempt with no release is a PERMANENT exclusion — if this now passes, \
+             the reconstruction has drifted into calling live code",
+        );
+        assert!(
+            failure.has_class(
+                seam_contracts::harness::liveness::LivenessViolationClass::ManualOnlyExit
+            ),
+            "expected manual_only_exit for the never-released claim:\n{failure}"
+        );
+        dump(
+            "F-B negative control — pre-release self-candidacy ledger",
+            &failure,
+        );
+    }
+
+    // -----------------------------------------------------------------------
     // The documented open residual — witnessed, not hidden.
     // -----------------------------------------------------------------------
 

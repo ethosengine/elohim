@@ -368,6 +368,15 @@ pub async fn run_once(
 
         let mut outcome = decide_outcome(&reauthor, recovery.as_ref());
 
+        // CHAIN ARRIVAL — a successful re-author (or an already-anchored
+        // recovery) means this conductor now holds a chain for the id, so any
+        // `no_local_chain` contest backoff standing against it is stale. Clear
+        // it so the next reconcile sweep contests instead of waiting out the
+        // window (see `services::contest_backoff`).
+        if outcome != RowOutcome::Failed {
+            crate::services::contest_backoff::note_local_chain_arrived(id);
+        }
+
         // AUTHOR-THEN-ADOPT, second half. The conductor now has a local chain for
         // this id, so the declaration it refused a moment ago can land. A failure
         // here is non-fatal by design: the row stays anchored-and-undeclared,

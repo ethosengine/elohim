@@ -443,6 +443,33 @@ async fn async_main(
     // the hot path (see `config::set_contest_two_way_declared`).
     elohim_storage::config::set_contest_two_way_declared(config.contest_two_way_declared);
 
+    // F-B THROUGHPUT LEVER. Both knobs have an explicit OFF value that restores
+    // the pre-F-B sweep exactly: fan-out 1 (sequential) and backoff 0 (contest
+    // every candidate every sweep). An unparseable value leaves the default
+    // rather than silently disabling the lever.
+    if let Ok(v) = std::env::var("ADOPT_CONTEST_FANOUT") {
+        match v.trim().parse::<usize>() {
+            Ok(n) if n >= 1 => config.adopt_contest_fanout = n,
+            _ => tracing::warn!(
+                value = %v,
+                default = config.adopt_contest_fanout,
+                "ADOPT_CONTEST_FANOUT is not a positive integer — keeping the default"
+            ),
+        }
+    }
+    if let Ok(v) = std::env::var("CONTEST_BACKOFF_SECONDS") {
+        match v.trim().parse::<u64>() {
+            Ok(n) => config.contest_backoff_seconds = n,
+            Err(_) => tracing::warn!(
+                value = %v,
+                default = config.contest_backoff_seconds,
+                "CONTEST_BACKOFF_SECONDS is not an integer — keeping the default"
+            ),
+        }
+    }
+    elohim_storage::config::set_adopt_contest_fanout(config.adopt_contest_fanout);
+    elohim_storage::config::set_contest_backoff_seconds(config.contest_backoff_seconds);
+
     // Demand-driven auto-pin (self-healing opportunity map row 15). Default ON
     // (demand-driven, not blanket backfill; consent floor preserved downstream
     // by the provide-eligibility gate). Env DISABLES it: 0/false/off/no.

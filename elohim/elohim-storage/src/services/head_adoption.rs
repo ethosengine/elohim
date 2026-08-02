@@ -72,9 +72,67 @@
 //! one sweep — the minting conductor's own next `resolve_content_head_local`
 //! sees the link it just committed and stamps the election onto the row.
 //!
-//! Expected drain: ~11.4k contested ids fleet-wide, `WITNESS_MAX_PER_TICK` (200)
-//! per tick per pod on ~300s sweeps ⇒ contest supply completes in roughly 1-2h
-//! across 7 pods, with election-and-obey draining behind it.
+//! ## Convergence arithmetic — what to watch on the meters (F-B, 2026-08-02)
+//!
+//! The pre-F-B estimate ("~11.4k ids, 200/tick, ~1-2h") was FALSIFIED live: the
+//! first hour minted ~90 elections, not thousands. It was wrong in two ways, and
+//! both are now fixed. Recorded here rather than deleted, because the corrected
+//! arithmetic is only trustworthy if the way the first one lied is visible.
+//!
+//! **Why it was wrong.** (1) The 200/tick cap was never the binding constraint —
+//! the 120s wall-clock budget was. At the observed ~0.4s per fast-failing
+//! contest, 120s buys ~280 sequential attempt-slots, and a *productive* contest
+//! (peer fetch + declare) costs seconds, so a handful of them consumed the whole
+//! sweep. (2) The attempts were dominated by `no_local_chain` — a
+//! target-independent refusal that CANNOT succeed on a later sweep either, so
+//! the same predictable failures re-consumed the budget every 300s while
+//! contestable ids sat behind them. Supply was ~200 attempts/sweep of which the
+//! productive share was single digits: ~90/hour fleet-wide.
+//!
+//! **The corrected model.** Per pod, per sweep (300s cadence):
+//!
+//! ```text
+//!   attempts/sweep  = min(200 cap, 120s ÷ (latency ÷ fanout))
+//!   with fanout 8 and ~0.4s latency ⇒ 120 ÷ 0.05 = 2400 → capped at 200
+//! ```
+//!
+//! So the fan-out moves the binding constraint OFF the wall clock and back ONTO
+//! the 200/tick cap, which is where a cap belongs: the sweep now reliably spends
+//! its full slice instead of timing out partway. The backoff then decides WHAT
+//! that slice is spent on. With `p` = the share of candidates that are
+//! predictable failures (live: `no_local_chain` was 887 of ~891 classified
+//! attempts, so p ≈ 0.85-0.99 on the worst pods), the productive attempts per
+//! sweep go from `200·(1-p)` — single digits at p = 0.97 — to ~200, because the
+//! backoff moves the whole `p` share behind the rest.
+//!
+//! **Fleet drain, first order.** 7 pods × 200 productive attempts/sweep × 12
+//! sweeps/hour = ~16.8k contest attempts/hour against ~11k contested ids. Even
+//! discounting heavily for the productive-contest latency (seconds, not 0.4s —
+//! a fetch plus a declare), for candidate overlap between pods, and for ids that
+//! need two rounds (contest → election → obey), the whole contested corpus gets
+//! its first real attempt within **hours, not days**. That is the F-B bar.
+//!
+//! **What to watch, in order of trustworthiness:**
+//!
+//! 1. `elohim_content_canonical_links_minted_total{source}` — the only series
+//!    that proves supply. Must climb; `contest_peer_head` and
+//!    `contest_self_head` should BOTH be non-zero once both sides participate.
+//! 2. `elohim_content_contest_skipped_total{reason}` RISING while
+//!    `elohim_content_contest_failed_total{class="no_local_chain"}` FALLS — that
+//!    crossover IS the lever working (budget reclaimed, not merely re-spent).
+//!    Skips rising while minting stays flat means the window is too long: cut
+//!    `CONTEST_BACKOFF_SECONDS`, or set it to 0 to disable.
+//! 3. `elohim_content_adopt_sweep_total{outcome}` — `budget_elapsed` should
+//!    become RARE. If it stays dominant, the conductor is the constraint and
+//!    raising `ADOPT_CONTEST_FANOUT` will not help.
+//! 4. `elohim_content_election_obeyed_total` — the consumption half. Supply
+//!    without obey means the elections are minting but not projecting.
+//! 5. `elohim_projection_reconcile_divergent{stream="content"}` fleet-sum —
+//!    the outcome, but the SLOWEST and noisiest signal (a rotating-page sample
+//!    that oscillates ±5k by construction; a 30-60min decline proves nothing).
+//!
+//! The per-sweep `gaps` gauge remains untrustworthy as a trend. Judge F-B on
+//! (1) and (2), not on gaps.
 //!
 //! ## Contest supply: what the first live window taught (2026-08-02)
 //!
@@ -1017,6 +1075,12 @@ fn self_candidate_key(id: &str, target: &str) -> String {
 /// Claim the right to self-candidate `(id, target)`. Returns `true` on the FIRST
 /// call for a pair and `false` afterwards — so a caller mints at most once per
 /// (id, local head) per process.
+///
+/// The claim is taken BEFORE the declare, not after it succeeds, and that is
+/// deliberate: under the fan-out sweep several tasks can reach this arm for the
+/// same id concurrently, and claim-on-success would let all of them mint. The
+/// cost of claiming early is that a FAILED attempt must hand the claim back —
+/// see [`release_self_candidacy`].
 fn claim_self_candidacy(id: &str, target: &str) -> bool {
     let ledger = SELF_CANDIDATE_MINTS.get_or_init(|| std::sync::Mutex::new(Default::default()));
     let mut guard = match ledger.lock() {
@@ -1028,6 +1092,30 @@ fn claim_self_candidacy(id: &str, target: &str) -> bool {
         guard.clear();
     }
     guard.insert(self_candidate_key(id, target))
+}
+
+/// Hand back a claim whose declare FAILED — the C3 half of
+/// [`claim_self_candidacy`].
+///
+/// ## The permanent exclusion this closes (2026-08-02, F-B)
+///
+/// The claim was taken before the attempt and never released, so ONE failed
+/// self-candidacy retired `(id, own_head)` for the life of the process: the next
+/// sweep took the `!claim_self_candidacy` early-return and never called the
+/// conductor again. The live fingerprint was `contest_self_head = 4` against
+/// `contest_failed{fetch_none} = 603` — 603 ids that had each burned their only
+/// attempt and could never nominate again without a pod restart.
+///
+/// That is a *permanent* exclusion with no automated exit, which C3 forbids. A
+/// released claim plus a [`contest_backoff`](crate::services::contest_backoff)
+/// entry converts it into a BOUNDED one: retried roughly hourly instead of
+/// either never (before) or every sweep (unbounded).
+fn release_self_candidacy(id: &str, target: &str) {
+    if let Some(ledger) = SELF_CANDIDATE_MINTS.get() {
+        if let Ok(mut guard) = ledger.lock() {
+            guard.remove(&self_candidate_key(id, target));
+        }
+    }
 }
 
 /// Which candidate a contest attempt named — the label for
@@ -1105,6 +1193,34 @@ async fn contest_peer(
     local_declared: Option<&str>,
 ) -> AdoptOutcome {
     let _ = ctx;
+    // BACKOFF GATE, ahead of every round-trip. A previous contest for this id
+    // failed PREDICTABLY (the zome's target-independent no-chain gate, or a
+    // refused self-head), and nothing about re-asking can change that until the
+    // conductor's holdings change. Skipping here saves BOTH the view-federation
+    // fetch and the declare — the two costs that were burning the sweep budget.
+    //
+    // Scoped to CONTEST only, on purpose: `try_obey_visible_election` runs
+    // upstream of this function and is never gated, so the arm that actually
+    // converges the conductor-missing class keeps running for a backed-off id.
+    //
+    // `Held` is the same outcome the skipped attempt would have produced (every
+    // contest failure path below returns `Held`), so every caller — the adopt
+    // sweep, the ghost witness, the boot re-anchor — sees exactly what it saw
+    // before, minus the wasted round-trips.
+    if let Some(reason) =
+        crate::services::contest_backoff::skip_class(id, crate::config::contest_backoff_window())
+    {
+        crate::metrics::inc_contest_skipped(reason);
+        tracing::debug!(
+            content_id = %id,
+            reason = ?reason,
+            "adopt-before-author: contest skipped — this id is serving a backoff for a \
+             predictable repeat failure; it becomes eligible again on window expiry or as \
+             soon as an author path lands a local chain"
+        );
+        return AdoptOutcome::Held;
+    }
+
     // IDEMPOTENCE, first gate: if the peer is advertising the head this row
     // already declares, there is no contest — the two sides agree and the
     // divergence is elsewhere (an anchor, not a head). Minting here would add a
@@ -1178,6 +1294,14 @@ async fn contest_peer(
             // self-election the module exists to stop.
             if msg.contains(ERR_NO_LOCAL_CHAIN) {
                 crate::metrics::inc_contest_failed(crate::metrics::ContestFailure::NoLocalChain);
+                // BACKOFF, recorded at the one site that can prove the class:
+                // this gate is target-independent (`gather_content_chain(id)`),
+                // so the verdict is a property of the ID, not of this peer or
+                // this target — which is why the ledger keys on id alone.
+                crate::services::contest_backoff::note(
+                    id,
+                    crate::metrics::ContestSkip::NoLocalChainBackoff,
+                );
                 tracing::info!(
                     target: "elohim_storage::head_adoption",
                     content_id = %id,
@@ -1253,6 +1377,19 @@ async fn contest_peer(
         ),
         Err(e) => {
             crate::metrics::inc_contest_failed(unresolvable_class);
+            // C3 REPAIR (2026-08-02, F-B). Hand the claim back and record a
+            // BOUNDED backoff instead. Before this pair of lines a failed
+            // self-candidacy retired `(id, own_head)` for the life of the
+            // process — a permanent exclusion with no automated exit, and the
+            // mechanism behind the live `contest_self_head=4` vs
+            // `fetch_none=603` split. Releasing without the backoff would swing
+            // to the other extreme (a predictable failure retried every sweep),
+            // so the two must land together.
+            release_self_candidacy(id, own_head);
+            crate::services::contest_backoff::note(
+                id,
+                crate::metrics::ContestSkip::SelfCandidacyBackoff,
+            );
             tracing::warn!(
                 target: "elohim_storage::head_adoption",
                 content_id = %id,
@@ -1261,7 +1398,7 @@ async fn contest_peer(
                 fetcher = fetcher_present,
                 error = %e,
                 "adopt-before-author: self-candidacy declare failed — this node could not even \
-                 nominate its own declared head; holding, retried next sweep"
+                 nominate its own declared head; holding, retried after the contest backoff"
             );
             AdoptOutcome::Held
         }
@@ -1325,6 +1462,12 @@ pub async fn finish_author_then_adopt(
     carried_record: Option<Vec<u8>>,
     peer_id: &str,
 ) -> AdoptOutcome {
+    // CHAIN ARRIVAL. The caller's author path just gave this conductor a chain
+    // for `id`, so any `no_local_chain` backoff standing against it is stale by
+    // construction. Clearing here (rather than waiting out the window) matters
+    // inside a single tick: `adopt_deferred_heads` runs BEFORE both witness
+    // sweeps, so an id can fail the no-chain gate and be authored seconds later.
+    crate::services::contest_backoff::note_local_chain_arrived(id);
     let hint = PeerHeadHint {
         head_action_hash: head_action_hash.to_string(),
         declared_at: None,
@@ -1832,6 +1975,72 @@ mod tests {
         assert!(
             claim_self_candidacy("quiescence:id-two", "uhCkk-shared"),
             "same head hash under a different id is a distinct candidacy"
+        );
+    }
+
+    /// **F-B, C3 repair.** A FAILED self-candidacy hands its claim back, so the
+    /// id can nominate again — bounded by the contest backoff rather than
+    /// retired for the life of the process.
+    ///
+    /// This is the assertion that closes the live `contest_self_head = 4` vs
+    /// `contest_failed{fetch_none} = 603` split: 603 ids had each burned their
+    /// one attempt and could never nominate again without a pod restart.
+    /// Claim-on-attempt is still correct (the fan-out sweep can reach this arm
+    /// for one id concurrently, and claim-on-success would let every task mint);
+    /// what was missing was the release.
+    #[test]
+    fn a_failed_self_candidacy_releases_its_claim_rather_than_retiring_the_id() {
+        let id = "quiescence:failed-then-retried";
+        let head = "uhCkk-head-that-failed";
+
+        assert!(
+            claim_self_candidacy(id, head),
+            "first attempt claims the pair"
+        );
+        assert!(
+            !claim_self_candidacy(id, head),
+            "a second attempt while the first is in flight must NOT double-mint — this is \
+             why the claim is taken before the declare, not after it succeeds"
+        );
+
+        // The declare failed. Hand the claim back.
+        release_self_candidacy(id, head);
+
+        assert!(
+            claim_self_candidacy(id, head),
+            "after a released claim the id must be nominatable again — before this repair it \
+             was retired for the life of the process, a permanent exclusion with no \
+             automated exit"
+        );
+    }
+
+    /// The release is SCOPED: handing back one pair must not release another
+    /// id's claim, or one failure would license a re-mint storm elsewhere.
+    #[test]
+    fn releasing_one_claim_leaves_every_other_claim_standing() {
+        assert!(claim_self_candidacy("release:kept", "uhCkk-kept"));
+        assert!(claim_self_candidacy("release:dropped", "uhCkk-dropped"));
+
+        release_self_candidacy("release:dropped", "uhCkk-dropped");
+
+        assert!(
+            !claim_self_candidacy("release:kept", "uhCkk-kept"),
+            "an unrelated id's claim must survive another id's release"
+        );
+        assert!(
+            claim_self_candidacy("release:dropped", "uhCkk-dropped"),
+            "the released pair is claimable again"
+        );
+    }
+
+    /// Releasing a pair that was never claimed is a no-op, not a panic — the
+    /// error path calls this unconditionally.
+    #[test]
+    fn releasing_an_unclaimed_pair_is_harmless() {
+        release_self_candidacy("release:never-claimed", "uhCkk-nothing");
+        assert!(
+            claim_self_candidacy("release:never-claimed", "uhCkk-nothing"),
+            "the pair is still freshly claimable"
         );
     }
 

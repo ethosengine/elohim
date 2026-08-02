@@ -97,6 +97,64 @@ pub fn contest_two_way_declared_enabled() -> bool {
     *CONTEST_TWO_WAY_DECLARED.get().unwrap_or(&true)
 }
 
+/// Process-wide mirror of [`Config::adopt_contest_fanout`]. Same rationale as
+/// [`CONTEST_TWO_WAY_DECLARED`]: the reconcile sweep carries no `Config`, and an
+/// env read on the hot path is the parallel-test-flake anti-pattern.
+static ADOPT_CONTEST_FANOUT: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+
+/// Process-wide mirror of [`Config::contest_backoff_seconds`].
+static CONTEST_BACKOFF_SECONDS: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+
+/// Publish the adopt-sweep fan-out for the reconcile sweep. Idempotent
+/// (`OnceLock::set` semantics).
+pub fn set_adopt_contest_fanout(fanout: usize) {
+    let _ = ADOPT_CONTEST_FANOUT.set(fanout);
+}
+
+/// How many adopt-before-author candidates the sweep may have in flight at once.
+///
+/// Clamped to at least 1: a zero would make the sweep a silent no-op, which is
+/// the one value a throughput knob must never be allowed to mean. `1` is exactly
+/// the pre-F-B sequential behaviour, so this is also the OFF switch.
+pub fn adopt_contest_fanout() -> usize {
+    (*ADOPT_CONTEST_FANOUT
+        .get()
+        .unwrap_or(&DEFAULT_ADOPT_CONTEST_FANOUT))
+    .max(1)
+}
+
+/// Publish the contest-backoff window for the reconcile sweep. Idempotent.
+pub fn set_contest_backoff_seconds(seconds: u64) {
+    let _ = CONTEST_BACKOFF_SECONDS.set(seconds);
+}
+
+/// How long a predictable contest failure holds an id back
+/// (`services::contest_backoff`). `Duration::ZERO` DISABLES the backoff, which
+/// restores the pre-F-B behaviour exactly.
+pub fn contest_backoff_window() -> std::time::Duration {
+    std::time::Duration::from_secs(
+        *CONTEST_BACKOFF_SECONDS
+            .get()
+            .unwrap_or(&DEFAULT_CONTEST_BACKOFF_SECONDS),
+    )
+}
+
+/// Conservative default fan-out for the adopt sweep.
+///
+/// 8, not "as many as fit": every in-flight candidate is a conductor round-trip,
+/// and the heal-pacing machinery in `projection_reconcile` exists because a
+/// saturated conductor (adam, at its read-pool ceiling) is the live constraint.
+/// 8 lifts the per-sweep contest supply roughly 8x while keeping the conductor's
+/// instantaneous load hard-bounded and far below its pool.
+pub const DEFAULT_ADOPT_CONTEST_FANOUT: usize = 8;
+
+/// Conservative default backoff window: 3600s.
+///
+/// Deliberately the SAME ~1h dormancy as `projection_reconcile`'s
+/// `MISS_READMIT_SWEEPS` (12 sweeps × the 300s reconcile cadence) — one
+/// re-attempt horizon at this seam, not a second one with a different shape.
+pub const DEFAULT_CONTEST_BACKOFF_SECONDS: u64 = 3600;
+
 /// Configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -318,6 +376,40 @@ pub struct Config {
     #[serde(default = "default_true")]
     pub contest_two_way_declared: bool,
 
+    /// F-B THROUGHPUT LEVER, half 1: how many adopt-before-author candidates the
+    /// reconcile sweep processes CONCURRENTLY.
+    ///
+    /// The sweep's budget is fixed (200 candidates/tick, 120s wall clock, ~300s
+    /// cadence) and the binding constraint is the wall clock, not the cap: 200
+    /// sequential conductor round-trips do not fit in 120s. Fan-out converts the
+    /// budget into ~N× the contest supply per sweep.
+    ///
+    /// `1` restores the exact pre-F-B sequential sweep (the OFF switch); the
+    /// per-item 25ms spacing is retained inside each concurrent task so a
+    /// fan-out of 1 is byte-for-byte the old behaviour. Raise with care: each
+    /// in-flight candidate is a conductor round-trip and a saturated conductor
+    /// is the live constraint this whole pacing layer exists for.
+    /// Loaded from env `ADOPT_CONTEST_FANOUT`.
+    #[serde(default = "default_adopt_contest_fanout")]
+    pub adopt_contest_fanout: usize,
+
+    /// F-B THROUGHPUT LEVER, half 2: how long (seconds) a PREDICTABLE contest
+    /// failure holds an id back from re-contesting
+    /// (`services::contest_backoff`).
+    ///
+    /// A contest that failed the zome's target-independent no-chain gate cannot
+    /// succeed on a later sweep either — until this conductor acquires a chain
+    /// for the id — so re-attempting it every sweep burns budget that productive
+    /// contests need. The backoff is never permanent: it expires on this window
+    /// AND is cleared immediately when an author path lands a local chain.
+    ///
+    /// `0` DISABLES the backoff (every candidate contested every sweep — the
+    /// pre-F-B behaviour). Default 3600 = 12 sweeps at the 300s cadence, the
+    /// same ~1h horizon as `MISS_READMIT_SWEEPS`.
+    /// Loaded from env `CONTEST_BACKOFF_SECONDS`.
+    #[serde(default = "default_contest_backoff_seconds")]
+    pub contest_backoff_seconds: u64,
+
     /// Demand-driven auto-pin: when a local content read MISSES (a client asked
     /// this node for content it does not have), author an `item` DevicePin for
     /// that content so the acquisition loop fetches it and the provide loop
@@ -442,6 +534,14 @@ fn default_fetch_blob_parallelism() -> usize {
     3
 }
 
+fn default_adopt_contest_fanout() -> usize {
+    DEFAULT_ADOPT_CONTEST_FANOUT
+}
+
+fn default_contest_backoff_seconds() -> u64 {
+    DEFAULT_CONTEST_BACKOFF_SECONDS
+}
+
 fn default_heal_on_read_budget_ms() -> u64 {
     5000
 }
@@ -503,6 +603,8 @@ impl Default for Config {
             salvage_recheck_seconds: default_salvage_recheck_seconds(),
             salvage_diversity_placement: default_true(),
             contest_two_way_declared: default_true(),
+            adopt_contest_fanout: default_adopt_contest_fanout(),
+            contest_backoff_seconds: default_contest_backoff_seconds(),
             demand_autopin_enabled: default_true(),
             demand_autopin_throttle_seconds: default_demand_autopin_throttle_seconds(),
             manifest_backfill_enabled: default_true(),
