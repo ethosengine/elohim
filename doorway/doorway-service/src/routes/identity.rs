@@ -202,12 +202,35 @@ fn render_resolution(
 /// is 400 and `methodNotSupported` is 501 per the DID bridge contract; storage
 /// failures surface as `internalError` (500) with a spec-shaped body — never a
 /// bare 502.
+///
+/// **Exhaustive by design — no `_` arm.** The DID error-code vocabulary is
+/// deliberately lossy (`IdentityHeadUnresolvable` and `IdentityHeadMalformed`
+/// both project to `internalError` on the wire), so the *status* is the only
+/// place the distinction survives for a caller deciding whether to retry. A
+/// catch-all would silently serve a future variant as somebody else's status —
+/// the compiler catching an unmapped variant here IS the guard. The mapping
+/// mirrors elohim-storage's `/db/identity/did/{did}` handler exactly, so the
+/// same resolution answers the same way whether the client reaches storage
+/// directly or through this doorway.
 fn error_status(err: &DidResolutionError) -> StatusCode {
     match err {
         DidResolutionError::InvalidDid(_) => StatusCode::BAD_REQUEST,
         DidResolutionError::NotFound(_) => StatusCode::NOT_FOUND,
         DidResolutionError::MethodNotSupported(_) => StatusCode::NOT_IMPLEMENTED,
         DidResolutionError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        // A FETCHED document described a different subject. Not the requester's
+        // fault and not ours — the upstream responder answered badly, which is
+        // what 502 means.
+        DidResolutionError::SubjectMismatch { .. } => StatusCode::BAD_GATEWAY,
+        // The head could not be determined (undelivered DHT record, timed-out
+        // read, a lagging projection). Fail-closed and RETRYABLE — 503, never
+        // 404: "we could not establish it" must not be served as "it does not
+        // exist".
+        DidResolutionError::IdentityHeadUnresolvable(_) => StatusCode::SERVICE_UNAVAILABLE,
+        // A head resolved but is unusable as declared (e.g. an empty controller
+        // set, which would read as implicit self-control). A substrate-side
+        // defect, not a client error.
+        DidResolutionError::IdentityHeadMalformed(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
@@ -651,6 +674,55 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::OK);
         let result: DidResolutionResult = serde_json::from_str(&read_body(resp).await).unwrap();
         assert_eq!(result.did_document.unwrap().id.as_string(), did);
+    }
+
+    /// The doorway's status mapping must agree with elohim-storage's, variant for
+    /// variant — a client must get the same answer whether it reaches storage
+    /// directly or through this doorway. The three identity-head-era variants are
+    /// pinned explicitly because their DID error CODES collapse
+    /// (`IdentityHeadUnresolvable` and `IdentityHeadMalformed` both project to
+    /// `internalError`), so the status is the only surviving distinction — and
+    /// 503-vs-500 is what tells a caller whether to retry.
+    #[test]
+    fn error_status_mapping_is_exhaustive_and_mirrors_storage() {
+        assert_eq!(
+            error_status(&DidResolutionError::InvalidDid("x".into())),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            error_status(&DidResolutionError::NotFound("x".into())),
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            error_status(&DidResolutionError::MethodNotSupported("x".into())),
+            StatusCode::NOT_IMPLEMENTED
+        );
+        assert_eq!(
+            error_status(&DidResolutionError::Internal("x".into())),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+        assert_eq!(
+            error_status(&DidResolutionError::SubjectMismatch {
+                requested: "did:web:a.example".into(),
+                returned: "did:web:b.example".into(),
+            }),
+            StatusCode::BAD_GATEWAY,
+            "a document naming another subject is an upstream fault → 502"
+        );
+        assert_eq!(
+            error_status(&DidResolutionError::IdentityHeadUnresolvable(
+                "lagging".into()
+            )),
+            StatusCode::SERVICE_UNAVAILABLE,
+            "unresolvable head is retryable → 503, NEVER 404 (absence was not established)"
+        );
+        assert_eq!(
+            error_status(&DidResolutionError::IdentityHeadMalformed(
+                "empty set".into()
+            )),
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "a malformed declaration is a substrate defect, not a client error"
+        );
     }
 
     #[tokio::test]

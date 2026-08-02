@@ -28,15 +28,27 @@
 //!   (distinct write-set) owns its `service` entries.
 //! - **`document_metadata`** — the `humans` row's `created`/`updated` stamps when
 //!   a row exists; otherwise the default empty (we never manufacture timestamps).
-//! - **`identity_head`** (Wave C1 — phase-2) — the live, notarized `binds-identity`
+//! - **`identity_head`** (Wave C1 — phase-2) — the newest NOTARIZED `binds-identity`
 //!   declaration whose `head_key` is this `agent_cid` (`identity_heads` projection),
-//!   surfacing the chain-root + controller set. `None` when the agent has no
-//!   declared head (the common case today) → the resolver keeps the phase-1
-//!   implicit-self document unchanged. The raw controller ids are framed as
-//!   `did:elohim:<id>` controller DIDs here (storage owns the identity-namespace
-//!   mapping; the resolver stays namespace-agnostic). Controllers come straight
-//!   from the declaration — the community-recovery quorum is a controller, never an
-//!   override (ontology guard).
+//!   read **revocation-inclusive**:
+//!   - live declaration → `Declared` (chain-root + controller set). The raw
+//!     controller ids are framed as `did:elohim:<id>` controller DIDs here (storage
+//!     owns the identity-namespace mapping; the resolver stays namespace-agnostic).
+//!     Controllers come straight from the declaration — the community-recovery
+//!     quorum is a controller, never an override (ontology guard).
+//!   - revoked declaration → `Revoked` (chain-root + head + any named successor),
+//!     which the resolver assembles as a **deactivated** document. Reading the
+//!     live-only query here would hide the revocation and serve a fully-armed,
+//!     implicitly self-controlled document instead — see
+//!     `db::identity_heads::find_head_by_head_key`'s warning.
+//!   - no row → `NeverDeclared` (the common case today) → the resolver keeps the
+//!     phase-1 implicit-self document unchanged. A missing row on a gossip-fed
+//!     projection is a *documented limitation*, not a settled claim; the catch-up
+//!     signal it needs does not exist for this pipeline yet (ledgered at
+//!     `genesis/data/timeline/backlog/identity-head-projection-catchup-signal-gap.md`).
+//!
+//!   An un-notarized (`dht_anchor_hash IS NULL`) declaration surfaces as neither —
+//!   fail-closed, unchanged.
 //!
 //! Identity-namespace hazard (see `elohim-storage/CLAUDE.md` — "Identity &
 //! Transport-Identity Coherence"): the DID method-specific-id and `agent_cid`
@@ -47,7 +59,8 @@
 
 use async_trait::async_trait;
 use did_bridge::{
-    DidDocumentMetadata, ElohimIdentityStore, ElohimStoreError, IdentityHead, ServiceRef,
+    DidDocumentMetadata, ElohimIdentityStore, ElohimStoreError, IdentityHead, IdentityHeadAnswer,
+    RevokedIdentity, ServiceRef,
 };
 use did_types::Did;
 
@@ -167,28 +180,90 @@ impl ElohimIdentityStore for DidIdentityStore {
             Some(h) => Ok(DidDocumentMetadata {
                 created: Some(h.created_at),
                 updated: Some(h.updated_at),
+                // OMITTED, not asserted-false: this store makes no revocation
+                // claim here (the revocation-aware answer is `identity_head`'s,
+                // which is already fail-closed on revoked rows). `None` is
+                // `skip_serializing_if`-elided, so the emitted document is
+                // byte-identical to the pre-`deactivated` shape.
+                deactivated: None,
             }),
             None => Ok(DidDocumentMetadata::default()),
         }
     }
 
-    async fn identity_head(
-        &self,
-        agent_cid: &str,
-    ) -> Result<Option<IdentityHead>, ElohimStoreError> {
-        // The live, notarized `binds-identity` declaration whose head is this agent
-        // (`identity_heads` projection, fail-closed on un-notarized/revoked rows).
-        // Absent → `None`, and the resolver falls back to the phase-1 self-only
-        // document. The common case today IS no head.
+    async fn identity_head(&self, agent_cid: &str) -> Result<IdentityHeadAnswer, ElohimStoreError> {
+        // The newest NOTARIZED `binds-identity` declaration whose head is this agent
+        // — revoked or not (`find_notarized_head_by_head_key`). Reading the
+        // revocation-INCLUSIVE query is the whole point: the live-head query hides a
+        // revoked row behind `revoked_at IS NULL`, which made a revoked identity
+        // indistinguishable from one that never declared a head, and therefore
+        // resolve to the phase-1 implicit-self document — fully armed and implicitly
+        // self-controlled. Still fail-closed on notarization: an un-notarized
+        // (storage-only) declaration surfaces neither as a head nor as a revocation.
         let mut conn = self
             .pool
             .get()
             .map_err(|e| ElohimStoreError::Backend(e.to_string()))?;
-        let Some(row) = crate::db::identity_heads::find_head_by_head_key(&mut conn, agent_cid)
-            .map_err(|e| ElohimStoreError::Backend(e.to_string()))?
+        let Some(row) =
+            crate::db::identity_heads::find_notarized_head_by_head_key(&mut conn, agent_cid)
+                .map_err(|e| ElohimStoreError::Backend(e.to_string()))?
         else {
-            return Ok(None);
+            // MISSING ROW ⇒ `NeverDeclared`, WITH A DOCUMENTED LIMITATION.
+            //
+            // The trait contract asks for a positive claim here (we looked, and no
+            // declaration exists). `identity_heads` is a gossip-fed projection, so
+            // strictly a missing row means "no declaration has been DELIVERED TO
+            // THIS NODE" — which establishes never-declared only while the
+            // projection is caught up, and is `Unresolvable("projection lagging")`
+            // while it is not.
+            //
+            // The ruling is implementable the moment a caught-up signal exists for
+            // THIS pipeline. It does not: `identity_heads` is fed by the mishpat
+            // `AppSignal` subscriber (`main.rs` → `subscribe_mishpat_signals` →
+            // `signals::handle_mishpat_signal`), a fire-and-forget callback with no
+            // cursor, no lag stamp and no liveness state. The two catch-up signals
+            // that DO exist belong to other pipelines and would answer a different
+            // question: `p2p::replication::ReconcileState::caught_up` tracks CONTENT
+            // replication, and `projector::status::compute_projector_status` tracks
+            // the EPR-atom projector (`epr_atoms` + `projector_cursor`), which does
+            // not project this table. Wiring either in would look like the ruling
+            // was implemented while leaving the same hole — the invented-wiring
+            // failure this enum exists to prevent.
+            //
+            // So this arm is honest degradation, not a resolved question: it keeps
+            // the phase-1 implicit-self document for a missing row, exactly as
+            // before, and the gap is ledgered rather than left as a comment —
+            // genesis/data/timeline/backlog/identity-head-projection-catchup-signal-gap.md.
+            // Closing it is one branch here once the mishpat projection carries a
+            // cursor. Note the blast radius is bounded by what actually changed: the
+            // *revoked* case (the armed-and-revoked document) is closed by the branch
+            // that follows; this is the never-delivered case, whose worst outcome is
+            // the unchanged phase-1 document.
+            return Ok(IdentityHeadAnswer::NeverDeclared);
         };
+
+        // Revoked ⇒ the head is revoked, and the resolver assembles a DEACTIVATED
+        // document (no key material, no relationships, no services, lineage aliases
+        // only). C9's two halves ride the row: `chain_root` re-anchors the lineage,
+        // and `successor_head_key` re-anchors the continuation when the declaration
+        // named one. An ABSENT successor stays honestly `None` — that is a TERMINAL
+        // revocation, not an unknown one: we determined it by reading the column.
+        // (A store that could not determine it must answer `Unresolvable`; a read
+        // failure lands in the `Backend` error above, never here.)
+        if let Some(revoked_at) = row.revoked_at.as_deref() {
+            tracing::debug!(
+                head_key = %agent_cid,
+                cid = %row.cid,
+                revoked_at = %revoked_at,
+                successor = ?row.successor_head_key,
+                "did:elohim identity_head: revoked head → deactivated document (confers nothing)"
+            );
+            return Ok(IdentityHeadAnswer::Revoked(RevokedIdentity {
+                chain_root: row.chain_root,
+                head: row.head_key,
+                successor: row.successor_head_key,
+            }));
+        }
 
         // Controllers come straight from the declaration. Frame each raw controller
         // id as a `did:elohim:<id>` controller DID (storage owns the namespace
@@ -212,7 +287,7 @@ impl ElohimIdentityStore for DidIdentityStore {
             }
         }
 
-        Ok(Some(IdentityHead {
+        Ok(IdentityHeadAnswer::Declared(IdentityHead {
             chain_root: row.chain_root,
             head: row.head_key,
             controllers,
@@ -400,6 +475,20 @@ mod tests {
 
     /// Seed a notarized `binds-identity` head projection keyed on `head_key`.
     fn insert_identity_head(pool: &DbPool, cid: &str, head_key: &str, controllers: &[&str]) {
+        insert_identity_head_with_successor(pool, cid, head_key, controllers, None)
+    }
+
+    /// As [`insert_identity_head`], plus the successor a rotation/recovery named.
+    /// No declaration carries one today (the mishpat validator does not require the
+    /// field), so this seeds the column directly to exercise the C9 re-anchor path
+    /// ahead of its producer.
+    fn insert_identity_head_with_successor(
+        pool: &DbPool,
+        cid: &str,
+        head_key: &str,
+        controllers: &[&str],
+        successor: Option<&str>,
+    ) {
         use crate::db::models::NewIdentityHead;
         let mut conn = pool.get().unwrap();
         let controllers_json = serde_json::to_string(controllers).unwrap();
@@ -413,6 +502,7 @@ mod tests {
                 controller_policy_json: r#"{"kind":"recovery-quorum","m":2,"n":3}"#.to_string(),
                 signed_at: "2026-07-17T00:00:00Z".to_string(),
                 revoked_at: None,
+                successor_head_key: successor.map(str::to_string),
                 dht_anchor_hash: Some(format!("{cid}-anchor")),
             },
         )
@@ -428,11 +518,10 @@ mod tests {
         insert_identity_head(&pool, "ih:1", AGENT_KEY, &[AGENT_KEY, RECOVERY]);
         let store = DidIdentityStore::new(pool, Some(AGENT_KEY.to_string()), vec![], None);
 
-        let head = store
-            .identity_head(AGENT_KEY)
-            .await
-            .unwrap()
-            .expect("a live notarized head must resolve");
+        let IdentityHeadAnswer::Declared(head) = store.identity_head(AGENT_KEY).await.unwrap()
+        else {
+            panic!("a live notarized head must resolve as Declared");
+        };
         assert_eq!(head.chain_root, "bafyreichainrootgenesis0000");
         assert_eq!(head.head, AGENT_KEY);
         // Controllers framed as did:elohim DIDs, straight from the declaration.
@@ -444,18 +533,34 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn identity_head_none_when_no_binding() {
-        // No binds-identity for the agent → None (graceful fallback to phase-1
-        // self-only resolution; the common case today).
+    async fn identity_head_never_declared_when_no_row() {
+        // No binds-identity row for the agent → NeverDeclared (the phase-1 self-only
+        // document; the common case today).
+        //
+        // DOCUMENTED LIMITATION, not a settled claim: `identity_heads` is gossip-fed,
+        // so a missing row strictly means "no declaration delivered HERE" — which
+        // establishes never-declared only while the projection is caught up. No
+        // caught-up signal exists for the mishpat→identity_heads pipeline (see the
+        // `identity_head` else-arm), so this stays honest degradation, ledgered at
+        // genesis/data/timeline/backlog/identity-head-projection-catchup-signal-gap.md.
         let pool = test_pool();
         let store = DidIdentityStore::new(pool, Some(AGENT_KEY.to_string()), vec![], None);
-        assert!(store.identity_head(AGENT_KEY).await.unwrap().is_none());
+        assert_eq!(
+            store.identity_head(AGENT_KEY).await.unwrap(),
+            IdentityHeadAnswer::NeverDeclared
+        );
     }
 
     #[tokio::test]
     async fn identity_head_fail_closed_on_revoked() {
-        // A revoked head must not surface (fail-closed) — resolution degrades to the
-        // phase-1 document rather than emitting a stale controller set.
+        // THE row-8 assertion. A revoked head must surface as `Revoked` — NOT as
+        // `NeverDeclared`.
+        //
+        // Asserting NeverDeclared here would launder the vulnerability into a green
+        // test: an absent `controller` in a DID document means THE SUBJECT CONTROLS
+        // IT, so a revoked identity answering NeverDeclared assembles the phase-1
+        // implicit-self document — fully armed, implicitly self-controlled — and the
+        // revocation disappears into the same silence as never having declared.
         let pool = test_pool();
         insert_identity_head(&pool, "ih:rev", AGENT_KEY, &[AGENT_KEY]);
         {
@@ -464,7 +569,144 @@ mod tests {
                 .expect("revoke");
         }
         let store = DidIdentityStore::new(pool, Some(AGENT_KEY.to_string()), vec![], None);
-        assert!(store.identity_head(AGENT_KEY).await.unwrap().is_none());
+
+        assert_eq!(
+            store.identity_head(AGENT_KEY).await.unwrap(),
+            IdentityHeadAnswer::Revoked(RevokedIdentity {
+                chain_root: "bafyreichainrootgenesis0000".to_string(),
+                head: AGENT_KEY.to_string(),
+                // Honest absence: this declaration named no successor, so the
+                // revocation is TERMINAL. `None` here is a determination (we read
+                // the column), never "unknown".
+                successor: None,
+            }),
+            "a revoked head must answer Revoked; NeverDeclared would serve a \
+             fully-armed implicitly self-controlled document"
+        );
+    }
+
+    #[tokio::test]
+    async fn identity_head_revoked_carries_the_named_successor() {
+        // C9's re-anchor half: when the declaration names a continuation, a reference
+        // keyed on the revoked head can follow the identity forward instead of
+        // dead-ending. (No producer declares one today — the column is seeded
+        // directly; see `insert_identity_head_with_successor`.)
+        const SUCCESSOR: &str = "uhCAkSuccessorHeadKey0000";
+        let pool = test_pool();
+        insert_identity_head_with_successor(
+            &pool,
+            "ih:rotated",
+            AGENT_KEY,
+            &[AGENT_KEY],
+            Some(SUCCESSOR),
+        );
+        {
+            let mut conn = pool.get().unwrap();
+            crate::db::identity_heads::set_revoked_at(
+                &mut conn,
+                "ih:rotated",
+                "2026-07-17T03:00:00Z",
+            )
+            .expect("revoke");
+        }
+        let store = DidIdentityStore::new(pool, Some(AGENT_KEY.to_string()), vec![], None);
+
+        let IdentityHeadAnswer::Revoked(revoked) = store.identity_head(AGENT_KEY).await.unwrap()
+        else {
+            panic!("a revoked head must answer Revoked");
+        };
+        assert_eq!(revoked.successor.as_deref(), Some(SUCCESSOR));
+    }
+
+    #[tokio::test]
+    async fn identity_head_un_notarized_revoked_row_does_not_surface() {
+        // Only the revoked filter was relaxed — notarization stays fail-closed. An
+        // un-notarized (storage-only) declaration must surface as neither a head nor
+        // a revocation, so an unauthenticated row cannot deactivate a live identity.
+        use crate::db::models::NewIdentityHead;
+        let pool = test_pool();
+        {
+            let mut conn = pool.get().unwrap();
+            crate::db::identity_heads::upsert_with_anchor(
+                &mut conn,
+                NewIdentityHead {
+                    cid: "ih:unanchored".to_string(),
+                    chain_root: "bafyreichainrootgenesis0000".to_string(),
+                    head_key: AGENT_KEY.to_string(),
+                    controllers_json: format!(r#"["{AGENT_KEY}"]"#),
+                    controller_policy_json: r#"{"kind":"self"}"#.to_string(),
+                    signed_at: "2026-07-17T00:00:00Z".to_string(),
+                    revoked_at: Some("2026-07-17T03:00:00Z".to_string()),
+                    successor_head_key: None,
+                    dht_anchor_hash: None,
+                },
+            )
+            .expect("insert un-notarized revoked head");
+        }
+        let store = DidIdentityStore::new(pool, Some(AGENT_KEY.to_string()), vec![], None);
+        assert_eq!(
+            store.identity_head(AGENT_KEY).await.unwrap(),
+            IdentityHeadAnswer::NeverDeclared,
+            "an un-notarized declaration establishes nothing in either direction"
+        );
+    }
+
+    /// End-to-end over the REAL resolver: the row-8 vulnerability, closed at the
+    /// surface a caller actually sees. Before the fix this assembled an ordinary
+    /// `did:elohim` document with verification methods, services and transport ids —
+    /// a fully-armed, implicitly self-controlled identity whose head was revoked.
+    #[tokio::test]
+    async fn revoked_head_resolves_to_a_deactivated_document_that_confers_nothing() {
+        use did_bridge::{DidResolver, ElohimResolver};
+        use did_types::Did;
+
+        let pool = test_pool();
+        insert_human(&pool, "human-self", AGENT_KEY);
+        insert_identity_head(&pool, "ih:rev", AGENT_KEY, &[AGENT_KEY]);
+        {
+            let mut conn = pool.get().unwrap();
+            crate::db::identity_heads::set_revoked_at(&mut conn, "ih:rev", "2026-07-17T03:00:00Z")
+                .expect("revoke");
+        }
+        let store = DidIdentityStore::new(
+            pool,
+            Some(AGENT_KEY.to_string()),
+            vec!["12D3KooWSelfPeerId".to_string()],
+            Some("https://node.example.host".to_string()),
+        );
+        let resolver = ElohimResolver::new(store);
+        let did = Did::parse(&format!("did:elohim:{AGENT_KEY}")).unwrap();
+
+        // Deactivation is a SUCCESSFUL resolution (DID Core), not a notFound: the DID
+        // exists and its state is knowable.
+        let result = resolver.resolve(&did).await.expect("deactivation resolves");
+        assert_eq!(
+            result.did_document_metadata.deactivated,
+            Some(true),
+            "the standards-registered deactivation signal must be set"
+        );
+        let doc = result.did_document.expect("a document, not a 404");
+
+        // Nothing to act with — belt and braces, for a consumer that ignores metadata.
+        assert!(doc.verification_method.is_none(), "no key material");
+        assert!(doc.authentication.is_none(), "no authentication");
+        assert!(doc.assertion_method.is_none(), "no assertionMethod");
+        assert!(doc.capability_invocation.is_none());
+        assert!(doc.capability_delegation.is_none());
+        assert!(doc.service.is_none(), "no endpoints projected");
+        assert!(
+            doc.controller.is_none(),
+            "no controller set is asserted for a revoked head"
+        );
+
+        // Lineage stays followable (C9): the chain-root alias, and NOT the live
+        // transport ids — a revoked identity's transports must not be advertised.
+        let aka = doc.also_known_as.expect("chain-root lineage alias");
+        assert!(aka.contains(&"did:elohim:bafyreichainrootgenesis0000".to_string()));
+        assert!(
+            !aka.iter().any(|a| a.contains("12D3KooW")),
+            "a revoked identity's transport ids must not be projected: {aka:?}"
+        );
     }
 
     /// The load-bearing contract test: a fully-assembled `did:elohim` document

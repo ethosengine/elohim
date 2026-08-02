@@ -434,6 +434,19 @@ fn parse_binds_identity(
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
+    // successor_head_key: OPTIONAL, and absent from every declaration today — the
+    // coordinator validator (`validate_binds_identity`) does not require the field
+    // and `revokes-commitment` carries only {target_cid, reason, signed_at}. Read
+    // it optionally anyway so a rotation that starts naming its continuation lands
+    // in the column with no further change (correct-but-dormant reader; the
+    // producer gap is the named follow-on). An empty string is NOT a successor —
+    // absent stays honestly `None`, which the resolver reads as a TERMINAL
+    // revocation, never as "unknown successor".
+    let successor_head_key = payload
+        .get("successor_head_key")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
 
     Ok(NewIdentityHead {
         cid: entry_hash.to_string(),
@@ -443,6 +456,7 @@ fn parse_binds_identity(
         controller_policy_json,
         signed_at,
         revoked_at: None,
+        successor_head_key,
         dht_anchor_hash: Some(action_hash.to_string()),
     })
 }

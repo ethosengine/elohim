@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use did_bridge::{
     DidResolutionError, DidWebFetch, ElohimIdentityStore, ElohimStoreError, IdentityHead,
-    ServiceRef,
+    IdentityHeadAnswer, RevokedIdentity, ServiceRef,
 };
 use did_types::Did;
 
@@ -21,9 +21,11 @@ pub struct MockElohimStore {
     pub profiles: HashMap<String, ServiceRef>,
     pub doorways: HashMap<String, Vec<ServiceRef>>,
     pub transports: HashMap<String, Vec<String>>,
-    /// Wave-B `binds-identity` heads, keyed by the head agent_cid. Absent ⇒ the
-    /// phase-1 implicit-self assembly (no `controller`, no lineage alias).
-    pub heads: HashMap<String, IdentityHead>,
+    /// What this store answers about each agent's Wave-B `binds-identity` head.
+    /// An agent with no entry answers `NeverDeclared` — the phase-1 implicit-self
+    /// assembly (no `controller`, no lineage alias). Revoked and unresolvable
+    /// agents are configured explicitly, because both are *claims*, not silences.
+    pub heads: HashMap<String, IdentityHeadAnswer>,
 }
 
 impl MockElohimStore {
@@ -68,11 +70,41 @@ impl MockElohimStore {
             .collect();
         self.heads.insert(
             agent_cid.to_string(),
-            IdentityHead {
+            IdentityHeadAnswer::Declared(IdentityHead {
                 chain_root: chain_root.to_string(),
                 head: agent_cid.to_string(),
                 controllers,
-            },
+            }),
+        );
+        self
+    }
+
+    /// Declare `agent_cid`'s head REVOKED, optionally naming the successor the
+    /// revocation pointed at. Builder — chains onto `populated`/`default`.
+    pub fn with_revoked_head(
+        mut self,
+        agent_cid: &str,
+        chain_root: &str,
+        successor: Option<&str>,
+    ) -> Self {
+        self.heads.insert(
+            agent_cid.to_string(),
+            IdentityHeadAnswer::Revoked(RevokedIdentity {
+                chain_root: chain_root.to_string(),
+                head: agent_cid.to_string(),
+                successor: successor.map(str::to_string),
+            }),
+        );
+        self
+    }
+
+    /// Make `agent_cid`'s head UNRESOLVABLE — the store looked and got no answer
+    /// (an undelivered DHT record, a timed-out read). Distinct from having no
+    /// entry at all, which answers `NeverDeclared`.
+    pub fn with_unresolvable_head(mut self, agent_cid: &str, why: &str) -> Self {
+        self.heads.insert(
+            agent_cid.to_string(),
+            IdentityHeadAnswer::Unresolvable(why.to_string()),
         );
         self
     }
@@ -102,11 +134,16 @@ impl ElohimIdentityStore for MockElohimStore {
         Ok(self.transports.get(agent_cid).cloned().unwrap_or_default())
     }
 
-    async fn identity_head(
-        &self,
-        agent_cid: &str,
-    ) -> Result<Option<IdentityHead>, ElohimStoreError> {
-        Ok(self.heads.get(agent_cid).cloned())
+    async fn identity_head(&self, agent_cid: &str) -> Result<IdentityHeadAnswer, ElohimStoreError> {
+        // No configured entry ⇒ NeverDeclared. That is the honest mapping for an
+        // in-memory store: the map IS the whole world, so a miss is an observed
+        // absence, not an unreachable one. A DHT-backed store must NOT copy this
+        // line — see the `identity_head` implementor contract.
+        Ok(self
+            .heads
+            .get(agent_cid)
+            .cloned()
+            .unwrap_or(IdentityHeadAnswer::NeverDeclared))
     }
 }
 

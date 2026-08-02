@@ -6,10 +6,21 @@
 //! Commitment entry, action='binds-identity'); these rows are the P1 reconciliation
 //! projection, populated from the create_commitment post-commit signal.
 //!
-//! A NULL `dht_anchor_hash` means un-notarized / storage-only. The `did:elohim` head
-//! resolver (`find_head_by_head_key`) fail-closes on such rows. `cid` is the
-//! Commitment `entry_hash` (NEVER `action_hash`); `head_key` is the current head
-//! agent_cid (the resolver's join key); `chain_root` is the stable identity-chain id.
+//! A NULL `dht_anchor_hash` means un-notarized / storage-only. BOTH reads fail-close
+//! on such rows. `cid` is the Commitment `entry_hash` (NEVER `action_hash`);
+//! `head_key` is the current head agent_cid (the resolver's join key); `chain_root`
+//! is the stable identity-chain id.
+//!
+//! ## Two reads, deliberately distinct
+//!
+//! - [`find_head_by_head_key`] — the **live head** (`revoked_at IS NULL`): who
+//!   controls this key right now.
+//! - [`find_notarized_head_by_head_key`] — the newest notarized declaration
+//!   **revoked or not**, carrying `revoked_at`. This is the `did:elohim` resolver's
+//!   read, because a revoked head that merely *vanishes* is indistinguishable from
+//!   one that was never declared — and an absent `controller` in a DID document
+//!   means the subject controls it, so the vanishing served a revoked identity a
+//!   fully-armed, implicitly self-controlled document.
 //!
 //! Mirrors `db::lenses` (the sibling A-class Commitment projection) field-for-field,
 //! including the sticky-on-set anchor/revoked preservation rule.
@@ -25,13 +36,15 @@ use super::models::{current_timestamp, IdentityHeadRow, NewIdentityHead};
 /// Idempotent upsert on `cid` (= Commitment entry_hash).
 ///
 /// **Sticky-on-set preservation rule** (mirrors `lenses::upsert_with_anchor`):
-/// `dht_anchor_hash` AND `revoked_at` are only overwritten when the incoming value
-/// is `Some(_)`. A later re-projection from the `binds-identity` signal always
-/// carries `dht_anchor_hash = Some` but `revoked_at = None` — so an un-anchored or
-/// post-revoke replay (Holochain re-emits on conductor restart/gossip) must never
-/// (a) strip the notarised anchor the resolver requires, nor (b) resurrect a revoked
-/// head by clobbering `revoked_at` back to NULL. Revocation is owned by
-/// `set_revoked_at`, not by the create-projection upsert.
+/// `dht_anchor_hash`, `revoked_at` AND `successor_head_key` are only overwritten
+/// when the incoming value is `Some(_)`. A later re-projection from the
+/// `binds-identity` signal always carries `dht_anchor_hash = Some` but
+/// `revoked_at = None` — so an un-anchored or post-revoke replay (Holochain
+/// re-emits on conductor restart/gossip) must never (a) strip the notarised anchor
+/// the resolver requires, nor (b) resurrect a revoked head by clobbering
+/// `revoked_at` back to NULL, nor (c) erase a named successor and silently convert
+/// a rotation into a terminal revocation. Revocation is owned by `set_revoked_at`,
+/// not by the create-projection upsert.
 pub fn upsert_with_anchor(
     conn: &mut SqliteConnection,
     new: NewIdentityHead,
@@ -47,6 +60,7 @@ pub fn upsert_with_anchor(
             ih::controller_policy_json.eq(&new.controller_policy_json),
             ih::signed_at.eq(&new.signed_at),
             ih::revoked_at.eq(&new.revoked_at),
+            ih::successor_head_key.eq(&new.successor_head_key),
             ih::dht_anchor_hash.eq(&new.dht_anchor_hash),
             ih::created_at.eq(&now),
             ih::updated_at.eq(&now),
@@ -59,9 +73,10 @@ pub fn upsert_with_anchor(
             ih::controllers_json.eq(new.controllers_json.clone()),
             ih::controller_policy_json.eq(new.controller_policy_json.clone()),
             ih::signed_at.eq(new.signed_at.clone()),
-            // dht_anchor_hash AND revoked_at are updated conditionally below, never
-            // here — so an incoming None cannot clobber an existing anchor or
-            // resurrect a revoked head.
+            // dht_anchor_hash, revoked_at AND successor_head_key are updated
+            // conditionally below, never here — so an incoming None cannot clobber
+            // an existing anchor, resurrect a revoked head, or erase a named
+            // successor.
             ih::updated_at.eq(&now),
         ))
         .execute(conn)?;
@@ -78,6 +93,12 @@ pub fn upsert_with_anchor(
             .execute(conn)?;
     }
 
+    if let Some(ref successor) = new.successor_head_key {
+        diesel::update(ih::identity_heads.filter(ih::cid.eq(&new.cid)))
+            .set(ih::successor_head_key.eq(successor))
+            .execute(conn)?;
+    }
+
     ih::identity_heads.filter(ih::cid.eq(&new.cid)).first(conn)
 }
 
@@ -89,10 +110,24 @@ pub fn get_by_cid(conn: &mut SqliteConnection, cid: &str) -> QueryResult<Option<
         .optional()
 }
 
-/// The did:elohim resolver's read: the current live, notarized identity head whose
-/// `head_key` is `agent_cid`. **Fail-closed**: only a non-revoked AND notarized
-/// (`dht_anchor_hash IS NOT NULL`) head is surfaced — an un-notarized or revoked
-/// declaration must never populate a `controller`.
+/// The current **live** (non-revoked), notarized identity head whose `head_key` is
+/// `agent_cid`. Only a non-revoked AND notarized (`dht_anchor_hash IS NOT NULL`)
+/// head is surfaced — an un-notarized or revoked declaration must never populate a
+/// `controller`.
+///
+/// # ⚠ A revoked head is INVISIBLE to this query
+///
+/// This is a *live-head* read, not an *existence* read. Never use it to decide
+/// whether a head was ever declared: `Ok(None)` here folds "no declaration exists"
+/// together with "the declaration was revoked", and an absent `controller` in a DID
+/// document means **the subject controls it** — so answering `NeverDeclared` from
+/// this query's `None` serves a revoked identity a fully-armed, implicitly
+/// self-controlled document. That is exactly the degradation
+/// [`did_bridge::IdentityHeadAnswer`] exists to close, and it is why the
+/// `did:elohim` resolver reads [`find_notarized_head_by_head_key`] instead.
+///
+/// Kept as the scoped "who controls this key right now" read for callers that have
+/// already established the head exists and want only a live one.
 ///
 /// **Head selection is DHT-canonical, node-independent** — `(signed_at DESC, cid
 /// ASC)`, NEVER `created_at` (local signal-arrival order, which differs per node and
@@ -109,6 +144,40 @@ pub fn find_head_by_head_key(
     ih::identity_heads
         .filter(ih::head_key.eq(agent_cid))
         .filter(ih::revoked_at.is_null())
+        .filter(ih::dht_anchor_hash.is_not_null())
+        .order((ih::signed_at.desc(), ih::cid.asc()))
+        .first(conn)
+        .optional()
+}
+
+/// The `did:elohim` resolver's read: the newest **notarized** declaration for
+/// `head_key`, **revoked or not** — the row carries `revoked_at` so the caller can
+/// tell a live head from a revoked one instead of a revoked head vanishing into the
+/// same silence as one that was never declared.
+///
+/// **Still fail-closed on notarization**: `dht_anchor_hash IS NOT NULL` is
+/// unchanged, so an un-notarized (storage-only) declaration surfaces neither as a
+/// head nor as a revocation. Only the `revoked_at IS NULL` filter is relaxed, and
+/// relaxing it is the point: the caller must *see* the revocation to serve a
+/// deactivated document.
+///
+/// **Selection is the same DHT-canonical ordering** as
+/// [`find_head_by_head_key`] — `(signed_at DESC, cid ASC)`, never `created_at` —
+/// so the answer is node-independent. Revocation does NOT re-order: the newest
+/// *declaration* wins and its lifecycle is then read off `revoked_at`. Two
+/// consequences worth stating, because they are the whole behavioural difference:
+///
+/// - newest declaration revoked, an older live one behind it ⇒ **Revoked**. Serving
+///   the older declaration's controllers would serve a superseded authority set.
+/// - newest declaration live, an older revoked one behind it ⇒ **live head**. A
+///   re-binding after a revocation (a community recovery re-declaring the same key)
+///   is a legitimate return to service.
+pub fn find_notarized_head_by_head_key(
+    conn: &mut SqliteConnection,
+    agent_cid: &str,
+) -> QueryResult<Option<IdentityHeadRow>> {
+    ih::identity_heads
+        .filter(ih::head_key.eq(agent_cid))
         .filter(ih::dht_anchor_hash.is_not_null())
         .order((ih::signed_at.desc(), ih::cid.asc()))
         .first(conn)
@@ -166,6 +235,7 @@ mod tests {
             controller_policy_json: r#"{"kind":"recovery-quorum","m":2,"n":3}"#.to_string(),
             signed_at: signed_at.to_string(),
             revoked_at: None,
+            successor_head_key: None,
             dht_anchor_hash: anchor.map(str::to_string),
         }
     }
@@ -299,12 +369,14 @@ mod tests {
         let mut conn = test_conn();
         let cid = "ih:preserve";
 
-        // First projection: anchored + revoked.
+        // First projection: anchored + revoked + a named successor.
         let mut revoked = sample_head(cid, HEAD_KEY, Some("h1"));
         revoked.revoked_at = Some("2026-07-17T01:00:00Z".to_string());
+        revoked.successor_head_key = Some("uhCAkSuccessorKey".to_string());
         upsert_with_anchor(&mut conn, revoked).expect("first upsert");
 
-        // Replay carrying None for both — must not strip the anchor nor un-revoke.
+        // Replay carrying None for all three — must not strip the anchor, un-revoke,
+        // nor erase the successor.
         upsert_with_anchor(&mut conn, sample_head(cid, HEAD_KEY, None)).expect("replay");
 
         let row = get_by_cid(&mut conn, cid)
@@ -319,6 +391,163 @@ mod tests {
             row.revoked_at.as_deref(),
             Some("2026-07-17T01:00:00Z"),
             "revoked_at preserved on a None replay (no fail-open resurrection)"
+        );
+        assert_eq!(
+            row.successor_head_key.as_deref(),
+            Some("uhCAkSuccessorKey"),
+            "successor preserved on a None replay — erasing it would silently \
+             convert a rotation into a terminal revocation"
+        );
+    }
+
+    // ── find_notarized_head_by_head_key (the row-8 production closure) ─────────
+
+    #[test]
+    fn notarized_query_surfaces_a_revoked_head_the_live_query_hides() {
+        // THE row-8 fix, at the query layer. The live-head query filters
+        // `revoked_at IS NULL`, so a revoked head is indistinguishable from one that
+        // was never declared — and the did:elohim resolver then assembles the
+        // phase-1 implicit-self document (fully armed, implicitly self-controlled)
+        // for a revoked identity. The notarized query must SURFACE the row, carrying
+        // revoked_at, so the resolver can deactivate the document instead.
+        let mut conn = test_conn();
+        upsert_with_anchor(&mut conn, sample_head("ih:rev", HEAD_KEY, Some("a1"))).expect("seed");
+        set_revoked_at(&mut conn, "ih:rev", "2026-07-17T03:00:00Z").expect("revoke");
+
+        assert!(
+            find_head_by_head_key(&mut conn, HEAD_KEY)
+                .expect("live query")
+                .is_none(),
+            "the live-head query still hides a revoked head (unchanged semantics)"
+        );
+
+        let row = find_notarized_head_by_head_key(&mut conn, HEAD_KEY)
+            .expect("notarized query")
+            .expect("a revoked head MUST surface — invisibility is the vulnerability");
+        assert_eq!(row.cid, "ih:rev");
+        assert_eq!(
+            row.revoked_at.as_deref(),
+            Some("2026-07-17T03:00:00Z"),
+            "revoked_at rides the row so the caller can tell revoked from live"
+        );
+    }
+
+    #[test]
+    fn notarized_query_still_fail_closes_on_un_notarized() {
+        // Only the revoked filter is relaxed. An un-notarized (storage-only) row
+        // must surface neither as a head nor as a revocation.
+        let mut conn = test_conn();
+        upsert_with_anchor(&mut conn, sample_head("ih:unanchored", HEAD_KEY, None))
+            .expect("unanchored");
+        assert!(
+            find_notarized_head_by_head_key(&mut conn, HEAD_KEY)
+                .expect("query")
+                .is_none(),
+            "an un-notarized declaration must never surface (fail-closed unchanged)"
+        );
+        // And an absent head_key is still None (absence is not invented).
+        assert!(
+            find_notarized_head_by_head_key(&mut conn, "uhCAkSomeOtherKey")
+                .expect("query")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn newest_declaration_wins_even_when_it_is_the_revoked_one() {
+        // Revocation does NOT re-order: the newest DECLARATION wins and its
+        // lifecycle is read off revoked_at. Serving the older live declaration's
+        // controllers would serve a superseded authority set.
+        let mut conn = test_conn();
+        upsert_with_anchor(
+            &mut conn,
+            sample_head_signed(
+                "ih:older-live",
+                HEAD_KEY,
+                Some("a-old"),
+                "2026-07-17T08:00:00Z",
+            ),
+        )
+        .expect("older live head");
+        upsert_with_anchor(
+            &mut conn,
+            sample_head_signed(
+                "ih:newer-revoked",
+                HEAD_KEY,
+                Some("a-new"),
+                "2026-07-17T09:00:00Z",
+            ),
+        )
+        .expect("newer head");
+        set_revoked_at(&mut conn, "ih:newer-revoked", "2026-07-17T10:00:00Z").expect("revoke");
+
+        let row = find_notarized_head_by_head_key(&mut conn, HEAD_KEY)
+            .expect("query")
+            .expect("a row must surface");
+        assert_eq!(
+            row.cid, "ih:newer-revoked",
+            "the newest declaration wins even when revoked — the older live one is superseded"
+        );
+        assert!(row.revoked_at.is_some());
+    }
+
+    #[test]
+    fn a_re_binding_after_revocation_returns_the_key_to_service() {
+        // The mirror case: newest declaration LIVE, an older revoked one behind it
+        // (a community recovery re-declaring the same key) is a legitimate return to
+        // service, not a permanent deactivation.
+        let mut conn = test_conn();
+        upsert_with_anchor(
+            &mut conn,
+            sample_head_signed(
+                "ih:old-revoked",
+                HEAD_KEY,
+                Some("a-old"),
+                "2026-07-17T08:00:00Z",
+            ),
+        )
+        .expect("older head");
+        set_revoked_at(&mut conn, "ih:old-revoked", "2026-07-17T08:30:00Z").expect("revoke");
+        upsert_with_anchor(
+            &mut conn,
+            sample_head_signed(
+                "ih:re-bound",
+                HEAD_KEY,
+                Some("a-new"),
+                "2026-07-17T09:00:00Z",
+            ),
+        )
+        .expect("re-binding");
+
+        let row = find_notarized_head_by_head_key(&mut conn, HEAD_KEY)
+            .expect("query")
+            .expect("a row must surface");
+        assert_eq!(row.cid, "ih:re-bound");
+        assert!(
+            row.revoked_at.is_none(),
+            "a re-binding after revocation is live again — the revocation does not stick to the key"
+        );
+    }
+
+    #[test]
+    fn successor_head_key_round_trips_when_a_declaration_names_one() {
+        // No declaration names a successor today (the mishpat validator does not
+        // require the field), so this pins the COLUMN plumbing ahead of its
+        // producer: when a rotation starts naming one, it reaches the resolver.
+        let mut conn = test_conn();
+        let mut rotated = sample_head("ih:rotated", HEAD_KEY, Some("a1"));
+        rotated.successor_head_key = Some("uhCAkSuccessorKey".to_string());
+        upsert_with_anchor(&mut conn, rotated).expect("seed");
+        set_revoked_at(&mut conn, "ih:rotated", "2026-07-17T03:00:00Z").expect("revoke");
+
+        let row = find_notarized_head_by_head_key(&mut conn, HEAD_KEY)
+            .expect("query")
+            .expect("row surfaces");
+        assert_eq!(
+            row.successor_head_key.as_deref(),
+            Some("uhCAkSuccessorKey"),
+            "a named successor reaches the resolver so a reference on the revoked \
+             head can follow the identity forward (C9 re-anchor)"
         );
     }
 

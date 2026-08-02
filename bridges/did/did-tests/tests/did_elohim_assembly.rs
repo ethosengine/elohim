@@ -1,7 +1,7 @@
 //! `did:elohim` projection-assembly against the mock identity store — proves the
 //! assembly contract per spec §3.4.
 
-use did_bridge::{DidResolver, ElohimResolver};
+use did_bridge::{DidResolutionError, DidResolver, ElohimResolver};
 use did_tests::MockElohimStore;
 use did_types::{Controller, Did, ServiceEndpoint, VerificationRelationship};
 
@@ -159,7 +159,10 @@ async fn no_head_document_is_self_consistent_and_controller_free() {
     // two calls to the SAME current resolver over a no-head store must agree, and
     // the no-head document must carry no `controller` and no lineage alias — only
     // transport ids in alsoKnownAs. `MockElohimStore` implements identity_head but
-    // returns None for this agent, so this exercises the default-None fallback.
+    // answers `NeverDeclared` for this agent, so this exercises the
+    // never-declared branch specifically (revoked and unresolvable have their own
+    // tests, and the three-way distinction is asserted in
+    // `never_declared_revoked_and_unresolvable_are_three_distinct_outcomes`).
     // (The load-bearing phase-1 shape guard is `assembles_full_document_from_store`.)
     let did = Did::parse(&format!("did:elohim:{FLEET_KEY}")).unwrap();
 
@@ -186,6 +189,131 @@ async fn no_head_document_is_self_consistent_and_controller_free() {
         serde_json::to_string(&a).unwrap(),
         serde_json::to_string(&b).unwrap(),
         "the no-head assembly is deterministic (self-consistent) across calls"
+    );
+}
+
+#[tokio::test]
+async fn revoked_head_deactivates_the_document_and_confers_no_authority() {
+    // Forecast row 8: a revoked identity used to resolve to an ordinary,
+    // fully-armed, implicitly self-controlled document. It now resolves to a
+    // DEACTIVATED document (DID 1.1 §7.1.2) carrying no key, no relationship,
+    // and no endpoint — even though the store still has a profile, a doorway and
+    // transport ids for this agent.
+    let store = MockElohimStore::populated(FLEET_KEY).with_revoked_head(
+        FLEET_KEY,
+        CHAIN_ROOT,
+        Some(CONTROLLER_KEY),
+    );
+    let resolver = ElohimResolver::new(store);
+    let did = Did::parse(&format!("did:elohim:{FLEET_KEY}")).unwrap();
+
+    let result = resolver.resolve(&did).await.unwrap();
+    assert_eq!(
+        result.did_document_metadata.deactivated,
+        Some(true),
+        "revocation must be stated, not inferred"
+    );
+    let doc = result
+        .did_document
+        .expect("deactivation resolves, not 404s");
+
+    assert!(doc.verification_method.is_none(), "no key to act with");
+    assert!(doc.authentication.is_none());
+    assert!(doc.assertion_method.is_none());
+    assert!(
+        doc.service.is_none(),
+        "a revoked identity's endpoints must not be projected as live"
+    );
+    let aka = doc.also_known_as.as_ref().expect("lineage preserved");
+    assert!(
+        !aka.contains(&"12D3KooWABCDEexamplePeerId".to_string()),
+        "transport ids must not be served for a revoked identity: {aka:?}"
+    );
+    assert!(aka.contains(&format!("did:elohim:{CHAIN_ROOT}")), "{aka:?}");
+    assert!(
+        aka.contains(&format!("did:elohim:{CONTROLLER_KEY}")),
+        "successor named by the revocation is followable: {aka:?}"
+    );
+
+    // The whole point, stated once more: the deactivated document is NOT the
+    // never-declared document with a flag on it.
+    let never = ElohimResolver::new(MockElohimStore::populated(FLEET_KEY))
+        .resolve(&did)
+        .await
+        .unwrap();
+    assert_eq!(never.did_document_metadata.deactivated, None);
+    assert!(never.did_document.unwrap().verification_method.is_some());
+}
+
+#[tokio::test]
+async fn unresolvable_head_fails_closed_instead_of_defaulting_to_self_control() {
+    // The third provenance the old `Option` had nowhere to put: the store looked
+    // and could not find out. Serving the implicit-self document here would
+    // assert self-control nobody verified.
+    let store = MockElohimStore::populated(FLEET_KEY)
+        .with_unresolvable_head(FLEET_KEY, "binds-identity record not yet gossiped");
+    let resolver = ElohimResolver::new(store);
+    let did = Did::parse(&format!("did:elohim:{FLEET_KEY}")).unwrap();
+
+    let err = resolver.resolve(&did).await.unwrap_err();
+    assert!(
+        matches!(err, DidResolutionError::IdentityHeadUnresolvable(_)),
+        "expected IdentityHeadUnresolvable, got {err:?}"
+    );
+    // Distinct from "this agent has no head" AND from "this agent does not
+    // exist" — three answers, three outcomes.
+    assert_ne!(err.error_code(), "notFound");
+    assert!(did_bridge::DidResolutionResult::from_error(&err)
+        .did_document
+        .is_none());
+}
+
+#[tokio::test]
+async fn never_declared_revoked_and_unresolvable_are_three_distinct_outcomes() {
+    // One assertion for the whole C4 split: the same agent, three store answers,
+    // three materially different resolutions. Under the previous
+    // `Option<IdentityHead>` shape the first two were byte-identical and the
+    // third was indistinguishable from the first.
+    let did = Did::parse(&format!("did:elohim:{FLEET_KEY}")).unwrap();
+
+    let never = ElohimResolver::new(MockElohimStore::populated(FLEET_KEY))
+        .resolve(&did)
+        .await
+        .expect("never-declared resolves");
+    let revoked = ElohimResolver::new(
+        MockElohimStore::populated(FLEET_KEY).with_revoked_head(FLEET_KEY, CHAIN_ROOT, None),
+    )
+    .resolve(&did)
+    .await
+    .expect("revoked resolves (deactivated)");
+    let unresolvable = ElohimResolver::new(
+        MockElohimStore::populated(FLEET_KEY).with_unresolvable_head(FLEET_KEY, "read timed out"),
+    )
+    .resolve(&did)
+    .await;
+
+    assert!(
+        unresolvable.is_err(),
+        "unresolvable must not serve a document"
+    );
+    assert_ne!(never, revoked, "never-declared and revoked must not agree");
+    assert!(never.did_document_metadata.deactivated.is_none());
+    assert_eq!(revoked.did_document_metadata.deactivated, Some(true));
+}
+
+#[tokio::test]
+async fn declared_head_with_empty_controller_set_is_refused() {
+    // A declared-but-empty controller set would serialize to a document with no
+    // `controller`, i.e. implicit self-control — a stronger claim than the
+    // declaration made. Refused, not silently promoted.
+    let store = MockElohimStore::populated(FLEET_KEY).with_head(FLEET_KEY, CHAIN_ROOT, &[]);
+    let resolver = ElohimResolver::new(store);
+    let did = Did::parse(&format!("did:elohim:{FLEET_KEY}")).unwrap();
+
+    let err = resolver.resolve(&did).await.unwrap_err();
+    assert!(
+        matches!(err, DidResolutionError::IdentityHeadMalformed(_)),
+        "expected IdentityHeadMalformed, got {err:?}"
     );
 }
 

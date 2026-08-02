@@ -10,6 +10,18 @@
 //! - `did:web:example.com%3A3000` → `https://example.com:3000/.well-known/did.json`
 //!   (the first `:`-segment is percent-decoded, so `%3A` becomes the port `:`)
 //!
+//! ## Security — the response is evidence, not authority (C5)
+//!
+//! `did:web` is the one method here that is **not** self-certifying: `did:key`
+//! and `did:elohim` derive their document from the key itself, while `did:web`
+//! is handed a document by a host. A successful HTTPS fetch establishes that the
+//! host answered — nothing more. So after parsing, the document's own `id` is
+//! re-checked against the DID that was asked about
+//! ([`verify_resolved_subject`](crate::verify_resolved_subject)); a mismatch is a
+//! typed refusal, never a pass-through. Without that check, any host that can
+//! answer for one domain can return a *different* domain's DID document and have
+//! it reported as a successful resolution of that other DID.
+//!
 //! ## Security — authority confusion (SSRF)
 //!
 //! `Did::parse` forbids a literal `@` in the method-specific-id, but `%40` is a
@@ -25,7 +37,9 @@ use async_trait::async_trait;
 use did_types::{Did, DidDocument};
 use percent_encoding::percent_decode_str;
 
-use crate::resolver::{DidResolutionError, DidResolutionResult, DidResolver};
+use crate::resolver::{
+    verify_resolved_subject, DidResolutionError, DidResolutionResult, DidResolver,
+};
 
 /// The transport seam for `did:web`: fetch the bytes at a derived URL. The
 /// caller (doorway) provides an HTTP client; tests provide a fixture map.
@@ -130,6 +144,9 @@ impl<F: DidWebFetch> DidResolver for DidWebResolver<F> {
         let bytes = self.fetch.fetch(&url).await?;
         let doc: DidDocument = serde_json::from_slice(&bytes)
             .map_err(|e| DidResolutionError::Internal(format!("did.json parse failed: {e}")))?;
+        // C5: the host answered — that is all the fetch established. Re-derive
+        // the one thing that makes this document an answer to THIS question.
+        verify_resolved_subject(did, &doc)?;
         Ok(DidResolutionResult::success(doc))
     }
 }
@@ -236,5 +253,65 @@ mod tests {
             derive_did_web_url(&did).unwrap_err().error_code(),
             "invalidDid"
         );
+    }
+
+    /// A fetch that always serves the same bytes, whatever URL is asked for —
+    /// i.e. a host answering for itself. The document it serves is the variable
+    /// under test.
+    struct FixedBytes(&'static str);
+
+    #[async_trait]
+    impl DidWebFetch for FixedBytes {
+        async fn fetch(&self, _url: &str) -> Result<Vec<u8>, DidResolutionError> {
+            Ok(self.0.as_bytes().to_vec())
+        }
+    }
+
+    const SELF_DOC: &str = r#"{
+      "@context": "https://www.w3.org/ns/did/v1.1",
+      "id": "did:web:example.com"
+    }"#;
+
+    /// The document `example.com` serves claims to BE `bank.example` — the
+    /// forecast-row-7 defect, at the resolver rather than the predicate.
+    const FOREIGN_DOC: &str = r#"{
+      "@context": "https://www.w3.org/ns/did/v1.1",
+      "id": "did:web:bank.example",
+      "verificationMethod": [
+        {
+          "id": "did:web:bank.example#key-1",
+          "type": "Multikey",
+          "controller": "did:web:bank.example",
+          "publicKeyMultibase": "z6MkuWzukKSaEVxe76gbFYrnW7jUUftksarjkrjUwKdEp8Lr"
+        }
+      ]
+    }"#;
+
+    #[tokio::test]
+    async fn resolve_accepts_a_document_that_names_the_requested_subject() {
+        let resolver = DidWebResolver::new(FixedBytes(SELF_DOC));
+        let did = Did::parse("did:web:example.com").unwrap();
+        let result = resolver.resolve(&did).await.unwrap();
+        assert_eq!(result.did_document.unwrap().id, did);
+    }
+
+    #[tokio::test]
+    async fn resolve_refuses_a_document_naming_another_subject() {
+        let resolver = DidWebResolver::new(FixedBytes(FOREIGN_DOC));
+        let did = Did::parse("did:web:example.com").unwrap();
+        let err = resolver.resolve(&did).await.unwrap_err();
+        match &err {
+            DidResolutionError::SubjectMismatch {
+                requested,
+                returned,
+            } => {
+                assert_eq!(requested, "did:web:example.com");
+                assert_eq!(returned, "did:web:bank.example");
+            }
+            other => panic!("expected SubjectMismatch, got {other:?}"),
+        }
+        assert_eq!(err.error_code(), "invalidDidDocument");
+        // And nothing leaks through: the error result carries no document.
+        assert!(DidResolutionResult::from_error(&err).did_document.is_none());
     }
 }

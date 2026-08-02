@@ -2,7 +2,7 @@
  "n_concerns": 16,
  "n_seams": 16,
  "n_cells": 256,
- "n_points_routed": 36,
+ "n_points_routed": 48,
  "plane_groups": [
   {
    "id": "control-truth",
@@ -279,7 +279,9 @@
     "T4"
    ],
    "reach_tier": "public",
-   "registry_crates": [],
+   "registry_crates": [
+    "did-bridge"
+   ],
    "spine_nodes": [],
    "n_a_concerns": []
   },
@@ -291,7 +293,9 @@
    "plane_note": "The .epr-meta policy family, the eprfs/cite-seal content-addressing family, CI/orchestrator, and the epr-cli/REA developer valueflow sidecar. Confirmed concern instances here: C7 (15 rules naming validators that do not exist, 2026-07-25), C5 (BlobCid::verifies hardcoding the wrong codec so self-verification was inert, 2026-07-24; and an unresolvable validator may not HARDEN an advisory rule, 2026-07-25), C4 (NOT_BUILT reading as 0 failures, CI museum #1), and C2's strongest precedent in the adjacent developer-tooling territory (the epr-cli/REA append-order-vs-occurredAt replay, a83b35079).\n",
    "tracks": [],
    "reach_tier": "community",
-   "registry_crates": [],
+   "registry_crates": [
+    "elohim-seam-contracts"
+   ],
    "spine_nodes": [],
    "n_a_concerns": []
   }
@@ -411,9 +415,10 @@
   }
  },
  "counts": {
-  "unexamined": 235,
-  "variant": 11,
-  "conformant": 10
+  "unexamined": 225,
+  "variant": 17,
+  "conformant": 13,
+  "n-a": 1
  },
  "cells": [
   {
@@ -721,8 +726,19 @@
    "concern": "C1",
    "seam": "SGOV",
    "plane": "governing-meta",
-   "state": "unexamined",
-   "score": 4.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "select_arbitrated_winner",
+     "status": "partial",
+     "verified": true,
+     "file": "src/election.rs"
+    }
+   ]
   },
   {
    "concern": "C2",
@@ -869,8 +885,19 @@
    "concern": "C2",
    "seam": "SGOV",
    "plane": "governing-meta",
-   "state": "unexamined",
-   "score": 5.0
+   "state": "conformant",
+   "reason": "1 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "select_arbitrated_winner",
+     "status": "answered",
+     "verified": true,
+     "file": "src/election.rs"
+    }
+   ]
   },
   {
    "concern": "C3",
@@ -933,7 +960,7 @@
    "seam": "S3.10",
    "plane": "data",
    "state": "conformant",
-   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "3 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [
     "T1",
     "T2",
@@ -954,6 +981,13 @@
      "status": "answered",
      "verified": true,
      "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "backoff_is_active",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/contest_backoff.rs"
     }
    ]
   },
@@ -1255,8 +1289,78 @@
    "concern": "C4",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "unexamined",
-   "score": 5.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "did-bridge",
+     "point": "verify_resolved_subject",
+     "status": "answered",
+     "verified": true,
+     "file": "src/resolver.rs"
+    },
+    {
+     "crate": "did-bridge",
+     "point": "DidResolutionError",
+     "status": "answered",
+     "verified": true,
+     "file": "src/resolver.rs"
+    },
+    {
+     "crate": "did-bridge",
+     "point": "DidResolutionResult",
+     "status": "answered",
+     "verified": true,
+     "file": "src/resolver.rs"
+    },
+    {
+     "crate": "did-bridge",
+     "point": "DidWebResolver::resolve",
+     "status": "partial",
+     "verified": true,
+     "file": "src/did_web.rs"
+    },
+    {
+     "crate": "did-bridge",
+     "point": "IdentityHeadAnswer",
+     "status": "answered",
+     "verified": true,
+     "file": "src/did_elohim.rs"
+    },
+    {
+     "crate": "did-bridge",
+     "point": "ElohimResolver::resolve",
+     "status": "answered",
+     "verified": true,
+     "file": "src/did_elohim.rs"
+    },
+    {
+     "crate": "did-bridge",
+     "point": "controller_from_head",
+     "status": "answered",
+     "verified": true,
+     "file": "src/did_elohim.rs"
+    },
+    {
+     "crate": "did-bridge",
+     "point": "assemble_deactivated_document",
+     "status": "answered",
+     "verified": true,
+     "file": "src/did_elohim.rs"
+    },
+    {
+     "crate": "did-bridge",
+     "point": "MethodRegistry::resolve",
+     "status": "answered",
+     "verified": true,
+     "file": "src/registry.rs"
+    }
+   ]
   },
   {
    "concern": "C4",
@@ -1389,8 +1493,50 @@
    "concern": "C5",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "unexamined",
-   "score": 4.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "did-bridge",
+     "point": "verify_resolved_subject",
+     "status": "answered",
+     "verified": true,
+     "file": "src/resolver.rs"
+    },
+    {
+     "crate": "did-bridge",
+     "point": "derive_did_web_url",
+     "status": "partial",
+     "verified": true,
+     "file": "src/did_web.rs"
+    },
+    {
+     "crate": "did-bridge",
+     "point": "DidWebResolver::resolve",
+     "status": "answered",
+     "verified": true,
+     "file": "src/did_web.rs"
+    },
+    {
+     "crate": "did-bridge",
+     "point": "ElohimResolver::resolve",
+     "status": "answered",
+     "verified": true,
+     "file": "src/did_elohim.rs"
+    },
+    {
+     "crate": "did-bridge",
+     "point": "assemble_deactivated_document",
+     "status": "answered",
+     "verified": true,
+     "file": "src/did_elohim.rs"
+    }
+   ]
   },
   {
    "concern": "C5",
@@ -1460,7 +1606,7 @@
    "seam": "S3.10",
    "plane": "data",
    "state": "conformant",
-   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "3 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [
     "T1",
     "T2",
@@ -1481,6 +1627,13 @@
      "status": "answered",
      "verified": true,
      "file": "src/services/head_adoption.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "backoff_is_active",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/contest_backoff.rs"
     }
    ]
   },
@@ -1558,8 +1711,19 @@
    "concern": "C6a",
    "seam": "SGOV",
    "plane": "governing-meta",
-   "state": "unexamined",
-   "score": 2.0
+   "state": "n-a",
+   "reason": "1 point(s) declare n-a with justification",
+   "tracks": [],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "select_arbitrated_winner",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/election.rs"
+    }
+   ]
   },
   {
    "concern": "C6b",
@@ -1845,8 +2009,29 @@
    "concern": "C7",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "unexamined",
-   "score": 3.0
+   "state": "conformant",
+   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "did-bridge",
+     "point": "assemble_deactivated_document",
+     "status": "answered",
+     "verified": true,
+     "file": "src/did_elohim.rs"
+    },
+    {
+     "crate": "did-bridge",
+     "point": "MethodRegistry::resolve",
+     "status": "answered",
+     "verified": true,
+     "file": "src/registry.rs"
+    }
+   ]
   },
   {
    "concern": "C7",
@@ -1937,6 +2122,13 @@
      "status": "partial",
      "verified": false,
      "file": "src/metrics.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "backoff_is_active",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/contest_backoff.rs"
     }
    ]
   },
@@ -2014,15 +2206,40 @@
    "concern": "C8",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "unexamined",
-   "score": 4.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "did-bridge",
+     "point": "DidResolutionError",
+     "status": "partial",
+     "verified": true,
+     "file": "src/resolver.rs"
+    }
+   ]
   },
   {
    "concern": "C8",
    "seam": "SGOV",
    "plane": "governing-meta",
-   "state": "unexamined",
-   "score": 4.0
+   "state": "variant",
+   "reason": "documented waiver: status unbound",
+   "tracks": [],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "select_arbitrated_winner",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/election.rs"
+    }
+   ]
   },
   {
    "concern": "C9",
@@ -2126,8 +2343,43 @@
    "concern": "C9",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "unexamined",
-   "score": 2.0
+   "state": "conformant",
+   "reason": "4 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "did-bridge",
+     "point": "IdentityHeadAnswer",
+     "status": "answered",
+     "verified": true,
+     "file": "src/did_elohim.rs"
+    },
+    {
+     "crate": "did-bridge",
+     "point": "ElohimResolver::resolve",
+     "status": "answered",
+     "verified": true,
+     "file": "src/did_elohim.rs"
+    },
+    {
+     "crate": "did-bridge",
+     "point": "controller_from_head",
+     "status": "answered",
+     "verified": true,
+     "file": "src/did_elohim.rs"
+    },
+    {
+     "crate": "did-bridge",
+     "point": "assemble_deactivated_document",
+     "status": "answered",
+     "verified": true,
+     "file": "src/did_elohim.rs"
+    }
+   ]
   },
   {
    "concern": "C9",
@@ -2519,8 +2771,36 @@
    "concern": "C12",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "unexamined",
-   "score": 2.0
+   "state": "variant",
+   "reason": "documented waiver: status unbound",
+   "tracks": [
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "did-bridge",
+     "point": "IdentityHeadAnswer",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/did_elohim.rs"
+    },
+    {
+     "crate": "did-bridge",
+     "point": "ElohimResolver::resolve",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/did_elohim.rs"
+    },
+    {
+     "crate": "did-bridge",
+     "point": "assemble_deactivated_document",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/did_elohim.rs"
+    }
+   ]
   },
   {
    "concern": "C12",
@@ -3258,7 +3538,7 @@
    "detail": "\u00a73 has no identity/T1-notary section; T1 concerns route under the \u00a73 seam owning their artifact, per the \u00a74 \"T1 notary floor (under 3.11)\" precedent. Candidate atlas correction: either an explicit \u00a73.16 identity/notary section, or an explicit statement in \u00a73 that T1 concerns route under the artifact-owning seam.\n"
   }
  ],
- "digest": "sha256:516bb595f0aa6f4e1a16a05d0bed79e7",
+ "digest": "sha256:f24801dc423431bb6d2065612e04c890",
  "ranked_unexamined_note": "head only \u2014 the full ranking is `cells` filtered to state=unexamined, sorted by -score then (concern, seam)",
  "_generated": {
   "by": ".claude/scripts/_lib/seam_matrix.py",

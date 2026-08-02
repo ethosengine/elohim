@@ -3761,6 +3761,19 @@ pub struct IdentityHeadRow {
     /// row that predates envelope stamping.
     pub signed_at: String,
     pub revoked_at: Option<String>,
+    /// The head key a revocation NAMED as this identity's continuation (a key
+    /// rotation or a community recovery). Rides the deactivated document's
+    /// `alsoKnownAs` so a reference keyed on the revoked head can follow the
+    /// identity forward — the re-anchor half of C9.
+    ///
+    /// NULL is MEANINGFUL: "the revocation named no successor" (a terminal
+    /// revocation), never "unknown successor" — a store that could not
+    /// *determine* the successor must answer `IdentityHeadAnswer::Unresolvable`
+    /// rather than `Revoked` with a null successor. No declaration names one
+    /// today (see `NewIdentityHead::successor_head_key`), so every revoked row
+    /// currently reads as terminal — an accurate reading of what those
+    /// declarations say.
+    pub successor_head_key: Option<String>,
     /// Source of truth: DHT (Commitment entry in mishpat DNA). Classification: A.
     /// NULL means un-notarized; the head resolver refuses to surface NULL rows.
     pub dht_anchor_hash: Option<String>,
@@ -3785,6 +3798,16 @@ pub struct NewIdentityHead {
     /// payload-carried `signed_at` is a best-effort fallback at parse time.
     pub signed_at: String,
     pub revoked_at: Option<String>,
+    /// The successor head named by a rotation/recovery, when the declaration
+    /// names one. **Correct-but-dormant by design**: the mishpat coordinator
+    /// validator (`validate_binds_identity`) does not yet require a successor
+    /// field and `revokes-commitment` carries only `{target_cid, reason,
+    /// signed_at}`, so nothing declares one today —
+    /// `mishpat_projection::parse_binds_identity` reads it OPTIONALLY so a
+    /// rotation that starts declaring one lands here with no further change.
+    /// Sticky-on-set in `upsert_with_anchor` (a `None` replay must not erase a
+    /// named successor), exactly like `dht_anchor_hash` and `revoked_at`.
+    pub successor_head_key: Option<String>,
     pub dht_anchor_hash: Option<String>,
 }
 

@@ -1,0 +1,37 @@
+-- Add successor_head_key to identity_heads — the head key a revocation NAMED as
+-- the identity's continuation (a key rotation or a community recovery).
+--
+-- Why it exists (the row-8 closure): the did:elohim head resolver now surfaces a
+-- REVOKED head as `IdentityHeadAnswer::Revoked` instead of letting the row vanish
+-- behind a `revoked_at IS NULL` filter. A vanished revoked head resolved as
+-- `NeverDeclared`, which assembles the phase-1 implicit-self document — a
+-- fully-armed, implicitly self-controlled DID document for an identity whose head
+-- was revoked. Surfacing it assembles a DEACTIVATED document instead (DID 1.1
+-- §7.1.2: no key material, no relationships, no services).
+--
+-- C9 (a re-key never silently orphans state) has two halves: fail LOUD *and*
+-- RE-ANCHOR. `chain_root` carries the re-anchor for the lineage; this column
+-- carries it for the continuation, so a reference keyed on the revoked head can
+-- follow the identity forward instead of dead-ending. Both ride the deactivated
+-- document's `alsoKnownAs`.
+--
+-- NULL is MEANINGFUL and honest: "the revocation named no successor" — a terminal
+-- revocation. It is NOT "unknown successor": a store that could not determine the
+-- successor must answer `IdentityHeadAnswer::Unresolvable`, never `Revoked` with a
+-- null successor (did-bridge `RevokedIdentity::successor` contract). Reading this
+-- column IS determining it.
+--
+-- Producer status (correct-but-dormant, deliberately): the `binds-identity`
+-- coordinator validator (mishpat DNA `commitments::validate_binds_identity`) does
+-- not yet require a successor field, and `revokes-commitment` carries only
+-- {target_cid, reason, signed_at} — so no declaration names a successor today and
+-- every revoked row reads as terminal, which is an ACCURATE reading of what those
+-- declarations say. `mishpat_projection::parse_binds_identity` reads the field
+-- optionally, so a rotation that starts declaring one lands here with no further
+-- change. Named follow-on:
+-- genesis/data/timeline/backlog/identity-head-projection-catchup-signal-gap.md.
+--
+-- Source of truth: DHT (mishpat DNA Commitment entry, action='binds-identity').
+-- Classification: A (projection of a notarized declaration).
+-- Spec: genesis/docs/superpowers/specs/2026-07-17-identity-head-key-lineage-design.md.
+ALTER TABLE identity_heads ADD COLUMN successor_head_key TEXT;

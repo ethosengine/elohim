@@ -43,14 +43,15 @@ pub use codec::{
     core32_to_multikey, dht_location_bytes, did_key_to_agent_cid, did_key_to_core32, CodecError,
 };
 pub use did_elohim::{
-    ElohimIdentityStore, ElohimResolver, ElohimStoreError, IdentityHead, ServiceRef,
+    assemble_deactivated_document, controller_from_head, ElohimIdentityStore, ElohimResolver,
+    ElohimStoreError, IdentityHead, IdentityHeadAnswer, RevokedIdentity, ServiceRef,
 };
 pub use did_key::{assemble_did_key_document, DidKeyResolver};
 pub use registry::MethodRegistry;
 pub use resolver::{
-    DidDocumentMetadata, DidResolutionError, DidResolutionMetadata, DidResolutionResult,
-    DidResolver, DID_DOCUMENT_CONTENT_TYPE, ERR_INTERNAL, ERR_INVALID_DID,
-    ERR_METHOD_NOT_SUPPORTED, ERR_NOT_FOUND,
+    verify_resolved_subject, DidDocumentMetadata, DidResolutionError, DidResolutionMetadata,
+    DidResolutionResult, DidResolver, DID_DOCUMENT_CONTENT_TYPE, ERR_INTERNAL, ERR_INVALID_DID,
+    ERR_INVALID_DID_DOCUMENT, ERR_METHOD_NOT_SUPPORTED, ERR_NOT_FOUND,
 };
 
 #[cfg(feature = "web-resolver")]

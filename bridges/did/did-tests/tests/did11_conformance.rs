@@ -101,6 +101,32 @@ async fn did_elohim_with_controllers_conforms_to_did11_schema() {
     );
 }
 
+#[tokio::test]
+async fn deactivated_did_elohim_document_conforms_to_did11_schema() {
+    // A revoked identity's document is stripped to `@context` + `id` +
+    // `alsoKnownAs`. That is a legal DID 1.1 document (only @context and id are
+    // required) — assert it, so "confers no authority" can never be achieved by
+    // emitting something the schema would reject.
+    const CHAIN_ROOT: &str = "bafyreichainrootgenesisnodecid00000000000000000000000000";
+
+    let store =
+        MockElohimStore::populated(AGENT_KEY).with_revoked_head(AGENT_KEY, CHAIN_ROOT, None);
+    let resolver = ElohimResolver::new(store);
+    let did = Did::parse(&format!("did:elohim:{AGENT_KEY}")).unwrap();
+    let result = resolver.resolve(&did).await.unwrap();
+
+    assert_eq!(result.did_document_metadata.deactivated, Some(true));
+    let doc = result.did_document.unwrap();
+    assert!(doc.verification_method.is_none(), "deactivated ⇒ no keys");
+
+    let json = serde_json::to_value(&doc).unwrap();
+    assert_eq!(
+        json["@context"][0], "https://www.w3.org/ns/did/v1.1",
+        "deactivated output must still pin the DID 1.1 context first"
+    );
+    assert_conforms("did:elohim deactivated (revoked head) output", &json);
+}
+
 /// A wire-fidelity fixture carrying the legacy DID **1.0** context. It must be
 /// accepted (the schema recognizes v1 as a legal base context).
 const V1_CONTEXT_FIXTURE: &str = r#"{

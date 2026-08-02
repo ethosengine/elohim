@@ -29,6 +29,15 @@ imago-dei ontology; no surface frames "self-sovereign" as an apex tier.
 | `did:elohim:<agent_cid>` | assembled | from an `ElohimIdentityStore` (implemented by elohim-storage) |
 | `did:web` | fetched | feature `web-resolver`; caller injects a `DidWebFetch` |
 
+`did:key` and `did:elohim` are self-certifying — the document is derived from the
+key, so its subject cannot be asserted at us. `did:web` is not: the document
+arrives from a host, so the resolver re-derives the document's `id` against the
+requested DID and refuses a mismatch (`SubjectMismatch` → `invalidDidDocument`).
+A revoked `did:elohim` identity resolves to a **deactivated** document
+(`didDocumentMetadata.deactivated = true`) carrying no key, service or transport
+material; an identity head the store cannot determine fails resolution closed
+rather than degrading to an implicitly self-controlled document.
+
 ## Usage
 
 ```rust

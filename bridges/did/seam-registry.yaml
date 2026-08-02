@@ -1,0 +1,553 @@
+# bridges/did/seam-registry.yaml
+#
+# Conforms to elohim/sdk/schemas/v1/manifest/seam-registry.schema.json. The W3C DID 1.1 bridge's
+# decision surface: DID resolution outcomes and their standard error codes, the did:web transfer
+# boundary (URL derivation + the fetched document's subject), and the did:elohim identity-head
+# answer (declared / revoked / never-declared / unresolvable) with its controller resolution.
+#
+# Placed at the WORKSPACE root rather than inside did-bridge/ so `contract_test_names_for`'s
+# nearest-ancestor walk reaches it from did-bridge/, did-types/ and did-tests/ alike. `crate` and
+# `crateRoot` name did-bridge, which owns every registered symbol; did-types is pure data model
+# (no decisions) and did-tests is the harness.
+#
+# Every symbol below was read at authoring time (2026-08-02) and every cited test currently passes
+# under `cargo test --workspace` (RUSTFLAGS="" + a pooled CARGO_TARGET_DIR — see CLAUDE.md).
+#
+# INTEGRATOR NOTE: the matrix routes registries to seam columns via `registry_crates` in
+# .claude/epr-meta/seam-catalog.yaml, and seam S3.6 (bridges) still carries `registry_crates: []`.
+# Until `did-bridge` is added there, this file loads and censuses cleanly but contributes ZERO
+# matrix cells — the census will say so out loud ("crate `did-bridge` is not routed to any seam
+# column"). That one-line catalog edit was outside this change's write-set.
+
+seamRegistryVersion: 1
+crate: did-bridge
+crateRoot: bridges/did/did-bridge
+seamLocus: >
+  The DID resolution decision surface in bridges/did: the resolution outcome + standard
+  error-code vocabulary (src/resolver.rs: DidResolutionResult, DidResolutionError,
+  verify_resolved_subject), the did:web transfer boundary (src/did_web.rs:
+  derive_did_web_url, DidWebResolver::resolve), the did:elohim identity-head answer and its
+  document consequences (src/did_elohim.rs: IdentityHeadAnswer, ElohimResolver::resolve,
+  controller_from_head, assemble_deactivated_document), and method routing
+  (src/registry.rs: MethodRegistry::resolve).
+
+decisionPoints:
+  - name: verify_resolved_subject
+    kind: verdict-fn
+    sourceLocation:
+      file: src/resolver.rs
+      modulePath: resolver::verify_resolved_subject
+      line: 204
+    summary: >
+      Re-derives that a FETCHED DID document actually describes the DID that was resolved —
+      exact equality of the two canonical DID strings; a mismatch is a typed refusal
+      (SubjectMismatch -> invalidDidDocument), never a pass-through.
+    notes: >
+      Born from this plan's own seeded forecast row 7 (bridges, CONFIRMED LIVE): "did:web
+      resolution never checks doc.id == did — a host can return another domain's DID as a
+      successful resolution; outbound SSRF is guarded, inbound response is not." The predicate
+      lives in resolver.rs rather than did_web.rs deliberately: it is not feature-gated, so it
+      compiles and is tested in every build, and did:plc (arriving with the atproto bridge) is a
+      second fetched method that inherits it rather than re-deriving it.
+    concernIds:
+      - id: C5
+        status: answered
+        justification: >
+          The transfer boundary's re-derivation clause, exactly. A successful HTTPS fetch
+          establishes that a host answered and nothing more; the one property that makes the
+          bytes an answer to THIS question is re-checked locally before the document is served.
+          foreign_subject_is_refused_as_invalid_did_document and
+          a_host_may_not_answer_with_another_domains_did prove the refusal at the predicate and
+          at the resolver respectively. The comparison sides have independent provenance (the
+          requested Did comes from the caller, the returned one is parsed from fetched bytes),
+          so the green is not measuring its own mirror — and the doc comment states the standing
+          rule that any future normalization must run on BOTH sides through one function.
+      - id: C4
+        status: answered
+        justification: >
+          The refusal is its own answer: a foreign document is neither notFound (the DID may
+          well exist) nor invalidDid (the requester's DID is fine) nor internalError (nothing
+          failed on our side). foreign_subject_is_refused_as_invalid_did_document asserts all
+          three non-equalities so the error code cannot silently collapse into a neighbour.
+    contractTests:
+      - path: bridges/did/did-bridge/src/resolver.rs
+        testName: matching_subject_is_accepted
+        kind: unit
+      - path: bridges/did/did-bridge/src/resolver.rs
+        testName: foreign_subject_is_refused_as_invalid_did_document
+        kind: unit
+      - path: bridges/did/did-bridge/src/resolver.rs
+        testName: subject_comparison_is_exact_not_case_folded
+        kind: unit
+      - path: bridges/did/did-bridge/src/resolver.rs
+        testName: cross_method_subject_is_refused
+        kind: unit
+      - path: bridges/did/did-tests/tests/did_web_resolution.rs
+        testName: a_host_may_not_answer_with_another_domains_did
+        kind: integration
+
+  - name: DidResolutionError
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/resolver.rs
+      modulePath: resolver::DidResolutionError
+      line: 109
+    summary: >
+      Why a resolution produced no document — NotFound / InvalidDid / MethodNotSupported /
+      Internal / SubjectMismatch / IdentityHeadUnresolvable / IdentityHeadMalformed — each
+      projected to a DID resolution-metadata error code by error_code().
+    notes: >
+      error_code() is a deliberately LOSSY projection: the standard vocabulary has no finer
+      bucket than internalError for "the head is unresolvable" vs "the head is malformed", so
+      both project there while staying distinct Rust variants. The distinction survives where it
+      is actionable (in-process, at the call site deciding retry-vs-refuse) and the wire stays
+      conformant instead of inventing codes no universal resolver would understand.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          The whole point of the enum: absent (NotFound), refused-as-untrustworthy
+          (SubjectMismatch), and unknowable (IdentityHeadUnresolvable) are three separate
+          variants that a caller can match on.
+          head_error_codes_are_distinct_variants_on_one_wire_code pins the lossy-projection
+          contract itself — two provenances, one conformant code, asserted rather than assumed.
+      - id: C8
+        status: partial
+        justification: >
+          error_code() is a stable, countable label vocabulary — but it is a WIRE code set, not
+          a per-decision reason label, and this crate has no metrics or tracing dependency, so
+          nothing here counts anything. The consuming runtime (doorway's universal-resolver
+          route, when it lands) owns instrumentation. Recorded as partial rather than n-a
+          because the vocabulary genuinely exists and is genuinely uninstrumented.
+    contractTests:
+      - path: bridges/did/did-bridge/src/resolver.rs
+        testName: head_error_codes_are_distinct_variants_on_one_wire_code
+        kind: unit
+      - path: bridges/did/did-tests/tests/registry_and_errors.rs
+        testName: unregistered_method_yields_method_not_supported
+        kind: integration
+      - path: bridges/did/did-tests/tests/registry_and_errors.rs
+        testName: invalid_did_string_yields_invalid_did
+        kind: integration
+      - path: bridges/did/did-tests/tests/registry_and_errors.rs
+        testName: nonexistent_elohim_agent_yields_not_found
+        kind: integration
+
+  - name: DidResolutionResult
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/resolver.rs
+      modulePath: resolver::DidResolutionResult
+      line: 71
+    summary: >
+      The DID 1.1 §7.1 resolution answer: the document (or None) plus resolution metadata
+      (content type on success, standard error code on failure) plus document metadata
+      (created / updated / deactivated).
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          from_error never carries a document and always carries an error code, so a failed
+          resolution can never be read as an empty-but-successful one. The `deactivated` flag
+          added for the revoked-head path is the case that forced the distinction: a deactivated
+          DID is a SUCCESSFUL resolution whose document confers nothing, which is a third state
+          beyond "here it is" and "it is not there".
+          deactivated_metadata_is_omitted_unless_asserted pins the other half — an unset flag
+          serializes as absent, never as an asserted `false`, because "not deactivated" and "no
+          claim recorded" are different statements.
+    contractTests:
+      - path: bridges/did/did-bridge/src/resolver.rs
+        testName: deactivated_metadata_is_omitted_unless_asserted
+        kind: unit
+      - path: bridges/did/did-tests/tests/registry_and_errors.rs
+        testName: registry_routes_to_registered_method
+        kind: integration
+      - path: bridges/did/did-tests/tests/registry_and_errors.rs
+        testName: unregistered_method_yields_method_not_supported
+        kind: integration
+
+  - name: derive_did_web_url
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/did_web.rs
+      modulePath: did_web::derive_did_web_url
+      line: 71
+    summary: >
+      Derives the HTTPS did.json URL from a did:web DID per the method spec, REJECTING (never
+      sanitizing) any segment that, after percent-decoding, carries an authority/path-confusion
+      character (`@` `/` `\` `?` `#` or control).
+    notes: >
+      Forcing incident 2026-07-17 (at birth): `did:web:trusted.example.com%40169.254.169.254`
+      would have derived `https://trusted.example.com@169.254.169.254/…` — userinfo/host
+      confusion pointing at the cloud-metadata address. `%40` is a legal idchar that only
+      becomes `@` after decoding, so Did::parse cannot catch it.
+    concernIds:
+      - id: C5
+        status: partial
+        justification: >
+          The crate re-derives the STRUCTURE of the URL it is being asked to fetch and refuses
+          smuggled authority — but it cannot know the caller's network topology, so it does not
+          establish that the resolved host is safe to contact. That half is explicitly delegated
+          to DidWebFetch implementors ("MUST validate the resolved URL's actual host against
+          their egress policy") and is unenforceable from here. Named as partial rather than
+          answered because the delegated half has no implementation in this repo yet — there is
+          no production DidWebFetch, so nobody is holding up the other end of the contract.
+    contractTests:
+      - path: bridges/did/did-bridge/src/did_web.rs
+        testName: rejects_at_sign_userinfo_confusion
+        kind: unit
+      - path: bridges/did/did-bridge/src/did_web.rs
+        testName: rejects_slash_path_injection
+        kind: unit
+      - path: bridges/did/did-bridge/src/did_web.rs
+        testName: rejects_backslash_confusion
+        kind: unit
+      - path: bridges/did/did-bridge/src/did_web.rs
+        testName: rejects_query_and_fragment_injection
+        kind: unit
+      - path: bridges/did/did-bridge/src/did_web.rs
+        testName: rejects_control_character
+        kind: unit
+      - path: bridges/did/did-bridge/src/did_web.rs
+        testName: rejects_confusion_in_path_segment_too
+        kind: unit
+      - path: bridges/did/did-tests/tests/did_web_resolution.rs
+        testName: url_derivation_covers_the_method_spec_forms
+        kind: integration
+
+  - name: DidWebResolver::resolve
+    kind: verdict-fn
+    sourceLocation:
+      file: src/did_web.rs
+      modulePath: did_web::DidWebResolver::resolve
+      line: 142
+    summary: >
+      derive URL -> injected fetch -> parse -> re-derive the document's subject -> serve. The
+      only non-self-certifying resolution path in the crate.
+    concernIds:
+      - id: C5
+        status: answered
+        justification: >
+          The subject re-derivation is wired into the serve path itself, not merely available
+          beside it — resolve_refuses_a_document_naming_another_subject exercises the resolver
+          (not the predicate) and asserts that no document escapes on the refusal path. This is
+          the anti-pattern the plan's forecast row 1 names for a different seam (a correct
+          predicate with zero production call sites); registering the call-site test alongside
+          the predicate test is how that shape is kept visible here.
+      - id: C4
+        status: partial
+        justification: >
+          The DidWebFetch trait returns Result<Vec<u8>, DidResolutionError>, which lets the
+          IMPLEMENTOR choose how a 404 and a connection failure are labelled — the fixture fetch
+          maps both to NotFound. So "the host has no document for this DID" and "we could not
+          reach the host" can still collapse below this boundary, in code this crate does not
+          own. The resolver's own outcomes (parse failure -> Internal, subject mismatch ->
+          SubjectMismatch) are distinct; the fetch's are only as honest as the fetcher. Closing
+          it means giving DidWebFetch a typed outcome, which belongs with the first production
+          fetch implementation (doorway), not ahead of it.
+    contractTests:
+      - path: bridges/did/did-bridge/src/did_web.rs
+        testName: resolve_accepts_a_document_that_names_the_requested_subject
+        kind: unit
+      - path: bridges/did/did-bridge/src/did_web.rs
+        testName: resolve_refuses_a_document_naming_another_subject
+        kind: unit
+      - path: bridges/did/did-tests/tests/did_web_resolution.rs
+        testName: a_host_may_not_answer_with_another_domains_did
+        kind: integration
+      - path: bridges/did/did-tests/tests/did_web_resolution.rs
+        testName: resolves_did_web_via_injected_fetch
+        kind: integration
+      - path: bridges/did/did-tests/tests/did_web_resolution.rs
+        testName: missing_did_web_document_is_not_found
+        kind: integration
+
+  - name: IdentityHeadAnswer
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/did_elohim.rs
+      modulePath: did_elohim::IdentityHeadAnswer
+      line: 119
+    summary: >
+      What an ElohimIdentityStore can say about an agent's Wave-B binds-identity head:
+      Declared(IdentityHead) / Revoked(RevokedIdentity) / NeverDeclared / Unresolvable(String).
+    notes: >
+      Replaces `Option<IdentityHead>`, named CONFIRMED LIVE by this plan's seeded forecast row 8
+      (bridges): "identity_head -> None conflates never-declared with revoked; absent controller
+      means implicit self-control — a revoked identity degrades silently to self-controlled."
+      The trait method defaults to NeverDeclared, so a store that never implements it assembles
+      exactly the document it always did.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          Four answers where there were two. NeverDeclared is a positive claim (we looked, no
+          declaration exists); Unresolvable is the full-arc law's home (a local get miss is a
+          fact about gossip, not about existence) and the implementor contract says so in the
+          trait doc; Revoked is a third state neither Option arm could hold.
+          the_four_head_answers_are_distinct_values pins the type-level distinctness and
+          never_declared_revoked_and_unresolvable_are_three_distinct_outcomes pins that the
+          distinction actually changes what gets served.
+      - id: C9
+        status: answered
+        justification: >
+          The revoked arm carries chain_root and successor, so a reference keyed on a revoked
+          head can re-anchor on the lineage instead of silently resolving to nothing — the
+          "fails loud or re-anchors" clause, both halves. RevokedIdentity's doc records the
+          asymmetry that keeps the re-anchor honest: successor: None means a TERMINAL
+          revocation, and a store that cannot determine the successor must answer Unresolvable
+          rather than Revoked-with-None.
+      - id: C12
+        status: unbound
+        justification: >
+          Nothing in this crate verifies authority TO ACT. The bridge projects authority
+          MATERIAL (verification methods, relationships, controller sets) and a consumer decides
+          what to do with it; there is no acting node here and no grant is checked. The revoked
+          fix narrows the blast radius (a deactivated document offers nothing to act with) but
+          that is fail-closed projection, not structural authorization. This plan's seeded
+          forecast row 8 carries the crate-external half of the same C12 clause —
+          valueflows' `extensions_opted_in` widening disclosure on a self-asserted header,
+          explicitly dated to M2 wiring ("the translate layer already takes the bool; no
+          resolver passes it until M2 wiring, which is the collision date") — which is in
+          bridges/valueflows, outside this registry's crate and outside the write-set of the
+          change that created this file. Recorded here so the bridges column carries the known
+          unbound C12 rather than reading unexamined.
+    contractTests:
+      - path: bridges/did/did-bridge/src/did_elohim.rs
+        testName: the_four_head_answers_are_distinct_values
+        kind: unit
+      - path: bridges/did/did-tests/tests/did_elohim_assembly.rs
+        testName: never_declared_revoked_and_unresolvable_are_three_distinct_outcomes
+        kind: integration
+      - path: bridges/did/did-tests/tests/did_elohim_assembly.rs
+        testName: revoked_head_deactivates_the_document_and_confers_no_authority
+        kind: integration
+      - path: bridges/did/did-tests/tests/did_elohim_assembly.rs
+        testName: unresolvable_head_fails_closed_instead_of_defaulting_to_self_control
+        kind: integration
+
+  - name: ElohimResolver::resolve
+    kind: verdict-fn
+    sourceLocation:
+      file: src/did_elohim.rs
+      modulePath: did_elohim::ElohimResolver::resolve
+      line: 231
+    summary: >
+      Assembles a did:elohim document from the identity store: validate the agent_cid, gate on
+      existence (notFound), then branch on the identity head — Unresolvable fails closed,
+      Revoked short-circuits to a deactivated document, Declared adds controllers + lineage,
+      NeverDeclared keeps the implicit-self document.
+    notes: >
+      The head is read FIRST, before any key material or service projection. Reading it later
+      would mean assembling a revoked identity's verification methods, services and transport
+      ids before discovering they must not be served — and every additional store call on the
+      fail-closed path is another chance to leak or to fail.
+    concernIds:
+      - id: C9
+        status: answered
+        justification: >
+          A revoked head no longer resolves to an ordinary self-controlled document; the
+          revocation is stated (deactivated: true) and the lineage stays followable.
+          revoked_head_deactivates_the_document_and_confers_no_authority asserts the negative
+          space explicitly — no verification method, no relationships, no services, and no
+          transport ids — against a store that still holds all of them for that agent, so the
+          test would fail if the branch merely stopped adding controllers.
+      - id: C4
+        status: answered
+        justification: >
+          Three store answers produce three materially different resolutions, and
+          unresolvable_head_fails_closed_instead_of_defaulting_to_self_control asserts the
+          hardest one: a head the store could not determine does NOT fall back to the
+          implicit-self document (which would assert self-control nobody verified) and is not
+          reported as notFound (which would claim an absence nobody observed).
+      - id: C5
+        status: answered
+        justification: >
+          did:elohim is self-certifying and stays that way: the verification method is DERIVED
+          from the agent_cid in the DID itself (agent_cid_to_core32 -> core32_to_multikey), so
+          the store cannot assert key material the resolver did not compute. What the store
+          supplies — controllers, lineage, services — is carried verbatim, and the one place a
+          store value could be silently PROMOTED into a stronger claim (an empty controller set
+          becoming implicit self-control) is refused by controller_from_head.
+          assembles_full_document_from_store pins the derived multikey against an independently
+          stated literal.
+      - id: C12
+        status: unbound
+        justification: >
+          Same as IdentityHeadAnswer: the resolver decides what a document SAYS, never what a
+          caller may DO. No grant is verified here and no action is gated. See that row for the
+          forecast-row-8 citation covering the crate-external, M2-dated half of the class.
+    contractTests:
+      - path: bridges/did/did-tests/tests/did_elohim_assembly.rs
+        testName: revoked_head_deactivates_the_document_and_confers_no_authority
+        kind: integration
+      - path: bridges/did/did-tests/tests/did_elohim_assembly.rs
+        testName: unresolvable_head_fails_closed_instead_of_defaulting_to_self_control
+        kind: integration
+      - path: bridges/did/did-tests/tests/did_elohim_assembly.rs
+        testName: declared_head_with_empty_controller_set_is_refused
+        kind: integration
+      - path: bridges/did/did-tests/tests/did_elohim_assembly.rs
+        testName: head_populates_controllers_and_lineage_alias
+        kind: integration
+      - path: bridges/did/did-tests/tests/did_elohim_assembly.rs
+        testName: no_head_document_is_self_consistent_and_controller_free
+        kind: integration
+      - path: bridges/did/did-tests/tests/did_elohim_assembly.rs
+        testName: assembles_full_document_from_store
+        kind: integration
+      - path: bridges/did/did-tests/tests/did_elohim_assembly.rs
+        testName: malformed_agent_cid_yields_invalid_did
+        kind: integration
+
+  - name: controller_from_head
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/did_elohim.rs
+      modulePath: did_elohim::controller_from_head
+      line: 396
+    summary: >
+      The declared controller set as a DID 1.1 `controller` value — one controller emits
+      Controller::One, several emit Controller::Many (Group Control), and an EMPTY declared set
+      is refused as IdentityHeadMalformed rather than emitted as nothing.
+    notes: >
+      Extracted from ElohimResolver::resolve's inline match, which had `[] => {}` — leaving
+      `controller` absent, which DID 1.1 reads as implicit self-control. That is a strictly
+      stronger claim than an empty declaration makes, invented by the serializer. The same
+      family as forecast row 8's "absent controller means implicit self-control", one level
+      down: not a revoked head, a malformed one.
+    concernIds:
+      - id: C9
+        status: answered
+        justification: >
+          The controller set IS the lineage's authority statement (self / steward-set /
+          community-recovery quorum), carried through verbatim — a recovery quorum is a
+          controller, never an override.
+          empty_controller_set_is_refused_not_silently_self_controlled and the resolver-level
+          declared_head_with_empty_controller_set_is_refused prove the one case where the
+          serializer could have quietly rewritten that statement.
+      - id: C4
+        status: answered
+        justification: >
+          "Declared, and empty" and "not declared" produce different outcomes: the first is a
+          refusal, the second is the implicit-self document. Before the extraction both emitted
+          the same bytes.
+    contractTests:
+      - path: bridges/did/did-bridge/src/did_elohim.rs
+        testName: one_controller_is_controller_one
+        kind: unit
+      - path: bridges/did/did-bridge/src/did_elohim.rs
+        testName: several_controllers_are_controller_many
+        kind: unit
+      - path: bridges/did/did-bridge/src/did_elohim.rs
+        testName: empty_controller_set_is_refused_not_silently_self_controlled
+        kind: unit
+      - path: bridges/did/did-tests/tests/did_elohim_assembly.rs
+        testName: declared_head_with_empty_controller_set_is_refused
+        kind: integration
+
+  - name: assemble_deactivated_document
+    kind: verdict-fn
+    sourceLocation:
+      file: src/did_elohim.rs
+      modulePath: did_elohim::assemble_deactivated_document
+      line: 435
+    summary: >
+      The resolution result for a REVOKED identity: didDocumentMetadata.deactivated = true, no
+      verification methods or relationships, no services, no transport ids — alsoKnownAs
+      carrying only the chain-root (and the successor, when the revocation named one).
+    notes: >
+      Deactivation is a SUCCESSFUL resolution per DID Core, not a notFound — reporting it as
+      absent would merge a refusal into an absence (C4). The document is emptied of authority
+      instead, so a consumer that reads metadata sees the revocation and a consumer that ignores
+      metadata still finds nothing it can act with.
+    concernIds:
+      - id: C9
+        status: answered
+        justification: >
+          Fails loud AND re-anchors, in one artifact: the deactivated flag is the loud failure,
+          the lineage aliases are the re-anchor. deactivated_document_confers_no_authority
+          asserts both plus the exact alias set; terminal_revocation_names_the_root_only and
+          degenerate_self_root_emits_no_alias pin the two edge shapes (no successor; chain_root
+          == subject, where a self-alias would be noise rather than lineage).
+      - id: C4
+        status: answered
+        justification: >
+          Revoked is its own answer with its own artifact — distinguishable from never-declared
+          (no flag, full document) and from unresolvable (no document at all).
+      - id: C5
+        status: answered
+        justification: >
+          The function asserts nothing it was not handed: the aliases come from the revocation's
+          own chain_root/successor and the subject comes from the requested DID. It is pure —
+          no store call on the fail-closed path — so there is no second source that could
+          disagree with the revocation.
+      - id: C7
+        status: answered
+        justification: >
+          Advertise equals serve, in the strong direction: the document does not advertise a
+          verification relationship, a service, or a transport it will not honour, because it
+          advertises none at all. The forcing shape it avoids is the inverse of the usual one —
+          a document that still LOOKED fully capable after its key was revoked.
+      - id: C12
+        status: unbound
+        justification: >
+          Emptying the document is fail-closed PROJECTION, not authorization: nothing here
+          verifies a grant at an acting node, and a consumer that already cached the pre-
+          revocation document is unaffected by this function. Cache invalidation and enforcement
+          belong to the consuming runtime. See IdentityHeadAnswer for the forecast-row-8
+          citation.
+    contractTests:
+      - path: bridges/did/did-bridge/src/did_elohim.rs
+        testName: deactivated_document_confers_no_authority
+        kind: unit
+      - path: bridges/did/did-bridge/src/did_elohim.rs
+        testName: terminal_revocation_names_the_root_only
+        kind: unit
+      - path: bridges/did/did-bridge/src/did_elohim.rs
+        testName: degenerate_self_root_emits_no_alias
+        kind: unit
+      - path: bridges/did/did-tests/tests/did_elohim_assembly.rs
+        testName: revoked_head_deactivates_the_document_and_confers_no_authority
+        kind: integration
+      - path: bridges/did/did-tests/tests/did11_conformance.rs
+        testName: deactivated_did_elohim_document_conforms_to_did11_schema
+        kind: integration
+
+  - name: MethodRegistry::resolve
+    kind: verdict-fn
+    sourceLocation:
+      file: src/registry.rs
+      modulePath: registry::MethodRegistry::resolve
+      line: 46
+    summary: >
+      Routes a DID to the resolver registered for its method; an unregistered method yields
+      MethodNotSupported rather than falling through to a default resolver.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          "No resolver for this method" is not "this DID does not exist" —
+          unregistered_method_yields_method_not_supported asserts the code is methodNotSupported
+          for a did:elohim asked of a key-only registry, while
+          nonexistent_elohim_agent_yields_not_found asserts notFound for the genuinely-absent
+          agent. Two questions, two answers, from the same call shape.
+      - id: C7
+        status: answered
+        justification: >
+          methods() is derived from the registered resolvers' own method() values rather than a
+          hand-maintained list, so what the registry advertises and what it will route are the
+          same set by construction. registry_reports_registered_methods pins it.
+    contractTests:
+      - path: bridges/did/did-tests/tests/registry_and_errors.rs
+        testName: registry_routes_to_registered_method
+        kind: integration
+      - path: bridges/did/did-tests/tests/registry_and_errors.rs
+        testName: unregistered_method_yields_method_not_supported
+        kind: integration
+      - path: bridges/did/did-tests/tests/registry_and_errors.rs
+        testName: nonexistent_elohim_agent_yields_not_found
+        kind: integration
+      - path: bridges/did/did-tests/tests/registry_and_errors.rs
+        testName: registry_reports_registered_methods
+        kind: integration

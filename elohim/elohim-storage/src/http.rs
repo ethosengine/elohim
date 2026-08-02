@@ -5199,11 +5199,31 @@ impl HttpServer {
         match resolver.resolve(&did).await {
             Ok(result) => Ok(response::ok(&result)),
             Err(err) => {
+                // Exhaustive by design — no `_` arm. The compiler catching a new
+                // resolution error here is the point: an unmapped variant would
+                // otherwise be silently served as somebody else's status code.
                 let status = match err {
                     DidResolutionError::NotFound(_) => StatusCode::NOT_FOUND,
                     DidResolutionError::InvalidDid(_)
                     | DidResolutionError::MethodNotSupported(_) => StatusCode::BAD_REQUEST,
                     DidResolutionError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+                    // A FETCHED document described a different subject. Not the
+                    // requester's fault and not ours — the upstream responder
+                    // answered badly, which is what 502 means.
+                    DidResolutionError::SubjectMismatch { .. } => StatusCode::BAD_GATEWAY,
+                    // The head could not be determined (undelivered DHT record,
+                    // timed-out read). Fail-closed and RETRYABLE — 503, never 404:
+                    // "we could not establish it" must not be served as "it does
+                    // not exist".
+                    DidResolutionError::IdentityHeadUnresolvable(_) => {
+                        StatusCode::SERVICE_UNAVAILABLE
+                    }
+                    // A head resolved but is unusable as declared (e.g. an empty
+                    // controller set, which would read as implicit self-control).
+                    // That is a substrate-side defect, not a client error.
+                    DidResolutionError::IdentityHeadMalformed(_) => {
+                        StatusCode::INTERNAL_SERVER_ERROR
+                    }
                 };
                 Ok(response::json_response(
                     status,
