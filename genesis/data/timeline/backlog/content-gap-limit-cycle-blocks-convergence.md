@@ -124,3 +124,58 @@ stricter).
   acquisition pins against byte-less advertisers is a REAL but SEPARATE churn
   loop (ch11's re-admission arm); gate re-admission on byte evidence or bound
   re-admissions per window. Watch `elohim_acquisition_pin_retirements_total{reason="readmitted"}`.
+
+## Post-deploy verdict (2026-08-02 ~01:40Z, edge #1287 + ~4h live observation)
+
+**The transport cure is proven live; the fleet still does not converge — the
+residue is a DIFFERENT illness, now precisely characterized.**
+
+Cure confirmed (all on the new image, all 7 pods):
+- "federation timeout" head-adoption lines: **zero** in sampled windows (was
+  the dominant per-request class, thousands/hour).
+- Responder budget works: `elohim_content_head_record_degraded_total{cause=
+  "budget_elapsed"}` ticks modestly (10 in the first hour) instead of wedging
+  the swarm loop.
+- The adopt-deferred arm RUNS every sweep (was: never completed a fetch).
+- The honest fold works: `/health p2p.caughtUp/converged` read false while
+  content work is outstanding — the gauge can no longer lie.
+
+Residue (the remaining blocker, NOT the cycle this doc originally named):
+- Fleet gaps-sum still oscillates 9k-19.8k with no trend over 4h. Adoption
+  total after 4h: **15**. Every adopt sweep logs
+  `adopt-deferred: candidates ~300, adopted 0, held 200` (200 = per-tick cap)
+  — `decide_head_action` Holds because the local row is ALREADY DECLARED with
+  a different head than the peer advertises: **two-way declared divergence,
+  ~11.4k divergent / ~10.7k refused fleet-wide** — consistent with adam's
+  re-anchoring storm having minted competing declared heads corpus-wide.
+- Heal outcomes (2h): refused_declared 25k · missing 24.9k · failed 18.2k ·
+  healed 59. The projection plane spends ~35k ops/hour honestly re-refusing
+  the same divergence.
+- Rust-side newest-wins is DELIBERATELY absent (`head_adoption.rs` module doc:
+  `declared_head_at` not globally comparable; carried-record branch substitutes
+  receiving conductor sys_time; presence-based rule prevents head-flapping).
+  The `HealCanonical` forward-ordering arm IS implemented
+  (`content_diesel.rs` stamp guard) but canonical answers lack provably-newer
+  `declared_at` for this class.
+- **The intended arbiter is in-zome: `select_canonical_winner` on the
+  conductor/DHT plane.** For ~11k rows it is not converging the fleet — either
+  the competing declaration links never propagated cross-conductor (gossip /
+  witness gap), or the in-zome election cannot order them either.
+
+## Next-shift shape (v2 — conductor-plane RCA)
+
+Why doesn't zome-level canonical arbitration converge the two-way declared
+class? Sample competing pairs (pick ids from adopt-deferred Hold logs on two
+pods), inspect both conductors' views of the declaration links
+(`select_canonical_winner` inputs), and determine: propagation gap vs
+election tie vs elected-but-projection-never-informed. ch06 heads-converge
+territory; touches the substrate trust contract (canonical channels alone
+move declared heads). The projection plane is now honest and instrumented —
+`refused_declared`, `divergent_refused`, and the Hold counts are the
+progress meters for whatever the conductor-plane fix is.
+
+Measurement lesson for anyone watching the drain: the per-sweep `gaps` gauge
+remains a rotating-page sample — fleet-sum oscillates ±5k by construction and
+a 30-60min decline proves nothing (this shift briefly mistook a downswing for
+a drain). Trend-trustworthy signals: `healedTotal`, `head_adopted_total`,
+`divergent_refused`, and the converged/caughtUp holds.
