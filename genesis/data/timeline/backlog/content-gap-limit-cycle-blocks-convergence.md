@@ -179,3 +179,73 @@ remains a rotating-page sample — fleet-sum oscillates ±5k by construction and
 a 30-60min decline proves nothing (this shift briefly mistook a downswing for
 a drain). Trend-trustworthy signals: `healedTotal`, `head_adopted_total`,
 `divergent_refused`, and the converged/caughtUp holds.
+
+## RCA v3 — conductor-plane arbitration CURED in structure (2026-08-02 shift, five waves)
+
+The v2 question ("why doesn't zome-level canonical arbitration converge the
+two-way declared class?") is answered and the cure is live. The answer was
+FOUR stacked walls, each a correct safety rule, discovered serially because
+each was only observable after the previous was cured:
+
+1. **Supply deadlock** — the only automated canonical-link minter (AdoptPeer)
+   is unreachable when the local row is declared; the canonical_head anchor
+   was EMPTY for the whole class; select_canonical_winner never ran. (The
+   projection's "declared head" and the zome's canonical-head link are
+   different authority planes sharing one phrase.)
+2. **Consumption wall** — the HealCanonical stamp guard compared wall-clock
+   declared_at (NULLed by the deploy PATCH path); the election's own clock was
+   computed in-zome then DISCARDED; AdoptLocal was structurally unreachable.
+3. **Declare wall** — contest declares fail on conductor-missing ids
+   (target-independent no-chain gate); two plausible hypotheses (reach gate,
+   unwired fetcher) were DISCONFIRMED by code before instrumentation named it.
+4. **Admission wall** — chain-HOLDING pods never contested: declared+divergent
+   rows died at the SkippedDeclared refusal without entering the candidate
+   list (gapfill route requires local-undeclared). Neither side ever supplied
+   the election.
+
+**Landed (commits 496a4aba8, 134331c83, da8975176; DNA #1388/#1390 SUCCESS;
+edge #1289/#1291/#1292/#1293 deployed):** the election clock + tier travel in
+head answers (canonical_declared_at/canonical_earned, additive); the stamp
+guard keys on election ordering (earned > elected > un-elected; both-elected
+compares notarized link clocks — never wall-clock); AdoptLocal reachable;
+ContestPeer mints canonical candidates (carried-record verified, self-head
+fallback when chain exists, (id,target) idempotence, never stamps);
+declared-divergence rows ADMITTED to candidates at the refusal site;
+election-obey for conductor-missing rows (resolve_canonical_election reads
+the election WITHOUT target retrieval; peer-couriered bytes zome-validated
+against the elected target). Telemetry that makes every layer visible:
+canonical_answers_total{tier}, contest_failed_total{class},
+canonical_links_minted_total{source}, election_obeyed/obey_failed{class},
+refused_stale{reason}.
+
+**Live verdict at shift close (~15:15Z):** every layer PROVEN live — CONTESTED
+lines minting on formerly-stuck pods (carried and non-carried shapes),
+staging-tier canonical answers climbing (0 → 605), divergent fleet-sum band
+down ~33% (19,252 → ~12,9xx). The fleet converges in STRUCTURE but not yet in
+RATE: ~90 elections minted against ~11k contested ids in the first hour.
+
+**Open residuals (this doc still carries them):**
+- **F-B (throughput) — now PROVEN necessary:** sweep budgets (200/tick, 120s
+  wall-clock, 300s cadence) are burned by no_local_chain candidates
+  (predictable failures) crowding out productive contests; add fan-out and/or
+  a known-no-chain backoff so contest supply reaches the full corpus in hours
+  not days. This is the next code lever.
+- **Both-sides-missing pairs** — unreachable by any storage arm; approximate
+  post-hoc via obey-fetch failures across all advertisers; if it survives as
+  the remaining divergence, the coordinator-zome no-chain-gate decision
+  (declare with validated carried record when no local chain) is the
+  operator-facing follow-up (adopt-before-author semantics).
+- **Recording lever** — once `/health p2p.converged` holds on A: one empty
+  commit `[edge:validate-only] [build:edge]` fires the gated saga recording
+  (2700s quiesce deadline); ch04 (stale-regressed) + ch06 (heads-converge) +
+  ch11 (never-measured) all ride it; a second recording confirms stability.
+- **Convergence sweettest (design ready, unbuilt):** two-agent conductors, one
+  id, independent roots, each declares the OTHER's head (contest shape);
+  await_consistency; assert both resolve the SAME head_action_hash AND the
+  SAME canonical_declared_at (equal heads with different clocks would still
+  leapfrog). Second scenario: earned-vs-newer-staging tier precedence across
+  gossip order. Lives in elohim/holochain/tests/sweettest (out of the closing
+  shift's path scope); `#[ignore]` is a CI no-op there.
+- **Self-mint trailing** (4 mints vs 603 fetch_none) — verify the (id,target)
+  ledger is deduping repeats as designed vs a second admission gap; one Loki
+  hour post-F-B answers it.
