@@ -1,0 +1,1 @@
+{"ts": "2026-08-02T19:24:09Z", "kind": "spine-snapshot", "nodes": {"dataplane-convergence": "green", "blob-durability": "green", "notary-authority": "red", "doorway-failover": "red", "reach-enforced-everywhere": "unwired", "identity-cross-signed": "unwired", "operator-runtime-surface": "unwired", "declarative-desired-state": "unwired", "sync-scale-honesty": "green"}}

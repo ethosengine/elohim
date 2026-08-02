@@ -1,0 +1,3268 @@
+{
+ "n_concerns": 16,
+ "n_seams": 16,
+ "n_cells": 256,
+ "n_points_routed": 36,
+ "plane_groups": [
+  {
+   "id": "control-truth",
+   "title": "Control / truth plane",
+   "gloss": "The DHT-notary: identity, commitments, attestations, reach. Source of truth; small, cheap, witnessed. Storage is a reconciliation controller OVER this plane (P1), never its owner.\n"
+  },
+  {
+   "id": "data",
+   "title": "Data plane",
+   "gloss": "Actual byte/record movement: blobs, CRDT docs, shards, quilt RS(N,K). Where availability and durability live.\n"
+  },
+  {
+   "id": "projection",
+   "title": "Projection plane",
+   "gloss": "Read-optimized renders of truth for fast/legible access \u2014 storage SQLite projections (P2P side) and the doorway (web2 side). NEVER the source of truth.\n"
+  },
+  {
+   "id": "bridges",
+   "title": "Bridges (translation seam)",
+   "gloss": "\u00a73.6 lifted out of the plane grouping per the plan: a bridge translates an external protocol to/from the canonical substrate. It is a seam you ADD a crate at, not a participation track.\n"
+  },
+  {
+   "id": "governing-meta",
+   "title": "Governing / meta plane",
+   "gloss": "The repo's own governance substrate \u2014 the .epr-meta policy family, the eprfs/cite-seal content-addressing family, CI/orchestrator, and the epr-cli/REA developer valueflow sidecar. It has no atlas \u00a73 section because the atlas maps the RUNTIME; this column exists because C4, C5 and C7 have confirmed precedents here and C2's strongest precedent (the epr-cli append-order-vs-occurredAt replay) sits in the adjacent developer-tooling territory. A track-keyed axis would score all of those `n-a` when they are `unexamined`.\n"
+  }
+ ],
+ "seams": [
+  {
+   "id": "S3.1",
+   "source_section": "3.1",
+   "name": "Hardware / capability gradient",
+   "plane": "control-truth",
+   "plane_note": "A device's capability_level is a DECLARED, witnessed fact (boot_registration writes it to the registry) \u2014 the operational envelope is derived from it. The derivation runs in the runtime, but the fact lives on the truth plane.\n",
+   "tracks": [
+    "T1",
+    "T2",
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "community",
+   "registry_crates": [],
+   "spine_nodes": [],
+   "n_a_concerns": []
+  },
+  {
+   "id": "S3.4",
+   "source_section": "3.4",
+   "name": "Mod / plugin (native extension INTO the runtime)",
+   "plane": "control-truth",
+   "plane_note": "Loading is a runtime act; INTEGRITY is a control-plane act \u2014 a plugin's effects route through the notary (bounds_validator + the delegates-compute Commitment + coordinator hot-swap). The atlas's own framing: \"integrity comes from routing a plugin's effects through the notary\".\n",
+   "tracks": [
+    "T2"
+   ],
+   "reach_tier": "trusted",
+   "registry_crates": [],
+   "spine_nodes": [
+    "operator-runtime-surface"
+   ],
+   "n_a_concerns": []
+  },
+  {
+   "id": "S3.5",
+   "source_section": "3.5",
+   "name": "SDK grammar (compose inward \u2014 add a MANIFEST)",
+   "plane": "control-truth",
+   "plane_note": "The four cheap moves (signal_kind, Commitment action, Governor impl, CoverageRollup predicate) are all control-plane vocabulary; integrity here is BY CONSTRUCTION, with no notary to route through.\n",
+   "tracks": [
+    "T1"
+   ],
+   "reach_tier": "commons",
+   "registry_crates": [],
+   "spine_nodes": [],
+   "n_a_concerns": []
+  },
+  {
+   "id": "S3.7",
+   "source_section": "3.7",
+   "name": "App-manifest / domain",
+   "plane": "control-truth",
+   "plane_note": "The protocol-schema enums a domain manifest composes are DNA-notarized; the renderer map it also carries is projection vocabulary. Assigned to control because the notarized half is what a concern class can violate irrecoverably.\n",
+   "tracks": [
+    "T1",
+    "T4"
+   ],
+   "reach_tier": "commons",
+   "registry_crates": [],
+   "spine_nodes": [],
+   "n_a_concerns": []
+  },
+  {
+   "id": "S3.12",
+   "source_section": "3.12",
+   "name": "Hub cluster ops + enablement (hub-INTERNAL swarm)",
+   "plane": "control-truth",
+   "plane_note": "Leader election, pod consensus and replica/PVC placement are control decisions on a SECOND libp2p swarm, private to the hub \u2014 distinct from Track-2 hub-to-hub federation (\u00a73.10/\u00a73.11). Debugging blade consensus inside elohim-storage/src/p2p means the wrong crate.\n",
+   "t1_routing": "Identity-preserving tier graduation and DNA-key lineage route here (atlas \u00a74: \"Graduate hardware (laptop->NUC->rack) keeping identity | Hub enablement (3.12)\"), which is why the identity-cross-signed forecast rung lands on this column despite being a T1 concern.\n",
+   "tracks": [
+    "T2"
+   ],
+   "reach_tier": "intimate",
+   "registry_crates": [
+    "elohim-node"
+   ],
+   "spine_nodes": [
+    "identity-cross-signed"
+   ],
+   "n_a_concerns": []
+  },
+  {
+   "id": "S3.14",
+   "source_section": "3.14",
+   "name": "Temporal / scheduling",
+   "plane": "control-truth",
+   "plane_note": "Validity horizons and expiry->obligation are notarized facts; the durable scheduler that fires them is operational. The `time` substrate SIGNAL (economic, accounted) is a different thing from the scheduler and must not be conflated with it.\n",
+   "tracks": [
+    "T1",
+    "T2"
+   ],
+   "reach_tier": "community",
+   "registry_crates": [],
+   "spine_nodes": [],
+   "n_a_concerns": []
+  },
+  {
+   "id": "S3.2",
+   "source_section": "3.2",
+   "name": "OS / packaging / deploy target",
+   "plane": "control-truth",
+   "plane_note": "Today this seam lives in CI and repo manifests (governing/meta-adjacent). Its DECLARED destination is the control plane \u2014 the declarative-desired-state rung has peers reconciling SIGNED desired state the way coordinators hot-swap. Assigned to its destination, with the today-state recorded here so the assignment is not read as a claim about the present.\n",
+   "tracks": [],
+   "reach_tier": "community",
+   "registry_crates": [],
+   "spine_nodes": [
+    "declarative-desired-state"
+   ],
+   "n_a_concerns": []
+  },
+  {
+   "id": "S3.3",
+   "source_section": "3.3",
+   "name": "Runtime / binary + footprint",
+   "plane": "control-truth",
+   "plane_note": "The single-node COMPOSITION axis (thin vs fat, cargo features, embedded children), orthogonal to network role. Same destination logic as \u00a73.2: which composition a peer runs is desired state. Footprint tuning is native-binary-only \u2014 never per-device WASM/DNA (that moves the DNA hash and partitions the fleet).\n",
+   "tracks": [
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "community",
+   "registry_crates": [],
+   "spine_nodes": [
+    "declarative-desired-state"
+   ],
+   "n_a_concerns": []
+  },
+  {
+   "id": "S3.10",
+   "source_section": "3.10",
+   "name": "Peer-hoster dataplane (Tracks 2 + 3)",
+   "plane": "data",
+   "plane_note": "Durable availability of records across disconnect. The head-election/notary side of the same record family is T1 (see t1_routing) \u2014 one column, two tracks, which is exactly why track is a cell ATTRIBUTE and not an axis.\n",
+   "t1_routing": "The content_store zome (select_canonical_winner, declare_canonical_head_inner) is the T1-notary/control side of this seam's record family and routes here, per the \u00a74 \"T1 notary floor (under 3.11)\" precedent applied to content heads.\n",
+   "tracks": [
+    "T1",
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "familiar",
+   "registry_crates": [
+    "elohim-storage",
+    "content_store"
+   ],
+   "spine_nodes": [
+    "dataplane-convergence",
+    "blob-durability",
+    "notary-authority",
+    "sync-scale-honesty",
+    "reach-enforced-everywhere"
+   ],
+   "n_a_concerns": []
+  },
+  {
+   "id": "S3.11",
+   "source_section": "3.11",
+   "name": "Aggregation / recursive rollup (Track 2)",
+   "plane": "data",
+   "plane_note": "Recursive signal aggregation over CoverageRollup plus the REA value-flow turning delegated compute into accounted flow, witnessed across DHT boundaries. A Case-A all-zeros bug here is a Track-1 identity-coherence failure wearing an aggregation costume \u2014 C0 before C-anything.\n",
+   "tracks": [
+    "T1",
+    "T2"
+   ],
+   "reach_tier": "community",
+   "registry_crates": [],
+   "spine_nodes": [
+    "notary-authority",
+    "sync-scale-honesty"
+   ],
+   "n_a_concerns": []
+  },
+  {
+   "id": "S3.13",
+   "source_section": "3.13",
+   "name": "Confidentiality / encryption / secrets",
+   "plane": "data",
+   "plane_note": "KeyEnvelope reader-key wraps ride the blob/quilt plane. Confidentiality is NOT integrity (T1 notary) and NOT authorization (\u00a73.4): a notarized entry is world-readable, so \"make this private\" is this seam, never a permission flag.\n",
+   "tracks": [
+    "T2"
+   ],
+   "reach_tier": "private",
+   "registry_crates": [],
+   "spine_nodes": [],
+   "n_a_concerns": []
+  },
+  {
+   "id": "S3.15",
+   "source_section": "3.15",
+   "name": "Resource governance / admission / backpressure",
+   "plane": "data",
+   "plane_note": "Guards ride the data AND projection planes (storage bounds_validator; doorway 503-shed; breakers); the unifying owner is the elohim-operator per-hub allocator, which is a control actor. Assigned to data because what it meters is byte/request flow.\n",
+   "tracks": [
+    "T2",
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "community",
+   "registry_crates": [],
+   "spine_nodes": [
+    "doorway-failover",
+    "operator-runtime-surface"
+   ],
+   "n_a_concerns": []
+  },
+  {
+   "id": "S3.8",
+   "source_section": "3.8",
+   "name": "Client surface",
+   "plane": "projection",
+   "plane_note": "Presentation + user-intent capture ONLY: render host-provided state, emit intent, bind nothing. Anything that looks like state ownership belongs to a doorway route, a zome coordinator, or a storage projection.\n",
+   "tracks": [
+    "T4"
+   ],
+   "reach_tier": "public",
+   "registry_crates": [],
+   "spine_nodes": [],
+   "n_a_concerns": []
+  },
+  {
+   "id": "S3.9",
+   "source_section": "3.9",
+   "name": "Doorway projection (Track 4)",
+   "plane": "projection",
+   "plane_note": "Makes canonical substrate truth legible to browsers and web2. The doorway is NOT a P2P participant \u2014 it never swarms libp2p or iroh. Bootstrap and signal consolidate here too.\n",
+   "tracks": [
+    "T4"
+   ],
+   "reach_tier": "public",
+   "registry_crates": [
+    "doorway"
+   ],
+   "spine_nodes": [
+    "doorway-failover",
+    "reach-enforced-everywhere"
+   ],
+   "n_a_concerns": []
+  },
+  {
+   "id": "S3.6",
+   "source_section": "3.6",
+   "name": "Bridge (translate outward \u2014 add a CRATE)",
+   "plane": "bridges",
+   "plane_note": "Imperative interop facing the non-elohim world. Not disjoint from \u00a73.4: the bridge is the COMPILE-TIME instance of native extension; the discriminator is direction + bind-time.\n",
+   "tracks": [
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "public",
+   "registry_crates": [],
+   "spine_nodes": [],
+   "n_a_concerns": []
+  },
+  {
+   "id": "SGOV",
+   "source_section": "plan surface 6 (no atlas \u00a73 section \u2014 the atlas maps the runtime)",
+   "name": "Governing / meta plane (repo's own governance substrate)",
+   "plane": "governing-meta",
+   "plane_note": "The .epr-meta policy family, the eprfs/cite-seal content-addressing family, CI/orchestrator, and the epr-cli/REA developer valueflow sidecar. Confirmed concern instances here: C7 (15 rules naming validators that do not exist, 2026-07-25), C5 (BlobCid::verifies hardcoding the wrong codec so self-verification was inert, 2026-07-24; and an unresolvable validator may not HARDEN an advisory rule, 2026-07-25), C4 (NOT_BUILT reading as 0 failures, CI museum #1), and C2's strongest precedent in the adjacent developer-tooling territory (the epr-cli/REA append-order-vs-occurredAt replay, a83b35079).\n",
+   "tracks": [],
+   "reach_tier": "community",
+   "registry_crates": [],
+   "spine_nodes": [],
+   "n_a_concerns": []
+  }
+ ],
+ "concern_tips": {
+  "C0": {
+   "ref": "c0-plane-location@1",
+   "home": "concerns.yaml",
+   "title": "Plane location \u2014 name the plane before binding any concern",
+   "severity_class": "silent-corruption",
+   "recurrence_shifts": 3
+  },
+  "C1": {
+   "ref": "c1-anti-self-election@1",
+   "home": "concerns.yaml",
+   "title": "Anti-self-election \u2014 no component crowns what it authored",
+   "severity_class": "silent-corruption",
+   "recurrence_shifts": 4
+  },
+  "C10": {
+   "ref": "c10-contract-evolution-honesty@1",
+   "home": "concerns.yaml",
+   "title": "Contract-evolution honesty \u2014 an unknown field is rejected or observed, never defaulted",
+   "severity_class": "silent-corruption",
+   "recurrence_shifts": 2
+  },
+  "C11": {
+   "ref": "c11-externally-imposed-backpressure@1",
+   "home": "concerns.yaml",
+   "title": "Externally-imposed backpressure \u2014 degrade by a declared, counted policy",
+   "severity_class": "loud-fail",
+   "recurrence_shifts": 3
+  },
+  "C12": {
+   "ref": "c12-consent-authorization@1",
+   "home": "concerns.yaml",
+   "title": "Consent/authorization (may-act) \u2014 authority verified structurally at the acting node",
+   "severity_class": "silent-corruption",
+   "recurrence_shifts": 2
+  },
+  "C13": {
+   "ref": "c13-graduated-authority@1",
+   "home": "concerns.yaml",
+   "title": "Graduated authority \u2014 every scaffold names its successor at the gate",
+   "severity_class": "silent-corruption",
+   "recurrence_shifts": 3
+  },
+  "C14": {
+   "ref": "c14-witnessed-residual@1",
+   "home": "concerns.yaml",
+   "title": "Witnessed residual \u2014 the outcome set closes with an arm that is witnessed, never dropped",
+   "severity_class": "silent-corruption",
+   "recurrence_shifts": 2
+  },
+  "C2": {
+   "ref": "c2-monotonic-authority@2",
+   "home": "policies.yaml",
+   "title": "C2 monotonic authority \u2014 never backwards, and name the clock",
+   "severity_class": "silent-corruption",
+   "recurrence_shifts": 5
+  },
+  "C3": {
+   "ref": "c3-liveness@1",
+   "home": "concerns.yaml",
+   "title": "Liveness \u2014 a legal move exists from every reachable state",
+   "severity_class": "loud-fail",
+   "recurrence_shifts": 5
+  },
+  "C4": {
+   "ref": "c4-honest-absence@1",
+   "home": "concerns.yaml",
+   "title": "Honest absence \u2014 absent, unreachable, refused and unverifiable are distinct answers",
+   "severity_class": "silent-corruption",
+   "recurrence_shifts": 5
+  },
+  "C5": {
+   "ref": "c5-evidence-not-authority@1",
+   "home": "concerns.yaml",
+   "title": "Evidence-not-authority (may-believe) \u2014 a claim confers only what the receiver re-derives",
+   "severity_class": "silent-corruption",
+   "recurrence_shifts": 4
+  },
+  "C6a": {
+   "ref": "c6a-bounded-work@2",
+   "home": "policies.yaml",
+   "title": "C6a bounded work \u2014 every loop, sweep and retry ladder respects a declared budget",
+   "severity_class": "loud-fail",
+   "recurrence_shifts": 4
+  },
+  "C6b": {
+   "ref": "c6b-idempotent-effect@1",
+   "home": "concerns.yaml",
+   "title": "Idempotent effect \u2014 replay against settled state mints nothing and double-applies nothing",
+   "severity_class": "silent-corruption",
+   "recurrence_shifts": 2
+  },
+  "C7": {
+   "ref": "c7-advertise-serve-symmetry@1",
+   "home": "concerns.yaml",
+   "title": "Advertise/serve symmetry \u2014 what a surface advertises equals what it serves",
+   "severity_class": "silent-corruption",
+   "recurrence_shifts": 3
+  },
+  "C8": {
+   "ref": "c8-observability-per-decision@1",
+   "home": "concerns.yaml",
+   "title": "Observability-per-decision \u2014 every outcome increments a labeled counter through a typed reason",
+   "severity_class": "silent-corruption",
+   "recurrence_shifts": 4
+  },
+  "C9": {
+   "ref": "c9-identity-lineage-continuity@1",
+   "home": "concerns.yaml",
+   "title": "Identity-lineage continuity \u2014 a re-key never silently orphans state",
+   "severity_class": "silent-corruption",
+   "recurrence_shifts": 2
+  }
+ },
+ "counts": {
+  "unexamined": 235,
+  "variant": 11,
+  "conformant": 10
+ },
+ "cells": [
+  {
+   "concern": "C0",
+   "seam": "S3.1",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C0",
+   "seam": "S3.4",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C0",
+   "seam": "S3.5",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C0",
+   "seam": "S3.7",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C0",
+   "seam": "S3.12",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C0",
+   "seam": "S3.14",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C0",
+   "seam": "S3.2",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C0",
+   "seam": "S3.3",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C0",
+   "seam": "S3.10",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 24.0
+  },
+  {
+   "concern": "C0",
+   "seam": "S3.11",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 24.0
+  },
+  {
+   "concern": "C0",
+   "seam": "S3.13",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C0",
+   "seam": "S3.15",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 18.0
+  },
+  {
+   "concern": "C0",
+   "seam": "S3.8",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C0",
+   "seam": "S3.9",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 18.0
+  },
+  {
+   "concern": "C0",
+   "seam": "S3.6",
+   "plane": "bridges",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C0",
+   "seam": "SGOV",
+   "plane": "governing-meta",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.1",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.4",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.5",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.7",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.12",
+   "plane": "control-truth",
+   "state": "variant",
+   "reason": "documented waiver: status unbound",
+   "tracks": [
+    "T2"
+   ],
+   "reach_tier": "intimate",
+   "points": [
+    {
+     "crate": "elohim-node",
+     "point": "ConsensusManager::request_consensus",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/pod/consensus.rs"
+    },
+    {
+     "crate": "elohim-node",
+     "point": "ConsensusOutcome",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/pod/consensus.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.14",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.2",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.3",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.10",
+   "plane": "data",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T1",
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "familiar",
+   "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "decide_head_action",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/head_adoption.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "contest failure classes (metrics::inc_contest_failed)",
+     "status": "n-a",
+     "verified": false,
+     "file": "src/metrics.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "declared_divergence_should_route_to_contest",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "gapfill_would_self_elect",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "conductor_missing_should_route_to_adopt",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "claim_self_candidacy",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/head_adoption.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "select_canonical_winner",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "declare_canonical_head_inner",
+     "status": "partial",
+     "verified": true,
+     "file": "src/lib.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.11",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 32.0
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.13",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.15",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 24.0
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.8",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.9",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 24.0
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.6",
+   "plane": "bridges",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C1",
+   "seam": "SGOV",
+   "plane": "governing-meta",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.1",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 5.0
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.4",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 20.0
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.5",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 5.0
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.7",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 5.0
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.12",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 20.0
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.14",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 5.0
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.2",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 20.0
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.3",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 20.0
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.10",
+   "plane": "data",
+   "state": "conformant",
+   "reason": "4 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T1",
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "familiar",
+   "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "decide_head_action",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/head_adoption.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "canonical_move_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "StaleReason",
+     "status": "answered",
+     "verified": true,
+     "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "select_canonical_winner",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.11",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 40.0
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.13",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 5.0
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.15",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 30.0
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.8",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 5.0
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.9",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 30.0
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.6",
+   "plane": "bridges",
+   "state": "unexamined",
+   "score": 5.0
+  },
+  {
+   "concern": "C2",
+   "seam": "SGOV",
+   "plane": "governing-meta",
+   "state": "unexamined",
+   "score": 5.0
+  },
+  {
+   "concern": "C3",
+   "seam": "S3.1",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.5
+  },
+  {
+   "concern": "C3",
+   "seam": "S3.4",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 10.0
+  },
+  {
+   "concern": "C3",
+   "seam": "S3.5",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.5
+  },
+  {
+   "concern": "C3",
+   "seam": "S3.7",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.5
+  },
+  {
+   "concern": "C3",
+   "seam": "S3.12",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 10.0
+  },
+  {
+   "concern": "C3",
+   "seam": "S3.14",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.5
+  },
+  {
+   "concern": "C3",
+   "seam": "S3.2",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 10.0
+  },
+  {
+   "concern": "C3",
+   "seam": "S3.3",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 10.0
+  },
+  {
+   "concern": "C3",
+   "seam": "S3.10",
+   "plane": "data",
+   "state": "conformant",
+   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T1",
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "familiar",
+   "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "decide_head_action",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/head_adoption.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "heal_decision",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C3",
+   "seam": "S3.11",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 20.0
+  },
+  {
+   "concern": "C3",
+   "seam": "S3.13",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 2.5
+  },
+  {
+   "concern": "C3",
+   "seam": "S3.15",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 15.0
+  },
+  {
+   "concern": "C3",
+   "seam": "S3.8",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 2.5
+  },
+  {
+   "concern": "C3",
+   "seam": "S3.9",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 15.0
+  },
+  {
+   "concern": "C3",
+   "seam": "S3.6",
+   "plane": "bridges",
+   "state": "unexamined",
+   "score": 2.5
+  },
+  {
+   "concern": "C3",
+   "seam": "SGOV",
+   "plane": "governing-meta",
+   "state": "unexamined",
+   "score": 2.5
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.1",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 5.0
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.4",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 20.0
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.5",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 5.0
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.7",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 5.0
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.12",
+   "plane": "control-truth",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2"
+   ],
+   "reach_tier": "intimate",
+   "points": [
+    {
+     "crate": "elohim-node",
+     "point": "ConsensusManager::request_consensus",
+     "status": "partial",
+     "verified": true,
+     "file": "src/pod/consensus.rs"
+    },
+    {
+     "crate": "elohim-node",
+     "point": "ConsensusOutcome",
+     "status": "partial",
+     "verified": true,
+     "file": "src/pod/consensus.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.14",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 5.0
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.2",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 20.0
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.3",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 20.0
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.10",
+   "plane": "data",
+   "state": "variant",
+   "reason": "documented waiver: status partial; answered but NO verified contract test: LocalResolve, resolve_canonical_election",
+   "tracks": [
+    "T1",
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "familiar",
+   "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "LocalResolve",
+     "status": "answered",
+     "verified": false,
+     "file": "src/services/head_adoption.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "contest failure classes (metrics::inc_contest_failed)",
+     "status": "partial",
+     "verified": false,
+     "file": "src/metrics.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "declared_divergence_should_route_to_contest",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "timeout_should_route_to_adopt",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "conductor_missing_should_route_to_adopt",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "classify_content_gap",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "resolve_canonical_election",
+     "status": "answered",
+     "verified": false,
+     "file": "src/lib.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.11",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 40.0
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.13",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 5.0
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.15",
+   "plane": "data",
+   "state": "conformant",
+   "reason": "1 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T2",
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-node",
+     "point": "AdmissionDecision",
+     "status": "answered",
+     "verified": true,
+     "file": "src/pod/admission.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.8",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 5.0
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.9",
+   "plane": "projection",
+   "state": "conformant",
+   "reason": "7 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "doorway",
+     "point": "decide_reconcile",
+     "status": "answered",
+     "verified": true,
+     "file": "src/render/registry.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "ReconcileDecision",
+     "status": "answered",
+     "verified": true,
+     "file": "src/render/registry.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "fetch_projections_with_fallback",
+     "status": "answered",
+     "verified": true,
+     "file": "src/projection/epr_router.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "FallbackOutcome",
+     "status": "answered",
+     "verified": true,
+     "file": "src/projection/epr_router.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "K2Store::put_at (MemK2Store)",
+     "status": "answered",
+     "verified": true,
+     "file": "src/bootstrap/k2.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "K2PutOutcome",
+     "status": "answered",
+     "verified": true,
+     "file": "src/bootstrap/k2.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "should_serve_response",
+     "status": "answered",
+     "verified": true,
+     "file": "src/cache/reach_aware_serving.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.6",
+   "plane": "bridges",
+   "state": "unexamined",
+   "score": 5.0
+  },
+  {
+   "concern": "C4",
+   "seam": "SGOV",
+   "plane": "governing-meta",
+   "state": "unexamined",
+   "score": 5.0
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.1",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.4",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.5",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.7",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.12",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.14",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.2",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.3",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.10",
+   "plane": "data",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T1",
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "familiar",
+   "points": [
+    {
+     "crate": "content_store",
+     "point": "declare_canonical_head_inner",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "validate_carried_head_record",
+     "status": "partial",
+     "verified": false,
+     "file": "src/lib.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.11",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 32.0
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.13",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.15",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 24.0
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.8",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.9",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 24.0
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.6",
+   "plane": "bridges",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C5",
+   "seam": "SGOV",
+   "plane": "governing-meta",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C6a",
+   "seam": "S3.1",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C6a",
+   "seam": "S3.4",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C6a",
+   "seam": "S3.5",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C6a",
+   "seam": "S3.7",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C6a",
+   "seam": "S3.12",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C6a",
+   "seam": "S3.14",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C6a",
+   "seam": "S3.2",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C6a",
+   "seam": "S3.3",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C6a",
+   "seam": "S3.10",
+   "plane": "data",
+   "state": "conformant",
+   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T1",
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "familiar",
+   "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "MissLedger::admit",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "should_probe_election",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/head_adoption.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C6a",
+   "seam": "S3.11",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C6a",
+   "seam": "S3.13",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C6a",
+   "seam": "S3.15",
+   "plane": "data",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2",
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-node",
+     "point": "DeferReason",
+     "status": "partial",
+     "verified": true,
+     "file": "src/pod/admission.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C6a",
+   "seam": "S3.8",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C6a",
+   "seam": "S3.9",
+   "plane": "projection",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "doorway",
+     "point": "K2Store::put_at (MemK2Store)",
+     "status": "partial",
+     "verified": true,
+     "file": "src/bootstrap/k2.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C6a",
+   "seam": "S3.6",
+   "plane": "bridges",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C6a",
+   "seam": "SGOV",
+   "plane": "governing-meta",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C6b",
+   "seam": "S3.1",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C6b",
+   "seam": "S3.4",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C6b",
+   "seam": "S3.5",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C6b",
+   "seam": "S3.7",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C6b",
+   "seam": "S3.12",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C6b",
+   "seam": "S3.14",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C6b",
+   "seam": "S3.2",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C6b",
+   "seam": "S3.3",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C6b",
+   "seam": "S3.10",
+   "plane": "data",
+   "state": "conformant",
+   "reason": "3 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T1",
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "familiar",
+   "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "declared_divergence_should_route_to_contest",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "declaration_would_move",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/head_adoption.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "claim_self_candidacy",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/head_adoption.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C6b",
+   "seam": "S3.11",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C6b",
+   "seam": "S3.13",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C6b",
+   "seam": "S3.15",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C6b",
+   "seam": "S3.8",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C6b",
+   "seam": "S3.9",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C6b",
+   "seam": "S3.6",
+   "plane": "bridges",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C6b",
+   "seam": "SGOV",
+   "plane": "governing-meta",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.1",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.4",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.5",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.7",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.12",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.14",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.2",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.3",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.10",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 24.0
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.11",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 24.0
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.13",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.15",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 18.0
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.8",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.9",
+   "plane": "projection",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "doorway",
+     "point": "classify_dispatch",
+     "status": "answered",
+     "verified": true,
+     "file": "src/server/http.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "Disposition",
+     "status": "answered",
+     "verified": true,
+     "file": "src/server/http.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "epr_should_serve_ssr",
+     "status": "answered",
+     "verified": true,
+     "file": "src/server/http.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "fetch_projections_with_fallback",
+     "status": "answered",
+     "verified": true,
+     "file": "src/projection/epr_router.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "should_serve_response",
+     "status": "partial",
+     "verified": true,
+     "file": "src/cache/reach_aware_serving.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.6",
+   "plane": "bridges",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C7",
+   "seam": "SGOV",
+   "plane": "governing-meta",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C8",
+   "seam": "S3.1",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C8",
+   "seam": "S3.4",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C8",
+   "seam": "S3.5",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C8",
+   "seam": "S3.7",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C8",
+   "seam": "S3.12",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C8",
+   "seam": "S3.14",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C8",
+   "seam": "S3.2",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C8",
+   "seam": "S3.3",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C8",
+   "seam": "S3.10",
+   "plane": "data",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T1",
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "familiar",
+   "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "StaleReason",
+     "status": "answered",
+     "verified": true,
+     "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "contest failure classes (metrics::inc_contest_failed)",
+     "status": "partial",
+     "verified": false,
+     "file": "src/metrics.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C8",
+   "seam": "S3.11",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 32.0
+  },
+  {
+   "concern": "C8",
+   "seam": "S3.13",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C8",
+   "seam": "S3.15",
+   "plane": "data",
+   "state": "conformant",
+   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T2",
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-node",
+     "point": "AdmissionController::evaluate",
+     "status": "answered",
+     "verified": true,
+     "file": "src/pod/admission.rs"
+    },
+    {
+     "crate": "elohim-node",
+     "point": "DeferReason",
+     "status": "answered",
+     "verified": true,
+     "file": "src/pod/admission.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C8",
+   "seam": "S3.8",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C8",
+   "seam": "S3.9",
+   "plane": "projection",
+   "state": "conformant",
+   "reason": "1 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "doorway",
+     "point": "SsrFallbackReason",
+     "status": "answered",
+     "verified": true,
+     "file": "src/server/http.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C8",
+   "seam": "S3.6",
+   "plane": "bridges",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C8",
+   "seam": "SGOV",
+   "plane": "governing-meta",
+   "state": "unexamined",
+   "score": 4.0
+  },
+  {
+   "concern": "C9",
+   "seam": "S3.1",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C9",
+   "seam": "S3.4",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C9",
+   "seam": "S3.5",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C9",
+   "seam": "S3.7",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C9",
+   "seam": "S3.12",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C9",
+   "seam": "S3.14",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C9",
+   "seam": "S3.2",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C9",
+   "seam": "S3.3",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C9",
+   "seam": "S3.10",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C9",
+   "seam": "S3.11",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C9",
+   "seam": "S3.13",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C9",
+   "seam": "S3.15",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C9",
+   "seam": "S3.8",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C9",
+   "seam": "S3.9",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C9",
+   "seam": "S3.6",
+   "plane": "bridges",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C9",
+   "seam": "SGOV",
+   "plane": "governing-meta",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C10",
+   "seam": "S3.1",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C10",
+   "seam": "S3.4",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C10",
+   "seam": "S3.5",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C10",
+   "seam": "S3.7",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C10",
+   "seam": "S3.12",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C10",
+   "seam": "S3.14",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C10",
+   "seam": "S3.2",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C10",
+   "seam": "S3.3",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C10",
+   "seam": "S3.10",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C10",
+   "seam": "S3.11",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C10",
+   "seam": "S3.13",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C10",
+   "seam": "S3.15",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C10",
+   "seam": "S3.8",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C10",
+   "seam": "S3.9",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C10",
+   "seam": "S3.6",
+   "plane": "bridges",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C10",
+   "seam": "SGOV",
+   "plane": "governing-meta",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C11",
+   "seam": "S3.1",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 1.5
+  },
+  {
+   "concern": "C11",
+   "seam": "S3.4",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 6.0
+  },
+  {
+   "concern": "C11",
+   "seam": "S3.5",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 1.5
+  },
+  {
+   "concern": "C11",
+   "seam": "S3.7",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 1.5
+  },
+  {
+   "concern": "C11",
+   "seam": "S3.12",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 6.0
+  },
+  {
+   "concern": "C11",
+   "seam": "S3.14",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 1.5
+  },
+  {
+   "concern": "C11",
+   "seam": "S3.2",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 6.0
+  },
+  {
+   "concern": "C11",
+   "seam": "S3.3",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 6.0
+  },
+  {
+   "concern": "C11",
+   "seam": "S3.10",
+   "plane": "data",
+   "state": "conformant",
+   "reason": "1 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T1",
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "familiar",
+   "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "MissLedger::admit",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C11",
+   "seam": "S3.11",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C11",
+   "seam": "S3.13",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 1.5
+  },
+  {
+   "concern": "C11",
+   "seam": "S3.15",
+   "plane": "data",
+   "state": "conformant",
+   "reason": "3 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T2",
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "elohim-node",
+     "point": "AdmissionController::evaluate",
+     "status": "answered",
+     "verified": true,
+     "file": "src/pod/admission.rs"
+    },
+    {
+     "crate": "elohim-node",
+     "point": "AdmissionDecision",
+     "status": "answered",
+     "verified": true,
+     "file": "src/pod/admission.rs"
+    },
+    {
+     "crate": "elohim-node",
+     "point": "DeferReason",
+     "status": "answered",
+     "verified": true,
+     "file": "src/pod/admission.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C11",
+   "seam": "S3.8",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 1.5
+  },
+  {
+   "concern": "C11",
+   "seam": "S3.9",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 9.0
+  },
+  {
+   "concern": "C11",
+   "seam": "S3.6",
+   "plane": "bridges",
+   "state": "unexamined",
+   "score": 1.5
+  },
+  {
+   "concern": "C11",
+   "seam": "SGOV",
+   "plane": "governing-meta",
+   "state": "unexamined",
+   "score": 1.5
+  },
+  {
+   "concern": "C12",
+   "seam": "S3.1",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C12",
+   "seam": "S3.4",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C12",
+   "seam": "S3.5",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C12",
+   "seam": "S3.7",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C12",
+   "seam": "S3.12",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C12",
+   "seam": "S3.14",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C12",
+   "seam": "S3.2",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C12",
+   "seam": "S3.3",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C12",
+   "seam": "S3.10",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C12",
+   "seam": "S3.11",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C12",
+   "seam": "S3.13",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C12",
+   "seam": "S3.15",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C12",
+   "seam": "S3.8",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C12",
+   "seam": "S3.9",
+   "plane": "projection",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T4"
+   ],
+   "reach_tier": "public",
+   "points": [
+    {
+     "crate": "doorway",
+     "point": "should_serve_response",
+     "status": "partial",
+     "verified": true,
+     "file": "src/cache/reach_aware_serving.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C12",
+   "seam": "S3.6",
+   "plane": "bridges",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C12",
+   "seam": "SGOV",
+   "plane": "governing-meta",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C13",
+   "seam": "S3.1",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C13",
+   "seam": "S3.4",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C13",
+   "seam": "S3.5",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C13",
+   "seam": "S3.7",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C13",
+   "seam": "S3.12",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C13",
+   "seam": "S3.14",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C13",
+   "seam": "S3.2",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C13",
+   "seam": "S3.3",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C13",
+   "seam": "S3.10",
+   "plane": "data",
+   "state": "variant",
+   "reason": "documented waiver: status unbound",
+   "tracks": [
+    "T1",
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "familiar",
+   "points": [
+    {
+     "crate": "content_store",
+     "point": "authorize_canonical_head_declarer",
+     "status": "unbound",
+     "verified": false,
+     "file": "src/lib.rs"
+    }
+   ]
+  },
+  {
+   "concern": "C13",
+   "seam": "S3.11",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 24.0
+  },
+  {
+   "concern": "C13",
+   "seam": "S3.13",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C13",
+   "seam": "S3.15",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 18.0
+  },
+  {
+   "concern": "C13",
+   "seam": "S3.8",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C13",
+   "seam": "S3.9",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 18.0
+  },
+  {
+   "concern": "C13",
+   "seam": "S3.6",
+   "plane": "bridges",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C13",
+   "seam": "SGOV",
+   "plane": "governing-meta",
+   "state": "unexamined",
+   "score": 3.0
+  },
+  {
+   "concern": "C14",
+   "seam": "S3.1",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C14",
+   "seam": "S3.4",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C14",
+   "seam": "S3.5",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C14",
+   "seam": "S3.7",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C14",
+   "seam": "S3.12",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C14",
+   "seam": "S3.14",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C14",
+   "seam": "S3.2",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C14",
+   "seam": "S3.3",
+   "plane": "control-truth",
+   "state": "unexamined",
+   "score": 8.0
+  },
+  {
+   "concern": "C14",
+   "seam": "S3.10",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C14",
+   "seam": "S3.11",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 16.0
+  },
+  {
+   "concern": "C14",
+   "seam": "S3.13",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C14",
+   "seam": "S3.15",
+   "plane": "data",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C14",
+   "seam": "S3.8",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C14",
+   "seam": "S3.9",
+   "plane": "projection",
+   "state": "unexamined",
+   "score": 12.0
+  },
+  {
+   "concern": "C14",
+   "seam": "S3.6",
+   "plane": "bridges",
+   "state": "unexamined",
+   "score": 2.0
+  },
+  {
+   "concern": "C14",
+   "seam": "SGOV",
+   "plane": "governing-meta",
+   "state": "unexamined",
+   "score": 2.0
+  }
+ ],
+ "ranked_unexamined": [
+  {
+   "concern": "C2",
+   "seam": "S3.11",
+   "score": 40.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 4.0,
+    "rung_reason": "notary-authority red+active"
+   }
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.11",
+   "score": 40.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 4.0,
+    "rung_reason": "notary-authority red+active"
+   }
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.11",
+   "score": 32.0,
+   "score_parts": {
+    "recurrence": 4,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 4.0,
+    "rung_reason": "notary-authority red+active"
+   }
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.11",
+   "score": 32.0,
+   "score_parts": {
+    "recurrence": 4,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 4.0,
+    "rung_reason": "notary-authority red+active"
+   }
+  },
+  {
+   "concern": "C8",
+   "seam": "S3.11",
+   "score": 32.0,
+   "score_parts": {
+    "recurrence": 4,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 4.0,
+    "rung_reason": "notary-authority red+active"
+   }
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.15",
+   "score": 30.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
+   }
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.9",
+   "score": 30.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
+   }
+  },
+  {
+   "concern": "C0",
+   "seam": "S3.10",
+   "score": 24.0,
+   "score_parts": {
+    "recurrence": 3,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 4.0,
+    "rung_reason": "notary-authority red+active"
+   }
+  },
+  {
+   "concern": "C0",
+   "seam": "S3.11",
+   "score": 24.0,
+   "score_parts": {
+    "recurrence": 3,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 4.0,
+    "rung_reason": "notary-authority red+active"
+   }
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.15",
+   "score": 24.0,
+   "score_parts": {
+    "recurrence": 4,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
+   }
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.9",
+   "score": 24.0,
+   "score_parts": {
+    "recurrence": 4,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
+   }
+  },
+  {
+   "concern": "C13",
+   "seam": "S3.11",
+   "score": 24.0,
+   "score_parts": {
+    "recurrence": 3,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 4.0,
+    "rung_reason": "notary-authority red+active"
+   }
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.15",
+   "score": 24.0,
+   "score_parts": {
+    "recurrence": 4,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
+   }
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.9",
+   "score": 24.0,
+   "score_parts": {
+    "recurrence": 4,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
+   }
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.10",
+   "score": 24.0,
+   "score_parts": {
+    "recurrence": 3,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 4.0,
+    "rung_reason": "notary-authority red+active"
+   }
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.11",
+   "score": 24.0,
+   "score_parts": {
+    "recurrence": 3,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 4.0,
+    "rung_reason": "notary-authority red+active"
+   }
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.12",
+   "score": 20.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 2.0,
+    "rung_reason": "identity-cross-signed unwired"
+   }
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.2",
+   "score": 20.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 2.0,
+    "rung_reason": "declarative-desired-state unwired"
+   }
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.3",
+   "score": 20.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 2.0,
+    "rung_reason": "declarative-desired-state unwired"
+   }
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.4",
+   "score": 20.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 2.0,
+    "rung_reason": "operator-runtime-surface unwired"
+   }
+  },
+  {
+   "concern": "C3",
+   "seam": "S3.11",
+   "score": 20.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 1.0,
+    "severity_class": "loud-fail",
+    "rung_proximity": 4.0,
+    "rung_reason": "notary-authority red+active"
+   }
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.2",
+   "score": 20.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 2.0,
+    "rung_reason": "declarative-desired-state unwired"
+   }
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.3",
+   "score": 20.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 2.0,
+    "rung_reason": "declarative-desired-state unwired"
+   }
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.4",
+   "score": 20.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 2.0,
+    "rung_reason": "operator-runtime-surface unwired"
+   }
+  },
+  {
+   "concern": "C0",
+   "seam": "S3.15",
+   "score": 18.0,
+   "score_parts": {
+    "recurrence": 3,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
+   }
+  },
+  {
+   "concern": "C0",
+   "seam": "S3.9",
+   "score": 18.0,
+   "score_parts": {
+    "recurrence": 3,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
+   }
+  },
+  {
+   "concern": "C13",
+   "seam": "S3.15",
+   "score": 18.0,
+   "score_parts": {
+    "recurrence": 3,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
+   }
+  },
+  {
+   "concern": "C13",
+   "seam": "S3.9",
+   "score": 18.0,
+   "score_parts": {
+    "recurrence": 3,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
+   }
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.15",
+   "score": 18.0,
+   "score_parts": {
+    "recurrence": 3,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 3.0,
+    "rung_reason": "doorway-failover red"
+   }
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.2",
+   "score": 16.0,
+   "score_parts": {
+    "recurrence": 4,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 2.0,
+    "rung_reason": "declarative-desired-state unwired"
+   }
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.3",
+   "score": 16.0,
+   "score_parts": {
+    "recurrence": 4,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 2.0,
+    "rung_reason": "declarative-desired-state unwired"
+   }
+  },
+  {
+   "concern": "C1",
+   "seam": "S3.4",
+   "score": 16.0,
+   "score_parts": {
+    "recurrence": 4,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 2.0,
+    "rung_reason": "operator-runtime-surface unwired"
+   }
+  },
+  {
+   "concern": "C10",
+   "seam": "S3.10",
+   "score": 16.0,
+   "score_parts": {
+    "recurrence": 2,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 4.0,
+    "rung_reason": "notary-authority red+active"
+   }
+  },
+  {
+   "concern": "C10",
+   "seam": "S3.11",
+   "score": 16.0,
+   "score_parts": {
+    "recurrence": 2,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 4.0,
+    "rung_reason": "notary-authority red+active"
+   }
+  },
+  {
+   "concern": "C12",
+   "seam": "S3.10",
+   "score": 16.0,
+   "score_parts": {
+    "recurrence": 2,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 4.0,
+    "rung_reason": "notary-authority red+active"
+   }
+  },
+  {
+   "concern": "C12",
+   "seam": "S3.11",
+   "score": 16.0,
+   "score_parts": {
+    "recurrence": 2,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 4.0,
+    "rung_reason": "notary-authority red+active"
+   }
+  },
+  {
+   "concern": "C14",
+   "seam": "S3.10",
+   "score": 16.0,
+   "score_parts": {
+    "recurrence": 2,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 4.0,
+    "rung_reason": "notary-authority red+active"
+   }
+  },
+  {
+   "concern": "C14",
+   "seam": "S3.11",
+   "score": 16.0,
+   "score_parts": {
+    "recurrence": 2,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 4.0,
+    "rung_reason": "notary-authority red+active"
+   }
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.12",
+   "score": 16.0,
+   "score_parts": {
+    "recurrence": 4,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 2.0,
+    "rung_reason": "identity-cross-signed unwired"
+   }
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.2",
+   "score": 16.0,
+   "score_parts": {
+    "recurrence": 4,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 2.0,
+    "rung_reason": "declarative-desired-state unwired"
+   }
+  }
+ ],
+ "errors": [],
+ "axis_notes": [
+  {
+   "id": "no-identity-column",
+   "detail": "\u00a73 has no identity/T1-notary section; T1 concerns route under the \u00a73 seam owning their artifact, per the \u00a74 \"T1 notary floor (under 3.11)\" precedent. Candidate atlas correction: either an explicit \u00a73.16 identity/notary section, or an explicit statement in \u00a73 that T1 concerns route under the artifact-owning seam.\n"
+  }
+ ],
+ "digest": "sha256:516bb595f0aa6f4e1a16a05d0bed79e7",
+ "ranked_unexamined_note": "head only \u2014 the full ranking is `cells` filtered to state=unexamined, sorted by -score then (concern, seam)",
+ "_generated": {
+  "by": ".claude/scripts/_lib/seam_matrix.py",
+  "regenerate": "python3 .claude/scripts/seam-audit.py --matrix --write",
+  "hand_edit": "never \u2014 this file is a derived read-model; edit the registries or the catalog"
+ }
+}

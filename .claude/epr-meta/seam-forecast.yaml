@@ -1,0 +1,174 @@
+# .claude/epr-meta/seam-forecast.yaml — the trajectory-crossed forecast (plan P4.4, surface 6).
+#
+# WHAT THIS IS. The proactive dual of the cascade: the plan's seeded worklist of spine/roadmap
+# rungs crossed with cells that are `unexamined` there, plus the two runners-up. Every row is
+# FINGERPRINTED so the calibration ledger (.claude/data/seam-calibration.jsonl) can score it
+# hit / miss-of-ranking / miss-of-canon when a spine node flips or a new red lands.
+#
+# THE INSTRUMENT SHIPS PRE-SEEDED, NOT EMPTY — that is the plan's own requirement, and the reason
+# is the success criterion: the next architecture-scale shift should find its walls already ranked
+# here, as forecast hits rather than bespoke production discoveries.
+#
+# ROWS 7 AND 8 ARE `confirmed-live` AND ARE DELIBERATELY *NOT* FILED AS LEDGER HITS. They were
+# found by this ceremony's own mining, not predicted — a `hit` means the forecast named a collision
+# BEFORE it happened, and back-filing them would inflate the hit rate with work the instrument did
+# not do. They are equally not `miss-of-ranking` (the ranking never got a chance) and not
+# `miss-of-canon` (both fit existing classes). They predate the instrument; the ledger's first row
+# is the spine BASELINE, and the first real outcome will be scored at the first flip after it.
+#
+# FINGERPRINT RULE (stability is the whole point). fp = sha256("<rung>|<seam>|<classes>")[:12],
+# where <classes> is the concern-id list sorted LEXICOGRAPHICALLY (so "C12,C7", not "C7,C12") and
+# comma-joined. The PROSE IS DELIBERATELY EXCLUDED: re-wording a prediction must not re-mint its
+# row, exactly as the measure tier fingerprints `rule|path` and not the finding's detail text. A
+# row whose rung, seam or class set changes IS a different forecast and gets a different
+# fingerprint — that is correct, not a bug. `_lib/seam_forecast.py` recomputes every fp at load
+# and reports a mismatch LOUD (a hand-edited fingerprint is a silently-broken calibration link).
+#
+# `rung: none` means the row is not tied to a spine node (the two bridges rows and the
+# steward/node runner-up). It is a real value, not a placeholder — such a row can never be scored
+# by a spine flip, so its calibration trigger must be a new red or a mining pass.
+#
+# WHY THIS HOME. Sibling of seam-catalog.yaml (the matrix's other authored axis input) and of the
+# two canon homes; read by the same tooling. No contentHash pin, for the same reason the catalog
+# has none: nothing BINDS a forecast row, so there is no pinned dependency to protect. The row's
+# fingerprint is its identity and the calibration ledger is its consumer.
+#
+# SEEDED RANK vs DERIVED RANK. `seeded_rank` is the plan's own ordering, transcribed verbatim in
+# substance and never recomputed. `_lib/seam_forecast.py` ALSO computes a derived rank from
+# recurrence x severity x rung-proximity (the matrix's ranking function) and renders the two side
+# by side. Disagreement between them is a signal worth reading, not an error: the seeded order
+# carries human judgment the arithmetic does not have, and the arithmetic carries substrate state
+# (which rung is red RIGHT NOW) the seeding did not.
+
+seam-forecast-version: 1
+seeded_from: genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md
+seeded_on: 2026-08-02
+
+rows:
+  - fp: 26d0023b922d
+    seeded_rank: 1
+    rung: reach-enforced-everywhere
+    seam: S3.9
+    classes: [C7, C12]
+    status: predicted
+    title: Reach enforcement lands on a dead predicate at doorway egress
+    prediction: >
+      `should_serve_response` exists and is re-exported but has ZERO production call sites, and its
+      no-reach branch is fail-open. Enforcement will land on a dead predicate and read green while
+      serving unauthorized — advertise/serve asymmetry (C7) at exactly the surface where may-act
+      (C12) is the guarantee.
+
+  - fp: e92a13f1cd8e
+    seeded_rank: 2
+    rung: reach-enforced-everywhere
+    seam: S3.10
+    classes: [C7]
+    status: predicted
+    title: The other four egress surfaces each need advertise-filter identical to serve-filter
+    prediction: >
+      DHT, CRDT sync, shard and federation egress each need advertise-filter == serve-filter. The
+      CRDT surface is already recorded as "broadcast-only fail-closed = exclusion, not
+      enforcement" — exclusion satisfies no reach guarantee, it only makes the gap quiet.
+
+  - fp: 80c64868567b
+    seeded_rank: 3
+    rung: doorway-failover
+    seam: S3.9
+    classes: [C4]
+    status: predicted
+    title: serving | shedding | dead is a three-way answer with no Answer<T> behind it
+    prediction: >
+      The invariant demands sibling doorways be honestly classifiable as serving | shedding | dead
+      — three-way — with no `Answer<T>` behind it. Clients will conflate shedding (retry) with dead
+      (fail over). The live red already has this shape.
+
+  - fp: 01863b3f3f45
+    seeded_rank: 4
+    rung: identity-cross-signed
+    seam: S3.12
+    classes: [C2, C9]
+    status: predicted
+    title: A rotation's authorizing clock is the quorum's decision time, not the key's mint time
+    prediction: >
+      Three-clocks-in-one-column recurs at the identity seam: the authorizing clock for a rotation
+      is the quorum's decision time, not the key's mint time. And the chain-root cid does not exist
+      yet, so there is no stable SUBJECT for monotonicity to be about — C9 is a precondition of C2
+      here, not a peer of it.
+
+  - fp: 167433895e0d
+    seeded_rank: 5
+    rung: declarative-desired-state
+    seam: S3.2
+    classes: [C1, C6a]
+    status: predicted
+    title: A peer authoring the signed manifest it then obeys is self-election at the config surface
+    prediction: >
+      A peer that authors the signed desired-state manifest it then obeys is self-election at the
+      config surface (C1); and an unbudgeted desired-state reconcile replays the heal-throughput
+      smell at config scale (C6a).
+
+  - fp: 9c8dda8caebe
+    seeded_rank: 6
+    rung: operator-runtime-surface
+    seam: S3.4
+    classes: [C5, C12]
+    status: predicted
+    title: A commitment-gated restart must verify the grant in the peer's OWN conductor
+    prediction: >
+      A commitment-gated restart must verify the `delegates-compute` grant in the peer's own
+      conductor. I1 has only ever been proven for HEADS, never for permissions; today's gate sits
+      at the courier — which is precisely the evidence-not-authority failure C5 names, with C12
+      (may-act) as the guarantee being skipped.
+
+  - fp: e261f7f079db
+    seeded_rank: 7
+    rung: none
+    seam: S3.6
+    classes: [C5]
+    status: confirmed-live
+    title: did:web resolution never checks doc.id == did
+    prediction: >
+      CONFIRMED LIVE by this ceremony's mining: did:web resolution never checks `doc.id == did`, so
+      a host can return ANOTHER domain's DID document as a successful resolution. Outbound SSRF is
+      guarded; the inbound response is not — the receiver re-derives nothing.
+
+  - fp: 0ebe1a67288d
+    seeded_rank: 8
+    rung: none
+    seam: S3.6
+    classes: [C4, C9, C12]
+    status: confirmed-live
+    title: identity_head -> None conflates never-declared with revoked
+    prediction: >
+      CONFIRMED LIVE: `identity_head -> None` conflates never-declared with REVOKED, and an absent
+      controller means implicit self-control — so a revoked identity degrades silently to
+      self-controlled (C4 collapsing two provenances into one null, C9 losing the lineage). C12 is
+      the PREDICTED half of this row, not the live half: valueflows' `extensions_opted_in` widens
+      disclosure on a self-asserted header; the translate layer already takes the bool and no
+      resolver passes it until M2 wiring, which is the collision date.
+
+  - fp: 9b1031d01fcb
+    seeded_rank: 9
+    runner_up: true
+    rung: notary-authority
+    seam: S3.11
+    classes: [C3]
+    status: predicted
+    title: The REA face has no heal and no contest path — no legal move by construction
+    prediction: >
+      Runner-up on the ACTIVE red: the REA face has neither a heal leg nor a contest path, so from
+      a diverged state there is no automated transition at all — a liveness hole by construction,
+      not by regression.
+
+  - fp: 9e50223fec64
+    seeded_rank: 10
+    runner_up: true
+    rung: none
+    seam: S3.12
+    classes: [C1]
+    status: predicted
+    title: steward/node leader election — C1 at the seam where self-election is definitional
+    prediction: >
+      Runner-up: `steward/node`'s `consensus.rs` leader election is the seam where self-election is
+      the DEFINITIONAL question, and it is entirely unbound — its registered decision points carry
+      C1 at status `unbound`, which is the census reporting exactly this gap.

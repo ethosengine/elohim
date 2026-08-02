@@ -921,6 +921,33 @@ def epr_meta_mode() -> int:
         print("\n" + _sc.render_census(_sc.census_data(ROOT)))
     except Exception as e:  # noqa: BLE001 — instrument liveness: say the gate died, never vanish
         print(f"\nDECISION-POINT CENSUS: ⚠ gate-error ({type(e).__name__})")
+    # CONCERN x SEAM MATRIX (P4.3) + CASCADE (P4.2) + FORECAST (P4.4). Thin wiring only; every
+    # gate is independently try-wrapped so one dead instrument never takes the others with it,
+    # and each says so out loud rather than vanishing (the 2026-06-09 scope-reconcile lesson).
+    # READ-ONLY here by construction: this is a scoreboard. Filing cascade findings, regenerating
+    # the matrix artifacts and appending to the calibration ledger all live behind explicit verbs
+    # in `.claude/scripts/seam-audit.py`.
+    matrix = None
+    try:
+        from _lib import seam_matrix as _sm
+        matrix = _sm.matrix_data(ROOT)
+        print("\n" + _sm.render_matrix(matrix))
+        state, detail = _sm.generated_freshness(ROOT, matrix)
+        if state != "fresh":
+            print(f"\n  generated artifact: ⚠ {state} ({detail})"
+                  f" → `python3 .claude/scripts/seam-audit.py --matrix --write`")
+    except Exception as e:  # noqa: BLE001
+        print(f"\nCONCERN x SEAM MATRIX: ⚠ gate-error ({type(e).__name__}: {e})")
+    try:
+        from _lib import seam_cascade as _casc
+        print("\n" + _casc.render_cascade(_casc.cascade_data(ROOT, matrix=matrix)))
+    except Exception as e:  # noqa: BLE001
+        print(f"\nCASCADE: ⚠ gate-error ({type(e).__name__}: {e})")
+    try:
+        from _lib import seam_forecast as _fc
+        print("\n" + _fc.render_forecast(ROOT, matrix=matrix))
+    except Exception as e:  # noqa: BLE001
+        print(f"\nFORECAST: ⚠ gate-error ({type(e).__name__}: {e})")
     return 0
 
 

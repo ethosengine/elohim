@@ -1,0 +1,344 @@
+# .claude/epr-meta/seam-catalog.yaml — the MATRIX COLUMN AXIS (seam-concern-contract plan, P4.3).
+#
+# WHAT THIS IS. A machine-readable TRANSCRIPTION of the concern-routing atlas's §3 seam catalog,
+# grouped by its §7 three-plane lens, plus the two columns the plan adds (a governing/meta-plane
+# column and the bridges column, which is §3.6 lifted out of the plane grouping because a
+# translation seam is not a participation track). The concern x seam matrix's ROWS come from the
+# two canon homes (policies.yaml + concerns.yaml); its COLUMNS come from here. Cells are DERIVED
+# by the census from `seam-registry.yaml` files — never authored here.
+#
+# WHO IS THE AUTHORITY. The atlas is:
+#   genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
+# Per the plan's authority split: the atlas §4 routing table remains the ROUTING authority (where a
+# concern lives); the canon is the GUARANTEE authority (what must hold). When this file and the
+# atlas disagree, route by the atlas and then correct whichever recorded the world wrong — this
+# file is a projection with a `source_section` on every row so the correction is cheap.
+#
+# WHY IT IS NOT IN THE SEAM REGISTRIES. A `seam-registry.yaml` names a crate/module locus and says
+# so explicitly in its own header ("NOT the concern-routing atlas's composition seams or
+# participation tracks — those are matrix vocabulary, surface 6"). Putting atlas coordinates in the
+# registries would collapse two deliberately distinct vocabularies. The mapping crate -> atlas seam
+# therefore lives HERE, on the matrix's own axis definition, where it can be corrected without
+# touching a source-of-truth registry.
+#
+# WHY THIS HOME. It sits beside the two canon homes it is read with (`policies.yaml`,
+# `concerns.yaml`) and is loaded by the same tooling (`_lib/seam_matrix.py`, wired into
+# `placement-audit.py --epr-meta`). It carries NO contentHash pin: pins exist so a BINDING can
+# declare which version of a guarantee applies (resolution mode 2), and nothing binds this file —
+# it is an axis, not a Precedent. Its correctness is checked structurally (every `registry_crates`
+# entry must resolve to a real registry; every `spine_nodes` entry to a real spine node) by
+# `_lib/__tests__/seam_matrix_test.py` against the live tree.
+#
+# PLANE ASSIGNMENT IS DOMINANT-PLANE, NOT EXCLUSIVE. Several seams genuinely span planes; each
+# carries a `plane_note` saying so rather than pretending the assignment is clean. The one thing
+# the grouping must never do is let a cell read `n-a` because a track-keyed axis scored it out of
+# existence — that is the failure mode the plan names when it insists on the governing/meta column.
+#
+# n-a IS EARNED, NOT DECLARED HERE. `n_a_concerns` exists on every seam and is deliberately EMPTY:
+# a cell becomes `n-a` when a registered decision point declares `status: n-a` with a
+# justification (the registry is where that judgment is witnessed). Blanket-declaring a class
+# inapplicable to a whole seam from this file would manufacture exactly the false-clean the
+# unexamined-cell ranking exists to prevent.
+
+seam-catalog-version: 1
+atlas_source: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
+spine_source: genesis/manifests/spine.yaml
+
+# The §7 plane groups, in render order. `governing-meta` and `bridges` are the plan's two
+# additions; the first three are the atlas's own lens verbatim.
+plane_groups:
+  - id: control-truth
+    title: Control / truth plane
+    gloss: >
+      The DHT-notary: identity, commitments, attestations, reach. Source of truth; small, cheap,
+      witnessed. Storage is a reconciliation controller OVER this plane (P1), never its owner.
+  - id: data
+    title: Data plane
+    gloss: >
+      Actual byte/record movement: blobs, CRDT docs, shards, quilt RS(N,K). Where availability and
+      durability live.
+  - id: projection
+    title: Projection plane
+    gloss: >
+      Read-optimized renders of truth for fast/legible access — storage SQLite projections (P2P
+      side) and the doorway (web2 side). NEVER the source of truth.
+  - id: bridges
+    title: Bridges (translation seam)
+    gloss: >
+      §3.6 lifted out of the plane grouping per the plan: a bridge translates an external protocol
+      to/from the canonical substrate. It is a seam you ADD a crate at, not a participation track.
+  - id: governing-meta
+    title: Governing / meta plane
+    gloss: >
+      The repo's own governance substrate — the .epr-meta policy family, the eprfs/cite-seal
+      content-addressing family, CI/orchestrator, and the epr-cli/REA developer valueflow sidecar.
+      It has no atlas §3 section because the atlas maps the RUNTIME; this column exists because
+      C4, C5 and C7 have confirmed precedents here and C2's strongest precedent (the epr-cli
+      append-order-vs-occurredAt replay) sits in the adjacent developer-tooling territory. A
+      track-keyed axis would score all of those `n-a` when they are `unexamined`.
+
+# ── Known axis gap, recorded rather than papered over ─────────────────────────────────────────
+# The atlas §3 catalog has NO identity / T1-notary column: identity is a participation TRACK in
+# the atlas (Figure B, T1 "notary FLOOR"), and the plan fixes tracks as cell attributes, not axes.
+# The atlas itself already routes a T1 concern under a §3 seam — §4's row "The region's commitment
+# totals look wrong / all-zero | T1 notary floor (under 3.11)" — so this catalog follows that
+# established move: T1/identity concerns route under the §3 seam that owns their artifact
+# (content head election -> 3.10; identity-preserving graduation and DNA-key lineage -> 3.12;
+# commitment/REA rollup -> 3.11), each recorded in the seam's `t1_routing` note. This is a
+# candidate atlas correction, not a silent workaround.
+axis_notes:
+  - id: no-identity-column
+    detail: >
+      §3 has no identity/T1-notary section; T1 concerns route under the §3 seam owning their
+      artifact, per the §4 "T1 notary floor (under 3.11)" precedent. Candidate atlas correction:
+      either an explicit §3.16 identity/notary section, or an explicit statement in §3 that T1
+      concerns route under the artifact-owning seam.
+
+seams:
+  # ── control / truth ────────────────────────────────────────────────────────────────────────
+  - id: S3.1
+    source_section: "3.1"
+    name: Hardware / capability gradient
+    plane: control-truth
+    plane_note: >
+      A device's capability_level is a DECLARED, witnessed fact (boot_registration writes it to the
+      registry) — the operational envelope is derived from it. The derivation runs in the runtime,
+      but the fact lives on the truth plane.
+    tracks: [T1, T2, T3, T4]
+    reach_tier: community
+    registry_crates: []
+    spine_nodes: []
+    n_a_concerns: []
+
+  - id: S3.4
+    source_section: "3.4"
+    name: Mod / plugin (native extension INTO the runtime)
+    plane: control-truth
+    plane_note: >
+      Loading is a runtime act; INTEGRITY is a control-plane act — a plugin's effects route through
+      the notary (bounds_validator + the delegates-compute Commitment + coordinator hot-swap).
+      The atlas's own framing: "integrity comes from routing a plugin's effects through the notary".
+    tracks: [T2]
+    reach_tier: trusted
+    registry_crates: []
+    spine_nodes: [operator-runtime-surface]
+    n_a_concerns: []
+
+  - id: S3.5
+    source_section: "3.5"
+    name: SDK grammar (compose inward — add a MANIFEST)
+    plane: control-truth
+    plane_note: >
+      The four cheap moves (signal_kind, Commitment action, Governor impl, CoverageRollup
+      predicate) are all control-plane vocabulary; integrity here is BY CONSTRUCTION, with no
+      notary to route through.
+    tracks: [T1]
+    reach_tier: commons
+    registry_crates: []
+    spine_nodes: []
+    n_a_concerns: []
+
+  - id: S3.7
+    source_section: "3.7"
+    name: App-manifest / domain
+    plane: control-truth
+    plane_note: >
+      The protocol-schema enums a domain manifest composes are DNA-notarized; the renderer map it
+      also carries is projection vocabulary. Assigned to control because the notarized half is
+      what a concern class can violate irrecoverably.
+    tracks: [T1, T4]
+    reach_tier: commons
+    registry_crates: []
+    spine_nodes: []
+    n_a_concerns: []
+
+  - id: S3.12
+    source_section: "3.12"
+    name: Hub cluster ops + enablement (hub-INTERNAL swarm)
+    plane: control-truth
+    plane_note: >
+      Leader election, pod consensus and replica/PVC placement are control decisions on a SECOND
+      libp2p swarm, private to the hub — distinct from Track-2 hub-to-hub federation (§3.10/§3.11).
+      Debugging blade consensus inside elohim-storage/src/p2p means the wrong crate.
+    t1_routing: >
+      Identity-preserving tier graduation and DNA-key lineage route here (atlas §4: "Graduate
+      hardware (laptop->NUC->rack) keeping identity | Hub enablement (3.12)"), which is why the
+      identity-cross-signed forecast rung lands on this column despite being a T1 concern.
+    tracks: [T2]
+    reach_tier: intimate
+    registry_crates: [elohim-node]
+    point_overrides:
+      # steward/node's admission surface is resource governance, not cluster ops — the atlas is
+      # explicit ("A peer is being flooded / a breaker is stuck open / set a quota -> 3.15").
+      "elohim-node::AdmissionController::evaluate": S3.15
+      "elohim-node::AdmissionDecision": S3.15
+      "elohim-node::DeferReason": S3.15
+    spine_nodes: [identity-cross-signed]
+    n_a_concerns: []
+
+  - id: S3.14
+    source_section: "3.14"
+    name: Temporal / scheduling
+    plane: control-truth
+    plane_note: >
+      Validity horizons and expiry->obligation are notarized facts; the durable scheduler that
+      fires them is operational. The `time` substrate SIGNAL (economic, accounted) is a different
+      thing from the scheduler and must not be conflated with it.
+    tracks: [T1, T2]
+    reach_tier: community
+    registry_crates: []
+    spine_nodes: []
+    n_a_concerns: []
+
+  - id: S3.2
+    source_section: "3.2"
+    name: OS / packaging / deploy target
+    plane: control-truth
+    plane_note: >
+      Today this seam lives in CI and repo manifests (governing/meta-adjacent). Its DECLARED
+      destination is the control plane — the declarative-desired-state rung has peers reconciling
+      SIGNED desired state the way coordinators hot-swap. Assigned to its destination, with the
+      today-state recorded here so the assignment is not read as a claim about the present.
+    tracks: []
+    reach_tier: community
+    registry_crates: []
+    spine_nodes: [declarative-desired-state]
+    n_a_concerns: []
+
+  - id: S3.3
+    source_section: "3.3"
+    name: Runtime / binary + footprint
+    plane: control-truth
+    plane_note: >
+      The single-node COMPOSITION axis (thin vs fat, cargo features, embedded children),
+      orthogonal to network role. Same destination logic as §3.2: which composition a peer runs is
+      desired state. Footprint tuning is native-binary-only — never per-device WASM/DNA (that
+      moves the DNA hash and partitions the fleet).
+    tracks: [T2, T3]
+    reach_tier: community
+    registry_crates: []
+    spine_nodes: [declarative-desired-state]
+    n_a_concerns: []
+
+  # ── data ───────────────────────────────────────────────────────────────────────────────────
+  - id: S3.10
+    source_section: "3.10"
+    name: Peer-hoster dataplane (Tracks 2 + 3)
+    plane: data
+    plane_note: >
+      Durable availability of records across disconnect. The head-election/notary side of the same
+      record family is T1 (see t1_routing) — one column, two tracks, which is exactly why track is
+      a cell ATTRIBUTE and not an axis.
+    t1_routing: >
+      The content_store zome (select_canonical_winner, declare_canonical_head_inner) is the
+      T1-notary/control side of this seam's record family and routes here, per the §4 "T1 notary
+      floor (under 3.11)" precedent applied to content heads.
+    tracks: [T1, T2, T3]
+    reach_tier: familiar
+    registry_crates: [elohim-storage, content_store]
+    spine_nodes: [dataplane-convergence, blob-durability, notary-authority, sync-scale-honesty,
+                  reach-enforced-everywhere]
+    n_a_concerns: []
+
+  - id: S3.11
+    source_section: "3.11"
+    name: Aggregation / recursive rollup (Track 2)
+    plane: data
+    plane_note: >
+      Recursive signal aggregation over CoverageRollup plus the REA value-flow turning delegated
+      compute into accounted flow, witnessed across DHT boundaries. A Case-A all-zeros bug here is
+      a Track-1 identity-coherence failure wearing an aggregation costume — C0 before C-anything.
+    tracks: [T1, T2]
+    reach_tier: community
+    registry_crates: []
+    spine_nodes: [notary-authority, sync-scale-honesty]
+    n_a_concerns: []
+
+  - id: S3.13
+    source_section: "3.13"
+    name: Confidentiality / encryption / secrets
+    plane: data
+    plane_note: >
+      KeyEnvelope reader-key wraps ride the blob/quilt plane. Confidentiality is NOT integrity
+      (T1 notary) and NOT authorization (§3.4): a notarized entry is world-readable, so "make this
+      private" is this seam, never a permission flag.
+    tracks: [T2]
+    reach_tier: private
+    registry_crates: []
+    spine_nodes: []
+    n_a_concerns: []
+
+  - id: S3.15
+    source_section: "3.15"
+    name: Resource governance / admission / backpressure
+    plane: data
+    plane_note: >
+      Guards ride the data AND projection planes (storage bounds_validator; doorway 503-shed;
+      breakers); the unifying owner is the elohim-operator per-hub allocator, which is a control
+      actor. Assigned to data because what it meters is byte/request flow.
+    tracks: [T2, T3, T4]
+    reach_tier: community
+    registry_crates: []
+    spine_nodes: [doorway-failover, operator-runtime-surface]
+    n_a_concerns: []
+
+  # ── projection ─────────────────────────────────────────────────────────────────────────────
+  - id: S3.8
+    source_section: "3.8"
+    name: Client surface
+    plane: projection
+    plane_note: >
+      Presentation + user-intent capture ONLY: render host-provided state, emit intent, bind
+      nothing. Anything that looks like state ownership belongs to a doorway route, a zome
+      coordinator, or a storage projection.
+    tracks: [T4]
+    reach_tier: public
+    registry_crates: []
+    spine_nodes: []
+    n_a_concerns: []
+
+  - id: S3.9
+    source_section: "3.9"
+    name: Doorway projection (Track 4)
+    plane: projection
+    plane_note: >
+      Makes canonical substrate truth legible to browsers and web2. The doorway is NOT a P2P
+      participant — it never swarms libp2p or iroh. Bootstrap and signal consolidate here too.
+    tracks: [T4]
+    reach_tier: public
+    registry_crates: [doorway]
+    spine_nodes: [doorway-failover, reach-enforced-everywhere]
+    n_a_concerns: []
+
+  # ── bridges ────────────────────────────────────────────────────────────────────────────────
+  - id: S3.6
+    source_section: "3.6"
+    name: Bridge (translate outward — add a CRATE)
+    plane: bridges
+    plane_note: >
+      Imperative interop facing the non-elohim world. Not disjoint from §3.4: the bridge is the
+      COMPILE-TIME instance of native extension; the discriminator is direction + bind-time.
+    tracks: [T3, T4]
+    reach_tier: public
+    registry_crates: []
+    spine_nodes: []
+    n_a_concerns: []
+
+  # ── governing / meta ───────────────────────────────────────────────────────────────────────
+  - id: SGOV
+    source_section: "plan surface 6 (no atlas §3 section — the atlas maps the runtime)"
+    name: Governing / meta plane (repo's own governance substrate)
+    plane: governing-meta
+    plane_note: >
+      The .epr-meta policy family, the eprfs/cite-seal content-addressing family, CI/orchestrator,
+      and the epr-cli/REA developer valueflow sidecar. Confirmed concern instances here: C7 (15
+      rules naming validators that do not exist, 2026-07-25), C5 (BlobCid::verifies hardcoding the
+      wrong codec so self-verification was inert, 2026-07-24; and an unresolvable validator may not
+      HARDEN an advisory rule, 2026-07-25), C4 (NOT_BUILT reading as 0 failures, CI museum #1), and
+      C2's strongest precedent in the adjacent developer-tooling territory (the epr-cli/REA
+      append-order-vs-occurredAt replay, a83b35079).
+    tracks: []
+    reach_tier: community
+    registry_crates: []
+    spine_nodes: []
+    n_a_concerns: []
