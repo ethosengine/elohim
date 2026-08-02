@@ -13,7 +13,7 @@ steward: rust-architect
 graduation-trigger: features/trust suite green with all reason-assertions wired
 domain: D-resilience
 cites:
-  - substrate-trust-contract-runbook | The Substrate Trust Contract | sha256:5cc93e37c6374cda | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md
+  - substrate-trust-contract-runbook | The Substrate Trust Contract | sha256:cb76e9f0ae6bacfc | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md
   - genesis/data/timeline/backlog/self-heal-doorway-alpha-storage-breaker-matthew-rekey.md
   - genesis/data/timeline/backlog/provide-reconciler-actual-set-transport-id-mismatch.md
 informed-by:

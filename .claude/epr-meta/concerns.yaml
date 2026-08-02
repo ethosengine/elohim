@@ -1,0 +1,626 @@
+# .claude/epr-meta/concerns.yaml — the CONCERN CANON (seam-concern-contract plan, design surface 1).
+#
+# Sibling of policies.yaml, same conventions (Precedent-shaped, `<id>@<version>` identity,
+# contentHash pins over the canonical-JSON body, supersession lineage; graduates to
+# Mishpat::Precedent identically) — but NOT edit-gate enforcement rows: these classes have no
+# evaluable predicate TODAY. It lives in its own file for exactly the reason governors.yaml does:
+# policies.yaml's fail-loud validation (rightly) rejects non-enforcement classes, and a fake
+# predicate would corrupt that discipline. Naming a `validator:` that does not exist would be this
+# canon's own C7 violation (advertise ≠ serve), so no row here carries one — and no row here
+# carries an enforcement `class:` either, because declaring a gate class with nothing to gate is
+# the same misrepresentation wearing a different key.
+#
+# THE TWO HOMES (define-once-bind-many, split by whether a predicate exists):
+#   • a class WITH an evaluable predicate today  -> an enforcement row in `policies.yaml`
+#     (currently: C2, whose storage-family placement is bound from
+#     `elohim/elohim-storage/src/.epr-meta`).
+#   • a class WITHOUT one                        -> a Precedent-shaped row HERE.
+# A class lives in exactly ONE home. When P4.1 registers a class's validator, its row MOVES to
+# policies.yaml as a NEW version row; the concerns.yaml row is marked `status: superseded` with
+# `superseded_by` naming the policies.yaml pin — lineage, never deletion.
+#
+# NAMED CONSUMERS (a consumer-less registry is a silently-unloaded one by another name):
+#   1. the decision-point CENSUS — `placement-audit.py --epr-meta` (plan P3.2): reads BOTH homes;
+#      every concern must list its bound decision points, every registered point must cite passing
+#      contract tests. A row here with no consumer fails the census.
+#   2. the CANON PROJECTION — `elohim/sdk/schemas/v1/registries/concern-classes.json` (plan P4.6):
+#      `{id, statement, version, contentHash}` GENERATED from both homes, never hand-written, so an
+#      external peer runtime inherits the same canon and can diff pins with no Claude tooling.
+#
+# ADMISSION BAR: >= 2 dated instances at DISTINCT seams (deliberately below the CI museum's
+# >= 3-shift bar — a canon row is cheaper than a museum row). Every row carries its instances with
+# commit hashes / dated records, so the bar is auditable, not asserted. The canon is OPEN and its
+# growth is MEASURED: `miss-of-canon` in the calibration ledger is the only admission intake.
+#
+# PINS ARE WRITTEN BY TOOLING, NEVER BY HAND: `python3 .claude/scripts/epr-meta-pin.py --write`
+# (canonical JSON, sorted keys, compact separators, minus contentHash/status/superseded_by — the
+# SAME canonicalization `_lib.epr_meta.policy_content_hash()` uses).
+#
+# STANDING (brit frame): every row declares `standing: attestation` — a Precedent citing content,
+# whose binding force/scope/supersession live on a plane separate from the hashed body — and
+# `resolution_mode: pinned`: which version binds a consumer is a DECLARED dependency, never
+# recency. A version bump moves nothing until each binding re-declares; the cascade (plan surface
+# 5) is the worklist that closes that gap. Liftability to CIDv1(dag-cbor, sha2-256) is proven by
+# fixture at `elohim/epr/tests/concern_canon_liftability.rs` — the P5 lift is a codec wrap of these
+# exact bytes, never a rewrite.
+#
+# Editing a row = a NEW version entry. Never mutate a landed version in place.
+
+concern-canon-version: 1
+concerns:
+  - id: c0-plane-location
+    version: 1
+    contentHash: sha256:df38bb561769ff552e76d63391996e41093a70621a47fae47ac25fcfa3500505
+    concern: C0
+    title: Plane location — name the plane before binding any concern
+    statement: >
+      Before any concern binds, the symptom names its plane — custody/availability ·
+      reach/audience · head/version, plus the truth-vs-projection distinction. A cure applied to
+      the wrong plane is a defect even when locally correct.
+    applies_to: >
+      Every diagnosis, every design gate, every finding triage. Evaluated FIRST, before any other
+      class. The answer vocabulary is exactly that guard set (the R1 three-plane guard extended by
+      the seam-map atlas §7 truth/projection split); the content/standing two-plane split is the
+      policy-registry spec's own established sense, and "dataplane" is a proper noun — both stand.
+      The ceremony's four substrate families and the matrix's §7 column grouping are DIFFERENT
+      axes and are never called planes.
+    binding: binding-local
+    standing: attestation
+    resolution_mode: pinned
+    probe_home: seam-registry
+    severity_class: silent-corruption
+    dispatch-agent: rust-architect
+    findings_namespace: concern:c0-plane-location
+    recurrence:
+      unit: distinct-shifts
+      shifts: 3
+      instances:
+        - "2026-07-09 content-head-election-vs-reach-fork-arbitration record — head/version read as reach/audience; the operator ontology-guard deleted content_head_election.rs rather than let an authority mechanism answer a reach question"
+        - "2026-07-31 R1 decision (same record) — declared_at is the RECEIVING conductor's clock: truth-plane arbitration (notarized DHT link timestamp) and projection-plane divergence are not the same question"
+        - "2026-08-02 ceremony mining — a landing-page divergence repeatedly read as head election when it was replication/custody"
+    status: active
+    established_by: deliberated-2026-08-02-operator+claude
+    why: >
+      This is the one class a SHARP AUTHORITY CANON ACTIVELY WORSENS: eight authority-flavoured
+      concerns make every symptom look like an authority problem, so C0 is evaluated before them
+      and its answer is recorded on the finding. Reach (audience, earned) != content_head
+      (version, declared) != replication (availability, custody) — three orthogonal planes; and
+      REA's monotonicity guard living in the PROJECTION rather than in DHT truth is exactly where
+      C0 and C2 meet. Authority split with the seam-map atlas: the atlas §4 concern-routing table
+      remains the ROUTING authority (where a concern lives); this canon is the GUARANTEE authority
+      (what must hold). When they disagree, route by the atlas, then correct whichever recorded
+      the world wrong.
+
+  - id: c1-anti-self-election
+    version: 1
+    contentHash: sha256:6786f77a5deca569a81ab88d317575f2d5b61cf68c4aaf2bbb9fe9354754039f
+    concern: C1
+    title: Anti-self-election — no component crowns what it authored
+    statement: >
+      No component crowns what it authored — except through the guarded legitimate arm:
+      self-candidacy is admissible exactly when `not_retrievable` itself proves a local chain
+      exists. A flat prohibition would forbid a cure the fleet depends on.
+    applies_to: >
+      Every decision point that selects among candidates where one candidate is locally authored:
+      head election, custody claims, config/manifest authorship, leader election, boot
+      re-projection, terminal write paths.
+    binding: binding-local
+    standing: attestation
+    resolution_mode: pinned
+    probe_home: seam-registry
+    severity_class: silent-corruption
+    dispatch-agent: rust-architect
+    findings_namespace: concern:c1-anti-self-election
+    recurrence:
+      unit: distinct-shifts
+      shifts: 4
+      instances:
+        - "8844cd1d6 2026-07-11 boot re-projection stamped the root-author fallback over the adopted canonical — 2,838 rows per restart"
+        - "f9ab9b853 2026-07-24 custody plane — self-held custody must gossip-publish, never self-dial"
+        - "b91ee0f95 2026-07-28 content write path — upsert_with_anchor self-declared on every own-conductor commit"
+        - "2175f2b60 2026-07-28 heal_content third site — a TERMINAL write invisible to both guarded sweeps"
+        - "134331c83 2026-08-02 guarded self-candidacy — decide_head_action Hold, gapfill_would_self_elect, zome no-chain gate, witness-bootstrap routing, contest quiescence"
+    status: active
+    established_by: deliberated-2026-08-02-operator+claude
+    why: >
+      Self-election is the authority family's most-recurrent class and its cures keep landing one
+      call site at a time — the third site (a terminal write) was invisible to BOTH sweeps already
+      guarding the first two. The guarantee is therefore stated over the DECISION POINT SET, not
+      over a call site: a seam answers C1 by enumerating every path that can crown, including
+      terminal writes, or it declares n-a. The legitimate arm is part of the guarantee because the
+      2026-08-02 cure depends on it — a component MAY stand as its own candidate when the refusal
+      evidence (`not_retrievable`) is itself proof that a local chain exists; that is evidence, not
+      self-preference. steward/node's `consensus.rs` leader election is the standing unbound seam
+      where C1 is the definitional question.
+
+  - id: c3-liveness
+    version: 1
+    contentHash: sha256:8bb97f24fde37f07e62e05dfb11c12bce47b35e6ac846dfd217588a869055746
+    concern: C3
+    title: Liveness — a legal move exists from every reachable state
+    statement: >
+      From every reachable non-terminal state, at least one AUTOMATED transition is enabled. A
+      human hand (or a deploy) as the only exit is a liveness hole, not an escape hatch.
+    applies_to: >
+      Every state machine, queue, guard set, breaker, and admission predicate — and, critically,
+      every COMPOSITION of locally-correct refusals: four independently-correct guards can compose
+      into no-legal-move.
+    binding: binding-local
+    standing: attestation
+    resolution_mode: pinned
+    probe_home: seam-registry
+    severity_class: loud-fail
+    dispatch-agent: rust-architect
+    findings_namespace: concern:c3-liveness
+    recurrence:
+      unit: distinct-shifts
+      shifts: 5
+      instances:
+        - "2026-07-11 over-broad GapFill guard froze forward convergence — the pre-wave-5 shape, one month earlier"
+        - "74fbdf2d7 2026-07-29 heal starved the gossip that would have ended it"
+        - "192f77cd0 2026-07-31 acquisition pull-queue — the only transition out of an exhausted pin was a human HTTP DELETE"
+        - "c16daaa79 2026-08-01 doorway breaker — a dropped half-open trial latches shed-forever (halfopen_without_record_deadlocks_forever)"
+        - "2026-08-02 two-way-declared deadlock — four locally-correct refusals composing into no legal move"
+    status: active
+    established_by: deliberated-2026-08-02-operator+claude
+    why: >
+      LIVENESS WAS NOBODY'S JOB. Safety rules accrete incident-by-incident and each is locally
+      correct; nothing in the review loop asks whether the conjunction still leaves a move. This
+      class exists to make that question structural: the P2 `Liveness` table harness enumerates a
+      predicate's input state-space and asserts every non-terminal state has >= 1 enabled
+      automated transition, and it is proven to generalize by FAILING against two independently
+      dated historical predicate sets (pre-wave-5 and the 2026-07-11 over-broad GapFill guard)
+      while passing current. The notary-authority REA face — no heal, no contest path, no legal
+      move by construction — is the standing unbound seam.
+
+  - id: c4-honest-absence
+    version: 1
+    contentHash: sha256:caffa2cb3e1ae7858458aa8c5cfb6d8e8515daeb9a0668e3b1c8ba455d1b6cb5
+    concern: C4
+    title: Honest absence — absent, unreachable, refused and unverifiable are distinct answers
+    statement: >
+      Absent, unreachable, refused, and unverifiable are distinct answers, and unreadable /
+      unmeasured never reads as zero or complete. On a full-arc fleet a local `get` miss maps to
+      Unreachable (gossip failed), never Absent.
+    applies_to: >
+      Every boundary return type, every fetcher, every gauge, every nullable field whose absence
+      has two provenances. 54 of 105 view schemas sit on the bare-nullable collapse surface —
+      hence view CONVENTIONS Rule 11.
+    binding: binding-local
+    standing: attestation
+    resolution_mode: pinned
+    probe_home: seam-registry
+    severity_class: silent-corruption
+    dispatch-agent: rust-architect
+    findings_namespace: concern:c4-honest-absence
+    recurrence:
+      unit: distinct-shifts
+      shifts: 5
+      instances:
+        - "CI museum #1 (2026-06-02 record) — NOT_BUILT / ABORTED / superseded builds read as 0 failures"
+        - "270dbafac 2026-07-11 ice_servers vs iceServers — absent-because-misspelled ran the fleet with zero ICE servers since inception"
+        - "dd1824e03 2026-07-22 identity reconcile — unreadable != absent; cure = abstain + observe"
+        - "d6c88e385 2026-07-23 shefa facing — unmeasured != zero"
+        - "2026-08-02 head-record responder + LocalResolve::Unresolved split + merged contest-failure log line"
+    status: active
+    established_by: deliberated-2026-08-02-operator+claude
+    why: >
+      The three-way distinction has been re-derived bespoke at least three times
+      (`FetchOutcome`/`RenderTerminal`, the freshness enum's `unverifiable`, `epr-pull-status`'s
+      documented "tri-state" nullable) and collapsed to a bare nullable far more often. The cure
+      is a TYPE, not a convention: `Answer<T>` (Present / Absent / Unreachable) in
+      `seam_contracts`, monomorphic on the wire behind `schemas/v1/objects/answer.schema.json` so
+      the distinction survives the Rust->TS boundary instead of collapsing to null. Standing
+      warning for the first adoption: on a full-arc fleet every zome get/get_links is local-only,
+      so a miss means gossip failed — mapping it to Absent would re-merge exactly what wave 4
+      separated.
+
+  - id: c5-evidence-not-authority
+    version: 1
+    contentHash: sha256:2350a0809ba49c4fa64fa4f403924e35aab861e7986d03c1ed7f1319f93e8229
+    concern: C5
+    title: Evidence-not-authority (may-believe) — a claim confers only what the receiver re-derives
+    statement: >
+      A transferred claim confers only what the receiver re-derives — signature over the action AND
+      the entry<->action binding (the clause that closes the swap attack). Evidence that cannot be
+      evaluated confers nothing, in either direction: an unresolvable validator neither hardens nor
+      softens.
+    applies_to: >
+      Every transfer boundary — carried records, couriered heads, gossip payloads, bridge
+      resolutions, cite seals, policy validators, capsule intake. C5 constrains BELIEF; C12
+      constrains ACTION.
+    binding: binding-network
+    standing: attestation
+    resolution_mode: pinned
+    probe_home: seam-registry
+    severity_class: silent-corruption
+    dispatch-agent: red-team
+    findings_namespace: concern:c5-evidence-not-authority
+    recurrence:
+      unit: distinct-shifts
+      shifts: 4
+      instances:
+        - "9e9c9d023 2026-07-24 eprfs/cite-seal family — BlobCid::verifies hardcoded the wrong codec, so self-verification was inert for every real fingerprint, and the existing test computed both sides the same wrong way and stayed green"
+        - "4d90bf276 2026-07-25 policy family — an unresolvable validator may not HARDEN an advisory rule; unevaluatable evidence confers nothing in either direction"
+        - "b91168724 2026-07-26 carried-record validation — the entry<->action binding clause closes the swap attack that signature + hash checks alone admit"
+        - "2026-08-02 bridges/did (confirmed live) — did:web resolution never checks doc.id == did; a host can return another domain's DID as a successful resolution"
+    status: active
+    established_by: deliberated-2026-08-02-operator+claude
+    why: >
+      Generosity without gullibility. The heal plane is already mutual aid — fills, salvage,
+      carried records, witness bootstrap — and C5's re-derivation is precisely what makes that good
+      faith SAFE to extend; peers are there for each other as friends, and verification is the
+      friendship's floor, not its opposite. Two standing verification disciplines belong to this
+      class and are stated here so they bind every future contract test: a passing contract test
+      can be MEASURING THE MIRROR (the 2026-07-24 codec bug: compute the two sides independently or
+      the green means nothing), and unevaluatable evidence is symmetric — it may not harden an
+      advisory rule any more than it may soften a gating one.
+
+  - id: c6a-bounded-work
+    version: 1
+    contentHash: sha256:855ea03160a434768678ce5df68143089ec9831bbe0d0e5288d98c6edeb5cc15
+    concern: C6a
+    title: Bounded work — every loop, sweep and retry ladder respects a declared budget
+    statement: >
+      Every loop, sweep, and retry ladder carries a declared budget it provably respects — and a
+      retry policy against an uncancellable call IS a loop even when no `loop` token appears in the
+      diff. New pacing binds the existing drain kernel rather than minting a fourth vocabulary.
+    applies_to: >
+      Sweeps, reconcile passes, retry ladders, responder/requester budget pairs, publish drains,
+      per-tick caps. Distinct from C11: C6a asks "does my sweep respect MY budget"; C11 asks "do I
+      survive traffic I did not choose".
+    binding: binding-local
+    standing: attestation
+    resolution_mode: pinned
+    probe_home: runbook
+    severity_class: loud-fail
+    dispatch-agent: rust-architect
+    findings_namespace: concern:c6a-bounded-work
+    recurrence:
+      unit: distinct-shifts
+      shifts: 4
+      instances:
+        - "6369721fd 2026-07-04 view-federation codec — the responder rejected its own oversized reply; cure trims BEFORE signing"
+        - "74fbdf2d7 2026-07-29 a retry ladder against an uncancellable call created unbounded work with no loop anywhere in the diff"
+        - "1b445b481 2026-08-01 a responder budget compile-asserted strictly below the requester's"
+        - "2026-08-02 sweep budgets + per-tick caps across the conductor-plane waves"
+    status: active
+    established_by: deliberated-2026-08-02-operator+claude
+    why: >
+      The class's teeth are in its scope clause, not its statement: the expensive instances had NO
+      loop token in the diff (a retry policy against an uncancellable call) or asserted a budget in
+      the wrong direction (responder below requester). Paced ingest drain has now been solved
+      TWICE; the live kernel is `drain_publish_queue` + wait-for-drain, and a third scheme is a
+      diagnosis failure, not a design. Live-metered: this class gets a runbook invariant->probe row
+      (mint-then-quiet), not a design-time contract test alone.
+
+  - id: c6b-idempotent-effect
+    version: 1
+    contentHash: sha256:055ecc7d50692aef933b336bf60f539f16c472a4b0886374fde01cb993d2cb56
+    concern: C6b
+    title: Idempotent effect — replay against settled state mints nothing and double-applies nothing
+    statement: >
+      Replaying a decision against settled state mints nothing and double-applies nothing — while
+      never licensing lazy acceptance: storage stays an EAGER reconciliation controller (P1).
+      Quiescence is about EFFECT, not effort.
+    applies_to: >
+      Every effectful decision that can re-run: stamp paths, mint/commit producers, dispatch
+      ledgers, boot re-projection, contest/election retries, (id,target) keyed work.
+    binding: binding-local
+    standing: attestation
+    resolution_mode: pinned
+    probe_home: seam-registry
+    severity_class: silent-corruption
+    dispatch-agent: rust-architect
+    findings_namespace: concern:c6b-idempotent-effect
+    recurrence:
+      unit: distinct-shifts
+      shifts: 2
+      instances:
+        - "8844cd1d6 2026-07-11 boot re-projection — the SAME decision replayed against settled state re-applied a stamp across 2,838 divergence-queued rows, serially, after every restart"
+        - "134331c83 / da8975176 2026-08-02 — (id,target) idempotence ledgers added so a replayed contest/election dispatch mints nothing"
+    status: active
+    established_by: deliberated-2026-08-02-operator+claude
+    why: >
+      Split out of C6 because the two halves fail differently and are cured differently: C6a is a
+      BUDGET (loud — starvation, OOM, timeout) and C6b is a FIXED POINT (silent — a second identical
+      effect that no counter distinguishes from the first). The anti-lazy clause is load-bearing
+      and stated in the guarantee so no future adoption reads quiescence as permission to stop
+      reconciling: the DHT is the manifest and storage is a k8s-style controller that eagerly
+      reconciles; a `Quiescent` harness proves the replay is a fixed point, never that the
+      controller may sleep.
+
+  - id: c7-advertise-serve-symmetry
+    version: 1
+    contentHash: sha256:ba502823e801e8a0e91e50cf7545b97595865fce068af3c3290f58f562267576
+    concern: C7
+    title: Advertise/serve symmetry — what a surface advertises equals what it serves
+    statement: >
+      What a surface advertises equals what it serves — capability, inventory, validator, coverage.
+      A surface that names something it cannot deliver misrepresents itself to every reader.
+    applies_to: >
+      Capability announcements, inventory gossip, provide/advertise loops, policy `validator:`
+      keys, published SDK surfaces, coverage claims, reach filters.
+    binding: binding-network
+    standing: attestation
+    resolution_mode: pinned
+    probe_home: runbook
+    severity_class: silent-corruption
+    dispatch-agent: code-reviewer
+    findings_namespace: concern:c7-advertise-serve-symmetry
+    recurrence:
+      unit: distinct-shifts
+      shifts: 3
+      instances:
+        - "4e1f34f1e 2026-07-25 policy family — 15 rules name validators that do not exist; a rule that names a validator it does not have misrepresents itself to every reader"
+        - "192f77cd0 2026-07-31 provide-loop advertising gated on a serve-side fact it did not check"
+        - "da8975176 2026-08-02 carried_present mislabeled 'peer answered' as 'bytes present'"
+    status: active
+    established_by: deliberated-2026-08-02-operator+claude
+    why: >
+      Confirmed at three seams in three different substrate families (governance policy, dataplane
+      provide-loop, election evidence) and DISCONFIRMED at this arc's inventory/head-record reach
+      filters — the class needs no further probation, and the disconfirmation is recorded because a
+      canon that only collects confirmations is measuring itself. Applied to this canon: no row
+      here carries a `validator:` key it does not have, and the SDK surface (plan surface 7) is not
+      claimed while the crate family is unpublishable. Live-metered: advertise/serve counters get a
+      runbook invariant->probe row.
+
+  - id: c8-observability-per-decision
+    version: 1
+    contentHash: sha256:598145dfcae8f2e72236ac8199565d0824c9bff037f2b48553c31c9a387c88d9
+    concern: C8
+    title: Observability-per-decision — every outcome increments a labeled counter through a typed reason
+    statement: >
+      Every decision outcome increments a labeled counter through a TYPED reason (`label()` from an
+      enum, never a raw string); failures are counted beside successes (a ratio is readable, a bare
+      failure count is not); no label is structurally constant; and every meter names its semantics
+      — census or sample — so a rotating-page gauge is never read as a drain.
+    applies_to: >
+      Every decision point, every refusal arm, every gauge and counter, every signal boundary where
+      a hash-typed field could silently become a String mirror.
+    binding: binding-local
+    standing: attestation
+    resolution_mode: pinned
+    probe_home: runbook
+    severity_class: silent-corruption
+    dispatch-agent: runtime-triage
+    findings_namespace: concern:c8-observability-per-decision
+    recurrence:
+      unit: distinct-shifts
+      shifts: 4
+      instances:
+        - "486982bb8 2026-07-25 an acquisition leg that fails 100% and says nothing — its only signal a dropped debug!"
+        - "b19f12014 2026-07-31 a convergence gauge blind to the distinction between correct-refusal and failure — not a conservative gauge, an unreadable one"
+        - "98a3c5f1e 2026-08-01 a label hardcoded 0 'for symmetry' — structurally constant is worse than absent"
+        - "2026-08-02 canonical answers consumed but never counted; tier/class/reason labels added wave-by-wave"
+    status: active
+    established_by: deliberated-2026-08-02-operator+claude
+    why: >
+      Each wave of the conductor-plane arc was blind until its own meter landed — the instruments
+      could not discriminate WHICH PLANE was refusing, which is why five serial waves were needed
+      for what was one stack. The cure is a compile shape, not a discipline: a `ReasonLabel` trait
+      (`label()`, `all()`) plus a conformance test for unique, stable label sets, so a decision
+      cannot ship without a typed reason. One recurring trap belongs to this class: a hash-typed
+      field in a conductor signal must stay typed (`HoloHashB64`) — a String mirror at the msgpack
+      boundary makes the meter go dark while the decision succeeds. Live-metered:
+      `elohim_content_canonical_answers_total{tier}` gets a runbook invariant->probe row.
+
+  - id: c9-identity-lineage-continuity
+    version: 1
+    contentHash: sha256:c2114b626c5a968b74323074fc061b41133aae5fd4a97ae9d01806e5f9cfdef2
+    concern: C9
+    title: Identity-lineage continuity — a re-key never silently orphans state
+    statement: >
+      Every reference to an agent resolves through a lineage root stable across key rotation; a
+      re-key never silently orphans state keyed on the old identity — it fails loud or re-anchors.
+    applies_to: >
+      Custody records, membership projections, authored-by references, controller sets, identity
+      heads, any table keyed on an agent pubkey rather than a lineage root.
+    binding: binding-network
+    standing: attestation
+    resolution_mode: pinned
+    probe_home: seam-registry
+    severity_class: silent-corruption
+    dispatch-agent: rust-architect
+    findings_namespace: concern:c9-identity-lineage-continuity
+    recurrence:
+      unit: distinct-shifts
+      shifts: 2
+      instances:
+        - "429e2f669 2026-07-31 storage custody plane — the resilience card's fossil-key ZERO: state keyed on the pre-rotation agent key silently stopped resolving; cure = re-claim self-held custody after a re-key"
+        - "2026-08-02 bridges/did (confirmed live) — identity_head -> None conflates never-declared with REVOKED, and an absent controller means implicit self-control, so a revoked identity degrades silently to self-controlled (C9 composed with C4)"
+    status: active
+    established_by: deliberated-2026-08-02-operator+claude
+    why: >
+      A rotation is a normal, expected life event in a recovery-capable identity system, so
+      key-as-primary-key is a latent zero waiting on the first rotation — and the zero is silent
+      because every query still SUCCEEDS, just against nothing. The forecast records the next
+      collision precisely: at identity-cross-signed + recovery the chain-root cid does not exist
+      yet, so there is no stable subject for monotonicity (C2) to even be ABOUT — C9 must land
+      before C2 can bind there.
+
+  - id: c10-contract-evolution-honesty
+    version: 1
+    contentHash: sha256:7eb05838e13be3eda8a20f64fbd948fd2e2a4400bbb108b331724098bd0ef97c
+    concern: C10
+    title: Contract-evolution honesty — an unknown field is rejected or observed, never defaulted
+    statement: >
+      A wire/config/schema contract change is rejected or observed, never defaulted — an unknown or
+      renamed field fails the parse or increments a counter.
+    applies_to: >
+      Wire formats, conductor/service config, view schemas, DB driver behaviour, dependency bumps
+      that change runtime semantics, msgpack/serde boundaries.
+    binding: binding-network
+    standing: attestation
+    resolution_mode: pinned
+    probe_home: seam-registry
+    severity_class: silent-corruption
+    dispatch-agent: code-reviewer
+    findings_namespace: concern:c10-contract-evolution-honesty
+    recurrence:
+      unit: distinct-shifts
+      shifts: 2
+      instances:
+        - "270dbafac 2026-07-11 conductor config — the snake_case ice_servers key was silently dead; the renamed field defaulted to empty instead of failing the parse, and the fleet ran with zero ICE servers since inception"
+        - "648196f3e 2026-07-30 DB driver contract — a diesel 2.3.5->2.3.11 strict-UTF-8 decode change altered runtime behaviour while `cargo check --locked --all-targets` stayed green; it reached dev and broke a committed resilience test"
+    status: active
+    established_by: deliberated-2026-08-02-operator+claude
+    why: >
+      Both instances share one shape: the contract MOVED and the consumer's default absorbed the
+      move, so the failure surfaced as behaviour, months or a release later, with no parse error and
+      no counter anywhere. The verification corollary is part of the guarantee: a dependency bump is
+      NOT verified by `cargo check` — check compiles tests without running them, which is exactly
+      how the diesel decode change landed. Contract-shaped diffs need executed tests, and unknown
+      fields need a hard parse failure or a counted observation.
+
+  - id: c11-externally-imposed-backpressure
+    version: 1
+    contentHash: sha256:3c5f870f3785f2c4375de13febffeca621808b221d3fded7aa528fbb798b9fce
+    concern: C11
+    title: Externally-imposed backpressure — degrade by a declared, counted policy
+    statement: >
+      Under load it did not schedule, a seam degrades by a DECLARED, COUNTED policy —
+      defer-with-retry-after, shed, or decline, each naming its reason — never by unbounded queueing
+      or OOM.
+    applies_to: >
+      Ingress admission, circuit breakers, doorway egress, invoke endpoints, conductor arc/memory
+      pressure — any seam whose input rate is chosen by someone else.
+    binding: binding-local
+    standing: attestation
+    resolution_mode: pinned
+    probe_home: runbook
+    severity_class: loud-fail
+    dispatch-agent: runtime-triage
+    findings_namespace: concern:c11-externally-imposed-backpressure
+    recurrence:
+      unit: distinct-shifts
+      shifts: 3
+      instances:
+        - "6135daae9 2026-03-07 steward/node AdmissionController — DeferReason already discriminates defer / shed / decline at a second substrate family"
+        - "4fb1de7c4 2026-07-19 doorway content-negotiated catching-up shed page with staged recovery progress — shedding made declared and legible rather than a bare 503"
+        - "c16daaa79 2026-08-01 doorway per-upstream breaker refusing without calling storage; both doorways at once on the /db/content path after a churn window legitimately opened the breakers"
+    status: active
+    established_by: deliberated-2026-08-02-operator+claude
+    why: >
+      Kept distinct from C6a deliberately, because the cures diverge: a budget violation is fixed by
+      bounding MY work, a backpressure violation is fixed by declaring and counting HOW I refuse
+      someone else's. The live discriminator already exists (`DeferReason`) and the live
+      disambiguation is already in the trust-contract runbook: `doorway_admission_shed_total`
+      climbing means genuine load shed, `doorway_upstream_breaker_open_total` climbing means the
+      breaker is refusing without calling storage. C11 composes with C3 — a breaker that cannot
+      leave shed is a liveness hole wearing a backpressure costume. Live-metered: shed/breaker
+      counters get a runbook invariant->probe row.
+
+  - id: c12-consent-authorization
+    version: 1
+    contentHash: sha256:7479976f0ff983157ec79cb739427ee73e2d66e87ab2e5e51154498cd1951667
+    concern: C12
+    title: Consent/authorization (may-act) — authority verified structurally at the acting node
+    statement: >
+      Authority to act is verified STRUCTURALLY against a notarized grant AT THE ACTING NODE — never
+      inferred from a carried claim, a self-asserted header, or a substring match.
+    applies_to: >
+      Every egress filter, every grant-gated action (restart, compute delegation, disclosure
+      widening), every reach enforcement point, every place a key or id is compared.
+    binding: binding-network
+    standing: attestation
+    resolution_mode: pinned
+    probe_home: seam-registry
+    severity_class: silent-corruption
+    dispatch-agent: red-team
+    findings_namespace: concern:c12-consent-authorization
+    recurrence:
+      unit: distinct-shifts
+      shifts: 2
+      instances:
+        - "e9e5368ee 2026-07-22 agent-key matcher — containment/substring comparison never actually matched; identity comparison must be byte-exact on the core, never a substring test"
+        - "2026-08-02 doorway egress (confirmed live) — should_serve_response exists and is re-exported with ZERO production call sites and a fail-open no-reach branch; reach enforcement would land on a dead predicate and read green while serving unauthorized"
+    status: active
+    established_by: deliberated-2026-08-02-operator+claude
+    why: >
+      C5 and C12 are deliberately separate classes because a system can be perfectly careful about
+      what it BELIEVES and still act on an unverified permission: I1 (verification terminates in the
+      receiving peer's own conductor) has only ever been proven for HEADS, never for permissions,
+      and today's commitment gate sits at the courier rather than at the acting node. The
+      fail-open-with-no-call-sites shape is the one to watch — an enforcement point that is never
+      called is indistinguishable from an enforcement point that always allows, and both read green.
+
+  - id: c13-graduated-authority
+    version: 1
+    contentHash: sha256:5ca1d2733c81ff5ceb27d5afd73ed5fa1b12b487b6e900f7be9d511c26c0b7df
+    concern: C13
+    title: Graduated authority — every scaffold names its successor at the gate
+    statement: >
+      Every authority gate serving a lower social tier is LABELED as a scaffold AND names its
+      successor criterion and graduation trigger on the notarized reach vocabulary
+      (`REACH_LEVELS`) — at the gate site, not only in a doc or backlog.
+    applies_to: >
+      Dev-tier / god-mode gates, staging-vs-earned tier pairs, interim authority channels, any
+      predicate whose current authority criterion is weaker than its intended one.
+    binding: binding-local
+    standing: attestation
+    resolution_mode: pinned
+    probe_home: seam-registry
+    severity_class: silent-corruption
+    dispatch-agent: code-reviewer
+    findings_namespace: concern:c13-graduated-authority
+    recurrence:
+      unit: distinct-shifts
+      shifts: 3
+      instances:
+        - "037611859 2026-07-10 staging-tier marker + earned-head guard — the live two-rung staging->earned canonical-tag pair, a distinct vocabulary from REACH_LEVELS"
+        - "11ea79cb2 2026-07-11 deploy designates the staging-tier head — the god-mode canonical-head declarer, labeled, with R2 (reach-cohort + signature) recorded as its successor"
+        - "2026-07-31 R1 decision — the deploy declare-cycle made load-bearing as the LABELED interim authority channel for declared-vs-declared divergence"
+    status: active
+    established_by: deliberated-2026-08-02-operator+claude
+    why: >
+      This has been done RIGHT twice by hand — both times with the label and successor recorded in
+      docs or backlog rather than AT THE GATE, which is exactly the failure mode the class names: a
+      scaffold that outlives its tier silently becomes capture, and a label nobody reads at the call
+      site does not prevent that. Authority graduates along the social-reach axis, and its apex is
+      COMMUNAL BACKSTOP — authority never terminates in an individual key-holder
+      (stewardship-over-sovereignty canon; the sovereignty-ontology-guard policy is this class's
+      already-enforced sibling at the doc plane). Graduation events CASCADE: when a scaffold's
+      successor lands, every cell that scaffold touched re-examines.
+
+  - id: c14-witnessed-residual
+    version: 1
+    contentHash: sha256:2ec2de528770ad1c492ed58557fcce8fb1cc88c602d79600c4fe149a5b6ae810
+    concern: C14
+    title: Witnessed residual — the outcome set closes with an arm that is witnessed, never dropped
+    statement: >
+      Every decision point's outcome set closes with a residual arm that is WITNESSED, never
+      dropped: an exception fitting no class is captured with a context capsule sufficient for
+      cross-node RCA (inputs digest, decision state, the clocks/lags/peer-states in play), carried
+      as evidence, delivered to the developer-facing RCA report, and DISPOSITIONED — cure, declared
+      variance, or a new concern class via the calibration ledger's miss-of-canon intake.
+    applies_to: >
+      Every match arm set, every catch-all, every `_ =>`, every error path whose only signal today
+      is a log line at a level the deployment drops.
+    binding: binding-local
+    standing: attestation
+    resolution_mode: pinned
+    probe_home: seam-registry
+    severity_class: silent-corruption
+    dispatch-agent: runtime-triage
+    findings_namespace: concern:c14-witnessed-residual
+    recurrence:
+      unit: distinct-shifts
+      shifts: 2
+      instances:
+        - "2026-07-12 substrate-convergence five-defect arc (history record) — distributed causes arrive as STACKS; an RCA capsule that carries only the local state cannot resolve a five-deep stack, which is why the capsule contract names clocks, lags and peer states"
+        - "486982bb8 2026-07-25 acquisition leg — a leg that fails 100% and says nothing, its only signal a dropped debug!: the residual arm existed and was unwitnessed"
+    status: active
+    established_by: deliberated-2026-08-02-operator+claude
+    why: >
+      The canon, matrix and forecast govern the ANTICIPATED. A distributed, diverse fleet also
+      guarantees the unanticipated — lags between peers, real-world interruptions, hydraulic
+      failures upstream of every abstraction — and those are expected inputs, not anomalies. Without
+      a channel for the unplanned event, reality re-enters the system as corrupted assumptions
+      instead of as a report. This class is the intake organ for canon growth itself: capture ->
+      carry (C5 applies to the capsule) -> collect (bind the LIVE runtime-findings.jsonl +
+      runtime-triage pipeline, do not fork it) -> report -> recover (restored capability — Mishpat,
+      never punishment) -> learn (miss-of-canon feeds the calibration ledger, so the fleet's
+      EXCEPTION-METABOLISM RATE becomes a health measure beside uptime). Peers witness and carry
+      each other's capsules so no node RCAs its own crash alone.

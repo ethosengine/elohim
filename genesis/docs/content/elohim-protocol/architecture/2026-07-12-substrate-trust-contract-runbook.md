@@ -20,6 +20,23 @@ convergence arc's judgment into procedure, so a maintaining agent (Opus-tier
 or below) can operate the substrate without re-deriving it. When this doc and
 live behavior disagree, run the probes — they are the authority.
 
+**Rescope (2026-08-02).** This doc remains *dataplane-scoped* reference — I1–I6
+and their probes are the 2026-07-11/12 convergence arc's invariants and are not
+restated or reinterpreted below. It now additionally carries a **concern-canon
+subsection** (§1a / §2a): the four concern classes that have a **live meter**
+get an invariant→probe row here, because this doc's own doctrine is that every
+trust claim gets a probe. Design-time classes (C0, C1, C3, C4, C5, C6b, C9, C10,
+C12, C13, C14 — and C2, whose home is the policy registry) deliberately get **no
+row here**: they cite a contract test in the per-crate seam registry instead. A
+probeless runbook row would advertise a watch this doc does not serve, which is
+concern class C7 committed by the canon itself. The canon is defined once in
+`.claude/epr-meta/concerns.yaml` (C0, C1, C3–C14) and
+`.claude/epr-meta/policies.yaml#c2-monotonic-authority` — these rows *bind* it,
+they do not redefine it. Standing shape of this doc's rows (the brit frame):
+**pin** — a sealed fingerprint re-blessed by judgment (`cite-gen --refresh`),
+never auto-blessed by recency; the guarantees themselves stand as
+**attestations** in the two registry homes.
+
 ## 1. The invariants (what you may now assume)
 
 | # | Invariant | Where enforced |
@@ -46,6 +63,31 @@ it polls storage `p2p/status.pull.caughtUp`, the `elohim_projection_reconcile_co
 gauge, and doorway content-serving on both sides, and only declares
 quiescence once a fresh reconcile sweep has run and still reads converged.
 
+### 1a. Concern-canon invariants (the live-metered classes only)
+
+Numbering continues I1–I6. These are the **cross-family concern classes** that
+happen to have a live dataplane meter; each states its guarantee in falsifiable
+form, and each is watched by a probe in §2a. The "Where enforced" column names
+the *meter*, not a code path — that is what makes these four eligible for a row
+here at all.
+
+| # | Invariant | Where enforced |
+|---|---|---|
+| I7 | **Bounded work: mint-then-quiet** (concern class C6a). Every sweep, loop and retry ladder carries a declared budget it provably respects, and once state is settled a replay mints **nothing**. A retry policy against an uncancellable call is a loop even when no `loop` token appears. | `elohim_content_canonical_links_minted_total{source}` read *against* `elohim_projection_reconcile_sweeps_total`; budget exhaustion is `elohim_content_witness_sweep_abandoned_total` |
+| I8 | **Advertise/serve symmetry** (concern class C7). What a surface advertises equals what it serves — capability, inventory, provider, coverage. An advertisement that resolves to nothing is counted at the advertiser, never left to surface as a transport fault at the requester. | `elohim_content_head_record_degraded_total{cause}`, `elohim_provide_provider_unresolved_total`, `elohim_salvage_provider_unresolved_total`, `elohim_shard_push_peer_unresolved_total` |
+| I9 | **Observability-per-decision** (concern class C8). Every decision outcome increments a labeled counter through a typed reason; failures are counted beside successes; no label is structurally constant; every meter names its semantics — census or sample. | `elohim_content_canonical_answers_total{tier}` (`none`/`staging`/`earned`) beside `elohim_content_contest_failed_total{class}` and `elohim_content_election_obeyed_total{path}` / `elohim_content_election_obey_failed_total{class}` |
+| I10 | **Externally-imposed backpressure degrades by a declared, counted policy** (concern class C11). Under load it did not schedule, a seam defers-with-`Retry-After`, sheds, or declines — each naming its reason — never by unbounded queueing or OOM. Distinct from I7: I7 asks "does my sweep respect **my** budget", I10 asks "do I survive traffic **I did not choose**". | `doorway_admission_shed_total`, `doorway_upstream_breaker_open_total`; the `catching_up` route's `Retry-After`; `steward/node`'s `DeferReason` (`pod/admission.rs`) already discriminates I7 from I10 |
+
+**Reading I7–I10 is comparative, never absolute.** Each is a *ratio or a pair*:
+`minted` alone is meaningless without `sweeps` (mint-then-quiet is minted-flat
+while sweeps-rise); `head_record_degraded` rising while requester-side
+`elohim_view_federation_outbound_total{result="timeout"}` falls is the C7 cure
+working, while a rise in **both** means the budget is too tight; a sustained
+~100% `canonical_answers{tier="none"}` against non-zero
+`elohim_projection_reconcile_divergent_refused` means no election exists to
+arbitrate — a supply-side fact, not a selector fault. A bare failure count is
+not a readable gauge (that is the C8 clause these rows are watched by).
+
 ## 2. The probes (how each invariant is watched)
 
 | Probe | Surface | Watches |
@@ -64,6 +106,19 @@ quiescence once a fresh reconcile sweep has run and still reads converged.
 Primary routing fact for all reads: each doorway's declare/resolve rides its
 PRIMARY conductor — `elohim.host`→adam (shem), `doorway-alpha`→matthew
 (on-prem). "B can't X" means *adam's conductor* can't X.
+
+### 2a. Concern-canon probes (one row per live-metered invariant)
+
+| Probe | Surface | Watches |
+|---|---|---|
+| `minted` flat while `sweeps` rises | storage `/metrics` (`elohim_content_canonical_links_minted_total{source}` ÷ `elohim_projection_reconcile_sweeps_total`), on demand | **I7** — mint-then-quiet. Minted rising monotonically with sweeps against settled state is the C6a budget being missed — the sweep isn't converging; `elohim_content_witness_sweep_abandoned_total` rising is the same budget being hit from the other direction (the sweep respected it — a saturated conductor, not an unbounded loop) |
+| advertiser-side unresolved counters | storage `/metrics` (`elohim_provide_provider_unresolved_total`, `elohim_salvage_provider_unresolved_total`, `elohim_shard_push_peer_unresolved_total`, `elohim_content_head_record_degraded_total{cause}`), on demand | **I8** — an advertisement that cannot be served is counted *at the advertiser*. Zero here plus requester-side timeouts is the pre-cure shape (fleet-wide adoption failure reading as a transport fault); read against `elohim_view_federation_outbound_total{result="timeout"}` |
+| `elohim_content_canonical_answers_total{tier}` | storage `/metrics`; also surfaced by the edge Dataplane Validation stage | **I9** — the per-decision census the canonical seam was blind to before wave 4 (`consumed but never counted`). `tier` must actually vary: a structurally-constant label is worse than an absent one |
+| `doorway_admission_shed_total` / `doorway_upstream_breaker_open_total` | doorway `/metrics`; `shedTotal` on the doorway status surface | **I10** — declared, counted degradation. A breaker that opens and never half-closes is the `halfopen_without_record_deadlocks_forever` liveness class (C3) wearing a backpressure costume — check that shed counts *stop* rising after upstream recovers |
+
+Every row above is comparative (see the I7–I10 reading note). The design-time
+classes are absent from this table **by construction**, not by omission: their
+contract is a test citation in the owning crate's seam registry.
 
 ## 3. The runbook (what to do when a probe reds)
 

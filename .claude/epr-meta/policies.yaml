@@ -189,6 +189,97 @@ policies:
       this publishable crate therefore requires explicit reach acknowledgement. The crate's Rust
       architecture test independently proves the zero-concrete-reference invariant.
 
+  # ── CONCERN CANON (seam-concern-contract plan, design surface 1) ──────────────────────────────
+  # The canon is split across TWO homes by whether an evaluable predicate exists TODAY: a class
+  # WITH one is an enforcement row here; the other fifteen are Precedent-shaped rows in the sibling
+  # `.claude/epr-meta/concerns.yaml` (its header explains why it is its own file). C2 is the only
+  # class currently in this home — its predicate is the `dedupe-of` bind-don't-redefine trigger,
+  # which is wired in `_eval_rule` today. No canon row names a `validator:` it does not have: that
+  # would be the canon's own C7 (advertise/serve) violation. When P4.1 registers a class's
+  # validator, that class's row MOVES here as a new version row and its concerns.yaml row is
+  # superseded (lineage, never deletion).
+  #
+  # STANDING SHAPES (the brit frame — every canon artifact declares one of record | attestation |
+  # fold | pin). A canon ROW is an `attestation`: a Precedent citing content, whose binding force,
+  # scope and supersession live on a plane separate from the hashed body — hence `standing:` and
+  # `resolution_mode: pinned` as explicit fields here and in concerns.yaml. A `.epr-meta` BINDING is
+  # a `pin`, and it declares that shape STRUCTURALLY rather than as a field: `policy: <id>@<version>`
+  # IS the sealed reference, re-blessed by judgment at each re-declaration, never auto-blessed by
+  # recency. The manifest schema (`elohim/sdk/schemas/v1/objects/epr-meta.schema.json`) is
+  # `additionalProperties: false` at both levels and the engine restricts a binding to
+  # {id, policy, params, when, why} — so a redundant `standing:` field there is not merely
+  # unnecessary, it is two truths about one fact, which is the duplication the two-plane split
+  # exists to prevent. Liftability of these bytes to CIDv1(dag-cbor, sha2-256) is proven by fixture:
+  # `elohim/epr/tests/concern_canon_liftability.rs` (+ the freshness/anti-mirror half at
+  # `.claude/scripts/_lib/__tests__/concern_canon_liftability_test.py`). The P5 lift wraps a codec
+  # around the sha256 these rows already carry — a move, never a rewrite.
+  - id: c2-monotonic-authority
+    version: 1
+    contentHash: sha256:a5a4d533a03eac9915d0b132ff374a834954446bad25ffd32e6cc9e8290ca1d9
+    concern: C2
+    title: C2 monotonic authority — never backwards, and name the clock
+    statement: >
+      Selection is decided by declared authority tiers and, within a tier, a NAMED NOTARIZED CLOCK
+      with a deterministic tiebreak — never a conductor-local clock, never arrival order. A move
+      backwards requires proof of forward ordering on that clock; missing ordering evidence refuses
+      the move rather than guessing.
+    applies_to: >
+      Every decision point that selects among competing versions of ONE subject — head election and
+      adoption, stamp/heal paths, event-fold "latest" resolution, link-selector ordering, selector
+      tiebreaks. Not a placement rule: which PLANE the subject lives on is C0's question, answered
+      first.
+    binding: binding-local
+    class: inject
+    scope:
+      write: "*.rs"
+      contains-any: ["stamp_declared_head", "StampMode", "projection_reconcile", "GapFill"]
+    dedupe-of: ".claude/epr-meta/policies.yaml#c2-monotonic-authority@1 (concern class C2 — monotonic authority)"
+    standing: attestation
+    resolution_mode: pinned
+    probe_home: seam-registry
+    severity_class: silent-corruption
+    dispatch-agent: rust-architect
+    findings_namespace: concern:c2-monotonic-authority
+    recurrence:
+      unit: distinct-shifts
+      shifts: 5
+      instances:
+        - "CI museum #12 (2026-06-02 record) — first-that-matches degenerating to index-0-always-wins"
+        - "25921a07a 2026-07-10 zome selector ordered by get_links ARRIVAL until the (timestamp, create_link_hash) tiebreak landed"
+        - "8844cd1d6 2026-07-11 storage heal — an unconditional Declare stamp moved a declared head BACKWARDS across 2,838 divergence-queued rows, serially, after every restart"
+        - "a83b35079 2026-07-29 epr-cli/REA sidecar — 'latest' by APPEND ORDER vs by occurredAt; the commit body names it 'the exact 8a1c531dc bug, reintroduced via replay'"
+        - "2026-08-02 conductor plane — stamp guard provably_newer, selector tiebreak, three-clocks-in-one-column"
+    status: active
+    established_by: deliberated-2026-08-02-operator+claude
+    why: >
+      CROSS-FAMILY STATEMENT (the class is older and wider than the dataplane). A self-healing loop
+      whose information source is weaker than the state it overwrites converts every restart into a
+      rollback; a fold that reads "latest" as append order re-mints the same defect through replay;
+      a selector ordered by arrival makes index-0 always win. All three are ONE guarantee failing:
+      selection must name the clock it orders on, that clock must be notarized (comparable across
+      the peers that will disagree — a DHT link timestamp, an occurredAt, never a receiving node's
+      local clock), and ties must break deterministically (create_link_hash), or two honest peers
+      converge to two different answers.
+      DATED INCIDENTS. 2026-07-11 (adam-alpha): two minutes after the first-ever cross-conductor
+      adoption, the restarted node's heal restamped the OLD head over the adopted canonical row —
+      2,838 rows, every restart. The blind first fix keyed the guard on WHO writes and froze forward
+      adoption (a C3 liveness hole created by a C2 cure); the real cure made the SOURCE name the
+      authority it CARRIES (`canonical`), never the writer's identity. 2026-07-12: elohim-host-landing
+      converged at edge #1187's seam-smoke and was healed back to the superseded head by #1188 — a
+      conductor that has not yet integrated a newer canonical link answers with the OLD canonical
+      record: canonical, yet stale. 2026-07-29 (epr-cli/REA): the same guarantee failing in a
+      non-dataplane family, on a projection rather than in DHT truth — which is precisely where C2
+      and C0 meet.
+      HOW A SEAM ANSWERS THIS ROW. Name the clock; prove the tiebreak is deterministic and
+      permutation-invariant (the `Arbitrated` harness); refuse rather than guess when ordering
+      evidence is missing (NULL either side = refuse); and never key the guard on the writer's
+      identity. This row's `dedupe-of` predicate fires as an ADVISORY at edit time — bind and
+      conform, do not re-derive a local ordering rule at a new seam. The class's mechanizable
+      detector (`epr:validator-heal-fills-never-moves`: a `StampMode::Declare` call site added
+      outside the canonical-channel list, or a stamp-guard edit that cites no contract test) is
+      registered by plan task P4.1; when it lands it arrives as version 2 of this row, and each
+      binding re-declares its pin — the version pin is a declared dependency, never recency.
+
   - id: governance-escalation-ladder
     version: 1
     contentHash: sha256:97008339f53de85e02ff63222f3e521889f538a458e56d05f656cc48ecf75954

@@ -27,26 +27,27 @@ rules:
       Root cause and fix plan (read before adding a new resolution-path NotFound arm):
       genesis/data/timeline/backlog/dataplane-peer-fallback-and-blob-replication.md
   - id: heal-fills-never-moves
-    class: inject
+    policy: c2-monotonic-authority@1
     when: { write: "*.rs", contains-any: ["stamp_declared_head", "StampMode", "projection_reconcile", "GapFill"] }
-    validator: epr:validator-heal-fills-never-moves
     why: >
-      INVARIANT — heal FILLS absence or converges FORWARD; it never moves authority backwards. A
-      projection-reconcile / stamp path uses `StampMode::{Declare, HealCanonical, GapFill}`:
+      LOCAL PLACEMENT of concern class C2 (monotonic authority) at the storage stamp/heal seam. The
+      guarantee, its cross-family statement and its dated incidents are DEFINED ONCE in the registry
+      (`.claude/epr-meta/policies.yaml#c2-monotonic-authority@1`) — this rule binds it, it does not
+      redefine it. What is local is only the placement and the vocabulary the guarantee wears here:
+      a projection-reconcile / stamp path uses `StampMode::{Declare, HealCanonical, GapFill}`.
       `Declare` is ONLY for deliberate canonical channels (declare route, propagation POST,
       own-conductor `ContentHeadDeclared` signal — request-borne/own-authored, may move a head
       anywhere including a deliberate revert); a heal with a canonical answer (`canonical == true`)
       MUST stamp `HealCanonical` — fill, same-head refresh, or a move ONLY with proof of forward
-      ordering (`declared_at` newer than the stored `declared_head_at`; NULL either side = refuse):
-      a conductor that has not yet integrated a newer canonical link answers with the OLD canonical
-      record — canonical, yet stale — and an unconditional Declare stamp moved the head BACKWARDS
-      (2026-07-12: elohim-host-landing converged at edge #1187's seam-smoke, healed back to the
-      superseded head by #1188). A fallback resolve (`canonical == false`, e.g. a cold conductor's
-      root-author election) MUST stamp `GapFill` — fill an empty row only (the 2026-07-11
-      resurrection class: HEALED anchor restamped the OLD head 2 min after cross-conductor adoption,
-      across 2,838 divergence-queued rows). Do not widen `Declare`, and do not key the guard on
+      ordering (`declared_at` newer than the stored `declared_head_at`; NULL either side = refuse —
+      that refusal IS C2's "missing ordering evidence refuses the move rather than guessing"); a
+      fallback resolve (`canonical == false`, e.g. a cold conductor's root-author election) MUST
+      stamp `GapFill` — fill an empty row only. Do not widen `Declare`, and do not key the guard on
       *who* writes (that froze forward adoption, defect #3) — key it on the authority the write
-      CARRIES (`canonical` + declaration ordering).
+      CARRIES (`canonical` + declaration ordering), which is C2's named-clock clause at this seam.
+      The version pin is a DECLARED dependency: when P4.1 registers
+      `epr:validator-heal-fills-never-moves` the policy lands as `c2-monotonic-authority@2` and this
+      binding re-declares deliberately — a new version moves nothing until each binding re-pins.
   - id: dataplane-guide-star
     class: inject
     when: { write: "*.rs", contains-any: ["shard_locations", "peer_statuses", "rea_commitments", "distribute_shards", "placement_gap", "household_resilience"] }
@@ -119,11 +120,21 @@ row — for 2,838 divergence-queued rows, serially, after every restart. The bli
 class #3) keyed the guard on *who* writes and froze forward adoption; the cure was making the SOURCE
 name the authority it carries (`canonical`), not gating on the writer.
 
-The `heal-fills-never-moves` rule fires as an advisory (class stays `inject` because
-`epr:validator-heal-fills-never-moves` is not registered in v1) when any `.rs` write in this subtree
-touches the stamp/heal path. It surfaces the invariant at edit time without blocking legitimate edits.
+The `heal-fills-never-moves` rule is a **binding of concern class C2 (monotonic authority)** —
+`policy: c2-monotonic-authority@1` in `.claude/epr-meta/policies.yaml`. Define-once-bind-many: the
+registry row owns the guarantee, its cross-family statement (the same class bit the zome
+link-selector's arrival ordering and the epr-cli/REA sidecar's append-order "latest") and its dated
+incidents; this manifest owns only the *placement* — the `when:` scope and the `StampMode`
+vocabulary the guarantee wears at this seam. It fires as an advisory (the policy's class is
+`inject`) when any `.rs` write in this subtree touches the stamp/heal path, surfacing the invariant
+at edit time without blocking legitimate edits. It carries **no `validator:` key**: a binding may
+not redeclare the policy's predicates, and naming a validator that is not registered would
+advertise enforcement this rule does not serve (concern class C7). When P4.1 registers
+`epr:validator-heal-fills-never-moves`, the policy lands as `c2-monotonic-authority@2` and this
+binding re-declares its pin deliberately — recency never moves a binding.
 
 See: `genesis/docs/content/elohim-protocol/history/2026-07-12-substrate-convergence-five-defect-arc.md`
+and the concern canon: `.claude/epr-meta/concerns.yaml` (C0, C1, C3–C14) + `policies.yaml` (C2).
 
 ## Governance note
 
