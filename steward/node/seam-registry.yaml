@@ -1,0 +1,231 @@
+# steward/node/seam-registry.yaml
+#
+# Conforms to elohim/sdk/schemas/v1/manifest/seam-registry.schema.json. Pod subsystem's
+# consensus-gathering and admission-control decision surface.
+#
+# Every symbol below was grepped and read at authoring time (2026-08-02). Where a concern is
+# genuinely unbound or a variant untested, this is recorded honestly rather than tagged
+# "answered" — including two enum variants (DeferReason::CapabilityUnavailable,
+# DeferReason::SystemPressure) that are declared but never constructed anywhere in this crate.
+
+seamRegistryVersion: 1
+crate: elohim-node
+crateRoot: steward/node
+seamLocus: >
+  Multi-agent consensus gathering for risky pod actions (src/pod/consensus.rs:
+  ConsensusManager::request_consensus / ConsensusOutcome) and admission-control backpressure
+  decisions for elohim-agent compute requests (src/pod/admission.rs:
+  AdmissionController::evaluate / AdmissionDecision / DeferReason).
+
+decisionPoints:
+  - name: ConsensusManager::request_consensus
+    kind: verdict-fn
+    sourceLocation:
+      file: src/pod/consensus.rs
+      modulePath: pod::consensus::ConsensusManager::request_consensus
+      line: 78
+    summary: >
+      Starts (or short-circuits) a consensus request for an Action: Safe risk short-circuits to
+      Approved with no peer round-trip; Risky checks peer count against `total` (InsufficientPeers
+      if short) then gathers responses toward `required`/`total`.
+    concernIds:
+      - id: C1
+        status: unbound
+        justification: >
+          This is the leader-election-adjacent surface where C1 is the definitional question —
+          does the proposing/requesting node's own vote or presence count toward the approval of
+          its OWN action? — and nothing in this function or the peer_agents/ConsensusResponse
+          plumbing it reads from excludes the proposing node from its own approver set; no test
+          constructs a scenario where the requester is also a counted evaluator. This framing is
+          carried directly from this plan's own architectural claim (task-instruction text,
+          corroborated by the plan's seeded-forecast runners-up row: "steward/node consensus.rs
+          leader election — C1 at the seam where self-election is the definitional question,
+          entirely unbound") rather than independently re-derived here; flagged as
+          plan-sourced, not code-proven, so a future reader can re-verify the self-vote claim
+          directly against evaluate_request / receive_response.
+      - id: C4
+        status: partial
+        justification: >
+          ConsensusOutcome is a genuinely five-way honest outcome (Approved / Rejected / Pending
+          / Timeout / InsufficientPeers), but only the Safe-action Approved short-circuit and the
+          not-enough-peers InsufficientPeers construction are reachable from any test today;
+          Rejected, Timeout, and Pending (the actual multi-peer-response-gathering arms in
+          check_consensus) are asserted nowhere.
+    contractTests:
+      - path: steward/node/src/pod/consensus.rs
+        testName: test_safe_action_no_consensus
+        kind: unit
+    notes: >
+      test_evaluate_request (same file) exercises ConsensusManager::evaluate_request, which
+      produces a single ConsensusResponse, not a ConsensusOutcome — it is NOT additional
+      coverage for this row's outcome type.
+
+  - name: ConsensusOutcome
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/pod/consensus.rs
+      modulePath: pod::consensus::ConsensusOutcome
+      line: 343
+    summary: >
+      Approved{approvals,reasoning} / Rejected{rejections,reasoning} / Pending{received,required}
+      / Timeout{received,required} / InsufficientPeers{available,required}.
+    concernIds:
+      - id: C1
+        status: unbound
+        justification: >
+          Same plan-sourced framing as ConsensusManager::request_consensus: the type carries no
+          structural distinction between "approved because peers judged it" and "approved by a
+          set that could include the proposer itself" — self-election at this surface is
+          representable but unguarded.
+      - id: C4
+        status: partial
+        justification: >
+          Five-way vocabulary in principle; only Approved (via the Safe-risk short-circuit) is
+          exercised by any test. is_final()/is_approved() helper methods are also untested
+          directly.
+    contractTests:
+      - path: steward/node/src/pod/consensus.rs
+        testName: test_safe_action_no_consensus
+        kind: unit
+
+  - name: AdmissionController::evaluate
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/pod/admission.rs
+      modulePath: pod::admission::AdmissionController::evaluate
+      line: 108
+    summary: >
+      Evaluates an incoming compute request against capability availability, remaining budget,
+      and queue depth (queue lock acquired before the budget check to close a TOCTOU race):
+      Declined (unknown capability) / Deferred{BudgetExhausted|QueueFull} / Accepted.
+    concernIds:
+      - id: C11
+        status: answered
+        justification: >
+          Deferred{reason, mesh_hints, retry_after_ms} is a declared, reasoned, retry-after-
+          bearing backpressure decision distinct from Declined (which is definitionally "cannot
+          serve at all," never retryable) — exactly C11's defer-vs-decline shape.
+          test_defer_budget_exhausted and test_defer_queue_full prove both live defer paths land
+          the correct DeferReason.
+      - id: C8
+        status: answered
+        justification: >
+          The decision result is a serde-tagged enum ("decision" discriminant, test_admission_
+          accepted_serializes / test_admission_deferred_with_empty_hints assert the tag and
+          field names directly) carrying a typed DeferReason, never a raw string.
+    contractTests:
+      - path: steward/node/src/pod/admission.rs
+        testName: test_accept_within_budget
+        kind: unit
+      - path: steward/node/src/pod/admission.rs
+        testName: test_defer_budget_exhausted
+        kind: unit
+      - path: steward/node/src/pod/admission.rs
+        testName: test_decline_unknown_capability
+        kind: unit
+      - path: steward/node/src/pod/admission.rs
+        testName: test_defer_queue_full
+        kind: unit
+
+  - name: AdmissionDecision
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/pod/admission.rs
+      modulePath: pod::admission::AdmissionDecision
+      line: 17
+    summary: >
+      Accepted{commitment_id,queue_position,estimated_wait_ms} / Deferred{reason,mesh_hints,
+      retry_after_ms} / Declined{reason: String}.
+    notes: >
+      The Deferred-vs-Declined split is exactly the shed-vs-dead distinction this plan's own
+      seeded forecast row 3 (doorway-failover, C4) names as missing at a different seam — a
+      client conflating "retry later" with "gone for good" is the live-red shape that row
+      describes; this type already makes the distinction structurally at the admission seam.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          Three-way outcome distinguishes "queue/accept" from "try later, here is when" from
+          "cannot serve this at all" — test_admission_accepted_serializes and
+          test_admission_deferred_with_empty_hints/with_mesh_hints pin the shape; test_decline_
+          unknown_capability pins the Declined arm.
+      - id: C11
+        status: answered
+        justification: Same evidence as AdmissionController::evaluate; the type IS the outcome C11 requires.
+    contractTests:
+      - path: steward/node/src/pod/admission.rs
+        testName: test_admission_accepted_serializes
+        kind: unit
+      - path: steward/node/src/pod/admission.rs
+        testName: test_admission_deferred_with_empty_hints
+        kind: unit
+      - path: steward/node/src/pod/admission.rs
+        testName: test_admission_deferred_with_mesh_hints
+        kind: unit
+      - path: steward/node/src/pod/admission.rs
+        testName: test_accept_within_budget
+        kind: unit
+      - path: steward/node/src/pod/admission.rs
+        testName: test_defer_budget_exhausted
+        kind: unit
+      - path: steward/node/src/pod/admission.rs
+        testName: test_decline_unknown_capability
+        kind: unit
+      - path: steward/node/src/pod/admission.rs
+        testName: test_defer_queue_full
+        kind: unit
+
+  - name: DeferReason
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/pod/admission.rs
+      modulePath: pod::admission::DeferReason
+      line: 37
+    summary: >
+      Why a request was deferred, not declined — BudgetExhausted / QueueFull /
+      CapabilityUnavailable / SystemPressure.
+    concernIds:
+      - id: C6a
+        status: partial
+        justification: >
+          BudgetExhausted and QueueFull are the two variants AdmissionController::evaluate
+          actually constructs, and both are declared, counted-by-caller-via-metrics reasons tied
+          to a bounded resource (budget, queue depth) — real C6a shape. CapabilityUnavailable
+          and SystemPressure are constructed by the production decision path nowhere
+          (grep-verified 2026-08-02: neither variant is built by AdmissionController::evaluate or
+          any other constructor in this crate); both are also pattern-matched (not constructed)
+          at elohim_service.rs:312-313, the exhaustive JSON-label match that converts a Deferred
+          reason to its wire string — a consumer, not a producer. SystemPressure additionally
+          appears in a bare equality assertion (test_defer_reason_equality, admission.rs:274)
+          that exercises neither AdmissionController::evaluate nor any deferral logic. Two of
+          four declared reasons are currently dead/aspirational vocabulary at the production
+          decision surface — a small C7-adjacent advertise-vs-construct gap on the enum's own
+          surface — while both stay live at the JSON-serialization boundary.
+      - id: C11
+        status: answered
+        justification: >
+          The two LIVE variants are exactly the declared, distinguishable backpressure reasons
+          C11 requires (each with its own retry_after_ms in the caller). Distinct from C6a per
+          the canon's own note: this is "do I survive traffic I didn't choose," not "does my own
+          sweep respect my budget."
+      - id: C8
+        status: answered
+        justification: >
+          test_defer_reason_equality proves DeferReason equality/inequality holds as expected —
+          a stable, comparable label vocabulary.
+    contractTests:
+      - path: steward/node/src/pod/admission.rs
+        testName: test_defer_reason_equality
+        kind: unit
+      - path: steward/node/src/pod/admission.rs
+        testName: test_defer_budget_exhausted
+        kind: unit
+      - path: steward/node/src/pod/admission.rs
+        testName: test_defer_queue_full
+        kind: unit
+    notes: >
+      CapabilityUnavailable and SystemPressure are flagged unconstructed-by-the-decision-path
+      here rather than silently tagged "answered" — a future validator/dna-hash-neutrality-style
+      check (surface 4) could mechanize "every reason-outcome-enum variant has >=1 construction
+      site in non-test code" directly from this registry (a bare equality-test construction, as
+      SystemPressure has today, should not satisfy such a check).

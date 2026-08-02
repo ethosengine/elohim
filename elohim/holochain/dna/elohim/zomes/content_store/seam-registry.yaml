@@ -1,0 +1,221 @@
+# elohim/holochain/dna/elohim/zomes/content_store/seam-registry.yaml
+#
+# Conforms to elohim/sdk/schemas/v1/manifest/seam-registry.schema.json. Coordinator-zome side of
+# the cross-root canonical-head election this shift cured; the storage-side CONSUMER of this
+# election's ordering is registered separately in elohim/elohim-storage/seam-registry.yaml
+# (canonical_move_verdict).
+#
+# Every symbol below was grepped and read at authoring time (2026-08-02). Where no direct test
+# exists, contractTests is explicit `null` with a gapNote — several rows here are genuinely
+# untested today, and recording that honestly is the point of this registry (P3.2's census is
+# built specifically to surface exactly these gaps, not to be told they don't exist).
+
+seamRegistryVersion: 1
+crate: content_store
+crateRoot: elohim/holochain/dna/elohim/zomes/content_store
+seamLocus: >
+  Cross-root canonical-head election and declare-time authority/evidence gates in the
+  content_store coordinator zome: the DHT-side arbiter (select_canonical_winner /
+  select_election), the declare-time no-chain / target-id / carried-record gates
+  (declare_canonical_head_inner, shared by both the staging and earned declare tiers), the
+  election-ahead-of-bytes read path (resolve_canonical_election), the last-mile carried-record
+  verifier for a conductor that holds the election but not the target bytes
+  (validate_carried_head_record), and the god-mode declare-authority scaffold
+  (authorize_canonical_head_declarer).
+
+decisionPoints:
+  - name: select_canonical_winner
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/lib.rs
+      modulePath: content_store::select_canonical_winner
+      line: 2917
+    summary: >
+      Selects the single winning canonical-head declaration from a candidate set: ANY earned
+      declaration beats ALL staging; within the winning tier, newest link timestamp wins;
+      ties break deterministically on the create-link action hash.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          Arbitrates on notarized DHT link evidence (tier + link timestamp + link hash) only —
+          no branch consults which agent authored a candidate, so no declaring authority can
+          win by virtue of being the resolving conductor's own.
+      - id: C2
+        status: answered
+        justification: >
+          This IS the plan's own canonical example of C2's guarantee form ("select_canonical_
+          winner's newest-within-tier on the DHT link timestamp, tie-broken on create_link_hash
+          — never a conductor-local clock, never arrival order"). equal_timestamps_break_
+          deterministically_on_link_hash proves order-independence directly (reversed input
+          order still yields the identical winner).
+    contractTests:
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: earned_wins_over_newer_staging
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: newest_earned_wins_within_tier
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: newest_staging_wins_when_no_earned
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: equal_timestamps_break_deterministically_on_link_hash
+        kind: unit
+        mirrorRisk: false
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: superseding_earned_is_the_sole_winner
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: empty_set_has_no_winner
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: winner_reports_its_own_clock_and_tier_not_a_losers
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: staging_winner_reports_staging_tier
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: tied_winners_propagate_an_identical_clock_in_any_input_order
+        kind: unit
+        mirrorRisk: false
+
+  - name: declare_canonical_head_inner
+    kind: verdict-fn
+    sourceLocation:
+      file: src/lib.rs
+      modulePath: content_store::declare_canonical_head_inner
+      line: 3599
+    summary: >
+      Shared body for both canonical-head declare tiers (staging + earned): the NO-CHAIN GATE
+      (gather_content_chain(id).is_some() — refuses "no content found for id" for a conductor
+      with zero local chain), target resolution with declare-carries-Record fallback, and the
+      TARGET-ID GATE (the resolved target's own Content.id must equal the declared id).
+    concernIds:
+      - id: C1
+        status: partial
+        justification: >
+          The FIRST, target-independent check ("declare_canonical_head: no content found for id")
+          is the anti-self-election floor beneath both declare tiers — a genuinely chain-less
+          conductor cannot declare at all, not even a peer's head. It is real and load-bearing
+          in the source, but no sweettest constructs a conductor that holds ZERO local chain for
+          the id and asserts on this exact error; see gapNote.
+      - id: C5
+        status: answered
+        justification: >
+          TARGET-ID GATE (content.id != id refusal) is directly exercised by
+          declare_canonical_rejects_target_id_mismatch; the carried-record branch's
+          entry-action-binding and signature proofs (delegated to validate_carried_record) are
+          exercised by declare_carries_record_for_unretrievable_target's four negative cases
+          (mismatched action, swapped entry, tampered bytes) plus one positive case.
+    contractTests:
+      - path: elohim/holochain/tests/sweettest/src/tests/lamad.rs
+        testName: declare_canonical_head_converges_independent_roots
+        kind: sweettest
+      - path: elohim/holochain/tests/sweettest/src/tests/lamad.rs
+        testName: declare_canonical_rejects_target_id_mismatch
+        kind: sweettest
+      - path: elohim/holochain/tests/sweettest/src/tests/lamad.rs
+        testName: declare_carries_record_for_unretrievable_target
+        kind: sweettest
+      - path: elohim/holochain/tests/sweettest/src/tests/lamad.rs
+        testName: earned_head_guard_and_scaffold_over_scaffold
+        kind: sweettest
+    gapNote: >
+      contractTests is non-null (the function overall IS tested), but the C1 no-chain gate
+      specifically is not: declare_canonical_head_converges_independent_roots and
+      declare_carries_record_for_unretrievable_target both give the declaring/non-holding
+      conductor SOME local root for the id before it declares — the latter test's own doc
+      comment says so explicitly ("c2 authors its own independent root for the same id, so c2
+      passes the id-exists gate locally — that gate is not what this test is about"). No test
+      in this repo (grep-verified 2026-08-02 for "no content found for id" and "no_local_chain")
+      exercises a conductor with LITERALLY zero chain for the id attempting to declare.
+
+  - name: resolve_canonical_election
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/lib.rs
+      modulePath: content_store::resolve_canonical_election
+      line: 3865
+    summary: >
+      Reports the DHT election ALONE (link ops only, GetStrategy::Local) without requiring the
+      winner's target Content to be retrievable — lets a caller fetch bytes from a peer and
+      verify them via validate_carried_head_record instead of waiting on arbitrarily-delayed
+      gossip. Option<CanonicalElectionOutput>; None is documented as "no election in my local
+      view YET," never authoritative absence.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          The doc comment is explicit and matches this plan's C4 guarantee form verbatim: "None
+          here means 'no election in my local view YET', never authoritative absence" — same
+          honest-absence contract as resolve_content_head_local, GetStrategy::Local chosen
+          specifically so this read never stalls (a heal-path read must never block toward the
+          60s network timeout).
+    contractTests: null
+    gapNote: >
+      No unit test or sweettest calls resolve_canonical_election directly (grep-verified
+      2026-08-02: zero references outside its own definition and doc comments). Its underlying
+      logic (select_election) is exercised only as a private helper inside select_canonical_
+      winner's unit tests, which never go through this extern's own Option<T> boundary.
+
+  - name: validate_carried_head_record
+    kind: verdict-fn
+    sourceLocation:
+      file: src/lib.rs
+      modulePath: content_store::validate_carried_head_record
+      line: 3923
+    summary: >
+      Last-mile election-obey verifier for a conductor that holds the DHT election but not the
+      winner's target bytes: cryptographically validates a CARRIED record against an expected
+      action hash (action-hash binding, author signature, entry-action binding) plus a
+      restated TARGET-ID GATE, WITHOUT requiring a local chain for the id (deliberately, since
+      that is exactly the class this extern exists to serve). Writes nothing — pure verifier.
+    concernIds:
+      - id: C5
+        status: partial
+        justification: >
+          Runs the SAME validate_carried_record proofs the declare path runs (action-hash
+          binding, signature, entry<->action binding — the swap-attack-closing clause), which
+          ARE exercised by declare_carries_record_for_unretrievable_target's negative cases —
+          but that test calls declare_canonical_content_head, never this extern. This extern's
+          own doc comment states its TARGET-ID GATE is DELIBERATELY DUPLICATED here ("this path
+          does not go through that function"), and that duplicated restatement, plus this
+          extern's own Option<None>-for-honest-absence return, is untested directly.
+    contractTests: null
+    gapNote: >
+      No test calls validate_carried_head_record directly (grep-verified 2026-08-02: zero
+      references outside its own definition). The shared validate_carried_record helper it
+      delegates to IS exercised, but only through the sibling declare_canonical_content_head
+      path — citing that test here would be exactly the anti-mirror/false-coverage hazard P3.2's
+      census is designed to catch (a passing test on a shared helper is not proof this extern's
+      own boundary and restated gate are correct).
+
+  - name: authorize_canonical_head_declarer
+    kind: verdict-fn
+    sourceLocation:
+      file: src/lib.rs
+      modulePath: content_store::authorize_canonical_head_declarer
+      line: 3237
+    summary: >
+      Gates WHO may call declare_canonical_content_head (the staging/scaffold tier). Currently
+      unconditional Ok(()) — a labeled DEV-TIME SCAFFOLD, "god-mode open," with a named but
+      unbuilt successor (steward allowlist, then reach-cohort edit-membership + signature).
+    concernIds:
+      - id: C13
+        status: unbound
+        justification: >
+          Doc-labeled scaffold with a named successor criterion — exactly C13's required shape
+          in principle — but the label and successor live ONLY in the doc comment, not at a
+          structured gate a matrix or birth-rule could check, and no successor has landed. This
+          is the precise gap the canon calls out about itself: "Both labels live in docs/backlog
+          rather than at the gate sites; this class requires the label and successor at the
+          gate." Until C13 gains a structured representation this function can be checked
+          against, this row is honestly unbound rather than answered.
+    contractTests: null
+    gapNote: >
+      No test exists for authorize_canonical_head_declarer itself (grep-verified 2026-08-02: no
+      #[test]/sweettest references the function name). It unconditionally returns Ok(()), so its
+      "authorization" is implicitly exercised only in the sense that every declare sweettest
+      succeeds because the gate never refuses — that is not a test of the gate's logic, since it
+      currently has none to test.

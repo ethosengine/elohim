@@ -1,0 +1,378 @@
+# doorway/doorway-service/seam-registry.yaml
+#
+# Conforms to elohim/sdk/schemas/v1/manifest/seam-registry.schema.json. Doorway's decision
+# surface: HTTP dispatch classification, SSR-vs-bundle serving, EPR projection-pool fallback,
+# kitsune2 bootstrap PUT outcome, and the reach-gated response-serving predicate.
+#
+# Every symbol below was grepped and read at authoring time (2026-08-02). Where no direct test
+# exists, contractTests is explicit `null` with a gapNote.
+
+seamRegistryVersion: 1
+crate: doorway
+crateRoot: doorway/doorway-service
+seamLocus: >
+  Doorway HTTP dispatch classification (src/server/http.rs: classify_dispatch/Disposition,
+  epr_should_serve_ssr, SsrFallbackReason), the SSR-bundle-head reconcile decision
+  (src/render/registry.rs: decide_reconcile/ReconcileDecision), the EPR projection-pool
+  primary/peer/empty/unreachable fallback classifier (src/projection/epr_router.rs:
+  fetch_projections_with_fallback/FallbackOutcome), the kitsune2 bootstrap PUT outcome
+  (src/bootstrap/k2.rs: K2Store::put_at/K2PutOutcome), and the reach-gated response-serving
+  predicate (src/cache/reach_aware_serving.rs: should_serve_response).
+
+decisionPoints:
+  - name: decide_reconcile
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/render/registry.rs
+      modulePath: render::registry::decide_reconcile
+      line: 1104
+    summary: >
+      Compares the currently-materialized SSR bundle head against a freshly-resolved declared
+      head: Err (read failure) safe-degrades to Unreachable; equal is UpToDate; different is
+      Stale (needs re-materialize + swap).
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          decide_reconcile_read_failure_is_unreachable_safe_degrade proves a read FAILURE is
+          classified distinctly from both UpToDate and Stale — a read error never silently reads
+          as "no change needed."
+    contractTests:
+      - path: doorway/doorway-service/src/render/registry.rs
+        testName: decide_reconcile_equal_is_up_to_date
+        kind: unit
+      - path: doorway/doorway-service/src/render/registry.rs
+        testName: decide_reconcile_different_is_stale
+        kind: unit
+      - path: doorway/doorway-service/src/render/registry.rs
+        testName: decide_reconcile_read_failure_is_unreachable_safe_degrade
+        kind: unit
+
+  - name: ReconcileDecision
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/render/registry.rs
+      modulePath: render::registry::ReconcileDecision
+      line: 1092
+    summary: Unreachable(String) / UpToDate(String) / Stale(String) — the decide_reconcile outcome.
+    notes: >
+      An independent THIRD derivation of the honest-absence type, alongside elohim-storage's
+      LocalResolve and steward/node's ConsensusOutcome — the same C4 shape rediscovered bespoke
+      at a third seam, exactly the recurrence pattern this whole plan exists to stop.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: Same evidence as decide_reconcile; the type IS the three-way honest outcome.
+    contractTests:
+      - path: doorway/doorway-service/src/render/registry.rs
+        testName: decide_reconcile_equal_is_up_to_date
+        kind: unit
+      - path: doorway/doorway-service/src/render/registry.rs
+        testName: decide_reconcile_different_is_stale
+        kind: unit
+      - path: doorway/doorway-service/src/render/registry.rs
+        testName: decide_reconcile_read_failure_is_unreachable_safe_degrade
+        kind: unit
+
+  - name: classify_dispatch
+    kind: verdict-fn
+    sourceLocation:
+      file: src/server/http.rs
+      modulePath: server::http::classify_dispatch
+      line: 76
+    summary: >
+      Classifies how an unmatched request should be dispatched by consulting the RouteRegistry:
+      StorageProxy / SsrRoute / RegistryUnhandled / NotFound. Deterministic given (registry
+      state, method, path); no wildcard path-prefix guards.
+    concernIds:
+      - id: C7
+        status: answered
+        justification: >
+          arbitrary_new_prefix_reaches_registry pins the durable contract this fn exists FOR:
+          "if the registry has any compiled route matching (method, path), the registry decides"
+          — no hand-maintained prefix list can silently diverge from what the registry actually
+          advertises. blob_path_dispatches_to_storage_proxy is the direct regression test for
+          the recurring bug where a route WAS registered but dispatch fell through to the SPA
+          bootstrap anyway (advertised != served).
+    contractTests:
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: blob_path_dispatches_to_storage_proxy
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: arbitrary_new_prefix_reaches_registry
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: unregistered_get_returns_not_found
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: unregistered_post_returns_not_found
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: classify_dispatch_returns_ssr_route_when_render_spec_set
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: gated_writes_classify_as_storage_proxy_not_ssr
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: landing_routes_that_epr_router_also_serves_still_classify_ssr
+        kind: unit
+
+  - name: Disposition
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/server/http.rs
+      modulePath: server::http::Disposition
+      line: 49
+    summary: StorageProxy{endpoint} / SsrRoute{spec,endpoint} / RegistryUnhandled / NotFound.
+    concernIds:
+      - id: C7
+        status: answered
+        justification: Same evidence as classify_dispatch; the type IS the advertise-vs-serve outcome.
+    contractTests:
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: blob_path_dispatches_to_storage_proxy
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: classify_dispatch_returns_ssr_route_when_render_spec_set
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: gated_writes_classify_as_storage_proxy_not_ssr
+        kind: unit
+
+  - name: epr_should_serve_ssr
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/server/http.rs
+      modulePath: server::http::epr_should_serve_ssr
+      line: 3247
+    summary: >
+      At the EPR-router dispatch: divert to the V8 SSR engine iff the disposition is SsrRoute
+      AND a renderer is loaded — otherwise serve the projected bundle directly.
+    concernIds:
+      - id: C7
+        status: answered
+        justification: >
+          Named directly by the doorway-ssr-arm-shadowed-chrome-every-serve project lesson: an
+          EPR-matched GET must divert to SSR on exactly the SAME condition classify_dispatch
+          already decided was SSR-eligible — page-borne wiring must go on BOTH serve paths, or
+          the disposition an app advertises (SsrRoute) diverges from what actually gets served.
+          epr_diverts_to_ssr_only_when_ssr_route_and_renderer_present asserts every non-SSR
+          disposition never diverts regardless of renderer state.
+    contractTests:
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: epr_diverts_to_ssr_only_when_ssr_route_and_renderer_present
+        kind: unit
+
+  - name: SsrFallbackReason
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/server/http.rs
+      modulePath: server::http::SsrFallbackReason
+      line: 3171
+    summary: >
+      Why an SSR-eligible route shed to the projected fallback bundle instead — 12 variants
+      (AuthModeUnsupported, Overflow, SpecParseError, RendererAbsent, RenderError, ErrorBackoff,
+      EmptyRender, RendererAppMismatch, and the granular Shell*/Compose variants). Tags the
+      response with an x-ssr-skipped header.
+    concernIds:
+      - id: C8
+        status: answered
+        justification: >
+          ssr_fallback_reason_skip_strings pins every variant's label string. The doc comment
+          for the Shell*/Compose split records the exact C8 forcing incident: a predecessor
+          single "shell-unavailable" string hid BOTH a cross-app selector bug (every /lamad
+          request burning a wrong-app V8 render) and an upstream fetch stall behind one opaque
+          label — each seam now names itself.
+    contractTests:
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: ssr_fallback_reason_skip_strings
+        kind: unit
+
+  - name: fetch_projections_with_fallback
+    kind: verdict-fn
+    sourceLocation:
+      file: src/projection/epr_router.rs
+      modulePath: projection::epr_router::fetch_projections_with_fallback
+      line: 177
+    summary: >
+      Consults an ordered pool of storage base URLs for active project-epr projections, falling
+      back through the pool when the primary is empty, wholly-poisoned (rows present but none
+      installable), or unreachable. Classification is measured AFTER validation, not on raw row
+      count.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          Four-way honest outcome (PrimaryNonEmpty / PeerServed / AllEmpty / AllUnreachable)
+          distinguishes a genuine empty state from total unreachability from a degraded-but-
+          served primary — all_unreachable_preserves_last_good and all_empty_is_a_genuine_
+          empty_state prove the two are never conflated by the caller's replace-vs-preserve
+          decision.
+      - id: C7
+        status: answered
+        justification: >
+          wholly_poisoned_primary_is_not_classified_primary_non_empty is the direct regression
+          test for the Welcome-at-/ incident: a primary that "answers" with rows of which ZERO
+          are installable must not be classified as a successful non-empty fetch (what would be
+          logged as success is not what would actually be served/installed) — advertised row
+          count must equal what replace_all would actually install.
+    contractTests:
+      - path: doorway/doorway-service/src/projection/epr_router.rs
+        testName: primary_non_empty_short_circuits_the_pool
+        kind: integration
+      - path: doorway/doorway-service/src/projection/epr_router.rs
+        testName: empty_primary_falls_back_to_a_peer_with_rows
+        kind: integration
+      - path: doorway/doorway-service/src/projection/epr_router.rs
+        testName: unreachable_primary_falls_back_to_a_peer_with_rows
+        kind: integration
+      - path: doorway/doorway-service/src/projection/epr_router.rs
+        testName: all_empty_is_a_genuine_empty_state
+        kind: integration
+      - path: doorway/doorway-service/src/projection/epr_router.rs
+        testName: all_unreachable_preserves_last_good
+        kind: integration
+      - path: doorway/doorway-service/src/projection/epr_router.rs
+        testName: single_primary_empty_is_genuine_empty_not_peer_served
+        kind: integration
+      - path: doorway/doorway-service/src/projection/epr_router.rs
+        testName: empty_url_pool_is_unreachable_not_panic
+        kind: integration
+      - path: doorway/doorway-service/src/projection/epr_router.rs
+        testName: wholly_poisoned_primary_is_not_classified_primary_non_empty
+        kind: integration
+      - path: doorway/doorway-service/src/projection/epr_router.rs
+        testName: wholly_poisoned_pool_is_all_empty_not_peer_served
+        kind: integration
+      - path: doorway/doorway-service/src/projection/epr_router.rs
+        testName: single_poisoned_primary_is_all_empty_not_primary_non_empty
+        kind: integration
+
+  - name: FallbackOutcome
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/projection/epr_router.rs
+      modulePath: projection::epr_router::FallbackOutcome
+      line: 123
+    summary: >
+      PrimaryNonEmpty{url,projections} / PeerServed{primary_url,primary_empty,serving_url,
+      projections} / AllEmpty{urls_tried} / AllUnreachable{urls_tried,last_error}.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: Same evidence as fetch_projections_with_fallback; the type IS the four-way outcome.
+    contractTests:
+      - path: doorway/doorway-service/src/projection/epr_router.rs
+        testName: all_empty_is_a_genuine_empty_state
+        kind: integration
+      - path: doorway/doorway-service/src/projection/epr_router.rs
+        testName: all_unreachable_preserves_last_good
+        kind: integration
+      - path: doorway/doorway-service/src/projection/epr_router.rs
+        testName: wholly_poisoned_primary_is_not_classified_primary_non_empty
+        kind: integration
+
+  - name: K2Store::put_at (MemK2Store)
+    kind: verdict-fn
+    sourceLocation:
+      file: src/bootstrap/k2.rs
+      modulePath: bootstrap::k2::MemK2Store::put_at
+      line: 176
+    summary: >
+      Validates and applies a kitsune2 bootstrap PUT: tombstone bodies remove the entry
+      (Removed); otherwise insert-or-overwrite (Stored), evicting an arbitrary victim when the
+      per-space cap is reached and the agent is new.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          tombstone_removes_entry and put_then_get_round_trips prove Stored vs Removed are
+          distinct, correctly-labeled outcomes matching what get_at subsequently serves.
+      - id: C6a
+        status: partial
+        justification: >
+          MAX_ENTRIES_PER_SPACE bounds resident per-space state via arbitrary-victim eviction
+          when full — a real bounded-work design element — but no test exercises the eviction
+          branch itself (a space at capacity plus a new agent PUT); only unbounded-space
+          insert/tombstone/expiry paths are covered.
+    contractTests:
+      - path: doorway/doorway-service/src/bootstrap/k2.rs
+        testName: mem_store_roundtrips_through_trait_object
+        kind: unit
+      - path: doorway/doorway-service/src/bootstrap/k2.rs
+        testName: put_then_get_round_trips
+        kind: unit
+      - path: doorway/doorway-service/src/bootstrap/k2.rs
+        testName: expired_entries_are_not_served_and_cleanup_prunes
+        kind: unit
+      - path: doorway/doorway-service/src/bootstrap/k2.rs
+        testName: tombstone_removes_entry
+        kind: unit
+
+  - name: K2PutOutcome
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/bootstrap/k2.rs
+      modulePath: bootstrap::k2::K2PutOutcome
+      line: 90
+    summary: Stored / Removed — shared by every K2Store backend (mem + mongo) so validation cannot fork.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: Same evidence as K2Store::put_at; the type IS the two-way outcome.
+    contractTests:
+      - path: doorway/doorway-service/src/bootstrap/k2.rs
+        testName: put_then_get_round_trips
+        kind: unit
+      - path: doorway/doorway-service/src/bootstrap/k2.rs
+        testName: tombstone_removes_entry
+        kind: unit
+
+  - name: should_serve_response
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/cache/reach_aware_serving.rs
+      modulePath: cache::reach_aware_serving::should_serve_response
+      line: 50
+    summary: >
+      Gates serving cached response bytes by extracted reach level, requester authentication,
+      and requester identity (for private reach). No reach specified -> allow (documented
+      backward-compat default).
+    notes: >
+      This IS the fail-open no-reach branch named in this plan's own seeded forecast row 1
+      (reach-enforced-everywhere x doorway egress): re-exported from cache/mod.rs but with ZERO
+      production call sites anywhere in this crate (grep-verified 2026-08-02 — the only
+      references are the re-export and this file's own #[cfg(test)] module). Registering it now
+      means the future enforcement task (wiring a real call site into the serving path) lands on
+      a row the census already tracks, rather than a rediscovery.
+    concernIds:
+      - id: C7
+        status: partial
+        justification: >
+          The predicate's OWN logic correctly gates serve-vs-deny by reach when called directly
+          in tests — but with zero production call sites, the advertise/serve symmetry it
+          computes is never actually enforced on a live request. Quoting this plan's own
+          forecast row 1 verbatim: "enforcement will land on a dead predicate and read green
+          while serving unauthorized."
+      - id: C12
+        status: partial
+        justification: >
+          Structurally verifies requester identity/authentication against the extracted reach
+          level when invoked — but is never invoked in the live request path, so no action is
+          actually authorized or denied by it today.
+      - id: C4
+        status: answered
+        justification: >
+          The no-reach-specified branch is an EXPLICIT, tested, documented "allow (backward
+          compat)" default, not a silent one — the gap here is C7/C12 binding (dead code), not
+          honesty about absence.
+    contractTests:
+      - path: doorway/doorway-service/src/cache/reach_aware_serving.rs
+        testName: test_should_serve_commons_content_unauthenticated
+        kind: unit
+      - path: doorway/doorway-service/src/cache/reach_aware_serving.rs
+        testName: test_should_not_serve_private_content_to_non_owner
+        kind: unit
+      - path: doorway/doorway-service/src/cache/reach_aware_serving.rs
+        testName: test_should_serve_private_content_to_owner
+        kind: unit

@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:manifest:seam-registry",
+  "title": "SeamRegistry",
+  "description": "Source of truth: repo/process artifact (Category C — no DHT entry type, per the seam-concern-contract-architecture plan's Non-goals). A per-crate `seam-registry.yaml` conforming to this schema is the SOURCE OF TRUTH for that crate's decision surface: every pure decision predicate, verdict fn, boundary answer type, and reason/outcome enum, plus the concern classes (C0-C14, C6 split into C6a/C6b) each one answers and the contract test(s) that pin its behaviour. The census (`placement-audit.py --epr-meta`, P3.2) and the concern x seam matrix (P4.3) are DERIVED READ-MODELS over this file — never hand-authored. 'Seam' here names a crate/module locus (this registry's own vocabulary), NOT the concern-routing atlas's composition seams or participation tracks — those are matrix vocabulary (surface 6), not registry vocabulary. Each row in `decisionPoints` is deliberately SELF-CONTAINED (no cross-row references) because the census loads and validates rows one at a time and a single malformed row must flag itself without emptying the registered set (the EprRouter poisoned-scope lesson: fail-closed `collect` over rows degrades to silence, never total loss).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["seamRegistryVersion", "crate", "crateRoot", "seamLocus", "decisionPoints"],
+  "properties": {
+    "seamRegistryVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Schema-compatibility version of this registry file, independent of the schema's own draft version. Bump when a row's shape changes in a way old census tooling could misread."
+    },
+    "crate": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The Rust package name exactly as declared in the owning Cargo.toml's `[package] name`. NOT necessarily the directory name — e.g. doorway-service's package name is `doorway`, and the content_store zome's crate name is `content_store`. The census resolves this against Cargo.toml, not the file path, to catch drift."
+    },
+    "crateRoot": {
+      "type": "string",
+      "pattern": "^[^/].*[^/]$",
+      "description": "Repo-relative path (no leading/trailing slash) to the crate's root directory (the one containing its Cargo.toml), e.g. 'elohim/elohim-storage' or 'doorway/doorway-service'. Disambiguates crate-name collisions and anchors every row's sourceLocation.file as relative-to-this-root."
+    },
+    "seamLocus": {
+      "type": "string",
+      "minLength": 1,
+      "description": "One to a few sentences naming the crate/module-level locus this registry covers (e.g. 'head-election and canonical-move decision surface in the P2P projection-reconcile + head-adoption pipeline'). A description of WHERE the decision points live, not a restatement of the atlas's composition-seam or participation-track vocabulary — those are matrix concerns (surface 6), not this file's."
+    },
+    "decisionPoints": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/decisionPoint" },
+      "description": "Every registered pure decision predicate, verdict fn, boundary answer type, and reason/outcome enum this crate exposes. Convention over macros: a YAML row plus (eventually) a naming-convention lint — no proc-macro, no registration-by-attribute."
+    }
+  },
+  "$defs": {
+    "concernId": {
+      "type": "string",
+      "enum": [
+        "C0", "C1", "C2", "C3", "C4", "C5",
+        "C6a", "C6b",
+        "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14"
+      ],
+      "description": "A concern class id from the canon (C0-C14; C6 splits into C6a bounded-work / C6b idempotent-effect). The canon's own text is the definition; this registry only cites ids, it does not restate guarantees."
+    },
+    "concernBindingStatus": {
+      "type": "string",
+      "enum": ["answered", "partial", "unbound", "n-a"],
+      "description": "How this decision point stands with respect to the cited concern TODAY (an architectural claim, re-verified at census time, not a permanent grade). 'answered' = the point's logic demonstrably enforces the concern's guarantee and a contract test pins it. 'partial' = the logic exists but a real gap remains (e.g. correct in isolation but unbound at its call site — dead code, zero production callers). 'unbound' = the concern SHOULD apply at this decision point (it is the definitional question here) but no guard or rule currently answers it. 'n-a' = on inspection this concern does not actually apply to this point; REQUIRES justification so the row cannot silently opt out of a concern the matrix would otherwise expect."
+    },
+    "concernBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": { "$ref": "#/$defs/concernId" },
+        "status": { "$ref": "#/$defs/concernBindingStatus" },
+        "justification": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required when status is 'n-a', 'unbound', or 'partial' — the honesty this schema exists to enforce: a decision point that looks concern-relevant may not silently claim full coverage. Optional (but welcome) when status is 'answered'."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "answered" } },
+            "required": ["status"]
+          },
+          "then": {}
+        },
+        {
+          "if": {
+            "properties": { "status": { "enum": ["partial", "unbound", "n-a"] } },
+            "required": ["status"]
+          },
+          "then": { "required": ["justification"] }
+        }
+      ]
+    },
+    "sourceLocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file"],
+      "properties": {
+        "file": {
+          "type": "string",
+          "pattern": "^[^/].*\\.rs$",
+          "description": "Path to the source file, relative to the registry's `crateRoot` (e.g. 'src/services/head_adoption.rs')."
+        },
+        "modulePath": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Rust module path to the item, e.g. 'services::head_adoption::decide_head_action' or 'content_diesel::StaleReason'. Omit only when the item is a private free function with no meaningful external path (still cite the symbol name in `name`)."
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-indexed line of the item's definition at authoring time. A LINE HINT, not a pin — it drifts as the file is edited; the census resolves by symbol name/grep, never trusts this number blindly (spot-check-the-measure discipline)."
+        }
+      }
+    },
+    "contractTest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "testName", "kind"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Repo-relative path (from the repo root, NOT crateRoot, since sweettests commonly live outside the crate) to the file containing the test."
+        },
+        "testName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "description": "The exact `fn` name of the test (or, for a table/property test asserting many cases, the one enclosing `#[test]`/`#[tokio::test]` fn). Must be a REAL, currently-passing test — cite only tests that exist; a name that does not resolve at census time is exactly the phantom-validator failure mode this plan exists to stop (C7)."
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["unit", "sweettest", "integration"],
+          "description": "unit = #[cfg(test)] mod in the same source file, no conductor/network. sweettest = Holochain SweetConductor multi-agent test (elohim/holochain/tests/sweettest). integration = crosses a process/HTTP boundary but is not a sweettest (e.g. wiremock-backed doorway tests)."
+        },
+        "mirrorRisk": {
+          "type": "boolean",
+          "description": "Optional self-flag: true if this test computes its expected value via the SAME helper/formula the code under test uses (the anti-mirror hazard P3.2's fixture targets — a passing test can be measuring the mirror, not the behaviour). Leave false/omitted when the test's expectation is an independently-stated literal or a different derivation path."
+        }
+      }
+    },
+    "decisionPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "sourceLocation", "concernIds", "contractTests"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The symbol's own name — a fn name (e.g. 'decide_head_action') or a type name (e.g. 'StaleReason'). Exactly one decision point per row; a fn and its own return-type enum are two separate rows if both are independently registrable (e.g. `decide_reconcile` the fn and `ReconcileDecision` the enum it returns may each carry their own concern bindings and test citations)."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "pure-decision-predicate",
+            "verdict-fn",
+            "boundary-answer-type",
+            "reason-outcome-enum"
+          ],
+          "description": "pure-decision-predicate = a side-effect-free fn mapping inputs to a decision (testable with no conductor/pool/network/peer). verdict-fn = a fn that additionally carries authority semantics over a proposed move/claim (may still be pure; the label marks its role, e.g. canonical_move_verdict, an authorization gate). boundary-answer-type = an enum/struct that IS the decision outcome returned across a boundary (a decide fn's return type, an extern's Option<T>, an HTTP-facing outcome type). reason-outcome-enum = a typed reason/label vocabulary consumed by metrics or callers to explain WHY a boundary-answer-type landed where it did (e.g. StaleReason, DeferReason, SsrFallbackReason)."
+        },
+        "sourceLocation": { "$ref": "#/$defs/sourceLocation" },
+        "concernIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/concernBinding" },
+          "description": "Every concern class this decision point's design makes a claim about today (answered, partial, unbound, or n-a-with-justification). This is an ARCHITECTURAL CLAIM the row's author derived from the plan's canon table — conservative tagging only: tag what the code demonstrably does today, not what it is aspirationally meant to do (an aspiration belongs in a 'partial'/'unbound' justification, not an 'answered' status)."
+        },
+        "contractTests": {
+          "type": ["array", "null"],
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/contractTest" },
+          "description": "The real, currently-existing test(s) that pin this decision point's behaviour. MUST be `null` (never an empty array, never omitted) when no test exists yet — an explicit, honest gap the census (P3.2) is meant to flag, not a silently-absent field. When null, `gapNote` is REQUIRED."
+        },
+        "gapNote": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required when `contractTests` is null: a one-to-two-sentence honest note on why no contract test exists yet (e.g. 'no direct unit or sweettest exercises this extern; only reachable indirectly through X, which is not the same claim'). Optional free-form commentary otherwise."
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional one-line statement of what decision this point makes (the matrix and census render this; keep it a single sentence)."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional free-form context: forcing incidents, forecast-row ties, known dead-code status, etc. Prefer `gapNote` for the specific no-test case."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "contractTests": { "type": "null" } },
+            "required": ["contractTests"]
+          },
+          "then": { "required": ["gapNote"] }
+        }
+      ]
+    }
+  }
+}

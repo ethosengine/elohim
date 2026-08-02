@@ -1,0 +1,510 @@
+# elohim/elohim-storage/seam-registry.yaml
+#
+# Conforms to elohim/sdk/schemas/v1/manifest/seam-registry.schema.json (SOURCE OF TRUTH for
+# shape). This file is the SOURCE OF TRUTH for elohim-storage's decision surface; the census
+# (placement-audit.py --epr-meta, P3.2) and the concern x seam matrix (P4.3) are derived
+# read-models over it — never hand-authored from it.
+#
+# Every symbol below was grepped and read at authoring time (2026-08-02); every cited test
+# name is a real, currently-present #[test]/#[tokio::test] fn in the named file. Where no
+# contract test exists, contractTests is explicit `null` with a gapNote — never a silent
+# omission (the census is supposed to flag exactly that; honesty here is load-bearing).
+#
+# "Seam" in this file names elohim-storage's crate/module locus — the P2P projection-reconcile
+# + head-adoption decision pipeline — NOT the concern-routing atlas's composition seams or
+# participation tracks (those are matrix vocabulary, surface 6, not registry vocabulary).
+
+seamRegistryVersion: 1
+crate: elohim-storage
+crateRoot: elohim/elohim-storage
+seamLocus: >
+  Head-election, canonical-move, and reconcile-routing decision surface in the P2P
+  projection-reconcile + head-adoption pipeline: src/services/head_adoption.rs (the
+  adopt-before-author pre-flight and its HeadDecision rule), src/db/content_diesel.rs (the
+  storage-side election-obey verdict), src/p2p/projection_reconcile.rs (gap classification,
+  admission routing into the adopt/contest arms, heal-leg liveness and bounded-retry
+  bookkeeping), and src/metrics.rs (the contest-failure reason vocabulary).
+
+decisionPoints:
+  - name: decide_head_action
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/head_adoption.rs
+      modulePath: services::head_adoption::decide_head_action
+      line: 400
+    summary: >
+      Total decision rule choosing AdoptLocal / AdoptPeer / ContestPeer / Hold / Author from
+      (own-conductor-canonical, peer-declared, local-declared, local-has-canonical-election,
+      contest-enabled). Presence-based, never timestamp-based.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          Author is reachable only when nothing is declared anywhere (own_conductor_canonical_
+          always_adopts_never_authors + author_is_reachable_only_when_no_head_exists_anywhere
+          prove this exhaustively over the 2^5 input space); ContestPeer never crowns local
+          authority — it only mints a DHT candidate for the zome's own arbiter to judge.
+      - id: C2
+        status: answered
+        justification: >
+          The rule is presence-based, not clock-based — it defers ALL ordering to the DHT
+          election (content_store::select_canonical_winner) and the storage-side verdict that
+          replays it (canonical_move_verdict). decide_head_action never compares timestamps
+          itself.
+      - id: C3
+        status: answered
+        justification: >
+          Proven total over its full boolean input space by
+          author_is_reachable_only_when_no_head_exists_anywhere (exactly 4 of 32 corners
+          author, and only when no head exists anywhere) and
+          contest_is_reachable_only_from_the_two_way_declared_corner — every input combination
+          maps to exactly one of the five decisions, so no input state is a dead end.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: own_conductor_canonical_always_adopts_never_authors
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: peer_declaration_on_an_undeclared_row_adopts
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: an_existing_local_declaration_holds
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: two_way_declared_without_an_election_contests
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: a_row_obeying_an_election_holds_against_a_peer_advertising_the_loser
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: contest_disabled_restores_the_old_hold
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: nothing_declared_anywhere_authors
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: author_is_reachable_only_when_no_head_exists_anywhere
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: contest_is_reachable_only_from_the_two_way_declared_corner
+        kind: unit
+
+  - name: canonical_move_verdict
+    kind: verdict-fn
+    sourceLocation:
+      file: src/db/content_diesel.rs
+      modulePath: db::content_diesel::canonical_move_verdict
+      line: 1321
+    summary: >
+      May a HealCanonical answer MOVE an already-declared row? Tier first (earned beats
+      staging), then election-presence, then notarized clock — antisymmetric and total.
+    notes: >
+      This IS the "select_canonical_winner consumption side" named in this row's authoring
+      task: it does not re-decide the DHT election, it replays the zome arbiter's own ordering
+      (tier, then link clock) at the storage projection boundary and refuses any non-forward
+      move. See content_store zome's seam-registry.yaml::select_canonical_winner for the
+      DHT-side arbiter this obeys.
+    concernIds:
+      - id: C2
+        status: answered
+        justification: >
+          canonical_move_verdict_is_antisymmetric_and_total proves the ordering is total and
+          that no two distinct elections ever displace each other in both directions (the flap
+          this exists to prevent).
+    contractTests:
+      - path: elohim/elohim-storage/src/db/content_diesel.rs
+        testName: canonical_move_verdict_is_antisymmetric_and_total
+        kind: unit
+      - path: elohim/elohim-storage/src/db/content_diesel.rs
+        testName: stale_reasons_are_distinct_and_labelled
+        kind: unit
+
+  - name: StaleReason
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/db/content_diesel.rs
+      modulePath: db::content_diesel::StaleReason
+      line: 1261
+    summary: >
+      Why a HealCanonical stamp declined to move a declared row — StoredNull / NotNewer / Tier.
+      Label values for elohim_projection_heal_refused_stale_total{reason}.
+    concernIds:
+      - id: C2
+        status: answered
+        justification: The three variants correspond exactly to canonical_move_verdict's ordering rules.
+      - id: C8
+        status: answered
+        justification: >
+          stale_reasons_are_distinct_and_labelled asserts label() values are pairwise distinct
+          — a metric label vocabulary that cannot collapse two different refusals into one
+          string.
+    contractTests:
+      - path: elohim/elohim-storage/src/db/content_diesel.rs
+        testName: stale_reasons_are_distinct_and_labelled
+        kind: unit
+
+  - name: LocalResolve
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/services/head_adoption.rs
+      modulePath: services::head_adoption::LocalResolve
+      line: 244
+    summary: >
+      What the pre-flight resolved from the OWN conductor: Probe (not yet asked) / Known(Option)
+      (observed-or-cached) / Unresolved (asked, timed out — absence NOT observed). The
+      Known(None)-vs-Unresolved split closes a documented CONTRACT DEVIATION where both
+      provenances used to collapse into one variant.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          Split on 2026-08-02 specifically so "observed absent" (Known(None)) and "unknown,
+          conductor did not answer" (Unresolved) can never again be silently conflated — named
+          directly in this plan's own text as the first seam-contracts adoption target for
+          Answer<T> (P1.2).
+    contractTests: null
+    gapNote: >
+      Constructed and consumed at more sites than the type definition alone (grep-verified
+      2026-08-02): the two match arms in try_adopt_canonical_head
+      (src/services/head_adoption.rs:490,506,509, both of which fold to the SAME `None` today
+      per the documented CONTRACT DEVIATION), the adopt-before-author pre-flight in
+      witness_ghost_anchors (src/p2p/projection_reconcile.rs:1788), the adopt_deferred_heads
+      loop that maps a fetch result onto Known/Unresolved (src/p2p/projection_reconcile.rs:
+      3198-3199), and reanchor_backfill's construction (src/services/reanchor_backfill.rs:287).
+      The true gap: no unit test asserts on LocalResolve::Known vs LocalResolve::Unresolved
+      directly — decide_head_action's tests exercise the downstream bool this degrades to, not
+      the enum itself. This is exactly the gap plan task P1.2 closes by retrofitting this type
+      onto seam_contracts::Answer<T> with its own contract test.
+
+  - name: contest failure classes (metrics::inc_contest_failed)
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/metrics.rs
+      modulePath: metrics::inc_contest_failed
+      line: 1253
+    summary: >
+      Four known failure-class literals for a contest attempt that minted nothing —
+      "no_local_chain" | "not_retrievable" | "fetch_none" | "declare_error".
+    notes: >
+      Currently a STRINGLY-TYPED label (&str), not a Rust enum — plan task P1.3 replaces this
+      with a typed ContestFailure implementing ReasonLabel (label strings held constant so
+      dashboards keep working). Registered here as the conceptual reason vocabulary in its
+      current pre-P1.3 shape so the gap is tracked, not rediscovered.
+    concernIds:
+      - id: C4
+        status: partial
+        justification: >
+          "no_local_chain" (upstream conductor genuinely holds no chain for the id) is
+          distinguished from "not_retrievable"/"fetch_none" (a fetch that could not be
+          completed) in the doc comment — an honest-absence-shaped distinction — but there is
+          no test anywhere asserting these four literals stay distinct or stable, and the
+          class is not yet a real Rust type a compiler can exhaustively match on.
+      - id: C8
+        status: partial
+        justification: >
+          The four literals ARE a labeled-counter vocabulary (CONTENT_CONTEST_FAILED{class}),
+          but as a bare &str there is no ReasonLabel::all() conformance check preventing a
+          typo'd fifth literal from silently fragmenting the metric — the exact class of defect
+          plan surface 3's ReasonLabel trait targets.
+      - id: C1
+        status: n-a
+        justification: >
+          This function only COUNTS a contest-failure class; it does not itself gate or permit
+          any self-election. The C1 guard it observes (a conductor genuinely has no local chain
+          for the id) lives upstream at content_store::declare_canonical_head_inner's no-chain
+          gate (see the content_store zome's seam-registry.yaml).
+    contractTests: null
+    gapNote: >
+      No test in src/metrics.rs or at any of the four call sites (src/services/head_adoption.rs
+      lines ~1054, ~1072, ~1092, ~1129) asserts on the "no_local_chain" / "not_retrievable" /
+      "fetch_none" / "declare_error" literal set. Grep-verified 2026-08-02: zero references to
+      any of the four strings inside a #[cfg(test)] module in this crate.
+
+  - name: declared_divergence_should_route_to_contest
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/p2p/projection_reconcile.rs
+      modulePath: p2p::projection_reconcile::declared_divergence_should_route_to_contest
+      line: 731
+    summary: >
+      Should a DECLARED row whose divergence heal just refused be handed to the adopt/contest
+      arm? Four required conditions: non-canonical answer, local declared, peer advertises a
+      DIFFERENT head, and no local canonical election yet (quiescence).
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          Admits the row into the SAME ContestPeer branch decide_head_action already proves
+          never crowns local authority — it supplies a DHT candidate, never a decision.
+      - id: C4
+        status: answered
+        justification: >
+          Closes the "no candidate list at all" dead-end (edge #1291) where a declared,
+          chain-holding row got SkippedDeclared and vanished from both adopt-candidate paths —
+          an honest-absence-adjacent silent-drop class.
+      - id: C6b
+        status: answered
+        justification: >
+          The fourth condition (!local_has_canonical_election) is the QUIESCENCE gate — once an
+          election stands behind the row, admission_and_the_gapfill_guard_never_both_fire-style
+          reasoning applies: re-admitting a settled row would re-mint a link every sweep
+          forever.
+    contractTests:
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: declared_divergence_admission_requires_all_four_conditions
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: admission_and_the_gapfill_guard_never_both_fire
+        kind: unit
+        mirrorRisk: false
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: the_declared_axis_is_now_covered_by_exactly_one_route
+        kind: unit
+
+  - name: gapfill_would_self_elect
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/p2p/projection_reconcile.rs
+      modulePath: p2p::projection_reconcile::gapfill_would_self_elect
+      line: 667
+    summary: >
+      Would a GapFill on THIS row crown this node's own fallback root over a peer's real
+      declaration? True only when the answer is non-canonical, a peer advertises a real
+      declaration, AND this row carries no declaration yet.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          gapfill_refuses_to_self_elect_over_a_peers_declaration is the direct regression test
+          for the exact live trace this guard exists to stop — a self-authored fallback root
+          becoming a PERMANENT, QUIET divergence.
+    contractTests:
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: gapfill_refuses_to_self_elect_over_a_peers_declaration
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: gapfill_is_unchanged_without_a_peer_hint
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: gapfill_guard_never_fires_on_a_canonical_answer
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: gapfill_guard_never_fires_on_an_already_declared_row
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: admission_and_the_gapfill_guard_never_both_fire
+        kind: unit
+        mirrorRisk: false
+
+  - name: timeout_should_route_to_adopt
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/p2p/projection_reconcile.rs
+      modulePath: p2p::projection_reconcile::timeout_should_route_to_adopt
+      line: 690
+    summary: >
+      Should a FAILED own-conductor resolve be handed to adopt-before-author instead of dropped
+      for the sweep? Yes iff the failure was transient (timeout-class) AND a peer advertises a
+      declaration.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          Closes the drop-forever hole where a timed-out row landed in NEITHER the ghost list
+          (needs Ok(None)) nor the adopt list — an unresponsive conductor silently re-dropped
+          the id every sweep. Distinguishes transient (unknown) from a genuine decode/logic
+          refusal.
+    contractTests:
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: timeout_routes_to_adopt_only_with_a_peer_hint
+        kind: unit
+
+  - name: conductor_missing_should_route_to_adopt
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/p2p/projection_reconcile.rs
+      modulePath: p2p::projection_reconcile::conductor_missing_should_route_to_adopt
+      line: 773
+    summary: >
+      Should a CONDUCTOR-MISSING row (resolve_content_head answered Ok(None)) also be routed to
+      adopt-before-author? Yes whenever a peer advertises a declaration for it.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          Closes the largest live heal-outcome class (Ok(None), the "MISSING" class) which
+          previously reached adoption only indirectly via witness_ghost_anchors and was silently
+          dropped for any row whose dht_anchor_hash was NULL.
+      - id: C1
+        status: answered
+        justification: >
+          Routes toward the SAME AdoptPeer arm decide_head_action already proves never
+          self-crowns — the alternative (witness_bootstrap authoring a fresh root) is precisely
+          the self-election this routing exists to avoid.
+    contractTests:
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: a_conductor_missing_row_routes_to_adopt_exactly_when_a_peer_declares
+        kind: unit
+
+  - name: classify_content_gap
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/p2p/projection_reconcile.rs
+      modulePath: p2p::projection_reconcile::classify_content_gap
+      line: 2438
+    summary: >
+      Classifies one advertised (id, peer_anchor) pair against local state into ContentGap:
+      AbsentLocal / AnchorGap / Divergent / InSync.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          content_gap_classification_absent_null_divergent proves an empty or absent
+          peer-advertised anchor is InSync (not divergence) — un-anchored is not evidence our
+          anchor is wrong, distinguishing "no claim" from "conflicting claim."
+    contractTests:
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: content_gap_classification_absent_null_divergent
+        kind: unit
+
+  - name: declaration_would_move
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/head_adoption.rs
+      modulePath: services::head_adoption::declaration_would_move
+      line: 384
+    summary: >
+      DECLARE-STORM GATE: would declaring `incoming` actually move this row's declaration?
+      None always moves (fill case); an identical (whitespace-trimmed) declaration never does.
+    concernIds:
+      - id: C6b
+        status: answered
+        justification: >
+          declare_storm_gate_refuses_a_declare_that_moves_nothing proves a converged corpus
+          issues ZERO zome declares per sweep — replaying against settled state mints nothing.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: declare_storm_gate_refuses_a_declare_that_moves_nothing
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: declare_storm_gate_allows_a_fill_and_a_real_move
+        kind: unit
+
+  - name: heal_decision
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/p2p/projection_reconcile.rs
+      modulePath: p2p::projection_reconcile::heal_decision
+      line: 1088
+    summary: >
+      Per-tick heal action: SkipNoBridge (bridge down, takes precedence) / SkipInFlight
+      (single-flight guard) / Spawn.
+    concernIds:
+      - id: C3
+        status: answered
+        justification: >
+          heal_decision_covers_bridge_and_single_flight exhaustively covers all 4 boolean
+          corners — every state maps to a legal action (Spawn, SkipInFlight, or SkipNoBridge),
+          no combination is left without a defined outcome.
+    contractTests:
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: heal_decision_covers_bridge_and_single_flight
+        kind: unit
+
+  - name: claim_self_candidacy
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/head_adoption.rs
+      modulePath: services::head_adoption::claim_self_candidacy
+      line: 898
+    summary: >
+      In-process ledger: may THIS (id, target-head) pair be nominated as a self-candidate this
+      process lifetime? First nomination allowed; identical re-nomination refused; a genuinely
+      moved local head is nominatable again.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          Bounds the guarded legitimate self-candidacy arm this plan's own canon names for C1
+          ("self-candidacy is admissible exactly when not_retrievable itself proves a local
+          chain exists") — the ledger stops a converged node from re-nominating the identical
+          head every sweep.
+      - id: C6b
+        status: answered
+        justification: >
+          self_candidacy_is_claimed_once_per_id_and_head proves 5 consecutive re-nomination
+          attempts of the SAME head are all refused after the first — idempotent under replay.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: self_candidacy_is_claimed_once_per_id_and_head
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: a_moved_local_head_may_be_nominated_again
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: the_self_candidacy_ledger_does_not_collide_across_ids
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: self_candidate_keys_are_unambiguous
+        kind: unit
+
+  - name: MissLedger::admit
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/p2p/projection_reconcile.rs
+      modulePath: p2p::projection_reconcile::MissLedger::admit
+      line: 224
+    summary: >
+      Cross-sweep miss-count admission: Retry (budget has room, or new evidence re-admitted the
+      id) vs Exhausted (retry budget spent against unchanged evidence, cooling down for
+      MISS_READMIT_SWEEPS).
+    concernIds:
+      - id: C6a
+        status: answered
+        justification: >
+          miss_ledger_makes_max_retries_real_across_sweeps proves MAX_RETRIES is a REAL,
+          cross-sweep-persistent budget (closing the hole where a per-sweep-rebuilt tracker made
+          the retry ceiling structurally unreachable).
+      - id: C11
+        status: answered
+        justification: >
+          Exhausted is a declared, counted (elohim_projection_reconcile_exhausted), reasoned
+          decline-for-now — exhaustion_is_never_permanent proves the cooldown always eventually
+          re-admits, so it degrades rather than blackholing the id.
+    contractTests:
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: miss_ledger_makes_max_retries_real_across_sweeps
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: new_peer_evidence_re_admits_an_exhausted_id_immediately
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: exhaustion_is_never_permanent
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: a_resolved_id_leaves_the_ledger_with_a_clean_budget
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: ledger_streams_do_not_share_budgets
+        kind: unit
+
+  - name: should_probe_election
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/head_adoption.rs
+      modulePath: services::head_adoption::should_probe_election
+      line: 696
+    summary: >
+      Should the election-obey arm spend a conductor round-trip probing for a visible DHT
+      election? Only when the head answer is entirely ABSENT (conductor-missing class) — a row
+      that got any answer is already served by the adopt/contest arms.
+    concernIds:
+      - id: C6a
+        status: answered
+        justification: >
+          election_obey_is_scoped_to_the_conductor_missing_class proves the probe is scoped so
+          it does not spend a round-trip per row per sweep on rows already served — bounded
+          work.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: election_obey_is_scoped_to_the_conductor_missing_class
+        kind: unit
