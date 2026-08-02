@@ -63,6 +63,8 @@ bodies themselves retire to git; the durable mechanism of each pattern lives in 
 
 | 13 | **A `DEFERRED:` fallback arm in the pre-push hook is DEAD CODE — the local gate is whatever the justfile says, and nothing else** — `run_gate` branches `elif command -v just && [ -f justfile ]` → `just gate`, *else* the big `case` block. `just` IS installed in the dev image, so for any project with a justfile the `case` arm never executes. Its `DEFERRED:` comments ("fallback includes X that the justfile gate omits") therefore describe **coverage nobody gets** — and read as reassurance while the gap is total. Compounding tell: `vitest run` does not type-check (vite strips types), so a `test`-only gate is blind to every strict-TS error in a spec file while CI's `tsc --noEmit` sees the whole tree. Diagnostic question when a red "should have been caught locally": *is the step in the justfile `gate` recipe, or only in the fallback arm?* Fix: put the step in the justfile; never park it in the fallback. | 2* | `backlog/ci-genesis-seeder-spec-typecheck-gate-gap.md` (#1400–#1401, TS2352/TS2493); `backlog/ci-genesis-projectionspec-ts2739.md` (#1101, TS2739 — same stage, same blind spot, two months earlier) |
 
+| 14 | **The measure OVER-reads: a findings-taxonomy token with no error context fingerprints the benign output of a SUCCEEDING step** — trap #1's opposite polarity, on the sentinel arm instead of the pipeline. A bare tool/verb token (`nerdctl`, `rollout`) matches lines that every *healthy* build emits: `set -x` command echoes of a cleanup that worked, and the progress narration `kubectl rollout status` prints two lines above `deployment … successfully rolled out`. Because a stage-level `unstable()` yields no JUnit cases, `ci-harvest` falls through to the console-tail scan, where `MAX_CONSOLE_FINDINGS_PER_BUILD = 4` is spent on the noise — so the false findings don't merely add up, they **crowd out the real cause in the same tail** and each new permutation costs a background triage dispatch. **Diagnostic tell: the captured line is a *progress* or *command* line, and the line 1–3 below it says the step succeeded.** Fix in three layers: the taxonomy token must carry error context (`rollout.*(?:failed\|timed out\|exceeded)`, not `rollout`); a class-level guard skips command echoes (`_CMD_ECHO`) and progress/success chatter (`_BENIGN_PROGRESS`); a test asserts both non-capture of the benign lines AND still-capture of the real failure shapes. Safe because a genuine stall emits a SEPARATE non-progress error line. | 2* | `backlog/ci-harvest-nerdctl-cleanup-echo-overcapture.md` (#1137, INFRASTRUCTURE/`nerdctl`); `backlog/ci-harvest-rollout-progress-overcapture.md` (#1195–#1293, DEPLOYMENT/`rollout` — second category, the surface the first fix could not reach) |
+
 \* #6 recurred in 2 shifts but is a full-cycle-cost no-op silencer worth the museum row.
 #12 is likewise 2 occurrences, but of an *identical mechanism against the identical config list*, where
 the second instance ran three weeks intermittently and its GREEN builds were the mis-provenanced ones —
@@ -75,6 +77,14 @@ wider than the one gate that was fixed — at the time of writing, `elohim-app` 
 `graph-walker` + `orchestrator-integration` node tests; `test-jenkinsfile-lints` is scoped to
 `jenkinsfile-cps-scope.test.mjs` alone) carry the identical dead claim. Audit every `DEFERRED:` note in
 `.husky/pre-push.bash` against the project's justfile `gate` recipe before trusting it.
+#14 is 2 occurrences a month apart, and it earns the row before a third on two grounds. First, the
+second instance proved the class is **wider than its first fix**: the `_CMD_ECHO` guard that closed the
+`nerdctl` echoes structurally could not touch rollout progress lines (step output carries no `+ `
+prefix), so "we fixed that" was false comfort. Second, like #13 it is a **meta-trap** — it degrades the
+apparatus an agent uses to see CI at all, and its harm is not additive but *displacing*: a four-finding
+per-build cap spent on benign chatter hides the real cause in the same log tail, which is how #1291's
+actual RBAC-drift `unstable()` went unfiled while four healthy rollouts got fingerprinted. When a
+findings entry looks strange, read the three lines BELOW the captured line before believing it.
 
 ## The load-bearing reading (so you feel the pull and resist it)
 

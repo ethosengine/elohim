@@ -7,9 +7,9 @@ title: "ci-harvest over-captures routine image-cleanup command echoes as failure
 slug: "ci-harvest-nerdctl-cleanup-echo-overcapture"
 written: "2026-07-02"
 author: "ci-failure-triage"
-status: "backlog"
+status: "wip"
 priority: "low"
-ci_status: blocked
+ci_status: in-progress
 fingerprints: [e4cad4b435b1, b9ee178c936d, 310cd811389a, b0d29582b52f]
 jobs: [elohim-edge]
 relatedNodeIds: []
@@ -19,6 +19,8 @@ cites:
   - .claude/scripts/ci-harvest.py
   - .claude/data/failure-taxonomy.json
   - genesis/data/timeline/backlog/ci-edge-p2p-sim-docker-compose-missing.md
+  - genesis/data/timeline/backlog/ci-harvest-rollout-progress-overcapture.md
+  - .claude/scripts/_lib/__tests__/ci_harvest_echo_test.py
   - genesis/docs/content/elohim-protocol/history/2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md
 ---
 
@@ -111,12 +113,15 @@ a museum row then (extend that record — never fork a second lessons doc).
 
 ## Current decision
 
-`blocked` — on a bounded harvester-precision fix that is deferred out of this
-run by dispatch scope ("canonicalization + ledger status only"). The four ledger
-lines are marked `status: blocked` so they persist and DEDUPE on recurrence
-(bump `seen`, no new triage dispatch) rather than re-firing the sentinel. What
-unblocks: land the classifier-precision fix below (a follow-up tooling change),
-then these entries can be closed. The stasis sweep re-checks `blocked` entries.
+`in-progress` (was `blocked`, superseded 2026-08-02) — the classifier-precision
+fix that this entry was blocked on has landed and is verified green; closure is
+now by disappearance, which the harvester confirms deterministically. Nothing
+here is waiting on a decision.
+
+> Historical: this read `blocked` — on a bounded harvester-precision fix
+> deferred out of the original run by dispatch scope ("canonicalization +
+> ledger status only"), with the four ledger lines marked `status: blocked` so
+> they would persist and DEDUPE on recurrence rather than re-fire the sentinel.
 
 ## Proposed fix (bounded, deferred — NOT landed this run)
 
@@ -138,9 +143,41 @@ whole class, not just `nerdctl`):
    INFRASTRUCTURE/`nerdctl`. Add a unit test with a synthetic cleanup-echo
    console fixture asserting zero findings.
 
+## Update 2026-08-02 — fix landed and verified; museum row earned
+
+**Both proposed fixes have since landed** and are now under test. Verified this
+run by reading the tree and running the harness, not by assertion:
+
+- `_CMD_ECHO = re.compile(r"^\s*\+ ")` exists in `ci-harvest.py` and is applied
+  in `collect_build_findings` step 2 (`continue` before regex classification).
+- `INFRASTRUCTURE.search` now reads
+  `hApp.*not found|nerdctl.*(?:error|fatal|denied|no such|failed)|level=fatal.*nerdctl|denied`
+  — the bare tool-name token is gone.
+- `python3 .claude/scripts/_lib/__tests__/ci_harvest_echo_test.py` → **exit 0**.
+- No recurrence of any of the four fingerprints in the 156 builds since #1137.
+
+So the four ledger entries moved `blocked → triaged` with
+`triaged_at_build: 1137` and `decompose_on_confirm: true`; the harvester now
+closes them deterministically once `elohim-edge`'s green streak confirms
+disappearance. (They were left parked at `blocked` after the fix landed — the
+triage-as-terminal residue this update clears.)
+
+**The museum criterion this entry set has been met.** This entry pre-committed:
+*"If the 'tool-name token matches `set -x` echo' shape recurs across ≥3 shifts
+or bites another taxonomy category, it earns a museum row then."* On 2026-08-02
+it bit **DEPLOYMENT** — the bare `rollout` token fingerprinting four
+`kubectl rollout status` progress lines from rollouts that succeeded
+(`ci-harvest-rollout-progress-overcapture.md`, #1195–#1293). Critically, the
+`_CMD_ECHO` fix above **structurally could not** cover that surface: rollout
+progress is step *output*, not a `set -x` echo, so it carries no `+ ` prefix.
+The generalized lesson graduated into the anti-patterns museum as **trap #14**
+(*the measure over-reads* — trap #1's opposite polarity), with both instances
+cited. Per the museum rule the record was EXTENDED, not forked.
+
 ## Fix trail
 
-No fix landed this run (dispatch scoped to canonicalization + ledger status).
+No fix landed *in the original run* (dispatch scoped to canonicalization +
+ledger status); it landed subsequently — see the 2026-08-02 update above.
 Ledger annotated:
 - `e4cad4b435b1`, `b9ee178c936d`, `310cd811389a`, `b0d29582b52f` →
   `status: blocked`, `backlog: ci-harvest-nerdctl-cleanup-echo-overcapture`,

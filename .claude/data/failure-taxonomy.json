@@ -53,7 +53,7 @@
         "elohim",
         "elohim-edge"
       ],
-      "search": "kubectl.*failed|rollout|CrashLoopBackOff",
+      "search": "kubectl.*failed|rollout.*(?:failed|timed out|exceeded)|exceeded its progress deadline|error: timed out waiting|CrashLoopBackOff|ImagePullBackOff|ErrImagePull",
       "ctx": 5,
       "max": 10,
       "fix": "Check Harbor image, kubectl describe pod",

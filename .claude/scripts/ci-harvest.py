@@ -66,6 +66,28 @@ MAX_CONSOLE_FINDINGS_PER_BUILD = 4
 # while the one real rmi failure in the same tail went uncaptured; backlog
 # ci-harvest-nerdctl-cleanup-echo-overcapture).
 _CMD_ECHO = re.compile(r"^\s*\+ ")
+
+# `kubectl rollout status` NARRATES ITS WAY TO SUCCESS: "Waiting for deployment
+# … rollout to finish: 0 out of 1 new replicas have been updated…" is what a
+# HEALTHY rollout prints, and two lines later comes "deployment … successfully
+# rolled out". These are step OUTPUT (not `set -x` echoes), so _CMD_ECHO cannot
+# catch them — edge #1195–#1293 filed four DEPLOYMENT fingerprints
+# (3efa4f507399/2e71d043c742/ca397410678e/ffb17d09045a) off rollouts that all
+# SUCCEEDED, while the real stage-level unstable() cause (RBAC drift) went
+# uncaptured; backlog ci-harvest-rollout-progress-overcapture.
+#
+# Soundness: skipping progress chatter never hides a real rollout failure —
+# when a rollout genuinely stalls, kubectl emits a SEPARATE error line
+# ("error: timed out waiting for the condition" / "exceeded its progress
+# deadline") that is not progress-shaped and still classifies.
+_BENIGN_PROGRESS = re.compile(
+    r"^\s*(?:"
+    r"Waiting for (?:deployment|rollout|statefulset|partitioned)\b"
+    r"|(?:deployment|statefulset|daemon set|daemonset)\b.*\bsuccessfully rolled out\b"
+    r"|statefulset rolling update complete\b"
+    r")",
+    re.IGNORECASE,
+)
 MAX_FAILED_TESTS_PER_BUILD = 8
 CONSOLE_TAIL = 60_000  # bytes of console tail to classify
 HTTP_TIMEOUT = 8
@@ -198,6 +220,8 @@ def collect_build_findings(job, build, taxonomy):
                 for line in tail.splitlines():
                     if _CMD_ECHO.match(line):
                         continue  # set -x echo — a command, not a failure
+                    if _BENIGN_PROGRESS.match(line):
+                        continue  # progress chatter of a SUCCEEDING step
                     if rx.search(line):
                         norm = normalize(line)
                         if norm and norm not in seen_lines:
