@@ -19,10 +19,24 @@ crate; it is plain data and has no runtime.
 string.* This crate gives each a type, so the distinctions survive review, refactors,
 and dashboards instead of being re-litigated after the next incident.
 
-**Prerequisites (to use the crate):** Rust 1.83+. Nothing else — no async
-runtime, no network, no database. Building the crate's *own* gate (its tests,
-clippy, and WASM check) has one more prerequisite; see
-[Maintainer gate](#maintainer-gate) — it does not apply to consuming the crate.
+**Prerequisites (to use the crate):** Rust 1.83+. Nothing else for a native
+runtime or service consumer — no async runtime, no network, no database. Two
+more prerequisites apply to two other named audiences, not to a plain native
+consumer above:
+
+- **A Holochain zome consumer** — your zome itself compiles to
+  `wasm32-unknown-unknown`, so you need that target installed:
+  `rustup target add wasm32-unknown-unknown`.
+- **Anyone building natively against this crate inside this repo's dev
+  container** — the container exports `RUSTFLAGS=--cfg
+  getrandom_backend="custom"` globally (needed elsewhere for Holochain WASM
+  builds), which breaks a native `cargo build`/`test`/`clippy` here; clear it
+  first with `export RUSTFLAGS=""` (the same gotcha CLAUDE.md documents for
+  doorway/steward-node).
+
+Building the crate's *own* gate (its tests, clippy, and WASM check) uses both
+of the above plus the exact command sequence; see
+[Maintainer gate](#maintainer-gate).
 
 ```toml
 [dependencies]  # Answer<T> / ReasonLabel at runtime — always add this one.
@@ -41,10 +55,18 @@ The registry `elohim` is a Nexus hosted index; add it to `~/.cargo/config.toml`
 index = "sparse+https://nexus.ethosengine.com/repository/cargo-internal/"
 ```
 
-Registry reachability is not assumed. Inside this monorepo, skip the registry
+Registry reachability is not assumed. This crate lives at `crates/seam-contracts`
+(repo-root-relative) — the observable signal that means "stop trying the
+registry, use the path form below" is `cargo build`/`cargo fetch` failing to
+resolve `elohim-seam-contracts` from the `elohim` registry: a network/DNS
+failure reaching `nexus.ethosengine.com`, or a `401`/`403` fetching the sparse
+index if anonymous read is not enabled in your environment (see
+`genesis/docs/setup/cargo-registry-developer-setup.md`'s auth-vs-authorization
+table for what those two codes mean). Inside this monorepo, skip the registry
 and depend on the crate by path instead (adjust the relative path to your
-crate's own location — this example is from a crate two directories under a
-top-level workspace such as `elohim/` or `doorway/`):
+crate's own location relative to `crates/seam-contracts` — this example is
+from a crate two directories under a top-level workspace such as `elohim/` or
+`doorway/`):
 
 ```toml
 [dependencies]
@@ -210,6 +232,9 @@ debt.
 
 ## `ReasonLabel` — outcomes you can count
 
+Create `tests/dashboard_contract.rs` in the same crate as [First use](#first-use)
+above (no `harness` feature needed for this one either):
+
 ```rust
 use seam_contracts::ReasonLabel;
 
@@ -238,6 +263,18 @@ fn labels_are_a_dashboard_contract() {
     );
 }
 ```
+
+<!-- Mirrors the `ReasonLabel` trait's own `# Implementing` doctest in
+     crates/seam-contracts/src/reason.rs — same ContestFailure enum, same
+     three labels — with the `#[test]` + `assert_reason_labels_stable`
+     wrap-and-pin shape that `answer_state_labels_are_stable` uses in
+     crates/seam-contracts/src/answer.rs (mod answer_tests) for this crate's
+     own AnswerState vocabulary. -->
+
+**Expected pass signal:** `cargo test dashboard_contract` — green, same as
+`answer_state_labels_are_stable` inside this crate's own suite. Like
+`Answer<T>`, `ReasonLabel` is plain data; nothing here talks to a peer, a
+database, or the network.
 
 Label strings are a contract with every panel, alert, and recording rule keyed on
 them. `assert_reason_labels_stable` turns "unchanged" from a claim in a commit
@@ -379,11 +416,9 @@ turns a bug into a week.
 
 ## Maintainer gate
 
-The dev environment exports a WASM-targeted `RUSTFLAGS`
-(`--cfg getrandom_backend="custom"`, needed elsewhere for Holochain WASM
-builds) globally; it breaks this crate's native `cargo test`/`clippy` runs, so
-clear it first. The last line needs the WASM target installed once per
-toolchain:
+The full local gate this crate's own CI/pre-push check runs — the same two
+prerequisites named above (wasm32 target, cleared `RUSTFLAGS`) apply here too,
+plus the exact command sequence:
 
 ```bash
 rustup target add wasm32-unknown-unknown     # one-time, for the last line below

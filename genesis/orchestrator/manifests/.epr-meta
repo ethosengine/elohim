@@ -15,7 +15,7 @@ rules:
   - id: webrtc-ice-servers-camelcase
     class: inject
     when: { write: "*.yaml", contains-any: ["webrtc_config", "webRtcConfig", "ice_servers", "iceServers"] }
-    validator: epr:validator-webrtc-ice-servers-key
+    dedupe-of: "scripts/ci/validate-conductor-config.sh (the deterministic render/deploy gate that rejects the dead key by name)"
     why: >
       INVARIANT — `webrtc_config` passes VERBATIM into tx5's serde-camelCase `WebRtcConfig`.
       The ICE-server list key MUST be `iceServers` (camelCase). The snake_case `ice_servers`
@@ -46,10 +46,14 @@ of every ICE server, and the fleet "works" until topology makes NAT traversal lo
 class #1 of the five-defect convergence arc). This is the anti-pattern shape: *a config surface that
 tolerates unknown keys turns a spelling into a silent capability loss.*
 
-The `webrtc-ice-servers-camelcase` rule fires as an advisory (class stays `inject` because
-`epr:validator-webrtc-ice-servers-key` is not registered in v1) when any `.yaml` write in this
-subtree contains a webrtc/ICE key. It catches the dead-key reintroduction at edit time without
+The `webrtc-ice-servers-camelcase` rule fires as an `inject` advisory when any `.yaml` write in
+this subtree contains a webrtc/ICE key. It catches the dead-key reintroduction at edit time without
 blocking legitimate manifest edits. The deterministic gate is
-`scripts/ci/validate-conductor-config.sh`, which rejects the dead key by name at render/deploy.
+`scripts/ci/validate-conductor-config.sh`, which rejects the dead key by name at render/deploy —
+and that script, not a validator-EPR, is where this concern is mechanized. The rule accordingly
+names **no validator** and points at it with `dedupe-of` instead: a `validator:` key naming a
+detector the resolver does not implement advertises enforcement the rule does not serve (concern
+class C7 — the phantom key was dropped 2026-08-02 by plan task P4.1, with every word of the
+teaching kept).
 
 See: `genesis/docs/content/elohim-protocol/history/2026-07-12-substrate-convergence-five-defect-arc.md`

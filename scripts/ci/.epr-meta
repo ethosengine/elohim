@@ -14,7 +14,7 @@ rules:
   - id: deploy-scripts-bash-coreutils-only
     class: inject
     when: { write: "*.sh", contains-any: ["python", "PyYAML", "pip install", "pip3", "import yaml", "env python"] }
-    validator: epr:validator-deploy-script-runtime
+    dedupe-of: "each deploy script's own header requirement (bash + coreutils only), scarred by edge #1183"
     why: >
       INVARIANT — deploy-container scripts are bash + coreutils ONLY. The render/deploy container
       has no python, no pip, no PyYAML — a script that imports one fails BEFORE `kubectl apply`,
@@ -44,9 +44,12 @@ class #5 of the five-defect convergence arc: *CI tooling verified outside its ru
 unverified claim.* Edge #1183 is the scar: one `import yaml` failed all seven human deploys and made
 the defect-#2/#3 fixes it was gating look inert.
 
-The `deploy-scripts-bash-coreutils-only` rule fires as an advisory (class stays `inject` because
-`epr:validator-deploy-script-runtime` is not registered in v1) when a `.sh` write in this subtree
-reaches for python/pip/PyYAML. It surfaces the constraint at edit time. Two disciplines the advisory
+The `deploy-scripts-bash-coreutils-only` rule fires as an `inject` advisory when a `.sh` write in
+this subtree reaches for python/pip/PyYAML. It names no validator — the real check is running the
+script in the container it deploys from, which is the very discipline the rule teaches, and a
+`validator:` key naming a detector the resolver does not implement would advertise enforcement the
+rule does not serve (the phantom key was dropped 2026-08-02, plan task P4.1). It surfaces the
+constraint at edit time. Two disciplines the advisory
 teaches: parse config with bash+coreutils, and TEST IN THE CONTAINER, not just on the host. Note the
 subtree also holds build-only scripts (e.g. `cargo-publish-*.sh`) that legitimately use a fuller
 toolchain because they never run on the deploy path — the rule is content-scoped to the python class

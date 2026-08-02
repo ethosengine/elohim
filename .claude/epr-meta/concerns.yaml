@@ -11,13 +11,16 @@
 # the same misrepresentation wearing a different key.
 #
 # THE TWO HOMES (define-once-bind-many, split by whether a predicate exists):
-#   • a class WITH an evaluable predicate today  -> an enforcement row in `policies.yaml`
-#     (currently: C2, whose storage-family placement is bound from
-#     `elohim/elohim-storage/src/.epr-meta`).
-#   • a class WITHOUT one                        -> a Precedent-shaped row HERE.
-# A class lives in exactly ONE home. When P4.1 registers a class's validator, its row MOVES to
+#   • a class WITH an evaluable predicate  -> an enforcement row in `policies.yaml`
+#     (C2 `heal-fills-never-moves` and C6a `bounded-work`, both bound from
+#     `elohim/elohim-storage/src/.epr-meta`; registered 2026-08-02 by plan task P4.1).
+#   • a class WITHOUT one                  -> a Precedent-shaped row HERE.
+# A class lives in exactly ONE home. When a class's validator is registered, its row MOVES to
 # policies.yaml as a NEW version row; the concerns.yaml row is marked `status: superseded` with
-# `superseded_by` naming the policies.yaml pin — lineage, never deletion.
+# `superseded_by` naming the policies.yaml pin — lineage, never deletion (C6a is the worked
+# example: `c6a-bounded-work@1` here, superseded by `policies.yaml#c6a-bounded-work@2`). The
+# census reads `status`, so an ACTIVE row always names the live home and a superseded one never
+# does. The reverse move does not exist: a predicate is not un-invented.
 #
 # NAMED CONSUMERS (a consumer-less registry is a silently-unloaded one by another name):
 #   1. the decision-point CENSUS — `placement-audit.py --epr-meta` (plan P3.2): reads BOTH homes;
@@ -258,7 +261,7 @@ concerns:
 
   - id: c6a-bounded-work
     version: 1
-    contentHash: sha256:855ea03160a434768678ce5df68143089ec9831bbe0d0e5288d98c6edeb5cc15
+    contentHash: sha256:9f3134f0d23dfa0f1697aef66bd39b3432293d1a0084023f705520a0389f6a4a
     concern: C6a
     title: Bounded work — every loop, sweep and retry ladder respects a declared budget
     statement: >
@@ -284,7 +287,8 @@ concerns:
         - "74fbdf2d7 2026-07-29 a retry ladder against an uncancellable call created unbounded work with no loop anywhere in the diff"
         - "1b445b481 2026-08-01 a responder budget compile-asserted strictly below the requester's"
         - "2026-08-02 sweep budgets + per-tick caps across the conductor-plane waves"
-    status: active
+    status: superseded
+    superseded_by: policies.yaml#c6a-bounded-work@2
     established_by: deliberated-2026-08-02-operator+claude
     why: >
       The class's teeth are in its scope clause, not its statement: the expensive instances had NO
@@ -293,6 +297,12 @@ concerns:
       TWICE; the live kernel is `drain_publish_queue` + wait-for-drain, and a third scheme is a
       diagnosis failure, not a design. Live-metered: this class gets a runbook invariant->probe row
       (mint-then-quiet), not a design-time contract test alone.
+      GRADUATED 2026-08-02 (plan task P4.1). This row is the PRE-predicate Precedent; the class now
+      has one (`epr:validator-bounded-work`) and therefore an enforcement home, so it moved to
+      `.claude/epr-meta/policies.yaml#c6a-bounded-work@2` — the two-home rule's whole point is that
+      the home tracks whether a predicate exists, and a class must live in exactly one. Kept here
+      superseded rather than deleted: a version that ever bound something is lineage, and the
+      census reads `status` so the live home is read from the ACTIVE row, never from this one.
 
   - id: c6b-idempotent-effect
     version: 1

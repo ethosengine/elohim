@@ -18,7 +18,7 @@ rules:
       contains-any: ["compute_cid", "canonical_bytes", "Sha2_256", "Cid::new_v1", "multihash",
                      "serde_ipld_dagcbor", "dag-cbor", "base32", "short_fingerprint",
                      "drift_fingerprint", "enum Verdict"]
-    validator: epr:validator-interface-first-reuse
+    dedupe-of: "elohim/eprfs/eprfs-core/src/address.rs (BlobCid) + elohim/epr/src/{cid,cbor,envelope}.rs (the canonical codec) — the interfaces this write may be re-deriving"
     why: >
       REUSE the canonical interface before authoring a bespoke CID / fingerprint / dag-cbor / verdict
       implementation — do not re-derive identity math or the codec. Canonical homes:
@@ -33,16 +33,16 @@ rules:
       Precedent — BritCid/BlobCid divergence, 2026-07-12 consolidation spec
       (elohim/brit/docs/specs/2026-07-12-shared-crate-consolidation-design.md): two CID newtypes, a
       re-implemented drift_fingerprint, and two verdict enums drifted apart because each was re-derived
-      instead of shared. Prefer a shared crate over a parallel reimplementation. (Advisory: the
-      epr:validator-interface-first-reuse validator-EPR is not registered in v1, so this rule surfaces
-      as an inject nudge — it never blocks.)
+      instead of shared. Prefer a shared crate over a parallel reimplementation. (Advisory `inject`
+      nudge — it never blocks, and it names no validator: "is this a re-implementation?" is a
+      judgement, not a textual predicate.)
   - id: interface-first-reuse-ts
     class: inject
     when:
       write: "*.ts"
       contains-any: ["compute_cid", "computeCid", "canonical_bytes", "canonicalBytes",
                      "multihash", "dag-cbor", "base32", "shortFingerprint", "short_fingerprint"]
-    validator: epr:validator-interface-first-reuse
+    dedupe-of: "elohim/sdk/schemas (generated TS wire shapes) — TypeScript RECEIVES computed identity, it never mints it"
     why: >
       REUSE the canonical interface — TypeScript RECEIVES computed identity, it does not mint it.
       A .ts file computing a CID / fingerprint / dag-cbor encoding is re-implementing the Rust
@@ -51,15 +51,15 @@ rules:
       elohim/sdk/schemas (consume the generated types, never hand-roll a wire struct); cite short-form →
       .claude/scripts/_lib/cite_graph.py. Precedent: BritCid/BlobCid divergence, 2026-07-12 consolidation
       spec (elohim/brit/docs/specs/2026-07-12-shared-crate-consolidation-design.md). Prefer a shared
-      crate/generated type over a parallel reimplementation. (Advisory: validator-EPR unregistered in v1;
-      inject nudge, never blocks.)
+      crate/generated type over a parallel reimplementation. (Advisory `inject` nudge, never blocks;
+      names no validator — the judgement is the reader's.)
   - id: interface-first-reuse-mjs
     class: inject
     when:
       write: "*.mjs"
       contains-any: ["compute_cid", "computeCid", "canonical_bytes", "canonicalBytes",
                      "multihash", "dag-cbor", "base32", "shortFingerprint", "short_fingerprint"]
-    validator: epr:validator-interface-first-reuse
+    dedupe-of: "elohim/epr/src/{cid,cbor,envelope}.rs — drive codegen FROM the schema, never mint a competing encoder"
     why: >
       REUSE the canonical interface — a codegen / tooling .mjs that hand-rolls CID / fingerprint /
       dag-cbor encoding is re-implementing the substrate's identity math. Canonical homes: addressing →
@@ -68,14 +68,14 @@ rules:
       the schema, never mint a competing encoder); cite short-form → .claude/scripts/_lib/cite_graph.py.
       Precedent: BritCid/BlobCid divergence, 2026-07-12 consolidation spec
       (elohim/brit/docs/specs/2026-07-12-shared-crate-consolidation-design.md). Prefer a shared source
-      over a parallel reimplementation. (Advisory: validator-EPR unregistered in v1; inject nudge, never blocks.)
+      over a parallel reimplementation. (Advisory `inject` nudge, never blocks; names no validator.)
   - id: interface-first-reuse-py
     class: inject
     when:
       write: "*.py"
       contains-any: ["compute_cid", "canonical_bytes", "multihash", "dag-cbor", "base32",
                      "short_fingerprint", "drift_fingerprint"]
-    validator: epr:validator-interface-first-reuse
+    dedupe-of: ".claude/scripts/_lib/cite_graph.py (the decode-only oracle) — only `eprfs cid` encodes CIDs"
     why: >
       REUSE the canonical interface — Python is the DECODE-ONLY oracle for cite fingerprints
       (.claude/scripts/_lib/cite_graph.py); only `eprfs cid` encodes CIDs (the single-encoder invariant).
@@ -84,10 +84,8 @@ rules:
       codec + compute_cid → elohim/epr (src/cid.rs, src/cbor.rs, src/envelope.rs); wire shapes →
       elohim/sdk/schemas. Precedent: BritCid/BlobCid divergence, 2026-07-12 consolidation spec
       (elohim/brit/docs/specs/2026-07-12-shared-crate-consolidation-design.md). Prefer the shared oracle
-      over a parallel reimplementation. (Advisory: validator-EPR unregistered in v1; inject nudge, never blocks.)
-validators:
-  - ref: epr:validator-interface-first-reuse
-    fuel: 200
+      over a parallel reimplementation. (Advisory `inject` nudge, never blocks; names no validator.)
+validators: []
 ---
 
 # elohim/ — the protocol substrate (interface-first reuse)
@@ -115,12 +113,18 @@ enums — each re-derived instead of shared, then drifting.
 Four rules cover the code surfaces (`*.rs`, `*.ts`, `*.mjs`, `*.py`); each fires only when the
 written content contains a re-implementation smell (a CID/codec/fingerprint/verdict symbol via
 `contains-any`), so ordinary edits are never touched. The signal is **content-shaped**, not
-placement-shaped, so it takes the `validator: epr:<name>` escape hatch — the same shape
-`elohim-storage/src/.epr-meta` uses. `epr:validator-interface-first-reuse` is **not yet registered**
-in v1 (`REFERENCE_VALIDATORS`), so the rule degrades to an **inject advisory**: it points at the
-canonical home and the precedent, and never blocks the write. When a real validator-EPR is wired (a
-semantic re-implementation detector, not a keyword match), this rule graduates to a live check without
-a manifest edit — the `why:` already carries the destination.
+placement-shaped, and each rule stands on its class ladder plus a `dedupe-of` pointer at the
+canonical home it is protecting.
+
+The rules name **no validator**, and the phantom `epr:validator-interface-first-reuse` ref they
+used to carry was dropped on 2026-08-02 (plan task P4.1). The reason is the discipline itself:
+"is this a re-implementation of an existing interface?" is a semantic judgement, not a keyword
+match, so no honest predicate exists yet — and a `validator:` key naming a detector the resolver
+does not implement advertises enforcement the rule does not serve (concern class C7, the class
+whose own type specimen was 15 policy rules naming validators that do not exist). The advisory is
+unchanged in class, trigger and text; only the false advertisement is gone. When a real semantic
+detector is written, it arrives as a registered `epr:validator-*` and these rules graduate then —
+the `why:` already carries the destination.
 
 The canonical interfaces the `why:` routes to:
 

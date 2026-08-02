@@ -13,7 +13,7 @@ rules:
   - id: unique-content-id-in-tests
     class: inject
     when: { write: "*.rs", contains-any: ["create_content", "test_content("] }
-    validator: epr:validator-sweettest-unique-content-id
+    dedupe-of: "elohim/holochain/tests/sweettest/tests/lamad.rs `unique_id()` (the helper that IS the cure; dna #1357)"
     why: >
       INVARIANT — sweettest retries share the process-global kitsune2 mem-bootstrap store. A
       `create_content` (or `test_content(...)`) call with a FIXED string id (e.g. "test-1",
@@ -43,9 +43,12 @@ five-defect convergence arc: a test mechanism that breaks its own retry path. Th
 `unique_id("base")` (epoch-nanos suffix, defined in `tests/lamad.rs`) per invocation — fresh ids
 every attempt, byte-identical scenario.
 
-The `unique-content-id-in-tests` rule fires as an advisory (class stays `inject` because
-`epr:validator-sweettest-unique-content-id` is not registered in v1) when a `.rs` write in this
-subtree calls `create_content` / `test_content(...)`. It surfaces the discipline at edit time
+The `unique-content-id-in-tests` rule fires as an `inject` advisory when a `.rs` write in this
+subtree calls `create_content` / `test_content(...)`. It names **no validator**: whether a given id
+is retry-visible is a scenario judgement, not a textual predicate, and a `validator:` key naming a
+detector the resolver does not implement would advertise enforcement the rule does not serve
+(concern class C7 — phantom key dropped 2026-08-02, plan task P4.1). It surfaces the discipline at
+edit time
 without blocking legitimate edits — single-agent tests with no retry-visible DHT residue may keep a
 fixed id, but any multi-conductor or gossip-visible id should route through `unique_id()`.
 

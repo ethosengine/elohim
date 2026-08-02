@@ -94,9 +94,22 @@ def main() -> int:
     check("Rust test's PINNED_CONTENT_HASH matches the registry pin", digest in rust)
 
     # ── 3. every canon row is pinned + declares its brit standing shape ──────────────────────
+    # Membership is by the `concern:` FIELD across both homes — never by an id prefix, which
+    # would silently miss a class that graduates under a different id (C6a did, 2026-08-02).
+    # The 16-class count is over ACTIVE rows only: a graduation leaves a `status: superseded`
+    # row behind by design (lineage, never deletion), and counting versions instead of classes
+    # would read that lineage as canon growth. Both are still checked row-by-row below —
+    # a superseded row's pin must stay reproducible or its lineage is unverifiable.
     STANDING = {"record", "attestation", "fold", "pin"}
-    canon = concerns + [p for p in policies if str(p.get("id", "")).startswith("c2-")]
-    check("canon spans 16 classes across the two homes", len(canon) == 16)
+    CLASS_IDS = set(getattr(epr_meta, "_CONCERN_CLASS_IDS", ()) or
+                    ("C0", "C1", "C2", "C3", "C4", "C5", "C6a", "C6b",
+                     "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14"))
+    canon = [r for r in concerns + policies if r.get("concern") in CLASS_IDS]
+    active = [r for r in canon if str(r.get("status", "")).strip() != "superseded"]
+    check("canon spans 16 classes across the two homes",
+          {r["concern"] for r in active} == CLASS_IDS)
+    check("exactly one ACTIVE row per class (a class lives in exactly one home)",
+          len(active) == 16)
     for r in canon:
         rid = r.get("id")
         check(f"{rid}: pinned", isinstance(r.get("contentHash"), str))

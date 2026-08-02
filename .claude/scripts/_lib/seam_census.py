@@ -320,6 +320,52 @@ def load_registry(path: Path, top_validator, item_validator) -> tuple[dict | Non
     return out, [], row_errors
 
 
+def contract_test_names_for(source_path: Path) -> set[str]:
+    """Every `contractTests[].testName` the nearest ancestor `seam-registry.yaml` registers for
+    THIS source file. A read-model query over the registry, exposed because the concern-canon
+    validators (`_lib.epr_meta._heal_fills_never_moves`) need it and the registry reader must
+    stay in exactly one place — the interface-first-reuse rule applied to our own tooling.
+
+    Parse-only (no jsonschema pass): a name lookup does not need row validation, and per the
+    per-row degradation discipline a malformed row here simply contributes no names rather than
+    emptying the set. Empty set = "this file has no registered contract tests", which callers
+    must read as an honest gap the CENSUS owns, never as a finding of their own."""
+    try:
+        cur = Path(source_path).resolve().parent
+    except Exception:  # noqa: BLE001
+        return set()
+    registry = None
+    for _ in range(_em.MAX_CASCADE_DEPTH):
+        cand = cur / REGISTRY_FILENAME
+        if cand.is_file():
+            registry = cand
+            break
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    if registry is None:
+        return set()
+    data, errs = _load_registry_file(registry)
+    if data is None or errs:
+        return set()
+    crate_root = registry.parent
+    try:
+        rel = Path(source_path).resolve().relative_to(crate_root).as_posix()
+    except Exception:  # noqa: BLE001
+        return set()
+    names: set[str] = set()
+    for pt in data.get("decisionPoints") or []:
+        if not isinstance(pt, dict):
+            continue
+        loc = pt.get("sourceLocation")
+        if not isinstance(loc, dict) or loc.get("file") != rel:
+            continue
+        for cite in pt.get("contractTests") or []:
+            if isinstance(cite, dict) and isinstance(cite.get("testName"), str):
+                names.add(cite["testName"])
+    return names
+
+
 # ───────────────────────────── concerns.yaml (the sibling canon home) ─────────────────────────────
 
 def load_concerns(repo_root: Path) -> tuple[dict, list[str]]:
@@ -528,24 +574,38 @@ def census_data(repo_root: Path) -> dict:
     policies, pol_errs = _em.load_policies(repo_root)
     for e in pol_errs:
         findings.append(_finding("error", "policies-registry-error", "-", "-", e))
-    concern_home: dict[str, str] = {}
-    concern_title: dict[str, str] = {}
-    for pol in policies.values():
-        if pol.get("__pin_mismatch__"):
-            continue
-        cid = pol.get("concern")
-        if cid in _CONCERN_ID_SET:
-            concern_home[cid] = "policies.yaml"
-            concern_title[cid] = pol.get("title", "")
-
     concerns_home, con_errs = load_concerns(repo_root)
     for e in con_errs:
         findings.append(_finding("error", "concerns-registry-error", "-", "-", e))
-    for row in concerns_home.values():
-        cid = row.get("concern")
-        if cid in _CONCERN_ID_SET:
-            concern_home.setdefault(cid, "concerns.yaml")
-            concern_title.setdefault(cid, row.get("title", ""))
+
+    # A class lives in exactly ONE home — but a GRADUATION (P4.1: a class whose validator gets
+    # registered moves from concerns.yaml to policies.yaml as a new version row) leaves a
+    # superseded row behind in the old home, by design: lineage, never deletion. So the index is
+    # built in two passes — ACTIVE rows first (policies.yaml wins a tie, since an enforcement row
+    # is the stronger home), superseded rows only as a fallback for a class that has no active row
+    # anywhere. Without the pass split, a superseded row could name the live home and the matrix
+    # would read a graduated class as still ungraduated.
+    def _rows(source: dict, home: str, want_superseded: bool):
+        for row in source.values():
+            if row.get("__pin_mismatch__"):
+                continue
+            cid = row.get("concern")
+            if cid not in _CONCERN_ID_SET:
+                continue
+            is_superseded = str(row.get("status", "")).strip() == "superseded"
+            if is_superseded is not want_superseded:
+                continue
+            yield cid, home, row
+
+    concern_home: dict[str, str] = {}
+    concern_title: dict[str, str] = {}
+    for want_superseded in (False, True):
+        for cid, home, row in (list(_rows(policies, "policies.yaml", want_superseded))
+                               + list(_rows(concerns_home, "concerns.yaml", want_superseded))):
+            if cid in concern_home:
+                continue
+            concern_home[cid] = home
+            concern_title[cid] = row.get("title", "")
 
     concern_summary: dict[str, dict] = {}
     unbound_concerns: list[str] = []

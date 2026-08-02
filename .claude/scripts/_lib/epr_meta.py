@@ -656,6 +656,309 @@ def _test_bench_aggregate_capacity(write: dict) -> bool:
     return True
 
 
+# ══ Concern-canon validators (seam-concern-contract plan, design surface 4 / task P4.1) ═══════
+# Three concrete detectors so standing prose nags become EVALUATED gates. Each is
+# precision-biased by construction: every one of them is bound at `class: inject` (advisory —
+# the escalation ladder's agent-self-grant tier), so a false positive costs one advisory line,
+# never a blocked write. That asymmetry is deliberate and load-bearing — a fuzzy heuristic must
+# never deny, and the 2026-07-25 policy-family lesson (an unresolvable validator may not HARDEN
+# an advisory rule) points the same way.
+#
+# Shared shape helpers first: `_prior_text` (the sovereignty-guard's pre-image read, factored)
+# and `_added_lines` (multiset line difference — "what did this write INTRODUCE"). Net-new
+# counting is what keeps a maintenance edit to an already-offending file from being trapped:
+# cleaning or merely touching a file never fires, only ADDING the shape does.
+
+def _prior_text(write: dict) -> str | None:
+    """Pre-edit content of the written path. `""` for a brand-new file (everything is net-new);
+    None when the prior state is unreadable — callers decide which way to fail, and for these
+    advisory validators the honest choice is to surface (the 2026-07-25 clause cuts the other
+    way only for rules that GATE)."""
+    if write.get("is_new"):
+        return ""
+    try:
+        return Path(write["path"]).read_text(errors="replace")
+    except OSError:
+        return None
+
+
+def _added_lines(pre: str, post: str) -> list[str]:
+    """Lines `post` carries MORE times than `pre` — a multiset difference, not a real diff.
+    Order-free and O(n), which is all a "what did this write introduce" check needs; a moved
+    line is correctly NOT reported as added, and a duplicated one correctly is."""
+    from collections import Counter
+    remaining = Counter(pre.splitlines())
+    out: list[str] = []
+    for line in post.splitlines():
+        if remaining.get(line, 0) > 0:
+            remaining[line] -= 1
+        else:
+            out.append(line)
+    return out
+
+
+def _repo_rel(path: str) -> str:
+    """Repo-relative POSIX path for `path` (validators receive absolute tool paths). Falls back
+    to the input when the path sits outside the resolved repo root."""
+    p = Path(path)
+    try:
+        return p.resolve().relative_to(find_repo_root(p).resolve()).as_posix()
+    except Exception:  # noqa: BLE001
+        return p.as_posix()
+
+
+# ── C2 / heal-fills-never-moves (`epr:validator-heal-fills-never-moves`, bound by
+# c2-monotonic-authority@2). Two arms, both narrow:
+#   (a) a NET-NEW `StampMode::Declare` call site in a file that is not a canonical channel.
+#       `Declare` may move a declared head anywhere (including a deliberate revert), so widening
+#       its call-site set is exactly how the 2026-07-11 resurrection class returns — 2,838 rows
+#       restamped backwards, serially, after every restart.
+#   (b) a write whose ADDED lines touch the stamp guard while the file cites NONE of the contract
+#       tests the seam registry registers for it — the "blind first fix" shape (defect #3: the
+#       guard was re-keyed on WHO writes and froze forward adoption; the tests are what named the
+#       difference). Arm (b) is skipped entirely when the registry registers no test for the file:
+#       an honest, census-owned gap is not this validator's finding to make.
+# The word-boundary regex matters: `CollectiveStampMode::Declare` (the collectives plane, a
+# different enum) contains `StampMode::Declare` as a substring and must NOT be counted.
+_HEAL_CANONICAL_CHANNEL_FILES = (
+    # The stamp implementation itself: the `stamp_declared_head` deliberate-declare wrapper, the
+    # `StampMode::Declare => {}` guard arm, and their in-file contract tests.
+    "elohim/elohim-storage/src/db/content_diesel.rs",
+    # The own-conductor deliberate canonical act after `adopt_peer` mints the link.
+    "elohim/elohim-storage/src/services/head_adoption.rs",
+)
+_DECLARE_CALL_RE = re.compile(r"(?<![A-Za-z0-9_])StampMode::Declare(?![A-Za-z0-9_])")
+_STAMP_GUARD_SYMBOLS = (
+    "canonical_move_verdict", "StampMode::HealCanonical", "StampMode::GapFill",
+    "moving_declared_row", "SkippedStale", "stamp_declared_head_mode",
+)
+
+
+def _registered_contract_tests(path: str) -> set[str]:
+    """Contract-test names the nearest `seam-registry.yaml` registers for this source file.
+    Delegates to the census read-model (imported lazily — seam_census imports THIS module, so a
+    top-level import would cycle); the registry reader stays in exactly one place."""
+    try:
+        from _lib import seam_census
+        return seam_census.contract_test_names_for(Path(path))
+    except Exception:  # noqa: BLE001 — a missing//broken registry must never break a gate
+        return set()
+
+
+def _heal_fills_never_moves(write: dict) -> bool:
+    import sys as _sys
+    path = write.get("path") or ""
+    if not path.endswith(".rs"):
+        return False
+    post = write.get("content")
+    if post is None:
+        return False  # content unresolved (unreadable disk / failing Edit) — abstain
+    pre = _prior_text(write)
+    rel = _repo_rel(path)
+
+    # (a) net-new Declare outside the canonical-channel list
+    post_n = len(_DECLARE_CALL_RE.findall(post))
+    pre_n = len(_DECLARE_CALL_RE.findall(pre)) if pre is not None else 0
+    if post_n > pre_n and rel not in _HEAL_CANONICAL_CHANNEL_FILES:
+        print(f"  heal-fills-never-moves — net-new `StampMode::Declare` call site in {rel} "
+              f"({pre_n} -> {post_n}), which is NOT a canonical channel:", file=_sys.stderr)
+        for ch in _HEAL_CANONICAL_CHANNEL_FILES:
+            print(f"    · canonical channel: {ch}", file=_sys.stderr)
+        print("    FIX: a heal carrying a canonical answer stamps `HealCanonical` (move only with "
+              "proof of forward ordering); a fallback resolve stamps `GapFill` (fill an empty row "
+              "only). Widen `Declare` only by adding a deliberate canonical channel here.",
+              file=_sys.stderr)
+        return True
+
+    # (b) stamp-guard edit that cites none of its registered contract tests
+    added = _added_lines(pre if pre is not None else "", post)
+    touched = sorted({sym for line in added for sym in _STAMP_GUARD_SYMBOLS if sym in line})
+    if touched:
+        tests = _registered_contract_tests(path)
+        if tests and not any(t in post for t in tests):
+            print(f"  heal-fills-never-moves — {rel} edits the stamp guard ({', '.join(touched)}) "
+                  f"while citing none of its registered contract tests:", file=_sys.stderr)
+            for t in sorted(tests):
+                print(f"    · {t}", file=_sys.stderr)
+            print("    FIX: keep (or name in the predicate's doc comment) the contract test that "
+                  "proves the ordering — a guard edit with no cited proof is how the blind "
+                  "who-writes fix froze forward adoption.", file=_sys.stderr)
+            return True
+    return False
+
+
+# ── C6a / bounded work (`epr:validator-bounded-work`, bound by c6a-bounded-work@2). The class's
+# teeth are in its SCOPE clause: the expensive instances had no `loop` token in the diff at all
+# (a retry policy against an uncancellable call, 74fbdf2d7) or asserted a budget in the wrong
+# direction. This detector is deliberately narrow — it fires only on ADDED lines carrying an
+# unambiguous unbounded-work shape, inside a crate that actually registers decision points (a
+# `seam-registry.yaml` at some ancestor), with NO budget vocabulary in the surrounding window.
+# It will miss real instances; it is built not to invent false ones, because the honest signal
+# for a fuzzy shape is an advisory and an advisory that cries wolf is deleted, not obeyed.
+_BOUNDED_WORK_SHAPES = (
+    "loop {",           # a bare infinite loop
+    "max_retries", "max_attempts", "retry_count", "retries", "retry_forever",
+    "backoff", ".retry(", "RetryPolicy", "RetryConfig",
+)
+_BOUNDED_WORK_BUDGET_TOKENS = (
+    "budget", "deadline", "timeout", "Duration::from", "max_per", "batch_size", "limit",
+    ".take(", "_cap", "cap:", "MAX_", "_MAX", "drain_publish_queue", "tokio::select",
+)
+# A one-line author declaration naming the budget suppresses the shape (the sovereignty-guard's
+# `sovereignty-frame:` idiom): the guarantee is a DECLARED budget, so declaring it satisfies it.
+_BOUNDED_WORK_MARKER = "bounded-work:"
+_BOUNDED_WORK_WINDOW = 12  # lines either side of the shape searched for budget vocabulary
+
+
+def _has_registered_seam(path: Path) -> bool:
+    """True iff some ancestor directory carries a `seam-registry.yaml` (a REGISTERED seam).
+    Restricting the detector to registered seams is the precision half of the bias: those are
+    the crates whose decision points are enumerated, so a budget question there has a home."""
+    try:
+        cur = path.resolve().parent
+    except Exception:  # noqa: BLE001
+        return False
+    for _ in range(MAX_CASCADE_DEPTH):
+        if (cur / "seam-registry.yaml").is_file():
+            return True
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    return False
+
+
+def _bounded_work(write: dict) -> bool:
+    import sys as _sys
+    path = write.get("path") or ""
+    if not path.endswith(".rs"):
+        return False
+    post = write.get("content")
+    if post is None:
+        return False
+    if _BOUNDED_WORK_MARKER in post:
+        return False  # budget declared in-content by the author
+    if not _has_registered_seam(Path(path)):
+        return False
+    pre = _prior_text(write)
+    added = set(_added_lines(pre if pre is not None else "", post))
+    if not added:
+        return False
+    lines = post.splitlines()
+    hits: list[tuple[int, str, str]] = []
+    for i, line in enumerate(lines):
+        if line not in added:
+            continue
+        stripped = line.strip()
+        if stripped.startswith(("//", "/*", "*", "#")):
+            # A COMMENT naming a retry token is documentation of a budget, not a new ladder —
+            # and it is the single largest false-positive source measured against the live
+            # storage crate (every `max_retries` mentioned in a doc comment). Skipping comments
+            # is what keeps this advisory worth reading.
+            continue
+        shape = next((s for s in _BOUNDED_WORK_SHAPES if s in line), None)
+        if shape is None:
+            continue
+        lo = max(0, i - _BOUNDED_WORK_WINDOW)
+        window = "\n".join(lines[lo:i + _BOUNDED_WORK_WINDOW + 1])
+        if any(tok in window for tok in _BOUNDED_WORK_BUDGET_TOKENS):
+            continue
+        hits.append((i + 1, shape, line.strip()[:100]))
+    if not hits:
+        return False
+    print(f"  bounded-work — new unbounded-work shape(s) in {_repo_rel(path)} with no budget "
+          f"within ±{_BOUNDED_WORK_WINDOW} lines:", file=_sys.stderr)
+    for lineno, shape, text in hits:
+        print(f"    · line {lineno} [{shape}] {text}", file=_sys.stderr)
+    print("    FIX: declare the budget the loop/ladder respects (a per-tick cap, a deadline, a "
+          "bounded `take`), or bind the existing drain kernel (`drain_publish_queue` + "
+          "wait-for-drain) rather than minting a fourth pacing vocabulary. A retry policy "
+          f"against an UNCANCELLABLE call is a loop even with no loop token. Declaring the "
+          f"budget in a `{_BOUNDED_WORK_MARKER} <budget>` comment satisfies this advisory.",
+          file=_sys.stderr)
+    return True
+
+
+# ── DNA hash neutrality (`epr:validator-dna-hash-neutrality`) — the one registered validator with
+# NO canon class behind it. The ceremony tested it as a class and declined: "DNA-hash-neutrality
+# classification (integrity vs coordinator diffs) has no runtime predicate — it becomes the third
+# registered validator, not a class." So it enters as policy MACHINERY only: no concerns.yaml row,
+# no policies.yaml row, just a detector attached where the resolver evaluates DNA diffs
+# (`elohim/holochain/dna/.epr-meta`).
+#
+# What it classifies: the Holochain DNA hash covers INTEGRITY zomes + modifiers ONLY. A
+# coordinator-zome-only change moves no hash and heals via `update_coordinators` hot-swap (cheap,
+# no re-key, no DHT churn); an integrity-zome or modifiers change moves the hash and therefore
+# rides the reinstall path — which mints a new agent key and, applied to SOME peers and not all,
+# partitions the namespace into two DHTs. The validator LABELS the hash-moving class (that is the
+# trap) and stays silent on the coordinator-only class (the cheap path needs no warning) — it
+# never blocks: its rule is `class: inject`.
+_DNA_TREE_PREFIX = "elohim/holochain/dna/"
+# Only files that end up INSIDE the zome wasm can move the hash. A README or a `.md` note living
+# in an integrity zome's directory changes no compiled byte — firing on those would train the
+# reader to ignore the advisory that matters.
+_DNA_WASM_BEARING_SUFFIXES = (".rs", "Cargo.toml", "Cargo.lock", ".wasm")
+
+
+def _dna_modifier_block(text: str) -> str:
+    """The hash-relevant slice of a `dna.yaml`: the `integrity:` section (whose zome list and
+    the `origin_time`/`network_seed`/`properties` modifiers under it are what the DNA hash is
+    computed over). Everything below the `coordinator:` key is hot-swappable and excluded."""
+    out, keeping = [], False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("integrity:"):
+            keeping = True
+        elif stripped.startswith("coordinator:"):
+            keeping = False
+        if keeping:
+            out.append(line.rstrip())
+    return "\n".join(out)
+
+
+def _dna_hash_neutrality(write: dict) -> bool:
+    import sys as _sys
+    rel = _repo_rel(write.get("path") or "")
+    if not rel.startswith(_DNA_TREE_PREFIX):
+        return False
+    tail = rel[len(_DNA_TREE_PREFIX):]
+    parts = tail.split("/")
+    post = write.get("content")
+
+    kind = None  # "integrity-zome" | "modifiers" | "coordinator-zome"
+    if "zomes" in parts:
+        zome_dir = parts[parts.index("zomes") + 1] if len(parts) > parts.index("zomes") + 1 else ""
+        if not rel.endswith(_DNA_WASM_BEARING_SUFFIXES):
+            return False  # docs/config beside a zome compile into nothing — neutral by construction
+        kind = "integrity-zome" if "integrity" in zome_dir else "coordinator-zome"
+    elif parts and parts[-1] == "dna.yaml":
+        if post is None:
+            return False
+        pre = _prior_text(write)
+        if pre is not None and _dna_modifier_block(pre) == _dna_modifier_block(post):
+            return False  # coordinator-side / cosmetic edit — the hashed slice is untouched
+        kind = "modifiers"
+
+    if kind in (None, "coordinator-zome"):
+        # Coordinator-only (or not a DNA-hash-bearing surface at all): NEUTRAL. Silent by design —
+        # the hot-swap path carries no trap, and an advisory on every coordinator edit would be
+        # the nag this whole registry exists to avoid.
+        return False
+
+    label = ("an INTEGRITY zome" if kind == "integrity-zome"
+             else "the hashed `integrity:` slice of dna.yaml (modifiers)")
+    print(f"  dna-hash-neutrality — HASH-MOVING: {rel} is {label}.", file=_sys.stderr)
+    print("    · integrity zomes + modifiers ARE the DNA hash; coordinator zomes are NOT.",
+          file=_sys.stderr)
+    print("    · consequence: this diff cannot land by `update_coordinators` hot-swap. It needs a "
+          "deliberate DNA-lineage event (ALLOW_DNA_REINSTALL), which mints a NEW agent key — and "
+          "reinstalling SOME peers in a namespace but not all splits one DHT into two.",
+          file=_sys.stderr)
+    print("    FIX: if the change can be expressed coordinator-side, do that (hot-swap, no re-key, "
+          "no churn). If it genuinely belongs in integrity, ride a planned lineage event with the "
+          "whole namespace — the alpha genesis PAIR must both get the flag.", file=_sys.stderr)
+    return True
+
+
 # Declared runtime-scoped validator refs: NOT unresolvable — Unavailable-by-declaration, skips
 # clean without downgrading the rule (constraint 6). Value names the runtime that owns them.
 RUNTIME_SCOPED_VALIDATORS = {
@@ -767,6 +1070,11 @@ REFERENCE_VALIDATORS = {
     "epr:validator-archetype-resource-alignment": _archetype_resource_alignment,
     "epr:validator-test-bench-aggregate-capacity": _test_bench_aggregate_capacity,
     "epr:validator-escalation-ladder": _escalation_ladder,
+    # Concern-canon validators (plan P4.1). The first two realize canon classes
+    # (c2-monotonic-authority@2, c6a-bounded-work@2); the third is machinery with no class.
+    "epr:validator-heal-fills-never-moves": _heal_fills_never_moves,
+    "epr:validator-bounded-work": _bounded_work,
+    "epr:validator-dna-hash-neutrality": _dna_hash_neutrality,
 }
 
 

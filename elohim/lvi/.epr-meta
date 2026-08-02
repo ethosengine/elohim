@@ -19,7 +19,7 @@ rules:
       write: "*.rs"
       contains-any: ["podman", "rootless", "cgroup", "seccomp", "pids-limit", "spawn", "Command::new",
                      "ResourceQuota", "sandbox", "ActionKind::Devspace", "supervise", "reap"]
-    validator: epr:validator-lvi-invariants
+    dedupe-of: "elohim/lvi/docs/specs/2026-07-20-elohim-native-devspace-design.md (co-resident containment — the adversarial verdict this invariant comes from)"
     why: >
       CO-RESIDENT SAFETY IS THE LOAD-BEARING INVARIANT. A devspace runs a trusted peer's UNVETTED
       code on a host that is also a live conductor/DHT participant. The sandbox MUST carry a hard
@@ -35,7 +35,7 @@ rules:
       write: "*.rs"
       contains-any: ["LocalMaterializer", "ProjectionManifest", "MaterializationPolicy", "FetchMissing",
                      "materialize", "image", "layer", "tarball", "docker", "OCI"]
-    validator: epr:validator-lvi-invariants
+    dedupe-of: "eprfs ProjectionManifest + LocalMaterializer (Sparse / FetchMissing) — the machinery lvi composes instead of re-implementing"
     why: >
       MOUNT, DON'T SHIP. The image dies as a unit. Consume eprfs ProjectionManifest +
       LocalMaterializer (Sparse / FetchMissing) — do NOT re-implement image/layer/pull/tarball
@@ -48,7 +48,7 @@ rules:
       write: "*.rs"
       contains-any: ["delegates-compute", "delegates_compute", "bounds_validator", "Commitment",
                      "X-API-Key", "api_key", "authorize", "grant"]
-    validator: epr:validator-lvi-invariants
+    dedupe-of: "the `replicates-commons` bounds_validator (the 7 generic checks) — the authorization primitive `delegates-compute` copies"
     why: >
       AUTHORIZATION IS A Mishpat::Commitment `delegates-compute`, validated by the copy-of-
       `replicates-commons` bounds_validator (the 7 generic checks) — never a bespoke token or grant.
@@ -61,7 +61,7 @@ rules:
       write: "*.rs"
       contains-any: ["persistent", "checkpoint", "cache", "target_dir", "node_modules", "sccache",
                      "NodeSeed", "seal", "custody"]
-    validator: epr:validator-lvi-invariants
+    dedupe-of: "brit NodeSeed (the authority-free checkpoint that replays on rematerialize) — derived bytes never enter commons custody"
     why: >
       DERIVED BYTES NEVER ENTER COMMONS CUSTODY (the discipline the wider project corrected 3x).
       Source edits seal to a brit NodeSeed (authority-free checkpoint that replays on rematerialize).
@@ -69,9 +69,7 @@ rules:
       never commons blobs. Stateful-service data is REFUSE-BY-DEFAULT unless an explicit `persistent`
       set is declared in the seed AND verified on teardown; the author-declared-but-unverified path
       is the silent-data-loss mode and does not ship.
-validators:
-  - ref: epr:validator-lvi-invariants
-    fuel: 200
+validators: []
 ---
 
 # lvi/ — devspace peer-runtime (self-contained governance region)
@@ -87,11 +85,18 @@ them). This manifest ADDS the four lvi-specific invariants on top of that inheri
 ## The four invariants (reminders, not gates)
 
 The rules above are **inject advisories** — they teach, they never block. Each fires only when an
-edit touches the code surface it guards (a `contains-any` smell), so ordinary edits are untouched.
-`epr:validator-lvi-invariants` is intentionally **not registered** in v1 (`REFERENCE_VALIDATORS`),
-so every rule degrades to an inject nudge that surfaces the invariant and its rationale. When a real
-semantic validator-EPR is wired under this name, the rules graduate to live checks with no manifest
-edit — the `why:` already carries the destination.
+edit touches the code surface it guards (a `contains-any` smell), so ordinary edits are untouched,
+and each stands on its class ladder plus a `dedupe-of` pointer at the machinery or verdict it is
+protecting.
+
+They name **no validator**. The phantom `epr:validator-lvi-invariants` ref was dropped on
+2026-08-02 (plan task P4.1): every one of these invariants is a *design* judgement — "is this
+sandbox quota actually isolating the co-resident conductor?", "is this an image builder wearing
+another name?" — with no textual predicate behind it, and a `validator:` key naming a detector the
+resolver does not implement advertises enforcement the rule does not serve (concern class C7).
+Nothing about the advisories' class, trigger or text changed; only the false advertisement is gone.
+When a real semantic validator-EPR is written, it arrives registered and these rules graduate then
+— the `why:` already carries the destination.
 
 Unlike the `bridges/did` conformance rules (which exist for drifts that happened at birth), lvi's
 invariants are **design-known sharp edges** — they come from the adversarial verdicts in the

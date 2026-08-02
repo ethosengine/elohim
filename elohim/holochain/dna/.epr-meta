@@ -1,0 +1,79 @@
+---
+epr-meta-version: 1
+id: holochain-dna-hash-neutrality
+purpose: >
+  The Holochain DNA sources — integrity + coordinator zomes and the per-DNA `dna.yaml` for
+  lamad/elohim, imagodei, infrastructure, node-registry and mishpat. One asymmetry is
+  gate-surfaced here, because it decides how a change can REACH a running fleet at all: the DNA
+  hash covers integrity zomes + modifiers ONLY. A coordinator-zome change moves no hash and
+  hot-swaps via `update_coordinators`; an integrity-zome or modifiers change moves the hash and
+  can only land through a deliberate DNA-lineage event, which mints a new agent key — and applied
+  to some peers in a namespace but not all, it splits one DHT into two. This manifest makes NO
+  coverage claim (no `covers:`): finer manifests below still cascade and the coverage census still
+  descends.
+rules:
+  - id: dna-hash-neutrality
+    class: inject
+    when:
+      write: "*"
+    validator: epr:validator-dna-hash-neutrality
+    why: >
+      HASH-MOVING vs COORDINATOR-ONLY — classify before you plan the landing. The Holochain DNA
+      hash is computed over the INTEGRITY zomes plus the modifiers; coordinator zomes are outside
+      it (`uhCok…` in an error is a WASM hash, `uhC0k…` a DNA hash). Consequences, not style
+      points: a coordinator-only diff heals via the conductor's `update_coordinators` hot-swap —
+      no re-key, no DHT churn, gated by ALLOW_COORDINATOR_UPDATE. An integrity-zome or modifiers
+      diff cannot: it needs a reinstall (ALLOW_DNA_REINSTALL, non-prod true by default), the
+      reinstall mints a NEW agent key, and force-reinstalling SOME peers in a namespace but not
+      all lands them on different DNA hashes — different DHTs — a P2P partition (the alpha genesis
+      PAIR must both get the flag). The validator LABELS the hash-moving class and stays silent on
+      the coordinator-only one: the cheap path carries no trap, and an advisory on every
+      coordinator edit would be the nag this registry exists to avoid. It never blocks. If the
+      change can be expressed coordinator-side, do that; if it genuinely belongs in integrity,
+      ride a planned lineage event with the whole namespace. Registry note: this rule is INLINE by
+      design — `epr:validator-dna-hash-neutrality` is registered machinery with NO concern-canon
+      row, because the ceremony tested DNA-hash-neutrality as a class and declined it ("no runtime
+      predicate… it becomes the third registered validator, not a class").
+cites:
+  - substrate-convergence-five-defect-arc
+---
+
+# elohim/holochain/dna — DNA sources (hash-neutrality gate)
+
+Integrity and coordinator zomes plus each DNA's `dna.yaml`. One pipeline builds every DNA
+(`elohim/holochain/dna/Jenkinsfile`); a DNA subdirectory holding only `dna.yaml` + `zomes/` + a
+`justfile` is normal and fully covered — the absence of a per-DNA Jenkinsfile is not missing CI.
+
+## The one asymmetry this manifest gates
+
+**The DNA hash covers integrity zomes + modifiers. Coordinator zomes are not in it.**
+
+| Diff touches | Hash | How it reaches a running conductor |
+|---|---|---|
+| `*/zomes/*_integrity/**` | **moves** | reinstall — `ALLOW_DNA_REINSTALL`; mints a new agent key; partial application splits the DHT |
+| the hashed `integrity:` slice of `*/dna.yaml` (modifiers) | **moves** | same as above |
+| `*/zomes/<coordinator>/**` | unchanged | `happ_manager::sync_coordinators` → `update_coordinators` hot-swap; no re-key, no churn |
+
+The `dna-hash-neutrality` inject fires **only on the hash-moving classes** and labels the verdict
+with its consequence (the reinstall/partition trap). Coordinator-only edits pass silently: the
+hot-swap path has no trap, and an advisory on every coordinator write would train agents to ignore
+the one that matters. For `dna.yaml` the validator compares the *hashed slice* of the pre- and
+post-edit file — a coordinator-side or cosmetic edit to that file does not fire.
+
+This is where a shipped DNA fix most often fails to land: when a fix doesn't reach the fleet, the
+first question is which zome class the diff touched, not whether the pipeline ran.
+
+## Why this rule names a validator when most inject rules should not
+
+A `validator:` key that names a detector the resolver does not implement is the concern canon's own
+C7 violation — advertise ≠ serve — and the 2026-08-02 sweep dropped every such phantom key in the
+repo. This one is the opposite case: `epr:validator-dna-hash-neutrality` is **registered**
+(`.claude/scripts/_lib/epr_meta.py`, `REFERENCE_VALIDATORS`) and evaluated on every write beneath
+this directory. It is deliberately the one registered validator with **no concern-canon row** in
+either registry home: the ceremony tested DNA-hash-neutrality as a canon class and declined it —
+the classification has no runtime predicate, so it is policy *machinery*, bound inline here, not a
+guarantee the canon states. Machinery without canon is legitimate; canon without machinery is what
+the honesty rule forbids.
+
+See: `elohim/holochain/dna/CLAUDE.md`, `elohim/holochain/dna/SCHEMA_VERSIONS.md`, and
+`genesis/docs/content/elohim-protocol/history/2026-07-12-substrate-convergence-five-defect-arc.md`.

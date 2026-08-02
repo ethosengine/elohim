@@ -16,7 +16,7 @@ rules:
   - id: peer-fallback-invariant
     class: inject
     when: { write: "*.rs", contains-any: ["App not found", "App ZIP not available"] }
-    validator: epr:validator-epr-peer-fallback
+    dedupe-of: "genesis/data/timeline/backlog/dataplane-peer-fallback-and-blob-replication.md (the peer-fallback invariant's canonical home)"
     why: >
       INVARIANT — peers are the store; doorways project with peer-fallback (race_fetch).
       Code writing "App not found" or "App ZIP not available" is on the EPR/blob
@@ -27,12 +27,12 @@ rules:
       Root cause and fix plan (read before adding a new resolution-path NotFound arm):
       genesis/data/timeline/backlog/dataplane-peer-fallback-and-blob-replication.md
   - id: heal-fills-never-moves
-    policy: c2-monotonic-authority@1
+    policy: c2-monotonic-authority@2
     when: { write: "*.rs", contains-any: ["stamp_declared_head", "StampMode", "projection_reconcile", "GapFill"] }
     why: >
       LOCAL PLACEMENT of concern class C2 (monotonic authority) at the storage stamp/heal seam. The
       guarantee, its cross-family statement and its dated incidents are DEFINED ONCE in the registry
-      (`.claude/epr-meta/policies.yaml#c2-monotonic-authority@1`) — this rule binds it, it does not
+      (`.claude/epr-meta/policies.yaml#c2-monotonic-authority@2`) — this rule binds it, it does not
       redefine it. What is local is only the placement and the vocabulary the guarantee wears here:
       a projection-reconcile / stamp path uses `StampMode::{Declare, HealCanonical, GapFill}`.
       `Declare` is ONLY for deliberate canonical channels (declare route, propagation POST,
@@ -45,13 +45,31 @@ rules:
       stamp `GapFill` — fill an empty row only. Do not widen `Declare`, and do not key the guard on
       *who* writes (that froze forward adoption, defect #3) — key it on the authority the write
       CARRIES (`canonical` + declaration ordering), which is C2's named-clock clause at this seam.
-      The version pin is a DECLARED dependency: when P4.1 registers
-      `epr:validator-heal-fills-never-moves` the policy lands as `c2-monotonic-authority@2` and this
-      binding re-declares deliberately — a new version moves nothing until each binding re-pins.
+      RE-DECLARED to @2 on 2026-08-02 (plan task P4.1), deliberately and not by recency: @2 replaces
+      @1's unconditional `dedupe-of` advisory with the real detector
+      `epr:validator-heal-fills-never-moves`, so this rule now fires on the SHAPE — a net-new
+      `StampMode::Declare` call site outside the canonical-channel list (`db/content_diesel.rs`,
+      `services/head_adoption.rs`), or an edit to the stamp guard citing none of the contract tests
+      `elohim/elohim-storage/seam-registry.yaml` registers for the file. A binding carries no
+      `validator:` key of its own — the predicate is the policy's, the placement is ours.
+  - id: bounded-work
+    policy: c6a-bounded-work@2
+    when: { write: "*.rs", contains-any: ["loop {", "retry", "retries", "Retry", "attempts", "backoff", "sweep"] }
+    why: >
+      LOCAL PLACEMENT of concern class C6a (bounded work) at the seam where its expensive instances
+      landed: the heal/drain/reconcile paths. The guarantee is DEFINED ONCE at
+      `.claude/epr-meta/policies.yaml#c6a-bounded-work@2` (graduated 2026-08-02 from the
+      concerns.yaml Precedent row when `epr:validator-bounded-work` was registered) — this rule
+      binds it. Local vocabulary: paced ingest is `drain_publish_queue` + wait-for-drain, already
+      solved twice; a third pacing scheme at this seam is a diagnosis failure, not a design. The
+      detector is precision-biased and advisory: it flags a NEW `loop {` or retry-ladder config
+      with no budget vocabulary within +/-12 lines, and a `bounded-work: <budget>` comment
+      declaring the budget satisfies it. It cannot see the responder-below-requester INVERSION
+      (`1b445b481`) — that one is an ordering fact, and the contract test is what proves it.
   - id: dataplane-guide-star
     class: inject
     when: { write: "*.rs", contains-any: ["shard_locations", "peer_statuses", "rea_commitments", "distribute_shards", "placement_gap", "household_resilience"] }
-    validator: epr:validator-dataplane-guide-star
+    dedupe-of: "elohim/elohim-storage/src/.epr-meta#guide-star (operator-set 2026-07-24; the full statement is in this manifest's body)"
     why: >
       GUIDE-STAR (operator-set 2026-07-24) — this plumbing exists so a person can EXIT
       their data to real community. The bar is requisite variety with the hyperscaler:
@@ -88,10 +106,14 @@ branch or an EPR-head-aware syncing-status response.
 (alpha-B, 2026-06-29): the `blobHash` pointer was null while the blob bytes were
 present locally — the resolver hard-failed instead of healing from a peer.
 
-The `peer-fallback-invariant` inject rule fires as an advisory (class stays `inject`
-because `epr:validator-epr-peer-fallback` is not yet registered in v1) when any `.rs`
-write in this directory contains "App not found" or "App ZIP not available". It catches
-reintroduction of the shortcut pattern at edit time without blocking legitimate edits.
+The `peer-fallback-invariant` inject rule fires as an advisory when any `.rs` write in this
+directory contains "App not found" or "App ZIP not available". It catches reintroduction of the
+shortcut pattern at edit time without blocking legitimate edits. It names **no validator**: the
+rule stands on its class ladder and its `dedupe-of` pointer to the invariant's canonical home
+(the backlog record). A `validator:` key naming a detector the resolver does not implement is the
+canon's own C7 violation — advertise ≠ serve — so the phantom key was dropped (2026-08-02, plan
+task P4.1) while every word of the rule's teaching survived. If a semantic peer-fallback detector
+is ever written, it arrives as a registered `epr:validator-*` and this rule graduates then.
 
 **The fix landed** (T17): `get_blob_or_heal` (`http.rs`, `BlobHealOutcome`) now runs the
 shared local-read + peer-heal sequence behind BOTH `GET /blob/{hash}` and the `/apps/`
@@ -121,27 +143,70 @@ class #3) keyed the guard on *who* writes and froze forward adoption; the cure w
 name the authority it carries (`canonical`), not gating on the writer.
 
 The `heal-fills-never-moves` rule is a **binding of concern class C2 (monotonic authority)** —
-`policy: c2-monotonic-authority@1` in `.claude/epr-meta/policies.yaml`. Define-once-bind-many: the
+`policy: c2-monotonic-authority@2` in `.claude/epr-meta/policies.yaml`. Define-once-bind-many: the
 registry row owns the guarantee, its cross-family statement (the same class bit the zome
 link-selector's arrival ordering and the epr-cli/REA sidecar's append-order "latest") and its dated
 incidents; this manifest owns only the *placement* — the `when:` scope and the `StampMode`
-vocabulary the guarantee wears at this seam. It fires as an advisory (the policy's class is
-`inject`) when any `.rs` write in this subtree touches the stamp/heal path, surfacing the invariant
-at edit time without blocking legitimate edits. It carries **no `validator:` key**: a binding may
-not redeclare the policy's predicates, and naming a validator that is not registered would
-advertise enforcement this rule does not serve (concern class C7). When P4.1 registers
-`epr:validator-heal-fills-never-moves`, the policy lands as `c2-monotonic-authority@2` and this
-binding re-declares its pin deliberately — recency never moves a binding.
+vocabulary the guarantee wears at this seam. It carries **no `validator:` key**: a binding may not
+redeclare the policy's predicates.
+
+**The pin moved to @2 on 2026-08-02 (plan task P4.1), and the move was a decision, not a default.**
+@1's predicate was `dedupe-of` — a bind-don't-redefine advisory that fired on *every* write
+touching the stamp vocabulary. @2 carries the registered detector
+`epr:validator-heal-fills-never-moves`, which fires on the shape instead: (a) a **net-new**
+`StampMode::Declare` call site outside the canonical-channel list — `src/db/content_diesel.rs` (the
+deliberate-declare wrapper, the guard arm, their in-file contract tests) and
+`src/services/head_adoption.rs` (the own-conductor act after `adopt_peer` mints the link); or (b)
+added lines touching the guard (`canonical_move_verdict`, the `HealCanonical`/`GapFill` arms,
+`moving_declared_row`, `SkippedStale`, `stamp_declared_head_mode`) while the file cites **none** of
+the contract tests `elohim/elohim-storage/seam-registry.yaml` registers for it — the blind-fix
+shape, where those tests were the only thing that told the two guards apart. Arm (b) stays silent
+when the registry registers no test for the file: an uncited decision point is an honest gap the
+**census** owns, not a finding this validator may mint. Still `inject`: a false positive costs one
+advisory line, never a blocked write. A binding pinned to @1 keeps @1's semantics until it
+re-declares — that is what makes the version a declared dependency rather than recency.
 
 See: `genesis/docs/content/elohim-protocol/history/2026-07-12-substrate-convergence-five-defect-arc.md`
-and the concern canon: `.claude/epr-meta/concerns.yaml` (C0, C1, C3–C14) + `policies.yaml` (C2).
+and the concern canon: `.claude/epr-meta/concerns.yaml` (C0, C1, C3–C5, C6b, C7–C14) +
+`policies.yaml` (C2, C6a).
+
+## Bounded work (C6a — gate-surfaced, 2026-08-02)
+
+The `bounded-work` rule binds `c6a-bounded-work@2`: **every loop, sweep and retry ladder carries a
+declared budget it provably respects — and a retry policy against an uncancellable call IS a loop
+even when no `loop` token appears in the diff** (`74fbdf2d7`, the instance that named the clause).
+The class graduated out of `concerns.yaml` into the enforcement registry when
+`epr:validator-bounded-work` was registered; the concerns.yaml row is superseded, not deleted.
+
+The detector is **precision-biased on purpose**: it flags an *added* line carrying an unambiguous
+shape (a bare `loop {`; `max_retries`/`max_attempts`/`retry_count`/`backoff`/`RetryPolicy`/
+`.retry(`) inside a crate that registers decision points, when no budget vocabulary appears within
+±12 lines. It will miss real instances — a sweep written as an iterator chain, a ladder assembled
+from a config struct three files away, and above all the responder-below-requester **inversion**
+(`1b445b481`), which is an ordering fact no textual scan can see. That is the correct trade for an
+advisory: a fuzzy gate that denies teaches agents to route around governance. Declaring the budget
+in a `bounded-work: <budget>` comment satisfies it — the guarantee is a *declared* budget, so the
+declaration IS the fix, and it is what a reviewer and the runbook's mint-then-quiet probe can then
+check. Local vocabulary: paced ingest is `drain_publish_queue` + wait-for-drain (solved twice
+already); a third pacing scheme here is a diagnosis failure, not a design.
+
+Calibrated, not asserted (2026-08-02): replayed against this crate at its **worst case** — every
+one of the 494 `src/**/*.rs` files treated as if written fresh, so every line counts as added —
+the detector fires on **24**. A real edit adds a handful of lines, so the live rate is far below
+that; the number is here so the next person can re-measure it instead of trusting this sentence.
+The dominant false-positive source was doc comments naming `max_retries` while *describing* a
+budget; comment lines are now skipped, which is what took the worst case from 34 to 24. Re-run the
+calibration before widening the shape set — a shape that doubles the noise buys nothing an
+advisory can spend.
 
 ## Governance note
 
-This manifest records two gate-surfaced invariants (peer-fallback on the resolution path;
-fills-never-moves on the heal path). No general authoring gate is warranted for the rest of the
-directory (operator WIP is active; other editing conventions live in `CLAUDE.md`). Each inject
-advisory is the lightest signal that surfaces its lesson where the drift recurs.
+This manifest records three gate-surfaced invariants (peer-fallback on the resolution path;
+fills-never-moves on the heal path; bounded work on the sweep/retry paths) plus the guide-star. No
+general authoring gate is warranted for the rest of the directory (operator WIP is active; other
+editing conventions live in `CLAUDE.md`). Each inject advisory is the lightest signal that surfaces
+its lesson where the drift recurs — and none of them names a validator the resolver does not
+implement, which is the honesty half of the same discipline.
 
 ## Guide-star (operator-set, 2026-07-24)
 
@@ -152,5 +217,7 @@ that anyone, grandma first, has a real place to exit their data to community.** 
 signals are a sensemaking substrate (many folds, many witnesses), the convergence bar
 is same-footprint-through-any-doorway, and the destination is earned forgetting: trust
 solid enough that people stop performing the surveillance vigilance the enclosed
-platforms trained into them. Advisory class (`inject`; validator unregistered in v1 by
-design) — it teaches at the point of edit, never blocks.
+platforms trained into them. Advisory class (`inject`) — it teaches at the point of
+edit, never blocks. It names no validator: the guide-star is a *telos*, not a
+mechanizable predicate, and the rule stands honestly on its class ladder and its
+`dedupe-of` pointer back to this section.

@@ -12,11 +12,9 @@ rules:
   - id: did11-conformance-on-wire-shape-edits
     class: inject
     when: { write: "*.rs", contains-any: ["DidDocument", "VerificationMethod", "publicKeyMultibase", "@context", "DID_CONTEXT"] }
-    validator: epr:validator-did11-conformance
+    dedupe-of: "bridges/did/did-tests/tests/did11_conformance.rs + schemas/did-document-1.1.schema.json (the mechanized W3C contract — the gate is the suite, this rule is the reminder)"
     why: "You are editing a DID 1.1 wire shape. The contract is the W3C TR (https://www.w3.org/TR/did-1.1/), mechanized as schemas/did-document-1.1.schema.json. Before committing: cargo test -p did-tests --test did11_conformance (plus the full suite). Invariants that have already drifted once and are test-guarded: emit @context v1.1 / accept+preserve v1; unknown extension properties survive round-trip (never deny_unknown_fields); did:web derived URLs reject decoded '@' '/' '\\' control chars (SSRF)."
-validators:
-  - ref: epr:validator-did11-conformance
-    fuel: 200
+validators: []
 cites:
   - did-bridge-identity-resolution
 ---
@@ -32,10 +30,13 @@ Governing spec: genesis/docs/superpowers/specs/2026-07-17-did-bridge-identity-re
    (additionalProperties stays true; DID documents legally carry extension properties).
 2. **Suite**: did-tests/tests/did11_conformance.rs validates every document this crate emits,
    plus the fidelity fixtures, against the schema — and asserts the v1.1 context pin.
-3. **v1 honesty**: the epr:validator-did11-conformance ref is NOT a registered validator-EPR;
-   in v1 the rule degrades to an inject advisory — which is its intended class (teach, never
-   block). If a conformance validator-EPR is ever registered under this name, the rule upgrades
-   in place.
+3. **Honesty about the mechanism**: the rule names **no validator**. The conformance check is the
+   suite (`cargo test -p did-tests --test did11_conformance`) and the schema — the rule's job is to
+   surface them at the moment a wire shape is edited, at `inject` class (teach, never block). A
+   `validator:` ref naming a detector the resolver does not implement advertises enforcement the
+   rule does not serve; the phantom `epr:validator-did11-conformance` ref was dropped 2026-08-02
+   (plan task P4.1) with the rule's teaching intact. If a real conformance validator-EPR is ever
+   registered, the rule graduates then — the `why:` already carries the destination.
 4. **History**: the three drifts this gate exists for all occurred at birth (2026-07-17):
    @context nearly pinned to 1.0; extension properties dropped on round-trip; did:web %40
    host-confusion SSRF. Review caught them once; the suite catches them forever.

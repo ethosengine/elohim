@@ -191,13 +191,25 @@ policies:
 
   # ── CONCERN CANON (seam-concern-contract plan, design surface 1) ──────────────────────────────
   # The canon is split across TWO homes by whether an evaluable predicate exists TODAY: a class
-  # WITH one is an enforcement row here; the other fifteen are Precedent-shaped rows in the sibling
-  # `.claude/epr-meta/concerns.yaml` (its header explains why it is its own file). C2 is the only
-  # class currently in this home — its predicate is the `dedupe-of` bind-don't-redefine trigger,
-  # which is wired in `_eval_rule` today. No canon row names a `validator:` it does not have: that
-  # would be the canon's own C7 (advertise/serve) violation. When P4.1 registers a class's
-  # validator, that class's row MOVES here as a new version row and its concerns.yaml row is
-  # superseded (lineage, never deletion).
+  # WITH one is an enforcement row here; the rest are Precedent-shaped rows in the sibling
+  # `.claude/epr-meta/concerns.yaml` (its header explains why it is its own file). No canon row
+  # names a `validator:` it does not have: that would be the canon's own C7 (advertise/serve)
+  # violation. When P4.1 registers a class's validator, that class's row MOVES here as a new
+  # version row and its old row is superseded (lineage, never deletion).
+  #
+  # GRADUATIONS SO FAR (P4.1, 2026-08-02): C2 graduated IN PLACE — @1's predicate was the
+  # `dedupe-of` bind-don't-redefine trigger (an unconditional advisory on every matching write);
+  # @2 replaces it with the real detector `epr:validator-heal-fills-never-moves`, so the advisory
+  # now fires on the shape instead of on the neighbourhood. C6a graduated ACROSS homes: its
+  # concerns.yaml row `c6a-bounded-work@1` is superseded by `c6a-bounded-work@2` here, carrying
+  # `epr:validator-bounded-work`. A version is a DECLARED dependency, so neither graduation moves
+  # a binding: `elohim/elohim-storage/src/.epr-meta` re-pins to @2 deliberately, and any binding
+  # still pinned to @1 keeps @1's semantics until it re-declares (the cascade, plan surface 5).
+  # A third validator, `epr:validator-dna-hash-neutrality`, is registered with NO row in either
+  # home — the ceremony tested DNA-hash-neutrality as a class and declined it ("no runtime
+  # predicate… it becomes the third registered validator, not a class"), so it enters as policy
+  # machinery bound inline at `elohim/holochain/dna/.epr-meta`. Machinery without canon is
+  # legitimate; canon without machinery is what the `validator:` honesty rule forbids.
   #
   # STANDING SHAPES (the brit frame — every canon artifact declares one of record | attestation |
   # fold | pin). A canon ROW is an `attestation`: a Precedent citing content, whose binding force,
@@ -249,7 +261,8 @@ policies:
         - "8844cd1d6 2026-07-11 storage heal — an unconditional Declare stamp moved a declared head BACKWARDS across 2,838 divergence-queued rows, serially, after every restart"
         - "a83b35079 2026-07-29 epr-cli/REA sidecar — 'latest' by APPEND ORDER vs by occurredAt; the commit body names it 'the exact 8a1c531dc bug, reintroduced via replay'"
         - "2026-08-02 conductor plane — stamp guard provably_newer, selector tiebreak, three-clocks-in-one-column"
-    status: active
+    status: superseded
+    superseded_by: c2-monotonic-authority@2
     established_by: deliberated-2026-08-02-operator+claude
     why: >
       CROSS-FAMILY STATEMENT (the class is older and wider than the dataplane). A self-healing loop
@@ -279,6 +292,155 @@ policies:
       outside the canonical-channel list, or a stamp-guard edit that cites no contract test) is
       registered by plan task P4.1; when it lands it arrives as version 2 of this row, and each
       binding re-declares its pin — the version pin is a declared dependency, never recency.
+
+  # C2 @2 — the graduation @1's own `why:` promised. Identical guarantee, identical scope; the
+  # ONLY semantic change is the predicate: `dedupe-of` (an unconditional bind-don't-redefine
+  # advisory on every matching write) becomes `epr:validator-heal-fills-never-moves`, so the
+  # advisory now fires on the SHAPE — a net-new `StampMode::Declare` call site outside the
+  # canonical-channel list, or a stamp-guard edit citing none of its registered contract tests.
+  # One actionable predicate per row is a hard registry rule (a second would silently never be
+  # evaluated), which is why the dedupe trigger is replaced rather than kept alongside.
+  - id: c2-monotonic-authority
+    version: 2
+    contentHash: sha256:373c0f803c0e7f2ffb2385dcb1278e2cb59d138b0500e4ab63e9ae578d9b9a34
+    concern: C2
+    title: C2 monotonic authority — never backwards, and name the clock
+    statement: >
+      Selection is decided by declared authority tiers and, within a tier, a NAMED NOTARIZED CLOCK
+      with a deterministic tiebreak — never a conductor-local clock, never arrival order. A move
+      backwards requires proof of forward ordering on that clock; missing ordering evidence refuses
+      the move rather than guessing.
+    applies_to: >
+      Every decision point that selects among competing versions of ONE subject — head election and
+      adoption, stamp/heal paths, event-fold "latest" resolution, link-selector ordering, selector
+      tiebreaks. Not a placement rule: which PLANE the subject lives on is C0's question, answered
+      first.
+    binding: binding-local
+    class: inject
+    scope:
+      write: "*.rs"
+      contains-any: ["stamp_declared_head", "StampMode", "projection_reconcile", "GapFill"]
+    validator: epr:validator-heal-fills-never-moves
+    standing: attestation
+    resolution_mode: pinned
+    probe_home: seam-registry
+    severity_class: silent-corruption
+    dispatch-agent: rust-architect
+    findings_namespace: concern:c2-monotonic-authority
+    recurrence:
+      unit: distinct-shifts
+      shifts: 5
+      instances:
+        - "CI museum #12 (2026-06-02 record) — first-that-matches degenerating to index-0-always-wins"
+        - "25921a07a 2026-07-10 zome selector ordered by get_links ARRIVAL until the (timestamp, create_link_hash) tiebreak landed"
+        - "8844cd1d6 2026-07-11 storage heal — an unconditional Declare stamp moved a declared head BACKWARDS across 2,838 divergence-queued rows, serially, after every restart"
+        - "a83b35079 2026-07-29 epr-cli/REA sidecar — 'latest' by APPEND ORDER vs by occurredAt; the commit body names it 'the exact 8a1c531dc bug, reintroduced via replay'"
+        - "2026-08-02 conductor plane — stamp guard provably_newer, selector tiebreak, three-clocks-in-one-column"
+    status: active
+    established_by: deliberated-2026-08-02-operator+claude
+    why: >
+      CROSS-FAMILY STATEMENT (the class is older and wider than the dataplane). A self-healing loop
+      whose information source is weaker than the state it overwrites converts every restart into a
+      rollback; a fold that reads "latest" as append order re-mints the same defect through replay;
+      a selector ordered by arrival makes index-0 always win. All three are ONE guarantee failing:
+      selection must name the clock it orders on, that clock must be notarized (comparable across
+      the peers that will disagree — a DHT link timestamp, an occurredAt, never a receiving node's
+      local clock), and ties must break deterministically (create_link_hash), or two honest peers
+      converge to two different answers.
+      DATED INCIDENTS. 2026-07-11 (adam-alpha): two minutes after the first-ever cross-conductor
+      adoption, the restarted node's heal restamped the OLD head over the adopted canonical row —
+      2,838 rows, every restart. The blind first fix keyed the guard on WHO writes and froze forward
+      adoption (a C3 liveness hole created by a C2 cure); the real cure made the SOURCE name the
+      authority it CARRIES (`canonical`), never the writer's identity. 2026-07-12: elohim-host-landing
+      converged at edge #1187's seam-smoke and was healed back to the superseded head by #1188 — a
+      conductor that has not yet integrated a newer canonical link answers with the OLD canonical
+      record: canonical, yet stale. 2026-07-29 (epr-cli/REA): the same guarantee failing in a
+      non-dataplane family, on a projection rather than in DHT truth — which is precisely where C2
+      and C0 meet.
+      HOW A SEAM ANSWERS THIS ROW. Name the clock; prove the tiebreak is deterministic and
+      permutation-invariant (the `Arbitrated` harness); refuse rather than guess when ordering
+      evidence is missing (NULL either side = refuse); and never key the guard on the writer's
+      identity.
+      WHAT @2 EVALUATES (the graduation from @1's dedupe advisory). Arm (a): a NET-NEW
+      `StampMode::Declare` call site in a `.rs` file outside the canonical-channel list
+      (`db/content_diesel.rs` — the deliberate-declare wrapper, the guard arm and their in-file
+      contract tests; `services/head_adoption.rs` — the own-conductor act after `adopt_peer` mints
+      the link). `Declare` may move a declared head anywhere, including a deliberate revert, so
+      WIDENING its call-site set is precisely how the resurrection class returns; a heal carrying a
+      canonical answer stamps `HealCanonical` (move only with proof of forward ordering), a
+      fallback resolve stamps `GapFill` (fill an empty row only). Arm (b): added lines touching the
+      stamp guard (`canonical_move_verdict`, the `HealCanonical`/`GapFill` arms,
+      `moving_declared_row`, `SkippedStale`, `stamp_declared_head_mode`) while the file cites NONE
+      of the contract tests its `seam-registry.yaml` registers for it — the blind-fix shape, where
+      the tests are the only thing that named the difference between the two guards. Arm (b) is
+      SKIPPED when the registry registers no test for the file: an uncited decision point is an
+      honest gap the CENSUS owns, not a finding this validator may mint. The word boundary is
+      load-bearing — `CollectiveStampMode::Declare` is a different enum on the collectives plane
+      and must never be counted. Advisory class by construction: a false positive costs one line,
+      never a blocked write.
+
+  # C6a @2 — the ACROSS-HOMES graduation. `c6a-bounded-work@1` lives in concerns.yaml (a
+  # Precedent row, no predicate); registering `epr:validator-bounded-work` moved the class here
+  # as a new version row and superseded the old one in place, lineage intact. The version
+  # continues across the move because the ARTIFACT is the same artifact — id is identity, version
+  # is its monotonic life — and because two rows keyed `c6a-bounded-work@1` in two files would
+  # make a pin ambiguous, which is the one thing a declared dependency may never be.
+  - id: c6a-bounded-work
+    version: 2
+    contentHash: sha256:88b41ea4940d3e461c4727128c2907e0f1f1e47a14f52c132d56e19fda7b6617
+    concern: C6a
+    title: C6a bounded work — every loop, sweep and retry ladder respects a declared budget
+    statement: >
+      Every loop, sweep, and retry ladder carries a declared budget it provably respects — and a
+      retry policy against an uncancellable call IS a loop even when no `loop` token appears in the
+      diff. New pacing binds the existing drain kernel rather than minting a fourth vocabulary.
+    applies_to: >
+      Sweeps, reconcile passes, retry ladders, responder/requester budget pairs, publish drains,
+      per-tick caps. Distinct from C11: C6a asks "does my sweep respect MY budget"; C11 asks "do I
+      survive traffic I did not choose".
+    binding: binding-local
+    class: inject
+    scope:
+      write: "*.rs"
+      contains-any: ["loop {", "retry", "retries", "Retry", "attempts", "backoff", "sweep"]
+    validator: epr:validator-bounded-work
+    standing: attestation
+    resolution_mode: pinned
+    probe_home: runbook
+    severity_class: loud-fail
+    dispatch-agent: rust-architect
+    findings_namespace: concern:c6a-bounded-work
+    recurrence:
+      unit: distinct-shifts
+      shifts: 4
+      instances:
+        - "6369721fd 2026-07-04 view-federation codec — the responder rejected its own oversized reply; cure trims BEFORE signing"
+        - "74fbdf2d7 2026-07-29 a retry ladder against an uncancellable call created unbounded work with no loop anywhere in the diff"
+        - "1b445b481 2026-08-01 a responder budget compile-asserted strictly below the requester's"
+        - "2026-08-02 sweep budgets + per-tick caps across the conductor-plane waves"
+    status: active
+    established_by: deliberated-2026-08-02-operator+claude
+    why: >
+      The class's teeth are in its scope clause, not its statement: the expensive instances had NO
+      loop token in the diff (a retry policy against an uncancellable call) or asserted a budget in
+      the wrong direction (responder below requester). Paced ingest drain has now been solved
+      TWICE; the live kernel is `drain_publish_queue` + wait-for-drain, and a third scheme is a
+      diagnosis failure, not a design. Live-metered: this class gets a runbook invariant->probe row
+      (mint-then-quiet), not a design-time contract test alone.
+      WHAT @2 EVALUATES, AND WHAT IT DELIBERATELY DOES NOT. `epr:validator-bounded-work` fires on
+      an ADDED line carrying an unambiguous unbounded-work shape (a bare `loop {`; retry-ladder
+      config — `max_retries`/`max_attempts`/`retry_count`/`backoff`/`RetryPolicy`/`.retry(`) inside
+      a crate that REGISTERS decision points (a `seam-registry.yaml` at some ancestor), when no
+      budget vocabulary (budget/deadline/timeout/`Duration::from`/`max_per`/`batch_size`/`.take(`/
+      a `MAX_` const/`drain_publish_queue`/`tokio::select`) appears within +/-12 lines. It is
+      PRECISION-BIASED on purpose and will miss real instances — a sweep expressed as an iterator
+      chain, a ladder assembled from a config struct three files away, the responder/requester
+      budget INVERSION (an ordering question no textual scan can see). It is bound advisory and
+      may never be promoted to a blocking class on this predicate: the honest use of a fuzzy
+      heuristic is to raise the question at the seam, and a fuzzy gate that denies teaches agents
+      to route around governance. Declaring the budget in a `bounded-work: <budget>` comment
+      satisfies the advisory — the guarantee is a DECLARED budget, so declaring it IS the fix, and
+      the declaration is what a reviewer and the runbook probe can then check.
 
   - id: governance-escalation-ladder
     version: 1

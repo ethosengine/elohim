@@ -145,4 +145,51 @@ with tempfile.TemporaryDirectory() as _td:
     check("Edit whose old_string is absent → silent (the Edit will fail anyway)",
           r.returncode == 0 and r.stdout.strip() == "")
 
+# Seam birth-rule (plan task P4.5): a `dedupe-of`-anchored inject fires on a decision-surface
+# shape (a new verdict/decision/outcome/reason enum, a `decide_*` fn, a route registration) and
+# stays quiet on an unrelated write — modeled on the live rules in
+# doorway/doorway-service/src/.epr-meta, steward/node/src/.epr-meta, crates/seam-contracts/.epr-meta.
+with tempfile.TemporaryDirectory() as _td:
+    root = Path(_td)
+    (root / ".git").mkdir()
+    _wr(root / ".epr-meta", """
+        ---
+        epr-meta-version: 1
+        root: true
+        rules:
+          - id: seam-birth-rule
+            class: inject
+            when:
+              write: "*.rs"
+              contains-any: ["Decision {", "Verdict {", "Outcome {", "Reason {",
+                             "Disposition {", "fn decide_", "Answer<", ".route(",
+                             "match (method"]
+            dedupe-of: ".claude/skills/p2p-design-gate/SKILL.md (Step 4: Concern-Canon Answer)"
+            why: "answer the concern canon and register in seam-registry.yaml before shipping"
+        ---
+    """)
+    r = _hook({"tool_name": "Write", "tool_input": {
+        "file_path": str(root / "decide.rs"),
+        "content": "pub enum FetchOutcome { Present, Absent, Unreachable }\n"}})
+    out = json.loads(r.stdout)
+    # inject is advisory (permit, never blocks) — it surfaces as additionalContext, not
+    # permissionDecision (that field is reserved for deny/ask, the two classes that can block).
+    check("decision-surface shape (Outcome {) fires inject (additionalContext, no permissionDecision)",
+          r.returncode == 0
+          and "permissionDecision" not in out["hookSpecificOutput"]
+          and "additionalContext" in out["hookSpecificOutput"])
+    check("inject verdict cites the p2p-design-gate Step 4 pointer",
+          "Step 4" in out["hookSpecificOutput"]["additionalContext"])
+    r = _hook({"tool_name": "Write", "tool_input": {
+        "file_path": str(root / "plain.rs"),
+        "content": "pub fn add(a: i32, b: i32) -> i32 { a + b }\n"}})
+    check("plain .rs diff (no decision-surface shape) stays silent",
+          r.returncode == 0 and r.stdout.strip() == "")
+    r = _hook({"tool_name": "Write", "tool_input": {
+        "file_path": str(root / "route.rs"),
+        "content": "fn decide_dispatch() -> Disposition { Disposition::NotFound }\n"}})
+    out = json.loads(r.stdout)
+    check("a `decide_*` fn returning a *-suffixed enum also fires inject",
+          r.returncode == 0 and "additionalContext" in out["hookSpecificOutput"])
+
 print(f"\n  {_passed} assertions passed ✅")
