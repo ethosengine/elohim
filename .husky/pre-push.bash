@@ -336,6 +336,42 @@ if echo "$CHANGED" | grep -qE "^elohim/eprfs/"; then
   echo "[pre-push] eprfs gate ✓"
 fi
 
+# ── crates/seam-contracts native workspace gate (excluded from the monorepo workspace) ──
+#
+# crates/seam-contracts declares its own explicit `[workspace]` table (a nested
+# single-crate root — the `crates/` siblings each wire via path deps, there is no
+# root monorepo workspace over crates/) and, like elohim/eprfs, no
+# build-manifest.json anywhere covers `crates/**` — the manifest-driven
+# graph-walker / run_gate machinery cannot see it. Gate it as a standalone block
+# (NOT routed through run_gate/PROJECTS), for two reasons: it avoids the
+# Unknown-project abort, AND it avoids the USE_MANIFEST bypass — the PROJECTS
+# grep-fallback section below only runs when the manifest path detected zero
+# projects, so a mixed push that ALSO touches a manifest-covered project would
+# otherwise skip a crates/-only detection living in that section entirely.
+# CARGO_TARGET_DIR resolves via the same pooled-slot helper every other native
+# gate uses (gate_pool_slot — family-keyed off genesis/agentic's pool policy,
+# same as elohim-storage/doorway/steward-node in run_gate — never a hardcoded
+# family); fails open to cargo's in-tree default if the pool isn't present.
+# Native build: RUSTFLAGS="" (the WASM getrandom flag breaks the link here too).
+# The wasm32 build with --no-default-features proves the crate's std-free leaf
+# claim (its Cargo.toml doc comment) actually holds under a no_std-shaped target.
+if echo "$CHANGED" | grep -qE "^crates/seam-contracts/"; then
+  echo "[pre-push] Gating crates/seam-contracts workspace (test + clippy -D + fmt + wasm32 build)..."
+  (
+    cd crates/seam-contracts || exit 1
+    SEAM_CONTRACTS_SLOT="$(gate_pool_slot "crates/seam-contracts" 2>/dev/null || true)"
+    if [ -n "${SEAM_CONTRACTS_SLOT:-}" ] && mkdir -p "$SEAM_CONTRACTS_SLOT" 2>/dev/null; then
+      export CARGO_TARGET_DIR="$SEAM_CONTRACTS_SLOT"
+      echo "  [seam-contracts] pooled target: $SEAM_CONTRACTS_SLOT"
+    fi
+    RUSTFLAGS="" cargo test --all-features \
+      && RUSTFLAGS="" cargo clippy --all-features -- -D warnings \
+      && RUSTFLAGS="" cargo fmt --check \
+      && RUSTFLAGS="" cargo build --target wasm32-unknown-unknown --no-default-features
+  ) || exit 1
+  echo "[pre-push] crates/seam-contracts gate ✓"
+fi
+
 # ── .ci-ignore freshness (projected from the .epr-meta manifest ci-trigger cascade) ──
 #
 # When any .epr-meta manifest or the generated .ci-ignore changes, ensure .ci-ignore is

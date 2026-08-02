@@ -5,6 +5,9 @@ version = "0.2.0"
 edition = "2021"
 authors = ["Elohim Protocol"]
 license = "Apache-2.0"
+# Nexus hosted registry `elohim` (see .cargo/config.toml) — matches the rest of the crates/ family
+# (elohim-sdk, elohim-storage-client, elohim-seam-contracts).
+publish = ["elohim"]
 
 [features]
 default = []

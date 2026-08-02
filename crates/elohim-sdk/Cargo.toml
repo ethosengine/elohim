@@ -6,6 +6,16 @@ description = "SDK for building P2P applications on the Elohim Protocol"
 authors = ["Elohim Protocol"]
 license = "AGPL-3.0"
 readme = "README.md"
+repository = "https://github.com/ethosengine/elohim"
+# Publish honesty (C7 applied to ourselves — plan surface 7, task P1.5): the
+# plan must not CLAIM an SDK surface while the crate family is unpublishable.
+# `elohim` is the Nexus hosted registry declared in the repo's
+# `.cargo/config.toml`; it is the same registry elohim-views, elohim-epr, and
+# the eprfs-* family publish to. Every path dependency below carries a `version`
+# alongside its `path` for the same reason — cargo strips `path` on publish and
+# resolves the version from the registry, so a bare path dep makes the whole
+# family unpublishable no matter what this field says.
+publish = ["elohim"]
 
 [features]
 default = ["client"]
@@ -29,15 +39,25 @@ thiserror = "1.0"
 tracing = "0.1"
 
 # HTTP client (for projection warming, doorway API)
-reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"], optional = true }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
 
 # Async runtime
 tokio = { version = "1", features = ["sync", "time"] }
 
-# Re-exported crates
-doorway-client = { path = "../doorway-client" }
-elohim-storage-client = { path = "../elohim-storage-client", optional = true }
-elohim-views = { path = "../../elohim/elohim-views" }
+# Re-exported crates. `path` + `version` on every one: `path` wins for local
+# builds, `version` is what a published artifact resolves against.
+doorway-client = { path = "../doorway-client", version = "0.2.0" }
+elohim-storage-client = { path = "../elohim-storage-client", version = "0.1.0", optional = true }
+elohim-views = { path = "../../elohim/elohim-views", version = "0.1.0" }
+
+# Seam contracts — the concern-canon compile shapes (`Answer<T>`, `ReasonLabel`)
+# and property harnesses, re-exported below as `elohim_sdk::contracts` so an
+# external peer runtime INHERITS the contracts instead of re-deriving them
+# (plan surface 7, the SDK inheritance surface). A leaf crate: zero first-party
+# deps, std-only default, so this adds nothing to the SDK's dependency weight.
+# The `harness` feature stays off here — an implementor enables it in its own
+# dev-dependencies.
+elohim-seam-contracts = { path = "../seam-contracts", version = "0.1.0" }
 
 # Sync support
 automerge = { version = "0.5", optional = true }

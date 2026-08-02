@@ -5,13 +5,25 @@ edition = "2021"
 description = "Rust client for elohim-storage sync API"
 authors = ["Elohim Protocol"]
 license = "AGPL-3.0"
+readme = "README.md"
+repository = "https://github.com/ethosengine/elohim"
+# Publish honesty (C7 applied to ourselves — plan surface 7, task P1.5). This
+# crate is a `path` dependency of elohim-sdk, so the SDK cannot publish until
+# this one can: cargo refuses to publish a crate whose dependency is
+# unpublishable to the target registry. `elohim` is the Nexus hosted registry
+# declared in the repo's `.cargo/config.toml` — the same one elohim-views,
+# elohim-epr, and elohim-seam-contracts publish to.
+publish = ["elohim"]
 
 [dependencies]
-# Wire-shape View types (lightweight; no elohim-storage transitive dep needed)
-elohim-views = { path = "../../elohim/elohim-views" }
+# Wire-shape View types (lightweight; no elohim-storage transitive dep needed).
+# `path` + `version`: `path` wins for local builds, `version` is what a
+# published artifact resolves against — cargo strips `path` on publish, so a
+# bare path dep is unpublishable no matter what the `publish` field says.
+elohim-views = { path = "../../elohim/elohim-views", version = "0.1.0" }
 
 # HTTP client
-reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 # Async runtime
 tokio = { version = "1", features = ["rt-multi-thread"] }

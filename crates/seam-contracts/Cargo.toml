@@ -1,0 +1,59 @@
+# crates/seam-contracts — the IoC/DI leg of the seam-concern contract architecture.
+#
+# Nested single-crate workspace root (the `crates/` siblings are each their own
+# root — there is NO root monorepo workspace; crates wire via path deps). The
+# explicit `[workspace]` table keeps this crate resolving standalone and gives it
+# its OWN Cargo.lock, which `boundary_tests::no_heavy_deps_in_dep_tree`
+# (src/lib.rs) reads via `include_str!` — the lockfile IS the leaf boundary.
+[workspace]
+
+[package]
+name = "elohim-seam-contracts"
+version = "0.1.0"
+edition = "2021"
+# MSRV = the highest `rust-version` declared anywhere in-tree, so this crate can
+# never be the thing that forces a toolchain bump. Verified 2026-08-02:
+#   elohim/rust-ipfs/Cargo.toml:3   rust-version = "1.83"   ← highest in-tree
+#   elohim/brit/**/Cargo.toml       rust-version = "1.82"
+#   steward/device/src-tauri/Cargo.toml:9  rust-version = "1.70"  ← highest
+#                                    NON-submodule first-party declaration
+# rust-ipfs and brit are submodule forks; 1.83 is nevertheless the honest
+# in-tree ceiling (any toolchain that builds the whole tree already clears it),
+# and this crate — std-only, zero first-party deps — compiles far below it.
+rust-version = "1.83"
+description = "Executable seam contracts for the Elohim Protocol concern canon — Answer<T> (honest absence), ReasonLabel (observability-per-decision), and the Arbitrated/Quiescent property harnesses. Leaf crate: zero first-party dependencies, std-only by default."
+authors = ["Elohim Protocol"]
+license = "AGPL-3.0"
+readme = "README.md"
+repository = "https://github.com/ethosengine/elohim"
+keywords = ["elohim", "contracts", "seam", "concerns", "p2p"]
+categories = ["data-structures", "development-tools::testing"]
+# Nexus hosted registry `elohim` (see .cargo/config.toml). Matches the
+# publishable first-party family (elohim-views, elohim-epr, eprfs-*) and the
+# `publish` fields P1.5 adds to elohim-sdk / elohim-storage-client.
+publish = ["elohim"]
+
+[lib]
+name = "seam_contracts"
+path = "src/lib.rs"
+
+[features]
+# std-only by construction: the default build pulls NOTHING.
+default = []
+# Convenience serde derives on the boundary types. NOT the wire contract — the
+# monomorphic `answer` envelope is schema-first and owned by plan task P1.4.
+serde = ["dep:serde"]
+# ts-rs derives for the non-generic vocabulary types (`AnswerState`). Implies
+# `serde` because the wire leg is serde + ts-rs together.
+ts = ["dep:ts-rs", "serde"]
+# Property harnesses for implementors. Default-OFF so a runtime consumer never
+# links them; an implementor turns it on in dev-dependencies. Split into a
+# `-testkit` crate only if the P2 Liveness table needs proptest/arbitrary.
+harness = []
+
+[dependencies]
+# The ENTIRE dependency surface, both optional. No first-party crate appears
+# here and none may: `boundary_tests::no_heavy_deps_in_dep_tree` fails the build
+# if one reaches the lockfile.
+serde = { version = "1.0", features = ["derive"], optional = true, default-features = false }
+ts-rs = { version = "10.1", optional = true }

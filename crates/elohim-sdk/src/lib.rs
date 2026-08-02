@@ -66,6 +66,35 @@ pub mod views {
     pub use elohim_views::*;
 }
 
+/// Seam contracts — the concern canon as compile shapes and property harnesses,
+/// re-exported from `elohim-seam-contracts`.
+///
+/// This is the **SDK inheritance surface**: an external peer runtime receives
+/// the protocol's hard-won concern contracts instead of re-deriving them one
+/// production incident at a time. The two you will reach for first:
+///
+/// - [`contracts::Answer`] — a three-way boundary answer
+///   (`Present` / `Absent` / `Unreachable`). Absence that was *observed* and
+///   absence that was never *established* are different facts; collapsing them
+///   into `Option<T>` is how a node claims authority over content it merely
+///   never received. On a full-arc fleet a local `get` miss is `Unreachable`.
+/// - [`contracts::ReasonLabel`] — a closed, countable outcome vocabulary, so
+///   every decision increments a labeled counter through a typed reason rather
+///   than a raw string.
+///
+/// The `Arbitrated` and `Quiescent` property harnesses live behind that crate's
+/// default-off `harness` feature; enable it in your own `[dev-dependencies]`
+/// rather than through the SDK, so nothing links a test harness at runtime.
+///
+/// Design:
+/// `genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md`.
+pub mod contracts {
+    // Package name is `elohim-seam-contracts`; the LIB name is `seam_contracts`
+    // (declared in that crate's `[lib]` table), and the lib name is what a
+    // dependent imports. `elohim_seam_contracts::` does not resolve.
+    pub use seam_contracts::*;
+}
+
 // Re-export core traits
 pub use traits::{ContentReadable, ContentWriteable, Syncable};
 
