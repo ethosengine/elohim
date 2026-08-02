@@ -11,13 +11,26 @@ external poller READS endpoints and WRITES the ledger. Zero Rust here.
 Endpoints (per node, degrade-quiet — a missing one contributes no fields):
   GET /admin/self-healing   PRIMARY (PENDING — stability-surface plan C)
   GET /admin/render-stats   SECONDARY (LANDED)
+  GET /admin/residuals      C14 residual capsules (PENDING — seam-concern plan P4.7)
   GET /health               liveness
 
 Stores:
   .claude/data/runtime-cursor.json    {poll_index, windows:{node:[sample,...]}}
   .claude/data/runtime-findings.jsonl one line per LIVE finding:
-      {ts, fp, class:"self-heal-exhaustion", node, provenance, line, status,
+      {ts, fp, class, node, provenance, line, status,
        seen, first_poll, last_poll, backlog?}  (closure = DELETION, D5)
+
+TWO CLASSES ON ONE LEDGER (seam-concern-contract plan P4.7, canon row C14). `class` was always an
+opaque ledger field — `rh.fingerprint` takes it as a parameter and `rh.reconcile` keys on `fp`
+alone — so the residual channel BINDS this pipeline instead of forking it, and the pure core
+(_lib/runtime_harvest.py) needed ZERO change. Proven by fixture, not asserted:
+_lib/__tests__/residual_channel_test.py reconciles a c14-class finding through the unmodified
+core. What DID need changing is right here in the shell: `render` used to hardcode the class name
+in its dispatch directive, which would have described a witnessed residual as a self-reported
+exhaustion and sent runtime-triage hunting a circuit breaker that never opened — the harvester
+committing C4 (honest absence) and C7 (advertise/serve) against its own findings.
+  • self-heal-exhaustion            — window predicates over /admin/self-healing + /admin/render-stats
+  • concern:c14-witnessed-residual  — capsules served at /admin/residuals (see _lib/residual_channel.py)
 
 Modes:
   (default)  poll all NODES, append sample, reconcile; human summary
@@ -46,6 +59,7 @@ import urllib.request
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _lib import residual_channel as rc  # noqa: E402
 from _lib import runtime_harvest as rh  # noqa: E402
 
 NODES = ["alpha"]  # doorway-alpha pod; extend per cluster-state
@@ -53,6 +67,7 @@ BASE_TMPL = "https://doorway-{node}.elohim.host"
 ENDPOINTS = {
     "self_healing": "/admin/self-healing",
     "render": "/admin/render-stats",
+    "residuals": "/admin/residuals",
     "health": "/health",
 }
 HTTP_TIMEOUT = 8
@@ -91,6 +106,12 @@ def poll_node(node, base):
     if isinstance(rs, dict):
         reached = True
         sample["render"] = rs  # render-stats is authoritative for render
+    # C14 capsules are EVENTS, not window state: they live under a key `harvest` pops before the
+    # sample joins the ring buffer, so 8 polls of capsules never accumulate in the cursor.
+    res = get_json(base + ENDPOINTS["residuals"])
+    if isinstance(res, list):
+        reached = True
+        sample["residuals"] = res
     h = get_json(base + ENDPOINTS["health"])
     if isinstance(h, dict):
         reached = True
@@ -144,10 +165,15 @@ def harvest(nodes, base_override, as_hook):
             sample = poll_node(node, base)
             if sample is None:
                 continue  # wholly unreachable -> no append, no finding (D3)
+            capsules = sample.pop("residuals", [])
             win = cursor["windows"].setdefault(node, [])
             win.append(sample)
             del win[: -rh.WINDOW]  # keep last WINDOW samples
-            for f in rh.evaluate({"node": node, "samples": win}):
+            # Two producers, ONE fingerprint/reconcile core (C14 binds this pipeline, D5 closure
+            # and the storm guard apply to residuals unchanged).
+            produced = (rh.evaluate({"node": node, "samples": win})
+                        + rc.findings_from_capsules(node, capsules))
+            for f in produced:
                 f["fp"] = rh.fingerprint(f["node"], f["class"], f["provenance"])
                 active.append(f)
         new, bumped, closed = rh.reconcile(entries, active, poll_index)
@@ -165,28 +191,37 @@ def harvest(nodes, base_override, as_hook):
     return new, bumped, closed
 
 
+def _by_class(entries):
+    """Group ledger entries by `class`, first-seen order. The ledger carries more than one class
+    (D5 + P4.7), and ONE dispatch directive naming the wrong class is worse than two naming the
+    right ones — a triage agent told "self-reported exhaustion" will look for a circuit breaker
+    that never opened."""
+    groups: dict[str, list] = {}
+    for e in entries:
+        groups.setdefault(e.get("class", "?"), []).append(e)
+    return groups
+
+
 def render(new, bumped, closed, as_hook):
     parts, sys_parts = [], []
-    if new:
-        fps = ", ".join(e["fp"] for e in new)
+    for cls, group in _by_class(new).items():
+        fps = ", ".join(e["fp"] for e in group)
         lines = " | ".join(f'{e["fp"]} [{e["provenance"]}] {e["node"]}: "{e["line"][:80]}"'
-                           for e in new[:5])
+                           for e in group[:5])
         parts.append(
-            f"[runtime-harvest] {len(new)} NEW self-heal-exhaustion finding(s) "
+            f"[runtime-harvest] {len(group)} NEW {cls} finding(s) "
             f"captured to .claude/data/runtime-findings.jsonl — {lines}. "
             f"DISPATCH (do not derail the current task): launch the `runtime-triage` "
             f"agent via the Agent tool with run_in_background: true and the prompt "
-            f"'Triage runtime ledger fingerprint(s) {fps} per your agent definition "
-            f"(.claude/agents/runtime-triage.md). The node self-REPORTED exhaustion; "
-            f"scope the cause, canonicalize by concern, fix if bounded or document "
-            f"the blocker.' Fall back to general-purpose with the same prompt if the "
+            f"'Triage runtime ledger fingerprint(s) {fps} (class {cls}) per your agent "
+            f"definition (.claude/agents/runtime-triage.md). {rc.framing_for(cls)}' "
+            f"Fall back to general-purpose with the same prompt if the "
             f"type is unavailable. Then continue your current task."
         )
-        sys_parts.append(f"+{len(new)} new runtime finding(s) -> runtime-triage dispatch")
-    if bumped:
-        sys_parts.append(f"{len(bumped)} known exhaustion(s) recurred")
-    if closed:
-        sys_parts.append(f"{len(closed)} exhaustion(s) self-resolved (closed by disappearance)")
+        sys_parts.append(f"+{len(group)} new {cls} finding(s) -> runtime-triage dispatch")
+    for label, bucket in (("recurred", bumped), ("self-resolved (closed by disappearance)", closed)):
+        for cls, group in _by_class(bucket).items():
+            sys_parts.append(f"{len(group)} known {cls} {label}")
     if not parts and not sys_parts:
         return None
     if as_hook:

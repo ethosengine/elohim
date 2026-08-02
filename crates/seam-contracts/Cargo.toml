@@ -55,5 +55,10 @@ harness = []
 # The ENTIRE dependency surface, both optional. No first-party crate appears
 # here and none may: `boundary_tests::no_heavy_deps_in_dep_tree` fails the build
 # if one reaches the lockfile.
-serde = { version = "1.0", features = ["derive"], optional = true, default-features = false }
+# `alloc` (NOT `std`): the residual capsule (src/residual.rs) carries String/Vec fields, and
+# serde ships their impls behind `alloc`. Adding `std` would work too and was declined — `alloc`
+# is the smaller grant and keeps the door this `default-features = false` was opened for (a
+# future no_std build) open. Enabling a feature adds no package to the lockfile, so the leaf
+# boundary test's ceiling is untouched.
+serde = { version = "1.0", features = ["derive", "alloc"], optional = true, default-features = false }
 ts-rs = { version = "10.1", optional = true }

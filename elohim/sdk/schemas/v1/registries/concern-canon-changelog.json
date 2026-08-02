@@ -1,0 +1,38 @@
+{
+  "$comment": "AUTHORED, not generated — a migration_note is a judgment no generator can invent. What IS mechanical is the pairing: `.claude/scripts/_lib/concern_canon_projection.py` reads the supersession lineage out of the two registry homes and asserts BOTH directions — every declared supersession has exactly one row here, every row here names a real supersession, and the content hashes match the live registry bytes. That check is what lets an external consumer diff `concern-classes.json` pins across two checkouts and read WHY each pin moved, with no Claude tooling in the loop. Seeded 2026-08-02 with the two phase-1 graduations (plan task P4.6).",
+  "concernCanonVersion": 1,
+  "semver": {
+    "rule": "Tightening a pin = MINOR (ship the new pin, `#[deprecated]` the old — the external build names the exact policy that moved). Removing a pin = MAJOR. Redefining a pin's semantics in place = FORBIDDEN at any version: the id is identity, the version is its monotonic life, and a consumer's `policy: <id>@<version>` is a declared dependency, never recency.",
+    "crateSurface": "crates/seam-contracts/src/canon.rs — CONCERN_CANON_VERSION + the per-class PolicyPin consts these rows move."
+  },
+  "changes": [
+    {
+      "policy_id": "c2-monotonic-authority",
+      "concern": "C2",
+      "from": 1,
+      "to": 2,
+      "from_home": "policies.yaml",
+      "to_home": "policies.yaml",
+      "from_content_hash": "sha256:a5a4d533a03eac9915d0b132ff374a834954446bad25ffd32e6cc9e8290ca1d9",
+      "to_content_hash": "sha256:373c0f803c0e7f2ffb2385dcb1278e2cb59d138b0500e4ab63e9ae578d9b9a34",
+      "kind": "graduation-in-place",
+      "date": "2026-08-02",
+      "migration_note": "Predicate graduation, identical guarantee. @1's actionable predicate was `dedupe-of` — an unconditional bind-don't-redefine advisory that fired on every write matching the scope neighbourhood. @2 replaces it with the real detector `epr:validator-heal-fills-never-moves`, which fires on the SHAPE: (a) a net-new `StampMode::Declare` call site outside the canonical-channel list (`db/content_diesel.rs`, `services/head_adoption.rs`), or (b) added lines touching the stamp guard while citing none of the contract tests that file's seam-registry.yaml registers. One actionable predicate per row is a hard registry rule, so the trigger is replaced rather than kept alongside. A consumer pinned to @1 keeps @1's semantics — noisier, never wrong — until it re-declares; nothing in the guarantee changed, so re-pinning is a one-line edit with no code change.",
+      "affected_contract": "crates/seam-contracts/src/canon.rs::PIN_C2_MONOTONIC_AUTHORITY_V2 (V1 retained and `#[deprecated]`); binding `elohim/elohim-storage/src/.epr-meta` rule `heal-fills-never-moves` (re-pinned to @2); contract tests `canonical_move_verdict_*` / `stamp_declared_head_*` cited by `elohim/elohim-storage/seam-registry.yaml`; validator `_heal_fills_never_moves` in .claude/scripts/_lib/epr_meta.py."
+    },
+    {
+      "policy_id": "c6a-bounded-work",
+      "concern": "C6a",
+      "from": 1,
+      "to": 2,
+      "from_home": "concerns.yaml",
+      "to_home": "policies.yaml",
+      "from_content_hash": "sha256:9f3134f0d23dfa0f1697aef66bd39b3432293d1a0084023f705520a0389f6a4a",
+      "to_content_hash": "sha256:88b41ea4940d3e461c4727128c2907e0f1f1e47a14f52c132d56e19fda7b6617",
+      "kind": "graduation-across-homes",
+      "date": "2026-08-02",
+      "migration_note": "Home graduation: the class acquired an evaluable predicate and therefore moved from the Precedent home (concerns.yaml, no `validator:`, no enforcement `class:`) to the enforcement home (policies.yaml, `class: inject`, `validator: epr:validator-bounded-work`). The version number CONTINUES across the move because the artifact is the same artifact — id is identity, version is its monotonic life — and because two rows keyed `c6a-bounded-work@1` in two files would make a pin ambiguous, which is the one thing a declared dependency may never be. Consumers reading the published projection see only the tip and need no awareness of the move; consumers pinning `c6a-bounded-work@1` must re-declare to `@2` to pick up the predicate, and the ONLY behavioural delta is that an unbudgeted loop/retry-ladder now draws an advisory at edit time. The predicate is precision-biased by design and may never be promoted to a blocking class on this evidence.",
+      "affected_contract": "crates/seam-contracts/src/canon.rs::PIN_C6A_BOUNDED_WORK_V2 (V1 retained and `#[deprecated]`); binding `elohim/elohim-storage/src/.epr-meta` rule `bounded-work`; concerns.yaml row `c6a-bounded-work@1` marked `status: superseded` with `superseded_by: policies.yaml#c6a-bounded-work@2`; validator `_bounded_work` in .claude/scripts/_lib/epr_meta.py; runbook probe home (mint-then-quiet) rather than a design-time contract test alone."
+    }
+  ]
+}
