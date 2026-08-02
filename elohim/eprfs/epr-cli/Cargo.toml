@@ -21,6 +21,9 @@ eprfs-core = { path = "../eprfs-core" }
 eprfs-host = { path = "../eprfs-host" }
 eprfs-meta = { path = "../eprfs-meta" }
 elohim-epr-rea = { path = "../../epr-rea" }
+# The canonical CID codec. `canon_lift` mints every atom through `elohim_epr::cid::compute_cid`
+# — the same function the P0.4 liftability gate proved — never a second implementation.
+elohim-epr = { path = "../../epr" }
 chrono = "0.4"
 cid = "0.11"
 glob = "0.3"

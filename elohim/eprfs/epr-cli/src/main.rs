@@ -1,7 +1,7 @@
 use std::{env, path::PathBuf, process::ExitCode};
 
 use elohim_epr_cli::{
-    check, doctor,
+    canon_lift, check, doctor,
     error::{Error, Result},
     explain, flow, git,
     git::{ChangeKind, ChangedPath},
@@ -19,6 +19,17 @@ fn main() -> ExitCode {
             Ok(code) => code,
             Err(error) => {
                 eprintln!("epr flow: {error}");
+                ExitCode::from(2)
+            }
+        };
+    }
+    // `canon-lift` likewise: it renders a generated artifact set (and a freshness verdict over
+    // it), not a Report, so it is dispatched before the Report-shaped commands.
+    if raw.first().map(String::as_str) == Some("canon-lift") {
+        return match canon_lift::run(&raw[1..]) {
+            Ok(code) => code,
+            Err(error) => {
+                eprintln!("epr canon-lift: {error}");
                 ExitCode::from(2)
             }
         };
@@ -193,5 +204,5 @@ fn print_human(report: &Report) {
 }
 
 fn usage() -> &'static str {
-    "usage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|ready [--target REF] [--deep]>"
+    "usage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|ready [--target REF] [--deep]|flow ...|canon-lift [--check|--write]>"
 }

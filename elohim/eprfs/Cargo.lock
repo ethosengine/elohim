@@ -399,6 +399,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "cid",
+ "elohim-epr",
  "elohim-epr-rea",
  "eprfs-core",
  "eprfs-host",
