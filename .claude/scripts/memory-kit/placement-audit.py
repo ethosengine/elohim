@@ -913,6 +913,14 @@ def epr_meta_mode() -> int:
                   f"pressure; new logic likely belongs in a module")
         for e in m.get("errors", []):
             print(f"  ! {e}")
+    # DECISION-POINT CENSUS (plan P3.2): the derived read-model over every seam-registry.yaml
+    # plus both concern-canon homes (policies.yaml + concerns.yaml). Thin wiring only — all
+    # logic lives in _lib/seam_census.py.
+    try:
+        from _lib import seam_census as _sc
+        print("\n" + _sc.render_census(_sc.census_data(ROOT)))
+    except Exception as e:  # noqa: BLE001 — instrument liveness: say the gate died, never vanish
+        print(f"\nDECISION-POINT CENSUS: ⚠ gate-error ({type(e).__name__})")
     return 0
 
 
