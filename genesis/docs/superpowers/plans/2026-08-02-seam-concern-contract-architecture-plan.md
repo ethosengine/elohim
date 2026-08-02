@@ -1,7 +1,7 @@
 ---
 title: "Seam-Concern Contract Architecture — first-class concern clusters that cascade to every boundary"
 id: seam-concern-contract-architecture-plan
-status: Draft
+status: Active
 class: protocol-canonical
 domain: D1 (cross-cutting envelope/IoC seam; tooling legs are process-meta and say so per-task)
 sprint: proposed-new-rung (post-saga architecture sprint; not an existing Sprint-N)
