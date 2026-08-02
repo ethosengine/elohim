@@ -1414,6 +1414,7 @@ pub async fn run_heal(
     let adopt = crate::services::head_adoption::AdoptContext {
         hints: &peer_head_hints,
         fetcher: Some(&head_record_fetcher),
+        contest_enabled: crate::config::contest_two_way_declared_enabled(),
     };
 
     // Deferred adoptions FIRST: these are ids the heal leg just refused to
@@ -1592,7 +1593,10 @@ struct ContentHealOutcome {
     /// `ghost_candidates` is: the heal leg has no fetcher (the head-record
     /// transport is assembled in [`run_heal`] alongside the peer hints), and the
     /// answer this leg already paid for is enough to classify without re-probing.
-    adopt_candidates: Vec<String>,
+    ///
+    /// Carries that answer with each id (see [`AdoptCandidate`]) so the adopt arm
+    /// can take `AdoptLocal` on a canonical one instead of asserting absence.
+    adopt_candidates: Vec<AdoptCandidate>,
 }
 
 /// Ghost-anchor witness: author a local notarized head for rows whose SQL
@@ -1742,7 +1746,11 @@ async fn witness_ghost_anchors(
                     tokio::time::sleep(WITNESS_ITEM_DELAY).await;
                     continue;
                 }
-                crate::services::head_adoption::AdoptOutcome::Held => {
+                // Contest minted a DHT candidate and deliberately left the row
+                // unchanged — counted with `held` here because, from the WITNESS
+                // sweep's point of view, the outcome is identical: do not author.
+                crate::services::head_adoption::AdoptOutcome::Held
+                | crate::services::head_adoption::AdoptOutcome::Contested => {
                     held += 1;
                     tokio::time::sleep(WITNESS_ITEM_DELAY).await;
                     continue;
@@ -2720,7 +2728,7 @@ async fn heal_content(
 ) -> ContentHealOutcome {
     let app_ctx = crate::db::AppContext::default_lamad();
     let mut ghost_candidates: Vec<String> = Vec::new();
-    let mut adopt_candidates: Vec<String> = Vec::new();
+    let mut adopt_candidates: Vec<AdoptCandidate> = Vec::new();
 
     // (5) Heal each gap from the OWN conductor (verified stamp), bounded by the
     // content leg budget so a saturated conductor lands SOME rows per tick and the
@@ -2740,6 +2748,16 @@ async fn heal_content(
         })
         .await;
         circuit.record(&attempt.result);
+        // ELECTION-TIER METER. Counted on EVERY answer, before any branch
+        // consumes it: `canonical` was previously read only to pick a stamp mode
+        // and then discarded, so "does an election even exist for this class?"
+        // was unanswerable from telemetry — the question that separates a
+        // supply-side deadlock from a gossip lag. An answer that never arrived
+        // is not an answer and is deliberately not counted here (the miss and
+        // timeout classes below own it).
+        if let Ok(Some(ref head)) = attempt.result {
+            crate::metrics::inc_content_canonical_answer(head.canonical_tier_label());
+        }
         match attempt.result {
             // GAPFILL SELF-ELECTION GUARD. Checked BEFORE the stamp, because the
             // stamp is what makes the divergence terminal (see
@@ -2774,7 +2792,16 @@ async fn heal_content(
                      deferred to the adopt-before-author arm"
                 );
                 tracker.mark_completed(&id);
-                adopt_candidates.push(id.clone());
+                // Carry the conductor's OWN answer forward. It is a fallback
+                // (non-canonical) here by construction — that is what this arm
+                // matched on — so the pre-flight will see `canonical == false`
+                // and route to the peer/contest arms exactly as before. The
+                // difference is that it now reads that from EVIDENCE rather than
+                // from a blanket `Known(None)` assertion.
+                adopt_candidates.push(AdoptCandidate {
+                    id: id.clone(),
+                    head: Some(head.clone()),
+                });
                 crate::metrics::inc_projection_heal_outcome(
                     "content",
                     HealOutcomeKind::DeferredToAdopt.label(),
@@ -2899,7 +2926,14 @@ async fn heal_content(
                 let routed_to_adopt =
                     conductor_missing_should_route_to_adopt(peer_head_hints.contains_key(&id));
                 if routed_to_adopt {
-                    adopt_candidates.push(id.clone());
+                    // `Ok(None)`: the conductor answered, and its answer was
+                    // "nothing". There is no head to carry, and no canonical
+                    // head can exist locally — `Unresolved` is the honest
+                    // provenance (see `AdoptCandidate::head`).
+                    adopt_candidates.push(AdoptCandidate {
+                        id: id.clone(),
+                        head: None,
+                    });
                 }
                 tracing::debug!(content_id = %id, routed_to_adopt, "projection-reconcile[content]: own conductor returned None; retry next sweep");
                 tracker.mark_failed(&id);
@@ -2929,7 +2963,13 @@ async fn heal_content(
                 let routed_to_adopt =
                     timeout_should_route_to_adopt(transient, peer_head_hints.contains_key(&id));
                 if routed_to_adopt {
-                    adopt_candidates.push(id.clone());
+                    // The conductor never answered — absence was NOT observed.
+                    // `head: None` maps to `LocalResolve::Unresolved`, the
+                    // variant that says exactly that.
+                    adopt_candidates.push(AdoptCandidate {
+                        id: id.clone(),
+                        head: None,
+                    });
                 }
                 tracing::warn!(content_id = %id, error = %e, transient, routed_to_adopt, "projection-reconcile[content]: conductor resolve failed; retry next sweep");
                 tracker.mark_failed(&id);
@@ -2985,6 +3025,23 @@ async fn heal_content(
     }
 }
 
+/// One id handed to [`adopt_deferred_heads`], carrying the own-conductor answer
+/// the heal leg ALREADY paid for.
+///
+/// Carrying it is not an optimisation — it is what makes `AdoptLocal` reachable
+/// from the adopt arm. This list previously held bare ids and the arm asserted
+/// `LocalResolve::Known(None)` for every one of them, so `conductor_canonical`
+/// was hard-wired false and a DHT-ELECTED canonical head could never be adopted
+/// here no matter what the conductor had just said.
+#[derive(Debug, Clone)]
+struct AdoptCandidate {
+    id: String,
+    /// `Some` when the conductor answered (canonical or fallback); `None` when
+    /// it timed out or reported nothing — mapped to `LocalResolve::Unresolved`,
+    /// which states "absence was not observed" rather than asserting it.
+    head: Option<crate::services::conductor_writes::ContentHeadWire>,
+}
+
 /// Run the adopt-before-author pre-flight over ids whose `GapFill` was refused by
 /// [`gapfill_would_self_elect`].
 ///
@@ -3021,7 +3078,7 @@ async fn heal_content(
 async fn adopt_deferred_heads(
     hc: &Arc<HcClient>,
     pool: &DbPool,
-    candidates: &[String],
+    candidates: &[AdoptCandidate],
     adopt: &crate::services::head_adoption::AdoptContext<'_>,
 ) {
     if candidates.is_empty() {
@@ -3030,22 +3087,39 @@ async fn adopt_deferred_heads(
     let app_ctx = crate::db::AppContext::default_lamad();
     let total = candidates.len();
     let mut adopted = 0usize;
+    let mut contested = 0usize;
     let mut held = 0usize;
     let mut retry = 0usize;
 
     let sweep = async {
-        for id in candidates.iter().take(WITNESS_MAX_PER_TICK as usize) {
+        for candidate in candidates.iter().take(WITNESS_MAX_PER_TICK as usize) {
+            let id = &candidate.id;
+            // PROVENANCE-EXACT local resolve. The heal leg ALREADY paid the
+            // conductor for these answers, so pass what it learned instead of
+            // asserting a blanket `Known(None)`:
+            //   - `Known(Some(head))` — the conductor answered. If that answer
+            //     is CANONICAL the pre-flight can now take `AdoptLocal`, which
+            //     was structurally unreachable from this arm while every
+            //     candidate claimed observed-absence. That is the whole point:
+            //     an elected head must be adoptable here.
+            //   - `Unresolved` — the conductor timed out or reported nothing.
+            //     Absence was never observed; the variant says so honestly.
+            let local_resolve = match &candidate.head {
+                Some(head) => crate::services::head_adoption::LocalResolve::Known(Some(head)),
+                None => crate::services::head_adoption::LocalResolve::Unresolved,
+            };
             match crate::services::head_adoption::try_adopt_canonical_head(
                 hc,
                 pool,
                 &app_ctx,
                 id,
-                crate::services::head_adoption::LocalResolve::Known(None),
+                local_resolve,
                 adopt,
             )
             .await
             {
                 crate::services::head_adoption::AdoptOutcome::Adopted => adopted += 1,
+                crate::services::head_adoption::AdoptOutcome::Contested => contested += 1,
                 crate::services::head_adoption::AdoptOutcome::Held => held += 1,
                 crate::services::head_adoption::AdoptOutcome::Author => retry += 1,
                 crate::services::head_adoption::AdoptOutcome::AuthorThenAdopt { .. } => {
@@ -3079,10 +3153,11 @@ async fn adopt_deferred_heads(
         target: "elohim_storage::projection_reconcile",
         candidates = total,
         adopted,
+        contested,
         held,
         retry,
-        "projection-reconcile[adopt-deferred]: adopted peer-declared heads for rows whose \
-         GapFill was refused as self-election"
+        "projection-reconcile[adopt-deferred]: adopted peer-declared heads, and contested \
+         two-way declared ones by minting a canonical candidate for the DHT election"
     );
 }
 
@@ -3138,6 +3213,14 @@ fn heal_content_one(
         Some(head.declared_at),
         Some(patch),
         mode,
+        // The DHT ELECTION behind a canonical answer — the winning declaration
+        // link's notarized timestamp and tier, which `canonical_move_verdict`
+        // arbitrates on. `None` for a fallback answer (no election ran) and from
+        // a pre-cure coordinator, which the guard reads as "carries no
+        // election". This is what makes an elected head CONSUMABLE by an
+        // already-declared row; without it the guard compared head-ACTION
+        // timestamps and refused every move the DHT had already decided.
+        head.canonical_ordering(),
     )
 }
 

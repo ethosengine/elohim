@@ -295,6 +295,79 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Own-conductor head answers by ELECTION TIER, counted on every
+    /// `resolve_content_head_local` reply the heal loop reads.
+    ///
+    /// THE MISSING METER (2026-08-02). `ContentHeadWire.canonical` was consumed
+    /// to pick a stamp mode and then discarded — never counted — so "is the
+    /// canonical-head anchor empty for this class?" could not be answered from
+    /// telemetry at all. A fleet stuck in two-way declared divergence and a fleet
+    /// whose election merely hasn't gossiped in look IDENTICAL on every other
+    /// gauge; this is the one that separates them.
+    ///
+    /// - `none`   — the root-author FALLBACK election: no canonical link resolved
+    ///   (either none was ever declared, or the winner's target has not gossiped
+    ///   in). Sustained ~100% `none` against a non-zero `divergent_refused` means
+    ///   NO ELECTION EXISTS to arbitrate — the supply side is the blocker, not
+    ///   the selector.
+    /// - `staging` / `earned` — a canonical winner resolved, at that tier. The
+    ///   cure signal is `none` falling as these rise.
+    pub static ref CONTENT_CANONICAL_ANSWERS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_content_canonical_answers_total",
+            "Own-conductor content HEAD answers by canonical-election tier.",
+        ),
+        &["tier"],
+    )
+    .unwrap();
+
+    /// WHY a `HealCanonical` stamp refused to move an already-declared row.
+    ///
+    /// A sibling of `elohim_projection_heal_outcomes_total{outcome="refused_stale"}`
+    /// rather than a label on it: adding `reason` to that family would multiply
+    /// the cardinality of every other outcome for one arm's benefit. The totals
+    /// reconcile — this family's sum equals that series.
+    ///
+    /// - `stored_null` — the row carries NO election ordering to compare against
+    ///   (its declaration came from a channel that NULLs it: the deploy PATCH's
+    ///   `HeadElection::Declare`, or a `ContentHeadDeclared` signal). Under the
+    ///   three-tier rule this is now a MOVE, so a nonzero rate here after the
+    ///   cure means an answer arrived carrying no election either.
+    /// - `not_newer` — both sides carry an election and the incoming one is not
+    ///   strictly newer. The honest, converged steady state.
+    /// - `tier` — incoming is STAGING and the row already holds an EARNED
+    ///   declaration. Correct refusal; earned is not displaced by scaffold.
+    pub static ref PROJECTION_REFUSED_STALE_REASONS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_projection_heal_refused_stale_total",
+            "HealCanonical stamps that kept the adopted head, by refusal reason.",
+        ),
+        &["reason"],
+    )
+    .unwrap();
+
+    /// Canonical-head LINKS this node minted on the DHT, by the channel that
+    /// caused it — the SUPPLY side of the election.
+    ///
+    /// Reads against `elohim_content_canonical_answers_total{tier="none"}`: links
+    /// minted is the input, canonical answers is the output. Supply flat at zero
+    /// while `none` sits at 100% is the two-way-declared deadlock — every peer
+    /// holds a declaration, so the only automated minter (`adopt_peer`, which
+    /// requires an UNDECLARED local row) never fires and no election is ever
+    /// created for the arbiter to run on.
+    ///
+    /// Sources today: `adopt_peer` (the adopt-before-author pre-flight) and
+    /// `http` (`POST /db/content/{id}/canonical-head`, i.e. the deploy's
+    /// stage-spa-blob declare). Further sources arrive with the supply fix.
+    pub static ref CONTENT_CANONICAL_LINKS_MINTED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_content_canonical_links_minted_total",
+            "Canonical-head declaration links minted through this node, by source channel.",
+        ),
+        &["source"],
+    )
+    .unwrap();
+
     /// Ghost-witness re-author call FAILURES, by class — the two per-row
     /// failure modes minted as saga-06-heads-converge stations (2026-07-26
     /// story-harvest of live Loki evidence, elohim-alpha namespace): previously
@@ -792,6 +865,9 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(CONTENT_HEAD_RECORD_DEGRADED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_AUTHORED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_HEAD_ADOPTED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_CANONICAL_ANSWERS.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_REFUSED_STALE_REASONS.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_CANONICAL_LINKS_MINTED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_REAUTHOR_FAILED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_SWEEP_ABANDONED.clone()));
         // Pre-touch both known `class` combos so both series exist in
@@ -1061,6 +1137,27 @@ pub fn inc_custody_announce(direction: &str) {
 
 /// Record one projection-reconcile heal row outcome. `stream` is "rea" | "content";
 /// `outcome` is one of the labels documented on [`PROJECTION_HEAL_OUTCOMES`].
+/// Count an own-conductor head answer by election tier: `"earned"`, `"staging"`,
+/// or `"none"` (root-author fallback — no canonical winner resolved).
+pub fn inc_content_canonical_answer(tier: &str) {
+    CONTENT_CANONICAL_ANSWERS.with_label_values(&[tier]).inc();
+}
+
+/// Count a `HealCanonical` refusal by reason (`StaleReason::label`).
+pub fn inc_projection_refused_stale(reason: &str) {
+    PROJECTION_REFUSED_STALE_REASONS
+        .with_label_values(&[reason])
+        .inc();
+}
+
+/// Count a canonical-head declaration LINK minted through this node, by the
+/// channel that caused it (`"adopt_peer"`, `"contest"`, `"http"`).
+pub fn inc_content_canonical_link_minted(source: &str) {
+    CONTENT_CANONICAL_LINKS_MINTED
+        .with_label_values(&[source])
+        .inc();
+}
+
 pub fn inc_projection_heal_outcome(stream: &str, outcome: &str) {
     PROJECTION_HEAL_OUTCOMES
         .with_label_values(&[stream, outcome])

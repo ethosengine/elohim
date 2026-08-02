@@ -792,6 +792,8 @@ mod tests {
             crdt_converged_at: None,
             declared_head_action_hash: None,
             declared_head_at: None,
+            canonical_declared_at: None,
+            canonical_earned: None,
         }
     }
 

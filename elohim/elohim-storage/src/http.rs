@@ -15557,6 +15557,8 @@ mod c3_serve_head_preference_tests {
             crdt_converged_at: None,
             declared_head_action_hash: declared.map(str::to_string),
             declared_head_at: None,
+            canonical_declared_at: None,
+            canonical_earned: None,
         }
     }
 

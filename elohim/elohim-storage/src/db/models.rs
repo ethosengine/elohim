@@ -131,6 +131,34 @@ pub struct Content {
     #[serde(skip)]
     #[ts(skip)]
     pub declared_head_at: Option<i64>,
+    /// DHT timestamp of the canonical-head declaration LINK that
+    /// `content_store::select_canonical_winner` elected — the ordering key the
+    /// heal guard actually keys on (see `StampMode::HealCanonical`).
+    ///
+    /// NOT `declared_head_at`. That field is the head ACTION's timestamp (when a
+    /// Content version was authored), and the zome's carried-record declare
+    /// branch replaces it with the receiving conductor's `sys_time()` — three
+    /// clocks in one column, none of which can order two DECLARATIONS. This one
+    /// carries the single notarized clock every peer reads identically.
+    ///
+    /// NULL = no election stands behind this row's declaration (a pre-migration
+    /// row, or a head advanced by a channel that carries none — the deploy
+    /// PATCH's `HeadElection::Declare`, or a `ContentHeadDeclared` signal). An
+    /// answer that DOES carry an election supersedes NULL: that is a move
+    /// FORWARD in authority, not a backwards move in time.
+    /// Internal-only — `serde(skip)`/`ts(skip)` keep the HTTP wire and generated
+    /// TS byte-identical. Classification: A (projection of the DHT election).
+    #[serde(skip)]
+    #[ts(skip)]
+    pub canonical_declared_at: Option<i64>,
+    /// Tier of the election behind `canonical_declared_at`: 1 = EARNED, 0 =
+    /// STAGING/unmarked, NULL = no election. Lets the heal guard replay
+    /// `select_canonical_winner`'s tier precedence (earned beats staging
+    /// regardless of recency) without re-reading the DHT.
+    /// Internal-only, same rationale as above. Classification: A.
+    #[serde(skip)]
+    #[ts(skip)]
+    pub canonical_earned: Option<i32>,
 }
 
 /// Content with tags attached (API response)

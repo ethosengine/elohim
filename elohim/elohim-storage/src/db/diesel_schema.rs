@@ -88,6 +88,8 @@ diesel::table! {
         crdt_converged_at -> Nullable<Text>,
         declared_head_action_hash -> Nullable<Text>,
         declared_head_at -> Nullable<BigInt>,
+        canonical_declared_at -> Nullable<BigInt>,
+        canonical_earned -> Nullable<Integer>,
     }
 }
 

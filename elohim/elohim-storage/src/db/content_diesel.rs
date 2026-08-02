@@ -914,6 +914,16 @@ pub fn upsert_with_anchor(
                     content::dht_anchor_hash.eq(dht_anchor_hash),
                     content::declared_head_action_hash.eq(dht_anchor_hash),
                     content::declared_head_at.eq(None::<i64>),
+                    // The ELECTION is cleared for the same reason the ordering
+                    // is: this commit crowns a NEW head, so any election stored
+                    // here belongs to the declaration being replaced. Leaving it
+                    // would let a superseded election out-rank the next real one
+                    // in `canonical_move_verdict` — and this is exactly the
+                    // channel (the deploy PATCH) whose NULL ordering created the
+                    // live two-way-declared class, so it must stay honest about
+                    // carrying no election rather than inherit a stale one.
+                    content::canonical_declared_at.eq(None::<i64>),
+                    content::canonical_earned.eq(None::<i32>),
                     content::updated_at.eq(sql::<Text>("CURRENT_TIMESTAMP")),
                 ))
                 .execute(conn)
@@ -1053,6 +1063,41 @@ pub fn declared_head_for(
     Ok(found.flatten().filter(|h| !h.trim().is_empty()))
 }
 
+/// [`declared_head_for`] plus WHETHER A DHT ELECTION STANDS BEHIND IT.
+///
+/// The second element is `content.canonical_declared_at IS NOT NULL`. The two
+/// are read together because the adopt-before-author rule needs both to tell a
+/// CONTESTABLE stalemate (this row declared on its own authority; no election
+/// has run) from a SETTLED one (an election ran and this row is obeying it).
+/// Splitting them into two queries would let the pair go inconsistent under a
+/// concurrent stamp — the row could gain an election between the reads and be
+/// contested anyway, re-minting a link against an already-settled question.
+pub fn declared_head_with_election(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+) -> Result<(Option<String>, bool), StorageError> {
+    let found: Option<(Option<String>, Option<i64>)> = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::id.eq(id))
+        .select((
+            content::declared_head_action_hash,
+            content::canonical_declared_at,
+        ))
+        .first::<(Option<String>, Option<i64>)>(conn)
+        .optional()
+        .map_err(|e| StorageError::Internal(format!("declared head lookup failed: {e}")))?;
+    match found {
+        None => Ok((None, false)),
+        Some((declared, election)) => Ok((
+            // An empty-string declaration is a corrupt write, not a declaration
+            // (same filter as `declared_head_for`).
+            declared.filter(|h| !h.trim().is_empty()),
+            election.is_some(),
+        )),
+    }
+}
+
 /// Batch form of [`declared_head_for`]: the declared HEAD for every id in `ids`
 /// that carries one, as `id → head`.
 ///
@@ -1123,6 +1168,13 @@ pub fn stamp_declared_head(
         declared_at,
         patch,
         StampMode::Declare,
+        // A deliberate declare channel has written a canonical link but has NOT
+        // read back its notarized timestamp, so it carries no election to
+        // record. The row's ordering is NULLed on a move (see the election
+        // bookkeeping in `stamp_declared_head_mode`) and backfills on the next
+        // canonical heal resolve — which answers with the election this declare
+        // just created.
+        None,
     )
     // `true` means "there was a row and we wrote it" — BOTH a converging stamp and
     // a same-head refresh qualify (this bool predates the Stamped/Refreshed split
@@ -1196,6 +1248,119 @@ pub enum StampOutcome {
     NoRow,
 }
 
+/// The DHT election standing behind a canonical head answer: the winning
+/// declaration LINK's notarized timestamp, and whether it was EARNED.
+///
+/// This is what `content_store::select_canonical_winner` arbitrated on, carried
+/// verbatim to the projection. `None` = the answer carries no election.
+pub type CanonicalOrdering = (i64, bool);
+
+/// Why a [`StampMode::HealCanonical`] stamp declined to move an already-declared
+/// row. Label values for `elohim_projection_heal_refused_stale_total{reason}`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StaleReason {
+    /// The INCOMING answer carries no election, and the stored row does. An
+    /// un-elected answer never displaces an elected declaration.
+    StoredNull,
+    /// Both sides carry an election and the incoming one is not strictly newer.
+    /// The converged steady state.
+    NotNewer,
+    /// Incoming is STAGING; the row holds an EARNED declaration. Earned is never
+    /// displaced by the scaffold tier.
+    Tier,
+}
+
+impl StaleReason {
+    pub fn label(self) -> &'static str {
+        match self {
+            StaleReason::StoredNull => "stored_null",
+            StaleReason::NotNewer => "not_newer",
+            StaleReason::Tier => "tier",
+        }
+    }
+}
+
+/// May a CANONICAL heal answer MOVE an already-declared row? Pure and total, so
+/// the rule that decides cross-peer head convergence is readable and testable
+/// without a conductor, a pool, or a peer.
+///
+/// ## This obeys the DHT; it does not invent an ordering
+///
+/// The substrate trust contract says canonical channels alone move declared
+/// heads, and heal FILLS or converges FORWARD — never backwards. Both hold here,
+/// because this function only ever runs on an answer that already proved
+/// `canonical == true`, i.e. one that came through
+/// `select_canonical_winner`. What it replays is that selector's OWN ordering:
+/// tier first, then the notarized link clock. It is emphatically NOT
+/// newest-wins on a wall clock — the rejected design that made heads flap.
+///
+/// Three tiers, in order:
+///
+/// 1. **TIER.** An EARNED election beats an unearned/absent one outright, and a
+///    STAGING answer never displaces an EARNED row. Mirrors
+///    `select_canonical_winner` rule 1 exactly, so a gossip-lagged peer cannot
+///    launder a staging declaration over an earned head via the heal path.
+/// 2. **ELECTION PRESENCE.** An answer carrying an election beats a row carrying
+///    NONE. This is the tier that unsticks the live two-way-declared class: those
+///    rows were declared by channels that record no election at all (the deploy
+///    PATCH's `HeadElection::Declare`, the timestamp-less `ContentHeadDeclared`
+///    signal), so under the old `provably_newer` test — which refused on NULL
+///    either side — a genuinely DHT-elected head could never be adopted. Moving
+///    here is forward in AUTHORITY: notarized election over un-elected
+///    self-declaration. It is the invariant's "key it on the authority the write
+///    CARRIES", applied literally.
+/// 3. **CLOCK.** Both sides elected ⇒ strictly-newer link timestamp wins; equal
+///    or older refuses. This is what keeps a stale-canonical conductor (one that
+///    has not yet integrated a newer link, answering with the OLD canonical
+///    record) from moving the head BACKWARDS — the 2026-07-12 regression. Note
+///    the comparison is now between two ELECTION clocks, which are the same
+///    notarized values on every peer, so it is globally consistent in a way the
+///    old head-action-timestamp comparison never was.
+///
+/// Returns `Ok(())` to move, `Err(reason)` to keep the adopted head.
+pub fn canonical_move_verdict(
+    incoming: Option<CanonicalOrdering>,
+    stored: Option<CanonicalOrdering>,
+) -> Result<(), StaleReason> {
+    match (incoming, stored) {
+        // (1) TIER — checked before anything else, both directions.
+        (Some((_, true)), Some((_, false))) => Ok(()),
+        (Some((_, false)), Some((_, true))) => Err(StaleReason::Tier),
+        // (2) ELECTION PRESENCE.
+        (Some(_), None) => Ok(()),
+        (None, Some(_)) => Err(StaleReason::StoredNull),
+        // (3) CLOCK — same tier on both sides.
+        (Some((inc, _)), Some((sto, _))) => {
+            if inc > sto {
+                Ok(())
+            } else {
+                Err(StaleReason::NotNewer)
+            }
+        }
+        // Neither side carries an election: nothing authorizes a move. This is
+        // the pre-cure world, preserved exactly — the old guard refused on NULL
+        // either side, and with no election anywhere there is still nothing to
+        // order by. An EARNED answer with no clock cannot occur (the zome sets
+        // both fields together or neither).
+        (None, None) => Err(StaleReason::StoredNull),
+    }
+}
+
+/// `canonical_ordering` is the DHT election behind a CANONICAL answer (see
+/// [`CanonicalOrdering`]). `None` means the caller's answer carries no election:
+/// every non-canonical channel, and the declare paths (which have written a link
+/// but not read back its notarized timestamp). It is consulted ONLY by
+/// [`StampMode::HealCanonical`]; the other modes ignore it for the move decision
+/// but still PERSIST it when present, so the column backfills.
+///
+/// Eight parameters, one over the clippy threshold. Deliberately NOT bundled
+/// into a params struct: every call site names these arguments explicitly, and
+/// the two that decide authority — `mode` and `canonical_ordering` — are exactly
+/// the ones a reader must be able to see at the call site without following a
+/// struct literal somewhere else. Hiding them behind a builder is how a heal
+/// path quietly acquires `Declare` semantics. Same `#[allow]` the crate already
+/// uses for `rea_commitment_service`, `economic_events`, and `api::mod`.
+#[allow(clippy::too_many_arguments)]
 pub fn stamp_declared_head_mode(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
@@ -1204,25 +1369,35 @@ pub fn stamp_declared_head_mode(
     declared_at: Option<i64>,
     patch: Option<ContentProjectionPatch>,
     mode: StampMode,
+    canonical_ordering: Option<CanonicalOrdering>,
 ) -> Result<StampOutcome, StorageError> {
     use diesel::dsl::sql;
     use diesel::sql_types::Text;
 
-    let existing: Option<(Option<String>, Option<i64>)> = content::table
+    #[allow(clippy::type_complexity)]
+    let existing: Option<(Option<String>, Option<i64>, Option<i64>, Option<i32>)> = content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::id.eq(id))
         .select((
             content::declared_head_action_hash,
             content::declared_head_at,
+            content::canonical_declared_at,
+            content::canonical_earned,
         ))
-        .first::<(Option<String>, Option<i64>)>(conn)
+        .first::<(Option<String>, Option<i64>, Option<i64>, Option<i32>)>(conn)
         .optional()
         .map_err(|e| StorageError::Internal(format!("Stamp declared head lookup: {e}")))?;
 
-    let (declared, stored_declared_at) = match existing {
-        None => return Ok(StampOutcome::NoRow),
-        Some(row) => row,
-    };
+    let (declared, _stored_declared_at, stored_canonical_at, stored_canonical_earned) =
+        match existing {
+            None => return Ok(StampOutcome::NoRow),
+            Some(row) => row,
+        };
+
+    // The stored election, reassembled. Both columns are written together, so a
+    // half-populated pair cannot occur; a defensive `zip` treats one as none.
+    let stored_ordering: Option<CanonicalOrdering> =
+        stored_canonical_at.map(|ts| (ts, stored_canonical_earned.unwrap_or(0) != 0));
 
     let moving_declared_row = matches!(
         declared.as_deref(),
@@ -1246,13 +1421,15 @@ pub fn stamp_declared_head_mode(
         }
         StampMode::HealCanonical => {
             if moving_declared_row {
-                // Monotonic move: allowed ONLY with proof of forward ordering.
-                // NULL on either side = unknown = refuse (heal never gambles).
-                let provably_newer = matches!(
-                    (declared_at, stored_declared_at),
-                    (Some(incoming), Some(stored)) if incoming > stored
-                );
-                if !provably_newer {
+                // Monotonic move, arbitrated by the DHT's OWN election — tier,
+                // then election presence, then the notarized link clock. See
+                // `canonical_move_verdict`: this replays `select_canonical_winner`
+                // rather than inventing an ordering, and it never widens
+                // `Declare`. A refusal is counted by reason so the two very
+                // different stuck states (no election anywhere vs. lost the
+                // clock comparison) stop being indistinguishable.
+                if let Err(reason) = canonical_move_verdict(canonical_ordering, stored_ordering) {
+                    crate::metrics::inc_projection_refused_stale(reason.label());
                     return Ok(StampOutcome::SkippedStale);
                 }
             }
@@ -1295,6 +1472,40 @@ pub fn stamp_declared_head_mode(
         .set(content::declared_head_at.eq(None::<i64>))
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Clear declared_head_at failed: {e}")))?;
+    }
+
+    // ELECTION bookkeeping — the same discipline as `declared_head_at` above,
+    // applied to the ordering that actually governs canonical moves. A stamp
+    // that CARRIES an election records it (so the row can later be compared
+    // clock-to-clock); a stamp that MOVES the head while carrying none must NULL
+    // it, because the stored election belongs to the declaration being replaced
+    // and keeping it would let a superseded election veto the next real one.
+    // Same-head stamps carrying nothing keep whatever is known (a refresh must
+    // not erase an election).
+    if let Some((ts, earned)) = canonical_ordering {
+        diesel::update(
+            content::table
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
+                .filter(content::id.eq(id)),
+        )
+        .set((
+            content::canonical_declared_at.eq(Some(ts)),
+            content::canonical_earned.eq(Some(i32::from(earned))),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Stamp canonical ordering failed: {e}")))?;
+    } else if moving_declared_row {
+        diesel::update(
+            content::table
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
+                .filter(content::id.eq(id)),
+        )
+        .set((
+            content::canonical_declared_at.eq(None::<i64>),
+            content::canonical_earned.eq(None::<i32>),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Clear canonical ordering failed: {e}")))?;
     }
 
     if let Some(patch) = patch {
@@ -1794,6 +2005,8 @@ mod tests {
                 crdt_converged_at TEXT,
                 declared_head_action_hash TEXT,
                 declared_head_at BIGINT,
+                canonical_declared_at BIGINT,
+                canonical_earned INTEGER,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
@@ -3556,6 +3769,7 @@ mod tests {
             None,
             None,
             StampMode::GapFill,
+            None,
         )
         .unwrap();
         assert_eq!(filled, StampOutcome::Stamped);
@@ -3569,6 +3783,7 @@ mod tests {
             None,
             None,
             StampMode::GapFill,
+            None,
         )
         .unwrap();
         assert_eq!(skipped, StampOutcome::SkippedDeclared);
@@ -3591,6 +3806,7 @@ mod tests {
             None,
             None,
             StampMode::GapFill,
+            None,
         )
         .unwrap();
         assert_eq!(same, StampOutcome::Refreshed);
@@ -3604,6 +3820,7 @@ mod tests {
             None,
             None,
             StampMode::Declare,
+            None,
         )
         .unwrap();
         assert_eq!(moved, StampOutcome::Stamped);
@@ -3612,16 +3829,21 @@ mod tests {
     /// HEAD-election (v) — the stale-canonical resurrection guard (2026-07-12
     /// live regression: elohim-host-landing converged at edge #1187's
     /// seam-smoke, healed BACKWARDS to the superseded head by #1188): a
-    /// HealCanonical stamp may fill, refresh, or move FORWARD (provably newer
-    /// `declared_at`), but must never move a declared row backwards or on
-    /// unknown ordering.
+    /// HealCanonical stamp may fill, refresh, or move FORWARD, but must never
+    /// move a declared row backwards.
+    ///
+    /// RE-AUTHORED 2026-08-02. The ordering compared is now the DHT ELECTION
+    /// clock (`canonical_ordering`, arg 8) rather than `declared_at` (arg 5).
+    /// The guarded property is unchanged and still asserted below; what changed
+    /// is that the comparison is now between two values that are the SAME on
+    /// every peer, instead of between head-action timestamps that are not.
     #[test]
     fn heal_canonical_stamp_is_monotonic() {
         let mut conn = setup_test_db();
         let ctx = AppContext::new("lamad");
         create_content(&mut conn, &ctx, mk_plain("cid-mono")).unwrap();
 
-        // Fill an undeclared row (heal's legitimate job) — records ordering.
+        // Fill an undeclared row (heal's legitimate job) — records the election.
         let filled = stamp_declared_head_mode(
             &mut conn,
             &ctx,
@@ -3630,19 +3852,28 @@ mod tests {
             Some(1_000),
             None,
             StampMode::HealCanonical,
+            Some((1_000, false)),
         )
         .unwrap();
         assert_eq!(filled, StampOutcome::Stamped);
 
-        // A deliberate canonical channel adopts a NEWER declaration.
-        assert!(
-            stamp_declared_head(&mut conn, &ctx, "cid-mono", "uhCkk-new", Some(2_000), None)
-                .unwrap()
-        );
+        // A NEWER election (the steward re-declared; the link gossiped in).
+        let newer = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-mono",
+            "uhCkk-new",
+            Some(2_000),
+            None,
+            StampMode::HealCanonical,
+            Some((2_000, false)),
+        )
+        .unwrap();
+        assert_eq!(newer, StampOutcome::Stamped);
 
-        // The regression: a conductor that has not integrated the newer
-        // canonical link answers with the OLD canonical record. The heal must
-        // NOT move the row backwards.
+        // THE REGRESSION: a conductor that has not integrated the newer
+        // canonical link answers with the OLD canonical record — canonical, yet
+        // stale. Its election clock is older, so the move is refused.
         let stale = stamp_declared_head_mode(
             &mut conn,
             &ctx,
@@ -3651,6 +3882,7 @@ mod tests {
             Some(1_000),
             None,
             StampMode::HealCanonical,
+            Some((1_000, false)),
         )
         .unwrap();
         assert_eq!(
@@ -3663,8 +3895,9 @@ mod tests {
             .unwrap();
         assert_eq!(row.declared_head_action_hash.as_deref(), Some("uhCkk-new"));
 
-        // Unknown ordering (incoming None) must also refuse the move.
-        let unknown = stamp_declared_head_mode(
+        // An answer carrying NO election cannot displace a row that carries one:
+        // an un-elected claim never outranks an elected declaration.
+        let unelected = stamp_declared_head_mode(
             &mut conn,
             &ctx,
             "cid-mono",
@@ -3672,9 +3905,25 @@ mod tests {
             None,
             None,
             StampMode::HealCanonical,
+            None,
         )
         .unwrap();
-        assert_eq!(unknown, StampOutcome::SkippedStale);
+        assert_eq!(unelected, StampOutcome::SkippedStale);
+
+        // Equal election clocks are NOT a move — the same election cannot elect
+        // two different heads, so this is evidence of confusion, not progress.
+        let tied = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-mono",
+            "uhCkk-other",
+            Some(9_999),
+            None,
+            StampMode::HealCanonical,
+            Some((2_000, false)),
+        )
+        .unwrap();
+        assert_eq!(tied, StampOutcome::SkippedStale);
 
         // Same-head refresh is idempotent, never a skip — and never `Stamped`:
         // the HEAD did not move, so it reports `Refreshed` (no convergence).
@@ -3686,12 +3935,13 @@ mod tests {
             Some(2_000),
             None,
             StampMode::HealCanonical,
+            Some((2_000, false)),
         )
         .unwrap();
         assert_eq!(same, StampOutcome::Refreshed);
 
-        // A provably NEWER canonical answer moves the row forward — this is
-        // exactly how a peer converges when the canonical link gossips in.
+        // A newer election moves the row forward — exactly how a peer converges
+        // once the winning declaration link gossips in.
         let forward = stamp_declared_head_mode(
             &mut conn,
             &ctx,
@@ -3700,6 +3950,7 @@ mod tests {
             Some(3_000),
             None,
             StampMode::HealCanonical,
+            Some((3_000, false)),
         )
         .unwrap();
         assert_eq!(forward, StampOutcome::Stamped);
@@ -3711,26 +3962,195 @@ mod tests {
             Some("uhCkk-newest")
         );
 
-        // A Declare-channel move WITHOUT a timestamp NULLs the stored ordering
-        // (it belongs to the prior declaration) — after which a heal cannot
-        // move the row at all until a timestamped declare restores ordering.
-        assert!(
-            stamp_declared_head(&mut conn, &ctx, "cid-mono", "uhCkk-untimed", None, None).unwrap()
+        // TIER precedence: an EARNED election beats a staging one outright, even
+        // with an OLDER clock — mirrors `select_canonical_winner` rule 1.
+        let earned = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-mono",
+            "uhCkk-earned",
+            Some(500),
+            None,
+            StampMode::HealCanonical,
+            Some((500, true)),
+        )
+        .unwrap();
+        assert_eq!(
+            earned,
+            StampOutcome::Stamped,
+            "earned tier must win regardless of staging recency"
         );
-        let stuck = stamp_declared_head_mode(
+
+        // …and staging must never displace it, however new.
+        let staging_over_earned = stamp_declared_head_mode(
             &mut conn,
             &ctx,
             "cid-mono",
             "uhCkk-newest",
-            Some(3_000),
+            Some(9_000),
             None,
             StampMode::HealCanonical,
+            Some((9_000, false)),
         )
         .unwrap();
         assert_eq!(
-            stuck,
+            staging_over_earned,
             StampOutcome::SkippedStale,
-            "heal never gambles on unknown stored ordering"
+            "the scaffold tier never overrides an earned canonical"
+        );
+    }
+
+    /// THE CURE (2026-08-02) — the two-way-declared class. A row declared by a
+    /// channel that records NO election (the deploy PATCH's
+    /// `HeadElection::Declare`, or a timestamp-less `ContentHeadDeclared`
+    /// signal) MUST be movable by a DHT-elected canonical answer.
+    ///
+    /// Under the previous rule this refused forever: the guard required a
+    /// non-NULL stored ordering and every such channel NULLs it, so ~11.4k rows
+    /// fleet-wide were elected-but-unconsumable. Moving here is forward in
+    /// AUTHORITY (notarized election over un-elected self-declaration), which is
+    /// what "key it on the authority the write CARRIES" means.
+    #[test]
+    fn an_elected_answer_moves_a_row_whose_declaration_has_no_election() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        create_content(&mut conn, &ctx, mk_plain("cid-unelected")).unwrap();
+
+        // The deploy PATCH shape: a declare channel crowns a head and records no
+        // election at all.
+        assert!(stamp_declared_head(
+            &mut conn,
+            &ctx,
+            "cid-unelected",
+            "uhCkk-self-declared",
+            None,
+            None
+        )
+        .unwrap());
+        let row = get_content(&mut conn, &ctx, "cid-unelected", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert!(
+            row.canonical_declared_at.is_none(),
+            "precondition: the declare channel records no election"
+        );
+
+        // A canonical answer carrying a real election now moves it.
+        let moved = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-unelected",
+            "uhCkk-elected",
+            Some(42),
+            None,
+            StampMode::HealCanonical,
+            Some((7_000, false)),
+        )
+        .unwrap();
+        assert_eq!(
+            moved,
+            StampOutcome::Stamped,
+            "a DHT-elected head must be consumable by an already-declared row — \
+             refusing here is the live stalemate this fix exists to break"
+        );
+
+        let row = get_content(&mut conn, &ctx, "cid-unelected", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-elected")
+        );
+        assert_eq!(
+            row.canonical_declared_at,
+            Some(7_000),
+            "the election clock must persist, or the row stays contestable and \
+             re-mints a link every sweep (the quiescence gate reads this column)"
+        );
+
+        // QUIESCENCE: now that an election stands behind the row, an answer
+        // carrying no election cannot move it back.
+        let back = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-unelected",
+            "uhCkk-self-declared",
+            None,
+            None,
+            StampMode::HealCanonical,
+            None,
+        )
+        .unwrap();
+        assert_eq!(back, StampOutcome::SkippedStale);
+    }
+
+    /// The pure rule, exhaustively — every ordered pair of (election, no
+    /// election) × (earned, staging) resolves without ambiguity, and the two
+    /// directions are never both moves (which would be a flap).
+    #[test]
+    fn canonical_move_verdict_is_antisymmetric_and_total() {
+        let cases = [
+            (Some((10, false)), None, true),
+            (None, Some((10, false)), false),
+            (Some((10, true)), Some((99, false)), true),
+            (Some((99, false)), Some((10, true)), false),
+            (Some((20, false)), Some((10, false)), true),
+            (Some((10, false)), Some((20, false)), false),
+            (Some((10, false)), Some((10, false)), false),
+            (None, None, false),
+        ];
+        for (incoming, stored, expect_move) in cases {
+            assert_eq!(
+                canonical_move_verdict(incoming, stored).is_ok(),
+                expect_move,
+                "verdict for incoming={incoming:?} stored={stored:?}"
+            );
+        }
+
+        // ANTISYMMETRY: for any two DIFFERENT elections, at most one direction
+        // moves. If both moved, two peers would swap heads forever.
+        let elections = [(10, false), (20, false), (10, true), (20, true)];
+        for a in elections {
+            for b in elections {
+                if a == b {
+                    continue;
+                }
+                let ab = canonical_move_verdict(Some(a), Some(b)).is_ok();
+                let ba = canonical_move_verdict(Some(b), Some(a)).is_ok();
+                assert!(!(ab && ba), "flap: {a:?} and {b:?} each displace the other");
+            }
+        }
+    }
+
+    /// Refusal reasons are distinct and stable — they are metric label values,
+    /// and conflating them re-creates exactly the ambiguity ("no election
+    /// anywhere" vs "lost the comparison") that made this class undiagnosable.
+    #[test]
+    fn stale_reasons_are_distinct_and_labelled() {
+        assert_eq!(
+            canonical_move_verdict(None, Some((1, false))).unwrap_err(),
+            StaleReason::StoredNull
+        );
+        assert_eq!(
+            canonical_move_verdict(Some((1, false)), Some((2, false))).unwrap_err(),
+            StaleReason::NotNewer
+        );
+        assert_eq!(
+            canonical_move_verdict(Some((9, false)), Some((1, true))).unwrap_err(),
+            StaleReason::Tier
+        );
+        let labels = [
+            StaleReason::StoredNull.label(),
+            StaleReason::NotNewer.label(),
+            StaleReason::Tier.label(),
+        ];
+        assert_eq!(
+            labels
+                .iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len(),
+            3,
+            "metric label values must be distinct"
         );
     }
 
@@ -3760,6 +4180,7 @@ mod tests {
             Some(1_000),
             None,
             StampMode::HealCanonical,
+            None,
         )
         .unwrap();
         assert_eq!(
@@ -3780,6 +4201,7 @@ mod tests {
                 Some(1_000),
                 None,
                 StampMode::HealCanonical,
+                None,
             )
             .unwrap();
             assert_eq!(

@@ -429,6 +429,20 @@ async fn async_main(
         );
     }
 
+    // Adopt-before-author CONTEST arm (default ON; the supply side of the
+    // canonical election). Env DISABLES it: 0/false/off/no — turning it off
+    // restores the prior `Hold`, which is safe but cannot converge a two-way
+    // declared corpus.
+    if let Ok(v) = std::env::var("CONTEST_TWO_WAY_DECLARED") {
+        config.contest_two_way_declared = !matches!(
+            v.trim().to_ascii_lowercase().as_str(),
+            "0" | "false" | "no" | "off"
+        );
+    }
+    // Publish it where the reconcile sweep can read it without an env lookup on
+    // the hot path (see `config::set_contest_two_way_declared`).
+    elohim_storage::config::set_contest_two_way_declared(config.contest_two_way_declared);
+
     // Demand-driven auto-pin (self-healing opportunity map row 15). Default ON
     // (demand-driven, not blanket backfill; consent floor preserved downstream
     // by the provide-eligibility gate). Env DISABLES it: 0/false/off/no.

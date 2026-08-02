@@ -2587,6 +2587,35 @@ pub struct ContentHeadOutput {
     /// output (no field) deserializing as false — the safe reading.
     #[serde(default)]
     pub canonical: bool,
+    /// The WINNING canonical-head declaration's DHT LINK timestamp — the exact
+    /// ordering [`select_canonical_winner`] arbitrated on.
+    ///
+    /// `Some` ONLY on the canonical branch of [`resolve_content_head_inner`];
+    /// `None` on the root-author fallback, on the declare paths (which have not
+    /// yet read back the link they just wrote), and — via `serde(default)` — from
+    /// any pre-cure coordinator. `None` therefore reads as "no election stands
+    /// behind this answer", which is the safe reading everywhere.
+    ///
+    /// ## Why this is NOT `declared_at`
+    ///
+    /// `declared_at` is the head ACTION's timestamp — when that Content VERSION
+    /// was authored — and on the carried-record branch of
+    /// [`declare_canonical_head_inner`] it is deliberately overwritten with the
+    /// receiving conductor's `sys_time()`. Three different clocks share that one
+    /// field, so it cannot order two DECLARATIONS. This field carries the one
+    /// clock that can: the notarized link timestamp every peer sees identically.
+    /// The storage projection's monotonic heal guard keys off THIS, not
+    /// `declared_at`.
+    #[serde(default)]
+    pub canonical_declared_at: Option<Timestamp>,
+    /// TRUE iff the winning declaration carried the EARNED provenance marker
+    /// ([`CANONICAL_TAG_EARNED`]); FALSE for STAGING/unmarked. `None` exactly
+    /// when [`Self::canonical_declared_at`] is `None` (no election behind the
+    /// answer). Lets a consumer replay [`select_canonical_winner`]'s TIER
+    /// precedence — earned beats staging regardless of recency — without
+    /// re-reading the DHT.
+    #[serde(default)]
+    pub canonical_earned: Option<bool>,
 }
 
 /// Input for `declare_content_head`. `head_action_hash: None` re-affirms the
@@ -2818,7 +2847,19 @@ fn newest_canonical_link(id: &str) -> ExternResult<Option<Link>> {
     let anchor = StringAnchor::new(CANONICAL_HEAD_ANCHOR, id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
     let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
-    let mut links = get_links(query, GetStrategy::default())?;
+    // STRATEGY = `Local` (2026-08-02). This is a GUARD read on the DECLARE path,
+    // and `GetStrategy::default()` is `Network`: on a conductor whose storage arc
+    // has not reconverged since its last restart (kitsune2 resets every local
+    // agent's current arc to `Empty` on join) it leaves the box and dies on the
+    // 60s `request_timeout_s` — so a corpus-scale canonical declare sweep would
+    // stall on the guard before doing any work. Reading `Local` is SAFE here
+    // because this guard is not the backstop: `select_canonical_winner` enforces
+    // tier precedence at RESOLVE time over the FULL link set (see its doc,
+    // rule 1), so a partitioned peer that cannot see an earned link locally still
+    // cannot displace it — every peer that CAN see the set resolves the earned
+    // head. The guard is the fast, local courtesy refusal; the selector is the
+    // invariant.
+    let mut links = get_links(query, GetStrategy::Local)?;
     if links.is_empty() {
         return Ok(None);
     }
@@ -2887,6 +2928,23 @@ fn select_canonical_winner(mut candidates: Vec<CanonicalCandidate>) -> Option<Ca
     candidates.pop()
 }
 
+/// The winning canonical-head declaration, resolved: the target `Record` PLUS
+/// the ordering and tier the election decided it on.
+///
+/// The two ordering fields exist because they were previously computed and then
+/// DISCARDED — `gather_canonical_head_record` returned only the `Record`, so the
+/// one clock that can order two declarations (the notarized link timestamp
+/// [`select_canonical_winner`] arbitrates on) never reached the projection. The
+/// storage heal guard was left comparing head-ACTION timestamps, which are not
+/// declaration times, and refused every forward move it should have taken.
+struct CanonicalHeadAnswer {
+    record: Record,
+    /// The winning declaration LINK's DHT timestamp.
+    declared_at: Timestamp,
+    /// Whether the winning declaration carried the EARNED provenance marker.
+    is_earned: bool,
+}
+
 /// Resolve the declared canonical cross-root head record for `id`, if one has
 /// been declared AND the WINNING declaration's target Content is retrievable in
 /// the local DHT view.
@@ -2908,7 +2966,10 @@ fn select_canonical_winner(mut candidates: Vec<CanonicalCandidate>) -> Option<Ca
 /// older earned). The newer earned declaration is the authority's current,
 /// visible choice and supersedes the older; degrading to the root-author election
 /// is partition-correct and converges on the newer target once it gossips in.
-fn gather_canonical_head_record(id: &str, strategy: GetStrategy) -> ExternResult<Option<Record>> {
+fn gather_canonical_head_record(
+    id: &str,
+    strategy: GetStrategy,
+) -> ExternResult<Option<CanonicalHeadAnswer>> {
     let anchor = StringAnchor::new(CANONICAL_HEAD_ANCHOR, id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
     let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
@@ -2937,8 +2998,18 @@ fn gather_canonical_head_record(id: &str, strategy: GetStrategy) -> ExternResult
     // yet, return None so `resolve_content_head` degrades to the root-author
     // election — never walk to an older/lower-tier declaration (see the
     // superseded-head nuance in the doc-comment above).
+    //
+    // The winner's ordering travels WITH the record: `winner.timestamp` is the
+    // link clock the selector just arbitrated on, and `winner.is_earned` its
+    // tier. Both are consumed by the storage projection's monotonic heal guard;
+    // dropping them here is what made a DHT-elected head unconsumable by an
+    // already-declared row.
     match get(winner.target, GetOptions::from(strategy))? {
-        Some(record) => Ok(Some(record)),
+        Some(record) => Ok(Some(CanonicalHeadAnswer {
+            record,
+            declared_at: winner.timestamp,
+            is_earned: winner.is_earned,
+        })),
         None => Ok(None),
     }
 }
@@ -3067,6 +3138,65 @@ mod canonical_head_selector_tests {
     fn empty_set_has_no_winner() {
         assert!(select_canonical_winner(vec![]).is_none());
     }
+
+    /// ORDERING TRAVELS (2026-08-02). `timestamp` and `is_earned` are no longer
+    /// selector-internal: `gather_canonical_head_record` propagates them onto
+    /// `ContentHeadOutput::{canonical_declared_at, canonical_earned}`, and the
+    /// storage heal guard MOVES an already-declared row on them. So the fields
+    /// the winner reports must be the WINNER's own — reporting any other
+    /// candidate's clock would let a peer "advance" onto a losing declaration.
+    #[test]
+    fn winner_reports_its_own_clock_and_tier_not_a_losers() {
+        let candidates = vec![
+            cand(false, 900, 9, 90), // staging, NEWEST clock — must not be reported
+            cand(true, 100, 1, 10),  // earned, older
+            cand(true, 300, 3, 11),  // earned, newest-within-tier ⇒ the winner
+        ];
+        let winner = select_canonical_winner(candidates).expect("winner");
+        assert_eq!(winner.target, ah(11), "newest earned is the winner");
+        assert_eq!(
+            winner.timestamp,
+            Timestamp::from_micros(300),
+            "the propagated clock is the WINNER's link timestamp, never the \
+             newest link's — a staging link at 900 must not become the ordering \
+             a peer advances on"
+        );
+        assert!(
+            winner.is_earned,
+            "the propagated tier is the winning tier; storage replays earned-beats-staging on it"
+        );
+    }
+
+    /// The tier bit must be reported honestly for an all-staging set too — a
+    /// staging winner that reported `is_earned` would gain earned protection in
+    /// the storage guard it never won on the DHT.
+    #[test]
+    fn staging_winner_reports_staging_tier() {
+        let winner =
+            select_canonical_winner(vec![cand(false, 100, 1, 10), cand(false, 300, 3, 30)])
+                .expect("winner");
+        assert_eq!(winner.target, ah(30));
+        assert_eq!(winner.timestamp, Timestamp::from_micros(300));
+        assert!(
+            !winner.is_earned,
+            "an unmarked/staging declaration must never report the earned tier"
+        );
+    }
+
+    /// The tie-break decides the propagated CLOCK as well as the target: two
+    /// peers reading the same tied set must advance on the same ordering, or the
+    /// storage guard would let them leapfrog each other forever.
+    #[test]
+    fn tied_winners_propagate_an_identical_clock_in_any_input_order() {
+        let mk = || vec![cand(true, 500, 5, 50), cand(true, 500, 8, 80)];
+        let w1 = select_canonical_winner(mk()).expect("winner");
+        let mut reversed = mk();
+        reversed.reverse();
+        let w2 = select_canonical_winner(reversed).expect("winner");
+        assert_eq!(w1.timestamp, w2.timestamp);
+        assert_eq!(w1.is_earned, w2.is_earned);
+        assert_eq!(w1.target, w2.target);
+    }
 }
 
 /// DEV-TIME SCAFFOLD — the earned-authority governance seam for WHO may declare
@@ -3127,6 +3257,15 @@ fn build_content_head_output(
         supersedes,
         content,
         canonical,
+        // Election ordering is attached by the ONE caller that holds it — the
+        // canonical branch of `resolve_content_head_inner`. Every other caller
+        // (root-author fallback, the two declare paths) legitimately has no
+        // election to report: a declare has written the link but not read it
+        // back, so it cannot know the notarized timestamp. `None` reads as "no
+        // election stands behind this answer", and the declaring peer's own row
+        // backfills the ordering on its next heal resolve.
+        canonical_declared_at: None,
+        canonical_earned: None,
     })
 }
 
@@ -3144,8 +3283,14 @@ fn resolve_content_head_inner(
     // IdToContent points at — resolves the SAME head. When undeclared (or the
     // canonical target has not gossiped in yet), fall through to the unchanged
     // root-author-newest election below: preserves prior behavior exactly.
-    if let Some(record) = gather_canonical_head_record(id, strategy)? {
-        return Ok(Some(build_content_head_output(id, &record, true)?));
+    if let Some(answer) = gather_canonical_head_record(id, strategy)? {
+        let mut out = build_content_head_output(id, &answer.record, true)?;
+        // The ONE site that knows the election: attach the winning link's clock
+        // and tier so the projection can obey the DHT's own arbitration instead
+        // of guessing from head-action timestamps.
+        out.canonical_declared_at = Some(answer.declared_at);
+        out.canonical_earned = Some(answer.is_earned);
+        return Ok(Some(out));
     }
     let (root_author, records) = match gather_content_chain(id, strategy)? {
         Some(x) => x,

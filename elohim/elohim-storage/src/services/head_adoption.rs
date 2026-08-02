@@ -39,7 +39,42 @@
 //! two peers' projections. The Rust rule is PRESENCE-based
 //! ([`decide_head_action`]); ordering is arbitrated in-zome by
 //! `select_canonical_winner`. Inventing a newest-wins election here would
-//! reintroduce the head-flapping this exists to stop.
+//! reintroduce the head-flapping this exists to stop. That remains true after
+//! the CONTEST arm below: contesting supplies a CANDIDATE to the in-zome
+//! arbiter, it never picks a winner.
+//!
+//! ## 4. CONTEST-THEN-OBEY (the two-way-declared class, 2026-08-02)
+//!
+//! The three arms above all assume at most one side holds a crown. The live
+//! fleet's dominant class violates that: ~11.4k ids where THIS row declares X
+//! and a peer advertises Y. `AdoptPeer` requires an undeclared local row, so it
+//! never fired; the rule answered `Hold`; and because the ONLY automated minter
+//! of canonical-head links is `AdoptPeer`, the DHT's `canonical_head` anchor
+//! stayed EMPTY for the whole class. `select_canonical_winner` was never called
+//! with a non-empty set — the arbiter existed but had nothing to arbitrate, so
+//! every conductor answered with its own root-author fallback and every heal
+//! honestly refused ("row already declared — heal left it to the canonical
+//! channels", ~3.5k/hr on matthew alone). A permanent stalemate that no amount
+//! of healing could break.
+//!
+//! [`HeadDecision::ContestPeer`] breaks it WITHOUT deciding anything locally: it
+//! mints a canonical-head link naming the peer's head, which is one candidate in
+//! the election. Every peer that does the same adds its own. The set is then
+//! arbitrated on the DHT — tier, then notarized link clock, then link-hash
+//! tiebreak — and the winner comes back through `resolve_content_head` as a
+//! `canonical == true` answer carrying its election ordering, which
+//! `content_diesel::canonical_move_verdict` obeys. Contest supplies; the DHT
+//! elects; the projection obeys.
+//!
+//! Quiescence is structural, not timed: once a row carries an election
+//! (`canonical_declared_at IS NOT NULL`) the rule returns to `Hold`, so a
+//! converged corpus mints ZERO links per sweep. The transient window is at most
+//! one sweep — the minting conductor's own next `resolve_content_head_local`
+//! sees the link it just committed and stamps the election onto the row.
+//!
+//! Expected drain: ~11.4k contested ids fleet-wide, `WITNESS_MAX_PER_TICK` (200)
+//! per tick per pod on ~300s sweeps ⇒ contest supply completes in roughly 1-2h
+//! across 7 pods, with election-and-obey draining behind it.
 //!
 //! **No admission or budget deny.** Every arm degrades to the author path and
 //! retries on the next sweep. Pacing and yielding are the callers' existing
@@ -154,6 +189,16 @@ pub enum LocalResolve<'a> {
     /// (e.g. `Known(None)` vs `Unresolved`) rather than adding behaviour that
     /// silently reads the timeout case as observed absence.
     Known(Option<&'a ContentHeadWire>),
+    /// The conductor was ASKED and did not answer (timeout), or answered
+    /// `Ok(None)` for an id whose absence we cannot act on.
+    ///
+    /// Split out from `Known(None)` on 2026-08-02, exactly as the note above
+    /// instructed: absence was NOT observed here, only unestablished. It behaves
+    /// identically today (forecloses `AdoptLocal`, leaves `AdoptPeer` /
+    /// `ContestPeer` / `Hold`), but it no longer LIES about provenance — a
+    /// future arm that needs "the conductor observed nothing" can now
+    /// distinguish the two without re-reading this comment and guessing.
+    Unresolved,
 }
 
 /// Everything the peer-hint arm needs. Both fields are absent at boot (the
@@ -162,15 +207,22 @@ pub enum LocalResolve<'a> {
 pub struct AdoptContext<'a> {
     pub hints: &'a PeerHeadHints,
     pub fetcher: Option<&'a dyn HeadRecordFetcher>,
+    /// `config.contest_two_way_declared` — the per-pod switch for the CONTEST
+    /// arm. `false` restores the pre-2026-08-02 `Hold`.
+    pub contest_enabled: bool,
 }
 
 impl AdoptContext<'_> {
     /// The boot-time shape: no peer inventory yet, no transport to fetch with.
+    ///
+    /// `contest_enabled: false` is not a policy choice — with no hints there is
+    /// nothing to contest, and the boot pass runs before P2P discovery.
     pub fn none() -> AdoptContext<'static> {
         static EMPTY: std::sync::OnceLock<PeerHeadHints> = std::sync::OnceLock::new();
         AdoptContext {
             hints: EMPTY.get_or_init(PeerHeadHints::new),
             fetcher: None,
+            contest_enabled: false,
         }
     }
 }
@@ -181,19 +233,25 @@ impl AdoptContext<'_> {
 /// is the part that must be readable in isolation and exhaustively tested
 /// without a conductor, a pool, or a peer.
 ///
-/// | own conductor canonical | peer declares | local declared | ⇒ |
-/// |---|---|---|---|
-/// | yes | – | – | [`HeadDecision::AdoptLocal`] |
-/// | no | yes | no | [`HeadDecision::AdoptPeer`] |
-/// | no | – | yes | [`HeadDecision::Hold`] |
-/// | no | no | no | [`HeadDecision::Author`] |
+/// | own conductor canonical | peer declares | local declared | local election | ⇒ |
+/// |---|---|---|---|---|
+/// | yes | – | – | – | [`HeadDecision::AdoptLocal`] |
+/// | no | yes | no | – | [`HeadDecision::AdoptPeer`] |
+/// | no | yes | yes | no | [`HeadDecision::ContestPeer`] |
+/// | no | yes | yes | yes | [`HeadDecision::Hold`] |
+/// | no | no | yes | – | [`HeadDecision::Hold`] |
+/// | no | no | no | – | [`HeadDecision::Author`] |
 ///
-/// Two rulings worth naming:
+/// Rulings worth naming:
 ///
-/// - **Peer-declares + local-declared ⇒ Hold, not adopt.** Two declarations
-///   cannot be ordered from Rust (see the module note), so the substrate holds
-///   and lets the canonical channels — and the zome's own arbitration —
-///   resolve it. Racing to overwrite is what made the head flap.
+/// - **Peer-declares + local-declared + NO local election ⇒ ContestPeer.** Still
+///   not an adopt: Rust does not order the two declarations, and nothing is
+///   stamped. It mints the DHT evidence so the zome's arbiter has a set to elect
+///   on. See [`HeadDecision::ContestPeer`].
+/// - **Peer-declares + local-declared + local election ⇒ Hold.** An election has
+///   already run and this row is obeying it. Contesting again would re-mint a
+///   link every sweep forever — this is the QUIESCENCE gate, and it is why a
+///   converged corpus mints exactly zero.
 /// - **Nothing declared anywhere ⇒ Author.** Today's behaviour, unchanged, and
 ///   now safe: under [`content_diesel::HeadElection::PreserveExistingDeclaration`]
 ///   a self-authored root is NOT a declaration, so any later declaration — from
@@ -205,7 +263,27 @@ pub enum HeadDecision {
     /// A peer advertises a declaration and this row has none — verified-fetch
     /// then declare through the own conductor.
     AdoptPeer,
-    /// This row already carries a declaration — neither adopt nor author.
+    /// BOTH sides declare, and this row's declaration has no canonical election
+    /// behind it — mint a canonical-head link naming the PEER's head so the DHT
+    /// has an election to run.
+    ///
+    /// ## Why this is not "racing to overwrite"
+    ///
+    /// The old rule held here, on the reasoning that two declarations cannot be
+    /// ordered from Rust. That reasoning is still exactly right — and it is why
+    /// this arm does NOT order them. It writes no row. It adds one candidate to
+    /// the DHT link set and lets `content_store::select_canonical_winner` decide,
+    /// which is deterministic (tier, then notarized link clock, then link-hash
+    /// tiebreak) and identical on every peer.
+    ///
+    /// Two peers contesting each other therefore CONVERGE rather than flap: A
+    /// mints a link naming B's head, B mints one naming A's, and both then
+    /// resolve the same winner from the same set. The old `Hold` was safe but
+    /// terminal — with no minter, the arbiter had an empty set and never ran, so
+    /// the class could not converge by any path.
+    ContestPeer,
+    /// This row already carries a declaration that an election stands behind (or
+    /// no peer is advertising anything) — neither adopt, contest, nor author.
     Hold,
     /// Nothing is declared anywhere — mint a (non-declaring) root.
     Author,
@@ -232,17 +310,34 @@ pub fn declaration_would_move(current: Option<&str>, incoming: &str) -> bool {
 }
 
 /// See [`HeadDecision`] for the table this implements.
+///
+/// `local_has_canonical_election` is `content.canonical_declared_at IS NOT NULL`
+/// — "an election has already run and this row is obeying its outcome". It is
+/// the QUIESCENCE input: it alone separates a contestable stalemate from a
+/// settled one, and it is what makes a converged corpus mint zero links.
+///
+/// `contest_enabled` is the per-pod config switch. `false` collapses
+/// `ContestPeer` back into `Hold`, i.e. exactly the pre-2026-08-02 behaviour.
 pub fn decide_head_action(
     conductor_canonical: bool,
     peer_declared: bool,
     local_declared: bool,
+    local_has_canonical_election: bool,
+    contest_enabled: bool,
 ) -> HeadDecision {
     if conductor_canonical {
         HeadDecision::AdoptLocal
     } else if peer_declared && !local_declared {
         HeadDecision::AdoptPeer
     } else if local_declared {
-        HeadDecision::Hold
+        // Both sides declare. Contest ONLY when no election stands behind this
+        // row — once one does, the row is obeying the DHT and re-minting would
+        // be a permanent write storm against an already-settled question.
+        if peer_declared && !local_has_canonical_election && contest_enabled {
+            HeadDecision::ContestPeer
+        } else {
+            HeadDecision::Hold
+        }
     } else {
         HeadDecision::Author
     }
@@ -257,6 +352,11 @@ pub enum AdoptOutcome {
     /// tried to move was refused as not-provably-forward). SKIP the author path
     /// and leave it to the canonical channels.
     Held,
+    /// A canonical-head link was minted naming the PEER's head — one candidate
+    /// added to the DHT election. The local row is deliberately UNCHANGED: the
+    /// winner is decided on the DHT and arrives later through the ordinary
+    /// canonical heal path. SKIP the author path.
+    Contested,
     /// Nothing adoptable. Proceed with the caller's existing author path.
     Author,
     /// A peer's head is adoptable but this conductor has no local chain to hang
@@ -282,8 +382,11 @@ pub async fn try_adopt_canonical_head(
     // (0) What does this row already claim? A pool failure is not a licence to
     // author — treat an unreadable row as declared (Hold) so a transient DB
     // problem can never mint a competing root.
-    let local_declared = match pool.get() {
-        Ok(mut conn) => match content_diesel::declared_head_for(&mut conn, ctx, id) {
+    // Read the declaration AND whether an election stands behind it in one
+    // borrow. A row obeying an election is settled (Hold); a row declaring on
+    // its own authority alone is contestable.
+    let (local_declared, local_election) = match pool.get() {
+        Ok(mut conn) => match content_diesel::declared_head_with_election(&mut conn, ctx, id) {
             Ok(v) => v,
             Err(e) => {
                 tracing::warn!(
@@ -305,7 +408,7 @@ pub async fn try_adopt_canonical_head(
 
     // (1) LOCAL-DHT ARM. Reuse a resolve the caller already paid for.
     let probed: Option<ContentHeadWire> = match local_resolve {
-        LocalResolve::Known(_) => None,
+        LocalResolve::Known(_) | LocalResolve::Unresolved => None,
         LocalResolve::Probe => match conductor_writes::call_resolve_content_head(hc, id).await {
             Ok(head) => head,
             Err(e) => {
@@ -322,6 +425,9 @@ pub async fn try_adopt_canonical_head(
     };
     let head: Option<&ContentHeadWire> = match local_resolve {
         LocalResolve::Known(h) => h,
+        // Absence was never observed — the conductor did not answer. Forecloses
+        // `AdoptLocal` and nothing else, exactly as documented.
+        LocalResolve::Unresolved => None,
         LocalResolve::Probe => probed.as_ref(),
     };
     let canonical_head = head.filter(|h| h.canonical);
@@ -331,6 +437,8 @@ pub async fn try_adopt_canonical_head(
         canonical_head.is_some(),
         hint.is_some(),
         local_declared.is_some(),
+        local_election,
+        adopt.contest_enabled,
     );
 
     match decision {
@@ -342,6 +450,10 @@ pub async fn try_adopt_canonical_head(
         HeadDecision::AdoptPeer => {
             let hint = hint.expect("AdoptPeer implies a hint");
             adopt_peer(hc, pool, ctx, id, hint, adopt.fetcher).await
+        }
+        HeadDecision::ContestPeer => {
+            let hint = hint.expect("ContestPeer implies a hint");
+            contest_peer(hc, ctx, id, hint, adopt.fetcher, local_declared.as_deref()).await
         }
         HeadDecision::Hold => {
             tracing::debug!(
@@ -381,6 +493,8 @@ fn adopt_local(pool: &DbPool, ctx: &AppContext, id: &str, head: &ContentHeadWire
         Some(head.declared_at),
         None,
         StampMode::HealCanonical,
+        // The DHT election behind this answer — what the guard actually compares.
+        head.canonical_ordering(),
     ) {
         Ok(StampOutcome::Stamped) => {
             crate::metrics::inc_content_head_adopted();
@@ -431,6 +545,103 @@ async fn adopt_peer(
     };
 
     declare_peer_head(hc, pool, ctx, id, &head_action_hash, carried_record, hint).await
+}
+
+/// CONTEST: mint a canonical-head link naming the PEER's head, adding one
+/// candidate to the DHT election. Never stamps the local row.
+///
+/// This is the supply half of contest-then-obey (see the module note). The
+/// verified path is identical to [`adopt_peer`]'s — fetch the peer's `Record`
+/// over view-federation, declare it through the OWN conductor with
+/// `carried_record`, and let the zome's `validate_carried_record` prove the
+/// bytes (action-hash binding, author signature, entry↔action binding) before
+/// the link is written. Evidence, not authority: the declare still goes through
+/// the conductor and the DHT still decides the winner.
+///
+/// Every failure degrades to [`AdoptOutcome::Held`] — the pre-cure behaviour —
+/// so a peer that cannot serve a record, or a conductor that refuses, costs one
+/// bounded attempt and rides the next sweep. Deliberately no retry loop: the
+/// contest set is ~11.4k ids and a retry ladder inside a 200/tick budget would
+/// starve the tail.
+async fn contest_peer(
+    hc: &Arc<HcClient>,
+    ctx: &AppContext,
+    id: &str,
+    hint: &PeerHeadHint,
+    fetcher: Option<&dyn HeadRecordFetcher>,
+    local_declared: Option<&str>,
+) -> AdoptOutcome {
+    let _ = ctx;
+    // IDEMPOTENCE, first gate: if the peer is advertising the head this row
+    // already declares, there is no contest — the two sides agree and the
+    // divergence is elsewhere (an anchor, not a head). Minting here would add a
+    // candidate identical to our own position, every sweep, forever.
+    if !declaration_would_move(local_declared, &hint.head_action_hash) {
+        tracing::debug!(
+            content_id = %id,
+            "adopt-before-author: contest gate — the peer advertises the head this row already \
+             declares, nothing to contest"
+        );
+        return AdoptOutcome::Held;
+    }
+
+    let carried = match fetcher {
+        Some(f) => f.fetch(&hint.peer_id, id).await,
+        None => None,
+    };
+    // The SERVED hash wins over the advertised one (same rule as `adopt_peer`):
+    // it is the action the bytes actually prove.
+    let (head_action_hash, carried_record) = match carried {
+        Some(c) => (c.head_action_hash, c.record),
+        None => (hint.head_action_hash.clone(), None),
+    };
+
+    match conductor_writes::call_declare_canonical_content_head(
+        hc,
+        id,
+        head_action_hash.clone(),
+        carried_record,
+    )
+    .await
+    {
+        Ok(declared) => {
+            crate::metrics::inc_content_canonical_link_minted("contest");
+            tracing::warn!(
+                target: "elohim_storage::head_adoption",
+                content_id = %id,
+                contested_head = %declared.head_action_hash,
+                held_head = %local_declared.unwrap_or(""),
+                from_peer = %hint.peer_id,
+                "adopt-before-author: CONTESTED a two-way declared head — minted a canonical \
+                 declaration naming the peer's head; the DHT election decides, the row is \
+                 unchanged until it does"
+            );
+            AdoptOutcome::Contested
+        }
+        Err(e) => {
+            let msg = e.to_string();
+            // A conductor with no local chain cannot declare, and this arm must
+            // NOT author (the row already has a declaration — authoring would be
+            // the self-election the whole module exists to stop).
+            if msg.contains(ERR_NO_LOCAL_CHAIN) || msg.contains(ERR_NOT_RETRIEVABLE) {
+                tracing::info!(
+                    content_id = %id,
+                    from_peer = %hint.peer_id,
+                    "adopt-before-author: contest could not be minted (no local chain, or the \
+                     peer's head is not retrievable and no usable carried record) — holding, \
+                     retried next sweep"
+                );
+            } else {
+                tracing::warn!(
+                    content_id = %id,
+                    from_peer = %hint.peer_id,
+                    error = %msg,
+                    "adopt-before-author: contest declare failed — holding, retried next sweep"
+                );
+            }
+            AdoptOutcome::Held
+        }
+    }
 }
 
 /// Second half of AUTHOR-THEN-ADOPT: call this after the caller's author path
@@ -504,6 +715,7 @@ async fn declare_peer_head(
     .await
     {
         Ok(declared) => {
+            crate::metrics::inc_content_canonical_link_minted("adopt_peer");
             // This declaration is a DELIBERATE own-conductor canonical act that
             // this process just caused — the same class as the declare route's
             // eager stamp — so `Declare` is the correct mode here (unlike the
@@ -517,6 +729,11 @@ async fn declare_peer_head(
                     Some(declared.declared_at),
                     None,
                     StampMode::Declare,
+                    // The declare has written a link but not read back its
+                    // notarized timestamp, so it carries no election to record.
+                    // The row's ordering backfills on the next canonical heal
+                    // resolve — which answers with the election just created.
+                    None,
                 )
                 .map_err(|e| e.to_string())
             });
@@ -594,19 +811,28 @@ async fn declare_peer_head(
 mod tests {
     use super::*;
 
-    /// All four branches of the decision rule, named by the situation each one
+    /// Contest ON — the rollout default. Keeps the older tests reading as
+    /// situations rather than argument lists.
+    fn decide(c: bool, p: bool, l: bool, election: bool) -> HeadDecision {
+        decide_head_action(c, p, l, election, true)
+    }
+
+    /// All branches of the decision rule, named by the situation each one
     /// describes rather than by its inputs.
     #[test]
     fn own_conductor_canonical_always_adopts_never_authors() {
-        // Regardless of what peers say or what this row already claims.
+        // Regardless of what peers say, what this row already claims, or whether
+        // an election stands behind it.
         for peer_declared in [false, true] {
             for local_declared in [false, true] {
-                assert_eq!(
-                    decide_head_action(true, peer_declared, local_declared),
-                    HeadDecision::AdoptLocal,
-                    "canonical own-conductor answer wins over every other input \
-                     (peer_declared={peer_declared}, local_declared={local_declared})"
-                );
+                for election in [false, true] {
+                    assert_eq!(
+                        decide(true, peer_declared, local_declared, election),
+                        HeadDecision::AdoptLocal,
+                        "canonical own-conductor answer wins over every other input \
+                         (peer={peer_declared}, local={local_declared}, election={election})"
+                    );
+                }
             }
         }
     }
@@ -614,7 +840,7 @@ mod tests {
     #[test]
     fn peer_declaration_on_an_undeclared_row_adopts() {
         assert_eq!(
-            decide_head_action(false, true, false),
+            decide(false, true, false, false),
             HeadDecision::AdoptPeer,
             "this is the live cure: peer B holds no crown, alpha-A advertises one"
         );
@@ -623,49 +849,116 @@ mod tests {
     #[test]
     fn an_existing_local_declaration_holds() {
         assert_eq!(
-            decide_head_action(false, true, true),
-            HeadDecision::Hold,
-            "two declarations cannot be ordered from Rust — hold, do not race"
-        );
-        assert_eq!(
-            decide_head_action(false, false, true),
+            decide(false, false, true, false),
             HeadDecision::Hold,
             "nobody is advertising anything better; keep what we have"
+        );
+        assert_eq!(
+            decide(false, false, true, true),
+            HeadDecision::Hold,
+            "no peer hint means nothing to contest, election or not"
+        );
+    }
+
+    /// THE LIVE CLASS (2026-08-02): both sides declare, no election has run.
+    /// This used to `Hold` forever — and because `AdoptPeer` is the only
+    /// automated minter of canonical links, holding meant the DHT arbiter never
+    /// got a set to elect on. ~11.4k ids fleet-wide sat here.
+    #[test]
+    fn two_way_declared_without_an_election_contests() {
+        assert_eq!(
+            decide(false, true, true, false),
+            HeadDecision::ContestPeer,
+            "supply the election a candidate; do NOT decide the winner locally"
+        );
+    }
+
+    /// QUIESCENCE — the property that makes this a cure and not a write storm.
+    /// Once an election stands behind the row, a peer advertising the LOSING
+    /// head must not provoke another mint: the question is settled on the DHT
+    /// and this row is already obeying it.
+    #[test]
+    fn a_row_obeying_an_election_holds_against_a_peer_advertising_the_loser() {
+        assert_eq!(
+            decide(false, true, true, true),
+            HeadDecision::Hold,
+            "a converged corpus mints ZERO links per sweep — re-contesting a \
+             settled election is exactly the permanent write storm this gate exists to stop"
+        );
+    }
+
+    /// The config switch is a true rollback: OFF restores the pre-cure rule.
+    #[test]
+    fn contest_disabled_restores_the_old_hold() {
+        assert_eq!(
+            decide_head_action(false, true, true, false, false),
+            HeadDecision::Hold,
+            "per-pod OFF switch must yield exactly the prior behaviour"
         );
     }
 
     #[test]
     fn nothing_declared_anywhere_authors() {
         assert_eq!(
-            decide_head_action(false, false, false),
+            decide(false, false, false, false),
             HeadDecision::Author,
             "today's behaviour, now safe: the authored root is not a declaration"
         );
     }
 
-    /// The rule is total: every input triple maps to exactly one decision, and
-    /// authoring happens ONLY in the all-false corner.
+    /// The rule is total: every input maps to exactly one decision, and
+    /// authoring happens ONLY when no head exists anywhere.
     #[test]
     fn author_is_reachable_only_when_no_head_exists_anywhere() {
         let mut authored = 0;
         for c in [false, true] {
             for p in [false, true] {
                 for l in [false, true] {
-                    if decide_head_action(c, p, l) == HeadDecision::Author {
-                        authored += 1;
-                        assert!(
-                            !c && !p && !l,
-                            "Author must be unreachable when any head exists \
-                             (canonical={c}, peer={p}, local={l})"
-                        );
+                    for e in [false, true] {
+                        for enabled in [false, true] {
+                            if decide_head_action(c, p, l, e, enabled) == HeadDecision::Author {
+                                authored += 1;
+                                assert!(
+                                    !c && !p && !l,
+                                    "Author must be unreachable when any head exists \
+                                     (canonical={c}, peer={p}, local={l}, election={e})"
+                                );
+                            }
+                        }
                     }
                 }
             }
         }
         assert_eq!(
-            authored, 1,
-            "exactly one of the eight input triples authors"
+            authored, 4,
+            "exactly the four no-head-anywhere corners author (election and the \
+             config switch are irrelevant when nothing is declared)"
         );
+    }
+
+    /// CONTEST never authors and never adopts — it is reachable only from the
+    /// two-way-declared corner, and only with the switch on.
+    #[test]
+    fn contest_is_reachable_only_from_the_two_way_declared_corner() {
+        for c in [false, true] {
+            for p in [false, true] {
+                for l in [false, true] {
+                    for e in [false, true] {
+                        for enabled in [false, true] {
+                            if decide_head_action(c, p, l, e, enabled) == HeadDecision::ContestPeer
+                            {
+                                assert!(
+                                    !c && p && l && !e && enabled,
+                                    "ContestPeer escaped its corner \
+                                     (canonical={c}, peer={p}, local={l}, election={e}, \
+                                      enabled={enabled})"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// DECLARE-STORM GATE. The cure must not install a write storm: a converged

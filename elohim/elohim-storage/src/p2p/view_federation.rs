@@ -569,6 +569,27 @@ async fn build_content_head_record_payload(
     let Some(view) = crate::views::content_head_view_from_content(&row.content) else {
         return absent(FreshnessState::Live);
     };
+    // HINT-INFLATION GUARD (2026-08-02). `content_head_view_from_content` falls
+    // back to `dht_anchor_hash` when the row carries no declaration, and it
+    // records that in `view.declared` — a bit this payload has no field for. So
+    // an anchored-but-UNDECLARED row was serving its anchor as if it were a
+    // notarized head, and the requester (which takes the SERVED hash over the
+    // advertised hint) would then name that anchor in a canonical declaration.
+    //
+    // A head-record answer must carry only a real DECLARATION. Answering absent
+    // here is not a regression: `head_record_client` already `?`s a missing
+    // `head_action_hash`, so the caller falls back to the peer's ADVERTISED
+    // hint — which comes from the inventory's `declared_head_action_hash` and is
+    // therefore a genuine declaration by construction.
+    if !view.declared {
+        tracing::debug!(
+            target: "elohim_storage::view_federation",
+            content_id = %content_id,
+            "ContentHeadRecord: row is anchored but UNDECLARED — answering absent rather than \
+             serving the anchor as a head"
+        );
+        return absent(FreshnessState::Live);
+    }
     let head_action_hash = view.head_action_hash;
     drop(conn);
 

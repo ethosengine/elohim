@@ -360,6 +360,51 @@ pub struct ContentHeadWire {
     /// old-coordinator wire output (no field) reading as false — safe.
     #[serde(default)]
     pub canonical: bool,
+    /// The winning canonical-head declaration LINK's notarized DHT timestamp —
+    /// the exact ordering `content_store::select_canonical_winner` arbitrated on.
+    ///
+    /// `Some` only when [`Self::canonical`] is true AND the coordinator is
+    /// post-cure; `None` from a pre-cure coordinator (via `serde(default)`), on
+    /// the root-author fallback, and on the declare paths. `None` reads as "no
+    /// election stands behind this answer" everywhere — the safe default.
+    ///
+    /// NOT [`Self::declared_at`], which is the head ACTION's timestamp (and is
+    /// replaced by the receiving conductor's `sys_time()` on the carried-record
+    /// declare branch). Three clocks share that field; this is the one that can
+    /// order two DECLARATIONS, and it is what
+    /// `content_diesel::canonical_move_verdict` compares.
+    #[serde(default)]
+    pub canonical_declared_at: Option<i64>,
+    /// Whether the winning declaration carried the EARNED provenance marker.
+    /// `None` exactly when [`Self::canonical_declared_at`] is `None`. Lets the
+    /// projection replay the selector's tier precedence (earned beats staging
+    /// regardless of recency) without re-reading the DHT.
+    #[serde(default)]
+    pub canonical_earned: Option<bool>,
+}
+
+impl ContentHeadWire {
+    /// The DHT election behind this answer, in the shape the stamp guard takes.
+    /// `None` when the answer carries no election — which is the only thing a
+    /// pre-cure coordinator, a fallback resolve, or a declare path can honestly
+    /// report.
+    pub fn canonical_ordering(&self) -> Option<crate::db::content_diesel::CanonicalOrdering> {
+        self.canonical_declared_at
+            .map(|ts| (ts, self.canonical_earned.unwrap_or(false)))
+    }
+
+    /// Election tier label for `elohim_content_canonical_answers_total`.
+    pub fn canonical_tier_label(&self) -> &'static str {
+        match self.canonical_earned {
+            Some(true) => "earned",
+            Some(false) => "staging",
+            // No election resolved: the root-author FALLBACK. Also what a
+            // pre-cure coordinator reports for a canonical answer, which is why
+            // this reads `canonical_earned` rather than `canonical` — the meter
+            // must not claim an election it has no evidence for.
+            None => "none",
+        }
+    }
 }
 
 /// Caller-input wire shape for the `content_store::declare_content_head` coordinator:

@@ -1,0 +1,31 @@
+-- Election ordering for the notary-declared content HEAD.
+--
+-- Source of truth: the Holochain DHT canonical-head LINK set (anchor
+-- `canonical_head`, elected by `content_store::select_canonical_winner`).
+-- These two columns are a PROJECTION of that election, not a second ledger.
+--
+-- WHY (2026-08-02 two-way-declared RCA). The monotonic heal guard in
+-- `stamp_declared_head_mode(StampMode::HealCanonical)` keyed off
+-- `declared_head_at`, which is the head ACTION's timestamp — when a Content
+-- VERSION was authored — and which the zome's carried-record branch overwrites
+-- with the receiving conductor's `sys_time()`. Three unrelated clocks shared one
+-- column, so it could never order two DECLARATIONS. Worse, every channel that
+-- produced the live divergence NULLs it (`HeadElection::Declare`, and the
+-- `ContentHeadDeclared` signal arm's timestamp-less stamp), and NULL-either-side
+-- refused the move — so a DHT-ELECTED canonical head was structurally
+-- unconsumable by an already-declared row.
+--
+-- `canonical_declared_at` carries the ONE clock every peer reads identically:
+-- the winning declaration link's notarized DHT timestamp, the exact value
+-- `select_canonical_winner` arbitrated on. `canonical_earned` carries its tier
+-- so the projection can replay earned-beats-staging without re-reading the DHT.
+--
+-- NULL on both = "no election stands behind this row's declaration" (every
+-- pre-migration row, and any head advanced by a channel that carries no
+-- election). That is a first-class, meaningful state: an answer that DOES carry
+-- an election supersedes it.
+--
+-- Additive and backfill-free by design: NULL is the correct value for existing
+-- rows, and the next canonical heal answer populates them.
+ALTER TABLE content ADD COLUMN canonical_declared_at BIGINT;
+ALTER TABLE content ADD COLUMN canonical_earned INTEGER;

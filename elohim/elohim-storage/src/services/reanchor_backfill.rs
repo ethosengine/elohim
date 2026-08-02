@@ -293,7 +293,14 @@ pub async fn run_once(
                 report.record(RowOutcome::Adopted);
                 continue;
             }
-            AdoptOutcome::Held => {
+            // A contest minted a canonical-head candidate on the DHT and left
+            // the row alone. Like `Held`, the one thing it must NOT do is fall
+            // through to the author path: the row already carries a declaration,
+            // so authoring here would be the self-election this pre-flight
+            // exists to prevent. (Unreachable in practice on this sweep — the
+            // boot pass has no peer hints — but the arm must be explicit rather
+            // than swept into a catch-all that would silently author.)
+            AdoptOutcome::Held | AdoptOutcome::Contested => {
                 report.record(RowOutcome::Held);
                 continue;
             }

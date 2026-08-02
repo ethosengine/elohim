@@ -72,6 +72,31 @@ pub fn default_storage_dir() -> PathBuf {
         .join("elohim-storage")
 }
 
+/// Process-wide mirror of [`Config::contest_two_way_declared`], published once
+/// by `main` after the config is fully assembled.
+///
+/// The reconcile sweep (`p2p::projection_reconcile::run_heal`) is reached
+/// through several layers that carry no `Config`, and threading one down for a
+/// single boolean would touch every caller. A `OnceLock` set at startup is the
+/// sanctioned alternative to reading `std::env::var` on the hot path — an env
+/// read there makes parallel tests flaky (a `set_var` in one test leaks into
+/// another) and re-reads a value that cannot change after boot anyway.
+static CONTEST_TWO_WAY_DECLARED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+/// Publish the contest switch for the reconcile sweep. Idempotent: the first
+/// call wins, later ones are ignored (`OnceLock::set` semantics), so a test that
+/// sets it cannot be clobbered by a second initialisation.
+pub fn set_contest_two_way_declared(enabled: bool) {
+    let _ = CONTEST_TWO_WAY_DECLARED.set(enabled);
+}
+
+/// Is the adopt-before-author CONTEST arm enabled? Defaults to `true` when
+/// `main` never published a value (tests, embedded uses) — the same default as
+/// the config field, so behaviour cannot diverge between the two homes.
+pub fn contest_two_way_declared_enabled() -> bool {
+    *CONTEST_TWO_WAY_DECLARED.get().unwrap_or(&true)
+}
+
 /// Configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -274,6 +299,25 @@ pub struct Config {
     #[serde(default = "default_true")]
     pub salvage_diversity_placement: bool,
 
+    /// Adopt-before-author CONTEST arm: when this row and a peer BOTH declare a
+    /// head, and this row's declaration has NO canonical election behind it,
+    /// mint a canonical-head declaration link naming the peer's head so the
+    /// DHT's own arbiter (`select_canonical_winner`) has something to elect on.
+    ///
+    /// Default **true** — this is the supply side of the election, and without
+    /// it the two-way-declared class is structurally stuck (every peer holds a
+    /// declaration, so the `AdoptPeer` arm — which requires an UNDECLARED local
+    /// row — never fires and no election is ever created). The knob exists as a
+    /// per-pod OFF switch: turning it off returns EXACTLY the prior `Hold`
+    /// behaviour, which is safe but non-converging.
+    ///
+    /// Contesting never stamps a row and never widens `Declare`. It only creates
+    /// the DHT evidence; the winner is chosen on the DHT and obeyed by the
+    /// existing `HealCanonical` path.
+    /// Loaded from env `CONTEST_TWO_WAY_DECLARED`.
+    #[serde(default = "default_true")]
+    pub contest_two_way_declared: bool,
+
     /// Demand-driven auto-pin: when a local content read MISSES (a client asked
     /// this node for content it does not have), author an `item` DevicePin for
     /// that content so the acquisition loop fetches it and the provide loop
@@ -458,6 +502,7 @@ impl Default for Config {
             salvage_target_replicas: default_salvage_target_replicas(),
             salvage_recheck_seconds: default_salvage_recheck_seconds(),
             salvage_diversity_placement: default_true(),
+            contest_two_way_declared: default_true(),
             demand_autopin_enabled: default_true(),
             demand_autopin_throttle_seconds: default_demand_autopin_throttle_seconds(),
             manifest_backfill_enabled: default_true(),
