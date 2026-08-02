@@ -1,0 +1,146 @@
+# crates/seam-contracts/seam-registry.yaml
+#
+# Conforms to elohim/sdk/schemas/v1/manifest/seam-registry.schema.json. FIRST row-bearing
+# registry for this crate, created under the birth rule its own `.epr-meta` states: a genuinely
+# new CROSS-CUTTING shape minted here gets its own registry (a per-seam INSTANTIATION of a shape
+# would register in the CONSUMING crate instead).
+#
+# What makes `select_arbitrated_winner` cross-cutting rather than an instantiation: it is not one
+# seam's use of a shape defined elsewhere — it is the ORDERING itself, lifted out of the elohim
+# DNA's `content_store` coordinator zome (plan task P5b, the P3.3 pull-forward) so the same total
+# order can be linked by a zome, a service, a sidecar, or an external peer runtime. The zome keeps
+# an HDK adapter and stays registered in its own seam-registry.yaml; that row now cites this
+# crate's tests alongside its own, and the two rows read as one behavioural claim.
+#
+# Every symbol below was grepped and read at authoring time (2026-08-02).
+
+seamRegistryVersion: 1
+crate: elohim-seam-contracts
+crateRoot: crates/seam-contracts
+seamLocus: >
+  The generic decision-surface vocabulary every consumer inherits: boundary answer types
+  (`Answer<T>`), outcome vocabularies (`ReasonLabel`), the witnessed-residual capsule
+  (`ResidualWitness`), the property harnesses (`harness::{arbitrated,quiescent,liveness}`), the
+  cross-repo policy pins (`canon`), and — registered here — the plain-data ELECTION predicate
+  (`election::select_arbitrated_winner`) that the harnesses' motivating instance is now built out
+  of rather than re-deriving. Leaf by construction: zero first-party dependencies, std-only
+  default, WASM-buildable, so a zome and a service can share one ordering without either
+  inheriting the other's dependency graph.
+
+decisionPoints:
+  - name: select_arbitrated_winner
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/election.rs
+      modulePath: seam_contracts::election::select_arbitrated_winner
+      line: 188
+    summary: >
+      Selects the single winning candidate from a set on the `ArbitrationKey` total order —
+      tier, then the named notarized clock, then a deterministic tiebreak, greater wins; `None`
+      for an empty set. Generic over the candidate representation: the caller supplies a pure
+      key function, so no HDK/diesel/transport type crosses into the contract crate.
+    concernIds:
+      - id: C2
+        status: answered
+        justification: >
+          This IS C2's guarantee form, made structural: `ArbitrationKey` has three REQUIRED
+          fields, so the pre-cure shape (a stable sort on the clock alone, ties resolved by
+          arrival order) is not expressible — there is no key type without a `tiebreak`.
+          Proven, not merely asserted: `real_predicate_is_arbitration_conformant` runs the
+          `Arbitrated` harness against THIS predicate over a fixture whose top two candidates
+          tie on `(tier, clock)`, exhaustively across all 24 orderings (`report.exhaustive`
+          asserted true, so the run is a proof over the fixture rather than a sample). The
+          harness's own module doc named `select_canonical_winner` as its motivating instance
+          from the day it landed and could not reach it — the instance was behind HDK types in
+          a WASM zome. This extraction is what closed that.
+      - id: C1
+        status: partial
+        justification: >
+          The predicate cannot consult who authored a candidate: its only inputs are the
+          candidate set and a pure key function, and the key type has no author/identity
+          component. So it adds no self-election channel of its own, and the live instance's
+          C1 answer (arbitrating on notarized link evidence alone) survives the extraction
+          unchanged. But the key function is the CALLER's, and a caller could construct a key
+          that ranks its own authorship highest — the anti-self-election guarantee is enforced
+          at the adapter that builds the key, not here. `partial`, not `answered`: this is a
+          structural absence of a channel, not a guard.
+      - id: C8
+        status: unbound
+        justification: >
+          The predicate returns the winner and nothing about WHY it won — a caller cannot tell
+          whether tier, clock, or tiebreak decided it. That is exactly the observability a
+          cross-peer divergence RCA wants (the 2026-07-10 forcing incident's whole question was
+          "which ordering component decided this, and did both peers agree on it"), so C8 is
+          the definitional question here and no reason label currently answers it. Deliberately
+          left unbound rather than guessed at: a `WinningMargin`-shaped vocabulary is a wire-
+          facing enum and would itself be a birth-rule decision, not a drive-by addition.
+      - id: C6a
+        status: n-a
+        justification: >
+          The predicate schedules no work and owns no budget: it orders a set the caller already
+          holds in memory, in one key pass plus one sort. The bounded-work question lives
+          upstream at the gather step (the live instance's `get_links` read) and, for the
+          checker, at `ArbitrationBudget` in the Arbitrated harness — which already carries its
+          own C6a binding. Binding it here too would be a second claim on someone else's budget.
+    contractTests:
+      - path: crates/seam-contracts/src/election.rs
+        testName: real_predicate_is_arbitration_conformant
+        kind: unit
+        mirrorRisk: false
+      - path: crates/seam-contracts/src/election.rs
+        testName: untied_set_is_arbitration_conformant
+        kind: unit
+      - path: crates/seam-contracts/src/election.rs
+        testName: empty_and_singleton_sets_are_arbitration_conformant
+        kind: unit
+      - path: crates/seam-contracts/src/election.rs
+        testName: tier_precedence_dominates_a_newer_clock
+        kind: unit
+      - path: crates/seam-contracts/src/election.rs
+        testName: unit_tier_degrades_to_clock_then_tiebreak
+        kind: unit
+      - path: crates/seam-contracts/src/election.rs
+        testName: earned_wins_over_newer_staging
+        kind: unit
+      - path: crates/seam-contracts/src/election.rs
+        testName: newest_earned_wins_within_tier
+        kind: unit
+      - path: crates/seam-contracts/src/election.rs
+        testName: newest_staging_wins_when_no_earned
+        kind: unit
+      - path: crates/seam-contracts/src/election.rs
+        testName: equal_timestamps_break_deterministically_on_link_hash
+        kind: unit
+        mirrorRisk: false
+      - path: crates/seam-contracts/src/election.rs
+        testName: superseding_earned_is_the_sole_winner
+        kind: unit
+      - path: crates/seam-contracts/src/election.rs
+        testName: empty_set_has_no_winner
+        kind: unit
+      - path: crates/seam-contracts/src/election.rs
+        testName: winner_reports_its_own_clock_and_tier_not_a_losers
+        kind: unit
+      - path: crates/seam-contracts/src/election.rs
+        testName: staging_winner_reports_staging_tier
+        kind: unit
+      - path: crates/seam-contracts/src/election.rs
+        testName: tied_winners_propagate_an_identical_clock_in_any_input_order
+        kind: unit
+    notes: >
+      BEHAVIOURAL-IDENTITY EVIDENCE (P5b). The last nine tests above are field-for-field ports of
+      `canonical_head_selector_tests` in
+      elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs — same test names, same fixture
+      seeds, same assertions — and the zome's originals stayed in place and stayed green THROUGH
+      the adapter (33/33 coordinator unit tests). Two suites, one claim, from opposite sides of
+      the extraction. The port's `link_hash` is `[u8; 36]` rather than a scalar on purpose: the
+      zome fixture builds `ActionHash::from_raw_36(vec![seed; 36])` and a `HoloHash`'s `Ord` is
+      lexicographic over its bytes, so with identical type prefixes the comparison reduces
+      exactly to that array — the port mirrors the SHAPE the tiebreak compares.
+
+      RESIDUE, stated honestly: the sort is stable and the maximum is taken from the end, so two
+      candidates whose keys compare FULLY equal still resolve by input order. That is safe iff
+      `tiebreak` is a genuine discriminator (two distinct declarations cannot share a
+      content-addressed hash) and is the reason the Arbitrated harness — not the type — is what
+      catches a constant or colliding tiebreak. `real_predicate_is_arbitration_conformant`
+      carries the worst case deliberately.

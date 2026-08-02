@@ -320,7 +320,7 @@ seams:
       COMPILE-TIME instance of native extension; the discriminator is direction + bind-time.
     tracks: [T3, T4]
     reach_tier: public
-    registry_crates: []
+    registry_crates: [did-bridge]
     spine_nodes: []
     n_a_concerns: []
 
@@ -339,6 +339,15 @@ seams:
       append-order-vs-occurredAt replay, a83b35079).
     tracks: []
     reach_tier: community
-    registry_crates: []
+    # `elohim-seam-contracts` (crates/seam-contracts) is the concern canon's EXECUTABLE surface —
+    # the sibling of the two canon data homes that sit one directory away (policies.yaml,
+    # concerns.yaml). It has no atlas §3 section for the same reason this whole column has none:
+    # the atlas maps the runtime, and this is the repo's governance substrate made compilable.
+    # Routed here rather than to a runtime column so the matrix never reads a GENERIC shape as a
+    # per-seam answer: the crate's `select_arbitrated_winner` is the shared ordering, while the
+    # dataplane INSTANCE that consumes it is witnessed at S3.10 through content_store's
+    # `select_canonical_winner` adapter row. Same C2 guarantee, two columns, neither standing in
+    # for the other.
+    registry_crates: [elohim-seam-contracts]
     spine_nodes: []
     n_a_concerns: []

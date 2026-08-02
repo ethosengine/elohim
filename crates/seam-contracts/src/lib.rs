@@ -15,6 +15,7 @@
 //! | C4 honest absence | [`Answer<T>`] — `Present` / `Absent` / `Unreachable` |
 //! | C8 observability-per-decision | [`ReasonLabel`] + its conformance checks |
 //! | C2 monotonic authority | [`harness::arbitrated`] — permutation-invariance + tiebreak determinism |
+//! | C2 monotonic authority | [`election::select_arbitrated_winner`] — the tiered ordering itself, with a non-optional tiebreak |
 //! | C6b idempotent effect | [`harness::quiescent`] — replay against settled state mints nothing |
 //! | C3 liveness | [`harness::liveness`] — every reachable non-terminal state has an automated move |
 //! | C14 witnessed residual | [`residual::ResidualWitness`] — the capsule an unclassified outcome is witnessed as |
@@ -80,6 +81,7 @@
 
 pub mod answer;
 pub mod canon;
+pub mod election;
 #[cfg(feature = "harness")]
 pub mod harness;
 pub mod reason;
@@ -87,6 +89,7 @@ pub mod residual;
 
 pub use answer::{Answer, AnswerReason, AnswerState};
 pub use canon::{PolicyPin, ALL_PINS, CONCERN_CANON_VERSION};
+pub use election::{select_arbitrated_winner, ArbitrationKey};
 pub use reason::{
     assert_reason_labels_conformant, assert_reason_labels_discriminating,
     assert_reason_labels_stable, check_reason_labels, ReasonLabel, ReasonLabelViolation,

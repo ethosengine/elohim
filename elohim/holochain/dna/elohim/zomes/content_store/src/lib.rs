@@ -2898,7 +2898,7 @@ struct CanonicalCandidate {
 }
 
 /// Select the single WINNING canonical-head declaration from a candidate set,
-/// tier-aware and partition-deterministic. Two correctness rules live here so
+/// tier-aware and partition-deterministic. Two correctness rules decide it, so
 /// every peer converges on the SAME winner from the SAME link set:
 ///
 ///   1. TIER precedence: ANY earned declaration beats ALL staging ones. Timestamp
@@ -2914,18 +2914,48 @@ struct CanonicalCandidate {
 ///
 /// Returns the winner (the caller resolves ONLY its target), or `None` for an
 /// empty set.
-fn select_canonical_winner(mut candidates: Vec<CanonicalCandidate>) -> Option<CanonicalCandidate> {
-    if candidates.is_empty() {
-        return None;
-    }
-    let earned_present = candidates.iter().any(|c| c.is_earned);
-    candidates.retain(|c| c.is_earned == earned_present);
-    candidates.sort_by(|a, b| {
-        a.timestamp
-            .cmp(&b.timestamp)
-            .then_with(|| a.link_hash.cmp(&b.link_hash))
-    });
-    candidates.pop()
+///
+/// # This is an HDK ADAPTER; the ordering lives in `seam_contracts`
+///
+/// Both rules ARE the concern canon's C2 guarantee (*"declared authority tiers
+/// and, within a tier, a named notarized clock with a deterministic tiebreak —
+/// never a conductor-local clock, never arrival order"*), and they are no longer
+/// written out here: they are
+/// [`seam_contracts::election::select_arbitrated_winner`] over an
+/// [`seam_contracts::election::ArbitrationKey`], whose three fields — `tier`,
+/// `clock`, `tiebreak` — are the two rules made non-optional by the type.
+/// A caller *cannot* express the pre-cure shape (sort on the clock alone),
+/// because there is no key without a tiebreak.
+///
+/// This function's remaining job is the mapping, and that is exactly the part
+/// that must stay here: `Link` provenance tag → `tier`, DHT link timestamp →
+/// `clock`, `create_link_hash` → `tiebreak`. No HDK/HDI type crosses into the
+/// contract crate (its own `no_heavy_deps_in_dep_tree` enforces the boundary),
+/// which is what lets the identical ordering be linked from elohim-storage, a
+/// sidecar, or an external peer runtime instead of re-derived — the
+/// `a83b35079` (2026-07-29) shape, where the same "latest by arrival order"
+/// defect re-minted itself in the epr-cli/REA sidecar.
+///
+/// Behaviour is unchanged, byte for byte. The extracted predicate carries a
+/// field-for-field port of this module's own `canonical_head_selector_tests`
+/// (same test names, same fixture seeds), and additionally runs under the
+/// `Arbitrated` property harness — permutation-invariance over ALL 24 orderings
+/// of a fixture whose top two candidates tie on `(tier, clock)`, which the zome
+/// suite could not reach from inside WASM.
+fn select_canonical_winner(candidates: Vec<CanonicalCandidate>) -> Option<CanonicalCandidate> {
+    use seam_contracts::election::{select_arbitrated_winner, ArbitrationKey};
+
+    select_arbitrated_winner(candidates, |c| ArbitrationKey {
+        // `bool` IS the two-tier order: staging (`false`) < earned (`true`).
+        tier: c.is_earned,
+        // The one clock that can order two DECLARATIONS — the notarized DHT link
+        // timestamp every peer reads identically (never `declared_at`, which is
+        // three different clocks sharing one field).
+        clock: c.timestamp,
+        // Content-addressed discriminator. Cloned once per candidate (the key is
+        // computed once, not once per comparison), never per comparison.
+        tiebreak: c.link_hash.clone(),
+    })
 }
 
 /// The winning canonical-head declaration, resolved: the target `Record` PLUS

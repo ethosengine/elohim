@@ -14,6 +14,13 @@ serde.workspace = true
 serde_bytes.workspace = true
 serde_json.workspace = true
 doorway-client.workspace = true
+# The concern-canon leaf (lib `seam_contracts`). `default-features = false` is the WASM
+# path: the crate's default feature set is already empty, so this is a declaration of
+# intent — a future default feature must never silently reach a zome. It carries no
+# dependencies of its own (its own `boundary_tests::no_heavy_deps_in_dep_tree` enforces
+# that), so linking it adds exactly one package to this workspace's lock and nothing to
+# the integrity zomes. COORDINATOR-ONLY: the DNA hash covers integrity zomes + modifiers.
+elohim-seam-contracts = { path = "../../../../../../crates/seam-contracts", default-features = false }
 content_store_integrity = { path = "../content_store_integrity" }
 hc-rna = { path = "../../../../rna/rust" }
 lamad-types = { path = "../../../../../sdk/domains/lamad/types" }

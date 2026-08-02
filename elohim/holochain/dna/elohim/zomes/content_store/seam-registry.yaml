@@ -29,18 +29,25 @@ decisionPoints:
     sourceLocation:
       file: src/lib.rs
       modulePath: content_store::select_canonical_winner
-      line: 2917
+      line: 2945
     summary: >
-      Selects the single winning canonical-head declaration from a candidate set: ANY earned
-      declaration beats ALL staging; within the winning tier, newest link timestamp wins;
-      ties break deterministically on the create-link action hash.
+      HDK ADAPTER (P5b, 2026-08-02) over `seam_contracts::election::select_arbitrated_winner`:
+      maps each canonical-head declaration LINK onto an `ArbitrationKey` — provenance tag =>
+      tier, DHT link timestamp => clock, create-link action hash => tiebreak — and returns the
+      winner the shared ordering elects. The ordering rules are unchanged and now live in the
+      contract crate: ANY earned declaration beats ALL staging; within the winning tier, newest
+      link timestamp wins; ties break deterministically on the create-link action hash.
     concernIds:
       - id: C1
         status: answered
         justification: >
           Arbitrates on notarized DHT link evidence (tier + link timestamp + link hash) only —
           no branch consults which agent authored a candidate, so no declaring authority can
-          win by virtue of being the resolving conductor's own.
+          win by virtue of being the resolving conductor's own. The extraction did not weaken
+          this and is where it is now ENFORCED: the shared predicate has no author/identity
+          component to consult at all (its row carries C1 as `partial` for exactly that reason
+          — the absence of a channel there, the guarantee here, since THIS adapter is what
+          builds the key).
       - id: C2
         status: answered
         justification: >
@@ -48,7 +55,12 @@ decisionPoints:
           winner's newest-within-tier on the DHT link timestamp, tie-broken on create_link_hash
           — never a conductor-local clock, never arrival order"). equal_timestamps_break_
           deterministically_on_link_hash proves order-independence directly (reversed input
-          order still yields the identical winner).
+          order still yields the identical winner). Since P5b the guarantee is additionally
+          STRUCTURAL rather than only tested: `ArbitrationKey`'s three fields are all required,
+          so the pre-`25921a07a` shape (a stable sort on the clock alone) is no longer
+          expressible at this call site — and the shared predicate runs under the `Arbitrated`
+          property harness over all 24 orderings of a `(tier, clock)`-tied fixture, a
+          permutation walk the zome suite could not perform from inside WASM.
     contractTests:
       - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
         testName: earned_wins_over_newer_staging
@@ -79,6 +91,43 @@ decisionPoints:
         testName: tied_winners_propagate_an_identical_clock_in_any_input_order
         kind: unit
         mirrorRisk: false
+      # The extracted predicate's own proofs (crates/seam-contracts/seam-registry.yaml holds the
+      # full row). Cited HERE too because after P5b this adapter's behaviour is decided there:
+      # a test that passes only in the zome would no longer be evidence about the ordering.
+      - path: crates/seam-contracts/src/election.rs
+        testName: real_predicate_is_arbitration_conformant
+        kind: unit
+        mirrorRisk: false
+      - path: crates/seam-contracts/src/election.rs
+        testName: tier_precedence_dominates_a_newer_clock
+        kind: unit
+      - path: crates/seam-contracts/src/election.rs
+        testName: equal_timestamps_break_deterministically_on_link_hash
+        kind: unit
+        mirrorRisk: false
+      - path: crates/seam-contracts/src/election.rs
+        testName: tied_winners_propagate_an_identical_clock_in_any_input_order
+        kind: unit
+        mirrorRisk: false
+    notes: >
+      ADAPTER RELATIONSHIP (P5b, 2026-08-02 — the P3.3 pull-forward). The ordering was extracted
+      to `seam_contracts::election::select_arbitrated_winner`
+      (crates/seam-contracts/seam-registry.yaml, row `select_arbitrated_winner`); this row is the
+      HDK side and keeps its own nine unit tests unchanged, because the mapping it performs —
+      `Link` provenance tag / DHT link timestamp / create-link hash onto the key's three fields —
+      is real behaviour that only a zome-side test can pin. The crate holds a field-for-field port
+      of those nine (same names, same fixture seeds); both suites are green, from opposite sides
+      of the extraction, which is the behavioural-identity evidence.
+
+      COORDINATOR-ONLY, HASH-NEUTRAL. The diff touches
+      `zomes/content_store/{Cargo.toml,src/lib.rs}` and the workspace `Cargo.lock` — no integrity
+      zome file, so the DNA hash (integrity zomes + modifiers) does not move and the change heals
+      onto running conductors via `happ_manager::sync_coordinators`' `update_coordinators`
+      hot-swap, not a reinstall/re-key. The contract crate is a leaf (zero first-party deps,
+      std-only default, `default-features = false` at this dep site), so it adds exactly one
+      package to the lock and nothing to the integrity zomes' dependency graph — its own
+      `no_heavy_deps_in_dep_tree` boundary test keeps `hdi`/`hdk` out, which is the invariant that
+      makes this direction of dependency (zome -> contract crate) safe at all.
 
   - name: declare_canonical_head_inner
     kind: verdict-fn
