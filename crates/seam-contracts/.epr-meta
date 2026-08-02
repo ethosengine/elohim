@@ -1,0 +1,58 @@
+---
+epr-meta-version: 1
+id: seam-contracts-seam-birth-rule
+purpose: >
+  `elohim-seam-contracts` (lib `seam_contracts`) — the concern canon's compile-shape
+  home: `Answer<T>` (C4), `ReasonLabel` (C8), and the `Arbitrated`/`Quiescent`/
+  `Liveness` property harnesses (C2/C6b/C3). Unlike a per-seam crate
+  (elohim-storage, doorway, steward/node), this leaf carries GENERIC vocabulary
+  every consumer inherits — so a new shared type minted here has a wider blast
+  radius than a per-seam instantiation, and the birth rule (plan task P4.5)
+  applies with extra weight: answer the canon here, or the gap ships to every
+  crate that depends on this one.
+rules:
+  - id: seam-birth-rule
+    class: inject
+    when:
+      write: "*.rs"
+      contains-any: ["pub enum ", "pub trait ", "Answer<", "Reason {", "Outcome {",
+                     "Decision {", "Verdict {", "ViolationClass {"]
+    dedupe-of: ".claude/skills/p2p-design-gate/SKILL.md (Step 4: Concern-Canon Answer) + elohim/sdk/schemas/v1/manifest/seam-registry.schema.json (the registry a new decision surface conforms to)"
+    why: >
+      A new pub enum/trait here (or a new `Answer<T>`/`ReasonLabel`-shaped type)
+      is exactly what the seam-concern contract architecture's birth rule governs
+      — with the added weight that this crate's vocabulary is GENERIC: a gap here
+      isn't one seam's problem, it's inherited by every crate that depends on
+      `seam_contracts`. Before shipping one: walk `p2p-design-gate` Step 4 —
+      answer C0-C14 (`answered`/`partial`/`unbound`/`n-a`-with-justification)
+      against the guarantee in its canon home (predicate-bearing classes are
+      enforcement rows in `.claude/epr-meta/policies.yaml`, currently C2/C6a; the
+      rest are Precedent-shaped rows in `.claude/epr-meta/concerns.yaml`). Then
+      register the point: a genuinely new CROSS-CUTTING shape (a fourth harness
+      alongside Arbitrated/Quiescent/Liveness, a new wire-facing reason/state
+      enum) gets its own `crates/seam-contracts/seam-registry.yaml` (schema:
+      `elohim/sdk/schemas/v1/manifest/seam-registry.schema.json`; this crate has
+      none yet — create it at that point); a per-seam INSTANTIATION of `Answer<T>`
+      or a `ReasonLabel` impl registers in the CONSUMING crate's own
+      `seam-registry.yaml` instead (elohim-storage, doorway/doorway-service,
+      steward/node already have one). The census (`placement-audit.py
+      --epr-meta`) is the enforcement backstop, not this advisory. This rule
+      matches file CONTENT, not added lines, so an edit anywhere in
+      `answer.rs`/`reason.rs`/`harness/*.rs` (already soaked in these tokens)
+      re-fires too — the accepted cost of a declarative advisory that never
+      blocks (never a validator: this is a judgement call, not a textual proof).
+cites:
+  - seam-concern-contract-architecture-plan
+---
+
+# crates/seam-contracts — seam birth rule (concern canon)
+
+`src/lib.rs`'s module doc describes the crate's own doc convention (every public
+item names its concerns, forcing incident, and contract test — the `#![deny(missing_docs)]`
+half of that is already structural). This manifest adds the other half — the
+edit-time reminder that a *new* generic decision-surface shape (plan task P4.5)
+must answer the concern canon and register before it ships, since what lands here
+is inherited by every consumer, not scoped to one seam. See
+`.claude/epr-meta/policies.yaml` + `.claude/epr-meta/concerns.yaml` for the sixteen
+classes (C0-C14, C6 split C6a/C6b) and the `p2p-design-gate` skill's Step 4 for the
+per-class checklist.

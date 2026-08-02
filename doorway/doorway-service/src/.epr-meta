@@ -1,0 +1,52 @@
+---
+epr-meta-version: 1
+id: doorway-service-src-seam-birth-rule
+purpose: >
+  Nested under `../.epr-meta` (`covers: subtree`) — this manifest does not reclaim
+  coverage; it adds ONE edit-time signal (plan task P4.5, the seam-concern
+  contract architecture's design-time birth rule). `doorway/doorway-service/
+  seam-registry.yaml` already registers this crate's decision surface
+  (decide_reconcile/ReconcileDecision, classify_dispatch/Disposition,
+  epr_should_serve_ssr/SsrFallbackReason, fetch_projections_with_fallback/
+  FallbackOutcome, K2Store::put_at/K2PutOutcome, should_serve_response) — the
+  rule below catches the NEXT one before it ships unregistered.
+rules:
+  - id: seam-birth-rule
+    class: inject
+    when:
+      write: "*.rs"
+      contains-any: ["Decision {", "Verdict {", "Outcome {", "Reason {",
+                     "Disposition {", "fn decide_", "Answer<", ".route(",
+                     "match (method"]
+    dedupe-of: ".claude/skills/p2p-design-gate/SKILL.md (Step 4: Concern-Canon Answer) + doorway/doorway-service/seam-registry.yaml (this crate's decision-point registry) — where a new decision surface answers the canon and gets registered"
+    why: >
+      This shape (a verdict/decision/outcome/reason enum, a `decide_*` predicate,
+      an `Answer<T>` boundary type, or a route registration) is exactly what the
+      seam-concern contract architecture's birth rule governs: a NEW decision
+      predicate, boundary answer type, sync message, or route may not be born
+      unregistered. Before shipping one: walk `p2p-design-gate` Step 4 — answer
+      C0-C14 (`answered`/`partial`/`unbound`/`n-a`-with-justification) against the
+      guarantee in its canon home (predicate-bearing classes are enforcement rows
+      in `.claude/epr-meta/policies.yaml`, currently C2/C6a; the rest are
+      Precedent-shaped rows in `.claude/epr-meta/concerns.yaml`) — then add a row
+      to `doorway/doorway-service/seam-registry.yaml` (schema:
+      `elohim/sdk/schemas/v1/manifest/seam-registry.schema.json`). The census
+      (`placement-audit.py --epr-meta`) is the enforcement backstop, not this
+      advisory: it fails loud on an unregistered point, an uncited contract test,
+      or a mirrored test. This rule matches file CONTENT, not added lines, so an
+      edit anywhere in an already-registered file (`http.rs`, `render/registry.rs`,
+      `projection/epr_router.rs`, `bootstrap/k2.rs`, `cache/reach_aware_serving.rs`)
+      re-fires too — the accepted cost of a declarative advisory that never
+      blocks (never a validator: this is a judgement call, not a textual proof).
+cites:
+  - seam-concern-contract-architecture-plan
+---
+
+# doorway/doorway-service/src — seam birth rule (concern canon)
+
+`../CLAUDE.md` and this crate's `seam-registry.yaml` describe the decision surface
+itself; this manifest only adds the edit-time reminder that a *new* one (plan task
+P4.5) must answer the concern canon and register before it ships. See
+`.claude/epr-meta/policies.yaml` + `.claude/epr-meta/concerns.yaml` for the sixteen
+classes (C0-C14, C6 split C6a/C6b) and the `p2p-design-gate` skill's Step 4 for the
+per-class checklist.

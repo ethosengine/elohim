@@ -19,6 +19,7 @@ This gate is **not optional**. It activates whenever a design conversation invol
 - Defining a new model, struct, or TypeScript interface for persistent data
 - Adding an HTTP route that serves or mutates data
 - Designing a sync/gossip message between peers
+- Introducing a new decision predicate, verdict fn, boundary answer type, or reason/outcome enum (Step 4 walks the concern canon)
 - Proposing a new "entity" of any kind
 
 **Sequence**: The gate sits between step 2 (understanding the domain need) and step 3 (proposing a design). You must complete the gate output before writing any schema, migration, or route code.
@@ -223,6 +224,50 @@ The HTTP route serves the **projection**, not the source of truth. The route is 
 
 **Why this order matters**: Starting with HTTP routes produces REST-shaped designs where the database is the source of truth. Starting with DHT entry types produces P2P-native designs where the network is the source of truth and everything else is a projection.
 
+## Step 4: Concern-Canon Answer (the birth rule)
+
+Steps 1-3 classify and place a data entity. A **decision predicate, verdict fn,
+boundary answer type, sync/gossip message, or HTTP route** additionally answers the
+concern canon — sixteen recurring failure classes (C0 plane location; C1
+anti-self-election; C2 monotonic authority; C3 liveness; C4 honest absence; C5
+evidence-not-authority; C6a bounded work / C6b idempotent effect; C7 advertise/serve
+symmetry; C8 observability-per-decision; C9 identity-lineage continuity; C10
+contract-evolution honesty; C11 externally-imposed backpressure; C12
+consent/authorization; C13 graduated authority; C14 witnessed residual) mined from
+repeated production incidents across every substrate family. This is the birth rule
+the seam-concern contract architecture exists to enforce: **a concern solved once
+must not be rediscovered bespoke at the next seam** — answer it (or justify
+`n-a`) here, before the code is written, not after the third incident.
+
+Two moves, both cheap now and expensive later:
+
+1. **Answer every class, don't skip.** For C0-C14 (16 ids — C6 splits into
+   C6a/C6b), record one of the registry's own four states — `answered` (logic
+   plus a contract test pin it) / `partial` (a real, named gap) / `unbound` (the
+   concern is the definitional question here and nothing currently answers it) /
+   `n-a` (state why it doesn't apply — a silent skip is exactly what this step
+   exists to catch). Read the guarantee from its canon home, don't restate from
+   memory: predicate-bearing classes are enforcement rows in
+   `.claude/epr-meta/policies.yaml` (currently C2, C6a); the rest are
+   Precedent-shaped rows in `.claude/epr-meta/concerns.yaml`.
+2. **Register the point at birth.** Add a row to the crate's `seam-registry.yaml`
+   (schema: `elohim/sdk/schemas/v1/manifest/seam-registry.schema.json`; create the
+   file if this crate has none yet) — name, kind (`pure-decision-predicate` /
+   `verdict-fn` / `boundary-answer-type` / `reason-outcome-enum`), source location,
+   the concern answers from move 1, and `contractTests` (explicit `null` +
+   `gapNote` when none exists yet — never a silently-omitted field).
+
+**The census is the enforcement backstop, not a courtesy reminder.**
+`placement-audit.py --epr-meta` reads every crate's `seam-registry.yaml` and fails
+loud on a missing registration, an uncited contract test, or a mirrored test (the
+anti-mirror fixture — a passing test measuring the same helper the code under
+test uses). The co-located `.epr-meta` `inject` rules on decision-surface `.rs`
+diffs (e.g. `doorway/doorway-service/src/.epr-meta`, `steward/node/src/.epr-meta`,
+`crates/seam-contracts/.epr-meta`) are this step's edit-time half — they fire
+on the same shapes this step asks you to walk through at design time. Skip this
+step and the gap doesn't vanish; it surfaces later, at the census or in
+production, which is exactly the cost this plan exists to avoid.
+
 ---
 
 ## Anti-Pattern Catalog
@@ -311,4 +356,7 @@ Only after this output is complete and reviewed should design proposals (schemas
 | `elohim/sdk/storage-client-ts/src/generated/` | Auto-generated TypeScript types from Rust views |
 | `app/elohim-app/src/app/elohim/adapters/` | Adapters that add computed fields — never transform wire format |
 | `doorway/doorway-service/src/routes/` | HTTP routes — the thinnest layer, designed last |
+| `.claude/epr-meta/policies.yaml` + `.claude/epr-meta/concerns.yaml` | The concern canon (C0-C14) — enforcement rows (predicate-bearing classes) vs Precedent-shaped rows; Step 4's canon homes |
+| `elohim/sdk/schemas/v1/manifest/seam-registry.schema.json` | Per-crate decision-point registry schema — where Step 4's registration lands |
+| `.claude/scripts/memory-kit/placement-audit.py` (`--epr-meta`) | The census — the enforcement backstop for Step 4, reads every crate's `seam-registry.yaml` |
 | `genesis/docs/content/elohim-protocol/protocol-specification.md` | Full EPR protocol specification |
