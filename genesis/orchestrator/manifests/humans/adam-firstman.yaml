@@ -337,6 +337,11 @@ spec:
             # hash or they partition onto different DHTs, so adam needs this too.
             - name: ALLOW_DNA_REINSTALL
               value: "true"
+            # Adopt-before-author gate — hand-rendered like the reinstall gate
+            # above (adam is alpha). See the template's inline comment; adam is
+            # a supplier peer, so the both-sides-missing exit needs him on.
+            - name: ELOHIM_ADOPT_BEFORE_AUTHOR
+              value: "true"
             - name: ENABLE_IMPORT_API
               value: "true"
             - name: ENABLE_CONTENT_DB

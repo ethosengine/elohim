@@ -715,6 +715,11 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     // rendering as allowDnaReinstall — see the template's inline comment.
     def allowSeedShardManifest = (humanConfig.env == 'prod') ? 'false' : 'true'
 
+    // Adopt-before-author gate (both-sides-missing canonical-head exit).
+    // Same non-prod-true rendering — prod participation is a governance
+    // decision, not a default. See the template's inline comment.
+    def adoptBeforeAuthor = (humanConfig.env == 'prod') ? 'false' : 'true'
+
     // Per-human primary doorway selection. When the env declares doorwayA +
     // doorwayB sub-maps (alpha today), route based on nodeTypes containing
     // 'remote': shem-side personas → doorwayB (elohim.host / signal.elohim.host),
@@ -772,6 +777,7 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         "s|ENV_PLACEHOLDER|${humanConfig.env}|g",
         "s|ALLOW_DNA_REINSTALL_PLACEHOLDER|${allowDnaReinstall}|g",
         "s|ALLOW_SEED_SHARD_MANIFEST_PLACEHOLDER|${allowSeedShardManifest}|g",
+        "s|ADOPT_BEFORE_AUTHOR_PLACEHOLDER|${adoptBeforeAuthor}|g",
         "s|RESOURCE_PREFIX_PLACEHOLDER|${humanConfig.resourcePrefix}|g",
         "s|INSTANCE_PLACEHOLDER|${humanConfig.instance}|g",
         "s|BOOTSTRAP_URL_PLACEHOLDER|${primaryDoorway.bootstrapUrl}|g",

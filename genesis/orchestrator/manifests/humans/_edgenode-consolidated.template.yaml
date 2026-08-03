@@ -369,6 +369,18 @@ spec:
             # test/demo-seeded), false for prod.
             - name: ALLOW_SEED_SHARD_MANIFEST
               value: "ALLOW_SEED_SHARD_MANIFEST_PLACEHOLDER"
+            # Adopt-before-author gate (head_adoption): lets a node with NO
+            # local chain for a content id declare a canonical head from a
+            # carried record the zome fully re-proves in wasm (signature +
+            # entry↔action + target-id binding). The both-sides-missing
+            # residual's only automated exit — dominant for genesis-seeded
+            # corpora whose fixture authors never had live chains. Same
+            # per-env rendering as ALLOW_DNA_REINSTALL: true for
+            # alpha/staging, false for prod (prod participation is a
+            # governance decision, not a default). Storage logs a boot WARN
+            # when enabled; unset/false is behavior-identical to pre-flag.
+            - name: ELOHIM_ADOPT_BEFORE_AUTHOR
+              value: "ADOPT_BEFORE_AUTHOR_PLACEHOLDER"
             - name: ENABLE_IMPORT_API
               value: "true"
             - name: ENABLE_CONTENT_DB
