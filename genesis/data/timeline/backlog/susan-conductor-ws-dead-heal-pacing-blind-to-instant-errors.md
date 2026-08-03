@@ -130,3 +130,13 @@ shift_objective: |
   of exhausting the full pending set every sweep. Sub-concern (a) — whether susan's
   conductor WS needs an operator-side restart/reconnect — is a separate,
   substrate-owned follow-up; do not fold it into this code fix's verification gate.
+
+## Occurrence log (2026-08-03, pipeline-landing shift close)
+
+~10:35Z: container restart, last_terminated_reason=Error (NOT OOMKilled), Ready
+again post-restart — first recorded container-level crash of the saturation
+pathology (prior episodes were WS-dead / per-call-timeout without termination).
+Same window: her conductor memory 1m-8m alloc-bucket anomaly (18-90x peers) and
+gossip-timeout-per-5s rate documented in the shift journal. Exit-code/log
+detail not pulled (flagged unverified). If the crash recurs, this entry
+graduates to a conductor-memory investigation with the smaps localizer.
