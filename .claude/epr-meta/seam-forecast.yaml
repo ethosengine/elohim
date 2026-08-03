@@ -173,21 +173,23 @@ rows:
       the DEFINITIONAL question, and it is entirely unbound — its registered decision points carry
       C1 at status `unbound`, which is the census reporting exactly this gap.
 
-  - fp: 836a69cc043c
+  - fp: a6ae99dea005
     seeded_rank: 11
     rung: none
     seam: S3.10
-    classes: [C4, C6a]
+    classes: [C11, C8]
     status: confirmed-live
-    title: resolve_canonical_election link-gather exceeds the wasm host-fn deadline (B2 recurrence at the election-READ site)
+    title: obey-path starvation — conductor DB-pool saturation (C11) behind uninstrumented exits (C8); B2-recurrence first-reading DISPROVEN
     prediction: >
-      CONFIRMED LIVE 2026-08-03 (pipeline-landing shift): the saga's defect B2 — GetStrategy
-      network-dependent gathers hanging on cold arcs — was cured at the DECLARE guard (496a4aba8)
-      but recurred uncured inside `resolve_canonical_election` (wave 4, da8975176): its get_links
-      dies "deadline has elapsed" (34 ribosome errors, 4/7 pods, 01:30-02:49Z) on exactly the
-      conductor-missing-side pods the obey path serves, killing every obey probe through the
-      then-uninstrumented Err exit. Known class, unforecast seam — a miss-of-ranking when scored
-      at the next saga-rung flip (rung: none — trigger is the red/mining pass, per the fp rule
-      above). The cure is coordinator-only (local-strategy link gather), hot-swappable.
-      Discovered BY the obey-probe instrumentation arc this row's evidence cites; the counter
-      (elohim_content_election_obey_probe_total{outcome=resolve_error}) is its live probe.
+      CONFIRMED LIVE 2026-08-03, diagnosis corrected same shift: the obey arm's ~900 probes/hr
+      die through exits that were uninstrumented (C8 — cured by the obey-probe counter, same
+      shift); the resolve_error slice (~3%) is conductor DB read-pool saturation
+      ("deadline has elapsed" = acquire_semaphore_permit 10s timeout, 4 permits/small pod) —
+      C11 backpressure, NOT the B2/GetStrategy class first written here (disproven by
+      git-show + cascade source: the election read has been Local since birth — an instance of
+      verify-the-measure-before-the-ranking; this row's own first version carried the wrong
+      classes and was re-minted per the fp rule). The dominant exit (no_election vs no_courier)
+      is adjudicated by elohim_content_election_obey_probe_total{outcome} post-deploy.
+      Levers ledgered: retryable-backpressure handling, probe pacing / election-in-head-answer
+      folding, pod CPU permit widening. Backlog:
+      resolve-canonical-election-get-links-deadline.md.

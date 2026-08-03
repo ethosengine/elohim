@@ -3,63 +3,73 @@ id: "backlog-resolve-canonical-election-get-links-deadline"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "resolve_canonical_election dies on get_links 'deadline has elapsed' — B2 recurrence at the election-READ site; obey path 0% survivable until cured"
+title: "Obey-path starvation: conductor DB-pool saturation on the election read (C11) + dominant exit unadjudicated until the probe counter deploys — NOT a B2/GetStrategy recurrence (disproven)"
 slug: "resolve-canonical-election-get-links-deadline"
 written: "2026-08-03"
-author: "pipeline-landing shift (integrator)"
+author: "pipeline-landing shift (integrator; diagnosis corrected same shift by code-disproof)"
 status: "backlog"
 priority: "high"
-tags: [dataplane, holochain, coordinator-zome, get-links, deadline, obey-path, convergence, b2-class, concern-c6a, concern-c4]
+tags: [dataplane, holochain, conductor, db-pool-saturation, backpressure, obey-path, convergence, concern-c11, concern-c8, misdiagnosis-corrected]
 cites:
   - elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
   - elohim/elohim-storage/src/services/head_adoption.rs
   - genesis/data/timeline/backlog/content-gap-limit-cycle-blocks-convergence.md
+  - genesis/data/timeline/backlog/susan-conductor-ws-dead-heal-pacing-blind-to-instant-errors.md
 ---
 
-# `resolve_canonical_election` get_links deadline — the obey path's true wall
+# Obey-path starvation — corrected diagnosis
 
-## Evidence (2026-08-03, quoted from ribosome ERROR logs, wasm_hash = live bundle)
+## What was disproven (kept for the record — the misdiagnosis is the lesson)
 
-`RuntimeError { source: … WasmError { file: "…/host_fn/get_links.rs", line: 76,
-error: Host("deadline has elapsed") } } zome=content_store
-fn_name=resolve_canonical_election` — 34 occurrences 01:30–02:49Z on
-adam/eve/gertrude/susan (the conductor-missing-side pods the obey path exists
-to serve). The coordinator hot-swap is PROVEN applied (7/7 pods, both rebake
-windows, hash-chain corroborated) — this is not a missing extern.
+First reading (this shift, ~03:30Z): "B2 recurrence — resolve_canonical_election
+ships an uncured Network-strategy gather." **Disproven by primary sources**:
+`git show da8975176` proves the election read has passed `GetStrategy::Local`
+since birth; `holochain_cascade-0.6.0/src/lib.rs:789` proves a Local gather
+never touches the network. The `Host("deadline has elapsed")` string is
+`tokio::time::error::Elapsed` from `acquire_semaphore_permit`
+(`holochain_sqlite db/access.rs:582`, 10s ACQUIRE_TIMEOUT) — the conductor's
+DB read pool (4 permits on small pods; `cascading()` holds one from EACH of
+cache/DHT/authored across the blocking query) is **saturated**. C11
+backpressure, retryable. The arithmetic seconded the disproof: 34 errors in
+79min ≈ 3% of ~900 probes/hr — resolve_error cannot explain a 0% obey rate;
+~97% of probes exit through a different arm.
 
-Consequence: every obey probe (~900/hr fleet-wide) dies at the election-read
-step; `election_obeyed_total` and `obey_failed_total` never got a first
-increment. Until the obey-probe counter landed (same shift), the failure was
-invisible: Err → `tracing::debug!` in a deployment that drops debug entirely.
+Instance of [[feedback_verify_the_measure_before_the_ranking]]: the ranking
+(B2-class, forecast row) was written before the measure (the probe counter)
+existed. The corrected forecast row carries C11.
 
-## The class
+## What is true and open
 
-The saga's **defect B2** — a `GetStrategy`-network-dependent gather hanging on
-cold arcs — was cured at the DECLARE guard (`496a4aba8`, newest_canonical_link
-Network→Local). The wave-4 election-READ extern (`resolve_canonical_election`,
-`da8975176`) shipped with the same hazard uncured, despite its own doc saying
-"gather/select WITHOUT target retrieval, Local links." Known class, second
-site. Forecast row fp `836a69cc043c` (confirmed-live) carries it; scored
-miss-of-ranking at the next saga-rung calibration.
+1. **The dominant obey exit is unadjudicated** until
+   `elohim_content_election_obey_probe_total{outcome}` (shipped this shift)
+   deploys. Read it FIRST: `no_election` dominant ⇒ link-gossip/visibility
+   wall; `no_courier` dominant ⇒ hint/carried-record supply (susan's
+   saturation poisons this fleet-wide — cross-cited); `resolve_error` ⇒ the
+   ~3% DB-saturation class only.
+2. **DB-timeout handling**: head_adoption currently drops the row
+   (`return None`) on the resolve Err — treat as retryable backpressure
+   (C11's declared-policy clause: defer-with-retry, counted) instead.
+3. **Zome-call load doubling**: the obey probe is an additive zome call per
+   row on a sweep that already calls resolve_content_head_local for the same
+   rows — wave 4 roughly doubled conductor zome-call load. Structural lever:
+   fold the election answer into the head answer the sweep already pays for,
+   or pace the probe.
+4. **Pod CPU**: `num_read_threads()` floors at 4 — more CPU widens the permit
+   pool directly (operator/manifest lever).
+5. **declare-path Network reads** (gather_content_chain + target get in
+   declare_canonical_head_inner): genuine sweep-hot-path Network reads,
+   deliberately NOT flipped — the first is the phantom-id gate (a cold local
+   view would reject legitimate declares), the second's miss is the documented
+   entry to the carried-record branch. A read-vs-write-path tension needing
+   its own decision, not a silent flip.
+6. **Not-unit-pinnable**: the zome suite cannot observe get_links strategy
+   (host-fn boundary); the regression home is a sweettest (conductor holds
+   links but not the winner's target) — recorded in the zome seam-registry
+   gapNote.
 
-## Fix direction (bounded, coordinator-only, hot-swappable — no DNA event)
+The zome-side edits that shipped from the disproof (error text naming the
+DB-saturation class; honest doc replacing the false "must never stall" claim;
+seam-registry C6a answered-with-accurate-reasoning) are legibility-only and
+ride the next coordinator swap — they do not move the obey rate.
 
-Make the link gather inside `resolve_canonical_election` strictly local
-(`GetOptions::local()` / the local link-query strategy the declare-guard cure
-used), so the election read never awaits the network on a hot sweep path. On a
-full-arc fleet a local link miss means gossip hasn't delivered — return the
-honest no-election answer (C4: Unreachable-shaped, never a hang). Verify with
-the new `elohim_content_election_obey_probe_total{outcome}` counter:
-resolve_error should collapse and no_election / attempted should become the
-live discriminator. Ships via `update_coordinators` (ALLOW_COORDINATOR_UPDATE
-non-prod default true); needs one DNA build + edge rebake cycle.
-
-Sibling observation (same evidence run): susan's conductor carries an 18–90×
-1m–8m allocation-bucket anomaly (851MB, decelerating growth) with gossip
-timeouts every ~5–6s — she poisons the carried-record supply fleet-wide
-(responder-budget hash-only answers → fetch_none). Track under
-susan-conductor-ws-dead-heal-pacing-blind-to-instant-errors.md; if the bucket
-growth doesn't plateau, that entry graduates to a conductor-memory
-investigation.
-
-Status: open, unowned — the named next-session lever for saga convergence.
+Status: open, unowned. First action: read the probe histogram post-deploy.

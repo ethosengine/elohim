@@ -901,11 +901,16 @@ async fn try_obey_visible_election(
             // Fall through to the normal decision rather than holding the id.
             //
             // WARN, not debug: this deployment drops `debug!` before Loki, so
-            // the level IS the observability. A conductor that will not answer
-            // the election read is the shipped-coordinator-didn't-land signal —
-            // the DNA hash is blind to coordinator zomes, so a fix can be built,
-            // deployed, and still not be on the running conductor. That is an
-            // ops finding a human must see, not a per-row curiosity.
+            // the level IS the observability. Two known producers of this arm,
+            // distinguishable only by the error text carried below: (a) the
+            // conductor's DB read-pool is saturated ("deadline has elapsed" =
+            // the 10s acquire_semaphore_permit timeout — C11 backpressure, seen
+            // live 2026-08-03; retryable, not a defect in the read itself); or
+            // (b) the shipped coordinator zome is not on the running conductor
+            // (the DNA hash is blind to coordinator zomes — an unknown-function
+            // error here is the didn't-land signal). Do NOT assume (b) from
+            // rate alone: the 2026-08-03 misdiagnosis assumed it while the
+            // hot-swap was proven applied 7/7 — read the error text.
             crate::metrics::inc_election_obey_probe(
                 crate::metrics::ElectionObeyProbe::ResolveError,
             );
@@ -914,8 +919,9 @@ async fn try_obey_visible_election(
                 content_id = %id, error = %e,
                 "election-obey: ELECTION READ FAILED — this conductor would not answer \
                  resolve_canonical_election, so no election could be obeyed for this row; \
-                 continuing with the normal decision (a sustained rate here means the shipped \
-                 coordinator zome is not on the running conductor)"
+                 continuing with the normal decision (read the error text: 'deadline has \
+                 elapsed' = conductor DB-pool saturation/backpressure; unknown-function = \
+                 coordinator zome not on the running conductor)"
             );
             return None;
         }
