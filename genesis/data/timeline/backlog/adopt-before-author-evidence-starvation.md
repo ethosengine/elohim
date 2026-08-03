@@ -90,10 +90,41 @@ raising; `=0` restores the ordinary 3600s window exactly. Bridge-less
 responder arm deliberately answers no reason → ordinary window (never the
 long class without an actual conductor ask).
 
-Still open here: lever 2 (C11 conductor saturation — permits/CPU/pacing),
-now measurable in isolation once the phantom load drains; and the HTTP twin
-(`GET /db/content/{id}/head-record`) not carrying the reason field (flagged,
-non-blocking).
+Still open here: lever 2 (C11 conductor saturation), now fully adjudicated —
+see below; and the HTTP twin (`GET /db/content/{id}/head-record`) not carrying
+the reason field (flagged, non-blocking).
+
+## Addendum 2026-08-03 (evening): C11 = CFS throttling; operator chose protocol-adapts
+
+Post-fix verification isolated lever 2 mechanically: susan/eve/gertrude at
+**100% CFS throttle** (adam 57%) at their archetype-modeled CPU limits
+(recycled-laptop 1000m / home-nuc 2000m), while shem holds ~9 cores headroom
+and the ethosengine trio idles at 6–12%. With phantoms deferring into the
+evidence-absent class, the active refusal load became almost pure
+budget_elapsed (~1825/hr) — throttled conductors cannot serve bytes in 5s.
+
+**Operator decision (2026-08-03): protocol adapts — archetype limits stay
+honest; weak devices exist in reality.** The simulacra correctly surfaced that
+the protocol over-demands its weakest members. Actions:
+
+1. LANDED (unpushed, rides next wave): susan edgenodeCpuLimit 1000m→2000m —
+   a deliberate documented bump mirroring jessica's same-archetype precedent
+   (NOT drift; the 2026-07-16 canonical alignment stands), restoration tied
+   to item 2 landing.
+2. **NEXT WAVE — requester-side advertiser diversity on the evidence fetch**
+   (the durable, elohim-native cure): when the hinted advertiser answers
+   hash-only with reason budget_elapsed (or unreachable), retry ONCE against
+   one alternative advertiser selected for health — prefer peers whose recent
+   answers carried bytes (matthew/adam idle while shem peers throttle).
+   Amplification bound: max one fallback per contest, never on no_record
+   (structural absence retries nothing). Design notes: candidate source =
+   whatever courier/hint plurality already exists per id (verify in
+   head_adoption's PeerHint flow); a tiny per-peer carried/degraded health
+   ratio (from adopt_evidence data the fix wave already collects) is enough —
+   no new gossip. Also worth carrying in the same wave: the contest/backoff
+   ledger is IN-MEMORY, so every deploy restart wipes the evidence-absent
+   classifications and re-churns the corpus from zero (~hours of re-learning)
+   — either persist the ledger or accept and document the re-churn cost.
 
 ## Verdict for the saga
 
