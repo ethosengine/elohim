@@ -1,8 +1,10 @@
 # Research Index
 
+This is the research **index and bibliography** for the Elohim Protocol, written for contributors and agents already working in this monorepo who need to find where the thinking lives. It spans two layers: *external* reference repos, cloned centrally and disposably into `repos/` (gitignored; see *Deep-Context Repos* below for the clone tooling), and *our own* research writing, which lives at each module boundary beside the code it informs; the problem-named sections below route to both. Links of the form `epr:<slug>` are content-addressed document IDs that survive file moves — when reading on plain GitHub, the slug matches a `<slug>.md` filename, usually in this directory. Start from the problem you hold and follow its section's links; to add coverage, extend the matching section rather than starting a parallel note.
+
 ## Deep-Context Repos (cloned on demand)
 
-Reference repos cloned locally for deep research. The `repos/` directory is gitignored — only the manifest is tracked.
+Reference repos cloned locally for deep research. The `repos/` directory is gitignored — only the manifest is tracked. Run these from the **repo root** (not from this directory); the only prerequisites are `git` and network access.
 
 ```bash
 ./genesis/research/research.sh status          # Show what's cloned vs available
@@ -12,13 +14,24 @@ Reference repos cloned locally for deep research. The `repos/` directory is giti
 ./genesis/research/research.sh size            # Show disk usage
 ```
 
-Add repos by editing `research-manifest.json`. See the manifest for current repos and relevance notes.
+On a fresh checkout `status` shows every repo as `○ (not cloned)` with its relevance note (`repos/` is gitignored — that is normal, not an error). After a successful `clone <name>`, `status` flips that row to `✓ <name> (163M, main)`-style with size and branch, and the repo appears under `genesis/research/repos/<name>/`. Cloning *all* costs multiple gigabytes of disk — check `size` and the manifest's repo list first, and prefer cloning by name.
+
+Add repos by appending an entry to the `repos` array in `research-manifest.json` (in this directory) — five fields; `pillar` names the domain pillar the repo informs (`elohim`, `imagodei`, `lamad`, `qahal`, `shefa`, `doorway`). `status` will list the entry once the JSON parses (it does not verify the URL — the first `clone <name>` does that):
+
+```json
+{ "repos": [
+  { "name": "polis", "url": "https://github.com/compdemocracy/polis.git",
+    "path": "genesis/research/repos/polis",
+    "relevance": "why this repo matters and what to read it for",
+    "pillar": "qahal" }
+] }
+```
 
 ---
 
-Research lives at each module boundary alongside the code it informs. This index connects the open questions driving each area of the protocol to where the thinking lives.
+## Foundations — the conviction the sections open with
 
-The sections below are ordered by the protocol's deepest conviction: that the hardest problem in human coordination isn't computation — it's legitimacy. People don't reject distributions because the math is wrong. They reject them because they can't see *why*. The protocol's answer is to collect richer signals than money can carry, let composable pipelines do honest math, and let elohim tell the story.
+The sections below open with the protocol's deepest conviction: that the hardest problem in human coordination isn't computation — it's legitimacy. People don't reject distributions because the math is wrong. They reject them because they can't see *why*. The protocol's answer is to collect richer signals than money can carry, let composable pipelines do honest math, and let elohim tell the story.
 
 This conviction is empirically grounded. Druckman & Adrian (2020) found that robot mediators produced more integrative agreements *and* higher participant satisfaction than human mediators delivering identical content — perceived neutrality outweighed human warmth. Sanfey et al. (2003) showed participants accepted unfair offers from computers at significantly higher rates than identical offers from humans, because non-intentional agents don't trigger the same sense of insult. Claure et al. (2023) demonstrated that AI-allocated resources reduced interpersonal tension even when allocations were unequal. The pattern is consistent: when an agent shows its work and has no ego in the outcome, people trust the result more than they trust each other.
 
@@ -105,7 +118,7 @@ EPR content has three tiers — Head (gossipped metadata), Document (peer-cached
 
 Content addressing answers *how bytes get named and verified*. It does not answer *whether they survive a decade*. The protocol's hot path is steward-delivered shards on a trust-weighted mesh — fast, pluralistic, governed by relationship. But what about cold storage? What about content that has graduated past active stewardship and needs a substrate that will still answer in twenty years, even if no household-cluster steward chooses to keep carrying it?
 
-The DDS Working Group has converged on a trio — **Arweave**, **Filecoin**, and **Logos** — as their archival/storage substrate options. These communities have spent a decade building exactly the layer the protocol does *not* try to build natively. The survey question is whether (a) any of them are aligned enough that doorway projection makes sense as an optional cold-path bridge, (b) any are divergent enough that they're better treated as informative comparison points than interop targets, and (c) whether the user's working thesis holds: that **Elohim Protocol may be the comprehensive target for what these orgs say they are trying to do** — civil-society infrastructure, sovereign computation, permanent legibility — assembled around a stewardship model rather than a market or a token.
+The DDS Working Group has converged on a trio — **Arweave**, **Filecoin**, and **Logos** — as their archival/storage substrate options. These communities have spent a decade building exactly the layer the protocol does *not* try to build natively. The survey question is whether (a) any of them are aligned enough that doorway projection makes sense as an optional cold-path bridge, (b) any are divergent enough that they're better treated as informative comparison points than interop targets, and (c) whether our working thesis holds: that **Elohim Protocol may be the comprehensive target for what these orgs say they are trying to do** — civil-society infrastructure, sovereign computation, permanent legibility — assembled around a stewardship model rather than a market or a token.
 
 That thesis is worth testing rather than asserted. The survey is the test.
 
@@ -130,6 +143,28 @@ Steward nodes don't form flat peer networks — they form trust-weighted meshes 
 **Key references:**
 
 - [Hypercore / Holepunch](https://github.com/holepunchto/hypercore) — a secure single-writer append-only signed log (BLAKE2b merkle) with **sparse replication** ("download only the blocks you need" = "replication follows relationship"), plus [HyperDHT](https://github.com/holepunchto/hyperdht): peer discovery by topic with **UDP holepunching** as a first-class feature. Structurally a Holochain source chain but *integrity-only* — a candidate data-plane substrate beside iroh/libp2p, never a truth layer. Autobase is multi-writer-convergence prior art (vs. Automerge). Surveyed alongside Distributed Press (which publishes to Hypercore) in the [June 2026 cross-pollination →](hypha-distributed-press-cross-pollination-2026-06-23.md).
+
+---
+
+## The Peer Problem — Freenet
+
+Every other entry in this index is prior art we borrow from. Freenet is different: it is another team solving *our* problem — a full-stack decentralized substrate with a live network of hundreds-to-low-thousands of peers, a whitepaper, published telemetry, a decentralized git forge, and an agent-development discipline that independently converged on our own (`skills/<name>/SKILL.md`, hooks, subagent review panels, design docs signed "[AI-assisted - Claude]"). It therefore gets a confrontation rather than a survey: compare, attack in both directions, and separate what we take from what we leave.
+
+The bet each project makes is the inverse of the other's. Freenet's thesis is to *"separate what merges from how it propagates"* — the application supplies its own lattice (an idempotent commutative monoid) and the platform stays generic over the algebra. We fix the substrate's semantics — a validating DHT, notarized provenance, an 8-level reach ordinal, REA commitments — and let applications compose within them. **Freenet buys generality and pays in refusal; we buy refusal and pay in generality.** That single trade predicts nearly every difference: their merge is *total*, so it cannot express "reject this update unconditionally" — no double-spend defense, no uniqueness, no revocation-that-can't-be-un-revoked — and their contract interface `validate_state(state, params, related)` has **no requester parameter**, so authorization is inexpressible at the layer that owns state. Their access model is binary (replicated-public contracts vs device-local-private delegates) with encryption as the only thing in between; there is no gradient, and no venue in which an outsider could negotiate for one.
+
+What we take, in order of leverage: **capability-relative hosting budgets** sized from `min(RAM, cgroup)` (we already read the cgroup limit and never consume it); *"distance is a **placement** input, never a **retention** input"*; *"upstream is computed, not stored"* (derived state self-corrects, formation flags rot, and a strict total order makes cycles structurally impossible); *"there is no relay category"* as an ontology-collapsing audit; and the process rules — **"instrumentation is horizontal"** (a PR adding a mechanism without telemetry *for that mechanism* gets bounced) and per-node-aggregate-scalars-only telemetry. What we leave: location derived from network address (their `connection_manager.rs` carries a signed *"DISCLOSED and ACCEPTED"* eclipse tradeoff with an unevictable attacker), state that is unverifiable from its key, and total merge as the state model.
+
+The sharpest mutual finding is a shared pathology rather than a difference: **dead configuration that reads as shipped capability.** As surveyed 2026-07-27: their paper claims WASM fuel limits while `enable_metering: false`; ours declared `enable_eviction: true` with zero readers. A *"constant or flag with no reader"* lint is the most reusable artifact the engagement produced.
+
+[Peer confrontation →](epr:freenet-peer-confrontation-2026-07-27) · implementation sequencing in [`freenet-lift-and-shift`](../docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md) · manifest clones: `freenet-core`, `freenet-git`, `freenet-agent-skills`, `freenet-paper-1`.
+
+---
+
+## The Ancestor — Secure Scuttlebutt
+
+Secure Scuttlebutt (2014–~2024) is the offline-first, gossip-replicated social protocol that most of today's local-first field descends from: identity was a bare cryptographic keypair, each identity published one append-only signed feed, replication followed the friendship graph, and everything hard — account recovery, moderation, economics, deletion, using two devices — was deliberately left out of the protocol for the social layer to absorb. We engaged it because it is a *completed* experiment whose own architects wrote the post-mortem before moving on: its refusals are, item for item, this protocol's feature list, which makes SSB the control group for our whole design. The retrospective (surveyed August 2026, from five cloned ssbc repos and the successor ecosystem) compares ten axes and sorts the results into what we **take** (they shipped private-message encryption for a decade while our encryption layer remains unbuilt — the one axis where they are decisively ahead; their replication-bandwidth disciplines; their USB-stick offline story, which we lack entirely), what we **watch** (their volunteer relay servers were designed to fade in importance and became de-facto infrastructure anyway — the same trap our doorway gateways face; their hour-long gigabytes-heavy first sync capped growth at tens of thousands of users, a ceiling our full-replication conductors share the shape of), and what we **leave** (key-as-identity with no recovery path, feeds that break permanently when two devices write at once, permanence so absolute that users feared their own posts).
+
+[Ancestor retrospective →](epr:ssb-scuttlebutt-ancestor-retrospective-2026-08-03) · manifest clones: `ssb-protocol-guide`, `ssb-db2`, `ssb-server`, `ssb-ebt`, `ssb2-discussion-forum`.
 
 ---
 
