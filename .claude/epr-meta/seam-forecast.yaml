@@ -172,3 +172,22 @@ rows:
       Runner-up: `steward/node`'s `consensus.rs` leader election is the seam where self-election is
       the DEFINITIONAL question, and it is entirely unbound — its registered decision points carry
       C1 at status `unbound`, which is the census reporting exactly this gap.
+
+  - fp: 836a69cc043c
+    seeded_rank: 11
+    rung: none
+    seam: S3.10
+    classes: [C4, C6a]
+    status: confirmed-live
+    title: resolve_canonical_election link-gather exceeds the wasm host-fn deadline (B2 recurrence at the election-READ site)
+    prediction: >
+      CONFIRMED LIVE 2026-08-03 (pipeline-landing shift): the saga's defect B2 — GetStrategy
+      network-dependent gathers hanging on cold arcs — was cured at the DECLARE guard (496a4aba8)
+      but recurred uncured inside `resolve_canonical_election` (wave 4, da8975176): its get_links
+      dies "deadline has elapsed" (34 ribosome errors, 4/7 pods, 01:30-02:49Z) on exactly the
+      conductor-missing-side pods the obey path serves, killing every obey probe through the
+      then-uninstrumented Err exit. Known class, unforecast seam — a miss-of-ranking when scored
+      at the next saga-rung flip (rung: none — trigger is the red/mining pass, per the fp rule
+      above). The cure is coordinator-only (local-strategy link gather), hot-swappable.
+      Discovered BY the obey-probe instrumentation arc this row's evidence cites; the counter
+      (elohim_content_election_obey_probe_total{outcome=resolve_error}) is its live probe.
