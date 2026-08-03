@@ -76,13 +76,6 @@ components:
         # so no ~/.codex symlink is needed (unlike CLAUDE_CONFIG_DIR).
         - name: CODEX_HOME
           value: /projects/.codex-config
-        # Shell history on the PVC — $HOME is ephemeral overlay, wiped every pod
-        # restart (2026-08-03 unclean node reboot lost it along with any state
-        # outside /projects).
-        - name: HISTFILE
-          value: /projects/.bash_history
-        - name: HISTFILESIZE
-          value: '20000'
         - name: USER
           value: user
         - name: RUST_BACKTRACE
@@ -245,16 +238,8 @@ commands:
 
         # Link ~/.claude to persistent config dir for VS Code extension IDE detection
         # The extension uses ~/.claude/ide for IPC sockets, must match CLAUDE_CONFIG_DIR
-        # Guard: never destroy real session data. If ~/.claude is a plain directory,
-        # a session wrote state to ephemeral overlay storage — rescue it onto the PVC
-        # before linking (the .claude/hooks/durability-guard.py SessionStart hook is
-        # the in-session counterpart of this check).
-        if [ -d /home/user/.claude ] && [ ! -L /home/user/.claude ]; then
-          rescue="$CLAUDE_CONFIG_DIR/rescued-ephemeral/$(date -u +%Y%m%dT%H%M%SZ)"
-          mkdir -p "$rescue" && cp -a /home/user/.claude/. "$rescue"/ 2>/dev/null || true
-          mv /home/user/.claude "/home/user/.claude.pre-link.$(date -u +%s)" 2>/dev/null || true
-        fi
-        ln -sfn "$CLAUDE_CONFIG_DIR" /home/user/.claude
+        rm -rf /home/user/.claude 2>/dev/null || true
+        ln -sf "$CLAUDE_CONFIG_DIR" /home/user/.claude
         mkdir -p /home/user/.claude/ide
 
   - id: setup-claude-mcp
