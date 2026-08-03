@@ -5584,6 +5584,15 @@ impl HttpServer {
             content_id,
             head_action_hash,
             carried_record,
+            // ADOPT-BEFORE-AUTHOR is NOT offered on the HTTP declare route, and
+            // that is deliberate rather than an omission. This route is an
+            // explicit operator/deploy act naming a target; the residual the flag
+            // exists for is the AUTOMATED sweep's both-sides-missing class, where
+            // no human is choosing the target. Exposing the bypass here would let
+            // an HTTP caller declare a head for an id the node has never held —
+            // widening the seam well past the residual, with none of the sweep's
+            // own gates (backoff, candidacy ledger, declare-storm) in front of it.
+            false,
         )
         .await
         {

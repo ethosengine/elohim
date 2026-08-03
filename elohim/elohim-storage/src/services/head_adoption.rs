@@ -207,11 +207,46 @@
 //!    now answers `canonical == true` with the election ordering, and the Fix-2
 //!    guard authorizes the move.
 //!
-//! **Residual class, out of reach this wave:** ids where BOTH sides are
-//! conductor-missing. Neither can declare (the no-chain gate is
-//! target-independent) and neither can obey (no election can be minted). Closing
-//! it needs the deliberate coordinator-zome decision about that gate, which
-//! touches adopt-before-author semantics and deserves its own review.
+//! **Residual class:** ids where BOTH sides are conductor-missing. Neither can
+//! declare (the no-chain gate is target-independent) and neither can obey (no
+//! election can be minted).
+//!
+//! ## ADOPT-BEFORE-AUTHOR — the residual's exit, shipped DORMANT
+//!
+//! That residual's only automated exit is for a node WITHOUT a local chain to be
+//! able to supply an election from a VALIDATED carried record. The coordinator
+//! now permits exactly that (`content_store::classify_chain_gate`), and this
+//! module drives it — behind `config::adopt_before_author_enabled()`, **default
+//! OFF**. The capability is built, tested and wired; turning it on is an env-var
+//! flip (`ELOHIM_ADOPT_BEFORE_AUTHOR=1`), not a build cycle.
+//!
+//! **Semantics.** The node ADOPTS a validated record's head as its declaration
+//! instead of AUTHORING one from a chain it does not have. Nothing is trusted:
+//! the zome re-derives the action hash, verifies the author's signature, checks
+//! the entry↔action binding and enforces the target-id gate, so a transferred
+//! claim confers only what the receiver re-derives (C5). The declaration is one
+//! more candidate for `select_canonical_winner`, never a crowning (C1).
+//!
+//! **Where it fires.** Exactly the two sites that today refuse with
+//! `no content found for id` — the CONTEST arm (the residual's real site) and
+//! `declare_peer_head`. Both retry ONLY after the classic attempt has already
+//! been refused for that reason, and only with bytes in hand, so the flag can
+//! never change what the classic path does.
+//!
+//! **Convergence math.** The reachable set is the both-sides-missing pairs where
+//! at least one side can FETCH the winner's bytes from any advertiser — i.e.
+//! `contest_failed{no_local_chain}` candidates whose view-federation fetch
+//! returns `Present` WITH bytes. Ids where no advertiser can serve the record
+//! (`fetch_none`) stay out of reach and are unaffected: the arm requires
+//! evidence, so it converts the byte-servable share of that class and nothing
+//! else. `minted{source="adopt_before_author"}` over
+//! `contest_failed{class="no_local_chain"}` reads that share directly, live.
+//!
+//! **Flag OFF is behaviour-identical.** Every new branch is inside
+//! `adopt_before_author_param`, which is `false` unless the node flag is on AND
+//! validated-shape bytes are present; with it false no extra conductor call, no
+//! clone, and no metric increment happens, and the zome refuses identically on
+//! `adopt_before_author: false`.
 //!
 //! **No admission or budget deny.** Every arm degrades to the author path and
 //! retries on the next sweep. Pacing and yielding are the callers' existing
@@ -552,6 +587,41 @@ pub fn declaration_would_move(current: Option<&str>, incoming: &str) -> bool {
         None => true,
         Some(c) => c.trim() != incoming.trim(),
     }
+}
+
+/// ADOPT-BEFORE-AUTHOR, as a pure predicate: may this call site ask the
+/// conductor to bypass its target-independent no-chain gate?
+///
+/// The mirror of `content_store::classify_chain_gate` on the storage side, and
+/// the ONE place the two conditions are joined — so "the flag is on" can never
+/// drift apart from "we actually hold evidence to send". A `true` from here
+/// always travels WITH the bytes that justify it.
+///
+/// `node_flag_enabled` is `config::adopt_before_author_enabled()` (the OnceLock
+/// mirror, default FALSE); `carried_bytes_present` means the view-federation
+/// fetch answered `Present` **with** `record: Some(_)` — a hash-only answer is
+/// not evidence and must not set the param.
+///
+/// Taking both as arguments rather than reading the config inside is what makes
+/// this testable without process state, and is the same discipline as
+/// [`decide_head_action`]'s `contest_enabled`.
+pub fn adopt_before_author_param(node_flag_enabled: bool, carried_bytes_present: bool) -> bool {
+    node_flag_enabled && carried_bytes_present
+}
+
+/// The retry payload for the adopt-before-author arms, cloned ONLY when the arm
+/// could actually use it.
+///
+/// The dormant path must cost nothing — not a conductor call, not a metric, and
+/// not a multi-KB `Vec<u8>` clone per contested id per sweep. Returning `None`
+/// while the flag is off is what makes "behaviour-identical" also mean
+/// "allocation-identical".
+fn adopt_retry_bytes(carried_record: Option<&Vec<u8>>) -> Option<Vec<u8>> {
+    let enabled = crate::config::adopt_before_author_enabled();
+    if !adopt_before_author_param(enabled, carried_record.is_some()) {
+        return None;
+    }
+    carried_record.cloned()
 }
 
 /// See [`HeadDecision`] for the table this implements.
@@ -1078,15 +1148,23 @@ async fn try_obey_visible_election(
     }
 }
 
-/// Process-local record of ids this node has already SELF-CANDIDATED, keyed by
-/// `(id, target)`.
+/// Process-local record of `(id, target)` pairs this node has already
+/// CANDIDATED — a candidate it minted, or tried to.
 ///
-/// Self-candidacy names THIS row's own declared head, so — unlike peer
-/// candidacy, whose target changes as peers move — the target is stable across
-/// sweeps. Without a ledger a node would re-mint the identical link every sweep
-/// during the window between minting and the election projecting onto the row.
-/// Keying on `(id, target)` (not `id` alone) keeps a genuinely NEW local head
-/// candidatable: if our head moves, that is a new candidate and must be minted.
+/// Two shapes share this ledger, and the key is what lets them:
+///
+/// - **SELF-candidacy** names THIS row's own declared head. The target is stable
+///   across sweeps, so a re-mint would be byte-identical.
+/// - **ADOPT-BEFORE-AUTHOR** (operator-reserved) names the PEER's head, minted
+///   by a node with no local chain from a validated carried record. Its target
+///   moves as the advertising peer's head moves — which is exactly why the key
+///   is `(id, target)` and not `id`.
+///
+/// Without a ledger a node would re-mint the identical link every sweep during
+/// the window between minting and the election projecting onto the row. Keying
+/// on `(id, target)` keeps a genuinely NEW candidate mintable: if the nominated
+/// head moves, that is a new candidate and must be minted. The two shapes cannot
+/// collide — they nominate different targets, so they occupy different keys.
 ///
 /// Process-local on purpose: it is a de-duplication cache, not a truth store.
 /// The DURABLE quiescence gate is `canonical_declared_at` on the row (see
@@ -1109,16 +1187,16 @@ fn self_candidate_key(id: &str, target: &str) -> String {
     format!("{id}\u{1}{target}")
 }
 
-/// Claim the right to self-candidate `(id, target)`. Returns `true` on the FIRST
+/// Claim the right to candidate `(id, target)`. Returns `true` on the FIRST
 /// call for a pair and `false` afterwards — so a caller mints at most once per
-/// (id, local head) per process.
+/// (id, nominated head) per process, whichever shape nominated it.
 ///
 /// The claim is taken BEFORE the declare, not after it succeeds, and that is
 /// deliberate: under the fan-out sweep several tasks can reach this arm for the
 /// same id concurrently, and claim-on-success would let all of them mint. The
 /// cost of claiming early is that a FAILED attempt must hand the claim back —
-/// see [`release_self_candidacy`].
-fn claim_self_candidacy(id: &str, target: &str) -> bool {
+/// see [`release_candidacy`].
+fn claim_candidacy(id: &str, target: &str) -> bool {
     let ledger = SELF_CANDIDATE_MINTS.get_or_init(|| std::sync::Mutex::new(Default::default()));
     let mut guard = match ledger.lock() {
         Ok(g) => g,
@@ -1132,13 +1210,13 @@ fn claim_self_candidacy(id: &str, target: &str) -> bool {
 }
 
 /// Hand back a claim whose declare FAILED — the C3 half of
-/// [`claim_self_candidacy`].
+/// [`claim_candidacy`].
 ///
 /// ## The permanent exclusion this closes (2026-08-02, F-B)
 ///
 /// The claim was taken before the attempt and never released, so ONE failed
 /// self-candidacy retired `(id, own_head)` for the life of the process: the next
-/// sweep took the `!claim_self_candidacy` early-return and never called the
+/// sweep took the `!claim_candidacy` early-return and never called the
 /// conductor again. The live fingerprint was `contest_self_head = 4` against
 /// `contest_failed{fetch_none} = 603` — 603 ids that had each burned their only
 /// attempt and could never nominate again without a pod restart.
@@ -1147,7 +1225,7 @@ fn claim_self_candidacy(id: &str, target: &str) -> bool {
 /// released claim plus a [`contest_backoff`](crate::services::contest_backoff)
 /// entry converts it into a BOUNDED one: retried roughly hourly instead of
 /// either never (before) or every sweep (unbounded).
-fn release_self_candidacy(id: &str, target: &str) {
+fn release_candidacy(id: &str, target: &str) {
     if let Some(ledger) = SELF_CANDIDATE_MINTS.get() {
         if let Ok(mut guard) = ledger.lock() {
             guard.remove(&self_candidate_key(id, target));
@@ -1300,13 +1378,20 @@ async fn contest_peer(
     } else {
         crate::metrics::ContestFailure::FetchNone
     };
+    // ADOPT-BEFORE-AUTHOR retry budget, reserved BEFORE the classic declare
+    // consumes the bytes. `None` whenever the flag is off or no bytes were
+    // served, so the dormant path clones nothing.
+    let adopt_retry = adopt_retry_bytes(carried_record.as_ref());
 
-    // ARM 1 — PEER-HEAD CANDIDACY.
+    // ARM 1 — PEER-HEAD CANDIDACY. `adopt_before_author: false` — this is the
+    // classic attempt, and it must stay the classic attempt: the bypass may only
+    // ever run AFTER the no-chain gate has actually refused, never instead of it.
     match conductor_writes::call_declare_canonical_content_head(
         hc,
         id,
         peer_head.clone(),
         carried_record,
+        false,
     )
     .await
     {
@@ -1330,7 +1415,35 @@ async fn contest_peer(
             // already carries a declaration, and authoring here is exactly the
             // self-election the module exists to stop.
             if msg.contains(ERR_NO_LOCAL_CHAIN) {
+                // Counted FIRST and unconditionally, even when the bypass below
+                // then succeeds. This series is the DENOMINATOR of the
+                // convergence math: `minted{source="adopt_before_author"}` over
+                // `contest_failed{class="no_local_chain"}` is the share of the
+                // residual the operator flip actually converts. Skipping the
+                // count on success would make the flag look free and the class
+                // look smaller than it is.
                 crate::metrics::inc_contest_failed(crate::metrics::ContestFailure::NoLocalChain);
+
+                // ADOPT-BEFORE-AUTHOR (operator-reserved, default OFF). The ONE
+                // arm that can move a both-sides-missing id. Returns `None` when
+                // dormant, when no bytes were served, when this node already
+                // nominated this target, or when the zome refused the evidence —
+                // and every one of those falls through to the unchanged tail
+                // below, so the dormant path is the pre-flag path exactly.
+                if let Some(outcome) = try_adopt_before_author(
+                    hc,
+                    id,
+                    &peer_head,
+                    adopt_retry,
+                    hint,
+                    carried_present,
+                    fetcher_present,
+                )
+                .await
+                {
+                    return outcome;
+                }
+
                 // BACKOFF, recorded at the one site that can prove the class:
                 // this gate is target-independent (`gather_content_chain(id)`),
                 // so the verdict is a property of the ID, not of this peer or
@@ -1391,7 +1504,7 @@ async fn contest_peer(
 
     // QUIESCENCE, second shape: we already nominated this exact head. Re-minting
     // would add an identical candidate every sweep until the election projects.
-    if !claim_self_candidacy(id, own_head) {
+    if !claim_candidacy(id, own_head) {
         tracing::debug!(
             content_id = %id,
             "adopt-before-author: contest gate — this node already nominated its own head for \
@@ -1400,8 +1513,18 @@ async fn contest_peer(
         return AdoptOutcome::Held;
     }
 
-    match conductor_writes::call_declare_canonical_content_head(hc, id, own_head.to_string(), None)
-        .await
+    // `adopt_before_author: false`, and structurally so: this arm is reached only
+    // AFTER the chain gate has already PASSED (the zome answers `is not
+    // retrievable` only downstream of it), so there is no no-chain gate here to
+    // bypass — and it carries no record to license one with either.
+    match conductor_writes::call_declare_canonical_content_head(
+        hc,
+        id,
+        own_head.to_string(),
+        None,
+        false,
+    )
+    .await
     {
         Ok(declared) => contested(
             ContestShape::SelfHead,
@@ -1422,7 +1545,7 @@ async fn contest_peer(
             // `fetch_none=603` split. Releasing without the backoff would swing
             // to the other extreme (a predictable failure retried every sweep),
             // so the two must land together.
-            release_self_candidacy(id, own_head);
+            release_candidacy(id, own_head);
             crate::services::contest_backoff::note(
                 id,
                 crate::metrics::ContestSkip::SelfCandidacyBackoff,
@@ -1438,6 +1561,120 @@ async fn contest_peer(
                  nominate its own declared head; holding, retried after the contest backoff"
             );
             AdoptOutcome::Held
+        }
+    }
+}
+
+/// ADOPT-BEFORE-AUTHOR: mint a canonical-head candidate for an id this conductor
+/// holds **no chain for**, from a carried record the zome proves in wasm.
+///
+/// Operator-reserved and DORMANT by default — see the module note. This is the
+/// only arm that can move a both-sides-missing pair, because it is the only one
+/// that does not require the declaring node to already know the id.
+///
+/// ## What licenses it
+///
+/// Evidence, and only evidence. `adopt_before_author: true` travels with the
+/// bytes ([`adopt_before_author_param`] joins the two conditions in one place),
+/// and the coordinator then runs `validate_carried_record` UNCONDITIONALLY on
+/// this branch — action-hash binding, author signature, entry↔action binding —
+/// plus the target-id gate. Nothing is taken on the peer's word: the peer is a
+/// byte courier, exactly as in `try_obey_visible_election`.
+///
+/// Nothing is stamped here either. Like every contest shape this adds ONE
+/// candidate to the DHT election and lets `select_canonical_winner` decide; the
+/// row converges later through the ordinary canonical heal path.
+///
+/// ## Returns
+///
+/// `Some` **only** on a successful mint. Dormant, no bytes, already-nominated,
+/// and refused-by-the-zome all return `None` so the caller's unchanged
+/// no-chain tail (backoff + `Held`) runs — which is what keeps the flag-off
+/// path byte-identical to the pre-flag one.
+///
+/// bounded-work: AT MOST ONE conductor round-trip per (id, target) per process,
+/// and zero when the flag is off. There is deliberately NO retry ladder here —
+/// the reconcile sweep IS the retry, at its own cadence, under its own slice cap
+/// (`compose_adopt_slice`). The `(id, target)` candidacy ledger bounds the mint
+/// count and the contest backoff bounds the re-attempt rate, so this arm adds no
+/// new pacing scheme to a seam that already has two.
+async fn try_adopt_before_author(
+    hc: &Arc<HcClient>,
+    id: &str,
+    peer_head: &str,
+    bytes: Option<Vec<u8>>,
+    hint: &PeerHeadHint,
+    carried_present: bool,
+    fetcher_present: bool,
+) -> Option<AdoptOutcome> {
+    // DORMANT GATE. `adopt_retry_bytes` already applied
+    // `adopt_before_author_param`, so a `Some` here means BOTH the node flag is
+    // on AND validated-shape bytes are in hand.
+    let bytes = bytes?;
+
+    // IDEMPOTENCE. Same `(id, target)` ledger the self-candidacy shape uses: the
+    // row is NOT stamped by a contest, so without this the arm would re-mint the
+    // identical link every sweep for the whole window between minting and the
+    // election projecting. Claimed BEFORE the attempt (the fan-out sweep can
+    // reach this arm concurrently for one id) and handed back on failure, which
+    // is the C3 repair that keeps a failed attempt from retiring the pair for
+    // the life of the process.
+    if !claim_candidacy(id, peer_head) {
+        tracing::debug!(
+            content_id = %id,
+            "adopt-before-author: bypass gate — this node already nominated this target for \
+             this id; awaiting the election"
+        );
+        return None;
+    }
+
+    match conductor_writes::call_declare_canonical_content_head(
+        hc,
+        id,
+        peer_head.to_string(),
+        Some(bytes),
+        true,
+    )
+    .await
+    {
+        Ok(declared) => {
+            crate::metrics::inc_content_canonical_link_minted(
+                crate::metrics::MINTED_SOURCE_ADOPT_BEFORE_AUTHOR,
+            );
+            tracing::warn!(
+                target: "elohim_storage::head_adoption",
+                content_id = %id,
+                contested_head = %declared.head_action_hash,
+                from_peer = %hint.peer_id,
+                carried = carried_present,
+                fetcher = fetcher_present,
+                "adopt-before-author: ADOPTED a peer's head as this node's canonical \
+                 declaration WITHOUT a local chain — the zome re-derived the record's action \
+                 hash, author signature, entry↔action binding and content id before writing \
+                 the link, so this is evidence the DHT arbiter can elect on, not a claim. The \
+                 both-sides-missing residual now has a candidate; the row is unchanged until \
+                 the election decides"
+            );
+            Some(AdoptOutcome::Contested)
+        }
+        Err(e) => {
+            // C3: hand the claim back, so one refusal cannot retire this
+            // (id, target) for the life of the process. The caller's no-chain
+            // tail then records the BOUNDED backoff — the same window, cleared
+            // the moment an author path lands a chain.
+            release_candidacy(id, peer_head);
+            crate::metrics::inc_contest_failed(crate::metrics::ContestFailure::AdoptRefused);
+            tracing::warn!(
+                target: "elohim_storage::head_adoption",
+                content_id = %id,
+                from_peer = %hint.peer_id,
+                error = %e,
+                "adopt-before-author: the conductor REFUSED a chainless declaration despite \
+                 carried evidence — the record did not prove itself (hash, signature, \
+                 entry↔action binding, or content id), or the coordinator predates the flag; \
+                 holding, retried after the contest backoff"
+            );
+            None
         }
     }
 }
@@ -1576,16 +1813,85 @@ async fn declare_peer_head(
     }
 
     let carried_bytes = carried_record.as_ref().map(|b| b.len()).unwrap_or(0);
-    match conductor_writes::call_declare_canonical_content_head(
+    // ADOPT-BEFORE-AUTHOR retry budget: `None` unless the node flag is on AND
+    // bytes are in hand, so the dormant path clones nothing and the ladder below
+    // collapses to the single classic call it has always been.
+    let adopt_retry = adopt_retry_bytes(carried_record.as_ref());
+    // Which channel actually minted, for `links_minted{source}`. Set to the
+    // adopt label ONLY on the branch that provably used the bypass — a label
+    // that could also mean "the classic path worked" would be unreadable as the
+    // flag's live probe.
+    let mut minted_source = "adopt_peer";
+
+    // bounded-work: at most TWO conductor round-trips (the classic declare, then
+    // the evidence retry), and exactly one while the flag is off. Not a retry
+    // ladder — the second call is a DIFFERENT request (evidence-backed) made
+    // once, only after the first was refused for the one reason it can answer.
+    let attempted = conductor_writes::call_declare_canonical_content_head(
         hc,
         id,
         head_action_hash.to_string(),
         carried_record.clone(),
+        false,
     )
-    .await
-    {
+    .await;
+    let attempted = match attempted {
+        Ok(declared) => Ok(declared),
+        Err(first) => {
+            let refused_for_no_chain = first.to_string().contains(ERR_NO_LOCAL_CHAIN);
+            match adopt_retry.filter(|_| refused_for_no_chain) {
+                None => Err(first),
+                Some(bytes) => {
+                    match conductor_writes::call_declare_canonical_content_head(
+                        hc,
+                        id,
+                        head_action_hash.to_string(),
+                        Some(bytes),
+                        true,
+                    )
+                    .await
+                    {
+                        Ok(declared) => {
+                            minted_source = crate::metrics::MINTED_SOURCE_ADOPT_BEFORE_AUTHOR;
+                            tracing::warn!(
+                                target: "elohim_storage::head_adoption",
+                                content_id = %id,
+                                head = %head_action_hash,
+                                from_peer = %hint.peer_id,
+                                "adopt-before-author: declared a peer's head WITHOUT a local \
+                                 chain, on a record the zome proved in wasm — no competing \
+                                 local root was authored at all (the author-then-adopt \
+                                 round-trip is skipped entirely)"
+                            );
+                            Ok(declared)
+                        }
+                        Err(second) => {
+                            crate::metrics::inc_contest_failed(
+                                crate::metrics::ContestFailure::AdoptRefused,
+                            );
+                            tracing::warn!(
+                                target: "elohim_storage::head_adoption",
+                                content_id = %id,
+                                from_peer = %hint.peer_id,
+                                error = %second,
+                                "adopt-before-author: the conductor refused a chainless \
+                                 declaration despite carried evidence; falling back to the \
+                                 unchanged author-then-adopt path"
+                            );
+                            // The ORIGINAL error propagates, so the tail below —
+                            // including the `AuthorThenAdopt` classification —
+                            // behaves exactly as it did before the flag existed.
+                            Err(first)
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    match attempted {
         Ok(declared) => {
-            crate::metrics::inc_content_canonical_link_minted("adopt_peer");
+            crate::metrics::inc_content_canonical_link_minted(minted_source);
             // This declaration is a DELIBERATE own-conductor canonical act that
             // this process just caused — the same class as the declare route's
             // eager stamp — so `Declare` is the correct mode here (unlike the
@@ -1806,9 +2112,21 @@ mod tests {
     }
 
     /// P1.3: the `elohim_content_contest_failed_total{class}` label vocabulary is
-    /// a dashboard contract. These four strings are BYTE-IDENTICAL to the raw
+    /// a dashboard contract. The first four strings are BYTE-IDENTICAL to the raw
     /// literals they replaced; changing one silently zeroes every panel keyed on
     /// it.
+    ///
+    /// RE-PINNED 2026-08-03 (adopt-before-author). `adopt_refused` is APPENDED,
+    /// and appending is the only mutation this pin should ever accept without a
+    /// migration: no existing label string moved, so every panel, alert and
+    /// recording rule keyed on the four originals keeps its exact series and
+    /// cannot go silently zero. The new class is genuinely new — "the evidence
+    /// branch ran and the zome rejected the record" fits none of the four — and
+    /// it is structurally zero while the flag is dormant, so a dashboard that
+    /// never adds it simply shows what it always showed.
+    ///
+    /// A future edit that RENAMES or REORDERS any of the first four is the case
+    /// this pin exists to stop; re-pinning it away is not a fix.
     #[test]
     fn contest_failure_labels_are_stable() {
         seam_contracts::assert_reason_labels_stable::<crate::metrics::ContestFailure>(&[
@@ -1816,6 +2134,7 @@ mod tests {
             "not_retrievable",
             "fetch_none",
             "declare_error",
+            "adopt_refused",
         ]);
         seam_contracts::assert_reason_labels_discriminating::<crate::metrics::ContestFailure>();
     }
@@ -2045,13 +2364,13 @@ mod tests {
         let head = "uhCkk-own-head";
 
         assert!(
-            claim_self_candidacy(id, head),
+            claim_candidacy(id, head),
             "the first nomination must be allowed — this is the candidate that \
              gives the DHT election something to pick"
         );
         for sweep in 0..5 {
             assert!(
-                !claim_self_candidacy(id, head),
+                !claim_candidacy(id, head),
                 "sweep {sweep}: re-nominating the SAME head adds an identical candidate \
                  for no gain — a converged corpus must mint zero"
             );
@@ -2064,10 +2383,10 @@ mod tests {
     #[test]
     fn a_moved_local_head_may_be_nominated_again() {
         let id = "quiescence:moved-head";
-        assert!(claim_self_candidacy(id, "uhCkk-head-A"));
-        assert!(!claim_self_candidacy(id, "uhCkk-head-A"));
+        assert!(claim_candidacy(id, "uhCkk-head-A"));
+        assert!(!claim_candidacy(id, "uhCkk-head-A"));
         assert!(
-            claim_self_candidacy(id, "uhCkk-head-B"),
+            claim_candidacy(id, "uhCkk-head-B"),
             "our head moved; that is a different candidate and the election must see it"
         );
     }
@@ -2076,9 +2395,9 @@ mod tests {
     /// one id's nomination silently suppress another's.
     #[test]
     fn the_self_candidacy_ledger_does_not_collide_across_ids() {
-        assert!(claim_self_candidacy("quiescence:id-one", "uhCkk-shared"));
+        assert!(claim_candidacy("quiescence:id-one", "uhCkk-shared"));
         assert!(
-            claim_self_candidacy("quiescence:id-two", "uhCkk-shared"),
+            claim_candidacy("quiescence:id-two", "uhCkk-shared"),
             "same head hash under a different id is a distinct candidacy"
         );
     }
@@ -2098,21 +2417,18 @@ mod tests {
         let id = "quiescence:failed-then-retried";
         let head = "uhCkk-head-that-failed";
 
+        assert!(claim_candidacy(id, head), "first attempt claims the pair");
         assert!(
-            claim_self_candidacy(id, head),
-            "first attempt claims the pair"
-        );
-        assert!(
-            !claim_self_candidacy(id, head),
+            !claim_candidacy(id, head),
             "a second attempt while the first is in flight must NOT double-mint — this is \
              why the claim is taken before the declare, not after it succeeds"
         );
 
         // The declare failed. Hand the claim back.
-        release_self_candidacy(id, head);
+        release_candidacy(id, head);
 
         assert!(
-            claim_self_candidacy(id, head),
+            claim_candidacy(id, head),
             "after a released claim the id must be nominatable again — before this repair it \
              was retired for the life of the process, a permanent exclusion with no \
              automated exit"
@@ -2123,17 +2439,17 @@ mod tests {
     /// id's claim, or one failure would license a re-mint storm elsewhere.
     #[test]
     fn releasing_one_claim_leaves_every_other_claim_standing() {
-        assert!(claim_self_candidacy("release:kept", "uhCkk-kept"));
-        assert!(claim_self_candidacy("release:dropped", "uhCkk-dropped"));
+        assert!(claim_candidacy("release:kept", "uhCkk-kept"));
+        assert!(claim_candidacy("release:dropped", "uhCkk-dropped"));
 
-        release_self_candidacy("release:dropped", "uhCkk-dropped");
+        release_candidacy("release:dropped", "uhCkk-dropped");
 
         assert!(
-            !claim_self_candidacy("release:kept", "uhCkk-kept"),
+            !claim_candidacy("release:kept", "uhCkk-kept"),
             "an unrelated id's claim must survive another id's release"
         );
         assert!(
-            claim_self_candidacy("release:dropped", "uhCkk-dropped"),
+            claim_candidacy("release:dropped", "uhCkk-dropped"),
             "the released pair is claimable again"
         );
     }
@@ -2142,9 +2458,9 @@ mod tests {
     /// error path calls this unconditionally.
     #[test]
     fn releasing_an_unclaimed_pair_is_harmless() {
-        release_self_candidacy("release:never-claimed", "uhCkk-nothing");
+        release_candidacy("release:never-claimed", "uhCkk-nothing");
         assert!(
-            claim_self_candidacy("release:never-claimed", "uhCkk-nothing"),
+            claim_candidacy("release:never-claimed", "uhCkk-nothing"),
             "the pair is still freshly claimable"
         );
     }
@@ -2301,6 +2617,165 @@ mod tests {
             ctx.fetcher.is_none(),
             "the one-shot boot pass runs before P2P discovery — the peer arm must \
              degrade to the local-DHT arm alone, not error"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // ADOPT-BEFORE-AUTHOR (operator-reserved, DEFAULT OFF)
+    // -----------------------------------------------------------------------
+
+    /// The predicate is the AND of both conditions over its whole input space —
+    /// exhaustive, because the one thing that must never happen is the flag
+    /// drifting apart from the evidence it is supposed to travel with.
+    #[test]
+    fn adopt_before_author_requires_both_the_flag_and_the_evidence() {
+        assert!(
+            adopt_before_author_param(true, true),
+            "flag on AND bytes in hand is the only licensed shape"
+        );
+        assert!(
+            !adopt_before_author_param(true, false),
+            "the flag alone must never set the param — an unevidenced chainless \
+             declaration is exactly the self-crowning this seam refuses"
+        );
+        assert!(
+            !adopt_before_author_param(false, true),
+            "evidence alone must never set it either; that is what makes the ship dormant"
+        );
+        assert!(!adopt_before_author_param(false, false));
+    }
+
+    /// THE DEFAULT-OFF PROOF, read from the shipped config rather than restated:
+    /// a process that never published the switch reports it disabled, so every
+    /// call site computes `false` and sends the pre-flag conductor payload.
+    ///
+    /// Deliberately asserts the CONFIG accessor, not a literal — a future edit
+    /// that flipped `config::adopt_before_author_enabled`'s fallback to `true`
+    /// would turn a dormant capability live on every pod in the fleet, and this
+    /// is the test that would catch it.
+    #[test]
+    fn the_node_flag_defaults_to_off_so_the_capability_ships_dormant() {
+        assert!(
+            !crate::config::adopt_before_author_enabled(),
+            "adopt-before-author must be OFF unless an operator sets \
+             ELOHIM_ADOPT_BEFORE_AUTHOR — the whole point of the dormant ship is \
+             that turning it on is a deliberate act"
+        );
+        assert!(
+            !adopt_before_author_param(crate::config::adopt_before_author_enabled(), true),
+            "with the shipped default even a validated carried record must not set the param"
+        );
+    }
+
+    /// FLAG OFF ⇒ NO RETRY BUDGET. The dormant path does not merely decline to
+    /// use the bytes — it never clones them. This is what makes "behaviour
+    /// identical" also mean "allocation identical" on the hottest sweep in the
+    /// crate (one contested id per candidate per sweep, records are multi-KB).
+    #[test]
+    fn a_dormant_node_reserves_no_adopt_retry_budget() {
+        let record = vec![0xABu8; 64];
+        assert!(
+            adopt_retry_bytes(Some(&record)).is_none(),
+            "with the flag off there is no retry payload, so no second conductor \
+             call and no multi-KB clone can occur"
+        );
+        assert!(
+            adopt_retry_bytes(None).is_none(),
+            "and with no bytes served there is nothing to reserve either way"
+        );
+    }
+
+    /// IDEMPOTENCE for the NEW shape, on the SAME `(id, target)` ledger the
+    /// self-candidacy shape uses. A contest never stamps the row, so without this
+    /// the arm would re-mint an identical link every sweep for the whole window
+    /// between minting and the election projecting.
+    #[test]
+    fn an_adopted_candidacy_mints_at_most_once_per_id_and_target() {
+        let id = "adopt-ledger:once";
+        let peer_head = "uhCkk-peer-head";
+        assert!(
+            claim_candidacy(id, peer_head),
+            "the first adopt-before-author nomination of this target is minted"
+        );
+        assert!(
+            !claim_candidacy(id, peer_head),
+            "a replay of the SAME nomination must be refused — this is the write-storm gate"
+        );
+    }
+
+    /// The peer's head MOVING is a genuinely new candidate and must be
+    /// nominatable. This is why the ledger keys on `(id, target)` and not on
+    /// `id`: the adopt shape's target tracks the advertising peer, unlike the
+    /// self-candidacy shape's, which is stable.
+    #[test]
+    fn a_moved_peer_head_is_a_new_adopted_candidacy() {
+        let id = "adopt-ledger:moved";
+        assert!(claim_candidacy(id, "uhCkk-peer-head-A"));
+        assert!(
+            claim_candidacy(id, "uhCkk-peer-head-B"),
+            "when the advertised head moves the node must be able to nominate the new one"
+        );
+    }
+
+    /// C3: a REFUSED adopt attempt hands its claim back, so one failure cannot
+    /// retire the pair for the life of the process. Mirrors the self-candidacy
+    /// repair — the same permanent-exclusion shape, at a new call site.
+    #[test]
+    fn a_refused_adopt_attempt_returns_its_claim() {
+        let id = "adopt-ledger:refused";
+        let peer_head = "uhCkk-refused-head";
+        assert!(claim_candidacy(id, peer_head));
+        release_candidacy(id, peer_head);
+        assert!(
+            claim_candidacy(id, peer_head),
+            "a refused evidence branch must leave the pair re-nominatable — a \
+             permanent exclusion with no automated exit is a C3 violation"
+        );
+    }
+
+    /// The new failure label is additive and distinguishable: `adopt_refused`
+    /// isolates "the bypass ran and the zome rejected the evidence" from every
+    /// pre-existing class, and — critically — the four pinned labels are
+    /// unchanged, because dashboards key on them byte-for-byte.
+    #[test]
+    fn the_adopt_refusal_label_is_additive_and_distinct() {
+        use crate::metrics::ContestFailure;
+        let labels: Vec<&str> = ContestFailure::ALL.iter().map(|c| c.label()).collect();
+        assert_eq!(
+            labels,
+            vec![
+                "no_local_chain",
+                "not_retrievable",
+                "fetch_none",
+                "declare_error",
+                "adopt_refused",
+            ],
+            "the four original labels must stay byte-identical and in place; the \
+             new one is APPENDED, never inserted"
+        );
+        assert_eq!(
+            labels.len(),
+            labels
+                .iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len(),
+            "every failure class must be separable on the dashboard"
+        );
+    }
+
+    /// The mint label is a named const rather than a literal precisely because it
+    /// IS the flag's live probe: a typo would mint a permanently-zero series and
+    /// read as "the operator flip did nothing".
+    #[test]
+    fn the_adopt_mint_label_is_separable_from_every_other_source() {
+        let adopt = crate::metrics::MINTED_SOURCE_ADOPT_BEFORE_AUTHOR;
+        assert_eq!(adopt, "adopt_before_author");
+        assert_ne!(adopt, ContestShape::PeerHead.source_label());
+        assert_ne!(adopt, ContestShape::SelfHead.source_label());
+        assert_ne!(
+            adopt, "adopt_peer",
+            "the bypass must not share a series with the classic peer-adopt arm — \
+             the whole convergence reading depends on telling them apart"
         );
     }
 }

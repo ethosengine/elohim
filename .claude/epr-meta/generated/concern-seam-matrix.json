@@ -2,7 +2,7 @@
  "n_concerns": 16,
  "n_seams": 16,
  "n_cells": 256,
- "n_points_routed": 48,
+ "n_points_routed": 52,
  "plane_groups": [
   {
    "id": "control-truth",
@@ -415,9 +415,9 @@
   }
  },
  "counts": {
-  "unexamined": 225,
-  "variant": 17,
-  "conformant": 13,
+  "unexamined": 224,
+  "variant": 21,
+  "conformant": 10,
   "n-a": 1
  },
  "cells": [
@@ -631,9 +631,9 @@
     },
     {
      "crate": "elohim-storage",
-     "point": "contest failure classes (metrics::inc_contest_failed)",
+     "point": "ContestFailure (metrics::inc_contest_failed)",
      "status": "n-a",
-     "verified": false,
+     "verified": true,
      "file": "src/metrics.rs"
     },
     {
@@ -659,7 +659,14 @@
     },
     {
      "crate": "elohim-storage",
-     "point": "claim_self_candidacy",
+     "point": "claim_candidacy",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/head_adoption.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "adopt_before_author_param",
      "status": "answered",
      "verified": true,
      "file": "src/services/head_adoption.rs"
@@ -675,6 +682,13 @@
      "crate": "content_store",
      "point": "declare_canonical_head_inner",
      "status": "partial",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "classify_chain_gate",
+     "status": "answered",
      "verified": true,
      "file": "src/lib.rs"
     }
@@ -959,8 +973,8 @@
    "concern": "C3",
    "seam": "S3.10",
    "plane": "data",
-   "state": "conformant",
-   "reason": "3 point(s) answered with a cited contract test that exists and contains the named fn",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [
     "T1",
     "T2",
@@ -984,10 +998,31 @@
     },
     {
      "crate": "elohim-storage",
+     "point": "compose_adopt_slice",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
      "point": "backoff_is_active",
      "status": "answered",
      "verified": true,
      "file": "src/services/contest_backoff.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "adopt_before_author_param",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/head_adoption.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "classify_chain_gate",
+     "status": "partial",
+     "verified": true,
+     "file": "src/lib.rs"
     }
    ]
   },
@@ -1121,7 +1156,7 @@
    "seam": "S3.10",
    "plane": "data",
    "state": "variant",
-   "reason": "documented waiver: status partial; answered but NO verified contract test: LocalResolve, resolve_canonical_election",
+   "reason": "answered but NO verified contract test: LocalResolve, resolve_canonical_election",
    "tracks": [
     "T1",
     "T2",
@@ -1138,9 +1173,9 @@
     },
     {
      "crate": "elohim-storage",
-     "point": "contest failure classes (metrics::inc_contest_failed)",
-     "status": "partial",
-     "verified": false,
+     "point": "ContestFailure (metrics::inc_contest_failed)",
+     "status": "answered",
+     "verified": true,
      "file": "src/metrics.rs"
     },
     {
@@ -1439,6 +1474,13 @@
    "reach_tier": "familiar",
    "points": [
     {
+     "crate": "elohim-storage",
+     "point": "adopt_before_author_param",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/head_adoption.rs"
+    },
+    {
      "crate": "content_store",
      "point": "declare_canonical_head_inner",
      "status": "answered",
@@ -1450,6 +1492,13 @@
      "point": "validate_carried_head_record",
      "status": "partial",
      "verified": false,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "classify_chain_gate",
+     "status": "answered",
+     "verified": true,
      "file": "src/lib.rs"
     }
    ]
@@ -1605,8 +1654,8 @@
    "concern": "C6a",
    "seam": "S3.10",
    "plane": "data",
-   "state": "conformant",
-   "reason": "3 point(s) answered with a cited contract test that exists and contains the named fn",
+   "state": "variant",
+   "reason": "answered but NO verified contract test: resolve_canonical_election",
    "tracks": [
     "T1",
     "T2",
@@ -1630,10 +1679,38 @@
     },
     {
      "crate": "elohim-storage",
+     "point": "ElectionObeyProbe",
+     "status": "answered",
+     "verified": true,
+     "file": "src/metrics.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "compose_adopt_slice",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
      "point": "backoff_is_active",
      "status": "answered",
      "verified": true,
      "file": "src/services/contest_backoff.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "adopt_before_author_param",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/head_adoption.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "resolve_canonical_election",
+     "status": "answered",
+     "verified": false,
+     "file": "src/lib.rs"
     }
    ]
   },
@@ -1785,8 +1862,8 @@
    "concern": "C6b",
    "seam": "S3.10",
    "plane": "data",
-   "state": "conformant",
-   "reason": "3 point(s) answered with a cited contract test that exists and contains the named fn",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [
     "T1",
     "T2",
@@ -1810,10 +1887,17 @@
     },
     {
      "crate": "elohim-storage",
-     "point": "claim_self_candidacy",
+     "point": "claim_candidacy",
      "status": "answered",
      "verified": true,
      "file": "src/services/head_adoption.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "classify_chain_gate",
+     "status": "partial",
+     "verified": true,
+     "file": "src/lib.rs"
     }
    ]
   },
@@ -2118,10 +2202,24 @@
     },
     {
      "crate": "elohim-storage",
-     "point": "contest failure classes (metrics::inc_contest_failed)",
-     "status": "partial",
-     "verified": false,
+     "point": "ContestFailure (metrics::inc_contest_failed)",
+     "status": "answered",
+     "verified": true,
      "file": "src/metrics.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "ElectionObeyProbe",
+     "status": "answered",
+     "verified": true,
+     "file": "src/metrics.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "compose_adopt_slice",
+     "status": "partial",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
     },
     {
      "crate": "elohim-storage",
@@ -2129,6 +2227,13 @@
      "status": "answered",
      "verified": true,
      "file": "src/services/contest_backoff.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "adopt_before_author_param",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/head_adoption.rs"
     }
    ]
   },
@@ -2996,8 +3101,23 @@
    "concern": "C14",
    "seam": "S3.10",
    "plane": "data",
-   "state": "unexamined",
-   "score": 16.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T1",
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "familiar",
+   "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "ElectionObeyProbe",
+     "status": "partial",
+     "verified": true,
+     "file": "src/metrics.rs"
+    }
+   ]
   },
   {
    "concern": "C14",
@@ -3484,18 +3604,6 @@
   },
   {
    "concern": "C14",
-   "seam": "S3.10",
-   "score": 16.0,
-   "score_parts": {
-    "recurrence": 2,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 4.0,
-    "rung_reason": "notary-authority red+active"
-   }
-  },
-  {
-   "concern": "C14",
    "seam": "S3.11",
    "score": 16.0,
    "score_parts": {
@@ -3529,6 +3637,18 @@
     "rung_proximity": 2.0,
     "rung_reason": "declarative-desired-state unwired"
    }
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.3",
+   "score": 16.0,
+   "score_parts": {
+    "recurrence": 4,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 2.0,
+    "rung_reason": "declarative-desired-state unwired"
+   }
   }
  ],
  "errors": [],
@@ -3538,7 +3658,7 @@
    "detail": "\u00a73 has no identity/T1-notary section; T1 concerns route under the \u00a73 seam owning their artifact, per the \u00a74 \"T1 notary floor (under 3.11)\" precedent. Candidate atlas correction: either an explicit \u00a73.16 identity/notary section, or an explicit statement in \u00a73 that T1 concerns route under the artifact-owning seam.\n"
   }
  ],
- "digest": "sha256:f24801dc423431bb6d2065612e04c890",
+ "digest": "sha256:36c8c655a90df57e54fe5baa6a5a6f36",
  "ranked_unexamined_note": "head only \u2014 the full ranking is `cells` filtered to state=unexamined, sorted by -score then (concern, seam)",
  "_generated": {
   "by": ".claude/scripts/_lib/seam_matrix.py",

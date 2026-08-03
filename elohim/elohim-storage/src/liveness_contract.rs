@@ -55,7 +55,14 @@
 //!   no storage arm moves it. That is a *documented open residual* of the 2026-08-02
 //!   shift, not a cured wall, and it gets its own witness test —
 //!   [`tests::both_sides_conductor_missing_is_a_known_open_residual`] — which asserts
-//!   the harness NAMES it rather than hiding it inside a green main table.
+//!   the harness NAMES it rather than hiding it inside a green main table. Since
+//!   ADOPT-BEFORE-AUTHOR that witness runs TWO legs over the same state table,
+//!   parameterised by the config bit exactly as [`CONTEST_ENABLED`] parameterises the
+//!   contest arm: **flag OFF (the shipped default)** — still `manual_only_exit`, the
+//!   residual is open and must keep saying so; **flag ON** — a genuine automated exit
+//!   exists. A capability that ships dormant does not close a residual, and modeling
+//!   both legs is what keeps that distinction legible instead of letting a built-but-off
+//!   arm read as a cure.
 //! - **Sweep SCHEDULING.** Whether a live row reaches its arm *this tick* — the
 //!   per-tick slice cap, the item spacing, the wall-clock budget, the contest
 //!   backoff's priority ordering — is a dimension this table does not carry. Every
@@ -82,7 +89,9 @@ use crate::p2p::projection_reconcile::{
     conductor_missing_should_route_to_adopt, declared_divergence_should_route_to_contest,
     gapfill_would_self_elect, timeout_should_route_to_adopt,
 };
-use crate::services::head_adoption::{decide_head_action, should_probe_election, HeadDecision};
+use crate::services::head_adoption::{
+    adopt_before_author_param, decide_head_action, should_probe_election, HeadDecision,
+};
 
 /// The `config.contest_two_way_declared` switch as shipped (`default_true()` in
 /// `config.rs`). Leg 3 models the default pod, not a hand-tuned one.
@@ -1202,41 +1211,103 @@ mod tests {
             Converged,
         }
 
-        let failure = check_liveness(
-            &[BothMissing::NeitherPodHoldsAChain, BothMissing::Converged],
-            |s| match s {
+        /// The residual's state table, parameterised by the ONE config bit that
+        /// changes it — modeled exactly the way [`CONTEST_ENABLED`] models
+        /// `config.contest_two_way_declared`, and driven by the same live
+        /// predicate the production arms consult
+        /// ([`crate::services::head_adoption::adopt_before_author_param`]).
+        ///
+        /// `carried_bytes_in_hand` is held TRUE here on purpose: the reachable
+        /// share of the residual is exactly the pairs where at least one side can
+        /// fetch the winner's bytes from an advertiser. A pair with no servable
+        /// record is a different (still-open) state that no flag can move, and
+        /// the arm honestly returns `None` for it — see the convergence-math note
+        /// in `services::head_adoption`'s module doc.
+        fn residual_transitions(
+            adopt_before_author: bool,
+        ) -> impl Fn(&BothMissing) -> Vec<Transition<BothMissing>> {
+            move |s: &BothMissing| match s {
+                BothMissing::Converged => vec![],
+                BothMissing::NeitherPodHoldsAChain => {
+                    // The live predicate, not a re-statement of it: if the two
+                    // conditions ever stop being ANDed, this table changes shape.
+                    let bypass_licensed = adopt_before_author_param(adopt_before_author, true);
+                    if bypass_licensed {
+                        vec![Transition::automated(
+                            "adopt-before-author: the pod fetches the advertiser's head Record \
+                             over view-federation and declares with adopt_before_author=true; \
+                             the zome re-derives the action hash, author signature, \
+                             entry↔action binding and content id, then writes the canonical \
+                             link — the arbiter finally has a candidate and both pods obey the \
+                             election through the ordinary heal path",
+                        )
+                        .to(BothMissing::Converged)]
+                    } else {
+                        // conductor_missing_should_route_to_adopt admits the row, and
+                        // decide_head_action answers ContestPeer — but the declare fails
+                        // the no-chain gate on BOTH sides, so nothing is minted and there
+                        // is no election for the obey arm to read.
+                        vec![Transition::deploy(
+                            "deploy declare-cycle, or the operator flip of \
+                             ELOHIM_ADOPT_BEFORE_AUTHOR (the capability ships dormant, so \
+                             turning it on is an operator act — which C3 does not count as \
+                             an automated exit)",
+                        )
+                        .to(BothMissing::Converged)]
+                    }
+                }
+            }
+        }
+
+        fn classify(s: &BothMissing) -> StateClass {
+            match s {
                 BothMissing::Converged => {
                     StateClass::Terminal("both pods obey one elected head; nothing further is owed")
                 }
                 BothMissing::NeitherPodHoldsAChain => StateClass::Live,
-            },
-            |s| match s {
-                BothMissing::Converged => vec![],
-                BothMissing::NeitherPodHoldsAChain => vec![
-                    // conductor_missing_should_route_to_adopt admits the row, and
-                    // decide_head_action answers ContestPeer — but the declare fails
-                    // the no-chain gate on BOTH sides, so nothing is minted and there
-                    // is no election for the obey arm to read.
-                    Transition::deploy(
-                        "deploy declare-cycle, or the operator-facing coordinator-zome \
-                         follow-up (declare with a validated carried record when no local \
-                         chain exists)",
-                    )
-                    .to(BothMissing::Converged),
-                ],
-            },
-        )
-        .expect_err(
-            "the both-sides-missing pair has no automated exit today — if this now passes, \
-             the RCA v3 residual has been cured and this witness should fold into the main \
-             table",
-        );
+            }
+        }
 
+        const STATES: &[BothMissing] =
+            &[BothMissing::NeitherPodHoldsAChain, BothMissing::Converged];
+
+        // ── LEG A — FLAG OFF (the shipped default). The residual is OPEN: the
+        // only exit is an operator/deploy act, which C3 refuses to count. This
+        // is the same verdict this witness has always reported, and it must stay
+        // reported while the capability ships dormant — a dormant cure is not a
+        // cure, and a green table here would claim otherwise.
+        let failure = check_liveness(STATES, classify, residual_transitions(false)).expect_err(
+            "with ELOHIM_ADOPT_BEFORE_AUTHOR unset the both-sides-missing pair still has no \
+             automated exit — if this now passes, the default changed and the honesty matrix \
+             is stale",
+        );
         assert!(
             failure.has_class(
                 seam_contracts::harness::liveness::LivenessViolationClass::ManualOnlyExit
             ),
             "{failure}"
+        );
+
+        // ── LEG B — FLAG ON. The residual is CLOSED: a genuine automated exit
+        // exists, driven by the live `adopt_before_author_param` predicate. This
+        // is the half that proves the capability is real rather than declared —
+        // if the arm is ever removed or its predicate stops ANDing the flag with
+        // the evidence, this leg goes red.
+        let report = check_liveness(STATES, classify, residual_transitions(true)).unwrap_or_else(
+            |failure| {
+                panic!(
+                    "adopt-before-author is supposed to be the residual's automated exit; the \
+                     harness cannot find one:\n{failure}"
+                )
+            },
+        );
+        assert!(
+            report.progress_checked,
+            "the flag-on leg must actually check progress, not merely enumerate: {report}"
+        );
+        assert!(
+            report.transitions_enumerated >= 1,
+            "the flag-on leg must enumerate the adopt-before-author transition: {report}"
         );
     }
 }

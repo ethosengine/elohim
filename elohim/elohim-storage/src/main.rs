@@ -443,6 +443,27 @@ async fn async_main(
     // the hot path (see `config::set_contest_two_way_declared`).
     elohim_storage::config::set_contest_two_way_declared(config.contest_two_way_declared);
 
+    // ADOPT-BEFORE-AUTHOR (default OFF — operator-reserved). Env ENABLES it:
+    // 1/true/yes/on. This is the both-sides-missing residual's only automated
+    // exit, shipped dormant so the decision to participate is a flip, not a
+    // build. Off, every call site sends the pre-flag conductor payload.
+    if let Ok(v) = std::env::var("ELOHIM_ADOPT_BEFORE_AUTHOR") {
+        config.adopt_before_author = matches!(
+            v.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes" | "on"
+        );
+    }
+    if config.adopt_before_author {
+        tracing::warn!(
+            "ADOPT-BEFORE-AUTHOR is ENABLED — this node may declare a canonical head for a \
+             content id it holds no local chain for, backed by a carried record the zome \
+             proves in wasm (action-hash binding, author signature, entry↔action binding, \
+             target-id gate). This is the both-sides-missing residual's exit; unset \
+             ELOHIM_ADOPT_BEFORE_AUTHOR to return to the dormant default"
+        );
+    }
+    elohim_storage::config::set_adopt_before_author(config.adopt_before_author);
+
     // F-B THROUGHPUT LEVER. Both knobs have an explicit OFF value that restores
     // the pre-F-B sweep exactly: fan-out 1 (sequential) and backoff 0 (contest
     // every candidate every sweep). An unparseable value leaves the default

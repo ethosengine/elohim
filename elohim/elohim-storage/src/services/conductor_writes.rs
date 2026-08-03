@@ -540,6 +540,24 @@ pub struct DeclareCanonicalHeadInput {
     /// which is also `#[serde(default, with = "serde_bytes")]`.
     #[serde(default, with = "serde_bytes")]
     pub carried_record: Option<Vec<u8>>,
+    /// ADOPT-BEFORE-AUTHOR (operator-reserved, default OFF): ask the coordinator
+    /// to accept this declaration even when it holds NO local chain for `id`,
+    /// PROVIDED [`Self::carried_record`] proves itself in wasm against the
+    /// declared target. Mirrors
+    /// `content_store::DeclareCanonicalHeadInput.adopt_before_author`.
+    ///
+    /// Additive in BOTH directions, which is what makes a rolling upgrade safe:
+    /// a `false` here is a msgpack `false` an OLD coordinator simply ignores
+    /// (serde skips unknown map keys — the struct is not `deny_unknown_fields`),
+    /// and a NEW coordinator receiving a payload with the key absent decodes it
+    /// to `false` via its own `#[serde(default)]`. Old-happ/new-storage and
+    /// new-happ/old-storage therefore both behave exactly as before.
+    ///
+    /// Never set speculatively: `head_adoption::adopt_before_author_param` sets
+    /// it only when the node-level flag is on AND validated-shape carried bytes
+    /// are actually in hand, so `true` always travels WITH its evidence.
+    #[serde(default)]
+    pub adopt_before_author: bool,
 }
 
 /// Caller-input wire shape for the `content_store::get_record_for_action`
@@ -680,16 +698,23 @@ pub async fn call_declare_content_head(
 /// target declare it anyway. The coordinator consults it ONLY on a local miss,
 /// and only after re-deriving the action hash, author signature, and
 /// entry↔action binding in wasm.
+/// `adopt_before_author` is the operator-reserved bypass of the coordinator's
+/// target-independent no-chain gate; pass `false` for the classic behaviour.
+/// Callers MUST NOT set it without carried bytes in hand — see
+/// [`DeclareCanonicalHeadInput::adopt_before_author`] and
+/// `head_adoption::adopt_before_author_param`.
 pub async fn call_declare_canonical_content_head(
     hc: &Arc<HcClient>,
     id: &str,
     head_action_hash: String,
     carried_record: Option<Vec<u8>>,
+    adopt_before_author: bool,
 ) -> Result<ContentHeadWire, StorageError> {
     let input = DeclareCanonicalHeadInput {
         id: id.to_string(),
         head_action_hash,
         carried_record,
+        adopt_before_author,
     };
     let payload = rmp_serde::to_vec_named(&input).map_err(|e| {
         StorageError::Internal(format!(

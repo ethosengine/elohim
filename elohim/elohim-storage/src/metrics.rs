@@ -367,6 +367,15 @@ lazy_static! {
     ///
     /// Watching the two contest labels against each other is how we learn WHICH
     /// shape actually converges the fleet.
+    ///
+    /// ADDITIVE (operator-reserved, default OFF): `adopt_before_author` — minted
+    /// by a node that holds NO local chain for the id, from a carried record the
+    /// zome proved in wasm. It is the ONLY label that can be non-zero for the
+    /// both-sides-missing residual, so it doubles as the flag's own live probe:
+    /// zero means the flag is off (or its precondition — validated carried bytes
+    /// for a chainless id — never occurred), never that the arm silently failed.
+    /// A failed attempt is counted separately as
+    /// `elohim_content_contest_failed_total{class="adopt_refused"}`.
     pub static ref CONTENT_CANONICAL_LINKS_MINTED: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_content_canonical_links_minted_total",
@@ -1084,6 +1093,15 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(NODE_CORPUS_DOCS.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_NAMESPACE_VIOLATIONS.clone()));
         let _ = REGISTRY.register(Box::new(SIGNAL_DECODE_MISS_TOTAL.clone()));
+        // Pre-touch the three signal families so zero-misses reads as a
+        // measured 0, never as an absent series (the exact ambiguity the
+        // obey-probe pre-touch exists to kill; this counter shipped without
+        // it and was flagged the same night).
+        for family in ["infra", "mishpat", "elohim_content"] {
+            SIGNAL_DECODE_MISS_TOTAL
+                .with_label_values(&[family])
+                .inc_by(0);
+        }
         let _ = REGISTRY.register(Box::new(ELOHIM_PLACEMENT_GAP_COUNT.clone()));
         let _ = REGISTRY.register(Box::new(ELOHIM_RS_COVERAGE_MILLI.clone()));
         let _ = REGISTRY.register(Box::new(ELOHIM_CUSTODIAN_FREE_BYTES.clone()));
@@ -1490,8 +1508,17 @@ pub fn inc_projection_refused_stale(reason: &str) {
         .inc();
 }
 
+/// `source` label for a link minted by the ADOPT-BEFORE-AUTHOR arm — a node with
+/// NO local chain for the id declaring from a wasm-proven carried record.
+///
+/// A named const rather than a literal at the call sites because this label IS
+/// the flag's live probe (see [`CONTENT_CANONICAL_LINKS_MINTED`]): a typo would
+/// mint a permanently-zero series and read as "the operator flip did nothing".
+pub const MINTED_SOURCE_ADOPT_BEFORE_AUTHOR: &str = "adopt_before_author";
+
 /// Count a canonical-head declaration LINK minted through this node, by the
-/// channel that caused it (`"adopt_peer"`, `"contest"`, `"http"`).
+/// channel that caused it (`"adopt_peer"`, `"contest_peer_head"`,
+/// `"contest_self_head"`, [`MINTED_SOURCE_ADOPT_BEFORE_AUTHOR`], `"http"`).
 pub fn inc_content_canonical_link_minted(source: &str) {
     CONTENT_CANONICAL_LINKS_MINTED
         .with_label_values(&[source])
@@ -1534,6 +1561,16 @@ pub enum ContestFailure {
     /// Anything else the conductor refused; always paired with a WARN carrying
     /// the verbatim message.
     DeclareError,
+    /// ADOPT-BEFORE-AUTHOR (operator-reserved, default OFF): the flag was on,
+    /// validated-shape carried bytes were in hand, and the conductor STILL
+    /// refused the chainless declaration.
+    ///
+    /// A genuinely NEW refusal shape, which is why it is a new variant rather
+    /// than folded into `declare_error`: it can only be produced by the evidence
+    /// branch, so it isolates "the bypass ran and the zome rejected the
+    /// evidence" from "the classic path failed". Structurally zero while the
+    /// flag is off — the arm that increments it is inside the flag's `if`.
+    AdoptRefused,
 }
 
 impl seam_contracts::ReasonLabel for ContestFailure {
@@ -1542,6 +1579,10 @@ impl seam_contracts::ReasonLabel for ContestFailure {
         ContestFailure::NotRetrievable,
         ContestFailure::FetchNone,
         ContestFailure::DeclareError,
+        // ADDITIVE. Appended, never inserted: the four labels above are pinned
+        // byte-identical to the pre-P1.3 literals because dashboards key on
+        // them, and appending is the only shape that cannot renumber a series.
+        ContestFailure::AdoptRefused,
     ];
 
     fn label(&self) -> &'static str {
@@ -1550,6 +1591,7 @@ impl seam_contracts::ReasonLabel for ContestFailure {
             ContestFailure::NotRetrievable => "not_retrievable",
             ContestFailure::FetchNone => "fetch_none",
             ContestFailure::DeclareError => "declare_error",
+            ContestFailure::AdoptRefused => "adopt_refused",
         }
     }
 }

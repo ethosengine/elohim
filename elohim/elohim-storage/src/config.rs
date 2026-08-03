@@ -97,6 +97,32 @@ pub fn contest_two_way_declared_enabled() -> bool {
     *CONTEST_TWO_WAY_DECLARED.get().unwrap_or(&true)
 }
 
+/// Process-wide mirror of [`Config::adopt_before_author`] — the OPERATOR-RESERVED
+/// switch for the both-sides-missing residual. Same `OnceLock` rationale as
+/// [`CONTEST_TWO_WAY_DECLARED`].
+///
+/// Defaults **false** when `main` never published a value, matching the config
+/// field, so the two homes cannot diverge and an embedded/test use is dormant
+/// exactly like a shipped pod.
+static ADOPT_BEFORE_AUTHOR: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+/// Publish the adopt-before-author switch for the reconcile sweep. Idempotent
+/// (`OnceLock::set` semantics — the first call wins).
+pub fn set_adopt_before_author(enabled: bool) {
+    let _ = ADOPT_BEFORE_AUTHOR.set(enabled);
+}
+
+/// May this node ask the conductor to declare a canonical head for an id it holds
+/// NO local chain for, on validated carried evidence?
+///
+/// **Default FALSE.** This is shipped DORMANT: the capability is built, tested,
+/// and wired, and turning it on is an env-var flip (`ELOHIM_ADOPT_BEFORE_AUTHOR`)
+/// rather than a build cycle. Off, every call site is byte-for-byte the prior
+/// behaviour — see `services::head_adoption::adopt_before_author_param`.
+pub fn adopt_before_author_enabled() -> bool {
+    *ADOPT_BEFORE_AUTHOR.get().unwrap_or(&false)
+}
+
 /// Process-wide mirror of [`Config::adopt_contest_fanout`]. Same rationale as
 /// [`CONTEST_TWO_WAY_DECLARED`]: the reconcile sweep carries no `Config`, and an
 /// env read on the hot path is the parallel-test-flake anti-pattern.
@@ -376,6 +402,36 @@ pub struct Config {
     #[serde(default = "default_true")]
     pub contest_two_way_declared: bool,
 
+    /// ADOPT-BEFORE-AUTHOR (operator-reserved): may this node ask the conductor
+    /// to declare a canonical head for an id it holds **no local chain** for,
+    /// backed by a carried record the zome proves in wasm?
+    ///
+    /// Default **false**, and deliberately so. `contest_two_way_declared` above
+    /// is default-ON because a node with a chain contesting its own view is a
+    /// safe supply act. This is a different question: it lets a node that has
+    /// never held an id enter the election for it. The mechanism is
+    /// evidence-bound and re-derived (`content_store::classify_chain_gate` opens
+    /// only with BOTH the opt-in and a record that passes every carried-record
+    /// clause plus the target-id gate), but WHETHER the fleet should participate
+    /// that way is an operator decision, not a default.
+    ///
+    /// ## The residual it exists for
+    ///
+    /// The zome's no-chain gate is target-INDEPENDENT, so when both sides of a
+    /// divergent pair lack a chain, neither can mint a candidate and the DHT
+    /// arbiter never runs. `contest_failed{no_local_chain}` is that class, and it
+    /// dominates non-progress. This flag is its only automated exit; with it off
+    /// the residual stays open (asserted in `liveness_contract`).
+    ///
+    /// ## Off is behaviour-identical
+    ///
+    /// Every call site passes the zome param as `flag && carried_bytes_in_hand`,
+    /// so `false` yields the exact pre-flag conductor payload — and the zome
+    /// itself refuses identically on `adopt_before_author: false`.
+    /// Loaded from env `ELOHIM_ADOPT_BEFORE_AUTHOR`.
+    #[serde(default)]
+    pub adopt_before_author: bool,
+
     /// F-B THROUGHPUT LEVER, half 1: how many adopt-before-author candidates the
     /// reconcile sweep processes CONCURRENTLY.
     ///
@@ -603,6 +659,7 @@ impl Default for Config {
             salvage_recheck_seconds: default_salvage_recheck_seconds(),
             salvage_diversity_placement: default_true(),
             contest_two_way_declared: default_true(),
+            adopt_before_author: false,
             adopt_contest_fanout: default_adopt_contest_fanout(),
             contest_backoff_seconds: default_contest_backoff_seconds(),
             demand_autopin_enabled: default_true(),

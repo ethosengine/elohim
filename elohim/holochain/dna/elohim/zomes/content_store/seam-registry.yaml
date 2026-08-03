@@ -302,3 +302,111 @@ decisionPoints:
       "authorization" is implicitly exercised only in the sense that every declare sweettest
       succeeds because the gate never refuses — that is not a test of the gate's logic, since it
       currently has none to test.
+
+  - name: classify_chain_gate
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/lib.rs
+      modulePath: content_store::classify_chain_gate
+      line: 3836
+    summary: >
+      ADOPT-BEFORE-AUTHOR (2026-08-03, operator-reserved, DEFAULT OFF). The declare path's
+      target-independent chain gate, extracted as a pure total function of
+      (chain_present, adopt_before_author, carried_record_present) -> ChainGate::{LocalChain,
+      AdoptOnCarriedEvidence, Refuse}. It is the ONE decision the new
+      DeclareCanonicalHeadInput.adopt_before_author field can move, and it moves exactly one of
+      its eight corners: no local chain + caller opted in + a carried record present routes to
+      AdoptOnCarriedEvidence, where declare_canonical_head_inner runs validate_carried_record
+      UNCONDITIONALLY (never local-get-first) and the shared TARGET-ID GATE still applies. Every
+      other corner reproduces the pre-flag verdict byte-for-byte, including the verbatim
+      "no content found for id" refusal the storage caller classifies on. Exists because that
+      gate asks about the DECLARER, not the target — so when BOTH sides of a divergent pair lack
+      a chain, neither can mint a candidate and the DHT arbiter never runs (the
+      both-sides-missing residual, RCA v3).
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          Extends the GUARDED LEGITIMATE ARM rather than widening self-election. C1's canon
+          admits self-candidacy "exactly when `not_retrievable` itself proves a local chain
+          exists" — evidence, not self-preference. This gate is the same shape one class over:
+          the bypass opens only when re-derived cryptographic evidence for the DECLARED TARGET
+          is in hand, and the declaration it permits is a candidate LINK for
+          select_canonical_winner (which has no author/identity component to consult), never a
+          crowning. the_bypass_opens_at_exactly_one_corner enumerates the whole 2^3 space and
+          pins that opt-in alone (opt_in_without_evidence_still_refuses) and evidence alone
+          (evidence_without_opt_in_still_refuses) both still refuse; the earned-head guard,
+          authorize_canonical_head_declarer and am_i_bootstrap_steward are all upstream of this
+          function and untouched.
+      - id: C5
+        status: answered
+        justification: >
+          This is C5's guarantee made structural at a new site. On the AdoptOnCarriedEvidence
+          branch declare_canonical_head_inner does NOT fall back to a local `get` — it calls
+          validate_carried_record unconditionally, so the declaration's entire license is what
+          the receiver re-derives: action-hash equality with the declared target, the author's
+          signature over the action, and the entry<->action binding (the swap-attack clause C5
+          names explicitly), followed by the shared TARGET-ID GATE requiring the carried
+          Content's own id to equal the declared id. Forcing the carried branch is deliberate:
+          a conductor just shown to hold no chain for the id must not be able to declare from a
+          local view instead of from evidence. Every clause is exercised WITH THE FLAG ON in
+          adopt_before_author_declares_without_a_local_chain, whose (g) case is the sharpest —
+          a fully genuine, correctly-signed record for a DIFFERENT content id, where checks 1-3
+          all pass and only the target-id gate refuses.
+      - id: C3
+        status: partial
+        justification: >
+          This gate IS the both-sides-missing residual's automated exit — the transition the
+          liveness harness could not find — but it ships DORMANT (default false at both homes:
+          the zome field's #[serde(default)] and config::adopt_before_author_enabled()). On a
+          default fleet the only exit remains an operator flip, which C3 explicitly refuses to
+          count ("a human hand (or a deploy) as the only exit is a liveness hole"). Recorded
+          partial rather than answered for exactly that reason, and the honesty is mechanised:
+          elohim-storage's both_sides_conductor_missing_is_a_known_open_residual now runs TWO
+          legs over the same state table — flag OFF still reports manual_only_exit, flag ON
+          finds the automated transition. It graduates to answered if and when the default
+          changes.
+      - id: C6b
+        status: partial
+        justification: >
+          The gate itself is stateless and total, so classification is idempotent by
+          construction (the_gate_is_stateless_so_a_replay_classifies_identically). The EFFECT
+          downstream is idempotent in OUTCOME but not in writes: a replayed declaration writes a
+          second canonical-head link naming the same target, and select_canonical_winner then
+          elects the identical winner (pinned by the sweettest's (j) case, which reads
+          resolve_canonical_election before and after a replay). Deduplication of the write is
+          deliberately the CALLER's job and lives in storage — the (id, target) candidacy ledger
+          plus the declare-storm gate — not in wasm, because the zome cannot know whether a
+          repeat call is a retry or a genuinely new nomination.
+    contractTests:
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: flag_off_is_behaviour_identical_to_the_pre_flag_gate
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: the_bypass_opens_at_exactly_one_corner
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: opt_in_without_evidence_still_refuses
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: evidence_without_opt_in_still_refuses
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: a_local_chain_always_wins_regardless_of_the_flag
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: the_gate_is_stateless_so_a_replay_classifies_identically
+        kind: unit
+      - path: elohim/holochain/tests/sweettest/src/tests/lamad.rs
+        testName: adopt_before_author_declares_without_a_local_chain
+        kind: sweettest
+        mirrorRisk: false
+    gapNote: >
+      The unit tests pin the GATE; they cannot pin the CLAUSES the gate's open corner depends
+      on (hash_action, verify_signature, hash_entry are HDK host functions with no existence
+      outside a wasm/conductor host, and this suite has no source-shape/include_str! pattern to
+      borrow). That is why the sweettest is cited alongside them and is the load-bearing test
+      here: it is the only place the action-hash, signature, entry<->action and target-id
+      clauses are exercised WITH adopt_before_author=true. This also partly closes
+      validate_carried_head_record's sibling gapNote about the shared helper being reachable
+      only through one declare shape — it is now exercised through two.

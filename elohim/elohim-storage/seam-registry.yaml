@@ -175,49 +175,55 @@ decisionPoints:
       the enum itself. This is exactly the gap plan task P1.2 closes by retrofitting this type
       onto seam_contracts::Answer<T> with its own contract test.
 
-  - name: contest failure classes (metrics::inc_contest_failed)
+  - name: ContestFailure (metrics::inc_contest_failed)
     kind: reason-outcome-enum
     sourceLocation:
       file: src/metrics.rs
-      modulePath: metrics::inc_contest_failed
-      line: 1253
+      modulePath: metrics::ContestFailure
+      line: 1524
     summary: >
-      Four known failure-class literals for a contest attempt that minted nothing —
-      "no_local_chain" | "not_retrievable" | "fetch_none" | "declare_error".
+      Why a contest attempt minted nothing, as a closed typed vocabulary implementing
+      seam_contracts::ReasonLabel — "no_local_chain" | "not_retrievable" | "fetch_none" |
+      "declare_error" | "adopt_refused". The first four are the original literals, pinned
+      BYTE-IDENTICAL because dashboards key on them; the fifth was APPENDED (never inserted)
+      by ADOPT-BEFORE-AUTHOR, 2026-08-03.
     notes: >
-      Currently a STRINGLY-TYPED label (&str), not a Rust enum — plan task P1.3 replaces this
-      with a typed ContestFailure implementing ReasonLabel (label strings held constant so
-      dashboards keep working). Registered here as the conceptual reason vocabulary in its
-      current pre-P1.3 shape so the gap is tracked, not rediscovered.
+      This row was registered pre-P1.3 as four stringly-typed &str literals with the typed
+      replacement named as the gap. P1.3 landed the ContestFailure enum + ReasonLabel impl, and
+      2026-08-03 added AdoptRefused. Updated in place rather than re-registered so the row's
+      history stays readable: the gap it was filed to track is closed, and the new variant
+      arrived under the same discipline (append-only labels, one variant per genuinely new
+      refusal shape).
     concernIds:
       - id: C4
-        status: partial
+        status: answered
         justification: >
-          "no_local_chain" (upstream conductor genuinely holds no chain for the id) is
-          distinguished from "not_retrievable"/"fetch_none" (a fetch that could not be
-          completed) in the doc comment — an honest-absence-shaped distinction — but there is
-          no test anywhere asserting these four literals stay distinct or stable, and the
-          class is not yet a real Rust type a compiler can exhaustively match on.
+          The honest-absence distinctions are now structural, not doc-only: "no_local_chain"
+          (this conductor genuinely holds no chain for the id — a target-INDEPENDENT gate) is a
+          separate variant from "not_retrievable" (the chain exists, the target could not be
+          resolved, AND we had bytes) and "fetch_none" (same wall, no bytes served) — and
+          "adopt_refused" is separate again: it means the evidence branch RAN and the zome
+          rejected the record, which is neither an absence nor a fetch problem. The set is
+          pinned by the_adopt_refusal_label_is_additive_and_distinct.
       - id: C8
-        status: partial
+        status: answered
         justification: >
-          The four literals ARE a labeled-counter vocabulary (CONTENT_CONTEST_FAILED{class}),
-          but as a bare &str there is no ReasonLabel::all() conformance check preventing a
-          typo'd fifth literal from silently fragmenting the metric — the exact class of defect
-          plan surface 3's ReasonLabel trait targets.
+          A closed Rust type with ReasonLabel::ALL, so the compiler enumerates the vocabulary
+          and a dashboard can too; inc_contest_failed takes the type, not a &str, so a typo'd
+          sixth literal is no longer expressible. The label-set test pins both stability (the
+          four original strings, in order) and separability (no duplicates).
       - id: C1
         status: n-a
         justification: >
-          This function only COUNTS a contest-failure class; it does not itself gate or permit
-          any self-election. The C1 guard it observes (a conductor genuinely has no local chain
-          for the id) lives upstream at content_store::declare_canonical_head_inner's no-chain
-          gate (see the content_store zome's seam-registry.yaml).
-    contractTests: null
-    gapNote: >
-      No test in src/metrics.rs or at any of the four call sites (src/services/head_adoption.rs
-      lines ~1054, ~1072, ~1092, ~1129) asserts on the "no_local_chain" / "not_retrievable" /
-      "fetch_none" / "declare_error" literal set. Grep-verified 2026-08-02: zero references to
-      any of the four strings inside a #[cfg(test)] module in this crate.
+          This type only NAMES a contest-failure class; it does not itself gate or permit any
+          self-election. The C1 guards it observes live upstream at
+          content_store::classify_chain_gate / declare_canonical_head_inner (see the
+          content_store zome's seam-registry.yaml).
+    contractTests:
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: the_adopt_refusal_label_is_additive_and_distinct
+        kind: unit
+        mirrorRisk: false
 
   - name: declared_divergence_should_route_to_contest
     kind: pure-decision-predicate
@@ -410,29 +416,43 @@ decisionPoints:
         testName: heal_decision_covers_bridge_and_single_flight
         kind: unit
 
-  - name: claim_self_candidacy
+  - name: claim_candidacy
     kind: pure-decision-predicate
     sourceLocation:
       file: src/services/head_adoption.rs
-      modulePath: services::head_adoption::claim_self_candidacy
-      line: 898
+      modulePath: services::head_adoption::claim_candidacy
+      line: 1290
     summary: >
-      In-process ledger: may THIS (id, target-head) pair be nominated as a self-candidate this
+      In-process ledger: may THIS (id, target-head) pair be nominated as a candidate this
       process lifetime? First nomination allowed; identical re-nomination refused; a genuinely
-      moved local head is nominatable again.
+      moved target is nominatable again. Renamed from claim_self_candidacy on 2026-08-03 —
+      TWO shapes now share it and the key is what lets them: SELF-candidacy (target = this
+      row's own declared head, stable across sweeps) and ADOPT-BEFORE-AUTHOR (target = the
+      PEER's head, minted by a node with no local chain from validated carried evidence, and
+      moving as the advertising peer moves). They cannot collide — different targets, different
+      keys.
     concernIds:
       - id: C1
         status: answered
         justification: >
-          Bounds the guarded legitimate self-candidacy arm this plan's own canon names for C1
+          Bounds BOTH guarded legitimate arms. For self-candidacy this is C1's named arm
           ("self-candidacy is admissible exactly when not_retrievable itself proves a local
-          chain exists") — the ledger stops a converged node from re-nominating the identical
-          head every sweep.
+          chain exists"). For adopt-before-author the guard is one class over and is upstream in
+          wasm (content_store::classify_chain_gate opens only on re-derived evidence); this
+          ledger's C1 contribution is the same in both cases — it stops a node re-nominating an
+          identical candidate every sweep, which is what would turn a supply act into a write
+          storm.
       - id: C6b
         status: answered
         justification: >
           self_candidacy_is_claimed_once_per_id_and_head proves 5 consecutive re-nomination
-          attempts of the SAME head are all refused after the first — idempotent under replay.
+          attempts of the SAME head are all refused after the first, and
+          an_adopted_candidacy_mints_at_most_once_per_id_and_target proves the identical
+          property for the new shape — idempotent under replay at both call sites. C3's
+          companion (a refused attempt hands its claim back, so no permanent exclusion) is
+          pinned per-shape by
+          a_failed_self_candidacy_releases_its_claim_rather_than_retiring_the_id and
+          a_refused_adopt_attempt_returns_its_claim.
     contractTests:
       - path: elohim/elohim-storage/src/services/head_adoption.rs
         testName: self_candidacy_is_claimed_once_per_id_and_head
@@ -445,6 +465,15 @@ decisionPoints:
         kind: unit
       - path: elohim/elohim-storage/src/services/head_adoption.rs
         testName: self_candidate_keys_are_unambiguous
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: an_adopted_candidacy_mints_at_most_once_per_id_and_target
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: a_moved_peer_head_is_a_new_adopted_candidacy
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: a_refused_adopt_attempt_returns_its_claim
         kind: unit
 
   - name: MissLedger::admit
@@ -724,3 +753,107 @@ decisionPoints:
       - path: elohim/elohim-storage/src/services/head_adoption.rs
         testName: releasing_an_unclaimed_pair_is_harmless
         kind: unit
+
+  - name: adopt_before_author_param
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/head_adoption.rs
+      modulePath: services::head_adoption::adopt_before_author_param
+      line: 608
+    summary: >
+      ADOPT-BEFORE-AUTHOR (2026-08-03, operator-reserved, DEFAULT OFF). May this call site ask
+      the conductor to bypass its target-independent no-chain gate? The AND of
+      (node_flag_enabled, carried_bytes_present) — the storage-side mirror of
+      content_store::classify_chain_gate, and the ONE place the two conditions are joined so
+      "the flag is on" cannot drift apart from "we hold evidence to send". `carried_bytes_present`
+      means the view-federation fetch answered Answer::Present WITH record: Some(_); a hash-only
+      answer is not evidence and must not set the param. Both inputs are arguments rather than
+      reads of process state, the same discipline as decide_head_action's contest_enabled.
+      Consumed by exactly two arms, each only AFTER the classic declare has already been refused
+      for "no content found for id": try_adopt_before_author (the CONTEST arm — the residual's
+      real site) and declare_peer_head's evidence retry.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          Cannot crown, and structurally cannot license an unevidenced declaration: the param is
+          false whenever bytes are absent, so a node with no chain and no record is refused
+          exactly as before (adopt_before_author_requires_both_the_flag_and_the_evidence pins
+          all four corners). What it permits is one CANDIDATE link for the DHT arbiter, which
+          has no author component to consult; nothing is stamped on the local row by either arm,
+          and the winner still arrives through the ordinary HealCanonical path.
+      - id: C5
+        status: answered
+        justification: >
+          The predicate is what guarantees a `true` always travels WITH the evidence that
+          justifies it — belief is conferred only by what the receiving CONDUCTOR re-derives
+          (validate_carried_record's action-hash / signature / entry<->action clauses plus the
+          target-id gate, all run unconditionally on that branch). Storage asserts nothing about
+          the record it forwards; the peer is a byte courier, exactly as in
+          try_obey_visible_election.
+      - id: C3
+        status: partial
+        justification: >
+          These arms ARE the both-sides-missing residual's automated exit, and the exit is real:
+          liveness_contract's both_sides_conductor_missing_is_a_known_open_residual now runs two
+          legs over one state table, and the flag-ON leg finds an automated transition where the
+          harness previously found none. But the capability ships DORMANT
+          (config::adopt_before_author_enabled() defaults false), so on a default fleet the only
+          exit is still an operator flip — which C3 refuses to count. Partial, not answered,
+          until the default changes. The C3 companion property at this seam IS answered: a
+          refused attempt releases its (id, target) claim
+          (a_refused_adopt_attempt_returns_its_claim), so one failure can never permanently
+          exclude a pair.
+      - id: C6a
+        status: answered
+        justification: >
+          Bounded and, while dormant, free. Off, adopt_retry_bytes returns None before any
+          allocation, so there is no second conductor round-trip and no multi-KB record clone on
+          the hottest sweep in the crate (a_dormant_node_reserves_no_adopt_retry_budget). On,
+          the budget is at most ONE extra round-trip per (id, target) per process — the
+          candidacy ledger bounds the mint count, the contest backoff bounds the re-attempt
+          rate, and there is deliberately NO retry ladder: the reconcile sweep is the retry, at
+          its own cadence under compose_adopt_slice's cap. No third pacing scheme is introduced
+          at a seam that already has two.
+      - id: C8
+        status: answered
+        justification: >
+          Every outcome of the new arms is counted and separable. A mint carries
+          links_minted{source="adopt_before_author"} (a named const, not a literal, because this
+          series IS the flag's live probe — a typo would read as "the operator flip did
+          nothing"); a refusal carries the appended typed class
+          contest_failed{class="adopt_refused"}, distinct from all four pre-existing classes.
+          contest_failed{class="no_local_chain"} is still counted FIRST and unconditionally,
+          even when the bypass then succeeds, so it remains the honest DENOMINATOR of the
+          convergence reading (minted{adopt_before_author} / contest_failed{no_local_chain} =
+          the share of the residual the flip converts). Pinned by
+          the_adopt_mint_label_is_separable_from_every_other_source and
+          the_adopt_refusal_label_is_additive_and_distinct.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: adopt_before_author_requires_both_the_flag_and_the_evidence
+        kind: unit
+        mirrorRisk: false
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: the_node_flag_defaults_to_off_so_the_capability_ships_dormant
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: a_dormant_node_reserves_no_adopt_retry_budget
+        kind: unit
+      - path: elohim/elohim-storage/src/liveness_contract.rs
+        testName: both_sides_conductor_missing_is_a_known_open_residual
+        kind: unit
+        mirrorRisk: false
+      - path: elohim/holochain/tests/sweettest/src/tests/lamad.rs
+        testName: adopt_before_author_declares_without_a_local_chain
+        kind: sweettest
+    gapNote: >
+      The unit tests pin the PREDICATE and the dormancy; the sweettest pins what the param
+      actually buys end-to-end. What no test in this crate covers is the LIVE wiring between
+      them — that main.rs's ELOHIM_ADOPT_BEFORE_AUTHOR parse reaches
+      config::set_adopt_before_author and thence these arms. That path is a bin-only startup
+      sequence with no harness in this crate (the same shape as CONTEST_TWO_WAY_DECLARED, which
+      is equally unpinned), so the operator flip's first real proof is the
+      links_minted{source="adopt_before_author"} series going non-zero on a live pod. Named here
+      rather than left implied: a zero series while the flag is believed on is a WIRING
+      question, not evidence that the arm failed.

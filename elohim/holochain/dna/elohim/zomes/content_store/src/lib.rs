@@ -2677,6 +2677,44 @@ pub struct DeclareCanonicalHeadInput {
     /// caller that sent the array shape.
     #[serde(default, with = "serde_bytes")]
     pub carried_record: Option<Vec<u8>>,
+    /// ADOPT-BEFORE-AUTHOR (operator-reserved, default OFF): permit the
+    /// declaration to proceed when this conductor holds **no local chain** for
+    /// `id` at all, provided [`Self::carried_record`] is supplied AND proves
+    /// itself in wasm against the declared target.
+    ///
+    /// ## The residual this exists for
+    ///
+    /// The `no content found for id` gate in [`declare_canonical_head_inner`] is
+    /// **target-independent**: it asks "does this conductor know the id?", so no
+    /// choice of target can pass it. When BOTH sides of a divergent pair are in
+    /// that state, neither can mint a canonical-head candidate, the DHT arbiter
+    /// has an empty set, and the pair cannot converge by any automated path —
+    /// the "both-sides-missing" residual. This flag is that residual's exit: the
+    /// node ADOPTS a validated record's head as its declaration instead of
+    /// authoring one from a chain it does not have.
+    ///
+    /// ## What it does NOT relax
+    ///
+    /// Every other gate is preserved and, on this branch, STRENGTHENED: the
+    /// bypass is licensed *only* by re-derived evidence, so
+    /// [`validate_carried_record`] runs unconditionally (action-hash binding,
+    /// author signature, entry↔action binding) and the TARGET-ID GATE still
+    /// requires the carried Content's own `id` to equal `id`. The declare-tier
+    /// authority gates (`authorize_canonical_head_declarer` /
+    /// `am_i_bootstrap_steward`) and the earned-head guard are untouched, and the
+    /// winner is still chosen by [`select_canonical_winner`] on the DHT. A
+    /// transferred claim therefore confers only what the receiver re-derives.
+    ///
+    /// ## Wire compatibility (both directions)
+    ///
+    /// `#[serde(default)]` → an old caller that omits the key decodes to `false`
+    /// and gets EXACTLY the prior behaviour. A new caller sending the key to an
+    /// OLD coordinator is equally safe: serde ignores unknown map keys (this
+    /// struct is not `deny_unknown_fields`), so the old coordinator refuses as it
+    /// always did. `false` is therefore behaviour-identical to the pre-flag
+    /// world at every point in a rolling upgrade.
+    #[serde(default)]
+    pub adopt_before_author: bool,
 }
 
 /// Input for [`get_record_for_action`] — the SOURCE side of
@@ -3269,6 +3307,132 @@ mod canonical_head_selector_tests {
     }
 }
 
+/// The ADOPT-BEFORE-AUTHOR chain gate, pinned over its whole input space.
+///
+/// [`classify_chain_gate`] is the one pure decision this flag introduces, and
+/// these tests are its contract: the gate's 2³ corners are enumerated
+/// EXHAUSTIVELY, so a future edit cannot widen the bypass without a red test.
+///
+/// The cryptographic clauses the bypass depends on ([`validate_carried_record`]:
+/// action-hash binding, author signature, entry↔action binding; plus the shared
+/// TARGET-ID GATE) call HDK host functions and therefore cannot run here — they
+/// are exercised end-to-end in the sweettest
+/// `adopt_before_author_declares_without_a_local_chain`
+/// (`elohim/holochain/tests/sweettest/src/tests/lamad.rs`), which is the honest
+/// home for a clause that needs a conductor. This module deliberately does NOT
+/// mirror them with hand-rolled fakes: a re-implemented signature check pins
+/// nothing about the shipped one.
+#[cfg(test)]
+mod adopt_before_author_gate_tests {
+    use super::{classify_chain_gate, ChainGate};
+
+    /// FLAG OFF, every other input free: the verdict is EXACTLY the pre-flag
+    /// verdict at all four corners. This is the behaviour-identity proof for a
+    /// default-off ship — with the flag false, the gate cannot be told apart
+    /// from a build that never had it.
+    #[test]
+    fn flag_off_is_behaviour_identical_to_the_pre_flag_gate() {
+        for chain_present in [false, true] {
+            for carried in [false, true] {
+                let got = classify_chain_gate(chain_present, false, carried);
+                let pre_flag = if chain_present {
+                    ChainGate::LocalChain
+                } else {
+                    ChainGate::Refuse
+                };
+                assert_eq!(
+                    got, pre_flag,
+                    "flag OFF must reproduce the pre-flag gate exactly \
+                     (chain_present={chain_present}, carried={carried})"
+                );
+            }
+        }
+    }
+
+    /// The ONLY corner the flag moves: no chain, opted in, evidence in hand.
+    #[test]
+    fn the_bypass_opens_at_exactly_one_corner() {
+        let mut opened = Vec::new();
+        for chain_present in [false, true] {
+            for adopt in [false, true] {
+                for carried in [false, true] {
+                    if classify_chain_gate(chain_present, adopt, carried)
+                        == ChainGate::AdoptOnCarriedEvidence
+                    {
+                        opened.push((chain_present, adopt, carried));
+                    }
+                }
+            }
+        }
+        assert_eq!(
+            opened,
+            vec![(false, true, true)],
+            "the evidence bypass must be reachable from exactly one of the eight corners"
+        );
+    }
+
+    /// Opt-in ALONE is not a bypass. A node that does not know the id and
+    /// carries no record must still be refused — otherwise the flag would
+    /// license an unevidenced declaration, which is the self-crowning the seam
+    /// exists to refuse (C1/C5).
+    #[test]
+    fn opt_in_without_evidence_still_refuses() {
+        assert_eq!(
+            classify_chain_gate(false, true, false),
+            ChainGate::Refuse,
+            "adopt_before_author with no carried record must NOT open the gate"
+        );
+    }
+
+    /// Evidence ALONE is not a bypass either: without the operator's opt-in the
+    /// refusal stands, which is what makes the ship dormant rather than live.
+    #[test]
+    fn evidence_without_opt_in_still_refuses() {
+        assert_eq!(
+            classify_chain_gate(false, false, true),
+            ChainGate::Refuse,
+            "a carried record must not open the gate while the flag is off"
+        );
+    }
+
+    /// A conductor that HOLDS a chain takes the classic path whatever the flag
+    /// says — the flag can only ever ADD a path, never redirect an existing one.
+    /// This is what keeps the local-`get`-first preference (locally-held truth
+    /// is never displaced by a carried record) intact under the flag.
+    #[test]
+    fn a_local_chain_always_wins_regardless_of_the_flag() {
+        for adopt in [false, true] {
+            for carried in [false, true] {
+                assert_eq!(
+                    classify_chain_gate(true, adopt, carried),
+                    ChainGate::LocalChain,
+                    "chain_present must route to the classic path \
+                     (adopt={adopt}, carried={carried})"
+                );
+            }
+        }
+    }
+
+    /// IDEMPOTENCE, at the level this pure fn can carry it: the gate is a total
+    /// function of its inputs with no hidden state, so a replay of the same
+    /// declaration classifies identically and can mint nothing new by drifting.
+    /// (The DHT-level replay property — a second identical declaration adds no
+    /// second candidate the arbiter can distinguish — is asserted in the
+    /// sweettest, where a link set actually exists.)
+    #[test]
+    fn the_gate_is_stateless_so_a_replay_classifies_identically() {
+        for chain_present in [false, true] {
+            for adopt in [false, true] {
+                for carried in [false, true] {
+                    let first = classify_chain_gate(chain_present, adopt, carried);
+                    let replay = classify_chain_gate(chain_present, adopt, carried);
+                    assert_eq!(first, replay);
+                }
+            }
+        }
+    }
+}
+
 /// DEV-TIME SCAFFOLD — the earned-authority governance seam for WHO may declare
 /// a cross-root canonical head.
 ///
@@ -3638,6 +3802,51 @@ fn validate_carried_record(target: &ActionHash, bytes: &[u8]) -> ExternResult<Re
     Ok(record)
 }
 
+/// What the target-independent CHAIN GATE decided for one declaration attempt.
+///
+/// The gate asks "does this conductor know `id` at all?" — a question about the
+/// DECLARER, never about the target — which is why no choice of target can
+/// change its answer, and why a both-sides-missing pair cannot mint a candidate
+/// from either side without an explicit bypass.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChainGate {
+    /// The conductor holds a chain for the id — the classic path. Target
+    /// resolution runs local-`get`-first with the carried record as fallback.
+    LocalChain,
+    /// No local chain, but the caller opted into ADOPT-BEFORE-AUTHOR **and**
+    /// supplied a carried record. The declaration proceeds on re-derived
+    /// evidence ALONE: [`validate_carried_record`] is mandatory on this branch.
+    AdoptOnCarriedEvidence,
+    /// No local chain and no licensed bypass — refuse, verbatim as before.
+    Refuse,
+}
+
+/// The chain gate as a pure, total function of its three inputs.
+///
+/// Pure on purpose, and separated from the HDK body for the same reason
+/// [`select_canonical_winner`]'s ordering is: this is the part a reader must be
+/// able to check without a conductor, and the part whose corners must be
+/// exhaustively pinned. There are exactly 8, and only ONE of them differs from
+/// the pre-flag world — the corner where all three inputs are true.
+///
+/// The bypass requires BOTH opt-in and evidence. `adopt_before_author` without a
+/// carried record is [`ChainGate::Refuse`], not a weaker gate: an unevidenced
+/// declaration from a node that does not know the id would be exactly the
+/// self-crowning this whole seam refuses.
+pub fn classify_chain_gate(
+    chain_present: bool,
+    adopt_before_author: bool,
+    carried_record_present: bool,
+) -> ChainGate {
+    if chain_present {
+        ChainGate::LocalChain
+    } else if adopt_before_author && carried_record_present {
+        ChainGate::AdoptOnCarriedEvidence
+    } else {
+        ChainGate::Refuse
+    }
+}
+
 /// Shared body for both canonical-head declaration tiers: validate the id +
 /// cross-root target, write the canonical-head link with the given provenance
 /// `tag`, emit the reused `ContentHeadDeclared` signal, and build the output.
@@ -3648,42 +3857,74 @@ fn validate_carried_record(target: &ActionHash, bytes: &[u8]) -> ExternResult<Re
 /// the local `get` misses. See [`DeclareCanonicalHeadInput::carried_record`]
 /// for why the local `get` cannot be made to succeed on a full-arc fleet, and
 /// [`validate_carried_record`] for what the carried bytes must prove.
+///
+/// `adopt_before_author` (operator-reserved, default OFF) is the ONE input that
+/// can change the target-independent chain gate's verdict — see
+/// [`classify_chain_gate`] and [`DeclareCanonicalHeadInput::adopt_before_author`].
 fn declare_canonical_head_inner(
     id: &str,
     head_action_hash: holo_hash::ActionHashB64,
     tag: &[u8],
     carried_record: Option<Vec<u8>>,
+    adopt_before_author: bool,
 ) -> ExternResult<ContentHeadOutput> {
     // The id must exist as content (guards typos / declaring a phantom id).
     // WRITE PATH = `GetStrategy::Network` (see `gather_content_chain`): a cold
     // local view must not make a real id look phantom.
-    if gather_content_chain(id, GetStrategy::Network)?.is_none() {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "declare_canonical_head: no content found for id '{id}'"
-        ))));
-    }
+    //
+    // The probe itself is UNCONDITIONAL — the flag changes what is done with the
+    // answer, never whether the question is asked, so a conductor that DOES hold
+    // a chain keeps the classic path byte-for-byte regardless of the flag.
+    let chain_present = gather_content_chain(id, GetStrategy::Network)?.is_some();
+    let gate = classify_chain_gate(chain_present, adopt_before_author, carried_record.is_some());
 
     // Resolve + validate the cross-root target: must be a retrievable Content
     // record. `ActionHash::from(ActionHashB64)` is the inner-hash unwrap.
     //
-    // DECLARE-CARRIES-RECORD: the local `get` stays FIRST — a target this
-    // conductor already holds is always preferred, so the carried path can
-    // never displace locally-held truth. Only on a local MISS do we fall back
-    // to the carried record, and then only after it proves itself in wasm. On a
-    // full-arc fleet this miss is terminal without a carried record (the
-    // cascade short-circuits at authority, so there is no network fetch to
-    // wait for) — hence the unchanged "not retrievable" error when the caller
-    // carried nothing, which is the honest diagnostic the CI ladder reads.
+    // DECLARE-CARRIES-RECORD: on the classic branch the local `get` stays FIRST
+    // — a target this conductor already holds is always preferred, so the
+    // carried path can never displace locally-held truth. Only on a local MISS
+    // do we fall back to the carried record, and then only after it proves
+    // itself in wasm. On a full-arc fleet this miss is terminal without a
+    // carried record (the cascade short-circuits at authority, so there is no
+    // network fetch to wait for) — hence the unchanged "not retrievable" error
+    // when the caller carried nothing, which is the honest diagnostic the CI
+    // ladder reads.
     let target = ActionHash::from(head_action_hash);
-    let (target_record, from_carried) = match get(target.clone(), GetOptions::default())? {
-        Some(record) => (record, false),
-        None => match carried_record {
-            Some(bytes) => (validate_carried_record(&target, &bytes)?, true),
-            None => {
-                return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                    "declare_canonical_head: target action {target:?} is not retrievable"
-                ))))
-            }
+    let (target_record, from_carried) = match gate {
+        ChainGate::Refuse => {
+            // Verbatim, byte-identical to the pre-flag refusal: the storage
+            // caller classifies on this substring (`ERR_NO_LOCAL_CHAIN`), and a
+            // reworded message would silently retire its backoff class.
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "declare_canonical_head: no content found for id '{id}'"
+            ))));
+        }
+        ChainGate::AdoptOnCarriedEvidence => {
+            // ADOPT-BEFORE-AUTHOR. The ONLY thing licensing this declaration is
+            // the carried record's proof, so validate it UNCONDITIONALLY —
+            // deliberately NOT local-`get`-first. A conductor that has just been
+            // shown to hold no chain for the id must not be able to declare on a
+            // local view instead of on re-derived evidence; forcing the carried
+            // branch is what keeps "adopt" and "prove" the same act.
+            let bytes = carried_record.ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "declare_canonical_head: adopt-before-author for id '{id}' reached the \
+                     evidence branch with no carried record"
+                )))
+            })?;
+            (validate_carried_record(&target, &bytes)?, true)
+        }
+        ChainGate::LocalChain => match get(target.clone(), GetOptions::default())? {
+            Some(record) => (record, false),
+            None => match carried_record {
+                Some(bytes) => (validate_carried_record(&target, &bytes)?, true),
+                None => {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "declare_canonical_head: target action {target:?} is not retrievable"
+                    ))))
+                }
+            },
         },
     };
     // Confirm it carries a Content entry (build_content_head_output would also
@@ -3794,6 +4035,7 @@ pub fn declare_canonical_content_head(
         input.head_action_hash,
         CANONICAL_TAG_STAGING,
         input.carried_record,
+        input.adopt_before_author,
     )
 }
 
@@ -3829,6 +4071,7 @@ pub fn declare_earned_canonical_head(
         input.head_action_hash,
         CANONICAL_TAG_EARNED,
         input.carried_record,
+        input.adopt_before_author,
     )
 }
 

@@ -135,6 +135,31 @@ struct DeclareCanonicalHeadWithRecordInput {
     pub carried_record: Option<Vec<u8>>,
 }
 
+/// Mirrors `content_store::DeclareCanonicalHeadInput` WITH the ADOPT-BEFORE-AUTHOR
+/// flag — the operator-reserved bypass of the target-independent no-chain gate.
+///
+/// A THIRD mirror rather than a field on the second, for the same reason the
+/// second exists: every call that keeps sending the narrower shape is a live
+/// backward-compatibility proof that `#[serde(default)]` decodes an absent key
+/// as `false`. Only the tests that mean to exercise the flag send this one.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct DeclareCanonicalHeadAdoptInput {
+    pub id: String,
+    pub head_action_hash: String,
+    pub carried_record: Option<Vec<u8>>,
+    pub adopt_before_author: bool,
+}
+
+/// Mirrors `content_store::CanonicalElectionOutput`. `winner_target` is `String`
+/// because the zome field is `ActionHashB64`, which serializes as a canonical
+/// base64 STRING (a raw-bytes `ActionHash` would fail to deserialize it).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CanonicalElectionOutput {
+    pub winner_target: String,
+    pub canonical_declared_at: Timestamp,
+    pub canonical_earned: bool,
+}
+
 /// Mirrors `content_store::GetRecordForActionInput` — the SOURCE half of
 /// declare-carries-Record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1453,6 +1478,424 @@ async fn declare_carries_record_for_unretrievable_target() -> Result<()> {
         root_a_action,
         "CONVERGENCE: the link c2 wrote from carried evidence is honored by the \
          authoring peer too"
+    );
+
+    Ok(())
+}
+
+/// ADOPT-BEFORE-AUTHOR: a conductor that holds **no chain for the id at all**
+/// can declare a canonical head from a validated carried record — and does so
+/// ONLY when the operator has opted in.
+///
+/// ## The residual this closes
+///
+/// `declare_canonical_head_inner`'s first gate (`gather_content_chain(id)`) is
+/// TARGET-INDEPENDENT: it asks whether the DECLARER knows the id, so no choice
+/// of target can pass it. When BOTH sides of a divergent pair are in that state
+/// neither can mint a canonical-head candidate, the DHT arbiter has an empty
+/// candidate set, and the pair cannot converge by ANY automated path. That is
+/// the "both-sides-missing" residual. This test is its exit.
+///
+/// ## Why it is not a weakening
+///
+/// The bypass is licensed by RE-DERIVED EVIDENCE and nothing else. Every clause
+/// is exercised below with the flag ON, so each one is proven to still refuse:
+///
+///   a. no record, old wire shape → the classic no-chain refusal (compat proof).
+///   b. FLAG OFF + a genuine record → STILL refused. Evidence alone never opens
+///      the gate; this is the behaviour-identity assertion at the zome boundary.
+///   c. FLAG ON + no record → refused. Opt-in alone never opens it either.
+///   d. FLAG ON + a record for a DIFFERENT action → refused (action-hash gate).
+///   e. FLAG ON + a genuine signed action with a SWAPPED entry → refused
+///      (entry↔action binding — the only gate that catches this forgery).
+///   f. FLAG ON + byte-tampered record → refused.
+///   g. FLAG ON + a fully genuine record for a DIFFERENT CONTENT ID → refused
+///      (TARGET-ID GATE). Checks 1-3 all PASS here, so this is the sharpest
+///      proof that the bypass did not drop the id binding.
+///   h. FLAG ON + the genuine record → the declaration LANDS, anchored on c1's
+///      original action hash and c1's authorship (no local re-author).
+///   i. `declared_at` is the local declaration time (heal-guard lockout guard).
+///   j. IDEMPOTENCE: a replay elects the identical winner — a second run adds no
+///      candidate the arbiter can tell apart, so nothing new is minted in effect.
+///   k. CONVERGENCE: once the peers meet, both resolve the same head.
+#[tokio::test(flavor = "multi_thread")]
+async fn adopt_before_author_declares_without_a_local_chain() -> Result<()> {
+    // ISOLATED and never exchanged until the very end: c2 must genuinely hold
+    // neither c1's record NOR any chain of its own for the id.
+    let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors_isolated().await?;
+    let seed = network_seed(DNA);
+    let dna_file = load_dna(DNA, &seed, Some(a1.clone())).await?;
+    let app1 = c1
+        .setup_app_for_agent("lamad-app", a1.clone(), &[dna_file.clone()])
+        .await?;
+    let app2 = c2
+        .setup_app_for_agent("lamad-app", a2.clone(), &[dna_file])
+        .await?;
+    let cell1 = app1.cells().first().unwrap().clone();
+    let cell2 = app2.cells().first().unwrap().clone();
+    let zome1 = cell1.zome("content_store");
+    let zome2 = cell2.zome("content_store");
+
+    let adopt_x = unique_id("adopt-before-author-x");
+    let other_id = unique_id("adopt-before-author-other");
+
+    // c1 authors the TARGET root, and a second root under a DIFFERENT id (the
+    // target-id-gate probe in (g), and the decoy for (d)/(e)).
+    let root_a: ContentOutput = c1
+        .call(&zome1, "create_content", test_content(&adopt_x))
+        .await;
+    let root_a_action = root_a.action_hash.clone();
+    let other: ContentOutput = c1
+        .call(&zome1, "create_content", test_content(&other_id))
+        .await;
+
+    // THE PRECONDITION THIS WHOLE TEST RESTS ON: c2 authors NOTHING for
+    // `adopt_x`. Asserted, not assumed — if c2 somehow held a chain, every
+    // refusal below would be proving the wrong gate.
+    let c2_pre: Option<ContentHeadOutput> = c2
+        .call(&zome2, "resolve_content_head", adopt_x.clone())
+        .await;
+    assert!(
+        c2_pre.is_none(),
+        "c2 must hold NO chain for the id — otherwise this test exercises the \
+         not-retrievable gate, not the no-chain gate it exists for"
+    );
+
+    let target_b64 = ActionHashB64::from(root_a_action.clone()).to_string();
+    let other_b64 = ActionHashB64::from(other.action_hash.clone()).to_string();
+
+    let served: Option<CarriedRecordOutput> = c1
+        .call(
+            &zome1,
+            "get_record_for_action",
+            GetRecordForActionInput {
+                action_hash: target_b64.clone(),
+            },
+        )
+        .await;
+    let served = served.expect("the authoring peer must serve its own record");
+    let other_served: Option<CarriedRecordOutput> = c1
+        .call(
+            &zome1,
+            "get_record_for_action",
+            GetRecordForActionInput {
+                action_hash: other_b64.clone(),
+            },
+        )
+        .await;
+    let other_served = other_served.expect("c1 must serve the other-id record");
+
+    // --- (a) no record at all, on the OLD two-field wire shape. Doubles as the
+    // backward-compat proof that a payload with neither `carried_record` nor
+    // `adopt_before_author` still decodes on the new coordinator.
+    let bare: std::result::Result<ContentHeadOutput, _> = c2
+        .call_fallible(
+            &zome2,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadInput {
+                id: adopt_x.clone(),
+                head_action_hash: target_b64.clone(),
+            },
+        )
+        .await;
+    let bare_err = format!("{:?}", bare.expect_err("a chainless declare must refuse"));
+    assert!(
+        bare_err.contains("no content found for id"),
+        "the no-chain refusal must be preserved VERBATIM — the storage caller \
+         classifies on this substring; got: {bare_err}"
+    );
+
+    // --- (b) FLAG OFF + a fully genuine carried record → STILL refused, with the
+    // SAME message. This is the behaviour-identity proof at the zome boundary: a
+    // default-off build cannot be told apart from one that never had the flag.
+    let flag_off: std::result::Result<ContentHeadOutput, _> = c2
+        .call_fallible(
+            &zome2,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadAdoptInput {
+                id: adopt_x.clone(),
+                head_action_hash: target_b64.clone(),
+                carried_record: Some(served.record.clone()),
+                adopt_before_author: false,
+            },
+        )
+        .await;
+    let flag_off_err = format!(
+        "{:?}",
+        flag_off.expect_err("evidence alone must not open the gate")
+    );
+    assert!(
+        flag_off_err.contains("no content found for id"),
+        "with the flag OFF a valid carried record must change NOTHING; got: {flag_off_err}"
+    );
+
+    // --- (c) FLAG ON + no record → refused. Opt-in is not a bypass; an
+    // unevidenced declaration from a node that does not know the id would be
+    // exactly the self-crowning this seam refuses.
+    let no_evidence: std::result::Result<ContentHeadOutput, _> = c2
+        .call_fallible(
+            &zome2,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadAdoptInput {
+                id: adopt_x.clone(),
+                head_action_hash: target_b64.clone(),
+                carried_record: None,
+                adopt_before_author: true,
+            },
+        )
+        .await;
+    let no_evidence_err = format!(
+        "{:?}",
+        no_evidence.expect_err("opt-in without evidence must refuse")
+    );
+    assert!(
+        no_evidence_err.contains("no content found for id"),
+        "adopt_before_author with NO carried record must refuse exactly as \
+         before; got: {no_evidence_err}"
+    );
+
+    // --- (d) FLAG ON + a record for a DIFFERENT action (action-hash gate).
+    let mismatched: std::result::Result<ContentHeadOutput, _> = c2
+        .call_fallible(
+            &zome2,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadAdoptInput {
+                id: adopt_x.clone(),
+                head_action_hash: target_b64.clone(),
+                carried_record: Some(other_served.record.clone()),
+                adopt_before_author: true,
+            },
+        )
+        .await;
+    let mismatched_err = format!(
+        "{:?}",
+        mismatched.expect_err("a record for another action must refuse")
+    );
+    assert!(
+        mismatched_err.contains("does not match"),
+        "the action-hash gate must still fire under the flag; got: {mismatched_err}"
+    );
+
+    // --- (e) FLAG ON + genuine signed action with a SWAPPED entry. Checks 1
+    // (hash) and 2 (signature) pass; only the entry↔action binding catches it,
+    // so this is the sharpest guard in the set.
+    let genuine: Record = holochain_serialized_bytes::decode(&served.record)
+        .map_err(|e| anyhow::anyhow!("decode served record: {e}"))?;
+    let other_record: Record = holochain_serialized_bytes::decode(&other_served.record)
+        .map_err(|e| anyhow::anyhow!("decode other record: {e}"))?;
+    let swapped = Record::new(
+        genuine.signed_action().clone(),
+        other_record.entry().as_option().cloned(),
+    );
+    let swapped_bytes: Vec<u8> = holochain_serialized_bytes::encode(&swapped)
+        .map_err(|e| anyhow::anyhow!("encode swapped record: {e}"))?;
+    let swapped_declare: std::result::Result<ContentHeadOutput, _> = c2
+        .call_fallible(
+            &zome2,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadAdoptInput {
+                id: adopt_x.clone(),
+                head_action_hash: target_b64.clone(),
+                carried_record: Some(swapped_bytes),
+                adopt_before_author: true,
+            },
+        )
+        .await;
+    let swapped_err = format!(
+        "{:?}",
+        swapped_declare.expect_err("a swapped entry must refuse")
+    );
+    assert!(
+        swapped_err.contains("does not match the action's entry hash"),
+        "the entry↔action binding must still fire under the flag — it is the \
+         ONLY check that catches a genuine signed action with substituted \
+         Content bytes; got: {swapped_err}"
+    );
+
+    // --- (f) FLAG ON + byte-tampered record. Either the decode fails or a hash
+    // check does; both are refusals, and neither may write a canonical link.
+    let mut tampered = served.record.clone();
+    let last = tampered.len() - 1;
+    tampered[last] ^= 0xFF;
+    let tampered_declare: std::result::Result<ContentHeadOutput, _> = c2
+        .call_fallible(
+            &zome2,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadAdoptInput {
+                id: adopt_x.clone(),
+                head_action_hash: target_b64.clone(),
+                carried_record: Some(tampered),
+                adopt_before_author: true,
+            },
+        )
+        .await;
+    assert!(
+        tampered_declare.is_err(),
+        "a byte-tampered carried record must be refused under the flag too"
+    );
+
+    // --- (g) FLAG ON + a FULLY GENUINE record for a DIFFERENT content id,
+    // declared (honestly) under its own action hash. Checks 1-3 ALL pass — only
+    // the TARGET-ID GATE stands between this and binding an unrelated record as
+    // `adopt_x`'s head. The most important negative in the set, because the
+    // bypass removed the only other id-scoped gate on this path.
+    let wrong_id: std::result::Result<ContentHeadOutput, _> = c2
+        .call_fallible(
+            &zome2,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadAdoptInput {
+                id: adopt_x.clone(),
+                head_action_hash: other_b64.clone(),
+                carried_record: Some(other_served.record.clone()),
+                adopt_before_author: true,
+            },
+        )
+        .await;
+    let wrong_id_err = format!(
+        "{:?}",
+        wrong_id.expect_err("a genuine record for another id must refuse")
+    );
+    assert!(
+        wrong_id_err.contains("does not match the declared id"),
+        "the TARGET-ID GATE is the last id-scoped guard once the chain gate is \
+         bypassed — it must name the mismatch; got: {wrong_id_err}"
+    );
+
+    // --- (h) POSITIVE. The genuine record lands the declaration from a node
+    // with NO chain for the id: the residual's exit, demonstrated.
+    let declared: ContentHeadOutput = c2
+        .call(
+            &zome2,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadAdoptInput {
+                id: adopt_x.clone(),
+                head_action_hash: target_b64.clone(),
+                carried_record: Some(served.record.clone()),
+                adopt_before_author: true,
+            },
+        )
+        .await;
+    assert_eq!(
+        declared.head_action_hash, root_a_action,
+        "ANCHOR EQUALITY: the canonical head is c1's ORIGINAL action hash — the \
+         carried record is verified in place, never re-authored locally (which \
+         is what makes this ADOPT-before-author rather than author-then-adopt)"
+    );
+    assert_eq!(
+        declared.author, a1,
+        "the declared head keeps its foreign author (a1), not the declarer (a2)"
+    );
+    assert_eq!(declared.content_id, adopt_x);
+    assert_ne!(
+        a1, a2,
+        "the two agents must be distinct for (h) to mean anything"
+    );
+
+    // --- (i) HEAL-GUARD LOCKOUT GUARD, same law as the sibling carried-record
+    // test: `declared_at` on the evidence branch is the DECLARING conductor's
+    // local sys_time, never the carried action's own (attacker-influenced)
+    // timestamp, which would permanently lock out the storage monotonic heal.
+    let carried_ts = genuine.action().timestamp();
+    assert_ne!(
+        declared.declared_at, carried_ts,
+        "declared_at must be the local declaration time, NOT the carried \
+         action's own timestamp"
+    );
+    assert!(
+        declared.declared_at >= carried_ts,
+        "declared_at ({:?}) must be >= the carried action's timestamp ({:?})",
+        declared.declared_at,
+        carried_ts
+    );
+
+    // --- (j) IDEMPOTENCE. A chainless node's declaration is now visible to its
+    // OWN election read — that is the candidate the arbiter was starved of. A
+    // REPLAY of the identical declare elects the identical winner: the second
+    // link names the same target, so it adds no candidate the arbiter can tell
+    // apart and the outcome is unmoved. (The storage side does not even issue
+    // the replay — its `(id, target)` candidacy ledger and declare-storm gate
+    // stop it before the conductor is called.)
+    let election_once: Option<CanonicalElectionOutput> = c2
+        .call(&zome2, "resolve_canonical_election", adopt_x.clone())
+        .await;
+    let election_once =
+        election_once.expect("the chainless declarer must SEE the election it just minted");
+    assert_eq!(
+        election_once.winner_target, target_b64,
+        "the minted candidate must elect c1's action"
+    );
+    assert!(
+        !election_once.canonical_earned,
+        "a staging-tier declare must never report the earned tier"
+    );
+
+    let _replay: ContentHeadOutput = c2
+        .call(
+            &zome2,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadAdoptInput {
+                id: adopt_x.clone(),
+                head_action_hash: target_b64.clone(),
+                carried_record: Some(served.record.clone()),
+                adopt_before_author: true,
+            },
+        )
+        .await;
+    let election_twice: Option<CanonicalElectionOutput> = c2
+        .call(&zome2, "resolve_canonical_election", adopt_x.clone())
+        .await;
+    assert_eq!(
+        election_twice
+            .expect("the election must still resolve after a replay")
+            .winner_target,
+        election_once.winner_target,
+        "IDEMPOTENCE: replaying the declaration must elect the identical winner \
+         — a replay may not move the head"
+    );
+
+    // --- (k) CONVERGENCE. The link is REAL, not just a 200: once the peers
+    // meet, the node that never held the id resolves c1's action as the head,
+    // and so does c1.
+    tokio::time::timeout(Duration::from_secs(30), async {
+        while !SweetConductor::exchange_peer_info([&c1, &c2]).await {
+            sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
+    await_consistency(60, [&cell1, &cell2])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout after adopt declare: {e}"))?;
+
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let resolved: ContentHeadOutput = loop {
+        let h: Option<ContentHeadOutput> = c2
+            .call(&zome2, "resolve_content_head", adopt_x.clone())
+            .await;
+        if let Some(h) = h {
+            if h.head_action_hash == root_a_action {
+                break h;
+            }
+        }
+        if Instant::now() >= deadline {
+            panic!("the adopted canonical head did not resolve on c2 within 30s");
+        }
+        sleep(Duration::from_millis(100)).await;
+    };
+    assert_eq!(
+        resolved.author, a1,
+        "the resolved adopted head keeps a1's authorship"
+    );
+
+    let head_c1: Option<ContentHeadOutput> = c1
+        .call(&zome1, "resolve_content_head", adopt_x.clone())
+        .await;
+    assert_eq!(
+        head_c1.expect("c1 must resolve the head").head_action_hash,
+        root_a_action,
+        "CONVERGENCE: the declaration a CHAINLESS node minted from carried \
+         evidence is honored by the authoring peer too — the both-sides-missing \
+         residual has an automated exit"
     );
 
     Ok(())
