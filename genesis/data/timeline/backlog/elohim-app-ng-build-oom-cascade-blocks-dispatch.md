@@ -59,3 +59,14 @@ orchestrator was load-bearing for the shift that found this)
    metrics around 2026-08-02T21:58Z and 2026-08-01T00:29Z).
 
 Status: open, unowned.
+
+## Addendum (2026-08-03, same shift): sibling deploy-stage false-negative — Ready-timeout too short for slow household nodes
+
+Edge #1294's "Deploy Edge Node - Alpha" marked jessica-alpha a rollout FAILURE at
+the 600s timeout — but kube_pod_status_ready shows her Ready at 00:07:41Z,
+~10min after the window closed, zero restarts, full workload participation
+minutes later. Cost: a false UNSTABLE + a junit rollout-failed testcase + the
+next reader chasing a healthy pod. Fix direction: raise the per-peer rollout
+timeout for household-class nodes (or verdict "late-Ready" distinctly from
+"failed") — a slow node is not a dead node (C4: absent ≠ timeout). Same
+Jenkinsfile surface as the pod-memory fix above.
