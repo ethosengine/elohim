@@ -222,6 +222,45 @@ pub struct ContentHeadRecordPayload {
     /// peer's conductor could retrieve it.
     #[serde(default)]
     pub record: Option<String>,
+    /// ADDITIVE (2026-08-03, adopt-before-author evidence supply): WHY `record`
+    /// is absent, when it is. `None` whenever bytes ARE served — and also
+    /// whenever the responder has nothing honest to say (no conductor bridge at
+    /// all), because "I never asked my conductor" establishes nothing about
+    /// whether the bytes exist.
+    ///
+    /// Vocabulary, matching the responder's three collapse sites:
+    /// `no_record` (the conductor answered cleanly and holds none — STRUCTURAL,
+    /// no capacity relief changes it) | `conductor_error` | `budget_elapsed`.
+    ///
+    /// ## Why a `String` and not an enum
+    ///
+    /// A unit-variant serde enum has no `#[serde(other)]` escape, so a peer
+    /// running a FUTURE version that adds a fourth reason would make this whole
+    /// payload undecodable here — and `head_record_client` maps an undecodable
+    /// payload to `Answer::Unreachable`, i.e. one added vocabulary word would
+    /// silently stop adoption against newer peers. A tolerant string decoded
+    /// into a typed reason with an `Unknown` fallback
+    /// (`services::head_adoption::RecordAbsentReason::from_wire`) keeps the
+    /// typing where it can be total and the tolerance where the fleet is mixed.
+    ///
+    /// ## Wire compatibility (MANDATORY — mixed-version peers during rolling
+    /// deploys)
+    ///
+    /// Additive and optional, same discipline as
+    /// [`ProjectionInventoryEntry::declared_head_action_hash`] and
+    /// [`ViewFederationRequest::inventory_offset`]:
+    /// - a NEW responder answering an OLD requester: this payload rides the
+    ///   frame as an opaque `JsonVal` map, and the old requester's
+    ///   `ContentHeadRecordPayload` is NOT `deny_unknown_fields`, so the extra
+    ///   key is ignored → yesterday's behaviour;
+    /// - an OLD responder answering a NEW requester: the key is missing and
+    ///   `#[serde(default)]` yields `None` → classified `Unknown`, which takes
+    ///   the ordinary backoff, i.e. yesterday's behaviour.
+    ///
+    /// `skip_serializing_if` keeps the `None` encoding byte-identical to the
+    /// pre-field one, so a served-bytes answer is unchanged on the wire.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub record_absent_reason: Option<String>,
 }
 
 /// One discovered projection row in a [`ProjectionInventoryPayload`]: the
@@ -555,6 +594,7 @@ mod inventory_offset_wire_compat_tests {
             head_action_hash: None,
             declared_at: None,
             record: None,
+            record_absent_reason: None,
         };
         let bytes = rmp_serde::to_vec_named(&absent).unwrap();
         let back: ContentHeadRecordPayload = rmp_serde::from_slice(&bytes).unwrap();
@@ -565,6 +605,7 @@ mod inventory_offset_wire_compat_tests {
             head_action_hash: Some("uhCkkDECLARED".into()),
             declared_at: Some(1_753_000_000_000_000),
             record: Some("YmFzZTY0".into()),
+            record_absent_reason: None,
         };
         let json = serde_json::to_value(&present).unwrap();
         assert!(
@@ -573,6 +614,104 @@ mod inventory_offset_wire_compat_tests {
         );
         let back: ContentHeadRecordPayload = serde_json::from_value(json).unwrap();
         assert_eq!(back, present);
+    }
+
+    /// The pre-field shape of the head-record payload — a stand-in for an OLD
+    /// (not-yet-updated) peer's struct during a rolling deploy. No
+    /// `record_absent_reason`, and NOT `deny_unknown_fields`, exactly like the
+    /// real struct was yesterday.
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+    #[serde(rename_all = "camelCase")]
+    struct OldContentHeadRecordPayload {
+        content_id: String,
+        #[serde(default)]
+        head_action_hash: Option<String>,
+        #[serde(default)]
+        declared_at: Option<i64>,
+        #[serde(default)]
+        record: Option<String>,
+    }
+
+    /// C10 WIRE COMPATIBILITY, both directions, over BOTH encodings the payload
+    /// actually travels through: MessagePack `to_vec_named` (the view-federation
+    /// codec's frame) and `serde_json::Value` (what `head_record_client` decodes
+    /// from `ViewSlice.payload`).
+    ///
+    /// This is the test that licenses shipping the field without a protocol
+    /// version bump. A rolling deploy puts old and new responders/requesters in
+    /// the same fleet for hours, and the failure mode of getting it wrong is not
+    /// a bad reason label — it is `head_record_client` seeing an undecodable
+    /// payload, answering `Unreachable`, and stopping adoption against every
+    /// peer on the other side of the version line.
+    #[test]
+    fn record_absent_reason_is_additive_in_both_directions() {
+        // NEW responder → OLD requester: the unknown key must be IGNORED, and
+        // every field the old struct does know must survive intact.
+        let new = ContentHeadRecordPayload {
+            content_id: "elohim-host-landing".into(),
+            head_action_hash: Some("uhCkkDECLARED".into()),
+            declared_at: Some(1_753_000_000_000_000),
+            record: None,
+            record_absent_reason: Some("no_record".into()),
+        };
+        let msgpack = rmp_serde::to_vec_named(&new).unwrap();
+        let old: OldContentHeadRecordPayload = rmp_serde::from_slice(&msgpack)
+            .expect("an old peer must still decode a new responder's msgpack frame");
+        assert_eq!(old.head_action_hash.as_deref(), Some("uhCkkDECLARED"));
+        assert_eq!(old.record, None);
+
+        let json = serde_json::to_value(&new).unwrap();
+        let old_json: OldContentHeadRecordPayload = serde_json::from_value(json.clone())
+            .expect("an old peer must still decode a new responder's JSON payload");
+        assert_eq!(old_json.head_action_hash.as_deref(), Some("uhCkkDECLARED"));
+        assert_eq!(
+            json.get("recordAbsentReason").and_then(|v| v.as_str()),
+            Some("no_record"),
+            "the reason must ride the wire camelCase, like every other key"
+        );
+
+        // OLD responder → NEW requester: the missing key defaults to None, which
+        // downstream classifies as `unknown` and takes the ordinary backoff.
+        let old_wire = OldContentHeadRecordPayload {
+            content_id: "elohim-host-landing".into(),
+            head_action_hash: Some("uhCkkDECLARED".into()),
+            declared_at: None,
+            record: None,
+        };
+        let back: ContentHeadRecordPayload =
+            rmp_serde::from_slice(&rmp_serde::to_vec_named(&old_wire).unwrap())
+                .expect("a new peer must decode an old responder's msgpack frame");
+        assert_eq!(back.record_absent_reason, None);
+        let back_json: ContentHeadRecordPayload =
+            serde_json::from_value(serde_json::to_value(&old_wire).unwrap())
+                .expect("a new peer must decode an old responder's JSON payload");
+        assert_eq!(back_json.record_absent_reason, None);
+    }
+
+    /// A served-bytes answer must encode BYTE-IDENTICALLY to the pre-field
+    /// shape: `skip_serializing_if` means the happy path's frame is unchanged,
+    /// so nothing keyed on those bytes (dedup, size budgets, a peer's parser)
+    /// sees any difference at all.
+    #[test]
+    fn a_carried_answer_encodes_byte_identically_to_the_pre_field_shape() {
+        let carried = ContentHeadRecordPayload {
+            content_id: "elohim-host-landing".into(),
+            head_action_hash: Some("uhCkkDECLARED".into()),
+            declared_at: Some(42),
+            record: Some("YmFzZTY0".into()),
+            record_absent_reason: None,
+        };
+        let old = OldContentHeadRecordPayload {
+            content_id: "elohim-host-landing".into(),
+            head_action_hash: Some("uhCkkDECLARED".into()),
+            declared_at: Some(42),
+            record: Some("YmFzZTY0".into()),
+        };
+        assert_eq!(
+            rmp_serde::to_vec_named(&carried).unwrap(),
+            rmp_serde::to_vec_named(&old).unwrap(),
+            "a None reason must not change the wire bytes of a carried answer"
+        );
     }
 
     #[test]

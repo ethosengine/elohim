@@ -342,6 +342,10 @@ spec:
             # a supplier peer, so the both-sides-missing exit needs him on.
             - name: ELOHIM_ADOPT_BEFORE_AUTHOR
               value: "true"
+            # Evidence-absent backoff — same conservative 6h bake as the
+            # template (see its inline comment).
+            - name: ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS
+              value: "21600"
             - name: ENABLE_IMPORT_API
               value: "true"
             - name: ENABLE_CONTENT_DB

@@ -248,7 +248,16 @@ lazy_static! {
 
     /// `ContentHeadRecord` answers served WITHOUT their Record bytes — the
     /// honest-absence degrade (the head hash is still served; only the carried
-    /// bytes are missing). label: cause = "budget_elapsed" | "conductor_error".
+    /// bytes are missing). label: cause = [`HeadRecordDegraded`]
+    /// ("no_record" | "conductor_error" | "budget_elapsed").
+    ///
+    /// `no_record` was the ONLY uncounted collapse until 2026-08-03 — and it is
+    /// the STRUCTURAL one: the conductor answered cleanly and holds no record at
+    /// all, which no amount of budget or capacity relief can change. Leaving it
+    /// silent made the phantom class (ids whose bytes exist nowhere) and the
+    /// saturation class arithmetically inseparable from meters alone, so the
+    /// remedy an operator reached for was a coin flip. See
+    /// `genesis/data/timeline/backlog/adopt-before-author-evidence-starvation.md`.
     ///
     /// `budget_elapsed` is the direct live signal for the responder bound
     /// (`HEAD_RECORD_CONDUCTOR_TIMEOUT`): it counts the asks a saturated
@@ -1060,6 +1069,29 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Requester-side EVIDENCE resolutions in the adopt/contest arm, by
+    /// [`AdoptEvidence`] — `carried` | `no_record` | `budget_elapsed` |
+    /// `conductor_error` | `unknown`. One increment per fetch the arm performs,
+    /// counted at the single `resolve_peer_evidence` site so the sum is exactly
+    /// "how many times did we go looking for bytes".
+    ///
+    /// This is the meter the 2026-08-03 diagnosis had to reconstruct by hand from
+    /// a `carried=` INFO line: `contest_failed{no_local_chain}` counted the
+    /// refusals, but nothing said WHY the bytes were missing, so the phantom
+    /// class (permanently no bytes anywhere) and the C11-saturation class (bytes
+    /// exist, the advertiser's conductor is wedged) were indistinguishable — and
+    /// they point at OPPOSITE remedies (data hygiene vs conductor capacity).
+    /// `no_record`-dominated says supply is structurally absent;
+    /// `budget_elapsed`-dominated says the supply is there and starved.
+    pub static ref CONTENT_ADOPT_EVIDENCE: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_content_adopt_evidence_total",
+            "Adopt-arm head-record evidence resolutions, by evidence state.",
+        ),
+        &["state"],
+    )
+    .unwrap();
+
     /// The contest-backoff ledger hit [`crate::services::contest_backoff::CONTEST_BACKOFF_CAP`]
     /// and fail-open CLEARED (every id returns to contested-every-sweep until it
     /// refills). Unlabeled: this is a single bounded-memory guard, not a
@@ -1111,6 +1143,19 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_OUTBOUND.clone()));
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_INBOUND_SERVED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_HEAD_RECORD_DEGRADED.clone()));
+        // Pre-touch every degrade cause. `no_record` shipped UNCOUNTED until
+        // 2026-08-03 and was the structural one; a series that only appears once
+        // it fires cannot answer "is this class silent, or is it not measured?"
+        // — the exact question the evidence-starvation diagnosis had to answer
+        // from log lines instead of meters.
+        {
+            use seam_contracts::ReasonLabel as _;
+            for cause in HeadRecordDegraded::ALL {
+                CONTENT_HEAD_RECORD_DEGRADED
+                    .with_label_values(&[cause.label()])
+                    .inc_by(0);
+            }
+        }
         let _ = REGISTRY.register(Box::new(CONTENT_HEAD_RECORD_FETCH_TOTAL.clone()));
         // Pre-touch every AnswerState so /metrics shows the full state set from
         // boot, same zero-with-a-series discipline as the obey-probe below.
@@ -1155,6 +1200,19 @@ pub fn register_all() {
             for reason in ContestSkip::ALL {
                 CONTENT_CONTEST_SKIPPED
                     .with_label_values(&[reason.label()])
+                    .inc_by(0);
+            }
+        }
+        let _ = REGISTRY.register(Box::new(CONTENT_ADOPT_EVIDENCE.clone()));
+        // Pre-touch every evidence state. This meter's whole job is to let an
+        // operator read WHICH supply wall dominates, and a state that only
+        // materialises on first occurrence cannot say "this class is measured
+        // and zero" — the absent-series trap, a repeat offender on this seam.
+        {
+            use seam_contracts::ReasonLabel as _;
+            for state in AdoptEvidence::ALL {
+                CONTENT_ADOPT_EVIDENCE
+                    .with_label_values(&[state.label()])
                     .inc_by(0);
             }
         }
@@ -1374,12 +1432,59 @@ pub fn inc_view_federation_inbound_served() {
     VIEW_FEDERATION_INBOUND_SERVED.inc();
 }
 
-/// Record one `ContentHeadRecord` answer served hash-only. `cause` is
-/// "budget_elapsed" (the responder gave up inside its own budget) or
-/// "conductor_error" (the conductor answered, with an error).
-pub fn inc_content_head_record_degraded(cause: &str) {
+/// Why a `ContentHeadRecord` answer was served hash-only — the label vocabulary
+/// of [`CONTENT_HEAD_RECORD_DEGRADED`], as a closed type.
+///
+/// **Concerns:** C8 (typed reason, closed vocabulary — this counter took a raw
+/// `&str` until 2026-08-03, and the branch that never called it was the one that
+/// mattered most).
+///
+/// The three variants are the RESPONDER's three collapse sites, and they are not
+/// interchangeable: `no_record` is structural (the conductor answered and holds
+/// nothing — no capacity relief changes it), while `conductor_error` and
+/// `budget_elapsed` are load-shaped (the bytes plausibly exist and the responder
+/// could not get at them in time). Reading a saturation wall as a structural one
+/// sends an operator to delete content that was merely starved.
+///
+/// **Contract test:**
+/// [`crate::p2p::view_federation::tests::head_record_degrade_labels_are_stable`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HeadRecordDegraded {
+    /// The conductor answered cleanly and holds NO record for this head. The
+    /// structural absence — the only one that says "these bytes are nowhere",
+    /// and the only branch that shipped uncounted.
+    NoRecord,
+    /// The conductor answered with an error.
+    ConductorError,
+    /// The responder's own budget (`HEAD_RECORD_CONDUCTOR_TIMEOUT`) fired first.
+    BudgetElapsed,
+}
+
+impl seam_contracts::ReasonLabel for HeadRecordDegraded {
+    const ALL: &'static [Self] = &[
+        HeadRecordDegraded::NoRecord,
+        HeadRecordDegraded::ConductorError,
+        HeadRecordDegraded::BudgetElapsed,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            HeadRecordDegraded::NoRecord => "no_record",
+            HeadRecordDegraded::ConductorError => "conductor_error",
+            HeadRecordDegraded::BudgetElapsed => "budget_elapsed",
+        }
+    }
+}
+
+/// Record one `ContentHeadRecord` answer served hash-only, by cause.
+///
+/// The `conductor_error` and `budget_elapsed` label STRINGS are byte-identical
+/// to the raw literals this function took before it was typed, so no existing
+/// dashboard series moves.
+pub fn inc_content_head_record_degraded(cause: HeadRecordDegraded) {
+    use seam_contracts::ReasonLabel as _;
     CONTENT_HEAD_RECORD_DEGRADED
-        .with_label_values(&[cause])
+        .with_label_values(&[cause.label()])
         .inc();
 }
 
@@ -1626,20 +1731,103 @@ pub enum ContestSkip {
     /// The chain exists; this row's own declared head is what cannot be
     /// resolved, and that does not change between sweeps either.
     SelfCandidacyBackoff,
+    /// A previous contest hit the no-chain gate AND the advertising peer's
+    /// responder stated that its conductor holds NO record for the head it
+    /// advertises ([`HeadRecordDegraded::NoRecord`]). The evidence this arm needs
+    /// does not exist on the only peer offering it, so the id is held for a
+    /// LONGER window than the ordinary no-chain backoff — but held, never
+    /// excluded: bytes can appear later (a genesis story gets witnessed), and the
+    /// window expiry re-admits the id with no intervention.
+    EvidenceAbsentBackoff,
 }
 
 impl seam_contracts::ReasonLabel for ContestSkip {
     const ALL: &'static [Self] = &[
         ContestSkip::NoLocalChainBackoff,
         ContestSkip::SelfCandidacyBackoff,
+        ContestSkip::EvidenceAbsentBackoff,
     ];
 
     fn label(&self) -> &'static str {
         match self {
             ContestSkip::NoLocalChainBackoff => "no_local_chain_backoff",
             ContestSkip::SelfCandidacyBackoff => "self_candidacy_backoff",
+            ContestSkip::EvidenceAbsentBackoff => "evidence_absent_backoff",
         }
     }
+}
+
+/// What the adopt/contest arm learned when it went looking for a peer's head
+/// `Record` — the label vocabulary of [`CONTENT_ADOPT_EVIDENCE`], as a closed
+/// type.
+///
+/// **Concerns:** C8 (typed reason, closed vocabulary). C14 (the residual is
+/// witnessed: a fetch that yields no bytes now names WHY, instead of vanishing
+/// into a single `carried=false` bit).
+///
+/// Deliberately separate from [`HeadRecordDegraded`] even though three variants
+/// share their label strings: this vocabulary is the REQUESTER's, and it has a
+/// success member (`Carried`) plus an `Unknown` the responder-side type must
+/// never have. Folding them would give the responder a `carried` label it can
+/// never emit and the requester a closed set it cannot honour across a
+/// mixed-version fleet.
+///
+/// **Contract test:**
+/// [`crate::services::head_adoption::tests::adopt_evidence_labels_are_stable`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AdoptEvidence {
+    /// The peer served the head AND its `Record` bytes. The only state the
+    /// adopt-before-author exit can act on.
+    Carried,
+    /// Hash-only, and the responder said its conductor holds NO record. The
+    /// STRUCTURAL absence: re-asking this peer cannot help.
+    NoRecord,
+    /// Hash-only, and the responder's own budget elapsed. The bytes plausibly
+    /// exist; the advertiser's conductor is saturated (the C11 class).
+    BudgetElapsed,
+    /// Hash-only, and the responder's conductor answered with an error.
+    ConductorError,
+    /// No cause is available: a hash-only answer from a peer too old to state
+    /// one, an unrecognised future reason, or an `Absent`/`Unreachable` answer
+    /// that established nothing about why bytes are missing.
+    ///
+    /// This is the mixed-version bucket, and it must stay a DISTINCT state:
+    /// silently folding it into `no_record` would apply the long evidence-absent
+    /// backoff on no evidence at all.
+    Unknown,
+}
+
+impl seam_contracts::ReasonLabel for AdoptEvidence {
+    const ALL: &'static [Self] = &[
+        AdoptEvidence::Carried,
+        AdoptEvidence::NoRecord,
+        AdoptEvidence::BudgetElapsed,
+        AdoptEvidence::ConductorError,
+        AdoptEvidence::Unknown,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            AdoptEvidence::Carried => "carried",
+            AdoptEvidence::NoRecord => "no_record",
+            AdoptEvidence::BudgetElapsed => "budget_elapsed",
+            AdoptEvidence::ConductorError => "conductor_error",
+            AdoptEvidence::Unknown => "unknown",
+        }
+    }
+}
+
+/// Count ONE adopt-arm evidence resolution.
+///
+/// **Concerns:** C8 — called from the single `resolve_peer_evidence` site in
+/// `services::head_adoption`, so the sum over states is exactly the number of
+/// head-record fetches the arm performed and every state has the same
+/// denominator.
+pub fn inc_adopt_evidence(state: AdoptEvidence) {
+    use seam_contracts::ReasonLabel as _;
+    CONTENT_ADOPT_EVIDENCE
+        .with_label_values(&[state.label()])
+        .inc();
 }
 
 /// Count a contest attempt skipped by the backoff ledger, by reason.

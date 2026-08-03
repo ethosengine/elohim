@@ -35,6 +35,7 @@ use futures::prelude::*;
 use libp2p::request_response;
 use std::io;
 
+use crate::services::head_adoption::RecordAbsentReason;
 use crate::views::{
     ContentHeadRecordPayload, Freshness, FreshnessState, JsonVal, ProjectionInventoryEntry,
     ProjectionInventoryPayload, ViewFederationRequest, ViewFederationResponse, ViewKind, ViewSlice,
@@ -474,7 +475,22 @@ pub async fn build_response_slice(
 /// record-less declare succeeds whenever the requester's own conductor can
 /// retrieve the target. A well-formed absence beats a transport timeout the
 /// requester cannot tell apart from an offline peer.
-async fn bounded_record_b64<F>(content_id: &str, call: F) -> Option<String>
+/// ## Naming the absence (2026-08-03)
+///
+/// The three collapse arms below all serve `record: null`, and until this change
+/// that was ALL a requester could see. The live consequence: 3533 adopt refusals
+/// in 100 minutes, every one of them exiting at its first line for want of
+/// bytes, with no way to tell from the answer whether the bytes were *nowhere*
+/// (the phantom class — 61%) or merely *unreachable through a saturated
+/// conductor* (39%). Those two need opposite remedies, so each arm now says
+/// which one it is, and the previously UNCOUNTED clean-`None` arm is counted.
+///
+/// The reason is advisory, never load-bearing for correctness: a requester that
+/// ignores it behaves exactly as it did before.
+async fn bounded_record_b64<F>(
+    content_id: &str,
+    call: F,
+) -> (Option<String>, Option<RecordAbsentReason>)
 where
     F: std::future::Future<
         Output = Result<
@@ -484,12 +500,31 @@ where
     >,
 {
     match tokio::time::timeout(HEAD_RECORD_CONDUCTOR_TIMEOUT, call).await {
-        Ok(Ok(Some(carried))) => {
-            Some(base64::engine::general_purpose::STANDARD.encode(&carried.record))
+        Ok(Ok(Some(carried))) => (
+            Some(base64::engine::general_purpose::STANDARD.encode(&carried.record)),
+            None,
+        ),
+        Ok(Ok(None)) => {
+            // THE STRUCTURAL ABSENCE, and the branch that shipped uncounted:
+            // the conductor answered cleanly and holds no record for this head.
+            // No capacity relief, no longer budget, and no number of re-asks
+            // changes it — only bytes entering the fleet. Distinguishing it from
+            // the two load-shaped arms below is the whole point of this field.
+            crate::metrics::inc_content_head_record_degraded(
+                crate::metrics::HeadRecordDegraded::NoRecord,
+            );
+            tracing::debug!(
+                target: "elohim_storage::view_federation",
+                content_id = %content_id,
+                "ContentHeadRecord: conductor holds NO record for this head; answering with \
+                 the head hash alone and naming the absence as structural"
+            );
+            (None, Some(RecordAbsentReason::NoRecord))
         }
-        Ok(Ok(None)) => None,
         Ok(Err(e)) => {
-            crate::metrics::inc_content_head_record_degraded("conductor_error");
+            crate::metrics::inc_content_head_record_degraded(
+                crate::metrics::HeadRecordDegraded::ConductorError,
+            );
             tracing::debug!(
                 target: "elohim_storage::view_federation",
                 content_id = %content_id,
@@ -497,14 +532,16 @@ where
                 "ContentHeadRecord: conductor could not serve the record; \
                  answering with the head hash alone"
             );
-            None
+            (None, Some(RecordAbsentReason::ConductorError))
         }
         Err(_elapsed) => {
             // The live signal for this bound. Counted HERE rather than left to
             // the requester's timeout counter, because that one cannot tell a
             // slow responder apart from an offline peer — the ambiguity that hid
             // fleet-wide adoption failure in the first place.
-            crate::metrics::inc_content_head_record_degraded("budget_elapsed");
+            crate::metrics::inc_content_head_record_degraded(
+                crate::metrics::HeadRecordDegraded::BudgetElapsed,
+            );
             tracing::info!(
                 target: "elohim_storage::view_federation",
                 content_id = %content_id,
@@ -513,7 +550,7 @@ where
                  budget; answering with the head hash alone (honest absence) so the \
                  requester's own deadline is never the thing that fires"
             );
-            None
+            (None, Some(RecordAbsentReason::BudgetElapsed))
         }
     }
 }
@@ -530,6 +567,10 @@ async fn build_content_head_record_payload(
                 head_action_hash: None,
                 declared_at: None,
                 record: None,
+                // No head is served at all here, so there is no absent RECORD to
+                // explain — the requester reads this as `Answer::Absent` and
+                // never looks at the reason.
+                record_absent_reason: None,
             })
             .unwrap_or(serde_json::Value::Null),
             state,
@@ -608,7 +649,7 @@ async fn build_content_head_record_payload(
     // the requester can still use: `adopt_peer` falls back to the advertised hash
     // and the record-less declare succeeds whenever its own conductor can
     // retrieve the target.
-    let record_b64 = match hc_registry.and_then(|r| r.lamad_client()) {
+    let (record_b64, record_absent_reason) = match hc_registry.and_then(|r| r.lamad_client()) {
         Some(hc) => {
             bounded_record_b64(
                 content_id,
@@ -619,7 +660,13 @@ async fn build_content_head_record_payload(
             )
             .await
         }
-        None => None,
+        // NO REASON, deliberately. A bridge-less responder never asked its
+        // conductor anything, so it has established NOTHING about whether the
+        // bytes exist. Answering `no_record` here would be a lie with teeth: the
+        // requester takes a 24h backoff on a stated structural absence, and this
+        // node is in no position to state one. Silence classifies as `unknown`
+        // and takes the ordinary window — which is exactly right.
+        None => (None, None),
     };
 
     (
@@ -628,6 +675,7 @@ async fn build_content_head_record_payload(
             head_action_hash: Some(head_action_hash),
             declared_at,
             record: record_b64,
+            record_absent_reason: record_absent_reason.map(|r| r.wire_str().to_string()),
         })
         .unwrap_or(serde_json::Value::Null),
         FreshnessState::Live,
@@ -1017,11 +1065,17 @@ mod tests {
             unreachable!("the responder budget must fire long before this resolves")
         };
 
-        let record = bounded_record_b64("wedged-id", never_answers).await;
+        let (record, reason) = bounded_record_b64("wedged-id", never_answers).await;
 
         assert_eq!(
             record, None,
             "a wedged conductor must degrade to a hash-only answer, never to a hang"
+        );
+        assert_eq!(
+            reason,
+            Some(RecordAbsentReason::BudgetElapsed),
+            "a wedge is a LOAD-shaped absence and must say so — mislabelling it structural \
+             would earn the id a 24h backoff for bytes that exist"
         );
         let elapsed = started.elapsed();
         assert!(
@@ -1042,19 +1096,30 @@ mod tests {
             action_hash: "uhCkkPROMPT".to_string(),
             record: vec![1, 2, 3, 4],
         };
-        let record = bounded_record_b64("prompt-id", async { Ok(Some(carried)) }).await;
+        let (record, reason) = bounded_record_b64("prompt-id", async { Ok(Some(carried)) }).await;
         assert_eq!(
             record,
             Some(base64::engine::general_purpose::STANDARD.encode([1u8, 2, 3, 4])),
             "an in-budget answer must still serve the bytes"
         );
+        assert_eq!(
+            reason, None,
+            "there is no absent record to explain when the bytes are served"
+        );
     }
 
-    /// An ANSWERED conductor error and an ELAPSED budget are the same honest
-    /// absence on the wire — a requester must not be able to tell them apart
-    /// (both mean "I cannot carry the bytes; here is the hash").
+    /// Every collapse arm serves the SAME hash-only shape — that part is the
+    /// original invariant and still holds — but since 2026-08-03 each one NAMES
+    /// itself, and the names are not interchangeable.
+    ///
+    /// `no_record` is structural (the bytes are nowhere) while `conductor_error`
+    /// and `budget_elapsed` are load-shaped (the bytes plausibly exist). The
+    /// requester spends a 24h deferral on the first and an hour on the others,
+    /// so a swapped label sends real content to the back of the queue for a day,
+    /// or keeps a phantom id burning sweep budget every hour forever.
     #[tokio::test(start_paused = true)]
-    async fn a_conductor_error_and_an_elapsed_budget_are_the_same_honest_absence() {
+    async fn every_collapse_arm_is_hash_only_and_names_itself() {
+        let none = bounded_record_b64("none-id", async { Ok(None) }).await;
         let errored = bounded_record_b64("err-id", async {
             Err(crate::error::StorageError::Internal("boom".into()))
         })
@@ -1064,12 +1129,34 @@ mod tests {
             unreachable!()
         })
         .await;
-        assert_eq!(errored, None);
-        assert_eq!(elapsed, None);
-        assert_eq!(
-            errored, elapsed,
-            "both degrade to the same hash-only answer"
+
+        // The unchanged half: all three are the same honest absence on the wire.
+        assert_eq!(none.0, None);
+        assert_eq!(errored.0, None);
+        assert_eq!(elapsed.0, None);
+
+        // The new half: three causes, three names.
+        assert_eq!(none.1, Some(RecordAbsentReason::NoRecord));
+        assert_eq!(errored.1, Some(RecordAbsentReason::ConductorError));
+        assert_eq!(elapsed.1, Some(RecordAbsentReason::BudgetElapsed));
+        assert_ne!(
+            none.1, elapsed.1,
+            "the structural absence and the saturation absence must never share a label"
         );
+    }
+
+    /// The degrade-cause label vocabulary is a dashboard contract. The two
+    /// pre-existing strings are BYTE-IDENTICAL to the raw literals they replaced
+    /// when the counter was typed; `no_record` is APPENDED, which is the only
+    /// mutation this pin should accept without a dashboard migration.
+    #[test]
+    fn head_record_degrade_labels_are_stable() {
+        seam_contracts::assert_reason_labels_stable::<crate::metrics::HeadRecordDegraded>(&[
+            "no_record",
+            "conductor_error",
+            "budget_elapsed",
+        ]);
+        seam_contracts::assert_reason_labels_discriminating::<crate::metrics::HeadRecordDegraded>();
     }
 
     #[test]

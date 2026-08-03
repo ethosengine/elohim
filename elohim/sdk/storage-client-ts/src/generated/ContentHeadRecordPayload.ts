@@ -32,4 +32,44 @@ declaredAt: number | null,
  * Standard-base64 serialized `Record` for `head_action_hash`, when this
  * peer's conductor could retrieve it.
  */
-record: string | null, };
+record: string | null, 
+/**
+ * ADDITIVE (2026-08-03, adopt-before-author evidence supply): WHY `record`
+ * is absent, when it is. `None` whenever bytes ARE served — and also
+ * whenever the responder has nothing honest to say (no conductor bridge at
+ * all), because "I never asked my conductor" establishes nothing about
+ * whether the bytes exist.
+ *
+ * Vocabulary, matching the responder's three collapse sites:
+ * `no_record` (the conductor answered cleanly and holds none — STRUCTURAL,
+ * no capacity relief changes it) | `conductor_error` | `budget_elapsed`.
+ *
+ * ## Why a `String` and not an enum
+ *
+ * A unit-variant serde enum has no `#[serde(other)]` escape, so a peer
+ * running a FUTURE version that adds a fourth reason would make this whole
+ * payload undecodable here — and `head_record_client` maps an undecodable
+ * payload to `Answer::Unreachable`, i.e. one added vocabulary word would
+ * silently stop adoption against newer peers. A tolerant string decoded
+ * into a typed reason with an `Unknown` fallback
+ * (`services::head_adoption::RecordAbsentReason::from_wire`) keeps the
+ * typing where it can be total and the tolerance where the fleet is mixed.
+ *
+ * ## Wire compatibility (MANDATORY — mixed-version peers during rolling
+ * deploys)
+ *
+ * Additive and optional, same discipline as
+ * [`ProjectionInventoryEntry::declared_head_action_hash`] and
+ * [`ViewFederationRequest::inventory_offset`]:
+ * - a NEW responder answering an OLD requester: this payload rides the
+ *   frame as an opaque `JsonVal` map, and the old requester's
+ *   `ContentHeadRecordPayload` is NOT `deny_unknown_fields`, so the extra
+ *   key is ignored → yesterday's behaviour;
+ * - an OLD responder answering a NEW requester: the key is missing and
+ *   `#[serde(default)]` yields `None` → classified `Unknown`, which takes
+ *   the ordinary backoff, i.e. yesterday's behaviour.
+ *
+ * `skip_serializing_if` keeps the `None` encoding byte-identical to the
+ * pre-field one, so a served-bytes answer is unchanged on the wire.
+ */
+recordAbsentReason: string | null, };

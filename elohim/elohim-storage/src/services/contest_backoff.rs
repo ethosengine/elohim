@@ -27,17 +27,32 @@
 //!    declared head and the conductor refused that too. The chain exists (that
 //!    gate already passed), so the refusal is about the row's own head being
 //!    unresolvable here — which likewise does not change between sweeps.
+//! 3. **`evidence_absent`** (2026-08-03) — a `no_local_chain` refusal where the
+//!    advertising peer's responder STATED that its own conductor holds no record
+//!    for the head it advertises. This is the same gate as (1), but its exit
+//!    condition is on a slower clock: (1) waits for THIS conductor to acquire a
+//!    chain, while this waits for the bytes to come into existence anywhere on
+//!    the fleet. Live evidence (2026-08-03): ~61% of the refusal population were
+//!    `e2e-*` phantom ids whose bytes exist nowhere, re-asked every hour
+//!    forever. It therefore serves [`BackoffWindows::evidence_absent`] (default
+//!    24h) rather than the ordinary window — a longer DEFERRAL, never a
+//!    different kind of thing. See
+//!    `genesis/data/timeline/backlog/adopt-before-author-evidence-starvation.md`.
 //!
 //! ## C3: a backoff is never a permanent exclusion
 //!
 //! Every backed-off id has **two** automated exits, and neither needs a human:
 //!
-//! - **Time expiry** — [`backoff_is_active`] is false once `window` has
-//!   elapsed. The window is a config knob
+//! - **Time expiry** — [`backoff_is_active`] is false once the class's window
+//!   has elapsed. The windows are config knobs
 //!   ([`crate::config::contest_backoff_window`], default 3600s = 12 sweeps at
 //!   the 300s cadence, deliberately the same ~1h dormancy as
-//!   `MISS_READMIT_SWEEPS`). `window == 0` disables the backoff entirely, which
-//!   restores the pre-F-B behaviour exactly.
+//!   `MISS_READMIT_SWEEPS`; and
+//!   [`crate::config::evidence_absent_backoff_window`], default 86400s).
+//!   `window == 0` disables that class entirely, which restores the prior
+//!   behaviour exactly. **This applies to the 24h class too**: an id whose bytes
+//!   appear on the fleet a day later is re-admitted with no intervention and no
+//!   human — the long window buys sweep budget, it never writes anything off.
 //! - **Local chain arrival** — [`note_local_chain_arrived`] clears the entry the
 //!   moment an author path gives this conductor a chain for the id. This is
 //!   *load-bearing*, not an optimisation: `adopt_deferred_heads` runs BEFORE
@@ -85,6 +100,74 @@ use crate::metrics::ContestSkip;
 // 200/tick, 25ms item delay, 120s wall clock) is unchanged and stays
 // authoritative — this only re-ORDERS what that budget is spent on.
 pub const CONTEST_BACKOFF_CAP: usize = 50_000;
+
+/// The window each backoff class serves.
+///
+/// **Concerns:** C3 (every field is a finite duration, so every class expires);
+/// C6a (the whole per-class budget lives here, in one readable struct, rather
+/// than as a widening parameter list at each call site).
+///
+/// **Contract test:** [`tests::each_class_expires_on_its_own_window`].
+///
+/// Two classes, two clocks, and the distinction is the point:
+///
+/// - [`contest`] waits for THIS conductor's holdings to change (a chain arrives
+///   via an author path). Sweep-scale — an hour is a fair bet.
+/// - [`evidence_absent`] waits for BYTES TO EXIST anywhere on the fleet, because
+///   the only peer advertising the head has stated its conductor holds no
+///   record for it. Human-scale — an unwitnessed story getting witnessed, not a
+///   sweep landing.
+///
+/// A single window cannot serve both without being wrong for one of them, which
+/// is why this is a struct and not a `Duration`.
+///
+/// [`contest`]: Self::contest
+/// [`evidence_absent`]: Self::evidence_absent
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BackoffWindows {
+    /// Window for every predictable-failure class except evidence-absent.
+    pub contest: Duration,
+    /// Window for [`ContestSkip::EvidenceAbsentBackoff`].
+    pub evidence_absent: Duration,
+}
+
+impl BackoffWindows {
+    /// Read both windows from the process-wide config mirrors.
+    ///
+    /// A constructor rather than a config read inside [`skip_class`]: the
+    /// decision functions stay pure and window-parameterised (testable without a
+    /// `OnceLock`), and the config coupling lives at exactly one line.
+    pub fn from_config() -> Self {
+        Self {
+            contest: crate::config::contest_backoff_window(),
+            evidence_absent: crate::config::evidence_absent_backoff_window(),
+        }
+    }
+
+    /// One window for every class — the shape the module had before the
+    /// evidence-absent split, kept for tests and for any caller that genuinely
+    /// has one horizon.
+    pub fn uniform(window: Duration) -> Self {
+        Self {
+            contest: window,
+            evidence_absent: window,
+        }
+    }
+
+    /// The window `class` serves.
+    ///
+    /// Pure and total. A ZERO `evidence_absent` window means the class is
+    /// DISABLED at the recording site (`head_adoption::evidence_backoff_class`
+    /// records the ordinary class instead), so an entry only reaches this arm
+    /// with a zero window if the env flipped mid-process — in which case
+    /// [`backoff_is_active`] releases it, which is the fail-open direction.
+    pub fn for_class(&self, class: ContestSkip) -> Duration {
+        match class {
+            ContestSkip::EvidenceAbsentBackoff => self.evidence_absent,
+            ContestSkip::NoLocalChainBackoff | ContestSkip::SelfCandidacyBackoff => self.contest,
+        }
+    }
+}
 
 /// Is a backoff recorded `elapsed` ago still holding, given `window`?
 ///
@@ -158,13 +241,15 @@ pub fn note(id: &str, class: ContestSkip) {
 ///
 /// Expired entries are dropped as they are observed, so the ledger sheds memory
 /// on the same reads that use it and no separate sweeper is needed.
-pub fn skip_class(id: &str, window: Duration) -> Option<ContestSkip> {
-    if window.is_zero() {
-        return None;
-    }
+///
+/// The window is resolved PER CLASS ([`BackoffWindows::for_class`]): an id held
+/// because the fleet has no bytes for it waits longer than one held because this
+/// conductor has no chain for it. A zero window for the recorded class means
+/// "not held" — the OFF switch, per class.
+pub fn skip_class(id: &str, windows: BackoffWindows) -> Option<ContestSkip> {
     let mut guard = ledger().lock().ok()?;
     let entry = *guard.get(id)?;
-    if backoff_is_active(entry.recorded_at.elapsed(), window) {
+    if backoff_is_active(entry.recorded_at.elapsed(), windows.for_class(entry.class)) {
         Some(entry.class)
     } else {
         guard.remove(id);
@@ -226,6 +311,10 @@ mod tests {
     use super::*;
 
     const WINDOW: Duration = Duration::from_secs(3600);
+    const WINDOWS: BackoffWindows = BackoffWindows {
+        contest: WINDOW,
+        evidence_absent: WINDOW,
+    };
 
     /// C3, as a property rather than an example: whatever finite window is
     /// configured, there is an elapsed time past which the id is eligible again.
@@ -261,7 +350,7 @@ mod tests {
         assert!(!backoff_is_active(Duration::ZERO, Duration::ZERO));
         note("zero-window:id", ContestSkip::NoLocalChainBackoff);
         assert_eq!(
-            skip_class("zero-window:id", Duration::ZERO),
+            skip_class("zero-window:id", BackoffWindows::uniform(Duration::ZERO)),
             None,
             "with the backoff disabled nothing may be skipped, even a recorded id"
         );
@@ -275,15 +364,15 @@ mod tests {
         note("class:no-chain", ContestSkip::NoLocalChainBackoff);
         note("class:self-cand", ContestSkip::SelfCandidacyBackoff);
         assert_eq!(
-            skip_class("class:no-chain", WINDOW),
+            skip_class("class:no-chain", WINDOWS),
             Some(ContestSkip::NoLocalChainBackoff)
         );
         assert_eq!(
-            skip_class("class:self-cand", WINDOW),
+            skip_class("class:self-cand", WINDOWS),
             Some(ContestSkip::SelfCandidacyBackoff)
         );
         assert_eq!(
-            skip_class("class:never-recorded", WINDOW),
+            skip_class("class:never-recorded", WINDOWS),
             None,
             "an id that never failed must never be skipped"
         );
@@ -297,10 +386,10 @@ mod tests {
     fn a_local_chain_arrival_clears_the_backoff_immediately() {
         let _exclusive = test_exclusive();
         note("arrival:authored", ContestSkip::NoLocalChainBackoff);
-        assert!(skip_class("arrival:authored", WINDOW).is_some());
+        assert!(skip_class("arrival:authored", WINDOWS).is_some());
         note_local_chain_arrived("arrival:authored");
         assert_eq!(
-            skip_class("arrival:authored", WINDOW),
+            skip_class("arrival:authored", WINDOWS),
             None,
             "an authored id is contestable on the very next sweep, not in an hour"
         );
@@ -328,11 +417,118 @@ mod tests {
             "the ledger must never grow past its cap"
         );
         assert_eq!(
-            skip_class("cap:0", WINDOW),
+            skip_class("cap:0", WINDOWS),
             None,
             "overflow must RELEASE ids (fail-open), never strand them"
         );
         reset();
+    }
+
+    /// PER-CLASS CLOCKS. The evidence-absent class must serve its OWN window,
+    /// not the contest one — that is the entire point of the split, and a
+    /// `for_class` that quietly returned `contest` for everything would make the
+    /// 24h lever a silent no-op while every test above still passed.
+    #[test]
+    fn each_class_expires_on_its_own_window() {
+        let windows = BackoffWindows {
+            contest: Duration::from_secs(3600),
+            evidence_absent: Duration::from_secs(86_400),
+        };
+        assert_eq!(
+            windows.for_class(ContestSkip::NoLocalChainBackoff),
+            Duration::from_secs(3600)
+        );
+        assert_eq!(
+            windows.for_class(ContestSkip::SelfCandidacyBackoff),
+            Duration::from_secs(3600)
+        );
+        assert_eq!(
+            windows.for_class(ContestSkip::EvidenceAbsentBackoff),
+            Duration::from_secs(86_400),
+            "the evidence-absent class must wait on its own, slower clock"
+        );
+
+        // At 2h the ordinary class has expired and the evidence-absent one has
+        // not — the observable consequence of the two clocks.
+        let two_hours = Duration::from_secs(7200);
+        assert!(!backoff_is_active(
+            two_hours,
+            windows.for_class(ContestSkip::NoLocalChainBackoff)
+        ));
+        assert!(backoff_is_active(
+            two_hours,
+            windows.for_class(ContestSkip::EvidenceAbsentBackoff)
+        ));
+    }
+
+    /// C3 FOR THE LONG CLASS, as a property. 24h is long enough that "is this
+    /// still a deferral or has it become an exclusion?" is a fair question to
+    /// ask of it — so it gets the same expiry proof the 1h class has, plus the
+    /// re-admission assertion through the real ledger.
+    #[test]
+    fn the_evidence_absent_class_is_a_deferral_not_an_exclusion() {
+        let _exclusive = test_exclusive();
+        for secs in [1u64, 3600, 86_400, 604_800] {
+            let windows = BackoffWindows {
+                contest: WINDOW,
+                evidence_absent: Duration::from_secs(secs),
+            };
+            let w = windows.for_class(ContestSkip::EvidenceAbsentBackoff);
+            assert!(backoff_is_active(Duration::ZERO, w));
+            assert!(
+                !backoff_is_active(w, w),
+                "at exactly the {secs}s window the evidence-absent hold must have expired"
+            );
+        }
+
+        // Through the real ledger: recorded → held; the same id read against an
+        // already-expired window → RE-ADMITTED (and the entry shed).
+        note("evidence:absent-id", ContestSkip::EvidenceAbsentBackoff);
+        assert_eq!(
+            skip_class(
+                "evidence:absent-id",
+                BackoffWindows {
+                    contest: WINDOW,
+                    evidence_absent: Duration::from_secs(86_400),
+                }
+            ),
+            Some(ContestSkip::EvidenceAbsentBackoff)
+        );
+        // A window shorter than the entry's age (zero here) is the expiry the
+        // sweep would see a day later: the id becomes contestable again with no
+        // intervention, which is what makes bytes-appear-later self-healing.
+        assert_eq!(
+            skip_class(
+                "evidence:absent-id",
+                BackoffWindows {
+                    contest: WINDOW,
+                    evidence_absent: Duration::ZERO,
+                }
+            ),
+            None,
+            "an expired evidence-absent hold must release the id, never strand it"
+        );
+    }
+
+    /// The ordinary classes must NOT inherit the long window — a shared clock
+    /// would quietly 24× the no-chain backoff and starve the ids that are only
+    /// waiting on an author path.
+    #[test]
+    fn a_long_evidence_window_does_not_lengthen_the_ordinary_classes() {
+        let _exclusive = test_exclusive();
+        note("mixed:no-chain", ContestSkip::NoLocalChainBackoff);
+        assert_eq!(
+            skip_class(
+                "mixed:no-chain",
+                BackoffWindows {
+                    contest: Duration::ZERO,
+                    evidence_absent: Duration::from_secs(86_400),
+                }
+            ),
+            None,
+            "a disabled contest window must release a no-chain entry regardless of how long \
+             the evidence-absent window is"
+        );
     }
 
     /// A recurrence restarts the window rather than letting a stale record age
@@ -346,7 +542,7 @@ mod tests {
         note("recur:id", ContestSkip::NoLocalChainBackoff);
         note("recur:id", ContestSkip::SelfCandidacyBackoff);
         assert_eq!(
-            skip_class("recur:id", WINDOW),
+            skip_class("recur:id", WINDOWS),
             Some(ContestSkip::SelfCandidacyBackoff),
             "the most recent failure class is the one reported"
         );

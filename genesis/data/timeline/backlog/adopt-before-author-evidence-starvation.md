@@ -67,6 +67,34 @@ Live adjudication of the two sub-causes, both confirmed as a SPLIT:
    uncounted branch — precisely the structural one. Without it, phantom vs
    C11 is only separable via the `carried=` INFO log line, not from meters.
 
+## Addendum 2026-08-03 (same day): levers 1+3 landed as one storage wave
+
+Implemented (Opus rust-architect, adversarially reviewed by Sonnet code-reviewer,
+SHIP verdict): `record_absent_reason` threaded through the ContentHeadRecord
+answer (additive, mixed-fleet-compat proven — map-keyed rmp_serde, payload
+travels as opaque Value, no deny_unknown_fields, byte-identical carried shape,
+typed `Unknown` fallback so future vocabulary can't brick decode); responder
+counts the formerly-uncounted no-record branch; requester classifies evidence
+and records an **evidence-absent long-backoff class** — the content-agnostic
+phantom-hygiene mechanism (lever 1 re-shaped: deferral-not-deletion,
+self-healing on re-admission) — plus `adopt_evidence{state}` pre-touched
+(lever 3 closed).
+
+Reviewer's one MODERATE caveat, accepted and mitigated: a clean conductor
+no-record can also mean not-yet-gossiped (full-arc law), so a real,
+still-converging id could catch the long deferral. Mitigation: code default
+86400s but alpha bakes `ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS=21600` (6h,
+genesis-declared in the human manifests); watch
+`adopt_evidence{state="no_record"}` vs later `carried` recoveries before
+raising; `=0` restores the ordinary 3600s window exactly. Bridge-less
+responder arm deliberately answers no reason → ordinary window (never the
+long class without an actual conductor ask).
+
+Still open here: lever 2 (C11 conductor saturation — permits/CPU/pacing),
+now measurable in isolation once the phantom load drains; and the HTTP twin
+(`GET /db/content/{id}/head-record`) not carrying the reason field (flagged,
+non-blocking).
+
 ## Verdict for the saga
 
 The flip is correct and behaviorally proven; convergence stays blocked on

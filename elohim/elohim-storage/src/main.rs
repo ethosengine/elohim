@@ -488,8 +488,36 @@ async fn async_main(
             ),
         }
     }
+    // EVIDENCE-SUPPLY LEVER. Same OFF-value discipline as the two knobs above:
+    // 0 does not mean "no backoff", it means "record the ordinary no-chain
+    // backoff instead" — the pre-lever behaviour exactly. An unparseable value
+    // keeps the default rather than silently disabling the lever.
+    if let Ok(v) = std::env::var("ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS") {
+        match v.trim().parse::<u64>() {
+            Ok(n) => config.evidence_absent_backoff_seconds = n,
+            Err(_) => tracing::warn!(
+                value = %v,
+                default = config.evidence_absent_backoff_seconds,
+                "ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS is not an integer — keeping the default"
+            ),
+        }
+    }
     elohim_storage::config::set_adopt_contest_fanout(config.adopt_contest_fanout);
     elohim_storage::config::set_contest_backoff_seconds(config.contest_backoff_seconds);
+    elohim_storage::config::set_evidence_absent_backoff_seconds(
+        config.evidence_absent_backoff_seconds,
+    );
+    // Stated at boot, not inferred from a metric: the operator flipping this
+    // needs the effective value in the log next to the flag it modifies.
+    tracing::info!(
+        contest_backoff_seconds = config.contest_backoff_seconds,
+        evidence_absent_backoff_seconds = config.evidence_absent_backoff_seconds,
+        "contest backoff windows: an id whose advertising peer states it holds NO record for \
+         the advertised head is held for the evidence-absent window (0 = the class is disabled \
+         and records the ordinary no-chain backoff); every other predictable failure uses the \
+         contest window. Both are deferrals with automatic re-admission on expiry, never \
+         exclusions"
+    );
 
     // Demand-driven auto-pin (self-healing opportunity map row 15). Default ON
     // (demand-driven, not blanket backfill; consent floor preserved downstream

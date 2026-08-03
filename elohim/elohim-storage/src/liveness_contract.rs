@@ -1095,9 +1095,17 @@ mod tests {
         let arrival_releases = {
             let _exclusive = contest_backoff::test_exclusive();
             contest_backoff::note("c3:witness", ContestSkip::NoLocalChainBackoff);
-            let held_before = contest_backoff::skip_class("c3:witness", WINDOW).is_some();
+            let held_before = contest_backoff::skip_class(
+                "c3:witness",
+                contest_backoff::BackoffWindows::uniform(WINDOW),
+            )
+            .is_some();
             contest_backoff::note_local_chain_arrived("c3:witness");
-            let released = contest_backoff::skip_class("c3:witness", WINDOW).is_none();
+            let released = contest_backoff::skip_class(
+                "c3:witness",
+                contest_backoff::BackoffWindows::uniform(WINDOW),
+            )
+            .is_none();
             held_before && released
         };
 

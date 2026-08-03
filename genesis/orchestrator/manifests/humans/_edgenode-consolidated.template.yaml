@@ -381,6 +381,15 @@ spec:
             # when enabled; unset/false is behavior-identical to pre-flag.
             - name: ELOHIM_ADOPT_BEFORE_AUTHOR
               value: "ADOPT_BEFORE_AUTHOR_PLACEHOLDER"
+            # Evidence-absent contest backoff (head_adoption): ids whose
+            # advertiser's conductor cleanly holds NO record defer this long
+            # before re-contesting (phantom-load relief). Conservative initial
+            # bake at 6h — a clean no-record can also mean not-yet-gossiped
+            # (full-arc law), so we hold below the 24h code default until
+            # no_record→carried recovery data accumulates. Raise by editing
+            # this literal; 0 restores the ordinary 3600s window.
+            - name: ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS
+              value: "21600"
             - name: ENABLE_IMPORT_API
               value: "true"
             - name: ENABLE_CONTENT_DB

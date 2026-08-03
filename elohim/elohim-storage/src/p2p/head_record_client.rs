@@ -34,6 +34,21 @@
 //!   present answer: a peer that holds a head it cannot resolve answers
 //!   hash-only, which is the dominant shape when the advertising peer is itself
 //!   conductor-missing.
+//!
+//! ## The third absence (2026-08-03): WHY the record is missing
+//!
+//! `Present`-hash-only was one bit standing for three different worlds, and the
+//! adopt arm burned its whole budget on the difference: the advertiser's
+//! conductor cleanly holds NO record (structural — the bytes are nowhere), or it
+//! errored, or its responder budget elapsed (load-shaped — the bytes exist and
+//! its conductor is saturated). The responder now names which
+//! (`ContentHeadRecordPayload::record_absent_reason`) and
+//! [`RecordAbsentReason::from_wire`] types it here.
+//!
+//! Two rules keep this safe across a mixed-version fleet: an unstated reason (an
+//! old peer) and an unrecognised one (a future peer) BOTH decode to "no stated
+//! cause", never to the structural verdict; and the field is advisory — a
+//! requester that ignores it behaves exactly as it did before.
 
 use std::time::Duration;
 
@@ -42,7 +57,7 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use seam_contracts::Answer;
 
 use super::P2PHandle;
-use crate::services::head_adoption::{CarriedHeadRecord, HeadRecordFetcher};
+use crate::services::head_adoption::{CarriedHeadRecord, HeadRecordFetcher, RecordAbsentReason};
 use crate::views::{ContentHeadRecordPayload, ViewFederationRequest, ViewKind};
 
 /// One-shot ask; the reconcile sweep is the retry loop.
@@ -195,9 +210,23 @@ fn classify_payload(
         None => None,
     };
 
+    // WHY the bytes are absent, when the responder said. Decoded even when bytes
+    // ARE present (the responder is required to leave it unset then) so a
+    // responder that contradicts itself is visible in the type rather than
+    // silently reinterpreted here.
+    //
+    // The malformed-base64 arm above deliberately keeps whatever the responder
+    // said — which is `None`, because a responder that served bytes states no
+    // reason. That classifies as `unknown` downstream, which is exactly right:
+    // the bytes DO exist on the advertiser, so this id must not earn the long
+    // evidence-absent deferral.
+    let record_absent_reason =
+        RecordAbsentReason::from_wire(payload.record_absent_reason.as_deref());
+
     Answer::Present(CarriedHeadRecord {
         head_action_hash,
         record,
+        record_absent_reason,
     })
 }
 
@@ -210,11 +239,21 @@ mod tests {
     /// wire payload should fail HERE, loudly, rather than default silently — the
     /// C10 contract-evolution rule applied to a fixture.
     fn payload(head: Option<&str>, record: Option<&str>) -> ContentHeadRecordPayload {
+        payload_with_reason(head, record, None)
+    }
+
+    /// As [`payload`], plus the responder's stated reason for an absent record.
+    fn payload_with_reason(
+        head: Option<&str>,
+        record: Option<&str>,
+        reason: Option<&str>,
+    ) -> ContentHeadRecordPayload {
         ContentHeadRecordPayload {
             content_id: "c1".to_string(),
             head_action_hash: head.map(str::to_string),
             declared_at: None,
             record: record.map(str::to_string),
+            record_absent_reason: reason.map(str::to_string),
         }
     }
 
@@ -268,5 +307,76 @@ mod tests {
     fn blank_record_is_no_record() {
         let blank = classify_payload(payload(Some("uhCkk-head"), Some("   ")), "p", "c");
         assert!(blank.into_option().unwrap().record.is_none());
+    }
+
+    /// Each stated reason reaches the domain type intact. This is the half of
+    /// the evidence-supply cure that runs on THIS side of the wire: the
+    /// responder can name a cause perfectly and it buys nothing if the requester
+    /// drops it on the floor.
+    #[test]
+    fn a_stated_reason_reaches_the_carried_record() {
+        for (wire, expected) in [
+            ("no_record", RecordAbsentReason::NoRecord),
+            ("conductor_error", RecordAbsentReason::ConductorError),
+            ("budget_elapsed", RecordAbsentReason::BudgetElapsed),
+        ] {
+            let answered = classify_payload(
+                payload_with_reason(Some("uhCkk-head"), None, Some(wire)),
+                "peer",
+                "c1",
+            );
+            assert_eq!(answered.state(), AnswerState::Present);
+            let carried = answered.into_option().unwrap();
+            assert!(carried.record.is_none());
+            assert_eq!(
+                carried.record_absent_reason,
+                Some(expected),
+                "the responder said {wire:?} and the requester must hear exactly that"
+            );
+        }
+    }
+
+    /// MIXED-VERSION SAFETY, the rule the long backoff depends on. An OLD peer
+    /// states nothing; a FUTURE peer may state a word this build has never heard
+    /// of. Neither may be read as the structural `no_record` verdict — that one
+    /// licenses a 24h deferral, and it must be earned by a peer positively
+    /// saying so, never by silence or by a word we cannot interpret.
+    #[test]
+    fn an_unstated_or_unknown_reason_is_never_the_structural_verdict() {
+        // Old peer: no key on the wire at all.
+        let old = classify_payload(payload(Some("uhCkk-head"), None), "peer", "c1");
+        assert_eq!(old.into_option().unwrap().record_absent_reason, None);
+
+        // Future peer: a reason this build does not know.
+        for unrecognised in ["reserved_for_future_use", "", "   ", "NO_RECORD"] {
+            let future = classify_payload(
+                payload_with_reason(Some("uhCkk-head"), None, Some(unrecognised)),
+                "peer",
+                "c1",
+            );
+            assert_eq!(
+                future.into_option().unwrap().record_absent_reason,
+                Some(RecordAbsentReason::Unknown),
+                "{unrecognised:?} must decode to Unknown, never to a structural verdict, and \
+                 never to a payload-level decode failure (which would answer Unreachable and \
+                 stop adoption against every newer peer)"
+            );
+        }
+    }
+
+    /// Malformed carried bytes are NOT an evidence absence. The advertiser DID
+    /// have the bytes; this node dropped them locally. Earning the long
+    /// evidence-absent deferral here would defer real, present content for a day
+    /// over a base64 bug.
+    #[test]
+    fn malformed_bytes_do_not_manufacture_an_evidence_absence() {
+        let malformed = classify_payload(
+            payload_with_reason(Some("uhCkk-head"), Some("!!!not-b64"), None),
+            "p",
+            "c",
+        );
+        let carried = malformed.into_option().unwrap();
+        assert!(carried.record.is_none());
+        assert_eq!(carried.record_absent_reason, None);
     }
 }

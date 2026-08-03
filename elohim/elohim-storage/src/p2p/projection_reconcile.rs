@@ -3319,7 +3319,11 @@ async fn adopt_deferred_heads(
     let app_ctx = crate::db::AppContext::default_lamad();
     let total = candidates.len();
     let fanout = crate::config::adopt_contest_fanout();
-    let backoff_window = crate::config::contest_backoff_window();
+    // Per-CLASS windows: the evidence-absent class (the advertiser stated it
+    // holds no record) waits on a slower clock than the ordinary no-chain one.
+    // Both remain DEFERRALS — a long-window id is de-prioritised into the
+    // reserved tail below, never dropped from the slice.
+    let backoff_windows = crate::services::contest_backoff::BackoffWindows::from_config();
 
     // PRIORITY PARTITION. `partition` yields (matching, non-matching), so
     // `deferred` are the backed-off ids and `eligible` the rest. Nothing is
@@ -3327,7 +3331,7 @@ async fn adopt_deferred_heads(
     // election-obey arm.
     let (deferred, eligible): (Vec<&AdoptCandidate>, Vec<&AdoptCandidate>) =
         candidates.iter().partition(|c| {
-            crate::services::contest_backoff::skip_class(&c.id, backoff_window).is_some()
+            crate::services::contest_backoff::skip_class(&c.id, backoff_windows).is_some()
         });
     let deferred_count = deferred.len();
     // bounded-work: the per-tick slice is exactly WITNESS_MAX_PER_TICK (200)

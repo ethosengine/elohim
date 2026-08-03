@@ -302,6 +302,78 @@ pub struct PeerHeadHint {
 /// `content_id → ` the first peer-advertised declaration seen this sweep.
 pub type PeerHeadHints = HashMap<String, PeerHeadHint>;
 
+/// WHY a peer served a head hash-only — the responder's own account of its
+/// absent `Record`, carried across the wire as a tolerant string
+/// (`views::ContentHeadRecordPayload::record_absent_reason`) and typed here.
+///
+/// **Concerns:** C4 (honest absence — an absence with a stated provenance is a
+/// different object from an unexplained one, and this type is what keeps them
+/// from collapsing). C8 (the vocabulary is closed at the point of USE, while the
+/// wire stays open so a future word cannot break a rolling deploy).
+///
+/// **Contract tests:** [`tests::a_wire_reason_round_trips_through_its_type`] and
+/// [`tests::an_unrecognised_reason_is_unknown_not_a_decode_failure`].
+///
+/// ## Why this exists
+///
+/// Until 2026-08-03 every hash-only answer looked identical to the requester:
+/// `record: None`, three causes, one bit. The live split behind that one bit was
+/// ~61% STRUCTURAL (the advertiser's conductor cleanly holds no record — the
+/// bytes are nowhere, and no capacity relief will make them appear) and ~39%
+/// SATURATION (the bytes exist; the advertiser's conductor could not serve them
+/// inside the responder budget). Those point at opposite remedies, and the arm
+/// that consumes them was re-asking both every hour forever.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecordAbsentReason {
+    /// The advertiser's conductor answered cleanly and holds NO record for the
+    /// head it advertises. Re-asking THIS peer cannot help; only new bytes
+    /// entering the fleet can.
+    NoRecord,
+    /// The advertiser's conductor answered with an error.
+    ConductorError,
+    /// The advertiser's responder budget elapsed. The bytes plausibly exist and
+    /// its conductor is saturated.
+    BudgetElapsed,
+    /// The responder named a reason this build does not know — a peer running a
+    /// FUTURE version. Treated exactly like an unstated reason: no long backoff
+    /// is taken on a word we cannot interpret.
+    Unknown,
+}
+
+impl RecordAbsentReason {
+    /// The wire token for this reason. Kept as the SAME strings the degrade
+    /// counter has always used, so a log line and a metric label read alike.
+    ///
+    /// [`Self::Unknown`] is never emitted by a responder — it only ever arises
+    /// from decoding — but it maps to `"unknown"` so a round-trip is total.
+    pub fn wire_str(self) -> &'static str {
+        match self {
+            RecordAbsentReason::NoRecord => "no_record",
+            RecordAbsentReason::ConductorError => "conductor_error",
+            RecordAbsentReason::BudgetElapsed => "budget_elapsed",
+            RecordAbsentReason::Unknown => "unknown",
+        }
+    }
+
+    /// Decode the wire field.
+    ///
+    /// The two `None`-ish inputs stay DISTINCT from each other in the type even
+    /// though both take the ordinary backoff downstream: `None` means the
+    /// responder said nothing (a pre-2026-08-03 peer), `Some(Unknown)` means it
+    /// said something this build cannot read. Neither may ever be widened into
+    /// [`Self::NoRecord`] — the long evidence-absent backoff is licensed by
+    /// stated evidence, never by its absence.
+    pub fn from_wire(raw: Option<&str>) -> Option<Self> {
+        let raw = raw?.trim();
+        Some(match raw {
+            "no_record" => RecordAbsentReason::NoRecord,
+            "conductor_error" => RecordAbsentReason::ConductorError,
+            "budget_elapsed" => RecordAbsentReason::BudgetElapsed,
+            _ => RecordAbsentReason::Unknown,
+        })
+    }
+}
+
 /// A head `Record` fetched from a peer — the SOURCE half of
 /// declare-carries-Record, obtained over the P2P view-federation plane.
 #[derive(Debug, Clone)]
@@ -314,6 +386,10 @@ pub struct CarriedHeadRecord {
     /// conductor cannot retrieve the record (honest absence — we then declare
     /// without a carried record, which is the classic behaviour).
     pub record: Option<Vec<u8>>,
+    /// The responder's account of why [`Self::record`] is absent, when it gave
+    /// one. Always `None` when bytes ARE carried; `None` also when the peer is
+    /// too old to state a reason.
+    pub record_absent_reason: Option<RecordAbsentReason>,
 }
 
 /// Fetches a peer's head `Record` over whichever transport the caller owns.
@@ -361,6 +437,23 @@ pub trait HeadRecordFetcher: Send + Sync {
     /// explicitly and **MUST NOT retry-loop**. The reconcile sweep is the retry,
     /// at its own cadence.
     ///
+    /// # The evidence obligation (2026-08-03)
+    ///
+    /// A `Present` answer whose `record` is `None` SHOULD carry
+    /// [`CarriedHeadRecord::record_absent_reason`] when the serving peer stated
+    /// one, and MUST NOT invent one when it did not. Two rules make this safe to
+    /// consume:
+    ///
+    /// - **`NoRecord` is a positive statement, never an inference.** It licenses
+    ///   a 24h deferral of the id, so it may only be set when the responder
+    ///   actually reported that its conductor holds no record. Silence, an
+    ///   unrecognised token, a transport failure, and a locally-dropped
+    ///   malformed record are ALL [`RecordAbsentReason::Unknown`]-or-`None`.
+    /// - **The field is advisory.** An implementation that always answers `None`
+    ///   here is conformant and behaves exactly as every implementation did
+    ///   before this field existed — the consumer falls back to the ordinary
+    ///   backoff window.
+    ///
     /// # Behaviour-neutrality of the retrofit
     ///
     /// Every call site in this module currently treats `Absent` and
@@ -370,6 +463,95 @@ pub trait HeadRecordFetcher: Send + Sync {
     /// [`Answer::into_option`], so a future arm that needs the distinction can
     /// find every place it is currently discarded with one grep.
     async fn fetch(&self, peer_id: &str, content_id: &str) -> Answer<CarriedHeadRecord>;
+}
+
+/// Ask one peer for `id`'s head record and CLASSIFY what came back — the single
+/// site in this module where an adopt-arm evidence resolution happens, and
+/// therefore the single site where [`crate::metrics::inc_adopt_evidence`] fires.
+///
+/// **Concerns:** C4 (the named `into_option` collapse lives here now, once,
+/// instead of at each fetch site). C8 (exactly one increment per resolution, so
+/// the counter's sum is "how many times did this arm go looking for bytes" and
+/// every state shares one denominator).
+///
+/// **Contract tests:** [`tests::evidence_classification_maps_every_answer_shape`]
+/// and [`tests::an_absent_fetcher_resolves_no_evidence_at_all`].
+///
+/// Returns `(carried, evidence)`. `evidence` is `None` ONLY when no fetch
+/// happened at all (the boot pass carries no fetcher) — an unasked question is
+/// not an answer, and counting it would corrupt the denominator.
+async fn resolve_peer_evidence(
+    fetcher: Option<&dyn HeadRecordFetcher>,
+    peer_id: &str,
+    id: &str,
+) -> (
+    Option<CarriedHeadRecord>,
+    Option<crate::metrics::AdoptEvidence>,
+) {
+    let Some(f) = fetcher else {
+        return (None, None);
+    };
+    // NAMED C4 COLLAPSE (`into_option`): `Absent` and `Unreachable` both mean
+    // "no bytes and no stated cause" to every consumer below, and both classify
+    // as `Unknown` — the pre-2026-08-03 behaviour exactly, now with the collapse
+    // recorded on a meter instead of only in a log line.
+    let carried = f.fetch(peer_id, id).await.into_option();
+    let state = classify_evidence(carried.as_ref());
+    crate::metrics::inc_adopt_evidence(state);
+    (carried, Some(state))
+}
+
+/// What one fetch established about the SUPPLY of head-record bytes.
+///
+/// Pure and total, split from [`resolve_peer_evidence`] for the same reason
+/// `head_record_client::classify_payload` is split from its transport half: the
+/// round-trip needs a swarm, the classification is the part that can be wrong.
+///
+/// The load-bearing rule is the LAST arm: an unstated or unrecognised reason is
+/// `Unknown`, never `NoRecord`. `NoRecord` licenses a 24h deferral, and it must
+/// be licensed by a peer's positive statement — never by silence.
+fn classify_evidence(carried: Option<&CarriedHeadRecord>) -> crate::metrics::AdoptEvidence {
+    use crate::metrics::AdoptEvidence;
+    match carried {
+        Some(c) if c.record.is_some() => AdoptEvidence::Carried,
+        Some(c) => match c.record_absent_reason {
+            Some(RecordAbsentReason::NoRecord) => AdoptEvidence::NoRecord,
+            Some(RecordAbsentReason::ConductorError) => AdoptEvidence::ConductorError,
+            Some(RecordAbsentReason::BudgetElapsed) => AdoptEvidence::BudgetElapsed,
+            Some(RecordAbsentReason::Unknown) | None => AdoptEvidence::Unknown,
+        },
+        None => AdoptEvidence::Unknown,
+    }
+}
+
+/// Which backoff class the no-chain refusal should record, given what the fetch
+/// established about supply.
+///
+/// **Concerns:** C3 (both outcomes are DEFERRALS with automatic expiry — this
+/// function chooses a duration, never an exclusion). C8 (the choice is a typed
+/// class the skip counter reports, so "how much of the residual is
+/// evidence-absent?" is a query, not an inference).
+///
+/// **Contract tests:** [`tests::only_a_stated_no_record_takes_the_long_backoff`]
+/// and [`tests::a_zero_evidence_window_restores_the_ordinary_class`].
+///
+/// Pure and total, taking the window rather than reading config, so the
+/// env-disabled behaviour is testable without touching a process-wide `OnceLock`
+/// (the parallel-test flake this codebase has already paid for once).
+///
+/// `evidence_absent_window == 0` collapses to the ordinary class rather than to
+/// "no backoff": disabling a lever must restore the behaviour before it existed,
+/// never something worse than it.
+fn evidence_backoff_class(
+    evidence: Option<crate::metrics::AdoptEvidence>,
+    evidence_absent_window: std::time::Duration,
+) -> crate::metrics::ContestSkip {
+    let stated_absent = evidence == Some(crate::metrics::AdoptEvidence::NoRecord);
+    if stated_absent && !evidence_absent_window.is_zero() {
+        crate::metrics::ContestSkip::EvidenceAbsentBackoff
+    } else {
+        crate::metrics::ContestSkip::NoLocalChainBackoff
+    }
 }
 
 /// What the pre-flight resolved from the OWN conductor.
@@ -868,14 +1050,13 @@ async fn adopt_peer(
     // its head. Absent fetcher (boot pass) or an old peer that cannot serve one
     // both degrade to a record-less declare, which succeeds iff this conductor
     // can already retrieve the target itself.
-    // NAMED C4 COLLAPSE (`into_option`): a peer that answered "no head" and a
-    // peer we never reached both degrade to the record-less declare here — the
-    // pre-P2.3 behaviour, preserved exactly. `Answer::Absent` becomes actionable
-    // separately only when an arm exists that should behave differently.
-    let carried = match fetcher {
-        Some(f) => f.fetch(&hint.peer_id, id).await.into_option(),
-        None => None,
-    };
+    //
+    // The evidence STATE is discarded here on purpose: this arm's row already
+    // carries a chain (that is what routed it here rather than to the contest
+    // arm), so a missing-bytes cause changes nothing it would do. It is still
+    // COUNTED inside `resolve_peer_evidence` — the meter's denominator is every
+    // ask this node makes, not only the asks one arm acts on.
+    let (carried, _evidence) = resolve_peer_evidence(fetcher, &hint.peer_id, id).await;
     // The SERVED hash wins over the advertised one: it is the action the bytes
     // actually prove. Falling back to the hint keeps the record-less path working.
     let (head_action_hash, carried_record) = match carried {
@@ -1322,9 +1503,10 @@ async fn contest_peer(
     // contest failure path below returns `Held`), so every caller — the adopt
     // sweep, the ghost witness, the boot re-anchor — sees exactly what it saw
     // before, minus the wasted round-trips.
-    if let Some(reason) =
-        crate::services::contest_backoff::skip_class(id, crate::config::contest_backoff_window())
-    {
+    if let Some(reason) = crate::services::contest_backoff::skip_class(
+        id,
+        crate::services::contest_backoff::BackoffWindows::from_config(),
+    ) {
         crate::metrics::inc_contest_skipped(reason);
         tracing::debug!(
             content_id = %id,
@@ -1350,14 +1532,13 @@ async fn contest_peer(
     }
 
     let fetcher_present = fetcher.is_some();
-    // NAMED C4 COLLAPSE (`into_option`): `carried_present` below asks "did we get
-    // BYTES?", and both non-present answers mean no. Pre-P2.3 behaviour exactly;
-    // the `fetch_none` / `not_retrievable` split is downstream of the bytes, not
-    // of the answer state.
-    let carried = match fetcher {
-        Some(f) => f.fetch(&hint.peer_id, id).await.into_option(),
-        None => None,
-    };
+    // EVIDENCE RESOLUTION. `carried_present` below still asks "did we get
+    // BYTES?" exactly as before; `evidence` additionally carries WHY not, which
+    // is what the no-chain tail uses to pick a backoff window. Both non-present
+    // answer states classify as `Unknown`, so the pre-P2.3 collapse is
+    // preserved — the `fetch_none` / `not_retrievable` split is downstream of
+    // the bytes, not of the answer state.
+    let (carried, evidence) = resolve_peer_evidence(fetcher, &hint.peer_id, id).await;
     // "Did we get BYTES?" — not "did the peer answer?". A peer holding a row it
     // cannot resolve answers hash-only (`record: None`), which is the DOMINANT
     // shape when the advertising peer is itself conductor-missing. Counting that
@@ -1448,19 +1629,32 @@ async fn contest_peer(
                 // this gate is target-independent (`gather_content_chain(id)`),
                 // so the verdict is a property of the ID, not of this peer or
                 // this target — which is why the ledger keys on id alone.
-                crate::services::contest_backoff::note(
-                    id,
-                    crate::metrics::ContestSkip::NoLocalChainBackoff,
+                //
+                // EVIDENCE-SUPPLY SPLIT (2026-08-03). Two ids that both land
+                // here are in genuinely different states, and re-asking them at
+                // the same rate wastes the sweep on the hopeless half: one has
+                // bytes on a saturated peer (they arrive when the conductor
+                // catches up — an hour is a fair bet), the other has bytes
+                // nowhere at all (nothing changes until content enters the
+                // fleet). `evidence_backoff_class` picks the window; BOTH are
+                // deferrals that expire on their own, so the second class
+                // self-heals the moment its bytes appear.
+                let skip_class = evidence_backoff_class(
+                    evidence,
+                    crate::config::evidence_absent_backoff_window(),
                 );
+                crate::services::contest_backoff::note(id, skip_class);
                 tracing::info!(
                     target: "elohim_storage::head_adoption",
                     content_id = %id,
                     from_peer = %hint.peer_id,
                     carried = carried_present,
                     fetcher = fetcher_present,
+                    evidence = evidence.map(|e| e.label()).unwrap_or("not_asked"),
+                    backoff = skip_class.label(),
                     "adopt-before-author: contest could not be minted — this conductor holds no \
                      chain for the id at all, so no candidate of any shape can be declared; \
-                     holding, retried next sweep"
+                     holding, retried after the backoff named above"
                 );
                 return AdoptOutcome::Held;
             }
@@ -2103,12 +2297,212 @@ mod tests {
         let present = Answer::Present(CarriedHeadRecord {
             head_action_hash: "uhCkk-head".into(),
             record: None,
+            record_absent_reason: None,
         });
         // A hash-only answer is still PRESENT — the peer answered. Reading it as
         // an absence is the `carried_present` mislabel (`da8975176`).
         assert!(present.is_present());
         let carried = present.into_option().expect("present carries a value");
         assert!(carried.record.is_none());
+    }
+
+    /// Build a carried answer with a stated (or unstated) absence reason.
+    fn hash_only(reason: Option<RecordAbsentReason>) -> CarriedHeadRecord {
+        CarriedHeadRecord {
+            head_action_hash: "uhCkk-head".into(),
+            record: None,
+            record_absent_reason: reason,
+        }
+    }
+
+    /// Every shape a fetch can come back in maps to exactly one evidence state,
+    /// and the mapping is the input to a 24×-longer deferral — so it is worth
+    /// asserting exhaustively rather than by example.
+    #[test]
+    fn evidence_classification_maps_every_answer_shape() {
+        use crate::metrics::AdoptEvidence;
+
+        let carried = CarriedHeadRecord {
+            head_action_hash: "uhCkk-head".into(),
+            record: Some(vec![1, 2, 3]),
+            record_absent_reason: None,
+        };
+        assert_eq!(
+            classify_evidence(Some(&carried)),
+            AdoptEvidence::Carried,
+            "bytes in hand is the only state the adopt exit can act on"
+        );
+
+        assert_eq!(
+            classify_evidence(Some(&hash_only(Some(RecordAbsentReason::NoRecord)))),
+            AdoptEvidence::NoRecord
+        );
+        assert_eq!(
+            classify_evidence(Some(&hash_only(Some(RecordAbsentReason::BudgetElapsed)))),
+            AdoptEvidence::BudgetElapsed
+        );
+        assert_eq!(
+            classify_evidence(Some(&hash_only(Some(RecordAbsentReason::ConductorError)))),
+            AdoptEvidence::ConductorError
+        );
+
+        // The three no-stated-cause shapes: an old peer, a future peer, and a
+        // non-Present answer already collapsed to `None`. All three are
+        // `Unknown`, and none of them is `NoRecord`.
+        for unknown in [
+            classify_evidence(Some(&hash_only(None))),
+            classify_evidence(Some(&hash_only(Some(RecordAbsentReason::Unknown)))),
+            classify_evidence(None),
+        ] {
+            assert_eq!(unknown, AdoptEvidence::Unknown);
+            assert_ne!(
+                unknown,
+                AdoptEvidence::NoRecord,
+                "silence must never be read as a structural absence"
+            );
+        }
+    }
+
+    /// A carried answer whose bytes ARE present outranks any reason the
+    /// responder might contradict itself with. Bytes in hand is bytes in hand.
+    #[test]
+    fn carried_bytes_outrank_a_contradictory_reason() {
+        let contradictory = CarriedHeadRecord {
+            head_action_hash: "uhCkk-head".into(),
+            record: Some(vec![7]),
+            record_absent_reason: Some(RecordAbsentReason::NoRecord),
+        };
+        assert_eq!(
+            classify_evidence(Some(&contradictory)),
+            crate::metrics::AdoptEvidence::Carried
+        );
+    }
+
+    /// ONLY a stated `no_record` earns the long deferral. Every other state —
+    /// including both mixed-version shapes — keeps the ordinary window, which is
+    /// byte-for-byte the behaviour before this lever existed.
+    #[test]
+    fn only_a_stated_no_record_takes_the_long_backoff() {
+        use crate::metrics::{AdoptEvidence, ContestSkip};
+        let day = std::time::Duration::from_secs(86_400);
+
+        assert_eq!(
+            evidence_backoff_class(Some(AdoptEvidence::NoRecord), day),
+            ContestSkip::EvidenceAbsentBackoff
+        );
+        for ordinary in [
+            Some(AdoptEvidence::Carried),
+            Some(AdoptEvidence::BudgetElapsed),
+            Some(AdoptEvidence::ConductorError),
+            Some(AdoptEvidence::Unknown),
+            // No fetch happened at all (the boot pass carries no fetcher).
+            None,
+        ] {
+            assert_eq!(
+                evidence_backoff_class(ordinary, day),
+                ContestSkip::NoLocalChainBackoff,
+                "{ordinary:?} must keep the ordinary window — the long one is for stated \
+                 structural absence only"
+            );
+        }
+    }
+
+    /// The OFF switch is a real off switch, and it fails in the SAFE direction:
+    /// a zero evidence window records the ORDINARY backoff, not "no backoff".
+    /// Disabling a throughput lever must restore the prior behaviour, never
+    /// something worse than it (which "no backoff" would be — every phantom id
+    /// contested every sweep again).
+    #[test]
+    fn a_zero_evidence_window_restores_the_ordinary_class() {
+        use crate::metrics::{AdoptEvidence, ContestSkip};
+        assert_eq!(
+            evidence_backoff_class(Some(AdoptEvidence::NoRecord), std::time::Duration::ZERO),
+            ContestSkip::NoLocalChainBackoff,
+            "with the lever disabled a stated absence must still be backed off, just on the \
+             ordinary window"
+        );
+    }
+
+    /// No fetcher means no fetch, and an unasked question must not be counted as
+    /// an answer — a `Some(Unknown)` here would inflate the meter's denominator
+    /// with every boot-pass candidate and make the evidence split unreadable.
+    #[tokio::test]
+    async fn an_absent_fetcher_resolves_no_evidence_at_all() {
+        let (carried, evidence) = resolve_peer_evidence(None, "peer", "id").await;
+        assert!(carried.is_none());
+        assert_eq!(
+            evidence, None,
+            "an unasked question is not an evidence state"
+        );
+    }
+
+    /// The `elohim_content_adopt_evidence_total{state}` vocabulary is a
+    /// dashboard contract from its FIRST deploy, for the same reason the
+    /// obey-probe's is: the whole point of the meter is that an operator reads
+    /// WHICH supply wall dominates, and a renamed label silently zeroes the
+    /// panel that says so.
+    ///
+    /// `carried` is pinned alongside the four absence states deliberately — it
+    /// is the success member, and dropping it leaves the failures with nothing
+    /// to divide by.
+    #[test]
+    fn adopt_evidence_labels_are_stable() {
+        seam_contracts::assert_reason_labels_stable::<crate::metrics::AdoptEvidence>(&[
+            "carried",
+            "no_record",
+            "budget_elapsed",
+            "conductor_error",
+            "unknown",
+        ]);
+        seam_contracts::assert_reason_labels_discriminating::<crate::metrics::AdoptEvidence>();
+    }
+
+    /// `ContestSkip`'s labels are the same kind of contract. `evidence_absent_backoff`
+    /// is APPENDED — no existing string moves, so every panel keyed on the two
+    /// originals keeps its exact series.
+    #[test]
+    fn contest_skip_labels_are_stable() {
+        seam_contracts::assert_reason_labels_stable::<crate::metrics::ContestSkip>(&[
+            "no_local_chain_backoff",
+            "self_candidacy_backoff",
+            "evidence_absent_backoff",
+        ]);
+        seam_contracts::assert_reason_labels_discriminating::<crate::metrics::ContestSkip>();
+    }
+
+    /// The wire vocabulary round-trips through its type. `wire_str` feeds the
+    /// responder's payload and `from_wire` reads it back, so a mismatch between
+    /// them is a silent cross-fleet mislabel that no single-sided test catches.
+    #[test]
+    fn a_wire_reason_round_trips_through_its_type() {
+        for reason in [
+            RecordAbsentReason::NoRecord,
+            RecordAbsentReason::ConductorError,
+            RecordAbsentReason::BudgetElapsed,
+        ] {
+            assert_eq!(
+                RecordAbsentReason::from_wire(Some(reason.wire_str())),
+                Some(reason),
+                "{reason:?} must survive its own wire token"
+            );
+        }
+        assert_eq!(RecordAbsentReason::from_wire(None), None);
+    }
+
+    /// An unrecognised token is `Unknown`, never a decode failure and never a
+    /// verdict. This is what lets a FUTURE peer add a fourth reason without
+    /// stopping adoption against this build.
+    #[test]
+    fn an_unrecognised_reason_is_unknown_not_a_decode_failure() {
+        assert_eq!(
+            RecordAbsentReason::from_wire(Some("some_future_word")),
+            Some(RecordAbsentReason::Unknown)
+        );
+        assert_eq!(
+            RecordAbsentReason::from_wire(Some("  budget_elapsed  ")),
+            Some(RecordAbsentReason::BudgetElapsed),
+            "whitespace around a known token must not demote it to Unknown"
+        );
     }
 
     /// P1.3: the `elohim_content_contest_failed_total{class}` label vocabulary is

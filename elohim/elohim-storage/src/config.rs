@@ -131,6 +131,12 @@ static ADOPT_CONTEST_FANOUT: std::sync::OnceLock<usize> = std::sync::OnceLock::n
 /// Process-wide mirror of [`Config::contest_backoff_seconds`].
 static CONTEST_BACKOFF_SECONDS: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
 
+/// Process-wide mirror of [`Config::evidence_absent_backoff_seconds`]. Same
+/// `OnceLock` rationale as [`CONTEST_BACKOFF_SECONDS`] — the reconcile sweep
+/// carries no `Config`, and an env read on the hot path is the parallel-test
+/// flake this codebase has already paid for once.
+static EVIDENCE_ABSENT_BACKOFF_SECONDS: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+
 /// Publish the adopt-sweep fan-out for the reconcile sweep. Idempotent
 /// (`OnceLock::set` semantics).
 pub fn set_adopt_contest_fanout(fanout: usize) {
@@ -165,6 +171,32 @@ pub fn contest_backoff_window() -> std::time::Duration {
     )
 }
 
+/// Publish the evidence-absent backoff window for the reconcile sweep.
+/// Idempotent.
+pub fn set_evidence_absent_backoff_seconds(seconds: u64) {
+    let _ = EVIDENCE_ABSENT_BACKOFF_SECONDS.set(seconds);
+}
+
+/// How long an id whose ONLY advertising peer reports "my conductor holds no
+/// record for this head" is held back from contesting
+/// (`metrics::ContestSkip::EvidenceAbsentBackoff`).
+///
+/// Longer than [`contest_backoff_window`] on purpose: the ordinary no-chain
+/// backoff waits for THIS conductor's holdings to change, while this one waits
+/// for bytes to come into existence somewhere on the fleet — a slower clock.
+///
+/// `Duration::ZERO` DISABLES the class: the evidence-absent verdict then records
+/// an ordinary `NoLocalChainBackoff` instead, which is byte-for-byte the
+/// behaviour before this window existed. It is deliberately NOT "no backoff at
+/// all" — disabling a lever must never be worse than never having it.
+pub fn evidence_absent_backoff_window() -> std::time::Duration {
+    std::time::Duration::from_secs(
+        *EVIDENCE_ABSENT_BACKOFF_SECONDS
+            .get()
+            .unwrap_or(&DEFAULT_EVIDENCE_ABSENT_BACKOFF_SECONDS),
+    )
+}
+
 /// Conservative default fan-out for the adopt sweep.
 ///
 /// 8, not "as many as fit": every in-flight candidate is a conductor round-trip,
@@ -180,6 +212,17 @@ pub const DEFAULT_ADOPT_CONTEST_FANOUT: usize = 8;
 /// `MISS_READMIT_SWEEPS` (12 sweeps × the 300s reconcile cadence) — one
 /// re-attempt horizon at this seam, not a second one with a different shape.
 pub const DEFAULT_CONTEST_BACKOFF_SECONDS: u64 = 3600;
+
+/// Default evidence-absent backoff window: 86400s (24h).
+///
+/// 24× the ordinary backoff because it waits on a different clock. The no-chain
+/// backoff waits for THIS conductor to acquire a chain — an hour is a fair bet
+/// at a 300s sweep cadence. The evidence-absent class waits for the head's bytes
+/// to come into existence anywhere on the fleet (an unwitnessed genesis story
+/// getting witnessed, a phantom id acquiring real content), which is a
+/// human-scale event, not a sweep-scale one. Re-asking every hour for something
+/// that changes on a scale of days is the budget waste this window closes.
+pub const DEFAULT_EVIDENCE_ABSENT_BACKOFF_SECONDS: u64 = 86_400;
 
 /// Configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -466,6 +509,28 @@ pub struct Config {
     #[serde(default = "default_contest_backoff_seconds")]
     pub contest_backoff_seconds: u64,
 
+    /// EVIDENCE-SUPPLY LEVER: how long (seconds) an id is held back when the
+    /// advertising peer's responder has STATED that its conductor holds no
+    /// record for the head it advertises
+    /// (`metrics::ContestSkip::EvidenceAbsentBackoff`).
+    ///
+    /// Distinct from [`Self::contest_backoff_seconds`] because it waits on a
+    /// different clock: the ordinary backoff waits for THIS conductor to acquire
+    /// a chain, this one waits for the bytes to exist anywhere on the fleet. The
+    /// live population it targets is the ~61% phantom share of the refusal load
+    /// (2026-08-03 diagnosis) — ids that cycle contest budget forever and can
+    /// never converge until real content appears behind them.
+    ///
+    /// Never an exclusion: the window expires and the id is re-admitted with no
+    /// intervention, so an id whose bytes DO appear later (a genesis story that
+    /// gets witnessed) converges on its own.
+    ///
+    /// `0` DISABLES the class — the verdict then records an ordinary
+    /// `NoLocalChainBackoff`, which is exactly the pre-lever behaviour.
+    /// Loaded from env `ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS`.
+    #[serde(default = "default_evidence_absent_backoff_seconds")]
+    pub evidence_absent_backoff_seconds: u64,
+
     /// Demand-driven auto-pin: when a local content read MISSES (a client asked
     /// this node for content it does not have), author an `item` DevicePin for
     /// that content so the acquisition loop fetches it and the provide loop
@@ -598,6 +663,10 @@ fn default_contest_backoff_seconds() -> u64 {
     DEFAULT_CONTEST_BACKOFF_SECONDS
 }
 
+fn default_evidence_absent_backoff_seconds() -> u64 {
+    DEFAULT_EVIDENCE_ABSENT_BACKOFF_SECONDS
+}
+
 fn default_heal_on_read_budget_ms() -> u64 {
     5000
 }
@@ -662,6 +731,7 @@ impl Default for Config {
             adopt_before_author: false,
             adopt_contest_fanout: default_adopt_contest_fanout(),
             contest_backoff_seconds: default_contest_backoff_seconds(),
+            evidence_absent_backoff_seconds: default_evidence_absent_backoff_seconds(),
             demand_autopin_enabled: default_true(),
             demand_autopin_throttle_seconds: default_demand_autopin_throttle_seconds(),
             manifest_backfill_enabled: default_true(),
