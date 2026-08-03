@@ -185,7 +185,7 @@ decisionPoints:
     sourceLocation:
       file: src/lib.rs
       modulePath: content_store::resolve_canonical_election
-      line: 3865
+      line: 3933
     summary: >
       Reports the DHT election ALONE (link ops only, GetStrategy::Local) without requiring the
       winner's target Content to be retrievable — lets a caller fetch bytes from a peer and
@@ -199,14 +199,48 @@ decisionPoints:
           The doc comment is explicit and matches this plan's C4 guarantee form verbatim: "None
           here means 'no election in my local view YET', never authoritative absence" — same
           honest-absence contract as resolve_content_head_local, GetStrategy::Local chosen
-          specifically so this read never stalls (a heal-path read must never block toward the
-          60s network timeout).
+          specifically so this read never awaits the network.
+      - id: C6a
+        status: answered
+        justification: >
+          BOUNDED WORK, no network await on the sweep path. One link-set gather on the
+          `canonical_head` StringAnchor for ONE id: no target retrieval, no chain walk, no
+          update-lineage recursion, and — because select_election is called here with
+          GetStrategy::Local — no network fetch at all. holochain_cascade's dht_get_links gates
+          its fetch_links call behind `if let GetStrategy::Network`, so the Local gather
+          provably never leaves the conductor and cannot reach the 60s p2p request_timeout_s.
+          That is the floor: the only cost this extern still imposes is its CALL RATE against a
+          shared conductor, which it cannot bound from the inside.
     contractTests: null
     gapNote: >
       No unit test or sweettest calls resolve_canonical_election directly (grep-verified
       2026-08-02: zero references outside its own definition and doc comments). Its underlying
       logic (select_election) is exercised only as a private helper inside select_canonical_
       winner's unit tests, which never go through this extern's own Option<T> boundary.
+
+      NOT UNIT-PINNABLE (2026-08-03): the Local-strategy regression pin was scoped for this row
+      and could NOT be honestly written. select_election's strategy is only observable through
+      the get_links HOST function, which does not exist outside a wasm/conductor host, and this
+      suite has no source-shape/include_str! test pattern to borrow (grep-verified: zero
+      matches). A sweettest asserting that a conductor holding the canonical-head links but NOT
+      the winner's target still answers Some(...) is the only real home; it remains open and is
+      the same gap this note already records.
+
+      FORCING INCIDENT (2026-08-03) — backlog/resolve-canonical-election-get-links-deadline.md,
+      forecast fp 836a69cc043c. 34 ribosome errors `Host("deadline has elapsed")` at
+      host_fn/get_links.rs:76, fn_name=resolve_canonical_election, on the conductor-missing-side
+      pods. Filed as a B2 recurrence (a network-strategy gather uncured at the election-READ
+      site). CODE-DISPROVEN: this extern has passed GetStrategy::Local since the commit that
+      introduced it (da8975176), select_election performs exactly one get_links and no get, and
+      Local provably cannot reach the network (cascade gate above). The residual producer of
+      that exact string is DatabaseError::Timeout(tokio::time::error::Elapsed) — Display "deadline
+      has elapsed" — from acquire_semaphore_permit's 10s ACQUIRE_TIMEOUT_MS on a LONG-READ
+      permit; cascading() holds one permit from EACH of the cache/DHT/authored pools across the
+      blocking query and each pool carries only num_read_threads() = max(num_cpus/2, 4). The
+      error therefore reports a SATURATED CONDUCTOR READ POOL (backpressure to retry/pace), not
+      a GetStrategy defect and not a missing coordinator zome. No coordinator-zome change can
+      cure it; select_election now names the class in its error text so the ops signal stops
+      mis-reading.
 
   - name: validate_carried_head_record
     kind: verdict-fn

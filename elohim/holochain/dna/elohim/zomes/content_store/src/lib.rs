@@ -3014,7 +3014,29 @@ fn select_election(id: &str, strategy: GetStrategy) -> ExternResult<Option<Canon
     let anchor = StringAnchor::new(CANONICAL_HEAD_ANCHOR, id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
     let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
-    let links = get_links(query, strategy)?;
+    // ERROR LEGIBILITY (2026-08-03) — CONTEXT ONLY; strategy, control flow and
+    // the returned link set are unchanged.
+    //
+    // A bare `Host("deadline has elapsed")` here was misread as a
+    // network-strategy defect (B2 recurrence) and as "the coordinator never
+    // landed". Under `Local` it can be neither: `CascadeImpl::dht_get_links`
+    // gates `fetch_links` behind `if let GetStrategy::Network`, so the gather
+    // never leaves the box. The only remaining producer of that string is
+    // `DatabaseError::Timeout(Elapsed)` from `acquire_semaphore_permit` — the
+    // 10s `ACQUIRE_TIMEOUT_MS` on a LONG-READ permit. `cascading()` holds one
+    // permit from EACH of cache/DHT/authored across the blocking query, and each
+    // pool has only `num_read_threads()` = `max(num_cpus/2, 4)`. So it means the
+    // conductor's read pool is SATURATED, not that the DHT was consulted.
+    let links = get_links(query, strategy).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "select_election: canonical-head link gather for id '{id}' failed under \
+             {strategy:?} strategy: {e}. NOTE: under Local this is NEVER a network \
+             await (the cascade skips fetch_links entirely) — a 'deadline has elapsed' \
+             here is a conductor DB read-permit timeout (saturated read pool), so treat \
+             it as BACKPRESSURE to retry, not as a missing coordinator zome or a \
+             GetStrategy defect."
+        )))
+    })?;
     let candidates: Vec<CanonicalCandidate> = links
         .into_iter()
         .filter_map(|link| {
@@ -3885,9 +3907,25 @@ pub struct CanonicalElectionOutput {
 /// [`validate_carried_head_record`]) instead of waiting on gossip that may be
 /// arbitrarily delayed.
 ///
-/// `GetStrategy::Local` — this is a read on the heal path and must never stall
-/// (same rationale as [`resolve_content_head_local`]). `None` here means "no
-/// election in my local view YET", never authoritative absence.
+/// `GetStrategy::Local` — this is a read on the heal path and must never await
+/// the network (same rationale as [`resolve_content_head_local`]). `None` here
+/// means "no election in my local view YET", never authoritative absence.
+///
+/// ## `Local` bounds the NETWORK await — it does not make this call infallible
+///
+/// Corrected 2026-08-03, after this extern's `Err` arm was twice misdiagnosed.
+/// The earlier phrasing ("must never stall") over-promised, and the over-promise
+/// is what made a `Host("deadline has elapsed")` out of `get_links` read as a
+/// `GetStrategy` defect at this site. It cannot be one: the cascade skips its
+/// network fetch entirely under `Local` (see [`select_election`]), so no
+/// `GetStrategy` change can affect this failure. That error is a conductor
+/// DB read-permit timeout — BACKPRESSURE from a saturated read pool — and the
+/// correct response is to retry/pace, not to re-ship this zome.
+///
+/// C6a (bounded work): one link-set gather on the `canonical_head` anchor for
+/// ONE id, no target retrieval, no chain walk, no network await. That is the
+/// floor; the sweep's cost is the CALL RATE against a shared conductor, which
+/// this extern cannot bound from the inside.
 ///
 /// Coordinator-only and read-only: no entries, no links, no commits — so it
 /// ships on the `update_coordinators` hot-swap path with no DNA-hash move.
