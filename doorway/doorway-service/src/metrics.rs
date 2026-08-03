@@ -236,16 +236,42 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(WATCHDOG_WEDGED_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(HEARTBEAT_AGE_MS.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_RECONNECT_TOTAL.clone()));
+        // Pre-touch every reconnect reason so `/metrics` shows the full closed
+        // vocabulary from boot — same zero-with-a-series discipline as
+        // elohim-storage's obey-probe pre-touch. `CONDUCTOR_CLOSE_CODE_TOTAL`
+        // is deliberately NOT pre-touched here: its `code` label is an
+        // unbounded WS close-code axis, not a closed vocabulary.
+        for reason in [
+            REASON_CONNECT_REFUSED,
+            REASON_CLOSE_FRAME,
+            REASON_WS_ERROR,
+            REASON_CHANNEL_CLOSED,
+        ] {
+            CONDUCTOR_RECONNECT_TOTAL
+                .with_label_values(&[reason])
+                .inc_by(0);
+        }
         let _ = REGISTRY.register(Box::new(CONDUCTOR_CLOSE_CODE_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_SESSION_DURATION_SECONDS.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_SESSIONS.clone()));
         let _ = REGISTRY.register(Box::new(RESOLVE_TOTAL.clone()));
+        for tier in ["projection", "conductor", "external"] {
+            RESOLVE_TOTAL.with_label_values(&[tier]).inc_by(0);
+        }
         let _ = REGISTRY.register(Box::new(BLOB_PANTRY_TOTAL.clone()));
+        for outcome in ["hit", "miss", "stocked", "skipped"] {
+            BLOB_PANTRY_TOTAL.with_label_values(&[outcome]).inc_by(0);
+        }
         let _ = REGISTRY.register(Box::new(UPSTREAM_BREAKER_OPEN_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(UPSTREAM_BACKPRESSURE_HONORED_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(ADMISSION_SHED_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(INBOUND_MAX_INFLIGHT.clone()));
         let _ = REGISTRY.register(Box::new(MEMBRANE_VERDICT_TOTAL.clone()));
+        for verdict in ["allow", "shape", "challenge", "deny"] {
+            MEMBRANE_VERDICT_TOTAL
+                .with_label_values(&[verdict])
+                .inc_by(0);
+        }
         let _ = REGISTRY.register(Box::new(MEMBRANE_BANS_ACTIVE.clone()));
     });
 }

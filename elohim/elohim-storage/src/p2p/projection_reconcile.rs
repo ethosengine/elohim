@@ -3142,6 +3142,76 @@ struct AdoptCandidate {
     head: Option<crate::services::conductor_writes::ContentHeadWire>,
 }
 
+/// Compose one sweep's bounded slice from the two priority classes, reserving a
+/// TAIL of the cap for backoff-deferred candidates.
+///
+/// Pure and total — no clock, no ledger, no conductor — so the reservation
+/// arithmetic is testable without a sweep. The eligible class keeps its
+/// precedence (it occupies the whole front of the slice); the deferred class
+/// keeps a floor. The forcing incident and the narrative live on
+/// [`adopt_deferred_heads`] (the "F-B: the throughput lever" section).
+///
+/// ```text
+/// reserve      = (cap / 4).min(deferred.len())
+/// eligible_cap = cap - reserve
+/// slice        = eligible[..eligible_cap] ++ deferred, truncated to cap
+/// ```
+///
+/// Three properties, each pinned by a test:
+///
+/// 1. **Nothing changes when the cap is not binding.** With
+///    `eligible.len() <= cap - reserve`, `take(eligible_cap)` is a no-op and the
+///    result is byte-for-byte the pre-2026-08-03 `eligible ++ deferred` slice
+///    (`a_short_eligible_class_composes_exactly_as_it_did_before_the_reservation`).
+/// 2. **The deferred class cannot be truncated to nothing.** Once eligible would
+///    fill the cap, exactly `reserve` deferred candidates ride the tail
+///    (`a_binding_cap_still_reserves_a_tail_for_the_deferred_class`).
+/// 3. **An empty deferred class costs the eligible class nothing.** `reserve`
+///    is `min`'d against `deferred.len()`, so it is 0 and the eligible class
+///    gets the full cap
+///    (`an_empty_deferred_class_gives_the_full_cap_to_eligible_candidates`).
+///
+/// Why a quarter: the deferred class is de-prioritised because its CONTEST
+/// cannot mint, not because it has nothing to do — its `try_obey_visible_election`
+/// probe is the only arm that converges the conductor-missing class. A quarter
+/// keeps three-quarters of every sweep on ids that can actually mint while
+/// guaranteeing the obey probe keeps running on the class that needs it. It is a
+/// FLOOR for the deferred class, never a quota against the eligible one: when
+/// eligible is short, deferred takes the whole remainder as before.
+///
+/// **Bounded-work (C6a) is unchanged.** The slice is still exactly `cap`
+/// ([`WITNESS_MAX_PER_TICK`]) candidates; the concurrency bound is still
+/// `adopt_contest_fanout`; and [`WITNESS_SWEEP_BUDGET`] (120s wall clock)
+/// remains authoritative over both. This re-orders WHICH ids fill a fixed slice
+/// — it never widens it.
+///
+/// Returns `(slice, deferred_in_slice)`. The second value is reported on the
+/// sweep log beside `backoff_deferred`, because the truncation this function
+/// cures was invisible precisely while the log said how many were deferred but
+/// not how many of those actually made the slice. It is returned rather than
+/// recomputed at the call site on purpose: a caller re-deriving it from the same
+/// `reserve` formula would be a mirror of this function, not an independent
+/// check of it.
+fn compose_adopt_slice<'a, T>(
+    eligible: Vec<&'a T>,
+    deferred: Vec<&'a T>,
+    cap: usize,
+) -> (Vec<&'a T>, usize) {
+    // A quarter of the slice, and never more deferred entries than exist —
+    // so an empty deferred class reserves nothing at all.
+    let reserve = (cap / 4).min(deferred.len());
+    let eligible_cap = cap.saturating_sub(reserve);
+    let eligible_taken = eligible.len().min(eligible_cap);
+    let work: Vec<&'a T> = eligible
+        .into_iter()
+        .take(eligible_cap)
+        .chain(deferred)
+        .take(cap)
+        .collect();
+    let deferred_in_slice = work.len() - eligible_taken;
+    (work, deferred_in_slice)
+}
+
 /// Run the adopt-before-author pre-flight over ids whose `GapFill` was refused by
 /// [`gapfill_would_self_elect`].
 ///
@@ -3202,6 +3272,19 @@ struct AdoptCandidate {
 /// same rows are re-discovered every sweep) while guaranteeing a contestable id
 /// is never displaced by one that provably cannot mint.
 ///
+/// **Lever 1's tail reservation (2026-08-03).** Re-ordering alone kept that
+/// promise only while the sweep was cap-bound by nothing: on a high-volume pod
+/// the live shape was `candidates: 395, attempted: 200, backoff_deferred: 134`
+/// — with 261 eligible ids in front, `.take(200)` truncated ALL 134 deferred
+/// ones off the end. "Priority, not exclusion" had silently become exclusion for
+/// the entire backoff window, and the excluded class is exactly the one the obey
+/// probe exists to serve. [`compose_adopt_slice`] therefore reserves a TAIL of
+/// the cap for deferred candidates — `(cap / 4).min(deferred.len())`, so a
+/// quarter of the slice at most, and nothing at all when there is nothing
+/// deferred. A backed-off id keeps its obey probe during the window it is
+/// de-prioritised for the contest arm, which is the distinction the F-B lever
+/// claimed from the start.
+///
 /// **Lever 2 — bounded fan-out.** Candidates are processed with at most
 /// [`crate::config::adopt_contest_fanout`] (default 8) in flight. The 25ms
 /// spacing is kept INSIDE each concurrent task, so a fan-out of 1 reproduces the
@@ -3250,11 +3333,11 @@ async fn adopt_deferred_heads(
     // bounded-work: the per-tick slice is exactly WITNESS_MAX_PER_TICK (200)
     // candidates; the concurrency bound is `fanout`; the wall-clock budget is
     // WITNESS_SWEEP_BUDGET (120s) and remains authoritative over both.
-    let work: Vec<&AdoptCandidate> = eligible
-        .into_iter()
-        .chain(deferred)
-        .take(WITNESS_MAX_PER_TICK as usize)
-        .collect();
+    // `compose_adopt_slice` reserves a tail of that same fixed slice for the
+    // deferred class so re-ordering cannot decay into exclusion when the cap
+    // binds — it changes WHICH ids fill the slice, never how big it is.
+    let (work, deferred_attempted) =
+        compose_adopt_slice(eligible, deferred, WITNESS_MAX_PER_TICK as usize);
     let attempted = work.len();
 
     // Atomics, not locals: they live OUTSIDE the future the budget may cancel,
@@ -3348,6 +3431,7 @@ async fn adopt_deferred_heads(
             attempted,
             fanout,
             backoff_deferred = deferred_count,
+            backoff_deferred_in_slice = deferred_attempted,
             adopted,
             contested,
             held,
@@ -3364,6 +3448,7 @@ async fn adopt_deferred_heads(
         attempted,
         fanout,
         backoff_deferred = deferred_count,
+        backoff_deferred_in_slice = deferred_attempted,
         adopted,
         contested,
         held,
@@ -3371,7 +3456,9 @@ async fn adopt_deferred_heads(
         "projection-reconcile[adopt-deferred]: adopted peer-declared heads, and contested \
          two-way declared ones by minting a canonical candidate for the DHT election \
          (backoff_deferred = candidates whose contest is a known predictable failure, moved \
-         behind the contestable ones rather than dropped)"
+         behind the contestable ones rather than dropped; backoff_deferred_in_slice = how many \
+         of those actually rode the reserved tail this sweep — the field that makes \
+         'priority, not exclusion' checkable instead of asserted)"
     );
 }
 
@@ -5173,6 +5260,168 @@ mod tests {
             classify_reauthor_failure_class(&StorageError::Timeout("per-attempt".into())),
             None
         );
+    }
+
+    // ── F-B tail reservation: "priority, not exclusion" made structural ──
+
+    /// (a) **Nothing changes while the cap is not binding.** The reservation is
+    /// a no-op whenever the eligible class fits inside `cap - reserve`, so every
+    /// sweep that was already draining its candidates behaves byte-for-byte as
+    /// it did before 2026-08-03. A cure that changed the common case would be a
+    /// new risk, not a fix.
+    #[test]
+    fn a_short_eligible_class_composes_exactly_as_it_did_before_the_reservation() {
+        let ids: Vec<usize> = (0..300).collect();
+        let cap = 200usize;
+
+        for (eligible_n, deferred_n) in [(0, 0), (0, 50), (10, 5), (100, 40), (149, 60)] {
+            let eligible: Vec<&usize> = ids[..eligible_n].iter().collect();
+            let deferred: Vec<&usize> = ids[200..200 + deferred_n].iter().collect();
+
+            // The pre-reservation composition, stated independently rather than
+            // by calling the function under test (no mirror).
+            let before: Vec<&usize> = eligible
+                .iter()
+                .copied()
+                .chain(deferred.iter().copied())
+                .take(cap)
+                .collect();
+
+            let reserve = (cap / 4).min(deferred_n);
+            assert!(
+                eligible_n <= cap - reserve,
+                "fixture must exercise the non-binding case"
+            );
+
+            let (after, deferred_in_slice) =
+                compose_adopt_slice(eligible.clone(), deferred.clone(), cap);
+            assert_eq!(
+                after, before,
+                "eligible={eligible_n} deferred={deferred_n}: the reservation must be invisible \
+                 while the cap is not binding"
+            );
+            // With nothing truncated, EVERY deferred candidate is still in the slice.
+            assert_eq!(deferred_in_slice, deferred_n.min(cap - eligible_n));
+        }
+    }
+
+    /// (b) **The live truncation, cured.** The 2026-08-03 shape was
+    /// `candidates: 395, attempted: 200, backoff_deferred: 134` — 261 eligible
+    /// in front of 134 deferred, and `.take(200)` dropped all 134. The deferred
+    /// class is exactly the conductor-missing one whose `try_obey_visible_election`
+    /// probe is its only converging arm, so excluding it for the whole backoff
+    /// window inverted the lever's stated promise.
+    #[test]
+    fn a_binding_cap_still_reserves_a_tail_for_the_deferred_class() {
+        let ids: Vec<usize> = (0..1000).collect();
+        let cap = 200usize;
+
+        // The live pod's own numbers.
+        let eligible: Vec<&usize> = ids[..261].iter().collect();
+        let deferred: Vec<&usize> = ids[500..634].iter().collect();
+        let reserve = (cap / 4).min(deferred.len());
+        assert_eq!(
+            reserve, 50,
+            "a quarter of the cap, capped by what is deferred"
+        );
+
+        let (work, deferred_in_slice) = compose_adopt_slice(eligible, deferred.clone(), cap);
+
+        assert_eq!(
+            work.len(),
+            cap,
+            "the slice is still exactly the per-tick cap"
+        );
+        assert_eq!(
+            deferred_in_slice, reserve,
+            "the deferred class must hold the reserved tail, not be truncated off the end"
+        );
+
+        // The tail is literally the deferred candidates, in order, at the end.
+        let tail: Vec<&usize> = work[cap - reserve..].to_vec();
+        let expected_tail: Vec<&usize> = deferred[..reserve].to_vec();
+        assert_eq!(tail, expected_tail);
+
+        // …and the eligible class still holds the whole front, in order.
+        assert!(work[..cap - reserve].iter().all(|v| **v < 261));
+
+        // The pre-cure composition, stated independently, so this test witnesses
+        // the BUG and not merely the new behaviour: 261 eligible ids filled the
+        // 200-slot slice outright, and every one of the 134 deferred ids was
+        // truncated off the end.
+        let before: Vec<&usize> = ids[..261]
+            .iter()
+            .chain(deferred.iter().copied())
+            .take(cap)
+            .collect();
+        assert_eq!(before.len(), cap);
+        assert!(
+            !before.iter().any(|v| **v >= 500),
+            "pre-cure: not one deferred id survived the truncation — which is the exclusion the \
+             F-B lever's doc says never happens"
+        );
+    }
+
+    /// (c) **An empty deferred class costs the eligible class nothing.** The
+    /// reserve is `min`'d against `deferred.len()`, so a pod with no backoff
+    /// entries gives the full cap to contestable ids — the reservation is a
+    /// floor for the deferred class, never a quota withheld from the eligible
+    /// one.
+    #[test]
+    fn an_empty_deferred_class_gives_the_full_cap_to_eligible_candidates() {
+        let ids: Vec<usize> = (0..1000).collect();
+        let cap = 200usize;
+        let eligible: Vec<&usize> = ids[..500].iter().collect();
+
+        let (work, deferred_in_slice) = compose_adopt_slice(eligible, Vec::new(), cap);
+
+        assert_eq!(work.len(), cap);
+        assert_eq!(deferred_in_slice, 0);
+        let expected: Vec<&usize> = ids[..cap].iter().collect();
+        assert_eq!(
+            work, expected,
+            "no reservation withheld from the eligible class"
+        );
+    }
+
+    /// The reservation must never widen the bounded-work budget it rides inside:
+    /// the slice is capped, the reserve is a fraction of that same cap, and the
+    /// 120s wall clock stays authoritative over both (C6a).
+    #[test]
+    fn the_tail_reservation_never_widens_the_bounded_work_budget() {
+        let ids: Vec<usize> = (0..2000).collect();
+        let cap = WITNESS_MAX_PER_TICK as usize;
+
+        for (eligible_n, deferred_n) in [(0, 0), (1, 1), (500, 500), (1, 900), (900, 1)] {
+            let eligible: Vec<&usize> = ids[..eligible_n].iter().collect();
+            let deferred: Vec<&usize> = ids[1000..1000 + deferred_n].iter().collect();
+            let (work, deferred_in_slice) = compose_adopt_slice(eligible, deferred, cap);
+
+            assert!(
+                work.len() <= cap,
+                "eligible={eligible_n} deferred={deferred_n} produced {} > cap {cap}",
+                work.len()
+            );
+            assert_eq!(work.len(), (eligible_n + deferred_n).min(cap));
+            assert!(deferred_in_slice <= work.len());
+            // The reserved share is a FLOOR for the deferred class, never a
+            // ceiling on it: when the eligible class alone could fill the slice,
+            // the deferred class takes exactly the reserve and no more, so three
+            // quarters of the sweep stays on ids that can actually mint. When
+            // eligible is short, deferred still takes the whole remainder.
+            if eligible_n >= cap {
+                assert_eq!(
+                    deferred_in_slice,
+                    (cap / 4).min(deferred_n),
+                    "eligible={eligible_n} deferred={deferred_n}: a saturating eligible class \
+                     must yield exactly the reserve"
+                );
+            }
+        }
+        // The wall-clock budget's own bound is asserted by
+        // `ghost_witness_reuses_the_witness_bounds`; it is unchanged by this
+        // function, which is the point — the reservation re-orders a fixed
+        // slice and touches neither the cap nor the clock.
     }
 
     #[test]

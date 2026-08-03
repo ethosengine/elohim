@@ -526,6 +526,7 @@ pub fn decode_infrastructure_signal(
             match rmp_serde::from_slice::<TagOnly>(bytes) {
                 Ok(tag) if INFRA_MIRROR_VARIANTS.contains(&tag.type_tag.as_str()) => {
                     INFRA_DECODE_MISSES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    crate::metrics::inc_signal_decode_miss("infra");
                     Err(SignalDecodeMiss::InfraShapeMismatch {
                         type_tag: tag.type_tag,
                         error: typed_err.to_string(),
@@ -737,6 +738,7 @@ pub fn decode_mishpat_signal(bytes: &[u8]) -> Result<MishpatSignal, SignalDecode
             match rmp_serde::from_slice::<TagOnly>(bytes) {
                 Ok(tag) if MISHPAT_MIRROR_VARIANTS.contains(&tag.type_tag.as_str()) => {
                     MISHPAT_DECODE_MISSES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    crate::metrics::inc_signal_decode_miss("mishpat");
                     Err(SignalDecodeMiss::MishpatShapeMismatch {
                         type_tag: tag.type_tag,
                         error: typed_err.to_string(),
@@ -1787,6 +1789,12 @@ pub fn handle_recovery_v2_signal(
             // T18 DnaSignal::KeyRevocation envelope path (see handle_imagodei_dna_signal).
             // Producer side (imagodei coordinator) still emits this variant; M4 deletes
             // the producer emissions + variant as a follow-up. No-op until then.
+            tracing::info!(
+                target: "elohim_storage::signals",
+                "RecoveryV2Signal::KeyRevocationEffective received — intentionally unconsumed \
+                 (superseded by the DnaSignal::KeyRevocation envelope path; producer emission \
+                 removal is a follow-up, see T6/M4)"
+            );
             Ok(())
         }
     }
@@ -3594,6 +3602,7 @@ pub fn decode_elohim_content_signal(
             match rmp_serde::from_slice::<TagOnly>(bytes) {
                 Ok(tag) if ELOHIM_CONTENT_MIRROR_VARIANTS.contains(&tag.type_tag.as_str()) => {
                     ELOHIM_CONTENT_DECODE_MISSES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    crate::metrics::inc_signal_decode_miss("elohim_content");
                     Err(SignalDecodeMiss::ElohimContentShapeMismatch {
                         type_tag: tag.type_tag,
                         error: typed_err.to_string(),

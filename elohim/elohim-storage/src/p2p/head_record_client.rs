@@ -72,11 +72,13 @@ impl HeadRecordFetcher for PeerHeadRecordFetcher {
             Ok(p) => p,
             Err(e) => {
                 // Unreachable, not Absent: we never asked anyone anything.
-                tracing::debug!(
+                tracing::warn!(
                     peer = %peer_id, error = %e,
                     "head-record fetch: unparseable peer id; skipping"
                 );
-                return Answer::Unreachable;
+                let answer = Answer::Unreachable;
+                crate::metrics::inc_head_record_fetch(answer.state());
+                return answer;
             }
         };
 
@@ -108,7 +110,9 @@ impl HeadRecordFetcher for PeerHeadRecordFetcher {
                     "head-record fetch failed (peer offline, or pre-cure and unable to \
                      decode ContentHeadRecord) — falling back to the author path"
                 );
-                return Answer::Unreachable;
+                let answer = Answer::Unreachable;
+                crate::metrics::inc_head_record_fetch(answer.state());
+                return answer;
             }
         };
 
@@ -123,11 +127,15 @@ impl HeadRecordFetcher for PeerHeadRecordFetcher {
                         error = %e,
                         "head-record payload undecodable — falling back to the author path"
                     );
-                    return Answer::Unreachable;
+                    let answer = Answer::Unreachable;
+                    crate::metrics::inc_head_record_fetch(answer.state());
+                    return answer;
                 }
             };
 
-        classify_payload(payload, peer_id, content_id)
+        let answer = classify_payload(payload, peer_id, content_id);
+        crate::metrics::inc_head_record_fetch(answer.state());
+        answer
     }
 }
 

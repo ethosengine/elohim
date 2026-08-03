@@ -877,29 +877,60 @@ async fn try_obey_visible_election(
     hint: Option<&PeerHeadHint>,
     fetcher: Option<&dyn HeadRecordFetcher>,
 ) -> Option<AdoptOutcome> {
+    // (0) The DENOMINATOR. Counted at entry, before any gate, because the
+    // question this arm went two shifts unable to answer was "how often does a
+    // probe even reach the fetch?" — and a success series alone cannot say. See
+    // [`crate::metrics::CONTENT_ELECTION_OBEY_PROBE`] for how the four labels
+    // read as walls.
+    crate::metrics::inc_election_obey_probe(crate::metrics::ElectionObeyProbe::Attempted);
+
     // (1) What did the DHT elect? Read from our OWN conductor.
     let election = match conductor_writes::call_resolve_canonical_election(hc, id).await {
         Ok(Some(e)) => e,
         // No election visible — nothing to obey. Behaviour is exactly unchanged
-        // for every id in this state, which is the pre-wave-4 world.
-        Ok(None) => return None,
+        // for every id in this state, which is the pre-wave-4 world. Counted,
+        // though: a `no_election`-dominated series names an ELECTION-VISIBILITY
+        // wall (the canonical-head links have not gossiped in), which is a
+        // gossip/link-layer finding, not an obey-arm one.
+        Ok(None) => {
+            crate::metrics::inc_election_obey_probe(crate::metrics::ElectionObeyProbe::NoElection);
+            return None;
+        }
         Err(e) => {
             // A conductor that will not answer is not evidence of anything.
             // Fall through to the normal decision rather than holding the id.
-            tracing::debug!(
+            //
+            // WARN, not debug: this deployment drops `debug!` before Loki, so
+            // the level IS the observability. A conductor that will not answer
+            // the election read is the shipped-coordinator-didn't-land signal —
+            // the DNA hash is blind to coordinator zomes, so a fix can be built,
+            // deployed, and still not be on the running conductor. That is an
+            // ops finding a human must see, not a per-row curiosity.
+            crate::metrics::inc_election_obey_probe(
+                crate::metrics::ElectionObeyProbe::ResolveError,
+            );
+            tracing::warn!(
+                target: "elohim_storage::head_adoption",
                 content_id = %id, error = %e,
-                "election-obey: could not read the canonical election; continuing with the \
-                 normal decision"
+                "election-obey: ELECTION READ FAILED — this conductor would not answer \
+                 resolve_canonical_election, so no election could be obeyed for this row; \
+                 continuing with the normal decision (a sustained rate here means the shipped \
+                 coordinator zome is not on the running conductor)"
             );
             return None;
         }
     };
 
     // (2) Someone has to hand us the bytes. With no peer or no transport this is
-    // not a failure — there is simply nothing to try yet.
+    // not a failure — there is simply nothing to try yet. It IS counted: an
+    // election we can see but never have a courier for is a hint-supply wall,
+    // and it is indistinguishable from "the arm is idle" without this label.
     let (hint, fetcher) = match (hint, fetcher) {
         (Some(h), Some(f)) => (h, f),
-        _ => return None,
+        _ => {
+            crate::metrics::inc_election_obey_probe(crate::metrics::ElectionObeyProbe::NoCourier);
+            return None;
+        }
     };
 
     let winner = election.winner_target.to_string();
@@ -1504,7 +1535,22 @@ async fn declare_peer_head(
     hint: &PeerHeadHint,
 ) -> AdoptOutcome {
     if let Ok(mut conn) = pool.get() {
-        let current = content_diesel::declared_head_for(&mut conn, ctx, id).unwrap_or(None);
+        let current = match content_diesel::declared_head_for(&mut conn, ctx, id) {
+            Ok(v) => v,
+            Err(e) => {
+                // A DB error here silently opened the declare-storm gate (the
+                // old `.unwrap_or(None)` read it identically to "undeclared").
+                // Behavior is unchanged — this arm still falls through as
+                // `None` — but the miss is now visible.
+                tracing::warn!(
+                    content_id = %id,
+                    error = %e,
+                    "adopt-before-author: declared_head_for failed — declare-storm gate cannot \
+                     see the current declaration; proceeding as undeclared"
+                );
+                None
+            }
+        };
         if !declaration_would_move(current.as_deref(), head_action_hash) {
             tracing::debug!(
                 content_id = %id,
@@ -1512,6 +1558,15 @@ async fn declare_peer_head(
             );
             return AdoptOutcome::Held;
         }
+    } else {
+        // Same silent-open: no connection means the declare-storm gate is
+        // skipped entirely (falls straight through to the declare below).
+        // Behavior is unchanged — only the visibility of the skip is new.
+        tracing::warn!(
+            content_id = %id,
+            "adopt-before-author: could not get a DB connection — declare-storm gate skipped, \
+             may re-declare an already-declared head"
+        );
     }
 
     let carried_bytes = carried_record.as_ref().map(|b| b.len()).unwrap_or(0);
@@ -1757,6 +1812,50 @@ mod tests {
             "declare_error",
         ]);
         seam_contracts::assert_reason_labels_discriminating::<crate::metrics::ContestFailure>();
+    }
+
+    /// The `elohim_content_election_obey_probe_total{outcome}` vocabulary is a
+    /// dashboard contract from its FIRST deploy, not after it earns one: the
+    /// whole point of the meter is that an operator reads which of the three
+    /// walls dominates, and a renamed label silently zeroes the panel that says
+    /// so.
+    ///
+    /// `attempted` is pinned alongside the exits deliberately. It is the
+    /// denominator — drop it and the exits become counts with nothing to divide
+    /// by, which is the state that made a 100%-failing arm look idle.
+    #[test]
+    fn election_obey_probe_labels_are_stable() {
+        seam_contracts::assert_reason_labels_stable::<crate::metrics::ElectionObeyProbe>(&[
+            "attempted",
+            "no_election",
+            "resolve_error",
+            "no_courier",
+        ]);
+        seam_contracts::assert_reason_labels_discriminating::<crate::metrics::ElectionObeyProbe>();
+    }
+
+    /// The obey-probe vocabulary must stay DISJOINT from the obey-FAILURE
+    /// vocabulary it sits beside.
+    ///
+    /// `CONTENT_ELECTION_OBEY_FAILED{class}` is scoped by its own doc to
+    /// had-an-election-didn't-move (`fetch` | `validate` | `stamp_refused`). If a
+    /// probe outcome ever collided with one of those strings, a reader
+    /// correlating the two meters would double-count one population and the
+    /// scoping sentence in both docs would quietly become false — the same
+    /// two-vocabularies-one-string hazard `ContestSkip` is kept separate from
+    /// `ContestFailure` to avoid.
+    #[test]
+    fn obey_probe_outcomes_never_collide_with_obey_failure_classes() {
+        use seam_contracts::ReasonLabel as _;
+        const OBEY_FAILURE_CLASSES: [&str; 3] = ["fetch", "validate", "stamp_refused"];
+        for outcome in crate::metrics::ElectionObeyProbe::ALL {
+            assert!(
+                !OBEY_FAILURE_CLASSES.contains(&outcome.label()),
+                "probe outcome {:?} collides with an obey-failure class — the two meters answer \
+                 different questions and must stay readable apart",
+                outcome.label()
+            );
+        }
     }
 
     /// All branches of the decision rule, named by the situation each one

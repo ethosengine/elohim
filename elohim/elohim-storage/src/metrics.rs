@@ -494,6 +494,64 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Election-obey PROBES, by how each probe ended — the denominator, plus the
+    /// three EARLY exits that [`CONTENT_ELECTION_OBEY_FAILED`] deliberately does
+    /// not cover.
+    ///
+    /// **The two meters answer different questions and must never be folded.**
+    /// `obey_failed` is scoped, by its own doc, to "we HAD an election and the
+    /// row still did not move" (fetch / validate / stamp_refused). This one is
+    /// scoped to "did the probe ever GET an election, and a courier, to act on?"
+    /// Folding them destroys both: a run of `no_election` would read as
+    /// obey-failures, and `fetch`/`validate`/`stamp_refused` would stop meaning
+    /// what they say.
+    ///
+    /// Labels (`outcome`):
+    ///
+    /// - `attempted` — the DENOMINATOR: one per probe entering
+    ///   `try_obey_visible_election`. NOT disjoint from the three exits; each of
+    ///   them is a subset of it. `attempted - (no_election + resolve_error +
+    ///   no_courier)` is exactly the population that reached the fetch arm, and
+    ///   that population is fully accounted for by
+    ///   `elohim_content_election_obeyed_total` +
+    ///   `elohim_content_election_obey_failed_total` — so the outcome set closes
+    ///   by arithmetic with no silent remainder.
+    /// - `no_election` — `resolve_canonical_election` answered `Ok(None)`: this
+    ///   conductor sees no election for the id. Dominant ⇒ an
+    ///   **election-visibility wall** (canonical-head links have not gossiped
+    ///   in) — a gossip/link-layer question, not an obey-arm one.
+    /// - `resolve_error` — the call itself failed. Dominant ⇒ a
+    ///   **coordinator-swap wall**: the shipped `resolve_canonical_election`
+    ///   extern is not on the running conductor. An ops question (the DNA hash
+    ///   is blind to coordinator zomes, so a shipped fix can sit unlanded), not
+    ///   a code one.
+    /// - `no_courier` — an election IS visible, but no peer hint / no head-record
+    ///   fetcher can supply the winner's bytes. Dominant ⇒ a **hint-supply
+    ///   wall**.
+    ///
+    /// **Forcing incident (2026-08-03 live diagnosis).** The obey arm ran ~900
+    /// probes/hr and died 100% at `resolve_canonical_election` through two exits
+    /// that incremented nothing and logged at `debug!` — a level this deployment
+    /// drops. Two shifts read the resulting flat-zero
+    /// `elohim_content_election_obeyed_total` as "the arm is idle" when it was
+    /// in fact "the arm is failing on every single row."
+    ///
+    /// All four label combinations are PRE-TOUCHED at registration (see
+    /// [`register_all`]). A structurally-absent series is what hid this: a
+    /// zero-valued series reads *measured zero*, an absent one reads *never
+    /// measured*, and only one of those is a fact. Pre-touching does not make
+    /// any label structurally constant (the C8 hazard) — every one of the four
+    /// is incremented by a real branch of
+    /// `services::head_adoption::try_obey_visible_election`.
+    pub static ref CONTENT_ELECTION_OBEY_PROBE: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_content_election_obey_probe_total",
+            "Election-obey probes by outcome (attempted denominator + the three early exits).",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
     /// Ghost-witness re-author call FAILURES, by class — the two per-row
     /// failure modes minted as saga-06-heads-converge stations (2026-07-26
     /// story-harvest of live Loki evidence, elohim-alpha namespace): previously
@@ -959,6 +1017,51 @@ lazy_static! {
     .unwrap();
 }
 
+// A SEPARATE `lazy_static!` block, purely to stay under the macro's recursion
+// limit — the single block above was already at the edge of it, and one more
+// entry tips `__lazy_static_internal!` over. No other reason for the split;
+// these statics register into the SAME [`REGISTRY`] as everything above.
+lazy_static! {
+    /// Durable Prometheus mirror of `signals.rs`'s per-family
+    /// `AtomicU64`/`Ordering::Relaxed` decode-miss counters (a REAL
+    /// mirror-variant tag whose typed decode still failed). label: family =
+    /// "infra" | "mishpat" | "elohim_content". Additive only — the atomics stay
+    /// as the in-process status-surface source of truth; this is the durable,
+    /// graphable twin, same idiom as `IDENTITY_NAMESPACE_VIOLATIONS`.
+    pub static ref SIGNAL_DECODE_MISS_TOTAL: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_signal_decode_miss_total",
+            "Real mirror-variant signal decode misses, by signal family.",
+        ),
+        &["family"],
+    )
+    .unwrap();
+
+    /// Requester-side [`p2p::head_record_client::PeerHeadRecordFetcher::fetch`]
+    /// outcomes, by [`seam_contracts::AnswerState`] — `present` | `absent` |
+    /// `unreachable`. Counted once inside `fetch` itself (every one of its exit
+    /// points), so every caller of the head-record client is covered without
+    /// needing its own inc site.
+    pub static ref CONTENT_HEAD_RECORD_FETCH_TOTAL: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_content_head_record_fetch_total",
+            "Requester-side head-record fetch outcomes, by AnswerState.",
+        ),
+        &["state"],
+    )
+    .unwrap();
+
+    /// The contest-backoff ledger hit [`crate::services::contest_backoff::CONTEST_BACKOFF_CAP`]
+    /// and fail-open CLEARED (every id returns to contested-every-sweep until it
+    /// refills). Unlabeled: this is a single bounded-memory guard, not a
+    /// per-reason vocabulary.
+    pub static ref CONTENT_CONTEST_BACKOFF_CLEARED: IntCounter = IntCounter::new(
+        "elohim_content_contest_backoff_cleared_total",
+        "Contest-backoff ledger cap-overflow fail-open clears.",
+    )
+    .unwrap();
+}
+
 /// Register every toolkit collector into [`REGISTRY`]. Idempotent (guarded by a
 /// `Once`), so calling it more than once at boot is safe. Call exactly once early
 /// in storage startup; `/metrics` reads the registry thereafter.
@@ -980,6 +1083,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_ANON_BUCKET_COUNT.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CORPUS_DOCS.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_NAMESPACE_VIOLATIONS.clone()));
+        let _ = REGISTRY.register(Box::new(SIGNAL_DECODE_MISS_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(ELOHIM_PLACEMENT_GAP_COUNT.clone()));
         let _ = REGISTRY.register(Box::new(ELOHIM_RS_COVERAGE_MILLI.clone()));
         let _ = REGISTRY.register(Box::new(ELOHIM_CUSTODIAN_FREE_BYTES.clone()));
@@ -989,16 +1093,90 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_OUTBOUND.clone()));
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_INBOUND_SERVED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_HEAD_RECORD_DEGRADED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_HEAD_RECORD_FETCH_TOTAL.clone()));
+        // Pre-touch every AnswerState so /metrics shows the full state set from
+        // boot, same zero-with-a-series discipline as the obey-probe below.
+        {
+            use seam_contracts::ReasonLabel as _;
+            for state in seam_contracts::AnswerState::ALL {
+                CONTENT_HEAD_RECORD_FETCH_TOTAL
+                    .with_label_values(&[state.label()])
+                    .inc_by(0);
+            }
+        }
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_AUTHORED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_HEAD_ADOPTED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_CANONICAL_ANSWERS.clone()));
+        // Pre-touch every canonical-election tier so `/metrics` can distinguish
+        // "this tier never wins" from "this tier was never asked about" from
+        // boot — same zero-with-a-series discipline as the obey-probe below.
+        for tier in ["earned", "staging", "none"] {
+            CONTENT_CANONICAL_ANSWERS
+                .with_label_values(&[tier])
+                .inc_by(0);
+        }
         let _ = REGISTRY.register(Box::new(PROJECTION_REFUSED_STALE_REASONS.clone()));
+        for reason in ["stored_null", "not_newer", "tier"] {
+            PROJECTION_REFUSED_STALE_REASONS
+                .with_label_values(&[reason])
+                .inc_by(0);
+        }
         let _ = REGISTRY.register(Box::new(CONTENT_CANONICAL_LINKS_MINTED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_FAILED.clone()));
+        {
+            use seam_contracts::ReasonLabel as _;
+            for class in ContestFailure::ALL {
+                CONTENT_CONTEST_FAILED
+                    .with_label_values(&[class.label()])
+                    .inc_by(0);
+            }
+        }
         let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_SKIPPED.clone()));
+        {
+            use seam_contracts::ReasonLabel as _;
+            for reason in ContestSkip::ALL {
+                CONTENT_CONTEST_SKIPPED
+                    .with_label_values(&[reason.label()])
+                    .inc_by(0);
+            }
+        }
+        let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_BACKOFF_CLEARED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_ADOPT_SWEEP.clone()));
+        {
+            use seam_contracts::ReasonLabel as _;
+            for outcome in AdoptSweepOutcome::ALL {
+                CONTENT_ADOPT_SWEEP
+                    .with_label_values(&[outcome.label()])
+                    .inc_by(0);
+            }
+        }
         let _ = REGISTRY.register(Box::new(CONTENT_ELECTION_OBEYED.clone()));
+        CONTENT_ELECTION_OBEYED
+            .with_label_values(&["carried"])
+            .inc_by(0);
         let _ = REGISTRY.register(Box::new(CONTENT_ELECTION_OBEY_FAILED.clone()));
+        for class in ["fetch", "validate", "stamp_refused"] {
+            CONTENT_ELECTION_OBEY_FAILED
+                .with_label_values(&[class])
+                .inc_by(0);
+        }
+        let _ = REGISTRY.register(Box::new(CONTENT_ELECTION_OBEY_PROBE.clone()));
+        // Pre-touch EVERY obey-probe outcome, for the same reason as the
+        // reauthor classes below — and with a sharper forcing incident. The obey
+        // arm failed on 100% of ~900 probes/hr for two shifts while its exits
+        // materialised no series at all, so `/metrics` could not distinguish
+        // "this arm is idle" from "this arm never once got past its first gate."
+        // Zero-with-a-series is a measured zero; no series is an unasked
+        // question. Iterating `ALL` (rather than listing literals) means a new
+        // variant cannot be added without also being pre-touched.
+        {
+            use seam_contracts::ReasonLabel as _;
+            for outcome in ElectionObeyProbe::ALL {
+                CONTENT_ELECTION_OBEY_PROBE
+                    .with_label_values(&[outcome.label()])
+                    .inc_by(0);
+            }
+        }
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_REAUTHOR_FAILED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_SWEEP_ABANDONED.clone()));
         // Pre-touch both known `class` combos so both series exist in
@@ -1018,6 +1196,30 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(IDENTITY_KEY_SUPERSEDE.clone()));
         let _ = REGISTRY.register(Box::new(SHARD_PUSH_PEER_UNRESOLVED.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_HEAL_OUTCOMES.clone()));
+        // Pre-touch every (stream, outcome) combination — 3 streams x 10
+        // `p2p::projection_reconcile::HealOutcomeKind` outcomes = 30 series —
+        // so an outcome that has literally never fired for a stream still
+        // reads as a measured zero, not an absent series. Labels below are the
+        // same vocabulary already used at the `inc_projection_heal_outcome`
+        // call sites in `p2p/projection_reconcile.rs`.
+        for stream in ["rea", "content", "collectives"] {
+            for outcome in [
+                "healed",
+                "timeout_retried",
+                "timeout_exhausted",
+                "missing",
+                "failed",
+                "refused_declared",
+                "refused_stale",
+                "no_row",
+                "refreshed",
+                "deferred_to_adopt",
+            ] {
+                PROJECTION_HEAL_OUTCOMES
+                    .with_label_values(&[stream, outcome])
+                    .inc_by(0);
+            }
+        }
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_GAPS.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_LOCAL_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_EXHAUSTED.clone()));
@@ -1133,6 +1335,13 @@ pub fn inc_identity_namespace_violation(column: &str, got: &str) {
     IDENTITY_NAMESPACE_VIOLATIONS
         .with_label_values(&[column, "agent_cid", got])
         .inc();
+}
+
+/// Increment the durable signal decode-miss mirror (paired with the
+/// per-family `AtomicU64` in `signals.rs`, additive only). `family` is
+/// "infra" | "mishpat" | "elohim_content".
+pub fn inc_signal_decode_miss(family: &str) {
+    SIGNAL_DECODE_MISS_TOTAL.with_label_values(&[family]).inc();
 }
 
 /// Record one outbound view-federation outcome. `result` is the outcome label
@@ -1403,6 +1612,11 @@ pub fn inc_contest_skipped(reason: ContestSkip) {
         .inc();
 }
 
+/// Count one contest-backoff ledger cap-overflow fail-open clear.
+pub fn inc_contest_backoff_cleared() {
+    CONTENT_CONTEST_BACKOFF_CLEARED.inc();
+}
+
 /// How one adopt-before-author sweep ended — the label vocabulary of
 /// [`CONTENT_ADOPT_SWEEP`], as a closed type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1436,6 +1650,98 @@ pub fn inc_adopt_sweep(outcome: AdoptSweepOutcome) {
     use seam_contracts::ReasonLabel as _;
     CONTENT_ADOPT_SWEEP
         .with_label_values(&[outcome.label()])
+        .inc();
+}
+
+/// How ONE election-obey probe ended — the label vocabulary of
+/// [`CONTENT_ELECTION_OBEY_PROBE`], as a closed type.
+///
+/// **Concerns:** C8 (observability-per-decision — a typed reason, never a raw
+/// string; the vocabulary enumerates itself, so a dashboard can list what it may
+/// see and a typo cannot mint a fifth permanently-zero series). C14 (witnessed
+/// residual, PARTIAL — see the registry row: the three previously-silent exits
+/// are now counted and the `resolve_error` echo meets the `warn!` floor, but no
+/// `ResidualWitness` capsule reaches the findings ledger yet).
+///
+/// Deliberately a SEPARATE type from [`ContestFailure`] and from the
+/// `class` vocabulary of [`CONTENT_ELECTION_OBEY_FAILED`], for the same reason
+/// [`ContestSkip`] is separate from [`ContestFailure`]: **a probe that never got
+/// an election is not an obey failure.** `CONTENT_ELECTION_OBEY_FAILED`'s doc
+/// scopes it to had-an-election-didn't-move; folding these four in would make it
+/// count work that was never attempted and would strip `fetch` / `validate` /
+/// `stamp_refused` of their meaning at the same time.
+///
+/// **Forcing incident:** 2026-08-03 live diagnosis — the obey arm ran ~900
+/// probes/hr and died 100% at `resolve_canonical_election` through two exits
+/// that incremented nothing and whose only signal was a `debug!` this deployment
+/// drops. Same shape as `486982bb8` (2026-07-25), the incident
+/// [`seam_contracts::residual`] itself is written against: *a leg that fails
+/// 100% and says nothing*.
+///
+/// **Contract tests:**
+/// [`crate::services::head_adoption::tests::election_obey_probe_labels_are_stable`]
+/// (the label strings, pinned as a dashboard contract from their first deploy)
+/// and [`tests::election_obey_probe_outcomes_are_pretouched_at_boot`] (all four
+/// series exist in the scrape from boot, which is the half that was missing).
+///
+/// Variant order is the denominator first, then the three exits in the order the
+/// probe hits them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ElectionObeyProbe {
+    /// A probe entered `try_obey_visible_election`. The DENOMINATOR — every
+    /// other variant is a subset of this one, never disjoint from it.
+    Attempted,
+    /// `resolve_canonical_election` answered `Ok(None)`: no election is visible
+    /// to this conductor for this id.
+    NoElection,
+    /// `resolve_canonical_election` returned `Err`: the conductor would not
+    /// answer the election read at all.
+    ResolveError,
+    /// An election IS visible, but there is no peer hint and/or no head-record
+    /// fetcher — nobody to hand us the winner's bytes.
+    NoCourier,
+}
+
+impl seam_contracts::ReasonLabel for ElectionObeyProbe {
+    const ALL: &'static [Self] = &[
+        ElectionObeyProbe::Attempted,
+        ElectionObeyProbe::NoElection,
+        ElectionObeyProbe::ResolveError,
+        ElectionObeyProbe::NoCourier,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            ElectionObeyProbe::Attempted => "attempted",
+            ElectionObeyProbe::NoElection => "no_election",
+            ElectionObeyProbe::ResolveError => "resolve_error",
+            ElectionObeyProbe::NoCourier => "no_courier",
+        }
+    }
+}
+
+/// Count one election-obey probe outcome.
+///
+/// **Concerns:** C8 — typed reason, closed vocabulary, and the `Attempted`
+/// denominator is counted BESIDE the exits so a failure rate is computable
+/// rather than inferred from a flat success series.
+pub fn inc_election_obey_probe(outcome: ElectionObeyProbe) {
+    use seam_contracts::ReasonLabel as _;
+    CONTENT_ELECTION_OBEY_PROBE
+        .with_label_values(&[outcome.label()])
+        .inc();
+}
+
+/// Count one requester-side head-record fetch outcome, by
+/// [`seam_contracts::AnswerState`].
+///
+/// **Concerns:** C8 — called from inside
+/// [`crate::p2p::head_record_client::PeerHeadRecordFetcher::fetch`] itself, so
+/// every caller of the head-record client is covered by one inc site.
+pub fn inc_head_record_fetch(state: seam_contracts::AnswerState) {
+    use seam_contracts::ReasonLabel as _;
+    CONTENT_HEAD_RECORD_FETCH_TOTAL
+        .with_label_values(&[state.label()])
         .inc();
 }
 
@@ -1939,6 +2245,55 @@ mod tests {
             text.contains("elohim_content_witness_sweep_abandoned_total"),
             "sweep-abandoned counter missing:\n{text}"
         );
+    }
+
+    /// The cure for the two-shift blind spot, asserted as a property of the
+    /// SCRAPE rather than of the code that writes it.
+    ///
+    /// All four `outcome` series must exist from registration alone — before any
+    /// probe has run. `attempted` is the one that matters most: without it a
+    /// flat-zero `elohim_content_election_obeyed_total` is ambiguous between
+    /// "the arm is idle" and "the arm fails on every row," which is exactly the
+    /// reading that cost 2026-08-01→03. Presence is asserted, never a value:
+    /// `cargo test` runs this module's tests in parallel threads of ONE process
+    /// against a process-global registry, so any sibling test may legitimately
+    /// have incremented these counters first.
+    #[test]
+    fn election_obey_probe_outcomes_are_pretouched_at_boot() {
+        register_all();
+
+        let text = gather_text();
+        assert!(
+            text.contains("elohim_content_election_obey_probe_total"),
+            "obey-probe counter missing:\n{text}"
+        );
+        for outcome in ["attempted", "no_election", "resolve_error", "no_courier"] {
+            assert!(
+                text.contains(&format!("outcome=\"{outcome}\"")),
+                "obey-probe outcome {outcome:?} not pre-touched at registration — an absent \
+                 series reads 'never measured', which is the ambiguity this metric exists to \
+                 remove:\n{text}"
+            );
+        }
+    }
+
+    #[test]
+    fn election_obey_probe_outcomes_increment() {
+        use seam_contracts::ReasonLabel as _;
+        register_all();
+
+        // Every variant is reachable from a real branch — the C8 guard against a
+        // structurally-constant label surviving because only one arm is wired.
+        for outcome in ElectionObeyProbe::ALL {
+            inc_election_obey_probe(*outcome);
+        }
+
+        let text = gather_text();
+        assert!(text.contains("elohim_content_election_obey_probe_total"));
+        assert!(text.contains("outcome=\"attempted\""), "{text}");
+        assert!(text.contains("outcome=\"no_election\""), "{text}");
+        assert!(text.contains("outcome=\"resolve_error\""), "{text}");
+        assert!(text.contains("outcome=\"no_courier\""), "{text}");
     }
 
     #[test]

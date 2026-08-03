@@ -508,6 +508,145 @@ decisionPoints:
       - path: elohim/elohim-storage/src/services/head_adoption.rs
         testName: election_obey_is_scoped_to_the_conductor_missing_class
         kind: unit
+      - path: elohim/elohim-storage/src/liveness_contract.rs
+        testName: the_election_obey_transition_is_courier_gated_and_lands_settled
+        kind: unit
+
+  - name: ElectionObeyProbe
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/metrics.rs
+      modulePath: metrics::ElectionObeyProbe
+      line: 1551
+    summary: >
+      How one election-obey probe ended - attempted (the denominator) / no_election /
+      resolve_error / no_courier. Label values for
+      elohim_content_election_obey_probe_total{outcome}, covering the three EARLY exits of
+      try_obey_visible_election that CONTENT_ELECTION_OBEY_FAILED's own doc scopes itself out
+      of (it counts had-an-election-didn-t-move only).
+    notes: >
+      Forcing incident 2026-08-03 (live alpha diagnosis): the obey arm ran ~900 probes/hr and
+      died on 100% of them at resolve_canonical_election, through two exits that incremented
+      nothing and whose only signal was a debug! this deployment drops before Loki. A flat-zero
+      elohim_content_election_obeyed_total read as "the arm is idle" for two shifts when it
+      meant "the arm fails on every row". Same shape as 486982bb8 (2026-07-25), the incident
+      seam_contracts::residual is written against. The resolve_error echo was promoted
+      debug!->warn! in the same change, since in this deployment the level IS the
+      observability. The three outcome labels also read as walls - no_election dominant means
+      an election-visibility (gossip/link-layer) wall, resolve_error dominant means a
+      coordinator-swap (ops) wall, no_courier dominant means a hint-supply wall.
+    concernIds:
+      - id: C8
+        status: answered
+        justification: >
+          A closed typed vocabulary implementing seam_contracts::ReasonLabel (no raw label
+          strings at any of the four call sites), with the Attempted DENOMINATOR counted beside
+          the exits so a failure RATE is computable rather than inferred from a flat success
+          series. All four label combinations are pre-touched at registration by iterating ALL,
+          so a new variant cannot be added without also being pre-touched - the structurally-
+          absent-series hole that hid this arm for two shifts. Pre-touching does not make any
+          label structurally constant: every variant is incremented by a real branch, asserted
+          by election_obey_probe_outcomes_increment.
+      - id: C14
+        status: partial
+        justification: >
+          Two of C14's six stations land here and the rest do not, so this is deliberately not
+          claimed as answered. CAPTURE: the three previously-silent exits are now counted, and
+          the outcome set CLOSES by arithmetic - attempted minus the three exits is exactly the
+          population that reached the fetch arm, and that population is fully accounted for by
+          elohim_content_election_obeyed_total + elohim_content_election_obey_failed_total, so
+          there is no unwitnessed remainder. LOCAL ECHO: the resolve_error arm now meets the
+          warn! floor the residual doc names as the floor (never the delivery). NOT DONE: no
+          ResidualWitness capsule is built, no inputs_digest / clock / lag / peer-state context
+          travels, nothing reaches .claude/data/runtime-findings.jsonl, and nothing is
+          dispositioned through the calibration ledger. A counter tells an operator WHICH wall
+          dominates; it cannot RCA a five-deep distributed stack. Closing the remaining four
+          stations is separate work.
+      - id: C6a
+        status: answered
+        justification: >
+          Counter-only - adds no loop, no retry, no conductor round-trip, and no work to the
+          sweep. The probe population it meters is bounded upstream by should_probe_election
+          (scoped to the conductor-missing class) and by the adopt sweep's own per-tick slice,
+          item spacing, and 120s wall clock, all unchanged.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: election_obey_probe_labels_are_stable
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: obey_probe_outcomes_never_collide_with_obey_failure_classes
+        kind: unit
+      - path: elohim/elohim-storage/src/metrics.rs
+        testName: election_obey_probe_outcomes_are_pretouched_at_boot
+        kind: unit
+      - path: elohim/elohim-storage/src/metrics.rs
+        testName: election_obey_probe_outcomes_increment
+        kind: unit
+
+  - name: compose_adopt_slice
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/p2p/projection_reconcile.rs
+      modulePath: p2p::projection_reconcile::compose_adopt_slice
+      line: 3283
+    summary: >
+      Which candidates fill one adopt sweep's fixed per-tick slice, given the eligible and the
+      backoff-deferred classes. Eligible holds the front; a tail of (cap / 4).min(deferred.len())
+      is RESERVED for the deferred class so re-ordering cannot decay into exclusion when the cap
+      binds. Pure and total - no clock, no ledger, no conductor.
+    notes: >
+      Forcing incident 2026-08-03 (live alpha): candidates 395, attempted 200,
+      backoff_deferred 134 - with 261 eligible ids in front, .take(200) truncated ALL 134
+      deferred candidates off the end of the slice. The F-B lever's own doc promises "priority,
+      not exclusion" precisely because the deferred class is the conductor-missing one whose
+      try_obey_visible_election probe is its ONLY converging arm; on a high-volume pod that
+      promise had silently inverted for the whole backoff window. The sweep log now also carries
+      backoff_deferred_in_slice, so the claim is checkable in a scrape rather than asserted in a
+      doc.
+    concernIds:
+      - id: C3
+        status: answered
+        justification: >
+          A backed-off id is DELAYED, never excluded - the same obligation
+          the_contest_backoff_is_never_a_permanent_exclusion witnesses at the ledger layer, now
+          held at the SCHEDULING layer too. Before this, both could be true (the backoff always
+          expires) while the id still never got a turn on a pod whose eligible class alone
+          overfills the cap, which is a liveness-shaped outage no state table sees: the liveness
+          contract models whether an arm EXISTS for a row, never whether that arm gets
+          scheduled. That scope limit is now stated in liveness_contract.rs's module doc, citing
+          this function as the scheduling-layer guarantee.
+      - id: C6a
+        status: answered
+        justification: >
+          Bounded work is unchanged and the tests pin it: the slice is still exactly
+          WITNESS_MAX_PER_TICK (200), the reserve is a fraction of that same cap (never an
+          addition to it), the concurrency bound is still adopt_contest_fanout, and
+          WITNESS_SWEEP_BUDGET (120s wall clock) remains authoritative over both. This function
+          changes WHICH ids fill a fixed slice, never how big it is -
+          the_tail_reservation_never_widens_the_bounded_work_budget asserts that over the
+          full shape space.
+      - id: C8
+        status: partial
+        justification: >
+          The composition is reported (backoff_deferred_in_slice, returned by this function
+          rather than recomputed at the call site so the log is not a mirror of the formula it
+          reports on), but on the sweep's tracing::warn! line only - there is no Prometheus
+          series for slice composition, so an operator must read logs to see the reservation
+          working. Adequate for the sweep log's existing shape; a counter would be the honest
+          upgrade if the reserve fraction ever becomes tunable.
+    contractTests:
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: a_short_eligible_class_composes_exactly_as_it_did_before_the_reservation
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: a_binding_cap_still_reserves_a_tail_for_the_deferred_class
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: an_empty_deferred_class_gives_the_full_cap_to_eligible_candidates
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: the_tail_reservation_never_widens_the_bounded_work_budget
+        kind: unit
 
   - name: backoff_is_active
     kind: pure-decision-predicate

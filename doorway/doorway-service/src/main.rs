@@ -1279,16 +1279,26 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
                         .await;
                     let refreshed = outcomes.iter().filter(|o| o.outcome == "refreshed").count();
                     let failed = outcomes.iter().filter(|o| o.outcome == "failed").count();
-                    if refreshed > 0 || failed > 0 {
+                    let unreachable = outcomes
+                        .iter()
+                        .filter(|o| o.outcome == "unreachable")
+                        .count();
+                    if refreshed > 0 || failed > 0 || unreachable > 0 {
                         info!(
-                            "SSR bundle reconcile: {} refreshed, {} failed ({} slugs checked)",
+                            "SSR bundle reconcile: {} refreshed, {} failed, {} unreachable ({} slugs checked)",
                             refreshed,
                             failed,
+                            unreachable,
                             outcomes.len()
                         );
                     } else {
-                        debug!(
-                            "SSR bundle reconcile: all {} slug(s) current",
+                        let current = outcomes.iter().filter(|o| o.outcome == "current").count();
+                        info!(
+                            "SSR bundle reconcile: {} refreshed, {} failed, {} unreachable, {} current ({} slugs checked)",
+                            refreshed,
+                            failed,
+                            unreachable,
+                            current,
                             outcomes.len()
                         );
                     }

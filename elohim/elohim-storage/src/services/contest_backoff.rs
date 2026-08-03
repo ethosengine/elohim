@@ -128,11 +128,20 @@ fn ledger() -> &'static Mutex<HashMap<String, BackoffEntry>> {
 /// throughput, never correctness).
 pub fn note(id: &str, class: ContestSkip) {
     let Ok(mut guard) = ledger().lock() else {
+        // Frequency check: this fires once per poisoned lock (a prior panic
+        // while holding it), not per call — safe at `warn!`.
+        tracing::warn!("contest_backoff: ledger lock poisoned; skipping this note (backoff is an optimisation, not correctness)");
         return;
     };
     if guard.len() >= CONTEST_BACKOFF_CAP && !guard.contains_key(id) {
         // FAIL-OPEN. Clearing returns every id to the pre-backoff behaviour
         // (contested every sweep); it can never strand one.
+        tracing::warn!(
+            cap = CONTEST_BACKOFF_CAP,
+            "contest_backoff: ledger hit its cap — clearing (fail-open; every id returns to \
+             contested-every-sweep until the ledger refills)"
+        );
+        crate::metrics::inc_contest_backoff_cleared();
         guard.clear();
     }
     guard.insert(

@@ -56,6 +56,25 @@
 //!   shift, not a cured wall, and it gets its own witness test —
 //!   [`tests::both_sides_conductor_missing_is_a_known_open_residual`] — which asserts
 //!   the harness NAMES it rather than hiding it inside a green main table.
+//! - **Sweep SCHEDULING.** Whether a live row reaches its arm *this tick* — the
+//!   per-tick slice cap, the item spacing, the wall-clock budget, the contest
+//!   backoff's priority ordering — is a dimension this table does not carry. Every
+//!   state here is asked "does an automated arm exist for it," never "does that arm
+//!   get a turn." The distinction is load-bearing, and 2026-08-03 is why it is
+//!   written down: an arm can be *modeled live and scheduled never*. On a
+//!   high-volume pod the adopt sweep's `.take(200)` truncated all 134
+//!   backoff-deferred candidates off the end of the slice, so the election-obey arm
+//!   modeled below never ran for that whole class — a liveness-shaped outage this
+//!   table is structurally blind to. The scheduling-layer guarantee lives beside the
+//!   scheduler instead: [`crate::p2p::projection_reconcile::compose_adopt_slice`]
+//!   reserves a tail of the cap for the deferred class, pinned by
+//!   `a_binding_cap_still_reserves_a_tail_for_the_deferred_class`. The same
+//!   reasoning is why the contest backoff is witnessed as its own two-state table
+//!   ([`tests::the_contest_backoff_is_never_a_permanent_exclusion`]) rather than
+//!   folded in here.
+//! - **Node-level configuration.** Whether this node has a head-record fetcher wired
+//!   at all is a startup fact, not a row state; see the courier note on the
+//!   election-obey arm in [`live_transitions_with`].
 
 use seam_contracts::harness::liveness::{check_liveness, LivenessFailure, StateClass, Transition};
 
@@ -322,13 +341,44 @@ fn live_transitions_with(s: &RowState, contest_enabled: bool) -> Vec<Transition<
     // beats contesting it again. This is wave 5's cure — `resolve_canonical_election`
     // reads the election WITHOUT target retrieval, so a pod with no local chain can
     // still obey.
-    if should_probe_election(head_answer_present) && s.election {
+    //
+    // COURIER GATE (2026-08-03 honesty fix). `try_obey_visible_election` needs
+    // BOTH halves: a visible election AND a byte courier. With `(hint, fetcher)`
+    // not `(Some, Some)` it returns `None` having moved nothing — the
+    // `no_courier` exit on `elohim_content_election_obey_probe_total`. Modeling
+    // the arm on election-visibility alone claimed a move the live code does not
+    // make.
+    //
+    // This adds no DIMENSION to the table, deliberately. The courier's per-row
+    // half IS `peer_head_hints.get(id)` — the same map `peer_advertises_declaration`
+    // reads — so it is already carried here as `PeerHint::advertises()`. A new
+    // `RowState` bit would double the 48-state product, force leg 2 to model a
+    // mechanism that did not exist in 2026-07-11 (`PeerHeadHints` postdates it
+    // entirely), and change the counts the three legs are compared on; that is
+    // the trade the F-B backoff witness declined for the same reason. The
+    // courier's OTHER half (whether this node has a `HeadRecordFetcher` wired at
+    // all) is a startup fact, not a row state, and stays outside the space — see
+    // the module doc's configuration note.
+    let courier_present = s.peer.advertises();
+    if should_probe_election(head_answer_present) && s.election && courier_present {
         out.push(
             Transition::automated(
-                "try_obey_visible_election: read the visible election without target retrieval \
-                 and adopt the elected head",
+                "try_obey_visible_election: read the visible election without target retrieval, \
+                 fetch the elected head's bytes from the advertising peer, and stamp them under \
+                 the election's own ordering",
             )
+            // A row that OBEYED lands settled: `stamp_declared_head_mode` writes
+            // `declared_head_action_hash` AND, under `HealCanonical` with the
+            // election's ordering, `canonical_declared_at` — and the head it now
+            // declares is the elected one, which is what the peer advertises.
+            // Leaving `declared`/`election` untouched described a row that had
+            // agreed with the fleet while still carrying no declaration, which is
+            // not a state this arm can produce. It is a no-op for the corner the
+            // arm reaches today (already declared, already elected), and the
+            // point is that it stays honest if that corner ever widens.
             .to(RowState {
+                declared: true,
+                election: true,
                 peer: PeerHint::Agreeing,
                 ..*s
             }),
@@ -889,6 +939,60 @@ mod tests {
              locally-correct guards each passed: {report}"
         );
         assert!(report.transitions_enumerated >= 13, "{report}");
+    }
+
+    /// The election-obey arm must be modeled the way it actually behaves: it
+    /// needs a byte COURIER as well as a visible election, and a row that obeys
+    /// lands SETTLED.
+    ///
+    /// Both halves are honesty fixes from the 2026-08-03 trace, and both are
+    /// no-ops for the single corner the arm reaches in today's table
+    /// (`Missing/declared/election/peer=Diverging`, where a courier is present by
+    /// construction and the row is already declared+elected). That is exactly why
+    /// they need a test: a claim that happens to be true only because of where
+    /// the classifier draws its Live/Terminal line will silently become false
+    /// when that line moves. This asserts the MODEL's own shape rather than a
+    /// verdict, so it fails on the edit that would otherwise re-introduce the
+    /// overclaim.
+    #[test]
+    fn the_election_obey_transition_is_courier_gated_and_lands_settled() {
+        let mut fired = 0usize;
+        for state in state_space() {
+            for transition in live_transitions(&state) {
+                if !transition.label.starts_with("try_obey_visible_election") {
+                    continue;
+                }
+                fired += 1;
+
+                assert!(
+                    state.peer.advertises(),
+                    "{state:?}: the obey arm is modeled as moving this row, but no peer \
+                     advertises a head — `try_obey_visible_election` returns None with no \
+                     courier (the no_courier probe exit)"
+                );
+
+                let landed = transition.to.expect("the obey arm models its target");
+                assert!(
+                    landed.declared && landed.election,
+                    "{state:?} -> {landed:?}: a row that obeyed carries the elected head AND \
+                     the election ordering that moved it"
+                );
+                assert!(
+                    matches!(landed.peer, PeerHint::Agreeing),
+                    "{state:?} -> {landed:?}: the row now holds the head the peer advertises"
+                );
+                assert!(
+                    classify(&landed).is_terminal(),
+                    "{state:?} -> {landed:?}: obeying settles the row; if this lands Live the \
+                     arm is modeled as making progress it does not make"
+                );
+            }
+        }
+        assert!(
+            fired >= 1,
+            "the obey arm fired nowhere in the table — wave 5's cure would be unmodeled, and \
+             leg 3's green would no longer say anything about it"
+        );
     }
 
     /// The cure is load-bearing, not incidental: flip the one shipped switch that

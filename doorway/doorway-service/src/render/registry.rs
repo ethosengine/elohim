@@ -629,6 +629,13 @@ impl RendererRegistry {
     /// `.await` or blocking call.
     pub async fn reconcile(&self, cache: &crate::cache::ContentCache) -> Vec<SlugOutcome> {
         let Some(ctx) = self.reconcile_ctx.clone() else {
+            // Reconcile is disabled (no declared-head source) — an operator
+            // admin refresh or background tick against a registry built this
+            // way previously read as a silent 0-slugs success.
+            tracing::warn!(
+                target: "doorway::ssr",
+                "bundle reconcile: no reconcile_ctx configured — skipping (0 slugs)"
+            );
             return Vec::new();
         };
 
@@ -662,7 +669,7 @@ impl RendererRegistry {
                 ReconcileDecision::Unreachable(err) => {
                     // Safe-degrade: keep serving current, status unchanged. Never
                     // adopt an unverifiable head.
-                    tracing::debug!(
+                    tracing::warn!(
                         target: "doorway::ssr",
                         slug = %slug,
                         error = %err,
