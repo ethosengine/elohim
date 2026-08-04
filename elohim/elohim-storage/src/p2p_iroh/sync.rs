@@ -175,6 +175,14 @@ mod tests {
                     total: 0,
                     has_more: false,
                 },
+                SyncRequest::ListDocumentsSince {
+                    h_app_id,
+                    corpus_digest,
+                    ..
+                } => SyncResponse::InSync {
+                    h_app_id,
+                    corpus_digest,
+                },
             }
         }
     }
