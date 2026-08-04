@@ -10,6 +10,10 @@
 //! the http-blob-graduation plan.
 //!
 //! Gated on `p2p-iroh`.
+//!
+//! Known-red as of 2026-08-04: blake3-address GET returns 400. Three-layer triage +
+//! exclusion contract in `genesis/data/timeline/backlog/2026-08-04-dual-address-blob-router-unmanifested-blake3-400.md`.
+//! Do not fix ad hoc.
 
 #![cfg(feature = "p2p-iroh")]
 

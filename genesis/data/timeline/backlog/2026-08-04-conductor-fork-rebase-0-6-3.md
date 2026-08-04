@@ -7,7 +7,7 @@ title: "Rebase the holochain-conductor fork 0.6.0 → upstream 0.6.3 keeping tx5
 slug: "conductor-fork-rebase-0-6-3"
 written: "2026-08-04"
 author: "holochain-iroh convergence campaign (Wave 1 Lane B)"
-status: "backlog"
+status: "resolved-pending-operator-push"
 priority: "high"
 tags: [conductor, holochain-fork, rebase, kitsune2, tx5, wave-1, codex-claimable]
 cites:
@@ -45,3 +45,7 @@ disjoint from Lanes A (elohim-storage), C (doorway), D (read-only).
 ## DoD
 
 4-commit branch `elohim-0.6.3` in the submodule, both gates EXIT=0 with output pasted, the config-delta report written, and NO monorepo gitlink change (the orchestrating session bumps the gitlink after composition review). Commit-only; never push to the monorepo.
+
+## Outcome (2026-08-04)
+
+Rebase completed on submodule branch `elohim-0.6.3` @ `da823fc6a` (4 commits, `f85c2a7` dropped correctly). Review caught 2 composition breaks, fixed in monorepo `4b163f707` + che `97916b6` (tx5 feature rename to `transport-tx5-backend-go-pion` + `--no-default-features`; required `relay_url` + denied unknown `NetworkConfig` keys). Gates evidenced green (release build, `holochain_p2p` 51/0). Remaining: operator pushes the branch, flips the che Jenkins params (same edit already staged locally), then bumps the gitlink.

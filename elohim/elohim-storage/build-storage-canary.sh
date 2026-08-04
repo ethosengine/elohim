@@ -23,7 +23,7 @@
 # Env:
 #   CONDUCTOR_SOURCE_IMAGE  REQUIRED — the conductor/edgenode image to embed
 #                           (build it first via edgenode/build-zombie-fix.sh with
-#                            HC_FEATURES=sqlite-encrypted,wasmer_sys,backend-go-pion,jemalloc-prof)
+#                            HC_FEATURES=sqlite-encrypted,wasmer_sys,transport-tx5-backend-go-pion,jemalloc-prof)
 #   REGISTRY   target registry/namespace (default harbor.ethosengine.com/ethosengine)
 #   TAG        image tag (default jemalloc-prof-canary-<short HEAD>)
 # ─────────────────────────────────────────────────────────────────────────────
