@@ -52,8 +52,11 @@ data:
       bootstrap_url: "https://doorway-alpha.elohim.host/bootstrap"
       # Signal served on dedicated subdomain (tx5/SBD protocol requires path = pubkey)
       signal_url: "wss://signal.alpha.elohim.host"
-      enable_mdns: false
-      enable_relaying: true
+      # REQUIRED field at holochain 0.6.3+ (single NetworkConfig struct; inert while the
+      # build compiles tx5-only). Value is the planned SOVEREIGN self-hosted iroh-relay —
+      # it must be live before any transport-iroh build ships; never fall back to n0's
+      # public relay default.
+      relay_url: "https://relay.elohim.host"
       webrtc_config:
         # iceServers MUST be camelCase — tx5's WebRtcConfig is serde-camelCase;
         # snake_case ice_servers is silently dropped (zero ICE servers).
