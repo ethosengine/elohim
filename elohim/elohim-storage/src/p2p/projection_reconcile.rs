@@ -2604,23 +2604,49 @@ async fn discover_content(
                     .or_insert_with(|| entry.dht_anchor_hash.clone());
             }
             // Additive field — absent from a pre-cure peer, which simply
-            // contributes no hint. First advertiser wins (same or-insert
+            // contributes no hint. First advertiser still WINS (same or-insert
             // discipline as the anchor above): the pre-flight asks exactly one
             // peer for the Record and, if that fails, retries next sweep rather
             // than fanning out.
+            //
+            // ADVERTISER DIVERSITY (2026-08-03). The later advertisers of the
+            // SAME head — which this loop has always seen and always discarded —
+            // are now RETAINED as alternate couriers. First-advertiser-wins
+            // routinely hinted a 100%-CFS-throttled conductor while idle peers
+            // holding the same genesis-seeded rows were never asked, which is
+            // why adopt-before-author had never minted. Retaining them costs one
+            // capped string vec per id and changes nothing about WHICH head is
+            // adopted (see `PeerHeadHint::alternates` on why a differing head is
+            // deliberately not recorded).
             if let Some(head) = entry
                 .declared_head_action_hash
                 .as_deref()
                 .map(str::trim)
                 .filter(|h| !h.is_empty())
             {
-                peer_head_hints.entry(entry.id.clone()).or_insert_with(|| {
-                    crate::services::head_adoption::PeerHeadHint {
-                        head_action_hash: head.to_string(),
-                        declared_at: entry.declared_head_at,
-                        peer_id: peer.peer_id.clone(),
+                match peer_head_hints.entry(entry.id.clone()) {
+                    std::collections::hash_map::Entry::Vacant(slot) => {
+                        slot.insert(crate::services::head_adoption::PeerHeadHint::sole(
+                            head.to_string(),
+                            entry.declared_head_at,
+                            peer.peer_id.clone(),
+                        ));
                     }
-                });
+                    std::collections::hash_map::Entry::Occupied(mut slot) => {
+                        let hint = slot.get_mut();
+                        // bounded-work: at most ALTERNATE_ADVERTISER_CAP extra
+                        // peer ids per id, so the hint map stays O(ids) with a
+                        // small constant regardless of mesh size.
+                        if hint.head_action_hash == head
+                            && hint.peer_id != peer.peer_id
+                            && hint.alternates.len()
+                                < crate::services::head_adoption::ALTERNATE_ADVERTISER_CAP
+                            && !hint.alternates.iter().any(|p| p == &peer.peer_id)
+                        {
+                            hint.alternates.push(peer.peer_id.clone());
+                        }
+                    }
+                }
             }
         }
     }

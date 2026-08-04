@@ -1101,6 +1101,48 @@ lazy_static! {
         "Contest-backoff ledger cap-overflow fail-open clears.",
     )
     .unwrap();
+
+    /// ADVERTISER DIVERSITY (2026-08-03). One ROUTE-AROUND decision on the
+    /// adopt-evidence path, by [`AdoptEvidenceFallback`] — `attempted` |
+    /// `carried` | `degraded` | `no_alternative`.
+    ///
+    /// Strictly SUPPLEMENTARY to [`CONTENT_ADOPT_EVIDENCE`], which keeps
+    /// counting exactly one FINAL resolution per evidence ask. This meter says
+    /// how often the primary advertiser was too weak to serve and whether
+    /// routing around it worked: `attempted = carried + degraded`, and
+    /// `no_alternative` is the population that WANTED a second courier and had
+    /// none (the signal that hint plurality, not peer health, is the wall).
+    ///
+    /// Why it exists: the hinted advertiser is chosen by first-advertiser-wins,
+    /// which on the live fleet was usually a 100% CFS-throttled conductor —
+    /// `adopt_evidence{budget_elapsed}` dominated while idle peers holding the
+    /// same rows were never asked. The protocol adapts; the meter says whether
+    /// the adaptation is finding anyone.
+    pub static ref CONTENT_ADOPT_EVIDENCE_FALLBACK: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_content_adopt_evidence_fallback_total",
+            "Adopt-arm advertiser-diversity fallback decisions, by outcome.",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
+    /// Contest-backoff ledger PERSISTENCE outcomes, by [`BackoffSnapshot`] —
+    /// `saved` | `save_failed` | `loaded` | `load_failed`.
+    ///
+    /// The ledger is process-local operational state (never a truth store), but
+    /// losing it on every deploy re-churns the whole corpus from zero — hours of
+    /// re-learning which ids are evidence-absent. A snapshot sidecar closes that
+    /// without a migration or a table; this meter says whether the sidecar is
+    /// actually round-tripping rather than silently failing to write.
+    pub static ref CONTENT_CONTEST_BACKOFF_SNAPSHOT: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_content_contest_backoff_snapshot_total",
+            "Contest-backoff ledger snapshot persistence outcomes.",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
 }
 
 /// Register every toolkit collector into [`REGISTRY`]. Idempotent (guarded by a
@@ -1217,6 +1259,28 @@ pub fn register_all() {
             }
         }
         let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_BACKOFF_CLEARED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_ADOPT_EVIDENCE_FALLBACK.clone()));
+        // Pre-touch every fallback outcome, same discipline as the evidence
+        // states above: `no_alternative` at zero is a MEANINGFUL reading (the
+        // hint plurality is there), and a series that only materialises on first
+        // occurrence cannot say that.
+        {
+            use seam_contracts::ReasonLabel as _;
+            for outcome in AdoptEvidenceFallback::ALL {
+                CONTENT_ADOPT_EVIDENCE_FALLBACK
+                    .with_label_values(&[outcome.label()])
+                    .inc_by(0);
+            }
+        }
+        let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_BACKOFF_SNAPSHOT.clone()));
+        {
+            use seam_contracts::ReasonLabel as _;
+            for outcome in BackoffSnapshot::ALL {
+                CONTENT_CONTEST_BACKOFF_SNAPSHOT
+                    .with_label_values(&[outcome.label()])
+                    .inc_by(0);
+            }
+        }
         let _ = REGISTRY.register(Box::new(CONTENT_ADOPT_SWEEP.clone()));
         {
             use seam_contracts::ReasonLabel as _;
@@ -1827,6 +1891,109 @@ pub fn inc_adopt_evidence(state: AdoptEvidence) {
     use seam_contracts::ReasonLabel as _;
     CONTENT_ADOPT_EVIDENCE
         .with_label_values(&[state.label()])
+        .inc();
+}
+
+/// What the advertiser-diversity fallback decided on ONE adopt-evidence
+/// resolution — the label vocabulary of [`CONTENT_ADOPT_EVIDENCE_FALLBACK`], as
+/// a closed type.
+///
+/// **Concerns:** C8 (typed reason, closed vocabulary). C6a (the vocabulary
+/// itself encodes the amplification bound: there is exactly ONE `attempted` per
+/// resolution, so `attempted` can never exceed `adopt_evidence` total).
+///
+/// **Contract test:**
+/// [`crate::services::head_adoption::tests::fallback_labels_are_stable`].
+///
+/// Deliberately separate from [`AdoptEvidence`]: this vocabulary answers "did we
+/// route around a weak advertiser, and did it help?", which is a different
+/// question from "what did the evidence say?". Folding them would double-count
+/// the evidence meter, whose whole value is one increment per ask.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AdoptEvidenceFallback {
+    /// A second advertiser was selected and asked. Exactly one per fallback, so
+    /// this is the denominator for `carried` + `degraded`.
+    Attempted,
+    /// The alternative advertiser served the `Record` bytes the primary could
+    /// not. The whole point of the lever.
+    Carried,
+    /// The alternative answered too, and also without bytes. The primary's
+    /// evidence stands as the resolution.
+    Degraded,
+    /// A fallback was WARRANTED (the primary answered degraded) and no distinct
+    /// candidate existed. Not a failure of peer health — a failure of hint
+    /// plurality, which is a different remedy (more advertisers per id).
+    NoAlternative,
+}
+
+impl seam_contracts::ReasonLabel for AdoptEvidenceFallback {
+    const ALL: &'static [Self] = &[
+        AdoptEvidenceFallback::Attempted,
+        AdoptEvidenceFallback::Carried,
+        AdoptEvidenceFallback::Degraded,
+        AdoptEvidenceFallback::NoAlternative,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            AdoptEvidenceFallback::Attempted => "attempted",
+            AdoptEvidenceFallback::Carried => "carried",
+            AdoptEvidenceFallback::Degraded => "degraded",
+            AdoptEvidenceFallback::NoAlternative => "no_alternative",
+        }
+    }
+}
+
+/// Count ONE advertiser-diversity fallback decision.
+pub fn inc_adopt_evidence_fallback(outcome: AdoptEvidenceFallback) {
+    use seam_contracts::ReasonLabel as _;
+    CONTENT_ADOPT_EVIDENCE_FALLBACK
+        .with_label_values(&[outcome.label()])
+        .inc();
+}
+
+/// Contest-backoff ledger snapshot persistence outcomes — the label vocabulary
+/// of [`CONTENT_CONTEST_BACKOFF_SNAPSHOT`], as a closed type.
+///
+/// Every member is NON-FATAL by construction: a failed save leaves the in-memory
+/// ledger authoritative, and a failed load starts empty — which is exactly the
+/// behaviour before the sidecar existed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BackoffSnapshot {
+    /// One periodic snapshot written (temp + rename).
+    Saved,
+    /// A snapshot write failed. The ledger stays dirty and the next tick retries.
+    SaveFailed,
+    /// A snapshot was restored at boot (once per process, at most).
+    Loaded,
+    /// A snapshot existed but was unreadable/undecodable/wrong-version. Start
+    /// empty — never crash on operational state.
+    LoadFailed,
+}
+
+impl seam_contracts::ReasonLabel for BackoffSnapshot {
+    const ALL: &'static [Self] = &[
+        BackoffSnapshot::Saved,
+        BackoffSnapshot::SaveFailed,
+        BackoffSnapshot::Loaded,
+        BackoffSnapshot::LoadFailed,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            BackoffSnapshot::Saved => "saved",
+            BackoffSnapshot::SaveFailed => "save_failed",
+            BackoffSnapshot::Loaded => "loaded",
+            BackoffSnapshot::LoadFailed => "load_failed",
+        }
+    }
+}
+
+/// Count ONE contest-backoff snapshot persistence outcome.
+pub fn inc_contest_backoff_snapshot(outcome: BackoffSnapshot) {
+    use seam_contracts::ReasonLabel as _;
+    CONTENT_CONTEST_BACKOFF_SNAPSHOT
+        .with_label_values(&[outcome.label()])
         .inc();
 }
 

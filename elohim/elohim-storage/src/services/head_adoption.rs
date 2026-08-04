@@ -295,11 +295,48 @@ pub struct PeerHeadHint {
     /// The ordering the peer carries. Recorded for logs only — see the
     /// module-level note on why this is never used to elect.
     pub declared_at: Option<i64>,
-    /// Which peer advertised it (the one we ask for the `Record`).
+    /// Which peer advertised it (the one we ask for the `Record` FIRST).
     pub peer_id: String,
+    /// OTHER peers that advertised the SAME `head_action_hash` this sweep — the
+    /// courier plurality the evidence fetch may route to when
+    /// [`Self::peer_id`] cannot serve the bytes.
+    ///
+    /// **Same head, deliberately.** An alternate here is a substitute COURIER
+    /// for one declaration, never a second opinion about which head is
+    /// canonical: nothing about the decision changes when we ask a different
+    /// peer, only who hands us the bytes. A peer advertising a DIFFERENT head is
+    /// not recorded, because adopting from it would silently change which action
+    /// gets declared.
+    ///
+    /// Bounded at harvest time (`p2p::projection_reconcile`); empty when only
+    /// one peer advertises the id, which is the pre-2026-08-03 shape exactly.
+    pub alternates: Vec<String>,
 }
 
-/// `content_id → ` the first peer-advertised declaration seen this sweep.
+/// How many ALTERNATE advertisers one hint retains.
+///
+/// Small on purpose. Only ONE alternate is ever asked per evidence resolution
+/// (the bound that keeps this a route-around and not a fan-out), so the list
+/// only needs enough breadth for the health tracker to have a choice when the
+/// best-known peer is itself down. 3 covers a household mesh; the memory cost is
+/// `ids × 3` short strings.
+pub const ALTERNATE_ADVERTISER_CAP: usize = 3;
+
+impl PeerHeadHint {
+    /// A hint with no alternates — the shape every construction site had before
+    /// advertiser diversity existed.
+    pub fn sole(head_action_hash: String, declared_at: Option<i64>, peer_id: String) -> Self {
+        Self {
+            head_action_hash,
+            declared_at,
+            peer_id,
+            alternates: Vec::new(),
+        }
+    }
+}
+
+/// `content_id → ` the first peer-advertised declaration seen this sweep, plus
+/// the other peers advertising that same declaration.
 pub type PeerHeadHints = HashMap<String, PeerHeadHint>;
 
 /// WHY a peer served a head hash-only — the responder's own account of its
@@ -480,14 +517,35 @@ pub trait HeadRecordFetcher: Send + Sync {
 /// Returns `(carried, evidence)`. `evidence` is `None` ONLY when no fetch
 /// happened at all (the boot pass carries no fetcher) — an unasked question is
 /// not an answer, and counting it would corrupt the denominator.
+///
+/// # ADVERTISER DIVERSITY (2026-08-03)
+///
+/// When the hinted advertiser answers without bytes and without a stated
+/// structural absence, this asks ONE alternative advertiser (see
+/// [`fallback_warrants`] for the trigger and
+/// [`crate::services::advertiser_health`] for the choice). The hint is
+/// first-advertiser-wins, and on the live fleet that peer was usually a
+/// 100%-CFS-throttled conductor while idle peers holding the same genesis-seeded
+/// rows were never asked once — which is why adopt-before-author had never
+/// minted despite being wired correctly end to end. **The protocol adapts to its
+/// weakest members rather than demanding they be strong.**
+///
+/// The bound is structural, not conventional: ONE extra fetch, chosen from a
+/// list the harvest already capped, with no loop and no ladder. And the
+/// accounting stays honest — [`crate::metrics::inc_adopt_evidence`] fires
+/// EXACTLY ONCE per resolution, for the FINAL state, so the evidence meter's
+/// denominator is unchanged by this lever. The fallback's own decisions land on
+/// a separate [`crate::metrics::CONTENT_ADOPT_EVIDENCE_FALLBACK`] series.
 async fn resolve_peer_evidence(
     fetcher: Option<&dyn HeadRecordFetcher>,
-    peer_id: &str,
+    hint: &PeerHeadHint,
     id: &str,
 ) -> (
     Option<CarriedHeadRecord>,
     Option<crate::metrics::AdoptEvidence>,
 ) {
+    use crate::metrics::{AdoptEvidence, AdoptEvidenceFallback};
+
     let Some(f) = fetcher else {
         return (None, None);
     };
@@ -495,10 +553,113 @@ async fn resolve_peer_evidence(
     // "no bytes and no stated cause" to every consumer below, and both classify
     // as `Unknown` — the pre-2026-08-03 behaviour exactly, now with the collapse
     // recorded on a meter instead of only in a log line.
-    let carried = f.fetch(peer_id, id).await.into_option();
+    let carried = f.fetch(&hint.peer_id, id).await.into_option();
     let state = classify_evidence(carried.as_ref());
+    crate::services::advertiser_health::record(&hint.peer_id, state == AdoptEvidence::Carried);
+
+    if !fallback_warrants(state, crate::config::evidence_fallback_enabled()) {
+        crate::metrics::inc_adopt_evidence(state);
+        return (carried, Some(state));
+    }
+
+    // The primary could not serve, and the cause is one another peer might not
+    // share. Ask ONE other advertiser of the SAME declaration.
+    let Some(alternate) =
+        crate::services::advertiser_health::select_alternative(&hint.peer_id, &hint.alternates)
+    else {
+        // No second courier exists for this id. Counted apart from a failed
+        // fallback because the remedy differs: this says hint PLURALITY is the
+        // wall, not peer health.
+        crate::metrics::inc_adopt_evidence_fallback(AdoptEvidenceFallback::NoAlternative);
+        crate::metrics::inc_adopt_evidence(state);
+        return (carried, Some(state));
+    };
+
+    // bounded-work: exactly ONE fallback fetch per evidence resolution — no
+    // loop, no ladder, no recursion. The candidate list is capped at harvest
+    // time and this arm consumes at most one entry from it, so the worst case is
+    // 2 round-trips per candidate per sweep (the sweep's own 200/tick + 120s
+    // budget is unchanged and stays authoritative).
+    crate::metrics::inc_adopt_evidence_fallback(AdoptEvidenceFallback::Attempted);
+    let alt_carried = f.fetch(&alternate, id).await.into_option();
+    let alt_state = classify_evidence(alt_carried.as_ref());
+    crate::services::advertiser_health::record(&alternate, alt_state == AdoptEvidence::Carried);
+
+    if alt_state == AdoptEvidence::Carried {
+        crate::metrics::inc_adopt_evidence_fallback(AdoptEvidenceFallback::Carried);
+        crate::metrics::inc_adopt_evidence(AdoptEvidence::Carried);
+        tracing::info!(
+            target: "elohim_storage::head_adoption",
+            content_id = %id,
+            primary_peer = %hint.peer_id,
+            primary_evidence = state.label(),
+            alternate_peer = %alternate,
+            "adopt-before-author: routed around a starved advertiser — an alternative peer \
+             served the head Record the hinted one could not"
+        );
+        return (alt_carried, Some(AdoptEvidence::Carried));
+    }
+
+    // Both answered without bytes. The PRIMARY's evidence is the resolution:
+    // it is the peer whose declaration this row is reasoning about, and the
+    // backoff class downstream must key on what IT said. (A conservative
+    // choice on purpose — an alternate's `no_record` may never license the long
+    // deferral when the primary said `budget_elapsed`, because the primary said
+    // the bytes plausibly exist.)
+    crate::metrics::inc_adopt_evidence_fallback(AdoptEvidenceFallback::Degraded);
     crate::metrics::inc_adopt_evidence(state);
+    tracing::debug!(
+        target: "elohim_storage::head_adoption",
+        content_id = %id,
+        primary_peer = %hint.peer_id,
+        primary_evidence = state.label(),
+        alternate_peer = %alternate,
+        alternate_evidence = alt_state.label(),
+        "adopt-before-author: the alternative advertiser could not serve the Record either; \
+         the primary's evidence stands"
+    );
     (carried, Some(state))
+}
+
+/// Does this evidence state warrant asking a SECOND advertiser?
+///
+/// **Concerns:** C6a (this predicate IS the amplification gate — every `true`
+/// here is one extra round-trip). C4 (the `no_record` arm is the honest-absence
+/// rule: a stated structural absence is a fact about the FLEET, not about the
+/// peer, so asking elsewhere for bytes that exist nowhere is pure amplification
+/// with no possible payoff).
+///
+/// **Contract tests:** [`tests::only_a_peer_shaped_failure_warrants_a_second_ask`]
+/// and [`tests::the_disabled_lever_never_warrants_a_second_ask`].
+///
+/// Exhaustively matched rather than wildcarded: a future evidence state must
+/// force an explicit decision here, because the default of "retry it" is the
+/// expensive one.
+///
+/// `enabled` is a PARAMETER rather than a config read, for the reason
+/// [`evidence_backoff_class`] documents: the OFF switch must be provable without
+/// touching a process-wide `OnceLock` (the parallel-test flake this codebase has
+/// already paid for once).
+fn fallback_warrants(state: crate::metrics::AdoptEvidence, enabled: bool) -> bool {
+    use crate::metrics::AdoptEvidence;
+    if !enabled {
+        return false;
+    }
+    match state {
+        // Bytes in hand — nothing to route around.
+        AdoptEvidence::Carried => false,
+        // The advertiser's conductor cleanly holds no record. STRUCTURAL: no
+        // other peer's conductor can conjure bytes that are nowhere on the
+        // fleet, and the evidence-absent backoff already owns this population.
+        AdoptEvidence::NoRecord => false,
+        // The three PEER-SHAPED failures — saturation, a conductor error, and an
+        // answer that established nothing (including unreachable). All say
+        // something about THIS peer's ability to serve right now, and another
+        // peer plausibly does not share it.
+        AdoptEvidence::BudgetElapsed | AdoptEvidence::ConductorError | AdoptEvidence::Unknown => {
+            true
+        }
+    }
 }
 
 /// What one fetch established about the SUPPLY of head-record bytes.
@@ -1056,7 +1217,11 @@ async fn adopt_peer(
     // arm), so a missing-bytes cause changes nothing it would do. It is still
     // COUNTED inside `resolve_peer_evidence` — the meter's denominator is every
     // ask this node makes, not only the asks one arm acts on.
-    let (carried, _evidence) = resolve_peer_evidence(fetcher, &hint.peer_id, id).await;
+    //
+    // ADVERTISER DIVERSITY applies here too, and matters MORE than the state
+    // does: this arm can only declare a head it has bytes for, so a starved
+    // hinted advertiser is exactly the wall a second courier removes.
+    let (carried, _evidence) = resolve_peer_evidence(fetcher, hint, id).await;
     // The SERVED hash wins over the advertised one: it is the action the bytes
     // actually prove. Falling back to the hint keeps the record-less path working.
     let (head_action_hash, carried_record) = match carried {
@@ -1538,7 +1703,7 @@ async fn contest_peer(
     // answer states classify as `Unknown`, so the pre-P2.3 collapse is
     // preserved — the `fetch_none` / `not_retrievable` split is downstream of
     // the bytes, not of the answer state.
-    let (carried, evidence) = resolve_peer_evidence(fetcher, &hint.peer_id, id).await;
+    let (carried, evidence) = resolve_peer_evidence(fetcher, hint, id).await;
     // "Did we get BYTES?" — not "did the peer answer?". A peer holding a row it
     // cannot resolve answers hash-only (`record: None`), which is the DOMINANT
     // shape when the advertising peer is itself conductor-missing. Counting that
@@ -1936,11 +2101,9 @@ pub async fn finish_author_then_adopt(
     // inside a single tick: `adopt_deferred_heads` runs BEFORE both witness
     // sweeps, so an id can fail the no-chain gate and be authored seconds later.
     crate::services::contest_backoff::note_local_chain_arrived(id);
-    let hint = PeerHeadHint {
-        head_action_hash: head_action_hash.to_string(),
-        declared_at: None,
-        peer_id: peer_id.to_string(),
-    };
+    // No alternates: this call already HAS the bytes in hand (the caller carried
+    // them through the author path), so there is no evidence fetch to route.
+    let hint = PeerHeadHint::sole(head_action_hash.to_string(), None, peer_id.to_string());
     match declare_peer_head(hc, pool, ctx, id, head_action_hash, carried_record, &hint).await {
         // A second "no local chain" refusal means the author did not actually
         // land; do not recurse — the next sweep retries from the top.
@@ -2428,12 +2591,380 @@ mod tests {
     /// with every boot-pass candidate and make the evidence split unreadable.
     #[tokio::test]
     async fn an_absent_fetcher_resolves_no_evidence_at_all() {
-        let (carried, evidence) = resolve_peer_evidence(None, "peer", "id").await;
+        let hint = PeerHeadHint::sole("uhCkk-head".into(), None, "peer".into());
+        let (carried, evidence) = resolve_peer_evidence(None, &hint, "id").await;
         assert!(carried.is_none());
         assert_eq!(
             evidence, None,
             "an unasked question is not an evidence state"
         );
+    }
+
+    // =========================================================================
+    // ADVERTISER DIVERSITY (2026-08-03)
+    // =========================================================================
+
+    /// A fetcher scripted per peer, recording who was asked and in what order —
+    /// the ONLY way to assert the amplification bound, which is a statement about
+    /// round-trips rather than about return values.
+    struct ScriptedFetcher {
+        answers: std::collections::HashMap<String, Answer<CarriedHeadRecord>>,
+        asked: std::sync::Mutex<Vec<String>>,
+    }
+
+    impl ScriptedFetcher {
+        fn new(script: Vec<(&str, Answer<CarriedHeadRecord>)>) -> Self {
+            Self {
+                answers: script
+                    .into_iter()
+                    .map(|(p, a)| (p.to_string(), a))
+                    .collect(),
+                asked: std::sync::Mutex::new(Vec::new()),
+            }
+        }
+
+        fn asked(&self) -> Vec<String> {
+            self.asked.lock().expect("asked lock").clone()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl HeadRecordFetcher for ScriptedFetcher {
+        async fn fetch(&self, peer_id: &str, _content_id: &str) -> Answer<CarriedHeadRecord> {
+            self.asked
+                .lock()
+                .expect("asked lock")
+                .push(peer_id.to_string());
+            match self.answers.get(peer_id) {
+                Some(Answer::Present(c)) => Answer::Present(c.clone()),
+                Some(Answer::Absent) => Answer::Absent,
+                _ => Answer::Unreachable,
+            }
+        }
+    }
+
+    fn carrying(bytes: &[u8]) -> Answer<CarriedHeadRecord> {
+        Answer::Present(CarriedHeadRecord {
+            head_action_hash: "uhCkk-head".into(),
+            record: Some(bytes.to_vec()),
+            record_absent_reason: None,
+        })
+    }
+
+    fn hash_only_answer(reason: RecordAbsentReason) -> Answer<CarriedHeadRecord> {
+        Answer::Present(hash_only(Some(reason)))
+    }
+
+    fn hint_with(primary: &str, alternates: &[&str]) -> PeerHeadHint {
+        PeerHeadHint {
+            head_action_hash: "uhCkk-head".into(),
+            declared_at: None,
+            peer_id: primary.to_string(),
+            alternates: alternates.iter().map(|s| (*s).to_string()).collect(),
+        }
+    }
+
+    /// Read one `adopt_evidence{state}` series. Deltas, never absolutes: the
+    /// registry is process-wide.
+    fn evidence_count(state: crate::metrics::AdoptEvidence) -> u64 {
+        crate::metrics::CONTENT_ADOPT_EVIDENCE
+            .with_label_values(&[state.label()])
+            .get()
+    }
+
+    fn fallback_count(outcome: crate::metrics::AdoptEvidenceFallback) -> u64 {
+        crate::metrics::CONTENT_ADOPT_EVIDENCE_FALLBACK
+            .with_label_values(&[outcome.label()])
+            .get()
+    }
+
+    /// THE AMPLIFICATION GATE, exhaustively. Every `true` here is an extra
+    /// conductor round-trip on a fleet whose conductors are the scarce resource,
+    /// and the `no_record` arm is the one that must never flip: a stated
+    /// structural absence is a fact about the FLEET, so asking a second peer for
+    /// bytes that exist nowhere is pure cost with no possible payoff.
+    #[test]
+    fn only_a_peer_shaped_failure_warrants_a_second_ask() {
+        use crate::metrics::AdoptEvidence;
+        for peer_shaped in [
+            AdoptEvidence::BudgetElapsed,
+            AdoptEvidence::ConductorError,
+            AdoptEvidence::Unknown,
+        ] {
+            assert!(
+                fallback_warrants(peer_shaped, true),
+                "{peer_shaped:?} says something about THIS peer — another peer may not share it"
+            );
+        }
+        assert!(
+            !fallback_warrants(AdoptEvidence::NoRecord, true),
+            "a stated structural absence must never be re-asked elsewhere"
+        );
+        assert!(
+            !fallback_warrants(AdoptEvidence::Carried, true),
+            "bytes in hand leave nothing to route around"
+        );
+    }
+
+    /// The OFF switch is a real off switch: with the lever disabled NO state
+    /// warrants a second ask, which is the single-ask path byte for byte.
+    #[test]
+    fn the_disabled_lever_never_warrants_a_second_ask() {
+        use crate::metrics::AdoptEvidence;
+        use seam_contracts::ReasonLabel as _;
+        for state in AdoptEvidence::ALL {
+            assert!(
+                !fallback_warrants(*state, false),
+                "{state:?} must not trigger a fallback when the lever is off"
+            );
+        }
+    }
+
+    /// THE CURE, end to end: the hinted advertiser is starved, an idle peer
+    /// holds the same rows, and the bytes arrive. This is the live shape —
+    /// `adopt_evidence{budget_elapsed}` dominating while matthew/adam idled — and
+    /// the resolution must report `carried`, because the arm downstream acts on
+    /// bytes, not on who supplied them.
+    #[tokio::test]
+    async fn a_degraded_primary_routes_to_a_healthy_alternate() {
+        let _exclusive = crate::services::advertiser_health::test_exclusive();
+        crate::services::advertiser_health::reset();
+        use crate::metrics::{AdoptEvidence, AdoptEvidenceFallback};
+
+        let before_carried = evidence_count(AdoptEvidence::Carried);
+        let before_budget = evidence_count(AdoptEvidence::BudgetElapsed);
+        let before_attempted = fallback_count(AdoptEvidenceFallback::Attempted);
+        let before_fb_carried = fallback_count(AdoptEvidenceFallback::Carried);
+
+        let fetcher = ScriptedFetcher::new(vec![
+            (
+                "throttled",
+                hash_only_answer(RecordAbsentReason::BudgetElapsed),
+            ),
+            ("idle", carrying(b"record-bytes")),
+        ]);
+        let hint = hint_with("throttled", &["idle"]);
+        let (carried, evidence) = resolve_peer_evidence(Some(&fetcher), &hint, "id").await;
+
+        assert_eq!(
+            carried.and_then(|c| c.record),
+            Some(b"record-bytes".to_vec()),
+            "the fallback's BYTES are what the caller gets"
+        );
+        assert_eq!(evidence, Some(AdoptEvidence::Carried));
+        assert_eq!(fetcher.asked(), vec!["throttled", "idle"]);
+
+        // ACCOUNTING: exactly ONE evidence increment, for the FINAL state. A
+        // per-attempt count would inflate the denominator and make the evidence
+        // split — the whole reason that meter exists — unreadable.
+        assert_eq!(evidence_count(AdoptEvidence::Carried), before_carried + 1);
+        assert_eq!(
+            evidence_count(AdoptEvidence::BudgetElapsed),
+            before_budget,
+            "the primary's degraded state must NOT also be counted"
+        );
+        assert_eq!(
+            fallback_count(AdoptEvidenceFallback::Attempted),
+            before_attempted + 1
+        );
+        assert_eq!(
+            fallback_count(AdoptEvidenceFallback::Carried),
+            before_fb_carried + 1
+        );
+        crate::services::advertiser_health::reset();
+    }
+
+    /// A stated structural absence is never re-asked. This is the amplification
+    /// bound at its most load-bearing: ~61% of the live refusal population is
+    /// phantom ids whose bytes exist NOWHERE, and fanning those out would double
+    /// the cost of the population with the least to gain.
+    #[tokio::test]
+    async fn a_structural_absence_is_never_routed_around() {
+        let _exclusive = crate::services::advertiser_health::test_exclusive();
+        crate::services::advertiser_health::reset();
+        use crate::metrics::{AdoptEvidence, AdoptEvidenceFallback};
+
+        let before_attempted = fallback_count(AdoptEvidenceFallback::Attempted);
+        let before_no_record = evidence_count(AdoptEvidence::NoRecord);
+
+        let fetcher = ScriptedFetcher::new(vec![
+            ("primary", hash_only_answer(RecordAbsentReason::NoRecord)),
+            ("idle", carrying(b"never-asked")),
+        ]);
+        let hint = hint_with("primary", &["idle"]);
+        let (carried, evidence) = resolve_peer_evidence(Some(&fetcher), &hint, "id").await;
+
+        assert!(carried.is_some_and(|c| c.record.is_none()));
+        assert_eq!(evidence, Some(AdoptEvidence::NoRecord));
+        assert_eq!(
+            fetcher.asked(),
+            vec!["primary"],
+            "a structural absence must cost exactly one round-trip"
+        );
+        assert_eq!(
+            fallback_count(AdoptEvidenceFallback::Attempted),
+            before_attempted
+        );
+        assert_eq!(
+            evidence_count(AdoptEvidence::NoRecord),
+            before_no_record + 1
+        );
+        crate::services::advertiser_health::reset();
+    }
+
+    /// A carried primary is the common converged case, and it must stay a single
+    /// round-trip — otherwise the lever taxes the ids that are already working.
+    #[tokio::test]
+    async fn a_carried_primary_is_never_routed_around() {
+        let _exclusive = crate::services::advertiser_health::test_exclusive();
+        crate::services::advertiser_health::reset();
+        let fetcher = ScriptedFetcher::new(vec![
+            ("primary", carrying(b"bytes")),
+            ("idle", carrying(b"also-bytes")),
+        ]);
+        let hint = hint_with("primary", &["idle"]);
+        let (_carried, evidence) = resolve_peer_evidence(Some(&fetcher), &hint, "id").await;
+        assert_eq!(evidence, Some(crate::metrics::AdoptEvidence::Carried));
+        assert_eq!(fetcher.asked(), vec!["primary"]);
+        crate::services::advertiser_health::reset();
+    }
+
+    /// ONE retry, never a ladder. Three alternates are offered and exactly one
+    /// is asked — the bound that keeps a route-around from becoming a fan-out
+    /// against a fleet whose conductors are already the scarce resource.
+    #[tokio::test]
+    async fn the_fallback_is_bounded_to_one_extra_fetch() {
+        let _exclusive = crate::services::advertiser_health::test_exclusive();
+        crate::services::advertiser_health::reset();
+        use crate::metrics::{AdoptEvidence, AdoptEvidenceFallback};
+
+        let before_budget = evidence_count(AdoptEvidence::BudgetElapsed);
+        let before_degraded = fallback_count(AdoptEvidenceFallback::Degraded);
+
+        let fetcher = ScriptedFetcher::new(vec![
+            (
+                "primary",
+                hash_only_answer(RecordAbsentReason::BudgetElapsed),
+            ),
+            ("alt-a", hash_only_answer(RecordAbsentReason::BudgetElapsed)),
+            ("alt-b", carrying(b"unreached")),
+            ("alt-c", carrying(b"unreached")),
+        ]);
+        let hint = hint_with("primary", &["alt-a", "alt-b", "alt-c"]);
+        let (carried, evidence) = resolve_peer_evidence(Some(&fetcher), &hint, "id").await;
+
+        assert_eq!(
+            fetcher.asked().len(),
+            2,
+            "exactly one fallback fetch, whatever it answers"
+        );
+        assert!(carried.is_some_and(|c| c.record.is_none()));
+        assert_eq!(
+            evidence,
+            Some(AdoptEvidence::BudgetElapsed),
+            "a failed fallback leaves the PRIMARY's evidence as the resolution — the backoff \
+             class downstream keys on what the advertising peer said"
+        );
+        assert_eq!(
+            evidence_count(AdoptEvidence::BudgetElapsed),
+            before_budget + 1,
+            "still exactly one evidence increment across both attempts"
+        );
+        assert_eq!(
+            fallback_count(AdoptEvidenceFallback::Degraded),
+            before_degraded + 1
+        );
+        crate::services::advertiser_health::reset();
+    }
+
+    /// No second courier ⇒ the primary's outcome, unchanged, and a counted
+    /// `no_alternative`. That series is the one that says HINT PLURALITY is the
+    /// wall rather than peer health — a different remedy entirely.
+    #[tokio::test]
+    async fn no_alternative_returns_the_primary_outcome_and_says_so() {
+        let _exclusive = crate::services::advertiser_health::test_exclusive();
+        crate::services::advertiser_health::reset();
+        use crate::metrics::{AdoptEvidence, AdoptEvidenceFallback};
+
+        let before_none = fallback_count(AdoptEvidenceFallback::NoAlternative);
+        let before_attempted = fallback_count(AdoptEvidenceFallback::Attempted);
+        let before_unknown = evidence_count(AdoptEvidence::Unknown);
+
+        // Unreachable primary, and the only "alternate" is the primary itself.
+        let fetcher = ScriptedFetcher::new(vec![]);
+        let hint = hint_with("lonely", &["lonely", "  "]);
+        let (carried, evidence) = resolve_peer_evidence(Some(&fetcher), &hint, "id").await;
+
+        assert!(carried.is_none(), "an unreachable peer carries nothing");
+        assert_eq!(evidence, Some(AdoptEvidence::Unknown));
+        assert_eq!(fetcher.asked(), vec!["lonely"]);
+        assert_eq!(
+            fallback_count(AdoptEvidenceFallback::NoAlternative),
+            before_none + 1
+        );
+        assert_eq!(
+            fallback_count(AdoptEvidenceFallback::Attempted),
+            before_attempted,
+            "no candidate means no fetch was attempted"
+        );
+        assert_eq!(evidence_count(AdoptEvidence::Unknown), before_unknown + 1);
+        crate::services::advertiser_health::reset();
+    }
+
+    /// The health tracker is fed by the SAME site that counts evidence, for both
+    /// the primary and the fallback — otherwise the second ask would be a blind
+    /// pick forever.
+    #[tokio::test]
+    async fn both_asks_feed_the_health_tracker() {
+        let _exclusive = crate::services::advertiser_health::test_exclusive();
+        crate::services::advertiser_health::reset();
+
+        let fetcher = ScriptedFetcher::new(vec![
+            (
+                "health:throttled",
+                hash_only_answer(RecordAbsentReason::BudgetElapsed),
+            ),
+            ("health:idle", carrying(b"bytes")),
+        ]);
+        let hint = hint_with("health:throttled", &["health:idle"]);
+        let _ = resolve_peer_evidence(Some(&fetcher), &hint, "id").await;
+
+        let throttled =
+            crate::services::advertiser_health::health("health:throttled").expect("tracked");
+        let idle = crate::services::advertiser_health::health("health:idle").expect("tracked");
+        assert_eq!((throttled.carried, throttled.degraded), (0, 1));
+        assert_eq!((idle.carried, idle.degraded), (1, 0));
+        assert!(
+            idle.carried_share() > throttled.carried_share(),
+            "the peer that served bytes must now be the preferred courier"
+        );
+        crate::services::advertiser_health::reset();
+    }
+
+    /// The `elohim_content_adopt_evidence_fallback_total{outcome}` vocabulary is
+    /// a dashboard contract from its first deploy, same as the evidence states.
+    #[test]
+    fn fallback_labels_are_stable() {
+        seam_contracts::assert_reason_labels_stable::<crate::metrics::AdoptEvidenceFallback>(&[
+            "attempted",
+            "carried",
+            "degraded",
+            "no_alternative",
+        ]);
+        seam_contracts::assert_reason_labels_discriminating::<crate::metrics::AdoptEvidenceFallback>(
+        );
+    }
+
+    /// The snapshot vocabulary likewise.
+    #[test]
+    fn backoff_snapshot_labels_are_stable() {
+        seam_contracts::assert_reason_labels_stable::<crate::metrics::BackoffSnapshot>(&[
+            "saved",
+            "save_failed",
+            "loaded",
+            "load_failed",
+        ]);
+        seam_contracts::assert_reason_labels_discriminating::<crate::metrics::BackoffSnapshot>();
     }
 
     /// The `elohim_content_adopt_evidence_total{state}` vocabulary is a

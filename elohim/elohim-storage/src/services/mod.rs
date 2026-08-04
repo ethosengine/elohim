@@ -19,6 +19,7 @@
 //! SQLite Database
 //! ```
 
+pub mod advertiser_health; // requester-side advertiser diversity — which peers actually SERVE head-record bytes (bounded, decaying, process-local)
 pub mod aggregator;
 pub mod agreement_service;
 pub mod anomaly_detection;

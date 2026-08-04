@@ -197,6 +197,31 @@ pub fn evidence_absent_backoff_window() -> std::time::Duration {
     )
 }
 
+/// Process-wide mirror of [`Config::evidence_fallback_enabled`]. Same `OnceLock`
+/// rationale as [`CONTEST_BACKOFF_SECONDS`]: the reconcile sweep carries no
+/// `Config`, and an env read on the hot path is the parallel-test flake this
+/// codebase has already paid for once.
+static EVIDENCE_FALLBACK_ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+/// Publish the advertiser-diversity switch for the reconcile sweep. Idempotent.
+pub fn set_evidence_fallback_enabled(enabled: bool) {
+    let _ = EVIDENCE_FALLBACK_ENABLED.set(enabled);
+}
+
+/// May the adopt-evidence path retry ONCE against an alternative advertiser when
+/// the hinted one answers without bytes and without a stated structural absence?
+///
+/// Default **true** — the hinted advertiser is chosen by first-advertiser-wins,
+/// which on the live fleet is routinely a saturated conductor while idle peers
+/// holding the same rows are never asked. A dark default-OFF lever that no
+/// operator flips stays inert.
+///
+/// `false` restores the pre-lever path EXACTLY: one ask, of the hinted peer,
+/// whatever it answers.
+pub fn evidence_fallback_enabled() -> bool {
+    *EVIDENCE_FALLBACK_ENABLED.get().unwrap_or(&true)
+}
+
 /// Conservative default fan-out for the adopt sweep.
 ///
 /// 8, not "as many as fit": every in-flight candidate is a conductor round-trip,
@@ -531,6 +556,28 @@ pub struct Config {
     #[serde(default = "default_evidence_absent_backoff_seconds")]
     pub evidence_absent_backoff_seconds: u64,
 
+    /// ADVERTISER-DIVERSITY LEVER: when the hinted advertiser answers the
+    /// adopt-evidence fetch WITHOUT bytes and without a stated structural
+    /// absence (`budget_elapsed`, `conductor_error`, or no readable cause), may
+    /// the arm ask ONE alternative advertiser for the same id?
+    ///
+    /// Default **true**. The hint is first-advertiser-wins, and the live fleet
+    /// (2026-08-03) routinely hinted a 100%-CFS-throttled conductor while idle
+    /// peers holding the same genesis-seeded rows were never asked — the reason
+    /// adopt-before-author had never minted. The protocol adapts and routes
+    /// around weak members rather than demanding they be strong.
+    ///
+    /// Amplification is hard-bounded at ONE extra fetch per evidence resolution:
+    /// no loop, no ladder, and never on a stated `no_record` (a structural
+    /// absence is not a peer's weakness, and asking elsewhere for bytes that
+    /// exist nowhere is pure amplification).
+    ///
+    /// To disable: set env `ELOHIM_EVIDENCE_FALLBACK` to `0`/`false`/`off`/`no`
+    /// (or `evidence_fallback_enabled = false` in config.toml), which restores
+    /// the single-ask path exactly. Loaded from env `ELOHIM_EVIDENCE_FALLBACK`.
+    #[serde(default = "default_true")]
+    pub evidence_fallback_enabled: bool,
+
     /// Demand-driven auto-pin: when a local content read MISSES (a client asked
     /// this node for content it does not have), author an `item` DevicePin for
     /// that content so the acquisition loop fetches it and the provide loop
@@ -732,6 +779,7 @@ impl Default for Config {
             adopt_contest_fanout: default_adopt_contest_fanout(),
             contest_backoff_seconds: default_contest_backoff_seconds(),
             evidence_absent_backoff_seconds: default_evidence_absent_backoff_seconds(),
+            evidence_fallback_enabled: default_true(),
             demand_autopin_enabled: default_true(),
             demand_autopin_throttle_seconds: default_demand_autopin_throttle_seconds(),
             manifest_backfill_enabled: default_true(),
@@ -795,6 +843,21 @@ impl Config {
         self.storage_dir.join("config.toml")
     }
 
+    /// Sidecar file the contest-backoff ledger snapshots to
+    /// (`services::contest_backoff`).
+    ///
+    /// A FILE under the storage dir, deliberately — not a table and not a
+    /// migration. The ledger is Category C operational state (a de-duplication
+    /// cache with automatic expiry, reconstructable by simply re-learning), and
+    /// putting it in the DB would spend a migration timestamp on state whose
+    /// worst-case loss is a few hours of re-churn. What the sidecar buys is
+    /// exactly that re-churn: every deploy restart currently wipes the
+    /// evidence-absent classifications and re-contests the whole corpus from
+    /// zero.
+    pub fn contest_backoff_snapshot_path(&self) -> PathBuf {
+        self.storage_dir.join("contest-backoff.json")
+    }
+
     /// Get extraction cache directory (defaults to {storage_dir}/cache/extractions)
     pub fn extraction_cache_dir(&self) -> PathBuf {
         if self.extraction_cache.cache_dir.as_os_str().is_empty() {
@@ -832,6 +895,21 @@ mod transport_backend_tests {
         let cfg = super::Config::default();
         assert!(cfg.demand_autopin_enabled);
         assert_eq!(cfg.demand_autopin_throttle_seconds, 300);
+    }
+
+    #[test]
+    fn evidence_fallback_defaults_on() {
+        // Advertiser diversity ships ON: the hinted advertiser is
+        // first-advertiser-wins and was routinely a saturated conductor, so a
+        // dark default-OFF lever would stay inert and adopt-before-author would
+        // keep never minting. Amplification is bounded at one extra fetch. A
+        // flipped default must not pass silently.
+        assert!(super::Config::default().evidence_fallback_enabled);
+        assert!(
+            super::evidence_fallback_enabled(),
+            "the unset process mirror must read ON, so a node that never publishes the config \
+             still routes around a starved advertiser"
+        );
     }
 
     #[test]

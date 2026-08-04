@@ -66,12 +66,31 @@
 //! pre-backoff behaviour (contest every sweep), never a silent permanent hold.
 //! This mirrors `head_adoption::SELF_CANDIDATE_LEDGER_CAP`.
 //!
-//! ## Process-local on purpose
+//! ## Process-local on purpose — with a snapshot, not a table
 //!
 //! Like the self-candidacy ledger this is a de-duplication cache, not a truth
-//! store. Losing it on restart costs at most one wasted contest attempt per id —
+//! store. Losing one entry on restart costs at most one wasted contest attempt,
 //! and a restart is itself an event that may have changed what the conductor
 //! holds, so re-attempting is arguably right.
+//!
+//! Losing the WHOLE ledger is a different quantity. Once the evidence-absent
+//! class exists (24h windows, ~61% of the live refusal population), a deploy
+//! restart re-churns the entire corpus from zero and spends hours re-learning
+//! classifications it had already paid for. So the ledger snapshots to ONE file
+//! under the storage dir ([`crate::config::Config::contest_backoff_snapshot_path`])
+//! and reloads at boot — deliberately NOT a diesel table:
+//!
+//! - it is Category C operational state, reconstructable by re-learning;
+//! - a migration timestamp is a scarce, collision-prone resource, and this state
+//!   does not deserve one;
+//! - every failure mode degrades to today's behaviour — an unreadable, corrupt,
+//!   wrong-version, or absent snapshot starts the ledger EMPTY, and a failed
+//!   save leaves the in-memory ledger authoritative.
+//!
+//! Expiry survives the round trip on absolute (same-node) epoch seconds, so a
+//! long restart correctly releases everything that expired while the process was
+//! down; the 50k cap applies on load, dropping the SOONEST-expiring entries
+//! first (they are the ones re-learned most cheaply).
 //!
 //! ## What it deliberately does NOT gate
 //!
@@ -82,10 +101,14 @@
 //! it, precisely so its obey probe keeps running.
 
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-use crate::metrics::ContestSkip;
+use serde::{Deserialize, Serialize};
+
+use crate::metrics::{BackoffSnapshot, ContestSkip};
 
 /// Hard cap on the backoff ledger. The contested set is ~11.4k ids fleet-wide;
 /// this leaves generous headroom while making unbounded growth impossible on a
@@ -234,6 +257,7 @@ pub fn note(id: &str, class: ContestSkip) {
             class,
         },
     );
+    mark_dirty();
 }
 
 /// Is `id` currently backed off? `Some(class)` when it is — the class is the
@@ -266,7 +290,12 @@ pub fn skip_class(id: &str, windows: BackoffWindows) -> Option<ContestSkip> {
 /// rather than an optimisation.
 pub fn note_local_chain_arrived(id: &str) {
     if let Ok(mut guard) = ledger().lock() {
-        guard.remove(id);
+        if guard.remove(id).is_some() {
+            // Only a real removal dirties the snapshot: this is called on every
+            // author-path landing, most of which touch no backed-off id, and a
+            // no-op must not schedule a write.
+            mark_dirty();
+        }
     }
 }
 
@@ -274,6 +303,354 @@ pub fn note_local_chain_arrived(id: &str) {
 /// test assertion only.
 pub fn tracked() -> usize {
     ledger().lock().map(|g| g.len()).unwrap_or(0)
+}
+
+// =============================================================================
+// SNAPSHOT PERSISTENCE — the deploy-restart re-churn cure (2026-08-03)
+// =============================================================================
+
+/// Snapshot file format version. Bumped when the on-disk shape changes; a
+/// snapshot written by any other version is IGNORED (fresh start), never
+/// partially interpreted.
+pub const SNAPSHOT_FORMAT_VERSION: u32 = 1;
+
+/// How often the snapshot task writes, when the ledger changed.
+///
+/// Coarse on purpose: this is de-duplication state whose worst-case loss is one
+/// interval of re-learning, and the point of persisting is to survive DEPLOYS
+/// (hours apart), not to be durable to the second.
+pub const SNAPSHOT_INTERVAL: Duration = Duration::from_secs(120);
+
+/// Set by every mutation; cleared when a snapshot is taken. The snapshot task
+/// writes only when this is true, so a quiescent node does no periodic I/O at
+/// all.
+static DIRTY: AtomicBool = AtomicBool::new(false);
+
+fn mark_dirty() {
+    DIRTY.store(true, Ordering::Relaxed);
+}
+
+/// One persisted backoff, on ABSOLUTE epoch seconds.
+///
+/// `Instant` is monotonic-from-boot and meaningless across processes, so the
+/// round trip goes through wall-clock epoch seconds — same node, same clock, so
+/// no cross-node skew question arises. Both timestamps are stored: `recorded_at`
+/// reconstructs the entry (letting a CHANGED window apply after a config flip),
+/// while `expires_at` is what the load gate and the cap ordering read.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersistedEntry {
+    /// The content id held back.
+    pub id: String,
+    /// [`ContestSkip`]'s wire label. An unrecognised label drops the entry —
+    /// same tolerance rule the head-record wire uses: a word this build cannot
+    /// read may never be widened into a class it does understand.
+    pub class: String,
+    /// When the failure was recorded (epoch seconds).
+    pub recorded_at_epoch_s: u64,
+    /// When the hold lapses under the window in force at snapshot time (epoch
+    /// seconds).
+    pub expires_at_epoch_s: u64,
+}
+
+/// The whole snapshot file.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersistedLedger {
+    /// [`SNAPSHOT_FORMAT_VERSION`] at write time.
+    pub version: u32,
+    /// When the snapshot was taken (epoch seconds) — diagnostic only.
+    pub saved_at_epoch_s: u64,
+    /// The held entries.
+    pub entries: Vec<PersistedEntry>,
+}
+
+/// What a load did. Returned rather than only logged so a test can assert the
+/// drop reasons apart from each other.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct LoadStats {
+    /// Entries installed into the ledger.
+    pub loaded: usize,
+    /// Entries dropped because their hold had already lapsed.
+    pub expired: usize,
+    /// Entries dropped for an unreadable class or an unrepresentable age.
+    pub unreadable: usize,
+    /// Entries dropped to respect [`CONTEST_BACKOFF_CAP`].
+    pub over_cap: usize,
+}
+
+/// Wall clock, epoch seconds. `0` if the clock is before the epoch (which would
+/// make every entry read as long-expired — the fail-open direction).
+fn now_epoch_s() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// Parse a persisted class label back to its type. Unknown ⇒ `None` ⇒ the entry
+/// is dropped.
+fn class_from_label(label: &str) -> Option<ContestSkip> {
+    use seam_contracts::ReasonLabel as _;
+    ContestSkip::ALL
+        .iter()
+        .find(|c| c.label() == label)
+        .copied()
+}
+
+/// Take a snapshot IF the ledger changed since the last one, clearing the dirty
+/// flag. `None` means "nothing to write".
+///
+/// **Concerns:** C6a — the map is read and converted UNDER the lock (cheap,
+/// allocation-only) and the file I/O happens outside it, so a slow disk can
+/// never block the sweep's `skip_class` reads.
+///
+/// Expired entries are omitted rather than written and re-dropped on load.
+pub fn take_snapshot_if_dirty(windows: BackoffWindows) -> Option<PersistedLedger> {
+    if !DIRTY.swap(false, Ordering::Relaxed) {
+        return None;
+    }
+    let now = now_epoch_s();
+    let entries = {
+        let Ok(guard) = ledger().lock() else {
+            // Poisoned: restore the dirty flag so a later tick retries.
+            mark_dirty();
+            return None;
+        };
+        // bounded-work: one pass over the ledger, itself bounded by
+        // CONTEST_BACKOFF_CAP. No I/O inside the lock.
+        guard
+            .iter()
+            .filter_map(|(id, entry)| {
+                use seam_contracts::ReasonLabel as _;
+                let window = windows.for_class(entry.class);
+                let elapsed = entry.recorded_at.elapsed();
+                if !backoff_is_active(elapsed, window) {
+                    return None;
+                }
+                let recorded_at_epoch_s = now.saturating_sub(elapsed.as_secs());
+                Some(PersistedEntry {
+                    id: id.clone(),
+                    class: entry.class.label().to_string(),
+                    recorded_at_epoch_s,
+                    expires_at_epoch_s: recorded_at_epoch_s.saturating_add(window.as_secs()),
+                })
+            })
+            .collect::<Vec<_>>()
+    };
+    Some(PersistedLedger {
+        version: SNAPSHOT_FORMAT_VERSION,
+        saved_at_epoch_s: now,
+        entries,
+    })
+}
+
+/// Which persisted entries may be installed, and in what shape — the pure half
+/// of the load.
+///
+/// **Concerns:** C3 (an entry whose expiry has passed is DROPPED, so a long
+/// downtime releases exactly what it should — persistence must never turn a
+/// deferral into a longer one than the window promised). C6a (the cap is applied
+/// here, dropping the SOONEST-expiring entries first: they are the ones a live
+/// sweep re-learns most cheaply).
+///
+/// **Contract tests:** [`tests::an_expired_entry_is_dropped_on_load`],
+/// [`tests::a_load_respects_the_cap_dropping_soonest_expiry_first`],
+/// [`tests::an_unreadable_class_drops_only_its_own_entry`].
+pub(crate) fn admissible(
+    entries: Vec<PersistedEntry>,
+    now_epoch_s: u64,
+) -> (Vec<PersistedEntry>, LoadStats) {
+    let mut stats = LoadStats::default();
+    let mut kept: Vec<PersistedEntry> = Vec::new();
+    // bounded-work: one pass over the file's entries, then one sort. The file is
+    // written by this same module and is cap-bounded; a hand-edited oversized
+    // file is truncated by the cap gate below rather than trusted.
+    for entry in entries {
+        if class_from_label(&entry.class).is_none() {
+            stats.unreadable += 1;
+            continue;
+        }
+        if entry.expires_at_epoch_s <= now_epoch_s {
+            stats.expired += 1;
+            continue;
+        }
+        if entry.recorded_at_epoch_s > now_epoch_s {
+            // A future record time cannot be turned into an `Instant` in the
+            // past; treat it as unreadable rather than inventing an age.
+            stats.unreadable += 1;
+            continue;
+        }
+        kept.push(entry);
+    }
+    if kept.len() > CONTEST_BACKOFF_CAP {
+        // Latest expiry survives: those entries have the most remaining value
+        // and are the most expensive to re-learn.
+        kept.sort_by_key(|e| std::cmp::Reverse(e.expires_at_epoch_s));
+        stats.over_cap = kept.len() - CONTEST_BACKOFF_CAP;
+        kept.truncate(CONTEST_BACKOFF_CAP);
+    }
+    stats.loaded = kept.len();
+    (kept, stats)
+}
+
+/// Install a decoded snapshot into the live ledger. Existing entries are
+/// preserved (a snapshot load happens at boot, when the ledger is empty; if it
+/// ever ran later, a live entry is the fresher evidence and wins).
+pub fn install(snapshot: PersistedLedger) -> LoadStats {
+    if snapshot.version != SNAPSHOT_FORMAT_VERSION {
+        tracing::warn!(
+            found = snapshot.version,
+            expected = SNAPSHOT_FORMAT_VERSION,
+            "contest_backoff: snapshot version mismatch — starting with an empty ledger"
+        );
+        return LoadStats::default();
+    }
+    let now = now_epoch_s();
+    let (entries, stats) = admissible(snapshot.entries, now);
+    let Ok(mut guard) = ledger().lock() else {
+        tracing::warn!("contest_backoff: ledger lock poisoned; snapshot not installed");
+        return LoadStats::default();
+    };
+    let base = Instant::now();
+    for entry in entries {
+        if guard.len() >= CONTEST_BACKOFF_CAP {
+            break;
+        }
+        let Some(class) = class_from_label(&entry.class) else {
+            continue;
+        };
+        let age = Duration::from_secs(now.saturating_sub(entry.recorded_at_epoch_s));
+        let Some(recorded_at) = base.checked_sub(age) else {
+            // Monotonic clock younger than the entry's age (a fresh boot after a
+            // long uptime). Dropping is the FAIL-OPEN direction — the id is
+            // contested next sweep, exactly as it would be with no snapshot.
+            continue;
+        };
+        // A LIVE entry always wins: it is this process's own fresher evidence,
+        // and at boot (the only call site) the ledger is empty anyway.
+        guard
+            .entry(entry.id)
+            .or_insert(BackoffEntry { recorded_at, class });
+    }
+    stats
+}
+
+/// Write a snapshot atomically (temp + rename), creating the parent dir if
+/// needed. Mirrors `services::arc_actuator`'s config-write discipline: a crash
+/// mid-write can never leave a half-file where a whole one was.
+pub fn save_to_path(path: &Path, snapshot: &PersistedLedger) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let bytes = serde_json::to_vec(snapshot)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    let tmp = path.with_extension("json.tmp");
+    std::fs::write(&tmp, &bytes)?;
+    std::fs::rename(&tmp, path)
+}
+
+/// Restore the ledger from `path` at boot.
+///
+/// EVERY failure is non-fatal and lands on the pre-snapshot behaviour (an empty
+/// ledger): no file, unreadable file, malformed JSON, wrong version. This is
+/// operational state — it may never be a reason a node does not start.
+pub fn load_from_path(path: &Path) {
+    let raw = match std::fs::read(path) {
+        Ok(r) => r,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            tracing::info!(
+                path = %path.display(),
+                "contest backoff ledger: no snapshot found — starting fresh (every id contestable)"
+            );
+            return;
+        }
+        Err(e) => {
+            tracing::warn!(
+                path = %path.display(),
+                error = %e,
+                "contest backoff ledger: snapshot unreadable — starting fresh"
+            );
+            crate::metrics::inc_contest_backoff_snapshot(BackoffSnapshot::LoadFailed);
+            return;
+        }
+    };
+    let snapshot: PersistedLedger = match serde_json::from_slice(&raw) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!(
+                path = %path.display(),
+                error = %e,
+                "contest backoff ledger: snapshot corrupt — starting fresh"
+            );
+            crate::metrics::inc_contest_backoff_snapshot(BackoffSnapshot::LoadFailed);
+            return;
+        }
+    };
+    let stats = install(snapshot);
+    crate::metrics::inc_contest_backoff_snapshot(BackoffSnapshot::Loaded);
+    tracing::info!(
+        path = %path.display(),
+        loaded = stats.loaded,
+        dropped_expired = stats.expired,
+        dropped_unreadable = stats.unreadable,
+        dropped_over_cap = stats.over_cap,
+        "contest backoff ledger restored from snapshot — these ids keep serving the deferral \
+         they had earned before the restart, instead of re-churning the corpus from zero"
+    );
+}
+
+/// Start the periodic snapshot writer. Call once, from `main`, after the backoff
+/// windows are published.
+///
+/// The write happens on the BLOCKING pool: a snapshot is a filesystem syscall
+/// and a core tokio worker has no yield point inside one (the doorway
+/// `getaddrinfo` wedge class).
+pub fn spawn_snapshot_task(path: PathBuf) {
+    tokio::spawn(async move {
+        // bounded-work: one write per SNAPSHOT_INTERVAL, and only when the
+        // ledger changed. Each write is a single file of at most
+        // CONTEST_BACKOFF_CAP entries. No retry ladder — a failed write simply
+        // re-marks the ledger dirty and the NEXT tick carries it.
+        let mut ticker = tokio::time::interval(SNAPSHOT_INTERVAL);
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            ticker.tick().await;
+            let Some(snapshot) = take_snapshot_if_dirty(BackoffWindows::from_config()) else {
+                continue;
+            };
+            let entries = snapshot.entries.len();
+            let target = path.clone();
+            let result =
+                tokio::task::spawn_blocking(move || save_to_path(&target, &snapshot)).await;
+            match result {
+                Ok(Ok(())) => {
+                    crate::metrics::inc_contest_backoff_snapshot(BackoffSnapshot::Saved);
+                    tracing::debug!(
+                        entries,
+                        path = %path.display(),
+                        "contest backoff ledger snapshotted"
+                    );
+                }
+                Ok(Err(e)) => {
+                    mark_dirty();
+                    crate::metrics::inc_contest_backoff_snapshot(BackoffSnapshot::SaveFailed);
+                    tracing::warn!(
+                        path = %path.display(),
+                        error = %e,
+                        "contest backoff ledger: snapshot write failed — the in-memory ledger \
+                         stays authoritative and the next tick retries"
+                    );
+                }
+                Err(e) => {
+                    mark_dirty();
+                    crate::metrics::inc_contest_backoff_snapshot(BackoffSnapshot::SaveFailed);
+                    tracing::warn!(
+                        error = %e,
+                        "contest backoff ledger: snapshot task join failed — retrying next tick"
+                    );
+                }
+            }
+        }
+    });
 }
 
 /// Drop every entry. Test isolation only — the process-local ledger is shared
@@ -529,6 +906,243 @@ mod tests {
             "a disabled contest window must release a no-chain entry regardless of how long \
              the evidence-absent window is"
         );
+    }
+
+    // =========================================================================
+    // SNAPSHOT PERSISTENCE
+    // =========================================================================
+
+    fn persisted(id: &str, class: ContestSkip, recorded: u64, expires: u64) -> PersistedEntry {
+        use seam_contracts::ReasonLabel as _;
+        PersistedEntry {
+            id: id.to_string(),
+            class: class.label().to_string(),
+            recorded_at_epoch_s: recorded,
+            expires_at_epoch_s: expires,
+        }
+    }
+
+    /// THE POINT OF THE FEATURE: a deferral survives a restart. Without this,
+    /// every deploy re-churns the corpus from zero — hours of re-learning the
+    /// classifications the node had already paid conductor round-trips for.
+    #[test]
+    fn a_snapshot_round_trips_the_deferral_through_a_restart() {
+        let _exclusive = test_exclusive();
+        reset();
+        note("snap:no-chain", ContestSkip::NoLocalChainBackoff);
+        note("snap:evidence", ContestSkip::EvidenceAbsentBackoff);
+
+        let snapshot =
+            take_snapshot_if_dirty(WINDOWS).expect("a mutated ledger must produce a snapshot");
+        assert_eq!(snapshot.version, SNAPSHOT_FORMAT_VERSION);
+        assert_eq!(snapshot.entries.len(), 2);
+
+        // Serde round trip — the file is JSON, so prove the shape survives it.
+        let bytes = serde_json::to_vec(&snapshot).expect("snapshot serialises");
+        let decoded: PersistedLedger = serde_json::from_slice(&bytes).expect("snapshot decodes");
+        assert_eq!(decoded, snapshot);
+
+        // "Restart": wipe the in-memory ledger, then install the snapshot.
+        reset();
+        assert_eq!(skip_class("snap:evidence", WINDOWS), None);
+        let stats = install(decoded);
+        assert_eq!(stats.loaded, 2);
+        assert_eq!(
+            skip_class("snap:no-chain", WINDOWS),
+            Some(ContestSkip::NoLocalChainBackoff),
+            "a restored entry keeps serving its deferral"
+        );
+        assert_eq!(
+            skip_class(
+                "snap:evidence",
+                BackoffWindows {
+                    contest: WINDOW,
+                    evidence_absent: Duration::from_secs(86_400),
+                }
+            ),
+            Some(ContestSkip::EvidenceAbsentBackoff),
+            "the CLASS survives the round trip, not just the fact of a hold"
+        );
+        reset();
+    }
+
+    /// A quiescent node writes nothing: the dirty flag is the whole I/O budget.
+    #[test]
+    fn an_unchanged_ledger_produces_no_snapshot() {
+        let _exclusive = test_exclusive();
+        reset();
+        note("dirty:id", ContestSkip::NoLocalChainBackoff);
+        assert!(take_snapshot_if_dirty(WINDOWS).is_some());
+        assert!(
+            take_snapshot_if_dirty(WINDOWS).is_none(),
+            "a second snapshot with no mutation in between must not write"
+        );
+        note("dirty:id2", ContestSkip::NoLocalChainBackoff);
+        assert!(
+            take_snapshot_if_dirty(WINDOWS).is_some(),
+            "a mutation re-arms the writer"
+        );
+        reset();
+    }
+
+    /// C3 ACROSS THE RESTART. Persistence must not turn a deferral into a longer
+    /// one than the window promised: an entry whose expiry passed while the
+    /// process was down is DROPPED, so a day-long outage releases the corpus
+    /// exactly as an uptime of the same length would have.
+    #[test]
+    fn an_expired_entry_is_dropped_on_load() {
+        let now = 1_000_000u64;
+        let (kept, stats) = admissible(
+            vec![
+                persisted("live", ContestSkip::NoLocalChainBackoff, now - 60, now + 60),
+                persisted(
+                    "lapsed",
+                    ContestSkip::NoLocalChainBackoff,
+                    now - 7200,
+                    now - 1,
+                ),
+                persisted(
+                    "exactly-now",
+                    ContestSkip::EvidenceAbsentBackoff,
+                    now - 100,
+                    now,
+                ),
+            ],
+            now,
+        );
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].id, "live");
+        assert_eq!(stats.expired, 2, "at exactly the expiry the hold is over");
+    }
+
+    /// Tolerance rule, same as the head-record wire's: a class label this build
+    /// cannot read drops ITS OWN entry and nothing else. A future class must
+    /// never be widened into one we do understand, and must never poison the
+    /// whole restore (the fail-closed-collect shape that once emptied the EPR
+    /// router).
+    #[test]
+    fn an_unreadable_class_drops_only_its_own_entry() {
+        let now = 1_000_000u64;
+        let (kept, stats) = admissible(
+            vec![
+                PersistedEntry {
+                    id: "future".into(),
+                    class: "some_class_from_2027".into(),
+                    recorded_at_epoch_s: now - 10,
+                    expires_at_epoch_s: now + 600,
+                },
+                persisted(
+                    "known",
+                    ContestSkip::NoLocalChainBackoff,
+                    now - 10,
+                    now + 600,
+                ),
+                PersistedEntry {
+                    id: "time-traveller".into(),
+                    class: "no_local_chain_backoff".into(),
+                    recorded_at_epoch_s: now + 5000,
+                    expires_at_epoch_s: now + 9000,
+                },
+            ],
+            now,
+        );
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].id, "known");
+        assert_eq!(stats.unreadable, 2);
+    }
+
+    /// The cap holds on the LOAD path too, and drops the soonest-expiring
+    /// entries — the ones a live sweep re-learns most cheaply.
+    #[test]
+    fn a_load_respects_the_cap_dropping_soonest_expiry_first() {
+        let now = 1_000_000u64;
+        // bounded-work: CONTEST_BACKOFF_CAP + 2 synthetic entries — the fixture
+        // that proves the cap, bounded by the constant it asserts.
+        let mut entries = Vec::with_capacity(CONTEST_BACKOFF_CAP + 2);
+        entries.push(persisted(
+            "soonest",
+            ContestSkip::NoLocalChainBackoff,
+            now - 10,
+            now + 1,
+        ));
+        entries.push(persisted(
+            "second-soonest",
+            ContestSkip::NoLocalChainBackoff,
+            now - 10,
+            now + 2,
+        ));
+        for n in 0..CONTEST_BACKOFF_CAP {
+            entries.push(persisted(
+                &format!("bulk:{n}"),
+                ContestSkip::EvidenceAbsentBackoff,
+                now - 10,
+                now + 86_400,
+            ));
+        }
+        let (kept, stats) = admissible(entries, now);
+        assert_eq!(kept.len(), CONTEST_BACKOFF_CAP);
+        assert_eq!(stats.over_cap, 2);
+        assert!(
+            !kept
+                .iter()
+                .any(|e| e.id == "soonest" || e.id == "second-soonest"),
+            "the soonest-expiring entries are the ones dropped"
+        );
+    }
+
+    /// A snapshot from another format version is IGNORED, never partially
+    /// interpreted — the same rule the wire uses for a word it cannot read.
+    #[test]
+    fn a_foreign_version_starts_fresh() {
+        let _exclusive = test_exclusive();
+        reset();
+        let stats = install(PersistedLedger {
+            version: SNAPSHOT_FORMAT_VERSION + 1,
+            saved_at_epoch_s: now_epoch_s(),
+            entries: vec![persisted(
+                "foreign:id",
+                ContestSkip::NoLocalChainBackoff,
+                now_epoch_s(),
+                now_epoch_s() + 3600,
+            )],
+        });
+        assert_eq!(stats.loaded, 0);
+        assert_eq!(tracked(), 0, "a foreign snapshot installs nothing");
+        reset();
+    }
+
+    /// Through the real filesystem: write, read back, and confirm a CORRUPT file
+    /// degrades to today's behaviour (empty ledger) rather than a failed boot.
+    /// This is operational state; it may never be a reason a node does not start.
+    #[test]
+    fn a_corrupt_or_missing_snapshot_file_starts_fresh() {
+        let _exclusive = test_exclusive();
+        reset();
+        let dir = tempfile::tempdir().expect("tempdir");
+
+        // Missing file — silent fresh start.
+        let missing = dir.path().join("nested").join("contest-backoff.json");
+        load_from_path(&missing);
+        assert_eq!(tracked(), 0);
+
+        // Real round trip through the file, including parent-dir creation.
+        note("file:id", ContestSkip::EvidenceAbsentBackoff);
+        let snapshot = take_snapshot_if_dirty(WINDOWS).expect("snapshot");
+        save_to_path(&missing, &snapshot).expect("save creates its parent dir and writes");
+        reset();
+        load_from_path(&missing);
+        assert_eq!(
+            skip_class("file:id", WINDOWS),
+            Some(ContestSkip::EvidenceAbsentBackoff),
+            "the hold survived a full file round trip"
+        );
+
+        // Corrupt file — fresh start, no panic.
+        reset();
+        std::fs::write(&missing, b"{not json at all").expect("write garbage");
+        load_from_path(&missing);
+        assert_eq!(tracked(), 0, "a corrupt snapshot must start empty");
+        reset();
     }
 
     /// A recurrence restarts the window rather than letting a stale record age

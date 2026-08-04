@@ -502,10 +502,28 @@ async fn async_main(
             ),
         }
     }
+    // ADVERTISER-DIVERSITY LEVER. Default ON (a dark default-OFF lever that no
+    // operator flips stays inert, and the hinted advertiser being a saturated
+    // conductor is the live wall). Env DISABLES it: 0/false/off/no — which
+    // restores the single-ask evidence path exactly.
+    if let Ok(v) = std::env::var("ELOHIM_EVIDENCE_FALLBACK") {
+        config.evidence_fallback_enabled = !matches!(
+            v.trim().to_ascii_lowercase().as_str(),
+            "0" | "false" | "off" | "no"
+        );
+    }
     elohim_storage::config::set_adopt_contest_fanout(config.adopt_contest_fanout);
     elohim_storage::config::set_contest_backoff_seconds(config.contest_backoff_seconds);
     elohim_storage::config::set_evidence_absent_backoff_seconds(
         config.evidence_absent_backoff_seconds,
+    );
+    elohim_storage::config::set_evidence_fallback_enabled(config.evidence_fallback_enabled);
+    tracing::info!(
+        evidence_fallback_enabled = config.evidence_fallback_enabled,
+        "advertiser diversity: when the hinted advertiser answers the adopt-evidence fetch \
+         without bytes and without a stated no_record, the arm asks ONE alternative advertiser \
+         of the same declaration (bounded at one extra fetch, never on a structural absence). \
+         Set ELOHIM_EVIDENCE_FALLBACK=0 to restore the single-ask path"
     );
     // Stated at boot, not inferred from a metric: the operator flipping this
     // needs the effective value in the log next to the flag it modifies.
@@ -518,6 +536,19 @@ async fn async_main(
          contest window. Both are deferrals with automatic re-admission on expiry, never \
          exclusions"
     );
+
+    // BACKOFF LEDGER PERSISTENCE. Restore before any sweep runs, then snapshot
+    // periodically. The ledger is process-local operational state (Category C,
+    // no table, no migration), but losing it on every deploy re-churned the
+    // whole corpus from zero — the evidence-absent classifications the node
+    // spent hours of conductor round-trips learning were wiped by a restart.
+    // Every failure mode here degrades to that pre-snapshot behaviour, never to
+    // a failed boot.
+    {
+        let snapshot_path = config.contest_backoff_snapshot_path();
+        elohim_storage::services::contest_backoff::load_from_path(&snapshot_path);
+        elohim_storage::services::contest_backoff::spawn_snapshot_task(snapshot_path);
+    }
 
     // Demand-driven auto-pin (self-healing opportunity map row 15). Default ON
     // (demand-driven, not blanket backfill; consent floor preserved downstream
