@@ -30,11 +30,13 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 ARG HC_FORK=https://github.com/ethosengine/holochain.git
-ARG HC_BRANCH=elohim-0.6
+ARG HC_BRANCH=elohim-0.6.3
 ARG TX5_FORK=https://github.com/ethosengine/tx5.git
 ARG TX5_BRANCH=elohim-0.8.1-zombie-fix
 # Best-effort feature set — VERIFY against holo-host's go-pion-custom release recipe.
-ARG HC_FEATURES=sqlite-encrypted,wasmer_sys,backend-go-pion
+# At 0.6.3 the tx5 feature was renamed backend-go-pion -> transport-tx5-backend-go-pion,
+# and `jemalloc` is our fork's production allocator feature.
+ARG HC_FEATURES=sqlite-encrypted,wasmer_sys,transport-tx5-backend-go-pion,jemalloc
 
 # ── builder: compile the patched glibc holochain binary ──────────────────────
 FROM rust:1.91-bookworm AS build
@@ -55,6 +57,8 @@ RUN git clone --depth 1 -b "${TX5_BRANCH}" "${TX5_FORK}" tx5 \
 WORKDIR /src/holochain-conductor
 # NOTE: no --locked (the [patch] updates the lockfile). go-pion backend ONLY (datachannel
 # backend pulls datachannel-sys → a C++/openssl/bindgen build we don't want and don't ship).
+# --no-default-features is REQUIRED at 0.6.3: default = ["transport-iroh"], and the iroh
+# transport flip is a later operator-gated wave — keep tx5 as the sole compiled transport.
 RUN cargo build --release --bin holochain \
       --no-default-features --features "${HC_FEATURES}"
 
