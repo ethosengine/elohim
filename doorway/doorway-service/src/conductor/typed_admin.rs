@@ -15,6 +15,7 @@ use holochain_client::{
 };
 use holochain_types::app::{AppBundleSource, AppStatus};
 use holochain_zome_types::prelude::{
+    // 0.7 migration: CapAccess becomes CapAccessType in the 0.7-line API.
     CapAccess, CapSecret, GrantZomeCallCapabilityPayload, ZomeCallCapGrant,
 };
 use tracing::warn;
