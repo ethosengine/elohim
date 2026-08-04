@@ -13,10 +13,12 @@
 //! dispatch.
 //!
 //! Per [`genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`],
-//! the EPR plane is dual-stack permanent. The Announce variant is the
-//! asymmetric outlier (libp2p put_record vs iroh pkarr-not-yet-wired);
-//! one of the tests pins the iroh-side "not yet wired" reason so a
-//! premature wire-up doesn't ship without spec amendment.
+//! the EPR plane is dual-stack permanent. The Announce variant was the
+//! asymmetric outlier (libp2p put_record vs iroh pkarr-not-yet-wired) until
+//! Plan 4 (gossip dual-publish, cutover gate #4) closed the gap — Announce
+//! now returns `accepted: true` on iroh once identity-binding gossip is
+//! dual-published; see `tests/iroh_epr_announce_accepted.rs` for the pinned
+//! contract.
 //!
 //! Gated on `p2p-iroh`.
 
@@ -188,45 +190,6 @@ async fn get_document_via_iroh_reports_not_yet_implemented() -> Result<()> {
             "GetDocument error should keep its parity message; got: {msg}"
         ),
         other => panic!("expected Error, got {other:?}"),
-    }
-
-    fixture.shutdown().await?;
-    Ok(())
-}
-
-/// Announce in iroh mode is intentionally unwired pending the n0
-/// mitigation roadmap (pkarr / iroh-gossip identity-binding). Pin the
-/// "not yet wired" response shape so a premature wire-up trips this
-/// test instead of silently shipping. When the n0 mitigation lands,
-/// this test gets rewritten to assert the new positive shape.
-#[tokio::test]
-async fn announce_via_iroh_returns_not_yet_wired_per_spec() -> Result<()> {
-    let provider_dir = tempdir().unwrap();
-    let fetcher_dir = tempdir().unwrap();
-
-    let fixture =
-        fixture_with_real_provider_backend(provider_dir.path(), fetcher_dir.path()).await?;
-
-    let client = IrohEprClient::new(fixture.fetcher.endpoint());
-    let res = client
-        .request(
-            fixture.provider_addr.clone(),
-            &EprRequest::Announce {
-                head: b"would-decode-to-an-EprHead".to_vec(),
-            },
-        )
-        .await?;
-
-    match res {
-        EprResponse::Announced { accepted, reason } => {
-            assert!(!accepted, "iroh-mode Announce must report not-accepted");
-            let reason = reason.unwrap_or_default();
-            assert!(
-                reason.contains("not yet wired") || reason.contains("n0 mitigation"),
-                "reason should reference the spec's n0 mitigation roadmap; got: {reason}"
-            );
-        }
-        other => panic!("expected Announced, got {other:?}"),
     }
 
     fixture.shutdown().await?;
