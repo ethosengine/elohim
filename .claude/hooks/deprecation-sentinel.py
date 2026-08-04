@@ -176,8 +176,38 @@ ECHO_HISTORY_PATH_RE = re.compile(
 #   install/audit output never references `.claude/` — so any matching line is
 #   an echo of our own tooling, not a live finding (3 spurious captures on
 #   2026-07-02 came from printing a code-review findings list).
+#
+# Guard N (2026-08-04) — the SAME agent surfaces under their OTHER two homes.
+#   Guard E keyed on `.claude/`, but every one of those surfaces is also
+#   stored content-addressed in the EPR package store and re-projected per
+#   agent runtime:
+#     `.epr-meta/elohim/packages/skills/<name>.json`        (package: body inline)
+#     `.epr-meta/elohim/projections/{claude,codex,codexProject}/skills/…`
+#     `.codex/{skills,agents,commands}/…`                   (the codex mirror)
+#   So one skill body lives in up to four places, and a repo-wide scope grep
+#   hits all of them while Guard E dismisses only the `.claude/` one. Live
+#   proof: fp `09f2f5632c00` (2026-08-04) — a scope grep for
+#   `enable_mdns|enable_relaying` hit `packages/skills/libp2p-transport.json`,
+#   whose inlined body carries the prose "not the deprecated
+#   `select_next_event()`". That is the SAME sentence Guard B already dismisses
+#   from the root CLAUDE.md (fp `97d4865837a9`, 2026-07-21) — a doc narrating a
+#   *past* upstream libp2p API deprecation, long since migrated. It cost a full
+#   background Opus dispatch to re-derive a dismissal the guards already held.
+#   fp-dedupe cannot collapse the class: each package re-seal rewrites the JSON
+#   and every projection mints its own distinct text, so only a structural
+#   path guard closes it.
+#   Deliberately narrow, two ways: the `.epr-meta/` clause requires a trailing
+#   slash, so it matches ONLY the root package store and never the
+#   directory-local `.epr-meta` compose-gate manifest FILES (`elohim/.epr-meta`,
+#   `doorway/doorway-service/.epr-meta` — no slash follows those); and the
+#   `.codex/` clause enumerates the agent-surface dirs, so `.codex/config.toml`
+#   stays capturable. Zero true-positive risk: a live toolchain warning is
+#   never sourced from a checked-in agent-doc projection — the finding, if real,
+#   belongs to the code the doc describes.
 ECHO_TOOLING_SOURCE_RE = re.compile(
     r"\.claude/(?:hooks|scripts|skills|agents|data|memory)/"
+    r"|(?:^|/|\s)\.epr-meta/"  # Guard N: EPR package store + agent projections
+    r"|(?:^|/|\s)\.codex/(?:skills|agents|commands)/"  # Guard N: codex mirror
     r"|### FINDING\b"
     r"|\bVERDICT: (?:CONFIRMED|REFUTED|UNCERTAIN)\b",
 )
@@ -476,7 +506,7 @@ def _is_echo_line(
     Called after classify() returns non-None to prevent false echo entries
     from being fingerprinted and appended to the ledger.
 
-    The six guards:
+    The guards (A–N):
       A) Line sourced from the ledger file (self-capture via recursive grep).
       B) Line sourced from the history/museum prose tree.
       C) Line that is git commit-message text (log oneline entry, or any
@@ -528,6 +558,14 @@ def _is_echo_line(
          (`/** … * @deprecated … */`) that G's regex cannot see. The live TS
          channel is ESLint `@typescript-eslint/no-deprecated` prose, which
          never contains the literal `@deprecated`. Not diff-exempt (like H2).
+      N) The same agent surfaces under their OTHER homes — the EPR package
+         store and its per-runtime projections (`.epr-meta/…`) and the codex
+         mirror (`.codex/{skills,agents,commands}/…`). Guard E keyed on
+         `.claude/` only, so one skill body stored in four places was
+         dismissed in one and dispatched from the other three. Folded into
+         Guard E's regex; see its comment block for the narrowness argument
+         (the `.epr-meta/` trailing slash excludes the directory-local
+         compose-gate manifest FILES).
     """
     # Guard A — ledger self-capture
     if ECHO_LEDGER_PATH.search(line):

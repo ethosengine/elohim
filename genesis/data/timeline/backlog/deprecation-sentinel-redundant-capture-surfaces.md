@@ -14,12 +14,13 @@ severity: medium
 fingerprints: []
 evidence_fingerprints: ["fb31d99a0ba8"]
 relatedNodeIds: []
-tags: [deprecation, tooling, deprecation-sentinel, pnpm, fingerprint-stability, automation-cost]
+tags: [deprecation, tooling, deprecation-sentinel, pnpm, fingerprint-stability, automation-cost, epr-meta]
 cites:
   - .claude/hooks/deprecation-sentinel.py
   - .claude/agents/deprecation-triage.md
   - .claude/data/deprecations.jsonl
   - .claude/skills/deprecation-stasis
+  - .epr-meta/elohim/packages/skills/libp2p-transport.json
   - genesis/data/timeline/backlog/deprecation-sophia-eslint-8-eol-flat-config-migration.md
   - genesis/data/timeline/backlog/security-jquery-2-1-1-shipped-in-sophia-umd-bundle.md
 ---
@@ -212,6 +213,58 @@ It landed at **zero migration cost**: all 8 affected rows were the punycode
 captures, closed and deleted in the same commit when the underlying warning was
 actually fixed (`tr46@3 → ^4.1.1`, sophia `576dd73f88`). See Verification.
 
+**Class 6 (observed + CLOSED 2026-08-04) — the same managed surface has FOUR
+homes, and the guard knew only one.** Guard E dismisses agent-surface prose
+keyed on the path `.claude/{hooks,scripts,skills,agents,data,memory}/`. But
+every one of those surfaces is *also* stored content-addressed in the EPR
+package store and re-projected per agent runtime:
+
+```
+.claude/skills/libp2p-transport/SKILL.md                              ← Guard E dismissed
+.epr-meta/elohim/packages/skills/libp2p-transport.json                ← dispatched
+.epr-meta/elohim/projections/{claude,codex,codexProject}/skills/…     ← dispatched
+.codex/skills/libp2p-transport/SKILL.md                               ← dispatched
+```
+
+So a repo-wide scope grep hits all four and the sentinel dismissed exactly one
+of them. Live proof, and it is the capture that dispatched the run which found
+it: **`09f2f5632c00`** (2026-08-04 15:18) — a scope grep for
+`enable_mdns|enable_relaying`, run during the holochain-iroh convergence work,
+hit `packages/skills/libp2p-transport.json` whose *inlined JSON body* carries
+the prose "uses `StreamExt::next()` (not the deprecated `select_next_event()`)".
+
+That is the **same sentence, from the same skill**, that Guard B already
+dismisses when it is read from the root CLAUDE.md — fingerprint `97d4865837a9`,
+2026-07-21, dispositioned then as "a doc narrating a *past* upstream API
+deprecation, not a live toolchain warning." The libp2p migration it describes is
+long since done: the codebase uses `StreamExt::next()`, and `select_next_event()`
+appears nowhere outside prose. One dismissal, already reasoned and recorded, was
+re-derived by a full background Opus dispatch because the prose arrived via a
+different path.
+
+The class is worse than a single duplicate: it is a **×4 multiplier on the
+entire `.claude/` echo surface**, and fp-dedupe cannot collapse it, because each
+package re-seal rewrites the JSON and each projection carries its own distinct
+text. Only a structural path guard closes it.
+
+**Guard N landed 2026-08-04** as two additive clauses folded into
+`ECHO_TOOLING_SOURCE_RE` (the same regex Guard E uses, so the class is dismissed
+by the guard that always should have covered it):
+
+```python
+r"|(?:^|/|\s)\.epr-meta/"                          # EPR package store + projections
+r"|(?:^|/|\s)\.codex/(?:skills|agents|commands)/"  # codex mirror
+```
+
+Narrow in two deliberate ways. The `.epr-meta/` clause requires a **trailing
+slash**, so it matches only the root package store and never the
+directory-local `.epr-meta` compose-gate manifest **files** (`elohim/.epr-meta`,
+`doorway/doorway-service/.epr-meta` — nothing follows those). The `.codex/`
+clause enumerates the agent-surface directories, so `.codex/config.toml` stays
+capturable. Zero true-positive risk on the same argument Guard E already rests
+on: a live toolchain warning is never sourced from a checked-in agent-doc
+projection — if the finding is real it belongs to the code the doc describes.
+
 ## Usage inventory
 
 Single file — `.claude/hooks/deprecation-sentinel.py`:
@@ -219,9 +272,10 @@ Single file — `.claude/hooks/deprecation-sentinel.py`:
 - `DEPRECATION_PATTERNS` (~line 58) — `\bDEPRECATED\b` under `re.IGNORECASE`
   matches the bare word `deprecated`, which is what admits the Class-1 summary
   line. Patterns at lines 62–66 are consequently redundant.
-- `_is_echo_line()` — where the structural guards live. Guards A–M are now
+- `_is_echo_line()` — where the structural guards live. Guards A–N are now
   present (J and K from this entry; L and M from the derived-artifact /
-  JSDoc-annotation class landed in the same commit). No remaining work here.
+  JSDoc-annotation class landed in the same commit; N from the Class-6
+  four-homes gap, folded into Guard E's own regex). No remaining work here.
 - The diff-hunk exemptions in Guards C and G (`not line.startswith(("+","-"))`)
   do **not** cover Class 1: pnpm's summary marker *is* `+`/`-`, so the shape
   must be matched precisely rather than exempted.
@@ -340,8 +394,20 @@ this entry's own stated deletion condition.
 
 **Class 5 is CLOSED — the pid normalization landed 2026-07-30** with an
 adversarial harness and zero migration cost (see Verification). Classes 1 and 2
-closed earlier the same day. **Classes 3 and 4 remain BLOCKED**, and they are
+closed earlier the same day. **Class 6 is CLOSED — Guard N landed 2026-08-04**,
+also at zero migration cost: exactly one live ledger row matched the new clauses
+(`09f2f5632c00`, the capture that dispatched the run), and it was deleted as
+fixed in the landing commit. **Classes 3 and 4 remain BLOCKED**, and they are
 now the entire remaining concern.
+
+Class 6 restates the lesson the earlier classes keep teaching, at a new seam:
+*a guard keyed on a path is only as complete as the path list*. The `.claude/`
+tree is not the only home of the surfaces Guard E dismisses — the EPR package
+store and the codex/codexProject projections carry byte-copies, and any surface
+with N homes is an N× echo multiplier the moment a guard names one of them. The
+generalizable check when adding a path-keyed guard: **ask how many homes the
+named surface has, and enumerate them, before assuming the path is the
+surface.**
 
 **Class 3 (Fix N — strip the `grep -n` prefix in `fingerprint()`) stays blocked
 on migration scale, and that scale is now measured rather than estimated.** The
@@ -455,6 +521,45 @@ shipped code path rather than a copy):
   still *fires once* — the fix narrows re-minting, not the warning surface.
 
 Harness exit 0, `RESULT: ALL PASS`.
+
+**Class 6 (Guard N) — verified and landed 2026-08-04.** Harness at the Class-5
+standard (loads `deprecation-sentinel.py` directly, so it drives the shipped
+`classify()` + `_is_echo_line()` rather than a copy):
+
+- **Positives — 9/9 suppressed** (a 10th never classifies, so it could not reach
+  the ledger anyway). Covers all four homes: the package JSON with its inlined
+  body, the `claude` / `codex` / `codexProject` projections, an agentdocs
+  package, the `.codex/{skills,agents,commands}` mirror, a capture with **no**
+  `grep -n` prefix, and a security-class advisory quoted inside a projected
+  skill.
+- **Negatives — 14/14 preserved, zero leaks.** The adversarial set is the point:
+  the directory-local compose-gate manifest **file**
+  (`doorway/doorway-service/.epr-meta:12:`, no trailing slash — the shape the
+  guard must not eat), the Rust path token `epr_meta::describe`, a crate named
+  `epr-meta/core` without the leading dot, `.codex/config.toml` (not an
+  agent-surface dir), and prose that merely *mentions* the store while carrying a
+  real `glob@7.2.3` warning. Plus the live channels: `npm warn deprecated`, the
+  pnpm resolution `WARN`, `warning: use of deprecated function`, the ESLint
+  `no-deprecated` prose, a `(node:PID)` DeprecationWarning, a real `src/` finding,
+  a diff-added `#[deprecated(…)]` attribute, and both security shapes.
+- **Whole-ledger stability — PASS, zero collateral.** Every live row's captured
+  `line` was re-tested against the new clauses: **exactly 1 of 257 matches**, and
+  it is `09f2f5632c00` itself. No other live entry — open, triaged, or blocked —
+  changes suppression state, so the guard needed no ledger migration.
+- **End-to-end through the hook's real entrypoint — PASS, measured both ways.**
+  One synthetic `PostToolUse` payload carrying three agent-surface projection
+  lines plus one genuine `npm warn deprecated glob@7.2.3`, against a throwaway
+  project dir:
+
+  | | ledger rows minted | dispatch |
+  |---|---|---|
+  | before Guard N (`git show HEAD:` copy of the hook) | **4** (3 junk) | 1 |
+  | after Guard N | **1** (the glob warning) | 1 |
+
+  The regression that matters is covered by the second row: the genuine warning
+  is still captured, still fingerprinted, and still emits
+  `deprecation-sentinel: +1 new → deprecation-triage dispatch`. Guard N narrows
+  the echo surface, not the warning surface.
 
 The Fix N (Class 3) and Class 4 measurements quoted in Current decision come
 from the same script run in comparison mode over the live ledger, recomputing
