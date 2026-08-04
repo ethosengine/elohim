@@ -7,7 +7,7 @@ title: "Realign doorway-service holochain client pins from the unreleased 0.9.0-
 slug: "doorway-client-pin-realign-0-6-x"
 written: "2026-08-04"
 author: "holochain-iroh convergence campaign (Wave 1 Lane C)"
-status: "backlog"
+status: "resolved-documented-hold"
 priority: "medium"
 tags: [doorway, holochain-client, dependency-pins, wire-format, wave-1, codex-claimable]
 cites:

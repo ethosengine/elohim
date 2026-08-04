@@ -139,6 +139,8 @@ cargo test -p holochain_p2p 2>&1 | tail -20; echo EXIT=$?   # dd12826's test liv
 
 ### Task C1: Doorway client-pin realign + 0.6.1 API-reshape audit
 
+> **OUTCOME 2026-08-04: DOCUMENTED HOLD (Codex lane, reviewed + integrated as `f49cf80b3`).** `holochain_client 0.8.3` requires `holo_hash ^0.6.3`, disjoint from `imagodei-types`' path-dep exact `=0.6.0` — the same shared-sdk `holo_hash` pin as Evidence §6, hit from the downward direction. All pin changes reverted; hold documented at the Cargo.toml pin site + the authorized `CapAccess` 0.7 breadcrumb. Resolves at Wave 3 Task F2 with the family move.
+
 **Files:**
 - Modify: `doorway/doorway-service/Cargo.toml:32-45`
 - Modify: `doorway/doorway-service/src/**` (compile-driven: `AppStatus` union reshape, `get_agent_activity` signature IF used)
