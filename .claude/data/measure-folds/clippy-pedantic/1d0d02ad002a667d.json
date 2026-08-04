@@ -1,0 +1,36 @@
+{
+  "computedAt": "2026-08-04T15:24:36+00:00",
+  "computedBy": "Matthew Dowell",
+  "counts": {
+    "byCode": {
+      "clippy::unnecessary_literal_bound": 1
+    },
+    "total": 1
+  },
+  "derivationKey": "1d0d02ad002a667d820bba750554d5769eff6d70411288cbef63e36d6a1ca6df",
+  "env": {
+    "cargo_lock": "b0cbfc860f6b0968d2abc7e9cc9f1847ccd19a6180e6ce0f9f3309bed358fff7",
+    "clippy": "clippy 0.1.97 (8bab26f4f6 2026-07-14)",
+    "clippy_toml": null,
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "rustflags": ""
+  },
+  "evidence": "claimed",
+  "findings": [
+    {
+      "code": "clippy::unnecessary_literal_bound",
+      "endLine": 74,
+      "file": "src/publish.rs",
+      "level": "warning",
+      "line": 74,
+      "message": "returning a `str` unnecessarily tied to the lifetime of arguments",
+      "rendered": "warning: returning a `str` unnecessarily tied to the lifetime of arguments\n  --> src/publish.rs:74:24\n   |\n74 |     fn reach(&self) -> &str {\n   |                        ^^^^ help: try: `&'static str`\n   |\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnecessary_literal_bound\n   = note: `-W clippy::unnecessary-literal-bound` implied by `-W clippy::pedantic`\n   = help: to override `-W clippy::pedantic` add `#[allow(clippy::unnecessary_literal_bound)]`\n"
+    }
+  ],
+  "measure": "clippy-pedantic@1",
+  "schema": "measure-fold@1",
+  "subject": {
+    "crate": "crates/doorway-client",
+    "tree": "716bdda5ce21078ec5ecf8a52de7706886c352f8"
+  }
+}

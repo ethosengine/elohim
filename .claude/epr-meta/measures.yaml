@@ -1,0 +1,179 @@
+# .claude/epr-meta/measures.yaml — the measure registry (middot) for the Elohim Protocol.
+#
+# "Middot" (singular middah, Hebrew מִדָּה — measure, attribute, dimension) is the
+# project-internal name for this primitive family, joining the pillar vocabulary (lamad,
+# qahal, shefa, mishpat, brit). Code and schemas use English, feature-specific names: the
+# artifact is a `Measure`, its memoized application a `MeasureFold` (or the consuming
+# feature's own noun), its peer verification rides the existing `Attestation` machinery —
+# `middot`/`middah` stays in prose, specs, and internal discussion, never in an enum, table,
+# route, or generated type. Full design:
+# genesis/docs/superpowers/specs/2026-08-04-middot-measure-primitive-design.md
+#
+# Contract:
+#   • A `<id>@<version>` reference is a DECLARED DEPENDENCY, never recency — the same
+#     version-pin discipline policies.yaml carries (lens-version-DAG spec, 2026-06-27).
+#     New semantics for a measure = a NEW version row; existing consumers (lenses, folds)
+#     keep the old semantics until they re-declare. `status: superseded` + `superseded_by`
+#     record lineage; a version with live consumers is never deleted, only superseded.
+#   • A measure never carries teeth — `default-authority` is always `observation` in v1.
+#     Strictness escalation happens only by composing a measure into a LENS with a contract
+#     half (see `lenses:` below); the measure itself never mode-switches between strict and
+#     lenient — it is always declared, in warm standby, and the consuming context chooses
+#     whether to read it.
+#   • `subsumes` is an intra-family, attestable byte-containment claim — verifiable by
+#     conformance probe (run both profiles on a fixture, assert superset) — deliberately
+#     NOT `covers`. `.epr-meta`'s `covers: subtree` is this claim's governance-plane sibling
+#     (an authority-backed responsibility claim, ratified and never re-audited); `subsumes`
+#     is evidence-backed and transfers no responsibility (spec §3 naming note).
+#   • Lift path: these rows are dev-tooling-tier scaffold — Operational (C) classification,
+#     the same liftable Precedent shape as policies.yaml (spec §7). They graduate into
+#     Mishpat Precedent entries (CID = entry_hash) when middot lifts into brit/eprfs — a
+#     move of the same bytes, never a rewrite.
+#
+# Two standing sections, mirroring policies.yaml's split:
+#   • `measures:` — Measure records: family, unit, procedure, env-sensitivity, subsumption.
+#     Teeth-free by construction (default-authority: observation, always).
+#   • `lenses:` — governance-plane bindings that CONSUME one or more measures and declare an
+#     enforcement class (deny/ask/inject/measure, per the escalation ladder) over a context.
+#     A lens is where any teeth live; the measures it consumes stay teeth-free regardless.
+
+measures-version: 1
+measures:
+  - id: clippy-standard
+    version: 1
+    family: clippy
+    unit: findings-set
+    procedure: "cargo clippy --message-format=json (workspace default lints)"
+    env-sensitivity: [rustc-version, clippy-version, cargo-lock, clippy-toml, rustflags]
+    default-authority: observation
+    status: active
+    established_by: deliberated-2026-08-04-operator+claude
+    why: >
+      The baseline clippy signal every crate already runs under its own workspace lint
+      config; naming it as a content-addressed measure gives the pedantic fold (below) a
+      subsumption edge to declare instead of re-deriving what "standard" means per crate.
+
+  - id: clippy-pedantic
+    version: 1
+    family: clippy
+    # Attestable byte-containment claim, conformance-probed against the tool — deliberately
+    # NOT `covers` (spec §3 naming note: `covers` is an authority-backed governance-plane
+    # responsibility claim; `subsumes` is an evidence-backed semantic claim, verifiable by
+    # running both profiles on a fixture and asserting the pedantic result byte-for-byte
+    # contains the standard one).
+    subsumes: clippy-standard@1
+    unit: findings-set
+    procedure: "cargo clippy --message-format=json -- -W clippy::pedantic -A <each allow>"
+    # Seeded from elohim/brit/Cargo.toml workspace.lints.clippy — the empirically-counted
+    # pedantic allow list brit's fork already carries. Occurrence-count comments (# xN) are
+    # carried over verbatim from that source; entries with no comment had none there either.
+    allows:
+      - needless_continue
+      - enum_glob_use  # x97
+      - missing_errors_doc  # x1792
+      - missing_panics_doc  # x447
+      - module_name_repetitions  # x125
+      - must_use_candidate  # x1696
+      - elidable_lifetime_names
+      - uninlined_format_args
+      - manual_option_zip
+      - unnecessary_debug_formatting
+      - redundant_closure_for_method_calls
+      - manual_checked_ops
+      - doc_link_with_quotes
+      - map_unwrap_or
+      - ptr_arg
+      - single_char_pattern
+      - case_sensitive_file_extension_comparisons
+      - default_trait_access  # x709
+      - doc_markdown  # x552
+      - cast_possible_truncation  # x216
+      - needless_pass_by_value  # x205
+      - return_self_not_must_use  # x204
+      - unreadable_literal  # x169
+      - items_after_statements  # x164
+      - single_match_else  # x162
+      - too_many_lines  # x161
+      - unnecessary_wraps  # x110
+      - match_same_arms  # x99
+      - cast_lossless  # x91
+      - ignored_unit_patterns  # x80
+      - used_underscore_binding  # x75
+      - needless_raw_string_hashes  # x75
+      - implicit_clone  # x70
+      - manual_let_else  # x64
+      - cast_precision_loss  # x56
+      - trivially_copy_pass_by_ref  # x43
+      - redundant_else  # x42
+      - if_not_else  # x37
+      - match_wildcard_for_single_variants  # x35
+      - cast_sign_loss  # x35
+      - similar_names  # x32
+      - struct_excessive_bools  # x29
+      - cast_possible_wrap  # x26
+      - explicit_iter_loop  # x24
+      - explicit_into_iter_loop  # x22
+      - explicit_deref_methods  # x22
+      - inconsistent_struct_constructor  # x18
+      - range_plus_one  # x17
+      - inefficient_to_string  # x14
+      - from_iter_instead_of_collect  # x13
+      - unused_self  # x10
+      - many_single_char_names  # x10
+      - manual_string_new  # x10
+      - iter_not_returning_iterator  # x10
+      - option_option  # x9
+      - inline_always  # x8
+      - manual_assert  # x7
+      - iter_without_into_iter  # x6
+      - copy_iterator  # x6
+      - should_panic_without_expect  # x5
+      - transmute_ptr_to_ptr  # x4
+      - match_wild_err_arm  # x4
+      - manual_is_variant_and  # x4
+      - bool_to_int_with_if  # x4
+      - struct_field_names  # x3
+      - wildcard_imports  # x2
+      - needless_for_each  # x2
+      - naive_bytecount  # x2
+      - mut_mut  # x2
+      - match_bool  # x2
+      - fn_params_excessive_bools  # x2
+      - filter_map_next  # x2
+      - checked_conversions  # x2
+      - borrow_as_ptr  # x2
+      - unnecessary_join  # x1
+      - stable_sort_primitive  # x1
+      - no_effect_underscore_binding  # x1
+      - empty_docs
+      - too_long_first_doc_paragraph
+      - large_stack_arrays
+      - result_large_err
+      - large_enum_variant
+    env-sensitivity: [rustc-version, clippy-version, cargo-lock, clippy-toml, rustflags]
+    default-authority: observation
+    status: active
+    established_by: deliberated-2026-08-04-operator+claude
+    why: >
+      The higher-resolution signal /code-review wants without pedantic gating normal
+      development (spec §1, problem 1). Seeding the allow list from brit's
+      empirically-counted set means the MVP fold reports genuinely new pedantic findings on
+      touched code rather than re-litigating fork-parity noise the project already decided
+      not to fix.
+
+lenses:
+  - id: review-lint-lens
+    version: 1
+    binding: persuasive
+    class: inject
+    consumes: [clippy-pedantic@1]
+    context: code-review
+    status: active
+    established_by: deliberated-2026-08-04-operator+claude
+    why: >
+      Findings are advisory-only — labeled "pedantic-lens (advisory)" in the review output —
+      never `-D`, never a push gate (spec §5, §8). The measure it consumes is always
+      declared, in warm standby; this lens is the one consuming context that chooses to read
+      it. Normal dev gates never read the pedantic measure: nothing "falls back" because
+      nothing switched, and strictness escalation stays a lens composition, never a mode
+      switch on the measure itself.
