@@ -126,6 +126,35 @@ the protocol over-demands its weakest members. Actions:
    classifications and re-churns the corpus from zero (~hours of re-learning)
    — either persist the ledger or accept and document the re-churn cost.
 
+## Addendum 2026-08-04: the diversity wave adjudicated — evidence is ABSENT fleet-wide, not throttled
+
+The advertiser-diversity wave (7b2fceb66: bounded same-head fallback +
+per-peer health tracker + backoff-ledger persistence) deployed clean and
+worked mechanically (563 bounded attempts, honest single-count accounting).
+Its diagnostic result overturns the C11-as-cause reading:
+
+- Responder-side per-pod: the idle ethosengine trio NEVER times out
+  (budget_elapsed 0/0/0) — asked as fallback couriers they answer fast and
+  honestly: **no_record** (matthew 77, jessica 310, james 353). The shem
+  quartet's budget_elapsed (388-492 each) was hiding the same answer behind
+  CPU starvation, not sitting on servable bytes.
+- fallback outcomes: attempted 563 · carried **0** · degraded 544;
+  no_alternative 1163. Fleet-wide carried total: 3.
+- Conclusion: for nearly the whole contested corpus (phantoms AND most
+  "real" ids) the DHT record bytes were never published/gossiped into any
+  reachable conductor — the local-stack DHT-anchor gap class
+  (bulk-seeded genesis content advertises heads whose records never
+  propagated). The 6h evidence-absent deferral is the CORRECT standing
+  state for this corpus; the exit is UPSTREAM SUPPLY: witnessing/authoring
+  the records (witness_bootstrap / import anchor step / byte-heal), not
+  courier routing, not conductor capacity.
+- susan's 2000m override verified applied (throttle 100%→63%); restoration
+  condition per acab4bf82 stands.
+
+Next lever (design-tier, the real one): a witness/anchor pass for the
+genesis corpus so records exist for adopt-before-author to carry — routes
+to the existing DHT-anchor-gap workstream, now with fleet-scale evidence.
+
 ## Verdict for the saga
 
 The flip is correct and behaviorally proven; convergence stays blocked on
