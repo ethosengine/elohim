@@ -118,6 +118,22 @@ For each issue found:
 - Fix: Specific recommendation with code example
 ```
 
+## Pedantic lens (advisory)
+
+When the diff under review touches a native Rust crate (`doorway/doorway-service`,
+`steward/node`, `elohim/elohim-storage`, `crates/*`), run:
+
+```bash
+python3 .claude/scripts/measure-fold.py --measure clippy-pedantic@1 --diff-only
+```
+
+If the script is missing, say so in the review rather than skipping silently — it may be
+landing in the same change-set. Present its findings in a separate section labeled
+**pedantic-lens (advisory)**, never mixed into the Critical/Warnings/Suggestions findings
+above: these findings inform, never block. The fold cache means a re-review of the same
+commit is free. Full design:
+`genesis/docs/superpowers/specs/2026-08-04-middot-measure-primitive-design.md`.
+
 ## Project-Specific Patterns
 
 ### Angular Services
