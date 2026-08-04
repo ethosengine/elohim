@@ -157,6 +157,8 @@ cargo test -p holochain_p2p 2>&1 | tail -20; echo EXIT=$?   # dd12826's test liv
 
 ### Task D1: Verification research pack (read-only; closes the three flagged unknowns)
 
+> **OUTCOME 2026-08-04: DONE (Codex lane, reviewed take-as-is, integrated).** All three verdicts evidence-backed and independently re-derived at review: (1) dalek `digest::crypto_common` bug fixed in 5.0.0 final (commit `59305b4e`, digest 0.11); (2) bootstrap wire core-compatible — and the doc CORRECTED this task's premise: holochain 0.6.0 pins kitsune2 `0.3.0` (0.6.3 pins `0.4.1`, `default = ["transport-iroh"]`); our doorway lock rides `0.4.0-dev.2`; new auth/relay surfaces (`/authenticate`, relay registration) are Wave-2 work, absent from our k2.rs today by design; (3) config mapping actionable for E1 — `bootstrap_url→coreBootstrap.serverUrl`, `relay_url→irohTransport.relayUrl` (top-level wins; n0 public relay is the DEFAULT unless set), `signal_url`/`webrtc_config` are tx5-only. Doc: `genesis/docs/content/elohim-protocol/history/2026-08-04-holochain-iroh-dep-verification-pack.md`.
+
 **Files:**
 - Create: `genesis/docs/content/elohim-protocol/history/2026-08-04-holochain-iroh-dep-verification-pack.md`
 

@@ -7,7 +7,7 @@ title: "Verification research pack: dalek 5.0.0 digest::crypto_common fix, kitsu
 slug: "holochain-iroh-dep-verification-pack"
 written: "2026-08-04"
 author: "holochain-iroh convergence campaign (Wave 1 Lane D)"
-status: "backlog"
+status: "resolved"
 priority: "medium"
 tags: [research, read-only, iroh, kitsune2, dalek, bootstrap, wave-1, codex-claimable]
 cites:
