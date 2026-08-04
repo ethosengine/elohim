@@ -119,16 +119,26 @@ A `Measure` is a record with:
 |---|---|---|
 | `id` / CID | content-derived identity; versions pin like registry policies (`<id>@<version>`, declared dependency never recency — the lens-version-DAG rule) | never mutated; new semantics = new version |
 | `family` | the orthogonal axis this measure lives on: `clippy`, `rustfmt`, `eslint`, `sonar`, `watts`, `attention-minutes`, `bytes-stored`, `view-events`, … | **family orthogonality:** results in different families sit side-by-side and are never summed into an unlabeled scalar (the quilt law, applied to measures) |
-| `covers` | intra-family lineage/subsumption: `clippy-pedantic@1 covers clippy-standard@1` means the pedantic result *byte-for-byte contains* everything the standard result would report | `covers` is an **attestable claim** (testable against the tool), not an assertion; a cached stronger fold may answer a weaker query only via a declared `covers` edge |
+| `subsumes` | intra-family lineage: `clippy-pedantic@1 subsumes clippy-standard@1` means the pedantic result *byte-for-byte contains* everything the standard result would report | `subsumes` is an **attestable claim** (testable against the tool), not an assertion; a cached stronger fold may answer a weaker query only via a declared `subsumes` edge |
 | `unit` | the denomination of the result (finding-count + finding-set CID; joules; minutes; bytes) | Commitment II: the unit must be witnessable; self-reported units are marked advisory-forever |
 | `procedure` | the executable reference (tool + invocation + result canonicalization) | deterministic given subject + environment, or it declares itself non-deterministic (excluded from fold caching) |
 | `env-sensitivity` | which environment facts change the result (toolchain version for clippy; none for bytes-stored) | load-bearing for the fold key (§4) |
 | `default-authority` | the tier its raw results carry: **observation** (always, in v1) | a measure never gates; teeth exist only in lenses (§5) |
 
 **Dimensional structure.** Measure-space is a disjoint union of families; within a family,
-`covers` induces a partial order (a subsumption lattice: standard ⊑ pedantic). A subject's
+`subsumes` induces a partial order (a subsumption lattice: standard ⊑ pedantic). A subject's
 measurement state is therefore a **vector indexed by family** — never a scalar — where each
 component records the strongest fold available plus its evidence tier.
+
+> **Naming note — `subsumes`, deliberately not `covers`.** `.epr-meta`'s `covers: subtree`
+> is this claim's governance-plane sibling: both are *containment claims that let a walker
+> terminate early* (the coverage audit stops at an owned region; a weaker query stops at a
+> stronger fold). The shared shape is real, but the discriminator is C5
+> (evidence-not-authority): `covers` is an **authority-backed responsibility claim** — a
+> ratified governance act vouching for a region, never re-audited by construction — while
+> `subsumes` is an **evidence-backed semantic claim** — verifiable by conformance probe,
+> transferring no responsibility. Two words keep the planes from wearing each other's
+> costumes; this note keeps the resonance from being lost.
 
 ## 4. The Fold (memoized application)
 
@@ -223,7 +233,7 @@ the witnessed-interaction spec apply to any aggregate that could expose a subjec
 - **Classification**: Derived (A2) — the plural-lenses spec's link design, unchanged.
 
 ### Design constraints discovered
-- `covers` claims need a conformance probe (run both profiles on a fixture, assert
+- `subsumes` claims need a conformance probe (run both profiles on a fixture, assert
   superset) before a cache may answer a weaker query from a stronger fold.
 - Environment fingerprinting needs a canonical `E-CID` recipe per family (rust toolchain:
   `rustc -V` + clippy version + lint-config hash).
@@ -237,7 +247,7 @@ the witnessed-interaction spec apply to any aggregate that could expose a subjec
 The `/code-review` lint escalation ships as the first middah, three small pieces:
 
 1. **Canon**: registry rows `measure:clippy-pedantic@1` (family `clippy`,
-   `covers: clippy-standard@1`, env-sensitivity: toolchain; allow-list seeded from brit's
+   `subsumes: clippy-standard@1`, env-sensitivity: toolchain; allow-list seeded from brit's
    empirically-counted pedantic allows) and an advisory lens row
    `review-lint-lens@1` (`binding: persuasive`, `class: inject`) declaring that lens
    findings are advisory-only — never `-D`, never a push gate.
