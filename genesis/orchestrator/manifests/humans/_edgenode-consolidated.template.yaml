@@ -432,6 +432,11 @@ spec:
             # Blob storage path for filesystem capacity calculations
             - name: ELOHIM_BLOB_PATH
               value: "/data/blobs"
+            # Dataplane transport backend (storage layer, NOT the conductor transport).
+            # "dual" runs libp2p + iroh side-by-side — campaign Wave-2 E3, decision 2026-08-04.
+            # Boot sentinel: "Dual: DualGossipPublisher wired into P2PNode". Rollback: "libp2p".
+            - name: ELOHIM_TRANSPORT_BACKEND
+              value: "dual"
           ports:
             # Conductor admin WS — exposed via elohim-storage forwarder on
             # 8444 (bridges to 127.0.0.1:4444). See top-of-file Architecture

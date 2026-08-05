@@ -283,11 +283,11 @@ spec:
             # K8s pods act as relay servers for desktop stewards behind NAT
             - name: RELAY_MODE
               value: "server"
-            # Gate #7 — iroh alpha-cluster soak (opened 2026-05-10).
-            # Flip to "libp2p" to roll back. "iroh" enables iroh-only (not yet
-            # available; use dual-stack during soak). See RUNBOOK below.
-            - name: TRANSPORT_BACKEND
-              value: "dual-stack"
+            # Dataplane transport backend (storage layer, NOT the conductor transport).
+            # "dual" runs libp2p + iroh side-by-side — campaign Wave-2 E3, decision 2026-08-04.
+            # Boot sentinel: "Dual: DualGossipPublisher wired into P2PNode". Rollback: "libp2p".
+            - name: ELOHIM_TRANSPORT_BACKEND
+              value: "dual"
           ports:
             - name: storage-http
               containerPort: 8090
