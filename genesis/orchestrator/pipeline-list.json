@@ -26,6 +26,12 @@
       "cascades": false
     },
     {
+      "name": "elohim-sophia",
+      "manualOnly": false,
+      "triggersGenesis": false,
+      "cascades": true
+    },
+    {
       "name": "elohim-steward",
       "manualOnly": true,
       "triggersGenesis": false,
