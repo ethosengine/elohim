@@ -1,5 +1,5 @@
 ---
-title: "The Digital Memory Ontology — standing as a first-class property of create · class · hold · consolidate · surface · forget"
+title: "The Digital Memory Ontology — standing as a first-class property of create · class · hold · consolidate · surface · tend · forget"
 id: digital-memory-standing-ontology-design
 status: Draft
 class: protocol-canonical
@@ -60,6 +60,8 @@ that ignores them will omit something real (§2.1).
 | **RECONSOLIDATE** | **Retrieval is not read-only.** A surfaced memory becomes labile and is re-stored, possibly changed. This is the mechanism the forgetting ceremony rides | A ceremony that changes nothing; "remembering together" as a no-op |
 | **PROCESS** | Processing is **itself an observation that creates new memory**, and **derived memory inherits the subject standing of its inputs** | **Inference laundering standing** — see §3, the load-bearing clause |
 | **FORGET** *(active forgetting)* | Forgetting is an **event with a witness** and a mechanism, not mere decay. Differentiated into *access-revocation* (unilateral, silent) · *record-retirement* (witnessed ceremony) · *remnant* (encrypted residue, honest about what p2p cannot erase) | Deletion theatre; and coerced unilateral erasure, because witnesses are required regardless of who initiates |
+| **BRACKET** *(the magic circle)* | A bounded space where **attribution rules differ** — entry, interior, exit. Play, disputation, role-play, and pseudonymous speech all happen inside one. Entry is permissioned (§4.2); the exit is a labile window | Play as a thing that must count; arguing a position you do not hold as a thing that accrues to you |
+| **TEND** *(tending a labile window)* | Care exercised while a memory is still malleable. The window opens **twice** — after the experience (consolidation) and after every retrieval (reconsolidation) — and how the moment is tended determines what is stored | Aftercare as optional politeness; an intense interaction that simply *stops* |
 
 ### 2.1 Why these words, and one term deliberately rejected
 
@@ -208,6 +210,90 @@ And within a single room the same verb inverts: a teacher **surfacing** *"this c
 letters"* is care; a stranger surfacing it is predation. A partner surfacing a shared moment is
 intimacy; the same recall after a breakup is harm. **Surfacing inherits the relationship, not just the
 data** — which is the standing clause (§3) arriving from a different direction.
+
+## 4.2 What the ontology must not PRECLUDE
+
+§4.1 tests whether the ontology can **express** hard cases. This tests whether it **forbids good
+ones** — the mirror failure, and just as disqualifying. An ontology that makes play, disputation,
+anonymity, or aftercare unsayable has not been careful; it has been narrow.
+
+### The one genuine preclusion
+
+**`CREATE` says memory is born of an observation with an observer, a subject, and an occasion.** Read
+universally, that makes an *unobserved act* unsayable — and **recorded play is not play.** Everything
+else below is an affordance gap, which is cheap. This one is a preclusion, which is not.
+
+### The bracket — play, disputation, and pseudonymous speech share one primitive
+
+Play requires that what happens inside it **does not count the same way**: a child playing house makes
+no commitments; a chess game is remembered while its moves bind nobody. Perspective-taking requires
+the same thing — if every utterance accrues to your standing, arguing a position you do not hold
+becomes dangerous and steelmanning is chilled. We *depend* on this and never afforded it: `theology.md`
+is explicitly *"forged under disputation, article by article, with the objections pressed at full
+strength,"* and the `blind-reader` agent is institutionalized perspective-taking.
+
+So: **BRACKET** — a bounded space where attribution rules differ, with an **entry** (permissioned —
+below), an **interior** (different rules), and an **exit** (a labile window, tended). The beat is the
+entry we designed this session; the exit is the half we never named.
+
+### The labile window — what aftercare actually *is*
+
+Aftercare is not primarily care; it is a **window**. Memory has a period after an event during which
+it is still being stabilized and remains malleable, and how the moment is narrated in that window
+shapes what is stored. That is why tending is not politeness — **the exit is when the experience gets
+written**.
+
+And reconsolidation reopens the same window on every retrieval, which collapses two things we had
+been treating as separate: **the forgetting ceremony is aftercare for a reconsolidation window.** One
+primitive, two occasions — the ceremony stops being bespoke machinery.
+
+| Occasion | The window opens after… | Tending is called |
+|---|---|---|
+| An intense scene | the scene | **aftercare** |
+| A hard shift | the work | **debrief / retrospective** |
+| Exertion | the effort | **cool-down** |
+| A death | the loss | **grief ritual** |
+| Surfacing a harm with a witness | the retrieval | **the forgetting ceremony** |
+
+### Anonymity — derived from relationship, granted as capability
+
+Two questions looked open and are answered by the **agency** primitive rather than by a rule about
+identity.
+
+**Observer anonymity: whistleblower is DERIVED, never declared.** *Power is a position in a relation,
+not an attribute* — you do not tag someone "powerful." The relational context the protocol already
+models (standing, reach, custody, holonic nesting) is exactly what lets an elohim derive: this is an
+observation by a party about someone holding **authority over them**, in the domain observed. Same
+derive-from-the-relationship move as `CLASS`. And it is the **newsroom bound read from the other
+side**: *"standing does not reach memory of one's own exercise of power over others"* and *"the
+less-powerful may observe without attribution"* are one mechanism in two directions.
+
+**Anonymity and perspective-taking are capability grants**, coupled to tended responsibilities — the
+same coupling the rights plan specifies, not a new mechanism. Both are bracket-entry permissions, and
+both are abusable in the same way (sealioning, bad-faith advocacy), so both are earnable and
+revocable rather than universal.
+
+**⚠ But an earned privilege reproduces the productivity franchise unless it splits.** If anonymity is
+earned by demonstrating tended responsibility, the ward, the trafficked person, and the child — who
+need it most — can least qualify. So:
+
+| Tier | What it is | Earned? |
+|---|---|---|
+| **Protective anonymity** — *floor* | Acting without your identity being resolvable, **for your own safety** | **Never.** Not earned, not revocable, available to the least-capacitated |
+| **Expressive anonymity** — *ceiling* | Holding reach and voice pseudonymously; speaking from a position you do not hold | Earned, coupled to responsibilities, revocable |
+
+**The backstop is the witnessed surround, not the anonymous act.** Anonymity is not a void: it covers
+the act, while the person remains inside a web of witnessed relations, and **harm leaves traces in its
+effects on others** even when the act itself is unattributed. That is the honest middle — accountable
+without being surveilled — and it is asymmetric linkage authority (§4.1) applied to the observer.
+
+### Still open, stated rather than papered over
+
+**Freedom from your own agent.** Can you do something your elohim does not remember? If every act is
+witnessed by the thing that serves you, there is no private space *from* your own AI. Our
+accountability instinct — witnessed identity, community backstopping — pushes hard against this, and
+it is precisely the instinct that needs a **bounded exception** rather than a principle. The bracket
+is the likely shape; whether an agent may be asked not to remember, and what that costs, is undesigned.
 
 ## 5. Scaffolding it into `.epr-meta` — the discipline made co-located
 
