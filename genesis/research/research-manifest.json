@@ -133,6 +133,27 @@
       "path": "genesis/research/repos/ssb2-discussion-forum",
       "relevance": "SSB survey \u2014 the community's own post-mortem venue: single-keypair identity pain, feed-fork intolerance, initial-sync cost, metafeeds complexity, and the successor designs (PPPP/minibutt lineage). The most valuable repo of the set for 'what they would do differently'.",
       "pillar": "elohim"
+    },
+    {
+      "name": "p2panda",
+      "url": "https://github.com/p2panda/p2panda.git",
+      "path": "genesis/research/repos/p2panda",
+      "relevance": "The modular-crate rewrite (2024+): p2panda-core/-net/-sync/-store/-blobs/-discovery/-encryption/-auth/-stream as independent, composable, idiomatic Rust crates over iroh. Survey target for BOTH protocol semantics and crate-discipline standards (2026-08-04 survey).",
+      "pillar": "elohim"
+    },
+    {
+      "name": "p2panda-aquadoggo",
+      "url": "https://github.com/p2panda/aquadoggo.git",
+      "path": "genesis/research/repos/p2panda-aquadoggo",
+      "relevance": "The PREVIOUS p2panda generation (bamboo logs + GraphQL + schema registry, 2020-2024) that the team abandoned for the modular crates \u2014 the pivot rationale is outcome data on monolithic-node design.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "p2panda-reflection",
+      "url": "https://github.com/p2panda/reflection.git",
+      "path": "genesis/research/repos/p2panda-reflection",
+      "relevance": "Collaborative local-first GTK text editor \u2014 the worked proof consuming the modular crates (+ Loro CRDT); shows how a real app composes p2panda building blocks.",
+      "pillar": "elohim"
     }
   ]
 }
