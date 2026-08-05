@@ -82,6 +82,16 @@ The pipeline collects signals well beyond what a dollar conveys — contribution
 
 [elohim/elohim-storage/research/](../../elohim/elohim-storage/research/) — `economic-systems-research.md` (Drips, Unyt, hREA, EAE survey), `future-distribution-models.md` (six post-v0 research directions)
 
+### The Measure Problem — Playnet / Free-Association
+
+The only project surveyed so far that answers the question our shefa pillar has not: *what is the unit, and how does the ledger close?* [Playnet](https://playnet.earth) is a Berlin volunteer collective whose 93-page v0.5 specifies a complete labour-time planning economy — ValueFlows-native, with a convex solver, a shipped browser client, and a legal appendix — and whose sibling `free-association` line independently derived a mutual-recognition allocator (`MR = min(A→B, B→A)`) with no VF lineage at all. Lynn Foster, a ValueFlows co-author, has a commit in their tree.
+
+The take is deliberately **unit-agnostic**: we adopt neither their labour-hours nor their SNE nor their recognition shares as a numéraire, but their *unit discipline* — the closure property that makes a surface a ledger rather than a chart, and the soft/hard tension distinction that makes a limit legible without making it negotiable. Every economic take was minted as a **Measure family** composing with [middot](epr:middot-measure-primitive-design). Their peer-attested capacity score, global solve, and confiscatory exit are refused on ratified-law grounds and recorded as such.
+
+**Name collision warning** (scar tissue, like the `hypha*` triple): the GitHub org is **`interplaynetary`**, not `playnet` — `github.com/playnet` is an unrelated devops user, and `playnet.xyz` / `play.net` / Playnet Inc. are all different entities. Their canonical code is on **Radicle**, and the public seeds are a stale, architecturally-superseded mirror.
+
+[Cross-pollination survey →](epr:playnet-free-association-cross-pollination-2026-08-05) · minted to [measure-family-borrows](epr:measure-family-borrows-backlog) + [design-legibility-borrows](epr:design-legibility-borrows-backlog).
+
 ---
 
 ## The Edge Problem
@@ -165,6 +175,14 @@ The sharpest mutual finding is a shared pathology rather than a difference: **de
 Secure Scuttlebutt (2014–~2024) is the offline-first, gossip-replicated social protocol that most of today's local-first field descends from: identity was a bare cryptographic keypair, each identity published one append-only signed feed, replication followed the friendship graph, and everything hard — account recovery, moderation, economics, deletion, using two devices — was deliberately left out of the protocol for the social layer to absorb. We engaged it because it is a *completed* experiment whose own architects wrote the post-mortem before moving on: its refusals are, item for item, this protocol's feature list, which makes SSB the control group for our whole design. The retrospective (surveyed August 2026, from five cloned ssbc repos and the successor ecosystem) compares ten axes and sorts the results into what we **take** (they shipped private-message encryption for a decade while our encryption layer remains unbuilt — the one axis where they are decisively ahead; their replication-bandwidth disciplines; their USB-stick offline story, which we lack entirely), what we **watch** (their volunteer relay servers were designed to fade in importance and became de-facto infrastructure anyway — the same trap our doorway gateways face; their hour-long gigabytes-heavy first sync capped growth at tens of thousands of users, a ceiling our full-replication conductors share the shape of), and what we **leave** (key-as-identity with no recovery path, feeds that break permanently when two devices write at once, permanence so absolute that users feared their own posts).
 
 [Ancestor retrospective →](epr:ssb-scuttlebutt-ancestor-retrospective-2026-08-03) · manifest clones: `ssb-protocol-guide`, `ssb-db2`, `ssb-server`, `ssb-ebt`, `ssb2-discussion-forum`.
+
+---
+
+## The Sibling Craftsman — p2panda
+
+p2panda is the SSB descendant that took the ancestor's post-mortem seriously: a three-person Berlin team (same CCC/solarpunk milieu SSB came from) that deprecated its own monolithic node (aquadoggo) in 2024 and rebuilt as ten data-type-agnostic Rust building blocks over iroh — an I/O-free core, trait-per-domain stores, pluggable sync protocols, a research-grounded group-encryption crate, bring-your-own-CRDT — with a shipped GNOME collaborative editor (Reflection) as the worked proof. It is materially the closest stack to ours in the whole field (Rust, iroh, CBOR, Ed25519, BLAKE3, SQLite, append-only logs), which makes it the one project whose *engineering discipline* transfers almost without translation — and that discipline is what the survey (August 2026) extracts: workspace-declared lints, feature-matrix CI, changelog/release runbooks, and above all the proof that a team can dissolve its own monolith into blocks that outlive the framework. The survey adjudicates this against a grounded audit of our own workspace (the building-blocks-vs-services gap), sorts a seven-item adoption program (manifest-declared lint contracts through a ranked crate-extraction sequence), flags `p2panda-encryption` as a serious candidate for our unbuilt encryption layer (audit status unresolved), and holds the same cardinal line as the Holepunch and SSB engagements: writer-signed validity, key-as-identity, and ACL-as-authority never cross into the truth plane.
+
+[Cross-pollination survey →](epr:p2panda-cross-pollination-2026-08-04) · manifest clones: `p2panda`, `p2panda-aquadoggo`, `p2panda-reflection`.
 
 ---
 
