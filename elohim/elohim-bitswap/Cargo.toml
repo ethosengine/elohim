@@ -24,7 +24,7 @@ anyhow = "1"
 unsigned-varint = { version = "0.8", features = ["futures", "asynchronous_codec"] }
 
 # Metrics
-prometheus = "0.13"
+prometheus = "0.14"
 lazy_static = "1"
 bytes = "1"
 
