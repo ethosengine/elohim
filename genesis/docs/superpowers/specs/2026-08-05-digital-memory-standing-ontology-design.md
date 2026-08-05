@@ -137,7 +137,7 @@ every one of them inverts.**
 | **Kindergarten** | Catastrophic in the wrong hands | **Also a harm** — forgetting a child's needs fails them | Hold in trust; standing reserved for a self who does not exist yet |
 | **Bedroom** | High, and it *changes when the relationship does* | Real — shared memory is part of the bond | Ceremony; consent is time-indexed and context-bound |
 | **Casual meeting** | Low individually, compounds into surveillance | Trivial | **Decay by default** — the only room where forgetting needs no ceremony |
-| **Brothel** | The memory *is* the risk; linkage can be lethal | Low | Minimize; hold standing **without ever resolving identity** |
+| **Brothel** | Third-party linkage can be lethal to the worker | **Real** — an unrecorded violent client cannot be warned about | **Asymmetric linkage authority**: the person at risk may link; everyone else faces a high bar |
 
 **The primitives do not change — the class sets the direction of the default.** This is the argument
 that the verb set is shaped correctly: if remembering-versus-forgetting were baked into the primitives,
@@ -150,9 +150,18 @@ Two demands visible only when the four are held together, and neither is served 
   child's adult self has standing over memories the child could never consent to. That is not "the
   guardian decides" — the guardian is *custodian of someone else's future claim*. Our capability
   gradient has a ward row and **no concept of deferred standing**.
-- **Standing without linkage.** The brothel needs memory holdable without being linkable. Community
-  backstopping assumes the community is findable, and if backstopping ever means *linking*, it is a
-  doxxing vector rather than a protection.
+- **Asymmetric linkage authority.** *"Unlinkable" is the wrong target and it defers to the wrong
+  party.* The beneficiary of nobody-being-linkable is whoever is avoiding social consequence — not
+  whoever is at risk. And total unlinkability would disarm the safety infrastructure the vulnerable
+  party has actually built: peer warning about a dangerous client, establishing a pattern, seeking
+  recourse are **all linking operations**. So linkage is not forbidden, it is **high-bar, and the bar
+  is held by the person at risk** — exactly as either spouse may disclose their own intimate data
+  while a third party faces an extraordinary bar. The data was never unlinkable; it was *linkable by
+  those with standing.* Two consequences: the bar must be **specified**, or it is a backdoor with
+  good manners; and it must be one an abuser, a prosecutor, or a curious institution **cannot meet**,
+  while the subject meets it by definition. This also sharpens the backstopping rule: community
+  backstopping governs **recovery and standing, never linkage** — linkage authority stays with the
+  person the memory endangers.
 
 And within a single room the same verb inverts: a teacher **surfacing** *"this child struggled with
 letters"* is care; a stranger surfacing it is predation. A partner surfacing a shared moment is
