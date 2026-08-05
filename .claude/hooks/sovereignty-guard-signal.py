@@ -37,6 +37,37 @@ for _ in range(8):
     _here = _here.parent
 from _lib import epr_meta as em  # noqa: E402  (shared detector — single source of truth)
 
+
+def active_rule_version(repo: Path, rule_id: str) -> str:
+    """`<rule_id>@<highest non-superseded version>` from the policy registry.
+
+    The drift ledger records WHICH RULE VERSION its landings were measured against — a review that
+    misattributes landings to a superseded row draws the wrong conclusion about whether the rule or
+    the corpus is drifting. This was hardcoded to `@1` and went stale the moment the guard bumped to
+    `@2` (found by audit, 2026-08-05), so it is derived instead.
+
+    Deliberately a cheap line scan, not a YAML parse: this runs on EVERY Edit|Write under a 2s
+    timeout and must never be the reason a hook is slow. Falls back to `@1` if the registry is
+    unreadable — telemetry degrades, it never blocks.
+    """
+    try:
+        best, seen_id, superseded = 0, False, False
+        for raw in (repo / ".claude" / "epr-meta" / "policies.yaml").read_text().splitlines():
+            line = raw.strip()
+            if line.startswith("- id:"):
+                if seen_id and not superseded:
+                    best = max(best, cur)
+                seen_id, superseded, cur = line.split(":", 1)[1].strip() == rule_id, False, 0
+            elif seen_id and line.startswith("version:"):
+                cur = int(line.split(":", 1)[1].strip() or 0)
+            elif seen_id and line.startswith("status:"):
+                superseded = line.split(":", 1)[1].strip() == "superseded"
+        if seen_id and not superseded:
+            best = max(best, cur)
+        return f"{rule_id}@{best or 1}"
+    except (OSError, ValueError):
+        return f"{rule_id}@1"
+
 _ESCALATE_AT = 3  # landings before the message asks for a rule/corpus drift review
 
 
@@ -103,7 +134,7 @@ def main() -> int:
                 state = json.loads(dj.read_text())
             except (json.JSONDecodeError, ValueError):
                 state = {}
-        state["rule"] = "sovereignty-ontology-guard@1"
+        state["rule"] = active_rule_version(repo, "sovereignty-ontology-guard")
         state["landings"] = int(state.get("landings", 0)) + net_new
         state["last"] = ts
         by = state.setdefault("by_path", {})
