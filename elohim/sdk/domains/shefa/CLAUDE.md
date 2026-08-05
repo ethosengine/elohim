@@ -1,7 +1,7 @@
 ---
 id: shefa-domain-gospel
 cites:
-  - genesis/docs/Shefa_Economic_Infrastructure_Whitepaper.md
+  - genesis/docs/content/elohim-protocol/shefa.md
 ---
 
 # Shefa Domain

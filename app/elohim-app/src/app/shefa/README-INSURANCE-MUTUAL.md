@@ -467,8 +467,7 @@ const metrics = await mutual.getAdjusterMetrics(adjusterId);
 
 - **Integration Guide:** `docs/integration/insurance-mutual-integration-guide.md`
 - **Design Review:** `docs/analysis/shefa-models-for-mutual-review.md`
-- **Developer Quick Start:** `docs/DEV-QUICK-START.md`
-- **Phase 1 Summary:** `docs/PHASE-1-BUILD-SUMMARY.md`
+- **Phase-1 build arc (distilled):** `genesis/docs/content/elohim-protocol/history/2026-06-26-elohim-mutual-phase1-build-arc.md`
 
 ---
 

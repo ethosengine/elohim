@@ -290,7 +290,7 @@ The infrastructure we build today will shape human consciousness for generations
 ## Further Reading
 
 - [Elohim Protocol Specification](./genesis/docs/content/elohim-protocol/protocol-specification.md) - The full EPR protocol design
-- [Shefa Economic Whitepaper](./genesis/docs/Shefa_Economic_Infrastructure_Whitepaper.md) - Economic layer philosophy
+- [Shefa Economic Whitepaper](./genesis/docs/content/elohim-protocol/shefa.md) - Economic layer philosophy
 - [Constitution Documentation](./genesis/docs/content/elohim-protocol/constitution.md) - Governance architecture
 - [Holochain](https://holochain.org/) - Distributed application framework
 - [ValueFlows](https://valueflo.ws/) - REA vocabulary for economic networks

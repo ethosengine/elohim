@@ -1,3 +1,17 @@
+---
+title: Shefa — Sacred Economic Infrastructure for Human Flourishing
+id: shefa-economic-infrastructure
+tier: vision
+status: vision
+created: ~2025 (pre-implementation whitepaper)
+class: protocol-canonical
+pillar: shefa
+provenance: relocated 2026-06-26 from genesis/docs/Shefa_Economic_Infrastructure_Whitepaper.md; body preserved verbatim
+cites:
+  - shefa-domain-gospel | CLAUDE | sha256:ca13d4bc043c03cb | path: elohim/sdk/domains/shefa/CLAUDE.md
+  - genesis/docs/content/elohim-protocol/economic_coordination/epic.md
+---
+
 # Shefa: Sacred Economic Infrastructure for Human Flourishing
 
 ## Abstract

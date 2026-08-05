@@ -77,7 +77,7 @@ This is not new philosophy. It is how human societies have always done resilienc
 
 ### **The REA Ledger as the Common Substrate**
 
-The Elohim Protocol uses a Resource-Event-Agent (REA) accounting model — the standard descended from McCarthy's 1982 ledger work, extended in the ValueFlows ontology, and grounded into agent-centric distributed storage through hREA on Holochain. The REA model is described in detail elsewhere in this corpus ([Shefa Economic Infrastructure](../../../Shefa_Economic_Infrastructure_Whitepaper.md), [REA economics skill](../../../../../.claude/skills/rea-economics/SKILL.md), [protocol specification](../protocol-specification.md)); the part that matters for resilience is this:
+The Elohim Protocol uses a Resource-Event-Agent (REA) accounting model — the standard descended from McCarthy's 1982 ledger work, extended in the ValueFlows ontology, and grounded into agent-centric distributed storage through hREA on Holochain. The REA model is described in detail elsewhere in this corpus ([Shefa Economic Infrastructure](../shefa.md), [REA economics skill](../../../../../.claude/skills/rea-economics/SKILL.md), [protocol specification](../protocol-specification.md)); the part that matters for resilience is this:
 
 > **Every flow of value in the network — content stewardship, compute hosting, learning recognition, care-work attribution, governance participation — is expressed as a typed Commitment between Agents over a Resource, fulfilled by Events, in the context of an Agreement.**
 
@@ -725,7 +725,7 @@ That is the work. That is the entire work. Mutual aid as substrate, recovery as 
 
 ---
 
-*Related chapters: [Manifesto](../manifesto.md) · [Constitution](../constitution.md) · [Protocol Specification](../protocol-specification.md) · [Shefa Economic Infrastructure](../../../Shefa_Economic_Infrastructure_Whitepaper.md) · [Grandparent (Value Scanner persona)](../value_scanner/grandparent/README.md)*
+*Related chapters: [Manifesto](../manifesto.md) · [Constitution](../constitution.md) · [Protocol Specification](../protocol-specification.md) · [Shefa Economic Infrastructure](../shefa.md) · [Grandparent (Value Scanner persona)](../value_scanner/grandparent/README.md)*
 
 *Related stories: [Gertrude Holds the Share](../../../../data/stories/gertrude-grandma--as-recovery-counterparty--backup-stewardship-for-household-dowell.md) · [The Dowells Hold Gertrude's Share](../../../../data/stories/matthew-manager--as-recovery-counterparty--backup-stewardship-for-household-gertrude.md) · [Gertrude Logs In with Help from Her People](../../../../data/stories/gertrude-grandma--as-account-claimant--social-recovery-with-help-from-family.md)*
 
