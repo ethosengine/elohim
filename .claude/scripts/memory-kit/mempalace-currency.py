@@ -9,13 +9,14 @@ need the CLI; the staleness CHECK never does.
 
   --status [--json]   one-line currency for the SessionStart headline (fresh vs N changes since last mine)
   --record            stamp .mempalace/.last-mine = now (call after a successful mine)
-  --remine            sync (prune deleted) + mine the surface + record  (needs the `mempalace` CLI)
+  --remine [--wait]   sync (prune deleted) + mine the surface + record  (needs the `mempalace` CLI)
+                      Records freshness ONLY if the run was not lock-blocked; --wait retries.
 
 The mined surface = the durable, cleaned multi-destination surface the front-link recalls from (canonical
 architecture seeds + curated history + working memory + canonical stories). NEVER the transient pile / raw
 code / junk drawer — index only the clean surface (the no-dumping-grounds rule applied to the index).
 """
-import sys, os, json, subprocess, datetime
+import sys, os, json, subprocess, datetime, time
 
 # the durable cleaned surface MemPalace indexes (relative to repo root)
 SURFACE = [
@@ -97,22 +98,71 @@ def record(root):
     print(f"mempalace-currency: recorded mine @ {datetime.date.today().isoformat()}")
 
 
-def remine(root):
+# The CLI prints this (and still exits 0) when another process holds the palace.
+# Treating it as success is what let a fully-blocked run report `fresh ✅`.
+LOCK_MARKER = "is held by PID"
+
+
+def _run_step(argv, timeout):
+    """Run one mempalace step. Return (ok, blocked). Echoes output as it would have."""
+    proc = subprocess.run(argv, timeout=timeout, check=False,
+                          capture_output=True, text=True)
+    out = (proc.stdout or "") + (proc.stderr or "")
+    if out.strip():
+        print(out.rstrip())
+    blocked = LOCK_MARKER in out
+    return (proc.returncode == 0 and not blocked), blocked
+
+
+def remine(root, wait=False):
+    """Sync + mine, recording freshness ONLY on evidence that work actually happened.
+
+    The freshness marker gates the memory-stasis loop and the ceremony's Phase-4d
+    exit criteria. Recording it after a lock-blocked run is self-concealing: the
+    next run also reads "fresh" and skips the work, so the index silently falls
+    behind the front-link while every dashboard reads green. A tool that reports
+    green on blocked work is worse than one that fails, because it removes the
+    signal that would have triggered a retry.
+    """
     palace = os.path.join(root, ".mempalace", "palace")
     base = ["mempalace", "--palace", palace]
     print("mempalace re-mine: sync (prune) + mine surface ...")
+    attempts = 12 if wait else 1
     try:
-        subprocess.run(base + ["sync", "--root", root, "--apply"], timeout=600, check=False)
-        for rel in SURFACE:
-            d = os.path.join(root, rel)
-            if os.path.isdir(d):
-                subprocess.run(base + ["mine", d], timeout=900, check=False)
+        for attempt in range(attempts):
+            blocked_any = False
+            ok, blocked = _run_step(base + ["sync", "--root", root, "--apply"], 600)
+            blocked_any |= blocked
+            for rel in SURFACE:
+                d = os.path.join(root, rel)
+                if os.path.isdir(d):
+                    _ok, _blocked = _run_step(base + ["mine", d], 900)
+                    ok &= _ok
+                    blocked_any |= _blocked
+            if not blocked_any:
+                break
+            if attempt < attempts - 1:
+                print(f"mempalace re-mine: palace busy — retrying in 30s "
+                      f"({attempt + 1}/{attempts - 1})")
+                time.sleep(30)
+        if blocked_any:
+            print("mempalace re-mine: ABORTED — palace was held for the whole run; "
+                  "freshness NOT recorded (previous mine date left intact). "
+                  "Stop the holder or re-run with --wait.")
+            return 1
+        if not ok:
+            print("mempalace re-mine: ABORTED — a step failed; freshness NOT recorded.")
+            return 1
         record(root)
         print(status(root))
+        return 0
     except FileNotFoundError:
-        print("mempalace CLI not found — staleness recorded but re-mine skipped (run on a host with the CLI)")
+        print("mempalace CLI not found — re-mine skipped and freshness NOT recorded "
+              "(run on a host with the CLI)")
+        return 1
     except Exception as e:  # noqa: BLE001 — best-effort; never crash the loop
-        print(f"mempalace re-mine error: {e}")
+        print(f"mempalace re-mine error: {e} — freshness NOT recorded")
+        return 1
 
 
 def main():
@@ -120,10 +170,10 @@ def main():
     if "--record" in sys.argv:
         record(root)
     elif "--remine" in sys.argv:
-        remine(root)
+        return remine(root, wait="--wait" in sys.argv)
     else:  # --status (default)
         print(json.dumps(status(root, True)) if "--json" in sys.argv else status(root))
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)

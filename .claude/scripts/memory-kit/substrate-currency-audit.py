@@ -34,6 +34,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field, asdict
@@ -86,10 +87,22 @@ FRONTMATTER_RE = re.compile(r"^---\n.*?\n---\n", re.DOTALL)
 FENCED_CODE_RE = re.compile(r"```[^\n]*\n.*?\n```", re.DOTALL)
 
 
+def _blank_out(m: re.Match[str]) -> str:
+    """Replace a matched region with its own newline count, preserving line numbers."""
+    return "\n" * m.group(0).count("\n")
+
+
 def extract_body(text: str) -> str:
-    """Strip YAML frontmatter + fenced code blocks. Leaves prose + inline backticks."""
-    body = FRONTMATTER_RE.sub("", text, count=1)
-    body = FENCED_CODE_RE.sub("", body)
+    """Blank out YAML frontmatter + fenced code blocks. Leaves prose + inline backticks.
+
+    Stripped regions are replaced by an equal number of newlines rather than
+    deleted, so a finding's line number matches the line in the actual file.
+    Deleting them shifted every reported line number by the size of the
+    frontmatter plus every preceding code block, which made findings hard to
+    locate in the surface being audited.
+    """
+    body = FRONTMATTER_RE.sub(_blank_out, text, count=1)
+    body = FENCED_CODE_RE.sub(_blank_out, body)
     return body
 
 
@@ -108,16 +121,46 @@ KNOWN_EXTS = (
 )
 
 
+# Non-path token classes that the backtick sweep picks up but which are never
+# filesystem claims. Excluding them at the predicate is what keeps the ranked
+# drift list honest — see the header note on measurement discipline.
+PROTOCOL_STR_RE = re.compile(r"^/[a-z0-9-]+(/[a-z0-9._-]+)*/\d+\.\d+\.\d+$")
+SLASH_CMD_RE = re.compile(r"^/[a-z0-9][a-z0-9-]*$")
+BARE_EXT_RE = re.compile(r"^\.\w+$")
+# All-lowercase slash-joined words with no extension: vocabulary triples like
+# `own/ownership/sovereign`, `steward/contributor/authored`, or an HTTP route.
+VOCAB_OR_ROUTE_RE = re.compile(r"^[a-z][a-z0-9-]*(/[a-z][a-z0-9-]*)+$")
+
+
+def _slash_command_names(root: Path) -> set[str]:
+    """Skill + slash-command names, so `/converge` is not read as a directory."""
+    names = {p.parent.name for p in (root / ".claude" / "skills").glob("*/SKILL.md")}
+    names |= {p.stem for p in (root / ".claude" / "commands").glob("*.md")}
+    return names
+
+
 def looks_like_path(tok: str) -> bool:
+    """Shape-only pre-filter: could this token possibly be a path claim?
+
+    Only classes that are never a path REGARDLESS of the filesystem are
+    excluded here. Anything whose path-ness depends on whether it resolves is
+    decided later by is_non_filesystem_shape, AFTER a resolution attempt —
+    deciding "not a path" before trying to resolve is what silently hid real
+    drift: an all-lowercase directory citation (`elohim/holochain/dna/bogus`),
+    the single most common citation style in this corpus, was classified as
+    vocabulary and never checked at all.
+    """
     if tok.startswith(("http://", "https://", "//")):
         return False
     if "*" in tok:
         return False
-    if tok.startswith("--") or tok.startswith("-"):
-        return False
-    if tok.startswith("/api/") or tok.startswith("/v1/"):  # HTTP routes, not files
+    if tok.startswith("-"):
         return False
     if "::" in tok:  # Rust paths like `crate::module`
+        return False
+    if "..." in tok or "…" in tok:  # `app/.../foo.ts` — an elided abbreviation
+        return False
+    if BARE_EXT_RE.match(tok):  # a bare `.ts` / `.md` mention
         return False
     if "/" in tok:
         return True
@@ -128,17 +171,122 @@ def looks_like_path(tok: str) -> bool:
     return False
 
 
-def path_exists_in_repo(root: Path, claim: str) -> bool:
-    """Check if claimed path exists, treating leading slash + bare names tolerantly."""
-    # Strip leading/trailing slash for filesystem check
+def _has_file_extension(clean: str) -> bool:
+    base = os.path.basename(clean.rstrip("/"))
+    return base.endswith(KNOWN_EXTS)
+
+
+def is_non_filesystem_shape(
+    tok: str, cmd_names: frozenset[str], top_level: frozenset[str], root: Path | None = None
+) -> bool:
+    """Is an UNRESOLVED token something that was never a filesystem claim?
+
+    Applied only after resolution fails, so a real-but-broken path is still
+    reported. The ordering matters: `/app/elohim-app/src/gone.ts` is a genuine
+    broken repo path written with a leading slash and MUST surface, while
+    `/db/content` (HTTP route) and `/opt/rust/cargo/bin/cargo-nextest`
+    (absolute host path, asserted absent) must not.
+    """
+    if PROTOCOL_STR_RE.match(tok):  # libp2p protocol id, /elohim/sync/2.0.0
+        return True
+    if SLASH_CMD_RE.match(tok) and tok[1:] in cmd_names:  # `/converge`, `/shift`
+        return True
+    clean = tok.strip("/")
+    if not clean:
+        return True
+    # Leading slash and no file extension → HTTP route or absolute host path.
+    if tok.startswith("/") and not _has_file_extension(clean):
+        return True
+    # Vocabulary triple (`own/ownership/sovereign`, `steward/contributor/authored`)
+    # or bare route: all-lowercase segments, no extension — dismissed ONLY when
+    # its leading TWO segments do not form a real path. A one-segment guard is
+    # not enough: `steward/` is a real top-level directory, so `steward/…`
+    # vocabulary would be reported, while a two-segment test separates it
+    # cleanly from `elohim/holochain/…` (where `elohim/holochain` is real).
+    # This keeps genuine directory citations auditable — the thing a blanket
+    # vocabulary exclusion silently destroyed.
+    if VOCAB_OR_ROUTE_RE.match(clean):
+        parts = clean.split("/")
+        if parts[0] not in top_level:
+            return True
+        if root is not None and len(parts) >= 2 and not (root / parts[0] / parts[1]).exists():
+            return True
+    return False
+
+
+def build_path_suffix_index(root: Path) -> frozenset[str]:
+    """Every tracked path AND every trailing segment-slice of it.
+
+    A gospel surface routinely cites a path relative to a context established
+    earlier in the prose (`p2p/mod.rs` under a heading about elohim-storage),
+    not relative to the repo root or to its own directory. Resolving only
+    against the root reports those as drift when they are correct — which
+    inverted the ranked drift list (a surface whose 50 findings were all
+    context-relative outranked surfaces with real drift). Suffix resolution is
+    deliberately permissive: it answers "does this path shape exist", which is
+    the claim a prose citation actually makes.
+
+    KNOWN PERMISSIVENESS: a suffix match confirms the path SHAPE exists
+    somewhere, not that it exists where the prose implies. `elohim/projections/`
+    resolves because `.epr-meta/elohim/projections/` is real, even though the
+    top-level `elohim/` has no `projections/`. That is the deliberate trade:
+    prose citations genuinely are context-relative, and the alternative
+    (root-only) produced 80% false positives. Resolution is ordered
+    root → surface-relative → suffix, so the more precise conventions win first.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "ls-files"], cwd=root, capture_output=True, text=True, timeout=120
+        )
+        tracked = [ln for ln in out.stdout.split("\n") if ln]
+    except (OSError, subprocess.SubprocessError):
+        tracked = []
+    # Every real path: each tracked file plus each of its ancestor directories.
+    real_paths: set[str] = set()
+    for rel in tracked:
+        parts = rel.split("/")
+        real_paths.add(rel)
+        for k in range(1, len(parts)):
+            real_paths.add("/".join(parts[:k]))
+    # Then every true trailing suffix OF a real path (dirs in both forms).
+    suffixes: set[str] = set()
+    for p in real_paths:
+        parts = p.split("/")
+        for start in range(len(parts)):
+            suf = "/".join(parts[start:])
+            suffixes.add(suf)
+            suffixes.add(suf + "/")
+    return frozenset(suffixes)
+
+
+def path_exists_in_repo(
+    root: Path,
+    claim: str,
+    surface_dir: Path | None = None,
+    suffix_index: frozenset[str] = frozenset(),
+) -> bool:
+    """Resolve a cited path against every convention a gospel surface uses.
+
+    Order: repo-root-relative, then relative to the citing surface's own
+    directory (the per-crate CLAUDE.md convention), then as a suffix of any
+    tracked path (the context-relative prose convention), then an absolute
+    host path, then a bare filename anywhere.
+    """
     clean = claim.strip("/")
     if not clean:
         return False
-    p = root / clean
-    if p.exists():
+    if (root / clean).exists():
         return True
-    # Some prompts cite paths relative to a subdir (e.g., `src/foo.rs` inside a crate).
-    # We can't disambiguate without context, so accept bare filename matches anywhere.
+    # Relative to the citing surface's directory — how a per-crate CLAUDE.md
+    # cites `src/routes/mod.rs`.
+    if surface_dir is not None and (surface_dir / clean).exists():
+        return True
+    # Context-relative prose citation.
+    if clean in suffix_index or clean + "/" in suffix_index:
+        return True
+    # Absolute host path (e.g. a config dir outside the repo).
+    if claim.startswith("/") and Path(claim).exists():
+        return True
     if "/" not in clean and "." in clean:
         # Bare filename — see if it exists anywhere in repo
         try:
@@ -150,7 +298,14 @@ def path_exists_in_repo(root: Path, claim: str) -> bool:
     return False
 
 
-def check_path_existence(root: Path, body: str) -> list[dict]:
+def check_path_existence(
+    root: Path,
+    body: str,
+    surface_dir: Path | None = None,
+    suffix_index: frozenset[str] = frozenset(),
+    cmd_names: frozenset[str] = frozenset(),
+    top_level: frozenset[str] = frozenset(),
+) -> list[dict]:
     """Return list of {claim, exists, line_no?} entries for path-like tokens."""
     findings: list[dict] = []
     seen: set[str] = set()
@@ -161,9 +316,12 @@ def check_path_existence(root: Path, body: str) -> list[dict]:
         if tok in seen:
             continue
         seen.add(tok)
-        if path_exists_in_repo(root, tok):
+        if path_exists_in_repo(root, tok, surface_dir, suffix_index):
             continue
-        # Compute line-number approximation
+        # Resolution failed — only NOW may the token be dismissed as a shape
+        # that was never a filesystem claim.
+        if is_non_filesystem_shape(tok, cmd_names, top_level, root):
+            continue
         line_no = body.count("\n", 0, m.start()) + 1
         findings.append({"claim": tok, "exists": False, "line_no_approx": line_no})
     return findings
@@ -188,6 +346,54 @@ PROCESS_STATUS_PATTERNS = [
 # indicate it's a tool/code reference rather than narrative status).
 EXEMPT_SUBSTR_WINDOW = 80  # chars on either side
 EXEMPT_SUBSTRINGS = ("TaskUpdate", "status: \"in_progress\"", "status='in_progress'", "in_progress\"")
+NEGATION_WINDOW = 60  # chars before the match, within its clause, to scan for negation
+
+# `in-flight` is also the PROPER NOUN of a shipped mechanism ("the in-flight
+# hook", "in-flight memory-to-code coherence"). Used as a compound modifier
+# before one of these nouns it names durable architecture, not sprint state.
+COMPOUND_MODIFIER_NOUNS = (
+    "edge", "hook", "hooks", "accumulator", "coherence", "signal", "signals",
+    "layer", "tier", "check", "checks", "audit", "gate", "counter", "counters",
+    "memory-to-code", "memory↔code", "design", "spec", "mechanism", "pass",
+    "plane", "path", "invalidation", "reconciliation",
+)
+_COMPOUND_RE = re.compile(
+    r"\bin[- ]flight[- ]+(" + "|".join(COMPOUND_MODIFIER_NOUNS) + r")\b", re.IGNORECASE
+)
+
+
+def _is_quoted_example(body: str, start: int, end: int) -> bool:
+    """True when the match sits inside a quoted anti-pattern example.
+
+    Gospel surfaces teach this very discipline by quoting what NOT to write
+    (`never "currently noisy"`). The quoted illustration is correct authoring,
+    so flagging it inverts the rule — the discipline's own statement of itself
+    became its highest-ranked violation.
+    """
+    line_start = body.rfind("\n", 0, start) + 1
+    line_end = body.find("\n", end)
+    line = body[line_start : line_end if line_end != -1 else len(body)]
+    rel = start - line_start
+    # Inside an inline code span (`…`) the phrase is an identifier — a filename
+    # like `2026-05-28-in-flight-memory-coherence-design.md`, a flag, a symbol —
+    # never narrative status. An odd backtick count before the match means the
+    # match opened inside one.
+    if line[:rel].count("`") % 2 == 1:
+        return True
+    # Count quote delimiters before the match on its line; an odd count means
+    # the match opened inside a quotation.
+    for q in ('"', "“", "'"):
+        if line.count(q) >= 2 and line[:rel].count(q) % 2 == 1:
+            return True
+    # Explicit negation framing ("never X", "not X", "no X") — but only within
+    # the SAME CLAUSE as the match. A line-wide search suppressed real drift
+    # whenever an unrelated earlier clause happened to contain a negation:
+    # "The design is not finalized, and the module is currently under dev."
+    # has `not` negating `finalized`, not the flagged `currently`.
+    clause = re.split(r"[,;:.—]", line[:rel])[-1][-NEGATION_WINDOW:]
+    if re.search(r"\b(never|not|avoid|instead of|rather than|no)\b", clause, re.IGNORECASE):
+        return True
+    return False
 
 
 def check_process_status(body: str) -> list[dict]:
@@ -198,6 +404,11 @@ def check_process_status(body: str) -> list[dict]:
             end = min(len(body), m.end() + EXEMPT_SUBSTR_WINDOW)
             window = body[start:end]
             if any(s in window for s in EXEMPT_SUBSTRINGS):
+                continue
+            # Proper-noun compound modifier: "the in-flight hook".
+            if label == "in-flight" and _COMPOUND_RE.match(body, m.start()):
+                continue
+            if _is_quoted_example(body, m.start(), m.end()):
                 continue
             line_no = body.count("\n", 0, m.start()) + 1
             findings.append({
@@ -264,7 +475,14 @@ class SurfaceReport:
         return len(self.drift_path) + len(self.drift_process_status)
 
 
-def audit_surface(path: Path, root: Path, family: str) -> tuple[SurfaceReport, str]:
+def audit_surface(
+    path: Path,
+    root: Path,
+    family: str,
+    suffix_index: frozenset[str] = frozenset(),
+    cmd_names: frozenset[str] = frozenset(),
+    top_level: frozenset[str] = frozenset(),
+) -> tuple[SurfaceReport, str]:
     text = path.read_text(encoding="utf-8", errors="replace")
     body = extract_body(text)
     line_count = text.count("\n") + 1
@@ -272,7 +490,9 @@ def audit_surface(path: Path, root: Path, family: str) -> tuple[SurfaceReport, s
         path=str(path.relative_to(root)),
         family=family,
         line_count=line_count,
-        drift_path=check_path_existence(root, body),
+        drift_path=check_path_existence(
+            root, body, path.parent, suffix_index, cmd_names, top_level
+        ),
         drift_process_status=check_process_status(body),
     )
     return rep, text
@@ -366,7 +586,7 @@ def write_markdown_report(out_path: Path, surfaces: list[SurfaceReport], uncited
 
     lines.append("## Methodology notes")
     lines.append("")
-    lines.append("- **Path existence**: backticked tokens that look path-like (contain `/`, end in a known extension, or end in `/`). URLs and `*`-wildcards excluded. False-positive class: paths cited relative to a subdir without context — bare filename matches anywhere in repo are accepted.")
+    lines.append("- **Path existence**: backticked tokens that look path-like (contain `/`, end in a known extension, or end in `/`). A claim counts as resolved if it exists relative to the repo root, relative to the **citing surface's own directory** (the per-crate CLAUDE.md convention), as a **suffix of any tracked path** (the context-relative prose convention — `p2p/mod.rs` under an elohim-storage heading), as an absolute host path, or as a bare filename anywhere. Excluded as never-filesystem-claims: URLs, `*`-wildcards, `crate::module`, elided abbreviations (`app/.../foo.ts`), bare extensions (`.ts`), libp2p protocol ids (`/elohim/sync/2.0.0`), slash-commands (`/converge`), and lowercase vocabulary triples or bare HTTP routes (`own/ownership/sovereign`).")
     lines.append("- **Process-status phrasing**: regex sweep on body (frontmatter + fenced code blocks stripped). Workflow primitives like `TaskUpdate ... status: \"in_progress\"` exempt within an 80-char window.")
     lines.append(f"- **Uncited recent memory**: memory entry mtime within last {memory_days}d; slug not found as `[[slug]]` in any gospel surface. Cartographer's lens decides which surfaces SHOULD cite each entry.")
     lines.append("")
@@ -390,18 +610,22 @@ def main() -> int:
     claude_mds = discover_claude_mds(REPO_ROOT)
     memory_entries = discover_memory_entries(REPO_ROOT)
 
+    suffix_index = build_path_suffix_index(REPO_ROOT)
+    cmd_names = frozenset(_slash_command_names(REPO_ROOT))
+    top_level = frozenset(q.name for q in REPO_ROOT.iterdir())
+
     surfaces: list[SurfaceReport] = []
     surface_texts: dict[Path, str] = {}
     for path in agents:
-        rep, text = audit_surface(path, REPO_ROOT, "agent")
+        rep, text = audit_surface(path, REPO_ROOT, "agent", suffix_index, cmd_names, top_level)
         surfaces.append(rep)
         surface_texts[path] = text
     for path in skills:
-        rep, text = audit_surface(path, REPO_ROOT, "skill")
+        rep, text = audit_surface(path, REPO_ROOT, "skill", suffix_index, cmd_names, top_level)
         surfaces.append(rep)
         surface_texts[path] = text
     for path in claude_mds:
-        rep, text = audit_surface(path, REPO_ROOT, "claude-md")
+        rep, text = audit_surface(path, REPO_ROOT, "claude-md", suffix_index, cmd_names, top_level)
         surfaces.append(rep)
         surface_texts[path] = text
 
