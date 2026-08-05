@@ -48,6 +48,22 @@ Feature files describe **what a human goes through** — learner experiences, ti
 
 **Feature/scenario authoring is Opus work.** `Feature:` blocks, scenario titles, Given/When/Then narrative, frontmatter, and persona setup are load-bearing for vision alignment — Haiku produces scenario-shaped objects that pass tests but don't carry the story. Step definition wiring, fixture builders, and helper utilities are fine for Sonnet/Haiku. When dispatching agents for a2o coverage work, split the authoring (Opus) from the glue (Sonnet/Haiku).
 
+## Blind-reader review after authoring
+
+Every completed `.feature` authoring pass gets a context-blind second-reader review before the story
+is called complete. Dispatch a fresh `blind-reader` agent with **only the feature-file path** and the
+`a2o-story` review profile. Do not include the conversation, plan, implementation diff, bug history,
+related docs, or an explanation of what the author meant. Information isolation is the test: a reader
+who inherits the author's context cannot reveal where the story depends on it.
+
+The reader reconstructs who the story serves, why the outcome is valuable, and the causal meaning of
+each scenario; it also names unexplained terms, hidden state, implied transitions, contradictions, and
+places where comments carry meaning the Gherkin itself should carry. A large findings set is useful,
+not a failed review. Revise the story from those findings and give the next pass to a **new** blind
+reader. Repeat until the verdict is `READY`, or record the specific findings the operator explicitly
+chooses to defer. The `.epr-meta` rule `a2o-story-blind-reader-review` and its PostToolUse signal keep
+this obligation attached to the authoring surface.
+
 ## Watch-outs
 
 - **A gherkin parse error aborts the WHOLE E2E run, not one scenario.** An unescaped `/` inside a scenario name or step (read by the parser as an empty regex alternation), a bare continuation line the AST rejects, or a malformed table will abort the entire feature-file load — every scenario in the run is lost and the build surfaces as `UNSTABLE` with a **blank cucumber report body** (empty report → UNSTABLE with no failing-scenario detail). When that happens, READ THE RAW E2E LOG FIRST (the parse error is there, not in the empty report). Backlog: a pre-push gherkin/cucumber grammar linter (`gherkin-prepush-lint`) to catch empty-alternation + bare-continuation before AST-abort drops the whole suite.

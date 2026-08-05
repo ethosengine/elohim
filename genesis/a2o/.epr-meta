@@ -4,10 +4,24 @@ id: a2o-governance
 covers: subtree
 purpose: >
   The a2o (acceptance-to-outcome) surface — executable BDD scenarios, Cucumber step definitions,
-  script infrastructure for reporting, and the framework runtime. Owned as a whole; no edit-time
-  gate is needed for everyday authoring (CLAUDE.md carries the conventions), but new feature
-  subdirectories must carry their own .epr-meta to prevent silent governance drop.
+  script infrastructure for reporting, and the framework runtime. Feature-story writes carry a
+  context-blind reader review obligation so their human value and causal narrative stand without
+  session context. New feature subdirectories must also carry their own .epr-meta to prevent silent
+  governance drop.
 rules:
+  - id: a2o-story-blind-reader-review
+    class: inject
+    when: { write: "*.feature" }
+    route-to: { dest: blind-reader }
+    parameters: { review-profile: a2o-story }
+    why: >
+      After the authoring pass, dispatch a fresh-context blind-reader with ONLY the completed
+      feature-file path and the `a2o-story` review profile. Do not provide the conversation, plan,
+      implementation diff, incident history, or related docs. Revise from its interpretability and
+      coherence findings, then repeat with a new blind reader until the story is READY or the operator
+      explicitly defers named findings. The PostToolUse signal makes this deferred review obligation
+      visible after writes; it is one review loop per completed authoring pass, not one subagent
+      dispatch per edit.
   - id: new-feature-subdir-needs-meta
     class: ask
     when: { write: ".epr-meta", new: true }
@@ -29,14 +43,17 @@ Executable BDD scenarios that verify deployed artifacts match genesis intent.
 - `scripts/` — sprint-report aggregator, coverage scanner, `look`/`graphos` tooling
 - `schemas/` — JSON schema for the sprint-report wire format
 
-## Conventions (authoritative, not gate-enforced in v1)
+## Conventions and the story review gate
 
 Feature authoring conventions are documented in `genesis/a2o/CLAUDE.md` — tag requirements
 (`@e2e`, `@concern:`, `@requires:`), persona patterns, step-definition paths, and the story-first
-workflow. No edit-time gate is needed here; the conventions are stable and well-understood.
+workflow. The `a2o-story-blind-reader-review` rule is deliberately semantic: after an authoring pass,
+a fresh agent receives only the feature file and reports whether an unfamiliar reader can reconstruct
+who benefits, why the behavior matters, and how each scenario proves that value. The companion
+PostToolUse signal routes the author to the general `blind-reader` with its `a2o-story` profile;
+findings feed a revise-and-reread loop.
 
 ## Governance note
 
-This manifest records considered ownership (`covers: subtree`) with no general authoring gate.
-The one wired rule (`new-feature-subdir-needs-meta`) prevents orphan subtrees — the one mechanical
-drift that CLAUDE.md cannot catch at author time.
+This manifest records considered ownership (`covers: subtree`). The blind-reader rule protects story
+interpretability; `new-feature-subdir-needs-meta` prevents orphan subtrees.

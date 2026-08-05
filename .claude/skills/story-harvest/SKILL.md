@@ -1,6 +1,6 @@
 ---
 name: story-harvest
-description: Use when finishing a development branch, after resolving a debugging session, or whenever a failure-then-fix cycle reveals engineering constraints worth preserving as a2o scenarios. Also invocable manually with /story-harvest.
+description: Use when finishing a development branch, after resolving a debugging session, or whenever a failure-then-fix cycle reveals engineering constraints worth preserving as a2o scenarios. Any written .feature story must then enter the context-isolated blind-reader revision loop required by genesis/a2o/.epr-meta. Also invocable manually with /story-harvest.
 metadata:
   sourceRuntime: claude
   master: package

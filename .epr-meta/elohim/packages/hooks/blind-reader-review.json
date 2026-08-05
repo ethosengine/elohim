@@ -1,0 +1,48 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "HookPackage",
+  "metadata": {
+    "id": "blind-reader-review",
+    "name": "blind-reader-review",
+    "version": "1.0.0",
+    "description": "Post-write adapter for directory-local blind-reader review rules.",
+    "sourceRuntime": "claude",
+    "runtimeTargets": [
+      "claude"
+    ],
+    "event": "PostToolUse",
+    "matcher": "Edit|Write",
+    "interpreter": "python3",
+    "language": "python",
+    "assetRefs": [],
+    "governance": {
+      "eprRef": "epr:elohim-agent/hooks/blind-reader-review",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    },
+    "master": "package",
+    "composedBy": "codex-gpt-5"
+  },
+  "source": {
+    "language": "python",
+    "interpreter": "python3",
+    "path": ".claude/hooks/blind-reader-review.py",
+    "body": "#!/usr/bin/env python3\n\"\"\"Post-write adapter for directory-local blind-reader review rules.\n\nEach .epr-meta manifest decides which authored files need a blind read and\nselects a review profile. This hook only makes that obligation visible after a\nsuccessful Edit/Write; it never pretends to perform or certify the semantic\nreview itself.\n\nHook Type: PostToolUse\nMatcher: Edit|Write\n\"\"\"\n\nfrom __future__ import annotations\n\nimport json\nimport os\nimport sys\nfrom pathlib import Path\n\n\nAGENT_ID = \"blind-reader\"\n\n\ndef _repo_root() -> Path | None:\n    project_dir = os.environ.get(\"CLAUDE_PROJECT_DIR\")\n    return Path(project_dir).resolve() if project_dir else None\n\n\ndef _target_path(file_path: str, repo: Path) -> Path:\n    target = Path(file_path)\n    if not target.is_absolute():\n        target = repo / target\n    return target.resolve()\n\n\ndef _matching_reviews(target: Path, repo: Path) -> list[tuple[str, str]]:\n    try:\n        target.relative_to(repo)\n    except ValueError:\n        return []\n\n    scripts_dir = repo / \".claude\" / \"scripts\"\n    if str(scripts_dir) not in sys.path:\n        sys.path.insert(0, str(scripts_dir))\n\n    try:\n        from _lib.epr_meta import _matches_when, resolve_write\n\n        content = target.read_text(errors=\"replace\")\n        write = {\n            \"path\": str(target),\n            \"content\": content,\n            \"is_new\": False,\n            \"is_new_subdir\": False,\n        }\n        result = resolve_write(target, write, repo)\n    except (ImportError, OSError):\n        return []\n\n    reviews: list[tuple[str, str]] = []\n    rules = result.get(\"merged\", {}).get(\"rules\", {})\n    for rule_id, rule in rules.items():\n        if not isinstance(rule, dict):\n            continue\n        route = rule.get(\"route-to\", {})\n        if route.get(\"dest\") != AGENT_ID or not _matches_when(rule.get(\"when\", {}), write):\n            continue\n        parameters = rule.get(\"parameters\", {})\n        profile = parameters.get(\"review-profile\", \"general\")\n        reviews.append((rule_id, profile))\n    return reviews\n\n\ndef _context(target: Path, repo: Path, reviews: list[tuple[str, str]]) -> str:\n    try:\n        display_path = target.relative_to(repo)\n    except ValueError:\n        display_path = target\n    rules = \", \".join(f\"`{rule_id}`\" for rule_id, _ in reviews)\n    profiles = \", \".join(f\"`{profile}`\" for _, profile in reviews)\n    return (\n        f\"[BLIND-READER REVIEW] `{display_path}` carries .epr-meta rule(s) {rules}. \"\n        f\"After this authoring pass is complete, dispatch a NEW fresh-context `{AGENT_ID}` with \"\n        f\"only this document path and review profile(s) {profiles}—no conversation, plan, diff, \"\n        \"incident history, sibling documents, glossary, or author explanation. Revise from the \"\n        \"full interpretability/coherence findings and repeat with another blind reader until \"\n        \"READY, or name findings the operator explicitly defers. Defer dispatch until the \"\n        \"completed authoring pass; do not spawn one per edit.\"\n    )\n\n\ndef main() -> int:\n    try:\n        payload = json.load(sys.stdin)\n    except (json.JSONDecodeError, ValueError):\n        return 0\n\n    file_path = (payload.get(\"tool_input\", {}) or {}).get(\"file_path\", \"\")\n    repo = _repo_root()\n    if not file_path or repo is None:\n        return 0\n\n    target = _target_path(file_path, repo)\n    reviews = _matching_reviews(target, repo)\n    if not reviews:\n        return 0\n\n    print(\n        json.dumps(\n            {\n                \"hookSpecificOutput\": {\n                    \"hookEventName\": \"PostToolUse\",\n                    \"additionalContext\": _context(target, repo, reviews),\n                }\n            }\n        )\n    )\n    return 0\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n"
+  },
+  "registration": {
+    "event": "PostToolUse",
+    "matcher": "Edit|Write",
+    "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/blind-reader-review.py\"",
+    "timeout": 3,
+    "type": "command"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/hooks/blind-reader-review.py"
+    }
+  }
+}
