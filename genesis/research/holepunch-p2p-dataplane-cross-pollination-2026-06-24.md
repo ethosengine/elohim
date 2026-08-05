@@ -3,6 +3,7 @@ title: Holepunch (Hypercore / Pear) — P2P Data-Plane & NAT-Traversal Cross-Pol
 id: holepunch-p2p-dataplane-cross-pollination-2026-06-24
 status: Capture
 date: 2026-06-24
+sovereignty-frame: adversary
 ---
 
 # Holepunch Cross-Pollination — June 2026
