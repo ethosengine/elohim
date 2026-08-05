@@ -81,7 +81,7 @@ The Elohim Protocol uses Unyt-inspired mutual credit with multiple currency swim
 
 ## Generated Types (from elohim-storage)
 
-Key types: `EconomicEventView`, `StewardshipAllocationView`, `ContributorPresenceView`. REA actions: `use`, `cite`, `produce`, `transfer`, `work`, `accept`, `modify`. Lamad event types: `content-view`, `affinity-mark`, `presence-claim`, `recognition-transfer`, `learning-engagement`, `content-contribution`, `compute-contribution`, `governance-participation`.
+Key types: `EconomicEventView`, `StewardshipAllocationView`, `ContributorPresenceView`. REA actions: the canonical vocabulary is `REA_ACTIONS` in `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` (~24 verbs — `use`, `cite`, `produce`, `transfer`, `work`, `accept`, `modify`, `consume`, `raise`, `lower`, `transfer-custody`, `combine`, `separate`, `deliver-service`, `give`, `take`, … ). Read that list before inventing a verb; it is a hand-maintained Rust const with no governing JSON schema, so it is NOT reachable via `schema:codegen`. Lamad event types: `content-view`, `affinity-mark`, `presence-claim`, `recognition-transfer`, `learning-engagement`, `content-contribution`, `compute-contribution`, `governance-participation`.
 
 See `references/generated-types.md` for full interface definitions and the complete shefa service landscape.
 
@@ -121,7 +121,7 @@ unclaimed -> stewarded -> claimed
 
 ## Shefa Service Landscape
 
-Services in `elohim-app/src/app/shefa/services/`. Most are stubs defining the API surface. Only `ExchangeService` is fully implemented. Core services (`EconomicService`, `EconomicEventFactoryService`, `EventService`) are partial. `ElohimStubService` is an intentional mock.
+Services in `app/elohim-app/src/app/shefa/services/`. Most are stubs defining the API surface. The concrete REA entry points are `EconomicEventsApiService` (`economic-events-api.service.ts`, implements `IEconomicEventFactory`), `ExchangeApiService` (`exchange-api.service.ts`), and `EventService` (`event.service.ts`). `ElohimStubService` is an intentional mock.
 
 Six service groups: Core, Contributor/Stewardship, Marketplace, Banking Bridge, Insurance, Compute. See `references/generated-types.md` for the full service listing with status and purpose.
 
@@ -202,18 +202,32 @@ await http.post(`/db/contributor-presences/${presenceId}/claim`, input);
 
 ## Key Files
 
+**Where REA truth lives, and where the mirrors live.** The **protocol** owns
+`EconomicEvent`, `Agreement`, `Commitment`, and `Resource` as wire types — declared under
+`elohim/sdk/domains/shefa/` (see its `CLAUDE.md` and the `types/` wire-types crate) and
+notarized in the DNA. Start there when adding or changing an REA type; the substrate is
+authoritative and TypeScript conforms to it, never the reverse.
+
+Inside the Angular app the split is: the **`elohim`** pillar holds the consumer-side REA
+*models* (cross-pillar vocabulary — these are prototype-era hand-written mirrors of the
+wire types, not a second source of truth), and **`shefa`** holds the economic *behaviour* —
+services, components, domain models. So reach for `@app/elohim` for an REA type in app
+code, `@app/shefa` for economic behaviour, and `elohim/sdk/domains/shefa/` when the
+question is what the type actually *is*.
+
 | File | Purpose |
 |------|---------|
-| `elohim-app/src/app/shefa/claude.md` | Shefa pillar overview |
-| `elohim-app/src/app/shefa/models/rea-bridge.model.ts` | ValueFlows ontology types |
-| `elohim-app/src/app/shefa/models/contributor-presence.model.ts` | Presence model |
-| `elohim-app/src/app/shefa/models/economic-event.model.ts` | Event model |
-| `elohim-app/src/app/shefa/services/economic.service.ts` | Core economic service |
-| `elohim-app/src/app/shefa/services/exchange.service.ts` | Marketplace |
-| `elohim-app/src/app/shefa/README-REQUESTS-AND-OFFERS.md` | Marketplace design |
+| `app/elohim-app/src/app/shefa/CLAUDE.md` | Shefa pillar overview |
+| `app/elohim-app/src/app/elohim/models/rea-bridge.model.ts` | ValueFlows ontology types (elohim pillar) |
+| `app/elohim-app/src/app/elohim/models/contributor-presence.model.ts` | Presence model (elohim pillar) |
+| `app/elohim-app/src/app/elohim/models/economic-event.model.ts` | Event model (elohim pillar) |
+| `app/elohim-app/src/app/shefa/services/economic-events-api.service.ts` | Core economic service |
+| `app/elohim-app/src/app/shefa/services/exchange-api.service.ts` | Marketplace |
+| `app/elohim-app/src/app/shefa/README-EXCHANGE.md` | Marketplace (requests + offers) design |
 | `app/elohim-app/src/app/shefa/README-INSURANCE-MUTUAL.md` | Insurance mutual design |
-| `genesis/docs/content/elohim-protocol/shefa.md` | Economic whitepaper |
-| `research/economic/README.md` | Unyt architecture exploration |
+| `genesis/docs/content/elohim-protocol/economic_coordination/epic.md` | Economic whitepaper |
+| `elohim/elohim-storage/research/economic-systems-research.md` | Economic systems research — Drips / Unyt / hREA / EAE |
+| `elohim/sdk/domains/shefa/CLAUDE.md` | Protocol-side REA wire-type ownership (authoritative) |
 | `elohim/sdk/storage-client-ts/src/generated/EconomicEventView.ts` | Generated type |
 | `elohim/elohim-storage/src/views.rs` | Rust view types (EconomicEventView, etc.) |
 

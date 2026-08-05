@@ -31,7 +31,9 @@ RUSTFLAGS="" cargo build --release && cargo test --lib --bins && cargo clippy --
 # is steward/node/justfile's `gate: fmt-check clippy test` — plain `cargo test`.
 RUSTFLAGS="" cargo build --release && cargo test && cargo clippy -- -D warnings && cargo fmt --check
 
-# elohim/elohim-storage/ — Holochain WASM build
+# elohim/elohim-storage/ — NATIVE binary, but needs the custom getrandom backend
+# (it is not a WASM build; the flag is a dependency requirement, and omitting it
+# fails the build). Its CI home is the EDGE pipeline, not the DNA pipeline.
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
 cargo test export_bindings         # Regenerate TypeScript types
 ```
@@ -92,7 +94,7 @@ Types flow from Rust through auto-generation to TypeScript:
 3. **storage-client-ts** (`@elohim/storage-client`) exports ready-to-use camelCase types
 4. **Adapters** (`app/elohim-app/src/app/elohim/adapters/`) add computed/derived fields only - never transform wire format
 
-**Key rule**: snake_case never leaves the Rust boundary. TypeScript receives camelCase with parsed JSON and proper booleans. No `JSON.parse()`, no case conversion, no `toWire/fromWire` functions in TypeScript.
+**Key rule**: snake_case never leaves the Rust boundary. TypeScript receives camelCase with parsed JSON and proper booleans. No `JSON.parse()`, no case conversion, no `toWire` / `fromWire` functions in TypeScript.
 
 **ts-rs cross-crate trap**: ts-rs computes import paths in generated TS from the Rust *source* crate's location, not the `export_to` directory. Moving a ts-rs-anchored type into a different crate while consumers stay put emits broken `../../../../` import paths in every referencing `.ts`. Move ALL `#[derive(TS)]` types together to one crate in a single atomic migration — never partial/incremental cross-crate moves — and verify byte-identical generated TS via sha256 diff.
 
@@ -108,7 +110,7 @@ Rust service consolidating three functions: bootstrap (agent discovery), signal 
 
 ### Bridges (`bridges/`)
 
-Pluggable interop crates that translate external protocols to and from elohim's canonical EPR-REA substrate. Runtimes consume the bridges relevant to their job: `doorway-service` consumes web2 bridges (`atproto`, `activitypub`, planned); `elohim-storage` consumes protocol-shaped bridges (`valueflows` for hREA / VF-GraphQL). See `bridges/CLAUDE.md` for the pattern and `genesis/docs/superpowers/specs/2026-05-20-wave3-valueflows-hrea-interop-design.md` for Wave 3 substrate work.
+Pluggable interop crates that translate external protocols to and from elohim's canonical EPR-REA substrate. Runtimes consume the bridges relevant to their job: `doorway-service` consumes web2 bridges (`atproto`, `activitypub`, planned); `elohim-storage` consumes protocol-shaped bridges (`valueflows` for hREA / VF-GraphQL). See `bridges/CLAUDE.md` for the pattern and `genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md` for Wave 3 substrate work.
 
 ### Content Pipeline
 
@@ -161,7 +163,7 @@ Frontend review/refinement is eyes-first: render before reading source. Rails av
 
 When using `finishing-a-development-branch`, invoke `story-harvest` between Step 1 (tests pass) and Step 3 (present options). When using `systematic-debugging` and a root cause is identified and fixed, invoke `story-harvest` before closing the debugging session. The skill identifies engineering constraints discovered during development — especially parameter-bearing discoveries (memory limits, concurrency thresholds, cache sizes) that inform operator presets and peer diversity configuration — and scaffolds a2o regression scenarios to preserve them.
 
-### Story-Graph Maintainer (every agent, in flight)
+### Story-Graph Maintainer (every agent, mid-flight)
 
 Every agent working inside a value chain (a2o chapters, valueflow commitments, spec gaps) also maintains the chain itself. A seam discovered mid-flight — one assertion that proves to be a pipeline of truths, or an unnamed precondition between two nodes — is a **missing node between named atoms**, not prose for a report. Capture it at discovery in mintable shape: `chain / between A→C / missing node B: <assertion + probe> / current state`. Depth and scaffolding: the `story-harvest` skill ("The Maintainer Role — Atom Perspective" — station decomposition keeps the finish-line assertion untouched and adds stations before it). Minted nodes become measured nodes automatically (`epr flow project` re-mints commitments from the recipes).
 
@@ -246,11 +248,12 @@ Pipeline metadata is declared in per-project `build-manifest.json` files. The `g
 |----------|-------------|----------|
 | App | `Jenkinsfile` (root) | `app/elohim-app/build-manifest.json` |
 | Edge | `elohim/holochain/Jenkinsfile` | `elohim/holochain/build-manifest.json` |
-| DNA (Lamad) | `elohim/holochain/dna/Jenkinsfile` | `elohim/holochain/dna/build-manifest.json` |
-| DNA (Mishpat) | `elohim/holochain/dna/mishpat/Jenkinsfile` | `elohim/holochain/dna/mishpat/build-manifest.json` |
+| DNA (all DNAs) | `elohim/holochain/dna/Jenkinsfile` | `elohim/holochain/dna/build-manifest.json` |
 | Genesis | `genesis/Jenkinsfile` | `genesis/build-manifest.json` |
 | Sophia | `sophia/Jenkinsfile` | `sophia/build-manifest.json` |
-| Steward | `steward/Jenkinsfile` | `steward/build-manifest.json` |
+| Steward | `steward/device/Jenkinsfile` | `steward/device/build-manifest.json` |
+
+**One DNA pipeline builds every DNA.** There is no per-DNA Jenkinsfile: `elohim/holochain/dna/Jenkinsfile` packs each DNA in turn — lamad (packed from the `dna/elohim/` directory, not `dna/lamad-v1/`), imagodei, infrastructure, node-registry, mishpat — and the DNA manifest's `elohim/holochain/dna/**` watch globs cover all of them. A DNA subdirectory holding only `dna.yaml` + `zomes/` + a `justfile` is normal and fully covered: do not read the absence of a per-DNA Jenkinsfile as missing CI, and do not add one. (`dna/hrea/` is a reserved placeholder — `workdir/` only, no zomes, not packed.)
 
 ## Code Style
 
