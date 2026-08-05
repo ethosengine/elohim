@@ -3,17 +3,19 @@ id: "backlog-prepush-cargo-target-pool"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "Pre-push hook bypasses the cargo-target-pool — no per-crate CARGO_TARGET_DIR → ENOSPC"
+title: "Pre-push cargo-target-pool: originally bypassed entirely (→ ENOSPC); reopened 2026-08-05 because a dangling /tmp slot symlink makes the pooling fail SILENTLY back to an in-tree build"
 slug: "prepush-cargo-target-pool"
 written: "2026-06-02"
 author: "cartographer"
-status: "resolved"
+status: "open"
 resolved: "2026-06-04"
-priority: "medium"
+reopened: "2026-08-05"
+priority: "high"
 area: "cargo"
-recurrence: 1
+recurrence: 2
 source_shifts:
   - "2026-05-18"
+  - "2026-08-05"
 domain: "code"
 relatedNodeIds:
   - "memory:feedback_multi_agent_pvc_pacing"
@@ -71,3 +73,76 @@ the soft watermark, and defers heavy Rust gates with a DEFERRED-BY-PVC banner at
 ceiling (FORCE_HEAVY_GATES=1 overrides). ENOSPC mid-push is now structurally prevented from
 both directions: builds land in policy-bounded slots, and pushes that can't fit defer
 instead of starving the volume.
+
+## REOPENED 2026-08-05 — the pooling fails SILENTLY when a slot's /tmp target is gone
+
+The 2026-06-04 resolution is correct in design and **fails open in exactly the wrong direction**.
+Pool slots for the `/tmp`-backed workspaces are symlinks:
+
+```
+/projects/.cargo-target-pool/family/angular22/doorway__doorway-service/dev -> /tmp/cargo-doorway
+```
+
+`/tmp` does not survive a host reboot (or a tmp reaper), so the symlink goes **dangling**. The
+guard in `run_gate` is:
+
+```bash
+if [ -n "${GATE_SLOT:-}" ] && mkdir -p "$GATE_SLOT" 2>/dev/null; then
+  export CARGO_TARGET_DIR="$GATE_SLOT"
+  echo "  [$PROJECT_NAME] pooled target: $GATE_SLOT"
+fi
+```
+
+`mkdir -p` on a **dangling symlink** fails with `File exists` (the symlink exists, but does not
+resolve to a directory) — verified directly:
+
+```
+$ mkdir -p /projects/.cargo-target-pool/family/angular22/doorway__doorway-service/dev
+mkdir: cannot create directory '...': File exists   # exit 1
+```
+
+So the `if` is false, `CARGO_TARGET_DIR` is never exported, **no message is printed**, and the
+gate falls back to an in-tree `target/` — the one path `project_container_cargo_environment_quirks`
+records as ENOENT-prone in this container. Observed 2026-08-05 12:18Z on a `dev`-targeted push:
+
+```
+[elohim-storage] pooled target: /projects/.cargo-target-pool/family/angular22/elohim__elohim-storage/dev
+elohim-storage: PASSED (258s)
+...
+[doorway] Running quality gate via just...        # <-- no "pooled target:" line
+error: failed to write `/projects/elohim/doorway/doorway-service/target/debug/.fingerprint/lzma-sys-.../invoked.timestamp`
+error: failed to write /projects/elohim/doorway/doorway-service/target/debug/deps/libclang_sys-....rmeta: No such file or directory (os error 2)
+PRE-PUSH GATE: FAILED (284s)  —  Failed: doorway
+```
+
+Storage passed (its slot is a real directory); doorway failed. **Nothing in the output says
+pooling was skipped** — the failure presents as a doorway code/build problem, which it is not.
+Disk was fine throughout (64% used, 318G free), so the PVC-pressure path is not involved.
+
+**Other dangling slots found in the same sweep** (any of these will silently degrade the same
+way for whoever pushes next on that family):
+
+```
+/projects/.cargo-target-pool/family/dev/crates/dev                  -> /tmp/cargo-pool-devfam-crates
+/projects/.cargo-target-pool/family/dev/doorway__doorway-service/dev -> /tmp/cargo-target/doorway-gate-dev
+/projects/.cargo-target-pool/family/dev/elohim__elohim-storage/dev   -> /tmp/cargo-target/pool-elohim__elohim-storage-dev
+/projects/.cargo-target-pool/family/dev/steward__node/dev            -> /tmp/cargo-pool-devfam-steward__node
+```
+
+**Shape of the fix (two parts, both small):**
+
+1. **Resolve through the symlink before creating.** `mkdir -p "$(readlink -f "$GATE_SLOT")"` (or
+   test `[ -L "$GATE_SLOT" ] && [ ! -e "$GATE_SLOT" ]` and recreate the target) so a `/tmp`-backed
+   slot self-heals after a reboot.
+2. **Never fall back silently.** If the slot cannot be prepared, print a loud
+   `⚠ POOL SLOT UNAVAILABLE — building in-tree` warning naming the slot. Fail-open on the *build*
+   is defensible; fail-open on the *signal* is what cost this push. Same lesson as the
+   `ci-rbac-jenkins-deployer` phantom-green class: a degraded mode that announces itself is fine,
+   a silent one is not.
+
+A `cargo-pool doctor` (or a check folded into `cargo-pool status`) that reports dangling slots
+across all families would catch these before a push does.
+
+**Immediate workaround** (what unblocked 2026-08-05): `mkdir -p /tmp/cargo-doorway`, then re-push.
+Leaves a junk in-tree `doorway/doorway-service/target` (5.9M here) for `cargo-pool legacy-targets`
+to reclaim.
