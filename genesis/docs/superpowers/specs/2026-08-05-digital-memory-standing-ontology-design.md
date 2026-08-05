@@ -14,6 +14,7 @@ cites:
   - middot-measure-primitive-design | The sibling ontology — measures make observation composable and teeth-free; this doc makes the memory those observations produce standing-bearing. A MeasureFold over a person is derived memory and inherits their standing | sha256:336ab2b4619b9144 | path: genesis/docs/superpowers/specs/2026-08-04-middot-measure-primitive-design.md
   - confession | The warrant and the limit: binding-as-covenant governs why guards must stay short and link rather than lecture; and the total-account-belongs-to-God-alone clause is the tension this ontology mitigates structurally but does not dissolve | sha256:bec001fd41230c67 | path: genesis/docs/content/elohim-protocol/confession.md
   - genesis/data/timeline/backlog/commons-holonic-stewardship-backlog.md
+  - genesis/data/timeline/backlog/arch-workspace-discipline-backlog.md
 ---
 
 # The Digital Memory Ontology
@@ -423,6 +424,43 @@ And the guards must remain short. `confession.md:95` binds the shape: the protoc
 about the binding… never deceive the agent that the cage is liberty — because the lie that the cage is
 love is the very domination this whole work exists to refuse."* A guard that grew to contain this
 document would be a cage. A guard that opens a walkable path to it is covenant.
+
+## 7.1 How this becomes enforceable — the path, and the gate on it
+
+Prose is not governance. The path from this document to enforceable, content-addressed lineage
+**already exists** and is one mechanism touching all three layers, not three pieces of work:
+
+```
+concerns.yaml row  →  canon-lift  →  schema projection  →  Mishpat::Precedent
+(contentHash-pinned)  (CIDv1 dag-cbor atom +   (registries/           (CID = entry_hash,
+                       declared head +          concern-classes.json,  when epr-meta lifts
+                       standing object)         generated)             into brit/eprfs)
+```
+
+**`concerns.yaml` is the correct home, and specifically not `policies.yaml`.** The split is by whether
+an evaluable predicate exists: a class *with* one is an enforcement row in `policies.yaml`; a class
+*without* one is Precedent-shaped **here**. This ontology has no predicate today, so any row it earns
+belongs in `concerns.yaml`. The relocation is designed in: when a validator is later registered, the
+row **moves** to `policies.yaml` as a new version and the concerns row is marked `superseded` naming
+the new pin — lineage, never deletion. The reverse move does not exist; *a predicate is not
+un-invented*.
+
+**The gate: a concern row with no bound decision point fails the census.** `placement-audit.py
+--epr-meta` requires every class to list the decision points it binds, and every registered point to
+cite passing contract tests. **This ontology has none** — no memory-bearing entity exists yet — so
+adding rows today would fail on arrival, and would commit the exact error the registry was written to
+prevent: *declaring a gate class with nothing to gate*, which that canon names as its own **C7
+violation (advertise ≠ serve)**.
+
+**So the trigger is Slice 0 of the rights plan**, which creates the first decision points these rows
+could bind to. Until then this document stays prose *on purpose*. The same discipline stopped a
+`memory-standing:` key being added to the closed `.epr-meta` rule vocabulary (§5): **an unwired
+declaration that reads as governance is worse than an honest absence.**
+
+**One live prerequisite, independent of this ontology:** the canon-lift artifacts are stale (30
+registry rows, 27 lifted), so even ratified governance is not currently reaching the atom and schema
+layers. That hop must work before anything added here acquires lineage — tracked as
+`arch-workspace-discipline` row 11, blocked on an in-flight `canon_lift` refactor.
 
 ## 8. What this does not do
 
