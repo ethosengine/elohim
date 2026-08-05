@@ -24,6 +24,24 @@ Feature: SSR capability is advertised, honored, and accountable
     And the response body's "authModes" includes "anonymous"
     And the response body's "renderers" includes "angular-ssr"
 
+  # Secure-by-default (2026-07-30). A credentialed render runs in a REUSED V8
+  # isolate whose JS heap is never reset between renders, so one principal's
+  # residue is live in the next principal's render. Until per-principal isolates
+  # are affordable, authenticated SSR is opt-in — never granted implicitly.
+  # The cost is nil: an unsupported posture falls back to CSR and hydrates with
+  # the user's credential client-side.
+  # See genesis/data/timeline/backlog/elohim-render-isolate-reuse-trust-boundary.md
+  Scenario: the derived claim does not implicitly offer authenticated SSR
+    Given the doorway has no operator override for auth modes
+    When I GET "/admin/capability" on the doorway
+    Then the response body's "authModes" includes "anonymous"
+    And the response body's "authModes" does not include "doorway-hosted"
+
+  Scenario: an operator may opt in to authenticated SSR explicitly
+    Given the doorway's override config is [render]\n auth_modes = ["anonymous","doorway-hosted"]
+    When I GET "/admin/capability" on the doorway
+    Then the response body's "authModes" includes "doorway-hosted"
+
   Scenario: doorway returns null when no SSR claim is published
     Given the doorway has no SSR_BUNDLES_DIR configured
     When I GET "/admin/capability" on the doorway
