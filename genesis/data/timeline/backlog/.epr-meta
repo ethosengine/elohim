@@ -1,0 +1,29 @@
+---
+epr-meta-version: 1
+id: timeline-backlog-governance
+purpose: "Backlog entries — near-future concern canon. Cluster-first: like concerns fold into subject cluster files (CLUSTERS.md is the map); standalone entries are for operationally-atomic concerns. The backlog graduates concerns into sprints; it is not a dump."
+rules:
+  - id: cluster-first-at-birth
+    class: inject
+    when: { write: "*.md", new: true }
+    dedupe-of: genesis/data/timeline/backlog/CLUSTERS.md
+    why: >
+      Check CLUSTERS.md first: if this concern has siblings (same subject, same seam), fold it as a
+      row in the matching arch-*-backlog cluster file — citing its source (survey epr: slug, incident,
+      review) — instead of minting a standalone entry. Standalone entries are for operationally-atomic
+      concerns (one bug, one incident, one bounded task). Research-derived takes ALWAYS go to a
+      cluster. If a new cluster is genuinely needed, add its row to CLUSTERS.md in the same pass.
+---
+# backlog/ — near-future concern canon (cluster-first)
+
+Timeline-CONVENTIONS-conformant backlog entries (`kind: backlog`, delivery-status axis). The
+operating rule this manifest encodes (operator decision 2026-08-04): **we will not act on every
+entry ever minted, so the backlog's value is graduation, not accumulation.** Like concerns cluster
+into subject files with ranked row tables; `CLUSTERS.md` is the map and the cheap status surface;
+rows graduate into shifts individually. The provenance chain (research → cluster row → spec →
+code + scenario → chronicle, each hop citing backward via `epr:` slugs) is documented in
+`CLUSTERS.md` §"The provenance chain" — the chronicle entry at the end is the compressed story.
+
+The birth-time inject above is a teaching signal, not a gate: it fires once per new entry with the
+cluster-first instruction. Graduation to `ask` class is available at a later dev-merge ratification
+if standalone dumps keep recurring.
