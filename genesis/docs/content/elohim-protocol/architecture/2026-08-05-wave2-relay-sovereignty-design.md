@@ -10,7 +10,8 @@ cites:
   - holochain-iroh-convergence-upgrade-campaign | the governing campaign whose Wave 2 Task E1 this design closes — and whose two stated assumptions it corrects (the flip is an image-feature change, not a config change; the household-first staging is not executable on the live DHT) | sha256:ddab91172812e446 | path: genesis/docs/superpowers/plans/2026-08-04-holochain-iroh-convergence-upgrade-campaign.md
   - holochain-iroh-dep-verification-pack | the Wave 1 Lane D config-mapping ground truth this design builds on — relay_url to irohTransport.relayUrl, signal_url/webrtc_config as tx5-only leftovers, and the unauthenticated-relay boundary imposed by doorway lacking /authenticate and /relay/register | sha256:36835df9cebacd31 | path: genesis/docs/content/elohim-protocol/history/2026-08-04-holochain-iroh-dep-verification-pack.md
   - substrate-trust-contract-runbook | the invariant/probe contract the transport flip must preserve — its seam-smoke, conductor-diagnostics and canonical-head probes carry over unchanged, seam-smoke[signal-bus] is retired by the flip and replaced by this design relay-reachability and n0-contamination probes | sha256:cb76e9f0ae6bacfc | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md
-  - genesis/orchestrator/manifests/infra/alpha-iroh-relay.yaml
+  - genesis/orchestrator/manifests/doorway/alpha.yaml
+  - genesis/orchestrator/manifests/doorway/alpha-b.yaml
   - genesis/orchestrator/manifests/infra/alpha-coturn-operations.yaml
   - genesis/orchestrator/manifests/infra/alpha-coturn-shem.yaml
   - genesis/data/timeline/backlog/sovereign-turn-relay-transport-commons.md
@@ -34,6 +35,17 @@ claim about persons or identity tiers is made or implied by hosting one.
 version of it, how it is exposed, how the transport flip is actually performed
 (it is *not* the config-only flip the campaign plan assumed), what proves it
 worked, and in what order the tx5-era infrastructure retires.
+
+**REVISED 2026-08-05 (operator ruling): the relay is a doorway concern.** The
+doorway consolidates bootstrap + signal + gateway by design; the relay is the
+signal function's iroh-generation successor, so it routes to the doorway seam
+even while its incarnation is transitional. Consequences threaded through this
+doc (D2/D3/D7 revised, §3 manifests, §4.2 rendering, §5.3 probe, §6.1 framing,
+§7 items 1/3/5, U7): per-doorway relays mirroring the signal topology
+(`relay.alpha.elohim.host` ↔ doorway A/operations, `relay.elohim.host` ↔
+doorway B/shem), per-human homing via `primaryDoorway`, dual-WAN redundancy
+restored, deployed as separate pods in the doorway manifest family — never
+compiled into doorway-service (lockfile isolation stands).
 
 **What this does not do.** No template edits, no cluster actions, no commits of
 conductor config. The manifest deliverable is inert until the operator applies
@@ -106,57 +118,63 @@ The layer guard holds: operational relay-hosting experience transfers, code does
 not, and the two configs must never be conflated. But the *stance* is one
 stance, and it applies to both.
 
-### D2. One relay name — `relay.elohim.host` — not per-env
+### D2. Per-doorway relays, mirroring the signal topology — REVISED 2026-08-05 (operator ruling)
 
-**Decision.** Keep the already-placeholdered single name. Do not per-env it the
-way `signal_url` is per-env.
+**Decision (operator-ratified routing).** The relay is a **doorway concern** —
+the iroh-generation successor of the *signal* function the doorway already
+consolidates by design (bootstrap + signal + gateway). SBD retiring does not
+retire the concern-slot; the relay refills it. Accordingly there is not one
+fleet relay but one relay **per doorway**, following the exact signal naming and
+premise topology:
 
-**Why this is not the same shape as `signal_url`.** SBD signal is per-doorway
-because a signal session is *doorway-scoped state* — `signal.alpha.elohim.host`
-and `signal.elohim.host` exist because matthew's doorway and adam's doorway hold
-different session tables. A relay holds no such state: it is a stateless byte
-forwarder keyed by endpoint id. Two envs sharing a relay cannot see each other's
-traffic and cannot join each other's DHT (different DNA hashes, different
-spaces). There is nothing to isolate.
+| Doorway | Signal today | Relay | CNAME anchor |
+|---|---|---|---|
+| A (`doorway/alpha.yaml`, operations) | `signal.alpha.elohim.host` | `relay.alpha.elohim.host` | → `alpha.elohim.host` |
+| B (`doorway/alpha-b.yaml`, shem) | `signal.elohim.host` | `relay.elohim.host` | → `elohim.host` apex |
 
-Three further reasons:
+Each human's conductor homes to its `primaryDoorway`'s relay, rendered exactly
+the way `signalUrl` is rendered today (`RELAY_URL_PLACEHOLDER`, sed in
+`deployHumanManifest` — §4.2a). The original single-name decision reasoned from
+"a relay holds no doorway-scoped state, so there is nothing to isolate" — true,
+but it answered the wrong question. The routing question is *whose concern is
+the network-edge rendezvous*, and the protocol's answer has always been: the
+doorway's.
 
-- **kitsune2 0.4.1 accepts exactly one relay URL.** `IrohTransportConfig.relay_url`
-  is `Option<String>`, singular (`kitsune2_transport_iroh-0.4.1/src/lib.rs:253`).
-  Per-env names buy no redundancy because a conductor can hold only one home
-  relay regardless.
-- **The placeholder is already in five config surfaces** (`elohim/holochain/edgenode/conductor-config.yaml:34`,
-  `che-devworkspaces/containers/elohim-edgenode/conductor-config.yaml`, and the
-  three edgenode/human manifests). Renaming costs five sed-templated edits for
-  zero functional gain.
-- **Only alpha flips this wave.** Prod and staging conductors stay on tx5 images;
-  their `relay_url` value remains inert. When they flip, they can point at the
-  same relay or a new one — the decision stays open at no cost.
+**Why per-doorway works on iroh (the fact the single-name draft missed):** a
+conductor holds exactly one *home* relay (`IrohTransportConfig.relay_url` is
+singular, `kitsune2_transport_iroh-0.4.1/src/lib.rs:253`), but peers do NOT
+need to share one — a peer URL embeds *that peer's* home relay
+(`transport_iroh/src/url.rs:31-52`), and the dialing side connects through
+**the other peer's** relay. Heterogeneous home relays across a fleet are native
+to the protocol. The singular field limits a conductor, not the fleet.
 
-**Reserved for later, with the trigger named.** `relay-alpha.elohim.host` /
-`relay-prod.elohim.host` are reserved. The one condition that forces the split
-is a *capacity or blast-radius* argument, not an isolation one: when prod's
-relayed traffic would degrade alpha's, split the name. Not before.
+The already-baked static `relay_url: "https://relay.elohim.host"` in five
+config surfaces is inert under tx5 and is superseded by per-human rendering at
+flip time (§4.2a).
 
-### D3. Single relay is a known resilience regression — recorded, not hidden
+### D3. Premise redundancy restored — the regression mostly dissolves — REVISED 2026-08-05
 
-The coturn design deliberately runs a **dual-WAN pair** (operations + shem)
-because a single relay is a single point of failure for the genesis pair. iroh's
-`RelayMap` supports multiple relays, but **kitsune2 0.4.1 exposes only one**.
-Wave 2 therefore ships strictly less relay redundancy than the tx5 stack it
-replaces.
+The coturn design deliberately runs a **dual-WAN pair** (operations + shem). The
+single-relay draft accepted a regression against that. Per-doorway relays (D2)
+**restore the dual-WAN shape**: a premise outage takes down that premise's relay
+only; conductors homed to the other doorway keep their rendezvous. The fleet
+inherits the *same* per-premise availability contract that signal already has
+today — B-homed conductors already lose signal when shem is down; the relay
+changes nothing about that envelope, it just refuses to make it worse
+fleet-wide.
 
-This is a real cost, accepted for one wave, with two mitigations:
+What REMAINS open (real, but narrower):
 
+- **Per-conductor single-homing.** A conductor still has exactly one home relay;
+  when its premise relay is down it loses inbound rendezvous (existing direct
+  paths survive; outbound dials through the peer's relay still work). The named
+  upstream follow-up stands: **`relay_url: Option<String>` → a list**, which is
+  what makes the "N-node federated relay commons" of
+  `genesis/data/timeline/backlog/sovereign-turn-relay-transport-commons.md`
+  expressible per-conductor, not just per-fleet.
 - iroh holepunches; tx5+coturn relayed far more traffic. A relay outage degrades
   a fraction of paths rather than all of them — *if* holepunching works, which
   §3.4 says is reduced in Phase A. Measure it (§5.3), do not assume it.
-- Named follow-up: **upstream `IrohTransportConfig.relay_url: Option<String>` →
-  a list**, so the dual-WAN commons pattern the coturn manifests already model
-  is expressible on iroh. This is the successor to
-  `genesis/data/timeline/backlog/sovereign-turn-relay-transport-commons.md`, not
-  a new idea — that backlog item's "N-node federated relay commons" is exactly
-  what the singular field blocks.
 
 ### D4. Unauthenticated relay this wave
 
@@ -302,7 +320,11 @@ conductor configs are tx5-only and become inert at the flip.
 
 ## 3. The relay deployment
 
-Manifest: `genesis/orchestrator/manifests/infra/alpha-iroh-relay.yaml`.
+Manifests (REVISED 2026-08-05 — doorway concern, per the operator ruling): the
+relay sections of `genesis/orchestrator/manifests/doorway/alpha.yaml` (relay A)
+and `genesis/orchestrator/manifests/doorway/alpha-b.yaml` (relay B). The
+standalone `infra/alpha-iroh-relay.yaml` draft is retired; everything below
+applies to *each* relay.
 
 ### 3.1 D5. Image: build `iroh-relay 0.95.1` from crates.io into Harbor
 
@@ -368,32 +390,30 @@ RTT per relay connection establishment. Not per frame.
   configuration-snippet). The relay connection is long-lived by design; a short
   read timeout produces a reconnect storm that looks like relay instability.
 
-### 3.3 D7. Placement: `node-type=operations`, `relay.elohim.host` CNAME → `alpha.elohim.host`
+### 3.3 D7. Placement: each relay rides its doorway's premise — REVISED 2026-08-05
 
-**Decision.** Hard-pin the relay to `node-type=operations` (the always-on
-on-prem Intel NUC where mongodb, nats, and doorway-A are already hard-pinned),
-and make `relay.elohim.host` a CNAME to `alpha.elohim.host`.
+**Decision.** Relay A pins with doorway A (`node-type=operations`, the always-on
+Intel NUC); relay B pins with doorway B (`node-type=remote`, shem). Each is its
+**own Deployment in the doorway manifest family** — a doorway *concern*, but a
+separate pod, so routine doorway redeploys never bounce every conductor's
+long-lived relay connection, and the stock `iroh-relay` lockfile (its
+pre-release dalek chain) never enters doorway-service's cargo workspace.
 
-**Why operations and not shem.** shem is the capability the scope gate turns
-off; `feedback_household_nodes_is_the_stable_floor` is the standing read of
-which leg is dependable. Pinning the fleet's *single* relay (D3) to the leg that
-gets suspended would make relay availability track the least reliable premise.
-doorway-B is hard-pinned to `node-type=remote` with no fallback precisely
-because it *is* adam's doorway; the relay is not premise-specific and should sit
-where uptime is.
+The single-relay draft's "operations, not shem — don't pin the fleet's only
+relay to the suspendable leg" concern dissolves with D2/D3: shem going down (or
+being scope-gated off) now degrades only B-homed conductors' rendezvous, which
+is the availability contract those conductors already live under for signal.
 
-**Why CNAME rather than a new A record.** `alpha.elohim.host` is already the
-beacon-maintained A record for the operations WAN, and that WAN IP is **dynamic**
-(residential Google Fiber). A CNAME inherits the beacon's drift-healing for free
-— no second record to keep synced, no second thing to go stale. This is the
-existing machinery doing one more job, not new machinery.
-(`project_two_premises_dns_beacon_owned`.)
+**Why CNAMEs rather than new A records.** Both anchors are beacon-maintained
+dynamic-WAN A records (`alpha.elohim.host` = operations, `elohim.host` apex =
+shem; residential fiber, IPs drift). CNAMEs inherit the beacon's drift-healing
+for free — no second record to go stale, existing machinery doing one more job
+(`project_two_premises_dns_beacon_owned`). Both `proxied: false`.
 
-**Consequence, named honestly.** Household conductors on the operations WAN will
-resolve `relay.elohim.host` publicly and hairpin out through the router and back
-in through the ingress to reach a pod on their own premise. It works; it is
-inefficient. Not worth solving in Wave 2 — revisit only if the hairpin shows up
-in the latency numbers.
+**Consequence, named honestly.** Conductors resolving their own premise's relay
+will hairpin out through the router and back in through the ingress. It works;
+it is inefficient. Not worth solving in Wave 2 — revisit only if the hairpin
+shows up in the latency numbers.
 
 ### 3.4 D8. QAD off in Phase A; the UDP plane is Phase B
 
@@ -519,13 +539,24 @@ Nothing is deleted at flip time. The keys change meaning:
 to k2Gossip; whether it needs the same treatment is an observation question, not
 a pre-flip one. Do not tune blind.
 
+**Per-human relay rendering (added 2026-08-05, per D2's per-doorway revision).**
+At flip time `relay_url` stops being a static baked string and becomes
+`RELAY_URL_PLACEHOLDER`, sed-rendered in `deployHumanManifest`
+(`elohim/holochain/Jenkinsfile:783-784` pattern) from the human's
+`primaryDoorway` — doorway A humans get `https://relay.alpha.elohim.host`,
+doorway B humans get `https://relay.elohim.host`, exactly parallel to how
+`signalUrl` is assigned today. The five static-placeholder surfaces are
+superseded by this rendering (dev/che configs keep a static value pointing at
+whichever relay is reachable from dev).
+
 **Config validation must move with the flip.**
 `validate-conductor-config.sh` is a GATE on every human-manifest render and
 today it validates that the ICE config parses into tx5's contract. Under iroh
 that check validates a dead key. It must be extended (not replaced — prod and
 staging stay on tx5) to assert, for an iroh-featured target: `relay_url` present,
-scheme `https`, host **not** matching `*.iroh.network`. That last assertion is
-the mechanical form of D1.
+scheme `https`, host **not** matching `*.iroh.network`, and host equal to the
+human's `primaryDoorway` relay. The `*.iroh.network` assertion is the mechanical
+form of D1.
 
 ### 4.3 Deletion order (retirement time, not flip time)
 
@@ -643,7 +674,7 @@ It must be *replaced*, not merely dropped, by the relay-reachability smoke below
 
 | Probe | How | What it proves |
 |---|---|---|
-| **The n0-contamination test** | `GET {doorway}/db/p2p/conductor-diagnostics` → every `agents[].url` matches `https://relay.elohim.host:443/{endpoint_id}` | THE sovereignty probe. kitsune2 canonicalizes a peer URL as `{scheme}://{host}:{port}{path}/{endpoint_id}` (`transport_iroh/src/url.rs:31-52`), so the agent-info URL *is* the relay hostname. n0 contamination reads as `*.relay.iroh.network`. Anything not `relay.elohim.host` fails the gate. |
+| **The n0-contamination test** | `GET {doorway}/db/p2p/conductor-diagnostics` → every `agents[].url` matches `https://relay.alpha.elohim.host:443/{endpoint_id}` OR `https://relay.elohim.host:443/{endpoint_id}`, and each agent's relay host matches its human's `primaryDoorway` | THE sovereignty probe. kitsune2 canonicalizes a peer URL as `{scheme}://{host}:{port}{path}/{endpoint_id}` (`transport_iroh/src/url.rs:31-52`), so the agent-info URL *is* the relay hostname. n0 contamination reads as `*.relay.iroh.network`. Any host outside our two relay names fails the gate. |
 | **Home-relay registration sentinel** | Loki, `container=elohim-node`: `Received a new listening address from relay server` (`transport_iroh/src/lib.rs:636`) | the conductor actually got a home relay from the relay server, as opposed to sitting relay-less |
 | **Direct-vs-relayed ratio** | Loki: `Connection established ... direct=true\|false` (`transport_iroh/src/lib.rs:842`) | the QAD-absence cost meter (§3.4). A `direct=false` majority is the number that justifies Phase B. |
 | **Relay liveness from outside** | `curl -s -o /dev/null -w '%{http_code}' https://relay.elohim.host/ping` → `200`; `curl http://relay.elohim.host/generate_204` → `204` (not a 301) | the ingress serves both the Https latency probe and the captive-portal probe correctly; the 301 case is the `ssl-redirect` trap (§3.2) |
@@ -662,6 +693,12 @@ Staged **inert → verified → removed**, with the gate stated before each remo
 Nothing here happens during the flip.
 
 ### 6.1 SBD signal server — retire in two pieces, not one
+
+**Framing (2026-08-05 ruling):** retiring SBD removes an *implementation*, not
+the concern. The network-edge rendezvous function is the doorway's by design
+(bootstrap + signal + gateway); the per-doorway relays (D2) are its
+iroh-generation refill. What follows retires the SBD code; the concern-slot
+never goes vacant.
 
 The module is `doorway/doorway-service/src/signal/` — 1607 lines across six
 files. It is **not** uniformly tx5 scaffolding:
@@ -766,11 +803,11 @@ remove early.
 
 | # | Decision | Why it is the operator's |
 |---|---|---|
-| 1 | **DNS:** create `relay.elohim.host` CNAME → `alpha.elohim.host` (Cloudflare, `proxied: false` — the beacon hard-writes unproxied) | zone change; and the proxied flag interacts with the beacon's exclusive-record lane |
+| 1 | **DNS:** create TWO CNAMEs (Cloudflare, `proxied: false` — the beacon hard-writes unproxied): `relay.alpha.elohim.host` → `alpha.elohim.host` and `relay.elohim.host` → `elohim.host` apex | zone change; and the proxied flag interacts with the beacon's exclusive-record lane |
 | 2 | **Harbor mirror:** build + push `harbor.ethosengine.com/ethosengine/iroh-relay:0.95.1-dev-latest` (recipe in the manifest header) | new image in the registry the fleet trusts |
-| 3 | **Apply** `genesis/orchestrator/manifests/infra/alpha-iroh-relay.yaml` (whichever pipeline applies `infra/*.yaml`) | cluster action |
+| 3 | **Apply/deploy** the relay sections now in `doorway/alpha.yaml` + `doorway/alpha-b.yaml` — they ride the doorway manifests' existing deploy path, so this is a normal doorway deploy rather than the open `infra/*.yaml` apply-path question (which shrank: see U7) | cluster action |
 | 4 | **NetworkPolicy:** add port 9090 to `allow-metrics-from-observability` so the relay PodMonitor scrapes | touches a policy file carrying a live-drift warning |
-| 5 | **Ratify the placement:** relay on `node-type=operations` rather than shem (D7), and **single relay** with the redundancy regression accepted for one wave (D3) | availability posture; contradicts the deliberate dual-WAN choice made for coturn |
+| 5 | ~~Ratify placement/single-relay~~ **RESOLVED by the 2026-08-05 operator ruling** — relay is a doorway concern, per-doorway relays mirror the signal topology (D2/D3/D7 revised); the dual-WAN shape is restored, no regression to accept | recorded here so the checklist numbering in circulation stays stable |
 | 6 | **Ratify the unauthenticated posture** (D4) — anyone who learns the hostname can relay their own traffic through it | security posture |
 | 7 | **Ratify the atomic flip window** (D10) — all alpha conductors in one rollout; the household-first staging in the campaign plan is not executable on the live DHT | changes the campaign's stated sequencing |
 | 8 | **Ratify the two image tags** (D9) — `hc-elohim-0.6.3` and `hc-elohim-0.6.3-iroh` both live in Harbor for the wave | registry footprint + the rollback contract |
@@ -833,10 +870,11 @@ matches on it (`http_server.rs:484`) and the client requires
 `curl -i -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' -H 'Sec-WebSocket-Protocol: iroh-relay-v1' https://relay.elohim.host/relay`
 → expect `101` with `Sec-WebSocket-Protocol: iroh-relay-v1` echoed.
 
-**U7 — Which pipeline applies `genesis/orchestrator/manifests/infra/*.yaml`?**
-The `alpha-doorway-podmonitor.yaml` header records this as an open question as
-of 2026-06-17 ("If the PodMonitors are not yet live, the apply-path for
-`infra/*.yaml` is the separate gap to close"). If that gap is still open, the
-relay manifest is authored-but-never-applied. *Verification:* operator confirms
-the apply path before Stage 0; a relay that exists only in the repo blocks the
-whole wave.
+**U7 — apply path: SHRUNK by the 2026-08-05 doorway-concern ruling.** The relay
+no longer lives in `infra/*.yaml` (whose apply-path was recorded open since
+2026-06-17); it rides the doorway manifests, which demonstrably deploy today.
+Residual verification: confirm the doorway deploy leg applies the whole manifest
+file (so new Deployment/Ingress/PodMonitor sections land) rather than patching
+named resources — one `kubectl get deploy iroh-relay-alpha -n <ns>` after the
+first doorway deploy answers it (operator-run; cluster reads are operator-owned
+from the dev seat).
