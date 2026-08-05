@@ -542,7 +542,8 @@ spec:
 # each other's home relay to cross premises, and this leg's availability
 # tracks signal.elohim.host's contract the same way doorway-A's leg tracks
 # signal.alpha.elohim.host's. Pulls the SAME Harbor image as alpha.yaml — no
-# second build recipe.
+# second build recipe, and (per alpha.yaml's "HARBOR MIRROR" header) that
+# image is now CI-built+pushed by the edge pipeline, not operator-mirrored.
 #
 # DNS (operator action, beacon-healed): relay.elohim.host CNAME ->
 # elohim.host (shem/apex anchor, proxied:false) — inherits the shem-leg

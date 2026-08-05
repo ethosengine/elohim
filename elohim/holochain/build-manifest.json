@@ -26,7 +26,8 @@
           "elohim/elohim-agent/**",
           "elohim/elohim-peer-fabric/**",
           "elohim/Cargo.lock",
-          "relay-addr-beacon/**"
+          "relay-addr-beacon/**",
+          "iroh-relay/**"
         ],
         "buildProcess": [
           "elohim/holochain/Jenkinsfile"

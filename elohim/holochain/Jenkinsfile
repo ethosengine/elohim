@@ -1586,6 +1586,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                                 sh "bash '${env.WORKSPACE}/scripts/ci/build-relay-addr-beacon.sh'"
                             }
+
+                            // Iroh Relay build (scripts/ci); UNSTABLE-isolated, same pattern as the beacon.
+                            catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                                sh "bash '${env.WORKSPACE}/scripts/ci/build-iroh-relay.sh'"
+                            }
                         }
                     }
                 }
@@ -1797,6 +1802,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 // Relay Addr Beacon push+alias — scripts/ci/push-relay-addr-beacon.sh
                                 sh "bash '${env.WORKSPACE}/scripts/ci/push-relay-addr-beacon.sh'"
+
+                                // Iroh Relay push+alias — scripts/ci/push-iroh-relay.sh
+                                sh "bash '${env.WORKSPACE}/scripts/ci/push-iroh-relay.sh'"
 
                                 // Also push dev-latest aliases on dev branch for backward compat
                                 if (env.BRANCH_NAME == 'dev') {

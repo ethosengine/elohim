@@ -667,8 +667,18 @@ spec:
 # dataplane's is a separate IrohConfig field. Two keys, one hostname per
 # premise.
 #
-# ─ HARBOR BUILD RECIPE (mirror; do NOT pull a third-party registry for the
-#   one component whose purpose is removing a third-party dependency) ──────
+# ─ HARBOR MIRROR (CI-BUILT+PUSHED — operator action retired) ──────────────
+#   The image is built + pushed by the edge pipeline (elohim/holochain/
+#   Jenkinsfile, mirroring the relay-addr-beacon pattern): iroh-relay/Dockerfile
+#   + scripts/ci/build-iroh-relay.sh build the SHORT-named local image,
+#   scripts/ci/push-iroh-relay.sh tags + pushes
+#   harbor.ethosengine.com/ethosengine/iroh-relay:0.95.1-<commit-hash> always,
+#   and the :0.95.1-dev-latest alias (the tag pinned below) once the branch
+#   reaches dev. Both steps are catchError-isolated (UNSTABLE, non-critical
+#   delivery) — a relay-image build/push failure never blocks the edge deploy.
+#   The recipe below is RETAINED for local/emergency rebuilds; do NOT pull a
+#   third-party registry for the one component whose purpose is removing a
+#   third-party dependency:
 #   # Dockerfile (own build context, no path-deps, crates.io direct — NOT
 #   # through Nexus, per relay-addr-beacon/Dockerfile's 2026-07-30 decision):
 #   #   FROM rust:1-slim-bookworm AS builder
