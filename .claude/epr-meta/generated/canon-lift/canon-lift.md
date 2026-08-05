@@ -2,7 +2,7 @@
 
 # Concern canon — brit lift
 
-**26 rows across both registry homes -> 26 CIDv1(dag-cbor, sha2-256) atoms** (26 pin-verified, 24 declared heads).
+**30 rows across both registry homes -> 30 CIDv1(dag-cbor, sha2-256) atoms** (30 pin-verified, 26 declared heads).
 
 The content plane (`canon-atoms.json`) and the standing plane (`precedent-standing.json`) are what the v1 YAML row deliberately conflates; `declared-heads.json` carries the brit declared-head-over-DAG primitive at resolution mode `pinned`. Every CID is a codec wrap of the exact bytes the registry's own `sha256` pin already covers — the digests below are the same 32 bytes, rendered twice.
 
@@ -13,6 +13,7 @@ The `sha256` column is the registry's own live pin; the `CID` is that same diges
 | Policy id | Head | Content sha256 pin | Content CID |
 |---|---|---|---|
 | `archetype-resource-alignment` | `policies.yaml@1` | `sha256:a62c78e26c81446263e2b6478d45e11d8f9d49685c2e93e82d7a1f98b529b795` | `bafyreifgfr4oe3ebirrghyvwi6gulyi5r6ous2c4f2j6qll2d6mlkknxsu` |
+| `brand-vocabulary-boundary` | `policies.yaml@1` | `sha256:e57794fb9a49b28b8fa30b463da87b36ead31df9d829b7eb54457b8f09307c63` | `bafyreihfo6kpxgsjwkfy7iyliy62q6zw5ljr36oyfg36wvcfpohqsmd4mm` |
 | `c0-plane-location` | `concerns.yaml@1` | `sha256:df38bb561769ff552e76d63391996e41093a70621a47fae47ac25fcfa3500505` | `bafyreig7hc5vmf3j75ks45wwgoizs3sbbe5hayq2i75oi6wcl7h2guafau` |
 | `c1-anti-self-election` | `concerns.yaml@1` | `sha256:6786f77a5deca569a81ab88d317575f2d5b61cf68c4aaf2bbb9fe9354754039f` | `bafyreidhq33xuxpmuvu2qgvyruyxk5ps2w3bz5umjkxsxo475e2uovadt4` |
 | `c10-contract-evolution-honesty` | `concerns.yaml@1` | `sha256:7eb05838e13be3eda8a20f64fbd948fd2e2a4400bbb108b331724098bd0ef97c` | `bafyreid6wbmdryj34pw2riqpmt55ssh5fyveiaf3weelgmlsicml2dxzpq` |
@@ -33,8 +34,9 @@ The `sha256` column is the registry's own live pin; the `CID` is that same diges
 | `eprfs-meta-domain-neutrality` | `policies.yaml@1` | `sha256:97b0cd767d6b8a90acb4035c6f6596aab5b33cdff3b1b6b57a632e944b90ebf2` | `bafyreiexwdgxm7llrkikznadlrxwlfvkwwztzx7twg3lk6tdf2kexehl6i` |
 | `governance-escalation-ladder` | `policies.yaml@1` | `sha256:97008339f53de85e02ff63222f3e521889f538a458e56d05f656cc48ecf75954` | `bafyreiexacbtt5j55bpaf73deixt4uqyrh2trjcy4vwql5swzreoz52zkq` |
 | `memory-frontmatter-at-birth` | `policies.yaml@1` | `sha256:a622e4d20e5aa57ab9152e48a082ff437499ad5b498516408f0cc864cce003ee` | `bafyreifgelsneds2uv5lsfjojcqif72dosm22w2jqulebdymzbsmzyad5y` |
+| `ownership-ontology-guard` | `policies.yaml@2` | `sha256:a06531b3d39fb2cec4844cff80fd43e1a0eb5a9cd2ac8a4e7b6c27c6ec287692` | `bafyreifamuy3hu47wlhmjbcm76ap2q7budvvvhgsvsfe463me7doykdwsi` |
 | `source-file-loc-ceiling` | `policies.yaml@1` | `sha256:8982019cf14bd70060399817c82d0d6865853280a6fdc11fd7a4c155a5074be7` | `bafyreiejqiazz4kl24agaomyc7ec2dlimwctfafg7xar7v5eyfk2kb2l44` |
-| `sovereignty-ontology-guard` | `policies.yaml@1` | `sha256:c6194b67110355fdde1b74603f9e64a571b394bca500783bfb8d2d5021ffceef` | `bafyreiggdffwoeidkx654g3uma7z4zffogzzjpffab4dx64nfvicd76o54` |
+| `sovereignty-ontology-guard` | `policies.yaml@2` | `sha256:d168f97031b22fe45175c94c7c569916d1f52ce0f1ff04b356864752d73bb2e7` | `bafyreigrnd4xamnsf7sfc5ojjr6fngiw2h2szyhr74clgvugi5jnoo5s44` |
 | `test-bench-aggregate-capacity` | `policies.yaml@1` | `sha256:a39ac2f8ec21391c60e43bf97cce33c324b526ab54c5d9ca6d5283fff48b4dec` | `bafyreifdtlbpr3bbheogbzb37f6m4m6des2snk2uyxm4u3ksqp77jc2n5q` |
 
 ## Lineage (superseded versions travel)
@@ -45,6 +47,10 @@ The `sha256` column is the registry's own live pin; the `CID` is that same diges
 | `policies.yaml#c2-monotonic-authority@2` | active | `policies.yaml#c2-monotonic-authority@1` | — |
 | `concerns.yaml#c6a-bounded-work@1` | superseded | — | `policies.yaml#c6a-bounded-work@2` |
 | `policies.yaml#c6a-bounded-work@2` | active | `concerns.yaml#c6a-bounded-work@1` | — |
+| `policies.yaml#ownership-ontology-guard@1` | superseded | — | `ownership-ontology-guard@2` |
+| `policies.yaml#ownership-ontology-guard@2` | active | `policies.yaml#ownership-ontology-guard@1` | — |
+| `policies.yaml#sovereignty-ontology-guard@1` | superseded | — | `sovereignty-ontology-guard@2` |
+| `policies.yaml#sovereignty-ontology-guard@2` | active | `policies.yaml#sovereignty-ontology-guard@1` | — |
 
 ## Findings
 

@@ -30,6 +30,28 @@
       ]
     },
     {
+      "id": "brand-vocabulary-boundary",
+      "resolutionMode": "pinned",
+      "resolutionModeSource": "registry-default",
+      "head": {
+        "registry": "policies.yaml",
+        "version": 1,
+        "cid": "bafyreihfo6kpxgsjwkfy7iyliy62q6zw5ljr36oyfg36wvcfpohqsmd4mm",
+        "sha256Pin": "sha256:e57794fb9a49b28b8fa30b463da87b36ead31df9d829b7eb54457b8f09307c63"
+      },
+      "tipBasis": "sole-active",
+      "competing": false,
+      "versions": [
+        {
+          "registry": "policies.yaml",
+          "version": 1,
+          "status": "active",
+          "cid": "bafyreihfo6kpxgsjwkfy7iyliy62q6zw5ljr36oyfg36wvcfpohqsmd4mm",
+          "supersededBy": null
+        }
+      ]
+    },
+    {
       "id": "c0-plane-location",
       "resolutionMode": "pinned",
       "resolutionModeSource": "row",
@@ -484,6 +506,35 @@
       ]
     },
     {
+      "id": "ownership-ontology-guard",
+      "resolutionMode": "pinned",
+      "resolutionModeSource": "registry-default",
+      "head": {
+        "registry": "policies.yaml",
+        "version": 2,
+        "cid": "bafyreifamuy3hu47wlhmjbcm76ap2q7budvvvhgsvsfe463me7doykdwsi",
+        "sha256Pin": "sha256:a06531b3d39fb2cec4844cff80fd43e1a0eb5a9cd2ac8a4e7b6c27c6ec287692"
+      },
+      "tipBasis": "sole-active",
+      "competing": false,
+      "versions": [
+        {
+          "registry": "policies.yaml",
+          "version": 1,
+          "status": "superseded",
+          "cid": "bafyreieynqldegzptmqgfwcuuyvpokbwnky6fuec2n6bnk3xujx424mpuu",
+          "supersededBy": "ownership-ontology-guard@2"
+        },
+        {
+          "registry": "policies.yaml",
+          "version": 2,
+          "status": "active",
+          "cid": "bafyreifamuy3hu47wlhmjbcm76ap2q7budvvvhgsvsfe463me7doykdwsi",
+          "supersededBy": null
+        }
+      ]
+    },
+    {
       "id": "source-file-loc-ceiling",
       "resolutionMode": "pinned",
       "resolutionModeSource": "registry-default",
@@ -511,9 +562,9 @@
       "resolutionModeSource": "registry-default",
       "head": {
         "registry": "policies.yaml",
-        "version": 1,
-        "cid": "bafyreiggdffwoeidkx654g3uma7z4zffogzzjpffab4dx64nfvicd76o54",
-        "sha256Pin": "sha256:c6194b67110355fdde1b74603f9e64a571b394bca500783bfb8d2d5021ffceef"
+        "version": 2,
+        "cid": "bafyreigrnd4xamnsf7sfc5ojjr6fngiw2h2szyhr74clgvugi5jnoo5s44",
+        "sha256Pin": "sha256:d168f97031b22fe45175c94c7c569916d1f52ce0f1ff04b356864752d73bb2e7"
       },
       "tipBasis": "sole-active",
       "competing": false,
@@ -521,8 +572,15 @@
         {
           "registry": "policies.yaml",
           "version": 1,
-          "status": "active",
+          "status": "superseded",
           "cid": "bafyreiggdffwoeidkx654g3uma7z4zffogzzjpffab4dx64nfvicd76o54",
+          "supersededBy": "sovereignty-ontology-guard@2"
+        },
+        {
+          "registry": "policies.yaml",
+          "version": 2,
+          "status": "active",
+          "cid": "bafyreigrnd4xamnsf7sfc5ojjr6fngiw2h2szyhr74clgvugi5jnoo5s44",
           "supersededBy": null
         }
       ]
