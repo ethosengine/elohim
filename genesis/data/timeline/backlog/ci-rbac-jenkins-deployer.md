@@ -10,12 +10,13 @@ author: "cartographer"
 status: "proposed"
 priority: "high"
 area: "recovery/k8s"
-recurrence: 4
+recurrence: 5
 source_shifts:
   - "2026-04-27"
   - "2026-05-04"
   - "2026-05-26"
   - "2026-07-06"
+  - "2026-08-05"
 domain: "operator"
 relatedNodeIds:
   - "memory:feedback_no_kubectl_from_dev_env"
@@ -126,3 +127,37 @@ suspended personas exist). Grant first, unmask second. A safe interim (repo-side
 dependency) is to keep the deploy non-blocking but make the drift loud — count Forbidden scales
 and set the stage UNSTABLE with an explicit `RBAC DRIFT` banner — so the phantom-green stops
 without breaking deploys before the grant is in place.
+
+## 5th recurrence — 2026-08-05 (edge #1306/#1308/#1309): a NEW resource class, `podmonitors`
+
+Wave-2 of the holochain-iroh convergence campaign shipped two self-hosted `iroh-relay`
+Deployments (A and B) each carrying a `PodMonitor` for Prometheus scrape. Every edge deploy of
+the wave emitted, verbatim (edge #1309, lines 21550–21601):
+
+```
+Error from server (Forbidden): error when retrieving current configuration of:
+Resource: "monitoring.coreos.com/v1, Resource=podmonitors", GroupVersionKind: "monitoring.coreos.com/v1, Kind=PodMonitor"
+... from server for: "genesis/orchestrator/manifests/doorway/alpha-rendered.yaml": podmonitors.monitoring.coreos.com "iroh-relay-alpha" is forbidden: User "system:serviceaccount:jenkins:jenkins-deployer" cannot get resource "podmonitors" in API group "monitoring.coreos.com" in the namespace "elohim-alpha"
+```
+
+Same for `iroh-relay-alpha-b`. **Both PodMonitors were silently not applied** — the relay pods
+themselves deployed and serve (`/ping`=200, `/generate_204`=204 on both `relay.alpha.elohim.host`
+and `relay.elohim.host`), so the *only* loss is metrics scrape. That makes this the mildest
+instance so far, but it is the same drift shape and it widens the missing grant set to a new
+API group.
+
+**Missing grant (add to the durable fix):** `monitoring.coreos.com` group, `podmonitors`
+resource — at minimum `get`/`create`/`patch` in `elohim-alpha` (and the other target
+namespaces once relays/monitors ship there).
+
+**Corroborating evidence in the same build** that the 4th-recurrence gap is still open:
+`statefulsets/scale` Forbidden re-appeared for all 7 orphan personas
+(caleb/daniel/emma/frank/nancy/pete/terrance in `elohim-alpha`, plus
+edgenode/pete/timothy in `elohim-staging`) at lines 21622–21669. The 2026-07-07 operator
+deletion cleared the *live storm*; the *grant* was never added, so `cleanupOrphanedHumans` is
+still fail-open on every deploy.
+
+**Why this one is worth the recurrence bump anyway:** an un-applied PodMonitor is exactly the
+kind of drift that reads as "monitoring never worked" months later. A brand-new component
+(the sovereign relay fleet) shipped observability-blind on day one, and nothing in the pipeline
+said so above a warning — the phantom-green pattern this item exists to kill.
