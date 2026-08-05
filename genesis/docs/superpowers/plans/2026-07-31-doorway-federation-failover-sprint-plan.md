@@ -117,13 +117,33 @@ pair is the seed testbed for the N-doorway federated commons, not the destinatio
 
 ## WS0 — Record the saga frontier (first, cheap)
 
-### Task 0.1: ch04/ch06 recording run — **tier: any session / operator**
+### Task 0.1: ch04/ch06/ch09/ch10 recording run — **tier: any session / operator**
 When `https://elohim.host/` serves 200 again (B out of its catch-up window — check
-before pushing), push one empty commit tagged `[edge:validate-only]` (skips build/deploy,
-runs Dataplane Validation only — no conductor restart, so it cannot reopen the window it
-measures). **Verify:** `genesis/a2o/reports/sprint-report-dataplane.json` shows
-`saga-04-doorway-serves` passed ≥1; note ch06 cross-node leg status in the sprint log.
-One push per batch; do not race other sessions' pushes.
+before pushing), then run exactly:
+
+```bash
+git diff --cached --quiet &&
+  git commit --allow-empty -m "ci(saga): isolated recording [build:edge] [edge:validate-only]" &&
+  git push
+```
+
+The orchestrator treats `[edge:validate-only]` as an isolation boundary: it dispatches
+only `elohim-edge` (no auto-added Genesis or accumulated graph work) with
+`VALIDATE_ONLY=true` and both force flags false. Edge then runs only Check Trigger,
+Checkout, Dataplane Validation, local Cleanup, and post-summary. All image build/push and
+Alpha/Staging/Prod deploy stages skip; therefore the StatefulSet unchanged check and
+hApp-digest pod-template stamp are not evaluated at all, and no conductor restart can
+reopen the window being measured. Do not combine unrelated `[build:*]` tags with the
+recording commit; isolation deliberately ignores them. One push per batch; do not race
+other sessions' pushes. The cached-diff preflight is load-bearing in the shared worktree:
+it refuses to mint the recording commit if any session has staged real files.
+
+**Verify in the edge log:** `VALIDATE_ONLY — skipping build/deploy stages`, every build/push
+and deploy stage says `skipped due to when conditional`, and Dataplane Validation runs at
+least one scenario. Then confirm `genesis/a2o/reports/sprint-report-dataplane.json`
+reports `failed=0` and `passed≥1` for `saga-04-doorway-serves`,
+`saga-06-heads-converge`, `saga-09-projectors-carry`, and
+`saga-10-card-tells-truth`.
 
 ## WS1 — Truth & measurement (the spine-legal first move)
 
