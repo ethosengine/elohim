@@ -613,3 +613,425 @@ spec:
                 name: elohim-doorway-alpha
                 port:
                   number: 8080
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Iroh Relay (doorway-A leg) — relay.alpha.elohim.host
+# ─────────────────────────────────────────────────────────────────────────
+# The relay is a DOORWAY concern, not standalone infra (2026-08-05 ruling,
+# superseding the earlier infra/alpha-iroh-relay.yaml). Doorway already
+# consolidates bootstrap + signal + gateway for the tx5/SBD transport
+# generation; the iroh-relay IS that same signal function's successor for the
+# iroh transport generation — SBD retires, relay refills the slot. It rides
+# in the doorway manifest set and mirrors the EXISTING signal topology 1:1:
+# each conductor homes to its primaryDoorway's relay (matthew/A here), peers
+# dial through each other's HOME relay to cross premises, so relay-premise
+# redundancy tracks the same availability contract signal.alpha.elohim.host
+# already gives. This leg lives with doorway-A on the operations premise; the
+# shem/apex mirror (iroh-relay-alpha-b / relay.elohim.host) is in alpha-b.yaml.
+#
+# Still its OWN pod, deliberately not folded into the doorway container: a
+# doorway redeploy must never bounce every conductor's long-lived relay
+# connection (see the replicas:1 correctness note below — session state lives
+# in exactly one instance).
+#
+# Design: genesis/docs/content/elohim-protocol/architecture/2026-08-05-wave2-relay-sovereignty-design.md
+# Campaign: genesis/docs/superpowers/plans/2026-08-04-holochain-iroh-convergence-upgrade-campaign.md (Wave 2, Task E1)
+# Config-mapping evidence: genesis/docs/content/elohim-protocol/history/2026-08-04-holochain-iroh-dep-verification-pack.md (verdict 3)
+#
+# ⚠ INERT UNTIL APPLIED, same as every manifest here — but the apply-path gap
+#   the standalone infra/alpha-iroh-relay.yaml carried (no confirmed pipeline
+#   applied infra/*.yaml) is CLOSED by this move: elohim/holochain/Jenkinsfile's
+#   deployDoorwayManifest already applies this file on every edge deploy.
+#
+# ─ VERSION CONTRACT (do not bump casually) ──────────────────────────────────
+# Conductor 0.6.3 -> kitsune2 0.4.1 -> kitsune2_transport_iroh 0.4.1 ->
+# iroh-holochain 0.95.1 -> iroh-relay-holochain 0.95.1 (the relay CLIENT).
+# The server pinned below is STOCK iroh-relay 0.95.1 from crates.io. That is
+# the right pairing on four independent lines of evidence:
+#   1. iroh-relay-0.95.1/src/http.rs is BYTE-IDENTICAL to
+#      iroh-relay-holochain-0.95.1/src/http.rs (same RELAY_PROTOCOL_VERSION
+#      "iroh-relay-v1", same RELAY_PATH "/relay", same client-auth header).
+#   2. holochain_p2p 0.6.3 and holochain 0.6.3 themselves dev-depend on stock
+#      iroh-relay 0.95.1 with features ["server","test-utils"].
+#   3. Upstream's own conductor rendezvous harness spawns that stock server
+#      and points transport-iroh conductors at it
+#      (crates/holochain/src/sweettest/sweet_conductor_config_rendezvous.rs).
+#   4. iroh-relay 0.95.1 publishes a Cargo.lock whose crypto chain
+#      (curve25519-dalek 5.0.0-pre.1 / ed25519-dalek 3.0.0-pre.1 /
+#      digest 0.11.0-rc.3 / sha2 0.11.0-rc.2) is identical to the conductor's
+#      resolution, which we have already compiled green.
+# The iroh 0.92 storage dataplane can share a relay INSTANCE with this one
+# (the relay wire is identical 0.92<->0.95.1 — frame tags, handshake structs,
+# protocol string, QAD ALPN all unchanged); sharing the CONFIG KEY is not —
+# the conductor's relay is `network.relay_url` in conductor-config, the
+# dataplane's is a separate IrohConfig field. Two keys, one hostname per
+# premise.
+#
+# ─ HARBOR BUILD RECIPE (mirror; do NOT pull a third-party registry for the
+#   one component whose purpose is removing a third-party dependency) ──────
+#   # Dockerfile (own build context, no path-deps, crates.io direct — NOT
+#   # through Nexus, per relay-addr-beacon/Dockerfile's 2026-07-30 decision):
+#   #   FROM rust:1-slim-bookworm AS builder
+#   #   ENV RUSTFLAGS=""            # clear the Holochain WASM getrandom flag
+#   #   RUN apt-get update && apt-get install -y --no-install-recommends \
+#   #         pkg-config && rm -rf /var/lib/apt/lists/*
+#   #   RUN cargo install iroh-relay --version 0.95.1 --locked \
+#   #         --features server --root /out
+#   #   FROM debian:bookworm-slim AS runtime
+#   #   RUN apt-get update && apt-get install -y --no-install-recommends \
+#   #         ca-certificates && rm -rf /var/lib/apt/lists/*
+#   #   COPY --from=builder /out/bin/iroh-relay /usr/local/bin/iroh-relay
+#   #   ENTRYPOINT ["/usr/local/bin/iroh-relay"]
+#   # --locked IS LOAD-BEARING, not hygiene: iroh-base 0.95.1 exact-pins
+#   # curve25519-dalek =5.0.0-pre.1, the pre-release whose published source
+#   # carries the digest::crypto_common path bug that froze the storage
+#   # dataplane on iroh 0.92. The bug is resolution-conditional; the
+#   # published lock pins the working digest 0.11.0-rc.3. Unlocked is a coin
+#   # flip.
+#   #   nerdctl -n k8s.io build -t iroh-relay:0.95.1 -f <Dockerfile> <ctx>
+#   #   nerdctl -n k8s.io tag  iroh-relay:0.95.1 \
+#   #     harbor.ethosengine.com/ethosengine/iroh-relay:0.95.1-dev-latest
+#   #   nerdctl -n k8s.io push \
+#   #     harbor.ethosengine.com/ethosengine/iroh-relay:0.95.1-dev-latest
+#   # (alpha-b.yaml's mirror relay pulls this SAME image — no second recipe.)
+#
+# ─ DNS (operator action, beacon-healed) ─────────────────────────────────────
+#   relay.alpha.elohim.host CNAME -> alpha.elohim.host (operations anchor,
+#   proxied:false). Inherits the operations-leg beacon's drift-healing for
+#   free — no second record to keep synced — same reasoning as every other
+#   alpha.elohim.host-anchored name.
+#
+# ─ POSTURE + DESIGN CHOICES CARRIED FROM THE ORIGINAL DESIGN (unchanged) ───
+#   - TLS terminates at the Ingress, not the relay: with no [tls] section the
+#     relay registers ALL its services (/relay, /ping, /generate_204, /,
+#     /robots.txt) on ONE listener. The client's TLS-exporter fast-path auth
+#     can't see through the terminating proxy, so it falls back to a
+#     challenge/response handshake — one extra RTT per CONNECTION, not per
+#     frame ("Verification not succeeding is part of normal operation",
+#     iroh-relay-0.95.1/src/protos/handshake.rs serverside()).
+#   - QUIC Address Discovery (QAD) is OFF this phase: no LoadBalancer/MetalLB
+#     to carry a raw UDP:7842 path, and ingress-nginx cannot proxy QUIC.
+#     Endpoints don't learn their observed public address from the relay, so
+#     hole-punching has fewer candidates and more traffic stays relayed — a
+#     SUPPORTED topology (upstream's own rendezvous harness runs
+#     relay.tls=None AND quic=None). Meter: Loki `container=elohim-node,
+#     "Connection established ... direct="`. Phase B = cert-manager TLS +
+#     hostNetwork UDP:7842, a real second design pass, not a toggle.
+#   - access="everyone" (deliberate, ratified): doorway's k2 bootstrap
+#     implements neither /authenticate nor /relay/register, so
+#     base64_auth_material_relay must stay UNSET — setting it against a base
+#     that lacks those endpoints fails the endpoint, it does not degrade.
+#     Exposure is bounded to availability/traffic-metadata: the relay cannot
+#     read our payloads, join our DHT, or enumerate our peers.
+#   - replicas: 1 is a CORRECTNESS choice, not a cost choice: relay clients
+#     hold a long-lived connection and TWO PEERS MUST BE ON THE SAME relay
+#     INSTANCE for it to forward between them; kitsune2 0.4.1 exposes
+#     relay_url as a singular Option<String> (no list, no session affinity
+#     the ingress could express). Named upstream follow-up:
+#     genesis/data/timeline/backlog/sovereign-turn-relay-transport-commons.md.
+#
+# ─ NETWORKPOLICY (operator action) ──────────────────────────────────────────
+#   elohim-alpha runs default-deny-cross-env; the PodMonitor below reads DOWN
+#   until port 9090 is added to `allow-metrics-from-observability` in
+#   genesis/orchestrator/manifests/infra/alpha-metrics-networkpolicy.yaml.
+#   Shipped with the known gap rather than omitted, so it stays closeable.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: iroh-relay-config-alpha
+  namespace: elohim-alpha
+  labels:
+    app: iroh-relay-alpha
+    environment: alpha
+    app.kubernetes.io/name: iroh-relay
+    app.kubernetes.io/instance: iroh-relay-alpha
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+data:
+  # iroh-relay 0.95.1 server config (TOML). Keys verified against
+  # iroh-relay-0.95.1/src/main.rs `struct Config`.
+  relay.toml: |
+    # Relay the byte plane. This is the whole point of the deployment.
+    enable_relay = true
+
+    # Plain HTTP; nginx terminates TLS (see header). 3340 is upstream's own
+    # dev-mode port — chosen over the :80 default so the container needs no
+    # NET_BIND_SERVICE capability. With no [tls] section this ONE listener
+    # serves /relay, /ping, /generate_204, / and /robots.txt.
+    http_bind_addr = "[::]:3340"
+
+    # OFF this phase — needs relay-held TLS + a raw UDP:7842 path. See header.
+    enable_quic_addr_discovery = false
+
+    # Sized for a fleet of ~7, not upstream's 1M-client default (which would
+    # reserve ~56 MB). 8192 entries costs ~450 KB.
+    key_cache_capacity = 8192
+
+    # Explicit rather than defaulted, so the posture is a RECORDED decision.
+    access = "everyone"
+
+    enable_metrics = true
+    metrics_bind_addr = "[::]:9090"
+
+    # [limits] DELIBERATELY UNSET. Per-client rx byte/burst caps are available
+    # (limits.client.rx.bytes_per_second / max_burst_bytes) but a cap set below
+    # gossip's real burst profile does not ERROR — it silently slows the DHT and
+    # reads as a transport fault. Set it after a bytes/sec baseline exists on
+    # the /metrics surface, not before.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iroh-relay-alpha
+  namespace: elohim-alpha
+  labels:
+    app: iroh-relay-alpha
+    environment: alpha
+    app.kubernetes.io/name: iroh-relay
+    app.kubernetes.io/instance: iroh-relay-alpha
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+spec:
+  replicas: 1
+  # Recreate, not RollingUpdate: two relay pods alive at once means peers can
+  # land on different instances and silently fail to reach each other (see the
+  # replicas:1 rationale in the header). A brief relay gap is the safer failure.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: iroh-relay-alpha
+      environment: alpha
+  template:
+    metadata:
+      annotations:
+        # Bump when relay.toml changes — the relay reads its config only at
+        # startup, so a ConfigMap edit without a pod restart never lands.
+        elohim.host/conf-revision: "2026-08-05-phase-a-no-qad"
+      labels:
+        app: iroh-relay-alpha
+        environment: alpha
+        app.kubernetes.io/name: iroh-relay
+        app.kubernetes.io/instance: iroh-relay-alpha
+        app.kubernetes.io/component: infra
+        app.kubernetes.io/part-of: elohim
+        app.kubernetes.io/managed-by: jenkins
+    spec:
+      # Same premise pin as doorway-A above: HARD-PINNED to node-type=operations
+      # (Intel-NUC, the always-on on-prem infra node where mongodb / nats /
+      # doorway-A also hard-pin). Keeps the pod coherent with the
+      # `relay.alpha.elohim.host -> alpha.elohim.host` CNAME, which points at
+      # THIS premise's WAN, and keeps relay availability off the leg the scope
+      # gate suspends (shem/remote).
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-type
+                    operator: In
+                    values:
+                      - operations
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      containers:
+        - name: iroh-relay
+          # Mirrored into Harbor from crates.io — see the HARBOR BUILD RECIPE
+          # in the header above.
+          image: harbor.ethosengine.com/ethosengine/iroh-relay:0.95.1-dev-latest
+          imagePullPolicy: Always
+          args:
+            - "--config-path"
+            - "/etc/iroh-relay/relay.toml"
+          env:
+            # info is the right floor: the relay logs client connect/disconnect
+            # at info, which is the census we read during the soak.
+            - name: RUST_LOG
+              value: "iroh_relay=info,info"
+          ports:
+            - name: relay-http
+              containerPort: 3340
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          # Generous-probe pattern (2026-05-27): timeoutSeconds: 15.
+          # /robots.txt is registered on the relay builder UNCONDITIONALLY
+          # (iroh-relay-0.95.1/src/server.rs:383), unlike /generate_204 which
+          # exists on this listener only while TLS is off. Probing robots.txt
+          # keeps the probe correct if Phase B ever enables relay-side TLS.
+          readinessProbe:
+            httpGet:
+              path: /robots.txt
+              port: 3340
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 15
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /robots.txt
+              port: 3340
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            timeoutSeconds: 15
+            failureThreshold: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: relay-config
+              mountPath: /etc/iroh-relay
+              readOnly: true
+      volumes:
+        - name: relay-config
+          configMap:
+            name: iroh-relay-config-alpha
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: iroh-relay-alpha
+  namespace: elohim-alpha
+  labels:
+    app: iroh-relay-alpha
+    environment: alpha
+    app.kubernetes.io/name: iroh-relay
+    app.kubernetes.io/instance: iroh-relay-alpha
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+spec:
+  type: ClusterIP
+  ports:
+    - name: relay-http
+      port: 3340
+      targetPort: relay-http
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app: iroh-relay-alpha
+    environment: alpha
+---
+# SEPARATE Ingress object — deliberately NOT merged into elohim-doorway-alpha's
+# ingress above. The relay needs ssl-redirect:false (see the LOAD-BEARING
+# comment below); merging would leak that flag onto the doorway hosts.
+# Follows the doorway ingress pattern (ingress-nginx + cert-manager
+# letsencrypt-production + the websocket annotation set), NOT the coturn
+# hostNetwork pattern: this is an HTTPS/WSS plane, not a raw UDP one.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: iroh-relay-alpha
+  namespace: elohim-alpha
+  labels:
+    app: iroh-relay-alpha
+    environment: alpha
+    app.kubernetes.io/name: iroh-relay
+    app.kubernetes.io/instance: iroh-relay-alpha
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+  annotations:
+    # WebSocket support for /relay. The relay connection is long-lived BY
+    # DESIGN — a short read timeout produces a reconnect storm that reads as
+    # relay instability.
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/websocket-services: "iroh-relay-alpha"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+    # LOAD-BEARING. iroh's captive-portal probe is issued as
+    # http://{host}/generate_204 (iroh net_report reportgen.rs). A 301 to https
+    # is not a 204 — forcing redirect makes every conductor believe it is behind
+    # a captive portal. Do NOT "tidy" this to true.
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+    # The relay wire caps a frame at 1 MiB (iroh-relay protos/relay.rs
+    # MAX_FRAME_SIZE). This does not gate post-upgrade websocket frames, but
+    # costs nothing as headroom on the upgrade request itself.
+    nginx.ingress.kubernetes.io/proxy-body-size: "2m"
+    # NO upstream-hash-by: there is exactly one backend pod by design
+    # (see replicas:1 in the header) and a hash annotation would imply otherwise.
+    cert-manager.io/cluster-issuer: letsencrypt-production
+spec:
+  ingressClassName: public
+  tls:
+    - hosts:
+        - relay.alpha.elohim.host
+      secretName: iroh-relay-alpha-tls
+  rules:
+    - host: relay.alpha.elohim.host
+      http:
+        paths:
+          # Whole host to the relay: /relay (wss), /ping (Https latency probe),
+          # /generate_204 (captive-portal probe), /, /robots.txt all live on the
+          # single relay listener while TLS is terminated upstream.
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: iroh-relay-alpha
+                port:
+                  number: 3340
+---
+# PodMonitor — scrape the relay's /metrics.
+#
+# ⚠ THIS TARGET READS **DOWN** until the operator adds port 9090 to
+#   `allow-metrics-from-observability` in
+#   genesis/orchestrator/manifests/infra/alpha-metrics-networkpolicy.yaml —
+#   elohim-alpha runs `default-deny-cross-env`, which gives the observability
+#   namespace no lane to app /metrics ports. Shipped WITH the known gap rather
+#   than omitted, so the gap is visible and closeable instead of forgotten.
+#   Same operator preconditions as alpha-doorway-podmonitor.yaml: the Prometheus
+#   Operator's podMonitorSelector must admit `release: kube-prom-stack`, its
+#   podMonitorNamespaceSelector must admit elohim-alpha.
+#
+# What it is for: the relay-side census. Connected-client count should equal
+# the flipped conductor count for THIS premise — a short count names WHICH
+# peer never found its home relay, which no conductor-side probe can tell you.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: iroh-relay-alpha
+  namespace: elohim-alpha
+  labels:
+    app: iroh-relay-alpha
+    environment: alpha
+    release: kube-prom-stack
+    app.kubernetes.io/name: iroh-relay
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+spec:
+  namespaceSelector:
+    matchNames:
+      - elohim-alpha
+  selector:
+    matchLabels:
+      app: iroh-relay-alpha
+  podMetricsEndpoints:
+    - port: metrics # containerPort 9090
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      honorLabels: false
