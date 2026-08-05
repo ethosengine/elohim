@@ -5,7 +5,7 @@
 //! can resolve the same references to content-addressed WASM without changing
 //! `.epr-meta` parsing or policy evaluation.
 
-use std::{collections::HashSet, fs, path::Path};
+use std::{collections::HashMap, collections::HashSet, fs, path::Path};
 
 use eprfs_meta::{ValidatorOutcome, ValidatorProvider, ValidatorRequest};
 use serde::Deserialize;
@@ -22,6 +22,7 @@ impl ValidatorProvider for ElohimRepositoryValidators {
     fn evaluate(&self, request: &ValidatorRequest<'_>) -> ValidatorOutcome {
         let detail = match request.reference {
             "epr:validator-p2p-design-gate" => p2p_design_gate(request),
+            "epr:validator-brand-vocabulary-boundary" => brand_vocabulary_boundary(request),
             "epr:validator-sovereignty-ontology-guard" => sovereignty_guard(request),
             "epr:validator-archetype-resource-alignment" => archetype_resource_alignment(request),
             "epr:validator-test-bench-aggregate-capacity" => test_bench_aggregate_capacity(request),
@@ -33,6 +34,212 @@ impl ValidatorProvider for ElohimRepositoryValidators {
             reason,
         })
     }
+}
+
+/// Keep opaque project/domain vocabulary at the brand and documentation layer.
+///
+/// This is deliberately an advisory, net-new-only source lint. Existing literals remain
+/// maintainable, but there is no compatibility suppression for new internal role, zome, package,
+/// persistence, or wire identifiers while the protocol remains in development.
+fn brand_vocabulary_boundary(request: &ValidatorRequest<'_>) -> Option<String> {
+    let path = request.write.path.as_str();
+    let normalized_path = path.replace('\\', "/").to_ascii_lowercase();
+    if [
+        ".claude/scripts/_lib/epr_meta.py",
+        ".claude/scripts/_lib/__tests__/brand_vocabulary_guard_test.py",
+        "elohim/eprfs/epr-cli/src/repository_validators.rs",
+    ]
+    .iter()
+    .any(|internal| normalized_path.ends_with(internal))
+    {
+        return None;
+    }
+    if normalized_path.starts_with(".claude/memory-kit/")
+        || normalized_path.contains("/.claude/memory-kit/")
+    {
+        return None;
+    }
+    let base = basename(path).to_ascii_lowercase();
+    let suffix = Path::new(path)
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| format!(".{}", value.to_ascii_lowercase()))
+        .unwrap_or_default();
+    if !is_brand_source(&suffix, &base) {
+        return None;
+    }
+
+    let post = request.write.content.as_deref()?;
+    let prior = request.write.prior_content.as_deref().unwrap_or("");
+    let added = added_lines(prior, post);
+    if added.is_empty() {
+        return None;
+    }
+
+    let lines: Vec<&str> = post.lines().collect();
+    let package_body_is_prose = suffix == ".json"
+        && (normalized_path.starts_with(".epr-meta/elohim/packages/")
+            || normalized_path.contains("/.epr-meta/elohim/packages/"));
+    let prose = brand_prose_lines(&lines, &suffix, package_body_is_prose);
+    let mut hits = Vec::new();
+    for (index, line) in lines.iter().enumerate() {
+        if !added.contains(*line)
+            || prose.contains(&index)
+            || brand_comment_only(line, &suffix, &base)
+        {
+            continue;
+        }
+        for (term, replacement) in brand_entries() {
+            if contains_brand_term(line, term) {
+                hits.push(format!(
+                    "line {} [{term}] `{}`; prefer {replacement}",
+                    index + 1,
+                    line.trim().chars().take(120).collect::<String>()
+                ));
+            }
+        }
+    }
+
+    (!hits.is_empty()).then(|| {
+        format!(
+            "net-new brand vocabulary in compilable artifact: {}. Name the capability in symbols, \
+             routes, schemas, tables, and wire values; keep brand vocabulary in product/architecture \
+             prose. Internal role names, zome names, package ids, discriminators, and wire literals \
+             are not compatibility boundaries during development—rename them too. This advisory \
+             never blocks. {}",
+            path,
+            hits.join(" | ")
+        )
+    })
+}
+
+fn brand_entries() -> &'static [(&'static str, &'static str)] {
+    &[
+        ("imagodei", "identity, presence, or stewardship-of-self"),
+        (
+            "lamad",
+            "learning, teaching, content, path, assessment, or mastery",
+        ),
+        (
+            "avodah",
+            "work, service, contribution, project, story, or flow",
+        ),
+        (
+            "qahal",
+            "community, collective, assembly, consent, or social governance",
+        ),
+        (
+            "shefa",
+            "economy, value flow, mutual credit, resource, or stewardship",
+        ),
+        (
+            "mishpat",
+            "governance, judgment, decision, policy, commitment, authority, or recovery quorum",
+        ),
+    ]
+}
+
+fn is_brand_source(suffix: &str, base: &str) -> bool {
+    const SUFFIXES: &[&str] = &[
+        ".bash", ".c", ".cc", ".cjs", ".cpp", ".cs", ".css", ".go", ".gql", ".graphql", ".groovy",
+        ".h", ".hpp", ".html", ".java", ".js", ".json", ".jsonc", ".jsx", ".kt", ".kts", ".mjs",
+        ".proto", ".py", ".rs", ".scss", ".sh", ".sql", ".svelte", ".swift", ".toml", ".ts",
+        ".tsx", ".vue", ".xml", ".yaml", ".yml",
+    ];
+    const BASENAMES: &[&str] = &["dockerfile", "jenkinsfile", "justfile", "makefile"];
+    SUFFIXES.contains(&suffix) || BASENAMES.contains(&base)
+}
+
+fn added_lines(prior: &str, post: &str) -> HashSet<String> {
+    let mut remaining = HashMap::<&str, usize>::new();
+    for line in prior.lines() {
+        *remaining.entry(line).or_default() += 1;
+    }
+    let mut added = HashSet::new();
+    for line in post.lines() {
+        match remaining.get_mut(line) {
+            Some(count) if *count > 0 => *count -= 1,
+            _ => {
+                added.insert(line.to_string());
+            }
+        }
+    }
+    added
+}
+
+fn brand_comment_only(line: &str, suffix: &str, base: &str) -> bool {
+    let stripped = line.trim_start();
+    if ["//", "/*", "*", "*/", "<!--", "-->"]
+        .iter()
+        .any(|prefix| stripped.starts_with(prefix))
+    {
+        return true;
+    }
+    if suffix == ".sql" && stripped.starts_with("--") {
+        return true;
+    }
+    matches!(suffix, ".py" | ".sh" | ".bash" | ".yaml" | ".yml" | ".toml")
+        .then(|| stripped.starts_with('#'))
+        .unwrap_or(false)
+        || matches!(base, "dockerfile" | "makefile") && stripped.starts_with('#')
+}
+
+fn brand_prose_lines(lines: &[&str], suffix: &str, package_body_is_prose: bool) -> HashSet<usize> {
+    let mut prose = HashSet::new();
+    let mut block_indent = None;
+    for (index, line) in lines.iter().enumerate() {
+        let stripped = line.trim();
+        let indent = line.len() - line.trim_start().len();
+        if let Some(parent_indent) = block_indent {
+            if !stripped.is_empty() && indent <= parent_indent {
+                block_indent = None;
+            } else {
+                prose.insert(index);
+                continue;
+            }
+        }
+        if let Some(value) = prose_field_value(line, package_body_is_prose) {
+            prose.insert(index);
+            if matches!(suffix, ".yaml" | ".yml" | ".toml")
+                && matches!(value.trim_start().chars().next(), Some('>') | Some('|'))
+            {
+                block_indent = Some(indent);
+            }
+        }
+    }
+    prose
+}
+
+fn prose_field_value(line: &str, package_body_is_prose: bool) -> Option<&str> {
+    let trimmed = line.trim_start();
+    let unquoted = trimmed.strip_prefix(['"', '\'']).unwrap_or(trimmed);
+    for field in ["description", "$comment", "why", "purpose", "body"] {
+        if field == "body" && !package_body_is_prose {
+            continue;
+        }
+        let Some(rest) = unquoted
+            .get(..field.len())
+            .filter(|head| head.eq_ignore_ascii_case(field))
+        else {
+            continue;
+        };
+        let after = &unquoted[rest.len()..];
+        let after = after
+            .strip_prefix(['"', '\''])
+            .unwrap_or(after)
+            .trim_start();
+        if let Some(value) = after.strip_prefix(':').or_else(|| after.strip_prefix('=')) {
+            return Some(value);
+        }
+    }
+    None
+}
+
+fn contains_brand_term(line: &str, term: &str) -> bool {
+    let lower = line.to_lowercase();
+    lower
+        .match_indices(term)
+        .any(|(index, _)| index == 0 || !lower.as_bytes()[index - 1].is_ascii_alphanumeric())
 }
 
 fn eprfs_meta_domain_neutrality(request: &ValidatorRequest<'_>) -> Option<String> {
@@ -474,6 +681,119 @@ mod tests {
             policy_ref: None,
             why: None,
         }
+    }
+
+    fn brand_flag(path: &str, prior: Option<&str>, content: &str) -> Option<String> {
+        let dir = TempDir::new().unwrap();
+        let rule = dummy_rule();
+        let mut write = GovernanceWrite::new(path);
+        write.is_new = prior.is_none();
+        write.prior_content = prior.map(str::to_string);
+        write.content = Some(content.to_string());
+        let request = ValidatorRequest {
+            repo_root: dir.path(),
+            reference: "epr:validator-brand-vocabulary-boundary",
+            rule: &rule,
+            write: &write,
+        };
+        brand_vocabulary_boundary(&request)
+    }
+
+    #[test]
+    fn brand_lint_flags_each_net_new_opaque_symbol() {
+        for (term, replacement) in brand_entries() {
+            let source = format!("export type {term}Signal = {{ id: string }};");
+            let reason = brand_flag("src/signals.ts", None, &source).expect(term);
+            assert!(reason.contains(term), "{reason}");
+            assert!(reason.contains(replacement), "{reason}");
+            assert!(reason.contains("never blocks"), "{reason}");
+        }
+    }
+
+    #[test]
+    fn brand_lint_ignores_docs_comments_and_schema_prose() {
+        let term = brand_entries()[5].0;
+        assert!(brand_flag("README.md", None, &format!("# About {term}")).is_none());
+        assert!(brand_flag(
+            "src/client.ts",
+            None,
+            &format!("// {term} is the project name")
+        )
+        .is_none());
+        assert!(brand_flag(
+            "schema.json",
+            None,
+            &format!("{{\n  \"description\": \"The {term} project\"\n}}"),
+        )
+        .is_none());
+
+        let package = format!("{{\n  \"body\": \"# About {term}\\n\"\n}}");
+        assert!(brand_flag(
+            ".epr-meta/elohim/packages/skills/reference.json",
+            None,
+            &package,
+        )
+        .is_none());
+
+        let report = format!("{{\"last_changed\": \"src/{term}.rs\"}}");
+        assert!(brand_flag(".claude/memory-kit/generated-report.json", None, &report,).is_none());
+    }
+
+    #[test]
+    fn brand_lint_has_no_internal_compatibility_suppression() {
+        let term = brand_entries()[5].0;
+        let source = format!(
+            "// brand-boundary: {term} — stable Holochain role identifier\n\
+             const GOVERNANCE_ROLE: &str = \"{term}\";"
+        );
+        assert!(brand_flag("src/roles.rs", None, &source).is_some());
+    }
+
+    #[test]
+    fn brand_lint_does_not_trap_maintenance_of_an_existing_literal() {
+        let term = brand_entries()[5].0;
+        let prior = format!("const OLD_ROLE: &str = \"{term}\";\n");
+        let post = format!("{prior}const TIMEOUT_SECONDS: u64 = 30;\n");
+        assert!(brand_flag("src/roles.rs", Some(&prior), &post).is_none());
+    }
+
+    #[test]
+    fn live_root_policy_resolves_as_a_pinned_nonblocking_advisory() {
+        let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../..")
+            .canonicalize()
+            .unwrap();
+        let term = brand_entries()[5].0;
+        let mut write = GovernanceWrite::new("brand-vocabulary-probe.ts");
+        write.is_new = true;
+        write.content = Some(format!("export type {term}Signal = {{ id: string }};"));
+
+        let evaluation = eprfs_meta::evaluate_path_with(
+            &repo_root,
+            repo_root.join("brand-vocabulary-probe.ts"),
+            &write,
+            &ElohimRepositoryValidators,
+        )
+        .unwrap();
+
+        assert!(
+            evaluation
+                .diagnostics
+                .iter()
+                .all(|diagnostic| diagnostic.code != "policy.pin-mismatch"),
+            "{:?}",
+            evaluation.diagnostics
+        );
+        let verdict = evaluation
+            .verdicts
+            .iter()
+            .find(|verdict| verdict.rule_id == "brand-vocabulary-boundary")
+            .expect("live root brand policy should fire");
+        assert_eq!(verdict.class, GovernanceRuleClass::Inject);
+        assert_eq!(
+            eprfs_meta::resolve_decision(&evaluation.verdicts).decision,
+            "permit"
+        );
     }
 
     fn write_charter_registry(dir: &TempDir) {
