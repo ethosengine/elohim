@@ -126,9 +126,9 @@ answers, so a future schema can be checked against them.
 that hides its limits is not a contract): we cannot guarantee deletion; we cannot detect coercion;
 revocation is uninformative, not invisible; the floor binds this protocol, not the world.
 
-## 4.1 Falsification cases — the ontology must express all four
+## 4.1 Falsification cases — the ontology must express all nine rooms
 
-An ontology that cannot express these four rooms is wrong, and this is the test to run before adding
+An ontology that cannot express these nine rooms is wrong, and this is the test to run before adding
 any primitive. They were chosen because the primitives are identical in each and **the meaning of
 every one of them inverts.**
 
@@ -138,13 +138,18 @@ every one of them inverts.**
 | **Bedroom** | High, and it *changes when the relationship does* | Real — shared memory is part of the bond | Ceremony; consent is time-indexed and context-bound |
 | **Casual meeting** | Low individually, compounds into surveillance | Trivial | **Decay by default** — the only room where forgetting needs no ceremony |
 | **Brothel** | Third-party linkage can be lethal to the worker | **Real** — an unrecorded violent client cannot be warned about | **Asymmetric linkage authority**: the person at risk may link; everyone else faces a high bar |
+| **Newsroom** | To the subject, reputational and legal — **and that is the point** | **Accountability collapses; power becomes unauditable** | **Standing is bounded.** It does not reach memory of one's own exercise of power over others |
+| **Emergency room** | Moderate — medical memory is sensitive | **Lethal** — the allergy nobody could look up | **Break-glass**: a bar a stranger *can* meet in ninety seconds, on an unconscious subject — and every crossing is **loud** |
+| **Deathbed** | The subject can no longer revoke, and kin may hold what they wanted released | Grief, lineage, inheritance, the historical record | **Standing persists, unheld.** Death confers no new permission; prior declarations govern |
+| **Protest** | Identification, prosecution, facial recognition | **State violence goes unevidenced** | Plural standing **without either-veto** — per-subject remedies only |
+| **Confessional** | The disclosure was made *because* it would be held | The relationship's whole purpose is defeated | **Custody carries a duty** — a floor claim on the custodian's behaviour, not only on the data |
 
 **The primitives do not change — the class sets the direction of the default.** This is the argument
 that the verb set is shaped correctly: if remembering-versus-forgetting were baked into the primitives,
-they would serve exactly one room and quietly betray the other three. Which is what most systems do —
-built for the casual meeting, then deployed in the bedroom.
+they would serve exactly one room and quietly betray the rest. Which is what most systems do — built
+for the casual meeting, then deployed in the bedroom.
 
-Two demands visible only when the four are held together, and neither is served today:
+**Seven demands visible only when the rooms are held together.** None is served today:
 
 - **Deferred standing.** The kindergarten needs standing held for a person who does not exist yet: the
   child's adult self has standing over memories the child could never consent to. That is not "the
@@ -162,6 +167,42 @@ Two demands visible only when the four are held together, and neither is served 
   while the subject meets it by definition. This also sharpens the backstopping rule: community
   backstopping governs **recovery and standing, never linkage** — linkage authority stays with the
   person the memory endangers.
+- **Bounded standing — the one that must not be missed.** Every other room protects the subject. The
+  newsroom is the inverse: **the subject's claim is the threat.** If standing gives you control over
+  memory about you, then *"this memory is about me"* becomes the most efficient suppression primitive
+  ever built, and every powerful person acquires a takedown lever. A journalist's record of wrongdoing
+  is memory *about* the wrongdoer. So the ontology must say where standing **stops** — the working
+  line: standing does not reach memory of one's own **exercise of power over others**, which is where
+  earned reach and accountability begin. Without this the ontology is a censorship tool, and this is
+  the first thing an adversary would use it for.
+- **The bar has two faces, and neither room alone defines it.** The brothel demands a bar an abuser or
+  prosecutor **cannot** meet. The emergency room demands one a **stranger with a scalpel can meet in
+  ninety seconds**, on a subject who cannot consent. Held together they give the bar its shape, and
+  the ER supplies the property that makes it survivable: **break-glass is loud.** Every crossing
+  leaves a record the subject sees afterward. A silent high bar is indistinguishable from no bar —
+  which is very likely what the brothel's bar needs too.
+- **Standing that outlives its holder.** The kindergarten gives standing for a self who does not exist
+  *yet*; the deathbed gives standing for a self who no longer does. Every simple answer fails
+  somewhere: **terminate** and the dead have no protection; **transfer to kin** and the family
+  inherits control over exactly what the person may have wanted released; **persist unheld** and
+  nothing can ever be resolved. The plan's stated default — custody never ripens into rights on
+  death — survives this room only if paired with *prior declarations govern* and *death confers no
+  new permission*. `NetworkWitnessPurpose::Dissolution` exists and is stub-rejected in the validator;
+  this is the room that says what it must become.
+- **Plurality needs two rules, not one.** The bedroom's either-veto is right where exposure is
+  unrecoverable and the subjects are few. It **breaks** in the protest: one subject's veto would
+  destroy accountability evidence for everyone else, and the subjects' interests genuinely conflict —
+  one needs the record as proof of state violence, another needs to not be identifiable, and *neither
+  is wrong*. So plural standing resolves by **either-veto** in the intimate class and by **per-subject
+  non-exclusive remedies** (filter, modify) at collective scale. The class must say which applies, and
+  consultation at protest scale is impossible by construction — the rule cannot presume it.
+- **Custody that carries a duty.** Our three relations name custodian, rights-holder, and subject, and
+  custody is currently a *neutral fact*: you either hold the bytes or you do not. The confessional
+  shows this is insufficient — a counsellor's memory of you carries an **obligation of care**, and in
+  some traditions a seal that survives even legal compulsion. That is a floor claim on the
+  **custodian's behaviour**, which the ontology has no way to state. We are already relying on the
+  property without being able to express it: the non-firable elohim-counsel *is* a duty-bearing
+  custodian, and it is the one primitive that survives a compromised guardian.
 
 And within a single room the same verb inverts: a teacher **surfacing** *"this child struggled with
 letters"* is care; a stranger surfacing it is predation. A partner surfacing a shared moment is
