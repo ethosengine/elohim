@@ -95,10 +95,14 @@ data:
       # Signal served on dedicated subdomain (tx5/SBD protocol requires path = pubkey)
       signal_url: "SIGNAL_URL_PLACEHOLDER"
       # REQUIRED field at holochain 0.6.3+ (single NetworkConfig struct; inert while
-      # the build compiles tx5-only). Value is the planned SOVEREIGN self-hosted
-      # iroh-relay — it must be live before any transport-iroh build ships; never
-      # fall back to n0's public relay default.
-      relay_url: "https://relay.elohim.host"
+      # the build compiles tx5-only). Rendered per-human from primaryDoorway
+      # (deployHumanManifest, mirroring SIGNAL_URL_PLACEHOLDER above): doorway A
+      # humans get https://relay.alpha.elohim.host, doorway B humans get
+      # https://relay.elohim.host — the relay is a per-doorway concern (Wave 2
+      # relay-sovereignty design, D2), not one fleet-wide name. Must be live
+      # before any transport-iroh build ships; never fall back to n0's public
+      # relay default.
+      relay_url: "RELAY_URL_PLACEHOLDER"
       # Authority arc factor: 1 = full DHT authority (kitsune2 default), 0 = leecher.
       # Per-node via deployments.json edgenodeArcFactor (default 1). Set 0 to relieve a
       # NON-ANCHOR node OOM-crash-looping on the full-arc working set (conductor RAM is
