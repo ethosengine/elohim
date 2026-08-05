@@ -8,6 +8,47 @@ rules:
     when: { write: "*cross-pollination*.md", new: true }
     dedupe-of: genesis/research/README.md
     why: "Check the Research Index (README.md) first — this topic may be catalogued (e.g. the hypha* name-collision triple). Extend the entry rather than starting a parallel note."
+  - id: mint-pass-at-close
+    class: inject
+    when: { write: "*.md", new: true }
+    dedupe-of: genesis/data/timeline/backlog/CLUSTERS.md
+    why: >
+      Research engagements close with a MINT PASS (operator decision 2026-08-04): each surviving
+      take/adopt item folds as a ROW into the matching backlog cluster file (see
+      genesis/data/timeline/backlog/CLUSTERS.md), citing this survey's epr: slug — never as a spray
+      of standalone backlog entries. Takes not worth a cluster row die honestly in the survey's
+      prose. The survey's Outputs section then points at the clusters it fed. This is the first hop
+      of the provenance chain (research → cluster row → spec → code + scenario → chronicle).
+  - id: sovereignty-frame-declared
+    class: ask
+    when: { write: "*.md", contains-any: ["sovereign", "Sovereign"], new: true }
+    require-frontmatter: [sovereignty-frame]
+    why: >
+      The MEMBRANE rule (operator decision 2026-08-05). Surveys must quote, reason inside, and argue
+      against the prevailing self-sovereignty ontology, because nearly every project we survey still
+      uses it (Playnet's "autonomic identifiers", p2panda/SSB's crypto-identity lineage, the whole
+      DID/VC/UCAN stack). Prompting on every quotation would tax the critique itself and push authors
+      toward euphemism — the opposite of clarity. So research does not gate the VOCABULARY; it gates
+      the DIFFERENTIATION. A survey that reaches for the words declares
+      `sovereignty-frame: adversary|bounded|bridge-legibility` in its frontmatter and says plainly
+      how the Elohim ontology differs: identity is imago dei — an inviolable right BACKSTOPPED by
+      community and institutional expression, never a self-asserted crypto primitive; real agency
+      comes from the community backstopping the individual. Naming the frame is what quarantines it
+      at the boundary, so an examined borrowing inoculates instead of leaking. The same marker is the
+      ONLY silencer for the global PostToolUse landing-logger, so one line does both jobs. Birth-time
+      only — maintenance of an existing survey is never trapped. The membrane ends at this directory:
+      canon (genesis/docs/content/elohim-protocol/) binds the unrelaxed sovereignty-ontology-guard
+      policy, where an apex frame would become doctrine rather than a quotation.
+  - id: readme-blind-reader-review
+    class: measure
+    when: { write: "README*.md" }
+    why: >
+      Nearer-wins RELAXATION of the repo-root readme-blind-reader-review rule (operator decision
+      2026-08-04): research/ is the messy desk of creativity — context leak between the author's head
+      and the page is acceptable here, because these notes exist to help us solve problems, not to
+      stand alone for external audiences. Blind-reader isolation stays mandatory for the
+      external-facing surfaces (epics, manifestos, READMEs elsewhere in the repo); this override
+      demotes it to observation-only for the Research Index and any research README.
 ---
 # research — surveys + prior-art
 
@@ -15,3 +56,33 @@ The Research Index (`README.md`) is the canonical catalog of what has been surve
 name-collision scar tissue (`hypha-dao` ≠ `hyphacoop` ≠ `hypha-network`). A new `*cross-pollination*.md`
 is checked against the index at birth so authors fold existing coverage rather than starting a parallel
 note. Edits to existing surveys and all other research files are unaffected.
+
+This directory is exempt from the repo-root README blind-reader review (relaxed to `measure` above):
+research is the messy desk — surveys and the index may lean on shared context freely. Documents that
+graduate out of research into the canon (epics, manifestos, module READMEs) pick the guard back up in
+their destination directories.
+
+## The sovereignty membrane (why this directory reads the guard differently)
+
+Research is where we meet other people's ontologies in their own words. Almost every project worth
+surveying still frames identity as *self-sovereignty* — so a survey has to say the phrase in order to
+disagree with it, and the sovereignty-ontology-guard, tuned for surfaces where such framing would
+become a design, mis-reads that disagreement as adoption. Relaxing it here to `measure` is a
+**context boundary**, not a loosening of the conviction: the vocabulary is admitted so it can be
+examined, and the price of admission is that the survey says plainly where we differ. Name the
+adversary frame, quote it accurately, argue with it, and record the difference — an unexamined
+borrowing is what leaks; an examined one is inoculation. Every doc that crosses back out of this
+directory carries the unrelaxed rule with it.
+
+## How research is written (the shape that composes)
+
+The messy desk still has a shape, because downstream hops consume it: (1) **graded claims** — every
+load-bearing claim carries ✅ verified-in-source / ◐ single-source / ⚠ web-only, so a cluster row or
+spec citing the survey inherits an honest confidence; (2) **sorted verdicts** — take / study / leave /
+watch (or green/red team), so the mint pass has a mechanical input; (3) **grounded adjudication** —
+verdicts adjudicate against *current build-state* (file:line), never the durable spec; (4) **a method
+note and credit** — who searched what, what the adversarial pass corrected. On close, the **mint pass**
+(rule above) folds surviving takes into backlog cluster rows citing the survey's `epr:` slug — the
+first hop of the provenance chain documented in `genesis/data/timeline/backlog/CLUSTERS.md`. A survey
+whose takes were never minted is an idea sink with no drain; the survey's Outputs section names the
+clusters it fed so the gap is visible at a glance.

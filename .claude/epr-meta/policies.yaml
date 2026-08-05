@@ -52,6 +52,28 @@ policies:
       DNA-lineage event only); plain native Rust is gated by fmt/clippy/nextest alone.
       Ratchet ceilings DOWN as the tail drains; never up.
 
+  - id: brand-vocabulary-boundary
+    version: 1
+    contentHash: sha256:e57794fb9a49b28b8fa30b463da87b36ead31df9d829b7eb54457b8f09307c63
+    title: Brand vocabulary stays at the brand boundary
+    binding: persuasive
+    class: inject
+    validator: epr:validator-brand-vocabulary-boundary
+    status: active
+    established_by: deliberated-2026-08-04-operator+codex
+    why: >
+      Product and architecture prose may use the protocol's domain brands; compilable artifacts
+      should name the capability an unfamiliar engineer is actually working with. Prefer identity,
+      learning, work, community or collective governance, economy or value flow, and the precise
+      governance concept (judgment, decision, policy, commitment, authority, or recovery quorum) in
+      symbols, routes, schemas, persistence names, and wire values. The validator is net-new-only and
+      ignores documentation, comments, and schema prose, so existing debt can be cleaned incrementally
+      without tolling unrelated maintenance. This repository is still pre-compatibility: internal
+      package ids, Holochain roles and zomes, persisted discriminators, and wire literals do not earn
+      an exception merely because we already use them. Rename those coded references now; add a real
+      migration boundary only after an external contract is deliberately ratified. Advisory only:
+      teach and inventory; never block authoring.
+
   - id: memory-frontmatter-at-birth
     version: 1
     contentHash: sha256:a622e4d20e5aa57ab9152e48a082ff437499ad5b498516408f0cc864cce003ee
@@ -124,6 +146,39 @@ policies:
       unqualified self-sovereignty can't model wards/IDD/seniors — the right is exercised WITH/THROUGH
       others). Dismissals aggregate to sovereignty-guard-signal.py so the RULE itself surfaces for drift
       review: the protocol governing the bytes of its own repo.
+
+  - id: ownership-ontology-guard
+    version: 1
+    contentHash: sha256:986c16321b2f9b2062d854a62af728366ab1e2d082d37c16ab77a26fcd718fa5
+    title: Ownership ontology guard — stewardship and custody, never enclosure
+    binding: binding-local
+    class: ask
+    scope: { write: "*.md", contains-any: ["ownership", "Ownership"] }
+    validator: epr:validator-ownership-ontology-guard
+    status: active
+    established_by: operator-ratification-pending-2026-08-05
+    why: >
+      The sibling drift to sovereignty-ontology-guard, named by the operator on 2026-08-05:
+      "ownership is like sovereignty — it might need a guard to help keep us from gravitating into
+      it." OWNERSHIP is the enclosure-flavoured apex the protocol subordinates to STEWARDSHIP and
+      CUSTODY. ValueFlows already splits the two — `primaryAccountable` (who holds the rights) vs
+      `custodianScope` (who physically stewards), with distinct `transferCustody` and
+      `transferAllRights` actions — and COLLAPSING them is exactly the enclosure failure the
+      Georgist common-inheritance framing exists to prevent: a holon that "owns" the commons it
+      stewards has enclosed it. The distinction is load-bearing for holonic land/commons
+      stewardship, where the commons holds the rights and a local unit holds custody, and custody
+      must be transferable without the rights ever moving. This guard fires on NET-NEW apex framing
+      only (bare "own"/"owner" are far too common to gate — the phrase list is deliberately narrow
+      and names only assertions that ownership is the RIGHT relationship to a resource). It is an
+      AFFIRMATION prompt, not a ban. Confirm your usage is one of the LEGITIMATE frames and proceed,
+      or reframe: (1) ADVERSARY — naming what is resisted (enclosure, platform data-ownership
+      claims, rent extraction); (2) BOUNDED — ownership WITHIN a commons that retains the rights;
+      (3) EXTERNAL-LEGIBILITY — describing an outside legal system's ownership on its own terms
+      (a title, a co-op share, a jurisdiction's property register). Declare `stewardship-frame:` in
+      the doc (a `sovereignty-frame:` marker also satisfies it — the two frames travel together) and
+      the guard goes quiet. Parallel rule, same shape and same escape hatch:
+      sovereignty-ontology-guard. Canon: genesis/docs/architecture/stewardship-over-sovereignty.md;
+      the Georgist common-inheritance framing; genesis/docs/content/elohim-protocol/hardware-providence-commons.md.
 
   - id: archetype-resource-alignment
     version: 1

@@ -413,6 +413,131 @@ def _p2p_design_gate(write: dict) -> bool:
     return any(s in c for s in ("GET /api/v1", "PRIMARY KEY", "uuid"))
 
 
+# ── Brand vocabulary stays at the brand boundary (`epr:validator-brand-vocabulary-boundary`).
+# Domain/project names are useful in architecture and product prose, but an unfamiliar engineer
+# should not need that glossary to understand a route, type, function, table, or wire value. This
+# advisory therefore scans only source/config artifacts, only NET-NEW lines, and ignores comments +
+# schema prose. There is deliberately no compatibility suppression while the protocol is in
+# development: internal role/zome/package/wire literals should be renamed too. This is `inject`,
+# never a blocker.
+_BRAND_CODE_SUFFIXES = frozenset({
+    ".bash", ".c", ".cc", ".cjs", ".cpp", ".cs", ".css", ".go", ".gql", ".graphql",
+    ".groovy", ".h", ".hpp", ".html", ".java", ".js", ".json", ".jsonc", ".jsx", ".kt",
+    ".kts", ".mjs", ".proto", ".py", ".rs", ".scss", ".sh", ".sql", ".svelte", ".swift",
+    ".toml", ".ts", ".tsx", ".vue", ".xml", ".yaml", ".yml",
+})
+_BRAND_CODE_BASENAMES = frozenset({"dockerfile", "jenkinsfile", "justfile", "makefile"})
+_BRAND_LINT_INTERNAL_SUFFIXES = (
+    "/.claude/scripts/_lib/epr_meta.py",
+    "/.claude/scripts/_lib/__tests__/brand_vocabulary_guard_test.py",
+    "/elohim/eprfs/epr-cli/src/repository_validators.rs",
+)
+_BRAND_VOCABULARY = {
+    "imagodei": "identity, presence, or stewardship-of-self",
+    "lamad": "learning, teaching, content, path, assessment, or mastery",
+    "avodah": "work, service, contribution, project, story, or flow",
+    "qahal": "community, collective, assembly, consent, or social governance",
+    "shefa": "economy, value flow, mutual credit, resource, or stewardship",
+    "mishpat": "governance, judgment, decision, policy, commitment, authority, or recovery quorum",
+}
+_BRAND_TERM_RES = {
+    term: re.compile(rf"(?<![A-Za-z0-9]){re.escape(term)}", re.IGNORECASE)
+    for term in _BRAND_VOCABULARY
+}
+_BRAND_PROSE_FIELD_RE = re.compile(
+    r"^\s*[\"']?(?:description|\$comment|why|purpose)[\"']?\s*[:=]",
+    re.IGNORECASE,
+)
+_BRAND_PACKAGE_BODY_RE = re.compile(r"^\s*[\"']?body[\"']?\s*[:=]", re.IGNORECASE)
+_BRAND_BLOCK_PROSE_RE = re.compile(
+    r"^(\s*)[\"']?(?:description|\$comment|why|purpose)[\"']?\s*[:=]\s*[>|]",
+    re.IGNORECASE,
+)
+
+
+def _brand_comment_only(line: str, suffix: str, basename: str) -> bool:
+    stripped = line.lstrip()
+    if stripped.startswith(("//", "/*", "*", "*/", "<!--", "-->")):
+        return True
+    if suffix == ".sql" and stripped.startswith("--"):
+        return True
+    if suffix in (".py", ".sh", ".bash", ".yaml", ".yml", ".toml") or basename in (
+            "dockerfile", "makefile"):
+        return stripped.startswith("#")
+    return False
+
+
+def _brand_prose_lines(lines: list[str], suffix: str, package_body_is_prose: bool = False) -> set[int]:
+    """Line indexes that are documentation inside a code/config artifact. JSON Schema
+    `description`/`$comment` values and YAML/TOML folded prose are not compilable references."""
+    out: set[int] = set()
+    block_indent: int | None = None
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        indent = len(line) - len(line.lstrip())
+        if block_indent is not None:
+            if stripped and indent <= block_indent:
+                block_indent = None
+            else:
+                out.add(i)
+                continue
+        if _BRAND_PROSE_FIELD_RE.match(line) or (
+                package_body_is_prose and _BRAND_PACKAGE_BODY_RE.match(line)):
+            out.add(i)
+        block = _BRAND_BLOCK_PROSE_RE.match(line)
+        if block and suffix in (".yaml", ".yml", ".toml"):
+            block_indent = len(block.group(1))
+    return out
+
+
+def _brand_vocabulary_boundary(write: dict) -> bool:
+    import sys as _sys
+
+    path = Path(write.get("path") or "")
+    normalized_path = path.as_posix().lower()
+    if any(normalized_path.endswith(suffix) for suffix in _BRAND_LINT_INTERNAL_SUFFIXES):
+        return False  # the validator and its fixtures necessarily enumerate the vocabulary
+    if "/.claude/memory-kit/" in f"/{normalized_path.lstrip('/')}":
+        return False  # generated observation ledgers are neither code nor authored configuration
+    suffix = path.suffix.lower()
+    basename = path.name.lower()
+    if suffix not in _BRAND_CODE_SUFFIXES and basename not in _BRAND_CODE_BASENAMES:
+        return False  # docs, feature narratives, images, and other non-code artifacts stay brand-safe
+    post = write.get("content")
+    if post is None:
+        return False
+    pre = _prior_text(write)
+    added = set(_added_lines(pre if pre is not None else "", post))
+    if not added:
+        return False
+
+    lines = post.splitlines()
+    package_body_is_prose = (
+        suffix == ".json" and "/.epr-meta/elohim/packages/" in f"/{normalized_path.lstrip('/')}"
+    )
+    prose_lines = _brand_prose_lines(lines, suffix, package_body_is_prose)
+    hits: list[tuple[int, str, str]] = []
+    for i, line in enumerate(lines):
+        if line not in added or i in prose_lines or _brand_comment_only(line, suffix, basename):
+            continue
+        for term, pattern in _BRAND_TERM_RES.items():
+            if pattern.search(line):
+                hits.append((i + 1, term, line.strip()[:120]))
+
+    if not hits:
+        return False
+    print(f"  brand-vocabulary-boundary — net-new brand vocabulary in compilable artifact "
+          f"{_repo_rel(str(path))}:", file=_sys.stderr)
+    for lineno, term, source in hits:
+        print(f"    · line {lineno} [{term}] {source}", file=_sys.stderr)
+        print(f"      prefer: {_BRAND_VOCABULARY[term]}", file=_sys.stderr)
+    print("    FIX: name the capability in symbols, routes, schemas, tables, and wire values. "
+          "Keep brand vocabulary in product/architecture prose. Internal role names, zome names, "
+          "package ids, discriminators, and wire literals are not compatibility boundaries during "
+          "development—rename them too. This advisory never blocks the write.", file=_sys.stderr)
+    return True
+
+
 # ── Sovereignty ontology guard (a validator-EPR). Fires an `ask` when a write NEWLY INTRODUCES
 # apex-assertion sovereignty framing — "self-sovereign" as the top identity/agency tier, "true/full
 # data sovereignty" celebrated as a goal — the crypto ontology the protocol rejects. It is a GUARD,
@@ -444,6 +569,33 @@ def _sov_apex_count(text: str) -> int:
     return sum(t.count(p) for p in _SOV_APEX_PHRASES)
 
 
+# ── Ownership ontology guard. The sibling drift to sovereignty, and the same shape: OWNERSHIP is
+# the enclosure-flavoured apex the protocol subordinates to STEWARDSHIP/CUSTODY. ValueFlows already
+# splits the two — `primaryAccountable` (who holds the rights) vs `custodianScope` (who physically
+# stewards), with distinct `transferCustody` / `transferAllRights` actions — and collapsing them is
+# precisely the enclosure failure the Georgist common-inheritance framing exists to prevent: a holon
+# that "owns" the commons it stewards has enclosed it. Phrases are narrow on purpose (the bare words
+# "own"/"owner" are far too common to gate); these are the ones that assert ownership as the RIGHT
+# relationship to a resource. Escape hatch mirrors sovereignty's: declare `stewardship-frame:`.
+# PRECISION NOTE (audit 2026-08-05): the discriminator is PROPERTY vs RESPONSIBILITY. English uses
+# "ownership" for both — "take full ownership of this bug", "the full ownership matrix" (already in
+# 5 files here: timeline/CONVENTIONS.md + the deliver skill and its 3 projections), "without sole
+# ownership burden". Those are accountability idioms, not enclosure claims, so `full ownership` and
+# `sole ownership` were REMOVED after a corpus grep proved the collision. What remains is
+# property-flavoured only.
+_OWN_APEX_PHRASES = (
+    "data ownership", "own your data", "owns their data", "owns your data",
+    "true ownership", "outright ownership",
+    "ownership rights", "ownership of the commons", "owns the commons",
+)
+_OWN_FRAME_MARKER = "stewardship-frame:"
+
+
+def _own_apex_count(text: str) -> int:
+    t = text.lower()
+    return sum(t.count(p) for p in _OWN_APEX_PHRASES)
+
+
 def _sovereignty_ontology_guard(write: dict) -> bool:
     post = write.get("content") or ""
     if _SOV_FRAME_MARKER in post.lower():
@@ -458,6 +610,26 @@ def _sovereignty_ontology_guard(write: dict) -> bool:
     except OSError:
         return True  # can't read prior state — fail toward surfacing (it's only an `ask`)
     return post_n > _sov_apex_count(pre)  # net-new only; cleaning/maintenance never fires
+
+
+def _ownership_ontology_guard(write: dict) -> bool:
+    """Fires on NET-NEW apex-ownership framing. Same contract as the sovereignty guard: an
+    affirmation prompt, never a ban — confirm the frame is legitimate (adversary / bounded /
+    external-legibility) or reframe toward custody+stewardship."""
+    post = write.get("content") or ""
+    low = post.lower()
+    if _OWN_FRAME_MARKER in low or _SOV_FRAME_MARKER in low:
+        return False  # frame explicitly declared/adjudicated for this surface
+    post_n = _own_apex_count(post)
+    if post_n == 0:
+        return False
+    if write.get("is_new"):
+        return True
+    try:
+        pre = Path(write["path"]).read_text(errors="replace")
+    except OSError:
+        return True  # can't read prior state — fail toward surfacing (it's only an `ask`)
+    return post_n > _own_apex_count(pre)  # net-new only
 
 
 # ── Archetype resource alignment (a validator-EPR). Fires an `ask` when deployments.json carries
@@ -1066,7 +1238,9 @@ def _escalation_ladder(write: dict) -> bool:
 
 REFERENCE_VALIDATORS = {
     "epr:validator-p2p-design-gate": _p2p_design_gate,
+    "epr:validator-brand-vocabulary-boundary": _brand_vocabulary_boundary,
     "epr:validator-sovereignty-ontology-guard": _sovereignty_ontology_guard,
+    "epr:validator-ownership-ontology-guard": _ownership_ontology_guard,
     "epr:validator-archetype-resource-alignment": _archetype_resource_alignment,
     "epr:validator-test-bench-aggregate-capacity": _test_bench_aggregate_capacity,
     "epr:validator-escalation-ladder": _escalation_ladder,

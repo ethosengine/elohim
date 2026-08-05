@@ -13,8 +13,23 @@ purpose: >
 rules:
   - id: sovereignty-ontology-guard
     policy: sovereignty-ontology-guard@1
+  - id: ownership-ontology-guard
+    policy: ownership-ontology-guard@1
+  - id: manifesto-epic-blind-reader-review
+    class: inject
+    when: { write: "epic*.md" }
+    route-to: { dest: blind-reader }
+    parameters: { review-profile: manifesto-epic }
+    why: >
+      After the epic authoring pass, dispatch a fresh-context blind-reader with ONLY the completed
+      epic path and the `manifesto-epic` review profile. The reader must recover the intended audience,
+      present human tension, proposed transformation, why it matters, and the emotional and ethical
+      through-line without the manifesto, sibling epics, session context, or protocol glossary. Revise
+      and repeat with a new blind reader until READY or the operator explicitly defers named findings.
 validators:
   - ref: epr:validator-sovereignty-ontology-guard
+    fuel: 100
+  - ref: epr:validator-ownership-ontology-guard
     fuel: 100
 cites:
   - stewardship-over-sovereignty | the foundational canon this guard enforces — rejects crypto-sovereignty, reserves stewardship/agency/authority, frames threshold/hardware crypto as accelerators of community recovery never gates | path: genesis/docs/architecture/stewardship-over-sovereignty.md
@@ -33,3 +48,12 @@ keystroke to proceed when the usage is legitimate — and it fires only on *intr
 doc to *clean* its sovereignty framing is never trapped. Dismissals aggregate through
 `sovereignty-guard-signal.py` (PostToolUse) into a drift ledger so the rule itself surfaces for
 evaluation: the protocol exercising its own governance over the bytes of this repo.
+
+## Manifesto-epic blind-reader review
+
+Every `epic*.md` authoring pass routes to the general `blind-reader` using the `manifesto-epic`
+profile. The test is deliberately harsher than ordinary editorial review: the reader receives no
+manifesto, sibling epic, glossary, implementation history, or author explanation. It must be able to
+recover the human condition being answered, the future the epic makes imaginable, who gains agency,
+why that change is valuable, and how the sections form one coherent emotional and ethical movement.
+A large findings set is useful; revisions go to a new blind reader until the epic stands alone.
