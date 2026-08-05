@@ -157,6 +157,7 @@ mod iroh_stress {
         IrohConfig {
             blobs_dir: dir.join("blobs_iroh"),
             secret_key_path: dir.join("iroh.key"),
+            relay_url: None,
             use_n0_relays: false,
             use_n0_discovery: false,
             discovery_resolvers: vec![],

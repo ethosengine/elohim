@@ -675,7 +675,7 @@ async fn async_main(
         #[cfg(feature = "p2p-iroh")]
         {
             let iroh_cfg =
-                elohim_storage::p2p_iroh::IrohConfig::from_storage_dir(&config.storage_dir);
+                elohim_storage::p2p_iroh::IrohConfig::from_storage_dir_and_env(&config.storage_dir);
             match elohim_storage::p2p_iroh::load_or_generate_secret_key(&iroh_cfg.secret_key_path) {
                 Ok(secret) => {
                     let node_id = secret.public().to_string();
@@ -2619,7 +2619,7 @@ async fn async_main(
         use elohim_storage::trust_service::TrustService;
         use elohim_storage::view_fed_service::{libp2p_keypair_from_ed25519_bytes, ViewFedService};
 
-        let iroh_cfg = IrohConfig::from_storage_dir(&config.storage_dir);
+        let iroh_cfg = IrohConfig::from_storage_dir_and_env(&config.storage_dir);
 
         // Sync backend — Automerge doc state is ONE truth (decision 1).
         //

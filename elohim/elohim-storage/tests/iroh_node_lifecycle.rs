@@ -15,6 +15,7 @@ async fn single_node_starts_and_shuts_down() {
     let cfg = IrohConfig {
         blobs_dir: dir.path().join("blobs_iroh"),
         secret_key_path: dir.path().join("iroh.key"),
+        relay_url: None,
         use_n0_relays: false,
         use_n0_discovery: false,
         discovery_resolvers: vec![],
@@ -31,6 +32,7 @@ async fn iroh_key_persisted_to_disk() {
     let cfg = IrohConfig {
         blobs_dir: dir.path().join("blobs_iroh"),
         secret_key_path: dir.path().join("iroh.key"),
+        relay_url: None,
         use_n0_relays: false,
         use_n0_discovery: false,
         discovery_resolvers: vec![],

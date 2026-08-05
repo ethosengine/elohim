@@ -159,6 +159,7 @@ async fn iroh_resolves_via_self_hosted_pkarr_only() {
     let make_cfg = |dir: &std::path::Path| IrohConfig {
         blobs_dir: dir.join("blobs"),
         secret_key_path: dir.join("iroh.key"),
+        relay_url: None,
         use_n0_relays: false,
         use_n0_discovery: false,
         discovery_resolvers: vec![DiscoveryResolverConfig {
