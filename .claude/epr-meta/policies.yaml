@@ -164,7 +164,6 @@ policies:
     class: ask
     scope: { write: "*.md", contains-any: ["sovereign", "Sovereign"] }
     validator: epr:validator-sovereignty-ontology-guard
-    status: active
     established_by: operator-ratification-pending-2026-07-15
     why: >
       The Elohim ontology REJECTS crypto self-sovereignty as an apex value (canon:
@@ -243,7 +242,6 @@ policies:
     class: ask
     scope: { write: "*.md", contains-any: ["ownership", "Ownership"] }
     validator: epr:validator-ownership-ontology-guard
-    status: active
     established_by: operator-ratification-pending-2026-08-05
     why: >
       The sibling drift to sovereignty-ontology-guard, named by the operator on 2026-08-05:
