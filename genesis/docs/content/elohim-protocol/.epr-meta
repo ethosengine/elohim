@@ -12,9 +12,9 @@ purpose: >
   ontological claim it is).
 rules:
   - id: sovereignty-ontology-guard
-    policy: sovereignty-ontology-guard@1
+    policy: sovereignty-ontology-guard@2
   - id: ownership-ontology-guard
-    policy: ownership-ontology-guard@1
+    policy: ownership-ontology-guard@2
   - id: manifesto-epic-blind-reader-review
     class: inject
     when: { write: "epic*.md" }
@@ -39,15 +39,36 @@ cites:
 
 # elohim-protocol/ — the protocol canon (governed)
 
-This directory is the vision. Its governance base is the **sovereignty ontology guard** (bound from
-`.claude/epr-meta/policies.yaml`, realized by `epr:validator-sovereignty-ontology-guard`): a write that
-NET-NEW introduces apex-assertion sovereignty framing ("self-sovereign" as the top identity tier, "true
-data sovereignty" as a goal) draws an `ask` that affirms the frame against the three legitimate uses
-(adversary / bounded / bridge-legibility) and points at the canon. It is a **guard, not a ban** — one
-keystroke to proceed when the usage is legitimate — and it fires only on *introduction*, so editing a
-doc to *clean* its sovereignty framing is never trapped. Dismissals aggregate through
-`sovereignty-guard-signal.py` (PostToolUse) into a drift ledger so the rule itself surfaces for
-evaluation: the protocol exercising its own governance over the bytes of this repo.
+This directory is the vision. Its governance base is a **sibling pair of ontology guards** (bound from
+`.claude/epr-meta/policies.yaml`, both at `@2`): a write that NET-NEW introduces apex-assertion framing
+draws an `ask` that affirms the frame against the legitimate uses and points at the canon.
+
+- **`sovereignty-ontology-guard@2`** — "self-sovereign" as the top identity tier, "true data
+  sovereignty" as a goal. Three frames: *adversary · bounded · bridge-legibility*.
+- **`ownership-ontology-guard@2`** — ownership as the right relationship to a resource. Four frames:
+  *adversary · bounded · external-legibility · **inalienable***.
+
+They are a **pair, not two rules**: ownership says *"mine, not yours"*, sovereignty says *"me, not
+us"* — one refusal of relationship in two grammars, so each cross-references the other and whoever
+learns one lesson inherits the other. The **inalienable** frame exists because the other three did not
+fit a person's absolute claim over their own body, likeness, or intimate images, and that gap made the
+guard teach the wrong lesson on the cases that matter most: an author writing correctly about a
+survivor's claim was being nudged to reframe toward custody, weakening it.
+
+Both are **guards, not bans** — one keystroke to proceed when the usage is legitimate — and both fire
+only on *introduction*, so editing a doc to *clean* its framing is never trapped. Declaring
+`sovereignty-frame:` or `stewardship-frame:` in a doc quiets them (and the PostToolUse logger) where
+the frame is already adjudicated.
+
+Each carries a **four-rung progressive-disclosure chain** in its `why:` — *prompt → architecture → law
+→ warrant* — so an agent can stop at the rung that answers its question rather than being handed a
+rule to memorize. The chain is deliberately links, not prose: a guard that grew to contain its own
+warrant would be the cage it warns against (`confession.md` — the protocol "never deceives the agent
+that the cage is liberty").
+
+Dismissals aggregate through `sovereignty-guard-signal.py` (PostToolUse) into a drift ledger so the
+rule itself surfaces for evaluation: the protocol exercising its own governance over the bytes of this
+repo. (The ownership guard has no equivalent sink yet — a known asymmetry, not a decision.)
 
 ## Manifesto-epic blind-reader review
 

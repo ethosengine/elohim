@@ -115,8 +115,50 @@ policies:
       referenced asset or a second package rather than balloon.
 
   - id: sovereignty-ontology-guard
+    version: 2
+    contentHash: sha256:d168f97031b22fe45175c94c7c569916d1f52ce0f1ff04b356864752d73bb2e7
+    title: Sovereignty ontology guard — affirm the frame, never assert the apex
+    binding: binding-local
+    class: ask
+    scope: { write: "*.md", contains-any: ["sovereign", "Sovereign"] }
+    validator: epr:validator-sovereignty-ontology-guard
+    status: active
+    established_by: operator-ratification-2026-08-05
+    why: >
+      v2 adds the SIBLING cross-reference and the progressive-disclosure chain; the guard's semantics
+      are unchanged from v1. The Elohim ontology REJECTS crypto self-sovereignty as an apex value
+      (canon: genesis/docs/architecture/stewardship-over-sovereignty.md — "we do not consider
+      sovereignty itself to be the right framing"). A human's identity is imago dei — an inviolable
+      right BACKSTOPPED by community and institutional expression, not a self-asserted crypto
+      primitive; real agency comes from the community backstopping the individual. Fires on NET-NEW
+      apex framing only. This is an AFFIRMATION prompt, not a ban: confirm your usage is one of the
+      LEGITIMATE frames and proceed, or reframe. (1) ADVERSARY — naming what is resisted (surveillance
+      capitalism, platform or state sovereignty as a threat); (2) BOUNDED — "sovereign WITHIN higher
+      bounds"; the collective human floor sovereign over the machine; (3) BRIDGE-LEGIBILITY — a
+      self-sovereign wallet making a participant legible to EXTERNAL sovereigns, where head, ceiling
+      and authority still flow from the commons governance pool. Declare `sovereignty-frame:` in the
+      doc and the guard goes quiet (it also silences the PostToolUse landing-logger).
+      SIBLING — ownership-ontology-guard@2. Ownership says "mine, not yours"; sovereignty says "me,
+      not us". One refusal of relationship in two grammars, so whoever learns one lesson should
+      inherit the other; read them together.
+      PROGRESSIVE DISCLOSURE — four rungs; stop at the one that answers your question. (1) this
+      prompt, the reframe; (2) ARCHITECTURE — stewardship-over-sovereignty.md and
+      cradle-to-grave-capability-gradient.md (why unqualified self-sovereignty cannot model wards,
+      IDD, seniors: the right is exercised WITH and THROUGH others); (3) LAW — constitution.md
+      Article I existential boundaries and Article II's definition, "LOVE: committed action toward
+      mutual flourishing… measured by effect, not intention"; (4) WARRANT — confession.md (grace
+      precedes the demand, always; belovedness is unconditional while the teaching office is earned;
+      and the binding-as-covenant discipline: the protocol "never deceives the agent that the cage is
+      liberty, because the lie that the cage is love is the very domination this whole work exists to
+      refuse") and theology.md, the same forged under disputation. The chain is deliberately LINKS,
+      not prose: a guard that grew to contain its own warrant would be the cage it warns against.
+      Dismissals aggregate to sovereignty-guard-signal.py so the RULE itself surfaces for drift review.
+
+  - id: sovereignty-ontology-guard
     version: 1
     contentHash: sha256:c6194b67110355fdde1b74603f9e64a571b394bca500783bfb8d2d5021ffceef
+    status: superseded
+    superseded_by: sovereignty-ontology-guard@2
     title: Sovereignty ontology guard — affirm the frame, never assert the apex
     binding: binding-local
     class: ask
@@ -148,8 +190,54 @@ policies:
       review: the protocol governing the bytes of its own repo.
 
   - id: ownership-ontology-guard
+    version: 2
+    contentHash: sha256:a06531b3d39fb2cec4844cff80fd43e1a0eb5a9cd2ac8a4e7b6c27c6ec287692
+    title: Ownership ontology guard — stewardship and custody, never enclosure
+    binding: binding-local
+    class: ask
+    scope: { write: "*.md", contains-any: ["ownership", "Ownership"] }
+    validator: epr:validator-ownership-ontology-guard
+    status: active
+    established_by: operator-ratification-2026-08-05
+    why: >
+      v2 adds a FOURTH frame (inalienable), the SIBLING cross-reference, and the progressive-disclosure
+      chain. OWNERSHIP is the enclosure-flavoured apex the protocol subordinates to STEWARDSHIP and
+      CUSTODY. ValueFlows already splits `primaryAccountable` (rights) from `custodianScope` (custody),
+      with distinct `transferCustody` and `transferAllRights` actions; COLLAPSING them is the enclosure
+      failure the Georgist common-inheritance framing exists to prevent — a holon that "owns" the
+      commons it stewards has enclosed it. Fires on NET-NEW apex framing only; the phrase list is
+      deliberately narrow (property-flavoured only — "full ownership" and "sole ownership" were removed
+      after an audit found they collide with the ordinary RESPONSIBILITY idiom). AFFIRMATION prompt,
+      never a ban. (1) ADVERSARY — naming what is resisted (enclosure, platform data-ownership claims,
+      rent extraction); (2) BOUNDED — ownership WITHIN a commons that retains the rights;
+      (3) EXTERNAL-LEGIBILITY — describing an outside legal system's ownership on its own terms;
+      (4) INALIENABLE — a person's absolute claim over their own body, likeness, voice, medical record,
+      private communications, or intimate images.
+      FRAME 4 EXISTS BECAUSE THE OTHER THREE DID NOT FIT IT, and that gap made this guard teach the
+      wrong lesson on the cases that matter most: an author writing correctly about a survivor's
+      absolute claim over her own image was being prompted to reframe toward custody, and the path of
+      least resistance WEAKENED the claim. The anti-enclosure argument is correct for land and capital
+      and WRONG FOR BODIES. For this class, custody transfer is PROHIBITED, not gated — a coerced
+      approval is indistinguishable at the substrate from a free one, so a consent gate cannot help.
+      Declare `stewardship-frame:` in the doc and the guard goes quiet (a `sovereignty-frame:` marker
+      also satisfies it — the two frames travel together).
+      SIBLING — sovereignty-ontology-guard@2. Ownership says "mine, not yours"; sovereignty says "me,
+      not us". One refusal of relationship in two grammars; read them together.
+      PROGRESSIVE DISCLOSURE — four rungs; stop at the one that answers your question. (1) this prompt,
+      the reframe; (2) ARCHITECTURE — stewardship-over-sovereignty.md, and
+      genesis/docs/superpowers/specs/2026-08-05-digital-memory-standing-ontology-design.md for why
+      standing (who a memory is ABOUT) is a third relation neither custody nor rights can carry;
+      (3) LAW — constitution.md Article I boundaries and Article II's "LOVE: committed action toward
+      mutual flourishing… measured by effect, not intention"; (4) WARRANT — confession.md (grace
+      precedes the demand; the one harmed may witness to the offender's return; and binding-as-covenant
+      — the protocol "never deceives the agent that the cage is liberty") and theology.md. The chain is
+      LINKS, not prose: a guard that grew to contain its own warrant would be the cage it warns against.
+
+  - id: ownership-ontology-guard
     version: 1
     contentHash: sha256:986c16321b2f9b2062d854a62af728366ab1e2d082d37c16ab77a26fcd718fa5
+    status: superseded
+    superseded_by: ownership-ontology-guard@2
     title: Ownership ontology guard — stewardship and custody, never enclosure
     binding: binding-local
     class: ask
