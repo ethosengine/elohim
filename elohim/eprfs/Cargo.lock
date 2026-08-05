@@ -486,7 +486,6 @@ name = "eprfs-meta"
 version = "0.1.0"
 dependencies = [
  "eprfs-core",
- "hex",
  "serde",
  "serde_json",
  "serde_yaml",

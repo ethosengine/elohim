@@ -4,7 +4,10 @@
 //! the eprfs EPR meta model. The Python hook remains a compatibility adapter
 //! while the shared parity corpus proves the native evaluator.
 
+mod canonical;
 mod evaluation;
+
+pub use canonical::{canonical_body, canonical_json, hex_lower, CanonError, HASH_EXCLUDE_KEYS};
 
 pub use evaluation::{
     evaluate_path, evaluate_path_with, policy_established_by, resolve_decision,

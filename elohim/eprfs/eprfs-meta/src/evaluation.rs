@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
-use crate::{flow_depth_ok, resolve_path, Result, MAX_MANIFEST_BYTES};
+use crate::{canonical_body, flow_depth_ok, hex_lower, resolve_path, Result, MAX_MANIFEST_BYTES};
 
 const POLICY_REGISTRY_REL: &str = ".claude/epr-meta/policies.yaml";
 
@@ -338,7 +338,7 @@ struct RegistryPolicy {
     /// The authored row, verbatim, captured for content-pin verification.
     /// Not deserialized from the typed schema — populated during load.
     #[serde(skip)]
-    raw_row: Value,
+    raw_row: serde_yaml::Value,
 }
 
 impl RegistryPolicy {
@@ -463,14 +463,35 @@ fn load_policies(repo_root: &Path) -> (BTreeMap<String, RegistryPolicy>, Vec<Pol
     // Re-parse the raw rows in file order so each typed policy can carry its
     // authored body verbatim for content-pin verification. The typed and raw
     // sequences are 1:1 by position.
-    let raw_rows: Vec<Value> = serde_yaml::from_str::<RawRegistry>(&text)
-        .map(|raw| raw.policies)
-        .unwrap_or_default();
+    //
+    // This parse is STRICTER than the typed one above: serde_yaml rejects a
+    // document with duplicate mapping keys outright, where the typed parse can
+    // still succeed. Never let that failure pass silently — with no raw rows
+    // every `raw_row` is Null, `compute_row_hash` returns None, and EVERY bound
+    // policy reads as `policy.pin-mismatch`. Pin verification would be entirely
+    // off while the registry merely looked maximally tampered.
+    let mut diagnostics = Vec::new();
+    let raw_rows: Vec<serde_yaml::Value> = match serde_yaml::from_str::<RawRegistry>(&text) {
+        Ok(raw) => raw.policies,
+        Err(err) => {
+            diagnostics.push(PolicyDiagnostic {
+                code: "policy.registry-unparsable".into(),
+                message: format!(
+                    "{} could not be raw-parsed for content pins, so NO pin is verified \
+                     (duplicate mapping keys are the usual cause): {err}",
+                    path.display()
+                ),
+            });
+            Vec::new()
+        }
+    };
 
     let mut policies = BTreeMap::new();
-    let mut diagnostics = Vec::new();
     for (index, mut policy) in registry.policies.into_iter().enumerate() {
-        policy.raw_row = raw_rows.get(index).cloned().unwrap_or(Value::Null);
+        policy.raw_row = raw_rows
+            .get(index)
+            .cloned()
+            .unwrap_or(serde_yaml::Value::Null);
         let key = policy.key();
         if policy.predicate_and_parameters().is_none() {
             diagnostics.push(PolicyDiagnostic {
@@ -492,27 +513,17 @@ fn load_policies(repo_root: &Path) -> (BTreeMap<String, RegistryPolicy>, Vec<Pol
 #[derive(Debug, Deserialize)]
 struct RawRegistry {
     #[serde(default)]
-    policies: Vec<Value>,
+    policies: Vec<serde_yaml::Value>,
 }
 
 /// Recompute the canonical content pin over an authored policy row: canonical
-/// JSON (sorted keys, no whitespace) of the row minus the `contentHash`,
-/// `status`, and `superseded` fields, hashed with SHA-256. This must match the
+/// JSON (sorted keys, no whitespace, ASCII escaped) of the row minus the
+/// `contentHash`, `status`, and `superseded_by` fields, hashed with SHA-256. This must match the
 /// Python `epr-meta-pin` canonicalization byte-for-byte.
-fn compute_row_hash(raw_row: &Value) -> Option<String> {
-    let obj = raw_row.as_object()?;
-    let mut filtered = Map::new();
-    for (key, value) in obj {
-        if matches!(key.as_str(), "contentHash" | "status" | "superseded") {
-            continue;
-        }
-        filtered.insert(key.clone(), value.clone());
-    }
-    // serde_json's default `Map` is a `BTreeMap`, so serialization is sorted by
-    // key and compact — exactly the canonical form.
-    let canonical = serde_json::to_string(&Value::Object(filtered)).ok()?;
-    let digest = Sha256::digest(canonical.as_bytes());
-    Some(format!("sha256:{}", hex::encode(digest)))
+fn compute_row_hash(raw_row: &serde_yaml::Value) -> Option<String> {
+    let canonical = canonical_body(raw_row.as_mapping()?).ok()?;
+    let digest = Sha256::digest(canonical);
+    Some(format!("sha256:{}", hex_lower(&digest)))
 }
 
 /// Ratification provenance for a registry policy (`id@version`), or `None` when
@@ -775,6 +786,62 @@ mod tests {
             format!("---\nepr-meta-version: 1\nid: root\nroot: true\nrules:\n{rules}\n---\n"),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn policy_hash_matches_python_for_unicode_and_excludes_lifecycle_keys() {
+        let row: serde_yaml::Value = serde_yaml::from_str(
+            "id: unicode\nversion: 1\nclass: inject\nwhy: a · b — c\n\
+             validator: validator-x\ncontentHash: sha256:dead\nstatus: superseded\n\
+             superseded_by: unicode@2\n",
+        )
+        .unwrap();
+        assert_eq!(
+            compute_row_hash(&row).as_deref(),
+            Some("sha256:5bb71f11d48df4b6b40f2cefb970017c301168687ba9c4b33162f28531436562")
+        );
+    }
+
+    #[test]
+    fn unparsable_registry_reports_a_diagnostic_instead_of_silently_voiding_every_pin() {
+        // A registry with DUPLICATE `status:` keys parses typed but is rejected by the
+        // raw serde_yaml pass. Before this diagnostic existed the failure was swallowed
+        // by unwrap_or_default(), so every raw_row went Null, every compute_row_hash
+        // returned None, and every bound policy silently read as pin-mismatch — pin
+        // verification fully disabled while looking like universal tampering.
+        let dir = TempDir::new().unwrap();
+        let registry = dir.path().join(".claude/epr-meta");
+        fs::create_dir_all(&registry).unwrap();
+        // Build the validator id at runtime. A concrete validator identity written as a
+        // literal anywhere in this crate's sources — comments included — trips
+        // publishable_meta_crate_embeds_no_concrete_validator_identity, the domain-neutrality
+        // guard that keeps eprfs-meta free of Elohim policy meaning. Hence the concat.
+        let validator = ["epr:", "validator-x"].concat();
+        fs::write(
+            registry.join("policies.yaml"),
+            format!(
+                r#"epr-meta-policies-version: 1
+policies:
+  - id: dupe
+    version: 1
+    class: inject
+    status: superseded
+    superseded_by: dupe@2
+    validator: {validator}
+    status: active
+    why: duplicated lifecycle key
+"#
+            ),
+        )
+        .unwrap();
+
+        let (_policies, diagnostics) = load_policies(dir.path());
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| d.code == "policy.registry-unparsable"),
+            "expected a policy.registry-unparsable diagnostic, got: {diagnostics:?}"
+        );
     }
 
     #[test]
