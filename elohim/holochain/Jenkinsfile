@@ -990,7 +990,10 @@ def deployDoorwayManifest(String targetEnv, String envFile, List allHumans, Stri
     """
 
     sh "bash genesis/orchestrator/scripts/check-ingress-conflicts.sh ${outputFile} elohim-${targetEnv}"
-    sh "kubectl apply -f ${outputFile}"
+    // Tolerates ONLY the known podmonitors RBAC drift (loudly) so the rollout wait
+    // below still runs — a poisoned apply exit hid a real doorway-B outage in
+    // edge #1306/#1308/#1309. Everything else still fails the deploy.
+    sh "bash '${env.WORKSPACE}/scripts/ci/apply-doorway-manifest.sh' ${outputFile}"
     sh "kubectl rollout restart deployment/${depName} -n elohim-${targetEnv}"
     sh "kubectl rollout status deployment/${depName} -n elohim-${targetEnv} --timeout=300s"
 }
