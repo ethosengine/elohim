@@ -803,8 +803,8 @@ remove early.
 
 | # | Decision | Why it is the operator's |
 |---|---|---|
-| 1 | **DNS:** create TWO CNAMEs (Cloudflare, `proxied: false` — the beacon hard-writes unproxied): `relay.alpha.elohim.host` → `alpha.elohim.host` and `relay.elohim.host` → `elohim.host` apex | zone change; and the proxied flag interacts with the beacon's exclusive-record lane |
-| 2 | **Harbor mirror:** build + push `harbor.ethosengine.com/ethosengine/iroh-relay:0.95.1-dev-latest` (recipe in the manifest header) | new image in the registry the fleet trusts |
+| 1 | ~~DNS~~ **DONE 2026-08-05 (operator):** both CNAMEs live and verified resolving to their premise anchors — `relay.alpha.elohim.host` → `alpha.elohim.host` (136.51.77.49) and `relay.elohim.host` → `elohim.host` apex (136.50.16.133) | zone change; the proxied flag interacts with the beacon's exclusive-record lane |
+| 2 | ~~Harbor mirror~~ **MOVED TO CI 2026-08-05** — the edge pipeline builds + pushes the image on the beacon pattern (`scripts/ci/{build,push}-iroh-relay.sh`; `:0.95.1-dev-latest` alias lands when the branch reaches dev). Residual operator involvement: none beyond the normal dev-merge | recorded for checklist-numbering stability |
 | 3 | **Apply/deploy** the relay sections now in `doorway/alpha.yaml` + `doorway/alpha-b.yaml` — they ride the doorway manifests' existing deploy path, so this is a normal doorway deploy rather than the open `infra/*.yaml` apply-path question (which shrank: see U7) | cluster action |
 | 4 | **NetworkPolicy:** add port 9090 to `allow-metrics-from-observability` so the relay PodMonitor scrapes | touches a policy file carrying a live-drift warning |
 | 5 | ~~Ratify placement/single-relay~~ **RESOLVED by the 2026-08-05 operator ruling** — relay is a doorway concern, per-doorway relays mirror the signal topology (D2/D3/D7 revised); the dual-WAN shape is restored, no regression to accept | recorded here so the checklist numbering in circulation stays stable |
