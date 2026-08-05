@@ -19,7 +19,7 @@ cites:
 
 # Conductor source_chain unwrap-panic under DB-lock pressure (adam-only)
 
-**Observed** 2026-08-05 ~04:27–05:23Z on `elohim-adam-alpha-0` (both the pre-Wave-2 pod and the post-restart pod — the class PREDATES the Wave-2 deploy and is 0.6.3-era or older; adam-only fleet-wide by Loki `sum by (instance)`).
+**Observed** 2026-08-05 ~04:27–05:59Z, primarily `elohim-adam-alpha-0` (both the pre-Wave-2 pod and the post-restart pod — the class PREDATES the Wave-2 deploy and is 0.6.3-era or older). **Scope correction (05:59Z):** single hits also on eve and susan during the churn settle — all three are shem-node residents (matthew/jessica/james on the ethosengine node showed zero), so the class tracks NODE-level DB/IO pressure on shem (4 full-arc conductors co-resident), not an adam-specific defect. adam decayed 7-in-4min → 1-in-35min as churn settled.
 
 **Mechanism (evidence-grounded):** adam runs sustained `PTxnGuard was held for 1.5–4.7s` warnings (`holochain_sqlite::db::guard`, the write-guard pressure silhouette from the 2026-07-20 slow-link history) → a source-chain transaction times out → upstream code `unwrap()`s the `Err(Timeout(Elapsed(())))` at `crates/holochain_state/src/source_chain.rs:499:22` → `FATAL PANIC` + holochain crash-report block (`/tmp/report-*.toml` in-pod). The edgenode wrapper restarts the conductor child, so the pod does NOT crashloop — k8s-invisible, log-visible only. Companion symptoms in the same windows: `validation_receipt_consumer` `DatabaseError(Timeout)` ERRORs, repeated `Failed to bind IPv6 listener: AddrInUse` on the websocket rebind after each child restart, app-port 4445 auth-timeout drops.
 
@@ -28,4 +28,4 @@ cites:
 **Routing:**
 1. **Upstream contribution candidate** (ethosengine/holochain fork, `elohim-0.6.3` branch): replace the unwrap at `source_chain.rs:499` with error propagation/retry — an unwrap on a DB timeout is a crash where a backoff belongs. Same contribution lane as the tx5 zombie-fix.
 2. **Local pressure lever** (existing history): adam's write-guard saturation is the 2026-07-20 composition defect — receipt/gossip pacing, not hardware. Any Wave-2+ soak that raises adam's panic rate above the ~1/10min floor is a regression signal for the dual-mode fan-out.
-3. **Probe:** Loki `{namespace="elohim-alpha"} |= "FATAL PANIC"` rate per instance; adam-only and decaying = known; fleet-spread or sustained-rising = escalate.
+3. **Probe:** Loki `{namespace="elohim-alpha"} |= "FATAL PANIC"` rate per instance; shem-cohort at ≤1/30min post-churn and decaying = known; any ethosengine-node peer, or sustained ≥2/30min per instance outside a restart window = escalate.
