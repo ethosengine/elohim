@@ -287,6 +287,64 @@ the act, while the person remains inside a web of witnessed relations, and **har
 effects on others** even when the act itself is unattributed. That is the honest middle — accountable
 without being surveilled — and it is asymmetric linkage authority (§4.1) applied to the observer.
 
+### Announcement, not extraction
+
+Google Analytics profiles how you **move**. The inversion is that you **announce how you wish to be
+met**, and the network responds to your presentation rather than harvesting your traces. That is what
+`AttentionTending` is for, and it generalizes the FILTER remedy: *"I would rather not see pictures of
+myself in this group"* is a presentation declaration, not a request for moderation.
+
+Content gets the counterpart: **posture** — how a thing should be met. A person announces; content
+announces; the network responds to both declarations. Neither requires surveillance to work, and both
+are contestable.
+
+### Authorization claims underneath anonymity
+
+Anonymity is **layered, not binary** — and this is what makes the protective floor safe rather than a
+void. A twelve-year-old may be fully unidentified *and* still carry an attestable **not-adult** claim.
+An EPR whose stewards declared it adult-content states a **requirement**. The match is
+**claim ⟷ requirement**, never identity ⟷ record: **neither side learns who the other is**, and the
+content that was not designed for that visitor does not reach them.
+
+So agency and safety stop trading against each other. The child is not identified, not profiled, not
+surveilled — and is still protected, because anonymity and authorization live at different layers.
+
+### Moderation is embedded, at the reach seam, as co-authorship
+
+Not *author declares* (mislabeling would be free — this is the misclassification attack) and not
+*platform enforces* (imposed afterward by a stranger). Instead: **an elohim recognizes the class as
+reach is being earned and co-authors the posture with the author** — the beat, applied at publication.
+And **whether that call was right is a debatable policy position in the network**, contestable through
+the ordinary challenge path rather than settled by whoever shipped the classifier.
+
+**The discriminator this makes possible.** Protective and extractive constraints are identical at the
+mechanism level — *"this was not designed for children"* and *"prove you are a paying subscriber"* are
+both "present a claim to pass." **Ratification plus contestability is the only thing that separates
+them**, which makes governance load-bearing here rather than ceremonial.
+
+⚠ **Two risks that come with it.** *Papers-please creep*: if every EPR may demand claims, anonymity
+becomes conditional on disclosure — so requirements must be **minimal** (*not-child*, never
+*birthdate*). And *who attests for someone who cannot attest for themselves* walks straight back into
+the guardian problem, for precisely the population the protective floor exists to serve.
+
+### Left of harm — why the levers are everywhere
+
+The levers are distributed on purpose: the author declares, the elohim co-authors, the steward sets
+requirements, the visitor announces, governance ratifies, anyone may contest. **Even someone who
+stumbles in holds one** — a child can say *"I saw this and probably should not have,"* and that is not
+a complaint entering a queue. It is **feedback that corrects the posture**: nobody is punished, the
+classification improves, and fewer people stumble in after them. Mishpat arriving from the receiving
+end — **restored capability, never punishment.**
+
+All of it is **upstream of harm on purpose**. The prevailing model is downstream cleanup, and its cost
+is **externalized onto traumatized moderation labour and onto the people who absorb the harm first**.
+Pushing left inverts the sign: trust and safety stop being a cost centre bolted onto a system that
+produces harm, and become **the ordinary output of a system working as designed** — a positive
+externality rather than a displaced negative one.
+
+That is the whole point of putting standing in the ontology instead of in a policy layer above it. A
+policy layer can only clean up after; a grammar decides what can be said in the first place.
+
 ### Still open, stated rather than papered over
 
 **Freedom from your own agent.** Can you do something your elohim does not remember? If every act is
