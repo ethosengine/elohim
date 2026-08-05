@@ -3,6 +3,7 @@ title: Architecture — Index
 tier: architecture
 status: Living document
 created: 2026-05-24
+last-verified: 2026-07-30
 maintainers: Matthew Dowell + Opus 4.7
 ---
 
@@ -53,9 +54,28 @@ defers:                            # ← things explicitly out of scope
 
 The four relationship fields — `realizes`, `informed-by`, `informs`, `defers` — are the **graph edges** that knit architecture specs to epics, to each other, to downstream sprint specs, and to scope boundaries. Together they make the architecture navigable in both directions: epic ↔ architecture spec ↔ sprint spec ↔ code.
 
+**`status:` is load-bearing, not decorative.** It declares how much of the spec is actually *built* — a seed may be an as-implemented distillation, or may declare itself vision (`truth:VISION`) for mechanisms that are designed but not yet built. Keep it honest as the spec's reality changes: a status that overstates implementation is worse than no spec at all, because downstream work will cite it as a mechanism.
+
 ## Current architecture specs
 
-### Records Lifecycle (in-flight)
+> **Completeness contract — the directory is the authority, not this list.** Every `tier: architecture`
+> document in this directory MUST appear somewhere below. A doc present on disk but absent here is a
+> **defect in this file**, not an unofficial spec. The check is mechanical and needs no maintained count
+> — diff the directory against the links in this file:
+>
+> ```bash
+> cd genesis/docs/content/elohim-protocol/architecture
+> comm -23 <(ls *.md | grep -vxE 'INDEX.md|MAP.md' | sort) \
+>          <(grep -oE '\]\(\./[^)/]+\.md\)' INDEX.md | sed 's|^](\./||; s|)$||' | sort -u)
+> ```
+>
+> Empty output means the graph is complete. Anything printed is an uncatalogued seed. Deliberately no
+> spec *count* is stated anywhere in this file: a hand-maintained tally is the thing that rots first,
+> and a stale tally is how a reader learns to distrust the whole index. The complementary question —
+> which *concern domain* (D1–D10) a seed belongs to — is **not** answered here; that is the walk's job,
+> and the seeds still awaiting a domain assignment are tracked in [MAP](./MAP.md)'s Lattice-coverage row.
+
+### Records Lifecycle — the anchor spec
 [`2026-05-24-records-lifecycle-design.md`](./2026-05-24-records-lifecycle-design.md)
 
 The eight foundational primitives (EPR, Event, Resource, Observation, Commitment, Attestation, FeedbackSignal, Links) — and the ten substrate gaps that close the records lifecycle gradient (Active → Subordinate → Shelved → Closed, with `surface` re-elevation, plus the bridge pattern for legacy systems).
@@ -86,8 +106,62 @@ The records-lifecycle spec rests on these substrate-defining architecture specs 
 | [`2026-05-23-doorway-access-tier-patterns.md`](./2026-05-23-doorway-access-tier-patterns.md) | Doorway web2 projection access tiers |
 | [`2026-06-02-sweettest-integration-layer.md`](./2026-06-02-sweettest-integration-layer.md) | DNA-level integration test tier (in-process conductors; native-build CI gotchas) |
 | [`2026-06-02-doorway-ssr-runtime.md`](./2026-06-02-doorway-ssr-runtime.md) | Doorway server-render as an honest compute capability (Angular-19 SSR build-glue) |
+| [`2026-05-02-blob-custody-reconciliation-design.md`](./2026-05-02-blob-custody-reconciliation-design.md) | Blob custody reconciliation — placement/salvage as a reconciled substrate primitive (placement signals are economic inputs to shefa) |
+| [`2026-06-11-doorway-two-axis-scaling.md`](./2026-06-11-doorway-two-axis-scaling.md) | Doorway's two independent scaling axes — the projection read path vs the conductor/identity-hosting pool — and the graduation flywheel between them (graduation is accounting-only as-implemented; no source-chain export exists) |
+| [`2026-08-05-wave2-relay-sovereignty-design.md`](./2026-08-05-wave2-relay-sovereignty-design.md) | Relay custody on the conductor transport plane — self-hosted iroh-relay, the tx5 retirement, and the never-n0 boundary (kitsune2 relay plane, distinct from the elohim-storage iroh dataplane) |
 
-These 14 specs were migrated from `genesis/docs/superpowers/specs/` on 2026-05-24. Their frontmatter normalization (to the architecture contract — `tier: architecture` + `realizes:` / `informed-by:` / `informs:`) is a follow-up pass; their content remains canonical as-is.
+Most of this table arrived in a **migration from `genesis/docs/superpowers/specs/` dated 2026-05-24**; seeds authored in this directory afterwards were never part of that migration. Frontmatter normalization of the migrated set (to the architecture contract — `tier: architecture` + `realizes:` / `informed-by:` / `informs:`) is a follow-up pass; their content remains canonical as-is.
+
+### Standing principles — patterns that govern every surface
+
+These are not seeds for one subject area; each states an invariant that any surface must satisfy. They are cited `informed-by:` far more often than they are read end-to-end, and they are deliberately **outside** MAP's D1–D10 concern lattice — a principle that governs everything has no single domain.
+
+| Spec | What it defines |
+|---|---|
+| [`trust-as-efficiency-signal.md`](./trust-as-efficiency-signal.md) | Trust as a compute-burden gradient — why trust is an efficiency signal, not a moral score; governs anything that propagates, discovers, validates, or replicates |
+| [`protocol-formal-substrate-rationale.md`](./protocol-formal-substrate-rationale.md) | Why the substrate is formal — collapsing bureaucracy into the protocol rather than re-encoding it in policy |
+| [`2026-05-04-compute-commitment-substrate-floor-design.md`](./2026-05-04-compute-commitment-substrate-floor-design.md) | The two-layer decision architecture — enforced **substrate floor** vs discerning **elohim ceiling**; the floor bounded/revocable/attested agent authority rests on |
+| [`social-reach-nervous-system.md`](./social-reach-nervous-system.md) | Reach as a sense-respond nervous system, and the legitimate user-side filter — gating, propagation, anti-bubble policy, restitution as an economic event |
+| [`ubiquitous-wisdom-dissolves-chokepoint.md`](./ubiquitous-wisdom-dissolves-chokepoint.md) | Capture-resistance as an AI-**deployment** property, not a substrate trick — wisdom at every node, not at a gate |
+
+### Orientation and operations — the cross-cutting surfaces
+
+Routers and runbooks rather than subject seeds. Two of these are what the root `CLAUDE.md` sends an agent to *first*, before any domain reasoning begins.
+
+| Spec | What it defines |
+|---|---|
+| [`2026-06-21-elohim-seam-map-concern-routing.md`](./2026-06-21-elohim-seam-map-concern-routing.md) | The concern-routing atlas — the device spectrum × composition stack, the three extension seams (SDK / bridge / mod), and the four participation tracks. Answers "**where does this live?**" on the *layer* axis, upstream of MAP's domain lattice |
+| [`2026-07-12-substrate-trust-contract-runbook.md`](./2026-07-12-substrate-trust-contract-runbook.md) | The dataplane's trust contract — the invariants you may assume, the probe watching each one, and the per-red decision tree. The **operate-time** door; where it and a design doc disagree, the probes are the authority |
+| [`cluster-topology.md`](./cluster-topology.md) | The live P2P modeling canvas — the multi-node topology the test environment actually runs, as distinct from the protocol architecture it hosts |
+
+### Governance, upgrade, and agent authority
+
+How the protocol's own rules change, and how an agent earns the authority to act. Read the `status:` line of each before citing it as a mechanism — this cluster deliberately separates what is **enforced** from what is **vision**.
+
+| Spec | What it defines |
+|---|---|
+| [`2026-06-11-dna-upgrade-governance.md`](./2026-06-11-dna-upgrade-governance.md) | The upgrade **policy** home and its enforcement (as-implemented distillation; the stewardship philosophy itself lives in protocol canon, not here) |
+| [`2026-07-14-upgrade-revert-and-constitutional-consensus.md`](./2026-07-14-upgrade-revert-and-constitutional-consensus.md) | Propagation-is-consent, the paired upgrade/revert pattern, earned ceiling authority, amendment-by-consensus-at-reach, the simulation gate, the eternity clause. **Declares itself `truth:VISION` in its §11** — the constitutional mechanisms are designed, not built |
+| [`governance-layers-architecture.md`](./governance-layers-architecture.md) | What an *elohim* is operationally — a pattern of context-bound, ephemeral, constitutionally-disclosed specialist subagents, not a monolithic agent that knows a human |
+| [`2026-07-16-alpha-test-bench-compute-envelope.md`](./2026-07-16-alpha-test-bench-compute-envelope.md) | Observed capacity constraint promoted to a governed, bounded commitment — the test bench as a compute envelope rather than an architecture |
+
+### Pillar-scoped seeds
+
+Seeds whose subject sits inside one pillar rather than across the substrate.
+
+| Spec | What it defines |
+|---|---|
+| [`imagodei-surfaces-design.md`](./imagodei-surfaces-design.md) | Imagodei decomposed into three architecturally distinct identity surfaces (identity core, web2 projection + recovery path, defender attestations) |
+| [`2026-06-04-qahal-epr-household-lattice-design.md`](./2026-06-04-qahal-epr-household-lattice-design.md) | The qahal household living-core lattice — a deliberately thin frame gathering the qahal work |
+| [`2026-06-11-bloom-mastery-progression-design.md`](./2026-06-11-bloom-mastery-progression-design.md) | Mastery progression over a Bloom-style gradient (lamad) |
+
+> **Frontmatter-contract exceptions.** Five documents in this directory do not declare `tier:` —
+> `2026-06-21-elohim-seam-map-concern-routing`, `2026-07-12-substrate-trust-contract-runbook`
+> (both `status: reference`), `2026-06-04-qahal-epr-household-lattice-design`,
+> `2026-06-11-bloom-mastery-progression-design`, and `2026-08-05-wave2-relay-sovereignty-design`
+> (all three `status: Draft`; the last also carries `class: substrate`). They are catalogued above
+> because they live here and are cited as canonical; whether `reference` should be a declared tier
+> alongside `architecture` is an open question for the contract, not a defect in the docs.
 
 ### Application archetypes (the proof gallery)
 
@@ -113,7 +187,7 @@ Patterns we've thought through that are NOT on the active subsumption path right
 
 ## Bidirectional links from epics
 
-Each epic that has been realized by an architecture spec carries a "Technical Realization" section at its bottom pointing back here. Currently:
+Each epic that has been realized by an architecture spec carries a "Technical Realization" section at its bottom pointing back here:
 
 - `economic_coordination/epic.md` → records-lifecycle + mint-monarch + applications/INDEX
 - `value_scanner/epic.md` → records-lifecycle + mint-monarch (care-stewardship)
@@ -126,6 +200,6 @@ New architecture specs (including new application archetypes and horizon graduat
 
 **If you are designing a new feature or pillar**: read the architecture specs whose primitives you'll touch. Cite them as `informed-by:` in your sprint spec. If you find yourself wanting to introduce a new substrate primitive, propose an architecture spec amendment instead of inventing it locally.
 
-**If you are reading an architecture spec**: walk the graph. `realizes:` takes you to the epic — the *why*. The body of the spec is the *what*. The code anchors in the spec body take you to the *how*. `informed-by:` shows what other architecture this rests on. `informs:` shows what downstream work must conform to it.
+**If you are reading an architecture spec**: walk the graph. `realizes:` takes you to the epic — the *why*. The body of the spec is the *what*. The code anchors in the spec body take you to the *how*. `informed-by:` shows what other architecture this rests on — **read the target's `status:` before you build on it**, because resting an `informed-by:` edge on a vision-tier spec means resting on a *design*, not a mechanism; carry that qualifier forward into your own spec rather than letting a vision read as a delivery. `informs:` shows what downstream work must conform to it.
 
 **If you are writing a code file that touches an architecture-defined primitive**: add a header comment with `// architecture: genesis/docs/content/elohim-protocol/architecture/<spec>.md` so the spec is reachable from the code. (This convention is recommended, not enforced; we'll mechanize it once we have more architecture specs to anchor against.)
