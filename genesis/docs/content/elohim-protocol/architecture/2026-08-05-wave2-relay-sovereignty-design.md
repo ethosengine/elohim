@@ -638,6 +638,26 @@ outside, registration happens, and two peers exchange ops. Zero risk to alpha.
 The upstream sweettest rendezvous harness is the cheaper first form of this —
 run it with the relay URL overridden to ours.
 
+> **STAGE 0 COMPLETE — PASSED 2026-08-06, all five criteria, against the live
+> `relay.elohim.host`.** One correction to the sentence above: the monorepo
+> sweettest tree (`elohim/holochain/tests/sweettest`) pins crates.io
+> holochain 0.6.0 / kitsune2 0.3.2 (tx5-only) and CANNOT host this; the
+> iroh-capable harness is the vendored fork `elohim/holochain-conductor`
+> (branch `elohim-0.6.3`), whose default test lane is already `transport-iroh`
+> and whose `SweetLocalRendezvous.relay_addr()` is overridable. The proof is
+> `crates/holochain/tests/iroh_stage0.rs` there (local bootstrap kept, relay
+> overridden to ours; two conductors, inline-zome DNA, create-on-A/get-on-B):
+> `CARGO_TARGET_DIR=<pool slot> RUSTFLAGS="" cargo test -p holochain --test
+> iroh_stage0 --features test_utils -- --nocapture` (`ELOHIM_RELAY_URL`
+> overrides the relay; `--locked` is broken in the fork independently of this —
+> the committed lock predates the jemalloc/tx5-patch manifests). Evidence:
+> zero tx5 crates compiled; the §5.3 registration sentinel fired verbatim
+> (`Received a new listening address from relay server
+> url=https://relay.elohim.host.:443/{id}`); both peer URLs sovereign-shaped,
+> zero `*.relay.iroh.network`; ops converged in 3.8s (`direct=true` — same-host,
+> not a U4 data point). Full log: `.stage0-logs/stage0-conductor-full.log`
+> (repo root). U5 is retired below with the census.
+
 **Stage 1 — alpha, whole namespace, one window.** All alpha conductors flip in
 one rollout. The genesis pair (adam + matthew) must land in the same window by
 the standing rule; but so must every other alpha peer, for the transport reason.
@@ -680,6 +700,28 @@ It must be *replaced*, not merely dropped, by the relay-reachability smoke below
 | **Relay liveness from outside** | `curl -s -o /dev/null -w '%{http_code}' https://relay.elohim.host/ping` → `200`; `curl http://relay.elohim.host/generate_204` → `204` (not a 301) | the ingress serves both the Https latency probe and the captive-portal probe correctly; the 301 case is the `ssl-redirect` trap (§3.2) |
 | **Relay-side census** | relay `/metrics` on :9090 — connected-client count should equal the flipped conductor count | every conductor found the relay; a short count names which peer did not |
 | **No lingering tx5** | Loki: absence of `tx5 send error` (the current live warning) and absence of any `wss://signal.` peer URL in `conductor-diagnostics` | the flip is complete rather than partial (§5.2) |
+
+**Two probe-authoring caveats from Stage 0 (2026-08-06) — absorb these before
+implementing the runtime probes above, or they false-signal on healthy fleets:**
+
+1. **Trailing dot.** iroh's `RelayUrl` canonicalizes the host to a
+   fully-qualified DNS name: the agent-info peer URL is
+   `https://relay.elohim.host.:443/{endpoint_id}` — **with a trailing dot** —
+   even though the config value is dot-free. Verified live in Stage 0 (first
+   run failed on exactly this equality). The n0-contamination probe and any
+   conductor-diagnostics checker MUST strip a trailing `.` from the host
+   before comparing, or a correctly-homed conductor reads as contaminated.
+   (`validate-conductor-config.sh` IROH-TARGET checks the *config* value,
+   which stays dot-free — the render gate is unaffected.)
+2. **`wss://` is legitimate in iroh logs.** The relay plane itself is a
+   websocket (`Dialing relay by websocket dial_url=wss://relay.elohim.host./relay`).
+   The "No lingering tx5" check must stay scoped to *peer URLs in
+   conductor-diagnostics*, never a bare log grep for `wss://`, or it reds on
+   a healthy iroh fleet.
+3. **Earlier registration sentinel.** `do_insert_relay: relay added, local URL
+   constructed local_url=https://…` (`transport_iroh/src/lib.rs:967`) fires
+   ~2.3s BEFORE the §5.3 `Received a new listening address` sentinel — worth
+   adding to the Loki probe as the earliest boots-correctly signal.
 
 **Config gate:** `validate-conductor-config.sh` extended per §4.2 — it is the
 render-time form of the n0-contamination test, catching the mistake before it
@@ -855,12 +897,23 @@ the `direct=true|false` sentinel (§5.3) over the Stage-2 soak. This is the sole
 input to the Phase-B QAD decision — do not build Phase B before reading it.
 
 **U5 — Do the conductor's failing QAD probes produce log noise or backoff that looks like a fault?**
-The probes will be attempted (`RelayMap::from_iter` sets `quic: Some(7842)`
-unconditionally) and will fail. Benign in principle; the question is whether
-they generate warn-level noise that will be misread during the soak.
-*Verification:* Stage 0 (off-DHT two-conductor proof) — read the full log of a
-conductor against the QAD-less relay and record the exact lines, so the soak's
-readers know what normal looks like.
+**RESOLVED 2026-08-06 (Stage 0, source-confirmed): NO — the failing probes are
+completely silent at `info`.** The probes ARE attempted exactly as predicted
+(`quic: Some(RelayQuicConfig { port: 7842 })` unconditional; `spawning QAD
+probes` → `probe v4 timed out` / `probe v4 failed: Failed to resolve relay
+address`) but every failure arm logs at DEBUG (`net_report.rs:538/552`); the
+only `warn!` on that path is reachable solely on a task JoinError, never on
+timeout/connect failure. Corollary for Stage 2: **there is no line to alert on
+— do not add a "QAD probe failing" alert; the only QAD-absence meter is the
+`direct=true|false` ratio** (§5.3), confirmed to emit at `info`. The complete
+WARN/ERROR census of a healthy two-conductor run (what "normal" looks like):
+10× kitsune2 `config parameter may be unused` WARN, 2× gossip `No local agents
+available` WARN, 2× `Queue consumer trigger ... shutting down` WARN, and 1×
+per-conductor benign startup ERROR `could not set crypto provider for tls`
+(rustls provider already installed — expect it, don't chase it). Full log:
+`.stage0-logs/stage0-conductor-full.log`. Caveat: ~10s single-host lifetime —
+the debug-only claim is a source fact, but a long cross-NAT soak could still
+surface classes this run never reached.
 
 **U6 — Does ingress-nginx pass `Sec-Websocket-Protocol: iroh-relay-v1` through unmodified?**
 **RESOLVED AFFIRMATIVELY 2026-08-06 (live probe, both hostnames):**
