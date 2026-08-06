@@ -61,9 +61,26 @@ The second of the two follow-on levers named above ("give the doorway a multi-co
 4. **Premise-affinity ordering of the fallback list.** `CONDUCTOR_URLS` is the whole alpha pool, both premises, so doorway-B's fallback may cross WireGuard to an ethosengine-node peer. That is a correct degraded path (any peer answers a DHT read), but ordering same-premise peers first would need premise metadata the pool does not carry. Follow-on, not a blocker.
 
 **Routing:**
-1. **Upstream contribution candidate** (ethosengine/holochain fork, `elohim-0.6.3` branch): replace the unwrap at `source_chain.rs:499` with error propagation/retry — an unwrap on a DB timeout is a crash where a backoff belongs. Same contribution lane as the tx5 zombie-fix.
+1. **Upstream contribution is already landed — do not reimplement.** Upstream
+   commit `9daee924b` (`fix(source-chain): don't panic on dht_db write timeout
+   (#5750)`) replaced this exact `.await.unwrap()`; it is present in the
+   `holochain-0.6.3` tag and in the fork via backport `7ca9d44e2`. The fork's
+   current `elohim-0.6.3` HEAD (`da823fc6a`) descends from that backport. The
+   panic artifact naming `source_chain.rs:499` as an `unwrap()` therefore proves
+   that the running binary was compiled from pre-fix source. Remaining work is
+   image/binary provenance plus a rebuild/rollout verification, not another
+   source patch.
 2. **Local pressure lever** (existing history): adam's write-guard saturation is the 2026-07-20 composition defect — receipt/gossip pacing, not hardware. Any Wave-2+ soak that raises adam's panic rate above the ~1/10min floor is a regression signal for the dual-mode fan-out.
 3. **Probe:** Loki `{namespace="elohim-alpha"} |= "FATAL PANIC"` rate per instance; shem-cohort at ≤1/30min post-churn and decaying = known; any ethosengine-node peer, or sustained ≥2/30min per instance outside a restart window = escalate.
+
+**Claim resolution — 2026-08-06, Codex:** routing item 1 was claimed and
+resolved as an evidence-backed no-op: the requested source fix predates the
+incident and is already in both upstream 0.6.3 and the fork branch. No fork file
+was changed. The pre-existing `Cargo.lock` and
+`crates/holochain/tests/iroh_stage0.rs` changes remain untouched and outside
+this claim. Keep this backlog item open until the deployed conductor binary is
+proven to contain `7ca9d44e2`/`9daee924b` or a descendant and the panic-rate
+probe confirms the unwrap class is gone.
 
 ## 2026-08-06 — the "did dual fan-out raise adam's rate?" probe RAN: verdict (b), transport exonerated at the resource level
 
@@ -78,5 +95,19 @@ The cheapest-next-probe named above (adam's own conductor logs + resource correl
 **Two observability gaps surfaced by the probe (both blind spots on the fleet's worst actor):**
 1. **The conductor crash-loop is invisible to `kube_pod_container_status_restarts_total`.** adam's pod `c0b4a5e7` (live since 2026-08-05T14:40Z) absorbed ~145 conductor panics with the K8s restart counter pinned at 0 — an in-container supervisor respawns the panicked binary below the K8s floor. Restart-count alerting cannot see this class; the Loki `FATAL PANIC` rate probe (routing item 3) is currently the *only* working detector.
 2. **No live DB-pool saturation metric.** The only DB-pool-adjacent export is `elohim_node_db_max_readers` — a static config ceiling (flat 16). The saturation figures driving this whole item (350%–22,662%) exist only as log strings. Exporting a read-pool utilization/queue-depth gauge from the conductor (or scraping it from elohim-storage's side) would make this item's probe quantitative and alertable.
+
+**Claim resolution — 2026-08-06, Codex:** observability gap 2 is code-complete
+within the claimed write fence
+`elohim/elohim-storage/src/{metrics.rs,conductor/process_manager.rs}`. The
+embedded-conductor manager now tees stdout/stderr without changing the bytes in
+either stream and projects each existing saturation event into
+`elohim_node_db_read_pool_last_saturation_ratio{kind}` (`1.0 = 100%`) plus
+`elohim_node_db_read_pool_saturation_events_total{kind}`. Labels are restricted
+to seven database-kind values; DNA/agent identifiers cannot enter cardinality.
+Focused verification: process-manager parser/structured-log/invalid-input/
+byte-forwarding suite **7 passed, 0 failed**; metrics registry exposition test
+**1 passed, 0 failed**. Conductor source, doorway, manifests, pipeline files,
+and the pre-existing fork changes were untouched. Live closure still requires a
+storage image rollout and `/metrics` evidence during a saturation event.
 
 **Independent review 2026-08-06 (verdict: ship).** Credential invariant confirmed structurally (no signer field exists to share; every endpoint authorizes against its own admin interface), write/read split verified at all call sites. Follow-ons from review, tracked here, none blocking: (a) boundary requests still exceed the SPA's ~4.95s abort — first request against a freshly-degraded primary pays the full primary deadline before cooldown starts, and one request per cooldown expiry pays the half-open re-probe (the 30s background `resolve_epr_storage_pool` refresh usually absorbs this for `get_all_doorways`, but `find_publishers` has no periodic caller and pays it inline); (b) no single-flight on the cooldown-expiry re-probe (N concurrent requests each probe); (c) no test yet for the "primary down, fallback answers Ok" happy path (needs a mock conductor; the credential crux is structurally enforced regardless). Module doc corrected to state the boundary caveat.

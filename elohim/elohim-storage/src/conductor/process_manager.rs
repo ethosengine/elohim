@@ -10,9 +10,100 @@
 use holochain_client::{AdminWebsocket, WebsocketConfig};
 use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::time::{sleep, Duration};
 use tracing::{error, info, warn};
+
+const DB_POOL_SATURATION_MARKER: &str = "Database read connection is saturated. Util ";
+
+#[derive(Debug, PartialEq)]
+struct DbPoolSaturation {
+    kind: &'static str,
+    utilization_ratio: f64,
+}
+
+/// Parse Holochain's existing read-pool saturation event without admitting
+/// per-DNA identifiers into Prometheus labels.
+fn parse_db_pool_saturation(line: &str) -> Option<DbPoolSaturation> {
+    let (prefix, utilization) = line.split_once(DB_POOL_SATURATION_MARKER)?;
+    let percent = utilization.split_once('%')?.0.trim().parse::<f64>().ok()?;
+    if !percent.is_finite() || percent < 0.0 {
+        return None;
+    }
+
+    // Plain tracing renders `kind=Dht(...)`; structured tracing renders the
+    // same value inside JSON. Restrict the result to a fixed vocabulary so a
+    // DNA hash can never become a high-cardinality metric label.
+    let prefix = prefix.to_ascii_lowercase();
+    let kind_context = prefix
+        .rfind("kind")
+        .map(|index| &prefix[index..])
+        .unwrap_or("");
+    let kind = if kind_context.contains("peermetastore") || kind_context.contains("peer_meta_store")
+    {
+        "peer_meta_store"
+    } else if kind_context.contains("authored") {
+        "authored"
+    } else if kind_context.contains("conductor") {
+        "conductor"
+    } else if kind_context.contains("cache") {
+        "cache"
+    } else if kind_context.contains("wasm") {
+        "wasm"
+    } else if kind_context.contains("dht") {
+        "dht"
+    } else {
+        "unknown"
+    };
+
+    Some(DbPoolSaturation {
+        kind,
+        utilization_ratio: percent / 100.0,
+    })
+}
+
+/// Drain one conductor output pipe, preserving its bytes on the parent output
+/// while projecting the existing saturation event into Prometheus. A broken
+/// parent output must not stop draining the child pipe (which would deadlock a
+/// log-heavy conductor), so forwarding errors are warned once and then ignored.
+async fn forward_conductor_output<R, W>(reader: R, mut writer: W, stream: &'static str)
+where
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
+    let mut reader = BufReader::new(reader);
+    let mut bytes = Vec::new();
+    let mut write_failed = false;
+
+    // bounded-work: one child-pipe lifetime; each iteration drains one
+    // newline-delimited record and terminates on EOF or the first read error.
+    loop {
+        bytes.clear();
+        match reader.read_until(b'\n', &mut bytes).await {
+            Ok(0) => break,
+            Ok(_) => {
+                let line = String::from_utf8_lossy(&bytes);
+                if let Some(sample) = parse_db_pool_saturation(&line) {
+                    crate::metrics::observe_db_read_pool_saturation(
+                        sample.kind,
+                        sample.utilization_ratio,
+                    );
+                }
+                if !write_failed {
+                    if let Err(err) = writer.write_all(&bytes).await {
+                        write_failed = true;
+                        warn!(%stream, %err, "Failed to forward conductor output; continuing to drain child pipe");
+                    }
+                }
+            }
+            Err(err) => {
+                warn!(%stream, %err, "Failed to read conductor output pipe");
+                break;
+            }
+        }
+    }
+}
 
 /// Manages a Holochain conductor child process.
 ///
@@ -68,17 +159,32 @@ impl ConductorManager {
             "Starting Holochain conductor"
         );
 
-        let child = Command::new(&self.conductor_binary)
+        let mut child = Command::new(&self.conductor_binary)
             .arg("--config-path")
             .arg(&self.config_path)
             .arg("--piped")
             .env("HOLOCHAIN_DATA_DIR", &self.data_dir)
             .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::inherit())
-            .stderr(std::process::Stdio::inherit())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
             .kill_on_drop(true)
             .spawn()
             .map_err(|e| ConductorError::SpawnFailed(e.to_string()))?;
+
+        if let Some(stdout) = child.stdout.take() {
+            tokio::spawn(forward_conductor_output(
+                stdout,
+                tokio::io::stdout(),
+                "stdout",
+            ));
+        }
+        if let Some(stderr) = child.stderr.take() {
+            tokio::spawn(forward_conductor_output(
+                stderr,
+                tokio::io::stderr(),
+                "stderr",
+            ));
+        }
 
         let pid = child.id().unwrap_or(0);
         info!(pid = pid, "Conductor process spawned");
@@ -313,6 +419,61 @@ mod tests {
             Duration::from_secs(180),
         );
         assert_eq!(mgr.child_pid(), None, "no child before start()");
+    }
+
+    #[test]
+    fn parses_db_pool_saturation_ratio_and_bounded_kind() {
+        let sample = parse_db_pool_saturation(
+            "INFO holochain_perf{kind=Dht(uhC0k-secret-dna-id)}: \
+             Database read connection is saturated. Util 22662.00%",
+        )
+        .expect("saturation event");
+
+        assert_eq!(sample.kind, "dht");
+        assert!((sample.utilization_ratio - 226.62).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn parses_structured_kind_without_using_identifier_as_label() {
+        let sample = parse_db_pool_saturation(
+            r#"{"spans":[{"kind":"Authored(CellId(uhC0k-private, uhCAk-private))"}],"fields":{"message":"Database read connection is saturated. Util 350.00%"}}"#,
+        )
+        .expect("structured saturation event");
+
+        assert_eq!(sample.kind, "authored");
+        assert!((sample.utilization_ratio - 3.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn ignores_non_saturation_and_invalid_utilization() {
+        assert!(parse_db_pool_saturation("Database connection ready").is_none());
+        assert!(parse_db_pool_saturation(
+            "kind=Dht Database read connection is saturated. Util NaN%"
+        )
+        .is_none());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn forwards_conductor_output_bytes_unchanged() {
+        use tokio::io::AsyncReadExt;
+
+        let (mut child_output, parent_reader) = tokio::io::duplex(1024);
+        let (parent_writer, mut captured_output) = tokio::io::duplex(1024);
+        let forward = tokio::spawn(forward_conductor_output(
+            parent_reader,
+            parent_writer,
+            "test",
+        ));
+        let expected =
+            b"kind=Dht Database read connection is saturated. Util 500.00%\nraw-\xff-byte\n";
+
+        child_output.write_all(expected).await.unwrap();
+        child_output.shutdown().await.unwrap();
+
+        let mut actual = Vec::new();
+        captured_output.read_to_end(&mut actual).await.unwrap();
+        forward.await.unwrap();
+        assert_eq!(actual, expected);
     }
 
     #[test]

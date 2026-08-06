@@ -16,7 +16,8 @@
 
 use lazy_static::lazy_static;
 use prometheus::{
-    Encoder, IntCounter, IntCounterVec, IntGauge, IntGaugeVec, Opts, Registry, TextEncoder,
+    Encoder, GaugeVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec, Opts, Registry,
+    TextEncoder,
 };
 use std::sync::Once;
 
@@ -1145,6 +1146,35 @@ lazy_static! {
     .unwrap();
 }
 
+// Keep incremental metric families outside the original registry block. That
+// block is already close to lazy_static's default macro-recursion ceiling; a
+// separate expansion avoids raising the recursion limit for the entire crate.
+lazy_static! {
+    /// Most recently observed conductor read-pool saturation ratio. This is an
+    /// event sample projected from the conductor log, not a continuously sampled
+    /// utilization value. labels: kind = dht|authored|cache|conductor|wasm|
+    /// peer_meta_store|unknown.
+    pub static ref NODE_DB_READ_POOL_LAST_SATURATION_RATIO: GaugeVec = GaugeVec::new(
+        Opts::new(
+            "elohim_node_db_read_pool_last_saturation_ratio",
+            "Most recently observed conductor read-pool saturation ratio (1.0 = 100%; 0 = no saturation event observed since process start).",
+        ),
+        &["kind"],
+    )
+    .unwrap();
+
+    /// Count of conductor read-pool saturation events. Paired with the last
+    /// ratio gauge so alerts can require both recent activity and magnitude.
+    pub static ref NODE_DB_READ_POOL_SATURATION_EVENTS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_node_db_read_pool_saturation_events_total",
+            "Conductor read-pool saturation events observed in the child log.",
+        ),
+        &["kind"],
+    )
+    .unwrap();
+}
+
 /// Register every toolkit collector into [`REGISTRY`]. Idempotent (guarded by a
 /// `Once`), so calling it more than once at boot is safe. Call exactly once early
 /// in storage startup; `/metrics` reads the registry thereafter.
@@ -1158,6 +1188,22 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(NODE_CGROUP_MEM_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CGROUP_SWAP_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(NODE_DB_MAX_READERS.clone()));
+        let _ = REGISTRY.register(Box::new(NODE_DB_READ_POOL_LAST_SATURATION_RATIO.clone()));
+        let _ = REGISTRY.register(Box::new(NODE_DB_READ_POOL_SATURATION_EVENTS.clone()));
+        for kind in [
+            "dht",
+            "authored",
+            "cache",
+            "conductor",
+            "wasm",
+            "peer_meta_store",
+            "unknown",
+        ] {
+            NODE_DB_READ_POOL_LAST_SATURATION_RATIO
+                .with_label_values(&[kind])
+                .set(0.0);
+            NODE_DB_READ_POOL_SATURATION_EVENTS.with_label_values(&[kind]);
+        }
         let _ = REGISTRY.register(Box::new(NODE_CPU_QUOTA_MILLICORES.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_SMAPS_ANON_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_ANON_MAPPING_COUNT.clone()));
@@ -1433,6 +1479,23 @@ pub fn set_boot_tunables(db_max_readers: u32, cpu_quota_cores: Option<f64>) {
     if let Some(c) = cpu_quota_cores {
         NODE_CPU_QUOTA_MILLICORES.set((c * 1000.0) as i64);
     }
+}
+
+/// Project one conductor read-pool saturation log event into Prometheus.
+///
+/// `utilization_ratio` uses 1.0 for 100%. The caller normalizes `kind` to the
+/// fixed label vocabulary registered above, preventing agent/DNA identifiers
+/// from becoming unbounded metric labels.
+pub(crate) fn observe_db_read_pool_saturation(kind: &str, utilization_ratio: f64) {
+    if !utilization_ratio.is_finite() || utilization_ratio < 0.0 {
+        return;
+    }
+    NODE_DB_READ_POOL_LAST_SATURATION_RATIO
+        .with_label_values(&[kind])
+        .set(utilization_ratio);
+    NODE_DB_READ_POOL_SATURATION_EVENTS
+        .with_label_values(&[kind])
+        .inc();
 }
 
 /// Set the conductor (child) smaps anon breakdown (the heap-leak locus gauges).
@@ -2413,6 +2476,7 @@ mod tests {
         set_proc_rss("holochain", 5_000_000_000, 130_000_000, 42);
         set_cgroup_mem(5_000_000_000, 130_000_000, 50_000_000, Some(0));
         set_boot_tunables(8, Some(4.0));
+        observe_db_read_pool_saturation("dht", 226.62);
         set_conductor_smaps(4_096, 132_096, 6_000_000_000, 5_600, 158_265_344);
         set_conductor_anon_buckets(&[
             ("1m-8m", 4_200, 5_800_000_000),
@@ -2509,6 +2573,11 @@ mod tests {
         );
         assert!(text.contains("elohim_node_cgroup_mem_bytes"));
         assert!(text.contains("elohim_node_db_max_readers"));
+        assert!(text.contains("elohim_node_db_read_pool_last_saturation_ratio"));
+        assert!(text.contains("elohim_node_db_read_pool_saturation_events_total"));
+        assert!(
+            text.contains("elohim_node_db_read_pool_last_saturation_ratio{kind=\"dht\"} 226.62")
+        );
         assert!(text.contains("elohim_identity_namespace_violation_total"));
         assert!(text.contains("elohim_node_conductor_anon_bucket_bytes"));
         assert!(text.contains("elohim_node_conductor_anon_bucket_count"));
