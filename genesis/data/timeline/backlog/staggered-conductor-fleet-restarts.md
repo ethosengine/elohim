@@ -58,3 +58,25 @@ but it is not needed to explain this event.
 
 The mechanism question is resolved; the staggered-restart design, arc-overlap
 argument, and convergence gate remain open, so the backlog entry stays `wip`.
+
+## Codex claim — options and standing reds (2026-08-06)
+
+Authorized deliverable: a collision-safe design package plus deterministic
+standing-red tests. Until the armed transport flip lands, this claim MUST NOT
+write `elohim/holochain/Jenkinsfile`, either human StatefulSet source, or
+`doorway/**`.
+
+Two constraints are load-bearing:
+
+1. the current guard restarts whenever the StatefulSet is not reported exactly
+   `unchanged`, so moving `deployVersion` outside `.spec.template` is not by
+   itself a restart cure;
+2. `RollingUpdate` starts during `kubectl apply`, so sequencing only the later
+   explicit restart is already too late.
+
+The design must therefore specify a runtime-content fingerprint and a
+wave-sequenced `apply → rollout → convergence probe`. The reds must demonstrate
+today's Git-SHA-driven pod-template change, raw-apply-word admission, fleet-wide
+parallel apply, and absent convergence admission without joining a default green
+suite. Design home:
+`genesis/docs/superpowers/specs/2026-08-06-staggered-conductor-restart-mitigation-design.md`.
