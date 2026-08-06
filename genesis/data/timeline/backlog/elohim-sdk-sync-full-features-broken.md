@@ -112,3 +112,22 @@ discovered this; do not touch elohim-sdk src as part of that task)
    to confirm no further breakage was hiding behind the compile failure.
 
 Status: open, unowned.
+
+## Addendum (2026-08-06, automerge 0.5.12→0.10.0 bump sprint verification)
+
+Re-confirmed independently during the automerge dependency-bump sprint (landed `007bd98ca`) —
+**not caused by the bump**. Proven via a path-limited `git stash` of `crates/elohim-sdk/Cargo.toml`
++ `Cargo.lock` (never a bare `git stash`, per shared-worktree discipline), rebuilding
+`cargo build --features sync` against automerge 0.5.12, observing the identical 4 errors
+(E0583 + 3x E0107) reported above, then popping the stash back to 0.10.0 and re-confirming the
+same 4 errors — byte-identical failure on both automerge versions. This closes the "did the bump
+break it" question definitively: it did not; the defect is fully independent of which automerge
+version is in the lockfile.
+
+Also newly verified this pass: **zero implementors of the `Syncable` trait anywhere in the
+repo**. This sharpens the fix-sketch's already-open question — write the missing module and fix
+the arity, or delete the trait as dead surface — into a real fork: since nothing depends on
+`Syncable` today, deletion carries zero blast radius beyond this crate. That decision is still
+deliberately NOT made here; it is upstream-of-fix, not answered by this addendum.
+
+Author: automerge 0.5.12 → 0.10.0 bump sprint (2026-08-06).
