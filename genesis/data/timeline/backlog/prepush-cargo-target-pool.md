@@ -7,7 +7,7 @@ title: "Pre-push cargo-target-pool: originally bypassed entirely (→ ENOSPC); r
 slug: "prepush-cargo-target-pool"
 written: "2026-06-02"
 author: "cartographer"
-status: "resolved"
+status: "open"
 resolved: "2026-08-06"
 reopened: "2026-08-05"
 priority: "high"
@@ -192,3 +192,12 @@ fallback on a dangling slot) is cured and verified. Residual, non-blocking, reco
 fifth site class (in-tree `./target` symlinks like `elohim/target` used by no-just fallback gates)
 is outside the pooled-slot guard — healed by hand this push; fold into any future
 `cargo-pool doctor` pass.
+
+## REOPENED (residual) 2026-08-06 — cargo-pool doctor
+
+The core fix is verified live, but the residual named above is now a formal claim: four dangling
+dev-family symlinks exist RIGHT NOW and are invisible to `cargo-pool status`; two are not
+self-healed by the readlink guard (their /tmp parents can't be recreated by mkdir alone).
+Deliverable: `cargo-pool doctor` (or a `status` fold-in) that walks every family slot +
+known in-tree `./target` symlinks (the elohim/target fifth-site class), reports dangling/
+unpreparable ones, and offers `--heal` to recreate /tmp targets. Claimable by any agent.
