@@ -7,7 +7,7 @@ title: "Commit the Stage-0 iroh harness + lock repair to the conductor fork (elo
 slug: "fork-stage0-harness-commit"
 written: "2026-08-06"
 author: "agentic-developer"
-status: "open"
+status: "resolved"
 priority: "medium"
 area: "holochain-fork"
 domain: "code"
@@ -38,3 +38,10 @@ Notes for the claimant:
 - Verify before push: `cargo test -p holochain --test iroh_stage0 --features test_utils` green
   AND `cargo build --locked -p holochain` now succeeds (the repair's proof).
 - Evidence logs stay in the monorepo (`.stage0-logs/`), referenced by the wave-2 design doc.
+
+## RESOLVED 2026-08-06 — landed on the fork
+
+Claimed by codex, integrated same day: `23ab107ed` (lock repair — `cargo build --locked -p holochain`
+green again) + `6d0814266` (Stage-0 test, 1 passed under --locked with live sovereign-relay
+registration/convergence/cross-peer read). Pushed `da823fc6a..6d0814266` to ethosengine/holochain
+`elohim-0.6.3`; monorepo submodule pointer bumped in the same integration batch.
