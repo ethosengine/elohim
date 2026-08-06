@@ -243,6 +243,102 @@ list_slots_for_family() {
   find "$fd" -mindepth 2 -maxdepth 2 -type d 2>/dev/null | sort
 }
 
+# Resolve a symlink target even when one or more path components do not exist.
+# `readlink -f` cannot do that, which is precisely the post-/tmp-loss case this
+# doctor must diagnose.
+resolve_link_target_lexical() {
+  local link="$1" raw
+  raw="$(readlink -- "$link" 2>/dev/null)" || return 1
+  case "$raw" in
+    /*) readlink -m -- "$raw" ;;
+    *)  readlink -m -- "$(dirname "$link")/$raw" ;;
+  esac
+}
+
+# A missing path is preparable when its nearest existing ancestor is a
+# directory. Existing dangling symlinks and regular-file ancestors are not.
+path_is_preparable() {
+  local candidate="$1" ancestor="$1" parent
+  while [ ! -e "$ancestor" ] && [ ! -L "$ancestor" ]; do
+    parent="$(dirname "$ancestor")"
+    [ "$parent" = "$ancestor" ] && return 1
+    ancestor="$parent"
+  done
+  [ -d "$ancestor" ] && [ "$candidate" != "$ancestor" ]
+}
+
+# List every cargo-target symlink the pool owns or relies on. Pool slots have
+# the fixed family/<family>/<workspace>/<profile> shape. In-tree target links
+# are scanned in the primary checkout and managed worktrees; directories are
+# intentionally excluded because legacy-targets already owns that class.
+list_cargo_target_links() {
+  local family_root="$POOL_ROOT/family"
+  if [ -d "$family_root" ]; then
+    find "$family_root" -mindepth 3 -maxdepth 3 -type l \
+      -printf 'pool-slot\t%p\n' 2>/dev/null
+  fi
+
+  local roots=("$POOL_PARENT_REPO") root wt
+  if [ -d "$POOL_WORKTREES_DIR" ]; then
+    for wt in "$POOL_WORKTREES_DIR"/*; do
+      [ -d "$wt" ] && roots+=("$wt")
+    done
+  fi
+  for root in "${roots[@]}"; do
+    [ -d "$root" ] || continue
+    if [ "$root" = "$POOL_PARENT_REPO" ]; then
+      find "$root" -maxdepth 6 -type l -name target \
+        -not -path "*/node_modules/*" \
+        -not -path "$POOL_ROOT/*" \
+        -not -path "*/.git/*" \
+        -not -path "$POOL_WORKTREES_DIR/*" \
+        -printf 'in-tree-target\t%p\n' 2>/dev/null
+    else
+      find "$root" -maxdepth 6 -type l -name target \
+        -not -path "*/node_modules/*" \
+        -not -path "$POOL_ROOT/*" \
+        -not -path "*/.git/*" \
+        -printf 'in-tree-target\t%p\n' 2>/dev/null
+    fi
+  done | sort -u
+}
+
+# Emit unhealthy cargo-target links as TSV:
+#   <class> <state> <link> <raw-target> <resolved-target>
+# `dangling` means the target is absent but can be recreated under /tmp.
+# `unpreparable` means automatic healing is unsafe or structurally impossible.
+list_cargo_target_link_findings() {
+  local kind link raw resolved state
+  while IFS=$'\t' read -r kind link; do
+    [ -L "$link" ] || continue
+    [ -d "$link" ] && continue
+    raw="$(readlink -- "$link" 2>/dev/null || true)"
+    resolved="$(resolve_link_target_lexical "$link" 2>/dev/null || true)"
+    state=unpreparable
+    case "$resolved" in
+      /tmp/*)
+        path_is_preparable "$resolved" && state=dangling
+        ;;
+    esac
+    printf '%s\t%s\t%s\t%s\t%s\n' "$kind" "$state" "$link" "$raw" "$resolved"
+  done < <(list_cargo_target_links)
+}
+
+# Recreate the directory behind one dangling link. Healing is deliberately
+# constrained to /tmp: never rewrite the link and never create elsewhere.
+heal_cargo_target_link() {
+  local link="$1" resolved
+  [ -L "$link" ] && [ ! -e "$link" ] || return 0
+  resolved="$(resolve_link_target_lexical "$link" 2>/dev/null)" || return 1
+  case "$resolved" in
+    /tmp/*) ;;
+    *) return 1 ;;
+  esac
+  path_is_preparable "$resolved" || return 1
+  mkdir -p -- "$resolved" || return 1
+  [ -d "$link" ]
+}
+
 # ---------------------------------------------------------------------------
 # Disk-pressure probe — substrate-agnostic. Reports on the volume containing
 # $POOL_PARENT_REPO. Used by preflight for warn/critical banners. Also used by

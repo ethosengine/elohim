@@ -3,6 +3,7 @@
 #
 # Subcommands:
 #   status                    Tabular family overview (disk + last touched).
+#   doctor [--heal]           Diagnose dangling cargo-target symlinks.
 #   steward [--dry-run]       Run stewardship pass against worktrees.
 #   key                       Print the slot path that the current PWD
 #                             would use for native cargo builds.
@@ -30,6 +31,7 @@ cargo-pool — cargo target pool operator CLI
 
 Usage:
   cargo-pool status
+  cargo-pool doctor [--heal]
   cargo-pool steward [--dry-run]
   cargo-pool key
   cargo-pool estimate [worktree-path]
@@ -60,6 +62,9 @@ Env:
   CARGO_TARGET_POOL_FAMILY     override family detection in `key`
   CARGO_TARGET_POOL_POLICY     override policy file path
   CARGO_TARGET_POOL_NO_ENFORCE=1  hooks skip auto-enforce (escape hatch)
+
+doctor is read-only by default. --heal recreates missing directory targets
+only when their resolved path is beneath /tmp; it never rewrites symlinks.
 
 Design: genesis/docs/plans/cargo-target-pool-design.md
 EOF
@@ -135,6 +140,45 @@ cmd_status() {
     echo "  Review: cargo-pool angular-cache"
     echo "  Clean:  cargo-pool angular-cache --clean --yes"
   fi
+
+  echo
+  cmd_doctor
+}
+
+cmd_doctor() {
+  local heal=0
+  case "${1:-}" in
+    "") ;;
+    --heal) heal=1 ;;
+    *) echo "cargo-pool doctor: unknown argument: $1" >&2; return 2 ;;
+  esac
+  [ "$#" -le 1 ] || { echo "cargo-pool doctor: too many arguments" >&2; return 2; }
+
+  echo "Cargo target link doctor:"
+  local kind state link raw resolved findings=0 healed=0 failed=0
+  while IFS=$'\t' read -r kind state link raw resolved; do
+    [ -n "$link" ] || continue
+    findings=$((findings + 1))
+    printf '  %-14s %-12s %s -> %s\n' "$kind" "$state" "$link" "$raw"
+    if [ "$heal" -eq 1 ]; then
+      if [ "$state" = dangling ] && heal_cargo_target_link "$link"; then
+        healed=$((healed + 1))
+        printf '  %-14s %-12s %s\n' "$kind" HEALED "$resolved"
+      else
+        failed=$((failed + 1))
+        printf '  %-14s %-12s %s\n' "$kind" UNPREPARABLE "${resolved:-$raw}"
+      fi
+    fi
+  done < <(list_cargo_target_link_findings)
+
+  if [ "$findings" -eq 0 ]; then
+    echo "  healthy — no dangling cargo-target symlinks"
+  elif [ "$heal" -eq 0 ]; then
+    echo "  $findings finding(s); run cargo-pool doctor --heal to recreate preparable /tmp targets"
+  else
+    echo "  healed=$healed unpreparable=$failed"
+  fi
+  [ "$failed" -eq 0 ]
 }
 
 cmd_steward() {
@@ -526,6 +570,7 @@ cmd_orphans() {
 
 case "$cmd" in
   status)         cmd_status "$@" ;;
+  doctor)         cmd_doctor "$@" ;;
   steward)        cmd_steward "$@" ;;
   key)            cmd_key "$@" ;;
   enforce)        cmd_enforce "$@" ;;

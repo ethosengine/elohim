@@ -201,3 +201,18 @@ self-healed by the readlink guard (their /tmp parents can't be recreated by mkdi
 Deliverable: `cargo-pool doctor` (or a `status` fold-in) that walks every family slot +
 known in-tree `./target` symlinks (the elohim/target fifth-site class), reports dangling/
 unpreparable ones, and offers `--heal` to recreate /tmp targets. Claimable by any agent.
+
+## CODEX IMPLEMENTED (uncommitted) 2026-08-06 — doctor + status fold-in
+
+`cargo-pool doctor` now inspects symlink-shaped family slots at their fixed depth and
+in-tree `target` symlinks in the primary checkout plus managed worktrees. Healthy links
+stay quiet; missing targets are reported as `dangling` only when a lexical resolution
+lands beneath `/tmp` and its nearest existing ancestor is a directory. Everything else
+is `unpreparable`. `doctor --heal` recreates only those preparable `/tmp` directories,
+never rewrites a link, and returns nonzero if any finding cannot be healed. `status`
+includes the same read-only diagnosis.
+
+Evidence: the isolated Node suite covers all three behaviors (read-only discovery,
+heal/fail-closed, status fold-in), and the live read-only command discovers the four
+current dev-family dangling links without modifying them. The fifth-site
+`elohim/target` is traversed but currently healthy, so it is correctly silent.
