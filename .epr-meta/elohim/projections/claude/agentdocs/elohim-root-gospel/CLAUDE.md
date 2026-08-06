@@ -6,6 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Polyglot monorepo for the Elohim Protocol - a distributed learning platform built on Holochain, Angular, and Rust. `dev` is the integration target (not a protected default): feature branches land on `dev` via local fast-forward merge — no PR. Release-grade PR review happens at `dev → main`.
 
+## What to work on, and how you know it's done
+
+Four artifacts. Everything else in the development machinery is commentary hanging off them.
+
+1. **`genesis/manifests/habits.yaml`** — what this system reliably does, each bound to a runnable check. Max 12 habits, max 2 `active`, `status: green | red | unwired`, and **flips require evidence** (a build number, a live probe, a test run) — never intention. `unwired` means we committed to a habit with no way to observe whether we keep it; that state is declared and counted on purpose. Render it with `.claude/scripts/habits-status.py [--full]`. **Work = move the top red toward green with proof.**
+2. **The `@concern:` tag** on the a2o scenario a habit's `checks:` names — the one identifier that joins a claim to its proof across CI, Gherkin, and this register without prose.
+3. **The `gate` command for the tree you touched** — `gate.projects` in the nearest `build-manifest.json` names the dir and steps. A lane of work and its verification are the same boundary.
+4. **A one-line delta in `habits.yaml`** when you finish. That is the deliverable, not a summary.
+
+A plan, spec, or sprint that serves no habit belongs in `held/`, not in flight. If you are about to write a new register, ledger, or ranking script, the answer is almost certainly one of the four above — this layer has repeatedly grown instruments with no reader (see `genesis/docs/superpowers/` for the 2026-08-06 nomenclature review).
+
 ## Build & Test Commands
 
 Run `pnpm install` from repo root once (workspace install). Sophia is a git submodule with its own pnpm workspace.
