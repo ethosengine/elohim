@@ -54,7 +54,13 @@ reconcile-projection catch-up is a different, HOURS-scale class — a
 breaker-flap pattern, not a longer version of the same churn. Precedent: the
 2026-07-19 doorway-catching-up incident, and the 2026-08-01 saga-recording
 incident where `divergentAnchor=1763` rode a 2h+ catch-up window before
-`elohim_projection_reconcile_converged` read 1 again. A measurement run fired
+`elohim_projection_reconcile_converged` read 1 again. Third precedent
+2026-08-06: a full-fleet simultaneous conductor restart (edge deploy at
+16:54Z) put every DHT-dependent doorway route dark for ~2.5-3h of fleet-wide
+`PTxnGuard` write-guard contention (0.6-1.9s holds even on healthy peers)
+before self-recovering with no cure deployed — the simultaneous-roll shape
+makes this class unavoidable until restarts are staggered
+(backlog `staggered-conductor-fleet-restarts`). A measurement run fired
 against the 20-min heuristic in this regime records a false red, because the
 fleet is still churning long after I6's window closed. Measurement runs must
 ride the bounded fleet-quiesce gate (`scripts/ci/fleet-quiesce-gate.sh`,
