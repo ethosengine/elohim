@@ -521,16 +521,33 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         info!("Node signing key generated for federation");
     }
 
-    // Create ZomeCaller for federation + service registration
+    // Create ZomeCaller for federation + service registration.
+    //
+    // SPOF removal (2026-08-06): the caller keeps its pinned primary — the
+    // doorway's co-located premise conductor — but now carries the already-declared
+    // conductor pool (CONDUCTOR_URLS) as an ordered fallback list. When the primary
+    // cannot answer (adam under sqlite write-guard pressure took
+    // GET /api/v1/federation/doorways down for 5.5h on doorway-B), agent-agnostic
+    // DHT reads route to another peer instead of dying. Identity-binding writes
+    // stay pinned — see the ZomeCaller module header. No new config: a
+    // single-conductor deployment dedupes to zero fallbacks and behaves exactly
+    // as before.
     {
         let admin_url = args.admin_url().to_string();
         let app_url = derive_app_url(&args.conductor_url, args.app_port_min);
-        let zome_caller = services::ZomeCaller::new(&admin_url, &app_url, &args.installed_app_id);
-        state.zome_caller = Some(Arc::new(zome_caller));
-        info!(
-            "ZomeCaller created for federation (admin: {}, app: {})",
-            admin_url, app_url
+        let zome_caller = services::ZomeCaller::with_fallbacks(
+            &admin_url,
+            &app_url,
+            &args.installed_app_id,
+            &conductor_urls,
         );
+        info!(
+            "ZomeCaller created for federation (admin: {}, app: {}, fallback conductors: {})",
+            admin_url,
+            app_url,
+            zome_caller.fallback_count()
+        );
+        state.zome_caller = Some(Arc::new(zome_caller));
     }
 
     // Set up P2P status polling from elohim-storage (if STORAGE_URL configured)

@@ -258,6 +258,7 @@ habits:
     refs:
       - "genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md"
       - "genesis/data/timeline/backlog/self-heal-adam-projection-catchup-exhaustion-full-arc.md"
+      - "2026-08-06: one layer below this invariant, doorway ZomeCaller grew multi-conductor failover for agent-agnostic DHT reads (reviewed ship, gates green — backlog conductor-source-chain-unwrap-panic-db-timeout.md), so a doorway's DHT routes no longer die with its pinned conductor; the apex-name born-red and its WS3 cure surface are unchanged"
 
   - id: reach-enforced-everywhere
     invariant: >

@@ -146,6 +146,13 @@ spec:
             - name: DELEGATES_COMPUTE_OP_GATE
               value: "observe"
             # Alpha hosts Matthew (founder) + Jessica (household)
+            #
+            # ALSO the ZomeCaller failover pool (2026-08-06). The doorway's
+            # federation/DHT-read caller pins CONDUCTOR_ADMIN_URL below as its
+            # primary, and uses this list as its ordered fallback when that peer
+            # cannot answer — signing credentials are re-authorized per-conductor,
+            # so each entry must be a real conductor with the `elohim` hApp.
+            # Trimming this list silently removes federation read failover.
             - name: CONDUCTOR_URLS
               value: "CONDUCTOR_URLS_PLACEHOLDER"
             - name: CONDUCTOR_ADMIN_URL

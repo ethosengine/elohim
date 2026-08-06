@@ -190,6 +190,14 @@ spec:
             # STORAGE_URL below) so doorway-B's projection cache + admin
             # writes hit the shem-side genesis peer first; the pool is only
             # consulted for reach when the primary can't satisfy a request.
+            #
+            # ALSO the ZomeCaller failover pool (2026-08-06). This is the SPOF
+            # this doorway actually hit: adam under sqlite write-guard pressure
+            # took GET /api/v1/federation/doorways down for 5.5h because the
+            # ZomeCaller was pinned to adam alone. Agent-agnostic DHT reads now
+            # fall back through this list (per-conductor credential
+            # authorization; identity-binding writes stay pinned to adam).
+            # Trimming this list silently removes federation read failover.
             - name: CONDUCTOR_URLS
               value: "CONDUCTOR_URLS_PLACEHOLDER"
             - name: CONDUCTOR_ADMIN_URL

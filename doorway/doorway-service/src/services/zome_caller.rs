@@ -10,6 +10,47 @@
 //! 2. Authorize signing credentials for the cell
 //! 3. Issue app auth token, connect AppWebsocket with signer
 //! 4. All zome calls are automatically signed by the client
+//!
+//! ## Conductor failover (single-peer SPOF removal)
+//!
+//! LIVE-INCIDENT INVARIANT (2026-08-05/06 doorway-B federation outage): the
+//! doorway pins this caller to ONE conductor (`--conductor-url` /
+//! `CONDUCTOR_ADMIN_URL`). When that peer got sick — adam under sqlite
+//! write-guard pressure, `authorize_signing_credentials timed out after 10000ms
+//! for role 'infrastructure'` — `GET /api/v1/federation/doorways` timed out
+//! CONTINUOUSLY for 5.5 hours. One sick peer took down a doorway API route.
+//!
+//! The cure has three parts, and the third is the crux:
+//!
+//! 1. **An ordered fallback list**, taken from the conductor pool the doorway
+//!    already declares (`CONDUCTOR_URLS`) — no new config schema.
+//! 2. **A primary cooldown.** Trying the sick primary first on every call would
+//!    still spend the full 10s deadline per request, and the browser aborts at
+//!    ~5s — so the route would stay dead. After an availability failure the
+//!    primary is skipped for [`PRIMARY_UNHEALTHY_COOLDOWN`] and re-probed after
+//!    (half-open), so recovery is automatic with no flap logic.
+//! 3. **Signing credentials are PER-CONDUCTOR.** `authorize_signing_credentials`
+//!    grants a cap on *that* conductor's cells for *that* conductor's agent; a
+//!    credential from the primary is meaningless on a fallback. So every
+//!    endpoint is connected through the one shared [`connect_endpoint`] routine,
+//!    which builds a FRESH `ClientAgentSigner` and authorizes against that
+//!    endpoint's OWN admin interface. There is no shared signer on `ZomeCaller`
+//!    — that absence is load-bearing, not incidental.
+//!
+//! ## What may fail over, and what may NOT
+//!
+//! Failing over changes WHICH AGENT signs the call, because each conductor has
+//! its own agent key and its own source chain. That is harmless for
+//! agent-agnostic DHT reads (`get_all_doorways`, `find_publishers` — any peer
+//! answers identically) and unacceptable for identity-binding writes
+//! (`create_human` binds the Human to the acting agent; `register_doorway` /
+//! `record_heartbeat` author the doorway's own registration).
+//!
+//! So failover is OPT-IN at the call site: [`ZomeCaller::call`] /
+//! [`ZomeCaller::call_zome`] stay primary-pinned (unchanged semantics), and
+//! [`ZomeCaller::call_failover`] / [`ZomeCaller::call_zome_failover`] are the
+//! read-path variants. Do not move a write onto the failover variants without
+//! first answering what a second author does to that entry's validation.
 
 use holochain_client::{
     AdminWebsocket, AppWebsocket, AuthorizeSigningCredentialsPayload, ClientAgentSigner,
@@ -17,6 +58,7 @@ use holochain_client::{
 };
 use holochain_types::prelude::ExternIO;
 use serde::{de::DeserializeOwned, Serialize};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{Mutex, RwLock};
@@ -54,6 +96,117 @@ pub fn zome_call_timeout() -> Duration {
         .filter(|&v| v > 0)
         .unwrap_or(DEFAULT_ZOME_CALL_TIMEOUT_MS);
     Duration::from_millis(ms)
+}
+
+/// How long the primary conductor is skipped after an availability failure.
+///
+/// Parameter-bearing discovery (2026-08-05 doorway-B outage): the naive "always
+/// try primary first" failover is a NO-OP for a browser client. The primary
+/// deadline is 10s; the SPA aborts at ~4.95s. So every request would still be
+/// user-visibly dead while the primary is sick, even with a healthy fallback
+/// standing by. The cooldown is what converts failover from theory into a served
+/// response — for requests INSIDE a cooldown window. Boundary requests still pay
+/// the primary's price: the first request to hit a freshly-degraded primary eats
+/// the full primary deadline before the cooldown starts, and after each cooldown
+/// expiry one request eats the half-open re-probe. Expect intermittent
+/// client-visible timeouts at those boundaries, not zero.
+///
+/// 60s is chosen so a transient conductor stall costs at most one cooled minute
+/// of primary-affinity (the fallback answers reads identically), while a peer
+/// that has genuinely recovered is re-probed promptly. Deliberately a const, not
+/// an env var: it is an availability invariant, not an operator tuning knob.
+const PRIMARY_UNHEALTHY_COOLDOWN: Duration = Duration::from_secs(60);
+
+/// Why a conductor call failed, at the only granularity failover cares about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CallFailureClass {
+    /// The conductor could not answer — unreachable, unresponsive, dead socket,
+    /// or any step of the connect/authorize handshake timing out. ANOTHER
+    /// conductor may well be able to answer, so this is the failover trigger.
+    Unavailable,
+    /// The conductor DID answer, with an error (validation, missing function,
+    /// wire error). Every peer in the pool would answer the same way, so failing
+    /// over just relocates the identical error and doubles the load. Never fail
+    /// over on this class.
+    Application,
+}
+
+/// A conductor failure carrying both its class (for routing) and its message
+/// (for the caller). The public API still returns `String`, so downstream
+/// string matching — e.g. federation's `e.contains("already exists")` — keeps
+/// working byte-identically.
+#[derive(Debug, Clone)]
+struct CallError {
+    class: CallFailureClass,
+    message: String,
+}
+
+impl CallError {
+    fn unavailable(message: impl Into<String>) -> Self {
+        Self {
+            class: CallFailureClass::Unavailable,
+            message: message.into(),
+        }
+    }
+}
+
+/// One conductor's pair of WebSocket interfaces.
+///
+/// The admin address is what makes per-conductor signing credentials possible:
+/// `authorize_signing_credentials` must be issued against the SAME conductor
+/// that will later verify the signature.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConductorEndpoint {
+    pub admin_addr: String,
+    pub app_addr: String,
+}
+
+impl ConductorEndpoint {
+    /// Build from an admin URL and an app URL (either may carry a `ws://` scheme).
+    pub fn new(admin_url: &str, app_url: &str) -> Self {
+        Self {
+            admin_addr: strip_ws_scheme(admin_url),
+            app_addr: strip_ws_scheme(app_url),
+        }
+    }
+
+    /// Build from an app URL alone, deriving the admin interface by the
+    /// established port-minus-one convention (8445 app → 8444 admin).
+    ///
+    /// This is the same derivation `main.rs::discover_existing_agents` already
+    /// applies to `CONDUCTOR_URLS` entries, so the fallback list needs no new
+    /// configuration — each fallback gets its OWN admin interface, which is
+    /// exactly what per-conductor credential authorization requires.
+    pub fn from_app_url(app_url: &str) -> Self {
+        Self::new(&crate::derive_admin_url_from_app(app_url), app_url)
+    }
+}
+
+/// Build the ordered fallback list for a primary endpoint from the doorway's
+/// declared conductor pool.
+///
+/// Drops the primary (it is tried first by construction) and any duplicates,
+/// preserving pool order so the operator's declared preference is honored.
+pub fn build_fallback_endpoints(
+    primary: &ConductorEndpoint,
+    pool_app_urls: &[String],
+) -> Vec<ConductorEndpoint> {
+    let mut out: Vec<ConductorEndpoint> = Vec::new();
+    for url in pool_app_urls {
+        let url = url.trim();
+        if url.is_empty() {
+            continue;
+        }
+        let ep = ConductorEndpoint::from_app_url(url);
+        if ep.app_addr == primary.app_addr {
+            continue;
+        }
+        if out.iter().any(|e| e.app_addr == ep.app_addr) {
+            continue;
+        }
+        out.push(ep);
+    }
+    out
 }
 
 /// Classify a [`ConductorApiError`] as a TRANSPORT failure (the socket is
@@ -100,33 +253,86 @@ fn is_transport_error(e: &ConductorApiError) -> bool {
 /// Follows the same pattern as elohim-storage's HcClient — uses the official
 /// holochain_client::AppWebsocket which handles request signing automatically.
 pub struct ZomeCaller {
-    admin_addr: String,
-    app_addr: String,
+    /// The pinned primary conductor. Every call tries this first (unless it is
+    /// in availability cooldown), and identity-binding writes NEVER leave it.
+    primary: ConductorEndpoint,
+    /// Ordered fallback conductors, primary excluded and deduped. Empty for a
+    /// single-conductor caller, in which case behavior is byte-identical to the
+    /// pre-failover implementation.
+    fallbacks: Vec<ConductorEndpoint>,
     installed_app_id: String,
-    /// The connected AppWebsocket (lazily initialized)
+    /// The connected AppWebsocket for [`Self::primary`] (lazily initialized)
     app_ws: RwLock<Option<AppWebsocket>>,
     /// Lock to prevent concurrent connection attempts
     connecting: Mutex<()>,
+    /// Lazily-established fallback connection, tagged with WHICH fallback it is.
+    ///
+    /// Cached deliberately: re-running the connect handshake per call would
+    /// re-issue `authorize_signing_credentials` — a conductor-side cap-grant
+    /// write — on every federation poll for the whole duration of a primary
+    /// outage, converting one sick peer into load on a healthy one.
+    fallback_ws: RwLock<Option<(usize, AppWebsocket)>>,
+    /// Lock to prevent concurrent fallback connection attempts
+    fallback_connecting: Mutex<()>,
+    /// Which fallback to try first (round-robins away from a failing one).
+    fallback_idx: AtomicUsize,
+    /// While set and in the future, the primary is skipped. See
+    /// [`PRIMARY_UNHEALTHY_COOLDOWN`].
+    primary_unhealthy_until: RwLock<Option<tokio::time::Instant>>,
 }
 
 impl ZomeCaller {
-    /// Create a new ZomeCaller.
+    /// Create a single-conductor ZomeCaller (no failover).
     ///
     /// `admin_url` and `app_url` can be either `ws://host:port` URLs or `host:port` addresses.
+    ///
+    /// Used for the deliberately-pinned temporary callers (hosted registration
+    /// on a specific operator conductor), where routing to a different peer
+    /// would be a correctness bug rather than a resilience win.
     pub fn new(admin_url: &str, app_url: &str, installed_app_id: &str) -> Self {
+        Self::with_fallbacks(admin_url, app_url, installed_app_id, &[])
+    }
+
+    /// Create a ZomeCaller with an ordered fallback conductor pool.
+    ///
+    /// `pool_app_urls` is the doorway's already-declared conductor pool
+    /// (`CONDUCTOR_URLS`); the primary is filtered out of it automatically, and
+    /// each remaining entry derives its own admin interface so signing
+    /// credentials are authorized per-conductor.
+    pub fn with_fallbacks(
+        admin_url: &str,
+        app_url: &str,
+        installed_app_id: &str,
+        pool_app_urls: &[String],
+    ) -> Self {
+        let primary = ConductorEndpoint::new(admin_url, app_url);
+        let fallbacks = build_fallback_endpoints(&primary, pool_app_urls);
         info!(
             admin_url = %admin_url,
             app_url = %app_url,
             installed_app_id = %installed_app_id,
+            fallback_conductors = fallbacks.len(),
             "ZomeCaller created"
         );
+        for (i, ep) in fallbacks.iter().enumerate() {
+            debug!(index = i, app = %ep.app_addr, admin = %ep.admin_addr, "ZomeCaller fallback conductor");
+        }
         Self {
-            admin_addr: strip_ws_scheme(admin_url),
-            app_addr: strip_ws_scheme(app_url),
+            primary,
+            fallbacks,
             installed_app_id: installed_app_id.to_string(),
             app_ws: RwLock::new(None),
             connecting: Mutex::new(()),
+            fallback_ws: RwLock::new(None),
+            fallback_connecting: Mutex::new(()),
+            fallback_idx: AtomicUsize::new(0),
+            primary_unhealthy_until: RwLock::new(None),
         }
+    }
+
+    /// Number of configured fallback conductors (0 = no failover available).
+    pub fn fallback_count(&self) -> usize {
+        self.fallbacks.len()
     }
 
     /// Get or create the AppWebsocket connection with signing credentials.
@@ -150,7 +356,7 @@ impl ZomeCaller {
             }
         }
 
-        info!("ZomeCaller connecting to conductor");
+        info!(conductor = %self.primary.app_addr, "ZomeCaller connecting to conductor");
 
         let deadline = zome_call_timeout();
 
@@ -165,159 +371,104 @@ impl ZomeCaller {
         // outer scope, so any early return drops it immediately; `app_ws` is only
         // written at the very end, so a mid-reconnect elapse leaves it cleanly
         // `None` for the next caller.
-        let reconnect_budget = deadline * 5 + Duration::from_secs(1);
-
-        let connect_body = async {
-            // Step 1: Connect to admin interface.
-            // Hard-bounded: an unresolvable conductor host (cluster NXDOMAIN) must
-            // resolve to an Err within `deadline`, never hang the caller forever.
-            // Resolve via tokio's ASYNC resolver first (off the worker pool), then
-            // connect with an already-resolved SocketAddr so holochain_client's
-            // synchronous std::net getaddrinfo never parks a worker (alpha doorway
-            // crashloop RCA 2026-06-15; see crate::conductor::resolve_host_port).
-            // The per-step `timeout` below can only bound an async resolve, not a
-            // blocking syscall — so this also makes that timeout effective.
-            let admin_socket = crate::conductor::resolve_host_port(&self.admin_addr).await?;
-            let admin_ws = tokio::time::timeout(
-                deadline,
-                AdminWebsocket::connect(admin_socket, Some(String::from("doorway-zome-caller"))),
-            )
-            .await
-            .map_err(|_| {
-                format!(
-                    "Admin connect timed out after {}ms ({})",
-                    deadline.as_millis(),
-                    self.admin_addr
-                )
-            })?
-            .map_err(|e| format!("Admin connect failed: {e}"))?;
-
-            info!("ZomeCaller connected to admin at {}", self.admin_addr);
-
-            // Step 2: Find cell_id from app info
-            let apps = tokio::time::timeout(deadline, admin_ws.list_apps(None))
-                .await
-                .map_err(|_| format!("list_apps timed out after {}ms", deadline.as_millis()))?
-                .map_err(|e| format!("list_apps failed: {e}"))?;
-
-            let app_info = apps
-                .iter()
-                .find(|a| a.installed_app_id == self.installed_app_id)
-                .ok_or_else(|| format!("App '{}' not found", self.installed_app_id))?;
-
-            // Step 3: Authorize signing credentials for ALL provisioned cells
-            let signer = ClientAgentSigner::default();
-            let mut cell_count = 0u32;
-
-            for (role_name, cells) in &app_info.cell_info {
-                for cell in cells {
-                    if let holochain_client::CellInfo::Provisioned(p) = cell {
-                        let credentials = tokio::time::timeout(
-                        deadline,
-                        admin_ws.authorize_signing_credentials(
-                            AuthorizeSigningCredentialsPayload {
-                                cell_id: p.cell_id.clone(),
-                                functions: None,
-                            },
-                        ),
-                    )
-                    .await
-                    .map_err(|_| {
-                        format!(
-                            "authorize_signing_credentials timed out after {}ms for role '{role_name}'",
-                            deadline.as_millis()
-                        )
-                    })?
-                    .map_err(|e| {
-                        format!("authorize_signing_credentials failed for role '{role_name}': {e}")
-                    })?;
-
-                        signer.add_credentials(p.cell_id.clone(), credentials);
-                        cell_count += 1;
-                        debug!(role = %role_name, "Authorized signing for cell");
-                    }
-                }
-            }
-
-            if cell_count == 0 {
-                return Err("No provisioned cells found".to_string());
-            }
-
-            info!(
-                app_id = %self.installed_app_id,
-                cells = cell_count,
-                "Signing credentials authorized for all cells"
-            );
-
-            // Step 4: Issue app auth token
-            let token = tokio::time::timeout(
-                deadline,
-                admin_ws.issue_app_auth_token(
-                    holochain_client::IssueAppAuthenticationTokenPayload {
-                        installed_app_id: self.installed_app_id.clone(),
-                        expiry_seconds: 3600,
-                        single_use: false,
-                    },
-                ),
-            )
-            .await
-            .map_err(|_| {
-                format!(
-                    "issue_app_auth_token timed out after {}ms",
-                    deadline.as_millis()
-                )
-            })?
-            .map_err(|e| format!("issue_app_auth_token failed: {e}"))?;
-
-            // Step 5: Connect AppWebsocket with signer
-            let signer_arc: Arc<ClientAgentSigner> = Arc::new(signer);
-            let app_socket = crate::conductor::resolve_host_port(&self.app_addr).await?;
-            let app_ws = tokio::time::timeout(
-                deadline,
-                AppWebsocket::connect(app_socket, token.token, signer_arc, None),
-            )
-            .await
-            .map_err(|_| {
-                format!(
-                    "App WebSocket connect timed out after {}ms ({})",
-                    deadline.as_millis(),
-                    self.app_addr
-                )
-            })?
-            .map_err(|e| format!("App WebSocket connect failed: {e}"))?;
-
-            info!(
-                "ZomeCaller connected to app interface at {} with signing",
-                self.app_addr
-            );
-
-            // Store connection
-            {
-                let mut ws = self.app_ws.write().await;
-                *ws = Some(app_ws);
-            }
-
-            Ok::<(), String>(())
-        };
+        let reconnect_budget = reconnect_budget(deadline);
 
         // Enforce the overall budget. On elapse, return promptly so `_lock`
         // drops and queued callers stop serializing behind a doomed reconnect.
-        match tokio::time::timeout(reconnect_budget, connect_body).await {
-            Ok(inner) => inner,
+        let connected = match tokio::time::timeout(
+            reconnect_budget,
+            connect_endpoint(&self.installed_app_id, &self.primary, deadline),
+        )
+        .await
+        {
+            Ok(inner) => inner?,
             Err(_elapsed) => {
                 warn!(
                     budget_ms = reconnect_budget.as_millis(),
                     "ZomeCaller reconnect exceeded full budget; releasing connecting lock"
                 );
-                Err(format!(
+                return Err(format!(
                     "reconnect exceeded full budget after {}ms",
                     reconnect_budget.as_millis()
-                ))
+                ));
             }
-        }
+        };
+
+        let mut ws = self.app_ws.write().await;
+        *ws = Some(connected);
+        Ok(())
     }
 
-    /// Call a zome function with raw bytes payload, return raw bytes.
+    /// Ensure the cached fallback connection targets `idx`, connecting if not.
+    ///
+    /// Each fallback gets its own [`connect_endpoint`] run — i.e. its own
+    /// `ClientAgentSigner` and its own `authorize_signing_credentials` against
+    /// its own admin interface. A credential minted on the primary is worthless
+    /// here, and nothing in this path reuses one.
+    async fn ensure_fallback_connected(
+        &self,
+        idx: usize,
+        deadline: Duration,
+    ) -> Result<(), String> {
+        {
+            let ws = self.fallback_ws.read().await;
+            if matches!(ws.as_ref(), Some((i, _)) if *i == idx) {
+                return Ok(());
+            }
+        }
+
+        let _lock = self.fallback_connecting.lock().await;
+
+        {
+            let ws = self.fallback_ws.read().await;
+            if matches!(ws.as_ref(), Some((i, _)) if *i == idx) {
+                return Ok(());
+            }
+        }
+
+        let endpoint = self
+            .fallbacks
+            .get(idx)
+            .ok_or_else(|| format!("fallback index {idx} out of range"))?;
+
+        info!(
+            conductor = %endpoint.app_addr,
+            index = idx,
+            "ZomeCaller connecting to FALLBACK conductor (primary unavailable)"
+        );
+
+        let budget = reconnect_budget(deadline);
+        let connected = match tokio::time::timeout(
+            budget,
+            connect_endpoint(&self.installed_app_id, endpoint, deadline),
+        )
+        .await
+        {
+            Ok(inner) => inner?,
+            Err(_elapsed) => {
+                warn!(
+                    budget_ms = budget.as_millis(),
+                    conductor = %endpoint.app_addr,
+                    "Fallback reconnect exceeded full budget; releasing connecting lock"
+                );
+                return Err(format!(
+                    "fallback reconnect exceeded full budget after {}ms",
+                    budget.as_millis()
+                ));
+            }
+        };
+
+        let mut ws = self.fallback_ws.write().await;
+        *ws = Some((idx, connected));
+        Ok(())
+    }
+
+    /// Call a zome function on the PINNED PRIMARY conductor.
+    ///
+    /// No failover. This is the correct entry point for identity-binding writes
+    /// (`create_human`, `register_doorway`, `record_heartbeat`) where changing
+    /// the signing agent would change what the entry means. For agent-agnostic
+    /// DHT reads use [`Self::call_zome_failover`].
     ///
     /// The AppWebsocket handles signing automatically.
     pub async fn call_zome(
@@ -327,7 +478,25 @@ impl ZomeCaller {
         fn_name: &str,
         payload: Vec<u8>,
     ) -> Result<Vec<u8>, String> {
-        self.ensure_connected().await?;
+        self.call_zome_primary(role_name, zome_name, fn_name, payload)
+            .await
+            .map_err(|e| e.message)
+    }
+
+    /// Primary-pinned call, retaining the failure classification for routing.
+    async fn call_zome_primary(
+        &self,
+        role_name: &str,
+        zome_name: &str,
+        fn_name: &str,
+        payload: Vec<u8>,
+    ) -> Result<Vec<u8>, CallError> {
+        // Every connect/authorize/token failure is an availability failure: the
+        // conductor could not be brought to a usable state. Another peer may
+        // still answer, so this class is what triggers failover.
+        self.ensure_connected()
+            .await
+            .map_err(CallError::unavailable)?;
 
         debug!(
             role_name = %role_name,
@@ -345,58 +514,25 @@ impl ZomeCaller {
         // must surface as a timeout Err, not park the calling task forever.
         let result = {
             let ws = self.app_ws.read().await;
-            let app_ws = ws.as_ref().ok_or("Not connected")?;
-            tokio::time::timeout(
-                deadline,
-                app_ws.call_zome(
-                    ZomeCallTarget::RoleName(role_name.into()),
-                    zome_name.into(),
-                    fn_name.into(),
-                    ExternIO::from(payload),
-                ),
-            )
-            .await
-        };
-
-        // Unwrap the timeout layer: Elapsed → a synthetic conductor error that
-        // triggers the same connection-reset path as a real call failure.
-        let result = match result {
-            Ok(inner) => inner,
-            Err(_elapsed) => {
-                warn!(
-                    role_name = %role_name,
-                    fn_name = %fn_name,
-                    timeout_ms = deadline.as_millis(),
-                    "Zome call timed out, clearing connection"
-                );
-                let mut ws = self.app_ws.write().await;
-                *ws = None;
-                return Err(format!(
-                    "Zome call timed out after {}ms ({role_name}/{zome_name}/{fn_name})",
-                    deadline.as_millis()
-                ));
-            }
+            let app_ws = ws
+                .as_ref()
+                .ok_or_else(|| CallError::unavailable("Not connected"))?;
+            call_on_ws(app_ws, role_name, zome_name, fn_name, payload, deadline).await
         };
 
         match result {
-            Ok(extern_io) => {
-                debug!(
-                    result_len = extern_io.as_bytes().len(),
-                    "ZomeCaller zome call succeeded"
-                );
-                Ok(extern_io.into_vec())
-            }
+            Ok(bytes) => Ok(bytes),
             Err(e) => {
                 // Connection-churn root fix (2026-06-13 iteration 3): only a
                 // genuinely-dead socket warrants a reconnect. A zome-returned
                 // application error (the conductor answered) leaves the socket
                 // healthy — clearing it here is the churn that wedged the
                 // gateway under load. Split warn! so Loki distinguishes the two.
-                if is_transport_error(&e) {
+                if e.class == CallFailureClass::Unavailable {
                     warn!(
                         role_name = %role_name,
                         fn_name = %fn_name,
-                        "Zome call transport failure, clearing connection: {e}"
+                        "Zome call unavailable, clearing connection: {}", e.message
                     );
                     let mut ws = self.app_ws.write().await;
                     *ws = None;
@@ -404,15 +540,199 @@ impl ZomeCaller {
                     warn!(
                         role_name = %role_name,
                         fn_name = %fn_name,
-                        "Zome call returned application error, keeping connection: {e}"
+                        "Zome call returned application error, keeping connection: {}", e.message
                     );
                 }
-                Err(format!("Zome call failed: {e}"))
+                Err(e)
             }
         }
     }
 
+    /// Call a zome function, failing over to another configured conductor when
+    /// the primary cannot answer.
+    ///
+    /// ONLY for agent-agnostic DHT reads — see the module header. A failed-over
+    /// call is signed by a DIFFERENT agent, which is meaningless for a read and
+    /// semantically wrong for a write.
+    ///
+    /// Routing:
+    /// - No fallbacks configured → identical to [`Self::call_zome`].
+    /// - Primary in availability cooldown → skipped entirely (this is what makes
+    ///   the failover visible to a client that aborts at ~5s).
+    /// - Primary answers with an application error → returned as-is; every peer
+    ///   would answer the same, so failing over would only relocate the error.
+    pub async fn call_zome_failover(
+        &self,
+        role_name: &str,
+        zome_name: &str,
+        fn_name: &str,
+        payload: Vec<u8>,
+    ) -> Result<Vec<u8>, String> {
+        if self.fallbacks.is_empty() {
+            return self.call_zome(role_name, zome_name, fn_name, payload).await;
+        }
+
+        let mut primary_error: Option<CallError> = None;
+
+        if !self.primary_in_cooldown().await {
+            match self
+                .call_zome_primary(role_name, zome_name, fn_name, payload.clone())
+                .await
+            {
+                Ok(bytes) => {
+                    self.clear_primary_cooldown().await;
+                    return Ok(bytes);
+                }
+                Err(e) if e.class == CallFailureClass::Application => return Err(e.message),
+                Err(e) => {
+                    warn!(
+                        conductor = %self.primary.app_addr,
+                        role_name = %role_name,
+                        fn_name = %fn_name,
+                        cooldown_s = PRIMARY_UNHEALTHY_COOLDOWN.as_secs(),
+                        "Primary conductor unavailable, failing over: {}", e.message
+                    );
+                    self.mark_primary_unhealthy().await;
+                    primary_error = Some(e);
+                }
+            }
+        } else {
+            debug!(
+                conductor = %self.primary.app_addr,
+                "Primary conductor in availability cooldown, routing straight to fallback"
+            );
+        }
+
+        match self
+            .call_zome_via_fallback(role_name, zome_name, fn_name, payload)
+            .await
+        {
+            Ok(bytes) => Ok(bytes),
+            Err(fallback_error) => Err(match primary_error {
+                Some(pe) => format!(
+                    "{}; every fallback conductor also failed: {}",
+                    pe.message, fallback_error.message
+                ),
+                None => format!(
+                    "primary conductor in availability cooldown; every fallback conductor also failed: {}",
+                    fallback_error.message
+                ),
+            }),
+        }
+    }
+
+    /// Try each configured fallback conductor in turn, starting where the last
+    /// failure left off.
+    ///
+    /// Stops early on an application error — the conductor answered, and every
+    /// other peer would answer identically.
+    async fn call_zome_via_fallback(
+        &self,
+        role_name: &str,
+        zome_name: &str,
+        fn_name: &str,
+        payload: Vec<u8>,
+    ) -> Result<Vec<u8>, CallError> {
+        let deadline = zome_call_timeout();
+        let count = self.fallbacks.len();
+        let mut last: Option<CallError> = None;
+
+        for _ in 0..count {
+            let idx = self.fallback_idx.load(Ordering::Relaxed) % count;
+
+            if let Err(e) = self.ensure_fallback_connected(idx, deadline).await {
+                warn!(
+                    conductor = %self.fallbacks[idx].app_addr,
+                    "Fallback conductor connect failed: {e}"
+                );
+                self.advance_fallback(idx, count);
+                last = Some(CallError::unavailable(e));
+                continue;
+            }
+
+            let result = {
+                let ws = self.fallback_ws.read().await;
+                match ws.as_ref() {
+                    Some((i, app_ws)) if *i == idx => {
+                        call_on_ws(
+                            app_ws,
+                            role_name,
+                            zome_name,
+                            fn_name,
+                            payload.clone(),
+                            deadline,
+                        )
+                        .await
+                    }
+                    // A concurrent caller rotated the slot out from under us.
+                    // Treat as unavailable and try the next endpoint.
+                    _ => Err(CallError::unavailable("fallback connection was replaced")),
+                }
+            };
+
+            match result {
+                Ok(bytes) => {
+                    info!(
+                        conductor = %self.fallbacks[idx].app_addr,
+                        role_name = %role_name,
+                        fn_name = %fn_name,
+                        "Served from FALLBACK conductor (primary unavailable)"
+                    );
+                    return Ok(bytes);
+                }
+                Err(e) if e.class == CallFailureClass::Application => return Err(e),
+                Err(e) => {
+                    warn!(
+                        conductor = %self.fallbacks[idx].app_addr,
+                        "Fallback conductor unavailable: {}", e.message
+                    );
+                    {
+                        let mut ws = self.fallback_ws.write().await;
+                        if matches!(ws.as_ref(), Some((i, _)) if *i == idx) {
+                            *ws = None;
+                        }
+                    }
+                    self.advance_fallback(idx, count);
+                    last = Some(e);
+                }
+            }
+        }
+
+        Err(last.unwrap_or_else(|| CallError::unavailable("no fallback conductors configured")))
+    }
+
+    fn advance_fallback(&self, idx: usize, count: usize) {
+        self.fallback_idx
+            .store((idx + 1) % count, Ordering::Relaxed);
+    }
+
+    /// Whether the primary is currently being skipped for availability reasons.
+    pub async fn primary_in_cooldown(&self) -> bool {
+        match *self.primary_unhealthy_until.read().await {
+            Some(until) => tokio::time::Instant::now() < until,
+            None => false,
+        }
+    }
+
+    async fn mark_primary_unhealthy(&self) {
+        let mut guard = self.primary_unhealthy_until.write().await;
+        *guard = Some(tokio::time::Instant::now() + PRIMARY_UNHEALTHY_COOLDOWN);
+    }
+
+    async fn clear_primary_cooldown(&self) {
+        let mut guard = self.primary_unhealthy_until.write().await;
+        if guard.is_some() {
+            info!(
+                conductor = %self.primary.app_addr,
+                "Primary conductor healthy again, clearing availability cooldown"
+            );
+            *guard = None;
+        }
+    }
+
     /// Typed wrapper: serialize input with MessagePack, deserialize output.
+    ///
+    /// Primary-pinned — see [`Self::call_zome`].
     pub async fn call<I: Serialize, O: DeserializeOwned>(
         &self,
         role_name: &str,
@@ -420,32 +740,253 @@ impl ZomeCaller {
         fn_name: &str,
         input: &I,
     ) -> Result<O, String> {
-        let payload = rmp_serde::to_vec_named(input)
-            .map_err(|e| format!("Failed to serialize input: {e}"))?;
-
+        let payload = encode_input(input)?;
         let response_bytes = self
             .call_zome(role_name, zome_name, fn_name, payload)
             .await?;
+        decode_response(&response_bytes)
+    }
 
-        rmp_serde::from_slice(&response_bytes).map_err(|e| {
-            let structure =
-                match rmpv::decode::read_value(&mut std::io::Cursor::new(&response_bytes)) {
-                    Ok(val) => format!("{val:?}"),
-                    Err(decode_err) => {
-                        format!("<raw {} bytes, decode err: {decode_err}>", response_bytes.len())
-                    }
-                };
-            format!(
-                "Failed to deserialize response: {e} | response_bytes({} bytes) structure: {structure}",
-                response_bytes.len()
-            )
-        })
+    /// Typed wrapper with conductor failover — see [`Self::call_zome_failover`].
+    ///
+    /// ONLY for agent-agnostic DHT reads.
+    pub async fn call_failover<I: Serialize, O: DeserializeOwned>(
+        &self,
+        role_name: &str,
+        zome_name: &str,
+        fn_name: &str,
+        input: &I,
+    ) -> Result<O, String> {
+        let payload = encode_input(input)?;
+        let response_bytes = self
+            .call_zome_failover(role_name, zome_name, fn_name, payload)
+            .await?;
+        decode_response(&response_bytes)
     }
 
     /// Check if currently connected
     pub async fn is_connected(&self) -> bool {
         self.app_ws.read().await.is_some()
     }
+}
+
+/// Overall budget for one endpoint's connect handshake.
+///
+/// The slow path runs up to 5 sequential conductor steps, each bounded by
+/// `deadline` — so the worst case is ~5×deadline (≈50s at the 10s default)
+/// while a `connecting` mutex is held. Bounding the entire body (additively to
+/// the per-step timeouts) guarantees the mutex releases promptly so queued
+/// callers get a fast `Err` instead of parking for the full stretch.
+fn reconnect_budget(deadline: Duration) -> Duration {
+    deadline * 5 + Duration::from_secs(1)
+}
+
+/// Connect to ONE conductor and return a signing-capable AppWebsocket.
+///
+/// THE PER-CONDUCTOR CREDENTIAL CRUX. Signing credentials are scoped to a
+/// conductor's cells and agent: `authorize_signing_credentials` issues a cap
+/// grant on THAT conductor, and only THAT conductor will verify the resulting
+/// signature. So this routine builds a FRESH [`ClientAgentSigner`] and
+/// authorizes against `endpoint.admin_addr` every time it runs — a fallback
+/// conductor never borrows the primary's credentials, because there is nothing
+/// to borrow: the signer is a local, per-connection value that dies with the
+/// socket. Both the primary and every fallback go through this one function so
+/// the invariant cannot drift apart between the two paths.
+async fn connect_endpoint(
+    installed_app_id: &str,
+    endpoint: &ConductorEndpoint,
+    deadline: Duration,
+) -> Result<AppWebsocket, String> {
+    // Step 1: Connect to admin interface.
+    // Hard-bounded: an unresolvable conductor host (cluster NXDOMAIN) must
+    // resolve to an Err within `deadline`, never hang the caller forever.
+    // Resolve via tokio's ASYNC resolver first (off the worker pool), then
+    // connect with an already-resolved SocketAddr so holochain_client's
+    // synchronous std::net getaddrinfo never parks a worker (alpha doorway
+    // crashloop RCA 2026-06-15; see crate::conductor::resolve_host_port).
+    // The per-step `timeout` below can only bound an async resolve, not a
+    // blocking syscall — so this also makes that timeout effective.
+    let admin_socket = crate::conductor::resolve_host_port(&endpoint.admin_addr).await?;
+    let admin_ws = tokio::time::timeout(
+        deadline,
+        AdminWebsocket::connect(admin_socket, Some(String::from("doorway-zome-caller"))),
+    )
+    .await
+    .map_err(|_| {
+        format!(
+            "Admin connect timed out after {}ms ({})",
+            deadline.as_millis(),
+            endpoint.admin_addr
+        )
+    })?
+    .map_err(|e| format!("Admin connect failed: {e}"))?;
+
+    info!("ZomeCaller connected to admin at {}", endpoint.admin_addr);
+
+    // Step 2: Find cell_id from app info
+    let apps = tokio::time::timeout(deadline, admin_ws.list_apps(None))
+        .await
+        .map_err(|_| format!("list_apps timed out after {}ms", deadline.as_millis()))?
+        .map_err(|e| format!("list_apps failed: {e}"))?;
+
+    let app_info = apps
+        .iter()
+        .find(|a| a.installed_app_id == installed_app_id)
+        .ok_or_else(|| format!("App '{installed_app_id}' not found"))?;
+
+    // Step 3: Authorize signing credentials for ALL provisioned cells OF THIS
+    // CONDUCTOR. A fresh signer per connection — never shared across endpoints.
+    let signer = ClientAgentSigner::default();
+    let mut cell_count = 0u32;
+
+    for (role_name, cells) in &app_info.cell_info {
+        for cell in cells {
+            if let holochain_client::CellInfo::Provisioned(p) = cell {
+                let credentials = tokio::time::timeout(
+                    deadline,
+                    admin_ws.authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
+                        cell_id: p.cell_id.clone(),
+                        functions: None,
+                    }),
+                )
+                .await
+                .map_err(|_| {
+                    format!(
+                        "authorize_signing_credentials timed out after {}ms for role '{role_name}'",
+                        deadline.as_millis()
+                    )
+                })?
+                .map_err(|e| {
+                    format!("authorize_signing_credentials failed for role '{role_name}': {e}")
+                })?;
+
+                signer.add_credentials(p.cell_id.clone(), credentials);
+                cell_count += 1;
+                debug!(role = %role_name, "Authorized signing for cell");
+            }
+        }
+    }
+
+    if cell_count == 0 {
+        return Err("No provisioned cells found".to_string());
+    }
+
+    info!(
+        app_id = %installed_app_id,
+        conductor = %endpoint.admin_addr,
+        cells = cell_count,
+        "Signing credentials authorized for all cells"
+    );
+
+    // Step 4: Issue app auth token
+    let token = tokio::time::timeout(
+        deadline,
+        admin_ws.issue_app_auth_token(holochain_client::IssueAppAuthenticationTokenPayload {
+            installed_app_id: installed_app_id.to_string(),
+            expiry_seconds: 3600,
+            single_use: false,
+        }),
+    )
+    .await
+    .map_err(|_| {
+        format!(
+            "issue_app_auth_token timed out after {}ms",
+            deadline.as_millis()
+        )
+    })?
+    .map_err(|e| format!("issue_app_auth_token failed: {e}"))?;
+
+    // Step 5: Connect AppWebsocket with signer
+    let signer_arc: Arc<ClientAgentSigner> = Arc::new(signer);
+    let app_socket = crate::conductor::resolve_host_port(&endpoint.app_addr).await?;
+    let app_ws = tokio::time::timeout(
+        deadline,
+        AppWebsocket::connect(app_socket, token.token, signer_arc, None),
+    )
+    .await
+    .map_err(|_| {
+        format!(
+            "App WebSocket connect timed out after {}ms ({})",
+            deadline.as_millis(),
+            endpoint.app_addr
+        )
+    })?
+    .map_err(|e| format!("App WebSocket connect failed: {e}"))?;
+
+    info!(
+        "ZomeCaller connected to app interface at {} with signing",
+        endpoint.app_addr
+    );
+
+    Ok(app_ws)
+}
+
+/// Issue one bounded zome call over an established socket, classifying the
+/// failure so the caller can decide whether another conductor could do better.
+async fn call_on_ws(
+    app_ws: &AppWebsocket,
+    role_name: &str,
+    zome_name: &str,
+    fn_name: &str,
+    payload: Vec<u8>,
+    deadline: Duration,
+) -> Result<Vec<u8>, CallError> {
+    let result = tokio::time::timeout(
+        deadline,
+        app_ws.call_zome(
+            ZomeCallTarget::RoleName(role_name.into()),
+            zome_name.into(),
+            fn_name.into(),
+            ExternIO::from(payload),
+        ),
+    )
+    .await;
+
+    match result {
+        // The conductor accepted the connection but never answered (the
+        // `record_heartbeat` hang seen in the live freeze). Availability class.
+        Err(_elapsed) => Err(CallError::unavailable(format!(
+            "Zome call timed out after {}ms ({role_name}/{zome_name}/{fn_name})",
+            deadline.as_millis()
+        ))),
+        Ok(Ok(extern_io)) => {
+            debug!(
+                result_len = extern_io.as_bytes().len(),
+                "ZomeCaller zome call succeeded"
+            );
+            Ok(extern_io.into_vec())
+        }
+        Ok(Err(e)) => Err(CallError {
+            class: if is_transport_error(&e) {
+                CallFailureClass::Unavailable
+            } else {
+                CallFailureClass::Application
+            },
+            message: format!("Zome call failed: {e}"),
+        }),
+    }
+}
+
+fn encode_input<I: Serialize>(input: &I) -> Result<Vec<u8>, String> {
+    rmp_serde::to_vec_named(input).map_err(|e| format!("Failed to serialize input: {e}"))
+}
+
+fn decode_response<O: DeserializeOwned>(response_bytes: &[u8]) -> Result<O, String> {
+    rmp_serde::from_slice(response_bytes).map_err(|e| {
+        let structure = match rmpv::decode::read_value(&mut std::io::Cursor::new(response_bytes)) {
+            Ok(val) => format!("{val:?}"),
+            Err(decode_err) => {
+                format!(
+                    "<raw {} bytes, decode err: {decode_err}>",
+                    response_bytes.len()
+                )
+            }
+        };
+        format!(
+            "Failed to deserialize response: {e} | response_bytes({} bytes) structure: {structure}",
+            response_bytes.len()
+        )
+    })
 }
 
 /// Strip `ws://` or `wss://` scheme from a URL, returning just `host:port`.
@@ -638,12 +1179,265 @@ mod tests {
     #[test]
     fn reconnect_budget_covers_all_five_sequential_steps() {
         let deadline = Duration::from_millis(DEFAULT_ZOME_CALL_TIMEOUT_MS);
-        let budget = deadline * 5 + Duration::from_secs(1);
+        let budget = reconnect_budget(deadline);
         // Strictly greater than the sum of the per-step deadlines, so a legitimate
         // (slow but progressing) reconnect is never falsely budget-killed…
         assert!(budget > deadline * 5);
         // …yet finite — never "no timeout", the bug class this whole module guards.
         assert_eq!(budget, Duration::from_millis(51_000));
+    }
+
+    // ── conductor failover: single-peer SPOF removal (2026-08-06) ───────────
+
+    fn primary() -> ConductorEndpoint {
+        ConductorEndpoint::new("ws://elohim-adam-alpha:4444", "ws://elohim-adam-alpha:4445")
+    }
+
+    /// The doorway declares its conductor pool ONCE (`CONDUCTOR_URLS`). The
+    /// fallback list is derived from it — no new config schema — with the
+    /// primary filtered out (it is tried first by construction) and duplicates
+    /// dropped, preserving the operator's declared order.
+    #[test]
+    fn fallbacks_come_from_the_declared_pool_minus_the_primary() {
+        let pool = vec![
+            // The primary itself, as the pool always contains it.
+            "ws://elohim-adam-alpha:4445".to_string(),
+            "ws://elohim-matthew-alpha-0.elohim-matthew-alpha-headless:8445".to_string(),
+            "ws://elohim-jessica-alpha-0.elohim-jessica-alpha-headless:8445".to_string(),
+            // A duplicate and an empty entry — both must be ignored.
+            "ws://elohim-matthew-alpha-0.elohim-matthew-alpha-headless:8445".to_string(),
+            "  ".to_string(),
+        ];
+
+        let fallbacks = build_fallback_endpoints(&primary(), &pool);
+
+        assert_eq!(
+            fallbacks.len(),
+            2,
+            "primary and duplicate must be filtered out of the fallback list"
+        );
+        assert_eq!(
+            fallbacks[0].app_addr,
+            "elohim-matthew-alpha-0.elohim-matthew-alpha-headless:8445"
+        );
+        assert_eq!(
+            fallbacks[1].app_addr, "elohim-jessica-alpha-0.elohim-jessica-alpha-headless:8445",
+            "pool order is the operator's declared preference and must be preserved"
+        );
+    }
+
+    /// THE CRUX. Signing credentials are per-conductor: a cap grant issued by
+    /// one conductor is worthless on another. So each fallback must carry its
+    /// OWN admin interface — on its own host — for `connect_endpoint` to
+    /// authorize against. A fallback that borrowed the primary's admin address
+    /// would authorize on the sick peer and then sign calls the healthy peer
+    /// rejects, which is exactly the bug this test forbids.
+    #[test]
+    fn each_fallback_authorizes_against_its_own_admin_interface() {
+        let pool = vec![
+            "ws://elohim-matthew-alpha-0.elohim-matthew-alpha-headless:8445".to_string(),
+            "ws://elohim-james-alpha-0.elohim-james-alpha-headless:8445".to_string(),
+        ];
+        let primary = primary();
+        let fallbacks = build_fallback_endpoints(&primary, &pool);
+
+        for ep in &fallbacks {
+            let admin_host = ep.admin_addr.rsplit_once(':').unwrap().0;
+            let app_host = ep.app_addr.rsplit_once(':').unwrap().0;
+            assert_eq!(
+                admin_host, app_host,
+                "a fallback's admin interface must live on its OWN host — \
+                 credentials authorized elsewhere are unusable"
+            );
+            assert_ne!(
+                ep.admin_addr, primary.admin_addr,
+                "a fallback must never reuse the primary's admin interface"
+            );
+            // Established socat convention: admin = app - 1 (8445 app → 8444 admin).
+            assert_eq!(ep.admin_addr, format!("{admin_host}:8444"));
+        }
+    }
+
+    /// An application error is answered identically by every peer in the pool.
+    /// Failing over on it would relocate the same error and double the load, so
+    /// the class split — not merely "did the call fail" — is what gates failover.
+    #[test]
+    fn only_availability_failures_are_failover_worthy() {
+        use holochain_conductor_api::ExternalApiWireError;
+        use std::io::{Error as IoError, ErrorKind};
+
+        // Availability: the conductor could not answer.
+        assert!(is_transport_error(&ConductorApiError::IoError(
+            IoError::new(ErrorKind::ConnectionRefused, "connection refused")
+        )));
+        // Application: the conductor DID answer.
+        assert!(
+            !is_transport_error(&ConductorApiError::ExternalApiWireError(
+                ExternalApiWireError::InternalError("validation failed".to_string())
+            )),
+            "a zome-returned error must not trigger failover — every peer answers the same"
+        );
+        assert_eq!(
+            CallError::unavailable("x").class,
+            CallFailureClass::Unavailable
+        );
+    }
+
+    /// A caller with no fallbacks configured (the deliberately-pinned temporary
+    /// callers, and any single-conductor deployment) must behave EXACTLY as
+    /// before: `call_zome_failover` delegates straight to the primary path.
+    #[test]
+    fn a_single_conductor_caller_has_no_failover_surface() {
+        let caller = ZomeCaller::new("ws://localhost:4444", "ws://localhost:4445", "elohim");
+        assert_eq!(caller.fallback_count(), 0);
+
+        // Even when handed a pool consisting only of itself.
+        let caller = ZomeCaller::with_fallbacks(
+            "ws://localhost:4444",
+            "ws://localhost:4445",
+            "elohim",
+            &["ws://localhost:4445".to_string()],
+        );
+        assert_eq!(
+            caller.fallback_count(),
+            0,
+            "the primary must not become its own fallback"
+        );
+    }
+
+    /// The parameter-bearing discovery from the live outage: "always try the
+    /// primary first" is a NO-OP for a browser. The primary deadline is 10s and
+    /// the SPA aborts at ~4.95s, so without a cooldown the route stays dead for
+    /// the whole outage even with a healthy fallback standing by. After one
+    /// availability failure the primary must be SKIPPED, and re-probed once the
+    /// cooldown expires (half-open, no flap logic).
+    #[tokio::test(start_paused = true)]
+    async fn an_unhealthy_primary_is_skipped_then_re_probed() {
+        let caller = ZomeCaller::with_fallbacks(
+            "ws://elohim-adam-alpha:4444",
+            "ws://elohim-adam-alpha:4445",
+            "elohim",
+            &["ws://elohim-matthew-alpha-0.headless:8445".to_string()],
+        );
+        assert_eq!(caller.fallback_count(), 1);
+
+        assert!(
+            !caller.primary_in_cooldown().await,
+            "a fresh caller prefers its pinned primary"
+        );
+
+        caller.mark_primary_unhealthy().await;
+        assert!(
+            caller.primary_in_cooldown().await,
+            "after an availability failure the sick primary must be skipped, \
+             not re-tried at 10s per request"
+        );
+
+        // Just before expiry: still skipped.
+        tokio::time::advance(PRIMARY_UNHEALTHY_COOLDOWN - Duration::from_secs(1)).await;
+        assert!(caller.primary_in_cooldown().await);
+
+        // Past expiry: re-probed automatically (half-open).
+        tokio::time::advance(Duration::from_secs(2)).await;
+        assert!(
+            !caller.primary_in_cooldown().await,
+            "a recovered primary must be re-probed without operator action"
+        );
+    }
+
+    /// A primary that starts answering again clears the cooldown, so affinity
+    /// returns to the doorway's co-located premise conductor on its own.
+    #[tokio::test(start_paused = true)]
+    async fn a_recovered_primary_reclaims_affinity() {
+        let caller = ZomeCaller::with_fallbacks(
+            "ws://elohim-adam-alpha:4444",
+            "ws://elohim-adam-alpha:4445",
+            "elohim",
+            &["ws://elohim-matthew-alpha-0.headless:8445".to_string()],
+        );
+
+        caller.mark_primary_unhealthy().await;
+        assert!(caller.primary_in_cooldown().await);
+
+        caller.clear_primary_cooldown().await;
+        assert!(
+            !caller.primary_in_cooldown().await,
+            "a successful primary call must restore primary affinity immediately"
+        );
+    }
+
+    /// Failing fallbacks rotate rather than re-hammering the same sick peer,
+    /// and the rotation wraps so every configured conductor gets a turn.
+    #[test]
+    fn a_failing_fallback_rotates_to_the_next_conductor() {
+        let caller = ZomeCaller::with_fallbacks(
+            "ws://elohim-adam-alpha:4444",
+            "ws://elohim-adam-alpha:4445",
+            "elohim",
+            &[
+                "ws://a-0.headless:8445".to_string(),
+                "ws://b-0.headless:8445".to_string(),
+                "ws://c-0.headless:8445".to_string(),
+            ],
+        );
+        let count = caller.fallback_count();
+        assert_eq!(count, 3);
+
+        assert_eq!(caller.fallback_idx.load(Ordering::Relaxed), 0);
+        caller.advance_fallback(0, count);
+        assert_eq!(caller.fallback_idx.load(Ordering::Relaxed), 1);
+        caller.advance_fallback(1, count);
+        assert_eq!(caller.fallback_idx.load(Ordering::Relaxed), 2);
+        caller.advance_fallback(2, count);
+        assert_eq!(
+            caller.fallback_idx.load(Ordering::Relaxed),
+            0,
+            "rotation must wrap so no conductor is starved"
+        );
+    }
+
+    /// End-to-end routing proof without a live conductor: point the primary AND
+    /// the fallback at closed ports. The call must
+    ///   (a) attempt the primary,
+    ///   (b) attempt the fallback with its OWN connect handshake,
+    ///   (c) surface a combined error rather than hanging, and
+    ///   (d) leave the primary in cooldown so the NEXT request does not stall on
+    ///       the sick peer — which is the actual SPOF removal.
+    #[tokio::test]
+    async fn a_dead_primary_routes_to_the_fallback_and_then_stays_off_the_primary() {
+        // Port 1 on loopback is closed → ECONNREFUSED immediately, so this test
+        // exercises the routing without waiting on any timeout.
+        let caller = ZomeCaller::with_fallbacks(
+            "ws://127.0.0.1:1",
+            "ws://127.0.0.1:2",
+            "elohim",
+            &["ws://127.0.0.1:3".to_string()],
+        );
+        assert_eq!(caller.fallback_count(), 1);
+
+        let result = tokio::time::timeout(
+            Duration::from_secs(20),
+            caller.call_zome_failover(
+                "infrastructure",
+                "infrastructure",
+                "get_all_doorways",
+                vec![],
+            ),
+        )
+        .await
+        .expect("failover must not hang the calling task");
+
+        let err = result.expect_err("both conductors are closed ports");
+        assert!(
+            err.contains("every fallback conductor also failed"),
+            "the error must name BOTH attempts so an operator can see the failover ran: {err}"
+        );
+
+        assert!(
+            caller.primary_in_cooldown().await,
+            "one sick primary must not be re-tried on every subsequent request — \
+             that is what kept GET /api/v1/federation/doorways dead for 5.5h"
+        );
     }
 
     /// The load-bearing fix #2 invariant: when every reconnect step hangs (full

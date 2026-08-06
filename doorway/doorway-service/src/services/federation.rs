@@ -391,8 +391,10 @@ pub async fn fetch_from_remote_doorway(
         online_only: Some(true),
     };
 
+    // FAILOVER-ELIGIBLE: publisher discovery is an agent-agnostic DHT read (see
+    // `get_all_doorways`). A blob fetch must not be hostage to one conductor's health.
     let publishers_result = zome_caller
-        .call_zome(
+        .call_zome_failover(
             &config.infrastructure_role,
             &config.zome_name,
             "find_publishers",
@@ -582,8 +584,14 @@ pub async fn get_all_doorways(
     zome_caller: &ZomeCaller,
     config: &FederationConfig,
 ) -> Result<Vec<DoorwayRegistration>, String> {
+    // FAILOVER-ELIGIBLE: `get_all_doorways` is an agent-agnostic DHT read — the
+    // registration set gossips to every peer, so any conductor in the pool answers
+    // identically and no signing identity is embedded in the result. Pinning this
+    // to one conductor is what made a single sick peer (adam, sqlite write-guard
+    // pressure, 2026-08-05) take `GET /api/v1/federation/doorways` down on
+    // doorway-B for 5.5 hours.
     match zome_caller
-        .call::<(), Vec<DoorwayOutput>>(
+        .call_failover::<(), Vec<DoorwayOutput>>(
             &config.infrastructure_role,
             &config.zome_name,
             "get_all_doorways",
