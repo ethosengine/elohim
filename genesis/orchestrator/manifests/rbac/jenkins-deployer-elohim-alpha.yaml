@@ -1,0 +1,66 @@
+# jenkins-deployer supplemental RBAC — elohim-alpha
+#
+# Durable fix for genesis/data/timeline/backlog/ci-rbac-jenkins-deployer.md
+# (5 recurrences: 2026-04-27, 2026-05-04, 2026-05-26, 2026-07-06, 2026-08-05).
+# The jenkins-deployer ServiceAccount (namespace `jenkins`) already holds
+# whatever base permissions let it apply Deployments/Services/PVCs/Ingress —
+# this Role grants ONLY the two permission classes that have been observed
+# Forbidden in this namespace, additively, without touching the operator-side
+# base grant. It is deliberately scoped narrow (least-privilege) rather than
+# re-declaring the SA's full permission set, which is not visible from the
+# repo and must not be reverse-engineered via kubectl (cluster is
+# operator-owned — see CLAUDE.md "Cluster ops are operator-owned").
+#
+# Grant 1 — `statefulsets/scale` (apps group). 4th recurrence (2026-07-06,
+# edge #1160): `cleanupOrphanedHumans` (elohim/holochain/Jenkinsfile) could not
+# scale orphaned conductor StatefulSets to 0 — `kubectl scale
+# statefulset/<name> -n elohim-alpha --replicas=0` returned Forbidden for all
+# 7 orphan personas, masked by `|| true` until the mask was replaced with a
+# loud UNSTABLE + `RBAC DRIFT` banner. Re-appeared 2026-08-05 (edge #1309) for
+# the same 7 personas, proving the grant was never actually added.
+#
+# Grant 2 — `podmonitors` (monitoring.coreos.com group). 5th recurrence
+# (2026-08-05, edge #1306/#1308/#1309): the wave-2 iroh-relay PodMonitors in
+# genesis/orchestrator/manifests/doorway/{alpha,alpha-b}.yaml could not be
+# applied — `kubectl apply` returned Forbidden on `get`/`create`/`patch` of
+# podmonitors.monitoring.coreos.com. Tolerated (loudly) by
+# scripts/ci/apply-doorway-manifest.sh until this grant lands; the RBAC DRIFT
+# banner it prints is the verification signal that this manifest was applied.
+#
+# APPLY IS OPERATOR-OWNED. This file is a ready-to-apply artifact only — no
+# agent may run kubectl against the live cluster (CLAUDE.md, "Cluster ops are
+# operator-owned"). Operator applies via:
+#   kubectl apply -f genesis/orchestrator/manifests/rbac/jenkins-deployer-elohim-alpha.yaml
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jenkins-deployer-supplemental
+  namespace: elohim-alpha
+  labels:
+    app.kubernetes.io/managed-by: jenkins-deployer-rbac
+    tracking: ci-rbac-jenkins-deployer
+rules:
+  - apiGroups: ["apps"]
+    resources: ["statefulsets/scale"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: ["monitoring.coreos.com"]
+    resources: ["podmonitors"]
+    verbs: ["get", "create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-deployer-supplemental-binding
+  namespace: elohim-alpha
+  labels:
+    app.kubernetes.io/managed-by: jenkins-deployer-rbac
+    tracking: ci-rbac-jenkins-deployer
+subjects:
+  - kind: ServiceAccount
+    name: jenkins-deployer
+    namespace: jenkins
+roleRef:
+  kind: Role
+  name: jenkins-deployer-supplemental
+  apiGroup: rbac.authorization.k8s.io

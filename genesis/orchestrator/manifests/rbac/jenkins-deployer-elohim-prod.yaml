@@ -1,0 +1,46 @@
+# jenkins-deployer supplemental RBAC — elohim-prod
+#
+# Sibling of jenkins-deployer-elohim-alpha.yaml — see that file's header for
+# the full backlog context (genesis/data/timeline/backlog/ci-rbac-jenkins-deployer.md).
+#
+# Grant — `statefulsets/scale` (apps group) only. `cleanupOrphanedHumans`
+# (elohim/holochain/Jenkinsfile) walks `elohim-alpha`, `elohim-staging`, and
+# `elohim-prod` for orphaned conductor StatefulSets, so the scale grant is
+# needed in all three; no PodMonitor manifest currently targets this
+# namespace (genesis/orchestrator/manifests/doorway/prod.yaml has none), so
+# the podmonitors grant is not added here — add it if/when a PodMonitor ships
+# to elohim-prod.
+#
+# APPLY IS OPERATOR-OWNED — see jenkins-deployer-elohim-alpha.yaml. Operator
+# applies via:
+#   kubectl apply -f genesis/orchestrator/manifests/rbac/jenkins-deployer-elohim-prod.yaml
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jenkins-deployer-supplemental
+  namespace: elohim-prod
+  labels:
+    app.kubernetes.io/managed-by: jenkins-deployer-rbac
+    tracking: ci-rbac-jenkins-deployer
+rules:
+  - apiGroups: ["apps"]
+    resources: ["statefulsets/scale"]
+    verbs: ["get", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-deployer-supplemental-binding
+  namespace: elohim-prod
+  labels:
+    app.kubernetes.io/managed-by: jenkins-deployer-rbac
+    tracking: ci-rbac-jenkins-deployer
+subjects:
+  - kind: ServiceAccount
+    name: jenkins-deployer
+    namespace: jenkins
+roleRef:
+  kind: Role
+  name: jenkins-deployer-supplemental
+  apiGroup: rbac.authorization.k8s.io

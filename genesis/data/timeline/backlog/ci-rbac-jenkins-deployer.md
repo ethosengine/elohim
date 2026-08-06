@@ -161,3 +161,50 @@ still fail-open on every deploy.
 kind of drift that reads as "monitoring never worked" months later. A brand-new component
 (the sovereign relay fleet) shipped observability-blind on day one, and nothing in the pipeline
 said so above a warning — the phantom-green pattern this item exists to kill.
+
+## Durable fix landed in-tree — 2026-08-06
+
+The deployer SA's supplemental RBAC now exists as a reviewable repo artifact, per the fix
+shape above — no more reverse-engineering the grant from a Forbidden log line:
+
+- `genesis/orchestrator/manifests/rbac/jenkins-deployer-elohim-alpha.yaml` — Role +
+  RoleBinding granting `apps/statefulsets/scale` (`get`, `patch`, `update`) AND
+  `monitoring.coreos.com/podmonitors` (`get`, `create`, `patch`).
+- `genesis/orchestrator/manifests/rbac/jenkins-deployer-elohim-staging.yaml` — same
+  `statefulsets/scale` grant only (no PodMonitor targets this namespace yet).
+- `genesis/orchestrator/manifests/rbac/jenkins-deployer-elohim-prod.yaml` — same
+  `statefulsets/scale` grant only (no PodMonitor targets this namespace yet).
+
+These are additive Roles bound to the existing `system:serviceaccount:jenkins:jenkins-deployer`
+identity — they do not attempt to re-declare the SA's full permission set (PVC/Deployment/
+Service create+patch, which already works and is not visible from the repo), only the two
+permission classes that have actually gone Forbidden across recurrences 4 and 5. No prior
+in-repo RBAC surface existed for jenkins-deployer (verified: no `rbac/`, `Role`, or
+`ClusterRole` manifest anywhere in the tree before this commit) — this is a first landing,
+not an edit to an existing grant.
+
+**Apply is still operator-owned.** Per CLAUDE.md ("Cluster ops are operator-owned"), no agent
+runs kubectl against the live cluster. The operator applies the three files above (order
+doesn't matter, they're independent namespaced Roles):
+```
+kubectl apply -f genesis/orchestrator/manifests/rbac/jenkins-deployer-elohim-alpha.yaml
+kubectl apply -f genesis/orchestrator/manifests/rbac/jenkins-deployer-elohim-staging.yaml
+kubectl apply -f genesis/orchestrator/manifests/rbac/jenkins-deployer-elohim-prod.yaml
+```
+
+**Verification signal (post-apply, on the next relevant deploy):**
+- The `⚠ RBAC DRIFT (tolerated): jenkins-deployer cannot apply PodMonitors` banner
+  (`scripts/ci/apply-doorway-manifest.sh`) stops appearing on alpha doorway deploys —
+  `kubectl apply` of `alpha.yaml`/`alpha-b.yaml` PodMonitors returns a plain `created`/
+  `configured`/`unchanged` line instead of Forbidden.
+- The `⚠️ RBAC DRIFT: could not scale N orphaned StatefulSet(s)` echo + `UNSTABLE` result from
+  `cleanupOrphanedHumans` (`elohim/holochain/Jenkinsfile:503–509`) stops firing on edge
+  deploys — orphan personas (if any exist at deploy time) scale to 0 cleanly instead of
+  Forbidden.
+- Absence of either banner across a build is the pass signal; their reappearance means the
+  grant did not take (wrong namespace, wrong SA identity, or a ClusterRoleBinding still
+  shadowing/overriding it) and this item should stay `proposed`, not close.
+
+Status intentionally left `proposed`: the repo-side fix is complete, but the item's own
+acceptance criterion ("operator can reconcile RBAC from code") isn't met until the operator
+applies these and the drift banners are observed gone on a live build.
