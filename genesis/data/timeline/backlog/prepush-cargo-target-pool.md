@@ -146,3 +146,31 @@ across all families would catch these before a push does.
 **Immediate workaround** (what unblocked 2026-08-05): `mkdir -p /tmp/cargo-doorway`, then re-push.
 Leaves a junk in-tree `doorway/doorway-service/target` (5.9M here) for `cargo-pool legacy-targets`
 to reclaim.
+
+## Fix implemented in-tree 2026-08-06 — pending commit/CI verification
+
+Both parts of the fix landed in `.husky/pre-push.bash` at all four call sites that guard a pooled
+`CARGO_TARGET_DIR` (the `crates/seam-contracts` standalone block, `run_gate`'s
+elohim-storage/doorway/steward-node case, and both `sweettest-check` case-statement copies — one
+per project-detection path per `CLAUDE.md`'s manifest-driven-vs-grep-fallback split):
+
+1. `mkdir -p "$GATE_SLOT"` → `mkdir -p "$(readlink -f "$GATE_SLOT")"` — resolves through the slot
+   symlink before creating, so a dangling `/tmp`-backed slot self-heals (recreates the vanished
+   `/tmp` target, then the symlink resolves normally).
+2. The `if` guard's silent no-op on failure now has an `else`: when the slot path is non-empty
+   (pool present) but preparation still fails, it prints
+   `  ⚠ POOL SLOT UNAVAILABLE — building in-tree: <slot path>` naming the slot. The pool-absent
+   case (`GATE_SLOT` empty — no pool root at all) still fails open with no message, unchanged from
+   before — that path was never the bug.
+
+Verified locally in the scratchpad (not against a live push): `bash -n .husky/pre-push.bash`
+passes; a simulated dangling symlink (target removed, mirroring a post-reboot `/tmp`) now
+self-heals and exports `CARGO_TARGET_DIR` with the `pooled target:` line, where before it silently
+produced no output and left `CARGO_TARGET_DIR` unset; a simulated unpreparable slot (target path
+traverses a regular file, so `mkdir -p` cannot succeed even after `readlink -f`) now prints the
+`⚠ POOL SLOT UNAVAILABLE` warning instead of failing silently; the pool-absent case (`GATE_SLOT=""`)
+still produces no `CARGO_TARGET_DIR` and no warning, confirming fail-open on absence is untouched.
+
+Not yet committed, not yet pushed, no CI run against it. Leaving `status: open` — closure needs a
+real pre-push (ideally against one of the dangling slots listed above, or a freshly re-dangled one)
+showing either the pooled-target line or the loud warning, never silence.

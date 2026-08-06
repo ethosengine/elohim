@@ -360,9 +360,15 @@ if echo "$CHANGED" | grep -qE "^crates/seam-contracts/"; then
   (
     cd crates/seam-contracts || exit 1
     SEAM_CONTRACTS_SLOT="$(gate_pool_slot "crates/seam-contracts" 2>/dev/null || true)"
-    if [ -n "${SEAM_CONTRACTS_SLOT:-}" ] && mkdir -p "$SEAM_CONTRACTS_SLOT" 2>/dev/null; then
+    # Resolve through the slot symlink before creating — a /tmp-backed slot
+    # left dangling by a reboot/tmp-reaper must self-heal here, not fail
+    # `mkdir -p` silently (genesis/data/timeline/backlog/prepush-cargo-target-pool.md,
+    # reopened 2026-08-05).
+    if [ -n "${SEAM_CONTRACTS_SLOT:-}" ] && mkdir -p "$(readlink -f "$SEAM_CONTRACTS_SLOT")" 2>/dev/null; then
       export CARGO_TARGET_DIR="$SEAM_CONTRACTS_SLOT"
       echo "  [seam-contracts] pooled target: $SEAM_CONTRACTS_SLOT"
+    else
+      [ -n "${SEAM_CONTRACTS_SLOT:-}" ] && echo "  ⚠ POOL SLOT UNAVAILABLE — building in-tree: $SEAM_CONTRACTS_SLOT"
     fi
     RUSTFLAGS="" cargo test --all-features \
       && RUSTFLAGS="" cargo clippy --all-features -- -D warnings \
@@ -695,9 +701,15 @@ run_gate() {
   esac
   if [ -n "$GATE_WS" ]; then
     GATE_SLOT="$(gate_pool_slot "$GATE_WS" 2>/dev/null || true)"
-    if [ -n "${GATE_SLOT:-}" ] && mkdir -p "$GATE_SLOT" 2>/dev/null; then
+    # Resolve through the slot symlink before creating — a /tmp-backed slot
+    # left dangling by a reboot/tmp-reaper must self-heal here, not fail
+    # `mkdir -p` silently (genesis/data/timeline/backlog/prepush-cargo-target-pool.md,
+    # reopened 2026-08-05).
+    if [ -n "${GATE_SLOT:-}" ] && mkdir -p "$(readlink -f "$GATE_SLOT")" 2>/dev/null; then
       export CARGO_TARGET_DIR="$GATE_SLOT"
       echo "  [$PROJECT_NAME] pooled target: $GATE_SLOT"
+    else
+      [ -n "${GATE_SLOT:-}" ] && echo "  ⚠ POOL SLOT UNAVAILABLE — building in-tree: $GATE_SLOT"
     fi
   fi
 
@@ -792,9 +804,14 @@ run_gate() {
         # subshell, so the export does not leak to other gates). Fail-open:
         # no pool → in-tree target/ as before.
         SWT_SLOT="$(sweettest_pool_slot 2>/dev/null || true)"
-        if [ -n "${SWT_SLOT:-}" ] && mkdir -p "$SWT_SLOT" 2>/dev/null; then
+        # Resolve through the slot symlink before creating — self-heal a
+        # dangling /tmp-backed slot instead of failing `mkdir -p` silently
+        # (genesis/data/timeline/backlog/prepush-cargo-target-pool.md, reopened 2026-08-05).
+        if [ -n "${SWT_SLOT:-}" ] && mkdir -p "$(readlink -f "$SWT_SLOT")" 2>/dev/null; then
           export CARGO_TARGET_DIR="$SWT_SLOT"
           echo "  [sweettest-check] pooled target: $SWT_SLOT"
+        else
+          [ -n "${SWT_SLOT:-}" ] && echo "  ⚠ POOL SLOT UNAVAILABLE — building in-tree: $SWT_SLOT"
         fi
         BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I$(ls -1d /usr/lib/clang/*/include 2>/dev/null | sort -V | tail -1)}" \
         RUSTFLAGS="" \
@@ -1010,10 +1027,15 @@ run_gate() {
       sweettest-check)
         echo "[$PROJECT_NAME] Running sweettest compile check..."
         # L3: redirect into the pooled slot (subshell-scoped export; fail-open).
+        # Resolve through the slot symlink before creating — self-heal a
+        # dangling /tmp-backed slot instead of failing `mkdir -p` silently
+        # (genesis/data/timeline/backlog/prepush-cargo-target-pool.md, reopened 2026-08-05).
         SWT_SLOT="$(sweettest_pool_slot 2>/dev/null || true)"
-        if [ -n "${SWT_SLOT:-}" ] && mkdir -p "$SWT_SLOT" 2>/dev/null; then
+        if [ -n "${SWT_SLOT:-}" ] && mkdir -p "$(readlink -f "$SWT_SLOT")" 2>/dev/null; then
           export CARGO_TARGET_DIR="$SWT_SLOT"
           echo "  [sweettest-check] pooled target: $SWT_SLOT"
+        else
+          [ -n "${SWT_SLOT:-}" ] && echo "  ⚠ POOL SLOT UNAVAILABLE — building in-tree: $SWT_SLOT"
         fi
         BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I$(ls -1d /usr/lib/clang/*/include 2>/dev/null | sort -V | tail -1)}" \
         RUSTFLAGS="" \
