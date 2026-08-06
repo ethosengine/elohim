@@ -174,3 +174,11 @@ still produces no `CARGO_TARGET_DIR` and no warning, confirming fail-open on abs
 Not yet committed, not yet pushed, no CI run against it. Leaving `status: open` — closure needs a
 real pre-push (ideally against one of the dangling slots listed above, or a freshly re-dangled one)
 showing either the pooled-target line or the loud warning, never silence.
+
+**2026-08-06, fifth site, same reboot class, different mechanism:** `elohim/target` is an
+in-tree symlink → `/tmp/cargo-elohim-workspace` (created 2026-07-04, not a pool slot), and the
+elohim-epr gate's no-just fallback runs plain cargo against it — dangling post-reboot it fails
+`failed to create directory .../elohim/target: Not a directory (os error 20)` and reds the gate.
+Healed by recreating the /tmp dir. Durable fix belongs with this item's scope: either migrate the
+elohim workspace to a pool slot (crates family) or extend the resolve-through-symlink guard to the
+fallback cargo sites that use in-tree `./target`.

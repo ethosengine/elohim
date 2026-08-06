@@ -805,7 +805,7 @@ remove early.
 |---|---|---|
 | 1 | ~~DNS~~ **DONE 2026-08-05 (operator):** both CNAMEs live and verified resolving to their premise anchors — `relay.alpha.elohim.host` → `alpha.elohim.host` (136.51.77.49) and `relay.elohim.host` → `elohim.host` apex (136.50.16.133) | zone change; the proxied flag interacts with the beacon's exclusive-record lane |
 | 2 | ~~Harbor mirror~~ **MOVED TO CI 2026-08-05** — the edge pipeline builds + pushes the image on the beacon pattern (`scripts/ci/{build,push}-iroh-relay.sh`; `:0.95.1-dev-latest` alias lands when the branch reaches dev). Residual operator involvement: none beyond the normal dev-merge | recorded for checklist-numbering stability |
-| 3 | **Apply/deploy** the relay sections now in `doorway/alpha.yaml` + `doorway/alpha-b.yaml` — they ride the doorway manifests' existing deploy path, so this is a normal doorway deploy rather than the open `infra/*.yaml` apply-path question (which shrank: see U7) | cluster action |
+| 3 | ~~Apply/deploy the relay sections~~ **MOSTLY DONE — REDUCED TO THE PODMONITOR HALF 2026-08-06 (operator kubectl):** both relay Deployments and both Ingresses are live in `elohim-alpha` (34h, `managed-by: jenkins`) — the 2026-08-05 deploy partial-applied the multi-doc file, and only the PodMonitor docs hit the then-missing `podmonitors` RBAC grant. That grant is now applied and probe-verified (`can-i` yes, no shadowing), so the residual is: the next doorway deploy creates the two relay PodMonitors | cluster action |
 | 4 | **NetworkPolicy:** add port 9090 to `allow-metrics-from-observability` so the relay PodMonitor scrapes | touches a policy file carrying a live-drift warning |
 | 5 | ~~Ratify placement/single-relay~~ **RESOLVED by the 2026-08-05 operator ruling** — relay is a doorway concern, per-doorway relays mirror the signal topology (D2/D3/D7 revised); the dual-WAN shape is restored, no regression to accept | recorded here so the checklist numbering in circulation stays stable |
 | 6 | **Ratify the unauthenticated posture** (D4) — anyone who learns the hostname can relay their own traffic through it | security posture |
@@ -870,11 +870,12 @@ matches on it (`http_server.rs:484`) and the client requires
 `curl -i -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' -H 'Sec-WebSocket-Protocol: iroh-relay-v1' https://relay.elohim.host/relay`
 → expect `101` with `Sec-WebSocket-Protocol: iroh-relay-v1` echoed.
 
-**U7 — apply path: SHRUNK by the 2026-08-05 doorway-concern ruling.** The relay
-no longer lives in `infra/*.yaml` (whose apply-path was recorded open since
-2026-06-17); it rides the doorway manifests, which demonstrably deploy today.
-Residual verification: confirm the doorway deploy leg applies the whole manifest
-file (so new Deployment/Ingress/PodMonitor sections land) rather than patching
-named resources — one `kubectl get deploy iroh-relay-alpha -n <ns>` after the
-first doorway deploy answers it (operator-run; cluster reads are operator-owned
-from the dev seat).
+**U7 — apply path: RESOLVED AFFIRMATIVELY 2026-08-06 (operator kubectl).** The
+deploy leg does apply whole manifest files: `deployment.apps/iroh-relay-alpha`,
+`iroh-relay-alpha-b`, and both relay Ingresses were live in `elohim-alpha`
+(34h old, `app.kubernetes.io/managed-by: jenkins`) from the same 2026-08-05
+deploy that reported the podmonitors Forbidden — the signature of a partial
+`kubectl apply -f` on a multi-doc file (applies what it can, reports the
+Forbidden, exits nonzero), not of new sections being skipped. Only the
+PodMonitor docs are missing, and the `podmonitors` grant is now applied and
+probe-verified — the next doorway deploy should create them (checklist §7 #3).
