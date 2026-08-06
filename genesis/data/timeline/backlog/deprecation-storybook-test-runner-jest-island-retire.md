@@ -8,10 +8,10 @@ slug: "deprecation-storybook-test-runner-jest-island-retire"
 written: "2026-07-30"
 author: "deprecation-triage"
 status: "backlog"
-priority: "medium"
+priority: "high"
 deprecation_status: blocked
 severity: low
-fingerprints: ["e83cd3f2d7e3"]
+fingerprints: ["e83cd3f2d7e3", "41d6b28f9cb6"]
 relatedNodeIds:
   - "backlog-deprecation-uuid-support-window-upgrade-unit"
   - "backlog-ci-storybook-smoke-test-timeout-flake"
@@ -121,7 +121,7 @@ built stories directly), which also removes the `:6006` port race that
 **Blocked — the replacement artifact is not fetchable from the configured
 registry, and the lockfile is write-locked.**
 
-1. **Mirror-blocked, probed this run.** The Nexus npm mirror
+1. ~~**Mirror-blocked, probed this run.** The Nexus npm mirror
    (`https://nexus.ethosengine.com/repository/npm/`) returns **HTTP 404 for the
    `@storybook/addon-vitest` packument itself** (`{"success":false,"error":"Not
    found"}`) — the replacement package cannot even be resolved, let alone
@@ -129,7 +129,15 @@ registry, and the lockfile is write-locked.**
    `@anthropic-ai/sdk-0.39.0.tgz` (already in the tree) → `200`, while
    `rimraf-6.1.3.tgz`, `tar-7.5.13.tgz`, `uuid-11.1.1.tgz` → `404` on two
    consecutive passes. Clearing this is a Nexus proxy/remote-cache operator
-   action.
+   action.~~
+   **VOID as of 2026-08-06 — this blocker no longer exists.** Commit `ecc65384f`
+   (2026-07-30, "reserve Nexus for first-party components; consume crates.io +
+   npmjs direct") repointed `.npmrc` `registry=` to `https://registry.npmjs.org/`;
+   Nexus now serves only the `@elohim:` scope. Re-probed this run:
+   **`@storybook/addon-vitest` resolves at `10.5.7`**, and `rimraf@6.1.3`,
+   `tar@7.5.13`, `uuid@11.1.1`, `uuid@13.0.1`, `glob@13.0.6` tarballs **all return
+   HTTP 200**. The replacement is fetchable. Blockers 2 and 3 below are what still
+   hold — and blocker 3 is the substantive one.
 2. **Write-lock.** `pnpm-lock.yaml`, `pnpm-workspace.yaml`, and the workspace
    `package.json`s (including `app/elohim-library/package.json`) are owned by
    concurrent in-flight runs this session; this triage was explicitly scoped to
@@ -153,6 +161,42 @@ sentinel cites this decision deterministically and never re-dispatches. It is a
 `deprecation-uuid-support-window-upgrade-unit.md`. Do not fold them back into one
 file — they have different owners, different blockers, and different unblock
 dates.
+
+### 2026-08-06 — re-triage on `41d6b28f9cb6`: promoted to `high`, now the highest-yield lever
+
+The 2026-08-06 root install replaced the 11-package banner `e83cd3f2d7e3` with a
+10-package one, `41d6b28f9cb6`:
+
+```
+WARN  10 deprecated subdependencies found: expect-playwright@0.8.0, glob@7.2.3,
+inflight@1.0.6, jest-process-manager@0.4.0, node-domexception@1.0.0,
+prebuild-install@7.1.3, rimraf@3.0.2, uuid@10.0.0, uuid@8.3.2,
+whatwg-encoding@2.0.0
+```
+
+A reverse-dep trace over `pnpm-lock.yaml` `snapshots:` (full table in
+`deprecation-angular19-toolchain-legacy-builder-transitives.md`) attributes **six
+of the ten** to `@storybook/test-runner@0.24.4` in `app/elohim-library` —
+`expect-playwright` and `jest-process-manager` directly, `whatwg-encoding` via its
+`http-server@14.1.1` companion, and `glob@7.2.3` / `inflight@1.0.6` /
+`rimraf@3.0.2` / `uuid@8.3.2` through its `nyc` + `jest@29` + `jest-junit`
+internals. No other single change touches more of this banner — hence `priority`
+`medium` → `high`.
+
+Note a coupling that was **not** visible at 2026-07-30: those last four have a
+*second* independent root — a stale `@angular-devkit/build-angular@19.2.22`
+auto-installed optional peer of `@analogjs/vite-plugin-angular`. Retiring the Jest
+island alone will not clear them from the banner, and clearing the auto-peer alone
+will not either; **both** roots must go. The three that are storybook's alone
+(`expect-playwright`, `jest-process-manager`, `whatwg-encoding`) do leave on this
+entry's commit.
+
+Still blocked — but the reason has narrowed to exactly one item: **blocker 3, the
+test-infrastructure migration risk.** `test-storybook` backs a pre-push gate and a
+Jenkins stage; swapping the runner requires every indexed story to still assert.
+That is operator-sprint scale, not background-agent scale — unchanged, and it is
+what keeps `deprecation_status: blocked` honest. Blocker 1 is void (above);
+blocker 2 (lockfile write-lock) is transient.
 
 ### Live trajectory
 

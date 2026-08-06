@@ -9,9 +9,9 @@ written: "2026-07-30"
 author: "deprecation-triage"
 status: "backlog"
 priority: "low"
-deprecation_status: blocked
+deprecation_status: open
 severity: low
-fingerprints: ["9b2c18a09eb7", "a200f917e702", "72a88a3bbff4", "e83cd3f2d7e3", "6bbd169077f5"]
+fingerprints: ["9b2c18a09eb7", "a200f917e702", "72a88a3bbff4", "e83cd3f2d7e3", "6bbd169077f5", "41d6b28f9cb6"]
 relatedNodeIds:
   - "backlog-dependabot-triage"
   - "backlog-deprecation-storybook-test-runner-jest-island-retire"
@@ -156,6 +156,18 @@ entry even though the advisory itself is Moderate. Security-class ownership of
 #640/#625 stays with the campaign — this entry does not fork it.
 
 ## Current decision
+
+> **SUPERSEDED 2026-08-06 — blocker 1 is VOID; this entry is now `open`, not
+> `blocked`.** Commit `ecc65384f` (2026-07-30, "reserve Nexus for first-party
+> components; consume crates.io + npmjs direct") repointed `.npmrc` `registry=` to
+> `https://registry.npmjs.org/`. Re-probed this run against the **now-current**
+> registry: **`uuid@11.1.1` → HTTP 200** and **`uuid@13.0.1` → HTTP 200** (both
+> recorded below as persistent 404s). The dual-published `uuid@11.1.1` — the exact
+> version the analysis below identifies as the one that would work for every CJS
+> carrier — **is fetchable**. Read the three blockers below as historical: only
+> blocker 2 (lockfile write-lock, transient) and blocker 3 (sophia submodule
+> boundary, scope-limited) survive, and neither is terminal for the root-workspace
+> half. See the dated section at the end of this entry.
 
 **Blocked (terminal for automation) — the patched artifact is not fetchable, and
 the one permitted lockfile writer is another agent.** Three independent blockers,
@@ -335,3 +347,48 @@ before inheriting the old blockers.
 
 Add to this entry's closure check: `uuid@8.3.2` absent from
 `sophia/pnpm-lock.yaml` in addition to the root lockfile surfaces already listed.
+
+
+## 2026-08-06 — re-triage on `41d6b28f9cb6`: the mirror blocker is void, root-workspace half is unblocked
+
+The 2026-08-06 root install banner (`41d6b28f9cb6`, 10 packages) still names both
+`uuid@10.0.0` and `uuid@8.3.2`. Re-scoped rather than re-derived.
+
+**Carrier confirmed** by reverse-dep trace over `pnpm-lock.yaml` `snapshots:`:
+
+| Version | Chain | Importer |
+|---|---|---|
+| `uuid@10.0.0` | `@cucumber/cucumber@11.3.0` → `@cucumber/gherkin`/`gherkin-utils` → `@cucumber/messages@26.0.1` → `uuid@10.0.0` | `genesis/a2o` |
+| `uuid@8.3.2` | ① `@storybook/test-runner` (direct), `jest-junit@16`, `nyc` → `istanbul-lib-processinfo@2.0.3`  ② `@angular-devkit/build-angular@19.2.22` → `webpack-dev-server` → `sockjs@0.3.24` | `app/elohim-library`; `app/elohim-app`, `doorway/doorway-app` |
+
+**What changed.** The entry's blocker 1 rested on a *Nexus mirror* fact: the mirror
+served only cached artifacts, so `uuid@11.1.1` (dual-published, the one version
+compatible with every CJS carrier here) 404'd while the ESM-only `uuid@14.0.1`
+happened to be cached. That entire framing is now moot — the repo no longer
+installs through Nexus for public packages. Probed this run:
+
+```
+uuid@11.1.1 -> HTTP 200   https://registry.npmjs.org/uuid/-/uuid-11.1.1.tgz
+uuid@13.0.1 -> HTTP 200   https://registry.npmjs.org/uuid/-/uuid-13.0.1.tgz
+```
+
+The CJS-vs-ESM analysis above still stands and is still the governing constraint:
+**target `uuid@11.1.1`, not `latest`** — `uuid@14`'s `exports["."].node` has no
+`require` branch and would break `@cucumber/messages`, `jest-junit`, `nyc`, and
+`sockjs` at `require()`. That analysis was the durable part of this entry; the
+availability claim was the perishable part.
+
+**Why nothing landed this run.** `pnpm-lock.yaml` was dirty, holding a hand-patched
+`@automerge/automerge` bump owned by a concurrent lane; `pnpm install` would have
+normalised it away. No manifest, no lockfile, no install was touched.
+
+**Live trajectory.** Both `uuid` lines are transitive-only — there is no
+first-party `uuid` declaration in the root workspace, so the lever is a
+`pnpm-workspace.yaml` `overrides:` pin to `11.1.1`, not a manifest bump. Verify it
+does not fight the existing `overrides:` block, then gate `genesis/a2o`
+(cucumber) and `app/elohim-library` (storybook). Note that `uuid@8.3.2` also
+retires for free if both of its roots are removed — see
+`deprecation-storybook-test-runner-jest-island-retire.md` and
+`deprecation-angular19-toolchain-legacy-builder-transitives.md`; an override may
+be unnecessary for that one. The **sophia** half of this entry remains behind the
+submodule boundary and is untouched by any of this.

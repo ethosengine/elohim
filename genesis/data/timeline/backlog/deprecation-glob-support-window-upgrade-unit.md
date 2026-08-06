@@ -201,6 +201,30 @@ Unlike the uuid entry, nothing external gates this: the target tarball is fetcha
 the API is verified compatible, no source changes are needed, and no override is
 required. It needs only the lockfile write-lock to clear.
 
+### 2026-08-06 — fork notice: this entry overlaps `deprecation-first-party-glob-v10-declarations-bump.md`
+
+Both entries were minted 2026-07-30 and both claim the **same first-party lever**
+(the two `glob: "^10.3.0"` declarations in `elohim-service` and the `elohim-content`
+MCP server). That is a forked concern, and the fork is why a fresh
+`glob@10.5.0` banner line re-triaged in 2026-08 had two plausible homes.
+
+**Canonical owner of the first-party `^10.3.0` → `^13` bump is
+`deprecation-first-party-glob-v10-declarations-bump.md`** — it carries the deeper
+module-shape/`@types/glob`/tsconfig analysis and the executable recipe. Fingerprint
+`45025802800f` (the 2026-08-06 MCP-server banner line) was attached **there**, not
+here. This entry's distinct residue is the **transitive 7.x carriers**, which have a
+different owner and a different unblock date and do not move with the first-party
+bump.
+
+Do not act on the first-party lever from this file. The stasis sweep should either
+narrow this entry to the transitive carriers only or fold it into its sibling —
+that consolidation was deliberately **not** attempted during a 3-fingerprint triage
+run, since neither entry was read end-to-end.
+
+Also void as of 2026-08-06: the "mirror-blocked" framing in this entry's `tags:`.
+Commit `ecc65384f` (2026-07-30) repointed `.npmrc` `registry=` to
+`https://registry.npmjs.org/`; `glob@13.0.6` tarball probes **HTTP 200**.
+
 1. **Wait for the lock owner to land** (the vite bump / cluster-06 campaign). Confirm
    with `git status --short pnpm-lock.yaml pnpm-workspace.yaml`.
 2. **Apply the four steps** under "The exact change" above.

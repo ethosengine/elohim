@@ -9,9 +9,9 @@ written: "2026-07-30"
 author: "deprecation-triage"
 status: "backlog"
 priority: "high"
-deprecation_status: blocked
+deprecation_status: open
 severity: low
-fingerprints: ["e83cd3f2d7e3"]
+fingerprints: ["e83cd3f2d7e3", "45025802800f"]
 relatedNodeIds:
   - "backlog-deprecation-anthropic-agent-sdk-legacy-http-stack-bump"
   - "backlog-deprecation-angular19-toolchain-legacy-builder-transitives"
@@ -131,6 +131,9 @@ assumed:
 
 **Blocked on the lockfile write-lock alone — no upstream blocker, no mirror
 blocker. This is the first thing to land when the lock clears.**
+*(Re-verified 2026-08-06 and still exactly true — see the dated update below.
+`deprecation_status` moved `blocked` → `open`: the only gate is a transient
+write-lock held by another agent, which is not an external blocker.)*
 
 `pnpm-lock.yaml` and `pnpm-workspace.yaml` are owned exclusively by concurrent
 in-flight runs this session, and this triage was explicitly scoped to touch
@@ -180,6 +183,29 @@ Fingerprint `e83cd3f2d7e3` stays **present with `status: blocked`**. It is a
    the verification in the `chore(deprecation):` commit message. Do **not** delete
    `e83cd3f2d7e3` from the ledger — the aggregate banner still carries its other
    packages; the fingerprint retires only when the last sibling closes.
+
+## 2026-08-06 — re-triage on fingerprint `45025802800f`: still ready, two ambient constraints now void
+
+A fresh workspace install re-emitted the same warning against the MCP-server
+importer (`.../mcp-servers/elohim-content | WARN deprecated glob@10.5.0`), minting
+fingerprint `45025802800f`. Re-scoped rather than re-derived. **The plan above is
+unchanged and still correct** — but two of its recorded ambient constraints have
+expired, and one new one applies:
+
+| Recorded constraint | Status on 2026-08-06 |
+|---|---|
+| "the mirror's `@babel/helpers@7.29.2` ceiling makes a wide `pnpm update` die with `ERR_PNPM_NO_MATCHING_VERSION`" | **Void.** That ceiling was a *Nexus mirror* artifact. Commit `ecc65384f` (2026-07-30, "reserve Nexus for first-party components; consume crates.io + npmjs direct") repointed `.npmrc` `registry=` to `https://registry.npmjs.org/`. The targeted-install advice is still *good hygiene*, but it is no longer *forced*. |
+| container `node -v` → `v22.22.2` | Now **`v24.18.1`**. Still inside `glob@13.0.6` engines (`18 \|\| 20 \|\| >=22`). |
+| — | **New:** at this triage `pnpm-lock.yaml` was dirty with a hand-patched `@automerge/automerge` bump owned by a concurrent lane. `pnpm install` would have normalised that hand-patch away. Untouched. |
+
+Re-probed this run against the **now-current** registry (`registry.npmjs.org`):
+`glob@13.0.6` `dist.tarball` → **HTTP 200**, and `npm view glob@13.0.6 deprecated`
+returns **empty** (13 carries no notice) while `glob@11.1.0` still returns izs's
+blanket notice. Call-sites re-confirmed unchanged: all ten first-party import
+sites are `import { glob } from 'glob'` with `await glob(pattern, {cwd, nodir})` —
+the v9+ signature, stable through v13.
+
+`45025802800f` joins `e83cd3f2d7e3` on this entry with ledger `status: triaged`.
 
 ## Verification
 

@@ -3,15 +3,15 @@ id: "backlog-deprecation-angular19-toolchain-legacy-builder-transitives"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "Angular 19 toolchain legacy-builder transitives (karma/webpack/pacote) — glob@7, inflight, rimraf@3, tar@6, uuid@8.3.2"
+title: "Legacy-builder transitives (karma/webpack) — glob@7, inflight, rimraf@3, uuid@8.3.2 — now carried by a stale build-angular@19 auto-peer inside an Angular 22 tree"
 slug: "deprecation-angular19-toolchain-legacy-builder-transitives"
 written: "2026-07-30"
 author: "deprecation-triage"
 status: "backlog"
-priority: "low"
-deprecation_status: blocked
+priority: "medium"
+deprecation_status: open
 severity: low
-fingerprints: ["e83cd3f2d7e3"]
+fingerprints: ["e83cd3f2d7e3", "41d6b28f9cb6"]
 relatedNodeIds:
   - "backlog-deprecation-storybook-test-runner-jest-island-retire"
   - "backlog-deprecation-uuid-support-window-upgrade-unit"
@@ -279,3 +279,124 @@ No fix was applied this run; nothing is claimed fixed. Verified:
 - **Files touched this run**: this entry (new), five sibling entries, and one
   `.claude/data/deprecations.jsonl` status transition. No lockfile, no
   `angular.json`, no `package.json`, no `pnpm install`.
+
+## 2026-08-06 — everything above this line is OVERTAKEN BY EVENTS. Read this section first.
+
+Angular **22.1.0 landed** (branch `feat/angular22-node24`; node `v24.18.1`, pnpm
+`10.30.3`). The four-step plan sketched above was **executed**, and the blocker
+this entry named as decisive is **gone**. Re-derived from disk this run, not
+inherited:
+
+| Claim above | Status 2026-08-06 |
+|---|---|
+| "`app/elohim-library` is the blocker — its four library targets need `@angular-devkit/build-angular:ng-packagr`" | **Resolved.** `app/elohim-library/angular.json` now uses **`@angular/build:ng-packagr`**. |
+| "Every Angular target in all five `angular.json` files uses a `@angular-devkit/build-angular:*` builder" | **False now.** All five use `@angular/build:*` exclusively (`:application`, `:dev-server`, `:extract-i18n`, `:ng-packagr`) plus `@analogjs/vitest-angular:test`. **Zero** `@angular-devkit/build-angular` builders remain. |
+| "`@angular-devkit/build-angular` is a devDependency of five workspaces" | **False now.** **No `package.json` in the repo declares it at all.** |
+| "`tar@6.2.1` … clears when `@angular/cli` advances" | **Cleared.** `grep -c "tar@6.2.1" pnpm-lock.yaml` → **0**. |
+| "the Nexus mirror serves cached artifacts only … 404s every Angular tarball" | **Void.** Commit `ecc65384f` (2026-07-30) repointed `.npmrc` `registry=` to `https://registry.npmjs.org/`. Re-probed this run: `glob@13.0.6`, `uuid@11.1.1`, `uuid@13.0.1`, `rimraf@6.1.3`, `tar@7.5.13` tarballs **all HTTP 200**; `@storybook/addon-vitest` resolves at `10.5.7`. **Every artifact this entry (and its five siblings) recorded as `404 / mirror-blocked` is now fetchable.** |
+| "the patched dependency `patches/@angular__build@19.2.22.patch` must be re-cut" | **Done** — the lockfile records `@angular/build@22.1.0(patch_hash=a65795db…)`. |
+
+### But the four deprecated packages did NOT leave the banner — and the reason is new
+
+Fingerprint `41d6b28f9cb6` (2026-08-06 root install) still names `glob@7.2.3`,
+`inflight@1.0.6`, `rimraf@3.0.2`, `uuid@8.3.2`. The **carrier changed**.
+`@angular-devkit/build-angular@19.2.22` — an **Angular 19** package — is still
+resolved inside an Angular 22 tree, and it is now reached by a path this entry
+never described:
+
+```
+@analogjs/vite-plugin-angular@2.6.4
+  peerDependencies:     "@angular-devkit/build-angular": "^17 || ^18 || ^19 || ^20 || ^21 || ^22"
+  peerDependenciesMeta: "@angular-devkit/build-angular": { "optional": true }
+```
+
+Nothing declares it; pnpm's `auto-install-peers` (default **true**, not disabled in
+`.npmrc`) materialises Analog's *optional* peer — and pins it at the stale
+**19.2.22** carried over from before the migration, even though the range happily
+accepts 22.x. `karma@` (2 occurrences) and `webpack-dev-server@` (8) survive
+underneath it, and with them the four banner packages.
+
+This is the **same mechanism** as
+`deprecation-angular-animations-package-retired.md`: an unused optional peer that
+pnpm installs because it can.
+
+### Current decision — open and bounded; one-line lever, serialized behind the lockfile
+
+Not blocked. The likely fix is a single `pnpm-workspace.yaml` entry:
+
+```yaml
+ignoredOptionalDependencies:
+  - '@angular-devkit/build-angular'
+```
+
+Analog's *other* optional peer, `@angular/build`, is present at `22.1.0` and is
+what actually drives the build, so dropping the legacy one should be inert.
+Verified from the installed manifests, because this is exactly where a plausible
+guess goes wrong:
+
+```
+@angular/build@22.1.0              optionalDependencies: { "lmdb": "3.5.6" }   ← no karma, no jest, no webpack
+@angular-devkit/build-angular@19.2.22   dependencies include: karma-source-map-support, webpack-dev-server
+```
+
+So the legacy Karma/Webpack subtree hangs off **`build-angular@19` only** — the
+modern `@angular/build@22` does not carry it. Removing the auto-peer does remove
+that subtree.
+
+**It will NOT empty these four lines from the banner, though — they have a second,
+independent root.** `glob@7.2.3`, `inflight@1.0.6`, `rimraf@3.0.2`, and
+`uuid@8.3.2` are *also* reached through `@storybook/test-runner@0.24.4` in
+`app/elohim-library` (via `nyc` → `istanbul-lib-processinfo` / `spawn-wrap`,
+`jest@29` internals, and `jest-junit`). Confirmed by reverse-dep trace over
+`snapshots:`.
+
+Therefore: this lever **halves** the carrier graph and removes a stale v19 package
+from a v22 tree — worth doing on its own merits — but the four banner lines only
+disappear when **both** roots are gone, and the second root is owned by
+`deprecation-storybook-test-runner-jest-island-retire.md`. Do not close this entry
+on the `ignoredOptionalDependencies` commit alone; close it when the banner
+actually loses the lines. Sequence the storybook retirement first or accept that
+the banner is unchanged after this commit.
+
+**Why it did not land this run:** `pnpm-lock.yaml` was **dirty**, holding a
+hand-patched `@automerge/automerge` bump owned by a concurrent lane. `pnpm install`
+would have normalised that hand-patch away. This run touched no lockfile, no
+manifest, and ran no install — so the lever is *specified and verified*, not
+*applied*. Treat the `ignoredOptionalDependencies` line as a hypothesis to verify,
+not a certainty: confirm `@angular-devkit/build-angular` actually leaves the tree
+and that `pnpm test` + a **direct `ng build`** on `app/elohim-app` stay green
+(in-container `tsc`/JIT misses `strictTemplates` AOT errors).
+
+Sequencing note: this shares one lever with the `@angular/animations` entry — both
+are `ignoredOptionalDependencies` additions. **Land them in the same commit** and
+verify once.
+
+### Ledger
+
+`41d6b28f9cb6` is the 2026-08-06 successor to the retired 11-package banner
+`e83cd3f2d7e3`. It names **10** packages and is likewise a **shared aggregate**.
+Full decomposition, from a reverse-dep trace over `pnpm-lock.yaml` `snapshots:`
+this run — every package is accounted for, and every one lands on an entry that
+already exists:
+
+| Banner package | Carrier chain | Owning entry |
+|---|---|---|
+| `glob@7.2.3` | ①`build-angular@19`→`karma@6.4.4`  ②`@storybook/test-runner`→`nyc`/`jest@29` | **this entry** (root ①) + storybook (root ②) |
+| `inflight@1.0.6` | `glob@7.2.3` (its only parent tree-wide) | same as above |
+| `rimraf@3.0.2` | ①`karma@6.4.4`  ②`@storybook/test-runner`, `nyc`, `spawn-wrap`  ③`chromium-edge-launcher`←`react-native`←`@libp2p/webrtc` | this entry + storybook + helia |
+| `uuid@8.3.2` | ①`webpack-dev-server`→`sockjs`  ②`@storybook/test-runner`, `jest-junit`, `istanbul-lib-processinfo` | this entry + storybook |
+| `expect-playwright@0.8.0` | `@storybook/test-runner@0.24.4` (direct) | `deprecation-storybook-test-runner-jest-island-retire.md` |
+| `jest-process-manager@0.4.0` | `@storybook/test-runner@0.24.4` (direct) | storybook |
+| `whatwg-encoding@2.0.0` | `http-server@14.1.1`→`html-encoding-sniffer@3` | storybook |
+| `uuid@10.0.0` | `@cucumber/cucumber@11.3.0`→`@cucumber/messages@26.0.1` — importer `genesis/a2o` | `deprecation-uuid-support-window-upgrade-unit.md` |
+| `node-domexception@1.0.0` | `@anthropic-ai/sdk@0.39.0`→`formdata-node@4.4.1` — importer `elohim/elohim-agent/elohim-agent-sdk` | `deprecation-anthropic-agent-sdk-legacy-http-stack-bump.md` |
+| `prebuild-install@7.1.3` | `@helia/verified-fetch@7.0.3`→`@libp2p/webrtc@6.0.11`→`node-datachannel@0.29.0` — importer `app/elohim-app` | `deprecation-helia-webrtc-native-addon-react-native-subtree.md` |
+
+Two chokepoints dominate: **`@storybook/test-runner`** (declared only in
+`app/elohim-library`) touches six of the ten, and the **stale `build-angular@19`
+auto-peer** touches four. Retiring the storybook Jest island is therefore the
+single highest-yield move against this banner.
+
+`41d6b28f9cb6` stays **present** with `status: triaged` so the sentinel cites these
+decisions and never re-dispatches; it retires only when the last sibling closes.
+No new backlog entry was minted for it — all ten packages already had owners.

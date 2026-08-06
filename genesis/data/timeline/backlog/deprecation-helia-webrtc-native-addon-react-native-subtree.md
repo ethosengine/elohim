@@ -11,7 +11,7 @@ status: "backlog"
 priority: "medium"
 deprecation_status: blocked
 severity: medium
-fingerprints: ["e83cd3f2d7e3"]
+fingerprints: ["e83cd3f2d7e3", "41d6b28f9cb6"]
 relatedNodeIds:
   - "backlog-deprecation-angular19-toolchain-legacy-builder-transitives"
 tags: [deprecation, helia, verified-fetch, libp2p, webrtc, node-datachannel, prebuild-install, react-native, babel, elohim-app, supply-chain, mirror-blocked, upstream-blocked]
@@ -189,3 +189,37 @@ No fix was applied this run; nothing is claimed fixed. Verified:
 - **Files touched this run**: this entry (new), five sibling entries, and one
   `.claude/data/deprecations.jsonl` status transition. No lockfile, no
   `package.json`, no `pnpm install`.
+
+
+## 2026-08-06 — `41d6b28f9cb6` attached; mirror blocker void
+
+The 2026-08-06 successor banner (`41d6b28f9cb6`, 10 packages) still names
+`prebuild-install@7.1.3`, and this entry is its sole owner. Reverse-dep trace over
+`pnpm-lock.yaml` `snapshots:`:
+
+```
+app/elohim-app  ->  @helia/verified-fetch@7.0.3
+                ->  @libp2p/webrtc@6.0.11
+                ->  node-datachannel@0.29.0
+                ->  prebuild-install@7.1.3
+```
+
+Deprecation text: `No longer maintained. Please contact the author of the relevant
+native addon; alternatives are available.` — i.e. the notice is addressed to
+`node-datachannel`'s maintainers, not to us; there is no first-party lever short
+of the `@libp2p/webrtc` subtree itself.
+
+This subtree also contributes the **third** independent root of `rimraf@3.0.2`
+(`react-native` -> `@react-native/community-cli-plugin` ->
+`@react-native/dev-middleware` -> `chromium-edge-launcher@0.2.0` -> `rimraf@3`),
+alongside the storybook and stale-`build-angular@19` roots. Relevant when judging
+whether `rimraf@3` can leave the banner: **three** roots must clear, not two.
+
+**Any "mirror-blocked" reasoning in this entry is void** — including the recorded
+`@babel/helpers@7.29.2` ceiling that made a wide `pnpm update` die with
+`ERR_PNPM_NO_MATCHING_VERSION`. That was a Nexus artifact; commit `ecc65384f`
+(2026-07-30) repointed `.npmrc` `registry=` to `https://registry.npmjs.org/`.
+Re-probe before inheriting any 404 or version-ceiling claim from this entry.
+
+Not landed this run: `pnpm-lock.yaml` was dirty (hand-patched
+`@automerge/automerge` bump owned by a concurrent lane); nothing was touched.

@@ -11,7 +11,7 @@ status: "backlog"
 priority: "medium"
 deprecation_status: blocked
 severity: low
-fingerprints: ["e83cd3f2d7e3"]
+fingerprints: ["e83cd3f2d7e3", "41d6b28f9cb6"]
 relatedNodeIds:
   - "backlog-deprecation-first-party-glob-v10-declarations-bump"
 tags: [deprecation, anthropic-sdk, elohim-agent-sdk, formdata-node, node-domexception, node-fetch, mirror-blocked, bounded-fix]
@@ -168,3 +168,30 @@ No fix was applied this run; nothing is claimed fixed. Verified:
 - **Files touched this run**: this entry (new), five sibling entries, and one
   `.claude/data/deprecations.jsonl` status transition. No lockfile, no
   `package.json`, no `pnpm install`.
+
+
+## 2026-08-06 — `41d6b28f9cb6` attached; mirror blocker void
+
+The 2026-08-06 successor banner (`41d6b28f9cb6`, 10 packages) still names
+`node-domexception@1.0.0`. Reverse-dep trace over `pnpm-lock.yaml` `snapshots:`
+confirms this entry is its sole owner:
+
+```
+elohim/elohim-agent/elohim-agent-sdk  ->  @anthropic-ai/sdk@0.39.0
+                                      ->  formdata-node@4.4.1
+                                      ->  node-domexception@1.0.0
+```
+
+Deprecation text: `Use your platform's native DOMException instead` — node 24
+(`v24.18.1` in this container) has had a global `DOMException` for years, so the
+shim is pure dead weight once the SDK stops depending on `formdata-node`.
+
+**Any "mirror-blocked" reasoning in this entry is void.** Commit `ecc65384f`
+(2026-07-30) repointed `.npmrc` `registry=` to `https://registry.npmjs.org/`;
+Nexus now serves only the `@elohim:` scope. Every artifact previously recorded as
+`404` re-probed **HTTP 200** this run. Re-verify the `@anthropic-ai/sdk` target
+version's fetchability directly rather than inheriting the old 404 claim.
+
+Not landed this run: `pnpm-lock.yaml` was dirty (hand-patched
+`@automerge/automerge` bump owned by a concurrent lane), so no manifest, lockfile,
+or install was touched.
