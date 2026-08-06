@@ -2068,8 +2068,9 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
             steps {
                 container('builder') {
                     // Substrate seam smoke — one named check per communication
-                    // seam (bootstrap-sharing / signal-bus / peer-store /
-                    // dht-fetch) so a red names ITSELF instead of surfacing as
+                    // seam (bootstrap-sharing / relay-reachability / peer-store /
+                    // n0-contamination / no-lingering-tx5 / dht-fetch) so a red
+                    // names ITSELF instead of surfacing as
                     // an unexplained convergence failure. Advisory while
                     // scenario 2 stabilizes; flip to --gate after green ×2.
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
