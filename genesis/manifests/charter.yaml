@@ -1,28 +1,49 @@
-# spine.yaml — the delivery spine: arc-level invariants, each bound to a runnable check.
+# charter.yaml — the delivery charter: arc-level invariants, each bound to a runnable check.
 #
 # WHY THIS EXISTS (2026-07-02, operator directive): cohesion was stored in prose
 # (240+ specs/plans, memory files, backlogs) which requires a strong reader every
 # session — the selection problem, not the work, is what sessions fail at. The
-# spine inverts control: these nodes are the INTERFACES; specs/plans/memories are
-# commentary hanging off them; sessions are interchangeable implementations of
+# charter inverts control: these articles are the INTERFACES; specs/plans/memories
+# are commentary hanging off them; sessions are interchangeable implementations of
 # "make the top red green"; CI + the convergence loop is the composition root.
 # Sibling of cluster-state.yaml (declared substrate capability) — this file is
-# declared delivery truth. Read by .claude/scripts/spine-status.py, which emits
+# declared delivery truth. Read by .claude/scripts/charter-status.py, which emits
 # the session-start headline.
 #
+# WHY "CHARTER" AND NOT "SPINE" (renamed 2026-08-06, operator directive). A spine
+# is vertebrae in sequence, and sequence is the one property this register does NOT
+# have: articles are unordered peers, each independently binding. The ordered
+# structure in this repo is the resiliency-SAGA (genesis/a2o/features/dataplane/
+# resiliency-saga/, chapters 01..11, with a frontier at the first non-green) — so
+# the old name described the SIBLING register, and a reader who trusted it inferred
+# the wrong shape. A charter is a set of ARTICLES: unordered, each binding on its
+# own, amended only by due process — which is precisely covenant rule 4 below.
+#
+# AN ARTICLE IS NOT A TEST SUITE. A suite is evidence; an article is the claim the
+# evidence is FOR. Three things follow, and each is why this file exists at all:
+#   - checks: are heterogeneous — an a2o scenario AND a cargo test AND a live
+#     observation can jointly prove one article. No suite spans those.
+#   - green suites systematically over-claim (#[ignore] is a CI no-op, host-green
+#     != CI-green, `cargo check` compiles tests without running them). evidence:
+#     is where you ARGUE the guarantee holds; guard: is what would silently reopen it.
+#   - unwired has no analog in testing. A missing test is mere absence; an unwired
+#     article is a guarantee we committed to with NO evidence path, declared and
+#     counted. That is the most valuable state in this file.
+#
 # THE COVENANT (anti-pile admission control):
-#   1. Max 12 nodes. A candidate node must displace one or wait.
+#   1. Max 12 articles. A candidate article must displace one or wait.
 #   2. status: green | red | unwired.
-#      - red    = a runnable check EXISTS and fails → this is schedulable work.
-#      - unwired = no runnable check yet → NOT schedulable; its ONLY legal first
+#      - red    = a runnable check EXISTS and fails -> this is schedulable work.
+#      - unwired = no runnable check yet -> NOT schedulable; its ONLY legal first
 #        move is writing the red (see first_move). Prose specs do not advance it.
-#   3. Max 2 nodes flagged active: true (the WIP fence). Finishing beats starting.
+#   3. Max 2 articles flagged active: true (the WIP fence). Finishing beats starting.
 #   4. Status flips require evidence (build #, live probe, test run) — never edit
 #      status from memory or intention.
-#   5. New specs/plans should cite the spine node they serve; a plan that serves
-#      no node is a candidate for held/, not for writing.
+#   5. New specs/plans should cite the charter article they serve; a plan that
+#      serves no article is a candidate for held/, not for writing.
 #   6. Session contract: (a) move reds toward green with proof, (b) file new reds
 #      as runnable checks, (c) one-line delta here. Nothing else is a deliverable.
+
 version: 1
 updated: 2026-07-31
 vision: >
@@ -30,7 +51,7 @@ vision: >
   capture-resistant foundation for communication that can scale to global
   coordination. Every guarantee constitutive, none opt-in.
 
-nodes:
+articles:
   - id: dataplane-convergence
     invariant: >
       Serving-critical content state converges peer-to-peer; no per-host

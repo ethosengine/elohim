@@ -19,16 +19,17 @@ THREE OUTCOMES, and the distinction between the last two is the whole instrument
 
 INTAKE PATH — WHO APPENDS, CONCRETELY (this must be runnable, never aspirational):
   1. `python3 .claude/scripts/seam-audit.py --calibrate`
-       Read-only. Compares `genesis/manifests/spine.yaml` against the LAST `spine-snapshot` row in
+       Read-only. Compares `genesis/manifests/charter.yaml` against the LAST `charter-snapshot` row in
        the ledger and prints every flip (a node whose status changed, or a node that appeared),
        each with its proposed classification against the forecast. Prints nothing to the ledger.
   2. `python3 .claude/scripts/seam-audit.py --calibrate --record`
        Appends one `calibration` row per flip with the proposed outcome, then one fresh
-       `spine-snapshot`. Idempotent in the only sense that matters: with no flips it appends
-       nothing at all (an unchanged spine is not an event), so it is safe on a `/loop`.
+       `charter-snapshot` (rows written before 2026-08-06 carry the old `spine-snapshot`
+       kind and are still read). Idempotent in the only sense that matters: with no flips it appends
+       nothing at all (an unchanged charter is not an event), so it is safe on a `/loop`.
   3. `python3 .claude/scripts/seam-audit.py --record-miss-of-canon --note "<evidence>"`
        The canon-growth intake. Deliberately a separate, explicit verb.
-The natural caller of (1)/(2) is whoever reads a spine flip or a new red — the delivery-stasis
+The natural caller of (1)/(2) is whoever reads a charter flip or a new red — the delivery-stasis
 loop, a shift close, or the operator. The ledger is APPEND-ONLY: rows are never drained or
 mutated, because a hit/miss is a historical fact and a "live set" of them would destroy the very
 growth-rate measure the ledger exists to compute (see `_lib.findings_ledger`'s two modes).
@@ -117,7 +118,7 @@ def derived_rank(repo_root: Path, rows: list[dict], *, matrix: dict | None = Non
     is at least as bad as its worst class."""
     m = matrix if matrix is not None else _sm.matrix_data(repo_root)
     seam_by_id = {s["id"]: s for s in m.get("seams", [])}
-    spine, _ = _sm.load_spine(repo_root)
+    charter, _ = _sm.load_charter(repo_root)
     tips = m.get("concern_tips", {})
     out = []
     for r in rows:
@@ -125,14 +126,14 @@ def derived_rank(repo_root: Path, rows: list[dict], *, matrix: dict | None = Non
         sev = max([_sm._SEVERITY_WEIGHT.get(tips.get(c, {}).get("severity_class"), 1.0)
                    for c in r["classes"]] or [1.0])
         seam = seam_by_id.get(r["seam"], {})
-        prox, why = _sm.rung_proximity(seam, spine)
-        # A row that names a spine rung directly is anchored to THAT node, not to the seam's
+        prox, why = _sm.rung_proximity(seam, charter)
+        # A row that names a charter rung directly is anchored to THAT node, not to the seam's
         # strongest linkage — the rung is the more specific fact and must win.
-        node = spine.get(r["rung"])
+        node = charter.get(r["rung"])
         if node:
-            prox, why = _sm.rung_proximity({"spine_nodes": [r["rung"]]}, spine)
+            prox, why = _sm.rung_proximity({"charter_articles": [r["rung"]]}, charter)
         # A CONFIRMED-LIVE row has already collided, so its distance to the next rung is zero.
-        # Without this floor the two bridges rows (rung `none`, no spine linkage) would sort to
+        # Without this floor the two bridges rows (rung `none`, no charter linkage) would sort to
         # the BOTTOM of a ranking whose whole purpose is "what will bite next" — an instrument
         # that buries its only confirmed findings is worse than no instrument.
         if r.get("status") == "confirmed-live":
@@ -155,19 +156,19 @@ def derived_rank(repo_root: Path, rows: list[dict], *, matrix: dict | None = Non
 def last_snapshot(repo_root: Path) -> dict | None:
     rows = _fl.read_rows(Path(repo_root) / CALIBRATION_LEDGER_REL)
     for r in reversed(rows):
-        if r.get("kind") == "spine-snapshot" and isinstance(r.get("nodes"), dict):
+        if r.get("kind") in ("charter-snapshot", "spine-snapshot") and isinstance(r.get("nodes"), dict):
             return r
     return None
 
 
 def detect_flips(repo_root: Path) -> tuple[list[dict], dict]:
-    """Compare the live spine to the last recorded snapshot. Returns (flips, live_nodes).
+    """Compare the live charter to the last recorded snapshot. Returns (flips, live_nodes).
     A flip is {node, from, to, kind}: `kind` is `status-flip` for a changed status, `new-node` for
     a node that did not exist in the snapshot, and `first-run` for every node when no snapshot has
     ever been taken (the first `--record` establishes the baseline and files NO calibration rows —
     a baseline is not a set of events)."""
-    spine, _ = _sm.load_spine(repo_root)
-    live = {k: v.get("status") for k, v in spine.items()}
+    charter, _ = _sm.load_charter(repo_root)
+    live = {k: v.get("status") for k, v in charter.items()}
     snap = last_snapshot(repo_root)
     if snap is None:
         return [{"node": k, "from": None, "to": v, "kind": "first-run"} for k, v in sorted(live.items())], live
@@ -189,11 +190,11 @@ def classify_flip(flip: dict, rows: list[dict]) -> list[dict]:
     if matches:
         return [{"outcome": "hit", "fp": r["fp"], "rung": r["rung"], "seam": r["seam"],
                  "classes": list(r["classes"]), "title": r.get("title", ""),
-                 "trigger": f"spine-flip:{flip['node']} {flip['from']}->{flip['to']}"}
+                 "trigger": f"charter-flip:{flip['node']} {flip['from']}->{flip['to']}"}
                 for r in matches]
     return [{"outcome": "miss-of-ranking", "fp": "", "rung": flip["node"], "seam": "",
              "classes": [], "title": "",
-             "trigger": f"spine-flip:{flip['node']} {flip['from']}->{flip['to']}",
+             "trigger": f"charter-flip:{flip['node']} {flip['from']}->{flip['to']}",
              "note": "no forecast row names this rung — the canon may be fine and only the "
                      "ranking wrong; confirm the colliding class before recording"}]
 
@@ -215,8 +216,8 @@ def calibrate(repo_root: Path) -> dict:
 
 
 def record(repo_root: Path, cal: dict) -> dict:
-    """Append the proposed calibration rows + a fresh spine snapshot. Append-only; never drains.
-    With zero proposals and an unchanged spine this writes NOTHING (an unchanged spine is not an
+    """Append the proposed calibration rows + a fresh charter snapshot. Append-only; never drains.
+    With zero proposals and an unchanged charter this writes NOTHING (an unchanged charter is not an
     event) — which is what makes it safe to run on a loop."""
     root = Path(repo_root)
     led = root / CALIBRATION_LEDGER_REL
@@ -227,7 +228,7 @@ def record(repo_root: Path, cal: dict) -> dict:
             written += 1
     snap_needed = cal.get("baseline_only") or cal.get("flips") or not cal.get("has_snapshot")
     if snap_needed:
-        _fl.append(led, {"ts": _fl.utc_now(), "kind": "spine-snapshot",
+        _fl.append(led, {"ts": _fl.utc_now(), "kind": "charter-snapshot",
                           "nodes": cal.get("live_nodes", {})})
     return {"written": written, "snapshot": bool(snap_needed)}
 

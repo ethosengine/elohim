@@ -1,4 +1,4 @@
-//! Standing RED for spine node `sync-scale-honesty` (genesis/manifests/spine.yaml).
+//! Standing RED for charter article `sync-scale-honesty` (genesis/manifests/charter.yaml).
 //!
 //! **Invariant under test:** the sync plane's cost is sub-quadratic and measured —
 //! announce-on-change (not poll-only), head-diff transfer, healthy request-response
@@ -34,9 +34,9 @@
 //! wedge the gate for everyone who touches this crate, and the pressure to "make the
 //! red go away" would fall on whoever is unlucky enough to push next. `#[ignore]`
 //! keeps them COMPILED on every gate run (so a refactor can't silently rot them)
-//! while leaving execution to the explicit spine check. This is the opposite of the
+//! while leaving execution to the explicit charter check. This is the opposite of the
 //! `#[ignore]`-as-CI-no-op trap in the root CLAUDE.md: there the harm is an ignored
-//! test that was believed to be running; here the spine node records exactly what
+//! test that was believed to be running; here the charter article records exactly what
 //! the check is and that it fails.
 //!
 //! Run (the spine check for node `sync-scale-honesty`):

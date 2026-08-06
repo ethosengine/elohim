@@ -22,7 +22,7 @@ check() {
 }
 
 check "SyncRequest::ListDocumentsSince" "elohim/elohim-storage/src/p2p/sync_round.rs" \
-      "the round opener must construct it (spine sync-scale-honesty)"
+      "the round opener must construct it (charter sync-scale-honesty)"
 check "inc_sync_in_sync" "elohim/elohim-storage/src/p2p" \
       "the InSync client arm must count the shortcut"
 check "PROJECTION_INVENTORY_TABLE_COLLECTIVES" "elohim/elohim-storage/src/p2p/projection_reconcile.rs" \

@@ -3,10 +3,10 @@ python3 .claude/scripts/_lib/__tests__/seam_matrix_test.py  (exit 0 = pass)
 
 Two halves, deliberately:
   (a) SYNTHETIC — cell-state derivation, routing, ranking and digest stability over fixture repos
-      under tempfile.TemporaryDirectory(). The real registries/catalog/spine are never written.
+      under tempfile.TemporaryDirectory(). The real registries/catalog/charter are never written.
   (b) LIVE, READ-ONLY — the structural contract of `.claude/epr-meta/seam-catalog.yaml` against
       the actual tree: every `registry_crates` entry must name a crate that really has a
-      `seam-registry.yaml`, every `spine_nodes` entry must name a real spine node, and every
+      `seam-registry.yaml`, every `charter_articles` entry must name a real charter article, and every
       `point_overrides` target must be a real seam id. A catalog that routes to nothing scores
       cells `unexamined` forever while looking healthy — that is precisely the silent-blindness
       class this whole plan exists to end, so it is a test, not a comment.
@@ -60,7 +60,7 @@ seams:
     tracks: [T2]
     reach_tier: familiar
     registry_crates: [fixcrate]
-    spine_nodes: [fix-red-active]
+    charter_articles: [fix-red-active]
     n_a_concerns: []
   - id: SY
     source_section: "9.2"
@@ -71,13 +71,13 @@ seams:
     registry_crates: []
     point_overrides:
       "fixcrate::moved_point": SY
-    spine_nodes: [fix-green]
+    charter_articles: [fix-green]
     n_a_concerns: []
 """
 
-_SPINE = """\
+_CHARTER = """\
 version: 1
-nodes:
+articles:
   - id: fix-red-active
     status: red
     active: true
@@ -152,7 +152,7 @@ def _fixture_repo(base: Path, points_yaml: str) -> Path:
     root = base / "repo"
     _w(root / sc.SEAM_REGISTRY_SCHEMA_REL, _REAL_SCHEMA_TEXT)
     _w(root / sm.SEAM_CATALOG_REL, _CATALOG)
-    _w(root / sm.SPINE_REL, _SPINE)
+    _w(root / sm.CHARTER_REL, _CHARTER)
     _w(root / ".claude/epr-meta/policies.yaml", _POLICIES)
     _w(root / ".claude/epr-meta/concerns.yaml", _CONCERNS)
     _w(root / "fix/seam-registry.yaml", _registry(points_yaml))
@@ -238,7 +238,7 @@ with tempfile.TemporaryDirectory() as td:
     d = sm.matrix_data(root)
     c4sx = _cell(d, "C4", "SX")
     c4sy = _cell(d, "C4", "SY")
-    check("rung-proximity: a red+active spine node outranks a green one",
+    check("rung-proximity: a red+active charter article outranks a green one",
           c4sx["score_parts"]["rung_proximity"] == 4.0
           and c4sy["score_parts"]["rung_proximity"] == 1.0)
     check("severity: silent-corruption weighs 2.0, loud-fail 1.0",
@@ -251,8 +251,8 @@ with tempfile.TemporaryDirectory() as td:
     check("ranked_unexamined is sorted by descending score",
           all(d["ranked_unexamined"][i]["score"] >= d["ranked_unexamined"][i + 1]["score"]
               for i in range(len(d["ranked_unexamined"]) - 1)))
-    check("a seam with no spine linkage falls to the proximity floor, never to zero",
-          sm.rung_proximity({"spine_nodes": []}, {})[0] == 0.5)
+    check("a seam with no charter linkage falls to the proximity floor, never to zero",
+          sm.rung_proximity({"charter_articles": []}, {})[0] == 0.5)
 
     dig = d["digest"]
     check("digest is stable across identical runs", sm.matrix_data(root)["digest"] == dig)
@@ -268,11 +268,11 @@ with tempfile.TemporaryDirectory() as td:
     check("the generated JSON records how to regenerate itself",
           "seam-audit.py --matrix --write" in payload["_generated"]["regenerate"])
 
-    # A substrate move (spine flip) must move the digest — otherwise the freshness check is inert.
-    _w(root / sm.SPINE_REL, _SPINE.replace("id: fix-green\n    status: green",
+    # A substrate move (charter flip) must move the digest — otherwise the freshness check is inert.
+    _w(root / sm.CHARTER_REL, _CHARTER.replace("id: fix-green\n    status: green",
                                             "id: fix-green\n    status: red"))
     d2 = sm.matrix_data(root)
-    check("a spine flip changes the digest (the freshness check is not inert)",
+    check("a charter flip changes the digest (the freshness check is not inert)",
           d2["digest"] != dig and sm.generated_freshness(root, d2)[0] == "stale")
 
 # ── a missing catalog is an ERROR, not an empty matrix ──
@@ -302,10 +302,10 @@ check("LIVE: every crate with a seam-registry.yaml is routed to some column "
       "(an unrouted registry silently contributes zero cells)",
       real_crates <= declared)
 
-spine_live, _ = sm.load_spine(REPO)
-declared_nodes = {n for s in live_cat["seams"] for n in (s.get("spine_nodes") or [])}
-check("LIVE: every spine node the catalog links is a real node in spine.yaml",
-      declared_nodes <= set(spine_live))
+charter_live, _ = sm.load_charter(REPO)
+declared_articles = {n for s in live_cat["seams"] for n in (s.get("charter_articles") or [])}
+check("LIVE: every charter article the catalog links is real in charter.yaml",
+      declared_articles <= set(charter_live))
 override_targets = {v for s in live_cat["seams"] for v in (s.get("point_overrides") or {}).values()}
 check("LIVE: every point_overrides target is a real seam id", override_targets <= live_seam_ids)
 check("LIVE: every seam declares a plane that exists in plane_groups",

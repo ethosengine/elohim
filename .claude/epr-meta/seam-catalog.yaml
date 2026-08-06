@@ -26,7 +26,7 @@
 # `placement-audit.py --epr-meta`). It carries NO contentHash pin: pins exist so a BINDING can
 # declare which version of a guarantee applies (resolution mode 2), and nothing binds this file —
 # it is an axis, not a Precedent. Its correctness is checked structurally (every `registry_crates`
-# entry must resolve to a real registry; every `spine_nodes` entry to a real spine node) by
+# entry must resolve to a real registry; every `charter_articles` entry to a real charter article) by
 # `_lib/__tests__/seam_matrix_test.py` against the live tree.
 #
 # PLANE ASSIGNMENT IS DOMINANT-PLANE, NOT EXCLUSIVE. Several seams genuinely span planes; each
@@ -42,7 +42,7 @@
 
 seam-catalog-version: 1
 atlas_source: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
-spine_source: genesis/manifests/spine.yaml
+charter_source: genesis/manifests/charter.yaml
 
 # The §7 plane groups, in render order. `governing-meta` and `bridges` are the plan's two
 # additions; the first three are the atlas's own lens verbatim.
@@ -107,7 +107,7 @@ seams:
     tracks: [T1, T2, T3, T4]
     reach_tier: community
     registry_crates: []
-    spine_nodes: []
+    charter_articles: []
     n_a_concerns: []
 
   - id: S3.4
@@ -121,7 +121,7 @@ seams:
     tracks: [T2]
     reach_tier: trusted
     registry_crates: []
-    spine_nodes: [operator-runtime-surface]
+    charter_articles: [operator-runtime-surface]
     n_a_concerns: []
 
   - id: S3.5
@@ -135,7 +135,7 @@ seams:
     tracks: [T1]
     reach_tier: commons
     registry_crates: []
-    spine_nodes: []
+    charter_articles: []
     n_a_concerns: []
 
   - id: S3.7
@@ -149,7 +149,7 @@ seams:
     tracks: [T1, T4]
     reach_tier: commons
     registry_crates: []
-    spine_nodes: []
+    charter_articles: []
     n_a_concerns: []
 
   - id: S3.12
@@ -173,7 +173,7 @@ seams:
       "elohim-node::AdmissionController::evaluate": S3.15
       "elohim-node::AdmissionDecision": S3.15
       "elohim-node::DeferReason": S3.15
-    spine_nodes: [identity-cross-signed]
+    charter_articles: [identity-cross-signed]
     n_a_concerns: []
 
   - id: S3.14
@@ -187,7 +187,7 @@ seams:
     tracks: [T1, T2]
     reach_tier: community
     registry_crates: []
-    spine_nodes: []
+    charter_articles: []
     n_a_concerns: []
 
   - id: S3.2
@@ -202,7 +202,7 @@ seams:
     tracks: []
     reach_tier: community
     registry_crates: []
-    spine_nodes: [declarative-desired-state]
+    charter_articles: [declarative-desired-state]
     n_a_concerns: []
 
   - id: S3.3
@@ -217,7 +217,7 @@ seams:
     tracks: [T2, T3]
     reach_tier: community
     registry_crates: []
-    spine_nodes: [declarative-desired-state]
+    charter_articles: [declarative-desired-state]
     n_a_concerns: []
 
   # ── data ───────────────────────────────────────────────────────────────────────────────────
@@ -236,7 +236,7 @@ seams:
     tracks: [T1, T2, T3]
     reach_tier: familiar
     registry_crates: [elohim-storage, content_store]
-    spine_nodes: [dataplane-convergence, blob-durability, notary-authority, sync-scale-honesty,
+    charter_articles: [dataplane-convergence, blob-durability, notary-authority, sync-scale-honesty,
                   reach-enforced-everywhere]
     n_a_concerns: []
 
@@ -251,7 +251,7 @@ seams:
     tracks: [T1, T2]
     reach_tier: community
     registry_crates: []
-    spine_nodes: [notary-authority, sync-scale-honesty]
+    charter_articles: [notary-authority, sync-scale-honesty]
     n_a_concerns: []
 
   - id: S3.13
@@ -265,7 +265,7 @@ seams:
     tracks: [T2]
     reach_tier: private
     registry_crates: []
-    spine_nodes: []
+    charter_articles: []
     n_a_concerns: []
 
   - id: S3.15
@@ -279,7 +279,7 @@ seams:
     tracks: [T2, T3, T4]
     reach_tier: community
     registry_crates: []
-    spine_nodes: [doorway-failover, operator-runtime-surface]
+    charter_articles: [doorway-failover, operator-runtime-surface]
     n_a_concerns: []
 
   # ── projection ─────────────────────────────────────────────────────────────────────────────
@@ -294,7 +294,7 @@ seams:
     tracks: [T4]
     reach_tier: public
     registry_crates: []
-    spine_nodes: []
+    charter_articles: []
     n_a_concerns: []
 
   - id: S3.9
@@ -307,7 +307,7 @@ seams:
     tracks: [T4]
     reach_tier: public
     registry_crates: [doorway]
-    spine_nodes: [doorway-failover, reach-enforced-everywhere]
+    charter_articles: [doorway-failover, reach-enforced-everywhere]
     n_a_concerns: []
 
   # ── bridges ────────────────────────────────────────────────────────────────────────────────
@@ -321,7 +321,7 @@ seams:
     tracks: [T3, T4]
     reach_tier: public
     registry_crates: [did-bridge]
-    spine_nodes: []
+    charter_articles: []
     n_a_concerns: []
 
   # ── governing / meta ───────────────────────────────────────────────────────────────────────
@@ -349,5 +349,5 @@ seams:
     # `select_canonical_winner` adapter row. Same C2 guarantee, two columns, neither standing in
     # for the other.
     registry_crates: [elohim-seam-contracts]
-    spine_nodes: []
+    charter_articles: []
     n_a_concerns: []

@@ -7,8 +7,8 @@
 //! we had (`tests/sync_libp2p_convergence.rs`) re-implements the round in the test
 //! file, so any assertion written there measures the mirror, not the wire. Pulling
 //! the decisions out as pure functions lets a test assert the shape of what
-//! production actually sends. See spine node `sync-scale-honesty`
-//! (`genesis/manifests/spine.yaml`) and `tests/sync_scale_honesty.rs`.
+//! production actually sends. See charter article `sync-scale-honesty`
+//! (`genesis/manifests/charter.yaml`) and `tests/sync_scale_honesty.rs`.
 //!
 //! **Cured 2026-07-27 (was a standing red).** The plane was poll-only with cost
 //! proportional to corpus size, not to the number of changes:
