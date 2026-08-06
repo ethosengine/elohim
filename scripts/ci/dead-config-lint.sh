@@ -42,17 +42,13 @@ check "ViewKind::ContentHeadRecord" "elohim/elohim-storage/src/p2p/head_record_c
       "a view kind the responder serves but nobody requests is a claim, not a feature \
 (same rule as PROJECTION_INVENTORY_TABLE_COLLECTIVES above)"
 
-# ── the inverse check: a key the code READS that nothing SETS ──────────────────
-# A knob with no reader is a claim (above). A key with no setter is a feature that
-# ships configured OFF with nothing red anywhere — which is how ELOHIM_IROH_RELAY_URL
-# left the iroh transport on RelayMode::Disabled fleet-wide while its boot sentinel
-# printed green (2026-08-06). ADVISORY for now: the current surface is ~20 ELOHIM_*
-# keys, so failing today would redden CI on pre-existing debt. Ratchet from a baseline
-# to give this teeth.
-if command -v python3 >/dev/null 2>&1; then
-  echo "--- config provenance (advisory: read by code, set by nothing) ---"
-  python3 "$ROOT/.claude/scripts/config-provenance.py" --prefix ELOHIM_ || true
-fi
-
+# NOT WIRED YET: the inverse check — "does this read key have a setter?" — lives at
+# .claude/scripts/config-provenance.py and finds real cases (ELOHIM_IROH_RELAY_URL is
+# read by the iroh transport and set by nothing, so the leg ships relay-less while its
+# boot sentinel prints green). It is NOT called from here because this script's runtime
+# is unverified for python3 and the deploy-container invariant (edge #1183) is bash +
+# coreutils only. A check that silently no-ops in CI is an instrument with no reader —
+# the exact class this script exists to catch. Wire it once the runtime is confirmed,
+# or port the query to bash.
 
 exit $fail
