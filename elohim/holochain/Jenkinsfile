@@ -392,7 +392,7 @@ def getEnvConfig() {
             ],
             doorwayManifest: 'genesis/orchestrator/manifests/doorway/alpha.yaml',
             envFile: 'genesis/orchestrator/environments/alpha.env',
-            infraManifests: ['genesis/orchestrator/manifests/infra/alpha-mongodb.yaml', 'genesis/orchestrator/manifests/infra/alpha-nats.yaml', 'genesis/orchestrator/manifests/infra/alpha-coturn-operations.yaml', 'genesis/orchestrator/manifests/infra/alpha-coturn-shem.yaml'],
+            infraManifests: ['genesis/orchestrator/manifests/infra/alpha-mongodb.yaml', 'genesis/orchestrator/manifests/infra/alpha-nats.yaml', 'genesis/orchestrator/manifests/infra/alpha-iroh-connection-ratio-grafana-dashboard.yaml', 'genesis/orchestrator/manifests/infra/alpha-coturn-operations.yaml', 'genesis/orchestrator/manifests/infra/alpha-coturn-shem.yaml'],
             healthUrl: 'https://doorway-alpha.elohim.host',
         ],
         staging: [
@@ -674,6 +674,16 @@ def resolveRelayUrl(String signalUrl, String humanName, String humanEnv) {
     }
 }
 
+// Wave-2 Stage 1 is an alpha-namespace-atomic transport flip. The iroh
+// conductor is embedded in this storage image; staging/prod keep their
+// environment storage tags as the rollback wave.
+def resolveStorageImage(String humanEnv, versions) {
+    if (humanEnv == 'alpha') {
+        return 'harbor.ethosengine.com/ethosengine/elohim-storage-iroh:hc-elohim-0.6.3-iroh'
+    }
+    return "harbor.ethosengine.com/ethosengine/elohim-storage:${versions.STORAGE_TAG}"
+}
+
 /**
  * Deploy a human manifest with topology-aware placeholder substitution.
  * Uses | as sed delimiter because URLs contain /.
@@ -681,6 +691,7 @@ def resolveRelayUrl(String signalUrl, String humanName, String humanEnv) {
 def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     def versions = readProperties(file: envFile)
     def deployVersion = sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
+    def storageImage = resolveStorageImage(humanConfig.env, versions)
     // Resolve the floating hApp tag to its content digest so a DNA-pipeline tag
     // move (new hApp bytes, no edge commit) surfaces as an STS spec change and
     // the genesis-peer surge guard lets the rollout restart proceed. FAIL SAFE
@@ -785,7 +796,7 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         // Image tag placeholders
         "s|EDGENODE_TAG_PLACEHOLDER|${versions.EDGENODE_TAG}|g",
         "s|DOORWAY_TAG_PLACEHOLDER|${doorwayRef}|g",
-        "s|STORAGE_TAG_PLACEHOLDER|${versions.STORAGE_TAG}|g",
+        "s|STORAGE_IMAGE_PLACEHOLDER|${storageImage}|g",
         "s|HAPP_INSTALLER_TAG_PLACEHOLDER|${versions.HAPP_INSTALLER_TAG}|g",
         "s|DOORWAY_APP_TAG_PLACEHOLDER|${versions.DOORWAY_APP_TAG}|g",
         "s|HAPP_TAG_PLACEHOLDER|${versions.HAPP_TAG}|g",
@@ -866,7 +877,10 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     // Seam-smoke gate: the conductor's webrtc_config must parse into tx5's
     // camelCase contract with real ICE servers — catches the dead-key class
     // (ice_servers ran the fleet with ZERO ICE servers until 2026-07-11).
-    sh "bash scripts/ci/validate-conductor-config.sh ${outputFile}"
+    // Alpha renders the transport-iroh image above, so its render gate must
+    // enforce the self-hosted relay contract. Other environments remain on
+    // tx5 and keep the validator's default ICE checks only.
+    sh "IROH_TARGET=${humanConfig.env == 'alpha' ? '1' : '0'} bash scripts/ci/validate-conductor-config.sh ${outputFile}"
 
     def resetHumans = (params.RESET_HUMANS ?: false) == true
     if (resetHumans) {

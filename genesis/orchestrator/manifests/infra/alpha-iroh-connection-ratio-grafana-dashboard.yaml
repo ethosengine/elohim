@@ -1,0 +1,141 @@
+# Grafana/Loki decision meter for the Wave-2 Stage-2 iroh soak.
+#
+# U4 makes the `Connection established ... direct=true|false` ratio the sole
+# input to the Phase-B QAD decision. U5 confirms failed QAD probes are silent at
+# info, so there is no separate failure line to alert on. This dashboard is a
+# report, not an alert: the operator selects the exact soak window and reads the
+# event-weighted direct ratio per local conductor pod together with its sample
+# count. No series means UNMEASURED, never 0%.
+#
+# Source stream: the embedded conductor's piped stdout/stderr in the
+# `elohim-node` container. The sentinel is a non-JSON child-process line, so the
+# LogQL deliberately filters text directly and does not append `| json`. The
+# conductor formatter may retain ANSI escapes between the structured field,
+# equals sign, and value, so the predicate is ANSI-tolerant rather than a
+# brittle literal `direct=true` filter.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: iroh-connection-ratio-dashboard
+  namespace: elohim-alpha
+  labels:
+    grafana_dashboard: "1"
+    app: elohim-edgenode
+    environment: alpha
+    release: kube-prom-stack
+    app.kubernetes.io/name: iroh-transport
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+data:
+  iroh-connection-ratio.json: |
+    {
+      "title": "Iroh — Direct Connection Ratio (alpha)",
+      "uid": "iroh-direct-ratio-alpha",
+      "tags": ["iroh", "elohim", "alpha", "transport", "stage-2"],
+      "timezone": "",
+      "schemaVersion": 39,
+      "version": 1,
+      "editable": true,
+      "graphTooltip": 1,
+      "refresh": "30s",
+      "time": { "from": "now-7d", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "datasource",
+            "label": "Loki",
+            "type": "datasource",
+            "query": "loki",
+            "current": {},
+            "hide": 0,
+            "refresh": 1,
+            "regex": ""
+          }
+        ]
+      },
+      "panels": [
+        {
+          "type": "row",
+          "title": "Stage-2 QAD decision input",
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "id": 1,
+          "panels": []
+        },
+        {
+          "type": "bargauge",
+          "title": "Direct connection ratio by conductor pod",
+          "description": "100 × direct=true connection-establishment events / all direct=true|false events in the selected dashboard window. Event-weighted per local pod; it is not a count of distinct remote peers. No bar means no samples (unmeasured), not 0% direct.",
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "gridPos": { "h": 10, "w": 16, "x": 0, "y": 1 },
+          "id": 2,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 50 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "displayMode": "gradient",
+            "minVizHeight": 10,
+            "minVizWidth": 0,
+            "namePlacement": "auto",
+            "orientation": "horizontal",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true },
+            "showUnfilled": true,
+            "sizing": "auto",
+            "valueMode": "color"
+          },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "${datasource}" },
+              "expr": "100 * sum by (pod) (count_over_time({namespace=\"elohim-alpha\", container=\"elohim-node\"} |= \"Connection established\" |~ \"direct.{0,64}=.{0,64}true\" [$__range])) / sum by (pod) (count_over_time({namespace=\"elohim-alpha\", container=\"elohim-node\"} |= \"Connection established\" |~ \"direct.{0,64}=.{0,64}(true|false)\" [$__range]))",
+              "legendFormat": "{{pod}}",
+              "queryType": "instant",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "type": "stat",
+          "title": "Observed connection establishments by pod",
+          "description": "Denominator for the ratio over the selected window. Read this beside the percentage: 1/1 is not a soak. No value means the emitter/log path is unmeasured and cannot support the Phase-B decision.",
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "gridPos": { "h": 10, "w": 8, "x": 16, "y": 1 },
+          "id": 3,
+          "fieldConfig": {
+            "defaults": { "unit": "short", "min": 0 },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "horizontal",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true },
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "${datasource}" },
+              "expr": "sum by (pod) (count_over_time({namespace=\"elohim-alpha\", container=\"elohim-node\"} |= \"Connection established\" |~ \"direct.{0,64}=.{0,64}(true|false)\" [$__range]))",
+              "legendFormat": "{{pod}}",
+              "queryType": "instant",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    }

@@ -298,7 +298,7 @@ spec:
         # Manages holochain conductor as embedded child process.
         # Replaces: edgenode + ws-proxy + elohim-storage + happ-installer
         - name: elohim-node
-          image: harbor.ethosengine.com/ethosengine/elohim-storage:STORAGE_TAG_PLACEHOLDER
+          image: STORAGE_IMAGE_PLACEHOLDER
           imagePullPolicy: Always
           env:
             - name: HUMAN_ID
