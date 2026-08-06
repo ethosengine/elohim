@@ -22,7 +22,7 @@ check() {
 }
 
 check "SyncRequest::ListDocumentsSince" "elohim/elohim-storage/src/p2p/sync_round.rs" \
-      "the round opener must construct it (charter sync-scale-honesty)"
+      "the round opener must construct it (habits sync-scale-honesty)"
 check "inc_sync_in_sync" "elohim/elohim-storage/src/p2p" \
       "the InSync client arm must count the shortcut"
 check "PROJECTION_INVENTORY_TABLE_COLLECTIVES" "elohim/elohim-storage/src/p2p/projection_reconcile.rs" \
@@ -41,5 +41,18 @@ re-crowns its own root every restart, which IS the divergence defect"
 check "ViewKind::ContentHeadRecord" "elohim/elohim-storage/src/p2p/head_record_client.rs" \
       "a view kind the responder serves but nobody requests is a claim, not a feature \
 (same rule as PROJECTION_INVENTORY_TABLE_COLLECTIVES above)"
+
+# ── the inverse check: a key the code READS that nothing SETS ──────────────────
+# A knob with no reader is a claim (above). A key with no setter is a feature that
+# ships configured OFF with nothing red anywhere — which is how ELOHIM_IROH_RELAY_URL
+# left the iroh transport on RelayMode::Disabled fleet-wide while its boot sentinel
+# printed green (2026-08-06). ADVISORY for now: the current surface is ~20 ELOHIM_*
+# keys, so failing today would redden CI on pre-existing debt. Ratchet from a baseline
+# to give this teeth.
+if command -v python3 >/dev/null 2>&1; then
+  echo "--- config provenance (advisory: read by code, set by nothing) ---"
+  python3 "$ROOT/.claude/scripts/config-provenance.py" --prefix ELOHIM_ || true
+fi
+
 
 exit $fail

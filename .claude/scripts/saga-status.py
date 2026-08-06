@@ -4,7 +4,7 @@
 The resiliency-saga (genesis/a2o/features/dataplane/resiliency-saga/NN-*.feature) narrates
 data surviving node loss as ten ordered chapters, each tagged `@concern:saga-NN-<name>`. This
 script joins three deterministic, read-only sources into ONE line every session can open with
-(sibling to charter-status.py's delivery-charter headline — same posture: never throw, degrade on
+(sibling to habits-status.py's delivery-habits headline — same posture: never throw, degrade on
 any missing input, no network):
 
   1. CHAPTERS — the feature files themselves (always present; the ordering ground truth).
@@ -63,7 +63,7 @@ SCRIPT = Path(__file__).resolve()
 
 def find_repo_root() -> Path:
     """Walk up from this script looking for a directory that looks like the repo root
-    (has .git AND genesis/); fall back to the fixed depth charter-status.py also assumes
+    (has .git AND genesis/); fall back to the fixed depth habits-status.py also assumes
     (.claude/scripts/<this file> -> repo root is two parents up)."""
     for anc in [SCRIPT] + list(SCRIPT.parents):
         if (anc / ".git").exists() and (anc / "genesis").is_dir():

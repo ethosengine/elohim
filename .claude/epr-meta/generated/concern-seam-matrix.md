@@ -12,7 +12,7 @@ State vocabulary: `conformant` = every citing point answered **and** cites a con
 
 ### Control / truth plane 
 
-| Seam | Atlas § | Name | Tracks | Reach tier | Charter articles |
+| Seam | Atlas § | Name | Tracks | Reach tier | Habits |
 |---|---|---|---|---|---|
 | `S3.1` | 3.1 | Hardware / capability gradient | T1, T2, T3, T4 | community | — |
 | `S3.4` | 3.4 | Mod / plugin (native extension INTO the runtime) | T2 | trusted | operator-runtime-surface |
@@ -25,7 +25,7 @@ State vocabulary: `conformant` = every citing point answered **and** cites a con
 
 ### Data plane 
 
-| Seam | Atlas § | Name | Tracks | Reach tier | Charter articles |
+| Seam | Atlas § | Name | Tracks | Reach tier | Habits |
 |---|---|---|---|---|---|
 | `S3.10` | 3.10 | Peer-hoster dataplane (Tracks 2 + 3) | T1, T2, T3 | familiar | dataplane-convergence, blob-durability, notary-authority, sync-scale-honesty, reach-enforced-everywhere |
 | `S3.11` | 3.11 | Aggregation / recursive rollup (Track 2) | T1, T2 | community | notary-authority, sync-scale-honesty |
@@ -34,20 +34,20 @@ State vocabulary: `conformant` = every citing point answered **and** cites a con
 
 ### Projection plane 
 
-| Seam | Atlas § | Name | Tracks | Reach tier | Charter articles |
+| Seam | Atlas § | Name | Tracks | Reach tier | Habits |
 |---|---|---|---|---|---|
 | `S3.8` | 3.8 | Client surface | T4 | public | — |
 | `S3.9` | 3.9 | Doorway projection (Track 4) | T4 | public | doorway-failover, reach-enforced-everywhere |
 
 ### Bridges (translation seam) 
 
-| Seam | Atlas § | Name | Tracks | Reach tier | Charter articles |
+| Seam | Atlas § | Name | Tracks | Reach tier | Habits |
 |---|---|---|---|---|---|
 | `S3.6` | 3.6 | Bridge (translate outward — add a CRATE) | T3, T4 | public | — |
 
 ### Governing / meta plane 
 
-| Seam | Atlas § | Name | Tracks | Reach tier | Charter articles |
+| Seam | Atlas § | Name | Tracks | Reach tier | Habits |
 |---|---|---|---|---|---|
 | `SGOV` | plan surface 6 (no atlas §3 section — the atlas maps the runtime) | Governing / meta plane (repo's own governance substrate) | — | community | — |
 
@@ -97,7 +97,7 @@ Legend: `✓` conformant · `~` variant · `·` unexamined · `-` n-a
 
 ## Ranked unexamined cells
 
-Rank = recurrence x severity x rung-proximity (severity: silent-corruption 2.0, loud-fail 1.0; rung-proximity from `genesis/manifests/charter.yaml`: active red 4.0, red 3.0, active unwired 2.5, unwired 2.0, green 1.0, unlinked 0.5).
+Rank = recurrence x severity x rung-proximity (severity: silent-corruption 2.0, loud-fail 1.0; rung-proximity from `genesis/manifests/habits.yaml`: active red 4.0, red 3.0, active unwired 2.5, unwired 2.0, green 1.0, unlinked 0.5).
 
 | # | Class | Seam | Score | Recurrence | Severity | Rung proximity |
 |---|---|---|---|---|---|---|

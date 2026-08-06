@@ -15,7 +15,7 @@ tags: [p2p, view-federation, request-response, libp2p, reconcile, timeouts, sync
 cites:
   - elohim/elohim-storage/src/p2p/view_federation.rs
   - elohim/elohim-storage/src/p2p/projection_reconcile.rs
-  - genesis/manifests/spine.yaml
+  - genesis/manifests/habits.yaml
 ---
 
 # Chronic F-T19 view-federation request flakiness (mesh-wide)
@@ -46,7 +46,7 @@ from heal (conductor needed) would let discovery use the boot window.
 Reconcile sweeps (REA + content) treat a failed inventory request as
 "peer not asked this sweep" — persistent flakiness slows convergence
 linearly and silently. This is the view-federation sibling of the sync-plane
-timeouts named in spine node `sync-scale-honesty` first_move (task #9,
+timeouts named in habit `sync-scale-honesty` first_move (task #9,
 persistent sync-request timeouts from 3 peers) — likely the same underlying
 transport/relay condition, different protocol.
 

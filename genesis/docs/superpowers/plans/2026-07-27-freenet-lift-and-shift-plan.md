@@ -9,7 +9,7 @@ requires_env: []
 topic: [freenet, prior-art, sync-scale-honesty, hosting-budget, reach-negotiation, durability-floor, licensing]
 cites:
   - genesis/research/freenet-peer-confrontation-2026-07-27.md
-  - genesis/manifests/spine.yaml
+  - genesis/manifests/habits.yaml
   - stewardship-over-sovereignty | stewardship-over-sovereignty | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md
 ---
 
@@ -48,9 +48,9 @@ Effort marks: **S** ≤ 1 day · **M** ≤ 1 sprint · **L** design-sized.
 
 ---
 
-## Phase 2 — Close `sync-scale-honesty` (spine node, RED, active)
+## Phase 2 — Close `sync-scale-honesty` (habit, RED, active)
 
-**The clearest lift in the survey.** Their `summarize / get_delta / apply_delta` is the shipped cure for our `O(peers × corpus)` opener — and we are closer than the spine node records.
+**The clearest lift in the survey.** Their `summarize / get_delta / apply_delta` is the shipped cure for our `O(peers × corpus)` opener — and we are closer than the habit records.
 
 Verified state: `ListDocumentsSince` is **handled on both transports** (`p2p/mod.rs:6656`, `p2p_iroh/sync_backend.rs:222`) with a digest short-circuit that logs *"digests match — answering InSync, enumerating nothing"* and falls back to full enumeration on mismatch. It is **never constructed**. `SyncChanges.bloom_filter` is declared (`sync_protocol.rs:64`), always `None` at all three call sites, and ignored by both receivers. **We built the answering half and never built the asking half.**
 

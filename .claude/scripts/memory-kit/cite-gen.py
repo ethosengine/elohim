@@ -86,6 +86,16 @@ def _resolve_doc(ref, index):
     return None
 
 
+def _looks_like_repo_path(ref: str) -> bool:
+    """A cite ref that names a file IN this repo (so its absence is a DEAD-CITE), rather than a
+    URL, a bare slug, or free prose. Conservative on purpose: a false DEAD-CITE fails a gate."""
+    if "://" in ref or ref.startswith(("http", "mailto:", "#")):
+        return False
+    if "/" not in ref or ref.strip() != ref or " " in ref:
+        return False
+    return Path(ref).suffix != "" and not Path(ref).is_absolute()
+
+
 def _is_doc_root(p: Path) -> bool:
     # Gospel CLAUDE.mds join the doc graph (2026-06-05) — see cite_graph.extend_index_with_gospels.
     return any(str(p).startswith(str(r)) for r in _doc_roots()) or cg.is_gospel_claude_md(p, ROOT)
@@ -208,6 +218,12 @@ def verify(doc: Path) -> list:
             # A legacy cite to a frontmatter-less doc (no id: possible) or to code/external is fine.
             if tgt and _is_doc_root(tgt) and fm.parse_file(tgt).get("id"):
                 problems.append(f"legacy doc cite (migrate to envelope): {c['ref']}")
+            elif tgt is None and _looks_like_repo_path(c["ref"]) and not (ROOT / c["ref"]).exists():
+                # DEAD-CITE. Without this arm a legacy cite to a DELETED file is indistinguishable
+                # from one to code/external — `_resolve_doc` returns None for both — so --verify
+                # returned ✅ on four plans still citing `genesis/manifests/spine.yaml` after the
+                # file was renamed, and one of them instructs an agent to edit it (2026-08-06).
+                problems.append(f"DEAD-CITE (target missing): {c['ref']}")
         else:
             if c["ref"] not in index:
                 problems.append(f"unresolvable slug: {c['ref']}")

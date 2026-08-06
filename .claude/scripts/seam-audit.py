@@ -15,7 +15,7 @@ program is behind an explicit verb (`--file`, `--write`, `--record`, `--record-m
   --matrix [--write]          the concern x seam matrix; --write regenerates
                               .claude/epr-meta/generated/concern-seam-matrix.{json,md}
   --forecast                  the seeded forecast, seeded vs derived rank, ledger summary
-  --calibrate [--record]      charter-flip intake for the calibration ledger (append-only)
+  --calibrate [--record]      habits-flip intake for the calibration ledger (append-only)
   --record-miss-of-canon --note "<evidence>" [--seam S3.x] [--rung <node>]
                               the canon-growth intake; refuses an empty note
   --spot-check [N]            INDEPENDENT re-derivation of N sampled decision points from disk;
@@ -102,7 +102,7 @@ def main() -> int:
         if args.json:
             print(json.dumps(cal, indent=1))
         else:
-            print("CALIBRATION  (plan P4.4 — append-only ledger, charter-flip intake)")
+            print("CALIBRATION  (plan P4.4 — append-only ledger, habits-flip intake)")
             print("=" * 72)
             print(f"forecast rows: {cal['forecast_rows']} · snapshot on file: "
                   f"{cal['has_snapshot']} · flips: {len(cal['flips'])}")
@@ -123,7 +123,7 @@ def main() -> int:
         if args.record:
             res = fc.record(root, cal)
             print(f"\nrecorded: {res['written']} calibration row(s)"
-                  + (" + a fresh charter snapshot" if res["snapshot"] else ""))
+                  + (" + a fresh habits snapshot" if res["snapshot"] else ""))
 
     if args.record_miss_of_canon:
         did = True

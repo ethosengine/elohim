@@ -13,9 +13,9 @@ priority: "high"
 requires_env: "shem"
 themes: [dataplane, libp2p, shem, reachability, acquisition, observability]
 relatedNodeIds:
-  - "genesis/manifests/spine.yaml"
+  - "genesis/manifests/habits.yaml"
   - "genesis/data/timeline/backlog/wan-nat-federation-dataplane-discovery-gap-2026-06-23.md"
-tags: [p2p, shem, blocked-by-env, spine:sync-scale-honesty]
+tags: [p2p, shem, blocked-by-env, habits:sync-scale-honesty]
 ---
 
 # Cluster→shem P2P request starvation — the 11-peer blackout
@@ -54,7 +54,7 @@ coverage of the shem node (restores observability for 11 peers at once);
 whether request-handler starvation under CPU caps deserves a QoS floor
 (protocol handlers vs conductor contention).
 
-**Code-side candidates (post-relief, spine `sync-scale-honesty`):** per-peer
+**Code-side candidates (post-relief, habit `sync-scale-honesty`):** per-peer
 timeout backoff/circuit so 11×~50/h request storms don't burn cycles;
 `/p2p/status` pull rollup should log its total/fetched at INFO on change (the
 rollup is currently untraced — this investigation could not read it from logs);

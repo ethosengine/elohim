@@ -5,13 +5,13 @@ status: Ready
 class: substrate
 context-tier: disclosed
 steward: rust-architect
-graduation-trigger: superseded-by-implementation — graduate once spine nodes `sync-scale-honesty` and `notary-authority` are green with evidence and the three unwired nodes each carry a runnable red
+graduation-trigger: superseded-by-implementation — graduate once habits `sync-scale-honesty` and `notary-authority` are green with evidence and the three unwired nodes each carry a runnable red
 created: 2026-07-25
 domain: D5
-sprint: spine-serving
-topic: [sync-plane, legibility, convergence, attribution, reach-enforcement, operator-surface, spine]
+sprint: charter-serving
+topic: [sync-plane, legibility, convergence, attribution, reach-enforcement, operator-surface, charter]
 cites:
-  - genesis/manifests/spine.yaml
+  - genesis/manifests/habits.yaml
   - elohim/elohim-storage/src/p2p/sync_round.rs
   - elohim/elohim-storage/tests/sync_scale_honesty.rs
   - elohim/elohim-storage/src/p2p/reconcile_rails.rs
@@ -32,7 +32,7 @@ cites:
 
 **Goal:** Make the substrate able to say what it is doing, push what changed, and converge — in that order — so the four properties an embedded-persistence SDK must promise (legibility, propagation, convergence, attribution) stop being absent at four different layers, and the remaining two (confidentiality, actuation) each acquire a runnable red instead of a prose gap.
 
-**Architecture:** The six gaps are not six parallel workstreams. **Legibility is the measuring instrument for the other five** — while `caughtUp: true` is reported over 1860 divergent anchors and `/health`'s cached copy disagrees with live `/p2p/status` by 12×, no cure to propagation or convergence can be *verified*, and any SLO offered over those fields would be a lie by construction. So Phase 0 lands an honest convergence metric and a staleness-stamped read path; Phase 1 cures propagation (announce-on-change send site + a round opener that is a function of local state); Phase 2 cures convergence (the isolated `rea_commitment_replication` sweettest red); Phase 3 writes the first red for each of the three `unwired` spine nodes, because per the spine covenant an unwired node's only legal first move is a runnable check — prose specs do not advance it.
+**Architecture:** The six gaps are not six parallel workstreams. **Legibility is the measuring instrument for the other five** — while `caughtUp: true` is reported over 1860 divergent anchors and `/health`'s cached copy disagrees with live `/p2p/status` by 12×, no cure to propagation or convergence can be *verified*, and any SLO offered over those fields would be a lie by construction. So Phase 0 lands an honest convergence metric and a staleness-stamped read path; Phase 1 cures propagation (announce-on-change send site + a round opener that is a function of local state); Phase 2 cures convergence (the isolated `rea_commitment_replication` sweettest red); Phase 3 writes the first red for each of the three `unwired` habits, because per the habits register covenant an unwired node's only legal first move is a runnable check — prose specs do not advance it.
 
 **Tech Stack:** Rust (elohim-storage native + doorway-service native), Automerge CRDT sync plane, libp2p 0.54.1 + iroh dual transport, rmp-serde MessagePack wire, Prometheus metrics, Holochain sweettest, Cucumber/a2o BDD, ts-rs + JSON-Schema view contract.
 
@@ -47,17 +47,17 @@ cites:
   - **A variant's FIELDS are a positional fixarray**, so adding a field to an existing variant *is* wire-breaking. That is the real reason `ListDocumentsSince` is a new variant rather than an extra field on `ListDocuments`.
   - An older peer decoding an unknown variant **errors** rather than landing on a neighbour — verified by test, and the premise the rollout rests on. Therefore: **ship the handler in one release, ship the sender in the next.** Never both in one deploy.
   - **This gate applies ONLY to new variants.** `AnnounceChange` (Task 9) is an *existing* variant every peer already decodes, so its sender ships without waiting for anything.
-- **The spine's fake-green guard is binding** (`spine.yaml`, node `sync-scale-honesty`): `sync_round::round_opener` and `sync_round::announcements_for_local_change` must stay the **only** constructors of the round opener and the announce requests. Returning announce requests without a caller that sends them turns the test green while nothing propagates.
-- **The WIP fence is binding** (spine covenant rule 3): max 2 nodes `active: true`. `notary-authority` and `sync-scale-honesty` hold both slots today. Phase 3 does not activate its nodes — it writes their reds, which is legal for an `unwired` node and does not consume a slot.
-- **Status flips require evidence** (spine covenant rule 4): a build number, a live probe, or a test run. Never edit `spine.yaml` status from intention.
-- **Changing what a CI-gated measure counts is an operator call**, per the blob-durability precedent recorded in `spine.yaml`. Task 5 is explicitly gated on that.
+- **The charter's fake-green guard is binding** (`charter.yaml`, node `sync-scale-honesty`): `sync_round::round_opener` and `sync_round::announcements_for_local_change` must stay the **only** constructors of the round opener and the announce requests. Returning announce requests without a caller that sends them turns the test green while nothing propagates.
+- **The WIP fence is binding** (charter covenant rule 3): max 2 nodes `active: true`. `notary-authority` and `sync-scale-honesty` hold both slots today. Phase 3 does not activate its nodes — it writes their reds, which is legal for an `unwired` node and does not consume a slot.
+- **Status flips require evidence** (charter covenant rule 4): a build number, a live probe, or a test run. Never edit `charter.yaml` status from intention.
+- **Changing what a CI-gated measure counts is an operator call**, per the blob-durability precedent recorded in `charter.yaml`. Task 5 is explicitly gated on that.
 - View-struct changes follow the schema contract: schema first (`elohim/sdk/schemas/v1/views/`), then the Rust struct, then `cargo test --test schema_contract`, then `pnpm run schema:codegen:ts`.
 
 ---
 
 ## Where this sits
 
-| # | Gap (session evidence) | Spine node | Node status | This plan |
+| # | Gap (session evidence) | Charter article | Node status | This plan |
 |---|---|---|---|---|
 | 1 | Legibility — the substrate can't report its own failure | (instrument for all) | — | **Phase 0** — Tasks 1–5 |
 | 2 | Propagation — poll-only, opener is O(corpus) | `sync-scale-honesty` | **red · active** | **Phase 1** — Tasks 6–8 |
@@ -99,10 +99,10 @@ that quietly absorbs its own errors teaches nothing:
 
 ---
 
-**Prioritization note (staleness guard).** `genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md` was last regenerated **2026-06-02** and ranks none of this work; `genesis/manifests/spine.yaml` was updated **2026-07-04** and carries live evidence through 2026-07-25. For dataplane work the spine is the live prioritization surface and this plan follows it. The roadmap needs a regeneration pass — that is a cartographer job, filed as complementary work below, not folded into this plan.
+**Prioritization note (staleness guard).** `genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md` was last regenerated **2026-06-02** and ranks none of this work; `genesis/manifests/habits.yaml` was updated **2026-07-04** and carries live evidence through 2026-07-25. For dataplane work the habits register is the live prioritization surface and this plan follows it. The roadmap needs a regeneration pass — that is a cartographer job, filed as complementary work below, not folded into this plan.
 
 **Complementary work captured, not absorbed** (one line each to `genesis/data/timeline/backlog/`, so scope stays genuine):
-- Roadmap regeneration against the current spine + `--ledger` (cartographer).
+- Roadmap regeneration against the current charter + `--ledger` (cartographer).
 - The C2 cross-signature slice decomposition (S2–S6) exists **only** in `.claude/shifts/2026-07-18T03-27-integrate-identity-head-c2-deliver.journal.md` — it needs a real plan file. Task 11 writes the red; the S2–S6 plan is a separate document.
 - Bucketed/merkle-range digest refinement of the sync opener (Task 7 lands the flat digest; range-splitting is a follow-on).
 
@@ -623,7 +623,7 @@ block); its age ships with it, and converged rides alongside caughtUp."
 
 ### Task 5: Move the a2o gate onto the trustworthy number — **operator-gated**
 
-`genesis/a2o/features/dataplane/peer-mesh.feature:22,28` asserts `/health p2p.caughtUp is true` for `alpha-A` and `elohim.host`. That gate reads the less trustworthy of the two numbers, and `caughtUp` overstates convergence by design. Changing it changes what a CI-gated measure counts — which `spine.yaml` records as an **operator call** (the blob-durability `@browser-only` precedent).
+`genesis/a2o/features/dataplane/peer-mesh.feature:22,28` asserts `/health p2p.caughtUp is true` for `alpha-A` and `elohim.host`. That gate reads the less trustworthy of the two numbers, and `caughtUp` overstates convergence by design. Changing it changes what a CI-gated measure counts — which `charter.yaml` records as an **operator call** (the blob-durability `@browser-only` precedent).
 
 **Files:**
 - Modify: `genesis/a2o/features/dataplane/peer-mesh.feature:18-30`
@@ -693,7 +693,7 @@ elohim_sync_request_outcomes_total{result="timeout"}
 Query via `mcp__observability__query_prometheus`. `elohim_sync_docs_enumerated_total`'s **rate over rounds** is the scaling read Phase 1 will move.
 
 - [ ] **Step 4:** Re-measure the acquisition leg. It failed 100% on both genesis peers (29/29, 5/5, `fetched=0`) and emitted zero lines in 1.13M logs over 6h. With `486982bb8` deployed it must now emit at or above `info!`. If it is still silent, that is a **new** finding — file it, do not absorb it into this plan.
-- [ ] **Step 5:** Record the delta in `spine.yaml` (one line, evidence-backed: build number + the queried values). Do not flip any status yet — Phase 0 builds the instrument, it does not cure a node.
+- [ ] **Step 5:** Record the delta in `charter.yaml` (one line, evidence-backed: build number + the queried values). Do not flip any status yet — Phase 0 builds the instrument, it does not cure a node.
 
 ---
 
@@ -942,7 +942,7 @@ Watch rate(elohim_sync_docs_enumerated_total) — it should collapse."
 
 ### Task 9: Wire the announce-on-change send site
 
-`SyncRequest::AnnounceChange` is defined (`sync_protocol.rs:77`) and handled by both transports (`p2p/mod.rs:6423`, `p2p_iroh/sync_backend.rs:147`), but **nothing in `src/` constructs one**. `sync::projector::project_content_doc` returns `Ok(true)` exactly when a local change was written — that is the send site the spine guard names.
+`SyncRequest::AnnounceChange` is defined (`sync_protocol.rs:77`) and handled by both transports (`p2p/mod.rs:6423`, `p2p_iroh/sync_backend.rs:147`), but **nothing in `src/` constructs one**. `sync::projector::project_content_doc` returns `Ok(true)` exactly when a local change was written — that is the send site the habits register guard names.
 
 **Files:**
 - Modify: `elohim/elohim-storage/src/p2p/sync_round.rs` (`announcements_for_local_change` ~`:131-144`)
@@ -998,7 +998,7 @@ pub fn announcements_for_local_change(
 
 - [ ] **Step 3: Wire the real send site — this is the half that matters**
 
-The spine's fake-green guard is explicit: returning requests without a caller that sends them turns the test green while nothing propagates. So:
+The charter's fake-green guard is explicit: returning requests without a caller that sends them turns the test green while nothing propagates. So:
 
 1. Add `P2PCommand::AnnounceLocalChange { doc_id, change_hash }` following the existing `P2PCommand` variants in `p2p/mod.rs`.
 2. In the swarm event loop's command arm, collect `swarm.connected_peers()`, call `sync_round::announcements_for_local_change(PROJECTION_NAMESPACE, &doc_id, &change_hash, &peers)`, and send each request through the same request-response behaviour the round uses. Increment `elohim_sync_requests_total{kind="announce_change"}` at the send site.
@@ -1040,9 +1040,9 @@ metadata-only. The 60s round stays as the reconciliation backstop.
 sync_scale_honesty: 2 passed, ignores removed."
 ```
 
-- [ ] **Step 6: Flip the spine node with evidence** — `@requires:alpha-cluster-6peer` for the live half
+- [ ] **Step 6: Flip the habit with evidence** — `@requires:alpha-cluster-6peer` for the live half
 
-Deploy, then record in `spine.yaml`: the test run (2/2), the build number, and the measured `rate(elohim_sync_docs_enumerated_total)` before vs after. Flip `sync-scale-honesty` to `green` only with those numbers in `evidence:`. Set `active: false`, freeing a WIP slot for Phase 3.
+Deploy, then record in `charter.yaml`: the test run (2/2), the build number, and the measured `rate(elohim_sync_docs_enumerated_total)` before vs after. Flip `sync-scale-honesty` to `green` only with those numbers in `evidence:`. Set `active: false`, freeing a WIP slot for Phase 3.
 
 ---
 
@@ -1075,11 +1075,11 @@ Expected: 0 passed, 1 failed — B cannot fetch A's commitment in 60s. Run this 
 
 - Does B's DHT hold A's `Commitment` entry at all (query B's local DHT directly in the sweettest, bypassing the coordinator fn)?
 - If the entry is present but the **link** is not, the seam is link-op integration on A's side or link gossip — not fetch.
-- If neither is present, it is gossip/publish timing: `spine.yaml` records that fresh actions need publish time, and restart churn runs ~20min (`substrate-trust-contract-runbook`).
+- If neither is present, it is gossip/publish timing: `charter.yaml` records that fresh actions need publish time, and restart churn runs ~20min (`substrate-trust-contract-runbook`).
 
 - [ ] **Step 3: Rule in or out the named asymmetry**
 
-`spine.yaml`'s own judgment: content and REA ride the **same Lamad cell**, but content's existing-row admission masks what REA's remote-advertised `IdToCommitment` lookups expose. So compare, in the same sweettest run, a content read and an REA read from B. If content resolves and REA does not on identical timing, the defect is in the `IdToCommitment` link path specifically — a much narrower target than "cross-conductor fetch".
+`charter.yaml`'s own judgment: content and REA ride the **same Lamad cell**, but content's existing-row admission masks what REA's remote-advertised `IdToCommitment` lookups expose. So compare, in the same sweettest run, a content read and an REA read from B. If content resolves and REA does not on identical timing, the defect is in the `IdToCommitment` link path specifically — a much narrower target than "cross-conductor fetch".
 
 - [ ] **Step 4: Write the fix only after the cause is named**
 
@@ -1095,7 +1095,7 @@ Expected: 1 passed. **Beware the zome class:** if the fix touches only coordinat
 
 - [ ] **Step 5: Confirm heal converts, then flip the node**
 
-With retrieval working, `healedTotal` must become non-zero and `elohim_reconcile_gaps{state="divergent"}` must fall — Phase 0's instrument is what makes this checkable. `@requires:alpha-cluster-6peer` for the live confirmation. Flip `notary-authority` in `spine.yaml` only on the spine's own strict rule: **×2 fresh edge validations on a settled fleet**, and only with the build numbers in `evidence:`. A single green run measured during post-deploy churn is exactly the false signal that regressed scenario 2 in edge #1188.
+With retrieval working, `healedTotal` must become non-zero and `elohim_reconcile_gaps{state="divergent"}` must fall — Phase 0's instrument is what makes this checkable. `@requires:alpha-cluster-6peer` for the live confirmation. Flip `notary-authority` in `charter.yaml` only on the habits register's own strict rule: **×2 fresh edge validations on a settled fleet**, and only with the build numbers in `evidence:`. A single green run measured during post-deploy churn is exactly the false signal that regressed scenario 2 in edge #1188.
 
 - [ ] **Step 6: Invoke `story-harvest`** — per the root CLAUDE.md, after `systematic-debugging` identifies and fixes a root cause, harvest the parameter-bearing discoveries (timing bounds, gossip windows) into a2o regression scenarios before closing.
 
@@ -1103,7 +1103,7 @@ With retrieval working, `healedTotal` must become non-zero and `elohim_reconcile
 
 # Phase 3 — Write the reds for the three unwired nodes
 
-Per spine covenant rule 2, an `unwired` node is **not schedulable** and its only legal first move is a runnable check. Prose specs do not advance it. Each task below writes exactly that check — failing, honest, and bounded. None of them activates its node (rule 3's WIP fence); activation is a later decision once Phases 1 and 2 free their slots.
+Per charter covenant rule 2, an `unwired` node is **not schedulable** and its only legal first move is a runnable check. Prose specs do not advance it. Each task below writes exactly that check — failing, honest, and bounded. None of them activates its node (rule 3's WIP fence); activation is a later decision once Phases 1 and 2 free their slots.
 
 These three are independent of each other and may be dispatched in parallel.
 
@@ -1119,7 +1119,7 @@ Note the slice decomposition (S2–S6) currently lives **only** in `.claude/shif
 - [ ] **Step 1: Write the failing test**
 
 ```rust
-//! Spine red for `identity-cross-signed`.
+//! Charter red for `identity-cross-signed`.
 //!
 //! A binding carrying STAGE1_SIGNATURE_SENTINEL is SELF-ASSERTED: the libp2p
 //! transport keypair and the Holochain agent key are generated independently
@@ -1161,7 +1161,7 @@ fn a_cross_signed_binding_is_admissible() {
 
 - [ ] **Step 2: Replace the `todo!` before committing**
 
-A `todo!()` in a spine red is a placeholder, not a check — it panics and reads as a failure for the wrong reason. Read `binding_cross_signature.rs`'s test module for the existing keypair/proof construction helpers and write the positive case with them. **A red that cannot be turned green by a correct implementation is not a red.**
+A `todo!()` in a charter red is a placeholder, not a check — it panics and reads as a failure for the wrong reason. Read `binding_cross_signature.rs`'s test module for the existing keypair/proof construction helpers and write the positive case with them. **A red that cannot be turned green by a correct implementation is not a red.**
 
 - [ ] **Step 3: Run it to verify it fails honestly**
 
@@ -1176,20 +1176,20 @@ Expected: FAIL — `cannot find function binding_admissible_for_attribution`. Th
 
 - [ ] **Step 4: Mark it `#[ignore]` with the reason inline**
 
-Same discipline as `sync_scale_honesty`: the storage pre-push gate runs every `tests/` target, so a standing red left in the default sweep wedges the gate for everyone. `#[ignore]` keeps it compiled (no silent rot) and leaves execution to the spine check.
+Same discipline as `sync_scale_honesty`: the storage pre-push gate runs every `tests/` target, so a standing red left in the default sweep wedges the gate for everyone. `#[ignore]` keeps it compiled (no silent rot) and leaves execution to the habits register check.
 
-- [ ] **Step 5: Commit and register the check on the spine node**
+- [ ] **Step 5: Commit and register the check on the habit**
 
 ```bash
-git add elohim/elohim-storage/tests/binding_attribution_refuses_sentinel.rs genesis/manifests/spine.yaml
-git commit -m "test(storage): spine red for identity-cross-signed — sentinel bindings are inadmissible
+git add elohim/elohim-storage/tests/binding_attribution_refuses_sentinel.rs genesis/manifests/habits.yaml
+git commit -m "test(storage): charter red for identity-cross-signed — sentinel bindings are inadmissible
 
 Writes the runnable check the unwired node needs to become schedulable. The
 C2-S1 algebra core is landed and unwired; controller.rs:630 still writes the
 sentinel. Node stays unwired->red on evidence, NOT active (WIP fence)."
 ```
 
-Add to `spine.yaml` under `identity-cross-signed`:
+Add to `charter.yaml` under `identity-cross-signed`:
 ```yaml
     checks:
       - "cargo test --test binding_attribution_refuses_sentinel -- --ignored (elohim/elohim-storage)"
@@ -1238,7 +1238,7 @@ The second scenario is what makes the red non-vacuous: it fails if a cure over-c
 - [ ] **Step 2: Write the CRDT-plane red as a Rust test**
 
 ```rust
-//! Spine red for `reach-enforced-everywhere`, CRDT sync plane.
+//! Charter red for `reach-enforced-everywhere`, CRDT sync plane.
 //!
 //! `sync::projector::reach_is_distribution_safe` is broadcast-only fail-closed:
 //! scoped content is dropped from the plane entirely (`project_content_doc`
@@ -1273,11 +1273,11 @@ cd /projects/elohim/elohim/elohim-storage && \
 
 Expected: the Rust red FAILS on the authorized-peer conjunct. The a2o feature is **not** added to the edge Dataplane Validation tag set in this task — adding a failing scenario to a CI-gated measure changes what that measure counts, which is the operator call already established in Task 5.
 
-- [ ] **Step 5: Commit and register on the spine node**
+- [ ] **Step 5: Commit and register on the habit**
 
 ```bash
-git add genesis/a2o/features/dataplane/reach-enforcement.feature elohim/elohim-storage/tests/reach_enforcement_per_plane.rs genesis/manifests/spine.yaml
-git commit -m "test: spine reds for reach-enforced-everywhere (HTTP + CRDT planes)
+git add genesis/a2o/features/dataplane/reach-enforcement.feature elohim/elohim-storage/tests/reach_enforcement_per_plane.rs genesis/manifests/habits.yaml
+git commit -m "test: charter reds for reach-enforced-everywhere (HTTP + CRDT planes)
 
 HTTP: intimate content returns 200 to any authenticated caller (reach gate is
 P2P-resolve-only). CRDT: scoped rows are excluded from the plane entirely,
@@ -1350,11 +1350,11 @@ Expected: undefined steps — that list **is** the implementation surface. Recor
 
 Same operator-call discipline as Tasks 5 and 12.
 
-- [ ] **Step 5: Commit and register on the spine node**
+- [ ] **Step 5: Commit and register on the habit**
 
 ```bash
-git add genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature genesis/manifests/spine.yaml
-git commit -m "test(a2o): spine red for operator-runtime-surface — commitment-gated verbs
+git add genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature genesis/manifests/habits.yaml
+git commit -m "test(a2o): charter red for operator-runtime-surface — commitment-gated verbs
 
 Three scenarios per the node's first_move: commitment holder acts and the peer
 attests; non-holder is refused; a peer serves its own telemetry (the adam-
@@ -1381,7 +1381,7 @@ Phase 3 (parallel; needs nothing above — writes reds only, activates nothing)
   T11 attribution red   T12 reach red   T13 operator red
 ```
 
-**What "done" means for this plan:** `sync-scale-honesty` and `notary-authority` are `green` in `spine.yaml` with build numbers and measured values in `evidence:`, and `identity-cross-signed`, `reach-enforced-everywhere`, and `operator-runtime-surface` have each moved `unwired → red` with a runnable check registered. At that point every one of the six properties is either delivered or **schedulable**, which is the precondition for offering any of them as an SDK promise.
+**What "done" means for this plan:** `sync-scale-honesty` and `notary-authority` are `green` in `charter.yaml` with build numbers and measured values in `evidence:`, and `identity-cross-signed`, `reach-enforced-everywhere`, and `operator-runtime-surface` have each moved `unwired → red` with a runnable check registered. At that point every one of the six properties is either delivered or **schedulable**, which is the precondition for offering any of them as an SDK promise.
 
 ## Self-review notes
 

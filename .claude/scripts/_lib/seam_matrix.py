@@ -41,9 +41,9 @@ RANKING (unexamined cells only, on the museum's frequency-ranking convention —
     severity        = silent-corruption 2.0 / loud-fail 1.0 (a class that fails silently outranks
                       one that fails loudly at equal recurrence — you cannot triage what does not
                       announce itself)
-    rung-proximity  = the strongest charter linkage of the seam: active red 4.0 / red 3.0 /
+    rung-proximity  = the strongest habits linkage of the seam: active red 4.0 / red 3.0 /
                       active unwired 2.5 / unwired 2.0 / green 1.0 / no linked node 0.5
-                      (from `genesis/manifests/charter.yaml`, the DECLARED delivery truth this repo
+                      (from `genesis/manifests/habits.yaml`, the DECLARED delivery truth this repo
                       already opens every session on)
 
 SPOT-CHECK BEFORE YOU TRUST THE RANKING. `feedback_verify_the_measure_before_the_ranking`: a drift
@@ -71,7 +71,7 @@ except Exception:  # pragma: no cover
     yaml = None
 
 SEAM_CATALOG_REL = ".claude/epr-meta/seam-catalog.yaml"
-CHARTER_REL = "genesis/manifests/charter.yaml"
+HABITS_REL = "genesis/manifests/habits.yaml"
 GENERATED_DIR_REL = ".claude/epr-meta/generated"
 MATRIX_JSON_REL = f"{GENERATED_DIR_REL}/concern-seam-matrix.json"
 MATRIX_MD_REL = f"{GENERATED_DIR_REL}/concern-seam-matrix.md"
@@ -112,19 +112,19 @@ def load_catalog(repo_root: Path) -> tuple[dict, list[str]]:
     return out, errs
 
 
-def load_charter(repo_root: Path) -> tuple[dict, list[str]]:
-    """`{node_id: {status, active}}` from the declared delivery charter. A missing charter degrades to
+def load_habits(repo_root: Path) -> tuple[dict, list[str]]:
+    """`{node_id: {status, active}}` from the declared delivery habits. A missing habits degrades to
     an empty map with a NOTE (rung-proximity then falls to its floor for every seam) — the matrix
     is still meaningful without it, only less sharply ordered."""
-    p = Path(repo_root) / CHARTER_REL
+    p = Path(repo_root) / HABITS_REL
     if not p.is_file() or yaml is None:
-        return {}, [f"{CHARTER_REL} unavailable — rung-proximity falls back to its floor for every seam"]
+        return {}, [f"{HABITS_REL} unavailable — rung-proximity falls back to its floor for every seam"]
     try:
         data = yaml.safe_load(p.read_text()) or {}
     except Exception as e:  # noqa: BLE001
-        return {}, [f"{CHARTER_REL} unreadable: {e}"]
+        return {}, [f"{HABITS_REL} unreadable: {e}"]
     out = {}
-    for n in data.get("articles") or data.get("nodes") or []:
+    for n in data.get("habits") or []:
         if isinstance(n, dict) and n.get("id"):
             out[n["id"]] = {"status": n.get("status"), "active": bool(n.get("active"))}
     return out, []
@@ -184,9 +184,9 @@ def matrix_data(repo_root: Path) -> dict:
     narrowest possible loss of resolution."""
     repo_root = Path(repo_root)
     catalog, cat_errs = load_catalog(repo_root)
-    charter, charter_errs = load_charter(repo_root)
+    habits, habits_errs = load_habits(repo_root)
     tips, tip_errs = concern_tips(repo_root)
-    errors = list(cat_errs) + list(charter_errs) + list(tip_errs)
+    errors = list(cat_errs) + list(habits_errs) + list(tip_errs)
 
     seams = catalog.get("seams", [])
     seam_ids = [s["id"] for s in seams]
@@ -255,7 +255,7 @@ def matrix_data(repo_root: Path) -> dict:
                 "points": E,
             }
             if state == "unexamined":
-                cell["score"], cell["score_parts"] = _score(tip, seam, charter)
+                cell["score"], cell["score_parts"] = _score(tip, seam, habits)
             cells.append(cell)
 
     # Light refs, not cell copies: the generated JSON is git-tracked and churns on every substrate
@@ -325,11 +325,11 @@ def _recurrence(row: dict | None) -> int:
     return 1
 
 
-def rung_proximity(seam: dict, charter: dict) -> tuple[float, str]:
-    """The strongest charter linkage of a seam. Returns (weight, explanation)."""
-    best, why = 0.5, "no linked charter article"
-    for nid in seam.get("charter_articles") or seam.get("spine_nodes") or []:
-        n = charter.get(nid)
+def rung_proximity(seam: dict, habits: dict) -> tuple[float, str]:
+    """The strongest habits linkage of a seam. Returns (weight, explanation)."""
+    best, why = 0.5, "no linked habits article"
+    for nid in seam.get("habits") or []:
+        n = habits.get(nid)
         if not n:
             continue
         st, act = n.get("status"), n.get("active")
@@ -348,11 +348,11 @@ def rung_proximity(seam: dict, charter: dict) -> tuple[float, str]:
     return best, why
 
 
-def _score(tip: dict | None, seam: dict, charter: dict) -> tuple[float, dict]:
+def _score(tip: dict | None, seam: dict, habits: dict) -> tuple[float, dict]:
     rec = _recurrence(tip)
     sev_class = (tip or {}).get("severity_class")
     sev = _SEVERITY_WEIGHT.get(sev_class, 1.0)
-    prox, why = rung_proximity(seam, charter)
+    prox, why = rung_proximity(seam, habits)
     return round(rec * sev * prox, 3), {
         "recurrence": rec, "severity": sev, "severity_class": sev_class,
         "rung_proximity": prox, "rung_reason": why,
@@ -603,12 +603,12 @@ def render_markdown(data: dict) -> str:
             continue
         L.append(f"### {g.get('title')} ")
         L.append("")
-        L.append("| Seam | Atlas § | Name | Tracks | Reach tier | Charter articles |")
+        L.append("| Seam | Atlas § | Name | Tracks | Reach tier | Habits |")
         L.append("|---|---|---|---|---|---|")
         for s in seams:
             L.append(f"| `{s['id']}` | {s.get('source_section')} | {s.get('name')} | "
                      f"{', '.join(s.get('tracks') or []) or '—'} | {s.get('reach_tier') or '—'} | "
-                     f"{', '.join(s.get('charter_articles') or s.get('spine_nodes') or []) or '—'} |")
+                     f"{', '.join(s.get('habits') or []) or '—'} |")
         L.append("")
 
     # The grid
@@ -636,7 +636,7 @@ def render_markdown(data: dict) -> str:
 
     L += ["## Ranked unexamined cells", "",
           "Rank = recurrence x severity x rung-proximity (severity: silent-corruption 2.0, "
-          "loud-fail 1.0; rung-proximity from `genesis/manifests/charter.yaml`: active red 4.0, "
+          "loud-fail 1.0; rung-proximity from `genesis/manifests/habits.yaml`: active red 4.0, "
           "red 3.0, active unwired 2.5, unwired 2.0, green 1.0, unlinked 0.5).", "",
           "| # | Class | Seam | Score | Recurrence | Severity | Rung proximity |",
           "|---|---|---|---|---|---|---|"]

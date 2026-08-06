@@ -32,6 +32,6 @@ snapshot was found in-repo to confirm the exact delta; treat that specific numbe
 and the 87-today figure as the only confirmed data point).
 
 Candidate next step: land the design's own §5 scoreboard leg first (cheapest, read-only) so the
-count becomes ambient pressure the same way `spine`/`saga` headlines already are, before attempting
+count becomes ambient pressure the same way `habits`/`saga` headlines already are, before attempting
 the push-gate leg (which needs the reseal/hold UX to be comfortable enough not to become pure
 friction).

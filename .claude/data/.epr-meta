@@ -22,7 +22,7 @@ rules:
       genesis/docs/superpowers/specs|plans/ (born with cites:); a resolved
       investigation graduates to genesis/docs/content/elohim-protocol/history/;
       a session handoff's durable facts belong in memory files or as commentary
-      citing a charter article (genesis/manifests/charter.yaml). If none of those fit,
+      citing a habit (genesis/manifests/habits.yaml). If none of those fit,
       that is usually the signal the content is conversation-scoped — let it go.
 ---
 

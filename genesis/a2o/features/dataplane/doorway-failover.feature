@@ -4,7 +4,7 @@
 # a person hitting the apex name gets the landing shell even while one doorway
 # is dead or in its post-deploy catch-up shed window.
 #
-# Spine node: doorway-failover (genesis/manifests/spine.yaml). Sprint plan:
+# Spine node: doorway-failover (genesis/manifests/habits.yaml). Sprint plan:
 # genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md.
 #
 # Measurement philosophy (v1): NO synthetic chaos. Adam's post-deploy

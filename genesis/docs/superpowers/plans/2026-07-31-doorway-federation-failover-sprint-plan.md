@@ -23,7 +23,7 @@ cites:
   - genesis/data/timeline/backlog/self-heal-adam-projection-catchup-exhaustion-full-arc.md
   - dual-wan-utility-plane-failover | Dual-WAN Utility-Plane Failover | sha256:86f425b0045ce6d0 | path: genesis/docs/superpowers/specs/2026-07-16-dual-wan-utility-plane-failover-design.md
   - doorway-catching-up-page | Doorway catching-up shed page | sha256:2dbde4d56b074a5e | path: genesis/docs/superpowers/specs/2026-07-19-doorway-catching-up-page-design.md
-  - genesis/manifests/spine.yaml
+  - genesis/manifests/habits.yaml
 informed-by:
   - genesis/data/timeline/backlog/doorway-utility-plane-and-borrowed-infra-exit-doctrine.md
   - genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
@@ -41,7 +41,7 @@ informed-by:
 **Goal:** `elohim.host` and alpha survive the loss — or the catch-up shed — of either
 doorway for read traffic, hosted users get *honest* (never silently-forked) session
 behavior across a doorway switch, and the proof is a runnable a2o failover check wired
-to a new spine node — closing the resiliency-saga frontier (ch04/ch06 recording + the
+to a new habit — closing the resiliency-saga frontier (ch04/ch06 recording + the
 "two doorways, one name" arc).
 
 **Architecture:** Federation-over-p2p, SDK-first. Every failover primitive lands at the
@@ -79,7 +79,7 @@ implementation with defined interfaces. Haiku = doc-drift fixes, config wiring.
 1. JWTs are HS256 with per-doorway k8s secrets (`alpha.yaml:294-300` vs `alpha-b.yaml:319-325`) — an A-minted token fails `verify_token` on B (`auth/jwt.rs:284-304`). JWKS endpoints are published but NOTHING consumes a peer's JWKS.
 2. Cross-doorway landing for a hosted user either 502s (`chaperone.rs:143-153`, conductor-pinned token) or **silently provisions a fresh empty identity** (`provisioner.rs:271,372` — conductor-salted `generate_app_id` can never find the sibling's install).
 3. `fetch_from_remote_doorway` (`services/federation.rs:373-549`) is fully implemented cross-doorway blob fallback with loop prevention — and has **zero callers**.
-4. No a2o step classifies shed-vs-dead (the `status.json` `upstreams[].circuit`/`errorStreak`/`admission.shedTotal` fields exist on the wire; only an unimplemented `@wip` scenario pins them). No cross-doorway liveness comparator. No spine node for failover.
+4. No a2o step classifies shed-vs-dead (the `status.json` `upstreams[].circuit`/`errorStreak`/`admission.shedTotal` fields exist on the wire; only an unimplemented `@wip` scenario pins them). No cross-doorway liveness comparator. No habit for failover.
 5. `elohim.host` apex is a single-owner A record (shem beacon, `alpha-coturn-shem.yaml:217-220`); the proven shared-record mechanism is not applied to the apex.
 6. The structural ch04 red is NOT routing: adam's per-space arc-convergence ceiling under ~35 hosted agents (`self-heal-adam-projection-catchup-exhaustion-full-arc.md:180-220`) — an operator provisioning decision (partial mitigation `DOORWAY_MAX_AGENTS_PER_CONDUCTOR=32` applied).
 
@@ -145,16 +145,16 @@ reports `failed=0` and `passed≥1` for `saga-04-doorway-serves`,
 `saga-06-heads-converge`, `saga-09-projectors-carry`, and
 `saga-10-card-tells-truth`.
 
-## WS1 — Truth & measurement (the spine-legal first move)
+## WS1 — Truth & measurement (the habits register-legal first move)
 
 ### Task 1.1: Author the failover red — **tier: Opus**
-**Files:** Create `genesis/a2o/features/dataplane/doorway-failover.feature`; Modify `genesis/manifests/spine.yaml` (add node), `genesis/a2o/features/dataplane/resiliency-saga/README.md` (cross-reference).
-**Spec:** New spine node `doorway-failover` (status `red`, runnable check = this feature; covenant: ≤12 nodes, currently 8). Feature `@e2e @dataplane @concern:doorway-failover`, three scenarios:
+**Files:** Create `genesis/a2o/features/dataplane/doorway-failover.feature`; Modify `genesis/manifests/habits.yaml` (add node), `genesis/a2o/features/dataplane/resiliency-saga/README.md` (cross-reference).
+**Spec:** New habit `doorway-failover` (status `red`, runnable check = this feature; covenant: ≤12 nodes, currently 8). Feature `@e2e @dataplane @concern:doorway-failover`, three scenarios:
 1. *Shed is not death*: when a doorway sheds (503 on a `/db/*` read), its `status.json` reports the cause (`upstreams[].circuit` open or `admission.shedTotal` rising) and the 503 carries `Retry-After` — the specified contract, not an outage.
 2. *One of two doorways always serves*: `alpha-A` and `elohim.host` — at least one serves `GET /` → 200 with `app-root` (raw-body steps reused from ch04). Both-shedding is the red this arc exists to kill.
 3. *Truth survives failover*: the surviving doorway serves the same declared head for `elohim-host-landing` (reuse the ch10/declared-head comparator steps verbatim).
 Scenario 2/3 run against the live pair (organic shed windows are real red evidence — no synthetic chaos needed in v1; the `peer-loss-failover.feature` kill-on-purpose shape is the v2 escalation, noted in the feature header, not built now).
-**Verify:** feature parses (`npx tsx` cucumber dry-run); scenarios execute (red is acceptable and expected); spine node lists the feature as its check.
+**Verify:** feature parses (`npx tsx` cucumber dry-run); scenarios execute (red is acceptable and expected); habit lists the feature as its check.
 
 ### Task 1.2: Shed-vs-dead step glue — **tier: Sonnet**
 **Files:** Create `genesis/a2o/steps/dataplane/failover.steps.ts`; Modify `genesis/a2o/src/framework/dataplane/surfaces.ts` (add `classifyDoorwayState(peerUrl): Promise<'serving'|'shedding'|'dead'>`), `genesis/a2o/features/dataplane/doorway-catching-up-page.feature` (de-`@wip` the circuit-state scenario its new step now implements).

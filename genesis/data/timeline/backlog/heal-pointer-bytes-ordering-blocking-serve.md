@@ -14,7 +14,7 @@ themes: [dataplane, heal-on-read, blob-custody, serving, backpressure]
 relatedNodeIds:
   - "genesis/data/timeline/backlog/dataplane-peer-fallback-and-blob-replication.md"
   - "genesis/data/timeline/backlog/cluster-to-shem-p2p-request-starvation-11-peer-blackout.md"
-tags: [p2p, serving, spine:sync-scale-honesty]
+tags: [p2p, serving, habits:sync-scale-honesty]
 ---
 
 # Heal pointer/bytes ordering + unbounded blocking serve

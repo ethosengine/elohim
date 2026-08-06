@@ -1,48 +1,54 @@
-# charter.yaml — the delivery charter: arc-level invariants, each bound to a runnable check.
+# habits.yaml — the delivery habits: what this system RELIABLY DOES, each bound to a
+# runnable check that proves it.
+#
+# THE NAME IS THE MANIFESTO'S OWN. genesis/docs/content/elohim-protocol/manifesto.md
+# quotes James Clear: "You don't rise to the level of your goals, you fall to the level
+# of your systems." This file is that level. It does not hold what we INTEND — intentions
+# live in specs and plans. It holds what the system is OBSERVED to do, and what it has
+# stopped doing. A habit is proven by repetition and evidence, never by declaration,
+# which is exactly the discipline this register enforces.
 #
 # WHY THIS EXISTS (2026-07-02, operator directive): cohesion was stored in prose
 # (240+ specs/plans, memory files, backlogs) which requires a strong reader every
-# session — the selection problem, not the work, is what sessions fail at. The
-# charter inverts control: these articles are the INTERFACES; specs/plans/memories
-# are commentary hanging off them; sessions are interchangeable implementations of
-# "make the top red green"; CI + the convergence loop is the composition root.
-# Sibling of cluster-state.yaml (declared substrate capability) — this file is
-# declared delivery truth. Read by .claude/scripts/charter-status.py, which emits
-# the session-start headline.
+# session — the selection problem, not the work, is what sessions fail at. This file
+# inverts control: these habits are the INTERFACES; specs/plans/memories are commentary
+# hanging off them; sessions are interchangeable implementations of "make the top red
+# green"; CI + the convergence loop is the composition root. Sibling of cluster-state.yaml
+# (declared substrate capability) — this file is declared delivery truth. Read by
+# .claude/scripts/habits-status.py, which emits the session-start headline.
 #
-# WHY "CHARTER" AND NOT "SPINE" (renamed 2026-08-06, operator directive). A spine
-# is vertebrae in sequence, and sequence is the one property this register does NOT
-# have: articles are unordered peers, each independently binding. The ordered
-# structure in this repo is the resiliency-SAGA (genesis/a2o/features/dataplane/
-# resiliency-saga/, chapters 01..11, with a frontier at the first non-green) — so
-# the old name described the SIBLING register, and a reader who trusted it inferred
-# the wrong shape. A charter is a set of ARTICLES: unordered, each binding on its
-# own, amended only by due process — which is precisely covenant rule 4 below.
+# NAMING HISTORY (2026-08-06): was `spine.yaml`/`nodes:`, briefly `charter.yaml`/`articles:`.
+# "Spine" implied vertebrae in SEQUENCE — the one property this register does not have
+# (the ordered structure is the resiliency-SAGA, chapters 01..11 with a frontier), and an
+# agent reading it conflated the two registers on exactly that axis. "Charter" collided
+# with a shipped wire field (`pub charter: String`, qahal collective charters, 28 Rust +
+# 26 generated TS files) and imported a granted-from-above frame this project rejects.
+# "Habit" collides with nothing, needs no metaphor essay, and is already our own word.
 #
-# AN ARTICLE IS NOT A TEST SUITE. A suite is evidence; an article is the claim the
-# evidence is FOR. Three things follow, and each is why this file exists at all:
-#   - checks: are heterogeneous — an a2o scenario AND a cargo test AND a live
-#     observation can jointly prove one article. No suite spans those.
-#   - green suites systematically over-claim (#[ignore] is a CI no-op, host-green
-#     != CI-green, `cargo check` compiles tests without running them). evidence:
-#     is where you ARGUE the guarantee holds; guard: is what would silently reopen it.
-#   - unwired has no analog in testing. A missing test is mere absence; an unwired
-#     article is a guarantee we committed to with NO evidence path, declared and
+# A HABIT IS NOT A TEST SUITE. A suite is evidence; a habit is the practice the evidence
+# is FOR. Three things follow, and each is why this file exists:
+#   - checks: are heterogeneous — an a2o scenario AND a cargo test AND a live observation
+#     can jointly prove one habit. No suite spans those.
+#   - green suites systematically over-claim (#[ignore] is a CI no-op, host-green !=
+#     CI-green, `cargo check` compiles tests without running them). evidence: is where you
+#     ARGUE the habit holds; guard: is what would silently break it.
+#   - unwired has no analog in testing. A missing test is mere absence; an unwired habit is
+#     one we have committed to with NO way to observe whether we keep it — declared and
 #     counted. That is the most valuable state in this file.
 #
 # THE COVENANT (anti-pile admission control):
-#   1. Max 12 articles. A candidate article must displace one or wait.
+#   1. Max 12 habits. A candidate must displace one or wait.
 #   2. status: green | red | unwired.
-#      - red    = a runnable check EXISTS and fails -> this is schedulable work.
-#      - unwired = no runnable check yet -> NOT schedulable; its ONLY legal first
-#        move is writing the red (see first_move). Prose specs do not advance it.
-#   3. Max 2 articles flagged active: true (the WIP fence). Finishing beats starting.
-#   4. Status flips require evidence (build #, live probe, test run) — never edit
-#      status from memory or intention.
-#   5. New specs/plans should cite the charter article they serve; a plan that
-#      serves no article is a candidate for held/, not for writing.
-#   6. Session contract: (a) move reds toward green with proof, (b) file new reds
-#      as runnable checks, (c) one-line delta here. Nothing else is a deliverable.
+#      - red     = a runnable check EXISTS and fails -> this is schedulable work.
+#      - unwired = no runnable check yet -> NOT schedulable; its ONLY legal first move is
+#        writing the red (see first_move). Prose specs do not advance it.
+#   3. Max 2 habits flagged active: true (the WIP fence). Finishing beats starting.
+#   4. Status flips require evidence (build #, live probe, test run) — never edit status
+#      from memory or intention.
+#   5. New specs/plans should cite the habit they serve; a plan that serves no habit is a
+#      candidate for held/, not for writing.
+#   6. Session contract: (a) move reds toward green with proof, (b) file new reds as
+#      runnable checks, (c) one-line delta here. Nothing else is a deliverable.
 
 version: 1
 updated: 2026-07-31
@@ -51,7 +57,7 @@ vision: >
   capture-resistant foundation for communication that can scale to global
   coordination. Every guarantee constitutive, none opt-in.
 
-articles:
+habits:
   - id: dataplane-convergence
     invariant: >
       Serving-critical content state converges peer-to-peer; no per-host

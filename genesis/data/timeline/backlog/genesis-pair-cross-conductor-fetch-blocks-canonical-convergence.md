@@ -234,7 +234,7 @@ every propagation attempt returns
     Guest("declare_canonical_head: target action ActionHash(...) is not retrievable")
 
 (zome-side network `get` timeout). Watched divergent 48+ minutes across
-multiple freshly-authored heads. This is the F-T19 class the spine's
+multiple freshly-authored heads. This is the F-T19 class the habits register's
 notary-authority evidence already names.
 
 **DELTA 2026-07-11 (dht-unity T1/T2 executed):** candidate 2 is REFUTED —

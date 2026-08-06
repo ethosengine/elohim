@@ -125,9 +125,9 @@ with tempfile.TemporaryDirectory() as td:
 # ═══════════════════════════════════════════════════════════════
 # 2. CALIBRATION LEDGER — baseline, flips, outcomes, append-only
 # ═══════════════════════════════════════════════════════════════
-_CHARTER_A = """\
+_HABITS_A = """\
 version: 1
-articles:
+habits:
   - id: fix-red-active
     status: red
     active: true
@@ -135,15 +135,15 @@ articles:
     status: unwired
     active: false
 """
-_CHARTER_B = _CHARTER_A.replace("id: fix-red-active\n    status: red",
+_HABITS_B = _HABITS_A.replace("id: fix-red-active\n    status: red",
                              "id: fix-red-active\n    status: green")
-_CHARTER_C = _CHARTER_B.replace("id: fix-other\n    status: unwired",
+_HABITS_C = _HABITS_B.replace("id: fix-other\n    status: unwired",
                              "id: fix-other\n    status: red")
 
 with tempfile.TemporaryDirectory() as td:
     root = Path(td) / "repo"
     _w(root / sf.FORECAST_REL, _FORECAST)
-    _w(root / sm.CHARTER_REL, _CHARTER_A)
+    _w(root / sm.HABITS_REL, _HABITS_A)
 
     cal0 = sf.calibrate(root)
     check("calibrate: with no snapshot on file every node reads `first-run`",
@@ -151,29 +151,29 @@ with tempfile.TemporaryDirectory() as td:
     check("calibrate: a baseline proposes NO calibration rows (a baseline is not an event)",
           cal0["proposals"] == [])
     res0 = sf.record(root, cal0)
-    check("record: the baseline writes only the charter snapshot",
+    check("record: the baseline writes only the habits snapshot",
           res0["written"] == 0 and res0["snapshot"] is True)
 
     cal_same = sf.calibrate(root)
-    check("calibrate: an unchanged charter produces zero flips (safe on a loop)",
+    check("calibrate: an unchanged habits produces zero flips (safe on a loop)",
           cal_same["flips"] == [] and cal_same["proposals"] == [])
     res_same = sf.record(root, cal_same)
-    check("record: an unchanged charter appends NOTHING at all", res_same["written"] == 0)
+    check("record: an unchanged habits appends NOTHING at all", res_same["written"] == 0)
     n_after_baseline = len(fl.read_rows(root / sf.CALIBRATION_LEDGER_REL))
 
     # A forecast row names fix-red-active -> a HIT.
-    _w(root / sm.CHARTER_REL, _CHARTER_B)
+    _w(root / sm.HABITS_REL, _HABITS_B)
     cal1 = sf.calibrate(root)
     check("calibrate: a status flip on a FORECAST rung proposes `hit`",
           len(cal1["proposals"]) == 1 and cal1["proposals"][0]["outcome"] == "hit")
     check("calibrate: the hit carries the forecast row's fingerprint (the calibration link)",
           cal1["proposals"][0]["fp"] == fp("fix-red-active", "SX", ["C2", "C4"]))
     check("calibrate: the hit records what triggered it",
-          "charter-flip:fix-red-active red->green" in cal1["proposals"][0]["trigger"])
+          "habits-flip:fix-red-active red->green" in cal1["proposals"][0]["trigger"])
     sf.record(root, cal1)
 
     # No forecast row names fix-other -> a MISS-OF-RANKING.
-    _w(root / sm.CHARTER_REL, _CHARTER_C)
+    _w(root / sm.HABITS_REL, _HABITS_C)
     cal2 = sf.calibrate(root)
     check("calibrate: a flip on an UNFORECAST rung proposes `miss-of-ranking`, never "
           "`miss-of-canon` (the canon is fine; the ordering was wrong)",
@@ -212,9 +212,9 @@ check("LIVE: rows 7 and 8 are transcribed as confirmed-live",
 check("LIVE: every row's seam id is a real column in the seam catalog",
       {r["seam"] for r in live_rows}
       <= {s["id"] for s in sm.load_catalog(REPO)[0]["seams"]})
-_live_charter, _ = sm.load_charter(REPO)
-check("LIVE: every row's rung is either a real charter article or the explicit `none`",
-      all(r["rung"] == "none" or r["rung"] in _live_charter for r in live_rows))
+_live_habits, _ = sm.load_habits(REPO)
+check("LIVE: every row's rung is either a real habit or the explicit `none`",
+      all(r["rung"] == "none" or r["rung"] in _live_habits for r in live_rows))
 check("LIVE: every class named by a forecast row is a canon class",
       all(c in sm._sc.ALL_CONCERN_IDS for r in live_rows for c in r["classes"]))
 

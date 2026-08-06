@@ -1,6 +1,6 @@
 @e2e @dataplane @wip @concern:operator-runtime-surface @requires:multi-node
 Feature: Operator verbs are commitment-gated protocol acts, not cluster surgery
-  RED-FIRST. These scenarios ARE the schedulable red for spine node
+  RED-FIRST. These scenarios ARE the schedulable red for habit
   `operator-runtime-surface`. They assert what "operating a peer" must come to mean, and
   pass unchanged the moment it does.
 
@@ -9,7 +9,7 @@ Feature: Operator verbs are commitment-gated protocol acts, not cluster surgery
     `@dataplane and not @wip and not @browser-only` (scripts/ci/run-dataplane-validation.sh).
     Without @wip these 4 scenarios join the byConcern rollup immediately as a new red
     concern — which CHANGES WHAT A CI-GATED MEASURE COUNTS. That is an operator call under
-    the blob-durability precedent recorded in genesis/manifests/spine.yaml, not something a
+    the blob-durability precedent recorded in genesis/manifests/habits.yaml, not something a
     session takes unilaterally. (The stage is advisory — catchError→UNSTABLE — so the cost
     is a red concern in the rollup, not a broken build. It is still the operator's call.)
     Run it locally meanwhile:

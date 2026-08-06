@@ -14,7 +14,7 @@ themes: [a2o, scope, resiliency, delivery, projection, minimal-footprint]
 relatedNodeIds:
   - "genesis/data/timeline/backlog/cluster-to-shem-p2p-request-starvation-11-peer-blackout.md"
   - "genesis/orchestrator/data/deployments.json"
-tags: [stories, scope, spine:sync-scale-honesty]
+tags: [stories, scope, habits:sync-scale-honesty]
 ---
 
 # Retune the epics' stories to the coordination-ladder cast

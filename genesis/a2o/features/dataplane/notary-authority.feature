@@ -1,4 +1,4 @@
-# RED-FIRST. These scenarios ARE the schedulable red for spine node `notary-authority`.
+# RED-FIRST. These scenarios ARE the schedulable red for habit `notary-authority`.
 # They assert what "notarized" must come to mean on the live alpha federation, and pass
 # unchanged the moment it does.
 #
@@ -53,7 +53,7 @@
 #
 # Design:  genesis/docs/superpowers/specs/2026-07-01-crdt-authoritative-content-state-dht-notary-decouple-design.md
 # Plan:    genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md (C1-C5)
-# Spine:   genesis/manifests/spine.yaml — node `notary-authority`
+# Spine:   genesis/manifests/habits.yaml — node `notary-authority`
 @e2e @dataplane @concern:notary-authority
 Feature: Notary authority — the federation converges on ONE earned canonical head
   Converged content state (the value) lives on the CRDT plane; the DHT notary witnesses

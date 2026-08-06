@@ -103,7 +103,7 @@ drops 20 → 10 scenarios; the full `@dataplane` suite drops 37 → 27. The enti
 no non-browser scenario is affected. Coverage is preserved: `@browser-only` scenarios
 still run under the playwright-mode jobs (`test:browser:e2e`, delivery-browser profile).
 
-**Expected effect on the spine's blob-durability node:** `passed=3 failed=5` (RED) →
+**Expected effect on the blob-durability habit:** `passed=3 failed=5` (RED) →
 `passed=3 failed=0` (GREEN — the 5 structural hard-fails become clean HELD-skips). This
 clears the failures and greens the concern; it does not by itself lift `passed` to ≥5
 (the remaining non-browser pending scenarios flip to passed only when their live-substrate

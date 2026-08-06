@@ -12,7 +12,7 @@ topic: [freenet, sync-scale-honesty, anti-entropy, dead-config, spine-red, d5-da
 cites:
   - freenet-lift-and-shift | Freenet lift-and-shift | sha256:d6a221d95b723d32 | path: genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md
   - genesis/research/freenet-peer-confrontation-2026-07-27.md
-  - genesis/manifests/spine.yaml
+  - genesis/manifests/habits.yaml
   - iroh-libp2p-complementarity | iroh ↔ libp2p Complementarity | sha256:29235aeb35aff128 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
   - adam-slow-link-write-guard-saturation | History/Finding: adam slow-link melt | sha256:556142ddd510a091 | path: genesis/docs/content/elohim-protocol/history/2026-07-20-adam-slow-link-write-guard-saturation.md
 ---
@@ -21,7 +21,7 @@ cites:
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Close the standing-red spine node `sync-scale-honesty` by making the sync round opener a function of local corpus state, and land the three zero-dependency guards that stop the same class of defect recurring.
+**Goal:** Close the standing-red habit `sync-scale-honesty` by making the sync round opener a function of local corpus state, and land the three zero-dependency guards that stop the same class of defect recurring.
 
 **Architecture:** The cure is a body change to one pure planner function. Everything it needs already exists — `corpus_digest()` (sorted, canonical), the `ListDocumentsSince` request variant, the `InSync` response variant, and digest-match short-circuit handlers on **both** transports. The one genuine gap is client-side: `SyncResponse::InSync` is constructed by both responders but has no explicit client arm, so it currently falls into a catch-all that logs "Unhandled sync response type." We make that arm explicit and counted *before* flipping the opener, so the optimisation is observable rather than silent.
 
@@ -45,7 +45,7 @@ cites:
 - `a_local_change_is_announced_to_connected_peers` — **PASSES.** The announce leg is already cured; the send site exists at `src/p2p/mod.rs:3612-3618`.
 - `the_round_opener_reflects_what_we_already_have` — **FAILS** at `tests/sync_scale_honesty.rs:99`. This is the whole remaining red.
 
-**The spine node's evidence block is stale.** It records `0 passed, 2 failed` (2026-07-25) and asserts *"`announcements_for_local_change` returns nothing."* Both statements are now false. Task 3 corrects it.
+**The habit's evidence block is stale.** It records `0 passed, 2 failed` (2026-07-25) and asserts *"`announcements_for_local_change` returns nothing."* Both statements are now false. Task 3 corrects it.
 
 Already present, needing no new code:
 - `sync_round::corpus_digest(&LocalCorpusState) -> String` (`sync_round.rs:122`) — sorts doc-ids and heads before hashing, so two peers holding the same corpus produce the same digest regardless of store enumeration order. The canonical-serialization hazard is already handled.
@@ -65,7 +65,7 @@ Already present, needing no new code:
 | `src/p2p/sync_round.rs` | The pure round planner — sole construction site | Change `round_opener` body (Task 2); add module-doc retention rule (Task 6) |
 | `src/reconcile/placement.rs` | Placement strategy | Add module-doc retention rule (Task 6) |
 | `tests/sync_scale_honesty.rs` | The spine red | No change — it is the acceptance test |
-| `genesis/manifests/spine.yaml` | Delivery spine | Flip node + evidence (Task 3) |
+| `genesis/manifests/habits.yaml` | Delivery habits | Flip node + evidence (Task 3) |
 | `scripts/ci/dead-config-lint.sh` | New CI guard | Create (Task 5) |
 
 ---
@@ -154,12 +154,12 @@ into the catch-all logging 'Unhandled sync response type'. Explicit arm +
 elohim_sync_in_sync_total so the digest short-circuit is observable before
 the opener starts using it.
 
-Serves spine node sync-scale-honesty."
+Serves habit sync-scale-honesty."
 ```
 
 ---
 
-### Task 2: Make the round opener a function of local state (closes the spine red)
+### Task 2: Make the round opener a function of local state (closes the habits register red)
 
 **Files:**
 - Modify: `src/p2p/sync_round.rs:150-157` (`round_opener` body only — signature unchanged)
@@ -249,16 +249,16 @@ Now emits ListDocumentsSince{corpus_digest}. Both transports already
 short-circuit on digest match and fall back to full enumeration on mismatch,
 so the divergent path is unchanged.
 
-Closes the head-diff half of spine node sync-scale-honesty.
+Closes the head-diff half of habit sync-scale-honesty.
 tests/sync_scale_honesty: 2 passed."
 ```
 
 ---
 
-### Task 3: Flip the spine node and correct its stale evidence
+### Task 3: Flip the habit and correct its stale evidence
 
 **Files:**
-- Modify: `genesis/manifests/spine.yaml` (the `sync-scale-honesty` node, ~line 277)
+- Modify: `genesis/manifests/habits.yaml` (the `sync-scale-honesty` node, ~line 277)
 
 - [ ] **Step 1: Verify with a clean run and capture the output verbatim**
 
@@ -298,7 +298,7 @@ Set `status: green`, `active: false`. Replace the evidence block, and explicitly
 
 ```bash
 cd /projects/elohim
-git add genesis/manifests/spine.yaml
+git add genesis/manifests/habits.yaml
 git commit -m "spine(sync-scale-honesty): red -> green with evidence; correct stale evidence block"
 ```
 

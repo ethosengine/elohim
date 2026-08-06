@@ -45,7 +45,7 @@
    ],
    "reach_tier": "community",
    "registry_crates": [],
-   "charter_articles": [],
+   "habits": [],
    "n_a_concerns": []
   },
   {
@@ -59,7 +59,7 @@
    ],
    "reach_tier": "trusted",
    "registry_crates": [],
-   "charter_articles": [
+   "habits": [
     "operator-runtime-surface"
    ],
    "n_a_concerns": []
@@ -75,7 +75,7 @@
    ],
    "reach_tier": "commons",
    "registry_crates": [],
-   "charter_articles": [],
+   "habits": [],
    "n_a_concerns": []
   },
   {
@@ -90,7 +90,7 @@
    ],
    "reach_tier": "commons",
    "registry_crates": [],
-   "charter_articles": [],
+   "habits": [],
    "n_a_concerns": []
   },
   {
@@ -107,7 +107,7 @@
    "registry_crates": [
     "elohim-node"
    ],
-   "charter_articles": [
+   "habits": [
     "identity-cross-signed"
    ],
    "n_a_concerns": []
@@ -124,7 +124,7 @@
    ],
    "reach_tier": "community",
    "registry_crates": [],
-   "charter_articles": [],
+   "habits": [],
    "n_a_concerns": []
   },
   {
@@ -136,7 +136,7 @@
    "tracks": [],
    "reach_tier": "community",
    "registry_crates": [],
-   "charter_articles": [
+   "habits": [
     "declarative-desired-state"
    ],
    "n_a_concerns": []
@@ -153,7 +153,7 @@
    ],
    "reach_tier": "community",
    "registry_crates": [],
-   "charter_articles": [
+   "habits": [
     "declarative-desired-state"
    ],
    "n_a_concerns": []
@@ -175,7 +175,7 @@
     "elohim-storage",
     "content_store"
    ],
-   "charter_articles": [
+   "habits": [
     "dataplane-convergence",
     "blob-durability",
     "notary-authority",
@@ -196,7 +196,7 @@
    ],
    "reach_tier": "community",
    "registry_crates": [],
-   "charter_articles": [
+   "habits": [
     "notary-authority",
     "sync-scale-honesty"
    ],
@@ -213,7 +213,7 @@
    ],
    "reach_tier": "private",
    "registry_crates": [],
-   "charter_articles": [],
+   "habits": [],
    "n_a_concerns": []
   },
   {
@@ -229,7 +229,7 @@
    ],
    "reach_tier": "community",
    "registry_crates": [],
-   "charter_articles": [
+   "habits": [
     "doorway-failover",
     "operator-runtime-surface"
    ],
@@ -246,7 +246,7 @@
    ],
    "reach_tier": "public",
    "registry_crates": [],
-   "charter_articles": [],
+   "habits": [],
    "n_a_concerns": []
   },
   {
@@ -262,7 +262,7 @@
    "registry_crates": [
     "doorway"
    ],
-   "charter_articles": [
+   "habits": [
     "doorway-failover",
     "reach-enforced-everywhere"
    ],
@@ -282,7 +282,7 @@
    "registry_crates": [
     "did-bridge"
    ],
-   "charter_articles": [],
+   "habits": [],
    "n_a_concerns": []
   },
   {
@@ -296,7 +296,7 @@
    "registry_crates": [
     "elohim-seam-contracts"
    ],
-   "charter_articles": [],
+   "habits": [],
    "n_a_concerns": []
   }
  ],

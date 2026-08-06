@@ -37,7 +37,7 @@ large already-seeded SQL corpus, and the sled DocStore wipes on PVC/sled reset.
 Consequence: after a fresh deploy or sled reset, **existing seeded content does not
 retroactively sync** until each node is re-written. This item is that missing back-fill.
 
-## Why deferred (not in the spine)
+## Why deferred (not in the habits register)
 
 Back-fill is O(total content rows), re-incurred each reset — an unbounded cost that would
 blow the bounded per-write spine. It belongs in a separate, idempotent, **gated** one-shot

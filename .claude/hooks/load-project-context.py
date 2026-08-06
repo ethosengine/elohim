@@ -96,16 +96,16 @@ def get_memory_budget(project_dir: str) -> str:
         return ""
 
 
-def get_charter_status(project_dir: str) -> str:
-    """Delivery-charter headline (deterministic; from charter-status.py --headline).
-    The charter (genesis/manifests/charter.yaml) is the session's selection surface:
+def get_habits_status(project_dir: str) -> str:
+    """Delivery-habits headline (deterministic; from habits-status.py --headline).
+    The habits (genesis/manifests/habits.yaml) is the session's selection surface:
     open on the top red contract instead of re-synthesizing the corpus."""
     import subprocess
-    charter = os.path.join(project_dir, '.claude', 'scripts', 'charter-status.py')
-    if not os.path.exists(charter):
+    habits = os.path.join(project_dir, '.claude', 'scripts', 'habits-status.py')
+    if not os.path.exists(habits):
         return ""
     try:
-        r = subprocess.run([sys.executable, charter, '--headline'],
+        r = subprocess.run([sys.executable, habits, '--headline'],
                            capture_output=True, text=True, timeout=10)
         return r.stdout.strip()
     except Exception:
@@ -114,7 +114,7 @@ def get_charter_status(project_dir: str) -> str:
 
 def get_saga_status(project_dir: str) -> str:
     """Resiliency-saga headline (deterministic; from saga-status.py, no args = one-liner).
-    Sibling of get_charter_status: same subprocess/timeout/silent-failure posture — a failed
+    Sibling of get_habits_status: same subprocess/timeout/silent-failure posture — a failed
     or slow saga-status.py emits nothing rather than blocking session start."""
     import subprocess
     saga = os.path.join(project_dir, '.claude', 'scripts', 'saga-status.py')
@@ -164,11 +164,11 @@ def main():
             context_parts.append(budget)
             context_parts.append("")
 
-        # Delivery charter — the selection surface (top red contract) that makes
+        # Delivery habits — the selection surface (top red contract) that makes
         # session start a selection problem, not a synthesis problem.
-        charter = get_charter_status(project_dir)
-        if charter:
-            context_parts.append(charter)
+        habits = get_habits_status(project_dir)
+        if habits:
+            context_parts.append(habits)
             context_parts.append("")
 
         # Resiliency-saga headline — the ten dataplane chapters' green/frontier state
