@@ -7,8 +7,8 @@ title: "Pre-push cargo-target-pool: originally bypassed entirely (→ ENOSPC); r
 slug: "prepush-cargo-target-pool"
 written: "2026-06-02"
 author: "cartographer"
-status: "open"
-resolved: "2026-06-04"
+status: "resolved"
+resolved: "2026-08-06"
 reopened: "2026-08-05"
 priority: "high"
 area: "cargo"
@@ -182,3 +182,13 @@ elohim-epr gate's no-just fallback runs plain cargo against it — dangling post
 Healed by recreating the /tmp dir. Durable fix belongs with this item's scope: either migrate the
 elohim workspace to a pool slot (crates family) or extend the resolve-through-symlink guard to the
 fallback cargo sites that use in-tree `./target`.
+
+## VERIFIED LIVE 2026-08-06 — resolved
+
+The 416e7db00 integration push ran the new guard on a real dev-targeted push: both
+`[elohim-storage] pooled target: …` and `[doorway] pooled target: …` lines printed from the
+readlink-resolved path, gates ALL CLEAR (531s), push accepted. The reopened concern (silent
+fallback on a dangling slot) is cured and verified. Residual, non-blocking, recorded above: the
+fifth site class (in-tree `./target` symlinks like `elohim/target` used by no-just fallback gates)
+is outside the pooled-slot guard — healed by hand this push; fold into any future
+`cargo-pool doctor` pass.
