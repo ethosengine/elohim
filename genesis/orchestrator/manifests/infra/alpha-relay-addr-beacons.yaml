@@ -1,0 +1,207 @@
+# Standalone dynamic-WAN DNS beacons for alpha's two premises.
+#
+# This is the Wave-2 relay-sovereignty §6.2 retirement prerequisite. The same
+# Cloudflare ownership lanes currently run as sidecars in the two coturn pods;
+# keeping them there makes coturn removal stale the entire elohim.host zone on
+# the next residential WAN-IP change. These Deployments deliberately own DNS
+# freshness only: no coturn sink, config volume, process-namespace sharing, or
+# CAP_KILL survives the re-home.
+#
+# APPLY/RETIRE ORDER (operator-owned; never reconcile the live cluster by hand
+# from a development environment):
+#   1. Apply this file while both coturn beacons still run.
+#   2. Observe each standalone beacon publish its exclusive record and keep the
+#      shared doorways.elohim.host contribution fresh for at least one cycle.
+#   3. Exercise the drift gate from design §6.2: each beacon must log
+#      `exclusive record DRIFTED` and restore its record within 30 seconds.
+#   4. Only then remove the beacon containers from the coturn manifests. Coturn
+#      itself remains until every tx5 conductor has retired.
+#
+# The two documents are intentionally separate one-replica Deployments rather
+# than one homogeneous two-replica Deployment: each premise owns a different
+# exclusive record and a different shared-record owner slug.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: relay-addr-beacon-operations
+  namespace: elohim-alpha
+  labels:
+    app: relay-addr-beacon
+    beacon-leg: operations
+    environment: alpha
+    app.kubernetes.io/name: relay-addr-beacon
+    app.kubernetes.io/instance: relay-addr-beacon-operations-alpha
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: relay-addr-beacon
+      beacon-leg: operations
+      environment: alpha
+  template:
+    metadata:
+      labels:
+        app: relay-addr-beacon
+        beacon-leg: operations
+        environment: alpha
+        app.kubernetes.io/name: relay-addr-beacon
+        app.kubernetes.io/instance: relay-addr-beacon-operations-alpha
+        app.kubernetes.io/component: infra
+        app.kubernetes.io/part-of: elohim
+        app.kubernetes.io/managed-by: jenkins
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-type
+                    operator: In
+                    values:
+                      - operations
+      # Preserve premise-local egress: the public-IP echo must observe the
+      # operations WAN, never a cluster-routed egress on another node.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: beacon
+          image: harbor.ethosengine.com/ethosengine/relay-addr-beacon:dev-latest
+          imagePullPolicy: Always
+          args:
+            - "--interval-secs"
+            - "30"
+            - "--sink"
+            - "cloudflare"
+            - "--record-name"
+            - "alpha.elohim.host"
+            - "--cf-zone"
+            - "elohim.host"
+            - "--state-file"
+            - "/var/lib/relay-addr-beacon/state.json"
+            - "--shared-record-name"
+            - "doorways.elohim.host"
+            - "--record-owner"
+            - "operations"
+          env:
+            - name: CF_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: relay-addr-beacon-cloudflare
+                  key: token
+          volumeMounts:
+            - name: beacon-state
+              mountPath: /var/lib/relay-addr-beacon
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: beacon-state
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: relay-addr-beacon-shem
+  namespace: elohim-alpha
+  labels:
+    app: relay-addr-beacon
+    beacon-leg: shem
+    environment: alpha
+    app.kubernetes.io/name: relay-addr-beacon
+    app.kubernetes.io/instance: relay-addr-beacon-shem-alpha
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: relay-addr-beacon
+      beacon-leg: shem
+      environment: alpha
+  template:
+    metadata:
+      labels:
+        app: relay-addr-beacon
+        beacon-leg: shem
+        environment: alpha
+        app.kubernetes.io/name: relay-addr-beacon
+        app.kubernetes.io/instance: relay-addr-beacon-shem-alpha
+        app.kubernetes.io/component: infra
+        app.kubernetes.io/part-of: elohim
+        app.kubernetes.io/managed-by: jenkins
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-type
+                    operator: In
+                    values:
+                      - remote
+      tolerations:
+        - key: remote-wan
+          operator: Exists
+          effect: NoSchedule
+      # Preserve premise-local egress so the echo service observes shem's WAN.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: beacon
+          image: harbor.ethosengine.com/ethosengine/relay-addr-beacon:dev-latest
+          imagePullPolicy: Always
+          args:
+            - "--interval-secs"
+            - "30"
+            - "--sink"
+            - "cloudflare"
+            - "--record-name"
+            - "elohim.host"
+            - "--cf-zone"
+            - "elohim.host"
+            - "--state-file"
+            - "/var/lib/relay-addr-beacon/state.json"
+            - "--shared-record-name"
+            - "doorways.elohim.host"
+            - "--record-owner"
+            - "shem"
+          env:
+            - name: CF_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: relay-addr-beacon-cloudflare
+                  key: token
+          volumeMounts:
+            - name: beacon-state
+              mountPath: /var/lib/relay-addr-beacon
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: beacon-state
+          emptyDir: {}
