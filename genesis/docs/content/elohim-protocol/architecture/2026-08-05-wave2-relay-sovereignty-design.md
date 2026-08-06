@@ -863,12 +863,17 @@ conductor against the QAD-less relay and record the exact lines, so the soak's
 readers know what normal looks like.
 
 **U6 — Does ingress-nginx pass `Sec-Websocket-Protocol: iroh-relay-v1` through unmodified?**
-Standard behavior, and the doorway's existing websocket annotation set is the
-same shape. But the relay hard-requires the subprotocol echo — the server
+**RESOLVED AFFIRMATIVELY 2026-08-06 (live probe, both hostnames):**
+`relay.elohim.host/relay` and `relay.alpha.elohim.host/relay` both answer
+`HTTP/1.1 101 Switching Protocols` with `sec-websocket-protocol: iroh-relay-v1`
+echoed (and a correct `sec-websocket-accept`), through the real ingress path.
+One trap for future probers: the request must be `--http1.1`. Over h2 (curl's
+ALPN default) the upgrade headers are stripped per spec and the relay answers
+`400 missing header: upgrade` — that h2 400 is NOT a failure of the echo.
+Original contract: the relay hard-requires the subprotocol echo — the server
 matches on it (`http_server.rs:484`) and the client requires
-`SWITCHING_PROTOCOLS`. *Verification:* Stage 0, or directly:
-`curl -i -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' -H 'Sec-WebSocket-Protocol: iroh-relay-v1' https://relay.elohim.host/relay`
-→ expect `101` with `Sec-WebSocket-Protocol: iroh-relay-v1` echoed.
+`SWITCHING_PROTOCOLS`. Probe:
+`curl -i --http1.1 -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' -H 'Sec-WebSocket-Protocol: iroh-relay-v1' https://relay.elohim.host/relay`
 
 **U7 — apply path: RESOLVED AFFIRMATIVELY 2026-08-06 (operator kubectl).** The
 deploy leg does apply whole manifest files: `deployment.apps/iroh-relay-alpha`,
