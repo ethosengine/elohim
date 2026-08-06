@@ -28,7 +28,7 @@
 //!
 //! ## Recording Flow
 //!
-//! 1. Client starts recording via `MediaCmd::MediaOffer { record: true }`
+//! 1. A future peer-plane media session declares that recording is enabled.
 //! 2. Client sends media chunks via RecordingCmd::MediaChunk
 //! 3. Service assembles chunks, computes hash, stores in tiered cache
 //! 4. On completion, creates BlobEntry in Holochain DHT
@@ -36,6 +36,7 @@
 //! ## Note
 //!
 //! This is a stub implementation. Full implementation requires:
+//! - Peer-plane (iroh/EPR) media-session signaling; doorway SBD is not its home
 //! - WebRTC media track handling (webrtc-rs or similar)
 //! - Video container muxing (mp4, webm)
 //! - Audio codec handling (opus, aac)
