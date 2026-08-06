@@ -71,10 +71,23 @@ habits:
     evidence: >
       edge #1135 2026-07-02: four standing-red concerns flipped green; elohim.host
       200 with blobHash converged from matthew (zero manual PATCH); 1838 lib tests.
+      HELD 2026-08-06 across the automerge 0.5.12 → 0.10.0 bump (host-verified,
+      not yet CI-measured): sync_libp2p_convergence 3/3 including
+      doc_authored_on_a_converges_to_b, sync_integration 5/5 including
+      test_concurrent_same_field_edits UNEDITED, all four guard invariants below
+      green, `just gate` exit 0 (3199 passed / 0 failed). The bump needed ZERO
+      source edits in this crate — 0.10 changed only get_changes' return from
+      Vec<&Change> to Vec<Change>, and our sole call site is `.len()`.
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
       (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach
       gate, amber set-to-set) — all pinned by lib tests.
+      Cross-version note (2026-08-06): the CRDT plane is wire-compatible across
+      the 0.5.12/0.10.0 span — save/load and save_after/load_incremental bytes
+      cross-load in BOTH directions (empirically proven, both versions linked in
+      one binary), so a mixed-version fleet during a rolling deploy converges.
+      Upstream documents no backward-compat guarantee; that claim is ours and
+      rests on the experiment, so re-run it before the next automerge bump.
 
   - id: blob-durability
     invariant: >
@@ -350,6 +363,12 @@ habits:
       send site exists at p2p/mod.rs:3612 and
       a_local_change_is_announced_to_connected_peers was ALREADY passing on
       2026-07-27. Only the head-diff half was outstanding.
+      HELD 2026-08-06 across the automerge 0.5.12 → 0.10.0 bump (host-verified):
+      2 passed, 0 failed on the explicit `-- --ignored` run. The save_after /
+      load_incremental + ListDocumentsSince{corpus_digest} path survives 0.10
+      unchanged. Note this check is exactly the class a dependency bump would rot
+      silently — the default sweep reports it "ignored", proving nothing, so it
+      must be run explicitly after any automerge move.
     guard: >
       Regression risk = a second construction site for the opener. p2p/sync_round.rs
       must remain the ONLY constructor; tests/sync_libp2p_convergence.rs must call

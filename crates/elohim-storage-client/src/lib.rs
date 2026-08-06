@@ -24,7 +24,8 @@
 //! doc.transact::<_, _, automerge::AutomergeError>(|tx| {
 //!     tx.put(automerge::ROOT, "title", "Updated")?;
 //!     Ok(())
-//! })?;
+//! })
+//! .map_err(|failure| failure.error)?;
 //!
 //! sync.save("graph:my-doc", &doc).await?;
 //! # Ok(())

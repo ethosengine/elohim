@@ -178,7 +178,7 @@ diesel_migrations = "2.2"
 
 
 # CRDT sync - Automerge for offline-first document sync
-automerge = "0.5"
+automerge = "0.10"
 
 # Concurrent hash map for policy hot cache
 dashmap = "5"

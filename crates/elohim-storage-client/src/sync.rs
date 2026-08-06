@@ -39,7 +39,8 @@ pub struct SyncResult {
 /// doc.transact::<_, _, automerge::AutomergeError>(|tx| {
 ///     tx.put(automerge::ROOT, "title", "Updated")?;
 ///     Ok(())
-/// })?;
+/// })
+/// .map_err(|failure| failure.error)?;
 ///
 /// // Save changes to server
 /// sync.save("graph:my-doc", &doc).await?;

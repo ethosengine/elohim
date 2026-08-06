@@ -60,7 +60,7 @@ elohim-views = { path = "../../elohim/elohim-views", version = "0.1.0" }
 elohim-seam-contracts = { path = "../seam-contracts", version = "0.1.0" }
 
 # Sync support
-automerge = { version = "0.5", optional = true }
+automerge = { version = "0.10", optional = true }
 
 # Native-only
 rusqlite = { version = "0.31", optional = true }

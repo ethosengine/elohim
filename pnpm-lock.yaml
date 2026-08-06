@@ -1092,7 +1092,7 @@ importers:
     dependencies:
       '@automerge/automerge':
         specifier: ^3.0.0
-        version: 3.2.4
+        version: 3.3.2
       multiformats:
         specifier: ^13.4.1
         version: 13.4.2
@@ -1632,8 +1632,8 @@ packages:
   '@assemblyscript/loader@0.9.4':
     resolution: {integrity: sha512-HazVq9zwTVwGmqdwYzu7WyQ6FQVZ7SwET0KKQuKm55jD0IfUpZgN0OPIiZG3zV1iSrVYcN0bdwLRXI/VNCYsUA==}
 
-  '@automerge/automerge@3.2.4':
-    resolution: {integrity: sha512-/IAShHSxme5d4ZK0Vs4A0P+tGaR/bSz6KtIJSCIPfwilCxsIqfRHAoNjmsXip6TGouadmbuw3WfLop6cal8pPQ==}
+  '@automerge/automerge@3.3.2':
+    resolution: {integrity: sha512-9vCdCL7pdQwUra66SBxPVHr+/t9epXKni9KDeak2rNBFMzABVh2u6gSpcwxi3jkR5qr047jVqZv9DlrOfVxLFw==}
 
   '@babel/code-frame@7.29.0':
     resolution: {integrity: sha512-9NhCeYjq9+3uxgdtp20LSiJXJvN0FeCtNGpJxuMFZ1Kv3cWUNb6DOhJwUvcVCzKGR66cw4njwM6hrJLqgOwbcw==}
@@ -15119,7 +15119,7 @@ snapshots:
 
   '@assemblyscript/loader@0.9.4': {}
 
-  '@automerge/automerge@3.2.4': {}
+  '@automerge/automerge@3.3.2': {}
 
   '@babel/code-frame@7.29.0':
     dependencies:

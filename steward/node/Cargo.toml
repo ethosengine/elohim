@@ -10,7 +10,7 @@ license = "Apache-2.0"
 tokio = { version = "1", features = ["full"] }
 
 # Sync engine
-automerge = "0.5"
+automerge = "0.10"
 
 # P2P networking (matches elohim-storage 0.54)
 libp2p = { version = "0.54", features = [

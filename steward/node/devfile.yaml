@@ -25,7 +25,7 @@ components:
   # Main development container
   - type: dockerimage
     alias: dev
-    image: rust:1.75-bookworm
+    image: rust:1.94.0-bookworm
     memoryLimit: 4Gi
     mountSources: true
     env:
@@ -58,7 +58,7 @@ components:
   # Node 2 (for cluster simulation)
   - type: dockerimage
     alias: node-2
-    image: rust:1.75-bookworm
+    image: rust:1.94.0-bookworm
     memoryLimit: 2Gi
     mountSources: true
     env:
@@ -81,7 +81,7 @@ components:
   # Node 3 (optional, for 3-node cluster)
   - type: dockerimage
     alias: node-3
-    image: rust:1.75-bookworm
+    image: rust:1.94.0-bookworm
     memoryLimit: 2Gi
     mountSources: true
     env:
