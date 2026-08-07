@@ -16,7 +16,7 @@ mod types;
 
 pub use k2::{K2PutOutcome, K2Store, MemK2Store};
 pub use k2_mongo::MongoK2Store;
-pub use store::BootstrapStore;
+pub use store::{mongo_bootstrap_misconfigured, BootstrapStore};
 pub use types::*;
 
 use bytes::Bytes;

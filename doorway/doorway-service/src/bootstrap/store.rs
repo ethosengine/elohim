@@ -238,6 +238,35 @@ impl Default for BootstrapStore {
     }
 }
 
+/// True when the bootstrap store is explicitly configured for the SHARED
+/// mongo backend (`BOOTSTRAP_MONGODB_DB` set) but no mongo client is
+/// available at startup — i.e. [`BootstrapStore::new`] is about to silently
+/// pick the per-pod [`super::k2::MemK2Store`] instead of the shared table the
+/// deployment declared it wants.
+///
+/// Fail-loud, not fail-open: doorway-A's redeploy (2026-08-07) lost its mongo
+/// connection at boot and fell back to `mem` without a trace, so the
+/// bootstrap-sharing seam ("both doorways read the SAME store") went
+/// structurally red for hours before anyone noticed (`backend:"mem"` on A vs
+/// `backend:"mongo"` on B). Callers (main.rs) use this to refuse to start
+/// instead of repeating that silent downgrade. `mem` stays perfectly fine
+/// when `mem` is the CONFIGURED backend (`BOOTSTRAP_MONGODB_DB` unset — e.g.
+/// local dev) — this only fires when the deployment declared a shared table
+/// and can't reach it.
+///
+/// Kept as a pure function of its inputs (no direct env read) so it stays
+/// trivially unit-testable; the caller supplies its own read of
+/// `BOOTSTRAP_MONGODB_DB` as `mongo_db_configured`.
+///
+/// See `genesis/data/timeline/backlog/doorway-a-bootstrap-mem-fallback.md`.
+pub fn mongo_bootstrap_misconfigured(
+    bootstrap_enabled: bool,
+    mongo_available: bool,
+    mongo_db_configured: bool,
+) -> bool {
+    bootstrap_enabled && mongo_db_configured && !mongo_available
+}
+
 /// Statistics about the bootstrap store
 #[derive(Debug, Clone)]
 pub struct BootstrapStats {
@@ -295,5 +324,30 @@ mod tests {
         // matching the pre-mongo behavior exactly (env-gated mongo path is off).
         let s = BootstrapStore::new(None);
         assert_eq!(s.k2().stats().await, (0, 0));
+    }
+
+    #[test]
+    fn mongo_bootstrap_misconfigured_fires_only_when_configured_but_unreachable() {
+        // The doorway-A incident: BOOTSTRAP_MONGODB_DB is set (shared table
+        // wanted) but no mongo client is up (connection failed at boot) —
+        // must refuse to start rather than silently pick mem.
+        assert!(mongo_bootstrap_misconfigured(true, false, true));
+
+        // mem is the CONFIGURED backend (no BOOTSTRAP_MONGODB_DB) — fine,
+        // matches local dev exactly.
+        assert!(!mongo_bootstrap_misconfigured(true, false, false));
+
+        // Mongo is up and configured — the happy shared-table path.
+        assert!(!mongo_bootstrap_misconfigured(true, true, true));
+
+        // Bootstrap disabled entirely — nothing to misconfigure.
+        assert!(!mongo_bootstrap_misconfigured(false, false, true));
+
+        // Remaining rows of the 8-row table — all fine (mongo up with no
+        // shared table declared, or bootstrap disabled in any combination).
+        assert!(!mongo_bootstrap_misconfigured(true, true, false));
+        assert!(!mongo_bootstrap_misconfigured(false, true, true));
+        assert!(!mongo_bootstrap_misconfigured(false, true, false));
+        assert!(!mongo_bootstrap_misconfigured(false, false, false));
     }
 }

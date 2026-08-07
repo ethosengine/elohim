@@ -189,6 +189,34 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         }
     };
 
+    // Fail-loud, not fail-open, for the bootstrap store specifically: when
+    // BOOTSTRAP_MONGODB_DB declares a SHARED bootstrap table but mongo is
+    // unavailable, `dev_mode`'s general "continue without mongo" leniency
+    // above would otherwise let `BootstrapStore::new` silently pick the
+    // per-pod mem backend — exactly the doorway-A incident (2026-08-07):
+    // A read backend:"mem" while B stayed on "mongo", so the two doorways
+    // could never converge on one bootstrap table and nobody noticed for
+    // hours. `mem` is fine when `mem` is the CONFIGURED backend (no
+    // BOOTSTRAP_MONGODB_DB — local dev); this only trips when the deployment
+    // explicitly wanted the shared table and can't reach it.
+    let bootstrap_mongo_db_configured = std::env::var("BOOTSTRAP_MONGODB_DB").is_ok();
+    if doorway::bootstrap::mongo_bootstrap_misconfigured(
+        args.bootstrap_enabled,
+        mongo.is_some(),
+        bootstrap_mongo_db_configured,
+    ) {
+        error!(
+            "FATAL: BOOTSTRAP_MONGODB_DB is set (shared kitsune2 bootstrap table \
+             configured) but MongoDB is unavailable — refusing to silently fall back \
+             to the per-pod mem bootstrap store. This is the doorway-A mem-fallback \
+             class (genesis/data/timeline/backlog/doorway-a-bootstrap-mem-fallback.md): \
+             a silent downgrade here breaks the shared-bootstrap invariant between \
+             doorways and hides a real infra fault. Fix MongoDB connectivity and \
+             redeploy."
+        );
+        std::process::exit(1);
+    }
+
     // Connect to NATS (optional in dev mode)
     let nats = match NatsClient::new(&args.nats, &format!("doorway-{}", args.node_id)).await {
         Ok(client) => {
