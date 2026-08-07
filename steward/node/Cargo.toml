@@ -114,3 +114,13 @@ path = "src/main.rs"
 [features]
 default = []
 bitswap = []
+
+# ---------------------------------------------------------------------------
+# Admin-seam unblock (2026-08-07): elohim-storage (path dep above) pins the
+# holochain 0.7-dev client family, whose holochain_serialized_bytes =0.0.57
+# pins serde =1.0.228, while the sdk domain-types' holo_hash =0.6.0 DNA-hash
+# guards pin hsb =0.0.56 -> serde =1.0.219. Cargo [patch] is workspace-root
+# scoped, so this workspace needs the same stanza as elohim-storage's and
+# doorway-service's — see vendor/holochain_serialized_bytes-0.0.56/VENDOR-NOTE.md.
+[patch.crates-io]
+holochain_serialized_bytes = { path = "../../vendor/holochain_serialized_bytes-0.0.56" }
