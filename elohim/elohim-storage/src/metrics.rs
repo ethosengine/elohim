@@ -812,8 +812,27 @@ lazy_static! {
     )
     .unwrap();
 
-    /// 1 when this peer holds what its peers advertised, 0 otherwise:
-    /// `pending == 0 && exhausted == 0 && divergentAnchor == 0`.
+    /// 1 when this peer holds what its peers advertised, 0 otherwise. The exact
+    /// predicate lives in [`converged_gauge_value`]; in words, ALL of:
+    ///
+    /// - the sweep was **measured** (peers were asked, and no arm short-circuited
+    ///   on a DB/query error) — "could not measure" is never published as
+    ///   converged;
+    /// - no arm left work **pending**;
+    /// - no attempted gap ended the sweep **failed** (the conductor answered
+    ///   `None`/`Err` for a gap this sweep actually tried);
+    /// - **unadjudicated** divergence is zero (`divergent - divergent_refused`).
+    ///
+    /// The HELP string previously read "pending+exhausted+divergent all zero",
+    /// which misdescribed it twice: divergence is gated on the ACTIONABLE
+    /// remainder (see [`PROJECTION_RECONCILE_DIVERGENT_REFUSED`]), and the
+    /// `exhausted` term is vacuous on these arms (the reconcile trackers are
+    /// rebuilt per sweep — see `reconcile_rails::GapCounts::exhausted`). An
+    /// operator reading the old string would look for a backlog that cannot be
+    /// the cause.
+    ///
+    /// When this reads 0, `elohim_projection_reconcile_converged_blocked_by`
+    /// names WHICH term is holding it there — do not deduce it.
     ///
     /// The field an SLO may ride. Deliberately NOT the same thing as the
     /// `caughtUp` published on `/p2p/status`, which goes true when a sweep ENDS
@@ -823,7 +842,33 @@ lazy_static! {
     /// healed-total counter is added here.
     pub static ref PROJECTION_RECONCILE_CONVERGED: IntGauge = IntGauge::new(
         "elohim_projection_reconcile_converged",
-        "1 when the peer holds what its peers advertised (pending+exhausted+divergent all zero).",
+        "1 when the peer holds what its peers advertised: sweep measured, nothing pending, \
+         nothing failed, and no unadjudicated divergence.",
+    )
+    .unwrap();
+
+    /// Which term is holding `elohim_projection_reconcile_converged` at 0.
+    /// label: term = "pending" | "failed" | "divergent_actionable" | "unmeasured".
+    ///
+    /// Every term is published EVERY sweep (0 or 1), so a term reading 0 is
+    /// evidence, not silence. Several can be 1 at once — they are independent
+    /// blockers, not a priority list.
+    ///
+    /// Why it exists: `converged` is one bit, so a fleet stuck at 0 forced a
+    /// code-read to guess which half of the predicate was responsible — and the
+    /// guess was WRONG (the `exhausted`/`MissLedger` bucket was blamed for
+    /// months while the real terms were `pending` and a small unadjudicated
+    /// divergence residue; live alpha A published `exhausted: 0` beside
+    /// `pending: 2894`). The fleet should TELL us which term pins the gauge.
+    ///
+    /// The invariant, asserted in tests: `converged == 1` iff every term is 0.
+    pub static ref PROJECTION_RECONCILE_CONVERGED_BLOCKED_BY: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_projection_reconcile_converged_blocked_by",
+            "1 per term currently preventing convergence (pending | failed | \
+             divergent_actionable | unmeasured); all zero iff converged is 1.",
+        ),
+        &["term"],
     )
     .unwrap();
 
@@ -1413,6 +1458,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_DIVERGENT_REFUSED.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_SWEEPS.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_CONVERGED.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_CONVERGED_BLOCKED_BY.clone()));
         let _ = REGISTRY.register(Box::new(SHARD_REDISTRIBUTE_BYTES_MISSING.clone()));
         let _ = REGISTRY.register(Box::new(PEER_STATUS_FANOUT_MISSED.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_FILL_TOTAL.clone()));
@@ -2274,23 +2320,63 @@ pub fn set_projection_reconcile_divergent_refused(stream: &str, divergent_refuse
         .set(divergent_refused as i64);
 }
 
-/// 1 when the peer holds what its peers advertised, 0 otherwise. Pure so the
-/// three-condition rule is testable without a registry — and so it cannot drift
-/// from `GapCounts::converged`, which computes the same rule minus divergence.
+/// The terms of the convergence predicate, in publication order. Every one is
+/// published every sweep on [`PROJECTION_RECONCILE_CONVERGED_BLOCKED_BY`].
+pub const CONVERGED_BLOCKED_BY_TERMS: [&str; 4] =
+    ["pending", "failed", "divergent_actionable", "unmeasured"];
+
+/// Which terms currently prevent convergence. Pure, so the honesty floor is
+/// testable without a registry, and so the gauge set and the `converged` bit are
+/// computed from ONE expression that cannot drift apart.
 ///
-/// `divergent_actionable` is the UNADJUDICATED divergence — the total MINUS the
-/// share heal is forbidden to move (a canonical channel owns the row's declared
-/// head) or has exhausted its retry budget against. Passing the TOTAL here is the
-/// bug this parameter name now guards: on a live peer the refused class is the
-/// dominant one and permanent until a canonical channel fires, so a total-gated
-/// gauge reads 0 forever no matter how well the heal leg works. Divergence
-/// nobody has adjudicated still defeats convergence — that half is the honest
-/// half and is kept.
+/// - **`unmeasured`** — this sweep could not observe the thing it reports on: no
+///   peer was asked, or an arm short-circuited on a DB/query error and returned
+///   an empty discovery. A sweep that measured nothing must not publish
+///   convergence; that is a false green, not a conservative one.
+/// - **`pending`** — an arm ended the sweep with gaps still outstanding (the
+///   heal leg yielded on its wall-clock budget or opened its circuit). This term
+///   also carries the `GapCounts::exhausted` bit, which is vacuous on the
+///   reconcile arms but real on the cross-cycle trackers.
+/// - **`failed`** — a gap this sweep ATTEMPTED ended failed (conductor answered
+///   `None`/`Err`). Steady state stays reachable: an id the conductor genuinely
+///   cannot see stops being attempted once the `MissLedger` exhausts it after
+///   `MAX_RETRIES`, so it no longer produces `failed`. The ledger's re-admit wave
+///   every `MISS_READMIT_SWEEPS` dormant sweeps will honestly flap this term for
+///   a few sweeps per cycle — that flap is the truth, not noise.
+/// - **`divergent_actionable`** — the UNADJUDICATED divergence: the total MINUS
+///   the share heal is forbidden to move (a canonical channel owns the row's
+///   declared head) or has spent its retry budget against. Passing the TOTAL is
+///   the bug this parameter name guards: on a live peer the refused class is
+///   dominant and permanent until a canonical channel fires, so a total-gated
+///   gauge reads 0 forever no matter how well the heal leg works. Divergence
+///   nobody has adjudicated still defeats convergence — that half is honest and
+///   is kept.
+pub fn converged_blockers(
+    counts: &crate::p2p::reconcile_rails::GapCounts,
+    divergent_actionable: usize,
+    measured: bool,
+) -> [(&'static str, bool); 4] {
+    [
+        ("pending", !counts.converged),
+        ("failed", counts.failed > 0),
+        ("divergent_actionable", divergent_actionable > 0),
+        ("unmeasured", !measured),
+    ]
+}
+
+/// 1 when the peer holds what its peers advertised, 0 otherwise — true exactly
+/// when [`converged_blockers`] reports no blocking term. Pure so the rule is
+/// testable without a registry.
 pub fn converged_gauge_value(
     counts: &crate::p2p::reconcile_rails::GapCounts,
     divergent_actionable: usize,
+    measured: bool,
 ) -> i64 {
-    i64::from(counts.converged && divergent_actionable == 0)
+    i64::from(
+        !converged_blockers(counts, divergent_actionable, measured)
+            .iter()
+            .any(|(_, blocked)| *blocked),
+    )
 }
 
 /// Publish one completed reconcile sweep: advance the sweep denominator and
@@ -2302,9 +2388,20 @@ pub fn converged_gauge_value(
 pub fn record_reconcile_sweep(
     counts: &crate::p2p::reconcile_rails::GapCounts,
     divergent_actionable: usize,
+    measured: bool,
 ) {
     PROJECTION_RECONCILE_SWEEPS.inc();
-    PROJECTION_RECONCILE_CONVERGED.set(converged_gauge_value(counts, divergent_actionable));
+    PROJECTION_RECONCILE_CONVERGED.set(converged_gauge_value(
+        counts,
+        divergent_actionable,
+        measured,
+    ));
+    // Every term every sweep, so a 0 is evidence rather than an absent series.
+    for (term, blocked) in converged_blockers(counts, divergent_actionable, measured) {
+        PROJECTION_RECONCILE_CONVERGED_BLOCKED_BY
+            .with_label_values(&[term])
+            .set(i64::from(blocked));
+    }
 }
 
 /// Record one Part-B redistribution attempt skipped because the candidate's blob
@@ -2400,19 +2497,24 @@ mod tests {
     use super::*;
     use crate::p2p::reconcile_rails::GapCounts;
 
-    #[test]
-    fn converged_gauge_needs_all_three_conditions_not_just_an_empty_queue() {
-        // pending==0 AND exhausted==0 AND divergentAnchor==0. Any one of the
-        // three defeats it — that is the whole point of the field.
-        let healed = GapCounts {
+    /// A fully-healed, fully-measured sweep — the only shape that converges.
+    fn healed_sweep() -> GapCounts {
+        GapCounts {
             pending: 0,
             completed: 5,
             failed: 0,
             caught_up: true,
             exhausted: 0,
             converged: true,
-        };
-        assert_eq!(converged_gauge_value(&healed, 0), 1);
+        }
+    }
+
+    #[test]
+    fn converged_gauge_needs_all_three_conditions_not_just_an_empty_queue() {
+        // measured AND pending==0 AND failed==0 AND divergent_actionable==0.
+        // Any one of them defeats it — that is the whole point of the field.
+        let healed = healed_sweep();
+        assert_eq!(converged_gauge_value(&healed, 0, true), 1);
 
         // The live beta shape: 22 sweeps, healedTotal 0 — every gap abandoned
         // at max_retries. `caught_up` is true here; convergence must not be.
@@ -2424,11 +2526,135 @@ mod tests {
             exhausted: 61,
             converged: false,
         };
-        assert_eq!(converged_gauge_value(&abandoned, 0), 0);
+        assert_eq!(converged_gauge_value(&abandoned, 0, true), 0);
 
         // Clean gap ledger, but rows sit locally under an anchor no peer
         // advertises. The sweep resolved nothing about them.
-        assert_eq!(converged_gauge_value(&healed, 1860), 0);
+        assert_eq!(converged_gauge_value(&healed, 1860, true), 0);
+    }
+
+    #[test]
+    fn an_unmeasured_sweep_never_publishes_convergence() {
+        // The N2 false-green: every discovery arm short-circuits to an `empty()`
+        // discovery on a DB/query error, whose all-zero counts are BYTE-
+        // IDENTICAL to a perfectly healed sweep — and `run_heal` publishes them
+        // regardless. Without the `measured` term a database outage is the
+        // easiest way to make this gauge read 1.
+        let healed = healed_sweep();
+        assert_eq!(
+            converged_gauge_value(&healed, 0, true),
+            1,
+            "the same counts, measured, DO converge"
+        );
+        assert_eq!(
+            converged_gauge_value(&healed, 0, false),
+            0,
+            "a sweep that observed nothing must never claim convergence"
+        );
+        assert!(
+            converged_blockers(&healed, 0, false)
+                .iter()
+                .any(|(term, blocked)| *term == "unmeasured" && *blocked),
+            "and it must say WHY — unmeasured is distinguishable from an honest false"
+        );
+    }
+
+    #[test]
+    fn an_attempted_gap_that_failed_defeats_convergence() {
+        // The honesty floor: the conductor answered None/Err for a gap this
+        // sweep actually TRIED. `mark_failed` drains it from `pending`, so
+        // without this term the sweep reports caught_up + pending 0 and claims
+        // convergence having resolved nothing (the live shape: failed 47).
+        let mut all_failed = healed_sweep();
+        all_failed.completed = 0;
+        all_failed.failed = 47;
+        assert_eq!(
+            converged_gauge_value(&all_failed, 0, true),
+            0,
+            "a sweep that could not resolve what it attempted has not converged"
+        );
+        assert!(converged_blockers(&all_failed, 0, true)
+            .iter()
+            .any(|(term, blocked)| *term == "failed" && *blocked));
+    }
+
+    #[test]
+    fn steady_state_with_ledger_exhausted_ids_still_converges() {
+        // Reachability guard — the floor must not become another pinned gauge.
+        // Ids the conductor genuinely cannot see stop being ATTEMPTED once the
+        // MissLedger exhausts them, so they produce no `failed`; their divergent
+        // share is already folded into `divergent_refused` and subtracted. The
+        // steady state is therefore a sweep with a large adjudicated backlog and
+        // a clean attempt record — and it converges.
+        let steady = GapCounts {
+            pending: 0,
+            completed: 3,
+            failed: 0,
+            caught_up: true,
+            exhausted: 0,
+            converged: true,
+        };
+        let divergent_actionable = 1951usize.saturating_sub(1951);
+        assert_eq!(
+            converged_gauge_value(&steady, divergent_actionable, true),
+            1,
+            "398 ledger-exhausted ids and 1951 adjudicated divergent rows must not veto \
+             a sweep that attempted everything it admitted and failed none of it"
+        );
+        assert!(
+            converged_blockers(&steady, divergent_actionable, true)
+                .iter()
+                .all(|(_, blocked)| !*blocked),
+            "no term may block the steady state"
+        );
+    }
+
+    #[test]
+    fn converged_is_one_exactly_when_no_term_blocks() {
+        // The invariant that keeps the diagnostic gauge honest: the blocked_by
+        // set is not a parallel description of the predicate, it IS the
+        // predicate. Every combination of the four terms is checked.
+        for pending in [0usize, 2894] {
+            for failed in [0usize, 47] {
+                for actionable in [0usize, 3] {
+                    for measured in [true, false] {
+                        let counts = GapCounts {
+                            pending,
+                            completed: 1,
+                            failed,
+                            caught_up: pending == 0,
+                            exhausted: 0,
+                            converged: pending == 0,
+                        };
+                        let blockers = converged_blockers(&counts, actionable, measured);
+                        let any_blocked = blockers.iter().any(|(_, b)| *b);
+                        assert_eq!(
+                            converged_gauge_value(&counts, actionable, measured) == 1,
+                            !any_blocked,
+                            "converged must be 1 iff every term is 0 \
+                             (pending={pending} failed={failed} actionable={actionable} \
+                              measured={measured})"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn every_predicate_term_is_published_every_sweep() {
+        // A term that only appears when it fires is indistinguishable from an
+        // emitter that never ran (the inc_identity_fill lesson). All four series
+        // must be materialised on every sweep so a 0 is EVIDENCE.
+        let published: Vec<&str> = converged_blockers(&healed_sweep(), 0, true)
+            .iter()
+            .map(|(term, _)| *term)
+            .collect();
+        assert_eq!(
+            published,
+            CONVERGED_BLOCKED_BY_TERMS.to_vec(),
+            "the published label set must be exactly the declared term set"
+        );
     }
 
     #[test]
@@ -2453,7 +2679,7 @@ mod tests {
         // on `..._divergent_refused`. Nothing is hidden, only re-classified.
         let actionable = 6071usize.saturating_sub(6071);
         assert_eq!(
-            converged_gauge_value(&healed, actionable),
+            converged_gauge_value(&healed, actionable, true),
             1,
             "divergence heal is FORBIDDEN to move must not defeat convergence"
         );
@@ -2462,7 +2688,7 @@ mod tests {
         // it. This is the guard against the split becoming a whitewash.
         let actionable = 6071usize.saturating_sub(6070);
         assert_eq!(
-            converged_gauge_value(&healed, actionable),
+            converged_gauge_value(&healed, actionable, true),
             0,
             "unadjudicated divergence must still defeat convergence"
         );
@@ -2527,6 +2753,7 @@ mod tests {
                 converged: false,
             },
             1860,
+            true,
         );
         inc_shard_redistribute_bytes_missing();
         set_peer_status_fanout_missed(2);
@@ -2628,6 +2855,15 @@ mod tests {
             text.contains("elohim_projection_reconcile_converged"),
             "converged gauge missing — the field an SLO rides:\n{text}"
         );
+        for term in CONVERGED_BLOCKED_BY_TERMS {
+            assert!(
+                text.contains(&format!(
+                    "elohim_projection_reconcile_converged_blocked_by{{term=\"{term}\"}}"
+                )),
+                "blocked-by term {term:?} missing — a fleet stuck at converged=0 must \
+                 REPORT which term pins it, not force a code read:\n{text}"
+            );
+        }
         // Sync plane cost + per-request outcome attribution.
         assert!(
             text.contains("elohim_sync_rounds_total"),

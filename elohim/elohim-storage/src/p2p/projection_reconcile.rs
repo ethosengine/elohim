@@ -161,8 +161,26 @@ pub enum Admission {
     /// Enqueue it — the retry budget has room (or fresh evidence re-admitted it).
     Retry,
     /// Retry budget spent against UNCHANGED evidence — do not enqueue this sweep.
-    /// ADJUDICATED, not unresolved: the conductor has been asked `MAX_RETRIES`
-    /// times and nothing new has been advertised since.
+    ///
+    /// A BOUNDED-WORK CONCESSION, not an adjudication. The honest claim is only
+    /// this: *our own* conductor has been asked `MAX_RETRIES` times and nothing
+    /// new has been advertised since, so asking again this sweep is very likely
+    /// to cost a round-trip and learn nothing. That is a statement about our
+    /// budget, not about the id.
+    ///
+    /// It deliberately does NOT mean the id is unresolvable, and nothing here
+    /// may treat it as proven-absent. The full-arc law says a local `get` miss
+    /// means gossip has not delivered the record, NOT that no record exists —
+    /// the scope note on `head_adoption.rs`'s `LocalResolve`/`Answer` split
+    /// (~:751-766) carries the assumption verbatim: a non-present answer
+    /// forecloses the local-adopt arm and nothing more; it must never author,
+    /// delete, tombstone, or otherwise assert network-wide absence.
+    ///
+    /// Real adjudication would need a PEER-CONFIRMED answer (ask the peers that
+    /// advertised it whether they can still serve it), which is a designed
+    /// follow-up and is NOT implemented here. Until it is, the cooldown is what
+    /// keeps the concession honest: after `MISS_READMIT_SWEEPS` dormant sweeps
+    /// the id is re-admitted and asked again, so exhaustion is always temporary.
     Exhausted,
 }
 
@@ -885,9 +903,17 @@ pub struct ProjectionReconcileStatus {
     /// `pending` permanently; that is why `caught_up` alone overstates.
     #[ts(type = "number")]
     pub exhausted: usize,
-    /// True when this peer holds what its peers advertised: nothing pending,
-    /// nothing abandoned, nothing divergent. `caught_up` says only that the
-    /// sweep ended — an SLO may be offered over THIS field, not that one.
+    /// True when this peer holds what its peers advertised. `caught_up` says
+    /// only that the sweep ended — an SLO may be offered over THIS field, not
+    /// that one.
+    ///
+    /// The predicate is [`crate::metrics::converged_blockers`] (one expression,
+    /// shared with `elohim_projection_reconcile_converged` so the wire field and
+    /// the metric cannot disagree): the sweep MEASURED something, nothing is
+    /// pending, nothing it attempted ended failed, and no UNADJUDICATED
+    /// divergence remains. Note `divergent_anchor` above stays the TOTAL — a
+    /// nonzero `divergentAnchor` beside `converged: true` is correct and
+    /// expected when every divergent row is adjudicated.
     pub converged: bool,
 }
 
@@ -914,12 +940,21 @@ impl ProjectionReconcileState {
     /// `divergent_anchor` is the TOTAL divergence across the folded arms;
     /// `divergent_refused` is the ADJUDICATED share of it. The difference —
     /// UNADJUDICATED divergence — is what convergence is gated on.
+    ///
+    /// `measured` is the honesty precondition: false when no peer was asked or
+    /// any arm short-circuited on a DB/query error. An unmeasured sweep publishes
+    /// its (all-zero, meaningless) counts as usual — the status surface stays a
+    /// faithful record of what the sweep saw — but it may NEVER claim
+    /// convergence. See [`crate::metrics::converged_blockers`] for the full
+    /// predicate; this method and the metric are computed from that one
+    /// expression so they cannot drift.
     async fn publish_sweep(
         &self,
         counts: crate::p2p::reconcile_rails::GapCounts,
         peers_asked: usize,
         divergent_anchor: usize,
         divergent_refused: usize,
+        measured: bool,
     ) {
         let divergent_actionable = divergent_anchor.saturating_sub(divergent_refused);
         let mut s = self.inner.write().await;
@@ -949,11 +984,35 @@ impl ProjectionReconcileState {
         // 8 healed in 12h), which is not an honest zero — it is a metric that
         // cannot move. Gating on the remainder keeps the honest half: a row nobody
         // has adjudicated still defeats convergence.
-        s.converged = counts.converged && divergent_actionable == 0;
+        //
+        // TWO further terms make this an honesty FLOOR rather than a best case:
+        //
+        //   3. `failed > 0` — a gap this sweep ATTEMPTED ended failed (the
+        //      conductor answered `None`/`Err`). A sweep that could not resolve
+        //      what it tried has not converged, and saying otherwise is the
+        //      whole failure mode this gauge exists to catch. Steady state stays
+        //      REACHABLE: an id the conductor genuinely cannot see exhausts into
+        //      the `MissLedger` after `MAX_RETRIES` and stops being attempted at
+        //      all, so it stops producing `failed`. The ledger's re-admit wave
+        //      every `MISS_READMIT_SWEEPS` dormant sweeps honestly flaps this
+        //      term for a few sweeps per cycle — that flap is the substrate
+        //      re-checking a dormant claim, not noise to be smoothed away.
+        //   4. `measured` — no peer asked, or an arm short-circuited on a
+        //      DB/query error, means this sweep OBSERVED NOTHING. Its all-zero
+        //      counts are indistinguishable from a healthy in-sync sweep, and
+        //      `run_heal` publishes regardless, so without this term a database
+        //      outage reads as convergence: the purest false green there is.
+        //
+        // `elohim_projection_reconcile_converged_blocked_by{term}` publishes
+        // WHICH of the four terms is responsible, every sweep — so a stuck fleet
+        // reports its own cause instead of being deduced from a code read (which
+        // is how the vacuous `exhausted` term got blamed for months).
+        s.converged =
+            crate::metrics::converged_gauge_value(&counts, divergent_actionable, measured) == 1;
         // Same call site as the wire field on purpose: metric and /p2p/status
         // are written together, so they cannot drift apart the way /health and
         // /p2p/status did (1860 vs 148 in the same minute, 2026-07-25).
-        crate::metrics::record_reconcile_sweep(&counts, divergent_actionable);
+        crate::metrics::record_reconcile_sweep(&counts, divergent_actionable, measured);
     }
 }
 
@@ -991,10 +1050,20 @@ pub struct ReaDiscovery {
     /// `elohim_projection_reconcile_exhausted{stream="rea"}`.
     exhausted_persistent: usize,
     local_total: usize,
+    /// This arm actually OBSERVED the state it reports. False when the arm
+    /// short-circuited on a DB/query error (see [`ReaDiscovery::empty`]).
+    ///
+    /// A short-circuited arm returns all-zero counts that are indistinguishable
+    /// from a healthy in-sync arm, and `run_heal` publishes the sweep anyway —
+    /// so without this bit a database outage reads as CONVERGENCE. Every
+    /// unmeasured arm forces `converged=false` and lights
+    /// `elohim_projection_reconcile_converged_blocked_by{term="unmeasured"}`.
+    measured: bool,
 }
 
 impl ReaDiscovery {
     /// Empty discovery (db unavailable this tick) — the heal leg has nothing to do.
+    /// UNMEASURED by construction: nothing was observed, so nothing may be claimed.
     fn empty() -> Self {
         Self {
             tracker: GapTracker::new(MAX_RETRIES),
@@ -1005,6 +1074,7 @@ impl ReaDiscovery {
             divergent_refused: 0,
             exhausted_persistent: 0,
             local_total: 0,
+            measured: false,
         }
     }
 }
@@ -1359,6 +1429,7 @@ pub async fn run_heal(
         divergent_refused: rea_divergent_refused,
         exhausted_persistent: rea_exhausted,
         local_total,
+        measured: rea_measured,
     } = rea;
     // Publish the last-sweep gauges BEFORE heal (discovered gaps + local rows), so
     // convergence is watchable on `/metrics` without tailing Loki. `exhausted` is
@@ -1397,6 +1468,7 @@ pub async fn run_heal(
         ids_discovered: content_ids_discovered,
         local_anchored,
         peer_head_hints,
+        measured: content_measured,
     } = content;
     crate::metrics::set_projection_reconcile_gauges(
         "content",
@@ -1432,6 +1504,7 @@ pub async fn run_heal(
         peers_asked: collectives_peers_asked,
         ids_discovered: collectives_ids_discovered,
         local_anchored: collectives_local_anchored,
+        measured: collectives_measured,
     } = collectives;
     // The collectives arm's divergence is refused BY CONSTRUCTION — a divergent
     // cid is counted and WARN-logged but never enqueued (no declaration-ordering
@@ -1501,12 +1574,19 @@ pub async fn run_heal(
         content_tracker.counts(),
         collectives_tracker.counts(),
     ]);
+    // MEASURED precondition (the N2 false-green): every arm short-circuits to an
+    // `empty()` discovery on a DB/query error, and those all-zero counts reach
+    // `publish_sweep` looking exactly like a healthy in-sync sweep. Requiring
+    // that every arm observed its state AND that at least one peer was asked is
+    // what keeps "could not measure" from publishing as "converged".
+    let measured = rea_measured && content_measured && collectives_measured && peers_asked > 0;
     state
         .publish_sweep(
             sweep_counts,
             peers_asked,
             rea_divergent + content_divergent,
             rea_divergent_refused + content_divergent_refused,
+            measured,
         )
         .await;
 
@@ -2125,6 +2205,7 @@ async fn discover_rea(
         divergent_refused: exhausted_divergent,
         exhausted_persistent,
         local_total,
+        measured: true,
     }
 }
 
@@ -2396,12 +2477,15 @@ pub struct ContentDiscovery {
     /// has no anchor for is not a "gap" the heal leg tracks, yet it is precisely
     /// the row the witness sweeps are about to mint a competing root for.
     peer_head_hints: crate::services::head_adoption::PeerHeadHints,
+    /// This arm actually OBSERVED the state it reports — see
+    /// [`ReaDiscovery::measured`].
+    measured: bool,
 }
 
 impl ContentDiscovery {
     /// Empty discovery (db unavailable this tick) — the heal leg has nothing to
     /// do. `peers_asked` records how many peers answered before the db failure so
-    /// the discovery log stays honest.
+    /// the discovery log stays honest. UNMEASURED by construction.
     fn empty(peers_asked: usize) -> Self {
         Self {
             tracker: GapTracker::new(MAX_RETRIES),
@@ -2413,6 +2497,7 @@ impl ContentDiscovery {
             ids_discovered: 0,
             local_anchored: 0,
             peer_head_hints: crate::services::head_adoption::PeerHeadHints::new(),
+            measured: false,
         }
     }
 }
@@ -2790,6 +2875,7 @@ async fn discover_content(
         ids_discovered,
         local_anchored,
         peer_head_hints,
+        measured: true,
     }
 }
 
@@ -3579,12 +3665,15 @@ pub struct CollectivesDiscovery {
     peers_asked: usize,
     ids_discovered: usize,
     local_anchored: usize,
+    /// This arm actually OBSERVED the state it reports — see
+    /// [`ReaDiscovery::measured`].
+    measured: bool,
 }
 
 impl CollectivesDiscovery {
     /// Empty discovery (db unavailable this tick) — the heal leg has nothing to
     /// do. `peers_asked` records how many peers answered before the db failure
-    /// so the discovery log stays honest.
+    /// so the discovery log stays honest. UNMEASURED by construction.
     fn empty(peers_asked: usize) -> Self {
         Self {
             tracker: GapTracker::new(MAX_RETRIES),
@@ -3595,6 +3684,7 @@ impl CollectivesDiscovery {
             peers_asked,
             ids_discovered: 0,
             local_anchored: 0,
+            measured: false,
         }
     }
 }
@@ -3896,6 +3986,7 @@ async fn discover_collectives(
         peers_asked,
         ids_discovered,
         local_anchored,
+        measured: true,
     }
 }
 
@@ -4351,6 +4442,7 @@ mod tests {
                 3,
                 1,
                 0,
+                true,
             )
             .await;
         let s1 = state.status().await;
@@ -4376,6 +4468,7 @@ mod tests {
                 2,
                 0,
                 0,
+                true,
             )
             .await;
         let s2 = state.status().await;
@@ -4404,7 +4497,8 @@ mod tests {
                 },
                 3,
                 1860, // ...but 1860 rows diverge, so the PEER did not.
-                0,    // ...and NONE of them is adjudicated.
+                0,    // ...and NONE of them is adjudicated.,
+                true,
             )
             .await;
 
@@ -4443,7 +4537,8 @@ mod tests {
                 },
                 3,
                 6071, // total divergence...
-                6071, // ...ALL of it adjudicated (heal forbidden to move it).
+                6071, // ...ALL of it adjudicated (heal forbidden to move it).,
+                true,
             )
             .await;
 
@@ -4477,7 +4572,8 @@ mod tests {
                 },
                 3,
                 6071,
-                6070, // one row short of fully adjudicated
+                6070, // one row short of fully adjudicated,
+                true,
             )
             .await;
 
@@ -4529,6 +4625,116 @@ mod tests {
         );
     }
 
+    /// Drive a reconcile arm's tracker through the REAL sweep shape: a fresh
+    /// per-sweep tracker, one conductor answer per admitted gap, then the
+    /// end-of-arm `update_caught_up`. `heal_ok` decides whether each gap healed
+    /// or came back `Ok(None)`.
+    ///
+    /// This is what the arms actually do (`heal_rea` / `heal_content` /
+    /// `heal_collectives` each mark every pending id exactly once), minus the
+    /// conductor. Hand-built `GapCounts` cannot catch a predicate that is wrong
+    /// about the shape the arms produce — the guard that read
+    /// `retry_exhausted_gaps_are_caught_up_but_not_converged` was asserting a
+    /// state (`exhausted > 0`) no reconcile arm can ever be in.
+    fn sweep_arm(admitted: &[&str], heal_ok: bool) -> GapCounts {
+        let mut tracker = GapTracker::new(MAX_RETRIES);
+        tracker.discover(admitted.iter().map(|s| s.to_string()).collect());
+        for id in admitted {
+            if heal_ok {
+                tracker.mark_completed(id);
+            } else {
+                tracker.mark_failed(id);
+            }
+        }
+        tracker.update_caught_up();
+        tracker.counts()
+    }
+
+    #[tokio::test]
+    async fn a_sweep_whose_every_gap_answered_none_does_not_claim_convergence() {
+        // THE REAL PATH, and the reason the honesty floor exists. Every gap the
+        // sweep attempted came back `Ok(None)` from the own conductor, so every
+        // one was `mark_failed` — which DRAINS `pending` without re-queueing.
+        // The arm therefore reports caught_up=true, pending=0 and (because the
+        // per-sweep tracker cannot reach MAX_RETRIES) exhausted=0: byte-for-byte
+        // the shape of a perfectly healed sweep. `failed` is the only surviving
+        // evidence that nothing was resolved.
+        let counts = sweep_arm(&["a", "b", "c"], false);
+        assert_eq!(counts.completed, 0, "nothing healed");
+        assert!(counts.caught_up, "mark_failed drained pending — sweep over");
+        assert_eq!(
+            counts.exhausted, 0,
+            "the per-sweep tracker cannot exhaust — this is why `exhausted` \
+             could never have been the term that pinned the gauge"
+        );
+
+        let state = ProjectionReconcileState::new();
+        state.publish_sweep(counts, 6, 0, 0, true).await;
+        let s = state.status().await;
+        assert_eq!(s.failed, 3);
+        assert!(
+            !s.converged,
+            "a sweep that resolved NONE of what it attempted must not converge"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_sweep_that_healed_everything_it_attempted_converges() {
+        // The other direction — the floor must not make convergence unreachable.
+        let counts = sweep_arm(&["a", "b", "c"], true);
+        let state = ProjectionReconcileState::new();
+        state.publish_sweep(counts, 6, 0, 0, true).await;
+        let s = state.status().await;
+        assert_eq!((s.completed, s.failed), (3, 0));
+        assert!(s.converged, "everything attempted was healed");
+    }
+
+    #[tokio::test]
+    async fn an_unmeasured_sweep_never_claims_convergence() {
+        // The N2 false-green on the wire field: `ReaDiscovery::empty()` and
+        // friends return all-zero counts on a DB/query error, and `run_heal`
+        // publishes them anyway. Those counts are INDISTINGUISHABLE from a
+        // healthy in-sync sweep, so before the `measured` term a database
+        // outage was the cheapest way to make this peer claim convergence.
+        let nothing_observed = sweep_arm(&[], true);
+        let state = ProjectionReconcileState::new();
+        state.publish_sweep(nothing_observed, 0, 0, 0, false).await;
+        assert!(
+            !state.status().await.converged,
+            "a sweep that observed nothing must not publish convergence"
+        );
+
+        // Same counts, honestly measured (an in-sync peer with no gaps): converged.
+        let state = ProjectionReconcileState::new();
+        state.publish_sweep(nothing_observed, 6, 0, 0, true).await;
+        assert!(
+            state.status().await.converged,
+            "an in-sync measured sweep still converges — the floor is not a veto"
+        );
+    }
+
+    #[tokio::test]
+    async fn steady_state_with_ledger_exhausted_ids_converges() {
+        // REACHABILITY: the floor must not become the next structurally-pinned
+        // gauge. The live steady state is ~398 ledger-exhausted content ids and
+        // ~1951 divergent rows. Neither reaches the tracker — the ledger holds
+        // exhausted ids OUT of `admitted` (so they produce no `failed`), and the
+        // divergent share is folded into `divergent_refused` and subtracted. A
+        // sweep that heals the gaps it WAS admitted converges despite both.
+        let counts = sweep_arm(&["admitted-1", "admitted-2"], true);
+        let state = ProjectionReconcileState::new();
+        state.publish_sweep(counts, 6, 1951, 1951, true).await;
+        let s = state.status().await;
+        assert_eq!(
+            s.divergent_anchor, 1951,
+            "the TOTAL stays on the wire — adjudicated backlog must never vanish"
+        );
+        assert!(
+            s.converged,
+            "an adjudicated backlog must not veto a sweep that did all it was given"
+        );
+    }
+
     #[tokio::test]
     async fn rea_divergence_the_own_conductor_confirms_does_not_defeat_convergence() {
         // The REA sibling of
@@ -4551,7 +4757,8 @@ mod tests {
                 },
                 6,
                 12, // total REA divergence...
-                12, // ...5 retry-exhausted + 7 conductor-confirmed = all of it.
+                12, // ...5 retry-exhausted + 7 conductor-confirmed = all of it.,
+                true,
             )
             .await;
 
@@ -4584,7 +4791,8 @@ mod tests {
                 },
                 6,
                 12,
-                11, // one row short of fully adjudicated
+                11, // one row short of fully adjudicated,
+                true,
             )
             .await;
 
@@ -4719,6 +4927,7 @@ mod tests {
                 3,
                 0,
                 0,
+                true,
             )
             .await;
 
@@ -5062,7 +5271,7 @@ mod tests {
             arm_counts(0, 0, 0),
         ]);
         // No unadjudicated divergence: the ONLY thing left is the content gaps.
-        state.publish_sweep(folded, 6, 1245, 1245).await;
+        state.publish_sweep(folded, 6, 1245, 1245, true).await;
 
         let status = state.status().await;
         assert_eq!(

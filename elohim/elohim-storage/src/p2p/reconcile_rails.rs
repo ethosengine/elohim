@@ -34,10 +34,42 @@ pub struct GapCounts {
     /// `enqueue_missing` refuses to re-queue these, so they are permanently
     /// absent from `pending`; that absence is why `pending.is_empty()`
     /// overstates convergence.
+    ///
+    /// ## NOT the same number as `elohim_projection_reconcile_exhausted`
+    ///
+    /// The metric and this field share a word and measure different things.
+    /// Read this before concluding that "exhausted" is holding a gauge down:
+    ///
+    /// - **This field** counts abandonment inside ONE tracker's lifetime. It can
+    ///   only fire on a tracker that OUTLIVES its cycles — `replication.rs`'s
+    ///   `Arc<RwLock<GapTracker>>` and `acquisition.rs`'s per-pin trackers,
+    ///   where a failure accumulates across cycles until it crosses
+    ///   `max_retries`.
+    /// - **The metric** publishes `projection_reconcile::MissLedger`'s
+    ///   cross-sweep adjudication (`exhausted_persistent`), which is a wholly
+    ///   separate structure and is already excluded from convergence BY
+    ///   CONSTRUCTION: a `MissLedger`-exhausted id is never admitted to a
+    ///   `GapTracker` at all, so it can appear in neither `pending` nor here.
+    ///
+    /// The projection-reconcile arms build a FRESH tracker per sweep and call
+    /// `mark_failed` at most once per id per sweep (the in-leg `call_with_retry`
+    /// never touches the tracker), so with `MAX_RETRIES = 3` this field is
+    /// structurally 0 on those arms — verified live: alpha A published
+    /// `exhausted: 0` beside `pending: 2894`. Pinned by
+    /// [`tests::a_per_sweep_tracker_cannot_exhaust_under_a_multi_attempt_budget`].
+    /// A reconcile arm that will not converge is held down by `pending` or by
+    /// unadjudicated divergence, never by this term.
     pub exhausted: usize,
     /// This PEER holds what its peers advertised: nothing pending AND nothing
     /// abandoned. Strictly stronger than `caught_up`; this is the field an SLO
     /// may be offered over.
+    ///
+    /// The `exhausted` term is kept deliberately: on the long-lived trackers it
+    /// is REAL undone work (attempted `max_retries` times this tracker's life
+    /// and given up on), which is exactly what an SLO must not be blind to.
+    /// Dropping it would collapse `converged` into `caught_up` and delete the
+    /// distinction this pair exists to draw — see the `exhausted` field docs for
+    /// why doing so would also be inert on the reconcile arms.
     pub converged: bool,
 }
 
@@ -240,11 +272,22 @@ mod tests {
 
     #[test]
     fn retry_exhausted_gaps_are_caught_up_but_not_converged() {
-        // The live lie: a sweep whose gaps all failed past max_retries drains
+        // The live lie: a tracker whose gaps all failed past max_retries drains
         // `pending` (mark_failed removes without re-queue) and reports
-        // caught_up=true while nothing was healed. That is "this sweep is
+        // caught_up=true while nothing was healed. That is "this cycle is
         // over", not "this peer holds what its peers hold" — the shape behind
         // caughtUp:true over 1860 divergent anchors.
+        //
+        // SCOPE: this drives the CROSS-CYCLE tracker shape (one tracker, three
+        // cycles of re-discover-then-fail) — i.e. `replication.rs` and
+        // `acquisition.rs`, which hold their trackers across cycles. It is NOT
+        // the projection-reconcile shape: those arms rebuild the tracker every
+        // sweep and answer each id once, so they can never reach this state (see
+        // `a_per_sweep_tracker_cannot_exhaust_under_a_multi_attempt_budget`).
+        // Reading this test as if it covered the reconcile arms is what sent a
+        // convergence diagnosis after the wrong term. The reconcile arms' real
+        // shape is guarded in `projection_reconcile.rs` by
+        // `a_sweep_whose_every_gap_answered_none_does_not_claim_convergence`.
         let mut t = GapTracker::new(2);
         t.discover(vec!["a".into(), "b".into(), "c".into()]);
         for _ in 0..2 {
@@ -323,6 +366,69 @@ mod tests {
             t.counts().exhausted,
             0,
             "not exhausted while unprobed providers remain"
+        );
+    }
+
+    #[test]
+    fn a_per_sweep_tracker_cannot_exhaust_under_a_multi_attempt_budget() {
+        // The shape EVERY projection-reconcile arm runs (`discover_*` builds a
+        // fresh tracker, `heal_*` marks each id completed-or-failed exactly
+        // once, then `update_caught_up`). With a budget above 1, one failure per
+        // id per sweep can never reach `max_retries`, so `GapCounts::exhausted`
+        // is structurally 0 there and `converged` reduces to `pending.is_empty()`
+        // on its own.
+        //
+        // This is the regression guard for a misdiagnosis, not a feature: the
+        // `elohim_projection_reconcile_exhausted{stream=…}` metric (the
+        // cross-sweep `MissLedger`, hundreds of ids live) was read as if it were
+        // THIS field and blamed for pinning
+        // `elohim_projection_reconcile_converged` at 0. It cannot be — alpha A
+        // published `exhausted: 0` beside `pending: 2894` while the gauge read
+        // 0. Relaxing the `exhausted` term would have changed nothing here and
+        // weakened the long-lived trackers below.
+        let mut t = GapTracker::new(3);
+        t.discover(vec!["a".into(), "b".into(), "c".into()]);
+        for id in ["a", "b", "c"] {
+            t.mark_failed(id); // one conductor answer per id per sweep
+        }
+        t.update_caught_up();
+
+        let c = t.counts();
+        assert_eq!(c.failed, 3, "all three failed this sweep");
+        assert_eq!(
+            c.exhausted, 0,
+            "one attempt per sweep can never spend a 3-retry budget within ONE tracker"
+        );
+        assert!(c.caught_up, "the sweep ended: mark_failed drained pending");
+        assert!(
+            c.converged,
+            "with exhausted structurally 0, this arm's convergence is gated by pending alone \
+             (and, above the rails, by unadjudicated divergence)"
+        );
+    }
+
+    #[test]
+    fn a_long_lived_tracker_still_exhausts_and_still_blocks() {
+        // The other half of the pair: replication/acquisition hold ONE tracker
+        // across cycles, so failures accumulate and `exhausted` becomes real
+        // undone work. It must keep defeating `converged` — that is the term an
+        // SLO would otherwise be blind to.
+        let mut t = GapTracker::new(3);
+        for _ in 0..3 {
+            t.discover(vec!["a".into()]); // re-discovered each cycle
+            t.mark_failed("a");
+        }
+        t.update_caught_up();
+
+        let c = t.counts();
+        assert_eq!(
+            c.exhausted, 1,
+            "three cycles spent the budget on this tracker"
+        );
+        assert!(c.caught_up, "the cycle ended");
+        assert!(
+            !c.converged,
+            "abandoned-after-max_retries is undone work, not adjudication"
         );
     }
 
