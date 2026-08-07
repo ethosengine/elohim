@@ -11,7 +11,7 @@ status: "backlog"
 priority: "low"
 deprecation_status: blocked
 severity: low
-fingerprints: ["a2464d792194"]
+fingerprints: []
 relatedNodeIds: []
 tags: [deprecation, devfile, che, doorway, hc-start, dev-stack]
 cites:
@@ -120,10 +120,26 @@ devfile pass owns the removal.
 The deprecation comment stays in place meanwhile — it correctly steers anyone
 who opens the command palette to `hc:start`.
 
+**Fingerprint list emptied 2026-08-07 — the concern is unchanged, its capture
+surface is gone.** This entry is the cleanest specimen of the class Guard O now
+closes: it was *born* from a self-authored comment. The `# DEPRECATED: use
+app/elohim-app/scripts/hc-start.sh …` note that commit `1162438ae` added on
+purpose was fingerprinted as a finding (`a2464d792194`), and a later scope grep
+of the same three lines minted a second one (`8cb5f41fe4ea`, still `open` when
+Guard O landed) — two background Opus dispatches spent on one comment whose
+entire content is a pointer to the replacement it names.
+
+Both rows are deleted: a first-party comment narrating a deprecation is the
+documentation surface, not a live toolchain warning, and the sentinel no longer
+fingerprints it (`.claude/hooks/deprecation-sentinel.py` Guard O; see
+`deprecation-sentinel-redundant-capture-surfaces.md` Class 7). Nothing about the
+decision above changes — the removal is still operator-gated and still owed. The
+only difference is that the *comment* no longer bills for it.
+
 ## Verification
 
 N/A — not yet removed (blocked on operator-gated devfile edit). When the operator
 removes the `start-doorway` block on a devfile-cleanup pass, verification =
 `devfile.yaml` parses (the workspace rebuilds cleanly) and `grep -n start-doorway
-devfile.yaml` returns nothing. Then delete this fingerprint from the ledger and
-delete this entry.
+devfile.yaml` returns nothing. Then delete this entry (the ledger rows are
+already gone — see Current decision).

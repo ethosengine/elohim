@@ -402,8 +402,58 @@ ECHO_COMMENT_OPENER_RE = re.compile(
     r"^[+-]?\s*"  # optional diff marker
     r"(?:[^\s:]+:\d+[:-])?\s*"  # optional grep `path:line:` prefix
     r"(?:\d+[:-])?\s*"  # optional bare `-n` line-number prefix
-    r"(?://[/!]?|\#(?!\[))"  # comment opener: // /// //! or # (NOT #[attr])
+    # comment opener: // /// //! or # — but NOT `#[attr]`, and NOT a Docker
+    # BuildKit progress prefix. BuildKit prints `#<step> <elapsed> <text>`
+    # (`#12 3.456 npm warn deprecated glob@7.2.3: …`), which is a LIVE warning
+    # wearing a comment costume: verified 2026-08-07 to match the pre-narrowing
+    # regex AND classify as `deprecation`. `#` followed by a digit is therefore
+    # never treated as a comment opener — every CI build in this repo runs
+    # inside Docker, so this shape is the dominant live channel for cargo/npm
+    # warnings. The exclusion also closes the same latent hole in Guard H2
+    # (a `#12 3.456 … RUSTSEC-2024-0437` line was dismissible as a remediation
+    # annotation). Narrowing an echo guard can only ever LOSE a dismissal, so
+    # it errs toward capture.
+    r"(?://[/!]?|\#(?!\[)(?!\d))"
 )
+
+# Guard O (2026-08-07) — FIRST-PARTY DEPRECATION-COMMENT self-capture: the
+#   deprecation-class analog of H2, and the general form of Guard G.
+#   Guard G already establishes that an in-source comment NARRATING a
+#   deprecation is the deprecation-IMPLEMENTATION/DOCUMENTATION surface, not a
+#   live toolchain warning. But G is anchored three ways that leak:
+#     - `//`-openers only, so `#` comments (Cargo.toml, shell, YAML, Dockerfile)
+#       and markdown prose escape;
+#     - ALL-CAPS `DEPRECATED` only, so ordinary lowercase prose escapes;
+#     - diff-EXEMPT, so the `+`-prefixed comment-ADD escapes — and that is the
+#       dominant shape, because writing the guard comment is what fix work DOES.
+#   The resulting class is self-amplifying in the worst way: a comment written
+#   to DOCUMENT an already-canonicalized deprecation becomes a perpetual
+#   dispatch generator, because every subsequent `git diff` or scope `grep` of
+#   the file it guards re-emits it under a fresh line-number/diff prefix that
+#   fp-dedupe cannot collapse (same defeat as Guards B/D/F/G/L).
+#   Measured live 2026-08-07: **33 of 286 ledger rows (11.5%)** are this class.
+#   Their dispositions are the zero-true-positive argument, and it is empirical
+#   rather than regex reasoning: 5 already hand-marked `false-positive`, 12
+#   `blocked` against concerns already canonicalized (learning-path zome
+#   surface, doorway warm-projection cache, holochain_sqlite tombstone, devfile
+#   dead command), 16 `open` — and **not one row in 286 was ever `triaged`**,
+#   i.e. no comment-line capture in the ledger's whole history ever became an
+#   actionable fix. The 16 open rows are Rust doc-comments (`/// deprecated in
+#   favour of …`), `#![allow(deprecated)]`, a shell comment, a markdown task
+#   heading, and a Cargo.toml pin-guard block — first-party prose, every one.
+#   Deliberately NOT diff-exempt (same call as H2 and M). The live deprecation
+#   channel is never comment-shaped — `npm warn deprecated`, ` WARN  deprecated`,
+#   `warning: use of deprecated`, `(node:N) DeprecationWarning`, Vitest
+#   `DEPRECATED: <prose>` all open with the tool's own token — and the one live
+#   channel that DOES open with `#` (Docker BuildKit `#12 3.456 …`) is excluded
+#   in the opener regex above. `#[deprecated…]` is an attribute, not a comment,
+#   and stays capturable.
+#   (This guard was itself dispatched by its own class: fps 4e4f2598ff5c /
+#   93a86c9e5657 / 1f681f440327 were a `git diff` of the holochain_sqlite
+#   TOMBSTONE GUARD comment — a comment whose entire purpose is to document a
+#   concern already canonicalized and blocked — and the triage run's own
+#   verification `grep` of that same comment minted three MORE, 6dd68a9c0f58 /
+#   07364812bedc / 022dae188a5f, requesting a second dispatch mid-run.)
 
 # Guard L — DERIVED/GENERATED ARTIFACT TREE self-capture:
 #   A grep/cat/find that recurses into a BUILD OUTPUT or dependency tree reads
@@ -506,7 +556,7 @@ def _is_echo_line(
     Called after classify() returns non-None to prevent false echo entries
     from being fingerprinted and appended to the ledger.
 
-    The guards (A–N):
+    The guards (A–O):
       A) Line sourced from the ledger file (self-capture via recursive grep).
       B) Line sourced from the history/museum prose tree.
       C) Line that is git commit-message text (log oneline entry, or any
@@ -566,6 +616,14 @@ def _is_echo_line(
          Guard E's regex; see its comment block for the narrowness argument
          (the `.epr-meta/` trailing slash excludes the directory-local
          compose-gate manifest FILES).
+      O) First-party deprecation-COMMENT self-capture (deprecation class only)
+         — Guard G generalized past its three leaky anchors (`//`-openers
+         only, ALL-CAPS only, diff-exempt). A comment narrating a deprecation
+         is the documentation surface, not a live warning; writing one to
+         guard an already-canonicalized concern otherwise turns that concern
+         into a perpetual dispatch generator. Not diff-exempt (like H2/M).
+         Docker BuildKit `#12 3.456 …` is excluded in the opener regex — it
+         is a live warning wearing a comment costume.
     """
     # Guard A — ledger self-capture
     if ECHO_LEDGER_PATH.search(line):
@@ -615,6 +673,16 @@ def _is_echo_line(
         and ADVISORY_ID_RE.search(line)
         and ECHO_COMMENT_OPENER_RE.match(line)
     ):
+        return True
+
+    # Guard O — first-party deprecation-comment self-capture: a COMMENT line in
+    # the deprecation class is the deprecation-documentation surface (Guard G
+    # generalized past its `//`-only / ALL-CAPS-only / diff-exempt anchors).
+    # Deliberately NOT diff-exempt: the `+`-prefixed comment-ADD from a
+    # `git diff` during fix work is the dominant shape. The one live channel
+    # that opens with `#` (Docker BuildKit `#12 3.456 …`) is excluded in
+    # ECHO_COMMENT_OPENER_RE; `#[deprecated…]` is an attribute and still captures.
+    if cls == "deprecation" and ECHO_COMMENT_OPENER_RE.match(line):
         return True
 
     # Guard L — derived/generated artifact tree (node_modules, dist, .angular/

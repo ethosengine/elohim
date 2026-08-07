@@ -3,7 +3,7 @@ id: "backlog-deprecation-sentinel-redundant-capture-surfaces"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "deprecation-sentinel fingerprint instability — Class 3 (grep -n prefix) and Class 4 (aggregate-banner drift) remain after Guards J/K and the Class-5 pid fix landed"
+title: "deprecation-sentinel fingerprint instability — Class 3 (grep -n prefix) and Class 4 (aggregate-banner drift) remain after Guards J/K/N/O and the Class-5 pid fix landed"
 slug: "deprecation-sentinel-redundant-capture-surfaces"
 written: "2026-07-30"
 author: "deprecation-triage"
@@ -265,6 +265,103 @@ capturable. Zero true-positive risk on the same argument Guard E already rests
 on: a live toolchain warning is never sourced from a checked-in agent-doc
 projection — if the finding is real it belongs to the code the doc describes.
 
+**Class 7 (observed + CLOSED 2026-08-07) — the guard comment bills for the
+concern it guards.** The largest single class yet, and structurally the most
+perverse: *documenting* a deprecation is what turns it into a permanent dispatch
+generator.
+
+When a deprecation is triaged to `blocked`, the right engineering response is
+often to leave a comment where the trap lives. `elohim/elohim-storage/Cargo.toml`
+carries a 13-line `TOMBSTONE GUARD` block explaining why `holochain_sqlite` is
+lock-pinned. `devfile.yaml` carries a three-line note pointing at `hc-start.sh`.
+Both are good comments doing their job. Both are also **permanent, high-traffic
+capture surfaces**: they sit in files that get diffed and grepped constantly, and
+every read re-emits them under a fresh `git diff` `+` marker or `grep -n` prefix
+that fp-dedupe cannot collapse.
+
+Guard G was supposed to cover this and leaks three ways at once:
+
+| Guard G anchor | What escapes |
+|---|---|
+| `//`-openers only | `#` comments — Cargo.toml, shell, YAML, Dockerfile, devfile — and markdown prose |
+| ALL-CAPS `DEPRECATED` only | ordinary lowercase prose (`# … is deprecated and no longer`) |
+| diff-EXEMPT (`+`/`-`) | the comment **ADD** — which is the dominant shape, because writing the guard comment is exactly what fix work *does* |
+
+The holochain_sqlite guard comment hit all three. It minted `4e4f2598ff5c` /
+`93a86c9e5657` / `1f681f440327` from a `git diff Cargo.toml` (three `+#` lines,
+lowercase, `#`-opener — one dispatch), and then **the triage run dispatched to
+handle those minted three more** (`6dd68a9c0f58` / `07364812bedc` /
+`022dae188a5f`) from its own verification `grep -n` of the same comment,
+requesting a *second* dispatch mid-run. Nine rows total for that one comment
+block, against a concern documented as `blocked` since the morning of the same
+day. The devfile note cost two dispatches the same way (`a2464d792194`, then
+`8cb5f41fe4ea` from a later scope grep).
+
+**Measured live before landing: 33 of 286 ledger rows (11.5%) are comment-line
+captures in the deprecation class.** The zero-true-positive argument is
+empirical rather than regex reasoning, and it is the strongest one available:
+
+| Disposition | Rows | Reading |
+|---|---|---|
+| `false-positive` (hand-marked) | 5 | already judged echo by a human/agent |
+| `blocked`, backlog-attached | 12 | prose about concerns already canonicalized |
+| `open` | 16 | untriaged — each still owed a dispatch |
+| **`triaged`** | **0** | **no comment-line capture in the ledger's history ever became an actionable fix** |
+
+The 16 open rows, inspected: Rust doc-comments (`/// deprecated in favour of
+[`Standing::evaluate`]`), `#![allow(deprecated)]`, a `//` inline note about a
+legacy WebSocket route, a shell comment, a markdown task heading, and the two
+guard blocks above. First-party prose, every one.
+
+**Guard O landed 2026-08-07** — the deprecation-class analog of H2, and the
+general form of G:
+
+```python
+if cls == "deprecation" and ECHO_COMMENT_OPENER_RE.match(line):
+    return True
+```
+
+Deliberately **not** diff-exempt, on H2's and M's argument: a comment is an
+annotation whether it is being added or merely re-read, and the `+#` add is the
+dominant shape. `#[deprecated…]` is an attribute, not a comment, and stays
+capturable via the opener's existing `#(?!\[)` clause.
+
+### The live channel that wears a comment costume
+
+Landing Guard O required narrowing `ECHO_COMMENT_OPENER_RE` first, and this is
+the part worth carrying forward. **Docker BuildKit prints `#<step> <elapsed>
+<text>`** — so a real warning from a container build arrives as:
+
+```
+#12 3.456 npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+```
+
+Verified 2026-08-07: that line matched the pre-narrowing opener regex **and**
+classified as `deprecation`. A naive Guard O would have silently eaten every
+npm/cargo/node deprecation warning emitted inside a Docker build — and **every CI
+build in this repo runs inside Docker**, so that is not an edge case, it is the
+primary live channel for the very warnings the sentinel exists to catch. The
+same hole was latent in Guard H2: a `#12 3.456 … RUSTSEC-2024-0437` line was
+dismissible as a remediation annotation.
+
+The fix is one lookahead — `#` followed by a digit is never a comment opener:
+
+```python
+r"(?://[/!]?|\#(?!\[)(?!\d))"
+```
+
+Narrowing an echo guard can only ever *lose a dismissal*, never gain one, so it
+errs toward capture by construction. Closing H2's hole came free with it.
+
+The generalizable lesson, and it is a new one — the earlier classes are all
+about *where* a surface lives (Class 6: how many homes does the path have?).
+Class 7 is about *what the text is*: **a note about a warning is not a warning**,
+and the sentinel had no way to tell them apart in the one language (`#` comments)
+that manifests, shell, YAML and CI config all share. The corollary for anyone
+triaging: when you write a guard comment to document a blocked concern, you have
+just created a capture surface — check that a guard covers it, or the concern
+you just closed will keep billing.
+
 ## Usage inventory
 
 Single file — `.claude/hooks/deprecation-sentinel.py`:
@@ -397,7 +494,9 @@ adversarial harness and zero migration cost (see Verification). Classes 1 and 2
 closed earlier the same day. **Class 6 is CLOSED — Guard N landed 2026-08-04**,
 also at zero migration cost: exactly one live ledger row matched the new clauses
 (`09f2f5632c00`, the capture that dispatched the run), and it was deleted as
-fixed in the landing commit. **Classes 3 and 4 remain BLOCKED**, and they are
+fixed in the landing commit. **Class 7 is CLOSED — Guard O landed 2026-08-07**,
+retiring 17 live rows (286 → 269) at zero true-positive cost and closing a
+latent Guard-H2 hole on the way. **Classes 3 and 4 remain BLOCKED**, and they are
 now the entire remaining concern.
 
 Class 6 restates the lesson the earlier classes keep teaching, at a new seam:
@@ -560,6 +659,57 @@ standard (loads `deprecation-sentinel.py` directly, so it drives the shipped
   is still captured, still fingerprinted, and still emits
   `deprecation-sentinel: +1 new → deprecation-triage dispatch`. Guard N narrows
   the echo surface, not the warning surface.
+
+**Class 7 (Guard O + opener narrowing) — verified and landed 2026-08-07.**
+Harness at the Class-5/Guard-N standard (loads `deprecation-sentinel.py`
+directly, driving the shipped `classify()` + `_is_echo_line()`):
+
+- **Positives — 17/17 suppressed.** All six fingerprints from the dispatching
+  run (three `+#` diff-hunk lines, three `grep -n` re-captures of the same
+  comment), plus every leaky shape Guard G could not see: `///` lowercase
+  doc-comments, `//!` module docs, `#![allow(deprecated)]`, a `#` shell comment
+  behind a `grep -n` prefix, a markdown `###` task heading, a `##` changelog
+  line, a `//` inline note, a `+    #` indented diff-add, and both the bare and
+  `path:line:`-prefixed forms of a manifest pin comment.
+- **Negatives — 14/14 preserved, zero leaks.** The adversarial set carries the
+  finding: **five Docker BuildKit shapes** (`#12 3.456 npm warn deprecated …`,
+  `#8 12.34 warning: use of deprecated function`, `#5 0.221 (node:N) [DEP0040]`,
+  `#33 15.7  WARN  deprecated eslint@8.57.1`, `#1 0.001 DEPRECATED: …`) — each
+  confirmed to classify as `deprecation` and to survive the guard. Plus the
+  unprefixed live channels, the ESLint `no-deprecated` prose, a
+  `Compiling serde_yaml v0.9.34+deprecated` build line, three `#[deprecated…]`
+  attribute forms (bare, diff-added, and with `since`/`note`), and a
+  `path.py:12: DeprecationWarning` whose prefix must not read as a comment.
+- **Security class — 5/5.** Guard H2's two canonical dismissals still dismiss
+  (`+# … fixing RUSTSEC-2024-0437.`, `// origin isolation (GHSA-…)`), and the
+  three live advisory channels survive — including
+  `#12 3.456 error: 1 vulnerability found: RUSTSEC-2024-0437 …`, which the
+  narrowing **gave back**: it was dismissible before this change.
+- **Whole-ledger stability — PASS.** Every live row re-tested under both the
+  `HEAD` hook and the new one: **17 of 286 change suppression state, all in the
+  newly-suppressed direction, 0 newly captured.** Dispositions of the 17: 12
+  `open`, 4 `blocked`, 1 `false-positive` — and **0 `triaged`**, i.e. the guard
+  cannot have cost a fix in flight. The 33-row measurement in Class 7 above is
+  the whole comment-line class; 16 of those were already suppressed by Guards
+  B/E/G at line level, so 17 is the honest marginal delta.
+- **End-to-end through the hook's real entrypoint — PASS, measured both ways.**
+  One synthetic `PostToolUse` payload carrying three guard-comment lines, one
+  genuine `npm warn deprecated glob@7.2.3`, and one BuildKit-prefixed
+  `npm warn deprecated inflight@1.0.6`, against a throwaway project dir:
+
+  | | ledger rows minted | dispatch |
+  |---|---|---|
+  | before Guard O (`git show HEAD:` copy of the hook) | **4** (2 junk) | 1 |
+  | after Guard O | **2** (both genuine warnings) | 1 |
+
+  Two regressions that matter are covered by the second row: the genuine
+  warnings are still captured and still emit the dispatch directive, and the
+  **BuildKit-prefixed warning survives in both runs** — the narrowing is what
+  makes Guard O safe to key on `#`. The `before` run also reproduced
+  `4e4f2598ff5c` byte-identically, confirming the harness drives the same path
+  that minted the real capture.
+
+Harness exit 0, `RESULT: ALL PASS`.
 
 The Fix N (Class 3) and Class 4 measurements quoted in Current decision come
 from the same script run in comparison mode over the live ledger, recomputing

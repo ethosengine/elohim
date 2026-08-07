@@ -11,7 +11,7 @@ status: "backlog"
 priority: "high"
 deprecation_status: blocked
 severity: high
-fingerprints: ["ff2716a33179", "db0d3a82bce6", "1ad08089f71f", "c012bf5384c5", "fc138fb125ab", "2128d54506f4", "517f54ba8954", "6319e4125d1c"]
+fingerprints: ["ff2716a33179", "db0d3a82bce6", "1ad08089f71f", "c012bf5384c5", "fc138fb125ab"]
 relatedNodeIds: []
 tags: [deprecation, rust, cargo, holochain, holochain_sqlite, holochain_data, semver, dependency-tombstone]
 cites:
@@ -181,10 +181,33 @@ Not fixed — nothing to verify as closed. Evidence backing the analysis above:
 
 ### Note on fingerprint count
 
-Eight ledger fingerprints canonicalize to this one concern. Only `ff2716a33179`
-is an independent signal; the other seven are the sentinel re-capturing the
-in-flight agent's investigation and remediation of this same tombstone, and the
-guard comment that documents it — including this triage run's own reads. Same
-redundant-capture-surface class as
-`deprecation-sentinel-redundant-capture-surfaces.md`; they warrant no separate
-dispatch.
+**Five** ledger fingerprints canonicalize to this one concern. Only
+`ff2716a33179` is an independent signal; the other four are the sentinel
+re-capturing the in-flight agent's investigation and remediation of this same
+tombstone.
+
+The count was eight until 2026-08-07. The other three
+(`2128d54506f4` / `517f54ba8954` / `6319e4125d1c`) were captures of the
+**TOMBSTONE GUARD comment** in `elohim/elohim-storage/Cargo.toml` — the comment
+written to document *this* entry's decision — and they were retired at source
+rather than carried, because that comment then generated six more captures on
+2026-08-07 and cost two further dispatch directives:
+
+| Wave | Fingerprints | Surface |
+|---|---|---|
+| 2026-08-07 02:07 | `4e4f2598ff5c` `93a86c9e5657` `1f681f440327` | `git diff Cargo.toml` of the guard comment (`+#` diff hunk) |
+| same run, mid-triage | `6dd68a9c0f58` `07364812bedc` `022dae188a5f` | the triage run's own verification `grep -n` of that same comment |
+
+None of the six was canonicalized here, because the correct fix was not to fold
+them into the concern but to stop the class from minting. **Guard O landed
+2026-08-07** in `.claude/hooks/deprecation-sentinel.py` — a first-party
+deprecation-comment is the documentation surface, not a live warning — and all
+nine guard-comment rows are now structurally unreachable and deleted from the
+ledger. See `deprecation-sentinel-redundant-capture-surfaces.md` **Class 7**.
+
+The generalizable trap, which this entry is the sharpest instance of: **writing
+a guard comment to document a blocked deprecation converts that concern into a
+perpetual dispatch generator**, because every later `git diff` or scope `grep`
+of the file it guards re-emits it under a fresh prefix. The comment is still the
+right thing to write — it is doing its job for human readers — but the sentinel
+has to know the difference between a warning and a note about a warning.
