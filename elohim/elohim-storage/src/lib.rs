@@ -1,3 +1,11 @@
+// `metrics.rs` declares its whole Prometheus surface in ONE `lazy_static!`
+// block, and that macro recurses once per static — so the crate crosses rustc's
+// default 128 limit purely by GROWING the metrics surface (it broke at 73
+// statics while adding `..._converged_blocked_by`). Raising the limit is the
+// intended fix; the alternative — splitting the block to stay under a compiler
+// default — would fragment the one place the metrics surface is legible.
+#![recursion_limit = "256"]
+
 //! Elohim Storage - Blob storage sidecar for Elohim nodes
 //!
 //! Runs alongside Holochain conductor to provide scalable blob storage.
