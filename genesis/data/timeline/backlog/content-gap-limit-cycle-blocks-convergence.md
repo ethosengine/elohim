@@ -439,3 +439,12 @@ here: more advertiser sources probed per gap id directly attacks the same
 0-1/sweep healed rate that keeps this plateau from decaying. The two backlog items
 are adjacent levers on the same underlying drain-rate problem, not independent
 concerns.
+
+**Follow-up (from the lane-cure review, 2026-08-07):** the normal-build path writes
+`STORAGE_TAG` into the env file without a pushed-tag preflight — a manual `STEPS`
+subset that skips `cargo-build-storage` while another component pushes can render
+alpha's `elohim-storage-iroh:${STORAGE_TAG}` against a tag never pushed
+(ImagePullBackOff). Pre-existing on the tx5 lane for staging/prod; alpha newly
+exposed now its tag is per-commit. Narrow (deliberate operator override only);
+fix shape: extend the DEPLOY_ONLY-style Harbor preflight to the normal-build
+env-file write.
