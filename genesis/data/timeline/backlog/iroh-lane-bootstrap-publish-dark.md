@@ -122,6 +122,27 @@ Discriminators (ceiling): entry-log in the fork's join callback (push to
 ethosengine/holochain elohim-0.6.3, operator-gated) or stack-dump/tokio-console on a
 live pod (operator kubectl).
 
+### 2026-08-07 ~05:50Z — UNIFIED: defect 1 cascades into a fleet-wide hidden /db outage
+
+The relay_url skew is not just an admin-seam annoyance — it wedges storage BOOT:
+`main.rs` retries `loop { conductor start → wait_for_ready → ensure_happ_installed }`
+(main.rs:849) forever on the list_apps failure (all 7 pods, ~12 retries/hour, uniform —
+Loki), and `HttpServer::new` sits AFTER the loop (main.rs:3012). Since the flip restart,
+**no alpha storage pod has bound HTTP :8090**: the doorway route registries (populated
+by fetching `{storage_url}/manifest` from the primary peer at boot) are empty of storage
+routes, so the ENTIRE `/db/*` surface 404s on both doorways (live-verified; POST
+/admin/steward-peers/refresh fails with connection errors to matthew/adam :8090).
+Conductors serve regardless — launched as children before the wedge, cells auto-start
+from persisted enable-state, and the doorway ZomeCaller dials conductor websockets
+directly — which is why the federation facade stayed green while the data surface was
+dark. "No visible outage window" was a facade-route measurement.
+
+Fix-forward consequence: the client-pin fix (717bbad23, in dev-latest) unblocks the boot
+loop → storage HTTP binds → /db heals → happ manager completes its enable/sync pass.
+Whether bootstrap publish then lights (defects collapse to one root) or stays dark
+(defect 2 genuinely independent — silent join-callback stall, discriminators above) is
+adjudicated by the bootstrap-coherence agents measure on the post-fix deploy.
+
 Evidence-hygiene correction: the overnight "peer-store FAIL total=0 addressed=0" reads
 are UNTRUSTWORTHY — /db/p2p/conductor-diagnostics 404s through the doorway (doorway's
 own not_found_response despite is_diagnostic_probe listing the path), and the seam-smoke
