@@ -272,6 +272,7 @@ habits:
       - "genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md"
       - "genesis/data/timeline/backlog/self-heal-adam-projection-catchup-exhaustion-full-arc.md"
       - "2026-08-06: one layer below this invariant, doorway ZomeCaller grew multi-conductor failover for agent-agnostic DHT reads (reviewed ship, gates green — backlog conductor-source-chain-unwrap-panic-db-timeout.md), so a doorway's DHT routes no longer die with its pinned conductor; the apex-name born-red and its WS3 cure surface are unchanged"
+      - "2026-08-07: live evidence toward the invariant — through the Wave-2 iroh transport flip (edge #1313, full 7-conductor restart) BOTH hostnames served the federation route with no visible outage window (measure 0->2 in minutes, vs the ~2.5-3h tx5 pre-fix churn the same night); attribution failover+fixed-binary+fresh-peer-stores, not decomposed; the a2o @concern:doorway-failover scenario remains the flip-to-green authority"
 
   - id: reach-enforced-everywhere
     invariant: >
