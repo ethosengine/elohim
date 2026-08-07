@@ -211,3 +211,39 @@ perpetual dispatch generator**, because every later `git diff` or scope `grep`
 of the file it guards re-emits it under a fresh prefix. The comment is still the
 right thing to write — it is doing its job for human readers — but the sentinel
 has to know the difference between a warning and a note about a warning.
+
+**It happened a second time the same day, through a different door — Class 8.**
+While the main session was pinning the `steward/node` lock past the tombstone,
+its own version-comparison diagnostic emitted
+
+```
+holochain_sqlite: storage=0.7.0-dev.19 steward=0.7.0+deprecated
+```
+
+and minted `f7f949929c67`. Ninety-eight seconds later the same comparison, re-run
+in Python, minted `e898eca36448` from the list-repr shape; the triage run
+dispatched to handle them minted five more from its own verification harness
+(`f4d8b5b3c714`, `c40d6cb35607`, `8db0f74af09c`, `1249d4932448`,
+`9ebdacdc42e2`). **Seven fingerprints, two dispatch directives, ten minutes —
+all readouts of the decision written above.** Guard F existed precisely to
+dismiss `+deprecated` build metadata, but was keyed on the two *syntaxes* cargo
+stores it in, so it went blind the moment an agent extracted the version and
+reprinted it.
+
+None of the seven is canonicalized here, on Class 7's reasoning: the fix is to
+stop the class minting, not to fold it into the concern. **Guard P landed
+2026-08-07** — Guard F restated as an invariant (a build-metadata token that is
+the line's *only* deprecation signal and is not in cargo's live ` v<ver>` prose
+shape), with a residual-signal check so a co-located real warning still
+captures. All seven rows are structurally unreachable and deleted. Crucially,
+the two live rows this entry *does* rely on (`ff2716a33179`, `fc138fb125ab`)
+carry cargo's ` v` join and were verified to survive the guard untouched. See
+`deprecation-sentinel-redundant-capture-surfaces.md` **Class 8**.
+
+So this one blocked concern has now generated two distinct echo classes and
+seeded two structural guards. That is worth stating plainly for whoever picks up
+the Holochain 0.7 campaign: **the cost of a long-lived `blocked` entry is not
+just the unfixed dependency — it is every diagnostic anyone runs against it
+while it stays blocked.** Both classes are closed, so the residual cost is now
+zero; but the pattern is the argument for keeping blocked entries few and
+sharply scoped.

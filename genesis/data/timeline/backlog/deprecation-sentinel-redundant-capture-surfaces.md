@@ -362,6 +362,82 @@ triaging: when you write a guard comment to document a blocked concern, you have
 just created a capture surface — check that a guard covers it, or the concern
 you just closed will keep billing.
 
+**Class 8 (observed + CLOSED 2026-08-07) — the guard knew the *syntax*, not the
+*invariant*.** Class 7's sibling, found the same day, and the fastest-minting
+class yet measured: **seven fingerprints for one already-`blocked` concern
+inside ten minutes.**
+
+Guard F dismisses a crates.io `+deprecated` build-metadata token in exactly two
+shapes — the quoted toml literal (`version = "0.9.34+deprecated"`, F1) and the
+hyphen-joined registry filename (`serde_yaml-0.9.34+deprecated.crate`, F2).
+Those are the token as the *toolchain stores* it. The moment an agent
+**extracts** that version and reprints it, the shape changes and the guard goes
+blind — while the semantics are unchanged. It is still registry metadata; it is
+still not a live warning.
+
+The emitting diagnostic is not incidental: comparing lock versions across
+workspaces is *exactly what triaging a blocked dependency concern requires*.
+The main session, mid-fix on the `holochain_sqlite` tombstone, ran a shell loop
+over eight holochain crates and printed
+
+```
+holochain_sqlite: storage=0.7.0-dev.19 steward=0.7.0+deprecated
+```
+
+→ `f7f949929c67`, one dispatch. Ninety-eight seconds later it re-did the same
+comparison in Python, whose list-repr changed the bytes —
+
+```
+holochain_sqlite: storage=['0.7.0-dev.19'] steward=['0.7.0+deprecated']
+```
+
+→ `e898eca36448`, a second row. Then the triage run dispatched to handle those
+minted **five more** from its own verification harness (`f4d8b5b3c714`,
+`c40d6cb35607`, `8db0f74af09c`, `1249d4932448`, `9ebdacdc42e2`) and requested a
+*second* dispatch mid-run — the identical self-amplification Class 7 exhibited,
+through a different door. Every join is a fresh fingerprint (`=`, `:`, tab,
+markdown table cell, JSON, python list-repr), and every version pair is a fresh
+fingerprint, so fp-dedupe can never collapse the class.
+
+**Guard P landed 2026-08-07.** The fix is not a third syntax bolted onto F — it
+is F restated as the **invariant F already rests on**, in three steps:
+
+```python
+if (
+    cls == "deprecation"
+    and BUILD_META_DEPRECATED_RE.search(line)                       # 1. carries the token
+    and not CARGO_VERSION_JOIN_RE.search(line)                      # 2. not cargo's live shape
+    and not DEPRECATION_PATTERNS.search(BUILD_META_DEPRECATED_RE.sub("", line))  # 3. residual
+):
+    return True
+```
+
+Step 2 is the carve-out that keeps the real channel open, and it is quoted
+verbatim from Guard F's own comment: *"a genuine build/compile deprecation is
+emitted UNQUOTED and prose-shaped with a SPACE-`v` version join."* So
+`Compiling serde_yaml v0.9.34+deprecated` and `Updating holochain_sqlite
+v0.7.0-dev.17 -> v0.7.0+deprecated` — the original true positive of the
+tombstone concern — survive untouched.
+
+Step 3 is the property worth carrying forward, because **no earlier guard has
+it**: strip every build-metadata token and ask whether any deprecation signal
+*remains*. If one does, the line carries a real warning alongside the metadata
+and must capture. That makes the guard structurally incapable of eating a
+co-located finding — a safety net regex shape-matching cannot provide, and the
+reason Guard P can be stated as a broad invariant rather than a narrow shape.
+(Guard F, which lacks it and is not class-gated, does eat two adversarial
+co-located constructions; recorded in Verification, not fixed — no toolchain
+emits a registry filename and a live warning on one line.)
+
+The generalizable lesson, and it is the complement of Class 6's: Class 6 asked
+*how many homes does the surface have?*; Class 7 asked *is this text a warning
+or a note about one?*; **Class 8 asks whether a guard is keyed on the syntax it
+first met or on the property that makes the class dismissible.** A guard keyed
+on syntax is defeated by anyone who reformats the data — and an agent doing
+scope work reformats data constantly. When adding an echo guard, write down the
+invariant first, then the carve-out for the live channel, then a residual check;
+the regex is the last step, not the first.
+
 ## Usage inventory
 
 Single file — `.claude/hooks/deprecation-sentinel.py`:
@@ -496,8 +572,21 @@ also at zero migration cost: exactly one live ledger row matched the new clauses
 (`09f2f5632c00`, the capture that dispatched the run), and it was deleted as
 fixed in the landing commit. **Class 7 is CLOSED — Guard O landed 2026-08-07**,
 retiring 17 live rows (286 → 269) at zero true-positive cost and closing a
-latent Guard-H2 hole on the way. **Classes 3 and 4 remain BLOCKED**, and they are
-now the entire remaining concern.
+latent Guard-H2 hole on the way. **Class 8 is CLOSED — Guard P landed
+2026-08-07**, retiring 8 live rows (276 → 268) at zero true-positive cost and
+generalizing Guard F from two hard-coded syntaxes to the invariant F rests on.
+**Classes 3 and 4 remain BLOCKED**, and they are now the entire remaining
+concern.
+
+Classes 7 and 8 landed the same day, from the same underlying concern
+(`holochain_sqlite`), and together they say something the earlier classes only
+hinted at: **triaging a blocked dependency is itself a capture-generating
+activity.** Class 7 came from *writing the guard comment*; Class 8 came from
+*printing the version comparison*. Both are correct engineering practice. Both
+minted dispatches for a decision already written down. The sentinel's echo
+surface is therefore not a fixed set of shapes to enumerate — it grows with the
+repertoire of the agents working the ledger, which is the argument for keying
+guards on invariants (Class 8) rather than on the syntax first encountered.
 
 Class 6 restates the lesson the earlier classes keep teaching, at a new seam:
 *a guard keyed on a path is only as complete as the path list*. The `.claude/`
@@ -708,6 +797,63 @@ directly, driving the shipped `classify()` + `_is_echo_line()`):
   makes Guard O safe to key on `#`. The `before` run also reproduced
   `4e4f2598ff5c` byte-identically, confirming the harness drives the same path
   that minted the real capture.
+
+Harness exit 0, `RESULT: ALL PASS`.
+
+**Class 8 (Guard P) — verified and landed 2026-08-07.** Harness at the
+Class-5/N/O standard (loads `deprecation-sentinel.py` directly, driving the
+shipped `classify()` + `_is_echo_line()`):
+
+- **Positives — 14/14 suppressed.** All seven fingerprints from the dispatching
+  run, plus the join-shapes the class will keep inventing: `:`-join, bare
+  space-join, tab/column, markdown table cell, JSON, python list-repr, a
+  `grep -n`-prefixed readout, and a diff-ADDED readout. F1 and F2's own four
+  shapes are included and pass, confirming Guard P **subsumes** Guard F rather
+  than sitting beside it.
+- **Negatives — 15/15 preserved, zero leaks.** The carve-out carries the
+  verification: **eight cargo ` v<ver>+deprecated` shapes** — `Compiling`,
+  `Checking`, `Downloaded … (registry …)`, the parenthesised join, the bare
+  `cargo tree` form, a BuildKit-prefixed `#12 3.456 Compiling …`, and both
+  live rows of the tombstone concern itself (`Updating holochain_sqlite
+  v0.7.0-dev.17 -> v0.7.0+deprecated`, `Downgrading … -> v0.7.0-dev.24`). Plus
+  two **co-located** cases proving step 3's residual net (a readout that also
+  carries `is deprecated` prose; a readout beside a real npm warning), the
+  tombstone's own `compile_error!` text, npm/pnpm/rustc/node channels, and a
+  diff-added `#[deprecated(note = …)]` attribute.
+- **Security class — 2/2 preserved.** Guard P is deprecation-gated, so an
+  advisory line is never reached.
+- **Whole-ledger stability — PASS.** Every live row re-tested under the `HEAD`
+  hook and the new one: **8 of 276 change suppression state, all in the
+  newly-suppressed direction, 0 newly captured.** Dispositions of the 8: 7
+  `open`, 1 `false-positive`, and — as in every prior class — **0 `triaged`**.
+  No readout capture in the ledger's history ever became an actionable fix. All
+  8 were deleted in the landing commit as structurally unreachable (276 → 268).
+- **End-to-end through the hook's real entrypoint — PASS, measured both ways.**
+  One synthetic `PostToolUse` payload carrying three version readouts, the real
+  cargo `Updating … -> v0.7.0+deprecated` line, and a BuildKit-prefixed
+  `npm warn deprecated glob@7.2.3`, against a throwaway project dir:
+
+  | | ledger rows minted | dispatch |
+  |---|---|---|
+  | before Guard P (`git show HEAD:` copy of the hook) | **5** (3 junk) | 1 |
+  | after Guard P | **2** (both genuine) | 1 |
+
+  The `before` run reproduced `f7f949929c67` **and** `ff2716a33179`
+  byte-identically, confirming the harness drives the same path that minted the
+  real captures. The two regressions that matter are covered by the second row:
+  the genuine cargo tombstone line and the BuildKit npm warning are both still
+  captured and still emit the dispatch directive. Guard P narrows the echo
+  surface, not the warning surface.
+
+Two **pre-existing Guard F leaks** were surfaced by this harness and are
+deliberately **recorded, not fixed** — Guard F runs before P and is unaffected
+by it. F matches on shape alone with no residual check and is not class-gated,
+so it eats `serde_yaml-0.9.34+deprecated.crate: npm warn deprecated glob@7.2.3…`
+(deprecation) and `RUSTSEC-2024-0437 in serde_yaml-0.9.34+deprecated.crate`
+(security). Both are adversarial-only constructions: no toolchain emits a
+registry artifact filename and a live warning on the same line. Folding F into
+P's residual form would close them, but that is a behavioral change to a guard
+with a clean live record and belongs to its own decision.
 
 Harness exit 0, `RESULT: ALL PASS`.
 

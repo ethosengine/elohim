@@ -265,6 +265,49 @@ ECHO_LOCKFILE_VERSION_META_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Guard P (2026-08-07) — EXTRACTED `+deprecated` BUILD-METADATA READOUT: the
+#   general form of Guard F, keyed on the invariant F already rests on rather
+#   than on two hard-coded syntaxes.
+#   Guard F dismisses a `+deprecated` build-metadata token in exactly two
+#   shapes — the QUOTED toml literal (F1) and the HYPHEN-joined registry
+#   filename (F2). Both are the token as the *toolchain* stores it. But the
+#   moment an agent EXTRACTS that version and reprints it, the shape changes
+#   and the guard stops seeing it, while the semantics are identical: still
+#   registry metadata, still not a live warning. A scope pass comparing lock
+#   versions across workspaces — the exact diagnostic that triaging a blocked
+#   dependency concern requires — emits
+#     `holochain_sqlite: storage=0.7.0-dev.19 steward=0.7.0+deprecated`
+#   and every join (`=`, `:`, tab, table cell, JSON, python list-repr) plus
+#   every version pair mints a FRESH fingerprint, so fp-dedupe can never
+#   collapse the class (same defeat as Guards B/D/F/G/L/O).
+#   Measured live 2026-08-07: SEVEN fingerprints for ONE already-`blocked`
+#   concern inside ten minutes — f7f949929c67 (main session's version-compare
+#   loop), e898eca36448 (its python re-do, 98s later, list-repr shape), and
+#   five more (f4d8b5b3c714 / c40d6cb35607 / 8db0f74af09c / 1249d4932448 /
+#   9ebdacdc42e2) from the triage run's own verification harness. Two dispatch
+#   directives requested for readouts of a decision already written down.
+#   The guard is stated as an INVARIANT with an explicit live-channel carve-out
+#   and a residual-signal safety net, in three steps:
+#     1. the line carries a semver build-metadata `+deprecated` token; AND
+#     2. that token is NOT in cargo's live prose shape — a SPACE-`v` version
+#        join (`Compiling serde_yaml v0.9.34+deprecated`, `Updating … ->
+#        v0.7.0+deprecated`). This is the carve-out that keeps the real channel
+#        open, and it is exactly the invariant Guard F's own comment asserts;
+#        AND
+#     3. with every build-metadata token REMOVED, no deprecation signal
+#        remains in the line. This is the safety net: a readout that also
+#        carries a genuine warning still captures, so the guard can only ever
+#        dismiss a line whose ONLY deprecation signal is the metadata token.
+#   Deprecation class only — a security-class advisory is never dismissed here.
+#   Deliberately NOT diff-exempt (same call as Guards H2/M/O): a readout is a
+#   readout whether it is being added to a doc or merely re-printed, and the
+#   `+`-prefixed add is a dominant shape because writing the comparison table
+#   is what the triage work DOES.
+BUILD_META_DEPRECATED_RE = re.compile(r"\d[0-9A-Za-z.\-]*\+deprecated\b", re.IGNORECASE)
+CARGO_VERSION_JOIN_RE = re.compile(
+    r"(?:^|[\s>=(\[,])v\d[0-9A-Za-z.\-]*\+deprecated\b", re.IGNORECASE
+)
+
 # Guard G — in-source DEPRECATED section-header / doc-comment self-capture:
 #   A scope-pass grep or cat of the codebase's OWN source surfaces comment
 #   banners and doc-comments that NARRATE a deliberate, migration-retained
@@ -571,6 +614,12 @@ def _is_echo_line(
          filename (`serde_yaml-0.9.34+deprecated.crate`) — a semver
          build-metadata suffix, registry metadata not a live toolchain warning;
          `grep -n`/`ls` re-emission defeats fp-dedupe.
+      P) The same `+deprecated` build-metadata token after an agent EXTRACTED
+         and REPRINTED it (`holochain_sqlite: storage=0.7.0-dev.19
+         steward=0.7.0+deprecated`) — Guard F generalized past its two
+         hard-coded syntaxes to the invariant F rests on: dismissed iff the
+         token is the line's ONLY deprecation signal AND is not in cargo's
+         live SPACE-`v` prose shape. Deprecation class only.
       G) In-source DEPRECATED section-header / doc-comment surfaced by a
          grep/cat of the codebase's own source — a trailing all-caps
          `(DEPRECATED)` section label or a `//`/`///` comment mentioning
@@ -639,6 +688,19 @@ def _is_echo_line(
     # registry artifact filename (`…-0.9.34+deprecated.crate`): registry
     # metadata, not a live warning. Deterministic, no command-flag dep — like D.
     if ECHO_LOCKFILE_VERSION_META_RE.search(line):
+        return True
+
+    # Guard P — EXTRACTED `+deprecated` build-metadata readout (Guard F
+    # generalized past its two hard-coded syntaxes to the invariant F rests
+    # on). Dismiss iff the line's ONLY deprecation signal is a semver
+    # build-metadata token that is not in cargo's live SPACE-`v` prose shape.
+    # Deprecation class only; not diff-exempt (per H2/M/O).
+    if (
+        cls == "deprecation"
+        and BUILD_META_DEPRECATED_RE.search(line)
+        and not CARGO_VERSION_JOIN_RE.search(line)
+        and not DEPRECATION_PATTERNS.search(BUILD_META_DEPRECATED_RE.sub("", line))
+    ):
         return True
 
     # Guard J — pnpm package-changes-summary twin (`+ eslint 8.57.1 deprecated`):
