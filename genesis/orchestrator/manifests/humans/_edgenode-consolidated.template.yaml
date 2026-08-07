@@ -315,7 +315,11 @@ spec:
             - name: SELF_HUMAN_ID
               value: "HUMAN_ID_PLACEHOLDER"
             - name: RUST_LOG
-              value: "info,elohim_storage=debug"
+              # kitsune2 debug targets: temporary diagnosis instrument for the
+              # iroh-lane bootstrap-publish silence (PUT failures log at debug!
+              # in kitsune2_bootstrap_client) — remove after
+              # backlog/iroh-lane-bootstrap-publish-dark closes.
+              value: "info,elohim_storage=debug,kitsune2_core=debug,kitsune2_bootstrap_client=debug"
             # --- Embedded conductor mode ---
             - name: EMBEDDED_CONDUCTOR
               value: "true"

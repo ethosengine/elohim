@@ -67,3 +67,45 @@ Morning fix path (ordered):
    independent (two defects, not one).
 3. Decisive convergence probe still stands (cross-peer head propagation) after the fix lands.
 D9 rollback remains one line if the operator prefers stability over fix-forward at morning triage.
+
+## 2026-08-07 morning triage — TWO independent defects confirmed
+
+**Defect 2 (bootstrap publish dark) verified independent of the list_apps skew.**
+
+Loki evidence (doorway access logs, elohim-alpha): PUT `/bootstrap/*` traffic died at
+23:39:56Z — the same minute conductors rebooted onto iroh (Launching HolochainP2p with
+irohTransport at 23:40:39Z on james/jessica) — while GET `/bootstrap/*` polls continue
+normally and the store reads `0 agents in 0 spaces` continuously. Zero PUTs in 80k+
+scanned doorway lines post-flip.
+
+Source review (kitsune2 0.4.1 at the Cargo.lock checksum + fork holochain_p2p):
+- `CoreBootstrapFactory` is registered UNCONDITIONALLY in `default_builder()` — no
+  transport gating; the fork wraps (not replaces) it via BootWrapFact (actor.rs:554-558).
+  Bootstrap publish IS wired under transport-iroh.
+- The `config.rs:165` "may be unused" WARN is a benign assembly-time lint whose
+  `debug_path` dumps the ENTIRE incoming config blob per call — "all four subtrees"
+  is a misreading; only tx5Transport is legitimately unclaimed on the iroh build.
+- `list_apps` failure cannot suppress publish: `local_agent_join → bootstrap.put()` runs
+  inside the conductor's own kitsune2, not the storage admin loop. happ_manager's early
+  return (happ_manager.rs:53-56) only blocks storage-side re-verification.
+
+Mechanism narrowed to H2 — publish attempted, failing below the log floor:
+- H1 (no current_url) ELIMINATED: `"Not updating agent info"` (core_space.rs:523,
+  info-level) — zero hits across 186k conductor lines post-flip.
+- `"Bootstrap PUT returned HTTP error"` (warn-level) — zero hits: not an HTTP-status
+  failure.
+- kitsune2_bootstrap_client swallows transport-level PUT failures (conn/TLS/DNS) into
+  a `debug!`-only path (core_bootstrap.rs push_task); GET has the identical asymmetry,
+  so live GETs don't clear PUT.
+- Instrument shipped with the fix batch: alpha conductor RUST_LOG gains
+  `kitsune2_core=debug,kitsune2_bootstrap_client=debug` (template + adam yaml, marked
+  temporary) — next deploy names the PUT failure or proves no attempt fires.
+
+Delivery path (confirmed against the build machinery): the iroh anchor is a binary-swap
+wrapper (elohim-storage:dev-latest + fork conductor bin; che-devworkspaces
+Jenkinsfile-elohim-edgenode). Sequence: (1) client fix → dev `[build:edge]` (refreshes
+dev-latest; interim deploy re-enters the same broken state — accepted); (2) operator
+fires elohim-edgenode job iroh lane (HC_FEATURES=…,transport-iroh +
+BUILD_STORAGE_CANARY=true) to re-wrap; (3) fresh-sha `[build:edge]` push moves
+DEPLOY_VERSION so ALL seven STSs (incl. genesis pair) restart onto the moved anchor;
+(4) convergence probe + read the new debug lines for defect 2.
