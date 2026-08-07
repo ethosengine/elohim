@@ -95,6 +95,16 @@ habits:
       admin seam live-verified on the iroh fleet (all 7 publishing, measure
       0→8); probes that can 404-as-zero are part of the facade (seam-smoke now
       fail-closed). Incident: backlog/iroh-lane-bootstrap-publish-dark.
+      2026-08-07 head-fork cure + honest-red localization: the 20h A/B declared-head
+      fork (born when app #1657's declare fan-out hit B mid boot-loop; adam never
+      saw the hash in 1.29M log lines) cured live — authorHeadOnce re-author +
+      DHT heal converged both doorways on uhCkkDYpMVdqJ3ND; bootstrap store
+      split-brain healed (both mongo, fail-loud guard c90d1b174); converged=0 is
+      HONEST — pin is the content gap plateau (pending ~2.9k vs 120s leg budget,
+      backlog/content-gap-limit-cycle-blocks-convergence), NOT MissLedger
+      exhaustion (name-collision trap disproved twice, tests pin it in
+      reconcile_rails.rs). Saga recorded state still 8/11 — measurement stays
+      gated behind the plateau by design.
 
   - id: blob-durability
     invariant: >

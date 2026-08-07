@@ -249,3 +249,31 @@ RATE: ~90 elections minted against ~11k contested ids in the first hour.
 - **Self-mint trailing** (4 mints vs 603 fetch_none) — verify the (id,target)
   ledger is deduping repeats as designed vs a second admission gap; one Loki
   hour post-F-B answers it.
+
+## 2026-08-07 — re-confirmed as the PRIMARY converged pin; operator decision surfaced
+
+Same-day red-team review plus a live probe re-confirm this doc, not
+`miss-ledger-exhausted-ids-veto-converged-forever` (closed not-a-defect the same
+session — that doc's premise was falsified: `MissLedger`-exhausted ids never enter a
+`GapTracker` and per-sweep trackers structurally cannot exhaust), as the standing dam
+on `converged`. Live alpha-A reading: pending 2894, healed 0-1/sweep, against a
+`CONTENT_LEG_BUDGET` of 120s wall-clock per sweep — the plateau this doc's RCA v3
+predicted survives unchanged.
+
+**Open operator decision surfaced by the review:** while this plateau drains, should
+the CI fleet-quiesce gate poll for **"quiesced"** (`caughtUp && divergent_actionable
+== 0`, sustained) instead of **"perfect"** (`converged == 1`)? The gate today waits on
+`converged`, which this doc's own math shows will not go true until the content-gap
+backlog fully drains — potentially the wrong bar for what the gate actually needs to
+guarantee (no outstanding actionable divergence, not zero outstanding gap-fill work).
+This is a decision only the operator can make (it trades gate strictness for gate
+liveness); it is not resolved by this note.
+
+**Bandwidth note:** the peer-probe/more-sources direction adopted for the MissLedger
+and REA adjudication drain paths (`Answer::Absent`-graduated adjudication via
+`PeerHeadRecordFetcher`, `PeerHeadHint.alternates` cap 3 — see
+`rea-stream-no-divergence-adjudication-drain-path`) also increases fill bandwidth
+here: more advertiser sources probed per gap id directly attacks the same
+0-1/sweep healed rate that keeps this plateau from decaying. The two backlog items
+are adjacent levers on the same underlying drain-rate problem, not independent
+concerns.
