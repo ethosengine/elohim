@@ -31,3 +31,20 @@ logs for the mongo connect attempt; decide whether the fallback should be fail-l
 untrustworthy-facade class as the /db outage this incident exposed) and whether a
 restart/config fix reconnects it. Related: iroh-lane-bootstrap-publish-dark (parent
 incident), probe-conductor-diagnostics-doorway-404 (probe honesty).
+
+## 2026-08-07 — fail-loud fix implemented, pending deploy
+
+Root cause confirmed: `DEV_MODE=true` downgraded the mongo connect failure at boot
+to a warn, silently selecting `MemK2Store` instead of refusing to start — exactly
+the silent-downgrade risk this entry named above.
+
+Fix landed in doorway-service: a `mongo_bootstrap_misconfigured()` decision function
+(`src/bootstrap/store.rs`) plus a refuse-to-start check in `main.rs` — when
+`BOOTSTRAP_MONGODB_DB` is configured but mongo is unreachable at startup, the
+process now fails closed regardless of `DEV_MODE`. Unit-tested; full doorway gate
+green.
+
+Status: implemented, pending deploy. Live doorway-alpha (A) is still running the
+pre-fix binary and remains on the mem backend until its doorway restarts onto the
+fix — the shared-mongo invariant stays broken in production until that redeploy
+lands.
