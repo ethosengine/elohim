@@ -219,13 +219,25 @@ describe("edge validate-only stage allowlist", () => {
       "gate failure must exit 3 before any cucumber invocation",
     );
 
-    // 3. The Jenkinsfile stage supplies the per-path deadline: long bounded
-    // wait for validate-only recording runs, short for post-deploy runs.
+    // 3. The Jenkinsfile stage supplies the deadline, and it is the SAME long
+    // bounded wait on both paths (2026-08-07). The old isValidateOnly()
+    // ternary gave the post-deploy path 900s — shorter than the ~20min
+    // conductor restart churn that path itself causes — so the run that most
+    // needs a measurement was the one that systematically could not take one.
+    // Guard against a regression to any per-path/short deadline.
     const validation = stages.get("Dataplane Validation");
     assert.match(
       validation,
-      /QUIESCE_DEADLINE_SECS=\$\{isValidateOnly\(\)\s*\?\s*'2700'\s*:\s*'900'\}/,
-      "stage must set QUIESCE_DEADLINE_SECS via the isValidateOnly() ternary",
+      /QUIESCE_DEADLINE_SECS=2700/,
+      "stage must set QUIESCE_DEADLINE_SECS=2700",
+    );
+    assert.ok(
+      !/QUIESCE_DEADLINE_SECS=[^"]*isValidateOnly/.test(validation),
+      "QUIESCE_DEADLINE_SECS must not be per-path — post-deploy churn (~20min) needs the full bound too",
+    );
+    assert.ok(
+      !/QUIESCE_DEADLINE_SECS=[^"]*900/.test(validation),
+      "900s expires inside the post-deploy restart-churn window (edge #1319)",
     );
   });
 });

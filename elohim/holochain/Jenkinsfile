@@ -677,9 +677,29 @@ def resolveRelayUrl(String signalUrl, String humanName, String humanEnv) {
 // Wave-2 Stage 1 is an alpha-namespace-atomic transport flip. The iroh
 // conductor is embedded in this storage image; staging/prod keep their
 // environment storage tags as the rollback wave.
+//
+// PER-COMMIT since 2026-08-07 (edge #1319 RCA). alpha used to return the
+// one-time artifact `elohim-storage-iroh:hc-elohim-0.6.3-iroh`, built once on
+// 2026-08-06 by the che-devworkspaces edgenode job. A static tag never moves:
+// pods restarted on every deploy and re-pulled the same frozen digest, so every
+// storage-side merge to dev after the flip was silently inert on alpha (the
+// honesty-floor gauge elohim_projection_reconcile_converged_blocked_by could not
+// appear, and the fail-closed quiesce gate read actionable=None → DID NOT
+// MEASURE). alpha now tracks dev on the iroh lane, built per commit by
+// scripts/ci/push-storage-iroh.sh from storage-iroh/Dockerfile.
+//
+// The frozen tag is NOT retired: it stays in Harbor as the ratified rollback
+// line for the wave (design doc 2026-08-05-wave2-relay-sovereignty-design.md D9,
+// checklist item 8) and nothing in this pipeline writes it. Rollback is still a
+// single image-tag repoint.
+//
+// Namespace-atomicity (D10) is unchanged: this is keyed on env, not on the
+// human, so all 7 alpha humans resolve to the same image and a partial flip —
+// which would transport-partition the DHT, tx5 peers being unable to dial an
+// iroh peer URL and vice-versa — stays unexpressible.
 def resolveStorageImage(String humanEnv, versions) {
     if (humanEnv == 'alpha') {
-        return 'harbor.ethosengine.com/ethosengine/elohim-storage-iroh:hc-elohim-0.6.3-iroh'
+        return "harbor.ethosengine.com/ethosengine/elohim-storage-iroh:${versions.STORAGE_TAG}"
     }
     return "harbor.ethosengine.com/ethosengine/elohim-storage:${versions.STORAGE_TAG}"
 }
@@ -1063,7 +1083,7 @@ def deployDoorwaysWithTestShape(String targetEnv, String envFile, List allHumans
 // Harbor before kubectl apply (~1s per tag, fail-fast on missing manifest).
 // Extracted from per-environment deploy stages to keep each stage's CPS
 // method body under the JVM 64KB size limit (cf. edge #922 method-too-large).
-def deployOnlyEnvFilePreflight(String envFile) {
+def deployOnlyEnvFilePreflight(String envFile, String targetEnv) {
     echo "DEPLOY_ONLY=true — preserving existing tags in ${envFile} (no overwrite)"
     def existing = readProperties(file: envFile)
     echo "  EDGENODE_TAG=${existing.EDGENODE_TAG}"
@@ -1083,6 +1103,13 @@ def deployOnlyEnvFilePreflight(String envFile) {
         ['elohim-happ-installer', existing.HAPP_INSTALLER_TAG],
         ['elohim-doorway-app', existing.DOORWAY_APP_TAG],
     ]
+    // alpha renders the iroh LANE of the same STORAGE_TAG (resolveStorageImage).
+    // A DEPLOY_ONLY run reusing an env file written before the per-commit iroh
+    // lane existed would otherwise resolve a tag that was never pushed and
+    // ImagePullBackOff the namespace — the failure mode this check exists for.
+    if (targetEnv == 'alpha') {
+        checks << ['elohim-storage-iroh', existing.STORAGE_TAG]
+    }
     def missing = []
     checks.each { repo, tag ->
         if (!tag || tag == 'null') return
@@ -1836,6 +1863,15 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 sh "bash '${env.WORKSPACE}/scripts/ci/push-harbor-untracked.sh' elohim-storage elohim-storage '${STORAGE_TAG}' 'elohim-storage'"
 
+                                // Wave-2 iroh transport lane — MUST run after the tx5-lane push
+                                // above: it overlays the iroh conductor onto the storage image
+                                // that push just put in Harbor. NOT catchError-isolated (unlike
+                                // the relay/beacon builds): resolveStorageImage points every
+                                // alpha human at elohim-storage-iroh:${STORAGE_TAG}, so a
+                                // missing tag must abort here rather than ImagePullBackOff the
+                                // namespace. See scripts/ci/push-storage-iroh.sh.
+                                sh "bash '${env.WORKSPACE}/scripts/ci/push-storage-iroh.sh'"
+
                                 sh "bash '${env.WORKSPACE}/scripts/ci/push-harbor-untracked.sh' elohim-happ-installer elohim-happ-installer '${HAPP_INSTALLER_TAG}' 'hApp Installer'"
 
                                 sh "bash '${env.WORKSPACE}/scripts/ci/push-harbor-untracked.sh' doorway-app doorway-app '${DOORWAY_APP_TAG}' 'Doorway App'"
@@ -1995,7 +2031,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 // post-mortem). Skip the rewrite; readProperties(envFile)
                                 // downstream picks up the unchanged dev-latest tags.
                                 if (params.DEPLOY_ONLY) {
-                                    deployOnlyEnvFilePreflight(ec.envFile)
+                                    deployOnlyEnvFilePreflight(ec.envFile, targetEnv)
                                 } else {
                                     // Normal build: write env file with current build tags (preserve SITE_TAG)
                                     def currentSiteTag = readProperties(file: ec.envFile).SITE_TAG ?: 'dev-latest'
@@ -2090,8 +2126,17 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                         sh "bash '${env.WORKSPACE}/scripts/ci/substrate-seam-smoke.sh' https://doorway-alpha.elohim.host https://elohim.host"
                     }
+                    // QUIESCE_DEADLINE_SECS is 2700 on BOTH paths since 2026-08-07.
+                    // The post-deploy path used to get 900 on the theory that only a
+                    // validate-only recording run needs a long bounded wait — but it is
+                    // the post-deploy path that just restarted the whole fleet, and
+                    // conductor restart churn is ~20min (substrate trust-contract
+                    // runbook). 900s therefore expired mid-churn and systematically
+                    // produced DID-NOT-MEASURE exactly where the measurement matters
+                    // most. The gate is bounded and fail-closed either way; a longer
+                    // bound only costs wall-clock on a fleet that is genuinely stuck.
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        withEnv(["E2E_DOORWAY_ALPHA=https://doorway-alpha.elohim.host", "QUIESCE_DEADLINE_SECS=${isValidateOnly() ? '2700' : '900'}"]) {
+                        withEnv(["E2E_DOORWAY_ALPHA=https://doorway-alpha.elohim.host", "QUIESCE_DEADLINE_SECS=2700"]) {
                             sh "bash '${env.WORKSPACE}/scripts/ci/run-dataplane-validation.sh'"
                         }
                     }
@@ -2129,7 +2174,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
 
                             def envFile = 'genesis/orchestrator/environments/staging.env'
                             if (params.DEPLOY_ONLY) {
-                                deployOnlyEnvFilePreflight(envFile)
+                                deployOnlyEnvFilePreflight(envFile, 'staging')
                             } else {
                                 def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'dev-latest'
                                 writeFile file: envFile, text: """# Staging Environment - auto-updated by pipeline after each deploy
@@ -2239,7 +2284,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
 
                             def envFile = 'genesis/orchestrator/environments/prod.env'
                             if (params.DEPLOY_ONLY) {
-                                deployOnlyEnvFilePreflight(envFile)
+                                deployOnlyEnvFilePreflight(envFile, 'prod')
                             } else {
                                 def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'latest'
                                 writeFile file: envFile, text: """# Production Environment - auto-updated by pipeline after each deploy

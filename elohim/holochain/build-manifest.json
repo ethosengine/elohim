@@ -56,6 +56,8 @@
           "elohim/elohim-storage/Cargo.toml",
           "elohim/elohim-storage/Cargo.lock",
           "elohim/elohim-storage/Dockerfile",
+          "storage-iroh/**",
+          "scripts/ci/push-storage-iroh.sh",
           "vendor/**",
           "elohim/sdk/**",
           "elohim/epr/**",

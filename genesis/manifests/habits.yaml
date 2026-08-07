@@ -118,6 +118,11 @@ habits:
       iroh flip was inert on alpha (blocked_by absent, actionable=None, honest
       DID-NOT-MEASURE). Cure = per-commit iroh-lane storage build + alpha repoint
       + 900s→2700s validate deadline; frozen tag kept as rollback.
+      2026-08-07 cure committed (NOT yet build-proven): storage-iroh/Dockerfile +
+      scripts/ci/push-storage-iroh.sh publish elohim-storage-iroh:${STORAGE_TAG}
+      per commit; resolveStorageImage repointed; deadline flat 2700 on both
+      dataplane paths. Awaiting an edge build number — the flip to measured stays
+      red until a deploy shows blocked_by present on alpha.
 
   - id: blob-durability
     invariant: >
