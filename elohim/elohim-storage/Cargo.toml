@@ -98,11 +98,48 @@ rmpv = "1.3"
 # Official Holochain client for signed zome calls
 # Holochain 0.6 requires signed calls with nonce, expires_at, and signature
 # Use lair_signing for the signer, but not wasmer (we're native, not wasm)
-holochain_client = { version = "0.9.0-dev.5", default-features = false, features = ["lair_signing"] }
-holochain_types = { version = "0.7.0-dev.5", default-features = false }
+# EXACT PIN (2026-08-07) — this is a floor AND a ceiling, both load-bearing.
+#
+# FLOOR: the iroh conductor emits `relay_url` in the AppManifestV0 wire shape
+# carried inside every AppInfo. Upstream renamed `signal_url` -> `relay_url` at
+# holochain_types 0.7.0-dev.23; AppManifestV0 is `deny_unknown_fields`, so any
+# older client rejects EVERY list_apps / install_app / enable_app response with
+# `unknown field relay_url` — taking down the whole storage<->conductor admin
+# seam. dev.23 is the FIRST release carrying the rename.
+# Guard: tests/happ_manifest_relay_url_compat.rs.
+#
+# CEILING: the conductor we actually run is the 0.6.3-based fork
+# (elohim/holochain-conductor). Every dev release past this point drifts the
+# client's wire surface further from that conductor for no benefit. dev.23/dev.24
+# is the MINIMUM step that clears the rename:
+#   - holochain_client dev.22 -> dev.24 source is BYTE-IDENTICAL (req-only bump)
+#   - holochain_conductor_api dev.21 -> dev.23 touches only config/ (new optional
+#     `wasm_backend`, serde_yaml -> yaml_serde); admin_interface.rs and
+#     app_interface.rs — the actual admin/app WIRE types — are byte-identical
+#   - holochain_types dev.21 -> dev.23 is the rename + the yaml-lib swap + an
+#     additive `dht_v2` module. Nothing else.
+# Raising this pin re-opens wire-skew risk against the fork; lowering it
+# re-breaks the admin seam. Move it only with a fresh cross-version diff.
+holochain_client = { version = "=0.9.0-dev.24", default-features = false, features = ["lair_signing"] }
+holochain_types = { version = "=0.7.0-dev.23", default-features = false }
 # Direct use is limited to Bundle::new in happ_manager's coordinator hot-swap;
 # version must stay in the range holochain_types resolves (one shared crate).
 mr_bundle = { version = "0.7.0-dev.2", default-features = false }
+
+# TOMBSTONE GUARD (2026-08-07): `holochain_sqlite` 0.7.0+deprecated is not a
+# soft deprecation — it is a tombstone crate whose lib body is a bare
+# `compile_error!("the holochain_sqlite crate is deprecated and no longer
+# available; use holochain_data instead")`. It hard-FAILS the build.
+#
+# holochain_sqlite is a transitive dep (holochain_types -> ^0.7.0-dev.19). Under
+# cargo semver, `0.7.0+deprecated` is just 0.7.0 with build metadata, so it is
+# the MAXIMUM match for that caret and gets picked by default. Cargo.lock is
+# therefore pinned to 0.7.0-dev.24 (the last real release). Anyone running a
+# broad `cargo update` will silently re-land the tombstone and get a build that
+# fails in a third-party crate with no obvious link to their change — if that
+# happens, re-run:
+#   cargo update -p holochain_sqlite --precise 0.7.0-dev.24
+# This resolves for real when the holochain family migrates to `holochain_data`.
 
 # Provide custom getrandom implementation for holochain's wasm-oriented dependencies
 # The custom backend delegates to std on native platforms
@@ -330,3 +367,18 @@ harness = false
 name = "elohim-storage"
 path = "src/main.rs"
 
+
+# ---------------------------------------------------------------------------
+# Admin-seam unblock (2026-08-07): see vendor/holochain_serialized_bytes-0.0.56/
+# VENDOR-NOTE.md. Upstream hsb 0.0.56 pins `serde =1.0.219` and hsb 0.0.57 pins
+# `serde =1.0.228`; the sdk domain-types crates hold `holo_hash =0.6.0` (a
+# DNA-hash guard — the same crates are compiled into integrity WASM) which drags
+# in 0.0.56, while holochain_client >= 0.9.0-dev.24 drags in 0.0.57. Only one
+# serde 1.x can resolve, so the two exact pins deadlock the client bump that
+# teaches us the conductor's `relay_url` app-manifest field.
+#
+# This patch harmonises 0.0.56's serde pin onto 0.0.57's. Source is verbatim.
+# Scope is this workspace only — the DNA zome workspaces keep their own locks and
+# stay on holo_hash 0.6.0, so no DNA hash moves.
+[patch.crates-io]
+holochain_serialized_bytes = { path = "../../vendor/holochain_serialized_bytes-0.0.56" }

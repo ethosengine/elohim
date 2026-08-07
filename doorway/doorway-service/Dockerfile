@@ -37,6 +37,14 @@ COPY elohim/elohim-compute ./elohim/elohim-compute
 COPY elohim/elohim-cache-core ./elohim/elohim-cache-core
 COPY elohim/sdk/domains/imagodei/types ./elohim/sdk/domains/imagodei/types
 COPY elohim/sdk/domains/infrastructure/types ./elohim/sdk/domains/infrastructure/types
+# Admin-seam unblock (2026-08-07): Cargo.toml's `[patch.crates-io]` points
+# holochain_serialized_bytes at `path = "../../vendor/holochain_serialized_bytes-0.0.56"`.
+# From /app/Cargo.toml that normalises to `/vendor/...`. A `[patch]` path is
+# resolved during dependency RESOLUTION, so it must exist before the first
+# `cargo build` in this stage or the build aborts at resolve time with
+# "failed to read /vendor/holochain_serialized_bytes-0.0.56/Cargo.toml".
+# See vendor/holochain_serialized_bytes-0.0.56/VENDOR-NOTE.md for why it exists.
+COPY vendor /vendor
 # Plan 2 SDK boundary: View wire-shapes live in elohim-views. doorway-service
 # consumes it directly; without this COPY the build aborts at resolve time:
 # "failed to read /elohim/elohim-views/Cargo.toml: No such file".

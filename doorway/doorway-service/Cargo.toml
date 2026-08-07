@@ -29,25 +29,62 @@ rmpv = "1.3"
 
 # Official Holochain client for typed admin API calls
 # No lair_signing needed — doorway doesn't sign zome calls, only admin ops
-# Lane C hold (2026-08-04): holochain_client 0.8.3 selects holo_hash ^0.6.3,
-# which cannot resolve beside imagodei-types' exact holo_hash =0.6.0 path pin.
-# Resolves at the convergence campaign's Wave-3 family move (Task F2: everything
-# to the 0.7 finals together — same shared-sdk holo_hash pin that defers the
-# storage iroh bump; see the 2026-08-04 convergence campaign plan, Evidence §6).
-holochain_client = { version = "0.9.0-dev.5", default-features = false }
+#
+# Lane C hold (2026-08-04) RESOLVED 2026-08-07. The hold was: holochain_client
+# selects a holo_hash that cannot resolve beside imagodei-types' exact
+# `holo_hash =0.6.0` path pin. The real blocker turned out to be one level down —
+# holo_hash 0.6.0 pins `holochain_serialized_bytes =0.0.56` (-> `serde =1.0.219`)
+# while the 0.7 client family pins hsb `=0.0.57` (-> `serde =1.0.228`), and only
+# one serde 1.x can resolve. Fixed by vendoring hsb 0.0.56 with its serde pin
+# harmonised onto 0.0.57's — see the [patch.crates-io] stanza at the bottom of
+# this file and vendor/holochain_serialized_bytes-0.0.56/VENDOR-NOTE.md.
+# imagodei-types keeps `holo_hash =0.6.0` (it is a DNA-hash guard — the same
+# crate is compiled into integrity WASM), so nothing about the DNA moves.
+#
+# EXACT PINS: the whole holochain family must move in lockstep. Their published
+# `^` requirements over-resolve — e.g. holochain_types 0.7.0-dev.23 declares
+# `holochain_zome_types ^0.7.0-dev.15` but does NOT compile against dev.20
+# (missing `WasmZome`, `CoordinatorZomeDef::wasm_hash`). The version set below is
+# the lockstep companion set derived from the dev.23/dev.24 requirement floors.
+#
+# WHY dev.23 IS THE FLOOR: the iroh conductor emits `relay_url` in the
+# AppManifestV0 wire shape carried inside every AppInfo (upstream renamed
+# `signal_url` -> `relay_url` at holochain_types 0.7.0-dev.23). AppManifestV0 is
+# `deny_unknown_fields`, so an older client rejects EVERY list_apps response —
+# which breaks `conductor::typed_admin::{list_apps, get_app_info}` and with them
+# conductor discovery. Same root cause as the elohim-storage admin seam; see
+# elohim/elohim-storage/tests/happ_manifest_relay_url_compat.rs.
+holochain_client = { version = "=0.9.0-dev.24", default-features = false }
 # Subcrate types not re-exported by holochain_client
-holo_hash = { version = "0.7.0-dev.3", features = ["encoding"] }
-holochain_zome_types = { version = "0.7.0-dev.5", default-features = false }
-holochain_types = { version = "0.7.0-dev.11", default-features = false }
+holo_hash = { version = "=0.7.0-dev.9", features = ["encoding"] }
+holochain_zome_types = { version = "=0.7.0-dev.15", default-features = false }
+holochain_types = { version = "=0.7.0-dev.23", default-features = false }
 # Wire format for conductor WebSocket protocol (WireMessage::Authenticate)
 # Used by projection subscriber to encode auth exactly as the conductor expects.
 # We'd prefer to use holochain_client::AppWebsocket directly, but it requires
 # SocketAddr (IP:port) — not hostnames — which doesn't work with k8s headless
 # services. When we move to native (non-k8s) deployment, we can drop this
 # wrapper and use AppWebsocket::connect() directly.
-holochain_websocket = "0.7.0-dev.11"
-holochain_conductor_api = { version = "0.7.0-dev.11", default-features = false }
-holochain_serialized_bytes = "0.0.56"
+holochain_websocket = "=0.7.0-dev.23"
+holochain_conductor_api = { version = "=0.7.0-dev.23", default-features = false }
+# Must track the client family's hsb (0.0.57), NOT holo_hash 0.6.0's (0.0.56):
+# `SerializedBytes` from a different hsb version is a DIFFERENT type, and the
+# subscriber/worker feed it straight into holochain_websocket::WireMessage and
+# holochain_conductor_api::AppAuthenticationRequest. Both hsb versions are in the
+# graph (0.0.56 for the =0.6.0 sdk-types side); this dep must name the family one.
+holochain_serialized_bytes = "=0.0.57"
+
+# TOMBSTONE GUARD (2026-08-07): `holochain_sqlite` 0.7.0+deprecated is not a soft
+# deprecation — its lib body is a bare `compile_error!("the holochain_sqlite
+# crate is deprecated and no longer available; use holochain_data instead")`.
+# It hard-FAILS the build. Under cargo semver `0.7.0+deprecated` is just 0.7.0
+# with build metadata, so it OUTRANKS every `0.7.0-dev.N` and is the default pick
+# for holochain_types' `^0.7.0-dev.19`. holochain_sqlite is transitive-only here;
+# Cargo.lock is pinned to 0.7.0-dev.19. A broad `cargo update` will silently
+# re-land the tombstone and fail the build inside a third-party crate — if that
+# happens, re-run:
+#   cargo update -p holochain_sqlite --precise 0.7.0-dev.19
+# Canonical write-up: genesis/data/timeline/backlog/deprecation-holochain-sqlite-tombstone-crate.md
 
 # Provide custom getrandom implementation for holochain's wasm-oriented dependencies
 getrandom = { version = "0.3", features = ["std"] }
@@ -197,3 +234,18 @@ path = "src/main.rs"
 [[bin]]
 name = "doorway-worker"
 path = "src/bin/worker.rs"
+
+# ---------------------------------------------------------------------------
+# Admin-seam unblock (2026-08-07) — the resolution of the Lane C hold noted on
+# the holochain_client dep above. See
+# ../../vendor/holochain_serialized_bytes-0.0.56/VENDOR-NOTE.md.
+#
+# imagodei-types / infrastructure-types pin `holo_hash =0.6.0` (a DNA-hash guard:
+# the same crates compile into integrity WASM), which drags in hsb 0.0.56 ->
+# `serde =1.0.219`. The 0.7 holochain_client family drags in hsb 0.0.57 ->
+# `serde =1.0.228`. Only one serde 1.x can resolve, so those two exact pins
+# deadlocked the client bump. This patch harmonises 0.0.56's serde pin onto
+# 0.0.57's; hsb source is verbatim and every other pin is untouched. Both hsb
+# versions then coexist and the sdk-types holo_hash pin stays exactly =0.6.0.
+[patch.crates-io]
+holochain_serialized_bytes = { path = "../../vendor/holochain_serialized_bytes-0.0.56" }
