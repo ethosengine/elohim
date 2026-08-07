@@ -744,6 +744,12 @@ export class ElohimClient {
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      // Schema negotiation: elohim-storage's `validate_schema_version_header`
+      // treats an absent `X-Schema-Version` on a guarded `/db/**\/bulk` write as a
+      // DEPRECATED client contract (warns, then falls back to
+      // `default_schema_version()`). `1` is the only member of
+      // `SUPPORTED_SCHEMA_VERSIONS` (elohim/elohim-views/src/shared.rs).
+      'X-Schema-Version': '1',
     };
     // Only include auth header when using doorway (storage doesn't need it in dev)
     if (!mode.storageUrl && mode.doorway.apiKey) {

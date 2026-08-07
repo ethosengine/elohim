@@ -214,7 +214,14 @@ async function publishNodes(
 ): Promise<void> {
   console.log(`Publishing ${nodes.length} ContentNode(s) to ${targetUrl}...`);
 
-  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  // `x-schema-version`: elohim-storage's `validate_schema_version_header` treats an
+  // absent header on `/db/content/bulk` as a DEPRECATED client contract (warns, then
+  // falls back to `default_schema_version()`). `1` is the only member of
+  // `SUPPORTED_SCHEMA_VERSIONS` (elohim/elohim-views/src/shared.rs).
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    'x-schema-version': '1',
+  };
   if (token) headers['authorization'] = `Bearer ${token}`;
 
   // Use bulk endpoint if available, otherwise create individually

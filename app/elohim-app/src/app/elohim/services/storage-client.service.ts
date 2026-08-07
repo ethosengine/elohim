@@ -31,6 +31,17 @@ import type { ListResponse, BulkCreateResult } from '../models/storage-response.
 import type { ContentType, ContentFormat, Reach } from '@app/generated/schema-enums';
 import type { ConnectionConfig } from '@elohim/service/connection';
 
+/**
+ * Schema-negotiation header sent on every guarded `/db/**\/bulk` write.
+ *
+ * elohim-storage's `validate_schema_version_header` treats an absent
+ * `X-Schema-Version` as a DEPRECATED client contract (it logs
+ * "Bulk request missing X-Schema-Version header" and falls back to
+ * `default_schema_version()`). `1` is the only member of
+ * `SUPPORTED_SCHEMA_VERSIONS` (elohim/elohim-views/src/shared.rs).
+ */
+const BULK_SCHEMA_HEADERS: Record<string, string> = { 'X-Schema-Version': '1' };
+
 /** Content node from storage (matches backend ContentWithTags) */
 export interface StorageContentNode {
   id: string;
@@ -261,7 +272,7 @@ export class StorageClientService {
     // Doorway proxies /db/* routes (no /api/ prefix for db)
     const endpoint = `${baseUrl}/db/content/bulk`;
 
-    return this.http.post<BulkCreateResult>(endpoint, items).pipe(
+    return this.http.post<BulkCreateResult>(endpoint, items, { headers: BULK_SCHEMA_HEADERS }).pipe(
       timeout(120000), // 2 min for bulk ops
       catchError((error: HttpErrorResponse) => this.handleError('bulkCreateContent', error))
     );
@@ -277,7 +288,7 @@ export class StorageClientService {
     // Doorway proxies /db/* routes (no /api/ prefix for db)
     const endpoint = `${baseUrl}/db/relationships/bulk`;
 
-    return this.http.post<BulkCreateResult>(endpoint, items).pipe(
+    return this.http.post<BulkCreateResult>(endpoint, items, { headers: BULK_SCHEMA_HEADERS }).pipe(
       timeout(120000),
       catchError((error: HttpErrorResponse) => this.handleError('bulkCreateRelationships', error))
     );

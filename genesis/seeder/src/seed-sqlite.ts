@@ -944,7 +944,7 @@ async function seedContent(items: CreateContentInput[]): Promise<{ inserted: num
     try {
       const response = await fetch(`${STORAGE_URL}/db/content/bulk`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Schema-Version': '1' },
         body: JSON.stringify(items),
       });
       status = response.status;

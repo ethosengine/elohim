@@ -37,6 +37,19 @@ impl StorageClient {
     /// Create a new storage client
     pub fn new(config: StorageConfig) -> Self {
         let mut headers = header::HeaderMap::new();
+        // Schema negotiation, sent on EVERY request as a client default.
+        //
+        // elohim-storage's `validate_schema_version_header` treats an absent
+        // `X-Schema-Version` on a guarded `/db/**/bulk` write as a DEPRECATED client
+        // contract: it logs "Bulk request missing X-Schema-Version header" and falls
+        // back to `default_schema_version()`. Declaring it here (rather than per call
+        // site) means a future guarded route added to this client is conformant by
+        // construction. The value is read from the shared contract so it cannot drift
+        // from `SUPPORTED_SCHEMA_VERSIONS` (elohim/elohim-views/src/shared.rs).
+        headers.insert(
+            "X-Schema-Version",
+            header::HeaderValue::from(elohim_views::shared::default_schema_version()),
+        );
         if let Some(ref api_key) = config.api_key {
             headers.insert(
                 header::AUTHORIZATION,
@@ -305,6 +318,11 @@ impl StorageClient {
     }
 
     /// Bulk create content items (for seeding)
+    ///
+    /// Sends `X-Schema-Version` explicitly: elohim-storage's
+    /// `validate_schema_version_header` treats an absent header on a guarded
+    /// `/db/**/bulk` write as a DEPRECATED client contract (it warns, then falls back
+    /// to `default_schema_version()`).
     pub async fn bulk_create_content(&self, items: Vec<CreateContentInput>) -> Result<BulkResult> {
         let url = format!(
             "{}/db/{}/content/bulk",

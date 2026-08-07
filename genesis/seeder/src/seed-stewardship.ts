@@ -461,7 +461,7 @@ class StewardshipClient extends DoorwayClient {
   async bulkCreateAllocations(inputs: CreateAllocationInput[]): Promise<BulkAllocationResult> {
     const response = await this.fetch('/db/allocations/bulk', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Schema-Version': '1' },
       body: JSON.stringify(inputs),
     });
 
