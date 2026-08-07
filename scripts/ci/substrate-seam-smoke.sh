@@ -27,14 +27,29 @@ note() { echo "seam-smoke[$1]: $2"; }
 bad()  { note "$1" "FAIL — $2"; [ "$GATE" = "--gate" ] && rc=1; }
 
 # ── 1. bootstrap-sharing ────────────────────────────────────────────────────
-ba=$(curl -sS -m 20 "$A/admin/bootstrap-coherence" 2>/dev/null)
-bb=$(curl -sS -m 20 "$B/admin/bootstrap-coherence" 2>/dev/null)
-ca=$(echo "$ba" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('spaces',0), d.get('agents',0))" 2>/dev/null || echo "0 0")
-cb=$(echo "$bb" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('spaces',0), d.get('agents',0))" 2>/dev/null || echo "0 0")
-if [ "$ca" = "$cb" ] && [ "$ca" != "0 0" ]; then
-  note bootstrap-sharing "OK — both doorways read the same store ($ca spaces/agents)"
+# PROBE-BROKEN ≠ empty store: a non-200 or unparseable body must never read as
+# "0 0" (that masked a doorway 404 as a partition signal on 2026-08-07 — see
+# backlog/probe-conductor-diagnostics-doorway-404). Fail-closed on plumbing.
+probe_json() { # url -> "HTTP <code>\n<body>"
+  local url="$1" out code
+  out=$(curl -sS -m 20 -w '\n%{http_code}' "$url" 2>/dev/null) || { echo "000"; return; }
+  code=${out##*$'\n'}
+  printf '%s\n%s' "$code" "${out%$'\n'*}"
+}
+pa=$(probe_json "$A/admin/bootstrap-coherence"); code_a=${pa%%$'\n'*}; ba=${pa#*$'\n'}
+pb=$(probe_json "$B/admin/bootstrap-coherence"); code_b=${pb%%$'\n'*}; bb=${pb#*$'\n'}
+if [ "$code_a" != "200" ] || [ "$code_b" != "200" ]; then
+  bad bootstrap-sharing "PROBE-BROKEN — /admin/bootstrap-coherence A=HTTP:$code_a B=HTTP:$code_b (plumbing, not store state)"
 else
-  bad bootstrap-sharing "doorway views differ or empty (A=$ca B=$cb)"
+  ca=$(echo "$ba" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('spaces',0), d.get('agents',0))" 2>/dev/null || echo "PARSE-FAIL")
+  cb=$(echo "$bb" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('spaces',0), d.get('agents',0))" 2>/dev/null || echo "PARSE-FAIL")
+  if [ "$ca" = "PARSE-FAIL" ] || [ "$cb" = "PARSE-FAIL" ]; then
+    bad bootstrap-sharing "PROBE-BROKEN — unparseable body (A=$ca B=$cb)"
+  elif [ "$ca" = "$cb" ] && [ "$ca" != "0 0" ]; then
+    note bootstrap-sharing "OK — both doorways read the same store ($ca spaces/agents)"
+  else
+    bad bootstrap-sharing "doorway views differ or empty (A=$ca B=$cb)"
+  fi
 fi
 
 # ── 2. relay reachability (replaces the retired tx5/SBD signal-bus) ────────
@@ -81,13 +96,24 @@ probe_relay "$RELAY_B_URL"
 
 # ── 3. peer-store (primary conductor addressing) ────────────────────────────
 for side in "$A" "$B"; do
-  diagnostics=$(curl -sS -m 30 "$side/db/p2p/conductor-diagnostics" 2>/dev/null)
+  pd=$(probe_json "$side/db/p2p/conductor-diagnostics")
+  diag_code=${pd%%$'\n'*}; diagnostics=${pd#*$'\n'}
+  if [ "$diag_code" != "200" ]; then
+    # Fail-closed on plumbing: a 404/timeout is NOT an empty peer store (the
+    # 2026-08-07 partition triage read a doorway 404 as total=0 for hours).
+    bad peer-store "PROBE-BROKEN — $side/db/p2p/conductor-diagnostics HTTP:$diag_code (plumbing, not store state; see backlog/probe-conductor-diagnostics-doorway-404)"
+    continue
+  fi
   agents=$(printf '%s' "$diagnostics" | \
     python3 -c "
 import json,sys
 d=json.load(sys.stdin)
 withurl=sum(1 for a in d.get('agents',[]) if a.get('url'))
-print(f\"{d.get('agentCount',0)} {withurl}\")" 2>/dev/null || echo "0 0")
+print(f\"{d.get('agentCount',0)} {withurl}\")" 2>/dev/null || echo "PARSE-FAIL")
+  if [ "$agents" = "PARSE-FAIL" ]; then
+    bad peer-store "PROBE-BROKEN — $side conductor-diagnostics body unparseable"
+    continue
+  fi
   total=${agents% *}; withurl=${agents#* }
   if [ "${total:-0}" -ge 5 ] && [ "${withurl:-0}" -ge 5 ]; then
     note peer-store "OK — $side conductor holds $total agent-infos ($withurl addressed)"
