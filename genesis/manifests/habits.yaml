@@ -112,6 +112,12 @@ habits:
       converged stays honest telemetry; plateau drains under
       backlog/content-gap-limit-cycle-blocks-convergence (F-B fan-out + peer-probe
       source widening = next sprint objective).
+      2026-08-07 edge #1319 evidence: gate fail-closed EXPOSED a lane freeze —
+      alpha storage pinned to the one-time elohim-storage-iroh:hc-elohim-0.6.3-iroh
+      artifact (resolveStorageImage), so every storage dev-merge since the 08-05
+      iroh flip was inert on alpha (blocked_by absent, actionable=None, honest
+      DID-NOT-MEASURE). Cure = per-commit iroh-lane storage build + alpha repoint
+      + 900s→2700s validate deadline; frozen tag kept as rollback.
 
   - id: blob-durability
     invariant: >

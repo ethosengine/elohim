@@ -292,6 +292,25 @@ throughput fan-out + known-no-chain backoff + peer-probe source widening (the
 `rea-stream-no-divergence-adjudication-drain-path`), attacking the 0-1/sweep healed
 rate directly.
 
+## 2026-08-07 — post-deploy finding (edge #1319): the cure cannot land — alpha storage image is lane-frozen
+
+Edge #1319 (first deploy carrying the honesty floor + drain levers) went UNSTABLE
+as an honest DID-NOT-MEASURE: the re-pointed quiesce gate read
+`actionable=None, unmeasured=None` for its whole window — the `blocked_by` series
+was absent because **alpha's storage container is hard-pinned to
+`elohim-storage-iroh:hc-elohim-0.6.3-iroh`** (`resolveStorageImage`, edge
+Jenkinsfile ~682), the one-time Wave-2 artifact built 2026-08-06. Pods rolled
+(deploy stamp moved) but re-pulled the frozen digest `f09bc2a7…` — verified via
+`kube_pod_container_info` on matthew. Every storage-side dev merge since the
+iroh flip has been silently inert on alpha; the fail-closed gate is what finally
+surfaced it. Cure in flight this session: per-commit iroh-lane storage build in
+the edge pipeline (`elohim-storage-iroh:${STORAGE_TAG}`), alpha render re-pointed
+to it, frozen tag retained in Harbor as the ratified rollback line; plus the
+validate-path quiesce deadline raised 900s→2700s (900s < the ~20min restart
+churn, so it systematically no-measures). Until that deploys, the drain-rate
+predictions above are UNTESTED live — do not read #1319's fleet behavior as
+evidence about the levers.
+
 **Post-review watch item (independent review of `da752307f`, same session):** the
 interaction of the pre-existing adopt fan-out (8) with the widened alternates ladder
 (now up to 3, was 1) raises worst-case concurrent fetches against a small courier
