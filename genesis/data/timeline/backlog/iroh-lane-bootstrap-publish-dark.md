@@ -44,3 +44,26 @@ the probe against a conductor's own admin API before trusting the zero).
 
 Divergence risk while open: writes on different islands diverge until heal; heal is fills-never-moves
 so nothing is lost, but the reconcile grows with time. Alpha-only (staging/prod are tx5).
+
+## 01:15Z evidence — root-cause candidate: admin-seam version skew, fix-forward shaped
+
+Conductor logs (james, recurring): `Error: list_apps failed: Websocket error: Received a message
+that did not deserialize: Deserialize("unknown field relay_url, expected one of name, description,
+roles, allow_deferred_memproofs, bootstrap_url, signal_url")` — the fork's iroh conductor now
+emits `relay_url` in the app-manifest wire shape; the monorepo's pinned holochain_client
+(elohim-storage's embedded manager) has deny_unknown_fields and rejects the response. The
+storage-side happ_manager cannot list_apps against its own conductor.
+
+Also confirmed in the same window: kitsune2 coreBootstrap.serverUrl IS configured
+(https://doorway-alpha.elohim.host/bootstrap; the "may be unused" WARN is the known-benign
+Stage-0 census class). Zero P2P `Connection established` lines fleet-wide in 60m.
+
+Morning fix path (ordered):
+1. Bump/patch the monorepo's holochain_client (or the manifest struct) to tolerate `relay_url`
+   — one-field skew; check the fork's holochain_client crate for the matching version and pin it.
+   Then REBUILD the iroh anchor (edgenode job iroh lane) + repoint/redeploy.
+2. Separately verify the bootstrap publish leg: grep kitsune2 core_bootstrap / doorway /bootstrap
+   access logs for PUT traffic — if absent even before the list_apps failure, the publish break is
+   independent (two defects, not one).
+3. Decisive convergence probe still stands (cross-peer head propagation) after the fix lands.
+D9 rollback remains one line if the operator prefers stability over fix-forward at morning triage.
