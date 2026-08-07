@@ -88,6 +88,13 @@ habits:
       one binary), so a mixed-version fleet during a rolling deploy converges.
       Upstream documents no backward-compat guarantee; that claim is ours and
       rests on the experiment, so re-run it before the next automerge bump.
+      2026-08-07 iroh-lane lesson: a serving facade masked a fleet-wide
+      storage-boot wedge + /db outage for ~14h (relay_url client skew wedged
+      ensure_happ_installed BEFORE the HTTP bind; conductor websockets kept
+      facade routes green) — cured fix-forward same-day, bootstrap publish +
+      admin seam live-verified on the iroh fleet (all 7 publishing, measure
+      0→8); probes that can 404-as-zero are part of the facade (seam-smoke now
+      fail-closed). Incident: backlog/iroh-lane-bootstrap-publish-dark.
 
   - id: blob-durability
     invariant: >
