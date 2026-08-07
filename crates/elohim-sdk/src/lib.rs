@@ -96,7 +96,7 @@ pub mod contracts {
 }
 
 // Re-export core traits
-pub use traits::{ContentReadable, ContentWriteable, Syncable};
+pub use traits::{ContentReadable, ContentWriteable};
 
 // Re-export client types
 #[cfg(feature = "client")]

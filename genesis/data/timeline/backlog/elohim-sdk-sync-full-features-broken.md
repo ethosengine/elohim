@@ -7,7 +7,8 @@ title: "elohim-sdk `sync`/`full` cargo features broken since introduction (E0107
 slug: "elohim-sdk-sync-full-features-broken"
 written: "2026-08-02"
 author: "fix-integration (seam-concern architecture sprint, Wave A)"
-status: "backlog"
+status: "resolved"
+resolved: "2026-08-07"
 priority: "medium"
 tags: [elohim-sdk, crates, cargo-features, compile-break, fmt-check, dormant-defect, automerge, sync]
 cites:
@@ -131,3 +132,67 @@ the arity, or delete the trait as dead surface — into a real fork: since nothi
 deliberately NOT made here; it is upstream-of-fix, not answered by this addendum.
 
 Author: automerge 0.5.12 → 0.10.0 bump sprint (2026-08-06).
+
+## Resolution (2026-08-07): deletion, not repair — the fork the addendum left open
+
+The 2026-08-06 addendum's fork (repair vs. delete `Syncable`) resolved to **delete**. `Syncable`
+was authored 2026-01-08 by `b78796c27` (the same Diesel-ORM commit the addendum already
+identified) — a commit that never mentions sync — and predates the sync mechanism that actually
+shipped: a projector (`spawn_content_projection_listener` → `project_content_doc`, one Automerge
+doc per entity id, driven by an `EventBus`), not per-type `to_automerge`/`from_automerge` trait
+impls. Zero implementors, referenced by no design doc, non-compiling since introduction — a
+fossil competing with the working pattern, not an unfinished contract.
+
+**Changes:**
+- Deleted `crates/elohim-sdk/src/traits/syncable.rs` entirely — both `Syncable` and `SyncState`
+  (the latter's only references were the export chain re-exporting it: `traits/mod.rs` and
+  `lib.rs`; nothing else in the repo touched `SyncState`, so it had no independent reason to
+  survive the trait's removal).
+- `crates/elohim-sdk/src/traits/mod.rs`: dropped `mod syncable;` and the `syncable::{Syncable,
+  SyncState}` re-export.
+- `crates/elohim-sdk/src/lib.rs:99`: dropped `Syncable` from the `pub use traits::{...}`
+  re-export.
+- `crates/elohim-sdk/src/sync/mod.rs`: removed the orphaned `#[cfg(feature = "sync")] mod
+  automerge_sync;` + `pub use automerge_sync::*;` (the E0583 source — the file never existed).
+  Kept the working `#[cfg(all(feature = "sync", feature = "client"))] pub use
+  elohim_storage_client::{AutomergeSync, SyncResult};` re-export untouched.
+- `crates/elohim-sdk/Cargo.toml`: with `Syncable` gone, no code in the crate references
+  `automerge::` directly anymore (verified by grep) — removed the direct `automerge = { version
+  = "0.10", optional = true }` dependency and dropped `dep:automerge` from the `sync` feature
+  definition (`sync = ["client", "dep:automerge"]` → `sync = ["client"]`). The `sync` feature
+  itself was kept — it still gates the `elohim-storage-client` re-export.
+- `crates/elohim-sdk/README.md`: removed `Syncable` from the traits table, rewrote the
+  surrounding paragraph to name the projector as the real sync mechanism, and updated the
+  Features table/prose — `sync`/`full` now read as "yes" (builds), not "no — does not compile".
+
+**Verification (before → after, `RUSTFLAGS=""`, `CARGO_TARGET_DIR` under the crates dev pool):**
+- `cargo build --all-targets`: EXIT=0 (both before and after — never broken).
+- `cargo build --features sync` (headline check): **before** EXIT=101, 4 errors (1× E0583 +
+  3× E0107, byte-identical to the errors quoted in the Symptom section above, re-confirmed via a
+  path-scoped `git stash`/pop of `crates/elohim-sdk` only) → **after** EXIT=0, clean build.
+- `cargo test`: EXIT=0. 7 unit tests passed, 0 failed (`reach`, `client::projection_warmer`,
+  `cache::write_buffer`). 6 doc-tests, all `rust,ignore` — 0 passed, 0 failed, 6 ignored (no
+  change; the removed `Syncable` doc example was also `rust,ignore` and was never executed).
+- `cargo clippy -- -D warnings`: still EXIT=101 with exactly the same 3 pre-existing errors this
+  entry's fix sketch flagged as out of scope (`src/cache/write_buffer.rs:26` and
+  `src/reach/mod.rs:39,78` — derivable-`Default` + `from_str`-shadows-`FromStr`) — confirmed
+  unchanged, none new, none caused by this deletion.
+- `cargo fmt --check` (headline check): **before** EXIT=1, hard parse failure crate-wide
+  (`Error writing files: failed to resolve mod \`automerge_sync\`: ...does not exist`) — rustfmt
+  never got past resolving the `mod` tree, so no actual formatting diff was ever reported →
+  **after** EXIT=1 still, but now for a completely different and far smaller reason: rustfmt
+  parses cleanly and reports genuine pre-existing style debt (unsorted `use` lists, unwrapped
+  long lines) across several files this task did not touch
+  (`src/cache/write_buffer.rs`, `src/client/content_client.rs`, `src/client/mod.rs`,
+  `src/client/projection_warmer.rs`) plus import-order diffs in the two files this task did edit
+  (`src/lib.rs`, `src/traits/mod.rs`) — pre-existing `use`-list ordering that predates this
+  change and is unrelated to the `Syncable`/`automerge_sync` deletion. Fixing that formatting
+  debt is a separate, out-of-scope pass (not part of this defect).
+
+Net: both headline checks moved from failing to their target state — `--features sync` builds
+clean, and `fmt --check` no longer dies on an unparseable `mod` tree (it now surfaces ordinary,
+pre-existing, unrelated formatting debt instead). The fix-sketch's step 1 (delete vs. implement)
+resolved to delete; step 2 (the `Result` alias fix) became moot — the code it would have fixed no
+longer exists.
+
+Author: elohim-sdk `Syncable` dead-trait cleanup (2026-08-07).

@@ -196,7 +196,7 @@ verify against your own deployment.
 | `contracts` | re-export of `elohim-seam-contracts` — the concern canon as compile shapes |
 | `WriteBuffer` / `WritePriority` / `WriteOp` | write batching with the `for_interactive` / `for_seeding` / `for_recovery` presets |
 | `ReachLevel` / `ReachEnforcer` | the notarized reach vocabulary and a local access check |
-| `ContentReadable` / `ContentWriteable` / `Syncable` | the traits your content types implement |
+| `ContentReadable` / `ContentWriteable` | the traits your content types implement |
 | `StorageClient` / `AutomergeSync` (feature `client`) | re-exported from `elohim-storage-client` |
 | `Cacheable` / `CacheSignal` / `CacheRule` | re-exported from `doorway-client` |
 
@@ -204,9 +204,10 @@ verify against your own deployment.
 callable for a type; `ContentWriteable` extends it with a `validate()` that
 defaults to `Ok(())` — `impl ContentWriteable for T {}` is valid and means "no
 extra validation" — and is what makes `save()`/`flush()` callable.
-`Syncable` is the CRDT-merge contract for the `sync` feature, which does not
-compile today (see Features below), so it has no working consumer in this
-crate yet.
+CRDT sync is not a per-type trait contract in this crate — the working
+mechanism is the `AutomergeSync` re-export from `elohim-storage-client`
+(feature `client`), one Automerge doc per entity id, driven by the projector
+(`spawn_content_projection_listener` → `project_content_doc`).
 
 ### Features
 
@@ -215,15 +216,12 @@ crate yet.
 | `client` (default) | HTTP access to elohim-storage / doorway (`reqwest`, `elohim-storage-client`) | yes |
 | `native` | `client` + `rusqlite` dependency — added, but unused; no local-storage code path exists in this crate yet | yes |
 | `wasm` | `client`, for the browser target | yes (same code as `client`) |
-| `sync` | `client` + `automerge` CRDT sync | **no — does not compile** |
-| `full` | `native` + `sync` | **no — inherits `sync`** |
+| `sync` | `client`; re-exports `AutomergeSync`/`SyncResult` from `elohim-storage-client` (`src/sync/mod.rs`) | yes |
+| `full` | `native` + `sync` | yes |
 
-`sync` and `full` do not compile — do not enable either. Use the `AutomergeSync`
-re-export from `elohim-storage-client` (feature `client`) if you need CRDT sync
-today (`src/sync/mod.rs` declares a module whose file has never existed, and
-`src/traits/syncable.rs`'s single-parameter `Result<T>` resolves to
-`std::result::Result` instead of the crate's alias). This is listed rather than
-quietly omitted for the same reason as everything else in this README.
+Use the `AutomergeSync` re-export from `elohim-storage-client` (feature
+`client`, or `sync`) for CRDT sync — this crate does not define its own sync
+trait or Automerge dependency.
 
 ## Modes
 

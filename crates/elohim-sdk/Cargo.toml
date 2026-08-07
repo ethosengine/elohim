@@ -25,8 +25,9 @@ client = ["dep:elohim-storage-client", "dep:reqwest"]
 native = ["client", "dep:rusqlite"]
 # WASM target for browser
 wasm = ["client"]
-# Full sync support with Automerge
-sync = ["client", "dep:automerge"]
+# Full sync support with Automerge (via the elohim-storage-client re-export;
+# see the AutomergeSync/SyncResult re-export in src/sync/mod.rs)
+sync = ["client"]
 # All features
 full = ["native", "sync"]
 
@@ -58,9 +59,6 @@ elohim-views = { path = "../../elohim/elohim-views", version = "0.1.0" }
 # The `harness` feature stays off here — an implementor enables it in its own
 # dev-dependencies.
 elohim-seam-contracts = { path = "../seam-contracts", version = "0.1.0" }
-
-# Sync support
-automerge = { version = "0.10", optional = true }
 
 # Native-only
 rusqlite = { version = "0.31", optional = true }

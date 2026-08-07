@@ -315,7 +315,6 @@ name = "elohim-sdk"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "automerge",
  "doorway-client",
  "elohim-seam-contracts",
  "elohim-storage-client",
