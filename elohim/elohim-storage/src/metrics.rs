@@ -2020,14 +2020,22 @@ pub fn inc_adopt_evidence(state: AdoptEvidence) {
 /// the evidence meter, whose whole value is one increment per ask.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AdoptEvidenceFallback {
-    /// A second advertiser was selected and asked. Exactly one per fallback, so
-    /// this is the denominator for `carried` + `degraded`.
+    /// An alternative advertiser was selected and asked — counted PER FETCH.
+    ///
+    /// Was exactly one per fallback until the source-widening lever (2026-08-07)
+    /// let one resolution walk up to
+    /// [`crate::config::evidence_fallback_max_alternates`] couriers. It is
+    /// therefore the round-trip denominator (`carried / attempted` = the
+    /// per-ask hit rate), while `carried` + `degraded` + `no_alternative`
+    /// remain exactly one per RESOLUTION. `attempted / (carried + degraded)` is
+    /// the mean ladder depth, and its rise above 1 is the lever engaging.
     Attempted,
-    /// The alternative advertiser served the `Record` bytes the primary could
-    /// not. The whole point of the lever.
+    /// An alternative advertiser served the `Record` bytes the primary could
+    /// not. The whole point of the lever. One per resolution — the ladder stops
+    /// at the first courier that carries.
     Carried,
-    /// The alternative answered too, and also without bytes. The primary's
-    /// evidence stands as the resolution.
+    /// EVERY alternative answered too, and all without bytes. The primary's
+    /// evidence stands as the resolution. One per resolution.
     Degraded,
     /// A fallback was WARRANTED (the primary answered degraded) and no distinct
     /// candidate existed. Not a failure of peer health — a failure of hint

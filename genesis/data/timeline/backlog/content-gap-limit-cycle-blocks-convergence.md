@@ -292,6 +292,114 @@ throughput fan-out + known-no-chain backoff + peer-probe source widening (the
 `rea-stream-no-divergence-adjudication-drain-path`), attacking the 0-1/sweep healed
 rate directly.
 
+### Sprint delta (2026-08-07, same session) — the levers landed one layer down
+
+The three named levers were re-scoped on contact with the code: **F-B's fan-out and
+known-no-chain backoff had ALREADY landed on the adopt/contest arm** (`571b0e704`,
+`7b2fceb66` — `adopt_contest_fanout` default 8, `contest_backoff` with its
+`no_local_chain` / `evidence_absent` classes, `PeerHeadHint.alternates` cap 3). What
+had NOT received them was the **content heal leg that SUPPLIES that arm**. All three
+levers therefore landed at the layer where they were actually missing:
+
+- **Lever 1 — heal-leg fan-out** (`resolve_pipeline`, `config::heal_resolve_fanout`,
+  default 8, `1` = the old sequential leg). `heal_content` awaited one
+  `resolve_content_head_local` at a time inside the 120s `CONTENT_LEG_BUDGET`. At the
+  live ~0.75s conductor latency that is **~160 of ~2 894 pending ids touched per
+  sweep** — and that single number caps BOTH `healed` and the adopt arm's candidate
+  supply, because every adopt candidate is produced by an outcome of this leg.
+  `buffered(fanout)` yields answers **in input order**, so the apply half stays the
+  byte-identical sequential body (one task, one order, no lock); only the I/O is
+  concurrent. Bounded overshoot on budget/circuit trip: ≤ `fanout - 1` already-issued
+  resolves, cancelled by dropping the stream.
+- **Lever 2 — heal-leg known-no-chain replay** (`services::heal_backoff`,
+  `config::heal_missing_backoff_seconds`, default 600s = 2 sweeps, `0` = off). The
+  leg's dominant outcome is `Ok(None)` (~24.9k `missing` per 2h fleet-wide against 59
+  `healed`) and it is a predictable repeat: only the author/obey arms, which run later
+  in the same tick on their own budget, can change it. A replay reproduces the
+  `Ok(None)` arm's effect **exactly** — same ghost candidate, same adopt-candidate
+  routing (so the `try_obey_visible_election` probe still runs every sweep), same
+  `mark_failed` — and skips only the round-trip. Deliberately **not** the F-C
+  exhausted-sawtooth shape: nothing is exhausted, tombstoned, or written off; it is a
+  cached answer with an expiry and three automated exits (window, any non-`Ok(None)`
+  answer, chain arrival via the same author-path hooks as
+  `contest_backoff::note_local_chain_arrived`). New heal-outcome label
+  `missing_deferred` keeps `missing` meaning "the conductor answered nothing".
+- **Lever 3 — widened advertiser probe** (`advertiser_health::select_alternatives` /
+  `rank`, `config::evidence_fallback_max_alternates`, default 2, hard-clamped to
+  `ALTERNATE_ADVERTISER_CAP` = 3, `0` = single-ask). The harvest was already retaining
+  up to 3 couriers per id and the resolution asked exactly **one**, so two thirds of
+  the plurality the sweep had paid to collect were never used. The probe now walks the
+  ranked couriers healthiest-first and stops at the first that carries.
+  `inc_adopt_evidence` still fires exactly once per resolution; `fallback{attempted}`
+  becomes the round-trip denominator while `carried`/`degraded`/`no_alternative` stay
+  one-per-resolution.
+
+**Expected drain-rate math** (per pod, per 300s sweep, 120s content leg):
+
+```text
+  pre-lever   : 120s ÷ 0.75s              = ~160 ids touched/sweep of ~2 894 pending
+                                          → ~18 sweeps (~90 min) to touch each id ONCE
+  lever 1 only: 120s ÷ (0.75s ÷ 8)        = ~1 280 ids touched/sweep
+                                          → ~2.3 sweeps (~12 min) for full coverage
+  levers 1+2  : replay share p ≈ 0.85     → ~2 460 replayed free + ~1 280 resolved
+                                          → the WHOLE pending set every sweep, with
+                                            ~1 280 slots of real conductor work left
+                                            over for ids whose answer is unknown
+```
+
+Fleet-wide that is 7 pods × ~1 280 real resolves/sweep × 12 sweeps/hour ≈ **107k
+conductor answers/hour against ~11k contested ids**, versus ~13.4k/hour before —
+roughly **8×**, and the coverage horizon per id falls from ~90 min to one sweep.
+Lever 3 multiplies the *conversion* of that supply rather than its volume: each
+adopt-evidence resolution that previously gave up after one starved courier now
+reaches up to three, so the share of `no_local_chain` candidates that convert to
+`minted{source="adopt_before_author"}` rises with the courier plurality that actually
+exists on the mesh (2-3 on a household mesh).
+
+**What to watch, in order of trustworthiness** (the per-sweep `gaps` gauge remains a
+rotating-page sample and proves nothing):
+
+1. The new `projection-reconcile[content]: heal leg finished` line — `to_resolve` vs
+   `replayed`, with `fanout`. `replayed` rising while
+   `elohim_projection_reconcile_heal_outcome{stream="content",outcome="missing"}`
+   falls and `…{outcome="missing_deferred"}` rises IS lever 2 working.
+2. `elohim_content_canonical_links_minted_total{source}` — still the only series that
+   proves contest supply, now fed ~8× more candidates per sweep.
+3. `elohim_content_adopt_evidence_fallback_total{outcome="attempted"}` over
+   `{carried}` — the per-round-trip hit rate of lever 3; `attempted / (carried +
+   degraded)` above 1 is the widened ladder engaging.
+4. `elohim_projection_reconcile_healed_total` and `head_adopted_total` — the outcome.
+5. `elohim_projection_reconcile_converged_blocked_by{term}` — which term still pins.
+
+**Side effect the post-deploy observer must expect — `caught_up` will start flipping
+true.** A leg that never finished was masking this doc's own "converged softness":
+with ~160 of ~2 894 ids touched per sweep, the untouched remainder held `pending`
+non-empty for free, so `caught_up` was false by starvation rather than by judgement.
+A finishing leg empties `pending` every sweep, and `caught_up` reading true is then
+the HONEST statement that the sweep processed everything it discovered. From that
+point the only thing between a fully conductor-missing corpus and a green `converged`
+is the honesty floor's `failed` term (`ad4d5ed3f`) — which holds, because a replay
+`mark_failed`s exactly as the live `Ok(None)` arm does. That invariant is now pinned
+by a test (`a_replayed_id_is_never_marked_completed`) asserting both halves: the
+replay never marks completed, AND `converged_gauge_value` stays 0 for a sweep whose
+only outcome was replayed misses. Anyone reading a `caught_up` rise on the CI quiesce
+gate should read it as the leg finishing, not as the plateau draining;
+`healed_total` / `head_adopted_total` / `minted_total` remain the drain evidence.
+
+**Honest bound on the claim:** lever 1 raises how many ids the leg can ASK about; it
+does not by itself make an answer converge. If `missing` stays the dominant outcome at
+8× volume, the residual is upstream (the both-sides-missing pairs and the
+coordinator-zome no-chain-gate decision this doc already carries), not throughput —
+and `adopt_sweep_total{outcome="budget_elapsed"}` staying dominant would say the
+conductor, not the leg, is now the constraint. Both readings are available on the
+first post-deploy hour.
+
+**Deliberately deferred:** the sweettest convergence scenario (still design-ready,
+unbuilt — it lives in the DNA workspace, out of this sprint's path scope) and the REA
+declared-head-equivalent record (`rea-stream-no-divergence-adjudication-drain-path`
+remains the owner; lever 3 only widens the content arm's courier set, it does not give
+REA the primitive it lacks).
+
 **Bandwidth note:** the peer-probe/more-sources direction adopted for the MissLedger
 and REA adjudication drain paths (`Answer::Absent`-graduated adjudication via
 `PeerHeadRecordFetcher`, `PeerHeadHint.alternates` cap 3 — see

@@ -512,7 +512,56 @@ async fn async_main(
             "0" | "false" | "off" | "no"
         );
     }
+    if let Ok(v) = std::env::var("ELOHIM_EVIDENCE_FALLBACK_MAX_ALTERNATES") {
+        match v.trim().parse::<usize>() {
+            Ok(n) => config.evidence_fallback_max_alternates = n,
+            Err(_) => tracing::warn!(
+                value = %v,
+                default = config.evidence_fallback_max_alternates,
+                "ELOHIM_EVIDENCE_FALLBACK_MAX_ALTERNATES is not an integer — keeping the default"
+            ),
+        }
+    }
+    // CONTENT-HEAL DRAIN LEVERS. The heal leg feeds the adopt arm, and F-B never
+    // reached it: fan-out 1 and window 0 restore the pre-lever sequential leg
+    // exactly. An unparseable value keeps the default rather than silently
+    // disabling the lever (same discipline as the F-B knobs above).
+    if let Ok(v) = std::env::var("HEAL_RESOLVE_FANOUT") {
+        match v.trim().parse::<usize>() {
+            Ok(n) if n >= 1 => config.heal_resolve_fanout = n,
+            _ => tracing::warn!(
+                value = %v,
+                default = config.heal_resolve_fanout,
+                "HEAL_RESOLVE_FANOUT is not a positive integer — keeping the default"
+            ),
+        }
+    }
+    if let Ok(v) = std::env::var("HEAL_MISSING_BACKOFF_SECONDS") {
+        match v.trim().parse::<u64>() {
+            Ok(n) => config.heal_missing_backoff_seconds = n,
+            Err(_) => tracing::warn!(
+                value = %v,
+                default = config.heal_missing_backoff_seconds,
+                "HEAL_MISSING_BACKOFF_SECONDS is not an integer — keeping the default"
+            ),
+        }
+    }
     elohim_storage::config::set_adopt_contest_fanout(config.adopt_contest_fanout);
+    elohim_storage::config::set_heal_resolve_fanout(config.heal_resolve_fanout);
+    elohim_storage::config::set_heal_missing_backoff_seconds(config.heal_missing_backoff_seconds);
+    elohim_storage::config::set_evidence_fallback_max_alternates(
+        config.evidence_fallback_max_alternates,
+    );
+    tracing::info!(
+        heal_resolve_fanout = config.heal_resolve_fanout,
+        heal_missing_backoff_seconds = config.heal_missing_backoff_seconds,
+        evidence_fallback_max_alternates = config.evidence_fallback_max_alternates,
+        "content-heal drain levers: the heal leg resolves N ids against its own conductor \
+         concurrently (1 = the pre-lever sequential leg), replays a known conductor-missing \
+         answer for the backoff window instead of re-paying for it (0 = always re-resolve), and \
+         the adopt-evidence path probes up to N alternate advertisers per id (0 = single-ask). \
+         All three are deferrals or bounds — none excludes an id from a sweep"
+    );
     elohim_storage::config::set_contest_backoff_seconds(config.contest_backoff_seconds);
     elohim_storage::config::set_evidence_absent_backoff_seconds(
         config.evidence_absent_backoff_seconds,

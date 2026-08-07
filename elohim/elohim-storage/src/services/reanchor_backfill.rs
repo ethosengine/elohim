@@ -375,6 +375,10 @@ pub async fn run_once(
         // window (see `services::contest_backoff`).
         if outcome != RowOutcome::Failed {
             crate::services::contest_backoff::note_local_chain_arrived(id);
+            // Same fact, the heal leg's ledger: a chain landing falsifies any
+            // cached conductor-missing verdict, so the next heal sweep must
+            // RESOLVE this id for real rather than replay the stale answer.
+            crate::services::heal_backoff::note_resolved(id);
         }
 
         // AUTHOR-THEN-ADOPT, second half. The conductor now has a local chain for

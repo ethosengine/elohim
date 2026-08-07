@@ -593,6 +593,17 @@ enum HealOutcomeKind {
     /// Conductor definitively could not see the row (`Ok(None)`) — retried next
     /// sweep, never immediately.
     Missing,
+    /// The leg REPLAYED a cached [`Self::Missing`] answer for this id rather
+    /// than re-asking the conductor for it (`services::heal_backoff`, drain
+    /// lever 2). Downstream effect is identical to `Missing` in every respect —
+    /// same ghost candidate, same adopt routing, same `mark_failed` — so this is
+    /// counted apart ONLY so the `missing` series keeps meaning "the conductor
+    /// answered nothing", and so the reclaimed round-trips are countable.
+    ///
+    /// `missing_deferred` RISING while `missing` FALLS is the lever working. If
+    /// `missing` stays flat while this climbs, the ledger is not being consulted;
+    /// if `healed` falls as this rises, the window is too long.
+    MissingDeferred,
     /// A non-transient error (decode/logic) or a projection-write failure — retried
     /// next sweep, but no in-leg retry (no free window fixes it).
     Failed,
@@ -642,6 +653,7 @@ impl HealOutcomeKind {
             HealOutcomeKind::TimeoutRetried => "timeout_retried",
             HealOutcomeKind::TimeoutExhausted => "timeout_exhausted",
             HealOutcomeKind::Missing => "missing",
+            HealOutcomeKind::MissingDeferred => "missing_deferred",
             HealOutcomeKind::Failed => "failed",
             HealOutcomeKind::RefusedDeclared => "refused_declared",
             HealOutcomeKind::RefusedStale => "refused_stale",
@@ -1932,6 +1944,10 @@ async fn witness_ghost_anchors(
                     // that verdict is now false, and the next sweep should
                     // contest rather than wait out the window.
                     crate::services::contest_backoff::note_local_chain_arrived(id);
+                    // Same fact, the heal leg's ledger: a chain landing
+                    // falsifies any cached conductor-missing verdict, so the
+                    // next heal sweep resolves this id for real.
+                    crate::services::heal_backoff::note_resolved(id);
                     // AUTHOR-THEN-ADOPT, second half: the conductor now has a
                     // local chain, so the declaration it refused can land.
                     if let Some((head_action_hash, carried_record, peer_id)) = pending_adopt {
@@ -2888,6 +2904,94 @@ async fn discover_content(
 /// is up; scheduled single-flight OFF the discovery ticker (see `main.rs`).
 /// `stamp_declared_head` is existing-row-only and idempotent, so a heal is safe
 /// under duplicate delivery. A heal logs WARN naming the id and discovering peer.
+/// DRAIN LEVER 1: the content heal leg's bounded-concurrency resolve pipeline.
+///
+/// **Concerns:** C6a (`fanout` IS the concurrency budget, and it is the ONLY
+/// thing this function widens — never the slice, never the wall clock).
+///
+/// **Contract tests:** [`tests::the_resolve_pipeline_respects_its_fanout_bound`],
+/// [`tests::a_fanout_of_one_is_the_sequential_leg`],
+/// [`tests::the_resolve_pipeline_yields_in_order`].
+///
+/// Yields `(id, answer)` **in input order** with at most `fanout` resolves in
+/// flight. In-order delivery is what lets the caller's apply half stay the exact
+/// sequential body it always was: every mutation of the tracker, the counters and
+/// the candidate lists happens on one task, in one order, with no lock. Only the
+/// I/O is concurrent.
+///
+/// A separate function rather than an inline stream because the concurrency bound
+/// is the claim worth testing and a conductor cannot be stood up in a unit test —
+/// this seam lets an instrumented resolver assert the bound on the SAME code the
+/// leg runs.
+///
+/// `fanout` is clamped to at least 1 (a zero would silently produce a stream that
+/// yields nothing); 1 is exactly the pre-lever sequential leg.
+fn resolve_pipeline<'a, F, Fut, T>(
+    ids: &'a [String],
+    fanout: usize,
+    resolve: F,
+) -> impl futures::Stream<Item = (String, T)> + 'a
+where
+    F: Fn(&'a String) -> Fut + 'a,
+    Fut: std::future::Future<Output = T> + 'a,
+{
+    use futures::stream::StreamExt as _;
+    // `map` is LAZY and `buffered` pulls at most `fanout` items ahead, so
+    // `resolve` is invoked at most `fanout` times before the caller consumes an
+    // answer — the bound is on future CREATION as well as on polling.
+    futures::stream::iter(ids.iter())
+        .map(move |id| {
+            let fut = resolve(id);
+            async move { (id.clone(), fut.await) }
+        })
+        .buffered(fanout.max(1))
+}
+
+/// DRAIN LEVER 2's apply half: give each replayed id exactly the effect the live
+/// conductor-missing arm gives it, minus the round-trip. Returns how many ids
+/// were counted as conductor-missing.
+///
+/// **Concerns:** C3 (a replay is a DEFERRAL of the question, never a terminality
+/// verdict — every id here stays pending-or-failed and stays a candidate).
+///
+/// **Contract tests:** [`tests::a_replayed_id_gets_the_missing_arms_full_effect`],
+/// [`tests::a_replayed_id_is_never_marked_completed`].
+///
+/// The three effects are load-bearing and must stay in lockstep with the
+/// `Ok(None)` arm in [`heal_content`]:
+///
+/// 1. **ghost candidate** — the ghost sweep narrows this list to rows that claim
+///    an anchor; dropping the id here would hide it from the witness path.
+/// 2. **adopt candidate** (when a peer advertises a declaration) — this is the
+///    id's `try_obey_visible_election` probe, the ONLY arm that converges the
+///    conductor-missing class. Skipping the resolve must never skip the probe.
+/// 3. **`mark_failed`** — honest: we did not heal it, so `caught_up` cannot be
+///    falsely satisfied by a replay. `mark_completed` here would be the lie that
+///    turns a throughput lever into a converged-gauge forgery.
+fn apply_replayed_missing(
+    replayed: &[String],
+    tracker: &mut GapTracker,
+    peer_head_hints: &crate::services::head_adoption::PeerHeadHints,
+    ghost_candidates: &mut Vec<String>,
+    adopt_candidates: &mut Vec<AdoptCandidate>,
+) -> usize {
+    for id in replayed {
+        ghost_candidates.push(id.clone());
+        if conductor_missing_should_route_to_adopt(peer_head_hints.contains_key(id)) {
+            adopt_candidates.push(AdoptCandidate {
+                id: id.clone(),
+                head: None,
+            });
+        }
+        tracker.mark_failed(id);
+        crate::metrics::inc_projection_heal_outcome(
+            "content",
+            HealOutcomeKind::MissingDeferred.label(),
+        );
+    }
+    replayed.len()
+}
+
 async fn heal_content(
     tracker: &mut GapTracker,
     discovered_by: &std::collections::HashMap<String, String>,
@@ -2908,16 +3012,70 @@ async fn heal_content(
     let mut healed = 0usize;
     let mut conductor_missing = 0usize;
     let mut circuit = HealCircuit::new(pacing.circuit_timeout_threshold);
-    for id in tracker.pending_ids() {
-        let attempt = call_with_retry(pacing, || {
+
+    // ── DRAIN LEVER 2: replay the predictable answers, free ──────────────────
+    //
+    // `Ok(None)` is this leg's dominant outcome and it is a predictable repeat
+    // within a sweep horizon: only the author/obey arms (which run LATER in this
+    // same tick, on their own budget) can change it. Replaying it reproduces the
+    // conductor-missing arm's effect EXACTLY — same ghost candidate, same adopt
+    // routing, same `mark_failed` — while spending no wall clock, so the whole
+    // 120s goes to ids whose answer is genuinely unknown.
+    //
+    // NOT an exclusion and NOT a terminality claim: the id stays a gap, stays in
+    // the tracker, and keeps its `try_obey_visible_election` probe in the adopt
+    // arm every sweep. See `services::heal_backoff` for the three automated
+    // exits.
+    let replay_window = crate::config::heal_missing_backoff_window();
+    let (replayed, to_resolve): (Vec<String>, Vec<String>) = tracker
+        .pending_ids()
+        .into_iter()
+        .partition(|id| crate::services::heal_backoff::should_replay(id, replay_window));
+    conductor_missing += apply_replayed_missing(
+        &replayed,
+        tracker,
+        peer_head_hints,
+        &mut ghost_candidates,
+        &mut adopt_candidates,
+    );
+
+    // ── DRAIN LEVER 1: resolve the rest with bounded fan-out ─────────────────
+    //
+    // `buffered` keeps exactly `fanout` conductor round-trips in flight and
+    // yields answers IN ORDER, so the apply half below is byte-for-byte the
+    // sequential body it replaces — every mutation of `tracker`, the counters
+    // and the candidate lists still happens on one task, in one order, with no
+    // lock. Only the I/O is concurrent.
+    //
+    // `fanout = 1` reproduces the pre-lever leg exactly (one in flight, applied
+    // immediately), so the knob is its own OFF switch.
+    //
+    // BOUNDED OVERSHOOT, stated: when the wall-clock budget or the circuit trips
+    // mid-pipeline, up to `fanout - 1` resolves have already been issued.
+    // Dropping the stream cancels them at their next await point. That is a
+    // bounded, one-time cost per leg and is the price of not paying the latency
+    // serially — it never widens the slice, only the concurrency.
+    use futures::stream::StreamExt as _;
+    let fanout = crate::config::heal_resolve_fanout();
+    let resolves = resolve_pipeline(&to_resolve, fanout, |id| {
+        call_with_retry(pacing, move || {
             // LOCAL-only resolve — the heal loop must not stall on a cold arc.
             // `Ok(None)` from this variant is "not in my local view YET", never
             // authoritative absence; the HTTP author gate and the adoption
             // pre-flight keep using the Network variant for that reason.
-            crate::services::conductor_writes::call_resolve_content_head_local(hc, &id)
+            crate::services::conductor_writes::call_resolve_content_head_local(hc, id)
         })
-        .await;
+    });
+    futures::pin_mut!(resolves);
+
+    while let Some((id, attempt)) = resolves.next().await {
         circuit.record(&attempt.result);
+        // LEDGER COHERENCE. Any answer other than `Ok(None)` falsifies a cached
+        // "missing" for this id, so it must not survive to be replayed — the
+        // conductor-missing arm below re-stamps it when the answer IS `Ok(None)`.
+        if !matches!(attempt.result, Ok(None)) {
+            crate::services::heal_backoff::note_resolved(&id);
+        }
         // ELECTION-TIER METER. Counted on EVERY answer, before any branch
         // consumes it: `canonical` was previously read only to pick a stamp mode
         // and then discarded, so "does an election even exist for this class?"
@@ -3126,6 +3284,10 @@ async fn heal_content(
                 // per-root chain are locally absent. Collect it here rather than
                 // re-probing later: the answer is already paid for.
                 ghost_candidates.push(id.clone());
+                // LEVER 2 STAMP, on a REAL answer only — never from the replay
+                // path above, so a replay can never extend its own window into
+                // an unbounded hold.
+                crate::services::heal_backoff::note_conductor_missing(&id);
                 // MISSING → PEER-ADOPTION ROUTING (2026-08-01). The ghost sweep
                 // below narrows this list to rows that already CLAIM an anchor,
                 // so a conductor-missing row with a NULL `dht_anchor_hash` — the
@@ -3201,6 +3363,9 @@ async fn heal_content(
                 target: "elohim_storage::projection_reconcile",
                 budget_secs = pacing.content_leg_budget.as_secs(),
                 healed,
+                fanout,
+                to_resolve = to_resolve.len(),
+                replayed = replayed.len(),
                 "projection-reconcile[content]: heal hit leg budget — yielding, remaining gaps resume next sweep"
             );
             break;
@@ -3213,11 +3378,30 @@ async fn heal_content(
                 target: "elohim_storage::projection_reconcile",
                 consecutive_timeouts = circuit.consecutive_timeouts(),
                 healed,
+                fanout,
                 "projection-reconcile[content]: OPENED the unresponsive-conductor circuit — shedding the rest of the leg, remaining gaps resume next sweep"
             );
             break;
         }
     }
+
+    // DRAIN-LEVER LEDGER LINE. `to_resolve` vs `replayed` is the split that makes
+    // lever 2 checkable rather than asserted: `replayed` RISING while the
+    // `missing` outcome series FALLS is the reclaimed round-trips, and `fanout`
+    // beside them says how many of `to_resolve` the leg could pay for at once.
+    tracing::info!(
+        target: "elohim_storage::projection_reconcile",
+        healed,
+        conductor_missing,
+        fanout,
+        to_resolve = to_resolve.len(),
+        replayed = replayed.len(),
+        replay_window_secs = replay_window.as_secs(),
+        backoff_tracked = crate::services::heal_backoff::tracked(),
+        "projection-reconcile[content]: heal leg finished (to_resolve = ids that cost a \
+         conductor round-trip this sweep; replayed = ids whose known conductor-missing answer \
+         was reused instead, still enqueued and still probed by the adopt arm)"
+    );
 
     // END-OF-ARM caught_up (mirrors `heal_rea`). `GapTracker::caught_up`
     // DEFAULTS to false and `enqueue_missing` only ever sets it false — nothing
@@ -6054,5 +6238,237 @@ mod tests {
             "a decode/logic error is not something adoption can fix"
         );
         assert!(!timeout_should_route_to_adopt(false, false));
+    }
+
+    // =========================================================================
+    // DRAIN LEVERS (2026-08-07) — the heal leg's throughput seam
+    // =========================================================================
+
+    /// A resolver that records how many of itself are in flight at once, so the
+    /// concurrency bound can be asserted as a FACT about the running pipeline
+    /// rather than inferred from the `buffered` argument.
+    #[derive(Default)]
+    struct ConcurrencyProbe {
+        in_flight: std::sync::atomic::AtomicUsize,
+        peak: std::sync::atomic::AtomicUsize,
+    }
+
+    impl ConcurrencyProbe {
+        async fn resolve(&self, id: &str) -> String {
+            use std::sync::atomic::Ordering::SeqCst;
+            let now = self.in_flight.fetch_add(1, SeqCst) + 1;
+            self.peak.fetch_max(now, SeqCst);
+            // A real await point, so the executor is free to start the next
+            // buffered future — without one, `buffered` would appear bounded at
+            // 1 no matter what and the test would prove nothing.
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            self.in_flight.fetch_sub(1, SeqCst);
+            format!("answered:{id}")
+        }
+
+        fn peak(&self) -> usize {
+            self.peak.load(std::sync::atomic::Ordering::SeqCst)
+        }
+    }
+
+    fn ids(n: usize) -> Vec<String> {
+        (0..n).map(|i| format!("id-{i}")).collect()
+    }
+
+    /// C6a, the whole of lever 1's safety claim: the leg may have at most
+    /// `fanout` conductor round-trips in flight. Exceeding it would stack load on
+    /// the one saturated resource the entire pacing layer exists to protect.
+    #[tokio::test]
+    async fn the_resolve_pipeline_respects_its_fanout_bound() {
+        use futures::stream::StreamExt as _;
+        let pool = ids(24);
+        let probe = ConcurrencyProbe::default();
+        let out: Vec<(String, String)> = resolve_pipeline(&pool, 4, |id| probe.resolve(id))
+            .collect()
+            .await;
+
+        assert_eq!(
+            out.len(),
+            pool.len(),
+            "every id must be resolved exactly once"
+        );
+        assert!(
+            probe.peak() <= 4,
+            "the pipeline ran {} resolves concurrently against a fanout of 4",
+            probe.peak()
+        );
+        assert!(
+            probe.peak() > 1,
+            "the pipeline never actually overlapped — a lever that does not fan out is not a \
+             throughput lever, and this is the assertion that would catch a `buffered` that \
+             silently degraded to sequential"
+        );
+    }
+
+    /// The OFF switch, proven rather than asserted: `fanout = 1` is the
+    /// pre-lever sequential leg, one resolve at a time.
+    #[tokio::test]
+    async fn a_fanout_of_one_is_the_sequential_leg() {
+        use futures::stream::StreamExt as _;
+        let pool = ids(6);
+        let probe = ConcurrencyProbe::default();
+        let out: Vec<(String, String)> = resolve_pipeline(&pool, 1, |id| probe.resolve(id))
+            .collect()
+            .await;
+        assert_eq!(out.len(), pool.len());
+        assert_eq!(
+            probe.peak(),
+            1,
+            "fanout 1 must reproduce the sequential leg exactly"
+        );
+    }
+
+    /// IN-ORDER delivery is what lets the apply half stay the sequential body it
+    /// always was. If this ever became unordered, the tracker mutations and the
+    /// candidate lists would silently reorder against the discovery order.
+    #[tokio::test]
+    async fn the_resolve_pipeline_yields_in_order() {
+        use futures::stream::StreamExt as _;
+        let pool = ids(12);
+        // Deliberately INVERTED latency: the first id is the slowest, so an
+        // unordered pipeline would surface it last.
+        let out: Vec<(String, String)> = resolve_pipeline(&pool, 8, |id| {
+            let id = id.clone();
+            async move {
+                let rank: u64 = id
+                    .rsplit('-')
+                    .next()
+                    .and_then(|n| n.parse().ok())
+                    .unwrap_or(0);
+                tokio::time::sleep(std::time::Duration::from_millis(24 - rank * 2)).await;
+                id
+            }
+        })
+        .collect()
+        .await;
+
+        let order: Vec<String> = out.into_iter().map(|(id, _)| id).collect();
+        assert_eq!(order, pool, "answers must arrive in input order");
+    }
+
+    /// LEVER 2 IS NOT AN EXCLUSION. A replayed id must land in exactly the same
+    /// three places the live `Ok(None)` arm puts it — most importantly the adopt
+    /// candidate list, which carries its `try_obey_visible_election` probe, the
+    /// only arm that converges this class.
+    #[test]
+    fn a_replayed_id_gets_the_missing_arms_full_effect() {
+        let mut tracker = GapTracker::new(MAX_RETRIES);
+        tracker.discover(vec!["hinted".to_string(), "unhinted".to_string()]);
+        let mut hints = crate::services::head_adoption::PeerHeadHints::new();
+        hints.insert(
+            "hinted".to_string(),
+            crate::services::head_adoption::PeerHeadHint::sole(
+                "uhCkk-head".into(),
+                None,
+                "peer".into(),
+            ),
+        );
+        let mut ghosts = Vec::new();
+        let mut adopts = Vec::new();
+
+        let missing = apply_replayed_missing(
+            &["hinted".to_string(), "unhinted".to_string()],
+            &mut tracker,
+            &hints,
+            &mut ghosts,
+            &mut adopts,
+        );
+
+        assert_eq!(missing, 2, "both ids count as conductor-missing");
+        assert_eq!(
+            ghosts,
+            vec!["hinted".to_string(), "unhinted".to_string()],
+            "a replay must still feed the ghost sweep"
+        );
+        assert_eq!(
+            adopts.iter().map(|c| c.id.as_str()).collect::<Vec<_>>(),
+            vec!["hinted"],
+            "the peer-hinted id keeps its adopt/obey probe; the unhinted one has no peer to \
+             adopt from — exactly the live arm's rule"
+        );
+        assert!(
+            adopts[0].head.is_none(),
+            "no head was resolved, so the candidate must carry the honest `Unresolved` \
+             provenance rather than a borrowed one"
+        );
+    }
+
+    /// THE LIE THIS LEVER MUST NEVER TELL, and the reason lever 1 needs it
+    /// asserted rather than assumed.
+    ///
+    /// A leg that never finished masked the documented "converged softness":
+    /// with ~160 of ~2 894 ids touched per sweep, the untouched remainder held
+    /// `pending` non-empty and `caught_up`/`converged` false for free. Fan-out
+    /// makes the leg finish, so `pending` legitimately empties every sweep — and
+    /// from that point the ONLY thing standing between a fully conductor-missing
+    /// corpus and a green `converged` is the honesty floor's `failed` term.
+    ///
+    /// So this asserts both halves: a replay `mark_failed`s (never
+    /// `mark_completed`s), AND that failure still blocks the published
+    /// `converged` gauge. `mark_completed` here would drain `pending`, satisfy
+    /// `caught_up`, clear the `failed` blocker, and turn a throughput lever into
+    /// a forgery of the one gauge the fleet is judged on.
+    #[test]
+    fn a_replayed_id_is_never_marked_completed() {
+        let mut tracker = GapTracker::new(MAX_RETRIES);
+        tracker.discover(vec!["gap".to_string()]);
+        let hints = crate::services::head_adoption::PeerHeadHints::new();
+
+        apply_replayed_missing(
+            &["gap".to_string()],
+            &mut tracker,
+            &hints,
+            &mut Vec::new(),
+            &mut Vec::new(),
+        );
+        tracker.update_caught_up();
+
+        let counts = tracker.counts();
+        assert_eq!(
+            counts.completed, 0,
+            "a replay heals nothing and must claim nothing"
+        );
+        assert_eq!(
+            counts.failed, 1,
+            "the id stays an honest failure, re-discovered next sweep"
+        );
+        assert!(
+            counts.caught_up,
+            "the leg genuinely processed everything it discovered — caught_up is the honest \
+             reading of that, and it is why the `failed` term below has to carry the weight"
+        );
+        assert_eq!(
+            crate::metrics::converged_gauge_value(&counts, 0, true),
+            0,
+            "a sweep whose only outcome was replayed conductor-misses has NOT converged; the \
+             honesty floor's `failed` term must keep the gauge at 0 even though `pending` is \
+             now empty and no divergence is actionable"
+        );
+    }
+
+    /// The empty case must cost nothing: an empty replay list is the converged
+    /// corpus, and it must not touch the tracker or the candidate lists at all.
+    #[test]
+    fn an_empty_replay_list_changes_nothing() {
+        let mut tracker = GapTracker::new(MAX_RETRIES);
+        tracker.discover(vec!["gap".to_string()]);
+        let hints = crate::services::head_adoption::PeerHeadHints::new();
+        let mut ghosts = Vec::new();
+        let mut adopts = Vec::new();
+
+        let missing = apply_replayed_missing(&[], &mut tracker, &hints, &mut ghosts, &mut adopts);
+
+        assert_eq!(missing, 0);
+        assert!(ghosts.is_empty() && adopts.is_empty());
+        assert_eq!(
+            tracker.counts().pending,
+            1,
+            "the id is untouched and still pending"
+        );
     }
 }

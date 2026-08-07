@@ -238,6 +238,81 @@ where
     best.map(|(peer, _)| peer)
 }
 
+/// The healthiest DISTINCT alternatives from `candidates`, best-first, at most
+/// `max` of them — the plural of [`select_alternative`].
+///
+/// **Concerns:** C6a (the returned length IS the amplification bound: one extra
+/// fetch per element, and the caller may not exceed it). C8 (deterministic —
+/// same ordering rule as [`choose`], so a tie keeps the earliest candidate and a
+/// live decision is reproducible from a log line).
+///
+/// **Contract tests:** [`tests::ranking_orders_by_health_and_never_repeats`],
+/// [`tests::a_zero_budget_ranks_nothing`].
+///
+/// Why a second function rather than calling [`choose`] in a loop: `choose` is
+/// the SINGLE-pick rule and its callers depend on it staying that (it is the one
+/// asserted by the existing selection tests). Ranking is a different question —
+/// "in what order would I ask them all?" — and answering it once, totally, is
+/// what keeps the widened probe loop-free at the call site.
+pub fn select_alternatives(primary: &str, candidates: &[String], max: usize) -> Vec<String> {
+    if max == 0 {
+        return Vec::new();
+    }
+    let scores: HashMap<String, f64> = match table().lock() {
+        Ok(guard) => candidates
+            .iter()
+            .filter_map(|c| {
+                guard
+                    .get(c.trim())
+                    .and_then(PeerEvidenceHealth::carried_share)
+                    .map(|s| (c.trim().to_string(), s))
+            })
+            .collect(),
+        // Lock poisoned: rank with no scores, which degrades to candidate order.
+        // Degraded, never dead — the same rule `select_alternative` follows.
+        Err(_) => HashMap::new(),
+    };
+    rank(primary, candidates, max, |peer| scores.get(peer).copied())
+        .into_iter()
+        .map(str::to_string)
+        .collect()
+}
+
+/// THE RANKING RULE, pure and total. See [`select_alternatives`].
+///
+// bounded-work: one pass to filter + one sort over `candidates`, which the
+// caller bounds (`PeerHeadHint::alternates`, capped at harvest time), then
+// truncation to `max`. No I/O, no retry, no loop over the network.
+pub(crate) fn rank<'a, F>(
+    primary: &str,
+    candidates: &'a [String],
+    max: usize,
+    score: F,
+) -> Vec<&'a str>
+where
+    F: Fn(&str) -> Option<f64>,
+{
+    let primary = primary.trim();
+    let mut seen: Vec<&'a str> = Vec::new();
+    let mut scored: Vec<(&'a str, f64)> = Vec::new();
+    for candidate in candidates {
+        let candidate = candidate.trim();
+        // DISTINCTNESS is load-bearing, not tidiness: a duplicate entry would
+        // spend one of the caller's bounded fetches re-asking a peer that just
+        // answered, which is the amplification this bound exists to prevent.
+        if candidate.is_empty() || candidate == primary || seen.contains(&candidate) {
+            continue;
+        }
+        seen.push(candidate);
+        scored.push((candidate, score(candidate).unwrap_or(UNTRACKED_PRIOR)));
+    }
+    // STABLE sort, descending by health: equal scores keep candidate order, so
+    // the first-ranked element is byte-identical to what `choose` picks.
+    scored.sort_by(|a, b| b.1.total_cmp(&a.1));
+    scored.truncate(max);
+    scored.into_iter().map(|(peer, _)| peer).collect()
+}
+
 /// Drop every entry. Test isolation only — the table is process-local and shared
 /// across `#[test]` fns in one binary. MUST be called while holding
 /// [`test_exclusive`], for the reason `contest_backoff::reset` documents.
@@ -425,5 +500,53 @@ mod tests {
             "overflow must RELEASE peers (fail-open), never keep a stale verdict"
         );
         reset();
+    }
+
+    /// DRAIN LEVER 3's rule. Widening the probe is only worth anything if the
+    /// SECOND ask goes to the second-healthiest peer — and it must never spend
+    /// one of its bounded fetches on a repeat or on the primary itself.
+    #[test]
+    fn ranking_orders_by_health_and_never_repeats() {
+        let candidates = peers(&["starved", "idle", "middling", "idle", "primary", "  "]);
+        let ranked = rank("primary", &candidates, 3, |p| match p {
+            "starved" => Some(0.0),
+            "middling" => Some(0.4),
+            "idle" => Some(0.95),
+            _ => None,
+        });
+        assert_eq!(
+            ranked,
+            vec!["idle", "middling", "starved"],
+            "best-first, primary excluded, duplicates and blanks dropped"
+        );
+        assert_eq!(
+            ranked.first().copied(),
+            choose("primary", &candidates, |p| match p {
+                "starved" => Some(0.0),
+                "middling" => Some(0.4),
+                "idle" => Some(0.95),
+                _ => None,
+            }),
+            "the first-ranked peer must be exactly the one the single-pick rule chooses — \
+             widening the probe may extend the ladder, never re-order its top rung"
+        );
+    }
+
+    /// The OFF switch is a bound, not a branch: `max = 0` ranks nothing, so the
+    /// caller's loop body never runs and the path is the pre-lever single ask.
+    #[test]
+    fn a_zero_budget_ranks_nothing() {
+        let candidates = peers(&["idle", "middling"]);
+        assert!(rank("primary", &candidates, 0, |_| None).is_empty());
+        assert!(select_alternatives("primary", &candidates, 0).is_empty());
+    }
+
+    /// The bound the caller relies on: `max` caps the returned length even when
+    /// far more distinct candidates exist. This IS the amplification bound —
+    /// every element is one extra round-trip.
+    #[test]
+    fn the_ranking_never_exceeds_its_budget() {
+        let candidates = peers(&["a", "b", "c", "d", "e"]);
+        assert_eq!(rank("primary", &candidates, 2, |_| None).len(), 2);
     }
 }

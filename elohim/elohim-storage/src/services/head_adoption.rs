@@ -521,21 +521,38 @@ pub trait HeadRecordFetcher: Send + Sync {
 /// # ADVERTISER DIVERSITY (2026-08-03)
 ///
 /// When the hinted advertiser answers without bytes and without a stated
-/// structural absence, this asks ONE alternative advertiser (see
-/// [`fallback_warrants`] for the trigger and
-/// [`crate::services::advertiser_health`] for the choice). The hint is
+/// structural absence, this asks the OTHER advertisers of the same declaration
+/// (see [`fallback_warrants`] for the trigger and
+/// [`crate::services::advertiser_health`] for the order). The hint is
 /// first-advertiser-wins, and on the live fleet that peer was usually a
 /// 100%-CFS-throttled conductor while idle peers holding the same genesis-seeded
 /// rows were never asked once — which is why adopt-before-author had never
 /// minted despite being wired correctly end to end. **The protocol adapts to its
 /// weakest members rather than demanding they be strong.**
 ///
-/// The bound is structural, not conventional: ONE extra fetch, chosen from a
-/// list the harvest already capped, with no loop and no ladder. And the
-/// accounting stays honest — [`crate::metrics::inc_adopt_evidence`] fires
-/// EXACTLY ONCE per resolution, for the FINAL state, so the evidence meter's
-/// denominator is unchanged by this lever. The fallback's own decisions land on
-/// a separate [`crate::metrics::CONTENT_ADOPT_EVIDENCE_FALLBACK`] series.
+/// ## SOURCE WIDENING (drain lever 3, 2026-08-07)
+///
+/// The 2026-08-03 shape asked exactly ONE alternate and then gave up for the
+/// sweep, while the harvest was already retaining up to
+/// [`ALTERNATE_ADVERTISER_CAP`] (3) couriers per id — so two thirds of the
+/// plurality the sweep had paid to collect were never used, and an id whose
+/// second-best courier could serve the bytes waited a full sweep (or a full
+/// backoff window) to find that out. The probe now walks the ranked couriers,
+/// healthiest first, up to [`crate::config::evidence_fallback_max_alternates`]
+/// (default 2). Fill bandwidth per gap id rises with the number of couriers that
+/// actually exist, which is the point: an id converges the moment ANY courier
+/// serves it.
+///
+/// The bound is structural, not conventional: a FIXED, pre-sized ladder over a
+/// list the harvest already capped — iterated once, never re-asking a peer, with
+/// no recursion and no retry. And the accounting stays honest —
+/// [`crate::metrics::inc_adopt_evidence`] fires EXACTLY ONCE per resolution, for
+/// the FINAL state, so the evidence meter's denominator is unchanged by either
+/// lever. The fallback's own decisions land on a separate
+/// [`crate::metrics::CONTENT_ADOPT_EVIDENCE_FALLBACK`] series, where `attempted`
+/// counts fallback FETCHES (so `attempted / carried` reads as a per-round-trip
+/// hit rate) while `carried` / `degraded` / `no_alternative` stay one-per-
+/// resolution.
 async fn resolve_peer_evidence(
     fetcher: Option<&dyn HeadRecordFetcher>,
     hint: &PeerHeadHint,
@@ -563,49 +580,61 @@ async fn resolve_peer_evidence(
     }
 
     // The primary could not serve, and the cause is one another peer might not
-    // share. Ask ONE other advertiser of the SAME declaration.
-    let Some(alternate) =
-        crate::services::advertiser_health::select_alternative(&hint.peer_id, &hint.alternates)
-    else {
+    // share. Ask the OTHER advertisers of the SAME declaration, healthiest
+    // first, up to the configured breadth.
+    let alternates = crate::services::advertiser_health::select_alternatives(
+        &hint.peer_id,
+        &hint.alternates,
+        crate::config::evidence_fallback_max_alternates(),
+    );
+    if alternates.is_empty() {
         // No second courier exists for this id. Counted apart from a failed
         // fallback because the remedy differs: this says hint PLURALITY is the
         // wall, not peer health.
         crate::metrics::inc_adopt_evidence_fallback(AdoptEvidenceFallback::NoAlternative);
         crate::metrics::inc_adopt_evidence(state);
         return (carried, Some(state));
-    };
-
-    // bounded-work: exactly ONE fallback fetch per evidence resolution — no
-    // loop, no ladder, no recursion. The candidate list is capped at harvest
-    // time and this arm consumes at most one entry from it, so the worst case is
-    // 2 round-trips per candidate per sweep (the sweep's own 200/tick + 120s
-    // budget is unchanged and stays authoritative).
-    crate::metrics::inc_adopt_evidence_fallback(AdoptEvidenceFallback::Attempted);
-    let alt_carried = f.fetch(&alternate, id).await.into_option();
-    let alt_state = classify_evidence(alt_carried.as_ref());
-    crate::services::advertiser_health::record(&alternate, alt_state == AdoptEvidence::Carried);
-
-    if alt_state == AdoptEvidence::Carried {
-        crate::metrics::inc_adopt_evidence_fallback(AdoptEvidenceFallback::Carried);
-        crate::metrics::inc_adopt_evidence(AdoptEvidence::Carried);
-        tracing::info!(
-            target: "elohim_storage::head_adoption",
-            content_id = %id,
-            primary_peer = %hint.peer_id,
-            primary_evidence = state.label(),
-            alternate_peer = %alternate,
-            "adopt-before-author: routed around a starved advertiser — an alternative peer \
-             served the head Record the hinted one could not"
-        );
-        return (alt_carried, Some(AdoptEvidence::Carried));
     }
 
-    // Both answered without bytes. The PRIMARY's evidence is the resolution:
-    // it is the peer whose declaration this row is reasoning about, and the
-    // backoff class downstream must key on what IT said. (A conservative
+    // bounded-work: at most `evidence_fallback_max_alternates()` fallback
+    // fetches per evidence resolution — hard-clamped to
+    // `ALTERNATE_ADVERTISER_CAP` (3), which is how many couriers the harvest
+    // ever retains, so this is a FIXED, pre-sized ladder rather than a retry
+    // loop: it iterates a bounded list once, never re-asks a peer, and cannot
+    // recurse. Worst case is 1 + N round-trips per candidate per sweep; the
+    // sweep's own 200/tick + 120s budget is unchanged and stays authoritative
+    // over all of it.
+    let mut last: Option<(&str, AdoptEvidence)> = None;
+    for alternate in &alternates {
+        crate::metrics::inc_adopt_evidence_fallback(AdoptEvidenceFallback::Attempted);
+        let alt_carried = f.fetch(alternate, id).await.into_option();
+        let alt_state = classify_evidence(alt_carried.as_ref());
+        crate::services::advertiser_health::record(alternate, alt_state == AdoptEvidence::Carried);
+
+        if alt_state == AdoptEvidence::Carried {
+            crate::metrics::inc_adopt_evidence_fallback(AdoptEvidenceFallback::Carried);
+            crate::metrics::inc_adopt_evidence(AdoptEvidence::Carried);
+            tracing::info!(
+                target: "elohim_storage::head_adoption",
+                content_id = %id,
+                primary_peer = %hint.peer_id,
+                primary_evidence = state.label(),
+                alternate_peer = %alternate,
+                couriers_asked = alternates.len(),
+                "adopt-before-author: routed around a starved advertiser — an alternative peer \
+                 served the head Record the hinted one could not"
+            );
+            return (alt_carried, Some(AdoptEvidence::Carried));
+        }
+        last = Some((alternate.as_str(), alt_state));
+    }
+
+    // EVERY courier answered without bytes. The PRIMARY's evidence is still the
+    // resolution: it is the peer whose declaration this row is reasoning about,
+    // and the backoff class downstream must key on what IT said. (A conservative
     // choice on purpose — an alternate's `no_record` may never license the long
     // deferral when the primary said `budget_elapsed`, because the primary said
-    // the bytes plausibly exist.)
+    // the bytes plausibly exist. Widening the probe does not widen that licence.)
     crate::metrics::inc_adopt_evidence_fallback(AdoptEvidenceFallback::Degraded);
     crate::metrics::inc_adopt_evidence(state);
     tracing::debug!(
@@ -613,9 +642,10 @@ async fn resolve_peer_evidence(
         content_id = %id,
         primary_peer = %hint.peer_id,
         primary_evidence = state.label(),
-        alternate_peer = %alternate,
-        alternate_evidence = alt_state.label(),
-        "adopt-before-author: the alternative advertiser could not serve the Record either; \
+        couriers_asked = alternates.len(),
+        last_alternate_peer = last.map(|(p, _)| p).unwrap_or("none"),
+        last_alternate_evidence = last.map(|(_, s)| s.label()).unwrap_or("none"),
+        "adopt-before-author: no alternative advertiser could serve the Record either; \
          the primary's evidence stands"
     );
     (carried, Some(state))
@@ -2101,6 +2131,9 @@ pub async fn finish_author_then_adopt(
     // inside a single tick: `adopt_deferred_heads` runs BEFORE both witness
     // sweeps, so an id can fail the no-chain gate and be authored seconds later.
     crate::services::contest_backoff::note_local_chain_arrived(id);
+    // Same fact, the heal leg's ledger: a chain landing falsifies any cached
+    // conductor-missing verdict for this id.
+    crate::services::heal_backoff::note_resolved(id);
     // No alternates: this call already HAS the bytes in hand (the caller carried
     // them through the author path), so there is no evidence fetch to route.
     let hint = PeerHeadHint::sole(head_action_hash.to_string(), None, peer_id.to_string());
@@ -2829,50 +2862,125 @@ mod tests {
         crate::services::advertiser_health::reset();
     }
 
-    /// ONE retry, never a ladder. Three alternates are offered and exactly one
-    /// is asked — the bound that keeps a route-around from becoming a fan-out
-    /// against a fleet whose conductors are already the scarce resource.
+    /// A BOUNDED LADDER, never an unbounded one (drain lever 3, 2026-08-07).
+    ///
+    /// Three alternates are offered, the configured breadth is 2, and exactly
+    /// two are asked — the third is never reached however promising it looks.
+    /// That bound is what keeps source-widening from becoming a fan-out against
+    /// a fleet whose conductors are already the scarce resource. The invariant
+    /// this replaces asserted a ladder of ONE; the ladder is now `min(alternates,
+    /// evidence_fallback_max_alternates())`, and it must still be a fixed,
+    /// pre-sized walk with no retry and no recursion.
     #[tokio::test]
-    async fn the_fallback_is_bounded_to_one_extra_fetch() {
+    async fn the_fallback_ladder_is_bounded_by_its_budget() {
         let _exclusive = crate::services::advertiser_health::test_exclusive();
         crate::services::advertiser_health::reset();
         use crate::metrics::{AdoptEvidence, AdoptEvidenceFallback};
 
-        let before_budget = evidence_count(AdoptEvidence::BudgetElapsed);
+        let budget = crate::config::evidence_fallback_max_alternates();
+        let before_budget_state = evidence_count(AdoptEvidence::BudgetElapsed);
         let before_degraded = fallback_count(AdoptEvidenceFallback::Degraded);
+        let before_attempted = fallback_count(AdoptEvidenceFallback::Attempted);
 
+        // Every offered alternate is starved EXCEPT the last, which the bound
+        // must keep out of reach — so a widened ladder cannot be mistaken for an
+        // exhaustive one.
         let fetcher = ScriptedFetcher::new(vec![
             (
                 "primary",
                 hash_only_answer(RecordAbsentReason::BudgetElapsed),
             ),
             ("alt-a", hash_only_answer(RecordAbsentReason::BudgetElapsed)),
-            ("alt-b", carrying(b"unreached")),
-            ("alt-c", carrying(b"unreached")),
+            ("alt-b", hash_only_answer(RecordAbsentReason::BudgetElapsed)),
+            ("alt-c", carrying(b"beyond-the-bound")),
         ]);
         let hint = hint_with("primary", &["alt-a", "alt-b", "alt-c"]);
         let (carried, evidence) = resolve_peer_evidence(Some(&fetcher), &hint, "id").await;
 
         assert_eq!(
             fetcher.asked().len(),
-            2,
-            "exactly one fallback fetch, whatever it answers"
+            1 + budget,
+            "the primary plus exactly `evidence_fallback_max_alternates()` couriers — no more, \
+             whatever they answer"
+        );
+        assert!(
+            !fetcher.asked().contains(&"alt-c".to_string()),
+            "the courier past the bound must never be asked, even though it holds the bytes"
         );
         assert!(carried.is_some_and(|c| c.record.is_none()));
         assert_eq!(
             evidence,
             Some(AdoptEvidence::BudgetElapsed),
-            "a failed fallback leaves the PRIMARY's evidence as the resolution — the backoff \
-             class downstream keys on what the advertising peer said"
+            "a fully-failed ladder leaves the PRIMARY's evidence as the resolution — the \
+             backoff class downstream keys on what the advertising peer said, and widening \
+             the probe must not widen that licence"
         );
         assert_eq!(
             evidence_count(AdoptEvidence::BudgetElapsed),
-            before_budget + 1,
-            "still exactly one evidence increment across both attempts"
+            before_budget_state + 1,
+            "still exactly ONE evidence increment across the whole ladder"
         );
         assert_eq!(
             fallback_count(AdoptEvidenceFallback::Degraded),
-            before_degraded + 1
+            before_degraded + 1,
+            "`degraded` stays one per RESOLUTION"
+        );
+        assert_eq!(
+            fallback_count(AdoptEvidenceFallback::Attempted),
+            before_attempted + budget as u64,
+            "`attempted` counts FETCHES, so it is the round-trip denominator"
+        );
+        crate::services::advertiser_health::reset();
+    }
+
+    /// THE FILL-BANDWIDTH CLAIM, which is the whole reason lever 3 exists: an id
+    /// whose SECOND-best courier holds the bytes now converges in this sweep.
+    /// Under the pre-widening single-ask rule this exact shape resolved
+    /// `budget_elapsed`, took a backoff, and waited — with the bytes sitting on a
+    /// peer the sweep had already harvested and simply never asked.
+    #[tokio::test]
+    async fn a_second_alternate_can_still_supply_the_bytes() {
+        let _exclusive = crate::services::advertiser_health::test_exclusive();
+        crate::services::advertiser_health::reset();
+        use crate::metrics::{AdoptEvidence, AdoptEvidenceFallback};
+
+        assert!(
+            crate::config::evidence_fallback_max_alternates() >= 2,
+            "this test asserts the SECOND courier is reached; it is meaningless at breadth < 2"
+        );
+        let before_carried = evidence_count(AdoptEvidence::Carried);
+        let before_fb_carried = fallback_count(AdoptEvidenceFallback::Carried);
+
+        let fetcher = ScriptedFetcher::new(vec![
+            (
+                "primary",
+                hash_only_answer(RecordAbsentReason::BudgetElapsed),
+            ),
+            (
+                "alt-a",
+                hash_only_answer(RecordAbsentReason::ConductorError),
+            ),
+            ("alt-b", carrying(b"record-bytes")),
+        ]);
+        let hint = hint_with("primary", &["alt-a", "alt-b"]);
+        let (carried, evidence) = resolve_peer_evidence(Some(&fetcher), &hint, "id").await;
+
+        assert_eq!(
+            carried.and_then(|c| c.record),
+            Some(b"record-bytes".to_vec()),
+            "the ladder must keep walking past a second starved courier to the one that carries"
+        );
+        assert_eq!(evidence, Some(AdoptEvidence::Carried));
+        assert_eq!(fetcher.asked(), vec!["primary", "alt-a", "alt-b"]);
+        assert_eq!(
+            evidence_count(AdoptEvidence::Carried),
+            before_carried + 1,
+            "one resolution, one evidence increment — the ladder's depth never inflates it"
+        );
+        assert_eq!(
+            fallback_count(AdoptEvidenceFallback::Carried),
+            before_fb_carried + 1,
+            "`carried` is one per RESOLUTION — the ladder stops at the first courier that serves"
         );
         crate::services::advertiser_health::reset();
     }

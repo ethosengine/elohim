@@ -131,6 +131,16 @@ static ADOPT_CONTEST_FANOUT: std::sync::OnceLock<usize> = std::sync::OnceLock::n
 /// Process-wide mirror of [`Config::contest_backoff_seconds`].
 static CONTEST_BACKOFF_SECONDS: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
 
+/// Process-wide mirror of [`Config::heal_resolve_fanout`]. Same `OnceLock`
+/// rationale as [`ADOPT_CONTEST_FANOUT`].
+static HEAL_RESOLVE_FANOUT: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+
+/// Process-wide mirror of [`Config::heal_missing_backoff_seconds`].
+static HEAL_MISSING_BACKOFF_SECONDS: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+
+/// Process-wide mirror of [`Config::evidence_fallback_max_alternates`].
+static EVIDENCE_FALLBACK_MAX_ALTERNATES: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+
 /// Process-wide mirror of [`Config::evidence_absent_backoff_seconds`]. Same
 /// `OnceLock` rationale as [`CONTEST_BACKOFF_SECONDS`] — the reconcile sweep
 /// carries no `Config`, and an env read on the hot path is the parallel-test
@@ -153,6 +163,62 @@ pub fn adopt_contest_fanout() -> usize {
         .get()
         .unwrap_or(&DEFAULT_ADOPT_CONTEST_FANOUT))
     .max(1)
+}
+
+/// Publish the content-heal resolve fan-out for the reconcile sweep. Idempotent.
+pub fn set_heal_resolve_fanout(fanout: usize) {
+    let _ = HEAL_RESOLVE_FANOUT.set(fanout);
+}
+
+/// How many own-conductor head resolves the CONTENT HEAL LEG may have in flight.
+///
+/// The adopt arm got its fan-out in F-B; the heal leg that SUPPLIES it did not,
+/// and remained one conductor round-trip at a time inside a 120s wall clock.
+/// Clamped to at least 1 for the same reason as [`adopt_contest_fanout`]: a zero
+/// would silently turn the leg into a no-op, and `1` is exactly the pre-lever
+/// sequential leg, so this is also the OFF switch.
+pub fn heal_resolve_fanout() -> usize {
+    (*HEAL_RESOLVE_FANOUT
+        .get()
+        .unwrap_or(&DEFAULT_HEAL_RESOLVE_FANOUT))
+    .max(1)
+}
+
+/// Publish the heal-leg conductor-missing backoff window. Idempotent.
+pub fn set_heal_missing_backoff_seconds(seconds: u64) {
+    let _ = HEAL_MISSING_BACKOFF_SECONDS.set(seconds);
+}
+
+/// How long the content heal leg may REPLAY a known `Ok(None)` own-conductor
+/// answer instead of paying for it again (`services::heal_backoff`).
+///
+/// `Duration::ZERO` DISABLES the elision — every pending id pays for a fresh
+/// conductor resolve every sweep, which is byte-for-byte the pre-lever leg.
+pub fn heal_missing_backoff_window() -> std::time::Duration {
+    std::time::Duration::from_secs(
+        *HEAL_MISSING_BACKOFF_SECONDS
+            .get()
+            .unwrap_or(&DEFAULT_HEAL_MISSING_BACKOFF_SECONDS),
+    )
+}
+
+/// Publish the advertiser-diversity breadth for the reconcile sweep. Idempotent.
+pub fn set_evidence_fallback_max_alternates(max: usize) {
+    let _ = EVIDENCE_FALLBACK_MAX_ALTERNATES.set(max);
+}
+
+/// How many ALTERNATE advertisers one adopt-evidence resolution may probe after
+/// the hinted one fails peer-shaped.
+///
+/// Hard-clamped to [`crate::services::head_adoption::ALTERNATE_ADVERTISER_CAP`]
+/// because that is how many the harvest ever retains — a larger value cannot
+/// mean more probes, only a misleading config. `0` restores the single-ask path
+/// exactly (same effect as `evidence_fallback_enabled = false`).
+pub fn evidence_fallback_max_alternates() -> usize {
+    (*EVIDENCE_FALLBACK_MAX_ALTERNATES
+        .get()
+        .unwrap_or(&DEFAULT_EVIDENCE_FALLBACK_MAX_ALTERNATES))
+    .min(crate::services::head_adoption::ALTERNATE_ADVERTISER_CAP)
 }
 
 /// Publish the contest-backoff window for the reconcile sweep. Idempotent.
@@ -230,6 +296,33 @@ pub fn evidence_fallback_enabled() -> bool {
 /// 8 lifts the per-sweep contest supply roughly 8x while keeping the conductor's
 /// instantaneous load hard-bounded and far below its pool.
 pub const DEFAULT_ADOPT_CONTEST_FANOUT: usize = 8;
+
+/// Conservative default fan-out for the CONTENT HEAL LEG's own-conductor
+/// resolves. Deliberately the SAME 8 as [`DEFAULT_ADOPT_CONTEST_FANOUT`]: the
+/// two legs run sequentially within one sweep (heal, then adopt), so 8 is the
+/// node's instantaneous conductor load either way — a number already proven safe
+/// live by the adopt arm rather than a second, differently-guessed one.
+pub const DEFAULT_HEAL_RESOLVE_FANOUT: usize = 8;
+
+/// Default heal-leg conductor-missing replay window: 600s.
+///
+/// Two sweeps at the 300s cadence — deliberately MUCH shorter than the contest
+/// backoff's hour. This window governs how stale a REPLAYED conductor answer may
+/// be, and the answer it replays (`Ok(None)`) is one that the obey/author arms
+/// running later in the SAME tick are actively trying to falsify. Two sweeps
+/// buys most of the round-trips back while keeping the replay close enough to
+/// the truth that a newly-acquired chain is noticed quickly.
+pub const DEFAULT_HEAL_MISSING_BACKOFF_SECONDS: u64 = 600;
+
+/// Default advertiser-diversity breadth: 2 alternates.
+///
+/// Worst case is 3 fetches per evidence resolution (primary + 2), against 2
+/// before this knob existed. Chosen against the live shape: a household mesh
+/// advertising the same genesis-seeded row typically has 2-3 couriers, and the
+/// harvest retains at most [`crate::services::head_adoption::ALTERNATE_ADVERTISER_CAP`]
+/// of them — so 2 reaches most of the plurality that exists while leaving the
+/// third ask for an operator who wants it.
+pub const DEFAULT_EVIDENCE_FALLBACK_MAX_ALTERNATES: usize = 2;
 
 /// Conservative default backoff window: 3600s.
 ///
@@ -517,6 +610,46 @@ pub struct Config {
     #[serde(default = "default_adopt_contest_fanout")]
     pub adopt_contest_fanout: usize,
 
+    /// DRAIN LEVER 1: how many own-conductor head resolves the CONTENT HEAL LEG
+    /// runs CONCURRENTLY.
+    ///
+    /// F-B gave the adopt arm a fan-out and left the leg that FEEDS it strictly
+    /// sequential: `heal_content` awaited one `resolve_content_head_local` at a
+    /// time inside a 120s wall clock, so at the live ~0.75s conductor latency a
+    /// sweep touched ~160 of ~2.9k pending ids. That single number caps BOTH the
+    /// healed rate and the adopt arm's candidate supply, because every candidate
+    /// list the adopt arm consumes is produced by an outcome of this leg.
+    ///
+    /// `1` restores the exact pre-lever sequential leg (the OFF switch). Raise
+    /// with care for the same reason as [`Self::adopt_contest_fanout`]: each
+    /// in-flight resolve is a conductor round-trip, and a saturated conductor is
+    /// the live constraint the whole pacing layer exists for.
+    /// Loaded from env `HEAL_RESOLVE_FANOUT`.
+    #[serde(default = "default_heal_resolve_fanout")]
+    pub heal_resolve_fanout: usize,
+
+    /// DRAIN LEVER 2: how long (seconds) the content heal leg may REPLAY a known
+    /// `Ok(None)` own-conductor answer instead of paying the round-trip again
+    /// (`services::heal_backoff`).
+    ///
+    /// `Ok(None)` is the leg's dominant outcome (live: ~24.9k `missing` per 2h
+    /// fleet-wide) and it is a PREDICTABLE repeat: the conductor holds no chain
+    /// for the id, and nothing this leg does changes that — only the obey/author
+    /// arms downstream can. Replaying it costs nothing and produces exactly the
+    /// same downstream effect (the same ghost candidate, the same adopt
+    /// candidate, the same `mark_failed`), freeing the whole round-trip for ids
+    /// whose answer is not already known.
+    ///
+    /// Never an exclusion and never a terminality claim: the id is still
+    /// enqueued, still probed by the adopt arm's `try_obey_visible_election`
+    /// every sweep, and still re-resolved for real once the window expires.
+    ///
+    /// `0` DISABLES the elision — every pending id pays for a fresh resolve
+    /// every sweep, which is byte-for-byte the pre-lever leg.
+    /// Loaded from env `HEAL_MISSING_BACKOFF_SECONDS`.
+    #[serde(default = "default_heal_missing_backoff_seconds")]
+    pub heal_missing_backoff_seconds: u64,
+
     /// F-B THROUGHPUT LEVER, half 2: how long (seconds) a PREDICTABLE contest
     /// failure holds an id back from re-contesting
     /// (`services::contest_backoff`).
@@ -577,6 +710,27 @@ pub struct Config {
     /// the single-ask path exactly. Loaded from env `ELOHIM_EVIDENCE_FALLBACK`.
     #[serde(default = "default_true")]
     pub evidence_fallback_enabled: bool,
+
+    /// DRAIN LEVER 3: how many ALTERNATE advertisers one adopt-evidence
+    /// resolution may probe after the hinted one fails peer-shaped.
+    ///
+    /// The harvest already retains up to
+    /// [`crate::services::head_adoption::ALTERNATE_ADVERTISER_CAP`] couriers per
+    /// id, but the resolution asked exactly ONE of them and then gave up for the
+    /// sweep — so two thirds of the plurality the sweep had already paid to
+    /// collect were never used. Widening the probe raises the FILL bandwidth per
+    /// gap id directly: an id converges the moment any one courier serves the
+    /// bytes, and on a mesh where advertiser health is uneven the second-best
+    /// courier is often the one that can.
+    ///
+    /// Hard-clamped to `ALTERNATE_ADVERTISER_CAP` (a larger value cannot mean
+    /// more probes). `0` restores the single-ask path exactly, as does
+    /// [`Self::evidence_fallback_enabled`] = false. Bounded and loop-free by
+    /// construction: at most `1 + N` fetches per resolution, and the sweep's own
+    /// 200/tick + 120s budget stays authoritative over all of it.
+    /// Loaded from env `ELOHIM_EVIDENCE_FALLBACK_MAX_ALTERNATES`.
+    #[serde(default = "default_evidence_fallback_max_alternates")]
+    pub evidence_fallback_max_alternates: usize,
 
     /// Demand-driven auto-pin: when a local content read MISSES (a client asked
     /// this node for content it does not have), author an `item` DevicePin for
@@ -710,6 +864,18 @@ fn default_contest_backoff_seconds() -> u64 {
     DEFAULT_CONTEST_BACKOFF_SECONDS
 }
 
+fn default_heal_resolve_fanout() -> usize {
+    DEFAULT_HEAL_RESOLVE_FANOUT
+}
+
+fn default_heal_missing_backoff_seconds() -> u64 {
+    DEFAULT_HEAL_MISSING_BACKOFF_SECONDS
+}
+
+fn default_evidence_fallback_max_alternates() -> usize {
+    DEFAULT_EVIDENCE_FALLBACK_MAX_ALTERNATES
+}
+
 fn default_evidence_absent_backoff_seconds() -> u64 {
     DEFAULT_EVIDENCE_ABSENT_BACKOFF_SECONDS
 }
@@ -777,9 +943,12 @@ impl Default for Config {
             contest_two_way_declared: default_true(),
             adopt_before_author: false,
             adopt_contest_fanout: default_adopt_contest_fanout(),
+            heal_resolve_fanout: default_heal_resolve_fanout(),
+            heal_missing_backoff_seconds: default_heal_missing_backoff_seconds(),
             contest_backoff_seconds: default_contest_backoff_seconds(),
             evidence_absent_backoff_seconds: default_evidence_absent_backoff_seconds(),
             evidence_fallback_enabled: default_true(),
+            evidence_fallback_max_alternates: default_evidence_fallback_max_alternates(),
             demand_autopin_enabled: default_true(),
             demand_autopin_throttle_seconds: default_demand_autopin_throttle_seconds(),
             manifest_backfill_enabled: default_true(),
