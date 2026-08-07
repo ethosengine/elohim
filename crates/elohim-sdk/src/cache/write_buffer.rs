@@ -13,20 +13,17 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 /// Write operation priority levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 pub enum WritePriority {
     /// High priority - identity/auth operations, flush immediately
     High = 0,
     /// Normal priority - regular content, moderate batching
+    #[default]
     Normal = 1,
     /// Bulk priority - seeding/recovery, aggressive batching
     Bulk = 2,
-}
-
-impl Default for WritePriority {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 /// A single write operation in the buffer
@@ -232,9 +229,17 @@ impl WriteBuffer {
         let mut batch = Vec::new();
 
         // Process by priority: High, Normal, Bulk
-        for priority in [WritePriority::High, WritePriority::Normal, WritePriority::Bulk] {
+        for priority in [
+            WritePriority::High,
+            WritePriority::Normal,
+            WritePriority::Bulk,
+        ] {
             if let Some(queue) = queues.get_mut(&priority) {
-                let keys: Vec<String> = queue.keys().take(self.config.batch_size - batch.len()).cloned().collect();
+                let keys: Vec<String> = queue
+                    .keys()
+                    .take(self.config.batch_size - batch.len())
+                    .cloned()
+                    .collect();
                 for key in keys {
                     if let Some(op) = queue.remove(&key) {
                         batch.push(op);
@@ -274,19 +279,25 @@ mod tests {
     async fn test_queue_and_take() {
         let buffer = WriteBuffer::new(WriteBufferConfig::default());
 
-        buffer.queue(WriteOp::new(
-            "content",
-            "id1",
-            serde_json::json!({"title": "Test 1"}),
-            WritePriority::Normal,
-        )).await.unwrap();
+        buffer
+            .queue(WriteOp::new(
+                "content",
+                "id1",
+                serde_json::json!({"title": "Test 1"}),
+                WritePriority::Normal,
+            ))
+            .await
+            .unwrap();
 
-        buffer.queue(WriteOp::new(
-            "content",
-            "id2",
-            serde_json::json!({"title": "Test 2"}),
-            WritePriority::High,
-        )).await.unwrap();
+        buffer
+            .queue(WriteOp::new(
+                "content",
+                "id2",
+                serde_json::json!({"title": "Test 2"}),
+                WritePriority::High,
+            ))
+            .await
+            .unwrap();
 
         let batch = buffer.take_batch().await;
         assert_eq!(batch.len(), 2);
@@ -299,19 +310,25 @@ mod tests {
     async fn test_deduplication() {
         let buffer = WriteBuffer::new(WriteBufferConfig::default());
 
-        buffer.queue(WriteOp::new(
-            "content",
-            "id1",
-            serde_json::json!({"title": "Version 1"}),
-            WritePriority::Normal,
-        )).await.unwrap();
+        buffer
+            .queue(WriteOp::new(
+                "content",
+                "id1",
+                serde_json::json!({"title": "Version 1"}),
+                WritePriority::Normal,
+            ))
+            .await
+            .unwrap();
 
-        buffer.queue(WriteOp::new(
-            "content",
-            "id1",
-            serde_json::json!({"title": "Version 2"}),
-            WritePriority::Normal,
-        )).await.unwrap();
+        buffer
+            .queue(WriteOp::new(
+                "content",
+                "id1",
+                serde_json::json!({"title": "Version 2"}),
+                WritePriority::Normal,
+            ))
+            .await
+            .unwrap();
 
         let batch = buffer.take_batch().await;
         assert_eq!(batch.len(), 1);
@@ -327,12 +344,15 @@ mod tests {
         });
 
         for i in 0..5 {
-            buffer.queue(WriteOp::new(
-                "content",
-                format!("id{}", i),
-                serde_json::json!({}),
-                WritePriority::Normal,
-            )).await.unwrap();
+            buffer
+                .queue(WriteOp::new(
+                    "content",
+                    format!("id{}", i),
+                    serde_json::json!({}),
+                    WritePriority::Normal,
+                ))
+                .await
+                .unwrap();
         }
 
         assert_eq!(buffer.backpressure().await, 50);

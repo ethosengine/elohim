@@ -158,7 +158,8 @@ impl AutomergeSync {
 
         // 4. Update known heads
         let new_heads = self.get_heads(&updated_doc);
-        self.known_heads.insert(doc_id.to_string(), new_heads.clone());
+        self.known_heads
+            .insert(doc_id.to_string(), new_heads.clone());
 
         Ok(SyncResult {
             doc: updated_doc,

@@ -8,5 +8,5 @@
 mod content_client;
 mod projection_warmer;
 
-pub use content_client::{ContentClient, ClientMode};
+pub use content_client::{ClientMode, ContentClient};
 pub use projection_warmer::ProjectionWarmer;

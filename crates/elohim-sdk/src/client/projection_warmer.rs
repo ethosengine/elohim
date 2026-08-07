@@ -92,7 +92,10 @@ impl ProjectionWarmer {
     }
 
     /// Warm multiple content items
-    pub async fn warm_batch<T: ContentReadable>(&self, contents: &[T]) -> Result<Vec<WarmResponse>> {
+    pub async fn warm_batch<T: ContentReadable>(
+        &self,
+        contents: &[T],
+    ) -> Result<Vec<WarmResponse>> {
         let mut responses = Vec::new();
 
         for content in contents {

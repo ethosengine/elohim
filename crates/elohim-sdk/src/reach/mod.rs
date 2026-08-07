@@ -13,10 +13,13 @@ use serde::{Deserialize, Serialize};
 ///
 /// Higher numeric values = more restricted access.
 /// Content at level N is accessible to requesters with reach level >= N.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum ReachLevel {
     /// Public commons - accessible to all (lowest barrier)
+    #[default]
     Commons = 0,
     /// Regional level
     Regional = 1,
@@ -35,21 +38,6 @@ pub enum ReachLevel {
 }
 
 impl ReachLevel {
-    /// Parse from string representation
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "private" => Some(Self::Private),
-            "invited" => Some(Self::Invited),
-            "local" => Some(Self::Local),
-            "neighborhood" => Some(Self::Neighborhood),
-            "municipal" => Some(Self::Municipal),
-            "bioregional" => Some(Self::Bioregional),
-            "regional" => Some(Self::Regional),
-            "commons" | "public" => Some(Self::Commons),
-            _ => None,
-        }
-    }
-
     /// Convert to string representation
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -75,17 +63,42 @@ impl ReachLevel {
     }
 }
 
-impl Default for ReachLevel {
-    fn default() -> Self {
-        Self::Commons
-    }
-}
-
 impl std::fmt::Display for ReachLevel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_str())
     }
 }
+
+impl std::str::FromStr for ReachLevel {
+    type Err = ParseReachLevelError;
+
+    /// Parse from string representation
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "private" => Ok(Self::Private),
+            "invited" => Ok(Self::Invited),
+            "local" => Ok(Self::Local),
+            "neighborhood" => Ok(Self::Neighborhood),
+            "municipal" => Ok(Self::Municipal),
+            "bioregional" => Ok(Self::Bioregional),
+            "regional" => Ok(Self::Regional),
+            "commons" | "public" => Ok(Self::Commons),
+            _ => Err(ParseReachLevelError(s.to_string())),
+        }
+    }
+}
+
+/// Error returned when a string does not match any [`ReachLevel`] variant.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseReachLevelError(String);
+
+impl std::fmt::Display for ParseReachLevelError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "unrecognized reach level: {:?}", self.0)
+    }
+}
+
+impl std::error::Error for ParseReachLevelError {}
 
 /// Enforces reach-based access control.
 ///

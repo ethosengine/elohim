@@ -100,23 +100,19 @@ pub use traits::{ContentReadable, ContentWriteable};
 
 // Re-export client types
 #[cfg(feature = "client")]
-pub use client::{ContentClient, ClientMode};
+pub use client::{ClientMode, ContentClient};
 
 // Re-export cache types
-pub use cache::{WriteBuffer, WritePriority, WriteOp};
+pub use cache::{WriteBuffer, WriteOp, WritePriority};
 
 // Re-export reach types
-pub use reach::{ReachLevel, ReachEnforcer};
+pub use reach::{ParseReachLevelError, ReachEnforcer, ReachLevel};
 
 // Re-export error types
-pub use error::{SdkError, Result};
+pub use error::{Result, SdkError};
 
 // Re-export from underlying crates
-pub use doorway_client::{
-    Cacheable, CacheSignal, CacheSignalType, CacheRule, CacheRuleBuilder,
-};
+pub use doorway_client::{CacheRule, CacheRuleBuilder, CacheSignal, CacheSignalType, Cacheable};
 
 #[cfg(feature = "client")]
-pub use elohim_storage_client::{
-    StorageClient, StorageConfig, AutomergeSync, SyncResult,
-};
+pub use elohim_storage_client::{AutomergeSync, StorageClient, StorageConfig, SyncResult};

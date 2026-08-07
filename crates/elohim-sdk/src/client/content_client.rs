@@ -131,14 +131,17 @@ impl ContentClient {
         let app_id = app_id.into();
 
         let storage = match &mode {
-            ClientMode::Native { sync_url: Some(url), .. } |
-            ClientMode::Node { storage_url: url, .. } => {
-                Some(StorageClient::new(StorageConfig {
-                    base_url: url.clone(),
-                    app_id: app_id.clone(),
-                    ..Default::default()
-                }))
+            ClientMode::Native {
+                sync_url: Some(url),
+                ..
             }
+            | ClientMode::Node {
+                storage_url: url, ..
+            } => Some(StorageClient::new(StorageConfig {
+                base_url: url.clone(),
+                app_id: app_id.clone(),
+                ..Default::default()
+            })),
             _ => None,
         };
 
@@ -203,17 +206,26 @@ impl ContentClient {
     /// - Native/Node: GET {storage}/db/{type}/{id}
     pub async fn get<T: ContentReadable>(&self, id: &str) -> Result<Option<T>> {
         match &self.mode {
-            ClientMode::Browser { doorway_url, api_key } => {
-                self.get_from_projection::<T>(doorway_url, api_key.as_deref(), id).await
+            ClientMode::Browser {
+                doorway_url,
+                api_key,
+            } => {
+                self.get_from_projection::<T>(doorway_url, api_key.as_deref(), id)
+                    .await
             }
-            ClientMode::Native { sync_url: Some(url), .. } |
-            ClientMode::Node { storage_url: url, .. } => {
-                self.get_from_storage::<T>(url, id).await
+            ClientMode::Native {
+                sync_url: Some(url),
+                ..
             }
+            | ClientMode::Node {
+                storage_url: url, ..
+            } => self.get_from_storage::<T>(url, id).await,
             ClientMode::Native { sync_url: None, .. } => {
                 // Native without sync URL - can only read from local cache
                 // TODO: Implement local SQLite read
-                Err(SdkError::InvalidMode("Native mode without sync_url cannot fetch remote content".into()))
+                Err(SdkError::InvalidMode(
+                    "Native mode without sync_url cannot fetch remote content".into(),
+                ))
             }
         }
     }
@@ -272,13 +284,20 @@ impl ContentClient {
         }
 
         match &self.mode {
-            ClientMode::Browser { doorway_url, api_key } => {
-                self.flush_to_projection(doorway_url, api_key.as_deref(), &batch).await
+            ClientMode::Browser {
+                doorway_url,
+                api_key,
+            } => {
+                self.flush_to_projection(doorway_url, api_key.as_deref(), &batch)
+                    .await
             }
-            ClientMode::Native { sync_url: Some(url), .. } |
-            ClientMode::Node { storage_url: url, .. } => {
-                self.flush_to_storage(url, &batch).await
+            ClientMode::Native {
+                sync_url: Some(url),
+                ..
             }
+            | ClientMode::Node {
+                storage_url: url, ..
+            } => self.flush_to_storage(url, &batch).await,
             ClientMode::Native { sync_url: None, .. } => {
                 // TODO: Local-only flush to SQLite
                 tracing::warn!("Flush to local-only native mode not yet implemented");
@@ -385,18 +404,19 @@ impl ContentClient {
             if !response.status().is_success() {
                 let status = response.status().as_u16();
                 let body = response.text().await.unwrap_or_default();
-                tracing::error!("Failed to flush {} items to projection: HTTP {} - {}", ops.len(), status, body);
+                tracing::error!(
+                    "Failed to flush {} items to projection: HTTP {} - {}",
+                    ops.len(),
+                    status,
+                    body
+                );
             }
         }
 
         Ok(())
     }
 
-    async fn flush_to_storage(
-        &self,
-        storage_url: &str,
-        batch: &[WriteOp],
-    ) -> Result<()> {
+    async fn flush_to_storage(&self, storage_url: &str, batch: &[WriteOp]) -> Result<()> {
         // Group by content type
         let mut by_type: HashMap<&str, Vec<&WriteOp>> = HashMap::new();
         for op in batch {
@@ -412,7 +432,12 @@ impl ContentClient {
             if !response.status().is_success() {
                 let status = response.status().as_u16();
                 let body = response.text().await.unwrap_or_default();
-                tracing::error!("Failed to flush {} items to storage: HTTP {} - {}", ops.len(), status, body);
+                tracing::error!(
+                    "Failed to flush {} items to storage: HTTP {} - {}",
+                    ops.len(),
+                    status,
+                    body
+                );
             }
         }
 

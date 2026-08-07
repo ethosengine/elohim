@@ -246,10 +246,7 @@ impl StorageClient {
 
     /// List content with optional filters
     pub async fn list_content(&self, options: ContentListOptions) -> Result<ContentListResponse> {
-        let mut url = format!(
-            "{}/db/{}/content",
-            self.config.base_url, self.config.app_id
-        );
+        let mut url = format!("{}/db/{}/content", self.config.base_url, self.config.app_id);
 
         let mut params = Vec::new();
         if let Some(ref ct) = options.content_type {
@@ -294,10 +291,7 @@ impl StorageClient {
 
     /// Create a new content item
     pub async fn create_content(&self, input: CreateContentInput) -> Result<Content> {
-        let url = format!(
-            "{}/db/{}/content",
-            self.config.base_url, self.config.app_id
-        );
+        let url = format!("{}/db/{}/content", self.config.base_url, self.config.app_id);
 
         let response = self
             .client
@@ -345,7 +339,10 @@ impl StorageClient {
         if !response.status().is_success() {
             let status = response.status().as_u16();
             let body = response.text().await.unwrap_or_default();
-            return Err(StorageError::Server { status, message: body });
+            return Err(StorageError::Server {
+                status,
+                message: body,
+            });
         }
         Ok(true)
     }
@@ -372,10 +369,7 @@ impl StorageClient {
 
     /// List paths with pagination
     pub async fn list_paths(&self, options: PathListOptions) -> Result<PathListResponse> {
-        let mut url = format!(
-            "{}/db/{}/paths",
-            self.config.base_url, self.config.app_id
-        );
+        let mut url = format!("{}/db/{}/paths", self.config.base_url, self.config.app_id);
 
         let mut params = Vec::new();
         if options.limit != 100 {
@@ -421,10 +415,7 @@ impl StorageClient {
 
     /// Create a new path with chapters and steps
     pub async fn create_path(&self, input: CreatePathInput) -> Result<PathWithDetails> {
-        let url = format!(
-            "{}/db/{}/paths",
-            self.config.base_url, self.config.app_id
-        );
+        let url = format!("{}/db/{}/paths", self.config.base_url, self.config.app_id);
 
         let response = self
             .client
@@ -454,7 +445,10 @@ impl StorageClient {
         if !response.status().is_success() {
             let status = response.status().as_u16();
             let body = response.text().await.unwrap_or_default();
-            return Err(StorageError::Server { status, message: body });
+            return Err(StorageError::Server {
+                status,
+                message: body,
+            });
         }
         Ok(true)
     }
@@ -463,10 +457,7 @@ impl StorageClient {
 
     /// Get database statistics for this app
     pub async fn get_db_stats(&self) -> Result<DbStats> {
-        let url = format!(
-            "{}/db/{}/stats",
-            self.config.base_url, self.config.app_id
-        );
+        let url = format!("{}/db/{}/stats", self.config.base_url, self.config.app_id);
 
         let response = self.client.get(&url).send().await?;
         self.handle_response(response).await

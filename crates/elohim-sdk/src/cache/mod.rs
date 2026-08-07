@@ -5,4 +5,4 @@
 
 mod write_buffer;
 
-pub use write_buffer::{WriteBuffer, WriteBufferConfig, WritePriority, WriteOp, WriteResult};
+pub use write_buffer::{WriteBuffer, WriteBufferConfig, WriteOp, WritePriority, WriteResult};

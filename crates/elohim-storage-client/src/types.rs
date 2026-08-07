@@ -202,9 +202,15 @@ pub struct CreateContentInput {
     pub tags: Vec<String>,
 }
 
-fn default_content_type() -> String { "concept".to_string() }
-fn default_content_format() -> String { "markdown".to_string() }
-fn default_reach() -> String { "public".to_string() }
+fn default_content_type() -> String {
+    "concept".to_string()
+}
+fn default_content_format() -> String {
+    "markdown".to_string()
+}
+fn default_reach() -> String {
+    "public".to_string()
+}
 
 /// Options for listing content
 #[derive(Debug, Clone, Default, Serialize)]
@@ -224,8 +230,10 @@ pub struct ContentListOptions {
     pub offset: u32,
 }
 
-#[allow(dead_code)]  // Used by serde default
-fn default_limit() -> u32 { 100 }
+#[allow(dead_code)] // Used by serde default
+fn default_limit() -> u32 {
+    100
+}
 
 /// Response from list content
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -339,8 +347,12 @@ pub struct CreatePathInput {
     pub chapters: Vec<CreateChapterInput>,
 }
 
-fn default_path_type() -> String { "guided".to_string() }
-fn default_visibility() -> String { "public".to_string() }
+fn default_path_type() -> String {
+    "guided".to_string()
+}
+fn default_visibility() -> String {
+    "public".to_string()
+}
 
 /// Input for creating a chapter
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -378,7 +390,9 @@ pub struct CreateStepInput {
     pub metadata_json: Option<String>,
 }
 
-fn default_step_type() -> String { "learn".to_string() }
+fn default_step_type() -> String {
+    "learn".to_string()
+}
 
 /// Options for listing paths
 #[derive(Debug, Clone, Default, Serialize)]

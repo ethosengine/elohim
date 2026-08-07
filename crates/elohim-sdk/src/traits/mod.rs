@@ -5,4 +5,4 @@
 
 mod content;
 
-pub use content::{ContentReadable, ContentWriteable, ContentQuery};
+pub use content::{ContentQuery, ContentReadable, ContentWriteable};
