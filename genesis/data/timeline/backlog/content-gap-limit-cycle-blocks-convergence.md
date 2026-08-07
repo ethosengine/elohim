@@ -292,6 +292,18 @@ throughput fan-out + known-no-chain backoff + peer-probe source widening (the
 `rea-stream-no-divergence-adjudication-drain-path`), attacking the 0-1/sweep healed
 rate directly.
 
+**Post-review watch item (independent review of `da752307f`, same session):** the
+interaction of the pre-existing adopt fan-out (8) with the widened alternates ladder
+(now up to 3, was 1) raises worst-case concurrent fetches against a small courier
+pool from ~16 to ~32 (all 8 resolutions simultaneously mid-ladder). Bounded — each
+fetch capped at 5s (F-A(i)), ladder sequential per resolution, first-Carried
+short-circuit — but it is a real amplification of per-courier pressure on 2-3-courier
+household meshes, exactly the F-A "loaded responder" shape. Watch
+`adopt_evidence_fallback{attempted}` vs `{carried}` alongside per-peer conductor
+latency in the first post-deploy hour; if attempted climbs while carried stays flat
+and responder latency rises, halve `ELOHIM_EVIDENCE_FALLBACK_MAX_ALTERNATES` before
+touching the fan-out.
+
 ### Sprint delta (2026-08-07, same session) — the levers landed one layer down
 
 The three named levers were re-scoped on contact with the code: **F-B's fan-out and
