@@ -105,6 +105,13 @@ habits:
       exhaustion (name-collision trap disproved twice, tests pin it in
       reconcile_rails.rs). Saga recorded state still 8/11 — measurement stays
       gated behind the plateau by design.
+      2026-08-07 gate decision (integrator): fleet-quiesce-gate re-pointed from
+      perfect (converged==1) to QUIESCED (caughtUp && blocked_by
+      divergent_actionable==0 && unmeasured==0, sustained; fail-closed on absent
+      series; 5-case fixture proof local) — measurement unblocks next deploy;
+      converged stays honest telemetry; plateau drains under
+      backlog/content-gap-limit-cycle-blocks-convergence (F-B fan-out + peer-probe
+      source widening = next sprint objective).
 
   - id: blob-durability
     invariant: >

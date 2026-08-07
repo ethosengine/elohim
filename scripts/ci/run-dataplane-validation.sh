@@ -66,8 +66,11 @@ mkdir -p "${REPORTS_DIR}"
 # Fleet-quiesce gate (2026-08-01, edge #1280 RCA): a deploy restarts the whole
 # fleet and the reconcile catch-up can run hours; measuring mid-churn records a
 # false red the ledger sync can read as a regression. The gate polls until the
-# fleet is calm (pull.caughtUp both sides, converged==1 on A sustained across a
-# fresh sweep, both doorways serving content 200) or the deadline lapses — on
+# fleet is calm (pull.caughtUp on A, QUIESCED on A — blocked_by
+# divergent_actionable==0 and unmeasured==0, per the 2026-08-07 decision in
+# the content-gap-limit-cycle backlog doc; converged==1 is telemetry, not the
+# gate — sustained across a fresh sweep, both doorways serving content 200)
+# or the deadline lapses — on
 # deadline we exit 3 ("did not measure", same idiom as the zero-scenario guard
 # below) BEFORE any cucumber run, so no sprint-report exists for a churn window.
 # Lives here, not in the Jenkinsfile stage, per the CPS extraction note above

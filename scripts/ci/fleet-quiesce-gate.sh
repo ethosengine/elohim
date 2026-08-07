@@ -41,18 +41,30 @@
 #      window) — gating on it would wedge the pipeline forever, and the
 #      saga asserts nothing about B's pull. B's gating legs are serving
 #      (content 200) only.
-#   3. storage-A /metrics: elohim_projection_reconcile_converged == 1,
-#      matched by an EXACT metric-name boundary (name followed by whitespace
-#      or '{'), never a bare prefix/startswith match — a startswith check
-#      would also match e.g. elohim_projection_reconcile_converged_total.
+#   3. storage-A /metrics: QUIESCED, not perfect (decision 2026-08-07, see
+#      genesis/data/timeline/backlog/content-gap-limit-cycle-blocks-convergence.md):
+#        elohim_projection_reconcile_converged_blocked_by{term="divergent_actionable"} == 0
+#        AND ...{term="unmeasured"} == 0
+#      i.e. the sweep MEASURED and no unadjudicated divergence is outstanding.
+#      The pending/failed terms (the content-gap drain backlog) deliberately
+#      do NOT gate: with a ~2.9k-gap plateau healing 0-1/sweep, converged==1
+#      is unreachable inside any gate deadline — gating on it turned this
+#      churn gate into an indefinite measurement embargo. converged itself
+#      stays honest and is still read + printed as telemetry; the plateau
+#      remains a named red draining under its own workstream. Both series are
+#      matched with an EXACT metric-name boundary (name followed by
+#      whitespace or '{'), never a bare prefix/startswith match. If the
+#      blocked_by series is ABSENT (pre-honesty-floor image), the gate fails
+#      closed and keeps waiting — absence of evidence is not quiescence.
 #   4. doorway-A and doorway-B GET /db/content/<content-id> both return 200
 #      (a 503 catching-up response is NOT a pass — keep waiting)
 #
-# Scope note: converged is required on storage-A ONLY. The saga's honesty
-# fence binds "converged" to alpha-A (the genesis/primary peer this incident
-# class is measured against); requiring it fleet-wide would over-gate B for
-# a property the saga never asserts of B. B's legs here are "serving" (200
-# on content) and "caught up" (pull.caughtUp) — not "converged".
+# Scope note: the quiesced predicate is required on storage-A ONLY. The
+# saga's honesty fence binds convergence measurement to alpha-A (the
+# genesis/primary peer this incident class is measured against); requiring
+# it fleet-wide would over-gate B for a property the saga never asserts of
+# B. B's legs here are "serving" (200 on content) and "caught up"
+# (pull.caughtUp) — not "converged".
 #
 # Scope note: this gate does NOT require divergent>=1. That honesty fence
 # (proving the saga actually observed real divergence before healing it)
@@ -167,16 +179,45 @@ def metric_value(text, name):
                 best = float(m.group(1))
     return best
 
+def labeled_metric_value(text, name, label, value):
+    # Same exact-boundary discipline as metric_value, but for one labeled
+    # series: `name{...label="value"...} <n>`. Returns None when the series
+    # is absent — callers treat None as fail-closed (absence of the
+    # honesty-floor gauge is not quiescence).
+    pat = re.compile(
+        r'^' + re.escape(name) + r'\{[^}]*'
+        + re.escape(label) + r'="' + re.escape(value) + r'"[^}]*\}'
+    )
+    best = None
+    for line in text.splitlines():
+        if not line or line.startswith('#'):
+            continue
+        if pat.match(line):
+            m = re.search(r'(-?\d+(?:\.\d+)?)\s*$', line)
+            if m:
+                best = float(m.group(1))
+    return best
+
 a_caught_up = caught_up(os.environ.get("STATUS_A", ""))
 b_caught_up = caught_up(os.environ.get("STATUS_B", ""))
 metrics_a = os.environ.get("METRICS_A", "")
 converged = metric_value(metrics_a, "elohim_projection_reconcile_converged")
 sweeps = metric_value(metrics_a, "elohim_projection_reconcile_sweeps_total")
-converged_ok = converged is not None and converged == 1
+# QUIESCED predicate (2026-08-07 decision — see header note 3): measured
+# sweep + zero actionable divergence. pending/failed deliberately not gating.
+BLOCKED_BY = "elohim_projection_reconcile_converged_blocked_by"
+actionable = labeled_metric_value(metrics_a, BLOCKED_BY, "term", "divergent_actionable")
+unmeasured = labeled_metric_value(metrics_a, BLOCKED_BY, "term", "unmeasured")
+quiesced_ok = (
+    actionable is not None and actionable == 0
+    and unmeasured is not None and unmeasured == 0
+)
 
 print(f"A_CAUGHT_UP={a_caught_up}")
 print(f"B_CAUGHT_UP={b_caught_up}")
-print(f"CONVERGED_OK={converged_ok}")
+print(f"QUIESCED_OK={quiesced_ok}")
+print(f"ACTIONABLE={actionable}")
+print(f"UNMEASURED={unmeasured}")
 print(f"CONVERGED={converged}")
 print(f"SWEEPS={sweeps}")
 PYEOF
@@ -184,7 +225,9 @@ PYEOF
 
   a_caught_up=$(printf '%s\n' "$parsed" | sed -n 's/^A_CAUGHT_UP=//p')
   b_caught_up=$(printf '%s\n' "$parsed" | sed -n 's/^B_CAUGHT_UP=//p')
-  converged_ok=$(printf '%s\n' "$parsed" | sed -n 's/^CONVERGED_OK=//p')
+  quiesced_ok=$(printf '%s\n' "$parsed" | sed -n 's/^QUIESCED_OK=//p')
+  actionable=$(printf '%s\n' "$parsed" | sed -n 's/^ACTIONABLE=//p')
+  unmeasured=$(printf '%s\n' "$parsed" | sed -n 's/^UNMEASURED=//p')
   converged=$(printf '%s\n' "$parsed" | sed -n 's/^CONVERGED=//p')
   sweeps=$(printf '%s\n' "$parsed" | sed -n 's/^SWEEPS=//p')
 
@@ -193,7 +236,9 @@ PYEOF
   [ "$a_caught_up" = "True" ] || { pass=0; reasons+=("A-not-caughtUp"); }
   # B-caughtUp deliberately NOT gating (empty-queue-by-design reads false;
   # see header note 2) — still printed in the summary for telemetry.
-  [ "$converged_ok" = "True" ] || { pass=0; reasons+=("A-not-converged(${converged:-null})"); }
+  # Quiesced, not perfect (header note 3): actionable==0 AND unmeasured==0,
+  # fail-closed on an absent blocked_by series. converged is telemetry only.
+  [ "$quiesced_ok" = "True" ] || { pass=0; reasons+=("A-not-quiesced(actionable=${actionable:-null},unmeasured=${unmeasured:-null})"); }
   [ "$code_a" = "200" ] || { pass=0; reasons+=("A-content-${code_a}"); }
   [ "$code_b" = "200" ] || { pass=0; reasons+=("B-content-${code_b}"); }
   # The sustain proof needs a numeric sweeps_total reading even though the
@@ -204,7 +249,7 @@ PYEOF
     reasons+=("A-sweeps-metric-missing")
   fi
 
-  summary="A-caughtUp=${a_caught_up:-?} B-caughtUp=${b_caught_up:-?} A-converged=${converged_ok:-?}(${converged:-null}) A-content=${code_a} B-content=${code_b} sweeps=${sweeps:-null}"
+  summary="A-caughtUp=${a_caught_up:-?} B-caughtUp=${b_caught_up:-?} A-quiesced=${quiesced_ok:-?}(actionable=${actionable:-null},unmeasured=${unmeasured:-null}) A-converged=${converged:-null} A-content=${code_a} B-content=${code_b} sweeps=${sweeps:-null}"
 
   if [ "$pass" -eq 1 ]; then
     if [ -z "$anchor_ts" ]; then

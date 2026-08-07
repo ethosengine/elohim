@@ -269,6 +269,29 @@ guarantee (no outstanding actionable divergence, not zero outstanding gap-fill w
 This is a decision only the operator can make (it trades gate strictness for gate
 liveness); it is not resolved by this note.
 
+## 2026-08-07 — DECIDED: quiesced (integrator ruling, same session)
+
+The gate is re-pointed at **quiesced**: `pull.caughtUp` on A AND
+`elohim_projection_reconcile_converged_blocked_by{term="divergent_actionable"} == 0`
+AND `…{term="unmeasured"} == 0`, sustained across an advancing sweep — implemented in
+`scripts/ci/fleet-quiesce-gate.sh` (fail-closed when the blocked_by series is absent,
+i.e. a pre-honesty-floor image can never pass). Rationale: the gate's charter is
+churn detection ("does a measurement mean anything?"), not drain completion; with
+pending ~2.9k healing 0-1/sweep, `converged==1` cannot be reached inside any gate
+deadline, so the perfect predicate had become an indefinite measurement embargo on
+ch04/ch06/ch11. Honesty is not traded away: `converged` remains published, honest,
+and printed by the gate as telemetry; the blocked_by gauge names the pinning term
+from the fleet; this doc remains the named red until the plateau drains. The
+`pending`/`failed` terms deliberately do not gate. Verified locally with a 5-case
+fixture harness (plateau-doesn't-block / actionable-blocks / unmeasured-blocks /
+absent-series-fail-closed / exact-name-boundary).
+
+Sprint objective set the same session: the gap-plateau drain — F-B adoption/contest
+throughput fan-out + known-no-chain backoff + peer-probe source widening (the
+`PeerHeadRecordFetcher`/`alternates` direction shared with
+`rea-stream-no-divergence-adjudication-drain-path`), attacking the 0-1/sweep healed
+rate directly.
+
 **Bandwidth note:** the peer-probe/more-sources direction adopted for the MissLedger
 and REA adjudication drain paths (`Answer::Absent`-graduated adjudication via
 `PeerHeadRecordFetcher`, `PeerHeadHint.alternates` cap 3 — see
