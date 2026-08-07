@@ -101,6 +101,33 @@ Mechanism narrowed to H2 — publish attempted, failing below the log floor:
   `kitsune2_core=debug,kitsune2_bootstrap_client=debug` (template + adam yaml, marked
   temporary) — next deploy names the PUT failure or proves no attempt fires.
 
+### 2026-08-07 ~04:15Z hoot-owl addendum — instrument live, mechanism narrowed past H2
+
+The kitsune2 debug instrument deployed (edge #1314) and REFUTES simple-H2: with
+`blocking_put_auth` logging "Putting agent info to bootstrap server" unconditionally at
+ENTRY (before any network I/O), zero such lines exist — so the PUT is never attempted at
+the client layer, not attempted-and-swallowed. GET polls are chatty per space; per-space
+`do_insert_relay` fires each boot. Every logged branch of the join-callback chain is
+silent: no "Not updating agent info" (no-URL branch), no "failed to sign agent info", no
+peer-store insert failure, no "Bootstrap overloaded". Code audit of the full chain is
+clean (fork BootWrap::put forwards; register_cb/invoke_cb correct; core_space callback
+logs both branches). Conclusion: the spawned join-callback task stalls silently before
+its first branch. Candidate mechanisms (log-indistinguishable):
+(a) CoreSpace.inner RwLock read parked forever (write-holder wedged — new_url ×
+    iroh-transport synchronous new_listening_address interplay);
+(b) MetaLairClient::sign() hang without timeout (sign-warn fires only on Err, never on
+    hang; serving traffic does NOT falsify this — zome reads skip conductor-lair and
+    doorway zome calls sign storage-side).
+Discriminators (ceiling): entry-log in the fork's join callback (push to
+ethosengine/holochain elohim-0.6.3, operator-gated) or stack-dump/tokio-console on a
+live pod (operator kubectl).
+
+Evidence-hygiene correction: the overnight "peer-store FAIL total=0 addressed=0" reads
+are UNTRUSTWORTHY — /db/p2p/conductor-diagnostics 404s through the doorway (doorway's
+own not_found_response despite is_diagnostic_probe listing the path), and the seam-smoke
+parser renders that 404 as "0 0". The reliable partition signals remain: doorway
+access-log PUT absence, bootstrap-coherence agents=0, zero P2P connections.
+
 Delivery path (confirmed against the build machinery): the iroh anchor is a binary-swap
 wrapper (elohim-storage:dev-latest + fork conductor bin; che-devworkspaces
 Jenkinsfile-elohim-edgenode). Sequence: (1) client fix → dev `[build:edge]` (refreshes
