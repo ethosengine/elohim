@@ -15,6 +15,7 @@ cites:
   - genesis/research/holepunch-p2p-dataplane-cross-pollination-2026-06-24.md
   - genesis/research/p2panda-cross-pollination-2026-08-04.md
   - elohim/elohim-storage/src/services/private_replica.rs
+  - genesis/docs/content/elohim-protocol/history/2026-08-07-version-dag-lives-at-l2-not-in-the-crdt-doc.md
 ---
 
 # Confidentiality-plane backlog (research mint pass, 2026-08-04)
@@ -34,6 +35,7 @@ This cluster is the subject's single re-surfacing point; items graduate individu
 | 4 | **Pluggable encryption-format + reindex-on-new-key shape** | SSB take #1b — steal `ssb-db2`'s `installEncryptionFormat` / `reindexEncrypted()` interface shape when building `KeyEnvelope`: cleanly separates "which messages can I decrypt *now*" from the log itself; exactly what a late-added reader-key substrate needs. Design input to #2/#3, not standalone work. | rides #2/#3 | (design input) |
 | 5 | **ed25519→X25519 key-conversion substrate** | The blocker both surveys name: Holochain agent keys are ed25519; every sealed-DEK path needs X25519. Named-but-unbuilt since the Holepunch survey; gates #2 and #3's production legs. Weave Wave C context. | design decision (conversion vs dual-key binding) | rust-architect shift |
 | 6 | **Encrypt-then-erasure-code production path** | Holepunch DEFER #6, still true: `private_replica.rs` math proven in tests (`reader_with_envelope_recovers_custodian_cannot`), but `parity_shard_count: 0` hardcoded, no custodian-dispatch path, blobs plaintext at rest. Unblocks when #3 + #5 land + RS(4,7) leaves test-only. | blocked on #3, #5 | backlog-only until then |
+| 7 | **Ciphertext-only relay seam (sync without plaintext)** | [Sedimentree](https://github.com/inkandswitch/keyhive/blob/main/design/sedimentree.md) is built for the case where — verbatim — *"all the sync server has is the commit graph, the actual contents of the commits are encrypted."* A relay that serves sync holding **only the commit graph** is a direct affordance for the hub-optional floor: it lets a doorway relay for peers without ever holding their plaintext. Today's doorway is a *projection* gateway and structurally requires plaintext to do its job, so this is a seam question, not a refactor. **Design option to have named before the next doorway-relay decision — not an action item.** Companion to the `KeyEnvelope` work: a ciphertext relay is only useful once #3/#5 give readers a way to decrypt. | blocked on #3, #5; needs a seam-map routing call (doorway seam vs T4 projection) first | brainstorm only |
 
 **Sequencing note:** #1 is independent and immediate. #2's audit-status question is a one-hour
 web/email check that gates a large fork in effort — do it before any `KeyEnvelope` design so #3

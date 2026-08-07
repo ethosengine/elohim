@@ -3,7 +3,7 @@ id: "backlog-arch-dataplane-borrows-backlog"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "Dataplane borrows backlog — survey-sourced transport/replication/blob mechanisms (Holepunch, SSB, p2panda)"
+title: "Dataplane borrows backlog — survey-sourced transport/replication/blob mechanisms (Holepunch, SSB, p2panda, sedimentree)"
 slug: "arch-dataplane-borrows-backlog"
 written: "2026-08-04"
 author: "claude (research mint pass, operator-directed clustering)"
@@ -15,6 +15,7 @@ cites:
   - genesis/research/ssb-scuttlebutt-ancestor-retrospective-2026-08-03.md
   - genesis/research/p2panda-cross-pollination-2026-08-04.md
   - genesis/data/timeline/backlog/arch-dataplane-refactor-backlog.md
+  - genesis/docs/content/elohim-protocol/history/2026-08-07-version-dag-lives-at-l2-not-in-the-crdt-doc.md
 ---
 
 # Dataplane borrows backlog (research mint pass, 2026-08-04)
@@ -35,9 +36,17 @@ before code. **Fold new survey-sourced dataplane borrows here — do not mint si
 | 6 | **PSI confidential topic discovery** | [p2panda](epr:p2panda-cross-pollination-2026-08-04) study #9 — discovery that never leaks topic identity to unrelated peers; the private end of the locate-token space (our inventory gossip ships bare hashes). Sits beside the Holepunch three-way credential split in the confidentiality cluster. | study-then-spec; pairs with [confidentiality-plane](epr:arch-confidentiality-plane-backlog) #3 | brainstorm first |
 | 7 | **Actor supervision for swarm event loops** | p2panda study #10 — ractor-style per-subsystem restart trees vs our monolithic `p2p/mod.rs` select! loop. Explicitly sequenced AFTER the refactor cluster's #10→#12→#15 decomposition chain hollows the loop. | blocked on refactor chain | backlog-only until then |
 | 8 | **Two-tier consistency idiom (named)** | p2panda adopt #6 — ephemeral gossip for presence, durable sync for content, one topic API (Reflection's proven shape). Documentation-only: name the idiom in the `automerge-sync` skill + dataplane docs so new features declare which plane they ride. | none | librarian/docs pass |
+| 9 | **Hash-trailing-zeros boundary selection + levelled strata** | [Sedimentree](https://github.com/inkandswitch/keyhive/blob/main/design/sedimentree.md) (Ink&Switch Beelay, Apache-2.0) — read a hash as a numeral in base *b*, count trailing zeros; *n* zeros marks a level-*n* boundary, ~1 per *bⁿ*. Peers who never negotiate still **agree on chunk boundaries**, because the boundary is a property of the content. Two applications: (a) the **L2 version-lineage DAG** (`Mishpat::Commitment` + `version_parent`) has exactly the unbounded-walk problem levelled strata + a support relation solve — *likely the higher-value leg, since it is our own growth problem, not a borrowed one*; (b) blob-dataplane range dedup without a negotiation round trip. **A technique, not a dependency** — no crate linked; Beelay itself is disqualified (pre-alpha, unaudited, "DO NOT use in production"). | p2p-design-gate for leg (a) — touches an existing DHT entry type's read path; leg (b) is Class C | rust-architect brainstorm → spec |
 
 **Below the line (dies honestly in the surveys unless resurfaced):** SSB vocabulary imports ("free
 listening", "near moderation") — adopt opportunistically in prose, no work item; Holepunch UDX
 (DEFER likely-permanent — only if measured iroh-QUIC underperforms post-cutover); Autobase
 linearization (redundant vs Automerge); channel-binding via handshake-hash (already owned by the
-`agent-peer-binding-cross-signed-proof` backlog entry).
+`agent-peer-binding-cross-signed-proof` backlog entry); **sedimentree as a sync protocol** — it
+carries no notarization, no authority, no canonical-head election, and its trust model is
+*availability from an untrusted relay* where L2's is *validation by a notary*, so adopting it would
+replace L1 transport and leave the DHT notary untouched. Verified 2026-08-07: the tree has **zero**
+uses of automerge's own sync protocol (`generate_sync_message` / `receive_sync_message` /
+`automerge::sync::State` — no hits), so the DAG-in-memory cost sedimentree exists to fix is one we
+never paid. The Automerge 3.0 / Hexane memory win is a *document-representation* win and arrived
+with the 0.10.0 bump, unrelated to this. See [the L2 version-DAG record](epr:version-dag-lives-at-l2-not-in-crdt-doc).
