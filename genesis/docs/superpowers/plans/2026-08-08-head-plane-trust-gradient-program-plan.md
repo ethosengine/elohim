@@ -116,6 +116,22 @@ do not rise — only per-round-trip yield.** Raising caps naively is the forbidd
   unbounded.
 - **NOT batched:** `validate_carried_head_record` (per-record crypto on
   caller-supplied bytes; hostile carrier would eat a batch budget; call rate already ~0).
+- **Contract revision (operator review 2026-08-08, BINDING — supersedes the
+  `resolved`/`unattempted` output shape above; T1 as first landed used the old shape
+  and is revised before any storage caller exists):** per-item outcomes are typed and
+  an admitted id's failure may NEVER discard accumulated results — no post-admission
+  `?`, including the `sys_time()` calls. Output: `schema_version: u16`, `attempted:
+  Vec<{id, outcome: Resolved(Option<T>) | Failed{reason: typed vocabulary, phase}}>`,
+  `unattempted`, `stop_reason: Option<...>`, `elapsed_ms`. `Resolved(None)` keeps the
+  single-id local-absence contract. Deterministic Refused/Unverifiable failures record
+  per-item and processing CONTINUES; shared Timeout/TransportError records the current
+  failure and STOPS (untouched tail → `unattempted`) — never hammer a saturated
+  conductor; a DB-read-permit timeout on local `get_links` is retryable backpressure,
+  never absence. Coordinator-side `content.id == requested_id` validation is mandatory
+  NOW (a link to another id's valid Content produced a silent wrong-content answer);
+  integrity-zome link validation is a separate hash-moving lineage change (backlogged:
+  `content-store-integrity-link-validation-gap`). The failure-disposition predicate
+  registers in the content_store seam registry BEFORE implementation.
 
 **Storage:** new `services/head_batch_resolver.rs` on the `commitment_fetcher.rs`
 template (trait + prod impl + `Mock*` NOT behind cfg(test), one file):
@@ -124,6 +140,10 @@ template (trait + prod impl + `Mock*` NOT behind cfg(test), one file):
 `queue_wait: Duration` (= observed RTT − extern `elapsed_ms` — the free
 conductor-pressure signal), and `unsupported: bool` (unknown-function from a
 not-yet-hot-swapped peer → fall through to single-id once, log once, never retry-loop).
+**Fallback rule revised with the contract revision above:** single-id fallback ONLY on
+unknown function or explicit `schema_version` mismatch; per-item `Failed` outcomes map
+to `Answer::Unreachable` with the typed reason (never single-id fallback); call-level
+infrastructure failure returns ALL ids to pending with backoff.
 Typed wrappers in `services/conductor_writes.rs` beside `call_resolve_content_head_local`
 (:628), `rmp_serde::to_vec_named` encoding.
 
