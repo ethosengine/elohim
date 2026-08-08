@@ -2,9 +2,9 @@
 
 # Concern x Seam Matrix
 
-**16 concern classes x 16 seams = 256 cells** — conformant 10 · variant 21 · n-a 1 · unexamined 224.
+**16 concern classes x 16 seams = 256 cells** — conformant 13 · variant 22 · n-a 2 · unexamined 219.
 
-Digest `sha256:36c8c655a90df57e54fe5baa6a5a6f36`. Rows come from the two canon homes at their lineage tips; columns from `.claude/epr-meta/seam-catalog.yaml` (atlas §3 grouped by §7 planes + governing/meta + bridges); cells are derived from every `seam-registry.yaml` by the census. Participation track and reach tier are cell attributes, not axes.
+Digest `sha256:dea158ed3ac41130c2aba061ec862cd5`. Rows come from the two canon homes at their lineage tips; columns from `.claude/epr-meta/seam-catalog.yaml` (atlas §3 grouped by §7 planes + governing/meta + bridges); cells are derived from every `seam-registry.yaml` by the census. Participation track and reach tier are cell attributes, not axes.
 
 State vocabulary: `conformant` = every citing point answered **and** cites a contract test that exists and contains the named fn · `variant` = a documented waiver (status partial/unbound) **or** an answered point with no verified test · `unexamined` = nobody has looked · `n-a` = declared inapplicable with justification.
 
@@ -55,7 +55,7 @@ State vocabulary: `conformant` = every citing point answered **and** cites a con
 
 | Class | S3.1 | S3.4 | S3.5 | S3.7 | S3.12 | S3.14 | S3.2 | S3.3 | S3.10 | S3.11 | S3.13 | S3.15 | S3.8 | S3.9 | S3.6 | SGOV |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| **C0** | · | · | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
+| **C0** | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | · | · |
 | **C1** | · | · | · | · | ~ | · | · | · | ~ | · | · | · | · | · | · | ~ |
 | **C2** | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | · | ✓ |
 | **C3** | · | · | · | · | · | · | · | · | ~ | · | · | · | · | · | · | · |
@@ -63,12 +63,12 @@ State vocabulary: `conformant` = every citing point answered **and** cites a con
 | **C5** | · | · | · | · | · | · | · | · | ~ | · | · | · | · | · | ~ | · |
 | **C6a** | · | · | · | · | · | · | · | · | ~ | · | · | ~ | · | ~ | · | - |
 | **C6b** | · | · | · | · | · | · | · | · | ~ | · | · | · | · | · | · | · |
-| **C7** | · | · | · | · | · | · | · | · | · | · | · | · | · | ~ | ✓ | · |
+| **C7** | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | ~ | ✓ | · |
 | **C8** | · | · | · | · | · | · | · | · | ~ | · | · | ✓ | · | ✓ | ~ | ~ |
-| **C9** | · | · | · | · | · | · | · | · | · | · | · | · | · | · | ✓ | · |
-| **C10** | · | · | · | · | · | · | · | · | · | · | · | · | · | · | · | · |
-| **C11** | · | · | · | · | · | · | · | · | ✓ | · | · | ✓ | · | · | · | · |
-| **C12** | · | · | · | · | · | · | · | · | · | · | · | · | · | ~ | ~ | · |
+| **C9** | · | · | · | · | · | · | · | · | - | · | · | · | · | · | ✓ | · |
+| **C10** | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | · | · | · |
+| **C11** | · | · | · | · | · | · | · | · | ~ | · | · | ✓ | · | · | · | · |
+| **C12** | · | · | · | · | · | · | · | · | ✓ | · | · | · | · | ~ | ~ | · |
 | **C13** | · | · | · | · | · | · | · | · | ~ | · | · | · | · | · | · | · |
 | **C14** | · | · | · | · | · | · | · | · | ~ | · | · | · | · | · | · | · |
 
@@ -108,54 +108,57 @@ Rank = recurrence x severity x rung-proximity (severity: silent-corruption 2.0, 
 | 5 | C8 | `S3.11` | 32.0 | 4 | 2.0 (silent-corruption) | 4.0 (notary-authority red+active) |
 | 6 | C2 | `S3.15` | 30.0 | 5 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
 | 7 | C2 | `S3.9` | 30.0 | 5 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
-| 8 | C0 | `S3.10` | 24.0 | 3 | 2.0 (silent-corruption) | 4.0 (notary-authority red+active) |
-| 9 | C0 | `S3.11` | 24.0 | 3 | 2.0 (silent-corruption) | 4.0 (notary-authority red+active) |
-| 10 | C1 | `S3.15` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
-| 11 | C1 | `S3.9` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
-| 12 | C13 | `S3.11` | 24.0 | 3 | 2.0 (silent-corruption) | 4.0 (notary-authority red+active) |
-| 13 | C5 | `S3.15` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
-| 14 | C5 | `S3.9` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
-| 15 | C7 | `S3.10` | 24.0 | 3 | 2.0 (silent-corruption) | 4.0 (notary-authority red+active) |
-| 16 | C7 | `S3.11` | 24.0 | 3 | 2.0 (silent-corruption) | 4.0 (notary-authority red+active) |
-| 17 | C2 | `S3.12` | 20.0 | 5 | 2.0 (silent-corruption) | 2.0 (identity-cross-signed unwired) |
-| 18 | C2 | `S3.2` | 20.0 | 5 | 2.0 (silent-corruption) | 2.0 (declarative-desired-state unwired) |
-| 19 | C2 | `S3.3` | 20.0 | 5 | 2.0 (silent-corruption) | 2.0 (declarative-desired-state unwired) |
-| 20 | C2 | `S3.4` | 20.0 | 5 | 2.0 (silent-corruption) | 2.0 (operator-runtime-surface unwired) |
-| 21 | C3 | `S3.11` | 20.0 | 5 | 1.0 (loud-fail) | 4.0 (notary-authority red+active) |
-| 22 | C4 | `S3.2` | 20.0 | 5 | 2.0 (silent-corruption) | 2.0 (declarative-desired-state unwired) |
-| 23 | C4 | `S3.3` | 20.0 | 5 | 2.0 (silent-corruption) | 2.0 (declarative-desired-state unwired) |
-| 24 | C4 | `S3.4` | 20.0 | 5 | 2.0 (silent-corruption) | 2.0 (operator-runtime-surface unwired) |
-| 25 | C0 | `S3.15` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
-| 26 | C0 | `S3.9` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
-| 27 | C13 | `S3.15` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
-| 28 | C13 | `S3.9` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
-| 29 | C7 | `S3.15` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
-| 30 | C1 | `S3.2` | 16.0 | 4 | 2.0 (silent-corruption) | 2.0 (declarative-desired-state unwired) |
-| 31 | C1 | `S3.3` | 16.0 | 4 | 2.0 (silent-corruption) | 2.0 (declarative-desired-state unwired) |
-| 32 | C1 | `S3.4` | 16.0 | 4 | 2.0 (silent-corruption) | 2.0 (operator-runtime-surface unwired) |
-| 33 | C10 | `S3.10` | 16.0 | 2 | 2.0 (silent-corruption) | 4.0 (notary-authority red+active) |
-| 34 | C10 | `S3.11` | 16.0 | 2 | 2.0 (silent-corruption) | 4.0 (notary-authority red+active) |
-| 35 | C12 | `S3.10` | 16.0 | 2 | 2.0 (silent-corruption) | 4.0 (notary-authority red+active) |
-| 36 | C12 | `S3.11` | 16.0 | 2 | 2.0 (silent-corruption) | 4.0 (notary-authority red+active) |
-| 37 | C14 | `S3.11` | 16.0 | 2 | 2.0 (silent-corruption) | 4.0 (notary-authority red+active) |
-| 38 | C5 | `S3.12` | 16.0 | 4 | 2.0 (silent-corruption) | 2.0 (identity-cross-signed unwired) |
-| 39 | C5 | `S3.2` | 16.0 | 4 | 2.0 (silent-corruption) | 2.0 (declarative-desired-state unwired) |
-| 40 | C5 | `S3.3` | 16.0 | 4 | 2.0 (silent-corruption) | 2.0 (declarative-desired-state unwired) |
+| 8 | C0 | `S3.11` | 24.0 | 3 | 2.0 (silent-corruption) | 4.0 (notary-authority red+active) |
+| 9 | C1 | `S3.15` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 10 | C1 | `S3.9` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 11 | C13 | `S3.11` | 24.0 | 3 | 2.0 (silent-corruption) | 4.0 (notary-authority red+active) |
+| 12 | C5 | `S3.15` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 13 | C5 | `S3.9` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 14 | C7 | `S3.11` | 24.0 | 3 | 2.0 (silent-corruption) | 4.0 (notary-authority red+active) |
+| 15 | C2 | `S3.12` | 20.0 | 5 | 2.0 (silent-corruption) | 2.0 (identity-cross-signed unwired) |
+| 16 | C2 | `S3.2` | 20.0 | 5 | 2.0 (silent-corruption) | 2.0 (declarative-desired-state unwired) |
+| 17 | C2 | `S3.3` | 20.0 | 5 | 2.0 (silent-corruption) | 2.0 (declarative-desired-state unwired) |
+| 18 | C2 | `S3.4` | 20.0 | 5 | 2.0 (silent-corruption) | 2.0 (operator-runtime-surface unwired) |
+| 19 | C3 | `S3.11` | 20.0 | 5 | 1.0 (loud-fail) | 4.0 (notary-authority red+active) |
+| 20 | C4 | `S3.2` | 20.0 | 5 | 2.0 (silent-corruption) | 2.0 (declarative-desired-state unwired) |
+| 21 | C4 | `S3.3` | 20.0 | 5 | 2.0 (silent-corruption) | 2.0 (declarative-desired-state unwired) |
+| 22 | C4 | `S3.4` | 20.0 | 5 | 2.0 (silent-corruption) | 2.0 (operator-runtime-surface unwired) |
+| 23 | C0 | `S3.15` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 24 | C0 | `S3.9` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 25 | C13 | `S3.15` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 26 | C13 | `S3.9` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 27 | C7 | `S3.15` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (doorway-failover red) |
+| 28 | C1 | `S3.2` | 16.0 | 4 | 2.0 (silent-corruption) | 2.0 (declarative-desired-state unwired) |
+| 29 | C1 | `S3.3` | 16.0 | 4 | 2.0 (silent-corruption) | 2.0 (declarative-desired-state unwired) |
+| 30 | C1 | `S3.4` | 16.0 | 4 | 2.0 (silent-corruption) | 2.0 (operator-runtime-surface unwired) |
+| 31 | C10 | `S3.11` | 16.0 | 2 | 2.0 (silent-corruption) | 4.0 (notary-authority red+active) |
+| 32 | C12 | `S3.11` | 16.0 | 2 | 2.0 (silent-corruption) | 4.0 (notary-authority red+active) |
+| 33 | C14 | `S3.11` | 16.0 | 2 | 2.0 (silent-corruption) | 4.0 (notary-authority red+active) |
+| 34 | C5 | `S3.12` | 16.0 | 4 | 2.0 (silent-corruption) | 2.0 (identity-cross-signed unwired) |
+| 35 | C5 | `S3.2` | 16.0 | 4 | 2.0 (silent-corruption) | 2.0 (declarative-desired-state unwired) |
+| 36 | C5 | `S3.3` | 16.0 | 4 | 2.0 (silent-corruption) | 2.0 (declarative-desired-state unwired) |
+| 37 | C5 | `S3.4` | 16.0 | 4 | 2.0 (silent-corruption) | 2.0 (operator-runtime-surface unwired) |
+| 38 | C6a | `S3.11` | 16.0 | 4 | 1.0 (loud-fail) | 4.0 (notary-authority red+active) |
+| 39 | C6b | `S3.11` | 16.0 | 2 | 2.0 (silent-corruption) | 4.0 (notary-authority red+active) |
+| 40 | C8 | `S3.12` | 16.0 | 4 | 2.0 (silent-corruption) | 2.0 (identity-cross-signed unwired) |
 
 ## Examined cells
 
 | Class | Seam | State | Why | Points |
 |---|---|---|---|---|
+| C0 | `S3.10` | conformant | 2 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-storage::HeadCorpusDigestReadiness`, `elohim-storage::advertised_head_corpus_digest` |
 | C1 | `S3.10` | variant | documented waiver: status partial | `elohim-storage::decide_head_action`, `elohim-storage::ContestFailure (metrics::inc_contest_failed)`, `elohim-storage::declared_divergence_should_route_to_contest`, `elohim-storage::gapfill_would_self_elect` |
 | C1 | `S3.12` | variant | documented waiver: status unbound | `elohim-node::ConsensusManager::request_consensus`, `elohim-node::ConsensusOutcome` |
 | C1 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::select_arbitrated_winner` |
-| C11 | `S3.10` | conformant | 1 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-storage::MissLedger::admit` |
+| C10 | `S3.10` | conformant | 2 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-storage::HeadCorpusDigestReadiness`, `elohim-storage::advertised_head_corpus_digest`, `content_store::batch_deadline_admission` |
+| C11 | `S3.10` | variant | documented waiver: status partial | `elohim-storage::MissLedger::admit`, `elohim-storage::HeadCorpusDigestReadiness`, `elohim-storage::advertised_head_corpus_digest`, `elohim-storage::AdaptiveBatchBudget::next_size` |
 | C11 | `S3.15` | conformant | 3 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-node::AdmissionController::evaluate`, `elohim-node::AdmissionDecision`, `elohim-node::DeferReason` |
+| C12 | `S3.10` | conformant | 1 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-storage::HeadCorpusDigestReadiness`, `elohim-storage::advertised_head_corpus_digest`, `elohim-storage::VerificationPricer::price` |
 | C12 | `S3.6` | variant | documented waiver: status unbound | `did-bridge::IdentityHeadAnswer`, `did-bridge::ElohimResolver::resolve`, `did-bridge::assemble_deactivated_document` |
 | C12 | `S3.9` | variant | documented waiver: status partial | `doorway::should_serve_response` |
-| C13 | `S3.10` | variant | documented waiver: status unbound | `content_store::authorize_canonical_head_declarer` |
-| C14 | `S3.10` | variant | documented waiver: status partial | `elohim-storage::ElectionObeyProbe` |
-| C2 | `S3.10` | conformant | 4 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-storage::decide_head_action`, `elohim-storage::canonical_move_verdict`, `elohim-storage::StaleReason`, `content_store::select_canonical_winner` |
+| C13 | `S3.10` | variant | documented waiver: status partial/unbound | `elohim-storage::HeadCorpusDigestReadiness`, `elohim-storage::advertised_head_corpus_digest`, `elohim-storage::StakesResolver::stage_for`, `content_store::authorize_canonical_head_declarer` |
+| C14 | `S3.10` | variant | documented waiver: status partial | `elohim-storage::ElectionObeyProbe`, `elohim-storage::HeadCorpusDigestReadiness`, `elohim-storage::advertised_head_corpus_digest`, `content_store::batch_failure_disposition` |
+| C2 | `S3.10` | conformant | 6 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-storage::decide_head_action`, `elohim-storage::canonical_move_verdict`, `elohim-storage::StaleReason`, `elohim-storage::HeadCorpusDigestReadiness` |
 | C2 | `SGOV` | conformant | 1 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-seam-contracts::select_arbitrated_winner` |
 | C3 | `S3.10` | variant | documented waiver: status partial | `elohim-storage::decide_head_action`, `elohim-storage::heal_decision`, `elohim-storage::compose_adopt_slice`, `elohim-storage::backoff_is_active` |
 | C4 | `S3.10` | variant | answered but NO verified contract test: LocalResolve, resolve_canonical_election | `elohim-storage::LocalResolve`, `elohim-storage::ContestFailure (metrics::inc_contest_failed)`, `elohim-storage::declared_divergence_should_route_to_contest`, `elohim-storage::timeout_should_route_to_adopt` |
@@ -163,13 +166,14 @@ Rank = recurrence x severity x rung-proximity (severity: silent-corruption 2.0, 
 | C4 | `S3.15` | conformant | 1 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-node::AdmissionDecision` |
 | C4 | `S3.6` | variant | documented waiver: status partial | `did-bridge::verify_resolved_subject`, `did-bridge::DidResolutionError`, `did-bridge::DidResolutionResult`, `did-bridge::DidWebResolver::resolve` |
 | C4 | `S3.9` | conformant | 7 point(s) answered with a cited contract test that exists and contains the named fn | `doorway::decide_reconcile`, `doorway::ReconcileDecision`, `doorway::fetch_projections_with_fallback`, `doorway::FallbackOutcome` |
-| C5 | `S3.10` | variant | documented waiver: status partial | `elohim-storage::adopt_before_author_param`, `content_store::declare_canonical_head_inner`, `content_store::validate_carried_head_record`, `content_store::classify_chain_gate` |
+| C5 | `S3.10` | variant | documented waiver: status partial | `elohim-storage::adopt_before_author_param`, `elohim-storage::HeadCorpusDigestReadiness`, `elohim-storage::advertised_head_corpus_digest`, `elohim-storage::SnapshotVerdict` |
 | C5 | `S3.6` | variant | documented waiver: status partial | `did-bridge::verify_resolved_subject`, `did-bridge::derive_did_web_url`, `did-bridge::DidWebResolver::resolve`, `did-bridge::ElohimResolver::resolve` |
-| C6a | `S3.10` | variant | answered but NO verified contract test: resolve_canonical_election | `elohim-storage::MissLedger::admit`, `elohim-storage::should_probe_election`, `elohim-storage::ElectionObeyProbe`, `elohim-storage::compose_adopt_slice` |
+| C6a | `S3.10` | variant | documented waiver: status partial; answered but NO verified contract test: resolve_canonical_election | `elohim-storage::MissLedger::admit`, `elohim-storage::should_probe_election`, `elohim-storage::ElectionObeyProbe`, `elohim-storage::compose_adopt_slice` |
 | C6a | `S3.15` | variant | documented waiver: status partial | `elohim-node::DeferReason` |
 | C6a | `S3.9` | variant | documented waiver: status partial | `doorway::K2Store::put_at (MemK2Store)` |
 | C6a | `SGOV` | n-a | 1 point(s) declare n-a with justification | `elohim-seam-contracts::select_arbitrated_winner` |
-| C6b | `S3.10` | variant | documented waiver: status partial | `elohim-storage::declared_divergence_should_route_to_contest`, `elohim-storage::declaration_would_move`, `elohim-storage::claim_candidacy`, `content_store::classify_chain_gate` |
+| C6b | `S3.10` | variant | documented waiver: status partial | `elohim-storage::declared_divergence_should_route_to_contest`, `elohim-storage::declaration_would_move`, `elohim-storage::claim_candidacy`, `elohim-storage::HeadCorpusDigestReadiness` |
+| C7 | `S3.10` | conformant | 2 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-storage::HeadCorpusDigestReadiness`, `elohim-storage::advertised_head_corpus_digest` |
 | C7 | `S3.6` | conformant | 2 point(s) answered with a cited contract test that exists and contains the named fn | `did-bridge::assemble_deactivated_document`, `did-bridge::MethodRegistry::resolve` |
 | C7 | `S3.9` | variant | documented waiver: status partial | `doorway::classify_dispatch`, `doorway::Disposition`, `doorway::epr_should_serve_ssr`, `doorway::fetch_projections_with_fallback` |
 | C8 | `S3.10` | variant | documented waiver: status partial | `elohim-storage::StaleReason`, `elohim-storage::ContestFailure (metrics::inc_contest_failed)`, `elohim-storage::ElectionObeyProbe`, `elohim-storage::compose_adopt_slice` |
@@ -177,6 +181,7 @@ Rank = recurrence x severity x rung-proximity (severity: silent-corruption 2.0, 
 | C8 | `S3.6` | variant | documented waiver: status partial | `did-bridge::DidResolutionError` |
 | C8 | `S3.9` | conformant | 1 point(s) answered with a cited contract test that exists and contains the named fn | `doorway::SsrFallbackReason` |
 | C8 | `SGOV` | variant | documented waiver: status unbound | `elohim-seam-contracts::select_arbitrated_winner` |
+| C9 | `S3.10` | n-a | 2 point(s) declare n-a with justification | `elohim-storage::HeadCorpusDigestReadiness`, `elohim-storage::advertised_head_corpus_digest` |
 | C9 | `S3.6` | conformant | 4 point(s) answered with a cited contract test that exists and contains the named fn | `did-bridge::IdentityHeadAnswer`, `did-bridge::ElohimResolver::resolve`, `did-bridge::controller_from_head`, `did-bridge::assemble_deactivated_document` |
 
 ## Axis notes

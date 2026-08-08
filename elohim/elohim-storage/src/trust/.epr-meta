@@ -1,0 +1,141 @@
+---
+epr-meta-version: 1
+id: elohim-storage-trust-gradient-seam
+purpose: >
+  The trust-gradient seam (head-plane trust-gradient program, plan §3 L5): stage.rs +
+  pricer.rs (the PURE half — declared NetworkStage, floor-priced verification depth,
+  no diesel/tokio/clock/env) and snapshot.rs + memo.rs (the stateful half — signed
+  head-set attestations, verification memoization). Landed INERT
+  (TrustGradient::inert(): Bootstrap stage, InertPricer, no memo store — every caller
+  of authorize_reach_for_human gets exactly today's behavior). No coverage claim here
+  (covers: omitted) — this manifest adds four edit-time rules on top of the parent
+  elohim/elohim-storage/src/.epr-meta's covers: subtree, which already owns this
+  directory; these rules are additive teaching, not a re-claim of responsibility.
+rules:
+  - id: no-stored-score
+    class: inject
+    when: { write: "*.rs", contains-any: ["pub score:"] }
+    dedupe-of: "elohim/elohim-storage/src/trust/memo.rs (module doc: NO NUMERIC FIELD, EVER)"
+    why: >
+      Section 4.2's derived-not-stored discipline: standing/trust is COMPUTED on demand,
+      never cached as a persisted number. VerificationMemo (memo.rs) deliberately carries
+      depth: VerificationDepth (an enum) and epoch: TrustEpoch (an opaque token), never a
+      bare numeric score — the module doc calls this out by name as the drift this rule
+      exists to catch. If you are adding a `pub score: <number>`-shaped field anywhere in
+      this seam, stop: the standing view (services::standing::Standing / StandingScore)
+      is the ALREADY-DERIVED read model; nothing downstream should cache its own copy of
+      a number that must always be recomputed from the live edge set.
+  - id: stage-cannot-cheapen-the-floor
+    class: ask
+    when:
+      write: "pricer.rs"
+      contains-any: ["impl VerificationPricer", "fn price(", "FloorClass::"]
+    dedupe-of: >
+      elohim/elohim-storage/src/trust/pricer.rs (module doc's THE safety invariant +
+      every_in_crate_pricer_forces_full_chain_across_the_entire_product_space +
+      conformance_harness_rejects_a_floor_cheapening_mutant +
+      floor_forces_full_chain_even_at_simulacra)
+    why: >
+      THE safety keystone this program reviews before accepting any change here: a
+      FloorClass other than None (Constitutional, LocalRelationship, CounterEvidence)
+      forces VerificationDepth::FullChain at EVERY NetworkStage, including Simulacra —
+      the "cheap dev/staging" stage is the one most tempted to cheapen it. Before landing
+      a new VerificationPricer implementor or touching price()/FloorClass: (1) add the
+      new implementor to tests::in_crate_pricers so the 4x4x8x6=768-case property test
+      actually exercises it — an implementor absent from that registry is invisible to
+      the keystone; (2) re-run
+      every_in_crate_pricer_forces_full_chain_across_the_entire_product_space and
+      conformance_harness_rejects_a_floor_cheapening_mutant and confirm both still pass.
+      This is the strongest class this seam's rules carry (ask, not inject) because a
+      silent floor-cheapening regression here is exactly the failure mode
+      trust-as-efficiency-signal.md exists to prevent: trust must reduce verification
+      cost, never eliminate it where a floor applies.
+  - id: dev-mode-is-not-network-stage
+    class: inject
+    when: { write: "*.rs", contains-any: ["DEV_MODE", "dev_mode"] }
+    dedupe-of: >
+      elohim/elohim-storage/src/trust/stage.rs (module doc: NetworkStage must never
+      derive from any DEV_MODE flag) + genesis/docs/superpowers/plans/2026-08-08-
+      head-plane-trust-gradient-program-plan.md section 2 evidence correction #2
+    why: >
+      Two UNRELATED dev_modes already exist in this codebase: elohim-storage's
+      (p2p/mod.rs) is inert (no supplier, no consumer); doorway's DEV_MODE (config.rs)
+      is LIVE, auth-permissive, and true fleet-wide. NetworkStage must NEVER be derived
+      from either — the durable home for declared stakes is the standing-policy manifest
+      / ELOHIM_NETWORK_STAKES (T10), and unknown/absent resolves to
+      NetworkStage::Bootstrap (fail-closed toward MORE scrutiny, never less). If you are
+      reading a DEV_MODE/dev_mode flag anywhere in this seam to decide a stage, stop —
+      that is precisely the conflation this plan corrected.
+  - id: pure-half-stays-pure-stage
+    class: inject
+    when:
+      write: "stage.rs"
+      contains-any: ["diesel", "tokio", "SystemTime::now", "Instant::now", "chrono", "std::env", "env::var"]
+    dedupe-of: "elohim/elohim-storage/src/trust/stage.rs (module doc: PURE module — no diesel, no tokio, no clock, no env)"
+    why: >
+      stage.rs is declared PURE — no diesel, no tokio, no clock, no env — so
+      StakesResolver::stage_for stays testable with no conductor and so the eventual
+      graduation to a standalone crates/trust-gradient (a git mv, per the module doc's
+      C13 successor note) is a move, not a rewrite. A dependency on diesel/tokio/a wall
+      clock/an env read belongs in a resolver's PRODUCTION implementation
+      (ManifestStakesResolver, T10) constructed OUTSIDE this file and passed in as
+      &dyn StakesResolver — never inlined here.
+  - id: pure-half-stays-pure-pricer
+    class: inject
+    when:
+      write: "pricer.rs"
+      contains-any: ["diesel", "tokio", "SystemTime::now", "Instant::now", "chrono", "std::env", "env::var"]
+    dedupe-of: "elohim/elohim-storage/src/trust/pricer.rs (module doc: PURE module — no diesel, no tokio, no clock, no env)"
+    why: >
+      Same discipline as stage.rs, for the pricing half: VerificationPricer::price must
+      stay a pure PricingInput -> PricedVerification function so the floor property test
+      (stage-cannot-cheapen-the-floor, this manifest) can exercise the full NetworkStage x
+      FloorClass x Reach x Standing product with no conductor, no clock, and no I/O. A
+      dependency on diesel/tokio/a wall clock/an env read belongs upstream, in whatever
+      supplies PricingInput — never inside price() itself.
+cites:
+  - head-plane-trust-gradient-program-plan
+---
+
+# elohim/elohim-storage/src/trust — the trust-gradient seam (L5)
+
+stage.rs + pricer.rs (PURE — the declared-stakes axis and the verification-depth
+pricer) and snapshot.rs + memo.rs (stateful — signed head-set attestations and
+verification memoization). Landed INERT: every caller of authorize_reach_for_human
+passes TrustGradient::inert() and gets exactly today's behavior (NetworkStage::
+Bootstrap, InertPricer always FullChain, no memo store). standing_projector (T19) is the
+writer that eventually lights up live gradient behavior — until it lands, standing is
+Unknown everywhere and nothing in this seam may claim otherwise.
+
+This manifest is nested under elohim/elohim-storage/src/.epr-meta, which already
+covers: subtree for the whole src/ tree — these four rules are additive edit-time
+teaching on top of that coverage, not a separate coverage claim.
+
+## The four rules
+
+- **no-stored-score** (inject) — catches a `pub score:`-shaped field anywhere in this
+  seam, the exact drift memo.rs's own module doc names as what its .epr-meta rail
+  exists to catch. Standing is always re-derived, never cached as a bare number.
+- **stage-cannot-cheapen-the-floor** (ask — the strongest class this manifest carries)
+  — any edit touching a VerificationPricer implementor, price(), or FloorClass prompts a
+  confirmation to re-run the keystone property test
+  (every_in_crate_pricer_forces_full_chain_across_the_entire_product_space +
+  conformance_harness_rejects_a_floor_cheapening_mutant) and to register any new
+  implementor in tests::in_crate_pricers. A floor class other than None must force
+  FullChain at every stage, including Simulacra — the stage most tempted to cheapen it.
+- **dev-mode-is-not-network-stage** — NetworkStage must never derive from either of the
+  two unrelated DEV_MODE/dev_mode flags already in this codebase (elohim-storage's inert
+  one, doorway's live auth-permissive one). Absent/unknown declared stakes resolve to
+  Bootstrap, fail-closed.
+- **pure-half-stays-pure-{stage,pricer}** — stage.rs and pricer.rs stay free of
+  diesel/tokio/a wall clock/an env read, so the eventual git mv to
+  crates/trust-gradient (the module doc's named C13 successor) is a move, not a
+  rewrite, and so the floor property test never needs a conductor to run.
+
+## Why ask, not deny, even for the floor rule
+
+Per the .epr-meta skill's class ladder, deny is reserved for genuinely-broken states (a
+doc that cannot be linked into the substrate). Touching pricer.rs is not itself broken —
+the 768-case property test is the real enforcement, and it runs at cargo test time
+regardless of this rail. ask is the strongest class this manifest authors: one keystroke
+lets a deliberate, tested change through; it never blocks a fix-in-progress.

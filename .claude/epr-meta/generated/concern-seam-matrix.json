@@ -2,7 +2,7 @@
  "n_concerns": 16,
  "n_seams": 16,
  "n_cells": 256,
- "n_points_routed": 52,
+ "n_points_routed": 68,
  "plane_groups": [
   {
    "id": "control-truth",
@@ -415,10 +415,10 @@
   }
  },
  "counts": {
-  "unexamined": 224,
-  "variant": 21,
-  "conformant": 10,
-  "n-a": 1
+  "unexamined": 219,
+  "conformant": 13,
+  "variant": 22,
+  "n-a": 2
  },
  "cells": [
   {
@@ -481,8 +481,30 @@
    "concern": "C0",
    "seam": "S3.10",
    "plane": "data",
-   "state": "unexamined",
-   "score": 24.0
+   "state": "conformant",
+   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T1",
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "familiar",
+   "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "HeadCorpusDigestReadiness",
+     "status": "answered",
+     "verified": true,
+     "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "advertised_head_corpus_digest",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    }
+   ]
   },
   {
    "concern": "C0",
@@ -672,6 +694,20 @@
      "file": "src/services/head_adoption.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "HeadCorpusDigestReadiness",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "advertised_head_corpus_digest",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
      "crate": "content_store",
      "point": "select_canonical_winner",
      "status": "answered",
@@ -815,7 +851,7 @@
    "seam": "S3.10",
    "plane": "data",
    "state": "conformant",
-   "reason": "4 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "6 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [
     "T1",
     "T2",
@@ -843,6 +879,34 @@
      "status": "answered",
      "verified": true,
      "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "HeadCorpusDigestReadiness",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "advertised_head_corpus_digest",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "verify_snapshot",
+     "status": "answered",
+     "verified": true,
+     "file": "src/trust/snapshot.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "compare_epochs",
+     "status": "answered",
+     "verified": true,
+     "file": "src/trust/snapshot.rs"
     },
     {
      "crate": "content_store",
@@ -1016,6 +1080,20 @@
      "status": "partial",
      "verified": true,
      "file": "src/services/head_adoption.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "HeadCorpusDigestReadiness",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "advertised_head_corpus_digest",
+     "status": "partial",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
     },
     {
      "crate": "content_store",
@@ -1207,10 +1285,45 @@
      "file": "src/p2p/projection_reconcile.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "HeadCorpusDigestReadiness",
+     "status": "answered",
+     "verified": true,
+     "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "advertised_head_corpus_digest",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "verify_wire_snapshot_for_readiness",
+     "status": "answered",
+     "verified": true,
+     "file": "src/trust/snapshot.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "classify_batch_call",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/head_batch_resolver.rs"
+    },
+    {
      "crate": "content_store",
      "point": "resolve_canonical_election",
      "status": "answered",
      "verified": false,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "batch_failure_disposition",
+     "status": "answered",
+     "verified": true,
      "file": "src/lib.rs"
     }
    ]
@@ -1481,6 +1594,41 @@
      "file": "src/services/head_adoption.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "HeadCorpusDigestReadiness",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "advertised_head_corpus_digest",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "SnapshotVerdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/trust/snapshot.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "verify_snapshot",
+     "status": "answered",
+     "verified": true,
+     "file": "src/trust/snapshot.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "head_set_delta",
+     "status": "answered",
+     "verified": true,
+     "file": "src/trust/snapshot.rs"
+    },
+    {
      "crate": "content_store",
      "point": "declare_canonical_head_inner",
      "status": "answered",
@@ -1497,6 +1645,13 @@
     {
      "crate": "content_store",
      "point": "classify_chain_gate",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "batch_failure_disposition",
      "status": "answered",
      "verified": true,
      "file": "src/lib.rs"
@@ -1655,7 +1810,7 @@
    "seam": "S3.10",
    "plane": "data",
    "state": "variant",
-   "reason": "answered but NO verified contract test: resolve_canonical_election",
+   "reason": "documented waiver: status partial; answered but NO verified contract test: resolve_canonical_election",
    "tracks": [
     "T1",
     "T2",
@@ -1706,10 +1861,45 @@
      "file": "src/services/head_adoption.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "HeadCorpusDigestReadiness",
+     "status": "partial",
+     "verified": true,
+     "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "advertised_head_corpus_digest",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AdaptiveBatchBudget::next_size",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/reconcile_rails.rs"
+    },
+    {
      "crate": "content_store",
      "point": "resolve_canonical_election",
      "status": "answered",
      "verified": false,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "batch_failure_disposition",
+     "status": "partial",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "batch_deadline_admission",
+     "status": "answered",
+     "verified": true,
      "file": "src/lib.rs"
     }
    ]
@@ -1893,6 +2083,27 @@
      "file": "src/services/head_adoption.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "HeadCorpusDigestReadiness",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "advertised_head_corpus_digest",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "digest_of_entry_lines",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/reconcile_rails.rs"
+    },
+    {
      "crate": "content_store",
      "point": "classify_chain_gate",
      "status": "partial",
@@ -2010,8 +2221,30 @@
    "concern": "C7",
    "seam": "S3.10",
    "plane": "data",
-   "state": "unexamined",
-   "score": 24.0
+   "state": "conformant",
+   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T1",
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "familiar",
+   "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "HeadCorpusDigestReadiness",
+     "status": "answered",
+     "verified": true,
+     "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "advertised_head_corpus_digest",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    }
+   ]
   },
   {
    "concern": "C7",
@@ -2234,6 +2467,41 @@
      "status": "answered",
      "verified": true,
      "file": "src/services/head_adoption.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "HeadCorpusDigestReadiness",
+     "status": "partial",
+     "verified": true,
+     "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "advertised_head_corpus_digest",
+     "status": "partial",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "PricingReason",
+     "status": "answered",
+     "verified": true,
+     "file": "src/trust/pricer.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "SnapshotRefusal",
+     "status": "answered",
+     "verified": true,
+     "file": "src/trust/snapshot.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "batch_failure_disposition",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
     }
    ]
   },
@@ -2406,8 +2674,30 @@
    "concern": "C9",
    "seam": "S3.10",
    "plane": "data",
-   "state": "unexamined",
-   "score": 16.0
+   "state": "n-a",
+   "reason": "2 point(s) declare n-a with justification",
+   "tracks": [
+    "T1",
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "familiar",
+   "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "HeadCorpusDigestReadiness",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "advertised_head_corpus_digest",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    }
+   ]
   },
   {
    "concern": "C9",
@@ -2553,8 +2843,37 @@
    "concern": "C10",
    "seam": "S3.10",
    "plane": "data",
-   "state": "unexamined",
-   "score": 16.0
+   "state": "conformant",
+   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T1",
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "familiar",
+   "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "HeadCorpusDigestReadiness",
+     "status": "answered",
+     "verified": true,
+     "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "advertised_head_corpus_digest",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "batch_deadline_admission",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    }
+   ]
   },
   {
    "concern": "C10",
@@ -2665,8 +2984,8 @@
    "concern": "C11",
    "seam": "S3.10",
    "plane": "data",
-   "state": "conformant",
-   "reason": "1 point(s) answered with a cited contract test that exists and contains the named fn",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [
     "T1",
     "T2",
@@ -2680,6 +2999,41 @@
      "status": "answered",
      "verified": true,
      "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "HeadCorpusDigestReadiness",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "advertised_head_corpus_digest",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AdaptiveBatchBudget::next_size",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/reconcile_rails.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "batch_failure_disposition",
+     "status": "partial",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "batch_deadline_admission",
+     "status": "partial",
+     "verified": true,
+     "file": "src/lib.rs"
     }
    ]
   },
@@ -2821,8 +3175,37 @@
    "concern": "C12",
    "seam": "S3.10",
    "plane": "data",
-   "state": "unexamined",
-   "score": 16.0
+   "state": "conformant",
+   "reason": "1 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T1",
+    "T2",
+    "T3"
+   ],
+   "reach_tier": "familiar",
+   "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "HeadCorpusDigestReadiness",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "advertised_head_corpus_digest",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "VerificationPricer::price",
+     "status": "answered",
+     "verified": true,
+     "file": "src/trust/pricer.rs"
+    }
+   ]
   },
   {
    "concern": "C12",
@@ -2975,7 +3358,7 @@
    "seam": "S3.10",
    "plane": "data",
    "state": "variant",
-   "reason": "documented waiver: status unbound",
+   "reason": "documented waiver: status partial/unbound",
    "tracks": [
     "T1",
     "T2",
@@ -2983,6 +3366,27 @@
    ],
    "reach_tier": "familiar",
    "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "HeadCorpusDigestReadiness",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "advertised_head_corpus_digest",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "StakesResolver::stage_for",
+     "status": "partial",
+     "verified": true,
+     "file": "src/trust/stage.rs"
+    },
     {
      "crate": "content_store",
      "point": "authorize_canonical_head_declarer",
@@ -3116,6 +3520,27 @@
      "status": "partial",
      "verified": true,
      "file": "src/metrics.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "HeadCorpusDigestReadiness",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/db/content_diesel.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "advertised_head_corpus_digest",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/projection_reconcile.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "batch_failure_disposition",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
     }
    ]
   },
@@ -3256,18 +3681,6 @@
   },
   {
    "concern": "C0",
-   "seam": "S3.10",
-   "score": 24.0,
-   "score_parts": {
-    "recurrence": 3,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 4.0,
-    "rung_reason": "notary-authority red+active"
-   }
-  },
-  {
-   "concern": "C0",
    "seam": "S3.11",
    "score": 24.0,
    "score_parts": {
@@ -3336,18 +3749,6 @@
     "severity_class": "silent-corruption",
     "rung_proximity": 3.0,
     "rung_reason": "doorway-failover red"
-   }
-  },
-  {
-   "concern": "C7",
-   "seam": "S3.10",
-   "score": 24.0,
-   "score_parts": {
-    "recurrence": 3,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 4.0,
-    "rung_reason": "notary-authority red+active"
    }
   },
   {
@@ -3556,31 +3957,7 @@
   },
   {
    "concern": "C10",
-   "seam": "S3.10",
-   "score": 16.0,
-   "score_parts": {
-    "recurrence": 2,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 4.0,
-    "rung_reason": "notary-authority red+active"
-   }
-  },
-  {
-   "concern": "C10",
    "seam": "S3.11",
-   "score": 16.0,
-   "score_parts": {
-    "recurrence": 2,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 4.0,
-    "rung_reason": "notary-authority red+active"
-   }
-  },
-  {
-   "concern": "C12",
-   "seam": "S3.10",
    "score": 16.0,
    "score_parts": {
     "recurrence": 2,
@@ -3649,6 +4026,54 @@
     "rung_proximity": 2.0,
     "rung_reason": "declarative-desired-state unwired"
    }
+  },
+  {
+   "concern": "C5",
+   "seam": "S3.4",
+   "score": 16.0,
+   "score_parts": {
+    "recurrence": 4,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 2.0,
+    "rung_reason": "operator-runtime-surface unwired"
+   }
+  },
+  {
+   "concern": "C6a",
+   "seam": "S3.11",
+   "score": 16.0,
+   "score_parts": {
+    "recurrence": 4,
+    "severity": 1.0,
+    "severity_class": "loud-fail",
+    "rung_proximity": 4.0,
+    "rung_reason": "notary-authority red+active"
+   }
+  },
+  {
+   "concern": "C6b",
+   "seam": "S3.11",
+   "score": 16.0,
+   "score_parts": {
+    "recurrence": 2,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 4.0,
+    "rung_reason": "notary-authority red+active"
+   }
+  },
+  {
+   "concern": "C8",
+   "seam": "S3.12",
+   "score": 16.0,
+   "score_parts": {
+    "recurrence": 4,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 2.0,
+    "rung_reason": "identity-cross-signed unwired"
+   }
   }
  ],
  "errors": [],
@@ -3658,7 +4083,7 @@
    "detail": "\u00a73 has no identity/T1-notary section; T1 concerns route under the \u00a73 seam owning their artifact, per the \u00a74 \"T1 notary floor (under 3.11)\" precedent. Candidate atlas correction: either an explicit \u00a73.16 identity/notary section, or an explicit statement in \u00a73 that T1 concerns route under the artifact-owning seam.\n"
   }
  ],
- "digest": "sha256:36c8c655a90df57e54fe5baa6a5a6f36",
+ "digest": "sha256:dea158ed3ac41130c2aba061ec862cd5",
  "ranked_unexamined_note": "head only \u2014 the full ranking is `cells` filtered to state=unexamined, sorted by -score then (concern, seam)",
  "_generated": {
   "by": ".claude/scripts/_lib/seam_matrix.py",

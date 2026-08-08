@@ -23,7 +23,11 @@ seamLocus: >
   adopt-before-author pre-flight and its HeadDecision rule), src/db/content_diesel.rs (the
   storage-side election-obey verdict), src/p2p/projection_reconcile.rs (gap classification,
   admission routing into the adopt/contest arms, heal-leg liveness and bounded-retry
-  bookkeeping), and src/metrics.rs (the contest-failure reason vocabulary).
+  bookkeeping), and src/metrics.rs (the contest-failure reason vocabulary). EXTENDED
+  (T12, 2026-08-08) to the head-plane trust-gradient program's AIMD batch-pacing +
+  corpus-digest fold (src/p2p/reconcile_rails.rs), the batch-extern fallback seam
+  (src/services/head_batch_resolver.rs), and the INERT trust-gradient decision surface
+  (src/trust/{stage,pricer,snapshot}.rs; plan §3 L5).
 
 decisionPoints:
   - name: decide_head_action
@@ -867,6 +871,11 @@ decisionPoints:
     summary: >
       Atomic local answer distinguishing an amber distribution-safe corpus with pending DHT
       witnesses from a ready whole-corpus digest and honest row total.
+    notes: >
+      RECONCILED (T12, 2026-08-08): this IS the plan's `head_corpus_digest_in_sync` row, under
+      readiness-first naming (paired with `advertised_head_corpus_digest` below for the
+      requester/responder `in_sync` predicate) — no symbol literally named
+      `head_corpus_digest_in_sync` exists (grep-verified); no separate row is registered.
     concernIds:
       - id: C0
         status: answered
@@ -1028,3 +1037,207 @@ decisionPoints:
         testName: content_inventory_reports_in_sync_true_when_requester_digest_matches
         kind: unit
         mirrorRisk: false
+
+  # ── Head-plane trust-gradient program (T12, 2026-08-08). Terse (file size cap);
+  # every symbol grepped/read at authoring time; every cited test is real.
+
+  - name: AdaptiveBatchBudget::next_size
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/p2p/reconcile_rails.rs
+      modulePath: p2p::reconcile_rails::AdaptiveBatchBudget::next_size
+      line: 389
+    summary: AIMD control law for batch-extern round-trip size — additive increase under a queue-wait threshold, multiplicative decrease over it, clamped to [floor, ceiling]. Pure, total.
+    concernIds:
+      - id: C6a
+        status: answered
+        justification: aimd_clamps_into_the_band proves the result stays in [floor, ceiling] from any input.
+      - id: C11
+        status: answered
+        justification: the_same_constants_separate_a_slow_conductor_from_a_fast_one — same constants converge adam(WAN)/matthew(LAN) to different steady states.
+    contractTests:
+      - path: elohim/elohim-storage/src/p2p/reconcile_rails.rs
+        testName: aimd_clamps_into_the_band
+        kind: unit
+
+  - name: digest_of_entry_lines
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/p2p/reconcile_rails.rs
+      modulePath: p2p::reconcile_rails::digest_of_entry_lines
+      line: 27
+    summary: Stable sort+hash fold shared by sync_round::corpus_digest and db::content_diesel::head_corpus_digest; a byte-drift here silently disables the InSync/in_sync shortcut fleet-wide.
+    concernIds:
+      - id: C6b
+        status: answered
+        justification: digest_entry_line_edge_cases_are_byte_pinned pins determinism; sync_round's corpus_digest_matches_the_pre_refactor_pinned_value proves the extraction minted no drift.
+    contractTests:
+      - path: elohim/elohim-storage/src/p2p/reconcile_rails.rs
+        testName: digest_entry_line_edge_cases_are_byte_pinned
+        kind: unit
+
+  - name: StakesResolver::stage_for
+    kind: verdict-fn
+    sourceLocation:
+      file: src/trust/stage.rs
+      modulePath: trust::stage::StakesResolver::stage_for
+      line: 99
+    summary: Resolves the declared NetworkStage + StakesProvenance for a scope. Only shipped implementor is FixedStakesResolver (always Bootstrap/BootstrapDefault); ManifestStakesResolver is T10.
+    concernIds:
+      - id: C13
+        status: partial
+        justification: StakesProvenance::Manifest{cid} names its own successor before T10 builds the reader; fixed_resolver_reports_bootstrap_default_provenance pins today's only answer.
+    contractTests:
+      - path: elohim/elohim-storage/src/trust/stage.rs
+        testName: fixed_resolver_reports_bootstrap_default_provenance
+        kind: unit
+
+  - name: VerificationPricer::price
+    kind: verdict-fn
+    sourceLocation:
+      file: src/trust/pricer.rs
+      modulePath: trust::pricer::VerificationPricer::price
+      line: 113
+    summary: Prices (stage, floor, reach, standing) into (depth, reason). THE safety invariant — floor != None forces FullChain at EVERY stage including Simulacra. InertPricer is the only shipped implementor.
+    concernIds:
+      - id: C12
+        status: answered
+        justification: every_in_crate_pricer_forces_full_chain_across_the_entire_product_space iterates the full 4x4x8x6=768-case product; conformance_harness_rejects_a_floor_cheapening_mutant proves the harness has teeth.
+    contractTests:
+      - path: elohim/elohim-storage/src/trust/pricer.rs
+        testName: every_in_crate_pricer_forces_full_chain_across_the_entire_product_space
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/pricer.rs
+        testName: conformance_harness_rejects_a_floor_cheapening_mutant
+        kind: unit
+
+  - name: PricingReason
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/trust/pricer.rs
+      modulePath: trust::pricer::PricingReason
+      line: 84
+    summary: Closed, countable outcome vocabulary for a pricing decision — single-variant today (PricerInert), legitimate per seam_contracts::ReasonLabel's own doc.
+    concernIds:
+      - id: C8
+        status: answered
+        justification: pricing_reason_is_reason_label_conformant asserts trait conformance and label stability.
+    contractTests:
+      - path: elohim/elohim-storage/src/trust/pricer.rs
+        testName: pricing_reason_is_reason_label_conformant
+        kind: unit
+
+  - name: SnapshotRefusal
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/trust/snapshot.rs
+      modulePath: trust::snapshot::SnapshotRefusal
+      line: 408
+    summary: Why a HeadSetSnapshot verification refused — CorpusDigestMismatch (C5), EpochRegression/EpochUnorderable (C2), UnknownSigner, Malformed. Closed ReasonLabel vocabulary.
+    concernIds:
+      - id: C8
+        status: answered
+        justification: snapshot_refusal_is_reason_label_conformant asserts trait conformance and label stability over the closed 5-variant ALL slice.
+    contractTests:
+      - path: elohim/elohim-storage/src/trust/snapshot.rs
+        testName: snapshot_refusal_is_reason_label_conformant
+        kind: unit
+
+  - name: SnapshotVerdict
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/trust/snapshot.rs
+      modulePath: trust::snapshot::SnapshotVerdict
+      line: 490
+    summary: Accepted(SnapshotAcceptance) or Refused(SnapshotRefusal) — the receiver acts on its own re-derived state, never the snapshot's claims (C5).
+    concernIds:
+      - id: C5
+        status: answered
+        justification: Forces a caller to name a BASIS for Accepted (ProvenSigner vs UnprovenSigner) rather than a bare boolean; verdict_refused_carries_the_reason pins the refused side.
+    contractTests:
+      - path: elohim/elohim-storage/src/trust/snapshot.rs
+        testName: verdict_refused_carries_the_reason
+        kind: unit
+
+  - name: verify_snapshot
+    kind: verdict-fn
+    sourceLocation:
+      file: src/trust/snapshot.rs
+      modulePath: trust::snapshot::verify_snapshot
+      line: 665
+    summary: Verifies a carried HeadSetSnapshot — structure, then the C2 epoch guard BEFORE the digest (a replayed old snapshot with a matching digest is what this order catches), then proof, then the C5 zero-cost digest comparison.
+    concernIds:
+      - id: C5
+        status: answered
+        justification: Compares against the receiver's OWN head_corpus_digest, never the snapshot's claim; accepts_with_unproven_signer_on_digest_match_at_zero_cost pins the zero-cost path.
+      - id: C2
+        status: answered
+        justification: refuses_epoch_regression_even_when_the_digest_matches proves ordering wins over a digest match.
+    contractTests:
+      - path: elohim/elohim-storage/src/trust/snapshot.rs
+        testName: accepts_with_unproven_signer_on_digest_match_at_zero_cost
+        kind: unit
+
+  - name: compare_epochs
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/trust/snapshot.rs
+      modulePath: trust::snapshot::compare_epochs
+      line: 203
+    summary: Orders a candidate TrustEpoch against the last verified one — Advanced/Same/Regressed/Unorderable. Pure, total; refuses to guess an underivable direction.
+    concernIds:
+      - id: C2
+        status: answered
+        justification: epoch_orders_by_edge_cardinality_and_refuses_what_it_cannot_order proves the full ordering including the fail-closed Unorderable case.
+    contractTests:
+      - path: elohim/elohim-storage/src/trust/snapshot.rs
+        testName: epoch_orders_by_edge_cardinality_and_refuses_what_it_cannot_order
+        kind: unit
+
+  - name: head_set_delta
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/trust/snapshot.rs
+      modulePath: trust::snapshot::head_set_delta
+      line: 866
+    summary: Delta between a snapshot's head set and the local one, in three disjoint buckets (only_in_snapshot/only_local/divergent) rather than one collapsed "gaps" list. Pure.
+    concernIds:
+      - id: C5
+        status: answered
+        justification: delta_splits_both_directions_and_divergence proves the buckets stay disjoint and correctly classified against the receiver's own local set.
+    contractTests:
+      - path: elohim/elohim-storage/src/trust/snapshot.rs
+        testName: delta_splits_both_directions_and_divergence
+        kind: unit
+
+  - name: verify_wire_snapshot_for_readiness
+    kind: verdict-fn
+    sourceLocation:
+      file: src/trust/snapshot.rs
+      modulePath: trust::snapshot::verify_wire_snapshot_for_readiness
+      line: 793
+    summary: Verifies a wire snapshot against HeadCorpusDigestReadiness rather than a bare digest; returns None (abstain) while the receiver's own corpus is Amber.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: wire_verify_abstains_while_the_receivers_own_corpus_is_amber pins that an amber receiver returns None (a THIRD, abstaining answer), not a fabricated mismatch.
+    contractTests:
+      - path: elohim/elohim-storage/src/trust/snapshot.rs
+        testName: wire_verify_abstains_while_the_receivers_own_corpus_is_amber
+        kind: unit
+
+  - name: classify_batch_call
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/head_batch_resolver.rs
+      modulePath: services::head_batch_resolver::classify_batch_call
+      line: 255
+    summary: What to do with ONE raw batch-call result — Accept/Fallback(reason)/CallFailure. Exactly two fallback triggers; everything else is CallFailure (no fallback, so a saturated conductor is never hammered with batch_size single-id calls).
+    concernIds:
+      - id: C4
+        status: answered
+        justification: the_fallback_rule_has_exactly_two_triggers proves the negative half is exhaustive — every non-matching result classifies as CallFailure, never Fallback.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/head_batch_resolver.rs
+        testName: the_fallback_rule_has_exactly_two_triggers
+        kind: unit
