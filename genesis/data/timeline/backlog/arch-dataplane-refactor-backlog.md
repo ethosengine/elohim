@@ -50,4 +50,31 @@ Ranked by leverage-per-risk for keeping dataplane iteration fast. **[MECH]** = s
 
 **Sequencing note:** items 1-9 are independently landable in any order (1, 4, 5, 7 are afternoon-sized). Items 10 → 12 → 15 are a strict dependency chain on `p2p/mod.rs`; do not run them concurrently with each other or with #6 (same file, same struct — merge-conflict zone). The custody-reconcile trait pattern (`reconcile/custody.rs`) is the proven template for 10/12/15 and should be cited in every extraction PR.
 
+## Row 16 pickup agenda (brainstorm handoff, 2026-08-08 integrator session)
+
+Row 16 carries the design take; this is the deep-dive agenda for the /brainstorm
+that picks it up. Second motivation beyond footprint scale: **verification
+velocity** — the fleet-quiesce gate and every recording wait out per-head churn
+after each deploy (45-min gate windows, multi-hour soaks, 300s sweep quanta);
+fewer governing heads ⇒ faster post-deploy quiescence ⇒ faster CI loops. This
+is slowing edge Dataplane Validation today.
+
+1. Root granularity — per-corpus / per-collection / per-author-epoch; what is
+   the re-declaration blast radius of one sub-item change under each?
+2. Reach/governance projection — per-item earned reach under a root head: does
+   the root's reach gate the bundle, or do sub-items carry reach as A2-derived
+   attributes the projection enforces?
+3. Adjudication semantics — can a peer contest a sub-item without contesting
+   the root? What does divergence adjudication mean at root granularity?
+4. Migration — how do ~4k existing A-class heads collapse into roots without a
+   partition (namespace-atomic like the iroh flip? lineage from old heads)?
+5. Interaction with the shipped drain levers (fan-out, no-chain backoff,
+   courier widening): roll-up shrinks N, levers raise throughput per N —
+   measure both on the same gauges (blocked_by, healedTotal, gate wall-clock).
+6. Falsifiable velocity claim — predict gate-quiesce wall-clock as f(head
+   count); test by bundling ONE corpus first and measuring the delta on the
+   next deploy's gate window.
+7. MANDATORY at pickup: p2p-design-gate (entry types / sync semantics change);
+   check Lamad DNA entry-type headroom.
+
 ---
