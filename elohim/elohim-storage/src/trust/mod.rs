@@ -15,7 +15,10 @@
 //! Module map:
 //! - [`stage`] — `NetworkStage`, `StakesProvenance`, `StakesResolver` (PURE).
 //! - [`pricer`] — `VerificationPricer`, the floor safety invariant (PURE).
-//! - [`snapshot`] — `HeadSetSnapshot` types only (no mint/verify — T8).
+//! - [`snapshot`] — `HeadSetSnapshot`: mint, verify (C5 re-derivation + the
+//!   C2 epoch guard), delta, and the dag-cbor CID.
+//! - [`snapshot_source`] — where a mint's inputs come from, and the (honestly
+//!   refusing) signer seam.
 //! - [`memo`] — `VerificationMemo` type, `VerificationMemoStore` trait, and
 //!   [`memo::InMemoryVerificationMemoStore`] (process-lifetime plumbing only,
 //!   T7 — nothing calls `get`/`put` yet; T9 wires consumption).
@@ -23,6 +26,7 @@
 pub mod memo;
 pub mod pricer;
 pub mod snapshot;
+pub mod snapshot_source;
 pub mod stage;
 
 pub use memo::{InMemoryVerificationMemoStore, VerificationMemo, VerificationMemoStore};
@@ -30,7 +34,16 @@ pub use pricer::{
     FloorClass, InertPricer, PricedVerification, PricingInput, PricingReason, VerificationDepth,
     VerificationPricer,
 };
-pub use snapshot::{HeadSetEntry, HeadSetSnapshot, SnapshotRefusal, SnapshotVerdict, TrustEpoch};
+pub use snapshot::{
+    compare_epochs, head_set_delta, mint_snapshot, verify_snapshot, verify_wire_snapshot,
+    verify_wire_snapshot_for_readiness, CarriedSnapshot, EpochOrdering, HeadDivergence,
+    HeadSetDelta, HeadSetEntry, HeadSetSnapshot, MintedSnapshot, SignerEdgeSet, SnapshotAcceptance,
+    SnapshotProof, SnapshotRefusal, SnapshotVerdict, TrustEpoch, VerifyInput,
+};
+pub use snapshot_source::{
+    FixedSnapshotSource, LocalHeadPlaneSnapshotSource, LocalKeySnapshotSigner, SnapshotInputs,
+    SnapshotSigner, SnapshotSource, UnavailableSnapshotSigner,
+};
 pub use stage::{FixedStakesResolver, NetworkStage, StakesProvenance, StakesResolver};
 
 /// Borrowed-context bundle for the trust-gradient seam — modeled on

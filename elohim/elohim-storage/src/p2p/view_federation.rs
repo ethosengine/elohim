@@ -289,9 +289,10 @@ pub struct SliceContext<'a> {
     /// (from `ViewFederationRequest.head_corpus_digest`; `None` ⇒ skip the
     /// comparison). Ignored for other view kinds and for any table other than
     /// [`PROJECTION_INVENTORY_TABLE_CONTENT`]. When present, the responder
-    /// computes its OWN digest via `db::content_diesel::head_corpus_digest`
-    /// and sets [`crate::views::ProjectionInventoryPayload::in_sync`] on the
-    /// reply — RESPONDER-ONLY for T4; no caller constructs this field yet.
+    /// computes its OWN digest readiness and sets
+    /// [`crate::views::ProjectionInventoryPayload::in_sync`] on the reply.
+    /// T5's requester constructs the field only behind the default-off rollout
+    /// flag and only after its own corpus leaves the amber witness window.
     pub head_corpus_digest: Option<String>,
     /// Conductor registry for the `ContentHeadRecord` view kind, which must ask
     /// THIS peer's conductor for the serialized `Record` behind its declared
@@ -776,6 +777,7 @@ fn build_inventory_payload(
                 total: 0,
                 entries: Vec::new(),
                 in_sync: None,
+                head_set_snapshot: None,
             })
             .unwrap_or(serde_json::Value::Null),
             FreshnessState::Offline,
@@ -800,6 +802,67 @@ fn build_inventory_payload(
 
     // Content table (notary-authority Leg 4) — anchored, distribution-safe rows.
     if table == PROJECTION_INVENTORY_TABLE_CONTENT {
+        // Compare BEFORE enumerating the page. The original T4 responder built
+        // the full inventory and only then computed `in_sync`, which made the
+        // advertised "zero-cost" shortcut save no responder work or wire bytes.
+        //
+        // Amber is an honest abstention, not a mismatch: while any
+        // distribution-safe row still has a NULL anchor, the witness sweep is
+        // changing the relation this digest describes. Returning `None` keeps
+        // the ordinary inventory path active without manufacturing a
+        // predictably flapping `false` verdict.
+        let in_sync = match requester_head_corpus_digest {
+            None => None,
+            Some(theirs) => {
+                match crate::db::content_diesel::head_corpus_digest_readiness(&mut conn, &app_ctx) {
+                    Ok(crate::db::content_diesel::HeadCorpusDigestReadiness::Ready {
+                        digest,
+                        total,
+                    }) if digest == theirs => {
+                        tracing::info!(
+                            target: "elohim_storage::view_federation",
+                            table = %table,
+                            total,
+                            "ProjectionInventory: corpus digest matched; skipping inventory enumeration"
+                        );
+                        let payload = ProjectionInventoryPayload {
+                            table: table.to_string(),
+                            total,
+                            entries: Vec::new(),
+                            in_sync: Some(true),
+                            head_set_snapshot: None,
+                        };
+                        return (
+                            serde_json::to_value(payload).unwrap_or(serde_json::Value::Null),
+                            FreshnessState::Live,
+                        );
+                    }
+                    Ok(crate::db::content_diesel::HeadCorpusDigestReadiness::Ready { .. }) => {
+                        Some(false)
+                    }
+                    Ok(crate::db::content_diesel::HeadCorpusDigestReadiness::Amber { pending }) => {
+                        tracing::info!(
+                            target: "elohim_storage::view_federation",
+                            table = %table,
+                            pending,
+                            "ProjectionInventory: corpus digest comparison abstained during local amber window"
+                        );
+                        None
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            target: "elohim_storage::view_federation",
+                            table = %table,
+                            error = %e,
+                            "ProjectionInventory: head corpus readiness query failed; \
+                             abstaining from in_sync verdict and serving inventory"
+                        );
+                        None
+                    }
+                }
+            }
+        };
+
         return match crate::db::content_diesel::list_content_anchor_inventory(
             &mut conn,
             &app_ctx,
@@ -831,34 +894,22 @@ fn build_inventory_payload(
                         declared_head_at: r.declared_head_at,
                     })
                     .collect();
-                // T4 (head-plane trust-gradient program): when the requester
-                // carried its own head-plane digest, answer with whether we
-                // agree. Computed ONLY on demand (never stored) — a second,
-                // unpaginated query over the SAME relation this page was
-                // drawn from. `None` when the requester sent nothing, so an
-                // old requester (or a request for a different table) pays no
-                // extra query and gets no answer to a question it never asked.
-                let in_sync = requester_head_corpus_digest.map(|theirs| {
-                    match crate::db::content_diesel::head_corpus_digest(&mut conn, &app_ctx) {
-                        Ok(ours) => ours == theirs,
-                        Err(e) => {
-                            tracing::warn!(
-                                target: "elohim_storage::view_federation",
-                                table = %table,
-                                error = %e,
-                                "ProjectionInventory: head_corpus_digest query failed; \
-                                 answering in_sync=false (fail toward re-verification, \
-                                 never toward a false shortcut)"
-                            );
-                            false
-                        }
-                    }
-                });
                 let mut payload = ProjectionInventoryPayload {
                     table: table.to_string(),
                     total,
                     entries,
                     in_sync,
+                    // T8: NO responder constructs a head-set snapshot in this
+                    // release. The DECODE + verify path
+                    // (`trust::snapshot::verify_wire_snapshot`) ships fleet-wide
+                    // first, per the `ListDocumentsSince` rollout precedent that
+                    // also governs `in_sync` above; a sender flips behind a
+                    // config flag only once every peer can read one. Minting is
+                    // additionally unsigned today (no agent-key handle exists
+                    // storage-side — see `trust::snapshot_source`), and shipping
+                    // unprovenanced attestations fleet-wide is not a switch this
+                    // task throws.
+                    head_set_snapshot: None,
                 };
                 // Responder self-protection: NEVER emit a frame our own
                 // `write_response` would reject. The id-cap above bounds the row
@@ -950,6 +1001,7 @@ fn build_inventory_payload(
                     // `in_sync` is a CONTENT-table concept (the head-plane
                     // digest join) — collectives has no such digest.
                     in_sync: None,
+                    head_set_snapshot: None,
                 };
                 let byte_dropped = fit_inventory_to_budget(&mut payload, INVENTORY_PAYLOAD_BUDGET);
                 if cap_truncated || byte_dropped > 0 {
@@ -1014,6 +1066,7 @@ fn build_inventory_payload(
                 // `in_sync` is a CONTENT-table concept — rea_commitments has
                 // no head-plane digest of its own.
                 in_sync: None,
+                head_set_snapshot: None,
             };
             // Responder self-protection (same invariant as the content path):
             // never emit a frame our own codec would reject. A no-op unless a
@@ -1505,6 +1558,64 @@ mod tests {
             Some(true),
             "a requester whose digest matches the responder's own must get in_sync=true"
         );
+        assert!(
+            payload.entries.is_empty(),
+            "a matching digest must skip inventory enumeration and wire transfer"
+        );
+        assert_eq!(
+            payload.total, 1,
+            "the shortcut still reports honest corpus size"
+        );
+    }
+
+    #[test]
+    fn content_inventory_abstains_from_digest_comparison_during_amber_window() {
+        use crate::db::content_diesel::{create_content, CreateContentInput};
+        let pool = crate::test_util::test_pool();
+        let ctx = crate::db::AppContext::default_lamad();
+        let mk = |id: &str, anchor: Option<&str>| CreateContentInput {
+            id: id.to_string(),
+            title: id.to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "public".to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+            dht_anchor_hash: anchor.map(str::to_string),
+        };
+        {
+            let mut conn = pool.get().expect("pool conn");
+            create_content(&mut conn, &ctx, mk("wf:green", Some("anc-green"))).unwrap();
+            create_content(&mut conn, &ctx, mk("wf:amber", None)).unwrap();
+        }
+
+        let partial_digest = {
+            let mut conn = pool.get().expect("pool conn");
+            crate::db::content_diesel::head_corpus_digest(&mut conn, &ctx).expect("digest")
+        };
+        let (val, state) = build_inventory_payload(
+            Some(&pool),
+            PROJECTION_INVENTORY_TABLE_CONTENT,
+            0,
+            Some(&partial_digest),
+        );
+        assert_eq!(state, FreshnessState::Live);
+        let payload: ProjectionInventoryPayload = serde_json::from_value(val).unwrap();
+        assert_eq!(
+            payload.in_sync, None,
+            "a responder with unwitnessed distribution-safe rows must abstain instead of reporting a predictably flapping match or mismatch"
+        );
+        assert_eq!(
+            payload.entries.len(),
+            1,
+            "amber abstention keeps the ordinary anchored-inventory path available"
+        );
     }
 
     #[test]
@@ -1549,6 +1660,91 @@ mod tests {
             payload.in_sync,
             Some(false),
             "a mismatched digest must answer in_sync=false, never a false shortcut"
+        );
+    }
+
+    /// T8 wire carry, end to end: mint a snapshot from the local head plane,
+    /// ride it on `ProjectionInventoryPayload::head_set_snapshot`, and verify
+    /// it on the receiving side against that receiver's OWN digest.
+    ///
+    /// This is the plumbing the responder does not yet switch on — the point of
+    /// the test is that the path is complete and reversible, so the eventual
+    /// sender flip is a one-line change rather than a new design. It also pins
+    /// the C5 property that matters most: what the receiver accepts on is a
+    /// digest IT derived, not one the snapshot asserted.
+    #[test]
+    fn a_minted_snapshot_rides_the_inventory_payload_and_verifies_on_the_far_side() {
+        use crate::db::content_diesel::{create_content, CreateContentInput};
+        use crate::trust::snapshot::{SnapshotAcceptance, SnapshotRefusal, SnapshotVerdict};
+        use crate::trust::snapshot_source::{
+            LocalHeadPlaneSnapshotSource, UnavailableSnapshotSigner,
+        };
+
+        let pool = crate::test_util::test_pool();
+        let ctx = crate::db::AppContext::default_lamad();
+        {
+            let mut conn = pool.get().expect("pool conn");
+            create_content(
+                &mut conn,
+                &ctx,
+                CreateContentInput {
+                    id: "wf:snap-a".to_string(),
+                    title: "wf:snap-a".to_string(),
+                    description: None,
+                    content_type: "concept".to_string(),
+                    content_format: "markdown".to_string(),
+                    blob_hash: None,
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "public".to_string(),
+                    created_by: None,
+                    tags: vec![],
+                    content_body: None,
+                    dht_anchor_hash: Some("anc-snap-a".to_string()),
+                },
+            )
+            .unwrap();
+        }
+
+        // Responder side: mint, then attach to the payload it would serve.
+        let minted = crate::trust::snapshot::mint_snapshot(
+            &LocalHeadPlaneSnapshotSource::new(pool.clone(), ctx.clone(), "uSigner".to_string()),
+            &UnavailableSnapshotSigner,
+        )
+        .expect("mint");
+        let payload = ProjectionInventoryPayload {
+            table: PROJECTION_INVENTORY_TABLE_CONTENT.to_string(),
+            total: 1,
+            entries: Vec::new(),
+            in_sync: Some(true),
+            head_set_snapshot: Some(minted.carried.encode_wire().expect("encode")),
+        };
+
+        // The payload rides `ViewSlice.payload` as JSON before the frame is
+        // msgpack'd, so the round-trip under test is the real one.
+        let json = serde_json::to_value(&payload).expect("to json");
+        let received: ProjectionInventoryPayload = serde_json::from_value(json).expect("from json");
+        let carried = received
+            .head_set_snapshot
+            .expect("snapshot survives the wire");
+
+        // Receiver side: its OWN digest is the oracle.
+        let local_digest = {
+            let mut conn = pool.get().expect("pool conn");
+            crate::db::content_diesel::head_corpus_digest(&mut conn, &ctx).expect("digest")
+        };
+        assert_eq!(
+            crate::trust::snapshot::verify_wire_snapshot(&carried, &local_digest, None),
+            SnapshotVerdict::Accepted(SnapshotAcceptance::UnprovenSigner),
+            "an in-sync receiver accepts at zero verification cost — and marks the \
+             provenance unproven, because nothing storage-side can sign"
+        );
+        assert_eq!(
+            crate::trust::snapshot::verify_wire_snapshot(&carried, "sha256:different", None),
+            SnapshotVerdict::Refused(SnapshotRefusal::CorpusDigestMismatch),
+            "and a receiver whose own corpus differs refuses — the snapshot's own \
+             claim never decides this"
         );
     }
 
@@ -1714,6 +1910,7 @@ mod tests {
             total: entries.len(),
             entries,
             in_sync: None,
+            head_set_snapshot: None,
         };
         let serialized = inventory_payload_len(&payload);
         assert!(
@@ -1742,6 +1939,7 @@ mod tests {
             total: original,
             entries,
             in_sync: None,
+            head_set_snapshot: None,
         };
 
         // A deliberately small budget forces the trim regardless of MAX_PAYLOAD.
@@ -1804,6 +2002,7 @@ mod tests {
                 },
             ],
             in_sync: None,
+            head_set_snapshot: None,
         };
         let dropped = fit_inventory_to_budget(&mut payload, INVENTORY_PAYLOAD_BUDGET);
         assert_eq!(dropped, 0, "a small payload under budget is never trimmed");

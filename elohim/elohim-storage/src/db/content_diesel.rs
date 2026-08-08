@@ -1792,20 +1792,69 @@ pub fn list_content_anchor_inventory(
 /// digest another peer advertises (on `ViewFederationRequest.head_corpus_digest`,
 /// or inside a signed `HeadSetSnapshot`) is already in sync with that peer's
 /// head plane at zero verification cost — see `trust::snapshot::HeadSetSnapshot`.
+fn load_head_corpus_rows(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+) -> Result<Vec<(String, Option<String>)>, StorageError> {
+    content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::reach.eq_any(DISTRIBUTION_SAFE_REACH))
+        .select((content::id, content::dht_anchor_hash))
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("head corpus digest load failed: {e}")))
+}
+
+/// Whether the distribution-safe head corpus is stable enough to advertise as
+/// a cross-peer equality shortcut.
+///
+/// `Amber` is derived from the presence of distribution-safe rows that the DHT
+/// has not witnessed yet (`dht_anchor_hash IS NULL`). During a bulk-seed witness
+/// sweep that set shrinks on every tick, so hashing only the anchored subset
+/// would produce a sequence of technically-correct but predictably mismatching
+/// digests. Callers must abstain until the relation is `Ready`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HeadCorpusDigestReadiness {
+    /// At least one cross-peer-visible row is still awaiting DHT witness.
+    Amber { pending: usize },
+    /// Every cross-peer-visible row is witnessed; the digest names the whole
+    /// stable relation at this database snapshot.
+    Ready { digest: String, total: usize },
+}
+
+/// Read digest eligibility and, when eligible, the digest itself from ONE SQL
+/// snapshot. A count query followed by a digest query would leave a race where
+/// a newly inserted amber row could arrive between the two and turn a partial
+/// relation into an advertised "whole corpus" fingerprint.
+pub fn head_corpus_digest_readiness(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+) -> Result<HeadCorpusDigestReadiness, StorageError> {
+    let rows = load_head_corpus_rows(conn, ctx)?;
+    let pending = rows.iter().filter(|(_, anchor)| anchor.is_none()).count();
+    if pending > 0 {
+        return Ok(HeadCorpusDigestReadiness::Amber { pending });
+    }
+
+    let total = rows.len();
+    let entries = rows
+        .into_iter()
+        .filter_map(|(id, anchor)| anchor.map(|a| format!("{id}={a}")))
+        .collect();
+    Ok(HeadCorpusDigestReadiness::Ready {
+        digest: crate::p2p::reconcile_rails::digest_of_entry_lines(entries),
+        total,
+    })
+}
+
 pub fn head_corpus_digest(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
 ) -> Result<String, StorageError> {
-    let rows: Vec<(String, Option<String>)> = content::table
-        .filter(content::h_app_id.eq(&ctx.h_app_id))
-        .filter(content::dht_anchor_hash.is_not_null())
-        .filter(content::reach.eq_any(DISTRIBUTION_SAFE_REACH))
-        .select((content::id, content::dht_anchor_hash))
-        .load(conn)
-        .map_err(|e| StorageError::Internal(format!("head corpus digest load failed: {e}")))?;
+    let rows = load_head_corpus_rows(conn, ctx)?;
 
-    // `IS NOT NULL` guarantees `Some` (same defensive `filter_map`, not
-    // `unwrap`, discipline as `list_content_anchor_inventory`).
+    // The raw digest remains useful for diagnostics and snapshot verification
+    // during the amber window. Cross-peer requesters MUST use
+    // `head_corpus_digest_readiness` and abstain while it reports Amber.
     let entries: Vec<String> = rows
         .into_iter()
         .filter_map(|(id, anchor)| anchor.map(|a| format!("{id}={a}")))
@@ -2599,6 +2648,52 @@ mod tests {
             baseline, after_change,
             "a changed anchor on an eligible row MUST change the digest — this is the \
              signal the in_sync shortcut relies on to catch divergence"
+        );
+    }
+
+    #[test]
+    fn head_corpus_digest_readiness_abstains_until_distribution_safe_rows_are_witnessed() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::default_lamad();
+        let mk = |id: &str, reach: &str, anchor: Option<&str>| CreateContentInput {
+            id: id.to_string(),
+            title: id.to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: reach.to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+            dht_anchor_hash: anchor.map(str::to_string),
+        };
+        create_content(&mut conn, &ctx, mk("c:green", "public", Some("anc-green"))).unwrap();
+        create_content(&mut conn, &ctx, mk("c:amber", "commons", None)).unwrap();
+        create_content(&mut conn, &ctx, mk("c:private", "private", None)).unwrap();
+
+        assert_eq!(
+            head_corpus_digest_readiness(&mut conn, &ctx).unwrap(),
+            HeadCorpusDigestReadiness::Amber { pending: 1 },
+            "only a distribution-safe NULL-anchor row holds the digest in amber; scoped rows never cross this peer boundary"
+        );
+
+        diesel::update(content::table.filter(content::id.eq("c:amber")))
+            .set(content::dht_anchor_hash.eq("anc-amber"))
+            .execute(&mut conn)
+            .unwrap();
+
+        let expected = head_corpus_digest(&mut conn, &ctx).unwrap();
+        assert_eq!(
+            head_corpus_digest_readiness(&mut conn, &ctx).unwrap(),
+            HeadCorpusDigestReadiness::Ready {
+                digest: expected,
+                total: 2,
+            },
+            "the shortcut becomes eligible exactly when the whole distribution-safe relation is witnessed"
         );
     }
 

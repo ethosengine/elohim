@@ -326,24 +326,51 @@ pub struct ProjectionInventoryPayload {
     /// ADDITIVE (T4, head-plane trust-gradient program plan §3 L2): set by the
     /// responder ONLY when the request carried
     /// [`ViewFederationRequest::head_corpus_digest`] for the `content` table —
-    /// `Some(true)` when the responder's OWN
-    /// `db::content_diesel::head_corpus_digest` equals the requester's digest
-    /// (the requester is already in sync with this peer's head plane at zero
-    /// verification cost), `Some(false)` on a mismatch, `None` when the
-    /// requester sent no digest (or asked a different table) — the pre-T4
-    /// shape, so an old requester paying no digest cost gets no answer to it.
+    /// `Some(true)` when the responder's OWN ready corpus digest equals the
+    /// requester's digest (the requester is already in sync with this peer's
+    /// head plane and the responder omits inventory enumeration), `Some(false)`
+    /// on a ready-corpus mismatch, `None` when either side is inside its
+    /// bulk-seed amber window, the requester sent no digest, or the request is
+    /// for a different table. Amber abstention is intentionally distinct from
+    /// mismatch: the anchored subset is still changing while witness work
+    /// remains.
     ///
-    /// This is a RESPONDER-COMPUTED verdict only; T4 lands ONLY this side. No
-    /// caller in this release constructs `head_corpus_digest` on the request
-    /// (that is T5, behind a config flag, deployed after the fleet-wide
-    /// responder rollout) — see the rollout rule on
-    /// [`ViewFederationRequest::head_corpus_digest`].
+    /// T5's requester remains dormant by default behind
+    /// `ELOHIM_HEAD_CORPUS_DIGEST` and additionally suppresses the field while
+    /// its own distribution-safe corpus is amber. The operator flips it only
+    /// after the T4 responder is fleet-wide.
     ///
     /// `skip_serializing_if` keeps the `None` encoding byte-identical to the
     /// pre-field shape, same discipline as `declared_head_action_hash` /
     /// `inventory_offset`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub in_sync: Option<bool>,
+    /// ADDITIVE (T8, head-plane trust-gradient program plan §3 L5): a
+    /// `trust::snapshot::CarriedSnapshot` — a `HeadSetSnapshot` plus its
+    /// optional detached signer proof — encoded as base64(dag-cbor canonical
+    /// bytes).
+    ///
+    /// **Bytes, not a structured field, on purpose.** The snapshot's CID is
+    /// minted over exactly these canonical bytes (`epr_codec::encode_epr_head`
+    /// pattern, dag-cbor 0x71), so carrying the bytes lets the receiver
+    /// re-derive the CID and re-verify the signature over the SAME preimage
+    /// the signer signed. A structured field would be re-encoded by this
+    /// crate's serializer and could differ byte-for-byte from what was signed
+    /// — evidence-not-authority (C5) requires the receiver to check the
+    /// original bytes, not a re-serialization of them. It also keeps this
+    /// wire crate free of a `cid`/dag-cbor dependency.
+    ///
+    /// **NO responder in this release constructs this field.** Same rollout
+    /// rule as `in_sync` / `head_corpus_digest` (the `ListDocumentsSince`
+    /// precedent): the DECODE + verify path ships fleet-wide first, and a
+    /// later task flips a sender behind a config flag. Receiving one changes
+    /// no behavior today — `trust::snapshot::verify_snapshot` returns a
+    /// verdict that is logged, never adopted.
+    ///
+    /// `skip_serializing_if` keeps the `None` encoding byte-identical to the
+    /// pre-field shape, same discipline as `in_sync` / `inventory_offset`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head_set_snapshot: Option<String>,
 }
 
 /// Per-device slice returned over the view-federation/1.0.0 libp2p protocol;
@@ -400,20 +427,19 @@ pub struct ViewFederationRequest {
     /// paying a full inventory round-trip when the two peers already agree.
     /// Ignored for non-`content`, non-`ProjectionInventory` view kinds.
     ///
-    /// **T4 wires the RESPONDER side only.** No caller in this release sets
-    /// this field — that is T5, gated behind a config flag, and per the
-    /// `ListDocumentsSince` rollout precedent it ships only after every
-    /// responder in the fleet has this field's decode path (one release
-    /// ahead), so an old responder never sees a digest it doesn't know to
-    /// answer.
+    /// **T5 requester rollout.** `projection_reconcile` sets this field only
+    /// when `ELOHIM_HEAD_CORPUS_DIGEST` is enabled AND every
+    /// distribution-safe local content row has a DHT anchor. The flag defaults
+    /// off until the T4 responder is fleet-wide; the readiness gate suppresses
+    /// digest flap during the hours-long bulk-seed witness window.
     ///
     /// ## Wire compatibility (MANDATORY — mixed-version peers during rolling
     /// deploys)
     ///
     /// Additive and optional, same discipline as `inventory_offset`:
     /// - a NEW peer sending this key to an OLD responder: the old struct lacks
-    ///   the field and ignores the unknown key → no `in_sync` answer
-    ///   (yesterday's behavior, since T5 has not landed a sender yet anyway);
+    ///   the field and ignores the unknown key → no `in_sync` answer, so the
+    ///   requester follows the ordinary inventory path;
     /// - an OLD peer sending no key to a NEW responder: `#[serde(default)]`
     ///   yields `None` → the responder skips the digest comparison and omits
     ///   `in_sync` (yesterday's behavior).
@@ -845,6 +871,7 @@ mod head_corpus_digest_wire_compat_tests {
             total: 0,
             entries: Vec::new(),
             in_sync: Some(true),
+            head_set_snapshot: None,
         };
         let bytes = rmp_serde::to_vec_named(&payload).unwrap();
         let back: ProjectionInventoryPayload = rmp_serde::from_slice(&bytes).unwrap();
@@ -959,6 +986,7 @@ mod head_corpus_digest_wire_compat_tests {
                 declared_head_at: None,
             }],
             in_sync: None,
+            head_set_snapshot: None,
         };
         let old = OldProjectionInventoryPayload {
             table: "content".into(),
@@ -981,5 +1009,131 @@ mod head_corpus_digest_wire_compat_tests {
         let decoded: OldProjectionInventoryPayload = rmp_serde::from_slice(&new_bytes)
             .expect("an old peer must still decode a None-in_sync payload");
         assert_eq!(decoded, old);
+    }
+}
+
+/// Wire-compat tests for T8 (head-plane trust-gradient program plan §3 L5):
+/// `ProjectionInventoryPayload::head_set_snapshot`. Same three-legged
+/// discipline as the two additive fields above — round-trip present, old bytes
+/// on the new struct, and byte-identity when `None` (which is what proves the
+/// new bytes decode on an old peer).
+#[cfg(test)]
+mod head_set_snapshot_wire_compat_tests {
+    use super::*;
+
+    /// Yesterday's `ProjectionInventoryPayload` — post-`in_sync` (T4), which
+    /// is the REAL immediately-pre-T8 shape, not the pre-`in_sync` one a
+    /// feature back.
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+    #[serde(rename_all = "camelCase")]
+    struct OldProjectionInventoryPayload {
+        table: String,
+        total: usize,
+        entries: Vec<ProjectionInventoryEntry>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        in_sync: Option<bool>,
+    }
+
+    fn entry() -> ProjectionInventoryEntry {
+        ProjectionInventoryEntry {
+            id: "epr:a".into(),
+            dht_anchor_hash: "anc-a".into(),
+            declared_head_action_hash: None,
+            declared_head_at: None,
+        }
+    }
+
+    #[test]
+    fn head_set_snapshot_round_trips_when_present() {
+        let payload = ProjectionInventoryPayload {
+            table: "content".into(),
+            total: 1,
+            entries: vec![entry()],
+            in_sync: Some(true),
+            // Opaque to this crate by design: base64(dag-cbor canonical bytes).
+            head_set_snapshot: Some("o2Vwcm9vZg".into()),
+        };
+        let bytes = rmp_serde::to_vec_named(&payload).unwrap();
+        let back: ProjectionInventoryPayload = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(back, payload);
+
+        // The payload also rides `ViewSlice.payload` as JSON before the frame
+        // is msgpack'd, so the JSON leg must round-trip identically.
+        let json = serde_json::to_value(&payload).unwrap();
+        assert_eq!(
+            json.get("headSetSnapshot").and_then(|v| v.as_str()),
+            Some("o2Vwcm9vZg")
+        );
+        let via_json: ProjectionInventoryPayload = serde_json::from_value(json).unwrap();
+        assert_eq!(via_json, payload);
+    }
+
+    #[test]
+    fn new_peer_decodes_old_payload_bytes_defaulting_the_snapshot_to_none() {
+        let old = OldProjectionInventoryPayload {
+            table: "content".into(),
+            total: 1,
+            entries: vec![entry()],
+            in_sync: Some(false),
+        };
+        let bytes = rmp_serde::to_vec_named(&old).unwrap();
+        let new: ProjectionInventoryPayload = rmp_serde::from_slice(&bytes)
+            .expect("new struct must decode a payload missing head_set_snapshot");
+        assert_eq!(
+            new.head_set_snapshot, None,
+            "missing key defaults to None — nothing to verify, so no verdict"
+        );
+        assert_eq!(new.in_sync, Some(false), "sibling field unaffected");
+
+        let json = serde_json::to_string(&old).unwrap();
+        let via_json: ProjectionInventoryPayload = serde_json::from_str(&json)
+            .expect("JSON leg defaults the missing head_set_snapshot too");
+        assert_eq!(via_json.head_set_snapshot, None);
+    }
+
+    #[test]
+    fn none_head_set_snapshot_is_byte_identical_to_the_pre_field_encoding() {
+        let new = ProjectionInventoryPayload {
+            table: "content".into(),
+            total: 1,
+            entries: vec![entry()],
+            in_sync: Some(true),
+            head_set_snapshot: None,
+        };
+        let old = OldProjectionInventoryPayload {
+            table: "content".into(),
+            total: 1,
+            entries: vec![entry()],
+            in_sync: Some(true),
+        };
+        let new_bytes = rmp_serde::to_vec_named(&new).unwrap();
+        assert_eq!(
+            new_bytes,
+            rmp_serde::to_vec_named(&old).unwrap(),
+            "None head_set_snapshot must serialize byte-identically to the pre-field \
+             struct — every responder that never attaches one emits yesterday's frame, \
+             so a rolling deploy is invisible on the wire"
+        );
+        let decoded: OldProjectionInventoryPayload = rmp_serde::from_slice(&new_bytes)
+            .expect("an old peer must still decode a None-snapshot payload");
+        assert_eq!(decoded, old);
+    }
+
+    #[test]
+    fn old_peer_ignores_a_carried_snapshot_it_does_not_understand() {
+        // A NEW responder that HAS flipped the sender emits the extra key; a
+        // pre-T8 peer must degrade to yesterday's behavior, not fail decode.
+        let new = ProjectionInventoryPayload {
+            table: "content".into(),
+            total: 1,
+            entries: vec![entry()],
+            in_sync: None,
+            head_set_snapshot: Some("o2Vwcm9vZg".into()),
+        };
+        let bytes = rmp_serde::to_vec_named(&new).unwrap();
+        let old: OldProjectionInventoryPayload = rmp_serde::from_slice(&bytes)
+            .expect("old struct tolerates the unknown head_set_snapshot key");
+        assert_eq!(old.entries, vec![entry()]);
+        assert_eq!(old.total, 1);
     }
 }

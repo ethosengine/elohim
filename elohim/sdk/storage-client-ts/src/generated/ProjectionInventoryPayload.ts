@@ -25,21 +25,49 @@ entries: Array<ProjectionInventoryEntry>,
  * ADDITIVE (T4, head-plane trust-gradient program plan §3 L2): set by the
  * responder ONLY when the request carried
  * [`ViewFederationRequest::head_corpus_digest`] for the `content` table —
- * `Some(true)` when the responder's OWN
- * `db::content_diesel::head_corpus_digest` equals the requester's digest
- * (the requester is already in sync with this peer's head plane at zero
- * verification cost), `Some(false)` on a mismatch, `None` when the
- * requester sent no digest (or asked a different table) — the pre-T4
- * shape, so an old requester paying no digest cost gets no answer to it.
+ * `Some(true)` when the responder's OWN ready corpus digest equals the
+ * requester's digest (the requester is already in sync with this peer's
+ * head plane and the responder omits inventory enumeration), `Some(false)`
+ * on a ready-corpus mismatch, `None` when either side is inside its
+ * bulk-seed amber window, the requester sent no digest, or the request is
+ * for a different table. Amber abstention is intentionally distinct from
+ * mismatch: the anchored subset is still changing while witness work
+ * remains.
  *
- * This is a RESPONDER-COMPUTED verdict only; T4 lands ONLY this side. No
- * caller in this release constructs `head_corpus_digest` on the request
- * (that is T5, behind a config flag, deployed after the fleet-wide
- * responder rollout) — see the rollout rule on
- * [`ViewFederationRequest::head_corpus_digest`].
+ * T5's requester remains dormant by default behind
+ * `ELOHIM_HEAD_CORPUS_DIGEST` and additionally suppresses the field while
+ * its own distribution-safe corpus is amber. The operator flips it only
+ * after the T4 responder is fleet-wide.
  *
  * `skip_serializing_if` keeps the `None` encoding byte-identical to the
  * pre-field shape, same discipline as `declared_head_action_hash` /
  * `inventory_offset`.
  */
-inSync: boolean | null, };
+inSync: boolean | null, 
+/**
+ * ADDITIVE (T8, head-plane trust-gradient program plan §3 L5): a
+ * `trust::snapshot::CarriedSnapshot` — a `HeadSetSnapshot` plus its
+ * optional detached signer proof — encoded as base64(dag-cbor canonical
+ * bytes).
+ *
+ * **Bytes, not a structured field, on purpose.** The snapshot's CID is
+ * minted over exactly these canonical bytes (`epr_codec::encode_epr_head`
+ * pattern, dag-cbor 0x71), so carrying the bytes lets the receiver
+ * re-derive the CID and re-verify the signature over the SAME preimage
+ * the signer signed. A structured field would be re-encoded by this
+ * crate's serializer and could differ byte-for-byte from what was signed
+ * — evidence-not-authority (C5) requires the receiver to check the
+ * original bytes, not a re-serialization of them. It also keeps this
+ * wire crate free of a `cid`/dag-cbor dependency.
+ *
+ * **NO responder in this release constructs this field.** Same rollout
+ * rule as `in_sync` / `head_corpus_digest` (the `ListDocumentsSince`
+ * precedent): the DECODE + verify path ships fleet-wide first, and a
+ * later task flips a sender behind a config flag. Receiving one changes
+ * no behavior today — `trust::snapshot::verify_snapshot` returns a
+ * verdict that is logged, never adopted.
+ *
+ * `skip_serializing_if` keeps the `None` encoding byte-identical to the
+ * pre-field shape, same discipline as `in_sync` / `inventory_offset`.
+ */
+headSetSnapshot: string | null, };
