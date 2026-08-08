@@ -11,10 +11,12 @@
 //!    conductor returns local absence without a network wait, then returns the
 //!    elected head after its DHT view converges.
 //! 6. `resolve_content_heads_local_batches_in_order_and_honors_budget` —
-//!    Head-Plane Trust-Gradient Program T1: batched, budget-bounded
+//!    Head-Plane Trust-Gradient Program T1 (contract revised per the
+//!    operator review 2026-08-08): batched, budget-bounded
 //!    `resolve_content_heads_local` / `resolve_canonical_elections` against a
-//!    live conductor (order preserved, honest per-id absence, zero-budget
-//!    starves every id as `unattempted`).
+//!    live conductor (order preserved, honest per-id `Resolved(None)`
+//!    absence, zero-budget starves every id as `unattempted` with
+//!    `stop_reason: BudgetExhausted`, `schema_version` present).
 //!
 //! The coordinator zome is `content_store` (per dna/elohim/dna.yaml).
 //! DNA artifact: `dna/elohim/workdir/lamad.dna`.
@@ -211,24 +213,115 @@ struct BatchIdsInput {
     pub budget_ms: Option<u32>,
 }
 
-/// Mirrors `content_store::BatchResolveHeadsOutput`. `resolved` is a
-/// `(String, Option<ContentHeadOutput>)` pair per id — MessagePack encodes a
-/// Rust tuple as a fixed-size array, which is exactly what `rmp_serde`
-/// (used identically on both the zome and the elohim-storage side) decodes
-/// back into a tuple, so this mirrors the wire shape without reinterpreting it.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct BatchResolveHeadsOutput {
-    pub resolved: Vec<(String, Option<ContentHeadOutput>)>,
-    pub unattempted: Vec<String>,
-    pub elapsed_ms: u32,
+// ---------------------------------------------------------------------------
+// Batched head-plane reads — contract revision (operator review 2026-08-08)
+//
+// Mirrors of `content_store::{BatchFailureReason, BatchResolvePhase,
+// BatchResolveFailure, BatchOutcome<T>, BatchAttempt<T>, BatchStopReason,
+// BatchResolveHeadsOutput, BatchResolveElectionsOutput}`. Live-poison
+// injection (a coordinator-compatible bad link, a cross-id link) is not
+// feasible from this standalone sweettest harness, so this suite proves
+// SHAPE + ORDERING + BUDGET STARVATION + `schema_version` presence against a
+// real conductor — the per-item failure-disposition semantics themselves are
+// pinned by the zome's own `run_admitted_batch_tests`
+// (deterministic-continue / shared-stop / duplicate-ordering /
+// clock-failure), which inject synthetic outcomes and need no conductor.
+// ---------------------------------------------------------------------------
+
+/// Mirrors `content_store::BatchFailureReason`.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum BatchFailureReason {
+    WrongContentId,
+    RecordShape,
+    PermitTimeout,
+    Transport,
+    ClockUnavailable,
+    Unknown,
 }
 
-/// Mirrors `content_store::BatchResolveElectionsOutput`.
+/// Mirrors `content_store::BatchResolvePhase`.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum BatchResolvePhase {
+    HeadResolve,
+    Election,
+    Clock,
+}
+
+/// Mirrors `content_store::BatchResolveFailure`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct BatchResolveFailure {
+    #[allow(dead_code)]
+    reason: BatchFailureReason,
+    #[allow(dead_code)]
+    phase: BatchResolvePhase,
+}
+
+/// Mirrors `content_store::BatchHeadOutcome` (`BatchOutcome<ContentHeadOutput>`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+enum BatchHeadOutcome {
+    Resolved(Option<ContentHeadOutput>),
+    #[allow(dead_code)]
+    Failed(BatchResolveFailure),
+}
+
+/// Mirrors `content_store::BatchHeadAttempt`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct BatchHeadAttempt {
+    id: String,
+    outcome: BatchHeadOutcome,
+}
+
+/// Mirrors `content_store::BatchElectionOutcome` (`BatchOutcome<CanonicalElectionOutput>`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+enum BatchElectionOutcome {
+    Resolved(Option<CanonicalElectionOutput>),
+    #[allow(dead_code)]
+    Failed(BatchResolveFailure),
+}
+
+/// Mirrors `content_store::BatchElectionAttempt`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct BatchElectionAttempt {
+    id: String,
+    outcome: BatchElectionOutcome,
+}
+
+/// Mirrors `content_store::BatchStopReason`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+enum BatchStopReason {
+    BudgetExhausted,
+    #[allow(dead_code)]
+    IdCeiling,
+    #[allow(dead_code)]
+    SharedFailure(BatchFailureReason),
+}
+
+/// Mirrors `content_store::BatchResolveHeadsOutput` (post-revision shape:
+/// `schema_version` + `attempted: Vec<BatchHeadAttempt>` + `unattempted` +
+/// `stop_reason` + `elapsed_ms` — T1's original `resolved`/`unattempted`/
+/// `elapsed_ms` shape is gone; the zome's own
+/// `batch_output_wire_contract_tests` pins that an old-shape decode of a
+/// new-shape response fails outright).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct BatchResolveHeadsOutput {
+    schema_version: u16,
+    attempted: Vec<BatchHeadAttempt>,
+    unattempted: Vec<String>,
+    stop_reason: Option<BatchStopReason>,
+    elapsed_ms: u32,
+}
+
+/// Mirrors `content_store::BatchResolveElectionsOutput` (same post-revision
+/// shape as [`BatchResolveHeadsOutput`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct BatchResolveElectionsOutput {
-    pub resolved: Vec<(String, Option<CanonicalElectionOutput>)>,
-    pub unattempted: Vec<String>,
-    pub elapsed_ms: u32,
+    schema_version: u16,
+    attempted: Vec<BatchElectionAttempt>,
+    unattempted: Vec<String>,
+    stop_reason: Option<BatchStopReason>,
+    elapsed_ms: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -1939,25 +2032,40 @@ async fn adopt_before_author_declares_without_a_local_chain() -> Result<()> {
     Ok(())
 }
 
-/// Head-Plane Trust-Gradient Program (L1/T1) — batched, budget-bounded reads
-/// against a LIVE conductor. Complements the pure `batch_deadline_admission`
-/// unit tests in the zome (ceiling clamp, default fill, deadline evaluation)
-/// with the one thing they cannot exercise: real `sys_time()` host calls and
-/// a real `select_election`/`resolve_content_head_inner` delegation.
+/// Head-Plane Trust-Gradient Program (L1/T1, contract revised per the
+/// operator review 2026-08-08) — batched, budget-bounded reads against a
+/// LIVE conductor. Complements the pure `batch_deadline_admission` /
+/// `run_admitted_batch` unit tests in the zome (ceiling clamp, default fill,
+/// deadline evaluation, deterministic-continue, shared-stop,
+/// duplicate-ordering, clock-failure — none of which need a conductor) with
+/// the one thing they cannot exercise: real `sys_time()` host calls and a
+/// real `select_election`/`resolve_content_head_inner` delegation through
+/// the NEW typed-outcome output shape.
 ///
-/// Proves:
+/// Live-poison injection (a coordinator-compatible bad link, a cross-id
+/// link) is not feasible from this standalone sweettest harness — those
+/// defect-2/defect-3 failure paths are pinned at the zome's own unit level
+/// (`run_admitted_batch_tests::deterministic_failure_preserves_earlier_and_later_successes`,
+/// `run_admitted_batch_tests::wrong_id_refusal_is_typed_failed_not_mislabeled_resolved`).
+/// This test proves SHAPE + ORDERING + BUDGET STARVATION +
+/// `schema_version` presence instead:
 ///   a. `resolve_content_heads_local` answers a batch of `[known, MISSING,
-///      known]` in ONE call, preserving input order, and the missing id comes
-///      back `None` — the SAME honest local-absence contract as the single-id
-///      extern, never an error and never dropped from `resolved`.
+///      known]` in ONE call, preserving input order, and the missing id
+///      comes back `BatchHeadOutcome::Resolved(None)` — the SAME honest
+///      local-absence contract as the single-id extern, never a `Failed`
+///      and never dropped from `attempted`. `schema_version` is present and
+///      matches the current contract. `stop_reason` is `None` (everything
+///      was attempted).
 ///   b. `budget_ms: Some(0)` admits NOTHING: every id comes back
-///      `unattempted` (never started) rather than resolved — the in-wasm
-///      deadline is wired end-to-end through a real conductor, not only
-///      provable in the pure predicate's unit tests.
+///      `unattempted` (never started) rather than an `attempted` entry —
+///      the in-wasm deadline is wired end-to-end through a real conductor,
+///      not only provable in the pure predicate's unit tests — and
+///      `stop_reason` names it `BudgetExhausted`, never confused with a
+///      per-item or shared failure.
 ///   c. `resolve_canonical_elections` mirrors the same batch shape for the
-///      bare DHT election: after A declares its own root canonical, the batch
-///      answer reports A's election and honest absence for B (never
-///      declared) — in order, in one call.
+///      bare DHT election: after A declares its own root canonical, the
+///      batch answer reports A's election and honest absence for B (never
+///      declared) — in order, in one call, `schema_version` present.
 #[tokio::test(flavor = "multi_thread")]
 async fn resolve_content_heads_local_batches_in_order_and_honors_budget() -> Result<()> {
     let (mut conductor, agent) = single_agent_conductor().await?;
@@ -1979,8 +2087,8 @@ async fn resolve_content_heads_local_batches_in_order_and_honors_budget() -> Res
         .call(&zome, "create_content", test_content(&id_b))
         .await;
 
-    // --- (a) order preserved; a genuinely-unknown id resolves to `None`, not
-    // an error and not a hole in `resolved`.
+    // --- (a) order preserved; a genuinely-unknown id resolves to
+    // `Resolved(None)`, never `Failed` and never a hole in `attempted`.
     let batch: BatchResolveHeadsOutput = conductor
         .call(
             &zome,
@@ -1992,7 +2100,11 @@ async fn resolve_content_heads_local_batches_in_order_and_honors_budget() -> Res
         )
         .await;
     assert_eq!(
-        batch.resolved.len(),
+        batch.schema_version, 1,
+        "schema_version is present and names the current contract"
+    );
+    assert_eq!(
+        batch.attempted.len(),
         3,
         "all three ids are attempted under the default budget"
     );
@@ -2000,42 +2112,39 @@ async fn resolve_content_heads_local_batches_in_order_and_honors_budget() -> Res
         batch.unattempted.is_empty(),
         "nothing should be starved under the default budget"
     );
+    assert!(
+        batch.stop_reason.is_none(),
+        "every id was attempted — no stop reason"
+    );
     assert_eq!(
-        batch.resolved[0].0, id_a,
+        batch.attempted[0].id, id_a,
         "input order is preserved (index 0)"
     );
+    let BatchHeadOutcome::Resolved(Some(head_a)) = &batch.attempted[0].outcome else {
+        panic!("id_a must resolve to a head, not a failure or absence");
+    };
+    assert_eq!(head_a.head_action_hash, created_a.action_hash);
     assert_eq!(
-        batch.resolved[0]
-            .1
-            .as_ref()
-            .expect("id_a resolves to its created head")
-            .head_action_hash,
-        created_a.action_hash
-    );
-    assert_eq!(
-        batch.resolved[1].0, missing_id,
+        batch.attempted[1].id, missing_id,
         "input order is preserved (index 1)"
     );
     assert!(
-        batch.resolved[1].1.is_none(),
-        "a genuinely unknown id is honest local absence — None, never an error, \
-         never dropped from `resolved`"
+        matches!(batch.attempted[1].outcome, BatchHeadOutcome::Resolved(None)),
+        "a genuinely unknown id is honest local absence — Resolved(None), \
+         never Failed, never dropped from `attempted`"
     );
     assert_eq!(
-        batch.resolved[2].0, id_b,
+        batch.attempted[2].id, id_b,
         "input order is preserved (index 2)"
     );
-    assert_eq!(
-        batch.resolved[2]
-            .1
-            .as_ref()
-            .expect("id_b resolves to its created head")
-            .head_action_hash,
-        created_b.action_hash
-    );
+    let BatchHeadOutcome::Resolved(Some(head_b)) = &batch.attempted[2].outcome else {
+        panic!("id_b must resolve to a head, not a failure or absence");
+    };
+    assert_eq!(head_b.head_action_hash, created_b.action_hash);
 
     // --- (b) a zero budget admits nothing: every id is `unattempted` (never
-    // started), not resolved-to-None — the two must never be confused.
+    // started), not an `attempted` entry — the two must never be confused,
+    // and `stop_reason` names ordinary budget exhaustion, not a failure.
     let starved: BatchResolveHeadsOutput = conductor
         .call(
             &zome,
@@ -2046,8 +2155,9 @@ async fn resolve_content_heads_local_batches_in_order_and_honors_budget() -> Res
             },
         )
         .await;
+    assert_eq!(starved.schema_version, 1);
     assert!(
-        starved.resolved.is_empty(),
+        starved.attempted.is_empty(),
         "zero budget must start no per-id work at all"
     );
     assert_eq!(
@@ -2055,6 +2165,11 @@ async fn resolve_content_heads_local_batches_in_order_and_honors_budget() -> Res
         vec![id_a.clone(), id_b.clone()],
         "every id is reported unattempted, in order — NOT a failure, and NOT \
          the same as a resolved None"
+    );
+    assert_eq!(
+        starved.stop_reason,
+        Some(BatchStopReason::BudgetExhausted),
+        "zero budget stops on ordinary budget exhaustion, never a shared failure"
     );
 
     // --- (c) `resolve_canonical_elections` mirrors the batch shape for the
@@ -2081,13 +2196,14 @@ async fn resolve_content_heads_local_batches_in_order_and_honors_budget() -> Res
             },
         )
         .await;
-    assert_eq!(elections.resolved.len(), 2);
+    assert_eq!(elections.schema_version, 1);
+    assert_eq!(elections.attempted.len(), 2);
     assert!(elections.unattempted.is_empty());
-    assert_eq!(elections.resolved[0].0, id_a);
-    let election_a = elections.resolved[0]
-        .1
-        .as_ref()
-        .expect("A has a canonical election after declaring");
+    assert!(elections.stop_reason.is_none());
+    assert_eq!(elections.attempted[0].id, id_a);
+    let BatchElectionOutcome::Resolved(Some(election_a)) = &elections.attempted[0].outcome else {
+        panic!("A must have a canonical election after declaring");
+    };
     assert!(
         !election_a.canonical_earned,
         "the god-mode scaffold declares STAGING, never earned"
@@ -2097,9 +2213,12 @@ async fn resolve_content_heads_local_batches_in_order_and_honors_budget() -> Res
         ActionHashB64::from(declared.head_action_hash.clone()).to_string(),
         "the batched election answer names the same winner the declare returned"
     );
-    assert_eq!(elections.resolved[1].0, id_b);
+    assert_eq!(elections.attempted[1].id, id_b);
     assert!(
-        elections.resolved[1].1.is_none(),
+        matches!(
+            elections.attempted[1].outcome,
+            BatchElectionOutcome::Resolved(None)
+        ),
         "B never declared a canonical head — honest absence, not an error"
     );
 

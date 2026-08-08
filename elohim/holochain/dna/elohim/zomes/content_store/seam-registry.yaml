@@ -410,3 +410,203 @@ decisionPoints:
       clauses are exercised WITH adopt_before_author=true. This also partly closes
       validate_carried_head_record's sibling gapNote about the shared helper being reachable
       only through one declare shape — it is now exercised through two.
+
+  - name: batch_failure_disposition
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/lib.rs
+      modulePath: content_store::batch_failure_disposition
+      line: 4003
+    summary: >
+      THE classification map for the Head-Plane batch reads (T1b, operator review 2026-08-08,
+      BINDING): given a typed BatchFailureReason, decides whether the batch CONTINUES to the
+      next id (deterministic/Refused/Unverifiable — re-asking the same id would not change the
+      answer) or STOPS (a SHARED/conductor-wide backpressure condition where continuing would
+      only hammer an already-struggling conductor further). Registered together with
+      batch_deadline_admission below as the seam registration this contract revision owed
+      BEFORE implementation.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          BatchFailureReason is a value this predicate consumes ONLY for genuine per-item
+          FAILURES; the honest-absence case (Resolved(None), the single-id local-absence
+          contract preserved exactly) never reaches this function at all — it is resolved
+          entirely inside BatchOutcome::Resolved before disposition is ever considered.
+          Absence and failure are two structurally DIFFERENT enum arms (BatchOutcome::Resolved
+          vs ::Failed) before this predicate runs at all, which is what closes the OLD
+          contract's defect: any admitted id's `Err` used to propagate through `?` and could
+          not be told apart from a legitimate absence by the caller.
+      - id: C5
+        status: answered
+        justification: >
+          `WrongContentId` classifies to Continue — a deterministic refusal (re-asking the SAME
+          id would produce the identical refusal, since the poisoned/misrouted link does not
+          change between calls), so the batch moves on rather than treating the id as
+          unreachable. wrong_id_refusal_is_typed_failed_not_mislabeled_resolved pins that the id
+          comes back a typed `Failed{reason: WrongContentId}`, NEVER a silently mislabeled
+          `Resolved(Some(_))` — the evidence-not-authority guarantee this defect closes: the
+          record was genuinely valid, just for the WRONG id, and refusing it is a decision
+          about EVIDENCE (content.id mismatch), never about which agent is asking.
+      - id: C6a
+        status: partial
+        justification: >
+          This predicate itself bounds nothing — it is a pure `BatchFailureReason ->
+          BatchFailureDisposition` mapping with no notion of accumulated work. The WORK-
+          preserving half of C6a this revision closes (an admitted id's failure or a mid-batch
+          `sys_time()` failure must never discard EARLIER successes) is `run_admitted_batch`'s
+          accumulator loop, which calls this predicate as one input among several but is not
+          itself registered as its own row in this file yet — see this row's `notes` and the
+          sibling `batch_deadline_admission` row's `notes` for the honest cross-reference.
+      - id: C8
+        status: answered
+        justification: >
+          The match is EXHAUSTIVE over every `BatchFailureReason` variant with no wildcard arm
+          — `WrongContentId | RecordShape => Continue`, everything else (`PermitTimeout`,
+          `Transport`, `ClockUnavailable`, `Unknown`) `=> Stop`. Adding a new reason variant is a
+          compile error here until it is explicitly classified, which is the structural
+          guarantee behind "typed per-id failure observability": no reason can silently fall
+          through unclassified, and `batch_failure_disposition_tests` exercises every variant
+          that exists today.
+      - id: C11
+        status: partial
+        justification: >
+          This predicate decides the CONTINUE-vs-STOP outcome itself (answered: every SHARED/
+          backpressure reason — PermitTimeout, Transport, ClockUnavailable, and the conservative
+          Unknown default — maps to Stop, closing "never hammer a saturated conductor").
+          Recorded partial because the OTHER half of C11 (the untouched tail actually becoming
+          `unattempted`, and telling a caller BudgetExhausted/IdCeiling/SharedFailure apart) is
+          `run_admitted_batch`'s job, uncited here for the same reason as C6a above.
+      - id: C14
+        status: answered
+        justification: >
+          BatchFailureReason is a CLOSED enum with stable `#[serde(rename_all = "snake_case")]`
+          names (never renumbered/renamed silently) and this predicate's exhaustive match is the
+          single place call-level text would otherwise have collapsed into an opaque `Err` — the
+          classification is a DATA value (BatchStopReason::SharedFailure(reason) /
+          BatchResolveFailure.reason) a caller can match on, never a string a caller must parse.
+    contractTests:
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: deterministic_reasons_continue
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: shared_and_unknown_reasons_stop
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: deterministic_failure_preserves_earlier_and_later_successes
+        kind: unit
+        mirrorRisk: false
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: wrong_id_refusal_is_typed_failed_not_mislabeled_resolved
+        kind: unit
+        mirrorRisk: false
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: shared_failure_stops_and_starves_the_tail
+        kind: unit
+        mirrorRisk: false
+    notes: >
+      NEW (T1b, 2026-08-08). The four `run_admitted_batch_tests` cited above exercise this
+      predicate's OBSERABLE BEHAVIOUR end-to-end (through the accumulator that calls it) rather
+      than by direct unit call for the Continue/Stop-preserves-tail proofs specifically — they
+      are cited here because they are the tests that actually assert the CONSEQUENCE this
+      predicate's decision produces (which ids end up `attempted` vs `unattempted`, and whether
+      `stop_reason` is set), which the two direct `batch_failure_disposition_tests` alone cannot
+      show. `run_admitted_batch` itself (the accumulator/composition site — content_store::
+      run_admitted_batch, src/lib.rs) is NOT separately registered as its own row in this file:
+      it is a generic HDK-free function with no independent authority/verdict semantics of its
+      own beyond composing `batch_deadline_admission` + this predicate, and registering it
+      would mostly restate concern claims already made here and on the sibling
+      `batch_deadline_admission` row. Recorded as an honest scope choice, not an oversight — the
+      two rows this task named are where the actual DECISIONS live; `run_admitted_batch` is the
+      wiring between them plus `BatchOutcome<T>` accumulation.
+
+  - name: batch_deadline_admission
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/lib.rs
+      modulePath: content_store::batch_deadline_admission
+      line: 3699
+    summary: >
+      T1's admission gate (Head-Plane Trust-Gradient Program L1) for the batched head-plane
+      reads: decides whether the id at `next_index` may be STARTED, via a hard ceiling clamp
+      (`BATCH_ID_CEILING`) evaluated before a resolved/clamped budget deadline
+      (`BATCH_BUDGET_DEFAULT_MS`/`BATCH_BUDGET_CEILING_MS`). Unchanged by the T1b contract
+      revision (constants, signature, and body are byte-identical to T1 except for the
+      operator's 2026-08-08 backward-wall-clock-step hardening test, which is additive
+      coverage, not a behaviour change) — registered NOW because it was never added to this
+      file when T1 landed (registration owed).
+    concernIds:
+      - id: C6a
+        status: answered
+        justification: >
+          A hard ceiling (`BATCH_ID_CEILING`) AND a resolved/clamped budget deadline together
+          bound both the NUMBER of ids a single call will ever attempt and the WALL-CLOCK time
+          it will spend doing so, independent of caller input (a caller cannot buy more of
+          either by asking) — `batch_deadline_admission_tests`' 8 cases (ceiling clamp exactly
+          at and past the boundary, small-id-count self-clamping, default-budget fill,
+          caller-budget-within/above the ceiling, zero-budget probe-only, and the 2026-08-08
+          backward-wall-clock-step hardening) pin every corner of this bound.
+      - id: C10
+        status: n-a
+        justification: >
+          `schema_version` is a field on `BatchResolveHeadsOutput`/`BatchResolveElectionsOutput`
+          (the OUTPUT type) — a boolean admission predicate has no output shape to version. This
+          concern is answered at the output-type level instead
+          (`batch_output_wire_contract_tests::schema_version_round_trips_as_the_discriminator`
+          plus the old/new decode-failure pins), not by this row; recorded `n-a` rather than
+          silently omitted so the matrix does not read this predicate as an unexplained gap on
+          C10.
+      - id: C11
+        status: partial
+        justification: >
+          Supplies the TIME/CEILING dimension of backpressure-avoidance (a caller cannot buy
+          unbounded wall-clock time or unbounded id count from a single call) but has NO notion
+          of a SHARED FAILURE mid-batch at all — its return value is a plain bool, not a typed
+          stop reason. The STOP-with-tail-preserved-as-`unattempted` decision for a shared
+          failure, and the `BudgetExhausted`/`IdCeiling`/`SharedFailure(reason)` distinction a
+          caller reads from `stop_reason`, are `run_admitted_batch`'s (it consumes this
+          predicate's bool as one input among several) — see the cross-reference in this row's
+          `notes` and the sibling `batch_failure_disposition` row.
+    contractTests:
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: admits_every_index_under_ceiling_and_budget
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: ceiling_clamp_refuses_at_and_past_the_ceiling
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: small_id_count_clamps_to_itself_not_the_ceiling
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: absent_budget_defaults_exactly
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: deadline_evaluated_at_the_callers_own_budget
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: caller_budget_above_ceiling_is_clamped_down
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: zero_budget_admits_nothing
+        kind: unit
+      - path: elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+        testName: backward_wall_clock_step_saturates_elapsed_to_zero
+        kind: unit
+        mirrorRisk: false
+    notes: >
+      REGISTRATION OWED (T1, commit 23a887d50). This predicate has been load-bearing and
+      unit-tested since T1 landed but was never added to this registry; this row closes that gap
+      as part of the T1b contract revision (the failure-disposition predicate's registration was
+      made a BEFORE-IMPLEMENTATION requirement precisely so this omission would not repeat).
+
+      CROSS-REFERENCE for the concerns the T1b revision as a WHOLE moves that neither this row
+      nor `batch_failure_disposition` fully carries alone: `BatchOutcome<T>`'s Resolved/Failed
+      split and `build_content_head_output`'s `WRONG_CONTENT_ID_MARKER` gate (C4, C5 — also
+      answered on the `batch_failure_disposition` row above from the disposition side);
+      `BatchResolveFailure`'s reason+phase struct and the closed `BatchFailureReason` enum (C8,
+      C14 — likewise on the sibling row); and `run_admitted_batch`'s accumulator, which carries
+      the WORK-preserving half of C6a, the tail-preservation half of C11, and
+      `BatchResolveHeadsOutput.schema_version` (C10). None of `BatchOutcome`, `BatchResolveFailure`,
+      or `run_admitted_batch` are separately registered as their own rows in this file — an
+      honest gap this note records rather than papers over, consistent with the two rows this
+      revision's registration step named.

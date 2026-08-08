@@ -31,3 +31,8 @@ gate-client-zome = { version = "0.1.0", path = "../../../../../elohim-agent/gate
 [dev-dependencies]
 # Enable testing shims (__test_set_decision_override) in test builds only.
 gate-client-zome = { version = "0.1.0", path = "../../../../../elohim-agent/gate-client-zome", features = ["testing"] }
+# Head-Plane Trust-Gradient Program (L1/T1b): pins the batch-output MessagePack
+# wire contract (old-shape-cannot-decode-new-bytes and vice versa) — already
+# resolved in this workspace's Cargo.lock as a transitive dep of the HDK/
+# holochain stack, so this adds no new package.
+rmp-serde = "1"

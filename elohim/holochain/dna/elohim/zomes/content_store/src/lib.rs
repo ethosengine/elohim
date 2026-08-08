@@ -3457,7 +3457,25 @@ fn authorize_canonical_head_declarer(_declarer: &AgentPubKey) -> ExternResult<()
     Ok(())
 }
 
+/// Shared substring `build_content_head_output`'s wrong-id refusal error
+/// carries — `classify_error_message` (below, in the batched head-plane
+/// section) matches on THIS constant rather than a re-typed literal, so the
+/// error text and its classification can never drift independently of each
+/// other.
+const WRONG_CONTENT_ID_MARKER: &str = "WRONG-CONTENT-ID";
+
 /// Build a `ContentHeadOutput` from an elected head record.
+///
+/// TARGET-ID GATE (operator review 2026-08-08, defect 3): `record` was
+/// reached via a DHT link (the canonical-head election in
+/// `resolve_content_head_inner`, or a root-author chain walk) — a poisoned
+/// or misrouted link can name a retrievable action whose Content is
+/// perfectly valid but belongs to a DIFFERENT id. Without this check that
+/// produced a silent WRONG-content answer labeled with the REQUESTED id
+/// (the caller has no way to tell). This mirrors the same-named gate
+/// already load-bearing on the two DECLARE paths
+/// (`declare_canonical_head_inner`'s TARGET-ID GATE, `validate_carried_head_record`'s
+/// restated gate) — this is the missing THIRD copy, on the READ path.
 fn build_content_head_output(
     content_id: &str,
     record: &Record,
@@ -3484,6 +3502,15 @@ fn build_content_head_output(
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "resolve_content_head: head record carries no Content entry".to_string()
         )))?;
+    if content.id != content_id {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "resolve_content_head: {WRONG_CONTENT_ID_MARKER} — record for requested id \
+             '{content_id}' actually names Content id '{actual}'; refusing to answer with \
+             mislabeled content (a poisoned or misrouted link produced a genuinely valid \
+             answer for the WRONG id).",
+            actual = content.id
+        ))));
+    }
     Ok(ContentHeadOutput {
         content_id: content_id.to_string(),
         head_action_hash,
@@ -3619,10 +3646,10 @@ pub const BATCH_BUDGET_DEFAULT_MS: u32 = 4_000;
 pub const BATCH_BUDGET_CEILING_MS: u32 = 15_000;
 
 /// Milliseconds elapsed between two `sys_time()` readings, saturating at zero
-/// (a caller passing a `now` before `start` — should not happen with the
-/// monotonic-per-call usage here — reads as "no time has passed" rather than
-/// underflowing) and at `u32::MAX` (irrelevant in practice: the largest
-/// possible value, `BATCH_BUDGET_CEILING_MS`, is far below it).
+/// and at `u32::MAX`. `sys_time()` is wall-clock rather than monotonic, so a
+/// backward clock step during a batch legitimately reads as "no time has
+/// passed" instead of underflowing. That can extend the time budget, but never
+/// the work bound: [`BATCH_ID_CEILING`] still limits the call to 256 ids.
 fn elapsed_ms_since(start: Timestamp, now: Timestamp) -> u32 {
     let diff_ms = now.as_millis().saturating_sub(start.as_millis()).max(0);
     u32::try_from(diff_ms).unwrap_or(u32::MAX)
@@ -3688,9 +3715,30 @@ pub fn batch_deadline_admission(
 #[cfg(test)]
 mod batch_deadline_admission_tests {
     use super::{
-        batch_deadline_admission, BATCH_BUDGET_CEILING_MS, BATCH_BUDGET_DEFAULT_MS,
-        BATCH_ID_CEILING,
+        batch_deadline_admission, elapsed_ms_since, BATCH_BUDGET_CEILING_MS,
+        BATCH_BUDGET_DEFAULT_MS, BATCH_ID_CEILING,
     };
+    use hdk::prelude::Timestamp;
+
+    #[test]
+    fn backward_wall_clock_step_saturates_elapsed_to_zero() {
+        let start = Timestamp::from_micros(2_000_000);
+        let stepped_back = Timestamp::from_micros(1_000_000);
+
+        assert_eq!(elapsed_ms_since(start, stepped_back), 0);
+        assert!(batch_deadline_admission(
+            BATCH_ID_CEILING,
+            Some(1),
+            BATCH_ID_CEILING - 1,
+            elapsed_ms_since(start, stepped_back),
+        ));
+        assert!(!batch_deadline_admission(
+            BATCH_ID_CEILING + 1,
+            Some(1),
+            BATCH_ID_CEILING,
+            elapsed_ms_since(start, stepped_back),
+        ));
+    }
 
     /// Under the ceiling, with budget to spare: every index is admitted.
     #[test]
@@ -3796,18 +3844,675 @@ mod batch_deadline_admission_tests {
     }
 }
 
+// =============================================================================
+// Contract revision (operator review 2026-08-08, BINDING) — typed per-item
+// outcomes, no post-admission `?`, wrong-id refusal
+// =============================================================================
+//
+// T1 as first landed used a `resolved: Vec<(String, Option<T>)>` shape where
+// ANY admitted id's `Err` (including a `sys_time()` failure) propagated
+// through `?` and discarded every earlier success in the batch, and a link
+// to valid Content belonging to ANOTHER id resolved silently — the answer
+// was real, just mislabeled with the requested id. No storage caller existed
+// yet, so the contract changes here rather than growing a compatibility
+// shim. `schema_version` is the discriminator a caller reads BEFORE
+// committing to either shape (pinned by `batch_output_wire_contract_tests`
+// below).
+//
+// The failure-disposition logic (classification of a real error into a
+// typed reason, and the reason into continue-vs-stop) is factored into pure,
+// HDK-free functions ([`batch_failure_disposition`], [`classify_error_message`],
+// [`run_admitted_batch`]) precisely so it is unit-testable the same way
+// [`batch_deadline_admission`] is above: the per-id work and the elapsed-time
+// reader arrive as injected closures in tests, never a real conductor call.
+
+/// Schema version of [`BatchResolveHeadsOutput`] / [`BatchResolveElectionsOutput`].
+/// A caller decodes this field FIRST (via a lenient/partial decode) before
+/// committing to either the old (`resolved`/`unattempted`/`elapsed_ms`, T1)
+/// or this shape — see `batch_output_wire_contract_tests` for what breaks if
+/// it doesn't.
+pub const BATCH_RESOLVE_SCHEMA_VERSION: u16 = 1;
+
+/// Typed reason vocabulary for a per-item batch failure (C14: no failure is
+/// ever reported as generic call-level text). Additive: a new variant is a
+/// plain enum change on a coordinator-only, read-only output type — no
+/// DNA-hash move.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum BatchFailureReason {
+    /// The id's link resolved to a retrievable, well-shaped Content record —
+    /// but that record's OWN `id` did not match the id that was requested.
+    /// A poisoned or misrouted link produced a genuinely VALID answer for
+    /// the WRONG id (operator review 2026-08-08, defect 3). DETERMINISTIC:
+    /// re-asking will not change the answer, so the batch CONTINUES.
+    WrongContentId,
+    /// The id's link resolved to a retrievable action, but its record shape
+    /// was not a Content entry at all (e.g. a compatible coordinator linked
+    /// the id to some other entry type) — defect 2.
+    /// `build_content_head_output`'s "no entry hash"/"no Content entry"
+    /// errors land here. DETERMINISTIC: the batch CONTINUES.
+    RecordShape,
+    /// The underlying `get`/`get_links` call failed on a conductor DB
+    /// read-permit acquisition timeout (`ACQUIRE_TIMEOUT_MS`, a SATURATED
+    /// read pool — see `select_election`'s own doc comment) — defect 4.
+    /// Retryable BACKPRESSURE, never evidence about the id, and SHARED
+    /// across the whole conductor: the batch STOPS rather than hammering an
+    /// already-saturated pool.
+    PermitTimeout,
+    /// A network/transport-class failure surfaced from a delegated call.
+    /// Kept distinct from `PermitTimeout` for observability (different
+    /// remediation: pace-the-caller vs check-connectivity). SHARED: STOPS.
+    Transport,
+    /// This conductor's own `sys_time()` host call failed mid-batch — a
+    /// clock-unavailable condition, distinct from any per-id work's own
+    /// failure (defect 1's `sys_time()` clause). SHARED: STOPS.
+    ClockUnavailable,
+    /// Any error surface that does not match a known class above.
+    /// CONSERVATIVE default: treated as SHARED/STOP — toward backpressure,
+    /// bounded by the deadline budget anyway.
+    Unknown,
+}
+
+/// Which per-id batch extern's work a [`BatchResolveFailure`] occurred in, or
+/// whether it was the shared in-wasm clock itself.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum BatchResolvePhase {
+    /// Failure while resolving [`resolve_content_heads_local`]'s per-id head
+    /// (delegates to `resolve_content_head_inner`).
+    HeadResolve,
+    /// Failure while resolving [`resolve_canonical_elections`]'s per-id
+    /// election (delegates to `select_election`).
+    Election,
+    /// Failure reading the in-wasm clock (`sys_time()`) itself, not
+    /// attributable to a specific id's underlying work.
+    Clock,
+}
+
+/// A single per-item batch failure: a typed reason plus which phase it
+/// occurred in. Never free-form text (C14) — see [`classify_error_message`]
+/// for how a real host-call error is mapped onto [`BatchFailureReason`].
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct BatchResolveFailure {
+    pub reason: BatchFailureReason,
+    pub phase: BatchResolvePhase,
+}
+
+/// Per-item batch outcome, generic over the per-id answer type
+/// (`ContentHeadOutput` for the heads batch, `CanonicalElectionOutput` for
+/// the elections batch — see the type aliases below). `Resolved(None)`
+/// preserves the single-id local-absence contract EXACTLY; `Failed` is a
+/// typed per-item failure that NEVER discards earlier or later attempts —
+/// the entire point of this revision is that this enum, never an
+/// extern-level `?`, is how a per-id failure reaches the caller once
+/// admission has begun.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum BatchOutcome<T> {
+    Resolved(Option<T>),
+    Failed(BatchResolveFailure),
+}
+
+/// One admitted id paired with its [`BatchOutcome`], in admission order.
+/// Duplicate ids in the input each get their OWN entry here — never
+/// collapsed or deduplicated (see `duplicate_ids_each_get_their_own_attempt_in_order`).
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BatchAttempt<T> {
+    pub id: String,
+    pub outcome: BatchOutcome<T>,
+}
+
+/// Why a batch STOPPED admitting further ids — distinct from an ordinary
+/// per-item failure so a caller can tell "the conductor is backpressured"
+/// (`SharedFailure`) apart from "the budget/ceiling was reached on schedule"
+/// (`BudgetExhausted`/`IdCeiling`), neither of which is a failure at all.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub enum BatchStopReason {
+    /// The in-wasm deadline (`budget_ms`, resolved/clamped by
+    /// [`batch_deadline_admission`]) was exhausted before every id was
+    /// attempted — NOT a failure, ordinary backpressure-avoidance.
+    BudgetExhausted,
+    /// The caller supplied more ids than [`BATCH_ID_CEILING`] — the tail
+    /// beyond the ceiling was never started, regardless of budget
+    /// remaining. NOT a failure.
+    IdCeiling,
+    /// A SHARED/conductor-wide failure class was hit on the current id —
+    /// its failure is recorded in `attempted` and the untouched tail
+    /// becomes `unattempted`, never hammered further.
+    SharedFailure(BatchFailureReason),
+}
+
+/// Disposition a [`BatchFailureReason`] resolves to: CONTINUE past a
+/// deterministic per-item failure (re-asking would not change the answer),
+/// or STOP the batch (a shared/backpressure condition where continuing
+/// would only hammer an already-struggling conductor further).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BatchFailureDisposition {
+    Continue,
+    Stop,
+}
+
+/// THE classification map (operator review 2026-08-08): which
+/// [`BatchFailureReason`] continues past the current id vs stops the batch.
+/// Deterministic/Refused/Unverifiable classes (`WrongContentId`,
+/// `RecordShape`) CONTINUE — re-asking the SAME id would produce the SAME
+/// refusal, so there is nothing to gain by stopping and nothing lost by
+/// moving on. Every SHARED/backpressure class (`PermitTimeout`,
+/// `Transport`, `ClockUnavailable`) and the conservative `Unknown` default
+/// STOP — continuing would hammer a conductor that is already struggling,
+/// which is the exact failure mode this program exists to close.
+pub fn batch_failure_disposition(reason: BatchFailureReason) -> BatchFailureDisposition {
+    match reason {
+        BatchFailureReason::WrongContentId | BatchFailureReason::RecordShape => {
+            BatchFailureDisposition::Continue
+        }
+        BatchFailureReason::PermitTimeout
+        | BatchFailureReason::Transport
+        | BatchFailureReason::ClockUnavailable
+        | BatchFailureReason::Unknown => BatchFailureDisposition::Stop,
+    }
+}
+
+#[cfg(test)]
+mod batch_failure_disposition_tests {
+    use super::{batch_failure_disposition, BatchFailureDisposition, BatchFailureReason};
+
+    #[test]
+    fn deterministic_reasons_continue() {
+        assert_eq!(
+            batch_failure_disposition(BatchFailureReason::WrongContentId),
+            BatchFailureDisposition::Continue
+        );
+        assert_eq!(
+            batch_failure_disposition(BatchFailureReason::RecordShape),
+            BatchFailureDisposition::Continue
+        );
+    }
+
+    #[test]
+    fn shared_and_unknown_reasons_stop() {
+        assert_eq!(
+            batch_failure_disposition(BatchFailureReason::PermitTimeout),
+            BatchFailureDisposition::Stop
+        );
+        assert_eq!(
+            batch_failure_disposition(BatchFailureReason::Transport),
+            BatchFailureDisposition::Stop
+        );
+        assert_eq!(
+            batch_failure_disposition(BatchFailureReason::ClockUnavailable),
+            BatchFailureDisposition::Stop
+        );
+        assert_eq!(
+            batch_failure_disposition(BatchFailureReason::Unknown),
+            BatchFailureDisposition::Stop
+        );
+    }
+}
+
+/// Pure string classifier for a real host-call error's message — HDK-free (a
+/// `&str`, not a `WasmError`, crosses the boundary here) so it is directly
+/// unit-testable against literal fixture strings mirroring the real error
+/// text `select_election` and `build_content_head_output` produce elsewhere
+/// in this file. Order matters: the wrong-content-id marker is checked
+/// before the more generic record-shape substrings.
+///
+/// THE CLASSIFICATION MAP:
+///   - contains [`WRONG_CONTENT_ID_MARKER`]              -> `WrongContentId`
+///   - contains "no Content entry" / "no entry hash"     -> `RecordShape`
+///   - contains "deadline has elapsed"                   -> `PermitTimeout`
+///     (the conductor DB read-permit timeout `select_election`'s doc
+///     comment documents — `DatabaseError::Timeout(Elapsed)` from
+///     `acquire_semaphore_permit`'s 10s `ACQUIRE_TIMEOUT_MS`)
+///   - contains "NetworkError" / "transport"/"Transport"  -> `Transport`
+///   - anything else                                      -> `Unknown` (STOP,
+///     conservative — see [`batch_failure_disposition`])
+pub fn classify_error_message(message: &str) -> BatchFailureReason {
+    if message.contains(WRONG_CONTENT_ID_MARKER) {
+        BatchFailureReason::WrongContentId
+    } else if message.contains("no Content entry") || message.contains("no entry hash") {
+        BatchFailureReason::RecordShape
+    } else if message.contains("deadline has elapsed") {
+        BatchFailureReason::PermitTimeout
+    } else if message.contains("NetworkError")
+        || message.contains("transport")
+        || message.contains("Transport")
+    {
+        BatchFailureReason::Transport
+    } else {
+        BatchFailureReason::Unknown
+    }
+}
+
+/// Classify a real [`WasmError`] surfaced from a delegated single-id call
+/// (`resolve_content_head_inner`, `select_election`) via its `Display`
+/// text — [`WasmError`]'s `Display` is `{:?}` of the whole struct, so the
+/// inner `Guest`/`Host` message text (and anything it wraps) is present in
+/// the string [`classify_error_message`] matches against.
+fn classify_wasm_error(err: &WasmError) -> BatchFailureReason {
+    classify_error_message(&err.to_string())
+}
+
+#[cfg(test)]
+mod classify_error_message_tests {
+    use super::{classify_error_message, BatchFailureReason, WRONG_CONTENT_ID_MARKER};
+
+    #[test]
+    fn permit_timeout_from_saturated_read_pool_message() {
+        let msg = "select_election: canonical-head link gather for id 'x' failed under Local \
+                    strategy: WasmError { file: \"src/lib.rs\", line: 1, error: \
+                    Host(\"deadline has elapsed\") }. NOTE: under Local this is NEVER a \
+                    network await...";
+        assert_eq!(
+            classify_error_message(msg),
+            BatchFailureReason::PermitTimeout
+        );
+    }
+
+    #[test]
+    fn record_shape_from_missing_content_entry_message() {
+        assert_eq!(
+            classify_error_message("resolve_content_head: head record carries no Content entry"),
+            BatchFailureReason::RecordShape
+        );
+        assert_eq!(
+            classify_error_message("resolve_content_head: head action carries no entry hash"),
+            BatchFailureReason::RecordShape
+        );
+    }
+
+    #[test]
+    fn wrong_content_id_marker_is_recognized() {
+        let msg = format!(
+            "resolve_content_head: {WRONG_CONTENT_ID_MARKER} — record for requested id 'a' \
+             actually names Content id 'b'; refusing to answer with mislabeled content."
+        );
+        assert_eq!(
+            classify_error_message(&msg),
+            BatchFailureReason::WrongContentId
+        );
+    }
+
+    #[test]
+    fn transport_class_message() {
+        assert_eq!(
+            classify_error_message("resolve_content_head: NetworkError(\"peer unreachable\")"),
+            BatchFailureReason::Transport
+        );
+    }
+
+    #[test]
+    fn unrecognized_message_is_unknown() {
+        assert_eq!(
+            classify_error_message("something entirely novel went wrong"),
+            BatchFailureReason::Unknown
+        );
+    }
+
+    /// Ordering matters: a message that happens to mention both markers
+    /// (should not occur in practice, but pins the priority explicitly)
+    /// picks the wrong-content-id classification first.
+    #[test]
+    fn wrong_content_id_marker_takes_priority_over_record_shape_substrings() {
+        let msg = format!("{WRONG_CONTENT_ID_MARKER} even though it carries no Content entry too");
+        assert_eq!(
+            classify_error_message(&msg),
+            BatchFailureReason::WrongContentId
+        );
+    }
+}
+
+/// Per-id work result the accumulator core ([`run_admitted_batch`])
+/// consumes — HDK-free by construction, decoupling the disposition/
+/// accumulation logic from any actual HDK host call. Real callers wrap
+/// `resolve_content_head_inner`/`select_election`; unit tests inject
+/// literal values via a closure.
+pub enum ItemResult<T> {
+    Resolved(Option<T>),
+    Failed(BatchResolveFailure),
+}
+
+/// The pure accumulator core (HDK-free — no `sys_time`, no `get`, no
+/// `get_links`, no `?` of its own). Given the ORIGINAL id list, the
+/// caller's budget, a FALLIBLE elapsed-time reader, and a per-id work
+/// closure, applies [`batch_deadline_admission`] + [`batch_failure_disposition`]
+/// to build the `(attempted, unattempted, stop_reason)` triple every batch
+/// extern reports.
+///
+/// This function performs NO fallible `?` of its own: every error path a
+/// caller can raise is captured through `elapsed_ms_fn`'s `Result` or
+/// `ItemResult::Failed`, which is exactly the discipline the operator
+/// review's defect 1 was named for — an admitted id's or a `sys_time()`
+/// call's failure must NEVER discard earlier successes. A clock failure
+/// mid-batch is recorded against the CURRENT id's slot (its own work was
+/// never attempted, so there is nothing else honest to report) and treated
+/// as a shared STOP.
+pub fn run_admitted_batch<T>(
+    ids: Vec<String>,
+    budget_ms: Option<u32>,
+    mut elapsed_ms_fn: impl FnMut() -> Result<u32, BatchResolveFailure>,
+    mut work_fn: impl FnMut(&str) -> ItemResult<T>,
+) -> (Vec<BatchAttempt<T>>, Vec<String>, Option<BatchStopReason>) {
+    let id_count = ids.len();
+    let admitted_ceiling = id_count.min(BATCH_ID_CEILING);
+    let mut attempted = Vec::with_capacity(admitted_ceiling);
+    let mut unattempted = Vec::new();
+    let mut stop_reason = None;
+    let mut ids_iter = ids.into_iter().enumerate();
+
+    while let Some((index, id)) = ids_iter.next() {
+        let elapsed_ms = match elapsed_ms_fn() {
+            Ok(ms) => ms,
+            Err(failure) => {
+                let reason = failure.reason;
+                attempted.push(BatchAttempt {
+                    id,
+                    outcome: BatchOutcome::Failed(failure),
+                });
+                stop_reason = Some(BatchStopReason::SharedFailure(reason));
+                unattempted.extend(ids_iter.map(|(_, rest)| rest));
+                return (attempted, unattempted, stop_reason);
+            }
+        };
+        if !batch_deadline_admission(id_count, budget_ms, index, elapsed_ms) {
+            stop_reason = Some(if index >= admitted_ceiling {
+                BatchStopReason::IdCeiling
+            } else {
+                BatchStopReason::BudgetExhausted
+            });
+            unattempted.push(id);
+            unattempted.extend(ids_iter.map(|(_, rest)| rest));
+            break;
+        }
+        match work_fn(&id) {
+            ItemResult::Resolved(answer) => {
+                attempted.push(BatchAttempt {
+                    id,
+                    outcome: BatchOutcome::Resolved(answer),
+                });
+            }
+            ItemResult::Failed(failure) => {
+                let reason = failure.reason;
+                let disposition = batch_failure_disposition(reason);
+                attempted.push(BatchAttempt {
+                    id,
+                    outcome: BatchOutcome::Failed(failure),
+                });
+                if disposition == BatchFailureDisposition::Stop {
+                    stop_reason = Some(BatchStopReason::SharedFailure(reason));
+                    unattempted.extend(ids_iter.map(|(_, rest)| rest));
+                    break;
+                }
+            }
+        }
+    }
+
+    (attempted, unattempted, stop_reason)
+}
+
+#[cfg(test)]
+mod run_admitted_batch_tests {
+    use super::{
+        run_admitted_batch, BatchFailureReason, BatchOutcome, BatchResolveFailure,
+        BatchResolvePhase, BatchStopReason, ItemResult, BATCH_BUDGET_CEILING_MS, BATCH_ID_CEILING,
+    };
+
+    fn failure(reason: BatchFailureReason) -> BatchResolveFailure {
+        BatchResolveFailure {
+            reason,
+            phase: BatchResolvePhase::HeadResolve,
+        }
+    }
+
+    /// Essential test 1 — `[good, wrong-type poison, good]`: the SECOND id's
+    /// deterministic `RecordShape` failure must not discard the first
+    /// success, and the THIRD id must still be attempted (CONTINUE, never
+    /// STOP, for a deterministic per-item class).
+    #[test]
+    fn deterministic_failure_preserves_earlier_and_later_successes() {
+        let ids = vec![
+            "good-1".to_string(),
+            "poison".to_string(),
+            "good-2".to_string(),
+        ];
+        let (attempted, unattempted, stop_reason) = run_admitted_batch::<u32>(
+            ids,
+            None,
+            || Ok(0),
+            |id| match id {
+                "poison" => ItemResult::Failed(failure(BatchFailureReason::RecordShape)),
+                _ => ItemResult::Resolved(Some(1)),
+            },
+        );
+        assert_eq!(attempted.len(), 3, "all three ids were attempted");
+        assert!(unattempted.is_empty(), "nothing was starved");
+        assert!(
+            stop_reason.is_none(),
+            "a deterministic per-item failure never sets stop_reason"
+        );
+        assert!(matches!(
+            attempted[0].outcome,
+            BatchOutcome::Resolved(Some(1))
+        ));
+        assert!(matches!(
+            &attempted[1].outcome,
+            BatchOutcome::Failed(f) if f.reason == BatchFailureReason::RecordShape
+        ));
+        assert!(matches!(
+            attempted[2].outcome,
+            BatchOutcome::Resolved(Some(1))
+        ));
+    }
+
+    /// Essential test 2 — wrong-id refusal is a typed `Failed`, never a
+    /// mislabeled `Resolved`, and (being deterministic) processing
+    /// continues to the next id.
+    #[test]
+    fn wrong_id_refusal_is_typed_failed_not_mislabeled_resolved() {
+        let ids = vec!["a".to_string(), "b".to_string()];
+        let (attempted, unattempted, stop_reason) = run_admitted_batch::<u32>(
+            ids,
+            None,
+            || Ok(0),
+            |id| match id {
+                "a" => ItemResult::Failed(failure(BatchFailureReason::WrongContentId)),
+                _ => ItemResult::Resolved(Some(2)),
+            },
+        );
+        assert_eq!(attempted.len(), 2);
+        assert!(unattempted.is_empty());
+        assert!(stop_reason.is_none());
+        assert!(
+            matches!(
+                &attempted[0].outcome,
+                BatchOutcome::Failed(f) if f.reason == BatchFailureReason::WrongContentId
+            ),
+            "never a mislabeled Resolved(Some(_))"
+        );
+        assert!(matches!(
+            attempted[1].outcome,
+            BatchOutcome::Resolved(Some(2))
+        ));
+    }
+
+    /// Essential test 3 — a shared/backpressure failure at id N preserves
+    /// `attempted[0..N]` (including N's own failure) and starves the tail
+    /// as `unattempted`, with `stop_reason` naming the shared failure.
+    #[test]
+    fn shared_failure_stops_and_starves_the_tail() {
+        let ids = vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+        ];
+        let (attempted, unattempted, stop_reason) = run_admitted_batch::<u32>(
+            ids,
+            None,
+            || Ok(0),
+            |id| match id {
+                "b" => ItemResult::Failed(failure(BatchFailureReason::PermitTimeout)),
+                _ => ItemResult::Resolved(Some(1)),
+            },
+        );
+        assert_eq!(
+            attempted.len(),
+            2,
+            "a and b were attempted; c and d were not"
+        );
+        assert_eq!(attempted[0].id, "a");
+        assert_eq!(attempted[1].id, "b");
+        assert!(matches!(
+            &attempted[1].outcome,
+            BatchOutcome::Failed(f) if f.reason == BatchFailureReason::PermitTimeout
+        ));
+        assert_eq!(unattempted, vec!["c".to_string(), "d".to_string()]);
+        assert_eq!(
+            stop_reason,
+            Some(BatchStopReason::SharedFailure(
+                BatchFailureReason::PermitTimeout
+            ))
+        );
+    }
+
+    /// Essential test 4 — duplicate ids in the input each get their OWN
+    /// attempt entry, in admission order, never collapsed/deduped.
+    #[test]
+    fn duplicate_ids_each_get_their_own_attempt_in_order() {
+        let ids = vec![
+            "x".to_string(),
+            "x".to_string(),
+            "y".to_string(),
+            "x".to_string(),
+        ];
+        let mut calls = 0u32;
+        let (attempted, unattempted, stop_reason) = run_admitted_batch::<u32>(
+            ids,
+            None,
+            || Ok(0),
+            |_id| {
+                calls += 1;
+                ItemResult::Resolved(Some(calls))
+            },
+        );
+        assert!(unattempted.is_empty());
+        assert!(stop_reason.is_none());
+        assert_eq!(attempted.len(), 4);
+        assert_eq!(
+            attempted.iter().map(|a| a.id.clone()).collect::<Vec<_>>(),
+            vec!["x", "x", "y", "x"],
+            "admission order preserved; duplicates are NOT collapsed"
+        );
+        // Each duplicate is its OWN attempt: the resolved payload increments
+        // per call, proving four independent invocations, not a memoized one.
+        assert!(matches!(
+            attempted[0].outcome,
+            BatchOutcome::Resolved(Some(1))
+        ));
+        assert!(matches!(
+            attempted[1].outcome,
+            BatchOutcome::Resolved(Some(2))
+        ));
+        assert!(matches!(
+            attempted[2].outcome,
+            BatchOutcome::Resolved(Some(3))
+        ));
+        assert!(matches!(
+            attempted[3].outcome,
+            BatchOutcome::Resolved(Some(4))
+        ));
+    }
+
+    /// The elapsed-time reader itself failing mid-batch (defect 1's
+    /// `sys_time()` clause) must not discard earlier successes either.
+    #[test]
+    fn clock_failure_mid_batch_preserves_earlier_successes_and_stops() {
+        let ids = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        let mut call_index = 0u32;
+        let (attempted, unattempted, stop_reason) = run_admitted_batch::<u32>(
+            ids,
+            None,
+            move || {
+                call_index += 1;
+                if call_index == 2 {
+                    Err(BatchResolveFailure {
+                        reason: BatchFailureReason::ClockUnavailable,
+                        phase: BatchResolvePhase::Clock,
+                    })
+                } else {
+                    Ok(0)
+                }
+            },
+            |_id| ItemResult::Resolved(Some(1)),
+        );
+        assert_eq!(
+            attempted.len(),
+            2,
+            "a resolved; b's slot records the clock failure"
+        );
+        assert!(matches!(
+            attempted[0].outcome,
+            BatchOutcome::Resolved(Some(1))
+        ));
+        assert!(matches!(
+            &attempted[1].outcome,
+            BatchOutcome::Failed(f) if f.reason == BatchFailureReason::ClockUnavailable
+        ));
+        assert_eq!(unattempted, vec!["c".to_string()]);
+        assert_eq!(
+            stop_reason,
+            Some(BatchStopReason::SharedFailure(
+                BatchFailureReason::ClockUnavailable
+            ))
+        );
+    }
+
+    /// Normal (non-failure) budget exhaustion still reports `unattempted`
+    /// exactly as before, with `stop_reason: BudgetExhausted` — never
+    /// confused with a shared failure.
+    #[test]
+    fn budget_exhaustion_reports_stop_reason_without_a_failure() {
+        let ids = vec!["a".to_string(), "b".to_string()];
+        let (attempted, unattempted, stop_reason) =
+            run_admitted_batch::<u32>(ids, Some(0), || Ok(0), |_id| ItemResult::Resolved(Some(1)));
+        assert!(attempted.is_empty(), "zero budget admits nothing");
+        assert_eq!(unattempted, vec!["a".to_string(), "b".to_string()]);
+        assert_eq!(stop_reason, Some(BatchStopReason::BudgetExhausted));
+    }
+
+    /// Ceiling-clamp starvation is reported as `IdCeiling`, distinct from
+    /// `BudgetExhausted`.
+    #[test]
+    fn ceiling_clamp_reports_id_ceiling_stop_reason() {
+        let ids: Vec<String> = (0..BATCH_ID_CEILING + 2)
+            .map(|i| format!("id-{i}"))
+            .collect();
+        let (attempted, unattempted, stop_reason) = run_admitted_batch::<u32>(
+            ids,
+            Some(BATCH_BUDGET_CEILING_MS),
+            || Ok(0),
+            |_id| ItemResult::Resolved(Some(1)),
+        );
+        assert_eq!(attempted.len(), BATCH_ID_CEILING);
+        assert_eq!(unattempted.len(), 2);
+        assert_eq!(stop_reason, Some(BatchStopReason::IdCeiling));
+    }
+}
+
 /// Batched, budget-bounded [`resolve_content_head_local`] over many ids in
 /// ONE conductor round-trip (see the module doc above).
 ///
-/// `resolved` pairs each ADMITTED id with its answer, in the order they were
-/// attempted — `None` means the SAME honest local absence
-/// [`resolve_content_head_local`] would report for that id alone, never a
-/// failure. `unattempted` holds every id that [`batch_deadline_admission`]
-/// refused (ceiling clamp or deadline) — these were NEVER STARTED, and a
-/// caller MUST treat them as "ask again", never as a miss (mirrors the
-/// single-id extern's `None` contract: honest absence of an ANSWER, not
-/// evidence of anything about the id itself). `elapsed_ms` is the in-wasm
-/// wall time this call spent, via `sys_time()`.
+/// `attempted` pairs each ADMITTED id with a typed [`BatchOutcome`], in the
+/// order they were attempted: `Resolved(None)` means the SAME honest local
+/// absence [`resolve_content_head_local`] would report for that id alone,
+/// never a failure; `Resolved(Some(_))` is a genuine head; `Failed` is a
+/// typed per-item failure (see [`BatchResolveFailure`]) that NEVER discards
+/// earlier or later attempts. `unattempted` holds every id that
+/// [`batch_deadline_admission`] refused (ceiling clamp or deadline) OR that
+/// sat behind a SHARED failure's stop point — these were NEVER STARTED, and
+/// a caller MUST treat them as "ask again", never as a miss.
+/// `stop_reason` explains WHY admission stopped short of every id (or
+/// `None` if every id was attempted). `elapsed_ms` is the in-wasm wall time
+/// this call spent, via `sys_time()`.
 ///
 /// Coordinator-only and read-only: no entries, no links, no commits — so it
 /// ships on the `update_coordinators` hot-swap path with no DNA-hash move.
@@ -3815,39 +4520,168 @@ mod batch_deadline_admission_tests {
 pub fn resolve_content_heads_local(
     input: BatchResolveHeadsInput,
 ) -> ExternResult<BatchResolveHeadsOutput> {
-    let start = sys_time()?;
-    let id_count = input.ids.len();
-    let mut resolved = Vec::with_capacity(id_count.min(BATCH_ID_CEILING));
-    let mut unattempted = Vec::new();
-    let mut ids = input.ids.into_iter().enumerate();
-    while let Some((index, id)) = ids.next() {
-        let elapsed_ms = elapsed_ms_since(start, sys_time()?);
-        if !batch_deadline_admission(id_count, input.budget_ms, index, elapsed_ms) {
-            unattempted.push(id);
-            unattempted.extend(ids.map(|(_, rest_id)| rest_id));
-            break;
+    // Nothing has been admitted yet at this point, so reporting the whole
+    // batch as unattempted-with-a-shared-failure (rather than a bare extern
+    // `Err`) is a STRICTLY stronger contract for a caller that already
+    // knows how to read `stop_reason`, and costs nothing since this is the
+    // very first fallible step (defect 1's "initial sys_time()" clause).
+    let start = match sys_time() {
+        Ok(t) => t,
+        Err(_) => {
+            return Ok(BatchResolveHeadsOutput {
+                schema_version: BATCH_RESOLVE_SCHEMA_VERSION,
+                attempted: Vec::new(),
+                unattempted: input.ids,
+                stop_reason: Some(BatchStopReason::SharedFailure(
+                    BatchFailureReason::ClockUnavailable,
+                )),
+                elapsed_ms: 0,
+            });
         }
-        let answer = resolve_content_head_inner(&id, GetStrategy::Local)?;
-        resolved.push((id, answer));
-    }
-    let elapsed_ms = elapsed_ms_since(start, sys_time()?);
+    };
+    let mut last_elapsed_ms = 0u32;
+    let (attempted, unattempted, stop_reason) = run_admitted_batch(
+        input.ids,
+        input.budget_ms,
+        || match sys_time() {
+            Ok(now) => {
+                let ms = elapsed_ms_since(start, now);
+                last_elapsed_ms = ms;
+                Ok(ms)
+            }
+            Err(_) => Err(BatchResolveFailure {
+                reason: BatchFailureReason::ClockUnavailable,
+                phase: BatchResolvePhase::Clock,
+            }),
+        },
+        |id| match resolve_content_head_inner(id, GetStrategy::Local) {
+            Ok(answer) => ItemResult::Resolved(answer),
+            Err(e) => ItemResult::Failed(BatchResolveFailure {
+                reason: classify_wasm_error(&e),
+                phase: BatchResolvePhase::HeadResolve,
+            }),
+        },
+    );
+    // `?` here would resurrect defect 1 for the FINAL reading alone — fall
+    // back to the last elapsed reading the loop itself took rather than
+    // discard the results just accumulated.
+    let elapsed_ms = match sys_time() {
+        Ok(now) => elapsed_ms_since(start, now),
+        Err(_) => last_elapsed_ms,
+    };
     Ok(BatchResolveHeadsOutput {
-        resolved,
+        schema_version: BATCH_RESOLVE_SCHEMA_VERSION,
+        attempted,
         unattempted,
+        stop_reason,
         elapsed_ms,
     })
 }
 
-/// Output of [`resolve_content_heads_local`].
+/// One admitted id paired with its [`resolve_content_heads_local`] outcome.
+pub type BatchHeadOutcome = BatchOutcome<ContentHeadOutput>;
+/// See [`BatchHeadOutcome`].
+pub type BatchHeadAttempt = BatchAttempt<ContentHeadOutput>;
+
+/// Output of [`resolve_content_heads_local`] — see the contract-revision
+/// module doc above for the shape history.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BatchResolveHeadsOutput {
-    /// Attempted ids paired with their answer, in the order they were
+    pub schema_version: u16,
+    /// Attempted ids paired with a typed outcome, in the order they were
     /// admitted.
-    pub resolved: Vec<(String, Option<ContentHeadOutput>)>,
-    /// Ids never started (ceiling clamp or deadline) — NOT failures.
+    pub attempted: Vec<BatchHeadAttempt>,
+    /// Ids never started (ceiling clamp, deadline, or behind a shared
+    /// failure's stop point) — NOT failures.
     pub unattempted: Vec<String>,
+    /// Why admission stopped short of every id, or `None` if every id was
+    /// attempted.
+    pub stop_reason: Option<BatchStopReason>,
     /// In-wasm wall time this call spent, measured via `sys_time()`.
     pub elapsed_ms: u32,
+}
+
+#[cfg(test)]
+mod batch_output_wire_contract_tests {
+    use super::{
+        BatchFailureReason, BatchHeadAttempt, BatchHeadOutcome, BatchResolveHeadsOutput,
+        BatchStopReason, ContentHeadOutput, BATCH_RESOLVE_SCHEMA_VERSION,
+    };
+    use serde::{Deserialize, Serialize};
+
+    /// T1's ORIGINAL (pre-revision) wire shape, reconstructed here
+    /// byte-for-byte so this test can pin exactly what an old caller
+    /// decoding a NEW response (and vice versa) would see.
+    /// `content_store::BatchResolveHeadsOutput` no longer has this shape
+    /// after the 2026-08-08 contract revision; this is the ONLY place it is
+    /// preserved, deliberately, as a compatibility fossil.
+    #[derive(Debug, Serialize, Deserialize)]
+    struct OldBatchResolveHeadsOutput {
+        resolved: Vec<(String, Option<ContentHeadOutput>)>,
+        unattempted: Vec<String>,
+        elapsed_ms: u32,
+    }
+
+    fn sample_new_output() -> BatchResolveHeadsOutput {
+        BatchResolveHeadsOutput {
+            schema_version: BATCH_RESOLVE_SCHEMA_VERSION,
+            attempted: vec![BatchHeadAttempt {
+                id: "id-a".to_string(),
+                outcome: BatchHeadOutcome::Resolved(None),
+            }],
+            unattempted: vec!["id-b".to_string()],
+            stop_reason: Some(BatchStopReason::BudgetExhausted),
+            elapsed_ms: 42,
+        }
+    }
+
+    fn sample_old_output() -> OldBatchResolveHeadsOutput {
+        OldBatchResolveHeadsOutput {
+            resolved: vec![("id-a".to_string(), None)],
+            unattempted: vec!["id-b".to_string()],
+            elapsed_ms: 42,
+        }
+    }
+
+    /// Contract pin #1: a caller still holding the OLD struct definition
+    /// CANNOT silently decode a NEW response as if nothing changed — it
+    /// must see a decode error, not a shape it misreads.
+    #[test]
+    fn old_shape_cannot_decode_new_bytes() {
+        let bytes = rmp_serde::to_vec_named(&sample_new_output()).expect("encode new output");
+        let result = rmp_serde::from_slice::<OldBatchResolveHeadsOutput>(&bytes);
+        assert!(
+            result.is_err(),
+            "an old caller must get a decode ERROR from a new-shape response, never a \
+             silently-misread struct (BINDING per the operator review: 'pin what breaks')"
+        );
+    }
+
+    /// Contract pin #2: symmetric — a caller expecting the NEW struct
+    /// cannot silently decode an OLD (pre-revision) response either.
+    #[test]
+    fn new_shape_cannot_decode_old_bytes() {
+        let bytes = rmp_serde::to_vec_named(&sample_old_output()).expect("encode old output");
+        let result = rmp_serde::from_slice::<BatchResolveHeadsOutput>(&bytes);
+        assert!(
+            result.is_err(),
+            "a new caller must get a decode ERROR from an old-shape response, never a \
+             silently-misread struct"
+        );
+    }
+
+    /// `schema_version` is the field a caller reads BEFORE committing to
+    /// either shape — round-tripping the NEW struct alone (both structs are
+    /// otherwise incompatible per the two tests above) proves it survives
+    /// its own wire trip and is readable as the discriminator the storage
+    /// caller's fallback rule depends on.
+    #[test]
+    fn schema_version_round_trips_as_the_discriminator() {
+        let bytes = rmp_serde::to_vec_named(&sample_new_output()).expect("encode new output");
+        let decoded: BatchResolveHeadsOutput =
+            rmp_serde::from_slice(&bytes).expect("new shape decodes its own bytes");
+        assert_eq!(decoded.schema_version, BATCH_RESOLVE_SCHEMA_VERSION);
+    }
 }
 
 /// Declare (notarize) the HEAD of a content id's version DAG. Author-gated:
@@ -4454,11 +5288,18 @@ pub fn resolve_canonical_election(id: String) -> ExternResult<Option<CanonicalEl
 
 /// Batched, budget-bounded [`resolve_canonical_election`] over many ids in
 /// ONE conductor round-trip — the election-only twin of
-/// [`resolve_content_heads_local`] (see the module doc above both). Same
-/// admission predicate ([`batch_deadline_admission`]), same
+/// [`resolve_content_heads_local`] (see the module doc above both, and the
+/// contract-revision module doc for the typed-outcome/no-post-admission-`?`
+/// shape). Same admission predicate ([`batch_deadline_admission`]), same
 /// [`BATCH_ID_CEILING`] / budget constants, same `unattempted`-is-not-a-failure
 /// contract. Per-id work delegates UNCHANGED to [`select_election`] under
 /// `GetStrategy::Local`.
+///
+/// NO wrong-id check here (unlike the heads twin): `select_election` never
+/// dereferences a Content record — it only reads canonical-head LINKS and
+/// returns the winning link's target `ActionHash`, so there is no content
+/// record for a poisoned link to mislabel. The only failure surface here is
+/// the shared `get_links` backpressure class (`PermitTimeout`/`Transport`).
 ///
 /// Coordinator-only and read-only: no entries, no links, no commits — so it
 /// ships on the `update_coordinators` hot-swap path with no DNA-hash move.
@@ -4466,42 +5307,80 @@ pub fn resolve_canonical_election(id: String) -> ExternResult<Option<CanonicalEl
 pub fn resolve_canonical_elections(
     input: BatchResolveElectionsInput,
 ) -> ExternResult<BatchResolveElectionsOutput> {
-    let start = sys_time()?;
-    let id_count = input.ids.len();
-    let mut resolved = Vec::with_capacity(id_count.min(BATCH_ID_CEILING));
-    let mut unattempted = Vec::new();
-    let mut ids = input.ids.into_iter().enumerate();
-    while let Some((index, id)) = ids.next() {
-        let elapsed_ms = elapsed_ms_since(start, sys_time()?);
-        if !batch_deadline_admission(id_count, input.budget_ms, index, elapsed_ms) {
-            unattempted.push(id);
-            unattempted.extend(ids.map(|(_, rest_id)| rest_id));
-            break;
+    let start = match sys_time() {
+        Ok(t) => t,
+        Err(_) => {
+            return Ok(BatchResolveElectionsOutput {
+                schema_version: BATCH_RESOLVE_SCHEMA_VERSION,
+                attempted: Vec::new(),
+                unattempted: input.ids,
+                stop_reason: Some(BatchStopReason::SharedFailure(
+                    BatchFailureReason::ClockUnavailable,
+                )),
+                elapsed_ms: 0,
+            });
         }
-        let winner = select_election(&id, GetStrategy::Local)?;
-        let answer = winner.map(|w| CanonicalElectionOutput {
-            winner_target: holo_hash::ActionHashB64::from(w.target),
-            canonical_declared_at: w.timestamp,
-            canonical_earned: w.is_earned,
-        });
-        resolved.push((id, answer));
-    }
-    let elapsed_ms = elapsed_ms_since(start, sys_time()?);
+    };
+    let mut last_elapsed_ms = 0u32;
+    let (attempted, unattempted, stop_reason) = run_admitted_batch(
+        input.ids,
+        input.budget_ms,
+        || match sys_time() {
+            Ok(now) => {
+                let ms = elapsed_ms_since(start, now);
+                last_elapsed_ms = ms;
+                Ok(ms)
+            }
+            Err(_) => Err(BatchResolveFailure {
+                reason: BatchFailureReason::ClockUnavailable,
+                phase: BatchResolvePhase::Clock,
+            }),
+        },
+        |id| match select_election(id, GetStrategy::Local) {
+            Ok(winner) => ItemResult::Resolved(winner.map(|w| CanonicalElectionOutput {
+                winner_target: holo_hash::ActionHashB64::from(w.target),
+                canonical_declared_at: w.timestamp,
+                canonical_earned: w.is_earned,
+            })),
+            Err(e) => ItemResult::Failed(BatchResolveFailure {
+                reason: classify_wasm_error(&e),
+                phase: BatchResolvePhase::Election,
+            }),
+        },
+    );
+    let elapsed_ms = match sys_time() {
+        Ok(now) => elapsed_ms_since(start, now),
+        Err(_) => last_elapsed_ms,
+    };
     Ok(BatchResolveElectionsOutput {
-        resolved,
+        schema_version: BATCH_RESOLVE_SCHEMA_VERSION,
+        attempted,
         unattempted,
+        stop_reason,
         elapsed_ms,
     })
 }
 
-/// Output of [`resolve_canonical_elections`].
+/// One admitted id paired with its [`resolve_canonical_elections`] outcome.
+pub type BatchElectionOutcome = BatchOutcome<CanonicalElectionOutput>;
+/// See [`BatchElectionOutcome`].
+pub type BatchElectionAttempt = BatchAttempt<CanonicalElectionOutput>;
+
+/// Output of [`resolve_canonical_elections`] — mirrors
+/// [`BatchResolveHeadsOutput`]'s contract exactly (see its doc and the
+/// contract-revision module doc above).
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BatchResolveElectionsOutput {
-    /// Attempted ids paired with their election answer, in the order they
-    /// were admitted.
-    pub resolved: Vec<(String, Option<CanonicalElectionOutput>)>,
-    /// Ids never started (ceiling clamp or deadline) — NOT failures.
+    pub schema_version: u16,
+    /// Attempted ids paired with a typed outcome, in the order they were
+    /// admitted.
+    pub attempted: Vec<BatchElectionAttempt>,
+    /// Ids never started (ceiling clamp, deadline, or behind a shared
+    /// failure's stop point) — NOT failures.
     pub unattempted: Vec<String>,
+    /// Why admission stopped short of every id, or `None` if every id was
+    /// attempted.
+    pub stop_reason: Option<BatchStopReason>,
     /// In-wasm wall time this call spent, measured via `sys_time()`.
     pub elapsed_ms: u32,
 }

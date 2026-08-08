@@ -140,6 +140,7 @@ dependencies = [
  "hdk",
  "holochain_serialized_bytes",
  "lamad-types",
+ "rmp-serde",
  "serde",
  "serde_bytes",
  "serde_json",
