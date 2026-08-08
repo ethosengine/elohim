@@ -872,6 +872,23 @@ lazy_static! {
     )
     .unwrap();
 
+    /// The atomic actionable-divergence COUNT behind the binary
+    /// `blocked_by{term="divergent_actionable"}` flag — set in
+    /// [`record_reconcile_sweep`] from the SAME fold, the SAME moment, so an
+    /// external reader (the CI fleet-quiesce gate's tolerance predicate) can
+    /// bound "how much in-flight divergence" without subtracting the
+    /// per-stream `divergent`/`divergent_refused` gauges, which are published
+    /// at DIFFERENT moments mid-sweep (discovery vs heal-leg re-publish) and
+    /// therefore over-read under cross-gauge subtraction — live 2026-08-08:
+    /// skewed sum 7-11 while the fold's own count read 1-2. Invariant, pinned
+    /// in tests: this gauge > 0 iff the blocked_by term flag is 1.
+    pub static ref PROJECTION_RECONCILE_DIVERGENT_ACTIONABLE: IntGauge = IntGauge::new(
+        "elohim_projection_reconcile_divergent_actionable",
+        "Atomic unadjudicated-divergence count from the converged fold (rea+content), \
+         published with blocked_by from the same sweep numbers.",
+    )
+    .unwrap();
+
     /// Part-B redistribution attempts SKIPPED because the candidate's blob bytes
     /// were not local — measured-but-dark content this node holds a manifest for but
     /// cannot source the bytes of, so it cannot be the distributor. Before this the
@@ -1459,6 +1476,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_SWEEPS.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_CONVERGED.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_CONVERGED_BLOCKED_BY.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_DIVERGENT_ACTIONABLE.clone()));
         let _ = REGISTRY.register(Box::new(SHARD_REDISTRIBUTE_BYTES_MISSING.clone()));
         let _ = REGISTRY.register(Box::new(PEER_STATUS_FANOUT_MISSED.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_FILL_TOTAL.clone()));
@@ -2404,6 +2422,9 @@ pub fn record_reconcile_sweep(
         divergent_actionable,
         measured,
     ));
+    // The atomic count behind the blocked_by term flag — same numbers, same
+    // moment (see the gauge's doc for why cross-gauge subtraction over-reads).
+    PROJECTION_RECONCILE_DIVERGENT_ACTIONABLE.set(divergent_actionable as i64);
     // Every term every sweep, so a 0 is evidence rather than an absent series.
     for (term, blocked) in converged_blockers(counts, divergent_actionable, measured) {
         PROJECTION_RECONCILE_CONVERGED_BLOCKED_BY
@@ -2646,6 +2667,32 @@ mod tests {
                     }
                 }
             }
+        }
+    }
+
+    #[test]
+    fn the_actionable_count_gauge_and_term_flag_publish_from_one_fold() {
+        // The CI quiesce gate's tolerance predicate reads the COUNT gauge; the
+        // strict predicate reads the term FLAG. Both must come from the same
+        // record_reconcile_sweep numbers or the gate's two modes can disagree
+        // about the same sweep (the 2026-08-08 cross-gauge-subtraction lesson:
+        // per-stream divergent/refused publish at different moments, so a
+        // derived sum read 7-11 while the fold's own count read 1-2).
+        for actionable in [0usize, 1, 2, 11] {
+            record_reconcile_sweep(&healed_sweep(), actionable, true);
+            assert_eq!(
+                PROJECTION_RECONCILE_DIVERGENT_ACTIONABLE.get(),
+                actionable as i64,
+                "count gauge must equal the fold's actionable value"
+            );
+            let flag = PROJECTION_RECONCILE_CONVERGED_BLOCKED_BY
+                .with_label_values(&["divergent_actionable"])
+                .get();
+            assert_eq!(
+                flag > 0,
+                actionable > 0,
+                "term flag must be 1 iff the count is nonzero (actionable={actionable})"
+            );
         }
     }
 

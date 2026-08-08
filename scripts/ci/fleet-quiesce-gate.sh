@@ -267,10 +267,18 @@ def stream_actionable_sum(text):
         return None
     return sum(max(v - ref.get(k, 0.0), 0.0) for k, v in div.items())
 
+# Preferred tolerance source: the ATOMIC count gauge (published by
+# record_reconcile_sweep from the same fold as the term flag — new 2026-08-08;
+# absent on older images). The cross-gauge sum is the transition fallback:
+# per-stream divergent/refused publish at different moments mid-sweep, so the
+# subtraction OVER-reads (live: sum 7-11 while the fold's count read 1-2) —
+# it can false-block, never false-pass, so it stays safe as a fallback.
+actionable_count = metric_value(metrics_a, "elohim_projection_reconcile_divergent_actionable")
 actionable_sum = stream_actionable_sum(metrics_a)
 if tol > 0:
+    basis = actionable_count if actionable_count is not None else actionable_sum
     quiesced_ok = (
-        actionable_sum is not None and actionable_sum <= tol
+        basis is not None and basis <= tol
         and unmeasured is not None and unmeasured == 0
     )
 else:
@@ -283,6 +291,7 @@ print(f"A_CAUGHT_UP={a_caught_up}")
 print(f"B_CAUGHT_UP={b_caught_up}")
 print(f"QUIESCED_OK={quiesced_ok}")
 print(f"ACTIONABLE={actionable}")
+print(f"ACTIONABLE_COUNT={actionable_count}")
 print(f"ACTIONABLE_SUM={actionable_sum}")
 print(f"UNMEASURED={unmeasured}")
 print(f"CONVERGED={converged}")
@@ -294,6 +303,7 @@ PYEOF
   b_caught_up=$(printf '%s\n' "$parsed" | sed -n 's/^B_CAUGHT_UP=//p')
   quiesced_ok=$(printf '%s\n' "$parsed" | sed -n 's/^QUIESCED_OK=//p')
   actionable=$(printf '%s\n' "$parsed" | sed -n 's/^ACTIONABLE=//p')
+  actionable_count=$(printf '%s\n' "$parsed" | sed -n 's/^ACTIONABLE_COUNT=//p')
   actionable_sum=$(printf '%s\n' "$parsed" | sed -n 's/^ACTIONABLE_SUM=//p')
   unmeasured=$(printf '%s\n' "$parsed" | sed -n 's/^UNMEASURED=//p')
   converged=$(printf '%s\n' "$parsed" | sed -n 's/^CONVERGED=//p')
@@ -306,7 +316,7 @@ PYEOF
   # see header note 2) — still printed in the summary for telemetry.
   # Quiesced, not perfect (header note 3): actionable==0 AND unmeasured==0,
   # fail-closed on an absent blocked_by series. converged is telemetry only.
-  [ "$quiesced_ok" = "True" ] || { pass=0; reasons+=("A-not-quiesced(actionable=${actionable:-null},sum=${actionable_sum:-null},tol=${ACTIONABLE_TOL},unmeasured=${unmeasured:-null})"); }
+  [ "$quiesced_ok" = "True" ] || { pass=0; reasons+=("A-not-quiesced(actionable=${actionable:-null},count=${actionable_count:-null},sum=${actionable_sum:-null},tol=${ACTIONABLE_TOL},unmeasured=${unmeasured:-null})"); }
   [ "$code_a" = "200" ] || { pass=0; reasons+=("A-content-${code_a}"); }
   [ "$code_b" = "200" ] || { pass=0; reasons+=("B-content-${code_b}"); }
   # The sustain proof needs a numeric sweeps_total reading even though the
@@ -317,7 +327,7 @@ PYEOF
     reasons+=("A-sweeps-metric-missing")
   fi
 
-  summary="A-caughtUp=${a_caught_up:-?} B-caughtUp=${b_caught_up:-?} A-quiesced=${quiesced_ok:-?}(actionable=${actionable:-null},sum=${actionable_sum:-null},tol=${ACTIONABLE_TOL},unmeasured=${unmeasured:-null}) A-converged=${converged:-null} A-content=${code_a} B-content=${code_b} sweeps=${sweeps:-null}"
+  summary="A-caughtUp=${a_caught_up:-?} B-caughtUp=${b_caught_up:-?} A-quiesced=${quiesced_ok:-?}(actionable=${actionable:-null},count=${actionable_count:-null},sum=${actionable_sum:-null},tol=${ACTIONABLE_TOL},unmeasured=${unmeasured:-null}) A-converged=${converged:-null} A-content=${code_a} B-content=${code_b} sweeps=${sweeps:-null}"
 
   if [ "$pass" -eq 1 ]; then
     if [ -z "$anchor_ts" ]; then
