@@ -149,6 +149,13 @@ budgets sum to 555s > the 300s tick (effective cadence ≥600s under saturation,
   deltas only; stakes-priced drilldown; simulacra networks price verification ~0
   via the stage-gate axis. This is the §3.2 gradient finally consuming a standing
   signal on the head plane.
+- **L7 (position, operator directive 2026-08-08):** `HcClient::call_zome` is
+  uncancellable — NOT accepted as a keystone constraint. Tactical: in-wasm deadline
+  in the batch externs. Strategic: extend the conductor fork we already carry (the
+  kitsune2 `store_slice_hash` patch lineage) with app-interface call
+  deadlines/cooperative cancellation, written upstreamable; if upstream declines,
+  the fork carries it — the substrate owns its scheduling floor. Planned as T13 in
+  the head-plane trust-gradient program plan.
 - **L6 (gate update):** p2p-design-gate capacity model is static and count-blind —
   no dimension for conductor-RTs × sweep-cadence × election candidacy (the costs
   that bind); conflates Holochain DHT + Kad plane under one "~3000 entries" number
