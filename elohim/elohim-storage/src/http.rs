@@ -5911,19 +5911,19 @@ impl HttpServer {
                                 // Arc on every request, wired at startup via
                                 // `HttpServer::with_memo_store`.
                                 .with_memo_store(self.memo_store.clone());
-                                // T6 (head-plane trust-gradient program): thread the
-                                // inert landing shape. TrustGradient still hard-codes
-                                // memo: None here — T9 is what swaps this for a
-                                // construction that reads `reach_gate.memo_store()`.
-                                let trust = crate::trust::TrustGradient::inert();
-                                if let Err(reason) = reach_gate.authorize_reach_for_human(
-                                    &mut conn,
-                                    &app_ctx,
-                                    &view.reach,
-                                    &human,
-                                    content_id,
-                                    &trust,
-                                ) {
+                                // T9: the gradient selection (memo-carrying vs
+                                // inert) lives in ONE place — the service's
+                                // own dormancy gate. Flag off ⇒ inert() ⇒
+                                // byte-identical to pre-T9 behavior.
+                                if let Err(reason) = reach_gate
+                                    .authorize_reach_for_human_with_own_trust(
+                                        &mut conn,
+                                        &app_ctx,
+                                        &view.reach,
+                                        &human,
+                                        content_id,
+                                    )
+                                {
                                     return Ok(Response::builder()
                                         .status(StatusCode::FORBIDDEN)
                                         .header(header::CONTENT_TYPE, "application/json")

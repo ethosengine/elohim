@@ -424,6 +424,30 @@ impl EprService {
         }
     }
 
+    /// [`Self::authorize_reach_for_human`] with the service's OWN
+    /// trust-gradient selection — the same dormancy gate as
+    /// `check_reach_authorization` (memo-carrying gradient only when
+    /// `ELOHIM_TRUST_MEMO_READS` is enabled AND a store is wired; otherwise
+    /// `inert()`, byte-identical to pre-T9 behavior). Exists so external
+    /// callers that already resolved their `Human` (the HTTP serve path)
+    /// share the ONE gate instead of constructing gradients ad hoc.
+    pub fn authorize_reach_for_human_with_own_trust(
+        &self,
+        conn: &mut diesel::SqliteConnection,
+        app_ctx: &AppContext,
+        reach: &str,
+        human: &crate::db::models::Human,
+        content_id: &str,
+    ) -> Result<(), String> {
+        let trust = match self.memo_store() {
+            Some(store) if crate::config::trust_memo_reads_enabled() => {
+                Self::memo_carrying_trust_gradient(store.as_ref())
+            }
+            _ => crate::trust::TrustGradient::inert(),
+        };
+        self.authorize_reach_for_human(conn, app_ctx, reach, human, content_id, &trust)
+    }
+
     /// Reach-authorization core operating on an ALREADY-RESOLVED requester
     /// `Human` — the single source of truth shared by the P2P transport path
     /// (`check_reach_authorization`, which resolves by Holochain agent key) and
