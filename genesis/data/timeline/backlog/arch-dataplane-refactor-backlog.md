@@ -77,4 +77,83 @@ is slowing edge Dataplane Validation today.
 7. MANDATORY at pickup: p2p-design-gate (entry types / sync semantics change);
    check Lamad DNA entry-type headroom.
 
+### 2026-08-08 evidence pass + operator steering (code-review brainstorm)
+
+Two-explorer evidence pass (sweep mechanics; classification/trust audit) after the
+operator asked why ~25MB quiesces in ~2.5h. The arithmetic closes: ~3,469 A-class
+heads ÷ 200/tick (`WITNESS_MAX_PER_TICK`, projection_reconcile.rs:120) ÷ 300s
+cadence = 100min floor, + ~20min conductor restart churn, + serial heal arms whose
+budgets sum to 555s > the 300s tick (effective cadence ≥600s under saturation,
+`SkipInFlight`), + gate sustain needing ≥2 heal cycles. Bytes are irrelevant.
+
+**Named anti-pattern: flat-trust per-item head governance.** Three layers:
+
+1. **Classification hardcodes past every stakes axis that exists.** Seeder mints
+   `reach: 'public'` as a literal (genesis/seeder/src/seed.ts:817; import CLI
+   `visibility: 'public'` import.ts:903; bulk route defaults omitted reach to
+   `'commons'` — the WIDEST tier, http.rs:4842). The cheap tier is built and free:
+   `Reach::Private/SelfScope` → `DirectOnly`, zero P2P (epr_store.rs:788),
+   `is_floor_allowed()` bypasses standing (epr_kind.rs:96), excluded from
+   `DISTRIBUTION_SAFE_REACH` inventory/head-record surfaces (content_diesel.rs:1663).
+   Attestation-derived reach (`trust.service.ts:109-154`, `enrich-trust` CLI) is
+   implemented and has no caller on the seed path.
+2. **The head plane never got the O(changes) cure the CRDT plane got.** No batched
+   head/election externs exist — `resolve_content_head_local`,
+   `resolve_canonical_election`, `validate_carried_head_record` are all 1-id-per-WS-RT
+   (~0.75s), while the batching pattern is already accepted at the same zome surface
+   (`batch_get_content_by_ids` lib.rs:4928, unused here) and the peer plane batches
+   2000/request (`ProjectionInventory`). `ListDocumentsSince{corpus_digest}`
+   (sync_protocol.rs:115, sync_round.rs:131) is the shipped precedent — its module
+   doc names the defect generically: "cost O(peers × corpus) instead of O(changes)."
+3. **Trust is not flat in the sweep — it is absent.** `verify_trust_context` is only
+   wired to transport handshake; `TrustService::handle` is a stub; trust cache is
+   peer-scoped flat-TTL 3600s; `authorize_reach_for_human` recomputes
+   O(stewards × collectives) per content access with no content-scoped memo; storage
+   `dev_mode` is threaded through the trust seam and deliberately inert
+   (p2p/mod.rs:987-1010 — the drilled socket for a network trust mode). The
+   2026-04-30 trust-compute-gradient brainstorm designed the gradient
+   ("bulk-verify amortization for known-good signer streams") and §3.1 admits
+   "today's substrate is binary; the gradient is absent" — still true in prod.
+
+**Operator steering recorded (2026-08-08):**
+- Head-election STAYS — it is the convergence mechanism and is structurally a
+  reach-earned process; verification gossip is acceptable. The smell is the
+  trust-flat electorate: high-standing seed-pair heads should converge the commons
+  fast; instead every peer pays unknown-signer cost per head.
+- Trust verification should be a signed snapshot up-front, drilldown-verified at
+  access time priced by stakes (low-stakes claim → cheap; high-stakes commons →
+  expensive); content caches its trust state; subsequent peers validate only NEW
+  trust edges (atomic delta), full recompute on demand — consistent with §4.2
+  derived-view-never-stored-score (amortization + provenance, not authority).
+- Dev/staging/genesis networks need a declared trust collapse ("simulacra") — the
+  §10.4 stage-gate degenerate point, consuming the inert `dev_mode` socket — so
+  fixture bootstrap doesn't pay live-network compute. Live authoring is
+  local-first/private-hub first; peer-network compute curves apply at
+  post/graduation, not at genesis (NO draft→graduate content path exists today;
+  the gate prescribes Category B drafts, nothing implements them).
+
+**Lever ranking (composes; each independently landable):**
+- **L1 (days, coordinator-only → `update_coordinators` hot-swap, no DNA hash move):**
+  batched externs `resolve_content_heads_local(Vec)` + `resolve_canonical_elections(Vec)`
+  — collapses heal arm A + obey-probe from N RTs to ⌈N/page⌉. Then raise
+  `WITNESS_MAX_PER_TICK`/25ms pacing (they exist to protect the conductor from
+  serial RT storms batching eliminates).
+- **L2 (days):** head-plane corpus digest — port `ListDocumentsSince{corpus_digest}`
+  to head discovery; converged peer answers one hash, O(changes) steady state.
+- **L3 (hours, seed-path):** corpus-scoped reach/provenance expression in seeder +
+  import CLI (kill the two literals); flip bulk-route default off the widest tier.
+- **L4 (Row 16 proper):** composite roots — `epr-composite` container already ships
+  (9 paths bundle ~3,460 refs); the change is A→A2 on referents.
+- **L5 (architecture):** trust-priced election gossip — high-standing peer signs the
+  verified head-set snapshot (dag-cbor CID); peers accept-with-provenance, verify
+  deltas only; stakes-priced drilldown; simulacra networks price verification ~0
+  via the stage-gate axis. This is the §3.2 gradient finally consuming a standing
+  signal on the head plane.
+- **L6 (gate update):** p2p-design-gate capacity model is static and count-blind —
+  no dimension for conductor-RTs × sweep-cadence × election candidacy (the costs
+  that bind); conflates Holochain DHT + Kad plane under one "~3000 entries" number
+  (exceeded at seed time: ~3,469 heads); Category A's `dht_anchor_hash NOT NULL`
+  contract is violated-by-design for hours by bulk seed. Gate needs a head-plane
+  cost question at classification time and a network-stakes/stage axis.
+
 ---
