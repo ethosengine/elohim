@@ -7,9 +7,12 @@
 //! **THE safety invariant** (the keystone this program reviews before
 //! accepting any change here): a [`FloorClass`] other than `None` forces
 //! [`VerificationDepth::FullChain`] at EVERY [`NetworkStage`], including
-//! `Simulacra`. [`tests::floor_forces_full_chain_across_the_entire_product_space`]
+//! `Simulacra`. [`tests::every_in_crate_pricer_forces_full_chain_across_the_entire_product_space`]
 //! is the property test that pins it, iterating the full
-//! `NetworkStage × FloorClass × Reach × Standing` product — not a sample.
+//! `NetworkStage × FloorClass × Reach × Standing` product — not a sample —
+//! for every implementation registered in `tests::in_crate_pricers` (a new
+//! `VerificationPricer` impl MUST be added to that registry; the harness's
+//! own teeth are proven by a deliberately-cheapening mutant test).
 
 use elohim_epr::Reach;
 use seam_contracts::ReasonLabel;
@@ -131,6 +134,8 @@ mod tests {
     use super::*;
     use crate::services::standing::StandingScore;
 
+    type RegisteredPricer = (&'static str, &'static dyn VerificationPricer);
+
     const STAGES: [NetworkStage; 4] = NetworkStage::ALL;
     const FLOORS: [FloorClass; 4] = [
         FloorClass::None,
@@ -167,18 +172,30 @@ mod tests {
         },
     ];
 
-    /// THE safety keystone. Every (stage, floor, reach, standing) quadruple
-    /// in the full product space — 4 × 4 × 8 × 6 = 768 cases, not a sample —
-    /// is priced, and wherever `floor != FloorClass::None` the result MUST
-    /// be `FullChain`. This is what protects the floor guarantee across a
-    /// future non-inert pricer swap: the test doesn't just check
-    /// `InertPricer`'s trivial case, it fixes the invariant's shape so any
-    /// later `VerificationPricer` impl can be dropped into this same loop.
-    #[test]
-    fn floor_forces_full_chain_across_the_entire_product_space() {
-        let pricer = InertPricer;
-        let mut cases_checked: u32 = 0;
-        let mut floor_protected_cases: u32 = 0;
+    #[derive(Debug, PartialEq, Eq)]
+    struct FloorConformanceReport {
+        cases_checked: usize,
+        floor_protected_cases: usize,
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct FloorConformanceViolation {
+        stage: NetworkStage,
+        floor: FloorClass,
+        reach: Reach,
+        standing: Standing,
+        actual_depth: VerificationDepth,
+    }
+
+    /// Exercise one pricer through the complete pricing product space.
+    ///
+    /// Returning the violation instead of asserting inside the loop lets the
+    /// mutation test below prove that this harness itself can go red.
+    fn check_floor_conformance(
+        pricer: &dyn VerificationPricer,
+    ) -> Result<FloorConformanceReport, FloorConformanceViolation> {
+        let mut cases_checked = 0;
+        let mut floor_protected_cases = 0;
 
         for &stage in &STAGES {
             for &floor in &FLOORS {
@@ -195,34 +212,105 @@ mod tests {
 
                         if floor.is_protected() {
                             floor_protected_cases += 1;
-                            assert_eq!(
-                                priced.depth,
-                                VerificationDepth::FullChain,
-                                "floor {floor:?} must force FullChain at EVERY stage, including \
-                                 Simulacra — got {:?} at stage={stage:?}, reach={reach:?}, \
-                                 standing={standing:?}",
-                                priced.depth
-                            );
+                            if priced.depth != VerificationDepth::FullChain {
+                                return Err(FloorConformanceViolation {
+                                    stage,
+                                    floor,
+                                    reach,
+                                    standing,
+                                    actual_depth: priced.depth,
+                                });
+                            }
                         }
                     }
                 }
             }
         }
 
-        assert_eq!(
+        Ok(FloorConformanceReport {
             cases_checked,
-            STAGES.len() as u32
-                * FLOORS.len() as u32
-                * REACHES.len() as u32
-                * STANDINGS.len() as u32,
-            "product space must be fully covered (4×4×8×6=768) — a silent shrink here weakens \
-             the safety keystone"
-        );
-        // Sanity: the floor-protected slice is exactly 3/4 of the space
-        // (Constitutional, LocalRelationship, CounterEvidence out of 4
-        // FloorClass variants) — confirms the assertion above actually fired
-        // on a non-trivial share of cases rather than vacuously passing.
-        assert_eq!(floor_protected_cases, cases_checked * 3 / 4);
+            floor_protected_cases,
+        })
+    }
+
+    fn assert_floor_conformance(
+        implementation_name: &str,
+        pricer: &dyn VerificationPricer,
+    ) -> FloorConformanceReport {
+        check_floor_conformance(pricer).unwrap_or_else(|violation| {
+            panic!(
+                "VerificationPricer {implementation_name} cheapened protected floor \
+                 {:?} at stage={:?}, reach={:?}, standing={:?}: got {:?}, expected FullChain",
+                violation.floor,
+                violation.stage,
+                violation.reach,
+                violation.standing,
+                violation.actual_depth,
+            )
+        })
+    }
+
+    /// Registry of every production `VerificationPricer` implementation in
+    /// this crate. Adding an implementation means adding it here so the same
+    /// conformance suite exercises it; tests below consume only this registry.
+    fn in_crate_pricers() -> [RegisteredPricer; 1] {
+        static INERT: InertPricer = InertPricer;
+        [("InertPricer", &INERT)]
+    }
+
+    /// Test-only mutant: it violates the keystone exactly where future
+    /// gradient pricing is most tempted to do so.
+    struct CheapeningMutantPricer;
+
+    impl VerificationPricer for CheapeningMutantPricer {
+        fn price(&self, input: &PricingInput) -> PricedVerification {
+            PricedVerification {
+                depth: if input.floor.is_protected() {
+                    VerificationDepth::DeltaVerify
+                } else {
+                    VerificationDepth::FullChain
+                },
+                reason: PricingReason::PricerInert,
+            }
+        }
+    }
+
+    /// THE safety keystone. Every (stage, floor, reach, standing) quadruple
+    /// in the full product space — 4 × 4 × 8 × 6 = 768 cases, not a sample —
+    /// is priced, and wherever `floor != FloorClass::None` the result MUST
+    /// be `FullChain`. This is what protects the floor guarantee across a
+    /// future non-inert pricer swap. Every in-crate implementation is supplied
+    /// through `in_crate_pricers`, while the shared checker takes a trait
+    /// object and therefore exercises the actual swappable interface.
+    #[test]
+    fn every_in_crate_pricer_forces_full_chain_across_the_entire_product_space() {
+        for (implementation_name, pricer) in in_crate_pricers() {
+            let report = assert_floor_conformance(implementation_name, pricer);
+            assert_eq!(
+                report.cases_checked,
+                STAGES.len() * FLOORS.len() * REACHES.len() * STANDINGS.len(),
+                "product space must be fully covered (4×4×8×6=768) — a silent shrink here weakens \
+                 the safety keystone for {implementation_name}"
+            );
+            // Sanity: the floor-protected slice is exactly 3/4 of the space
+            // (Constitutional, LocalRelationship, CounterEvidence out of 4
+            // FloorClass variants) — confirms the assertion above actually
+            // fired on a non-trivial share rather than vacuously passing.
+            assert_eq!(
+                report.floor_protected_cases,
+                report.cases_checked * 3 / 4,
+                "protected slice unexpectedly changed for {implementation_name}"
+            );
+        }
+    }
+
+    #[test]
+    fn conformance_harness_rejects_a_floor_cheapening_mutant() {
+        let violation = check_floor_conformance(&CheapeningMutantPricer)
+            .expect_err("the deliberately cheapening mutant must violate the floor invariant");
+
+        assert!(violation.floor.is_protected());
+        assert_eq!(violation.actual_depth, VerificationDepth::DeltaVerify);
     }
 
     /// Explicit Simulacra-specific slice of the same invariant, named
@@ -231,21 +319,26 @@ mod tests {
     /// name ("EVERY stage including Simulacra").
     #[test]
     fn floor_forces_full_chain_even_at_simulacra() {
-        let pricer = InertPricer;
-        for &floor in &[
-            FloorClass::Constitutional,
-            FloorClass::LocalRelationship,
-            FloorClass::CounterEvidence,
-        ] {
-            for &reach in &REACHES {
-                for &standing in &STANDINGS {
-                    let priced = pricer.price(&PricingInput {
-                        stage: NetworkStage::Simulacra,
-                        floor,
-                        reach,
-                        standing,
-                    });
-                    assert_eq!(priced.depth, VerificationDepth::FullChain);
+        for (implementation_name, pricer) in in_crate_pricers() {
+            for &floor in &[
+                FloorClass::Constitutional,
+                FloorClass::LocalRelationship,
+                FloorClass::CounterEvidence,
+            ] {
+                for &reach in &REACHES {
+                    for &standing in &STANDINGS {
+                        let priced = pricer.price(&PricingInput {
+                            stage: NetworkStage::Simulacra,
+                            floor,
+                            reach,
+                            standing,
+                        });
+                        assert_eq!(
+                            priced.depth,
+                            VerificationDepth::FullChain,
+                            "{implementation_name} cheapened {floor:?} at Simulacra"
+                        );
+                    }
                 }
             }
         }
