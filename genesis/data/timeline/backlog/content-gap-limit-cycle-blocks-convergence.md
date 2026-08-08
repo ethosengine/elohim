@@ -440,6 +440,27 @@ here: more advertiser sources probed per gap id directly attacks the same
 are adjacent levers on the same underlying drain-rate problem, not independent
 concerns.
 
+## 2026-08-08 — edge #1320: lane cure PROVEN live; embargo narrowed to a ~3-row actionable residue
+
+The per-commit iroh-lane build worked end-to-end on its first run: `✓
+elohim-storage-iroh pushed: …:1.0.0-dev-88a4d622`, all 7 alpha humans rendered
+it, and from the first completed sweep the honesty floor published live —
+`blocked_by{divergent_actionable}=1, {unmeasured}=0` in the gate log. The 2700s
+gate then did its designed job: five measured sweeps, fleet calm (caughtUp,
+content 200s), refusal for ONE named reason — actionable divergence
+outstanding. Not churn, not instrument absence. Prometheus sizes it:
+matthew content actionable oscillates 1-3 (rea 0, collectives 0) — **the whole
+measurement embargo is now ~3 nameable content rows.** Drain levers visibly
+live: `missing_deferred` ticking (~146/h), refused_declared collapsed ~50×
+(≈238/h vs ≈12.5k/h pre-fix). Note the old image's last half-hour read
+actionable=0 while the new image holds 1-3 — either post-restart backlog
+(<1h soak vs hours-class precedent) or a persistent class the widened probing
+now surfaces honestly. Next: soak, re-probe; if 1-3 persists, sample the ids
+from adopt-deferred Hold / adjudication logs — that class IS the Stage-2
+peer-probe adjudication scope (`rea-stream-no-divergence-adjudication-drain-path`).
+A validate-only recording (`[edge:validate-only] [build:edge]` empty commit)
+fires the gated saga measurement once actionable holds 0.
+
 **Follow-up (from the lane-cure review, 2026-08-07):** the normal-build path writes
 `STORAGE_TAG` into the env file without a pushed-tag preflight — a manual `STEPS`
 subset that skips `cargo-build-storage` while another component pushes can render

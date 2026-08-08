@@ -112,6 +112,14 @@ habits:
       converged stays honest telemetry; plateau drains under
       backlog/content-gap-limit-cycle-blocks-convergence (F-B fan-out + peer-probe
       source widening = next sprint objective).
+      2026-08-08 edge #1320 evidence: lane cure PROVEN live (per-commit
+      elohim-storage-iroh:1.0.0-dev-88a4d622 on all 7; blocked_by publishing
+      from first sweep) — gate honestly refused on the ONE named term:
+      divergent_actionable=1 sustained (matthew content actionable 1-3; rea 0,
+      collectives 0). Embargo = ~3 rows. missing_deferred live ~146/h;
+      refused_declared collapsed ~50x. Next: soak → re-probe → if persistent,
+      Stage-2 adjudication on the sampled ids; validate-only fires measurement
+      once actionable holds 0.
       2026-08-07 edge #1319 evidence: gate fail-closed EXPOSED a lane freeze —
       alpha storage pinned to the one-time elohim-storage-iroh:hc-elohim-0.6.3-iroh
       artifact (resolveStorageImage), so every storage dev-merge since the 08-05
