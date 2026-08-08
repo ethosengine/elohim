@@ -401,6 +401,17 @@ spec:
             # this literal; 0 restores the ordinary 3600s window.
             - name: ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS
               value: "21600"
+            # T5 head-plane requester digest leg (flipped 2026-08-08).
+            # Content-inventory requests carry a corpus digest once every
+            # distribution-safe local row is anchored; a responder whose
+            # corpus already matches answers in_sync and both sides skip
+            # enumeration. Responder half confirmed deployed fleet-wide by
+            # edge #1326 (all peers restarted onto ecc840eb); the digest
+            # branches are structurally unreachable until a requester flips,
+            # and every non-match/abstain branch falls back to the legacy
+            # inventory enumeration. Revert = "false" (pre-T5 wire).
+            - name: ELOHIM_HEAD_CORPUS_DIGEST
+              value: "true"
             - name: ENABLE_IMPORT_API
               value: "true"
             - name: ENABLE_CONTENT_DB

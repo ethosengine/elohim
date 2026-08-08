@@ -357,6 +357,12 @@ spec:
             # template (see its inline comment).
             - name: ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS
               value: "21600"
+            # T5 head-plane requester digest — same flip as the template
+            # (2026-08-08, see its inline comment). Hand-rendered here like
+            # the gates above; adam is a supplier peer with the largest
+            # corpus, where digest-match enumeration skips matter most.
+            - name: ELOHIM_HEAD_CORPUS_DIGEST
+              value: "true"
             - name: ENABLE_IMPORT_API
               value: "true"
             - name: ENABLE_CONTENT_DB
