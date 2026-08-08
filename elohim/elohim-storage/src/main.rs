@@ -2303,6 +2303,17 @@ async fn async_main(
         }
     };
 
+    // T7 (head-plane trust-gradient program): the verification-memo store
+    // must be process-lifetime, not re-created per request/per-transport —
+    // constructed here (outer scope, BEFORE P2PNode / iroh EprService /
+    // HttpServer, same placement rationale as `graph_engine_arc` above) so
+    // every `EprService` on every transport shares the SAME store instance.
+    // Not feature-gated: `trust` is always compiled in. Still consulted by
+    // NOBODY — `TrustGradient::inert()` keeps passing `memo: None` at every
+    // call site until T9 wires reads/writes into `authorize_reach_for_human`.
+    let verification_memo_store: std::sync::Arc<dyn elohim_storage::trust::VerificationMemoStore> =
+        std::sync::Arc::new(elohim_storage::trust::memo::InMemoryVerificationMemoStore::new());
+
     // Initialize P2P node if enabled.
     // Built when the backend is anything other than pure `Iroh` — i.e. for
     // `Libp2p` AND `Dual`. In `Dual` the iroh node is built alongside (below);
@@ -2499,6 +2510,11 @@ async fn async_main(
         {
             p2p_node = p2p_node.with_graph_engine(graph_engine_arc.clone());
         }
+
+        // T7: wire the process-lifetime verification-memo store so the
+        // libp2p-side per-request `EprService` snapshot (`P2PNode::epr_service`)
+        // shares the same store instance as the HTTP and iroh paths.
+        p2p_node = p2p_node.with_memo_store(Some(verification_memo_store.clone()));
 
         // Surface the P1 projection-reconcile status on /p2p/status. The sweep
         // itself runs in a task spawned after this block (it needs the lamad
@@ -2741,6 +2757,12 @@ async fn async_main(
         // enforces the prerequisite-mastery gate identically to libp2p + HTTP.
         #[cfg(feature = "graph-native")]
         let epr_service = epr_service.with_graph_engine(graph_engine_arc.clone());
+        // T7: share the SAME process-lifetime verification-memo store as the
+        // libp2p and HTTP paths (this `EprService` is itself already
+        // constructed once and held via `Arc` for the process lifetime —
+        // unlike the per-request HTTP construction, no restructuring needed
+        // here beyond wiring the store in).
+        let epr_service = epr_service.with_memo_store(Some(verification_memo_store.clone()));
         let epr_service = Arc::new(epr_service);
         let epr_backend: Arc<dyn elohim_storage::p2p_iroh::EprBackend> =
             Arc::new(EprServiceBackend::new(epr_service));
@@ -3075,6 +3097,13 @@ async fn async_main(
     {
         http_server = http_server.with_graph_engine(graph_engine_arc.clone());
     }
+
+    // T7 (head-plane trust-gradient program): wire the SAME process-lifetime
+    // verification-memo store the P2P/iroh paths use, so the per-request
+    // `EprService` constructed at the HTTP reach-authorization gate
+    // (`http.rs`'s `resolve` handler) is backed by a store with correct
+    // (process, not per-request) lifetime.
+    http_server = http_server.with_memo_store(verification_memo_store.clone());
 
     // Transport-identity seam — lets `/p2p/status` report the active transport's
     // peerId (iroh mode) instead of 503, so the resilience join works on iroh.

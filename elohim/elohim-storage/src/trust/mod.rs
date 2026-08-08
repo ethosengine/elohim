@@ -16,15 +16,16 @@
 //! - [`stage`] — `NetworkStage`, `StakesProvenance`, `StakesResolver` (PURE).
 //! - [`pricer`] — `VerificationPricer`, the floor safety invariant (PURE).
 //! - [`snapshot`] — `HeadSetSnapshot` types only (no mint/verify — T8).
-//! - [`memo`] — `VerificationMemo` type + `VerificationMemoStore` trait only
-//!   (no store impl, no wiring — T7/T9).
+//! - [`memo`] — `VerificationMemo` type, `VerificationMemoStore` trait, and
+//!   [`memo::InMemoryVerificationMemoStore`] (process-lifetime plumbing only,
+//!   T7 — nothing calls `get`/`put` yet; T9 wires consumption).
 
 pub mod memo;
 pub mod pricer;
 pub mod snapshot;
 pub mod stage;
 
-pub use memo::{VerificationMemo, VerificationMemoStore};
+pub use memo::{InMemoryVerificationMemoStore, VerificationMemo, VerificationMemoStore};
 pub use pricer::{
     FloorClass, InertPricer, PricedVerification, PricingInput, PricingReason, VerificationDepth,
     VerificationPricer,

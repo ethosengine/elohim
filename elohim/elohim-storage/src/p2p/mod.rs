@@ -677,6 +677,14 @@ pub struct P2PNode {
     acquisition_rotation: Arc<std::sync::atomic::AtomicUsize>,
     /// Extraction cache for delivery capability advertisement
     extraction_cache: Option<Arc<ExtractionCache>>,
+    /// T7 (head-plane trust-gradient program): process-lifetime
+    /// verification-memo store, threaded into the per-request
+    /// [`Self::epr_service`] snapshot via [`Self::with_memo_store`] so the
+    /// libp2p EPR read path shares the SAME store instance as the HTTP and
+    /// iroh paths. `None` (default) preserves today's behavior exactly —
+    /// nothing consults it yet (`TrustGradient::inert()` still passes
+    /// `memo: None`; T9 wires consumption).
+    memo_store: Option<Arc<dyn crate::trust::VerificationMemoStore>>,
     /// Content graph engine (graph-native feature). Threaded into the
     /// per-request [`Self::epr_service`] snapshot so the libp2p read path
     /// enforces the prerequisite-mastery gate (via `PREREQUISITE` edges) and
@@ -2401,6 +2409,7 @@ impl P2PNode {
             acquisition_queue: Arc::new(tokio::sync::Mutex::new(std::collections::VecDeque::new())),
             acquisition_rotation: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             extraction_cache: None,
+            memo_store: None,
             #[cfg(feature = "graph-native")]
             graph_engine: None,
             delivery_peers: Arc::new(DashMap::new()),
@@ -2449,6 +2458,19 @@ impl P2PNode {
         graph_engine: Option<Arc<crate::graph::engine::GraphEngine>>,
     ) -> Self {
         self.graph_engine = graph_engine;
+        self
+    }
+
+    /// Wire the process-lifetime verification-memo store (T7). Threaded into
+    /// the per-request [`Self::epr_service`] snapshot so the libp2p EPR read
+    /// path shares the SAME store instance as the HTTP and iroh paths. Call
+    /// once at startup with the SAME `Arc` clone threaded to `HttpServer`
+    /// and the iroh `EprService`.
+    pub fn with_memo_store(
+        mut self,
+        memo_store: Option<Arc<dyn crate::trust::VerificationMemoStore>>,
+    ) -> Self {
+        self.memo_store = memo_store;
         self
     }
 
@@ -7367,7 +7389,10 @@ impl P2PNode {
         );
         #[cfg(feature = "graph-native")]
         let svc = svc.with_graph_engine(self.graph_engine.clone());
-        svc
+        // T7: same process-lifetime memo-store Arc on every per-request
+        // snapshot — the store's lifetime is process-wide even though this
+        // `EprService` value itself is rebuilt per call.
+        svc.with_memo_store(self.memo_store.clone())
     }
 
     /// Snapshot the EPR-atom-relevant deps into a transport-neutral

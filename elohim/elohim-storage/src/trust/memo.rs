@@ -3,16 +3,21 @@
 //! re-verifying at full cost.
 //!
 //! Design: `genesis/docs/superpowers/plans/2026-08-08-head-plane-trust-gradient-program-plan.md`
-//! §3 L5. This task ships the TYPE and the `VerificationMemoStore` trait
-//! only — no store implementation, no wiring into `authorize_reach_for_human`
-//! (that is T7/T9), no `invalidate_for_subject` caller (T19's FeedbackSignal
-//! hook).
+//! §3 L5. This module ships the `VerificationMemo` type, the
+//! `VerificationMemoStore` trait, and [`InMemoryVerificationMemoStore`] (T7's
+//! process-lifetime plumbing) — but no WIRING into `authorize_reach_for_human`
+//! (T9's job) and no `invalidate_for_subject` caller (T19's FeedbackSignal
+//! hook). `TrustGradient::inert()` hard-codes `memo: None` at every call site,
+//! so nothing in this module is consulted for a decision yet.
 //!
 //! **NO NUMERIC FIELD, EVER** — §4.2's derived-not-stored discipline applies
 //! to this memo specifically (the `.epr-meta` rail T12 adds exists to catch
 //! `score:`-shaped drift here). `epoch` is a [`crate::trust::snapshot::TrustEpoch`]
 //! token (a `String` wrapper), never a bare integer; `depth` is the
 //! [`crate::trust::pricer::VerificationDepth`] enum, never a numeric score.
+
+use std::collections::HashMap;
+use std::sync::Mutex;
 
 use chrono::{DateTime, Utc};
 
@@ -63,6 +68,58 @@ pub trait VerificationMemoStore: Send + Sync {
     /// TTL eviction, if a store implements one, is a backstop only, never
     /// primary.
     fn invalidate_for_subject(&self, subject_cid: &str);
+}
+
+/// The minimal in-memory [`VerificationMemoStore`] — a `Mutex<HashMap<...>>`
+/// keyed by `(subject_cid, evaluator_agent_cid)`, following the crate's
+/// established small-store shape (`services::commitment_fetcher::MockCommitmentFetcher`).
+///
+/// **T7 plumbing only.** This exists so a store can be `Arc`'d once in
+/// `main.rs` and given process lifetime, threaded to every `EprService`
+/// construction site (HTTP per-request, libp2p per-request snapshot, iroh
+/// process-lifetime instance). Nothing calls [`Self::get`] or [`Self::put`]
+/// yet — `TrustGradient::inert()` still passes `memo: None` everywhere, so
+/// no caller of `authorize_reach_for_human` consults this store. T9 wires
+/// consumption; T19's `standing_projector` is what eventually makes a cache
+/// hit here mean something beyond "we asked before."
+///
+/// No persistence, no TTL eviction (memo.rs module doc: TTL is a backstop
+/// ONLY, and only once something writes memos — moot until T9).
+#[derive(Debug, Default)]
+pub struct InMemoryVerificationMemoStore {
+    memos: Mutex<HashMap<(String, String), VerificationMemo>>,
+}
+
+impl InMemoryVerificationMemoStore {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl VerificationMemoStore for InMemoryVerificationMemoStore {
+    fn get(&self, subject_cid: &str, evaluator_agent_cid: &str) -> Option<VerificationMemo> {
+        let key = (subject_cid.to_string(), evaluator_agent_cid.to_string());
+        self.memos
+            .lock()
+            .expect("InMemoryVerificationMemoStore mutex poisoned")
+            .get(&key)
+            .cloned()
+    }
+
+    fn put(&self, subject_cid: &str, evaluator_agent_cid: &str, memo: VerificationMemo) {
+        let key = (subject_cid.to_string(), evaluator_agent_cid.to_string());
+        self.memos
+            .lock()
+            .expect("InMemoryVerificationMemoStore mutex poisoned")
+            .insert(key, memo);
+    }
+
+    fn invalidate_for_subject(&self, subject_cid: &str) {
+        self.memos
+            .lock()
+            .expect("InMemoryVerificationMemoStore mutex poisoned")
+            .retain(|(subject, _), _| subject != subject_cid);
+    }
 }
 
 #[cfg(test)]
@@ -118,5 +175,62 @@ mod tests {
     fn store_trait_is_object_safe() {
         let store: &dyn VerificationMemoStore = &NullStore;
         assert!(store.get("subject", "evaluator").is_none());
+    }
+
+    #[test]
+    fn in_memory_store_starts_empty() {
+        let store = InMemoryVerificationMemoStore::new();
+        assert!(store.get("subject", "evaluator").is_none());
+    }
+
+    #[test]
+    fn in_memory_store_put_then_get_round_trips() {
+        let store = InMemoryVerificationMemoStore::new();
+        store.put("subject-a", "evaluator-a", sample_memo());
+        assert_eq!(store.get("subject-a", "evaluator-a"), Some(sample_memo()));
+    }
+
+    #[test]
+    fn in_memory_store_keys_by_subject_and_evaluator_pair() {
+        let store = InMemoryVerificationMemoStore::new();
+        store.put("subject-a", "evaluator-a", sample_memo());
+        // Same subject, different evaluator: no memo.
+        assert!(store.get("subject-a", "evaluator-b").is_none());
+        // Different subject, same evaluator: no memo.
+        assert!(store.get("subject-b", "evaluator-a").is_none());
+    }
+
+    #[test]
+    fn in_memory_store_invalidate_for_subject_drops_only_that_subject() {
+        let store = InMemoryVerificationMemoStore::new();
+        store.put("subject-a", "evaluator-a", sample_memo());
+        store.put("subject-b", "evaluator-a", sample_memo());
+        store.invalidate_for_subject("subject-a");
+        assert!(store.get("subject-a", "evaluator-a").is_none());
+        assert!(store.get("subject-b", "evaluator-a").is_some());
+    }
+
+    /// The T7 plumbing invariant: two handles sharing the SAME `Arc` see
+    /// each other's writes — proving the store is fit to be process-lifetime
+    /// (constructed once in `main.rs`, `Arc`'d, cloned into every
+    /// `EprService` construction site) rather than accidentally
+    /// per-request-fresh.
+    #[test]
+    fn shared_arc_handles_see_each_others_writes() {
+        use std::sync::Arc;
+
+        let store: Arc<dyn VerificationMemoStore> = Arc::new(InMemoryVerificationMemoStore::new());
+        let handle_a = store.clone();
+        let handle_b = store.clone();
+
+        handle_a.put("subject-a", "evaluator-a", sample_memo());
+
+        // A second Arc handle to the SAME underlying store — as if it came
+        // from a second per-request EprService construction — sees the
+        // write the first handle made.
+        assert_eq!(
+            handle_b.get("subject-a", "evaluator-a"),
+            Some(sample_memo())
+        );
     }
 }

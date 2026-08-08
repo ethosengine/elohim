@@ -43,6 +43,16 @@ pub struct EprService {
     /// the graph is absent.
     #[cfg(feature = "graph-native")]
     graph_engine: Option<Arc<crate::graph::engine::GraphEngine>>,
+    /// T7 (head-plane trust-gradient program): the process-lifetime
+    /// verification-memo store, `Arc`'d once in `main.rs` and threaded to
+    /// every `EprService` construction site (HTTP per-request, libp2p
+    /// per-request snapshot, iroh process-lifetime instance) via
+    /// [`Self::with_memo_store`]. `EprService` only HOLDS this — it does not
+    /// yet read or write it; `TrustGradient::inert()` (passed to
+    /// `authorize_reach_for_human` by every call site) still hard-codes
+    /// `memo: None`. T9 is what makes `authorize_reach_for_human` consult
+    /// `self.memo_store()` to build a non-inert `TrustGradient`.
+    memo_store: Option<Arc<dyn crate::trust::VerificationMemoStore>>,
 }
 
 impl std::fmt::Debug for EprService {
@@ -51,6 +61,7 @@ impl std::fmt::Debug for EprService {
             .field("has_db_pool", &self.db_pool.is_some())
             .field("has_policy_enforcement", &self.policy_enforcement.is_some())
             .field("has_extraction_cache", &self.extraction_cache.is_some())
+            .field("has_memo_store", &self.memo_store.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -69,6 +80,7 @@ impl EprService {
             peer_trust_cache,
             #[cfg(feature = "graph-native")]
             graph_engine: None,
+            memo_store: None,
         }
     }
 
@@ -82,6 +94,28 @@ impl EprService {
     ) -> Self {
         self.graph_engine = graph_engine;
         self
+    }
+
+    /// Wire the process-lifetime verification-memo store (T7). Callers pass
+    /// the SAME `Arc` clone at every construction site so every `EprService`
+    /// — regardless of transport or per-request re-construction — shares one
+    /// underlying store instance. `None` (tests, call sites that predate T7)
+    /// preserves exactly today's behavior: [`Self::memo_store`] returns
+    /// `None` and nothing changes.
+    pub fn with_memo_store(
+        mut self,
+        memo_store: Option<Arc<dyn crate::trust::VerificationMemoStore>>,
+    ) -> Self {
+        self.memo_store = memo_store;
+        self
+    }
+
+    /// The process-lifetime verification-memo store, if wired. `None` until
+    /// [`Self::with_memo_store`] is called (e.g. test fixtures, or a
+    /// construction site that hasn't opted in). Not yet consulted by
+    /// `authorize_reach_for_human` — T9 wires that read.
+    pub fn memo_store(&self) -> Option<&Arc<dyn crate::trust::VerificationMemoStore>> {
+        self.memo_store.as_ref()
     }
 
     /// Dispatch the read-side EPR variants. Returns `None` for `Announce`
@@ -735,6 +769,69 @@ mod tests {
         assert_eq!(reach_level_index("self"), 5);
         assert_eq!(reach_level_index("private"), 5);
         assert_eq!(reach_level_index("garbage"), 0);
+    }
+
+    // ---- T7: process-lifetime memo store plumbing ----
+
+    #[test]
+    fn fresh_service_has_no_memo_store_by_default() {
+        let svc = EprService::new(None, None, None, PeerTrustCache::new());
+        assert!(svc.memo_store().is_none());
+    }
+
+    #[test]
+    fn with_memo_store_wires_the_store_through() {
+        use crate::trust::InMemoryVerificationMemoStore;
+
+        let store: Arc<dyn crate::trust::VerificationMemoStore> =
+            Arc::new(InMemoryVerificationMemoStore::new());
+        let svc =
+            EprService::new(None, None, None, PeerTrustCache::new()).with_memo_store(Some(store));
+        assert!(svc.memo_store().is_some());
+    }
+
+    /// The plumbing invariant T7 exists to establish: two `EprService`
+    /// instances built from the SAME `Arc` clone (exactly what happens when
+    /// the HTTP handler and the P2P `epr_service()` snapshot both construct
+    /// a fresh `EprService` per request/call from one process-lifetime Arc
+    /// held in `main.rs`/`HttpServer`/`P2PNode`) see each other's writes —
+    /// proving the store's lifetime is process-wide, not per-construction.
+    #[test]
+    fn two_services_sharing_the_arc_see_the_same_store_writes() {
+        use crate::trust::{InMemoryVerificationMemoStore, VerificationMemo};
+
+        let shared: Arc<dyn crate::trust::VerificationMemoStore> =
+            Arc::new(InMemoryVerificationMemoStore::new());
+
+        // Two independently-constructed EprServices, as if from two
+        // different per-request/per-call construction sites, both threading
+        // the SAME process-lifetime Arc.
+        let svc_a = EprService::new(None, None, None, PeerTrustCache::new())
+            .with_memo_store(Some(shared.clone()));
+        let svc_b = EprService::new(None, None, None, PeerTrustCache::new())
+            .with_memo_store(Some(shared.clone()));
+
+        let memo = VerificationMemo {
+            verifier_agent_cid: "uhCAk-verifier".to_string(),
+            verified_at: chrono::DateTime::<chrono::Utc>::UNIX_EPOCH,
+            lens_manifest_cid: "bafyreilens".to_string(),
+            depth: crate::trust::VerificationDepth::FullChain,
+            epoch: crate::trust::TrustEpoch("edge-set-token".to_string()),
+            edge_set_digest: "sha256-deadbeef".to_string(),
+        };
+
+        // Write through svc_a's handle...
+        svc_a
+            .memo_store()
+            .expect("memo store wired")
+            .put("subject-1", "evaluator-1", memo.clone());
+
+        // ...read back through svc_b's INDEPENDENTLY-CONSTRUCTED handle.
+        let seen = svc_b
+            .memo_store()
+            .expect("memo store wired")
+            .get("subject-1", "evaluator-1");
+        assert_eq!(seen, Some(memo));
     }
 
     #[tokio::test]

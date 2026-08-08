@@ -176,6 +176,15 @@ pub struct HttpServer {
     p2p_handle: Option<crate::p2p::P2PHandle>,
     /// Extraction cache for HTML5 app files (None = disabled)
     extraction_cache: Option<Arc<ExtractionCache>>,
+    /// T7 (head-plane trust-gradient program): process-lifetime
+    /// verification-memo store, wired once at startup via
+    /// [`Self::with_memo_store`] and cloned into the per-request
+    /// `EprService` the HTTP reach-authorization gate constructs (the
+    /// `EprService::new(...)` call inside the content-resolve handler) —
+    /// the prerequisite fix that makes the memo store's lifetime correct
+    /// (process, not per-request). Not yet consulted for any decision;
+    /// `TrustGradient::inert()` still passes `memo: None` (T9 wires reads).
+    memo_store: Option<Arc<dyn crate::trust::VerificationMemoStore>>,
     /// In-memory index: slug -> blobHash (avoids per-request SQLite scan)
     slug_index: Arc<RwLock<std::collections::HashMap<String, String>>>,
     /// Write-admission limiter (mutating requests): prevents OOM under burst
@@ -508,6 +517,7 @@ impl HttpServer {
             #[cfg(feature = "p2p")]
             p2p_handle: None,
             extraction_cache: None,
+            memo_store: None,
             slug_index: Arc::new(RwLock::new(std::collections::HashMap::new())),
             request_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS)),
             read_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_READS)),
@@ -810,6 +820,15 @@ impl HttpServer {
     /// Set the extraction cache
     pub fn with_extraction_cache(mut self, cache: Arc<ExtractionCache>) -> Self {
         self.extraction_cache = Some(cache);
+        self
+    }
+
+    /// Wire the process-lifetime verification-memo store (T7). Call once at
+    /// startup with the SAME `Arc` clone threaded to `P2PNode` and the iroh
+    /// `EprService`, so every transport's `EprService` shares one store
+    /// instance.
+    pub fn with_memo_store(mut self, store: Arc<dyn crate::trust::VerificationMemoStore>) -> Self {
+        self.memo_store = Some(store);
         self
     }
 
@@ -5884,11 +5903,18 @@ impl HttpServer {
                                     None,
                                     None,
                                     crate::p2p::trust_cache::PeerTrustCache::new(),
-                                );
+                                )
+                                // T7: this `EprService` is still constructed
+                                // fresh per request (unchanged — cheap,
+                                // Option<Arc<_>> handles), but the memo store
+                                // it holds is now the SAME process-lifetime
+                                // Arc on every request, wired at startup via
+                                // `HttpServer::with_memo_store`.
+                                .with_memo_store(self.memo_store.clone());
                                 // T6 (head-plane trust-gradient program): thread the
-                                // inert landing shape. This does NOT restructure the
-                                // per-request EprService construction above — that
-                                // fix (process-lifetime memo store) is T7.
+                                // inert landing shape. TrustGradient still hard-codes
+                                // memo: None here — T9 is what swaps this for a
+                                // construction that reads `reach_gate.memo_store()`.
                                 let trust = crate::trust::TrustGradient::inert();
                                 if let Err(reason) = reach_gate.authorize_reach_for_human(
                                     &mut conn,
