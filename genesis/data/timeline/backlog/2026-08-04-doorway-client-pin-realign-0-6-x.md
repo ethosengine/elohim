@@ -36,3 +36,18 @@ Write-set: `doorway/doorway-service/**` only — disjoint from Lanes A/B/D.
 ## DoD
 
 All gates EXIT=0 with output pasted (or the documented-conflict report), committed path-limited to `doorway/` on a work branch. Commit-only; the orchestrating session reviews before integration (done = composes, not compiles).
+
+## Note (2026-08-08, from the storage-side reconcile review)
+
+The storage-side sibling landed first (`473aa9867`): elohim-storage now takes
+its client family from the conductor fork itself (git dep, 0.8.3/0.6.3 at rev
+`6d0814266`), while doorway still pins the registry `=0.9.0-dev.24` family.
+The two families are momentarily wire-compatible ONLY because both post-date
+the `relay_url` rename (holochain_types 0.7.0-dev.23) — this is luck of
+version ranges, not a design guarantee. A doorway-side rollback below dev.23
+would silently reintroduce the exact admin-seam break the storage commit
+fixed. When this lane executes, prefer the same fork-family git dep the
+storage side proved out (constraint analysis lives at the pin in
+elohim/elohim-storage/Cargo.toml; the =0.6.0 holo_hash collision it documents
+applies to any crates.io 0.6.x-range client here too if doorway ever grows a
+domain-types path dep).

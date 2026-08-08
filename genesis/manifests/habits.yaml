@@ -199,6 +199,12 @@ habits:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
       - "sweettest rea_commitment_replication (elohim/holochain/tests/sweettest — unignored 837b772c9; isolated late-join conductors, bounded 60s peer-B retrieval; STANDING RED until the Matthew→Adam link-op/fetch seam is cured)"
     evidence: >
+      DELTA 2026-08-08 (edge #1326): no-measure — the fleet-quiesce gate
+      exceeded its 2700s deadline (node B never caughtUp; fleet churning), so
+      the Dataplane Validation cucumber suite was skipped entirely and the
+      @concern:notary-authority scenario did not execute. Red stands
+      unmeasured, not re-confirmed. Next measurable window: the next edge
+      deploy whose quiesce gate completes (the T5-flip batch is queued).
       DELTA 2026-07-24 (convergence-day, dev@b83447bf7): the REA face of this
       red is now runnable AND metric-visible — adam heal outcome missing:372
       with rea local_total:0 (heal pacing cured starvation, exposing that B

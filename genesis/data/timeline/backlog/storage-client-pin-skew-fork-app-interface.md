@@ -52,3 +52,21 @@ shift_objective: reconcile elohim-storage's holochain_client pin with the
 elohim-0.6.3 fork lineage so fork app-interface capabilities (call-deadline
 Stage 1) are callable from the runtime; full cargo test gate; document the
 admin-seam constraint that motivated =0.9.0-dev.24.
+
+## Resolution (2026-08-08)
+
+Landed as `473aa9867` (feat/angular22-node24, commit-only pending batch push):
+elohim-storage's client family now comes from the conductor fork itself — git
+dep on ethosengine/holochain at immutable rev `6d0814266` (client 0.8.3,
+elohim-0.6.3 lineage). Option (a) (registry 0.8.3) proved IMPOSSIBLE: the sdk
+domain-types crates pin `holo_hash = "=0.6.0"` as a DNA-hash guard, and cargo
+unifies any registry 0.6.x-range client's holo_hash into collision with it;
+a git-sourced holo_hash is a distinct package and coexists. That — not the
+relay_url rename the old pin comment claimed (relay_url is in upstream 0.6.3)
+— is the real constraint that motivated `=0.9.0-dev.24`; full three-constraint
+analysis now lives at the pin in elohim/elohim-storage/Cargo.toml. Gates:
+cargo test EXIT=0 (159 suites) · export_bindings EXIT=0 no TS drift · clippy
+EXIT=0 · fmt EXIT=0. Independent review verdict SHIP (zero warnings).
+Consuming the fork's call-deadline client leg is now a one-line `rev` bump —
+blocked only on `elohim-0.6.3-call-deadline` (or successor) being pushed to
+the fork remote.
