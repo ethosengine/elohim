@@ -57,6 +57,8 @@ pub use lamad_types::{
     BatchAddPathStepsInput,
     BatchGetContentInput,
     BatchGetContentOutput,
+    BatchResolveElectionsInput,
+    BatchResolveHeadsInput,
     BulkCreateContentInput,
     BulkCreateContentOutput,
     CheckAttestationInput,
@@ -3583,6 +3585,271 @@ pub fn resolve_content_head_local(id: String) -> ExternResult<Option<ContentHead
     resolve_content_head_inner(&id, GetStrategy::Local)
 }
 
+// =============================================================================
+// Batched head-plane reads (Head-Plane Trust-Gradient Program, L1/T1)
+// =============================================================================
+//
+// `resolve_content_heads_local` / `resolve_canonical_elections` collapse many
+// single-id conductor round-trips into ONE call, at flat read-permit cost
+// (`2026-07-20-adam-slow-link-write-guard-saturation.md`: the head sweep is a
+// READ path harmed by queueing behind kitsune2's write guard — batching
+// amortizes the ROUND-TRIP, not the per-id work; the per-tick cap and
+// concurrency do not rise). Per-id work is delegated UNCHANGED to
+// `resolve_content_head_inner` / `select_election` under `GetStrategy::Local`
+// — batching changes call SHAPE only, never election semantics.
+// `validate_carried_head_record` is deliberately NOT batched: it runs
+// per-record crypto on caller-supplied bytes, so a hostile carrier would
+// otherwise eat a whole batch's budget on signature checks for one call.
+//
+// `HcClient::call_zome` (the storage-side caller) has no timeout or
+// cancellation — a caller-side timeout would leave the conductor executing
+// with nobody listening. Every batch call therefore carries its OWN in-wasm
+// deadline and returns PARTIAL results rather than trusting a caller to hang
+// up. Never ship unbounded batch work.
+
+/// Hard ceiling on ids attempted by a single batch call, REGARDLESS of the
+/// caller-supplied budget. Ids beyond this ceiling are `unattempted` — never
+/// started, never charged against the deadline.
+pub const BATCH_ID_CEILING: usize = 256;
+/// Default per-call wall-clock budget (in-wasm, measured via `sys_time()`)
+/// when the caller does not specify one.
+pub const BATCH_BUDGET_DEFAULT_MS: u32 = 4_000;
+/// Hard ceiling on any caller-supplied `budget_ms` — a caller cannot ask
+/// either batch extern to run longer than this, no matter what it requests.
+pub const BATCH_BUDGET_CEILING_MS: u32 = 15_000;
+
+/// Milliseconds elapsed between two `sys_time()` readings, saturating at zero
+/// (a caller passing a `now` before `start` — should not happen with the
+/// monotonic-per-call usage here — reads as "no time has passed" rather than
+/// underflowing) and at `u32::MAX` (irrelevant in practice: the largest
+/// possible value, `BATCH_BUDGET_CEILING_MS`, is far below it).
+fn elapsed_ms_since(start: Timestamp, now: Timestamp) -> u32 {
+    let diff_ms = now.as_millis().saturating_sub(start.as_millis()).max(0);
+    u32::try_from(diff_ms).unwrap_or(u32::MAX)
+}
+
+/// Pure admission predicate for one batch call — the ONE place that decides
+/// whether the id at `next_index` (0-based, over the ORIGINAL `id_count`
+/// before any clamping) may be STARTED. Three things happen here, and
+/// nowhere else:
+///
+///   1. **CEILING CLAMP** — `id_count` is clamped to [`BATCH_ID_CEILING`]; an
+///      index at or past the clamp is refused before the deadline is ever
+///      consulted, so a caller sending 1000 ids never starts more than 256
+///      regardless of budget.
+///   2. **DEFAULT FILL** — `budget_ms: None` resolves to
+///      [`BATCH_BUDGET_DEFAULT_MS`].
+///   3. **DEADLINE EVALUATION** — a caller-supplied budget is clamped to at
+///      most [`BATCH_BUDGET_CEILING_MS`], and the id is admitted only while
+///      `elapsed_ms` (time already spent in this call — see
+///      [`elapsed_ms_since`]) is strictly less than the resolved budget.
+///
+/// ## Why a per-id `sys_time()` check, not every k=16 ids (evidence, 2026-08-08)
+///
+/// `sys_time()` is `HDK.sys_time(())`, which resolves to
+/// `host_call::<(), Timestamp>(__hc__sys_time_1, ())`
+/// (`hdk-0.6.0/src/hdk.rs:644`). `host_call` (`holochain_wasmer_guest-0.0.101/
+/// src/guest.rs:55`) MessagePack-encodes a unit `()`, crosses the wasm↔host
+/// import boundary EXACTLY ONCE, and decodes a small `Timestamp` back — no
+/// database touch, no cascade, no read-permit acquisition. This is a
+/// fundamentally cheaper class of host call than the per-id work it guards:
+/// `select_election`'s own doc comment (above) documents that `get_links`
+/// goes through `cascading()`, which blocks on a semaphore-gated read permit
+/// with a 10s `ACQUIRE_TIMEOUT_MS` against a pool sized
+/// `max(num_cpus/2, 4)` — i.e. a SATURATED conductor can make a single id's
+/// underlying work take up to ~10s. A batch of the maximum 256 ids therefore
+/// pays at most 256 of the CHEAPEST class of host call (negligible next to a
+/// multi-second budget) to buy the TIGHTEST possible deadline enforcement:
+/// checking every k=16 ids would let one slow id blow the budget by up to
+/// 15x that per-id cost before the next check fires, and a caller has no way
+/// to bound that overshoot. Checking per-id bounds the worst-case overshoot
+/// to exactly ONE in-flight id's cost — the only bound worth having on a read
+/// path already documented to queue behind conductor pressure. Ceiling-alone
+/// (no clock at all) was rejected for the same reason: 256 ids at a
+/// slow-pool cost each could still run far past any budget a caller declared,
+/// which is precisely the unbounded-batch-work failure mode this program
+/// exists to close.
+pub fn batch_deadline_admission(
+    id_count: usize,
+    budget_ms: Option<u32>,
+    next_index: usize,
+    elapsed_ms: u32,
+) -> bool {
+    let admitted_ids = id_count.min(BATCH_ID_CEILING);
+    if next_index >= admitted_ids {
+        return false;
+    }
+    let effective_budget_ms = budget_ms
+        .unwrap_or(BATCH_BUDGET_DEFAULT_MS)
+        .min(BATCH_BUDGET_CEILING_MS);
+    elapsed_ms < effective_budget_ms
+}
+
+#[cfg(test)]
+mod batch_deadline_admission_tests {
+    use super::{
+        batch_deadline_admission, BATCH_BUDGET_CEILING_MS, BATCH_BUDGET_DEFAULT_MS,
+        BATCH_ID_CEILING,
+    };
+
+    /// Under the ceiling, with budget to spare: every index is admitted.
+    #[test]
+    fn admits_every_index_under_ceiling_and_budget() {
+        for i in 0..10 {
+            assert!(batch_deadline_admission(10, Some(1_000), i, 0));
+        }
+    }
+
+    /// CEILING CLAMP: an index at or past `BATCH_ID_CEILING` is refused even
+    /// with a huge `id_count` and a fresh (zero-elapsed) deadline.
+    #[test]
+    fn ceiling_clamp_refuses_at_and_past_the_ceiling() {
+        assert!(batch_deadline_admission(
+            BATCH_ID_CEILING + 10,
+            Some(BATCH_BUDGET_CEILING_MS),
+            BATCH_ID_CEILING - 1,
+            0
+        ));
+        assert!(!batch_deadline_admission(
+            BATCH_ID_CEILING + 10,
+            Some(BATCH_BUDGET_CEILING_MS),
+            BATCH_ID_CEILING,
+            0
+        ));
+        assert!(!batch_deadline_admission(
+            BATCH_ID_CEILING + 10,
+            Some(BATCH_BUDGET_CEILING_MS),
+            BATCH_ID_CEILING + 5,
+            0
+        ));
+    }
+
+    /// A caller requesting FEWER ids than the ceiling clamps to their own
+    /// count, not the global ceiling — index == id_count is refused.
+    #[test]
+    fn small_id_count_clamps_to_itself_not_the_ceiling() {
+        assert!(batch_deadline_admission(3, Some(1_000), 2, 0));
+        assert!(!batch_deadline_admission(3, Some(1_000), 3, 0));
+    }
+
+    /// DEFAULT FILL: `budget_ms: None` behaves exactly like
+    /// `Some(BATCH_BUDGET_DEFAULT_MS)` at the boundary.
+    #[test]
+    fn absent_budget_defaults_exactly() {
+        assert!(batch_deadline_admission(
+            1,
+            None,
+            0,
+            BATCH_BUDGET_DEFAULT_MS - 1
+        ));
+        assert!(!batch_deadline_admission(
+            1,
+            None,
+            0,
+            BATCH_BUDGET_DEFAULT_MS
+        ));
+        assert_eq!(
+            batch_deadline_admission(1, None, 0, BATCH_BUDGET_DEFAULT_MS - 1),
+            batch_deadline_admission(
+                1,
+                Some(BATCH_BUDGET_DEFAULT_MS),
+                0,
+                BATCH_BUDGET_DEFAULT_MS - 1
+            )
+        );
+    }
+
+    /// DEADLINE EVALUATION: a caller-supplied budget WITHIN the ceiling is
+    /// honored exactly at its own boundary, not the global ceiling's.
+    #[test]
+    fn deadline_evaluated_at_the_callers_own_budget() {
+        assert!(batch_deadline_admission(1, Some(500), 0, 499));
+        assert!(!batch_deadline_admission(1, Some(500), 0, 500));
+        assert!(!batch_deadline_admission(1, Some(500), 0, 501));
+    }
+
+    /// A caller-supplied budget ABOVE `BATCH_BUDGET_CEILING_MS` is clamped
+    /// DOWN to the ceiling — a caller cannot buy more time than the ceiling
+    /// allows by asking for it.
+    #[test]
+    fn caller_budget_above_ceiling_is_clamped_down() {
+        let huge = BATCH_BUDGET_CEILING_MS + 10_000;
+        assert!(batch_deadline_admission(
+            1,
+            Some(huge),
+            0,
+            BATCH_BUDGET_CEILING_MS - 1
+        ));
+        assert!(!batch_deadline_admission(
+            1,
+            Some(huge),
+            0,
+            BATCH_BUDGET_CEILING_MS
+        ));
+    }
+
+    /// Zero budget admits nothing — every id (including index 0) is refused
+    /// immediately, which is a valid "probe only, do no work" caller intent.
+    #[test]
+    fn zero_budget_admits_nothing() {
+        assert!(!batch_deadline_admission(5, Some(0), 0, 0));
+    }
+}
+
+/// Batched, budget-bounded [`resolve_content_head_local`] over many ids in
+/// ONE conductor round-trip (see the module doc above).
+///
+/// `resolved` pairs each ADMITTED id with its answer, in the order they were
+/// attempted — `None` means the SAME honest local absence
+/// [`resolve_content_head_local`] would report for that id alone, never a
+/// failure. `unattempted` holds every id that [`batch_deadline_admission`]
+/// refused (ceiling clamp or deadline) — these were NEVER STARTED, and a
+/// caller MUST treat them as "ask again", never as a miss (mirrors the
+/// single-id extern's `None` contract: honest absence of an ANSWER, not
+/// evidence of anything about the id itself). `elapsed_ms` is the in-wasm
+/// wall time this call spent, via `sys_time()`.
+///
+/// Coordinator-only and read-only: no entries, no links, no commits — so it
+/// ships on the `update_coordinators` hot-swap path with no DNA-hash move.
+#[hdk_extern]
+pub fn resolve_content_heads_local(
+    input: BatchResolveHeadsInput,
+) -> ExternResult<BatchResolveHeadsOutput> {
+    let start = sys_time()?;
+    let id_count = input.ids.len();
+    let mut resolved = Vec::with_capacity(id_count.min(BATCH_ID_CEILING));
+    let mut unattempted = Vec::new();
+    let mut ids = input.ids.into_iter().enumerate();
+    while let Some((index, id)) = ids.next() {
+        let elapsed_ms = elapsed_ms_since(start, sys_time()?);
+        if !batch_deadline_admission(id_count, input.budget_ms, index, elapsed_ms) {
+            unattempted.push(id);
+            unattempted.extend(ids.map(|(_, rest_id)| rest_id));
+            break;
+        }
+        let answer = resolve_content_head_inner(&id, GetStrategy::Local)?;
+        resolved.push((id, answer));
+    }
+    let elapsed_ms = elapsed_ms_since(start, sys_time()?);
+    Ok(BatchResolveHeadsOutput {
+        resolved,
+        unattempted,
+        elapsed_ms,
+    })
+}
+
+/// Output of [`resolve_content_heads_local`].
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BatchResolveHeadsOutput {
+    /// Attempted ids paired with their answer, in the order they were
+    /// admitted.
+    pub resolved: Vec<(String, Option<ContentHeadOutput>)>,
+    /// Ids never started (ceiling clamp or deadline) — NOT failures.
+    pub unattempted: Vec<String>,
+    /// In-wasm wall time this call spent, measured via `sys_time()`.
+    pub elapsed_ms: u32,
+}
+
 /// Declare (notarize) the HEAD of a content id's version DAG. Author-gated:
 /// only the root Create's author may move or re-affirm the head.
 ///
@@ -4183,6 +4450,60 @@ pub fn resolve_canonical_election(id: String) -> ExternResult<Option<CanonicalEl
         canonical_declared_at: winner.timestamp,
         canonical_earned: winner.is_earned,
     }))
+}
+
+/// Batched, budget-bounded [`resolve_canonical_election`] over many ids in
+/// ONE conductor round-trip — the election-only twin of
+/// [`resolve_content_heads_local`] (see the module doc above both). Same
+/// admission predicate ([`batch_deadline_admission`]), same
+/// [`BATCH_ID_CEILING`] / budget constants, same `unattempted`-is-not-a-failure
+/// contract. Per-id work delegates UNCHANGED to [`select_election`] under
+/// `GetStrategy::Local`.
+///
+/// Coordinator-only and read-only: no entries, no links, no commits — so it
+/// ships on the `update_coordinators` hot-swap path with no DNA-hash move.
+#[hdk_extern]
+pub fn resolve_canonical_elections(
+    input: BatchResolveElectionsInput,
+) -> ExternResult<BatchResolveElectionsOutput> {
+    let start = sys_time()?;
+    let id_count = input.ids.len();
+    let mut resolved = Vec::with_capacity(id_count.min(BATCH_ID_CEILING));
+    let mut unattempted = Vec::new();
+    let mut ids = input.ids.into_iter().enumerate();
+    while let Some((index, id)) = ids.next() {
+        let elapsed_ms = elapsed_ms_since(start, sys_time()?);
+        if !batch_deadline_admission(id_count, input.budget_ms, index, elapsed_ms) {
+            unattempted.push(id);
+            unattempted.extend(ids.map(|(_, rest_id)| rest_id));
+            break;
+        }
+        let winner = select_election(&id, GetStrategy::Local)?;
+        let answer = winner.map(|w| CanonicalElectionOutput {
+            winner_target: holo_hash::ActionHashB64::from(w.target),
+            canonical_declared_at: w.timestamp,
+            canonical_earned: w.is_earned,
+        });
+        resolved.push((id, answer));
+    }
+    let elapsed_ms = elapsed_ms_since(start, sys_time()?);
+    Ok(BatchResolveElectionsOutput {
+        resolved,
+        unattempted,
+        elapsed_ms,
+    })
+}
+
+/// Output of [`resolve_canonical_elections`].
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BatchResolveElectionsOutput {
+    /// Attempted ids paired with their election answer, in the order they
+    /// were admitted.
+    pub resolved: Vec<(String, Option<CanonicalElectionOutput>)>,
+    /// Ids never started (ceiling clamp or deadline) — NOT failures.
+    pub unattempted: Vec<String>,
+    /// In-wasm wall time this call spent, measured via `sys_time()`.
+    pub elapsed_ms: u32,
 }
 
 /// Input for [`validate_carried_head_record`].

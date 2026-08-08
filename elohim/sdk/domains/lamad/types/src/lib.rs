@@ -942,6 +942,46 @@ pub struct ImportStatusOutput {
 }
 
 // =============================================================================
+// Head-Plane Batch Reads (Head-Plane Trust-Gradient Program, T1)
+// =============================================================================
+//
+// Input types only — the coordinator's batch outputs pair each id with a
+// `ContentHeadOutput`/`CanonicalElectionOutput`, both of which carry HDK-native
+// `Timestamp`/`AgentPubKey` fields this crate deliberately excludes (see the
+// module doc: "must NOT depend on HDK, HDI, or any WASM-specific crates").
+// Those outputs stay zome-local, mirroring how `ContentHeadOutput` and
+// `CanonicalElectionOutput` themselves are defined in the coordinator, not
+// here. `ids`/`budget_ms` carry no such dependency, so they follow the
+// `BatchGetContentInput`/`CheckIdsExistInput` placement precedent above.
+
+/// Input for `content_store::resolve_content_heads_local` — batched,
+/// budget-bounded reads over many content ids in ONE conductor round-trip.
+/// `budget_ms` is an in-wasm wall-clock deadline (never unbounded batch work);
+/// absent defaults to the coordinator's `BATCH_BUDGET_DEFAULT_MS`, and any
+/// value is clamped to at most `BATCH_BUDGET_CEILING_MS`. `ids` beyond the
+/// coordinator's `BATCH_ID_CEILING` are reported `unattempted` regardless of
+/// budget.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct BatchResolveHeadsInput {
+    pub ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget_ms: Option<u32>,
+}
+
+/// Input for `content_store::resolve_canonical_elections`. Same shape as
+/// [`BatchResolveHeadsInput`] — kept as a distinct type because the two batch
+/// externs answer different questions (elected head content vs. the bare DHT
+/// election) and may diverge independently as each grows its own filters.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct BatchResolveElectionsInput {
+    pub ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget_ms: Option<u32>,
+}
+
+// =============================================================================
 // Tests
 // =============================================================================
 
@@ -1304,8 +1344,47 @@ mod tests {
         assert_eq!(decoded.batch_id, "import-001");
         assert_eq!(decoded.chunk_index, 0);
     }
-}
 
+    #[test]
+    fn batch_resolve_heads_input_msgpack_roundtrip() {
+        let input = BatchResolveHeadsInput {
+            ids: vec!["a".to_string(), "b".to_string()],
+            budget_ms: Some(2_000),
+        };
+        let bytes = rmp_serde::to_vec_named(&input).unwrap();
+        let decoded: BatchResolveHeadsInput = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(decoded.ids, vec!["a".to_string(), "b".to_string()]);
+        assert_eq!(decoded.budget_ms, Some(2_000));
+    }
+
+    /// `budget_ms: None` must drop the key entirely (patch-semantics
+    /// convention above) so an old coordinator's `#[serde(default)]` still
+    /// decodes it — never a msgpack nil.
+    #[test]
+    fn batch_resolve_heads_input_absent_budget_omits_the_key() {
+        let input = BatchResolveHeadsInput {
+            ids: vec!["a".to_string()],
+            budget_ms: None,
+        };
+        let bytes = rmp_serde::to_vec_named(&input).unwrap();
+        let decoded: BatchResolveHeadsInput = rmp_serde::from_slice(&bytes).unwrap();
+        assert!(decoded.budget_ms.is_none());
+        let as_str = String::from_utf8_lossy(&bytes);
+        assert!(!as_str.contains("budget_ms"));
+    }
+
+    #[test]
+    fn batch_resolve_elections_input_msgpack_roundtrip() {
+        let input = BatchResolveElectionsInput {
+            ids: vec!["x".to_string(), "y".to_string(), "z".to_string()],
+            budget_ms: None,
+        };
+        let bytes = rmp_serde::to_vec_named(&input).unwrap();
+        let decoded: BatchResolveElectionsInput = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(decoded.ids.len(), 3);
+        assert!(decoded.budget_ms.is_none());
+    }
+}
 
 #[cfg(test)]
 #[cfg(feature = "ts")]
@@ -1372,5 +1451,7 @@ mod ts_export {
         QueueImportInput::export_all_to(&out).unwrap();
         ImportChunkInput::export_all_to(&out).unwrap();
         ImportStatusOutput::export_all_to(&out).unwrap();
+        BatchResolveHeadsInput::export_all_to(&out).unwrap();
+        BatchResolveElectionsInput::export_all_to(&out).unwrap();
     }
 }

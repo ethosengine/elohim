@@ -10,6 +10,11 @@
 //! 5. `resolve_content_head_local_is_nonblocking_and_converges` — a cold
 //!    conductor returns local absence without a network wait, then returns the
 //!    elected head after its DHT view converges.
+//! 6. `resolve_content_heads_local_batches_in_order_and_honors_budget` —
+//!    Head-Plane Trust-Gradient Program T1: batched, budget-bounded
+//!    `resolve_content_heads_local` / `resolve_canonical_elections` against a
+//!    live conductor (order preserved, honest per-id absence, zero-budget
+//!    starves every id as `unattempted`).
 //!
 //! The coordinator zome is `content_store` (per dna/elohim/dna.yaml).
 //! DNA artifact: `dna/elohim/workdir/lamad.dna`.
@@ -191,6 +196,39 @@ struct ContentHeadOutput {
     pub declared_at: Timestamp,
     pub supersedes: Option<ActionHash>,
     pub content: WireContent,
+}
+
+// ---------------------------------------------------------------------------
+// Batched head-plane reads (Head-Plane Trust-Gradient Program, T1)
+// ---------------------------------------------------------------------------
+
+/// Mirrors `lamad_types::BatchResolveHeadsInput` /
+/// `lamad_types::BatchResolveElectionsInput` — identical shape, shared mirror.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct BatchIdsInput {
+    pub ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget_ms: Option<u32>,
+}
+
+/// Mirrors `content_store::BatchResolveHeadsOutput`. `resolved` is a
+/// `(String, Option<ContentHeadOutput>)` pair per id — MessagePack encodes a
+/// Rust tuple as a fixed-size array, which is exactly what `rmp_serde`
+/// (used identically on both the zome and the elohim-storage side) decodes
+/// back into a tuple, so this mirrors the wire shape without reinterpreting it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct BatchResolveHeadsOutput {
+    pub resolved: Vec<(String, Option<ContentHeadOutput>)>,
+    pub unattempted: Vec<String>,
+    pub elapsed_ms: u32,
+}
+
+/// Mirrors `content_store::BatchResolveElectionsOutput`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct BatchResolveElectionsOutput {
+    pub resolved: Vec<(String, Option<CanonicalElectionOutput>)>,
+    pub unattempted: Vec<String>,
+    pub elapsed_ms: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -1896,6 +1934,173 @@ async fn adopt_before_author_declares_without_a_local_chain() -> Result<()> {
         "CONVERGENCE: the declaration a CHAINLESS node minted from carried \
          evidence is honored by the authoring peer too — the both-sides-missing \
          residual has an automated exit"
+    );
+
+    Ok(())
+}
+
+/// Head-Plane Trust-Gradient Program (L1/T1) — batched, budget-bounded reads
+/// against a LIVE conductor. Complements the pure `batch_deadline_admission`
+/// unit tests in the zome (ceiling clamp, default fill, deadline evaluation)
+/// with the one thing they cannot exercise: real `sys_time()` host calls and
+/// a real `select_election`/`resolve_content_head_inner` delegation.
+///
+/// Proves:
+///   a. `resolve_content_heads_local` answers a batch of `[known, MISSING,
+///      known]` in ONE call, preserving input order, and the missing id comes
+///      back `None` — the SAME honest local-absence contract as the single-id
+///      extern, never an error and never dropped from `resolved`.
+///   b. `budget_ms: Some(0)` admits NOTHING: every id comes back
+///      `unattempted` (never started) rather than resolved — the in-wasm
+///      deadline is wired end-to-end through a real conductor, not only
+///      provable in the pure predicate's unit tests.
+///   c. `resolve_canonical_elections` mirrors the same batch shape for the
+///      bare DHT election: after A declares its own root canonical, the batch
+///      answer reports A's election and honest absence for B (never
+///      declared) — in order, in one call.
+#[tokio::test(flavor = "multi_thread")]
+async fn resolve_content_heads_local_batches_in_order_and_honors_budget() -> Result<()> {
+    let (mut conductor, agent) = single_agent_conductor().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
+    let app = conductor
+        .setup_app_for_agent("lamad-app", agent.clone(), &[dna])
+        .await?;
+    let cell = app.cells().first().expect("cell installed").clone();
+    let zome = cell.zome("content_store");
+
+    let id_a = unique_id("batch-a");
+    let id_b = unique_id("batch-b");
+    let missing_id = unique_id("batch-missing");
+
+    let created_a: ContentOutput = conductor
+        .call(&zome, "create_content", test_content(&id_a))
+        .await;
+    let created_b: ContentOutput = conductor
+        .call(&zome, "create_content", test_content(&id_b))
+        .await;
+
+    // --- (a) order preserved; a genuinely-unknown id resolves to `None`, not
+    // an error and not a hole in `resolved`.
+    let batch: BatchResolveHeadsOutput = conductor
+        .call(
+            &zome,
+            "resolve_content_heads_local",
+            BatchIdsInput {
+                ids: vec![id_a.clone(), missing_id.clone(), id_b.clone()],
+                budget_ms: None,
+            },
+        )
+        .await;
+    assert_eq!(
+        batch.resolved.len(),
+        3,
+        "all three ids are attempted under the default budget"
+    );
+    assert!(
+        batch.unattempted.is_empty(),
+        "nothing should be starved under the default budget"
+    );
+    assert_eq!(
+        batch.resolved[0].0, id_a,
+        "input order is preserved (index 0)"
+    );
+    assert_eq!(
+        batch.resolved[0]
+            .1
+            .as_ref()
+            .expect("id_a resolves to its created head")
+            .head_action_hash,
+        created_a.action_hash
+    );
+    assert_eq!(
+        batch.resolved[1].0, missing_id,
+        "input order is preserved (index 1)"
+    );
+    assert!(
+        batch.resolved[1].1.is_none(),
+        "a genuinely unknown id is honest local absence — None, never an error, \
+         never dropped from `resolved`"
+    );
+    assert_eq!(
+        batch.resolved[2].0, id_b,
+        "input order is preserved (index 2)"
+    );
+    assert_eq!(
+        batch.resolved[2]
+            .1
+            .as_ref()
+            .expect("id_b resolves to its created head")
+            .head_action_hash,
+        created_b.action_hash
+    );
+
+    // --- (b) a zero budget admits nothing: every id is `unattempted` (never
+    // started), not resolved-to-None — the two must never be confused.
+    let starved: BatchResolveHeadsOutput = conductor
+        .call(
+            &zome,
+            "resolve_content_heads_local",
+            BatchIdsInput {
+                ids: vec![id_a.clone(), id_b.clone()],
+                budget_ms: Some(0),
+            },
+        )
+        .await;
+    assert!(
+        starved.resolved.is_empty(),
+        "zero budget must start no per-id work at all"
+    );
+    assert_eq!(
+        starved.unattempted,
+        vec![id_a.clone(), id_b.clone()],
+        "every id is reported unattempted, in order — NOT a failure, and NOT \
+         the same as a resolved None"
+    );
+
+    // --- (c) `resolve_canonical_elections` mirrors the batch shape for the
+    // bare DHT election. A declares its own root canonical; B never declares.
+    let declared: ContentHeadOutput = conductor
+        .call(
+            &zome,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadInput {
+                id: id_a.clone(),
+                head_action_hash: ActionHashB64::from(created_a.action_hash.clone()).to_string(),
+            },
+        )
+        .await;
+    assert_eq!(declared.content_id, id_a);
+
+    let elections: BatchResolveElectionsOutput = conductor
+        .call(
+            &zome,
+            "resolve_canonical_elections",
+            BatchIdsInput {
+                ids: vec![id_a.clone(), id_b.clone()],
+                budget_ms: None,
+            },
+        )
+        .await;
+    assert_eq!(elections.resolved.len(), 2);
+    assert!(elections.unattempted.is_empty());
+    assert_eq!(elections.resolved[0].0, id_a);
+    let election_a = elections.resolved[0]
+        .1
+        .as_ref()
+        .expect("A has a canonical election after declaring");
+    assert!(
+        !election_a.canonical_earned,
+        "the god-mode scaffold declares STAGING, never earned"
+    );
+    assert_eq!(
+        election_a.winner_target,
+        ActionHashB64::from(declared.head_action_hash.clone()).to_string(),
+        "the batched election answer names the same winner the declare returned"
+    );
+    assert_eq!(elections.resolved[1].0, id_b);
+    assert!(
+        elections.resolved[1].1.is_none(),
+        "B never declared a canonical head — honest absence, not an error"
     );
 
     Ok(())
