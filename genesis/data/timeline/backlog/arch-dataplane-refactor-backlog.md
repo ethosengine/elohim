@@ -151,12 +151,14 @@ budgets sum to 555s > the 300s tick (effective cadence ≥600s under saturation,
   signal on the head plane.
 - **L7 (position, operator directive 2026-08-08):** `HcClient::call_zome` is
   uncancellable — NOT accepted as a keystone constraint. Tactical: in-wasm deadline
-  in the batch externs. Strategic: **upstream-first** — a well-reasoned, tested PR to
-  holochain dev adding call deadlines/cooperative cancellation as a foundational
-  capability (upstream idioms, generally useful, no elohim implementation imposed);
-  the fork lineage we already carry (kitsune2 `store_slice_hash` patch) is the bridge
-  in review and the fallback if declined — either way the substrate owns its
-  scheduling floor. Planned as T13 in the head-plane trust-gradient program plan.
+  in the batch externs. Strategic: pragmatic dual-track, no ideological ordering —
+  a well-reasoned, tested PR to holochain dev adding call deadlines/cooperative
+  cancellation as a foundational capability (upstream idioms, generally useful, no
+  elohim implementation imposed; pro-social AND self-interested — merged = fork
+  maintenance we stop carrying), alongside the fork lineage we already carry
+  (kitsune2 `store_slice_hash` patch) which delivers on our timeline regardless of
+  review pace. Decision memo weighs both by delivery need; the substrate owns its
+  scheduling floor either way. Planned as T13 in the head-plane trust-gradient plan.
 - **L6 (gate update):** p2p-design-gate capacity model is static and count-blind —
   no dimension for conductor-RTs × sweep-cadence × election candidacy (the costs
   that bind); conflates Holochain DHT + Kad plane under one "~3000 entries" number

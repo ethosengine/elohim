@@ -70,15 +70,18 @@ binding on every task below:
 **Position on the uncancellable call (operator directive 2026-08-08): this is NOT a
 keystone constraint we design around forever.** A scheduling floor owned by an upstream
 we don't control is itself a capture vector in a capture-resistant compute substrate.
-Two-track position: (tactical, this sprint) the in-wasm deadline in T1 — redesign how we
-use it, bounded from inside; (strategic, T13 spike) **upstream-first contribution**: a
-well-reasoned, tested PR to the holochain org's dev branch (and/or
-holochain-client-rust) adding app-interface call deadlines/cooperative cancellation as
-a FOUNDATIONAL capability — designed in upstream's idioms, generally useful to every
-conductor consumer, never imposing elohim's implementation or vocabulary in the PR. The
+Two-track position, pragmatic and pro-social — we need technology that delivers the
+vision and will do what it takes to get there: (tactical, this sprint) the in-wasm
+deadline in T1 — redesign how we use it, bounded from inside; (strategic, T13 spike)
+both instruments on the table with no ideological ordering. A well-reasoned, tested PR
+to the holochain org's dev branch (and/or holochain-client-rust) adding app-interface
+call deadlines/cooperative cancellation as a FOUNDATIONAL capability — upstream's
+idioms, generally useful, never imposing elohim's implementation — is pro-social AND
+self-interested (a merged capability is fork-maintenance we stop carrying). The
 conductor fork we ALREADY carry (the kitsune2 `store_slice_hash` patch ships on that
-lineage, operator-gated on image build) is the BRIDGE while the PR is in review and the
-FALLBACK if upstream declines — either way the substrate owns its scheduling floor.
+lineage, operator-gated on image build) delivers on OUR timeline regardless of upstream
+review pace. T13's decision memo weighs both by delivery need; the substrate owns its
+scheduling floor either way.
 
 **Write-guard constraint** (`2026-07-20-adam-slow-link-write-guard-saturation.md`): the
 head sweep is a READ path harmed by queueing behind kitsune2's write guard. Batching
@@ -243,7 +246,7 @@ CARGO_TARGET_DIR at the pool slot; DNA workspace = plain cargo + sweettest via C
 | T10 | `ManifestStakesResolver` + `ELOHIM_NETWORK_STAKES` + Simulacra activation on genesis fixtures + seeder per-fixture reach field (`@requires:alpha-cluster-6peer` for the activation leg) — **trap: per-fixture opt-in, land AFTER T5 so the digest baseline is stable; a blanket seed.ts flip silently resizes the corpus L1/L2 are measured against** | **Opus** + operator gate | T5, T6 | manifest_registry, seed.ts, import.ts | trust/stage.rs, seed.ts, import CLI, manifests |
 | T11 | p2p-design-gate amendment (§5 below) | **Opus** (gospel-adjacent skill surface) | evidence in this plan | SKILL.md | .claude/skills/p2p-design-gate/SKILL.md |
 | T12 | seam-registry rows + `.epr-meta` rails (YAML fully specified in design record) | **Sonnet** | T3, T6 landed (rows cite real files) | design record | seam-registry.yaml ×2, src/trust/.epr-meta, src/.epr-meta |
-| T13 | Upstream-first spike: contribution-grade PR to holochain dev (app-interface call deadline/cooperative cancellation as a general capability — upstream idioms, tested, no elohim-specific imposition) + fork bridge patch on the existing lineage while in review + decision memo for the operator | **Opus** (spike, design-bearing; upstream PR + fleet deploy both operator-gated) | — (independent; informs post-sprint) | conductor fork repo, hc_client.rs, upstream dev branch | upstream PR draft + fork branch + design note |
+| T13 | Conductor capability spike: fork patch on the existing lineage (delivery on our timeline) + contribution-grade upstream PR draft (general capability, upstream idioms, tested, no elohim-specific imposition — pro-social and cuts our fork maintenance if merged) + decision memo weighing both by delivery need | **Opus** (spike, design-bearing; upstream PR + fleet deploy both operator-gated) | — (independent; informs post-sprint) | conductor fork repo, hc_client.rs, upstream dev branch | upstream PR draft + fork branch + design note |
 
 **Concurrency guidance:** {T1}, {T4}, {T6} are mutually disjoint start-points (T3/T4
 share only `reconcile_rails.rs` — sequence that one file). T3 is the highest-risk diff;
