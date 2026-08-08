@@ -854,6 +854,54 @@ impl<'a> LocalResolve<'a> {
     }
 }
 
+/// Has this id's DHT ELECTION already been read, or must the obey arm read it
+/// itself?
+///
+/// The sibling of [`LocalResolve`], for the second conductor read
+/// `try_adopt_canonical_head` makes. It exists for exactly one reason: the adopt
+/// arm can now learn every candidate's election in 2–4 BATCHED round-trips
+/// (`services::head_batch_resolver`) instead of one per candidate, and the
+/// pre-flight must be able to consume that answer instead of re-buying it.
+///
+/// **Concerns:** C4 — the three answer states stay apart, and each routes the
+/// way the single-id path already routed its equivalent:
+///
+/// - [`Answer::Present`] — an election is visible; obey it.
+/// - [`Answer::Absent`] — the conductor answered and holds no election. EXACTLY
+///   the old `Ok(None)` arm: not applicable, carry on with the normal decision.
+/// - [`Answer::Unreachable`] — the conductor did not answer (backpressure, a
+///   never-started batch id, or a coordinator that would not serve the extern).
+///   EXACTLY the old `Err` arm: a conductor that will not answer is not evidence
+///   of anything, so fall through to the normal decision rather than hold.
+///
+/// [`ElectionResolve::Probe`] is deliberately NOT an [`Answer`] arm, for the same
+/// reason [`LocalResolve::Probe`] is not: "I have not asked" is an instruction,
+/// not an answer about the world.
+#[derive(Debug, Clone, Copy)]
+pub enum ElectionResolve<'a> {
+    /// Not yet asked — the obey arm calls `resolve_canonical_election` itself
+    /// (the pre-batch behaviour, byte-for-byte).
+    Probe,
+    /// Already asked, in a batch the caller paid for.
+    Resolved(Answer<&'a conductor_writes::CanonicalElectionWire>),
+}
+
+impl ElectionResolve<'_> {
+    /// The batch-probe constructor: the coordinator ANSWERED, with an election
+    /// or with a genuine "no election".
+    pub fn observed(
+        election: Option<&conductor_writes::CanonicalElectionWire>,
+    ) -> ElectionResolve<'_> {
+        ElectionResolve::Resolved(Answer::observed_absence(election))
+    }
+
+    /// The no-answer constructor: unattempted, backpressured, or unreachable.
+    /// Absence was never observed.
+    pub fn unresolved() -> ElectionResolve<'static> {
+        ElectionResolve::Resolved(Answer::Unreachable)
+    }
+}
+
 /// Everything the peer-hint arm needs. Both fields are absent at boot (the
 /// one-shot re-anchor pass runs before P2P discovery), which correctly degrades
 /// the pre-flight to the local-DHT arm alone.
@@ -1065,6 +1113,7 @@ pub async fn try_adopt_canonical_head(
     ctx: &AppContext,
     id: &str,
     local_resolve: LocalResolve<'_>,
+    election_resolve: ElectionResolve<'_>,
     adopt: &AdoptContext<'_>,
 ) -> AdoptOutcome {
     // (0) What does this row already claim? A pool failure is not a licence to
@@ -1135,7 +1184,8 @@ pub async fn try_adopt_canonical_head(
     // the very next sweep sees `canonical_declared_at` set and quiesces.
     if should_probe_election(head.is_some()) {
         if let Some(outcome) =
-            try_obey_visible_election(hc, pool, ctx, id, hint, adopt.fetcher).await
+            try_obey_visible_election(hc, pool, ctx, id, hint, adopt.fetcher, election_resolve)
+                .await
         {
             return outcome;
         }
@@ -1322,6 +1372,7 @@ async fn try_obey_visible_election(
     id: &str,
     hint: Option<&PeerHeadHint>,
     fetcher: Option<&dyn HeadRecordFetcher>,
+    election_resolve: ElectionResolve<'_>,
 ) -> Option<AdoptOutcome> {
     // (0) The DENOMINATOR. Counted at entry, before any gate, because the
     // question this arm went two shifts unable to answer was "how often does a
@@ -1330,46 +1381,79 @@ async fn try_obey_visible_election(
     // read as walls.
     crate::metrics::inc_election_obey_probe(crate::metrics::ElectionObeyProbe::Attempted);
 
-    // (1) What did the DHT elect? Read from our OWN conductor.
-    let election = match conductor_writes::call_resolve_canonical_election(hc, id).await {
-        Ok(Some(e)) => e,
-        // No election visible — nothing to obey. Behaviour is exactly unchanged
-        // for every id in this state, which is the pre-wave-4 world. Counted,
-        // though: a `no_election`-dominated series names an ELECTION-VISIBILITY
-        // wall (the canonical-head links have not gossiped in), which is a
-        // gossip/link-layer finding, not an obey-arm one.
-        Ok(None) => {
+    // (1) What did the DHT elect? Read from our OWN conductor — either right
+    // here (`Probe`, the single-id path) or from the BATCH answer the caller
+    // already paid for (`Resolved`, the arm-4 two-phase path). Same conductor,
+    // same question, same three routings; only the round-trip count differs.
+    let election = match election_resolve {
+        ElectionResolve::Resolved(Answer::Present(e)) => e.clone(),
+        ElectionResolve::Resolved(Answer::Absent) => {
+            // Identical to the `Ok(None)` arm below: no election visible,
+            // nothing to obey, behaviour exactly unchanged for this id.
             crate::metrics::inc_election_obey_probe(crate::metrics::ElectionObeyProbe::NoElection);
             return None;
         }
-        Err(e) => {
-            // A conductor that will not answer is not evidence of anything.
-            // Fall through to the normal decision rather than holding the id.
-            //
-            // WARN, not debug: this deployment drops `debug!` before Loki, so
-            // the level IS the observability. Two known producers of this arm,
-            // distinguishable only by the error text carried below: (a) the
-            // conductor's DB read-pool is saturated ("deadline has elapsed" =
-            // the 10s acquire_semaphore_permit timeout — C11 backpressure, seen
-            // live 2026-08-03; retryable, not a defect in the read itself); or
-            // (b) the shipped coordinator zome is not on the running conductor
-            // (the DNA hash is blind to coordinator zomes — an unknown-function
-            // error here is the didn't-land signal). Do NOT assume (b) from
-            // rate alone: the 2026-08-03 misdiagnosis assumed it while the
-            // hot-swap was proven applied 7/7 — read the error text.
+        ElectionResolve::Resolved(Answer::Unreachable) => {
+            // Identical to the `Err` arm below: the batch never answered for
+            // this id (unattempted, backpressured, or extern-absent). A
+            // conductor that will not answer is not evidence of anything —
+            // fall through to the normal decision rather than holding the id.
             crate::metrics::inc_election_obey_probe(
                 crate::metrics::ElectionObeyProbe::ResolveError,
             );
             tracing::warn!(
                 target: "elohim_storage::head_adoption",
-                content_id = %id, error = %e,
-                "election-obey: ELECTION READ FAILED — this conductor would not answer \
-                 resolve_canonical_election, so no election could be obeyed for this row; \
-                 continuing with the normal decision (read the error text: 'deadline has \
-                 elapsed' = conductor DB-pool saturation/backpressure; unknown-function = \
-                 coordinator zome not on the running conductor)"
+                content_id = %id,
+                "election-obey: the BATCH election probe returned no answer for this id \
+                 (unattempted, or a shared conductor-backpressure stop) — no election could \
+                 be obeyed for this row; continuing with the normal decision, retried next sweep"
             );
             return None;
+        }
+        ElectionResolve::Probe => {
+            match conductor_writes::call_resolve_canonical_election(hc, id).await {
+                Ok(Some(e)) => e,
+                // No election visible — nothing to obey. Behaviour is exactly unchanged
+                // for every id in this state, which is the pre-wave-4 world. Counted,
+                // though: a `no_election`-dominated series names an ELECTION-VISIBILITY
+                // wall (the canonical-head links have not gossiped in), which is a
+                // gossip/link-layer finding, not an obey-arm one.
+                Ok(None) => {
+                    crate::metrics::inc_election_obey_probe(
+                        crate::metrics::ElectionObeyProbe::NoElection,
+                    );
+                    return None;
+                }
+                Err(e) => {
+                    // A conductor that will not answer is not evidence of anything.
+                    // Fall through to the normal decision rather than holding the id.
+                    //
+                    // WARN, not debug: this deployment drops `debug!` before Loki, so
+                    // the level IS the observability. Two known producers of this arm,
+                    // distinguishable only by the error text carried below: (a) the
+                    // conductor's DB read-pool is saturated ("deadline has elapsed" =
+                    // the 10s acquire_semaphore_permit timeout — C11 backpressure, seen
+                    // live 2026-08-03; retryable, not a defect in the read itself); or
+                    // (b) the shipped coordinator zome is not on the running conductor
+                    // (the DNA hash is blind to coordinator zomes — an unknown-function
+                    // error here is the didn't-land signal). Do NOT assume (b) from
+                    // rate alone: the 2026-08-03 misdiagnosis assumed it while the
+                    // hot-swap was proven applied 7/7 — read the error text.
+                    crate::metrics::inc_election_obey_probe(
+                        crate::metrics::ElectionObeyProbe::ResolveError,
+                    );
+                    tracing::warn!(
+                        target: "elohim_storage::head_adoption",
+                        content_id = %id, error = %e,
+                        "election-obey: ELECTION READ FAILED — this conductor would not answer \
+                         resolve_canonical_election, so no election could be obeyed for this row; \
+                         continuing with the normal decision (read the error text: 'deadline has \
+                         elapsed' = conductor DB-pool saturation/backpressure; unknown-function = \
+                         coordinator zome not on the running conductor)"
+                    );
+                    return None;
+                }
+            }
         }
     };
 

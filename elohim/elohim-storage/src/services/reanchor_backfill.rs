@@ -285,6 +285,8 @@ pub async fn run_once(
             &app_ctx,
             id,
             crate::services::head_adoption::LocalResolve::Probe,
+            // `Probe` for the same reason: this sweep has paid for neither read.
+            crate::services::head_adoption::ElectionResolve::Probe,
             adopt,
         )
         .await;

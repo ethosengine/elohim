@@ -119,17 +119,24 @@ use crate::views::{ProjectionInventoryPayload, ViewFederationRequest, ViewKind};
 /// read-pool ceiling). Do not raise without weighing conductor saturation.
 const WITNESS_MAX_PER_TICK: i64 = 200;
 
-/// Per-item spacing inside a witness sweep (each item is a conductor round-trip).
-const WITNESS_ITEM_DELAY: Duration = Duration::from_millis(25);
+// `WITNESS_ITEM_DELAY` (25ms per item) was DELETED by L1 (head-plane
+// trust-gradient program, 2026-08-08). It was vestigial in both shapes it had:
+// inside `adopt_deferred_heads`'s `for_each_concurrent` it was 5s/tick of pure
+// sleep that protected nothing (the concurrency bound is the throttle), and in
+// the sequential witness sweeps it added ~25ms to conductor WRITES that already
+// cost 0.4–1s each — ~3–6% of spacing standing in for real backpressure
+// awareness. What replaces it is a CLOSED LOOP, not another guessed constant:
+// `reconcile_rails::AdaptiveBatchBudget` reads the conductor's own queue-wait
+// and shrinks the ask. The witness sweeps keep their two REAL bounds
+// (`HealPacing::witness_max_per_tick` and `witness_sweep_budget`).
 
 /// Wall-clock budget for one witness sweep. `HcClient::call_zome` awaits with no
 /// timeout of its own, so a hung/stuck conductor call would otherwise hold the
 /// heal leg's single-flight guard forever (the RAII `HealFlag` covers panic and
 /// cancellation, but not an infinite await). Bounding the whole sweep releases
 /// the guard normally on the worst case and resumes next tick (the sweep is
-/// idempotent). Derivation: `WITNESS_MAX_PER_TICK` (200) × `WITNESS_ITEM_DELAY`
-/// (25ms) = 5s of spacing, plus generous conductor-latency headroom for 200
-/// round-trips on a healthy node.
+/// idempotent). Sized for `WITNESS_MAX_PER_TICK` (200) conductor round-trips on
+/// a healthy node with generous latency headroom.
 const WITNESS_SWEEP_BUDGET: Duration = Duration::from_secs(120);
 
 /// Per-sweep retry budget for conductor-can't-see-it gaps. A gap that the
@@ -404,6 +411,91 @@ pub struct HealPacing {
     /// Consecutive synthetic per-attempt timeouts that shed the rest of a leg.
     /// `0` disables the circuit (never opens).
     pub circuit_timeout_threshold: u32,
+    /// Per-tick candidate cap for the witness/adopt sweeps (folded here from the
+    /// former free-standing `WITNESS_MAX_PER_TICK` const). **This number does
+    /// not rise.** L1 collapses ROUND-TRIPS, never the slice — raising the cap
+    /// is the forbidden move under the write-guard constraint.
+    pub witness_max_per_tick: i64,
+    /// Wall-clock budget for one witness/adopt sweep (folded here from the former
+    /// `WITNESS_SWEEP_BUDGET` const). Authoritative over every other bound.
+    pub witness_sweep_budget: Duration,
+    /// IN-WASM deadline handed to the batch externs.
+    ///
+    /// STRICT ORDERING INVARIANT: this must stay strictly BELOW
+    /// [`Self::attempt_timeout`]. The extern bounds itself from the inside and
+    /// returns partial results; the caller-side timeout does not cancel anything
+    /// (`HcClient::call_zome` has no cancellation), so a caller timeout that
+    /// fired first would leave the conductor executing with nobody listening AND
+    /// discard results it had already accumulated. Pinned by
+    /// [`tests::the_attempt_timeout_stays_above_the_extern_budget`].
+    pub batch_extern_budget: Duration,
+    /// Concurrent BATCH conductor calls the head-plane arms may have in flight.
+    ///
+    /// **Two, down from the single-id fan-out of eight.** Each call now carries
+    /// up to `AdaptiveBatchBudget::current()` ids, so holding the old fan-out
+    /// would multiply the conductor's concurrent load by the batch size — the
+    /// exact move the write-guard constraint forbids. Pinned by
+    /// [`tests::the_batch_fanout_is_lower_than_the_single_id_fanout_it_replaces`].
+    pub head_batch_fanout: usize,
+}
+
+/// Concurrent batch conductor calls per head-plane arm. See
+/// [`HealPacing::head_batch_fanout`] for why this is 2 and not 8.
+const HEAD_BATCH_FANOUT: usize = 2;
+
+/// Metric label for the heads batch extern.
+const HEAD_BATCH_EXTERN_HEADS: &str = "resolve_content_heads_local";
+/// Metric label for the elections batch extern.
+const HEAD_BATCH_EXTERN_ELECTIONS: &str = "resolve_canonical_elections";
+
+/// PROCESS-WIDE AIMD batch-size state.
+///
+/// Process-wide, not per-sweep: the controller's whole job is to learn THIS
+/// conductor's pressure across sweeps (adam converges small, matthew large under
+/// the same constants). A per-sweep controller would re-learn from the floor
+/// every 300s and never converge anywhere.
+///
+/// `Option` so the static can be `const`-constructed; a poisoned lock degrades
+/// to the floor, which is the safe direction.
+static HEAD_BATCH_BUDGET: std::sync::Mutex<
+    Option<crate::p2p::reconcile_rails::AdaptiveBatchBudget>,
+> = std::sync::Mutex::new(None);
+
+/// The batch size to ask for on this sweep.
+fn head_batch_budget_current() -> usize {
+    HEAD_BATCH_BUDGET
+        .lock()
+        .map_or(crate::p2p::reconcile_rails::BATCH_SIZE_FLOOR, |mut g| {
+            g.get_or_insert_with(crate::p2p::reconcile_rails::AdaptiveBatchBudget::default)
+                .current()
+        })
+}
+
+/// Fold one observed conductor queue-wait into the controller.
+fn head_batch_budget_observe(queue_wait: Duration) {
+    if let Ok(mut g) = HEAD_BATCH_BUDGET.lock() {
+        g.get_or_insert_with(crate::p2p::reconcile_rails::AdaptiveBatchBudget::default)
+            .observe(queue_wait);
+    }
+}
+
+/// PROCESS-LIFETIME batch resolver.
+///
+/// One per process, deliberately: the resolver LATCHES into single-id mode the
+/// first time a conductor proves it cannot serve the batch externs, and that
+/// latch is what makes "fall through once, log once, never retry-loop the batch"
+/// true. A per-sweep resolver would re-probe the batch extern every 300s
+/// forever on a pre-hot-swap conductor — the retry-loop the rule forbids.
+static HEAD_BATCH_RESOLVER: std::sync::OnceLock<
+    Arc<crate::services::head_batch_resolver::ConductorHeadBatchResolver>,
+> = std::sync::OnceLock::new();
+
+fn head_batch_resolver(
+    hc: &Arc<HcClient>,
+) -> &'static Arc<crate::services::head_batch_resolver::ConductorHeadBatchResolver> {
+    HEAD_BATCH_RESOLVER.get_or_init(|| {
+        Arc::new(crate::services::head_batch_resolver::ConductorHeadBatchResolver::new(hc.clone()))
+    })
 }
 
 impl Default for HealPacing {
@@ -417,6 +509,10 @@ impl Default for HealPacing {
             content_leg_budget: CONTENT_LEG_BUDGET,
             collectives_leg_budget: COLLECTIVES_LEG_BUDGET,
             circuit_timeout_threshold: HEAL_CIRCUIT_TIMEOUT_THRESHOLD,
+            witness_max_per_tick: WITNESS_MAX_PER_TICK,
+            witness_sweep_budget: WITNESS_SWEEP_BUDGET,
+            batch_extern_budget: crate::services::head_batch_resolver::BATCH_EXTERN_BUDGET,
+            head_batch_fanout: HEAD_BATCH_FANOUT,
         }
     }
 }
@@ -439,6 +535,13 @@ impl HealPacing {
             // drive deliberate timeout streaks and must not be shed mid-set. The
             // circuit's own tests opt in explicitly.
             circuit_timeout_threshold: 0,
+            witness_max_per_tick: WITNESS_MAX_PER_TICK,
+            witness_sweep_budget: Duration::from_secs(3600),
+            // Kept STRICTLY below the 30s test `attempt_timeout` — the same
+            // ordering the production profile holds, so the invariant test
+            // covers both profiles rather than only the shipped one.
+            batch_extern_budget: Duration::from_secs(4),
+            head_batch_fanout: HEAD_BATCH_FANOUT,
         }
     }
 
@@ -1452,6 +1555,10 @@ pub async fn run_heal(
     // REA runs FIRST with its own reserved budget so its small backlog is never
     // starved behind the large content queue (the incident).
     let pacing = HealPacing::default();
+    // ONE process-lifetime resolver (see `head_batch_resolver`), borrowed by the
+    // two head-plane arms below.
+    let resolver: &dyn crate::services::head_batch_resolver::HeadBatchResolver =
+        head_batch_resolver(hc).as_ref();
     let ReaDiscovery {
         mut tracker,
         discovered_by,
@@ -1518,10 +1625,10 @@ pub async fn run_heal(
     } = heal_content(
         &mut content_tracker,
         &content_discovered_by,
-        hc,
         pool,
         &pacing,
         &peer_head_hints,
+        resolver,
     )
     .await;
 
@@ -1578,16 +1685,16 @@ pub async fn run_heal(
     // GapFill, and they are unreachable by both witness sweeps below (anchored,
     // and conductor-resolvable). Running them here is what turns the refusal
     // into convergence rather than into a permanent gap.
-    adopt_deferred_heads(hc, pool, &adopt_candidates, &adopt).await;
+    adopt_deferred_heads(hc, pool, &adopt_candidates, &adopt, &pacing, resolver).await;
 
     // GAP 1.5: green the un-witnessed seeded corpus. Composed onto (not forked
     // from) the content arm — same conductor gate + single-flight guard.
-    witness_bootstrap(hc, pool, provide_state, &adopt).await;
+    witness_bootstrap(hc, pool, provide_state, &adopt, &pacing).await;
 
     // Ghost-anchor witness: the NULL-anchor sweep above cannot see rows whose
     // anchor string outlived its conductor incarnation. Runs on the same leg,
     // fed by the conductor answers the heal already paid for.
-    witness_ghost_anchors(hc, pool, &ghost_candidates, &adopt).await;
+    witness_ghost_anchors(hc, pool, &ghost_candidates, &adopt, &pacing).await;
 
     // Publish the WHOLE sweep (F-D, 2026-08-01): every arm's post-heal counts
     // folded, alongside the divergent-anchor counter that already folded across
@@ -1674,6 +1781,7 @@ async fn witness_bootstrap(
     pool: &DbPool,
     provide_state: &ProvideLoopState,
     adopt: &crate::services::head_adoption::AdoptContext<'_>,
+    pacing: &HealPacing,
 ) {
     // A lamad-scoped ContentService drives the canonical re-anchor path
     // (`update_via_conductor` null-anchor branch). The EventBus is a throwaway:
@@ -1686,8 +1794,11 @@ async fn witness_bootstrap(
         Arc::new(crate::services::events::EventBus::new()),
     );
     let cfg = crate::services::reanchor_backfill::ReanchorConfig {
-        max_per_sweep: WITNESS_MAX_PER_TICK,
-        item_delay: WITNESS_ITEM_DELAY,
+        max_per_sweep: pacing.witness_max_per_tick,
+        // ZERO: the per-item sleep was deleted by L1 (see the note where
+        // `WITNESS_ITEM_DELAY` used to live). This sweep's real bounds are
+        // `max_per_sweep` and the wall clock below.
+        item_delay: Duration::ZERO,
     };
     // Wall-clock bound (see WITNESS_SWEEP_BUDGET): on elapse the run_once future
     // is dropped, cancelling any in-flight (possibly hung) conductor call, so the
@@ -1701,7 +1812,7 @@ async fn witness_bootstrap(
         &cfg,
         adopt,
     );
-    match tokio::time::timeout(WITNESS_SWEEP_BUDGET, sweep).await {
+    match tokio::time::timeout(pacing.witness_sweep_budget, sweep).await {
         Ok(Ok(report)) if report.candidates > 0 => {
             crate::metrics::add_content_witness_authored(report.reanchored as u64);
             tracing::info!(
@@ -1730,7 +1841,7 @@ async fn witness_bootstrap(
         Err(_elapsed) => {
             tracing::warn!(
                 target: "elohim_storage::projection_reconcile",
-                budget_secs = WITNESS_SWEEP_BUDGET.as_secs(),
+                budget_secs = pacing.witness_sweep_budget.as_secs(),
                 "projection-reconcile[witness]: sweep exceeded wall-clock budget \
                  (likely a slow/saturated conductor) — abandoned, single-flight guard \
                  released, resumes next tick"
@@ -1815,6 +1926,7 @@ async fn witness_ghost_anchors(
     pool: &DbPool,
     candidates: &[String],
     adopt: &crate::services::head_adoption::AdoptContext<'_>,
+    pacing: &HealPacing,
 ) {
     if candidates.is_empty() {
         return;
@@ -1858,7 +1970,7 @@ async fn witness_ghost_anchors(
         let mut failed = 0usize;
         let mut adopted = 0usize;
         let mut held = 0usize;
-        for (id, reach, content_type) in ghosts.iter().take(WITNESS_MAX_PER_TICK as usize) {
+        for (id, reach, content_type) in ghosts.iter().take(pacing.witness_max_per_tick as usize) {
             // Same guard as the re-anchor path: a reach outside the DNA-notarized
             // vocabulary can never be re-authored, so it would burn a conductor
             // round-trip every sweep forever.
@@ -1901,13 +2013,16 @@ async fn witness_ghost_anchors(
                 &ghost_ctx,
                 id,
                 crate::services::head_adoption::LocalResolve::observed(None),
+                // `Probe`: the ghost sweep did NOT pay for an election read (the
+                // adopt arm's batch probe covers the adopt candidate list, which
+                // is a different set). Unchanged single-id behaviour here.
+                crate::services::head_adoption::ElectionResolve::Probe,
                 adopt,
             )
             .await;
             let pending_adopt = match preflight {
                 crate::services::head_adoption::AdoptOutcome::Adopted => {
                     adopted += 1;
-                    tokio::time::sleep(WITNESS_ITEM_DELAY).await;
                     continue;
                 }
                 // Contest minted a DHT candidate and deliberately left the row
@@ -1916,7 +2031,6 @@ async fn witness_ghost_anchors(
                 crate::services::head_adoption::AdoptOutcome::Held
                 | crate::services::head_adoption::AdoptOutcome::Contested => {
                     held += 1;
-                    tokio::time::sleep(WITNESS_ITEM_DELAY).await;
                     continue;
                 }
                 crate::services::head_adoption::AdoptOutcome::Author => None,
@@ -1999,12 +2113,11 @@ async fn witness_ghost_anchors(
                     );
                 }
             }
-            tokio::time::sleep(WITNESS_ITEM_DELAY).await;
         }
         (authored, skipped, failed, adopted, held)
     };
 
-    match tokio::time::timeout(WITNESS_SWEEP_BUDGET, sweep).await {
+    match tokio::time::timeout(pacing.witness_sweep_budget, sweep).await {
         Ok((authored, skipped, failed, adopted, held)) => {
             crate::metrics::add_content_witness_authored(authored as u64);
             tracing::warn!(
@@ -2023,7 +2136,7 @@ async fn witness_ghost_anchors(
             crate::metrics::inc_content_witness_sweep_abandoned();
             tracing::warn!(
                 target: "elohim_storage::projection_reconcile",
-                budget_secs = WITNESS_SWEEP_BUDGET.as_secs(),
+                budget_secs = pacing.witness_sweep_budget.as_secs(),
                 candidates = total,
                 "projection-reconcile[ghost-witness]: sweep exceeded wall-clock budget \
                  (likely a slow/saturated conductor) — abandoned, resumes next sweep"
@@ -2999,23 +3112,31 @@ async fn discover_content(
 ///
 /// `fanout` is clamped to at least 1 (a zero would silently produce a stream that
 /// yields nothing); 1 is exactly the pre-lever sequential leg.
-fn resolve_pipeline<'a, F, Fut, T>(
-    ids: &'a [String],
+///
+/// Generic over the UNIT of work `U`, not hard-wired to one id: L1 changed the
+/// unit from `String` (one id per conductor round-trip) to `Vec<String>` (a
+/// batch per round-trip) WITHOUT changing a single property this function is
+/// tested for. That is the point of the parameter — the fan-out bound, the
+/// bound on future creation, and the in-order delivery are the same claims
+/// about the same code either way.
+fn resolve_pipeline<'a, U, F, Fut, T>(
+    units: &'a [U],
     fanout: usize,
     resolve: F,
-) -> impl futures::Stream<Item = (String, T)> + 'a
+) -> impl futures::Stream<Item = (U, T)> + 'a
 where
-    F: Fn(&'a String) -> Fut + 'a,
+    U: Clone + 'a,
+    F: Fn(&'a U) -> Fut + 'a,
     Fut: std::future::Future<Output = T> + 'a,
 {
     use futures::stream::StreamExt as _;
     // `map` is LAZY and `buffered` pulls at most `fanout` items ahead, so
     // `resolve` is invoked at most `fanout` times before the caller consumes an
     // answer — the bound is on future CREATION as well as on polling.
-    futures::stream::iter(ids.iter())
-        .map(move |id| {
-            let fut = resolve(id);
-            async move { (id.clone(), fut.await) }
+    futures::stream::iter(units.iter())
+        .map(move |unit| {
+            let fut = resolve(unit);
+            async move { (unit.clone(), fut.await) }
         })
         .buffered(fanout.max(1))
 }
@@ -3068,10 +3189,10 @@ fn apply_replayed_missing(
 async fn heal_content(
     tracker: &mut GapTracker,
     discovered_by: &std::collections::HashMap<String, String>,
-    hc: &Arc<HcClient>,
     pool: &DbPool,
     pacing: &HealPacing,
     peer_head_hints: &crate::services::head_adoption::PeerHeadHints,
+    resolver: &dyn crate::services::head_batch_resolver::HeadBatchResolver,
 ) -> ContentHealOutcome {
     let app_ctx = crate::db::AppContext::default_lamad();
     let mut ghost_candidates: Vec<String> = Vec::new();
@@ -3129,89 +3250,146 @@ async fn heal_content(
     // bounded, one-time cost per leg and is the price of not paying the latency
     // serially — it never widens the slice, only the concurrency.
     use futures::stream::StreamExt as _;
-    let fanout = crate::config::heal_resolve_fanout();
-    let resolves = resolve_pipeline(&to_resolve, fanout, |id| {
+    // The UNIT is now a CHUNK of ids, not one id. `resolve_pipeline` is
+    // unchanged in every property it is tested for (bounded creation, bounded
+    // polling, IN-ORDER delivery) — only its unit type moved, which is what
+    // keeps the apply half below the same sequential body it always was.
+    //
+    // FAN-OUT DROPS 8 -> 2. Each call now carries up to `batch_size` ids, so
+    // keeping the single-id fan-out would multiply the conductor's CONCURRENT
+    // load by the batch size. The write-guard constraint permits collapsing
+    // round-trips at flat read-permit cost and nothing else.
+    let fanout = pacing.head_batch_fanout;
+    let batch_size = head_batch_budget_current();
+    crate::metrics::set_head_batch_size(HEAD_BATCH_EXTERN_HEADS, batch_size);
+    let chunks: Vec<Vec<String>> = to_resolve
+        .chunks(batch_size.max(1))
+        .map(<[String]>::to_vec)
+        .collect();
+    let resolves = resolve_pipeline(&chunks, fanout, |chunk| {
         call_with_retry(pacing, move || {
             // LOCAL-only resolve — the heal loop must not stall on a cold arc.
-            // `Ok(None)` from this variant is "not in my local view YET", never
-            // authoritative absence; the HTTP author gate and the adoption
-            // pre-flight keep using the Network variant for that reason.
-            crate::services::conductor_writes::call_resolve_content_head_local(hc, id)
+            // `Resolved(None)` from this extern is "not in my local view YET",
+            // never authoritative absence; the HTTP author gate and the
+            // adoption pre-flight keep using the Network variant for that
+            // reason.
+            resolver.resolve_heads(chunk, pacing.batch_extern_budget)
         })
     });
     futures::pin_mut!(resolves);
 
-    while let Some((id, attempt)) = resolves.next().await {
+    let mut batch_calls = 0usize;
+    let mut batch_unattempted = 0usize;
+    while let Some((chunk, attempt)) = resolves.next().await {
         circuit.record(&attempt.result);
-        // LEDGER COHERENCE. Any answer other than `Ok(None)` falsifies a cached
-        // "missing" for this id, so it must not survive to be replayed — the
-        // conductor-missing arm below re-stamps it when the answer IS `Ok(None)`.
-        if !matches!(attempt.result, Ok(None)) {
-            crate::services::heal_backoff::note_resolved(&id);
-        }
-        // ELECTION-TIER METER. Counted on EVERY answer, before any branch
-        // consumes it: `canonical` was previously read only to pick a stamp mode
-        // and then discarded, so "does an election even exist for this class?"
-        // was unanswerable from telemetry — the question that separates a
-        // supply-side deadlock from a gossip lag. An answer that never arrived
-        // is not an answer and is deliberately not counted here (the miss and
-        // timeout classes below own it).
-        if let Ok(Some(ref head)) = attempt.result {
-            crate::metrics::inc_content_canonical_answer(head.canonical_tier_label());
-        }
-        match attempt.result {
-            // GAPFILL SELF-ELECTION GUARD. Checked BEFORE the stamp, because the
-            // stamp is what makes the divergence terminal (see
-            // `gapfill_would_self_elect`). The extra projection read is paid only
-            // on the narrow suspicious path — a non-canonical answer for an id a
-            // peer is advertising a declaration for.
-            Ok(Some(ref head))
-                if !head.canonical && peer_head_hints.contains_key(&id) && {
-                    // Read failure DEFERS (conservative): deferring writes
-                    // nothing and the next sweep retries, whereas guessing
-                    // "undeclared" and stamping is irreversible.
-                    let local_declared = pool.get().ok().and_then(|mut c| {
-                        crate::db::content_diesel::declared_head_for(&mut c, &app_ctx, &id).ok()
-                    });
-                    match local_declared {
-                        Some(d) => gapfill_would_self_elect(false, true, d.as_deref()),
-                        None => true,
-                    }
-                } =>
-            {
-                let peer = discovered_by
-                    .get(&id)
-                    .cloned()
-                    .unwrap_or_else(|| "unknown".to_string());
+        batch_calls += 1;
+        let retried = attempt.retried;
+        let resolution = match attempt.result {
+            Ok(r) => r,
+            // ── CALL-LEVEL INFRASTRUCTURE FAILURE ────────────────────────────
+            //
+            // The conductor delivered NO answer of any kind. Every id in this
+            // chunk goes BACK TO PENDING with backoff (the next sweep, ~300s):
+            // no `mark_failed` (that would burn `MAX_RETRIES` and poison the
+            // `MissLedger` for ids the conductor never spoke about), and no
+            // single-id fallback (that would multiply the load on a conductor
+            // already refusing work by the batch size).
+            Err(e) => {
+                let transient = is_transient_conductor_error(&e);
+                crate::metrics::observe_head_batch_call(
+                    HEAD_BATCH_EXTERN_HEADS,
+                    "call_failed",
+                    chunk.len(),
+                    Duration::ZERO,
+                );
                 tracing::warn!(
                     target: "elohim_storage::projection_reconcile",
-                    content_id = %id,
-                    discovered_via_peer = %peer,
-                    fallback_head = %head.head_action_hash,
-                    "projection-reconcile[content]: REFUSED to GapFill an undeclared row with \
-                     this node's own fallback root while a peer advertises a declaration — \
-                     deferred to the adopt-before-author arm"
+                    error = %e,
+                    transient,
+                    ids = chunk.len(),
+                    "projection-reconcile[content]: BATCH head resolve failed at the CALL level \
+                     — every id in this batch returns to pending (never marked failed: the \
+                     conductor said nothing about them), retried next sweep"
                 );
-                tracker.mark_completed(&id);
-                // Carry the conductor's OWN answer forward. It is a fallback
-                // (non-canonical) here by construction — that is what this arm
-                // matched on — so the pre-flight will see `canonical == false`
-                // and route to the peer/contest arms exactly as before. The
-                // difference is that it now reads that from EVIDENCE rather than
-                // from a blanket `Known(None)` assertion.
-                adopt_candidates.push(AdoptCandidate {
-                    id: id.clone(),
-                    head: Some(head.clone()),
-                });
-                crate::metrics::inc_projection_heal_outcome(
-                    "content",
-                    HealOutcomeKind::DeferredToAdopt.label(),
-                );
+                // A conductor that will not answer must not be asked for the
+                // rest of the leg either.
+                break;
             }
-            Ok(Some(head)) => match heal_content_one(&head, pool, &app_ctx) {
-                Ok(crate::db::content_diesel::StampOutcome::Stamped) => {
-                    tracker.mark_completed(&id);
-                    healed += 1;
+        };
+        head_batch_budget_observe(resolution.queue_wait);
+        crate::metrics::observe_head_batch_call(
+            HEAD_BATCH_EXTERN_HEADS,
+            if resolution.via_single_id_fallback {
+                "fallback"
+            } else {
+                "answered"
+            },
+            chunk.len(),
+            resolution.queue_wait,
+        );
+        // ── UNATTEMPTED: NEVER STARTED, NEVER A FAILURE ──────────────────────
+        //
+        // These ids are left in `pending` untouched. `mark_failed` here is THE
+        // trap this arm exists to avoid: it would spend a retry budget on ids
+        // the coordinator declined to even look at, and the `MissLedger` would
+        // exhaust them for a condition that is purely about the coordinator's
+        // clock.
+        if !resolution.unattempted.is_empty() {
+            batch_unattempted += resolution.unattempted.len();
+            crate::metrics::add_head_batch_unattempted(
+                HEAD_BATCH_EXTERN_HEADS,
+                resolution.stop_reason.as_ref().map_or(
+                    "none",
+                    crate::services::conductor_writes::BatchStopReason::label,
+                ),
+                resolution.unattempted.len(),
+            );
+        }
+        let stopped_shared = matches!(
+            resolution.stop_reason,
+            Some(crate::services::conductor_writes::BatchStopReason::SharedFailure(_))
+        );
+        for item in resolution.items {
+            let id = item.id;
+            let answer = item.answer;
+            let failure_reason = item.reason;
+            // LEDGER COHERENCE. Any answer other than an observed absence
+            // falsifies a cached "missing" for this id, so it must not survive
+            // to be replayed — the conductor-missing arm below re-stamps it
+            // when the answer IS an observed absence.
+            if !matches!(answer, seam_contracts::Answer::Absent) {
+                crate::services::heal_backoff::note_resolved(&id);
+            }
+            // ELECTION-TIER METER. Counted on EVERY answer, before any branch
+            // consumes it: `canonical` was previously read only to pick a stamp mode
+            // and then discarded, so "does an election even exist for this class?"
+            // was unanswerable from telemetry — the question that separates a
+            // supply-side deadlock from a gossip lag. An answer that never arrived
+            // is not an answer and is deliberately not counted here (the miss and
+            // timeout classes below own it).
+            if let seam_contracts::Answer::Present(ref head) = answer {
+                crate::metrics::inc_content_canonical_answer(head.canonical_tier_label());
+            }
+            match answer {
+                // GAPFILL SELF-ELECTION GUARD. Checked BEFORE the stamp, because the
+                // stamp is what makes the divergence terminal (see
+                // `gapfill_would_self_elect`). The extra projection read is paid only
+                // on the narrow suspicious path — a non-canonical answer for an id a
+                // peer is advertising a declaration for.
+                seam_contracts::Answer::Present(ref head)
+                    if !head.canonical && peer_head_hints.contains_key(&id) && {
+                        // Read failure DEFERS (conservative): deferring writes
+                        // nothing and the next sweep retries, whereas guessing
+                        // "undeclared" and stamping is irreversible.
+                        let local_declared = pool.get().ok().and_then(|mut c| {
+                            crate::db::content_diesel::declared_head_for(&mut c, &app_ctx, &id).ok()
+                        });
+                        match local_declared {
+                            Some(d) => gapfill_would_self_elect(false, true, d.as_deref()),
+                            None => true,
+                        }
+                    } =>
+                {
                     let peer = discovered_by
                         .get(&id)
                         .cloned()
@@ -3220,214 +3398,298 @@ async fn heal_content(
                         target: "elohim_storage::projection_reconcile",
                         content_id = %id,
                         discovered_via_peer = %peer,
-                        retried = attempt.retried,
-                        "projection-reconcile[content]: HEALED content anchor from own conductor (peer discovery)"
+                        fallback_head = %head.head_action_hash,
+                        "projection-reconcile[content]: REFUSED to GapFill an undeclared row with \
+                         this node's own fallback root while a peer advertises a declaration — \
+                         deferred to the adopt-before-author arm"
                     );
-                    crate::metrics::inc_projection_heal_outcome(
-                        "content",
-                        if attempt.retried {
-                            HealOutcomeKind::TimeoutRetried.label()
-                        } else {
-                            HealOutcomeKind::Healed.label()
-                        },
-                    );
-                }
-                Ok(crate::db::content_diesel::StampOutcome::Refreshed) => {
-                    // The own conductor answered with the head this row ALREADY
-                    // holds: the write refreshed value fields and backfilled the
-                    // declaration ordering, but the HEAD did not move — so the
-                    // peer-advertised divergence that enqueued this row is
-                    // UNCHANGED and will re-enqueue next sweep. Deliberately NOT
-                    // counted in `healed` and NOT logged as HEALED: conflating
-                    // this no-op with convergence is what made a spinning heal
-                    // plane read as a working one (see `StampOutcome::Refreshed`).
                     tracker.mark_completed(&id);
-                    tracing::info!(
-                        target: "elohim_storage::projection_reconcile",
-                        content_id = %id,
-                        "projection-reconcile[content]: head unchanged — refreshed row, divergence NOT resolved (own conductor answered the head this row already holds)"
-                    );
-                    crate::metrics::inc_projection_heal_outcome(
-                        "content",
-                        HealOutcomeKind::Refreshed.label(),
-                    );
-                }
-                Ok(crate::db::content_diesel::StampOutcome::SkippedDeclared) => {
-                    // Row already carries a DIFFERENT declared head — the heal
-                    // must not move it (a fresh-boot conductor resolve can fall
-                    // through to the root-author election and would resurrect a
-                    // superseded head over an adopted canonical one — the
-                    // 2026-07-11 20:42:40 regression). Canonical channels own it.
-                    tracker.mark_completed(&id);
-                    tracing::info!(content_id = %id, "projection-reconcile[content]: row already declared — heal left it to the canonical channels");
-                    crate::metrics::inc_projection_heal_outcome(
-                        "content",
-                        HealOutcomeKind::RefusedDeclared.label(),
-                    );
-
-                    // DECLARED-DIVERGENCE ADMISSION. Refusing the stamp is
-                    // correct — and, on its own, terminal: this row reached no
-                    // candidate list at all, so the DHT election never got a
-                    // candidate from the one side that CAN declare (it holds the
-                    // chain). Admitting it here is candidate ADMISSION only; the
-                    // decision rule is untouched and answers `ContestPeer`.
-                    //
-                    // The election read is what keeps this from re-admitting a
-                    // settled row every sweep, so a read failure must NOT admit
-                    // (conservative: a spurious admission re-contests a decided
-                    // question, which is the write storm the gate exists to stop).
-                    let (declared, has_election) = pool
-                        .get()
-                        .ok()
-                        .and_then(|mut c| {
-                            crate::db::content_diesel::declared_head_with_election(
-                                &mut c, &app_ctx, &id,
-                            )
-                            .ok()
-                        })
-                        .unwrap_or((None, true));
-                    let peer_differs = peer_head_hints.get(&id).is_some_and(|h| {
-                        declared
-                            .as_deref()
-                            .is_none_or(|d| d.trim() != h.head_action_hash.trim())
+                    // Carry the conductor's OWN answer forward. It is a fallback
+                    // (non-canonical) here by construction — that is what this arm
+                    // matched on — so the pre-flight will see `canonical == false`
+                    // and route to the peer/contest arms exactly as before. The
+                    // difference is that it now reads that from EVIDENCE rather than
+                    // from a blanket `Known(None)` assertion.
+                    adopt_candidates.push(AdoptCandidate {
+                        id: id.clone(),
+                        head: Some(head.clone()),
                     });
-                    if declared_divergence_should_route_to_contest(
-                        head.canonical,
-                        declared.is_some(),
-                        peer_differs,
-                        has_election,
-                    ) {
-                        adopt_candidates.push(AdoptCandidate {
-                            id: id.clone(),
-                            // The conductor's own (non-canonical) answer, already
-                            // paid for — so the pre-flight reads `canonical=false`
-                            // from EVIDENCE and routes to contest.
-                            head: Some(head.clone()),
-                        });
+                    crate::metrics::inc_projection_heal_outcome(
+                        "content",
+                        HealOutcomeKind::DeferredToAdopt.label(),
+                    );
+                }
+                seam_contracts::Answer::Present(head) => {
+                    match heal_content_one(&head, pool, &app_ctx) {
+                        Ok(crate::db::content_diesel::StampOutcome::Stamped) => {
+                            tracker.mark_completed(&id);
+                            healed += 1;
+                            let peer = discovered_by
+                                .get(&id)
+                                .cloned()
+                                .unwrap_or_else(|| "unknown".to_string());
+                            tracing::warn!(
+                                target: "elohim_storage::projection_reconcile",
+                                content_id = %id,
+                                discovered_via_peer = %peer,
+                                retried,
+                                "projection-reconcile[content]: HEALED content anchor from own conductor (peer discovery)"
+                            );
+                            crate::metrics::inc_projection_heal_outcome(
+                                "content",
+                                if retried {
+                                    HealOutcomeKind::TimeoutRetried.label()
+                                } else {
+                                    HealOutcomeKind::Healed.label()
+                                },
+                            );
+                        }
+                        Ok(crate::db::content_diesel::StampOutcome::Refreshed) => {
+                            // The own conductor answered with the head this row ALREADY
+                            // holds: the write refreshed value fields and backfilled the
+                            // declaration ordering, but the HEAD did not move — so the
+                            // peer-advertised divergence that enqueued this row is
+                            // UNCHANGED and will re-enqueue next sweep. Deliberately NOT
+                            // counted in `healed` and NOT logged as HEALED: conflating
+                            // this no-op with convergence is what made a spinning heal
+                            // plane read as a working one (see `StampOutcome::Refreshed`).
+                            tracker.mark_completed(&id);
+                            tracing::info!(
+                                target: "elohim_storage::projection_reconcile",
+                                content_id = %id,
+                                "projection-reconcile[content]: head unchanged — refreshed row, divergence NOT resolved (own conductor answered the head this row already holds)"
+                            );
+                            crate::metrics::inc_projection_heal_outcome(
+                                "content",
+                                HealOutcomeKind::Refreshed.label(),
+                            );
+                        }
+                        Ok(crate::db::content_diesel::StampOutcome::SkippedDeclared) => {
+                            // Row already carries a DIFFERENT declared head — the heal
+                            // must not move it (a fresh-boot conductor resolve can fall
+                            // through to the root-author election and would resurrect a
+                            // superseded head over an adopted canonical one — the
+                            // 2026-07-11 20:42:40 regression). Canonical channels own it.
+                            tracker.mark_completed(&id);
+                            tracing::info!(content_id = %id, "projection-reconcile[content]: row already declared — heal left it to the canonical channels");
+                            crate::metrics::inc_projection_heal_outcome(
+                                "content",
+                                HealOutcomeKind::RefusedDeclared.label(),
+                            );
+
+                            // DECLARED-DIVERGENCE ADMISSION. Refusing the stamp is
+                            // correct — and, on its own, terminal: this row reached no
+                            // candidate list at all, so the DHT election never got a
+                            // candidate from the one side that CAN declare (it holds the
+                            // chain). Admitting it here is candidate ADMISSION only; the
+                            // decision rule is untouched and answers `ContestPeer`.
+                            //
+                            // The election read is what keeps this from re-admitting a
+                            // settled row every sweep, so a read failure must NOT admit
+                            // (conservative: a spurious admission re-contests a decided
+                            // question, which is the write storm the gate exists to stop).
+                            let (declared, has_election) = pool
+                                .get()
+                                .ok()
+                                .and_then(|mut c| {
+                                    crate::db::content_diesel::declared_head_with_election(
+                                        &mut c, &app_ctx, &id,
+                                    )
+                                    .ok()
+                                })
+                                .unwrap_or((None, true));
+                            let peer_differs = peer_head_hints.get(&id).is_some_and(|h| {
+                                declared
+                                    .as_deref()
+                                    .is_none_or(|d| d.trim() != h.head_action_hash.trim())
+                            });
+                            if declared_divergence_should_route_to_contest(
+                                head.canonical,
+                                declared.is_some(),
+                                peer_differs,
+                                has_election,
+                            ) {
+                                adopt_candidates.push(AdoptCandidate {
+                                    id: id.clone(),
+                                    // The conductor's own (non-canonical) answer, already
+                                    // paid for — so the pre-flight reads `canonical=false`
+                                    // from EVIDENCE and routes to contest.
+                                    head: Some(head.clone()),
+                                });
+                            }
+                        }
+                        Ok(crate::db::content_diesel::StampOutcome::SkippedStale) => {
+                            // The conductor's CANONICAL answer is not provably newer
+                            // than the declared head this row already adopted — a
+                            // conductor that has not yet integrated the newer canonical
+                            // link answers with the OLD canonical record, and stamping
+                            // it would move the head BACKWARDS (the 2026-07-12
+                            // regression: converged at edge #1187's seam-smoke, healed
+                            // back to the superseded head by #1188). Completed, not
+                            // failed: retrying yields the same stale answer until the
+                            // conductor integrates the newer link, at which point the
+                            // next sweep's answer becomes provably newer and stamps.
+                            tracker.mark_completed(&id);
+                            tracing::info!(content_id = %id, "projection-reconcile[content]: conductor canonical answer not provably newer — heal kept the adopted head");
+                            crate::metrics::inc_projection_heal_outcome(
+                                "content",
+                                HealOutcomeKind::RefusedStale.label(),
+                            );
+                        }
+                        Ok(crate::db::content_diesel::StampOutcome::NoRow) => {
+                            // Row vanished between presence check and stamp (rare race).
+                            // Nothing to stamp — resolved, not a conductor miss.
+                            tracker.mark_completed(&id);
+                            tracing::debug!(content_id = %id, "projection-reconcile[content]: stamp found no local row; nothing to do");
+                            crate::metrics::inc_projection_heal_outcome(
+                                "content",
+                                HealOutcomeKind::NoRow.label(),
+                            );
+                        }
+                        Err(e) => {
+                            tracing::warn!(content_id = %id, error = %e, "projection-reconcile[content]: stamp failed; retry next sweep");
+                            tracker.mark_failed(&id);
+                            crate::metrics::inc_projection_heal_outcome(
+                                "content",
+                                HealOutcomeKind::Failed.label(),
+                            );
+                        } // SkippedDeclared / SkippedStale / NoRow are benign resolutions
+                          // (row already correct or absent): `mark_completed`, no stamp, and
+                          // deliberately NOT counted as `healed` so the cure signal (real
+                          // stamps) is not inflated by no-op resolutions.
                     }
                 }
-                Ok(crate::db::content_diesel::StampOutcome::SkippedStale) => {
-                    // The conductor's CANONICAL answer is not provably newer
-                    // than the declared head this row already adopted — a
-                    // conductor that has not yet integrated the newer canonical
-                    // link answers with the OLD canonical record, and stamping
-                    // it would move the head BACKWARDS (the 2026-07-12
-                    // regression: converged at edge #1187's seam-smoke, healed
-                    // back to the superseded head by #1188). Completed, not
-                    // failed: retrying yields the same stale answer until the
-                    // conductor integrates the newer link, at which point the
-                    // next sweep's answer becomes provably newer and stamps.
-                    tracker.mark_completed(&id);
-                    tracing::info!(content_id = %id, "projection-reconcile[content]: conductor canonical answer not provably newer — heal kept the adopted head");
-                    crate::metrics::inc_projection_heal_outcome(
-                        "content",
-                        HealOutcomeKind::RefusedStale.label(),
-                    );
-                }
-                Ok(crate::db::content_diesel::StampOutcome::NoRow) => {
-                    // Row vanished between presence check and stamp (rare race).
-                    // Nothing to stamp — resolved, not a conductor miss.
-                    tracker.mark_completed(&id);
-                    tracing::debug!(content_id = %id, "projection-reconcile[content]: stamp found no local row; nothing to do");
-                    crate::metrics::inc_projection_heal_outcome(
-                        "content",
-                        HealOutcomeKind::NoRow.label(),
-                    );
-                }
-                Err(e) => {
-                    tracing::warn!(content_id = %id, error = %e, "projection-reconcile[content]: stamp failed; retry next sweep");
+                seam_contracts::Answer::Absent => {
+                    // Conductor can't see it yet (catch-up) — retry on the NEXT
+                    // sweep via a fresh inventory diff, never an immediate re-queue.
+                    conductor_missing += 1;
+                    // GHOST-ANCHOR CANDIDATE (see `witness_ghost_anchors`). This is
+                    // the ONLY place the substrate learns "my own conductor has no
+                    // chain for an id my projection carries" — `resolve_content_head`
+                    // returns `Ok(None)` exactly when BOTH the canonical link and the
+                    // per-root chain are locally absent. Collect it here rather than
+                    // re-probing later: the answer is already paid for.
+                    ghost_candidates.push(id.clone());
+                    // LEVER 2 STAMP, on a REAL answer only — never from the replay
+                    // path above, so a replay can never extend its own window into
+                    // an unbounded hold.
+                    crate::services::heal_backoff::note_conductor_missing(&id);
+                    // MISSING → PEER-ADOPTION ROUTING (2026-08-01). The ghost sweep
+                    // below narrows this list to rows that already CLAIM an anchor,
+                    // so a conductor-missing row with a NULL `dht_anchor_hash` — the
+                    // dominant `AnchorGap` class — never saw the adopt pre-flight and
+                    // went straight to `witness_bootstrap`'s AUTHOR path instead.
+                    // Listing it here gives it the pre-flight FIRST (see
+                    // `conductor_missing_should_route_to_adopt`); an already-declared
+                    // row simply `Hold`s, so this can never double-declare.
+                    let routed_to_adopt =
+                        conductor_missing_should_route_to_adopt(peer_head_hints.contains_key(&id));
+                    if routed_to_adopt {
+                        // `Ok(None)`: the conductor answered, and its answer was
+                        // "nothing". There is no head to carry, and no canonical
+                        // head can exist locally — `Unresolved` is the honest
+                        // provenance (see `AdoptCandidate::head`).
+                        adopt_candidates.push(AdoptCandidate {
+                            id: id.clone(),
+                            head: None,
+                        });
+                    }
+                    tracing::debug!(content_id = %id, routed_to_adopt, "projection-reconcile[content]: own conductor returned None; retry next sweep");
                     tracker.mark_failed(&id);
                     crate::metrics::inc_projection_heal_outcome(
                         "content",
-                        HealOutcomeKind::Failed.label(),
+                        HealOutcomeKind::Missing.label(),
                     );
-                } // SkippedDeclared / SkippedStale / NoRow are benign resolutions
-                  // (row already correct or absent): `mark_completed`, no stamp, and
-                  // deliberately NOT counted as `healed` so the cure signal (real
-                  // stamps) is not inflated by no-op resolutions.
-            },
-            Ok(None) => {
-                // Conductor can't see it yet (catch-up) — retry on the NEXT
-                // sweep via a fresh inventory diff, never an immediate re-queue.
-                conductor_missing += 1;
-                // GHOST-ANCHOR CANDIDATE (see `witness_ghost_anchors`). This is
-                // the ONLY place the substrate learns "my own conductor has no
-                // chain for an id my projection carries" — `resolve_content_head`
-                // returns `Ok(None)` exactly when BOTH the canonical link and the
-                // per-root chain are locally absent. Collect it here rather than
-                // re-probing later: the answer is already paid for.
-                ghost_candidates.push(id.clone());
-                // LEVER 2 STAMP, on a REAL answer only — never from the replay
-                // path above, so a replay can never extend its own window into
-                // an unbounded hold.
-                crate::services::heal_backoff::note_conductor_missing(&id);
-                // MISSING → PEER-ADOPTION ROUTING (2026-08-01). The ghost sweep
-                // below narrows this list to rows that already CLAIM an anchor,
-                // so a conductor-missing row with a NULL `dht_anchor_hash` — the
-                // dominant `AnchorGap` class — never saw the adopt pre-flight and
-                // went straight to `witness_bootstrap`'s AUTHOR path instead.
-                // Listing it here gives it the pre-flight FIRST (see
-                // `conductor_missing_should_route_to_adopt`); an already-declared
-                // row simply `Hold`s, so this can never double-declare.
-                let routed_to_adopt =
-                    conductor_missing_should_route_to_adopt(peer_head_hints.contains_key(&id));
-                if routed_to_adopt {
-                    // `Ok(None)`: the conductor answered, and its answer was
-                    // "nothing". There is no head to carry, and no canonical
-                    // head can exist locally — `Unresolved` is the honest
-                    // provenance (see `AdoptCandidate::head`).
-                    adopt_candidates.push(AdoptCandidate {
-                        id: id.clone(),
-                        head: None,
-                    });
                 }
-                tracing::debug!(content_id = %id, routed_to_adopt, "projection-reconcile[content]: own conductor returned None; retry next sweep");
-                tracker.mark_failed(&id);
-                crate::metrics::inc_projection_heal_outcome(
-                    "content",
-                    HealOutcomeKind::Missing.label(),
-                );
-            }
-            Err(e) => {
-                let transient = is_transient_conductor_error(&e);
-                // TIMEOUT → PEER-ADOPTION ROUTING (2026-07-29). A row whose own-
-                // conductor resolve timed out used to fall out of BOTH candidate
-                // lists — neither a ghost (we never got `Ok(None)`) nor an adopt
-                // candidate — so a conductor that cannot answer meant the id was
-                // simply dropped every sweep, forever. When a peer advertises a
-                // declaration for this id we already hold the verified path to it:
-                // `adopt_deferred_heads` fetches the peer's head Record over
-                // view-federation and declares it with `carried_record`, which the
-                // zome's `validate_carried_record` verifies (action-hash binding,
-                // author signature, entry↔action binding) before acceptance. That
-                // is evidence, not authority: the DHT stays the manifest, the
-                // declare still goes through the conductor, and the stamp modes are
-                // untouched — this only ADDS a candidate, it never widens `Declare`.
-                //
-                // The row stays `mark_failed` (honest: WE did not heal it) so it is
-                // re-discovered next sweep and `caught_up` is not falsely satisfied.
-                let routed_to_adopt =
-                    timeout_should_route_to_adopt(transient, peer_head_hints.contains_key(&id));
-                if routed_to_adopt {
-                    // The conductor never answered — absence was NOT observed.
-                    // `head: None` maps to `LocalResolve::unresolved()`
-                    // (`Answer::Unreachable`), which says exactly that.
-                    adopt_candidates.push(AdoptCandidate {
-                        id: id.clone(),
-                        head: None,
-                    });
-                }
-                tracing::warn!(content_id = %id, error = %e, transient, routed_to_adopt, "projection-reconcile[content]: conductor resolve failed; retry next sweep");
-                tracker.mark_failed(&id);
-                crate::metrics::inc_projection_heal_outcome(
-                    "content",
-                    if transient {
-                        HealOutcomeKind::TimeoutExhausted.label()
+                seam_contracts::Answer::Unreachable => {
+                    // PER-ITEM `Failed`. The coordinator ANSWERED, with a TYPED
+                    // reason, and nothing about this id was established — which is
+                    // why it is `Unreachable`, never `Absent`.
+                    //
+                    // ROUTING BY REASON CLASS (the contract revision's whole point):
+                    //
+                    //   DETERMINISTIC (`WrongContentId`, `RecordShape`) — re-asking
+                    //     produces the SAME refusal, so it is a real per-id failure
+                    //     and follows this arm's existing failure accounting
+                    //     (`mark_failed`, `Failed` outcome).
+                    //   BACKPRESSURE (`PermitTimeout`, `Transport`,
+                    //     `ClockUnavailable`, `Unknown`) — a saturated read pool
+                    //     says NOTHING about the id. It goes BACK TO PENDING:
+                    //     `mark_failed` would burn `MAX_RETRIES` and poison the
+                    //     `MissLedger` against a condition the id did not cause.
+                    let backpressure = failure_reason.is_some_and(
+                        crate::services::conductor_writes::BatchFailureReason::is_backpressure,
+                    );
+                    // TIMEOUT → PEER-ADOPTION ROUTING (2026-07-29), unchanged. A row
+                    // the conductor could not answer for used to fall out of BOTH
+                    // candidate lists — neither a ghost (we never observed absence)
+                    // nor an adopt candidate — so a conductor that cannot answer
+                    // meant the id was simply dropped every sweep, forever. When a
+                    // peer advertises a declaration we already hold the verified
+                    // path to it: `adopt_deferred_heads` fetches the peer's head
+                    // Record over view-federation and declares it with
+                    // `carried_record`, which the zome verifies (action-hash
+                    // binding, author signature, entry↔action binding) before
+                    // acceptance. Evidence, not authority.
+                    let routed_to_adopt = timeout_should_route_to_adopt(
+                        backpressure,
+                        peer_head_hints.contains_key(&id),
+                    );
+                    if routed_to_adopt {
+                        // The conductor never answered for this id — absence was NOT
+                        // observed. `head: None` maps to `LocalResolve::unresolved()`
+                        // (`Answer::Unreachable`), which says exactly that.
+                        adopt_candidates.push(AdoptCandidate {
+                            id: id.clone(),
+                            head: None,
+                        });
+                    }
+                    let reason_label = failure_reason.map_or("none", |r| r.label());
+                    if backpressure {
+                        // BACK TO PENDING: deliberately NO `mark_failed`. The id
+                        // stays in `pending`, so `caught_up` stays honestly false
+                        // and the next sweep asks again on a clean budget.
+                        tracing::warn!(
+                            content_id = %id, reason = reason_label, routed_to_adopt,
+                            "projection-reconcile[content]: batch reported CONDUCTOR BACKPRESSURE \
+                             for this id — returned to pending, NOT marked failed (a saturated \
+                             read pool is not evidence about the id)"
+                        );
+                        crate::metrics::inc_projection_heal_outcome(
+                            "content",
+                            HealOutcomeKind::TimeoutExhausted.label(),
+                        );
                     } else {
-                        HealOutcomeKind::Failed.label()
-                    },
-                );
+                        tracing::warn!(
+                            content_id = %id, reason = reason_label, routed_to_adopt,
+                            "projection-reconcile[content]: batch reported a DETERMINISTIC per-id \
+                             failure; retry next sweep"
+                        );
+                        tracker.mark_failed(&id);
+                        crate::metrics::inc_projection_heal_outcome(
+                            "content",
+                            HealOutcomeKind::Failed.label(),
+                        );
+                    }
+                }
             }
+        }
+
+        // STOP REASON. A SHARED failure means the coordinator stopped admitting
+        // because the conductor is struggling; asking it for the next chunk
+        // would be the hammering the whole contract revision exists to prevent.
+        // A budget/ceiling stop is NOT a failure — it is the deadline working,
+        // and the leg carries on.
+        if stopped_shared {
+            tracing::warn!(
+                target: "elohim_storage::projection_reconcile",
+                healed,
+                batch_calls,
+                batch_unattempted,
+                "projection-reconcile[content]: batch stopped on a SHARED conductor failure — \
+                 shedding the rest of the leg, every unanswered id stays pending"
+            );
+            break;
         }
 
         // Per-leg budget: yield so the leg recycles next sweep (see `heal_rea`).
@@ -3437,6 +3699,7 @@ async fn heal_content(
                 budget_secs = pacing.content_leg_budget.as_secs(),
                 healed,
                 fanout,
+                batch_size,
                 to_resolve = to_resolve.len(),
                 replayed = replayed.len(),
                 "projection-reconcile[content]: heal hit leg budget — yielding, remaining gaps resume next sweep"
@@ -3467,6 +3730,9 @@ async fn heal_content(
         healed,
         conductor_missing,
         fanout,
+        batch_size,
+        batch_calls,
+        batch_unattempted,
         to_resolve = to_resolve.len(),
         replayed = replayed.len(),
         replay_window_secs = replay_window.as_secs(),
@@ -3673,11 +3939,32 @@ fn compose_adopt_slice<'a, T>(
 /// **Expected effect.** ~8× the attempts per sweep, with the wasted share of
 /// those attempts falling as the backoff fills. See the convergence arithmetic
 /// in the [`crate::services::head_adoption`] module doc.
+///
+/// # L1: the TWO-PHASE restructure (2026-08-08)
+///
+/// Every candidate whose own-conductor answer was absent used to spend ONE
+/// conductor round-trip on its own `resolve_canonical_election` probe inside
+/// `try_adopt_canonical_head`. On a 200-candidate slice that is 200 round-trips
+/// before any declare happens, and the live failure split
+/// (`no_local_chain: 887/891`) says the probes were consuming the slots.
+///
+/// Phase 1 now asks for EVERY probe-eligible id's election in 2–4 BATCHED
+/// round-trips; phase 2 runs the same per-item loop it always ran, handed the
+/// answer instead of buying it. **The cap stays 200 and
+/// [`compose_adopt_slice`] is untouched** — this collapses round-trips, it does
+/// not widen the slice.
+///
+/// An id the batch never answered for (`unattempted`, or behind a shared
+/// backpressure stop) gets [`ElectionResolve::unresolved`], which routes
+/// EXACTLY as the old single-id `Err` arm did: fall through to the normal
+/// decision, retry next sweep. Nothing is held on a non-answer.
 async fn adopt_deferred_heads(
     hc: &Arc<HcClient>,
     pool: &DbPool,
     candidates: &[AdoptCandidate],
     adopt: &crate::services::head_adoption::AdoptContext<'_>,
+    pacing: &HealPacing,
+    resolver: &dyn crate::services::head_batch_resolver::HeadBatchResolver,
 ) {
     use futures::stream::StreamExt as _;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -3710,8 +3997,21 @@ async fn adopt_deferred_heads(
     // deferred class so re-ordering cannot decay into exclusion when the cap
     // binds — it changes WHICH ids fill the slice, never how big it is.
     let (work, deferred_attempted) =
-        compose_adopt_slice(eligible, deferred, WITNESS_MAX_PER_TICK as usize);
+        compose_adopt_slice(eligible, deferred, pacing.witness_max_per_tick as usize);
     let attempted = work.len();
+
+    // ── PHASE 1: BATCH-PROBE THE ELECTIONS ───────────────────────────────────
+    //
+    // Only ids whose own-conductor head answer was ABSENT can be served by the
+    // obey arm (`head_adoption::should_probe_election`), so only those are
+    // asked. Scoping the probe here rather than inside the per-item loop is the
+    // whole round-trip collapse: 200 probes become 2–4 calls.
+    let probe_ids: Vec<String> = work
+        .iter()
+        .filter(|c| crate::services::head_adoption::should_probe_election(c.head.is_some()))
+        .map(|c| c.id.clone())
+        .collect();
+    let elections = batch_probe_elections(resolver, pacing, &probe_ids).await;
 
     // Atomics, not locals: they live OUTSIDE the future the budget may cancel,
     // so a budget-elapsed sweep still reports what it managed to do.
@@ -3721,6 +4021,7 @@ async fn adopt_deferred_heads(
     let retry = AtomicUsize::new(0);
 
     let app_ctx_ref = &app_ctx;
+    let elections_ref = &elections;
     let (adopted_ref, contested_ref, held_ref, retry_ref) = (&adopted, &contested, &held, &retry);
 
     let sweep = futures::stream::iter(work.iter().copied()).for_each_concurrent(
@@ -3742,12 +4043,23 @@ async fn adopt_deferred_heads(
                 Some(head) => crate::services::head_adoption::LocalResolve::observed(Some(head)),
                 None => crate::services::head_adoption::LocalResolve::unresolved(),
             };
+            // PHASE 2's half of the two-phase split: hand the pre-flight the
+            // election phase 1 already paid for. `None` in the map means either
+            // "this id was not probe-eligible" (the pre-flight will not consult
+            // it) or "the batch never answered for it" — both correctly become
+            // `unresolved()`, which is the old `Err` routing, never a claim.
+            let election_resolve = match elections_ref.get(id.as_str()) {
+                Some(Some(e)) => crate::services::head_adoption::ElectionResolve::observed(Some(e)),
+                Some(None) => crate::services::head_adoption::ElectionResolve::observed(None),
+                None => crate::services::head_adoption::ElectionResolve::unresolved(),
+            };
             match crate::services::head_adoption::try_adopt_canonical_head(
                 hc,
                 pool,
                 app_ctx_ref,
                 id,
                 local_resolve,
+                election_resolve,
                 adopt,
             )
             .await
@@ -3773,14 +4085,16 @@ async fn adopt_deferred_heads(
                     );
                 }
             }
-            // Per-item spacing, retained INSIDE the concurrent task: at
-            // `fanout = 1` this reproduces the pre-F-B sequential cadence
-            // exactly, so the knob is a true off switch.
-            tokio::time::sleep(WITNESS_ITEM_DELAY).await;
+            // (The former 25ms per-item sleep lived here. It was 5s/tick of
+            // pure sleep INSIDE a `for_each_concurrent`, which protected
+            // nothing — the concurrency bound is and always was the throttle.
+            // Deleted by L1; the closed-loop replacement is
+            // `AdaptiveBatchBudget`, which reads the conductor's own queue-wait
+            // rather than guessing a constant.)
         },
     );
 
-    let budget_elapsed = tokio::time::timeout(WITNESS_SWEEP_BUDGET, sweep)
+    let budget_elapsed = tokio::time::timeout(pacing.witness_sweep_budget, sweep)
         .await
         .is_err();
     crate::metrics::inc_adopt_sweep(if budget_elapsed {
@@ -3799,10 +4113,11 @@ async fn adopt_deferred_heads(
     if budget_elapsed {
         tracing::warn!(
             target: "elohim_storage::projection_reconcile",
-            budget_secs = WITNESS_SWEEP_BUDGET.as_secs(),
+            budget_secs = pacing.witness_sweep_budget.as_secs(),
             candidates = total,
             attempted,
             fanout,
+            election_probes = probe_ids.len(),
             backoff_deferred = deferred_count,
             backoff_deferred_in_slice = deferred_attempted,
             adopted,
@@ -3820,6 +4135,7 @@ async fn adopt_deferred_heads(
         candidates = total,
         attempted,
         fanout,
+        election_probes = probe_ids.len(),
         backoff_deferred = deferred_count,
         backoff_deferred_in_slice = deferred_attempted,
         adopted,
@@ -3833,6 +4149,122 @@ async fn adopt_deferred_heads(
          of those actually rode the reserved tail this sweep — the field that makes \
          'priority, not exclusion' checkable instead of asserted)"
     );
+}
+
+/// PHASE 1 of the arm-4 two-phase adopt: resolve every probe-eligible id's DHT
+/// election in BATCHES instead of one round-trip per candidate.
+///
+/// Returns `id -> Option<election>` where:
+///
+/// - `Some(Some(e))` — the conductor answered and an election is visible;
+/// - `Some(None)` — the conductor answered and there is NO election (the honest
+///   observed absence, identical to the single-id `Ok(None)`);
+/// - **absent from the map** — no answer for that id (`unattempted`, a
+///   per-item failure, or a call-level failure). The caller turns this into
+///   [`crate::services::head_adoption::ElectionResolve::unresolved`], which is
+///   the single-id `Err` routing exactly: fall through, retry next sweep.
+///
+/// A call-level failure is not fatal to the arm and is not a claim about
+/// anything: the whole chunk simply produces no entries, so those candidates run
+/// their ordinary decision with no election in hand — precisely what they did
+/// before this arm could see elections at all.
+async fn batch_probe_elections(
+    resolver: &dyn crate::services::head_batch_resolver::HeadBatchResolver,
+    pacing: &HealPacing,
+    ids: &[String],
+) -> std::collections::HashMap<
+    String,
+    Option<crate::services::conductor_writes::CanonicalElectionWire>,
+> {
+    use futures::stream::StreamExt as _;
+    let mut out = std::collections::HashMap::new();
+    if ids.is_empty() {
+        return out;
+    }
+    let batch_size = head_batch_budget_current();
+    crate::metrics::set_head_batch_size(HEAD_BATCH_EXTERN_ELECTIONS, batch_size);
+    let chunks: Vec<Vec<String>> = ids
+        .chunks(batch_size.max(1))
+        .map(<[String]>::to_vec)
+        .collect();
+    // SAME fan-out ceiling as arm 2 (2, not the single-id 8): each call now
+    // carries up to `batch_size` ids, so the conductor's concurrent load must
+    // come DOWN as the per-call payload goes up.
+    let probes = resolve_pipeline(&chunks, pacing.head_batch_fanout, |chunk| {
+        call_with_retry(pacing, move || {
+            resolver.resolve_elections(chunk, pacing.batch_extern_budget)
+        })
+    });
+    futures::pin_mut!(probes);
+    while let Some((chunk, attempt)) = probes.next().await {
+        match attempt.result {
+            Ok(resolution) => {
+                head_batch_budget_observe(resolution.queue_wait);
+                crate::metrics::observe_head_batch_call(
+                    HEAD_BATCH_EXTERN_ELECTIONS,
+                    if resolution.via_single_id_fallback {
+                        "fallback"
+                    } else {
+                        "answered"
+                    },
+                    chunk.len(),
+                    resolution.queue_wait,
+                );
+                crate::metrics::add_head_batch_unattempted(
+                    HEAD_BATCH_EXTERN_ELECTIONS,
+                    resolution.stop_reason.as_ref().map_or(
+                        "none",
+                        crate::services::conductor_writes::BatchStopReason::label,
+                    ),
+                    resolution.unattempted.len(),
+                );
+                let stopped_shared = matches!(
+                    resolution.stop_reason,
+                    Some(crate::services::conductor_writes::BatchStopReason::SharedFailure(_))
+                );
+                for item in resolution.items {
+                    match item.answer {
+                        seam_contracts::Answer::Present(e) => {
+                            out.insert(item.id, Some(e));
+                        }
+                        seam_contracts::Answer::Absent => {
+                            out.insert(item.id, None);
+                        }
+                        // NO ENTRY: a per-item failure establishes nothing.
+                        seam_contracts::Answer::Unreachable => {}
+                    }
+                }
+                if stopped_shared {
+                    tracing::warn!(
+                        target: "elohim_storage::projection_reconcile",
+                        probed = out.len(),
+                        "projection-reconcile[adopt-deferred]: election batch stopped on a \
+                         SHARED conductor failure — the remaining candidates run without an \
+                         election in hand (their pre-flight is unchanged), retried next sweep"
+                    );
+                    break;
+                }
+            }
+            Err(e) => {
+                crate::metrics::observe_head_batch_call(
+                    HEAD_BATCH_EXTERN_ELECTIONS,
+                    "call_failed",
+                    chunk.len(),
+                    Duration::ZERO,
+                );
+                tracing::warn!(
+                    target: "elohim_storage::projection_reconcile",
+                    error = %e,
+                    ids = chunk.len(),
+                    "projection-reconcile[adopt-deferred]: election batch failed at the CALL \
+                     level — those candidates run with no election in hand (never a claim of \
+                     absence), retried next sweep"
+                );
+                break;
+            }
+        }
+    }
+    out
 }
 
 /// Project ONE conductor-resolved content HEAD into local SQL via the VERIFIED
@@ -5946,12 +6378,80 @@ mod tests {
     fn ghost_witness_reuses_the_witness_bounds() {
         // The ghost sweep runs on the SAME heal leg as `witness_bootstrap`, so it
         // must not introduce a second, unbounded conductor load: it reuses the
-        // per-tick cap, the per-item spacing, and the wall-clock budget. Locking
-        // this keeps a future tuning change from bounding one sweep and not the
-        // other.
-        assert!(WITNESS_MAX_PER_TICK > 0);
-        assert!(!WITNESS_ITEM_DELAY.is_zero());
-        assert!(WITNESS_SWEEP_BUDGET > WITNESS_ITEM_DELAY * (WITNESS_MAX_PER_TICK as u32));
+        // per-tick cap and the wall-clock budget, both now read off ONE
+        // `HealPacing` rather than two free-standing consts. Locking this keeps a
+        // future tuning change from bounding one sweep and not the other.
+        //
+        // The third bound this test used to assert — a per-item sleep — was
+        // DELETED by L1: 25ms in front of a 0.4–1s conductor write is not
+        // backpressure protection, it is a constant standing in for one. The two
+        // bounds that remain are real, and the closed-loop
+        // `AdaptiveBatchBudget` is what now reacts to actual conductor pressure.
+        let pacing = HealPacing::default();
+        assert!(pacing.witness_max_per_tick > 0);
+        assert!(!pacing.witness_sweep_budget.is_zero());
+        assert_eq!(
+            pacing.witness_max_per_tick, WITNESS_MAX_PER_TICK,
+            "the fold into HealPacing must not silently change the cap"
+        );
+        assert_eq!(pacing.witness_sweep_budget, WITNESS_SWEEP_BUDGET);
+    }
+
+    /// STRICT ORDERING INVARIANT: the caller-side per-attempt timeout must stay
+    /// strictly ABOVE the in-wasm extern budget, on EVERY pacing profile.
+    ///
+    /// Why it is a safety property and not a tuning preference:
+    /// `HcClient::call_zome` has no cancellation, so if the caller's timeout
+    /// fired FIRST the conductor would keep executing the batch with nobody
+    /// listening — and the partial results the extern's own deadline exists to
+    /// return would be thrown away. The whole in-wasm-deadline design is
+    /// pointless unless the outer bound is looser than the inner one.
+    #[test]
+    fn the_attempt_timeout_stays_above_the_extern_budget() {
+        for (name, pacing) in [
+            ("default", HealPacing::default()),
+            ("test_fast", HealPacing::test_fast()),
+        ] {
+            assert!(
+                pacing.attempt_timeout > pacing.batch_extern_budget,
+                "{name}: attempt_timeout {:?} must be STRICTLY above the extern budget {:?} — \
+                 an outer timeout that fires first abandons a still-executing conductor call \
+                 and discards the partial results the in-wasm deadline exists to deliver",
+                pacing.attempt_timeout,
+                pacing.batch_extern_budget,
+            );
+            assert!(
+                !pacing.batch_extern_budget.is_zero(),
+                "{name}: a zero extern budget would make every batch return everything \
+                 unattempted"
+            );
+        }
+    }
+
+    /// The concurrency half of the write-guard constraint, as a test: the batch
+    /// fan-out must be BELOW the single-id fan-out it replaces. Each batch call
+    /// now carries many ids, so holding the old concurrency would multiply the
+    /// conductor's load by the batch size — the forbidden move.
+    #[test]
+    fn the_batch_fanout_is_lower_than_the_single_id_fanout_it_replaces() {
+        // The single-id heal leg's default fan-out, which the batch arms replace.
+        let single_id_fanout = crate::config::heal_resolve_fanout();
+        for (name, pacing) in [
+            ("default", HealPacing::default()),
+            ("test_fast", HealPacing::test_fast()),
+        ] {
+            assert!(
+                pacing.head_batch_fanout < single_id_fanout,
+                "{name}: batch fan-out {} must be BELOW the single-id fan-out {single_id_fanout} \
+                 — each batch call now carries many ids, so holding the old concurrency would \
+                 multiply the conductor's load by the batch size (the forbidden move)",
+                pacing.head_batch_fanout,
+            );
+            assert!(
+                pacing.head_batch_fanout >= 1,
+                "{name}: a zero fan-out would silently turn the arm into a no-op"
+            );
+        }
     }
 
     #[test]
@@ -5967,17 +6467,14 @@ mod tests {
     }
 
     #[test]
-    fn witness_sweep_budget_exceeds_paced_floor() {
-        // The wall-clock budget must exceed the unavoidable per-item spacing floor
-        // (cap × delay) with headroom for the conductor round-trips, so a HEALTHY
-        // sweep never trips the timeout — the budget only fires on a hung/saturated
-        // conductor, releasing the single-flight guard instead of holding it forever.
-        let paced_floor = WITNESS_ITEM_DELAY * (WITNESS_MAX_PER_TICK as u32);
-        assert!(
-            WITNESS_SWEEP_BUDGET > paced_floor,
-            "budget {WITNESS_SWEEP_BUDGET:?} must exceed the paced floor {paced_floor:?}"
-        );
-        // And it must be a real bound (not effectively infinite).
+    fn witness_sweep_budget_is_a_real_bound() {
+        // With the per-item sleep deleted there is no longer a "paced floor" to
+        // exceed; what still must hold is that the budget is a REAL bound —
+        // large enough that a healthy sweep never trips it (so it fires only on
+        // a hung/saturated conductor, releasing the single-flight guard) and
+        // small enough not to be effectively infinite (which would let one
+        // sweep hold the guard for the rest of the process).
+        assert!(WITNESS_SWEEP_BUDGET >= Duration::from_secs(30));
         assert!(WITNESS_SWEEP_BUDGET <= Duration::from_secs(600));
     }
 
@@ -6368,6 +6865,279 @@ mod tests {
 
     fn ids(n: usize) -> Vec<String> {
         (0..n).map(|i| format!("id-{i}")).collect()
+    }
+
+    // ═════════════════════════════════════════════════════════════════════
+    // ARM 2 (`heal_content`) — batch consumption, driven by the mock resolver
+    // ═════════════════════════════════════════════════════════════════════
+    //
+    // These run the REAL arm: same tracker, same apply half, same accounting.
+    // Only the conductor is a mock, which is the seam L1 added for exactly this
+    // reason — before it, the arm's failure routing was unreachable from a unit
+    // test because it needed a live conductor.
+
+    use crate::services::conductor_writes::BatchFailureReason;
+    use crate::services::head_batch_resolver::{MockAnswer, MockHeadBatchResolver};
+
+    /// Ids that are unique per test: `heal_backoff` and `contest_backoff` both
+    /// hold PROCESS-WIDE ledgers, so two tests sharing an id can race each other
+    /// (the 2026-08-08 gate flake). A per-test prefix removes the shared key
+    /// entirely, which is stronger than serialising the tests.
+    fn arm_ids(prefix: &str, n: usize) -> Vec<String> {
+        (0..n).map(|i| format!("{prefix}-{i}")).collect()
+    }
+
+    async fn run_heal_content_arm(
+        tracker: &mut GapTracker,
+        resolver: &MockHeadBatchResolver,
+    ) -> ContentHealOutcome {
+        let pool = crate::test_util::test_pool();
+        let hints = crate::services::head_adoption::PeerHeadHints::new();
+        heal_content(
+            tracker,
+            &std::collections::HashMap::new(),
+            &pool,
+            &HealPacing::test_fast(),
+            &hints,
+            resolver,
+        )
+        .await
+    }
+
+    /// THE TRAP. `unattempted` ids were NEVER STARTED by the coordinator, so
+    /// they are not failures in any sense — and `mark_failed` on them is a
+    /// double harm:
+    ///
+    /// 1. it drains them from `pending`, so `update_caught_up` flips `caught_up`
+    ///    TRUE for a sweep that healed nothing (the convergence forgery
+    ///    `retry_exhausted_gaps_are_caught_up_but_not_converged` documents); and
+    /// 2. it spends the retry budget that the cross-sweep `MissLedger` turns
+    ///    into real exhaustion — poisoning ids the conductor declined to even
+    ///    look at, for a condition (its own deadline) they did not cause.
+    ///
+    /// So: they stay pending, `failed` stays 0, and `caught_up` stays FALSE.
+    #[tokio::test]
+    async fn unattempted_ids_stay_pending_never_failed_and_cannot_forge_caught_up() {
+        let ids = arm_ids("arm2-unattempted", 3);
+        let mut tracker = GapTracker::new(MAX_RETRIES);
+        tracker.discover(ids.clone());
+
+        let mock = MockHeadBatchResolver::new();
+        for id in &ids {
+            mock.seed_head(id, MockAnswer::Unattempted);
+        }
+        let out = run_heal_content_arm(&mut tracker, &mock).await;
+
+        let c = tracker.counts();
+        assert_eq!(
+            c.failed, 0,
+            "an id the coordinator NEVER STARTED must not spend a retry"
+        );
+        assert_eq!(c.pending, 3, "every unattempted id stays pending");
+        assert_eq!(c.completed, 0);
+        assert!(
+            !c.caught_up,
+            "a sweep that answered nothing must not claim the sweep is over"
+        );
+        assert_eq!(out.healed, 0);
+        assert_eq!(out.conductor_missing, 0, "unattempted is NOT a miss");
+    }
+
+    /// PER-ITEM `Failed` ROUTING BY REASON CLASS.
+    ///
+    /// Deterministic reasons are real facts about the id and follow the arm's
+    /// existing failure accounting. Backpressure reasons say nothing about the
+    /// id and must return it to pending — same trap as above, arriving by a
+    /// different door.
+    #[tokio::test]
+    async fn per_item_failures_route_by_reason_class() {
+        let mut tracker = GapTracker::new(MAX_RETRIES);
+        let det_a = "arm2-route-det-wrong-id".to_string();
+        let det_b = "arm2-route-det-record-shape".to_string();
+        let bp_a = "arm2-route-bp-permit".to_string();
+        let bp_b = "arm2-route-bp-transport".to_string();
+        let bp_c = "arm2-route-bp-clock".to_string();
+        let bp_d = "arm2-route-bp-unknown".to_string();
+        let all = vec![
+            det_a.clone(),
+            det_b.clone(),
+            bp_a.clone(),
+            bp_b.clone(),
+            bp_c.clone(),
+            bp_d.clone(),
+        ];
+        tracker.discover(all.clone());
+
+        let mock = MockHeadBatchResolver::new();
+        mock.seed_head(
+            &det_a,
+            MockAnswer::Failed(BatchFailureReason::WrongContentId),
+        );
+        mock.seed_head(&det_b, MockAnswer::Failed(BatchFailureReason::RecordShape));
+        mock.seed_head(&bp_a, MockAnswer::Failed(BatchFailureReason::PermitTimeout));
+        mock.seed_head(&bp_b, MockAnswer::Failed(BatchFailureReason::Transport));
+        mock.seed_head(
+            &bp_c,
+            MockAnswer::Failed(BatchFailureReason::ClockUnavailable),
+        );
+        mock.seed_head(&bp_d, MockAnswer::Failed(BatchFailureReason::Unknown));
+
+        run_heal_content_arm(&mut tracker, &mock).await;
+
+        let failed: std::collections::HashSet<String> = tracker.failed_ids().into_iter().collect();
+        let pending: std::collections::HashSet<String> =
+            tracker.pending_ids().into_iter().collect();
+
+        for id in [&det_a, &det_b] {
+            assert!(
+                failed.contains(id),
+                "{id}: a DETERMINISTIC refusal is a real per-id failure"
+            );
+            assert!(!pending.contains(id));
+        }
+        for id in [&bp_a, &bp_b, &bp_c, &bp_d] {
+            assert!(
+                pending.contains(id),
+                "{id}: conductor BACKPRESSURE must return the id to pending"
+            );
+            assert!(
+                !failed.contains(id),
+                "{id}: marking it failed would burn MAX_RETRIES and poison the MissLedger \
+                 against a condition the id did not cause"
+            );
+        }
+    }
+
+    /// A CALL-LEVEL infrastructure failure returns EVERY id to pending, with
+    /// backoff (the bounded in-leg retry, then the next sweep). No id is marked
+    /// failed — the conductor said nothing about any of them — and the leg sheds
+    /// rather than hammering on.
+    #[tokio::test]
+    async fn a_call_level_failure_returns_every_id_to_pending_with_backoff() {
+        let ids = arm_ids("arm2-callfail", 4);
+        let mut tracker = GapTracker::new(MAX_RETRIES);
+        tracker.discover(ids.clone());
+
+        let mock = MockHeadBatchResolver::new();
+        // Three queued transient failures: `call_with_retry` (test_fast:
+        // max_row_retries = 2) takes the initial attempt plus two backed-off
+        // retries, so the whole retry ladder is exercised and still ends in Err.
+        for _ in 0..3 {
+            mock.fail_next_call(crate::error::StorageError::Timeout(
+                "Websocket error: Timeout".into(),
+            ));
+        }
+        let out = run_heal_content_arm(&mut tracker, &mock).await;
+
+        let c = tracker.counts();
+        assert_eq!(
+            c.failed, 0,
+            "a conductor that never answered has said nothing about any id"
+        );
+        assert_eq!(c.pending, 4, "every id in the batch returns to pending");
+        assert_eq!(out.healed, 0);
+        assert_eq!(
+            mock.calls(),
+            3,
+            "the in-leg retry ladder ran (that IS the backoff), then the leg shed"
+        );
+    }
+
+    /// FAN-OUT CEILING, proven on the real arm: at most
+    /// `HealPacing::head_batch_fanout` (2) conductor calls in flight, down from
+    /// the single-id leg's 8. Each call now carries many ids, so the concurrency
+    /// must come DOWN — holding 8 would multiply the conductor's load by the
+    /// batch size, which the write-guard constraint forbids.
+    #[tokio::test]
+    async fn the_batch_arm_respects_its_fanout_ceiling() {
+        // Enough ids to fill several chunks even at the AIMD ceiling (128).
+        let ids = arm_ids("arm2-fanout", 600);
+        let mut tracker = GapTracker::new(MAX_RETRIES);
+        tracker.discover(ids.clone());
+
+        let mock = MockHeadBatchResolver::new();
+        mock.set_latency(Duration::from_millis(15));
+        run_heal_content_arm(&mut tracker, &mock).await;
+
+        assert!(
+            mock.peak_in_flight() <= HealPacing::test_fast().head_batch_fanout,
+            "the arm ran {} batch calls concurrently against a fan-out of {}",
+            mock.peak_in_flight(),
+            HealPacing::test_fast().head_batch_fanout
+        );
+        assert!(
+            mock.calls() >= 2,
+            "the test must actually produce multiple chunks to bound"
+        );
+        assert_eq!(
+            mock.ids_asked(),
+            600,
+            "every pending id must be carried by exactly one batch"
+        );
+    }
+
+    /// The round-trip collapse itself, stated as an assertion rather than a
+    /// hope: 600 ids cost far fewer than 600 conductor calls. This is the whole
+    /// L1 claim, and it is the number `elohim_head_batch_ids_total /
+    /// elohim_head_batch_calls_total` publishes live.
+    #[tokio::test]
+    async fn the_batch_arm_collapses_round_trips() {
+        let ids = arm_ids("arm2-collapse", 600);
+        let mut tracker = GapTracker::new(MAX_RETRIES);
+        tracker.discover(ids.clone());
+        let mock = MockHeadBatchResolver::new();
+        run_heal_content_arm(&mut tracker, &mock).await;
+        assert!(
+            mock.calls() * 8 <= 600,
+            "600 ids cost {} conductor calls — the batch is not collapsing round-trips",
+            mock.calls()
+        );
+    }
+
+    /// IN-ORDER APPLY over the new unit. The apply half stays the sequential
+    /// body it always was only if chunks arrive in the order they were composed;
+    /// an unordered pipeline would silently reorder every tracker mutation
+    /// against the discovery order.
+    #[tokio::test]
+    async fn the_chunk_pipeline_yields_chunks_in_order() {
+        use futures::stream::StreamExt as _;
+        let chunks: Vec<Vec<String>> = (0..10).map(|i| vec![format!("chunk-{i}")]).collect();
+        // INVERTED latency: the first chunk is the slowest, so an unordered
+        // pipeline would surface it last.
+        let out: Vec<(Vec<String>, usize)> = resolve_pipeline(&chunks, 8, |chunk| {
+            let chunk = chunk.clone();
+            async move {
+                let rank: u64 = chunk[0]
+                    .rsplit('-')
+                    .next()
+                    .and_then(|n| n.parse().ok())
+                    .unwrap_or(0);
+                tokio::time::sleep(Duration::from_millis(22 - rank * 2)).await;
+                rank as usize
+            }
+        })
+        .collect()
+        .await;
+        let order: Vec<usize> = out.into_iter().map(|(_, rank)| rank).collect();
+        assert_eq!(order, (0..10).collect::<Vec<_>>());
+    }
+
+    /// A batch that answers `Absent` for every id must behave EXACTLY like the
+    /// single-id `Ok(None)` arm did: counted as conductor-missing, marked
+    /// failed (the honest "we did not heal it"), and offered to the ghost sweep.
+    /// This is the behaviour-preservation half of the restructure.
+    #[tokio::test]
+    async fn an_all_absent_batch_reproduces_the_conductor_missing_arm() {
+        let ids = arm_ids("arm2-absent", 5);
+        let mut tracker = GapTracker::new(MAX_RETRIES);
+        tracker.discover(ids.clone());
+        let mock = MockHeadBatchResolver::new(); // default answer is Absent
+        let out = run_heal_content_arm(&mut tracker, &mock).await;
+
+        assert_eq!(out.conductor_missing, 5);
+        assert_eq!(out.ghost_candidates.len(), 5);
+        assert_eq!(tracker.counts().failed, 5);
+        assert_eq!(tracker.counts().pending, 0);
     }
 
     /// C6a, the whole of lever 1's safety claim: the leg may have at most
