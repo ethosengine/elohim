@@ -67,7 +67,8 @@ mkdir -p "${REPORTS_DIR}"
 # fleet and the reconcile catch-up can run hours; measuring mid-churn records a
 # false red the ledger sync can read as a regression. The gate polls until the
 # fleet is calm (pull.caughtUp on A, QUIESCED on A — blocked_by
-# divergent_actionable==0 and unmeasured==0, per the 2026-08-07 decision in
+# divergent_actionable within tolerance (2 on this path — see the export
+# below) and unmeasured==0, per the 2026-08-07/08 decisions in
 # the content-gap-limit-cycle backlog doc; converged==1 is telemetry, not the
 # gate — sustained across a fresh sweep, both doorways serving content 200)
 # or the deadline lapses — on
@@ -78,6 +79,11 @@ mkdir -p "${REPORTS_DIR}"
 # limit on edge #1282). QUIESCE_SKIP=1 bypasses for local/manual runs.
 if [ "${QUIESCE_SKIP:-0}" != "1" ]; then
   QUIESCE_EXIT=0
+  # Tolerance 2 on this path (2026-08-08): steady-state in-flight retry rows
+  # (undeclared-divergent, mid-budget — 0-2 at any instant, re-minted by page
+  # rotation) defeated strict-zero sustain in 2/2 live 45-min windows. See the
+  # QUIESCE_ACTIONABLE_TOLERANCE header note in fleet-quiesce-gate.sh.
+  export QUIESCE_ACTIONABLE_TOLERANCE="${QUIESCE_ACTIONABLE_TOLERANCE:-2}"
   bash "${WORKSPACE}/scripts/ci/fleet-quiesce-gate.sh" \
     "${DOORWAY}" \
     "${E2E_DOORWAY_B:-https://elohim.host}" \

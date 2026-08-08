@@ -29,6 +29,22 @@
 #                           (default 330 — must exceed the 300s reconcile
 #                           sweep cadence, so a fresh sweep is guaranteed to
 #                           have run between them)
+#   QUIESCE_ACTIONABLE_TOLERANCE
+#                           max blocked_by{divergent_actionable} value a PASS
+#                           observation may carry (default 0 — strict).
+#                           Decision 2026-08-08 (integrator, same gate-liveness
+#                           axis as the quiesced re-point): at steady state the
+#                           fleet always holds 0-2 undeclared-divergent rows
+#                           MID-RETRY-BUDGET (in-flight work, not standing
+#                           divergence — they exhaust to refused or resolve
+#                           within budget), and page rotation re-mints them, so
+#                           instantaneous-zero sustained across a sweep
+#                           boundary is a race the gate lost in 2/2 live
+#                           45-min windows (edge #1321: 242s/330s near-miss;
+#                           #1322: 60s). A small tolerance measures "calm
+#                           enough to mean something" without touching the
+#                           honesty gauges; unmeasured stays strict-zero and
+#                           caughtUp/serving/sustain are unchanged.
 #
 # A single PASS observation requires ALL of:
 #   1. storage-A /p2p/status: pull.caughtUp === true
@@ -44,6 +60,8 @@
 #   3. storage-A /metrics: QUIESCED, not perfect (decision 2026-08-07, see
 #      genesis/data/timeline/backlog/content-gap-limit-cycle-blocks-convergence.md):
 #        elohim_projection_reconcile_converged_blocked_by{term="divergent_actionable"} == 0
+#        (or the raw actionable remainder within QUIESCE_ACTIONABLE_TOLERANCE
+#        when that knob is set — see its own note above)
 #        AND ...{term="unmeasured"} == 0
 #      i.e. the sweep MEASURED and no unadjudicated divergence is outstanding.
 #      The pending/failed terms (the content-gap drain backlog) deliberately
@@ -115,6 +133,7 @@ DEADLINE_SECS="${QUIESCE_DEADLINE_SECS:-2700}"
 POLL_SECS="${QUIESCE_POLL_SECS:-60}"
 SUSTAIN_SECS="${QUIESCE_SUSTAIN_SECS:-330}"
 CURL_TIMEOUT="${QUIESCE_CURL_TIMEOUT_SECS:-20}"
+ACTIONABLE_TOL="${QUIESCE_ACTIONABLE_TOLERANCE:-0}"
 
 log() {
   printf 'fleet-quiesce[%s]: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1"
@@ -148,7 +167,7 @@ while :; do
   [ -n "$code_a" ] || code_a="000"
   [ -n "$code_b" ] || code_b="000"
 
-  parsed=$(STATUS_A="$status_a" STATUS_B="$status_b" METRICS_A="$metrics_a" python3 - <<'PYEOF'
+  parsed=$(STATUS_A="$status_a" STATUS_B="$status_b" METRICS_A="$metrics_a" ACTIONABLE_TOL="$ACTIONABLE_TOL" python3 - <<'PYEOF'
 import json, os, re
 
 def caught_up(raw):
@@ -204,19 +223,67 @@ metrics_a = os.environ.get("METRICS_A", "")
 converged = metric_value(metrics_a, "elohim_projection_reconcile_converged")
 sweeps = metric_value(metrics_a, "elohim_projection_reconcile_sweeps_total")
 # QUIESCED predicate (2026-08-07 decision — see header note 3): measured
-# sweep + zero actionable divergence. pending/failed deliberately not gating.
+# sweep + actionable divergence within tolerance (default 0; see the
+# QUIESCE_ACTIONABLE_TOLERANCE header note for the 2026-08-08 in-flight-row
+# rationale). unmeasured stays strict-zero. pending/failed deliberately not
+# gating. NOTE: blocked_by{divergent_actionable} is a 0/1 TERM flag, not a
+# count — the tolerance therefore reads the raw actionable REMAINDER
+# (divergent - divergent_refused summed across streams) when tolerance > 0,
+# and falls back to the strict term flag at tolerance 0.
 BLOCKED_BY = "elohim_projection_reconcile_converged_blocked_by"
 actionable = labeled_metric_value(metrics_a, BLOCKED_BY, "term", "divergent_actionable")
 unmeasured = labeled_metric_value(metrics_a, BLOCKED_BY, "term", "unmeasured")
-quiesced_ok = (
-    actionable is not None and actionable == 0
-    and unmeasured is not None and unmeasured == 0
-)
+tol = 0.0
+try:
+    tol = float(os.environ.get("ACTIONABLE_TOL", "0") or "0")
+except ValueError:
+    tol = 0.0
+if not (0.0 < tol < 1000.0):  # clamp nan/inf/negative/absurd to strict
+    tol = 0.0
+
+def stream_actionable_sum(text):
+    # Sum max(divergent - refused, 0) per stream label. Returns None when the
+    # divergent series is absent entirely (fail-closed, same as the term flag).
+    # COUPLING NOTE: this sum equals the Rust-side divergent_actionable term
+    # only because collectives publishes divergent == divergent_refused BY
+    # CONSTRUCTION (projection_reconcile.rs — collectives never folds into
+    # publish_sweep). If collectives ever adjudicates independently, re-check
+    # this sum against publish_sweep's fold set.
+    div = {}
+    ref = {}
+    pat_d = re.compile(r'^elohim_projection_reconcile_divergent\{[^}]*stream="([^"]+)"[^}]*\}\s+(-?\d+(?:\.\d+)?)\s*$')
+    pat_r = re.compile(r'^elohim_projection_reconcile_divergent_refused\{[^}]*stream="([^"]+)"[^}]*\}\s+(-?\d+(?:\.\d+)?)\s*$')
+    for line in text.splitlines():
+        if not line or line.startswith('#'):
+            continue
+        m = pat_d.match(line)
+        if m:
+            div[m.group(1)] = float(m.group(2))
+            continue
+        m = pat_r.match(line)
+        if m:
+            ref[m.group(1)] = float(m.group(2))
+    if not div:
+        return None
+    return sum(max(v - ref.get(k, 0.0), 0.0) for k, v in div.items())
+
+actionable_sum = stream_actionable_sum(metrics_a)
+if tol > 0:
+    quiesced_ok = (
+        actionable_sum is not None and actionable_sum <= tol
+        and unmeasured is not None and unmeasured == 0
+    )
+else:
+    quiesced_ok = (
+        actionable is not None and actionable == 0
+        and unmeasured is not None and unmeasured == 0
+    )
 
 print(f"A_CAUGHT_UP={a_caught_up}")
 print(f"B_CAUGHT_UP={b_caught_up}")
 print(f"QUIESCED_OK={quiesced_ok}")
 print(f"ACTIONABLE={actionable}")
+print(f"ACTIONABLE_SUM={actionable_sum}")
 print(f"UNMEASURED={unmeasured}")
 print(f"CONVERGED={converged}")
 print(f"SWEEPS={sweeps}")
@@ -227,6 +294,7 @@ PYEOF
   b_caught_up=$(printf '%s\n' "$parsed" | sed -n 's/^B_CAUGHT_UP=//p')
   quiesced_ok=$(printf '%s\n' "$parsed" | sed -n 's/^QUIESCED_OK=//p')
   actionable=$(printf '%s\n' "$parsed" | sed -n 's/^ACTIONABLE=//p')
+  actionable_sum=$(printf '%s\n' "$parsed" | sed -n 's/^ACTIONABLE_SUM=//p')
   unmeasured=$(printf '%s\n' "$parsed" | sed -n 's/^UNMEASURED=//p')
   converged=$(printf '%s\n' "$parsed" | sed -n 's/^CONVERGED=//p')
   sweeps=$(printf '%s\n' "$parsed" | sed -n 's/^SWEEPS=//p')
@@ -238,7 +306,7 @@ PYEOF
   # see header note 2) — still printed in the summary for telemetry.
   # Quiesced, not perfect (header note 3): actionable==0 AND unmeasured==0,
   # fail-closed on an absent blocked_by series. converged is telemetry only.
-  [ "$quiesced_ok" = "True" ] || { pass=0; reasons+=("A-not-quiesced(actionable=${actionable:-null},unmeasured=${unmeasured:-null})"); }
+  [ "$quiesced_ok" = "True" ] || { pass=0; reasons+=("A-not-quiesced(actionable=${actionable:-null},sum=${actionable_sum:-null},tol=${ACTIONABLE_TOL},unmeasured=${unmeasured:-null})"); }
   [ "$code_a" = "200" ] || { pass=0; reasons+=("A-content-${code_a}"); }
   [ "$code_b" = "200" ] || { pass=0; reasons+=("B-content-${code_b}"); }
   # The sustain proof needs a numeric sweeps_total reading even though the
@@ -249,7 +317,7 @@ PYEOF
     reasons+=("A-sweeps-metric-missing")
   fi
 
-  summary="A-caughtUp=${a_caught_up:-?} B-caughtUp=${b_caught_up:-?} A-quiesced=${quiesced_ok:-?}(actionable=${actionable:-null},unmeasured=${unmeasured:-null}) A-converged=${converged:-null} A-content=${code_a} B-content=${code_b} sweeps=${sweeps:-null}"
+  summary="A-caughtUp=${a_caught_up:-?} B-caughtUp=${b_caught_up:-?} A-quiesced=${quiesced_ok:-?}(actionable=${actionable:-null},sum=${actionable_sum:-null},tol=${ACTIONABLE_TOL},unmeasured=${unmeasured:-null}) A-converged=${converged:-null} A-content=${code_a} B-content=${code_b} sweeps=${sweeps:-null}"
 
   if [ "$pass" -eq 1 ]; then
     if [ -z "$anchor_ts" ]; then
