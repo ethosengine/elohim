@@ -67,6 +67,7 @@ fn test_request() -> ViewFederationRequest {
         agent_cid: "bafkreibmzonpj42xk5vxltpl2h3mj5qnxmvprsnwkl3uml7yzhbpqu7c4a".to_string(),
         request_id: "test-req-001".to_string(),
         inventory_offset: None,
+        head_corpus_digest: None,
     }
 }
 
@@ -187,6 +188,7 @@ async fn responder_signs_slice_with_agent_key_when_agent_matches() {
             keypair: &keypair,
             pool: None, // pool=None → stub json!({}) payload
             inventory_offset: None,
+            head_corpus_digest: None,
             // ContentHeadRecord is the only view kind that needs a
             // conductor; these cases never request it.
             hc_registry: None,
@@ -250,6 +252,7 @@ async fn responder_returns_offline_for_unknown_agent_cid() {
             keypair: &keypair,
             pool: None, // pool=None; non-matching agent always returns Null regardless
             inventory_offset: None,
+            head_corpus_digest: None,
             // ContentHeadRecord is the only view kind that needs a
             // conductor; these cases never request it.
             hc_registry: None,
@@ -308,6 +311,7 @@ async fn responder_echoes_view_kind_and_request_id() {
             keypair: &keypair,
             pool: None, // pool=None
             inventory_offset: None,
+            head_corpus_digest: None,
             // ContentHeadRecord is the only view kind that needs a
             // conductor; these cases never request it.
             hc_registry: None,

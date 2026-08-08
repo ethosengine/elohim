@@ -30,4 +30,35 @@ export type ViewFederationRequest = { viewKind: ViewKind, agentCid: string, requ
  * pre-field encoding, so the `canonical_bytes` dedup key is unchanged for
  * every existing caller.
  */
-inventoryOffset: number | null, };
+inventoryOffset: number | null, 
+/**
+ * ADDITIVE (T4, head-plane trust-gradient program plan §3 L2): the
+ * requester's own `db::content_diesel::head_corpus_digest` for the
+ * `content` `ProjectionInventory` table, carried so the responder can
+ * answer `ProjectionInventoryPayload::in_sync` without the requester
+ * paying a full inventory round-trip when the two peers already agree.
+ * Ignored for non-`content`, non-`ProjectionInventory` view kinds.
+ *
+ * **T4 wires the RESPONDER side only.** No caller in this release sets
+ * this field — that is T5, gated behind a config flag, and per the
+ * `ListDocumentsSince` rollout precedent it ships only after every
+ * responder in the fleet has this field's decode path (one release
+ * ahead), so an old responder never sees a digest it doesn't know to
+ * answer.
+ *
+ * ## Wire compatibility (MANDATORY — mixed-version peers during rolling
+ * deploys)
+ *
+ * Additive and optional, same discipline as `inventory_offset`:
+ * - a NEW peer sending this key to an OLD responder: the old struct lacks
+ *   the field and ignores the unknown key → no `in_sync` answer
+ *   (yesterday's behavior, since T5 has not landed a sender yet anyway);
+ * - an OLD peer sending no key to a NEW responder: `#[serde(default)]`
+ *   yields `None` → the responder skips the digest comparison and omits
+ *   `in_sync` (yesterday's behavior).
+ *
+ * `skip_serializing_if` keeps the `None` wire bytes byte-identical to the
+ * pre-field encoding, so the `canonical_bytes` dedup key is unchanged for
+ * every existing caller.
+ */
+headCorpusDigest: string | null, };

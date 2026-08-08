@@ -2090,6 +2090,7 @@ async fn discover_rea(
             // Rotating window: this sweep asks for the page at `sweep_offset` so
             // successive sweeps cover a corpus larger than the responder's cap.
             inventory_offset: Some(sweep_offset),
+            head_corpus_digest: None,
         };
         let resp = match p2p.view_federate(peer_id, request, PEER_TIMEOUT).await {
             Ok(r) => r,
@@ -2650,6 +2651,7 @@ async fn discover_content(
             request_id: uuid::Uuid::new_v4().to_string(),
             // Rotating window: this sweep asks for the page at `sweep_offset`.
             inventory_offset: Some(sweep_offset),
+            head_corpus_digest: None,
         };
         let resp = match p2p.view_federate(peer_id, request, PEER_TIMEOUT).await {
             Ok(r) => r,
@@ -4002,6 +4004,7 @@ async fn discover_collectives(
             agent_cid: p2p.agent_pubkey().to_string(),
             request_id: uuid::Uuid::new_v4().to_string(),
             inventory_offset: Some(sweep_offset),
+            head_corpus_digest: None,
         };
         let resp = match p2p.view_federate(peer_id, request, PEER_TIMEOUT).await {
             Ok(r) => r,
@@ -4546,6 +4549,7 @@ pub async fn reconcile_shard_locations_from_peers(p2p: &P2PHandle, pool: &DbPool
             agent_cid: p2p.agent_pubkey().to_string(),
             request_id: uuid::Uuid::new_v4().to_string(),
             inventory_offset: None,
+            head_corpus_digest: None,
         };
         let resp = match p2p.view_federate(peer_id, request, PEER_TIMEOUT).await {
             Ok(r) => r,

@@ -6,6 +6,33 @@
 
 use std::collections::{HashMap, HashSet};
 
+/// Stable fingerprint of a set of pre-formatted entry lines: sort, then hash
+/// with a length-delimiting `\n` after each entry so `("ab","c")` and
+/// `("a","bc")` cannot collide.
+///
+/// Extracted from `p2p::sync_round::corpus_digest` (T4, head-plane
+/// trust-gradient program) so [`crate::db::content_diesel::head_corpus_digest`]
+/// (a DIFFERENT corpus — the SQL content table, not the sync-round DocStore)
+/// can reuse the exact same fold instead of restating it. Callers own their
+/// own entry-line formatting (e.g. `"{doc_id}={sorted_heads.join(\",\")}"` or
+/// `"{id}={dht_anchor_hash}"`) — this function only owns the sort+hash step,
+/// which is where a byte-for-byte drift would silently disable an `InSync`/
+/// `in_sync` shortcut.
+///
+/// Deliberately NOT in the `seam-contracts` crate: its no-heavy-deps boundary
+/// test forbids a `sha2` dependency.
+pub fn digest_of_entry_lines(mut entries: Vec<String>) -> String {
+    use sha2::{Digest, Sha256};
+    entries.sort();
+    let mut h = Sha256::new();
+    for e in &entries {
+        h.update(e.as_bytes());
+        // Length-delimit so ("ab","c") and ("a","bc") cannot collide.
+        h.update(b"\n");
+    }
+    format!("sha256:{:x}", h.finalize())
+}
+
 /// Generic gap state machine: known-local / pending / completed / failed(retries).
 /// Retry discipline is retry-on-NEXT-cycle (never immediate re-queue — the
 /// freeze-at-partial battle-scar, see replication.rs mark_failed docs).

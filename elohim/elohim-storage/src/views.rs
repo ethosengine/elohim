@@ -187,6 +187,7 @@ mod federation_canonical_tests {
             agent_cid: "agent_test".to_string(),
             request_id: "req_001".to_string(),
             inventory_offset: None,
+            head_corpus_digest: None,
         };
         let bytes = req.canonical_bytes();
         let back: ViewFederationRequest = rmp_serde::from_slice(&bytes).unwrap();

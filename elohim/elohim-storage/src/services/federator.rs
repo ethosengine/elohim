@@ -109,6 +109,7 @@ impl Federator {
                     // Federator fetches non-inventory view kinds; the rotating
                     // inventory window is driven only by projection_reconcile.
                     inventory_offset: None,
+                    head_corpus_digest: None,
                 };
 
                 match p2p.view_federate(peer_id, request, per_peer_timeout).await {

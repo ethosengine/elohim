@@ -1767,6 +1767,52 @@ pub fn list_content_anchor_inventory(
     Ok((entries, total))
 }
 
+/// Head-plane corpus digest (T4, head-plane trust-gradient program plan §3
+/// L2): a stable fingerprint of every anchored, distribution-safe content
+/// row's `(id, dhtAnchorHash)` pair — the SAME relation
+/// [`list_content_anchor_inventory`] serves, unpaginated and hashed instead of
+/// paged.
+///
+/// Reuses [`DISTRIBUTION_SAFE_REACH`] — never restates the reach tiers; a
+/// second copy is exactly how a scoped tier eventually leaks into a
+/// cross-peer digest. Hashed via the SAME fold
+/// [`crate::p2p::reconcile_rails::digest_of_entry_lines`] the sync-round
+/// corpus digest (`p2p::sync_round::corpus_digest`) uses, so two independent
+/// corpora (the DocStore-backed sync round vs. this SQL content table) share
+/// one sort+hash implementation rather than two that could silently drift
+/// apart.
+///
+/// **Derived on demand, never stored.** Sub-ms over ~3.5k rows (the 2026-08-08
+/// evidence pass), so there is no dirty-flag or cache to invalidate — a
+/// staleness bug in a cache would be strictly worse than the query cost it
+/// would save. If profiling ever proves otherwise, the cache key MUST be
+/// `(count(*), max(updated_at))` over this same relation, never a dirty flag.
+///
+/// This is the L2 join key: a peer whose OWN `head_corpus_digest` equals the
+/// digest another peer advertises (on `ViewFederationRequest.head_corpus_digest`,
+/// or inside a signed `HeadSetSnapshot`) is already in sync with that peer's
+/// head plane at zero verification cost — see `trust::snapshot::HeadSetSnapshot`.
+pub fn head_corpus_digest(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+) -> Result<String, StorageError> {
+    let rows: Vec<(String, Option<String>)> = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::dht_anchor_hash.is_not_null())
+        .filter(content::reach.eq_any(DISTRIBUTION_SAFE_REACH))
+        .select((content::id, content::dht_anchor_hash))
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("head corpus digest load failed: {e}")))?;
+
+    // `IS NOT NULL` guarantees `Some` (same defensive `filter_map`, not
+    // `unwrap`, discipline as `list_content_anchor_inventory`).
+    let entries: Vec<String> = rows
+        .into_iter()
+        .filter_map(|(id, anchor)| anchor.map(|a| format!("{id}={a}")))
+        .collect();
+    Ok(crate::p2p::reconcile_rails::digest_of_entry_lines(entries))
+}
+
 /// Get content count for an app
 pub fn content_count(conn: &mut SqliteConnection, ctx: &AppContext) -> Result<i64, StorageError> {
     content::table
@@ -2461,6 +2507,98 @@ mod tests {
             ids,
             vec!["c:alpha", "c:mid", "c:zeta"],
             "equal updated_at falls back to id ascending"
+        );
+    }
+
+    #[test]
+    fn head_corpus_digest_is_stable_and_order_independent() {
+        // T4 (head-plane trust-gradient program): two identical corpora must
+        // produce the SAME digest regardless of insertion order — the sort
+        // step in `digest_of_entry_lines` is what the whole `in_sync`
+        // shortcut rests on. Mirrors
+        // `p2p::sync_round::tests::corpus_digest_matches_the_pre_refactor_pinned_value`
+        // for the OTHER corpus this fold now serves.
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        let mk = |id: &str, anchor: &str| CreateContentInput {
+            id: id.to_string(),
+            title: id.to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "public".to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+            dht_anchor_hash: Some(anchor.to_string()),
+        };
+        create_content(&mut conn, &ctx, mk("c:a", "anc-a")).unwrap();
+        create_content(&mut conn, &ctx, mk("c:b", "anc-b")).unwrap();
+        let digest_ab = head_corpus_digest(&mut conn, &ctx).unwrap();
+        assert!(digest_ab.starts_with("sha256:"));
+
+        let mut conn2 = setup_test_db();
+        let ctx2 = AppContext::new("lamad");
+        // Reverse insertion order.
+        create_content(&mut conn2, &ctx2, mk("c:b", "anc-b")).unwrap();
+        create_content(&mut conn2, &ctx2, mk("c:a", "anc-a")).unwrap();
+        let digest_ba = head_corpus_digest(&mut conn2, &ctx2).unwrap();
+        assert_eq!(
+            digest_ab, digest_ba,
+            "insertion order must not affect the digest — both peers hashing the \
+             same logical corpus must agree regardless of row-arrival order"
+        );
+    }
+
+    #[test]
+    fn head_corpus_digest_excludes_scoped_and_unanchored_rows_and_changes_on_anchor_change() {
+        // Reuses the SAME DISTRIBUTION_SAFE_REACH gate as
+        // `list_content_anchor_inventory` — a scoped-tier or un-anchored row
+        // must never perturb the cross-peer digest either way.
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        let mk = |id: &str, reach: &str, anchor: Option<&str>| CreateContentInput {
+            id: id.to_string(),
+            title: id.to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: reach.to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+            dht_anchor_hash: anchor.map(str::to_string),
+        };
+        create_content(&mut conn, &ctx, mk("c:pub", "public", Some("anc-pub"))).unwrap();
+        let baseline = head_corpus_digest(&mut conn, &ctx).unwrap();
+
+        create_content(&mut conn, &ctx, mk("c:priv", "private", Some("anc-priv"))).unwrap();
+        create_content(&mut conn, &ctx, mk("c:noanchor", "public", None)).unwrap();
+        let after_noise = head_corpus_digest(&mut conn, &ctx).unwrap();
+        assert_eq!(
+            baseline, after_noise,
+            "a scoped-tier row and an un-anchored row must not change the digest — \
+             neither is eligible for the cross-peer inventory this digest fingerprints"
+        );
+
+        // Changing the eligible row's anchor DOES change the digest.
+        diesel::update(content::table.filter(content::id.eq("c:pub")))
+            .set(content::dht_anchor_hash.eq("anc-pub-CHANGED"))
+            .execute(&mut conn)
+            .unwrap();
+        let after_change = head_corpus_digest(&mut conn, &ctx).unwrap();
+        assert_ne!(
+            baseline, after_change,
+            "a changed anchor on an eligible row MUST change the digest — this is the \
+             signal the in_sync shortcut relies on to catch divergence"
         );
     }
 

@@ -323,6 +323,27 @@ pub struct ProjectionInventoryPayload {
     pub total: usize,
     /// Most-recent-N `(id, dhtAnchorHash)` pairs, newest first.
     pub entries: Vec<ProjectionInventoryEntry>,
+    /// ADDITIVE (T4, head-plane trust-gradient program plan §3 L2): set by the
+    /// responder ONLY when the request carried
+    /// [`ViewFederationRequest::head_corpus_digest`] for the `content` table —
+    /// `Some(true)` when the responder's OWN
+    /// `db::content_diesel::head_corpus_digest` equals the requester's digest
+    /// (the requester is already in sync with this peer's head plane at zero
+    /// verification cost), `Some(false)` on a mismatch, `None` when the
+    /// requester sent no digest (or asked a different table) — the pre-T4
+    /// shape, so an old requester paying no digest cost gets no answer to it.
+    ///
+    /// This is a RESPONDER-COMPUTED verdict only; T4 lands ONLY this side. No
+    /// caller in this release constructs `head_corpus_digest` on the request
+    /// (that is T5, behind a config flag, deployed after the fleet-wide
+    /// responder rollout) — see the rollout rule on
+    /// [`ViewFederationRequest::head_corpus_digest`].
+    ///
+    /// `skip_serializing_if` keeps the `None` encoding byte-identical to the
+    /// pre-field shape, same discipline as `declared_head_action_hash` /
+    /// `inventory_offset`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub in_sync: Option<bool>,
 }
 
 /// Per-device slice returned over the view-federation/1.0.0 libp2p protocol;
@@ -372,6 +393,36 @@ pub struct ViewFederationRequest {
     /// every existing caller.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inventory_offset: Option<u32>,
+    /// ADDITIVE (T4, head-plane trust-gradient program plan §3 L2): the
+    /// requester's own `db::content_diesel::head_corpus_digest` for the
+    /// `content` `ProjectionInventory` table, carried so the responder can
+    /// answer `ProjectionInventoryPayload::in_sync` without the requester
+    /// paying a full inventory round-trip when the two peers already agree.
+    /// Ignored for non-`content`, non-`ProjectionInventory` view kinds.
+    ///
+    /// **T4 wires the RESPONDER side only.** No caller in this release sets
+    /// this field — that is T5, gated behind a config flag, and per the
+    /// `ListDocumentsSince` rollout precedent it ships only after every
+    /// responder in the fleet has this field's decode path (one release
+    /// ahead), so an old responder never sees a digest it doesn't know to
+    /// answer.
+    ///
+    /// ## Wire compatibility (MANDATORY — mixed-version peers during rolling
+    /// deploys)
+    ///
+    /// Additive and optional, same discipline as `inventory_offset`:
+    /// - a NEW peer sending this key to an OLD responder: the old struct lacks
+    ///   the field and ignores the unknown key → no `in_sync` answer
+    ///   (yesterday's behavior, since T5 has not landed a sender yet anyway);
+    /// - an OLD peer sending no key to a NEW responder: `#[serde(default)]`
+    ///   yields `None` → the responder skips the digest comparison and omits
+    ///   `in_sync` (yesterday's behavior).
+    ///
+    /// `skip_serializing_if` keeps the `None` wire bytes byte-identical to the
+    /// pre-field encoding, so the `canonical_bytes` dedup key is unchanged for
+    /// every existing caller.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head_corpus_digest: Option<String>,
 }
 
 /// Response envelope for `/elohim/view-federation/1.0.0` — peer B returns the
@@ -446,6 +497,7 @@ mod inventory_offset_wire_compat_tests {
             agent_cid: "agent".into(),
             request_id: "r".into(),
             inventory_offset: None,
+            head_corpus_digest: None,
         };
         let old = OldViewFederationRequest {
             view_kind: ViewKind::Cluster,
@@ -470,6 +522,7 @@ mod inventory_offset_wire_compat_tests {
             agent_cid: "agent".into(),
             request_id: "r".into(),
             inventory_offset: Some(1000),
+            head_corpus_digest: None,
         };
         let bytes = rmp_serde::to_vec_named(&new).unwrap();
         let old: OldViewFederationRequest =
@@ -505,6 +558,7 @@ mod inventory_offset_wire_compat_tests {
             agent_cid: "agent".into(),
             request_id: "r".into(),
             inventory_offset: Some(2000),
+            head_corpus_digest: None,
         };
         let bytes = rmp_serde::to_vec_named(&req).unwrap();
         let back: ViewFederationRequest = rmp_serde::from_slice(&bytes).unwrap();
@@ -726,5 +780,206 @@ mod inventory_offset_wire_compat_tests {
         );
         let back: ViewKind = serde_json::from_value(json).unwrap();
         assert_eq!(back, kind);
+    }
+}
+
+/// Wire-compat tests for T4 (head-plane trust-gradient program plan §3 L2):
+/// `ViewFederationRequest::head_corpus_digest` (requester → responder) and
+/// `ProjectionInventoryPayload::in_sync` (responder → requester). Same
+/// discipline as [`inventory_offset_wire_compat_tests`] above — additive,
+/// optional, `skip_serializing_if`-backed, so a rolling deploy mixes old and
+/// new peers for hours without either side losing a field it understands.
+#[cfg(test)]
+mod head_corpus_digest_wire_compat_tests {
+    use super::*;
+
+    /// Yesterday's `ViewFederationRequest` shape — no `head_corpus_digest`,
+    /// but (unlike [`inventory_offset_wire_compat_tests::OldViewFederationRequest`])
+    /// it DOES already carry `inventory_offset`, since that field landed first.
+    /// This is the REAL immediately-pre-T4 shape, not the pre-`inventory_offset`
+    /// shape two features back.
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+    #[serde(rename_all = "camelCase")]
+    struct OldViewFederationRequest {
+        view_kind: ViewKind,
+        agent_cid: String,
+        request_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        inventory_offset: Option<u32>,
+    }
+
+    /// Yesterday's `ProjectionInventoryPayload` shape — no `in_sync`.
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+    #[serde(rename_all = "camelCase")]
+    struct OldProjectionInventoryPayload {
+        table: String,
+        #[allow(dead_code)]
+        total: usize,
+        entries: Vec<ProjectionInventoryEntry>,
+    }
+
+    // ------------------------------------------------------------------
+    // (a) Round-trip with the field(s) present.
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn head_corpus_digest_round_trips_when_present() {
+        let req = ViewFederationRequest {
+            view_kind: ViewKind::ProjectionInventory {
+                table: "content".into(),
+            },
+            agent_cid: "agent".into(),
+            request_id: "r".into(),
+            inventory_offset: None,
+            head_corpus_digest: Some("sha256:deadbeef".into()),
+        };
+        let bytes = rmp_serde::to_vec_named(&req).unwrap();
+        let back: ViewFederationRequest = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(back, req);
+    }
+
+    #[test]
+    fn in_sync_round_trips_when_present() {
+        let payload = ProjectionInventoryPayload {
+            table: "content".into(),
+            total: 0,
+            entries: Vec::new(),
+            in_sync: Some(true),
+        };
+        let bytes = rmp_serde::to_vec_named(&payload).unwrap();
+        let back: ProjectionInventoryPayload = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(back, payload);
+
+        // The payload also rides `ViewSlice.payload` as JSON before the frame
+        // is msgpack'd, so the JSON leg must round-trip identically.
+        let json = serde_json::to_value(&payload).unwrap();
+        assert_eq!(json.get("inSync").and_then(|v| v.as_bool()), Some(true));
+        let via_json: ProjectionInventoryPayload = serde_json::from_value(json).unwrap();
+        assert_eq!(via_json, payload);
+    }
+
+    // ------------------------------------------------------------------
+    // (b) Old bytes (without the field) decode on the new struct.
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn new_peer_decodes_old_request_bytes_defaulting_digest_to_none() {
+        // An OLD (post-inventory_offset, pre-T4) peer emits a request with no
+        // head_corpus_digest key at all.
+        let old = OldViewFederationRequest {
+            view_kind: ViewKind::ProjectionInventory {
+                table: "content".into(),
+            },
+            agent_cid: "agent".into(),
+            request_id: "r".into(),
+            inventory_offset: Some(500),
+        };
+        let bytes = rmp_serde::to_vec_named(&old).unwrap();
+        let new: ViewFederationRequest = rmp_serde::from_slice(&bytes)
+            .expect("new struct must decode a request missing head_corpus_digest");
+        assert_eq!(
+            new.head_corpus_digest, None,
+            "missing key defaults to None — the responder skips the digest comparison"
+        );
+        assert_eq!(new.inventory_offset, Some(500), "sibling field unaffected");
+        assert_eq!(new.agent_cid, "agent");
+    }
+
+    #[test]
+    fn new_peer_decodes_old_inventory_payload_defaulting_in_sync_to_none() {
+        // An OLD responder emits a ProjectionInventoryPayload with no in_sync
+        // key (it never saw a head_corpus_digest to answer).
+        let old = OldProjectionInventoryPayload {
+            table: "content".into(),
+            total: 0,
+            entries: Vec::new(),
+        };
+        let bytes = rmp_serde::to_vec_named(&old).unwrap();
+        let new: ProjectionInventoryPayload = rmp_serde::from_slice(&bytes)
+            .expect("new struct must decode a payload missing in_sync");
+        assert_eq!(
+            new.in_sync, None,
+            "missing key defaults to None — no answer to a question never asked"
+        );
+
+        let json = serde_json::to_string(&old).unwrap();
+        let via_json: ProjectionInventoryPayload =
+            serde_json::from_str(&json).expect("JSON leg defaults the missing in_sync too");
+        assert_eq!(via_json.in_sync, None);
+    }
+
+    // ------------------------------------------------------------------
+    // (c) New bytes with `None` decode on the OLD struct shape — proven via
+    // byte-identity: a `None` field must add NO wire bytes, so the frame an
+    // old peer receives is indistinguishable from yesterday's.
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn none_head_corpus_digest_is_byte_identical_to_the_pre_field_encoding() {
+        let new = ViewFederationRequest {
+            view_kind: ViewKind::ProjectionInventory {
+                table: "content".into(),
+            },
+            agent_cid: "agent".into(),
+            request_id: "r".into(),
+            inventory_offset: Some(0),
+            head_corpus_digest: None,
+        };
+        let old = OldViewFederationRequest {
+            view_kind: ViewKind::ProjectionInventory {
+                table: "content".into(),
+            },
+            agent_cid: "agent".into(),
+            request_id: "r".into(),
+            inventory_offset: Some(0),
+        };
+        let new_bytes = rmp_serde::to_vec_named(&new).unwrap();
+        assert_eq!(
+            new_bytes,
+            rmp_serde::to_vec_named(&old).unwrap(),
+            "None head_corpus_digest must serialize byte-identically to the pre-field \
+             struct — the canonical_bytes dedup key must not change for callers that \
+             never set the field"
+        );
+        // And an OLD peer's struct must still decode the new (unchanged) bytes.
+        let decoded: OldViewFederationRequest = rmp_serde::from_slice(&new_bytes)
+            .expect("an old peer must still decode a None-digest request");
+        assert_eq!(decoded, old);
+    }
+
+    #[test]
+    fn none_in_sync_is_byte_identical_to_the_pre_field_encoding() {
+        let new = ProjectionInventoryPayload {
+            table: "content".into(),
+            total: 2,
+            entries: vec![ProjectionInventoryEntry {
+                id: "epr:a".into(),
+                dht_anchor_hash: "anc-a".into(),
+                declared_head_action_hash: None,
+                declared_head_at: None,
+            }],
+            in_sync: None,
+        };
+        let old = OldProjectionInventoryPayload {
+            table: "content".into(),
+            total: 2,
+            entries: vec![ProjectionInventoryEntry {
+                id: "epr:a".into(),
+                dht_anchor_hash: "anc-a".into(),
+                declared_head_action_hash: None,
+                declared_head_at: None,
+            }],
+        };
+        let new_bytes = rmp_serde::to_vec_named(&new).unwrap();
+        assert_eq!(
+            new_bytes,
+            rmp_serde::to_vec_named(&old).unwrap(),
+            "None in_sync must serialize byte-identically to the pre-field struct — a \
+             request that never carried a digest must produce the exact frame it did \
+             before this field existed"
+        );
+        let decoded: OldProjectionInventoryPayload = rmp_serde::from_slice(&new_bytes)
+            .expect("an old peer must still decode a None-in_sync payload");
+        assert_eq!(decoded, old);
     }
 }

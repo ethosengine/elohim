@@ -6039,6 +6039,7 @@ impl P2PNode {
                         let local_agent_cid = identity.agent_pubkey().to_string();
                         let local_peer_id = identity.peer_id_string();
                         let inventory_offset = request.inventory_offset;
+                        let head_corpus_digest = request.head_corpus_digest;
                         match build_response_slice(
                             request.view_kind,
                             crate::p2p::view_federation::SliceContext {
@@ -6050,6 +6051,7 @@ impl P2PNode {
                                 keypair: identity.keypair(),
                                 pool: db_pool.as_ref(),
                                 inventory_offset,
+                                head_corpus_digest,
                                 hc_registry: hc_registry.as_deref(),
                             },
                         )

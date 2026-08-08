@@ -129,8 +129,7 @@ impl LocalCorpusState {
 /// An unsorted digest would differ spuriously between peers and the shortcut
 /// would simply never fire, silently degrading to today's full enumeration.
 pub fn corpus_digest(local: &LocalCorpusState) -> String {
-    use sha2::{Digest, Sha256};
-    let mut entries: Vec<String> = local
+    let entries: Vec<String> = local
         .docs
         .iter()
         .map(|d| {
@@ -139,14 +138,7 @@ pub fn corpus_digest(local: &LocalCorpusState) -> String {
             format!("{}={}", d.doc_id, heads.join(","))
         })
         .collect();
-    entries.sort();
-    let mut h = Sha256::new();
-    for e in &entries {
-        h.update(e.as_bytes());
-        // Length-delimit so ("ab","c") and ("a","bc") cannot collide.
-        h.update(b"\n");
-    }
-    format!("sha256:{:x}", h.finalize())
+    crate::p2p::reconcile_rails::digest_of_entry_lines(entries)
 }
 
 /// The single request that opens a sync round with one peer.
@@ -203,6 +195,43 @@ pub fn announcements_for_local_change(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// **Byte-pin, captured from the PRE-REFACTOR `corpus_digest` body**
+    /// (inline `sha2::Sha256` fold, before `digest_of_entry_lines` was
+    /// extracted to `reconcile_rails.rs`). Value obtained by running this
+    /// exact fixture through the unmodified function on 2026-08-08:
+    /// `sha256:e1c5d7414b6d236e0ffb76b98739b1045f1c0a925a0a9e58d27788eec245cefe`
+    /// (verified independently via `printf 'alpha=z9\nbeta=h1,h2\n' | sha256sum`,
+    /// matching the entry-line/sort/newline-delimit shape byte-for-byte).
+    ///
+    /// This is wire-visible: `corpus_digest` is what `round_opener` puts on
+    /// `SyncRequest::ListDocumentsSince`, and the `InSync` shortcut fires only
+    /// when both peers compute the SAME digest for the SAME corpus. A single
+    /// silently-changed byte in the fold (sort order, delimiter, hex casing)
+    /// would make every peer pair permanently miss the shortcut and fall back
+    /// to full enumeration — a fleet-wide regression invisible to any test
+    /// that only checks "digests are stable" without pinning the value itself.
+    #[test]
+    fn corpus_digest_matches_the_pre_refactor_pinned_value() {
+        let local = LocalCorpusState {
+            docs: vec![
+                DocHead {
+                    doc_id: "beta".into(),
+                    heads: vec!["h2".into(), "h1".into()],
+                },
+                DocHead {
+                    doc_id: "alpha".into(),
+                    heads: vec!["z9".into()],
+                },
+            ],
+        };
+        assert_eq!(
+            corpus_digest(&local),
+            "sha256:e1c5d7414b6d236e0ffb76b98739b1045f1c0a925a0a9e58d27788eec245cefe",
+            "corpus_digest must reproduce the pre-refactor byte-for-byte value; \
+             a mismatch here means the InSync shortcut just broke fleet-wide"
+        );
+    }
 
     #[test]
     fn round_interval_uses_the_configured_cadence() {

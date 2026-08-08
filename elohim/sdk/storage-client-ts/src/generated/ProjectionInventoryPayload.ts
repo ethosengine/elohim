@@ -20,4 +20,26 @@ total: number,
 /**
  * Most-recent-N `(id, dhtAnchorHash)` pairs, newest first.
  */
-entries: Array<ProjectionInventoryEntry>, };
+entries: Array<ProjectionInventoryEntry>, 
+/**
+ * ADDITIVE (T4, head-plane trust-gradient program plan §3 L2): set by the
+ * responder ONLY when the request carried
+ * [`ViewFederationRequest::head_corpus_digest`] for the `content` table —
+ * `Some(true)` when the responder's OWN
+ * `db::content_diesel::head_corpus_digest` equals the requester's digest
+ * (the requester is already in sync with this peer's head plane at zero
+ * verification cost), `Some(false)` on a mismatch, `None` when the
+ * requester sent no digest (or asked a different table) — the pre-T4
+ * shape, so an old requester paying no digest cost gets no answer to it.
+ *
+ * This is a RESPONDER-COMPUTED verdict only; T4 lands ONLY this side. No
+ * caller in this release constructs `head_corpus_digest` on the request
+ * (that is T5, behind a config flag, deployed after the fleet-wide
+ * responder rollout) — see the rollout rule on
+ * [`ViewFederationRequest::head_corpus_digest`].
+ *
+ * `skip_serializing_if` keeps the `None` encoding byte-identical to the
+ * pre-field shape, same discipline as `declared_head_action_hash` /
+ * `inventory_offset`.
+ */
+inSync: boolean | null, };

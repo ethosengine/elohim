@@ -284,6 +284,15 @@ pub struct SliceContext<'a> {
     /// view kinds. Lets successive reconcile sweeps window across the whole
     /// corpus instead of re-serving only the capped hot set.
     pub inventory_offset: Option<u32>,
+    /// T4 (head-plane trust-gradient program): the requester's own
+    /// `head_corpus_digest` for the `content` `ProjectionInventory` table
+    /// (from `ViewFederationRequest.head_corpus_digest`; `None` ⇒ skip the
+    /// comparison). Ignored for other view kinds and for any table other than
+    /// [`PROJECTION_INVENTORY_TABLE_CONTENT`]. When present, the responder
+    /// computes its OWN digest via `db::content_diesel::head_corpus_digest`
+    /// and sets [`crate::views::ProjectionInventoryPayload::in_sync`] on the
+    /// reply — RESPONDER-ONLY for T4; no caller constructs this field yet.
+    pub head_corpus_digest: Option<String>,
     /// Conductor registry for the `ContentHeadRecord` view kind, which must ask
     /// THIS peer's conductor for the serialized `Record` behind its declared
     /// head. `None` in test contexts and wherever the bridge is not wired — the
@@ -326,8 +335,12 @@ pub async fn build_response_slice(
 ) -> Result<ViewFederationResponse, libp2p::identity::SigningError> {
     // ProjectionInventory: not agent-scoped. Build from local SQL directly.
     if let ViewKind::ProjectionInventory { table } = &view_kind {
-        let (payload, state) =
-            build_inventory_payload(ctx.pool, table, ctx.inventory_offset.unwrap_or(0));
+        let (payload, state) = build_inventory_payload(
+            ctx.pool,
+            table,
+            ctx.inventory_offset.unwrap_or(0),
+            ctx.head_corpus_digest.as_deref(),
+        );
         let mut slice = ViewSlice {
             peer_id: ctx.local_peer_id,
             view_kind: view_kind.clone(),
@@ -754,6 +767,7 @@ fn build_inventory_payload(
     pool: Option<&crate::db::DbPool>,
     table: &str,
     offset: u32,
+    requester_head_corpus_digest: Option<&str>,
 ) -> (serde_json::Value, FreshnessState) {
     let empty = || {
         (
@@ -761,6 +775,7 @@ fn build_inventory_payload(
                 table: table.to_string(),
                 total: 0,
                 entries: Vec::new(),
+                in_sync: None,
             })
             .unwrap_or(serde_json::Value::Null),
             FreshnessState::Offline,
@@ -816,10 +831,34 @@ fn build_inventory_payload(
                         declared_head_at: r.declared_head_at,
                     })
                     .collect();
+                // T4 (head-plane trust-gradient program): when the requester
+                // carried its own head-plane digest, answer with whether we
+                // agree. Computed ONLY on demand (never stored) — a second,
+                // unpaginated query over the SAME relation this page was
+                // drawn from. `None` when the requester sent nothing, so an
+                // old requester (or a request for a different table) pays no
+                // extra query and gets no answer to a question it never asked.
+                let in_sync = requester_head_corpus_digest.map(|theirs| {
+                    match crate::db::content_diesel::head_corpus_digest(&mut conn, &app_ctx) {
+                        Ok(ours) => ours == theirs,
+                        Err(e) => {
+                            tracing::warn!(
+                                target: "elohim_storage::view_federation",
+                                table = %table,
+                                error = %e,
+                                "ProjectionInventory: head_corpus_digest query failed; \
+                                 answering in_sync=false (fail toward re-verification, \
+                                 never toward a false shortcut)"
+                            );
+                            false
+                        }
+                    }
+                });
                 let mut payload = ProjectionInventoryPayload {
                     table: table.to_string(),
                     total,
                     entries,
+                    in_sync,
                 };
                 // Responder self-protection: NEVER emit a frame our own
                 // `write_response` would reject. The id-cap above bounds the row
@@ -908,6 +947,9 @@ fn build_inventory_payload(
                     table: table.to_string(),
                     total,
                     entries,
+                    // `in_sync` is a CONTENT-table concept (the head-plane
+                    // digest join) — collectives has no such digest.
+                    in_sync: None,
                 };
                 let byte_dropped = fit_inventory_to_budget(&mut payload, INVENTORY_PAYLOAD_BUDGET);
                 if cap_truncated || byte_dropped > 0 {
@@ -969,6 +1011,9 @@ fn build_inventory_payload(
                 table: table.to_string(),
                 total,
                 entries,
+                // `in_sync` is a CONTENT-table concept — rea_commitments has
+                // no head-plane digest of its own.
+                in_sync: None,
             };
             // Responder self-protection (same invariant as the content path):
             // never emit a frame our own codec would reject. A no-op unless a
@@ -1166,6 +1211,7 @@ mod tests {
             agent_cid: "agent_abc".to_string(),
             request_id: "req_001".to_string(),
             inventory_offset: None,
+            head_corpus_digest: None,
         };
         let bytes = rmp_serde::to_vec_named(&req).unwrap();
         let back: ViewFederationRequest = rmp_serde::from_slice(&bytes).unwrap();
@@ -1184,6 +1230,7 @@ mod tests {
             agent_cid: "agent_xyz".to_string(),
             request_id: "req_002".to_string(),
             inventory_offset: None,
+            head_corpus_digest: None,
         };
         let mut buf: Vec<u8> = Vec::new();
         {
@@ -1285,7 +1332,8 @@ mod tests {
         // Poolless/conductor-less context: the content table is KNOWN, but with
         // no pool the responder must return an honest empty inventory (Offline),
         // never a fabricated one.
-        let (val, state) = build_inventory_payload(None, PROJECTION_INVENTORY_TABLE_CONTENT, 0);
+        let (val, state) =
+            build_inventory_payload(None, PROJECTION_INVENTORY_TABLE_CONTENT, 0, None);
         assert_eq!(state, FreshnessState::Offline);
         let payload: ProjectionInventoryPayload = serde_json::from_value(val).unwrap();
         assert_eq!(payload.table, "content");
@@ -1296,7 +1344,7 @@ mod tests {
     #[test]
     fn unknown_table_still_empty_after_content_added() {
         // Adding the `content` table must not make an UNKNOWN table serve rows.
-        let (val, state) = build_inventory_payload(None, "agreements", 0);
+        let (val, state) = build_inventory_payload(None, "agreements", 0, None);
         assert_eq!(state, FreshnessState::Offline);
         let payload: ProjectionInventoryPayload = serde_json::from_value(val).unwrap();
         assert_eq!(payload.table, "agreements");
@@ -1337,7 +1385,7 @@ mod tests {
         }
 
         let (val, state) =
-            build_inventory_payload(Some(&pool), PROJECTION_INVENTORY_TABLE_COLLECTIVES, 0);
+            build_inventory_payload(Some(&pool), PROJECTION_INVENTORY_TABLE_COLLECTIVES, 0, None);
         assert_eq!(state, FreshnessState::Live);
         let payload: ProjectionInventoryPayload = serde_json::from_value(val).unwrap();
         assert_eq!(payload.table, "collectives");
@@ -1387,7 +1435,7 @@ mod tests {
         }
 
         let (val, state) =
-            build_inventory_payload(Some(&pool), PROJECTION_INVENTORY_TABLE_CONTENT, 0);
+            build_inventory_payload(Some(&pool), PROJECTION_INVENTORY_TABLE_CONTENT, 0, None);
         assert_eq!(state, FreshnessState::Live);
         let payload: ProjectionInventoryPayload = serde_json::from_value(val).unwrap();
         assert_eq!(payload.table, "content");
@@ -1399,6 +1447,109 @@ mod tests {
         );
         assert_eq!(payload.entries[0].dht_anchor_hash, "anc-1");
         assert_eq!(payload.total, 1);
+        assert_eq!(
+            payload.in_sync, None,
+            "a requester that sends no head_corpus_digest gets no in_sync answer — \
+             the responder must not compute (or claim) a comparison nobody asked for"
+        );
+    }
+
+    #[test]
+    fn content_inventory_reports_in_sync_true_when_requester_digest_matches() {
+        // T4: the requester's own head_corpus_digest, when it equals what the
+        // responder computes over the SAME anchored/distribution-safe rows,
+        // must come back `in_sync: Some(true)` — the L2 zero-cost shortcut.
+        use crate::db::content_diesel::{create_content, CreateContentInput};
+        let pool = crate::test_util::test_pool();
+        let ctx = crate::db::AppContext::default_lamad();
+        {
+            let mut conn = pool.get().expect("pool conn");
+            let mk = |id: &str, reach: &str, anchor: Option<&str>| CreateContentInput {
+                id: id.to_string(),
+                title: id.to_string(),
+                description: None,
+                content_type: "concept".to_string(),
+                content_format: "markdown".to_string(),
+                blob_hash: None,
+                blob_cid: None,
+                content_size_bytes: None,
+                metadata_json: None,
+                reach: reach.to_string(),
+                created_by: None,
+                tags: vec![],
+                content_body: None,
+                dht_anchor_hash: anchor.map(str::to_string),
+            };
+            create_content(
+                &mut conn,
+                &ctx,
+                mk("wf:sync-a", "public", Some("anc-sync-1")),
+            )
+            .unwrap();
+        }
+        let ours = {
+            let mut conn = pool.get().expect("pool conn");
+            crate::db::content_diesel::head_corpus_digest(&mut conn, &ctx).expect("digest")
+        };
+
+        let (val, state) = build_inventory_payload(
+            Some(&pool),
+            PROJECTION_INVENTORY_TABLE_CONTENT,
+            0,
+            Some(&ours),
+        );
+        assert_eq!(state, FreshnessState::Live);
+        let payload: ProjectionInventoryPayload = serde_json::from_value(val).unwrap();
+        assert_eq!(
+            payload.in_sync,
+            Some(true),
+            "a requester whose digest matches the responder's own must get in_sync=true"
+        );
+    }
+
+    #[test]
+    fn content_inventory_reports_in_sync_false_when_requester_digest_diverges() {
+        let pool = crate::test_util::test_pool();
+        let ctx = crate::db::AppContext::default_lamad();
+        {
+            use crate::db::content_diesel::{create_content, CreateContentInput};
+            let mut conn = pool.get().expect("pool conn");
+            create_content(
+                &mut conn,
+                &ctx,
+                CreateContentInput {
+                    id: "wf:sync-b".to_string(),
+                    title: "wf:sync-b".to_string(),
+                    description: None,
+                    content_type: "concept".to_string(),
+                    content_format: "markdown".to_string(),
+                    blob_hash: None,
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "public".to_string(),
+                    created_by: None,
+                    tags: vec![],
+                    content_body: None,
+                    dht_anchor_hash: Some("anc-sync-2".to_string()),
+                },
+            )
+            .unwrap();
+        }
+
+        let (val, state) = build_inventory_payload(
+            Some(&pool),
+            PROJECTION_INVENTORY_TABLE_CONTENT,
+            0,
+            Some("sha256:not-the-real-digest"),
+        );
+        assert_eq!(state, FreshnessState::Live);
+        let payload: ProjectionInventoryPayload = serde_json::from_value(val).unwrap();
+        assert_eq!(
+            payload.in_sync,
+            Some(false),
+            "a mismatched digest must answer in_sync=false, never a false shortcut"
+        );
     }
 
     /// Reach gate on the head-record responder — the mirror of the inventory's
@@ -1515,13 +1666,15 @@ mod tests {
 
         // Page 0 (offset 0). The honest total is 3 regardless of how many rows a
         // single page carries — the requester can always detect the remainder.
-        let (val0, _) = build_inventory_payload(Some(&pool), PROJECTION_INVENTORY_TABLE_CONTENT, 0);
+        let (val0, _) =
+            build_inventory_payload(Some(&pool), PROJECTION_INVENTORY_TABLE_CONTENT, 0, None);
         let p0: ProjectionInventoryPayload = serde_json::from_value(val0).unwrap();
         assert_eq!(p0.total, 3, "honest total = whole corpus, not served count");
 
         // A window past the first row (offset 2) reaches the cold tail — proving
         // successive sweeps cover the corpus rather than re-serving the hot set.
-        let (val2, _) = build_inventory_payload(Some(&pool), PROJECTION_INVENTORY_TABLE_CONTENT, 2);
+        let (val2, _) =
+            build_inventory_payload(Some(&pool), PROJECTION_INVENTORY_TABLE_CONTENT, 2, None);
         let p2: ProjectionInventoryPayload = serde_json::from_value(val2).unwrap();
         assert_eq!(p2.total, 3, "total is offset-invariant");
         let tail_ids: Vec<&str> = p2.entries.iter().map(|e| e.id.as_str()).collect();
@@ -1560,6 +1713,7 @@ mod tests {
             table: PROJECTION_INVENTORY_TABLE_CONTENT.to_string(),
             total: entries.len(),
             entries,
+            in_sync: None,
         };
         let serialized = inventory_payload_len(&payload);
         assert!(
@@ -1587,6 +1741,7 @@ mod tests {
             table: PROJECTION_INVENTORY_TABLE_CONTENT.to_string(),
             total: original,
             entries,
+            in_sync: None,
         };
 
         // A deliberately small budget forces the trim regardless of MAX_PAYLOAD.
@@ -1648,6 +1803,7 @@ mod tests {
                     declared_head_at: None,
                 },
             ],
+            in_sync: None,
         };
         let dropped = fit_inventory_to_budget(&mut payload, INVENTORY_PAYLOAD_BUDGET);
         assert_eq!(dropped, 0, "a small payload under budget is never trimmed");

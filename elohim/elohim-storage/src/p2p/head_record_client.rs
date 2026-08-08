@@ -104,6 +104,7 @@ impl HeadRecordFetcher for PeerHeadRecordFetcher {
             agent_cid: self.p2p.agent_pubkey().to_string(),
             request_id: uuid::Uuid::new_v4().to_string(),
             inventory_offset: None,
+            head_corpus_digest: None,
         };
 
         let resp = match self
