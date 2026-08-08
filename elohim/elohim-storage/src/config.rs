@@ -123,6 +123,23 @@ pub fn adopt_before_author_enabled() -> bool {
     *ADOPT_BEFORE_AUTHOR.get().unwrap_or(&false)
 }
 
+/// Process-wide mirror of [`Config::head_corpus_digest_enabled`]. The requester
+/// half of the additive digest protocol ships dormant until responders are
+/// fleet-wide; reading this `OnceLock` in the reconcile sweep avoids hot-path
+/// environment reads and parallel-test leakage.
+static HEAD_CORPUS_DIGEST_ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+/// Publish the head-corpus digest requester switch. Idempotent; first call wins.
+pub fn set_head_corpus_digest_enabled(enabled: bool) {
+    let _ = HEAD_CORPUS_DIGEST_ENABLED.set(enabled);
+}
+
+/// May projection-reconcile carry a head-corpus digest on content inventory
+/// requests? Defaults false so a mixed-version fleet preserves the pre-T5 wire.
+pub fn head_corpus_digest_enabled() -> bool {
+    *HEAD_CORPUS_DIGEST_ENABLED.get().unwrap_or(&false)
+}
+
 /// Process-wide mirror of [`Config::adopt_contest_fanout`]. Same rationale as
 /// [`CONTEST_TWO_WAY_DECLARED`]: the reconcile sweep carries no `Config`, and an
 /// env read on the hot path is the parallel-test-flake anti-pattern.
@@ -593,6 +610,16 @@ pub struct Config {
     #[serde(default)]
     pub adopt_before_author: bool,
 
+    /// T5 head-plane requester rollout switch. When enabled, content inventory
+    /// requests carry a digest only after every distribution-safe local row is
+    /// DHT-witnessed. During the bulk-seed amber window the field remains absent,
+    /// preserving the ordinary inventory path and avoiding digest flap.
+    ///
+    /// Default **false** until the additive T4 responder is fleet-wide. Loaded
+    /// from env `ELOHIM_HEAD_CORPUS_DIGEST`.
+    #[serde(default)]
+    pub head_corpus_digest_enabled: bool,
+
     /// F-B THROUGHPUT LEVER, half 1: how many adopt-before-author candidates the
     /// reconcile sweep processes CONCURRENTLY.
     ///
@@ -942,6 +969,7 @@ impl Default for Config {
             salvage_diversity_placement: default_true(),
             contest_two_way_declared: default_true(),
             adopt_before_author: false,
+            head_corpus_digest_enabled: false,
             adopt_contest_fanout: default_adopt_contest_fanout(),
             heal_resolve_fanout: default_heal_resolve_fanout(),
             heal_missing_backoff_seconds: default_heal_missing_backoff_seconds(),

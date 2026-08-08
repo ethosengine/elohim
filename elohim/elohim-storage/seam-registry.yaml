@@ -857,3 +857,174 @@ decisionPoints:
       links_minted{source="adopt_before_author"} series going non-zero on a live pod. Named here
       rather than left implied: a zero series while the flag is believed on is a WIRING
       question, not evidence that the arm failed.
+
+  - name: HeadCorpusDigestReadiness
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/db/content_diesel.rs
+      modulePath: db::content_diesel::HeadCorpusDigestReadiness
+      line: 1816
+    summary: >
+      Atomic local answer distinguishing an amber distribution-safe corpus with pending DHT
+      witnesses from a ready whole-corpus digest and honest row total.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Explicitly lives on the head/version projection plane: NULL anchor presence is the
+          local projection's evidence that DHT witness is pending; it says nothing about blob
+          custody or audience policy.
+      - id: C1
+        status: n-a
+        justification: The type selects no candidate and authors or crowns no head.
+      - id: C2
+        status: n-a
+        justification: The type observes anchor presence and never permits or applies a move.
+      - id: C3
+        status: n-a
+        justification: This is an observation type, not the witness state machine that advances Amber to Ready.
+      - id: C4
+        status: answered
+        justification: >
+          Amber{pending} and Ready{digest,total} are structurally distinct; an incomplete
+          relation cannot be mistaken for an empty or complete corpus.
+      - id: C5
+        status: n-a
+        justification: The answer is derived from local SQL and confers no authority from peer evidence.
+      - id: C6a
+        status: partial
+        justification: >
+          One SQL snapshot and one linear digest fold replace the former page-query-plus-second-
+          digest-query race, and callers invoke it at most once per reconcile request/sweep.
+          The whole-corpus fold is inherently O(local distribution-safe rows) and has no explicit
+          row ceiling; profiling evidence is sub-ms at ~3,469 rows, but a future unbounded corpus
+          would require streaming or an operator budget.
+      - id: C6b
+        status: n-a
+        justification: The type and its constructor query are read-only and mint no effect.
+      - id: C7
+        status: answered
+        justification: >
+          The query reuses the exact DISTRIBUTION_SAFE_REACH constant used by
+          list_content_anchor_inventory; the contract test proves a scoped NULL-anchor row does
+          not hold a cross-peer digest amber while a public one does.
+      - id: C8
+        status: partial
+        justification: >
+          Call sites log the pending count and readiness-query failures, but no Prometheus series
+          yet exposes amber duration or the ready/amber decision ratio across the fleet.
+      - id: C9
+        status: n-a
+        justification: No agent or transport identity participates in corpus readiness.
+      - id: C10
+        status: answered
+        justification: >
+          Readiness changes no wire type; it gates the already-additive optional digest/in_sync
+          fields whose old/new MessagePack compatibility fixtures remain pinned in elohim-views.
+      - id: C11
+        status: n-a
+        justification: The query is locally scheduled and does not consume externally imposed traffic directly.
+      - id: C12
+        status: n-a
+        justification: It authorizes no write, disclosure, or custody action.
+      - id: C13
+        status: n-a
+        justification: It prices no authority tier and changes no verification floor.
+      - id: C14
+        status: n-a
+        justification: Amber is expected witness progress, not an unexplained residual or failed branch.
+    contractTests:
+      - path: elohim/elohim-storage/src/db/content_diesel.rs
+        testName: head_corpus_digest_readiness_abstains_until_distribution_safe_rows_are_witnessed
+        kind: unit
+        mirrorRisk: false
+
+  - name: advertised_head_corpus_digest
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/p2p/projection_reconcile.rs
+      modulePath: p2p::projection_reconcile::advertised_head_corpus_digest
+      line: 193
+    summary: >
+      Carries the additive head-corpus digest exactly in the rollout-enabled plus fully-witnessed
+      corner; disabled or amber nodes send the byte-identical pre-T5 request.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: The predicate gates a head/version-plane equality hint over a projection-derived DHT witness signal.
+      - id: C1
+        status: n-a
+        justification: It neither authors nor chooses a head; equality only skips redundant inventory diffing.
+      - id: C2
+        status: n-a
+        justification: It cannot move authority and the full inventory/heal path remains the only effectful path on mismatch.
+      - id: C3
+        status: partial
+        justification: >
+          Once enabled, Amber automatically reaches the Ready corner as the existing witness
+          sweep anchors rows. The shipped default is deliberately dormant for rolling-deploy
+          safety, so activation still requires the T5 operator flip after fleet responder proof.
+      - id: C4
+        status: answered
+        justification: >
+          The predicate consumes the explicit Amber/Ready answer and refuses to serialize a
+          partial digest; an amber responder likewise abstains with in_sync=None rather than
+          manufacturing a guaranteed false mismatch.
+      - id: C5
+        status: n-a
+        justification: A digest is equality evidence only and confers no head authority or write permission.
+      - id: C6a
+        status: answered
+        justification: >
+          Exactly one readiness query is paid per enabled discovery sweep, outside the peer
+          loop; every peer reuses the resulting string. A matching responder now returns an
+          empty entry list before page enumeration, making the shortcut actually bounded and
+          cheaper instead of computing both paths.
+      - id: C6b
+        status: n-a
+        justification: The predicate is pure and replaying the same request applies no effect.
+      - id: C7
+        status: answered
+        justification: >
+          Requester readiness, responder readiness, raw digest, and served content inventory all
+          reuse the same distribution-safe relation; a match therefore advertises exactly the
+          set the peer would otherwise serve.
+      - id: C8
+        status: partial
+        justification: >
+          Ready, amber suppression, responder abstention, and successful short-circuit are INFO/
+          DEBUG visible, but there is not yet a typed Prometheus outcome series for fleet-wide
+          hit-rate and suppression-rate measurement.
+      - id: C9
+        status: n-a
+        justification: Corpus equality is independent of agent-to-transport identity resolution.
+      - id: C10
+        status: answered
+        justification: >
+          The flag defaults false, the optional field remains absent byte-for-byte while off or
+          amber, and the existing old/new wire fixtures pin unknown-key and missing-key behavior.
+      - id: C11
+        status: n-a
+        justification: The predicate shapes an outbound scheduled request; responder frame caps still own hostile inbound pressure.
+      - id: C12
+        status: n-a
+        justification: It grants no action and broadens no reach; scoped content remains excluded.
+      - id: C13
+        status: n-a
+        justification: The optimization is stage-independent and never lowers constitutional, local-relationship, or counter-evidence floors.
+      - id: C14
+        status: n-a
+        justification: Amber suppression is an expected state with a counted pending value, not a silent unexplained residual.
+    contractTests:
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: digest_advertisement_requires_both_rollout_enablement_and_green_corpus
+        kind: unit
+        mirrorRisk: false
+      - path: elohim/elohim-storage/src/p2p/view_federation.rs
+        testName: content_inventory_abstains_from_digest_comparison_during_amber_window
+        kind: unit
+        mirrorRisk: false
+      - path: elohim/elohim-storage/src/p2p/view_federation.rs
+        testName: content_inventory_reports_in_sync_true_when_requester_digest_matches
+        kind: unit
+        mirrorRisk: false

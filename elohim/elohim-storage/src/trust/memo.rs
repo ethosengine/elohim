@@ -16,10 +16,11 @@
 //! token (a `String` wrapper), never a bare integer; `depth` is the
 //! [`crate::trust::pricer::VerificationDepth`] enum, never a numeric score.
 
-use std::collections::HashMap;
+use std::num::NonZeroUsize;
 use std::sync::Mutex;
 
 use chrono::{DateTime, Utc};
+use lru::LruCache;
 
 use crate::trust::pricer::VerificationDepth;
 use crate::trust::snapshot::TrustEpoch;
@@ -70,9 +71,15 @@ pub trait VerificationMemoStore: Send + Sync {
     fn invalidate_for_subject(&self, subject_cid: &str);
 }
 
-/// The minimal in-memory [`VerificationMemoStore`] — a `Mutex<HashMap<...>>`
+/// Default number of subject/evaluator pairs retained process-wide. At roughly
+/// a few hundred bytes per memo, 4,096 entries keeps the cache in the low-MiB
+/// range; eviction is fail-safe because a miss causes full re-verification.
+pub const DEFAULT_VERIFICATION_MEMO_CAPACITY: usize = 4_096;
+
+/// The minimal in-memory [`VerificationMemoStore`] — a bounded
+/// `Mutex<LruCache<...>>`
 /// keyed by `(subject_cid, evaluator_agent_cid)`, following the crate's
-/// established small-store shape (`services::commitment_fetcher::MockCommitmentFetcher`).
+/// established hot-path cache shape (`p2p::dedup::DedupLru`).
 ///
 /// **T7 plumbing only.** This exists so a store can be `Arc`'d once in
 /// `main.rs` and given process lifetime, threaded to every `EprService`
@@ -83,16 +90,49 @@ pub trait VerificationMemoStore: Send + Sync {
 /// consumption; T19's `standing_projector` is what eventually makes a cache
 /// hit here mean something beyond "we asked before."
 ///
-/// No persistence, no TTL eviction (memo.rs module doc: TTL is a backstop
-/// ONLY, and only once something writes memos — moot until T9).
-#[derive(Debug, Default)]
+/// No persistence and no TTL eviction (memo.rs module doc: TTL is a backstop
+/// only). Capacity eviction is active before T9 starts writing on the hot path:
+/// losing the least-recently-used memo only restores full verification cost,
+/// while allowing unbounded growth would turn evaluator/subject diversity into
+/// process-memory pressure.
+#[derive(Debug)]
 pub struct InMemoryVerificationMemoStore {
-    memos: Mutex<HashMap<(String, String), VerificationMemo>>,
+    memos: Mutex<LruCache<(String, String), VerificationMemo>>,
 }
 
 impl InMemoryVerificationMemoStore {
     pub fn new() -> Self {
-        Self::default()
+        Self::with_capacity(DEFAULT_VERIFICATION_MEMO_CAPACITY)
+    }
+
+    /// Construct a bounded store. Zero is clamped to one, matching the crate's
+    /// other LRU caches; a disabled cache is represented by `memo: None` on
+    /// `TrustGradient`, not by a surprising always-miss store.
+    pub fn with_capacity(capacity: usize) -> Self {
+        let capacity =
+            NonZeroUsize::new(capacity.max(1)).expect("capacity.max(1) is always non-zero");
+        Self {
+            memos: Mutex::new(LruCache::new(capacity)),
+        }
+    }
+
+    /// Current occupancy, primarily for operational and bound-verification
+    /// tests. It can never exceed the configured capacity.
+    pub fn len(&self) -> usize {
+        self.memos
+            .lock()
+            .expect("InMemoryVerificationMemoStore mutex poisoned")
+            .len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl Default for InMemoryVerificationMemoStore {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -111,14 +151,22 @@ impl VerificationMemoStore for InMemoryVerificationMemoStore {
         self.memos
             .lock()
             .expect("InMemoryVerificationMemoStore mutex poisoned")
-            .insert(key, memo);
+            .put(key, memo);
     }
 
     fn invalidate_for_subject(&self, subject_cid: &str) {
-        self.memos
+        let mut memos = self
+            .memos
             .lock()
-            .expect("InMemoryVerificationMemoStore mutex poisoned")
-            .retain(|(subject, _), _| subject != subject_cid);
+            .expect("InMemoryVerificationMemoStore mutex poisoned");
+        let keys: Vec<_> = memos
+            .iter()
+            .filter(|((subject, _), _)| subject == subject_cid)
+            .map(|(key, _)| key.clone())
+            .collect();
+        for key in keys {
+            memos.pop(&key);
+        }
     }
 }
 
@@ -180,6 +228,7 @@ mod tests {
     #[test]
     fn in_memory_store_starts_empty() {
         let store = InMemoryVerificationMemoStore::new();
+        assert!(store.is_empty());
         assert!(store.get("subject", "evaluator").is_none());
     }
 
@@ -208,6 +257,33 @@ mod tests {
         store.invalidate_for_subject("subject-a");
         assert!(store.get("subject-a", "evaluator-a").is_none());
         assert!(store.get("subject-b", "evaluator-a").is_some());
+    }
+
+    #[test]
+    fn in_memory_store_never_grows_past_capacity() {
+        let store = InMemoryVerificationMemoStore::with_capacity(2);
+        store.put("subject-a", "evaluator", sample_memo());
+        store.put("subject-b", "evaluator", sample_memo());
+        store.put("subject-c", "evaluator", sample_memo());
+
+        assert_eq!(store.len(), 2);
+        assert!(store.get("subject-a", "evaluator").is_none());
+        assert!(store.get("subject-b", "evaluator").is_some());
+        assert!(store.get("subject-c", "evaluator").is_some());
+    }
+
+    #[test]
+    fn in_memory_store_eviction_respects_recent_reads() {
+        let store = InMemoryVerificationMemoStore::with_capacity(2);
+        store.put("subject-a", "evaluator", sample_memo());
+        store.put("subject-b", "evaluator", sample_memo());
+        assert!(store.get("subject-a", "evaluator").is_some());
+
+        store.put("subject-c", "evaluator", sample_memo());
+
+        assert!(store.get("subject-a", "evaluator").is_some());
+        assert!(store.get("subject-b", "evaluator").is_none());
+        assert!(store.get("subject-c", "evaluator").is_some());
     }
 
     /// The T7 plumbing invariant: two handles sharing the SAME `Arc` see

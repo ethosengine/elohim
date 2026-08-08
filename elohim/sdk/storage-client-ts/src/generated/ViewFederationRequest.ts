@@ -39,20 +39,19 @@ inventoryOffset: number | null,
  * paying a full inventory round-trip when the two peers already agree.
  * Ignored for non-`content`, non-`ProjectionInventory` view kinds.
  *
- * **T4 wires the RESPONDER side only.** No caller in this release sets
- * this field — that is T5, gated behind a config flag, and per the
- * `ListDocumentsSince` rollout precedent it ships only after every
- * responder in the fleet has this field's decode path (one release
- * ahead), so an old responder never sees a digest it doesn't know to
- * answer.
+ * **T5 requester rollout.** `projection_reconcile` sets this field only
+ * when `ELOHIM_HEAD_CORPUS_DIGEST` is enabled AND every
+ * distribution-safe local content row has a DHT anchor. The flag defaults
+ * off until the T4 responder is fleet-wide; the readiness gate suppresses
+ * digest flap during the hours-long bulk-seed witness window.
  *
  * ## Wire compatibility (MANDATORY — mixed-version peers during rolling
  * deploys)
  *
  * Additive and optional, same discipline as `inventory_offset`:
  * - a NEW peer sending this key to an OLD responder: the old struct lacks
- *   the field and ignores the unknown key → no `in_sync` answer
- *   (yesterday's behavior, since T5 has not landed a sender yet anyway);
+ *   the field and ignores the unknown key → no `in_sync` answer, so the
+ *   requester follows the ordinary inventory path;
  * - an OLD peer sending no key to a NEW responder: `#[serde(default)]`
  *   yields `None` → the responder skips the digest comparison and omits
  *   `in_sync` (yesterday's behavior).

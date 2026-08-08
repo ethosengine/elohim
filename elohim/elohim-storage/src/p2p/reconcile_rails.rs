@@ -7,8 +7,10 @@
 use std::collections::{HashMap, HashSet};
 
 /// Stable fingerprint of a set of pre-formatted entry lines: sort, then hash
-/// with a length-delimiting `\n` after each entry so `("ab","c")` and
-/// `("a","bc")` cannot collide.
+/// with a `\n` delimiter after each entry. Entries containing `\n` use an
+/// invalid-UTF-8 marker plus a big-endian byte length before their bytes; this
+/// keeps the historical byte stream unchanged for ordinary entries while
+/// preventing `["alpha", "beta"]` from colliding with `["alpha\nbeta"]`.
 ///
 /// Extracted from `p2p::sync_round::corpus_digest` (T4, head-plane
 /// trust-gradient program) so [`crate::db::content_diesel::head_corpus_digest`]
@@ -26,8 +28,13 @@ pub fn digest_of_entry_lines(mut entries: Vec<String>) -> String {
     entries.sort();
     let mut h = Sha256::new();
     for e in &entries {
+        if e.contains('\n') {
+            // 0xff cannot begin a valid UTF-8 String, so this framed form can
+            // never alias the legacy unframed form used by ordinary entries.
+            h.update([0xff]);
+            h.update((e.len() as u64).to_be_bytes());
+        }
         h.update(e.as_bytes());
-        // Length-delimit so ("ab","c") and ("a","bc") cannot collide.
         h.update(b"\n");
     }
     format!("sha256:{:x}", h.finalize())
@@ -273,6 +280,45 @@ impl DispatchBudget {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn digest_entry_line_edge_cases_are_byte_pinned() {
+        let cases = [
+            (
+                "empty set",
+                Vec::<String>::new(),
+                "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            ),
+            (
+                "empty entry",
+                vec![String::new()],
+                "sha256:01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+            ),
+            (
+                "unicode entry",
+                vec!["café=α,β".to_string()],
+                "sha256:970a36aa23ba1629e6d87fac7229402cf5821a784d234e3c4c38c5be323bcba3",
+            ),
+            (
+                "embedded newline",
+                vec!["alpha\nbeta".to_string()],
+                "sha256:981be2eac0bd6bf3cf016a96d4e0252fa456f574e5e8c2ccb0dc2d6073f133e9",
+            ),
+        ];
+
+        for (case, entries, expected) in cases {
+            assert_eq!(digest_of_entry_lines(entries), expected, "{case}");
+        }
+    }
+
+    #[test]
+    fn embedded_newline_cannot_impersonate_two_entries() {
+        assert_ne!(
+            digest_of_entry_lines(vec!["alpha".into(), "beta".into()]),
+            digest_of_entry_lines(vec!["alpha\nbeta".into()]),
+            "an embedded newline must not create a false InSync result"
+        );
+    }
 
     #[test]
     fn desired_set_reconcile_diffs_wants_against_local() {

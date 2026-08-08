@@ -413,6 +413,7 @@ habits:
       unchanged. Note this check is exactly the class a dependency bump would rot
       silently — the default sweep reports it "ignored", proving nothing, so it
       must be run explicitly after any automerge move.
+      HELD 2026-08-08: T5 digest rollout stays default-off and abstains while any distribution-safe row lacks a DHT witness; focused lib filters passed (4 digest + 1 requester-gate + 6 responder-inventory tests, 0 failed).
     guard: >
       Regression risk = a second construction site for the opener. p2p/sync_round.rs
       must remain the ONLY constructor; tests/sync_libp2p_convergence.rs must call

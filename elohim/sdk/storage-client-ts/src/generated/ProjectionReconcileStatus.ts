@@ -63,8 +63,16 @@ sweeps: number,
  */
 exhausted: number, 
 /**
- * True when this peer holds what its peers advertised: nothing pending,
- * nothing abandoned, nothing divergent. `caught_up` says only that the
- * sweep ended — an SLO may be offered over THIS field, not that one.
+ * True when this peer holds what its peers advertised. `caught_up` says
+ * only that the sweep ended — an SLO may be offered over THIS field, not
+ * that one.
+ *
+ * The predicate is [`crate::metrics::converged_blockers`] (one expression,
+ * shared with `elohim_projection_reconcile_converged` so the wire field and
+ * the metric cannot disagree): the sweep MEASURED something, nothing is
+ * pending, nothing it attempted ended failed, and no UNADJUDICATED
+ * divergence remains. Note `divergent_anchor` above stays the TOTAL — a
+ * nonzero `divergentAnchor` beside `converged: true` is correct and
+ * expected when every divergent row is adjudicated.
  */
 converged: boolean, };

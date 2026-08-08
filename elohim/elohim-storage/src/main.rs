@@ -464,6 +464,23 @@ async fn async_main(
     }
     elohim_storage::config::set_adopt_before_author(config.adopt_before_author);
 
+    // T5 HEAD-CORPUS DIGEST REQUESTER (default OFF). The T4 responder field is
+    // additive, but senders stay dormant until the fleet has that responder.
+    // Even when enabled, projection-reconcile derives amber/readiness from the
+    // local DHT-anchor relation and omits the field while witness work remains.
+    if let Ok(v) = std::env::var("ELOHIM_HEAD_CORPUS_DIGEST") {
+        config.head_corpus_digest_enabled = matches!(
+            v.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes" | "on"
+        );
+    }
+    if config.head_corpus_digest_enabled {
+        tracing::info!(
+            "head-corpus digest requester is ENABLED; amber-window readiness still gates each request"
+        );
+    }
+    elohim_storage::config::set_head_corpus_digest_enabled(config.head_corpus_digest_enabled);
+
     // F-B THROUGHPUT LEVER. Both knobs have an explicit OFF value that restores
     // the pre-F-B sweep exactly: fan-out 1 (sequential) and backoff 0 (contest
     // every candidate every sweep). An unparseable value leaves the default

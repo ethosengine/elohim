@@ -190,6 +190,13 @@ conductor-fork patch stays warranted), `elohim_head_batch_size` (gauge).
   pre-cure peers would fail decode). Rollout rule from `ListDocumentsSince`: responder
   ships fleet-wide one release before any sender constructs the field. Three compat
   tests: round-trip, old-bytes-on-new-struct, new-bytes-on-old-struct.
+- **Amber-window honesty (T5 challenge pass):** enabling the requester is necessary
+  but not sufficient to carry a digest. `head_corpus_digest_readiness` reads the exact
+  distribution-safe relation in one SQL snapshot and returns `Amber{pending}` while
+  any row still lacks a DHT anchor; the requester omits the optional field and an amber
+  responder abstains with `in_sync: None`. Only `Ready` advertises. A matching responder
+  compares before enumeration and returns an empty page plus the honest total, so the
+  claimed zero-cost shortcut actually avoids page construction and wire transfer.
 - **L2 before L5:** a peer whose own digest equals the one inside a signed snapshot is
   already in sync → accept-with-provenance at zero cost. The digest is the snapshot's
   self-description.
@@ -266,7 +273,7 @@ CARGO_TARGET_DIR at the pool slot; DNA workspace = plain cargo + sweettest via C
 | T2 | Hot-swap rollout: `[build:dna]` push → `ALLOW_COORDINATOR_UPDATE` path → verify externs answer on alpha before ANY storage caller lands | **Orchestrator** (+ ci-observer watches) | T1 | Jenkins, alpha probes | — |
 | T3 | `HeadBatchResolver` (trait+prod+mock) + `conductor_writes` wrappers + arm 2 batch consumption (fanout 8→2) + arm 4 two-phase restructure + `AdaptiveBatchBudget` + fold `WITNESS_*` into `HealPacing` + delete `WITNESS_ITEM_DELAY` + C8 counters | **Opus** (hottest loop; `resolve_pipeline` in-order/apply-half invariants; MissLedger poisoning trap) | T1 (compiles against types), T2 (before enabling live path) | projection_reconcile.rs, head_adoption.rs, heal_backoff.rs | head_batch_resolver.rs (new), conductor_writes.rs, projection_reconcile.rs, reconcile_rails.rs, metrics.rs |
 | T4 | `digest_of_entry_lines` extraction + byte-identical fixture test + `head_corpus_digest` + additive wire fields + responder + 3 compat tests | **Sonnet** | — (disjoint from T3 except reconcile_rails.rs — T3 lands first OR coordinate the one-file merge) | sync_round.rs, content_diesel.rs, elohim-views/shared.rs | reconcile_rails.rs, sync_round.rs, content_diesel.rs, view_federation.rs, elohim-views/shared.rs |
-| T5 | Requester behind config flag; flip after fleet confirms responder | **Orchestrator** | T4 deployed | alpha probes | projection_reconcile.rs (flag read) |
+| T5 | Requester behind default-off `ELOHIM_HEAD_CORPUS_DIGEST`; amber readiness suppresses partial digests; flip only after fleet confirms responder | **Orchestrator** | T4 deployed | alpha probes | config.rs, main.rs, projection_reconcile.rs, view_federation.rs |
 | T6 | `src/trust/` landed INERT: stage.rs, pricer.rs, snapshot types, `TrustGradient::inert()`, floor property test, `authorize_reach_for_human` param sweep | **Sonnet** implement; **Opus reviews the floor property test** (the safety keystone) | — (disjoint from T3/T4) | epr_service.rs, epr_kind.rs, standing.rs, manifest_registry | src/trust/* (new), epr_service.rs, http.rs (param thread) |
 | T7 | Fix per-request `EprService` construction; process-lifetime memo store `Arc` from main.rs | **Sonnet** | T6 | http.rs, main.rs, epr_service.rs | http.rs, main.rs, epr_service.rs |
 | T8 | Snapshot mint/verify/delta + `SnapshotSource` + `trust_epoch` C2 guard + additive wire carry | **Opus** (C2 ordering semantics, refusal taxonomy, epr_codec CID discipline) | T4 (digest join), T6 (types) | epr_codec.rs, trust/*, elohim-views | trust/snapshot.rs, view_federation.rs, elohim-views/shared.rs |

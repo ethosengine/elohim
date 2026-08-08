@@ -184,6 +184,26 @@ pub enum Admission {
     Exhausted,
 }
 
+/// Decide whether this sweep may advertise the local head-corpus digest.
+///
+/// The rollout flag and the DHT-witness readiness gate are deliberately
+/// independent: enabling T5 authorizes the additive wire field, but a bulk-seed
+/// amber window still abstains until the digest represents the whole
+/// distribution-safe corpus rather than a moving anchored subset.
+pub fn advertised_head_corpus_digest(
+    enabled: bool,
+    readiness: &crate::db::content_diesel::HeadCorpusDigestReadiness,
+) -> Option<String> {
+    match (enabled, readiness) {
+        (true, crate::db::content_diesel::HeadCorpusDigestReadiness::Ready { digest, .. }) => {
+            Some(digest.clone())
+        }
+        (false, _) | (true, crate::db::content_diesel::HeadCorpusDigestReadiness::Amber { .. }) => {
+            None
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct MissEntry {
     /// Sweeps this id has been a gap under `evidence`.
@@ -2596,7 +2616,10 @@ async fn discover_content(
     // safe rows (the same set this node advertises). Absent / un-anchored rows
     // are resolved via presence below. Offset 0 / i64::MAX: the LOCAL diff needs
     // the WHOLE local set (the rotating window only bounds the PEER ask).
-    let local_anchors: std::collections::HashMap<String, String> = {
+    let (local_anchors, requester_head_corpus_digest): (
+        std::collections::HashMap<String, String>,
+        Option<String>,
+    ) = {
         let mut conn = match pool.get() {
             Ok(c) => c,
             Err(e) => {
@@ -2604,7 +2627,7 @@ async fn discover_content(
                 return ContentDiscovery::empty(0);
             }
         };
-        match crate::db::content_diesel::list_content_anchor_inventory(
+        let local_anchors = match crate::db::content_diesel::list_content_anchor_inventory(
             &mut conn,
             &app_ctx,
             0,
@@ -2618,7 +2641,45 @@ async fn discover_content(
                 tracing::warn!(error = %e, "projection-reconcile[content]: local inventory failed; skipping sweep");
                 return ContentDiscovery::empty(0);
             }
-        }
+        };
+
+        let requester_head_corpus_digest = if crate::config::head_corpus_digest_enabled() {
+            match crate::db::content_diesel::head_corpus_digest_readiness(&mut conn, &app_ctx) {
+                Ok(readiness) => {
+                    let advertised = advertised_head_corpus_digest(true, &readiness);
+                    match &readiness {
+                        crate::db::content_diesel::HeadCorpusDigestReadiness::Ready {
+                            total,
+                            ..
+                        } => tracing::debug!(
+                            target: "elohim_storage::projection_reconcile",
+                            total,
+                            advertised = advertised.is_some(),
+                            "projection-reconcile[content]: local head corpus digest ready"
+                        ),
+                        crate::db::content_diesel::HeadCorpusDigestReadiness::Amber { pending } => {
+                            tracing::info!(
+                                target: "elohim_storage::projection_reconcile",
+                                pending,
+                                "projection-reconcile[content]: suppressing head corpus digest during local amber window"
+                            )
+                        }
+                    }
+                    advertised
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        target: "elohim_storage::projection_reconcile",
+                        error = %e,
+                        "projection-reconcile[content]: head corpus readiness query failed; sending ordinary inventory request"
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        (local_anchors, requester_head_corpus_digest)
     };
     let local_anchored = local_anchors.len();
 
@@ -2651,7 +2712,7 @@ async fn discover_content(
             request_id: uuid::Uuid::new_v4().to_string(),
             // Rotating window: this sweep asks for the page at `sweep_offset`.
             inventory_offset: Some(sweep_offset),
-            head_corpus_digest: None,
+            head_corpus_digest: requester_head_corpus_digest.clone(),
         };
         let resp = match p2p.view_federate(peer_id, request, PEER_TIMEOUT).await {
             Ok(r) => r,
@@ -2673,6 +2734,16 @@ async fn discover_content(
                 continue;
             }
         };
+
+        if payload.in_sync == Some(true) {
+            tracing::info!(
+                target: "elohim_storage::projection_reconcile",
+                peer = %peer.peer_id,
+                peer_total = payload.total,
+                "projection-reconcile[content]: peer head corpus is in sync; inventory diff skipped"
+            );
+            continue;
+        }
 
         // Honest total (Fix 2a) drives the window and truncation observability:
         // when `total > entries.len()` the peer inventory is WINDOWED — ids
@@ -5154,6 +5225,26 @@ mod tests {
         // spawn without a conductor); discovery still ran.
         assert_eq!(heal_decision(false, false), HealAction::SkipNoBridge);
         assert_eq!(heal_decision(false, true), HealAction::SkipNoBridge);
+    }
+
+    #[test]
+    fn digest_advertisement_requires_both_rollout_enablement_and_green_corpus() {
+        use crate::db::content_diesel::HeadCorpusDigestReadiness;
+
+        let amber = HeadCorpusDigestReadiness::Amber { pending: 17 };
+        let ready = HeadCorpusDigestReadiness::Ready {
+            digest: "sha256:ready".to_string(),
+            total: 3_469,
+        };
+
+        assert_eq!(advertised_head_corpus_digest(false, &amber), None);
+        assert_eq!(advertised_head_corpus_digest(false, &ready), None);
+        assert_eq!(advertised_head_corpus_digest(true, &amber), None);
+        assert_eq!(
+            advertised_head_corpus_digest(true, &ready).as_deref(),
+            Some("sha256:ready"),
+            "the additive field opens only in the enabled+fully-witnessed corner"
+        );
     }
 
     // ── MISSING-class adoption routing (2026-08-01) ─────────────────────────
