@@ -172,10 +172,16 @@ pub(crate) fn reset_for_test() {
 mod tests {
     use super::*;
 
+    /// Serializes this module's tests: `reset_for_test` clears the ONE global
+    /// ledger, so a parallel sibling's reset landing between another test's
+    /// note and assert wipes its entry (live flake, pre-push gate 2026-08-08).
+    static LEDGER_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     /// The whole lever in one assertion: a fresh id costs a conductor
     /// round-trip, and a second sweep within the window does not.
     #[test]
     fn a_known_missing_id_is_replayed_within_its_window() {
+        let _guard = LEDGER_TEST_LOCK.lock().unwrap();
         reset_for_test();
         let window = Duration::from_secs(600);
         let id = "heal-backoff:replayed";
@@ -195,6 +201,7 @@ mod tests {
     /// terminality. An elapsed window re-admits the id with no intervention.
     #[test]
     fn a_replay_window_always_expires() {
+        let _guard = LEDGER_TEST_LOCK.lock().unwrap();
         reset_for_test();
         let id = "heal-backoff:expires";
         note_conductor_missing(id);
@@ -214,6 +221,7 @@ mod tests {
     /// replays nothing at all, even for an id the ledger knows.
     #[test]
     fn a_zero_window_disables_every_replay() {
+        let _guard = LEDGER_TEST_LOCK.lock().unwrap();
         reset_for_test();
         let id = "heal-backoff:disabled";
         note_conductor_missing(id);
@@ -227,6 +235,7 @@ mod tests {
     /// invalidates the cached verdict immediately rather than at window expiry.
     #[test]
     fn a_resolved_id_stops_replaying_at_once() {
+        let _guard = LEDGER_TEST_LOCK.lock().unwrap();
         reset_for_test();
         let window = Duration::from_secs(600);
         let id = "heal-backoff:cleared";
@@ -246,6 +255,7 @@ mod tests {
     /// space on one of them would silently strand the replay.
     #[test]
     fn ids_are_matched_trimmed() {
+        let _guard = LEDGER_TEST_LOCK.lock().unwrap();
         reset_for_test();
         let window = Duration::from_secs(600);
         note_conductor_missing("  heal-backoff:trimmed  ");
@@ -258,6 +268,7 @@ mod tests {
     /// occupy a ledger slot forever.
     #[test]
     fn an_empty_id_is_never_recorded() {
+        let _guard = LEDGER_TEST_LOCK.lock().unwrap();
         reset_for_test();
         let before = tracked();
         note_conductor_missing("   ");
