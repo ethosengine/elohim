@@ -33,15 +33,18 @@ If you find yourself reaching for `CREATE TABLE` or `#[derive(Serialize)]` befor
 
 ## DHT Capacity Constraints (READ FIRST)
 
-The Holochain DHT is a **notary, not a database**. Hard constraints shape every classification decision:
+The Holochain DHT is a **notary, not a database**. Hard constraints shape every classification decision — and they live on TWO planes an earlier revision of this table conflated:
+
+**Plane 1 — Holochain DHT (the notary plane):**
 
 | Constraint | Limit | Current State |
 |---|---|---|
 | Entry types per DNA | ~100 | Lamad: **~73** (freed by mishpat split), Mishpat: **11**, Imagodei: 28, Infrastructure: 6 |
-| Total DHT entries | ~3000 before degradation | Designed for 100s-1000s |
 | Entry size | <1KB target | Proofs only: who (agent key), what (content hash), when (timestamp) |
 | Query capability | None — link traversal only | No SQL, no pagination, no filtering |
 | Gossip latency | 200-2000ms | Unacceptable for real-time reads |
+
+**Plane 2 — the head plane (per-item recurring cost, NOT DHT storage):** every Category A item ALSO becomes a local head row swept by the reconciliation arms, a per-item libp2p Kad record re-provided on the drain ticker (~15s), an election candidate, and a conductor round-trip consumer. The retired “~3000 entries before degradation” line was this plane's cost wearing the notary plane's costume — the measured reality (Row 16 evidence pass, 2026-08-08): **~3,469 A-class content heads live at genesis quiesce in ~2.5h** after a deploy (200 heads/tick × 300s sweep cadence × 1 uncancellable conductor WS round-trip per head, pre-batching). Storage is not the scarce resource — **recurring per-item attention is**. Step 1.5 prices it.
 
 **Before proposing ANY new DHT entry type**: Check if the DNA has headroom. Lamad at ~73/~100 means you have some breathing room after the mishpat split, but still check existing entry types first. Mishpat (governance) is at 11/~100 with room for growth. Most entities that need notarization already have entry types, not create one. Most entities that need notarization already have entry types — the gap is usually the missing `dht_anchor_hash` in the storage projection, not a missing entry type.
 
@@ -57,7 +60,7 @@ Every data entity falls into exactly one of five categories. Walk the tree for e
 
 **Requirements**:
 - Uses an EXISTING Holochain DHT entry type (do NOT create new ones without checking DNA capacity)
-- MUST have `dht_anchor_hash NOT NULL` in the SQLite storage projection
+- MUST have `dht_anchor_hash NOT NULL` in the SQLite storage projection **once witnessed** — the contract holds from the moment the witness sweep anchors the row, not at insert. **Bulk-seed amber window (honesty clause):** a bulk-seeded Category A row is born with `dht_anchor_hash` NULL and stays amber until the witness sweep reaches it — hours at current cadence (Step 1.5's measured quiesce numbers). Design reads to tolerate the amber window — derive amber/green from anchor presence (see the amber/green anti-pattern row) — instead of treating NULL as corruption or, worse, stamping the field locally
 - Source of truth is **Holochain DHT** — the SQLite row is a read-optimized projection, not the canonical record
 - Post-commit signal projects the entry to elohim-storage for fast query
 
@@ -133,6 +136,29 @@ Does the community need to witness/verify this data?
                   YES → OPERATIONAL (Category C)
                   NO  → Go back. You missed something. It's probably A or A2.
 ```
+
+---
+
+## Step 1.5: Head-Plane Cost Budget (Category A / A2 only)
+
+Classification (Step 1) says WHERE truth lives; this step prices WHAT it costs to keep it live. Every Category A/A2 entity joins the head plane — sweep arms, election candidacy, Kad records, conductor round-trips — and that cost recurs forever, per item, on every peer. Declare, for each A/A2 entity:
+
+1. **Expected item count** — at seed and at 1 year (order of magnitude is fine; “unbounded” is an answer, and it triggers requirement 3).
+2. **The per-item recurring cost formula it joins** — conductor round-trips × sweep cadence × election candidacy × adjudication surface. Measured anchor (Row 16 evidence pass, 2026-08-08): ~3,469 A-class heads × 1 uncancellable WS round-trip each, at 200 heads/tick on a 300s cadence = **~2.5h of gate-quiesce compute after every deploy**.
+3. **Above ~500 items: a bundling justification or an explicit operator sign-off.** Name which bundling shape applies — **composite root** (many items under one declared head), **A2-via-link** (attribute of an existing head, no new head), or **corpus digest** (one fingerprint answers “are we in sync?” for the whole set) — or record the operator's sign-off treating the head-plane cost as declared stakes.
+
+A design that passes Step 1 classification but adds thousands of per-item heads MUST state what that does to quiesce. “It's notarized, so it's correct” is not an answer to “what does the sweep pay every deploy?”
+
+---
+
+## Network Stakes Stage (the declared-stakes axis)
+
+The network runs at a declared stage — `Simulacra < Bootstrap < Coordinated < Enforced` (`elohim/elohim-storage/src/trust/stage.rs`): `Simulacra` for dev/staging/genesis fixtures (cheap verification, fast CI loops — reached ONLY by explicit declaration, never a default, never derived from any `DEV_MODE`), `Enforced` for the live runtime where friction, negotiation, and trust-building are the product. Verification cost is priced against the declared stage (`genesis/docs/content/elohim-protocol/architecture/trust-as-efficiency-signal.md` §6; implementation program: `genesis/docs/superpowers/plans/2026-08-08-head-plane-trust-gradient-program-plan.md`) — the same machinery, priced by declared stakes, never a dev hack beside the real path.
+
+Every new entity and decision predicate declares:
+
+- **Which stages it must behave under.** Most entities: all four. A genesis-fixture-only surface may be Simulacra-only — but must say so explicitly.
+- **Which of its costs are stage-priceable vs floor-protected.** A stage-priceable cost (e.g. full-chain re-verification of an already-witnessed, digest-matching head) may cheapen at lower declared stakes. A **floor-protected** cost NEVER cheapens at any stage, including Simulacra: `Constitutional` (manifests, attestations, delegations), `LocalRelationship` (local-relationship reach, unconditional), `CounterEvidence` (corrections always reach the creator, un-filterable). The floor invariant is pinned by property test (`trust::pricer` — `floor != None ⇒ FullChain` over the full stage×floor×reach×standing product).
 
 ---
 
@@ -292,6 +318,8 @@ These are known regressions — design choices that have caused real bugs or arc
 | Cross-namespace identity string-equality | The same agent has three identities (Holochain `uhCAk…` key, libp2p `12D3Koo…` peer id, iroh NodeId). Joining/matching one against another by raw string silently empties the join (caused the all-zeros resilience card, repeatedly). | Resolve through the canonical agent↔transport resolver (the `AgentPeerBinding` projection / `peer_transport_manifest`). Never string-compare identities across namespaces; pick `agent_cid` as the canonical join key and resolve transport ids TO it. |
 | `self-sovereign` / "true data sovereignty" as the **apex** identity, agency, or capability tier | Imports the silicon-crypto sovereignty ontology the protocol explicitly *subordinates* to community governance. The apex-tier label reads as a neutral capability level ("more keys → more autonomy → higher") and sails past review as a load-bearing ontological claim. Also silently excludes everyone who holds the right *through others* (children, IDD, seniors, wards). | Frame the high-autonomy tier as **community-grounded** (e.g. *node-stewardship standing*), not *self-sovereign*. Key-location is a mechanical fact (`custodial` → on-device → always-on), not an ascent toward sovereignty. Sovereignty is the *adversary frame*, never the protocol's own apex. Confirm the corrected lexicon with the architect. See "Identity Ontology Guard." |
 
+**The conductor call you cannot cancel.** `HcClient::call_zome` has no timeout and no cancellation path — a caller-side timeout abandons the call while the conductor keeps executing it with nobody listening, still holding the read permit whose saturation the timeout was reacting to (the failure compounds exactly when it hurts most). Design every conductor-touching surface so the WORK is bounded before the call is made: batch externs carry their own in-wasm deadline and return partial results; callers size batches and interpret `unattempted`, never bolt a timeout onto the call. Edit-time rail: `conductor-call-is-uncancellable` in `elohim/elohim-storage/src/.epr-meta`.
+
 ---
 
 ## Identity & Transport-Identity Coherence
@@ -331,6 +359,8 @@ When the gate is complete, present the result in this format before proceeding t
 ### Entity: {EntityName}
 - **Classification**: Notarized (A) | Derived (A2) | Agent-Scoped (B) | Agent-Scoped+Attestation (B2) | Operational (C)
 - **Justification**: {1-2 sentences on why this classification}
+- **Head-Plane Cost Budget** (A/A2 only): {count at seed / at 1yr; the recurring cost formula joined; above ~500 items — bundling shape (composite root | A2-via-link | corpus digest) or operator sign-off}
+- **Network Stakes**: {stages this entity must behave under; which costs are stage-priceable vs floor-protected}
 - **Content Address Strategy**: Content-Derived (CID) | Agent-Scoped Composite | Slug/UUID
 - **Address Justification**: {Why this strategy, not the others}
 - **Source of Truth**: Holochain DHT | Private Source Chain | SQLite (operational)
