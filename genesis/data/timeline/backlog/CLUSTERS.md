@@ -29,7 +29,7 @@ the map, never the content.
 
 | Cluster | Subject | Rows | Groomed | Notes |
 |---|---|---|---|---|
-| [arch-dataplane-refactor-backlog](epr:arch-dataplane-refactor-backlog) | Dataplane *internal* reshaping — reuse, IoC seams, `p2p/mod.rs` decomposition chain (10→12→15), dev QoL | 15 | 2026-06-11 | Pre-dates this index; the cluster precedent |
+| [arch-dataplane-refactor-backlog](epr:arch-dataplane-refactor-backlog) | Dataplane *internal* reshaping — reuse, IoC seams, `p2p/mod.rs` decomposition chain (10→12→15), dev QoL, head-plane scale | 16 | 2026-08-08 | Row 16 (composite-root head class) added from the 2026-08-08 sync-cost evidence; p2p-design-gate mandatory on pickup |
 | [arch-workspace-discipline-backlog](epr:arch-workspace-discipline-backlog) | Crate/workspace discipline — lints, licensing, versioning, CI gates, extraction sequence (p2panda-derived) | 12 | 2026-08-06 | Items 2 + 9 need operator decisions (license policy; root LICENSE absent) |
 | [arch-dataplane-borrows-backlog](epr:arch-dataplane-borrows-backlog) | *Externally-sourced* dataplane mechanisms from surveys (Holepunch/SSB/p2panda/sedimentree) — each p2p-design-gated | 9 | 2026-08-07 | Sibling of refactor cluster: borrows vs reshaping |
 | [arch-confidentiality-plane-backlog](epr:arch-confidentiality-plane-backlog) | The unbuilt encryption layer (§3.13) — fail-closed classifier, KeyEnvelope, p2panda-encryption candidate, X25519 substrate, ciphertext relay | 7 | 2026-08-07 | #1 is immediate; #2's audit-check gates the design fork |
