@@ -2526,6 +2526,12 @@ mod tests {
     use super::*;
     use crate::p2p::reconcile_rails::GapCounts;
 
+    /// Serializes every test that calls [`record_reconcile_sweep`]: the
+    /// prometheus statics are process-global and `cargo test --lib` runs
+    /// multithreaded, so a set-then-assert on the actionable count gauge can
+    /// race another test's sweep publish without this guard.
+    static SWEEP_GAUGE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     /// A fully-healed, fully-measured sweep — the only shape that converges.
     fn healed_sweep() -> GapCounts {
         GapCounts {
@@ -2672,6 +2678,7 @@ mod tests {
 
     #[test]
     fn the_actionable_count_gauge_and_term_flag_publish_from_one_fold() {
+        let _guard = SWEEP_GAUGE_LOCK.lock().unwrap();
         // The CI quiesce gate's tolerance predicate reads the COUNT gauge; the
         // strict predicate reads the term FLAG. Both must come from the same
         // record_reconcile_sweep numbers or the gate's two modes can disagree
@@ -2751,6 +2758,7 @@ mod tests {
 
     #[test]
     fn register_all_idempotent_and_gathers_all_metrics() {
+        let _guard = SWEEP_GAUGE_LOCK.lock().unwrap();
         register_all();
         register_all(); // Once-guarded — must not panic or double-register.
 
