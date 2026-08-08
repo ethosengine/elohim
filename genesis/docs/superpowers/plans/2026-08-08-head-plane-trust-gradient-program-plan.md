@@ -66,6 +66,14 @@ binding on every task below:
 4. **`HcClient::call_zome` has no timeout and no cancellation** (`hc_client.rs:405`).
    A caller timeout leaves the conductor executing with nobody listening. The batch
    extern therefore carries its **own in-wasm deadline** and returns partial results.
+   *Qualified by the T13 spike (2026-08-08,
+   `genesis/docs/superpowers/specs/2026-08-08-conductor-call-deadline-capability-spike.md`):
+   the client API already declares a timeout (`CallZomeOptions::timeout`) but enforces
+   it client-side only — the deadline is a missing MESSAGE, not a missing concept; and
+   most slow-call cost is DB-permit queue-wait that IS cancellable-on-drop (tokio
+   semaphore permits return) — only the wasm body is non-interruptible. The in-wasm
+   deadline design above stands unchanged; the qualification reshapes the upstream
+   ask, not this sprint's tactic.*
 
 **Position on the uncancellable call (operator directive 2026-08-08): this is NOT a
 keystone constraint we design around forever.** A scheduling floor owned by an upstream
