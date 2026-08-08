@@ -118,6 +118,11 @@ pub mod shard_service;
 pub mod sharding;
 pub mod signals; // Official holochain_client wrapper with signing support
 pub mod signing; // ConductorSigningClient — EPR Phase 2B Task C.1 (imagodei sign_for_agent wrapper)
+
+// Trust-gradient seam (head-plane trust-gradient program, L5) — landed
+// INERT. See src/trust/mod.rs for the module map + the inert-landing
+// contract. PURE by design (stage.rs, pricer.rs); no diesel/tokio/env.
+pub mod trust;
 pub mod trust_service;
 pub mod view_fed_service;
 pub mod write_through; // Write-through flag state — EPR Phase 2B Task C.4 (4-layer override stack)

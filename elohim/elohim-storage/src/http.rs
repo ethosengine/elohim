@@ -5885,12 +5885,18 @@ impl HttpServer {
                                     None,
                                     crate::p2p::trust_cache::PeerTrustCache::new(),
                                 );
+                                // T6 (head-plane trust-gradient program): thread the
+                                // inert landing shape. This does NOT restructure the
+                                // per-request EprService construction above — that
+                                // fix (process-lifetime memo store) is T7.
+                                let trust = crate::trust::TrustGradient::inert();
                                 if let Err(reason) = reach_gate.authorize_reach_for_human(
                                     &mut conn,
                                     &app_ctx,
                                     &view.reach,
                                     &human,
                                     content_id,
+                                    &trust,
                                 ) {
                                     return Ok(Response::builder()
                                         .status(StatusCode::FORBIDDEN)

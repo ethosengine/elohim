@@ -358,7 +358,8 @@ impl EprService {
         // path resolves by the reliable `humans.id` column and calls
         // `authorize_reach_for_human` directly. The tier arms live in ONE place.
         let (mut conn, app_ctx, human) = self.resolve_agent(agent_pubkey)?;
-        self.authorize_reach_for_human(&mut conn, &app_ctx, reach, &human, content_id)
+        let trust = crate::trust::TrustGradient::inert();
+        self.authorize_reach_for_human(&mut conn, &app_ctx, reach, &human, content_id, &trust)
     }
 
     /// Reach-authorization core operating on an ALREADY-RESOLVED requester
@@ -380,7 +381,17 @@ impl EprService {
         reach: &str,
         human: &crate::db::models::Human,
         content_id: &str,
+        trust: &crate::trust::TrustGradient<'_>,
     ) -> Result<(), String> {
+        // T6 (head-plane trust-gradient program): `trust` is threaded so
+        // every caller passes a real seam value, but this gate does not yet
+        // CONSULT it — the landing is INERT by construction. Every call site
+        // passes `TrustGradient::inert()`, which reproduces this function's
+        // pre-T6 behavior exactly (Bootstrap stage, InertPricer/FullChain,
+        // no memo). T9 wires the memo; T19 wires live standing. See
+        // genesis/docs/content/elohim-protocol/architecture/trust-as-efficiency-signal.md.
+        let _ = trust;
+
         match reach {
             "commons" | "public" => Ok(()),
 
@@ -782,6 +793,13 @@ mod tests {
         EprService::new(None, None, None, PeerTrustCache::new())
     }
 
+    /// T6: every `authorize_reach_for_human` test call site threads the
+    /// inert trust-gradient landing shape — see the crate-wide `rg
+    /// 'authorize_reach_for_human'` sweep in the T6 commit body.
+    fn inert_trust() -> crate::trust::TrustGradient<'static> {
+        crate::trust::TrustGradient::inert()
+    }
+
     fn mk_human(conn: &mut diesel::SqliteConnection, id: &str, agent_key: Option<&str>) {
         use diesel::RunQueryDsl;
         diesel::insert_or_ignore_into(crate::db::diesel_schema::humans::table)
@@ -842,7 +860,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(reach_svc()
-            .authorize_reach_for_human(&mut conn, &ctx, "commons", &h, "c-commons")
+            .authorize_reach_for_human(&mut conn, &ctx, "commons", &h, "c-commons", &inert_trust())
             .is_ok());
     }
 
@@ -863,13 +881,27 @@ mod tests {
             .unwrap();
         assert!(
             reach_svc()
-                .authorize_reach_for_human(&mut conn, &ctx, "private", &creator, "c-priv")
+                .authorize_reach_for_human(
+                    &mut conn,
+                    &ctx,
+                    "private",
+                    &creator,
+                    "c-priv",
+                    &inert_trust()
+                )
                 .is_ok(),
             "creator may read own private content"
         );
         assert!(
             reach_svc()
-                .authorize_reach_for_human(&mut conn, &ctx, "private", &other, "c-priv")
+                .authorize_reach_for_human(
+                    &mut conn,
+                    &ctx,
+                    "private",
+                    &other,
+                    "c-priv",
+                    &inert_trust()
+                )
                 .is_err(),
             "non-creator must be denied private content"
         );
@@ -894,7 +926,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(reach_svc()
-            .authorize_reach_for_human(&mut conn, &ctx, "self", &creator, "c-priv2")
+            .authorize_reach_for_human(&mut conn, &ctx, "self", &creator, "c-priv2", &inert_trust())
             .is_ok());
     }
 
@@ -913,7 +945,14 @@ mod tests {
             .unwrap();
         assert!(
             reach_svc()
-                .authorize_reach_for_human(&mut conn, &ctx, "intimate", &jessica, "love-map")
+                .authorize_reach_for_human(
+                    &mut conn,
+                    &ctx,
+                    "intimate",
+                    &jessica,
+                    "love-map",
+                    &inert_trust()
+                )
                 .is_err(),
             "unrelated human must be denied intimate content"
         );
@@ -930,7 +969,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(reach_svc()
-            .authorize_reach_for_human(&mut conn, &ctx, "garbage-tier", &h, "c-x")
+            .authorize_reach_for_human(&mut conn, &ctx, "garbage-tier", &h, "c-x", &inert_trust())
             .is_err());
     }
 
