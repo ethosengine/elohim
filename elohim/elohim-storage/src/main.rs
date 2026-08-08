@@ -481,6 +481,39 @@ async fn async_main(
     }
     elohim_storage::config::set_head_corpus_digest_enabled(config.head_corpus_digest_enabled);
 
+    // T9 (head-plane trust-gradient program): verification-memo READS,
+    // default OFF. Until T19 wires `invalidate_for_subject` to a real
+    // standing-change signal, TTL is the only staleness bound a cached
+    // `authorize_reach_for_human` ALLOW/DENY has — so this stays an explicit
+    // operator opt-in, not a build-cycle flip. The store itself (T7) and its
+    // LRU bound are unconditional; only CONSULTING it is gated here.
+    if let Ok(v) = std::env::var("ELOHIM_TRUST_MEMO_READS") {
+        config.trust_memo_reads_enabled = matches!(
+            v.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes" | "on"
+        );
+    }
+    if config.trust_memo_reads_enabled {
+        tracing::info!(
+            ttl_seconds = config.trust_memo_ttl_seconds,
+            "trust-memo reads are ENABLED for authorize_reach_for_human's familiar tier; \
+             TTL is the only staleness bound until T19 wires invalidate_for_subject"
+        );
+    }
+    elohim_storage::config::set_trust_memo_reads_enabled(config.trust_memo_reads_enabled);
+
+    if let Ok(v) = std::env::var("ELOHIM_TRUST_MEMO_TTL_SECONDS") {
+        match v.trim().parse::<u64>() {
+            Ok(n) => config.trust_memo_ttl_seconds = n,
+            _ => tracing::warn!(
+                value = %v,
+                default = config.trust_memo_ttl_seconds,
+                "ELOHIM_TRUST_MEMO_TTL_SECONDS is not a non-negative integer — keeping the default"
+            ),
+        }
+    }
+    elohim_storage::config::set_trust_memo_ttl_seconds(config.trust_memo_ttl_seconds);
+
     // F-B THROUGHPUT LEVER. Both knobs have an explicit OFF value that restores
     // the pre-F-B sweep exactly: fan-out 1 (sequential) and backoff 0 (contest
     // every candidate every sweep). An unparseable value leaves the default

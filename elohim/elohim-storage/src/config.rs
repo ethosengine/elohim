@@ -140,6 +140,58 @@ pub fn head_corpus_digest_enabled() -> bool {
     *HEAD_CORPUS_DIGEST_ENABLED.get().unwrap_or(&false)
 }
 
+/// Process-wide mirror of [`Config::trust_memo_reads_enabled`] (T9,
+/// head-plane trust-gradient program). `authorize_reach_for_human`'s
+/// `familiar`-tier arm gates memo consultation on this flag AND on the
+/// caller's `TrustGradient` carrying a store — see
+/// `epr_service::trust_memo_reads_param` for the pure AND-gate (deliberately
+/// NOT tested by flipping this `OnceLock`: like every other flag in this
+/// file, it is idempotent/first-call-wins, so a test that flips it would
+/// leak into every other test sharing the process).
+static TRUST_MEMO_READS_ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+/// Publish the trust-memo-reads switch. Idempotent; first call wins.
+pub fn set_trust_memo_reads_enabled(enabled: bool) {
+    let _ = TRUST_MEMO_READS_ENABLED.set(enabled);
+}
+
+/// May `authorize_reach_for_human` consult the verification-memo store to
+/// skip the `familiar`-tier stewards-times-collectives fan-out?
+///
+/// **Default FALSE.** Until T19 wires `invalidate_for_subject` to a real
+/// FeedbackSignal, TTL (`trust_memo_ttl_seconds`) and LRU eviction are the
+/// ONLY invalidation a memo hit has — a cached ALLOW/DENY can outlive a real
+/// standing change by up to the TTL window with nothing to notice early.
+/// Off, `authorize_reach_for_human` never touches the store even when one is
+/// wired, so behavior is byte-identical to before this flag existed.
+pub fn trust_memo_reads_enabled() -> bool {
+    *TRUST_MEMO_READS_ENABLED.get().unwrap_or(&false)
+}
+
+/// Process-wide mirror of [`Config::trust_memo_ttl_seconds`] (T9). Same
+/// `OnceLock` rationale as [`TRUST_MEMO_READS_ENABLED`].
+static TRUST_MEMO_TTL_SECONDS: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+
+/// Publish the trust-memo TTL backstop. Idempotent; first call wins.
+pub fn set_trust_memo_ttl_seconds(seconds: u64) {
+    let _ = TRUST_MEMO_TTL_SECONDS.set(seconds);
+}
+
+/// How long a `VerificationMemo` may be replayed before `authorize_reach_for_human`
+/// treats it as a miss and recomputes, regardless of `invalidate_for_subject`.
+///
+/// `0` disables replay entirely (every lookup is treated as stale, so a memo
+/// is always recorded but never consulted) — the same "0 is the OFF value"
+/// convention as this file's other backoff windows, not a special case.
+/// Default [`DEFAULT_TRUST_MEMO_TTL_SECONDS`] (300s): short enough that the
+/// pre-T19 gap (TTL/LRU are the only invalidation) is a bounded staleness
+/// window, not an indefinite one.
+pub fn trust_memo_ttl_seconds() -> u64 {
+    *TRUST_MEMO_TTL_SECONDS
+        .get()
+        .unwrap_or(&DEFAULT_TRUST_MEMO_TTL_SECONDS)
+}
+
 /// Process-wide mirror of [`Config::adopt_contest_fanout`]. Same rationale as
 /// [`CONTEST_TWO_WAY_DECLARED`]: the reconcile sweep carries no `Config`, and an
 /// env read on the hot path is the parallel-test-flake anti-pattern.
@@ -358,6 +410,16 @@ pub const DEFAULT_CONTEST_BACKOFF_SECONDS: u64 = 3600;
 /// human-scale event, not a sweep-scale one. Re-asking every hour for something
 /// that changes on a scale of days is the budget waste this window closes.
 pub const DEFAULT_EVIDENCE_ABSENT_BACKOFF_SECONDS: u64 = 86_400;
+
+/// Default verification-memo TTL backstop: 300s (T9, head-plane
+/// trust-gradient program).
+///
+/// Short on purpose: until T19 wires `invalidate_for_subject` to a real
+/// standing-change signal, this window IS the staleness bound on a cached
+/// `authorize_reach_for_human` ALLOW/DENY — 5 minutes caps how long a memo
+/// can disagree with ground truth to a duration an operator can reason
+/// about, rather than leaving it open-ended.
+pub const DEFAULT_TRUST_MEMO_TTL_SECONDS: u64 = 300;
 
 /// Configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -619,6 +681,26 @@ pub struct Config {
     /// from env `ELOHIM_HEAD_CORPUS_DIGEST`.
     #[serde(default)]
     pub head_corpus_digest_enabled: bool,
+
+    /// T9 head-plane trust-gradient program: may `authorize_reach_for_human`'s
+    /// `familiar`-tier arm consult the process-lifetime verification-memo
+    /// store (T7) instead of recomputing the stewards-times-collectives
+    /// fan-out every request?
+    ///
+    /// Default **false**: until T19 wires `invalidate_for_subject` to a real
+    /// standing-change signal, TTL (`trust_memo_ttl_seconds`) and LRU
+    /// eviction are the only invalidation a cached ALLOW/DENY has. Off, the
+    /// gate never touches the store — see `epr_service::trust_memo_reads_param`
+    /// for the exact (flag AND gradient-carries-store) condition. Loaded from
+    /// env `ELOHIM_TRUST_MEMO_READS`.
+    #[serde(default)]
+    pub trust_memo_reads_enabled: bool,
+
+    /// T9: how long (seconds) a `VerificationMemo` may be replayed before
+    /// `authorize_reach_for_human` treats it as a miss. `0` disables replay
+    /// (always stale). Loaded from env `ELOHIM_TRUST_MEMO_TTL_SECONDS`.
+    #[serde(default = "default_trust_memo_ttl_seconds")]
+    pub trust_memo_ttl_seconds: u64,
 
     /// F-B THROUGHPUT LEVER, half 1: how many adopt-before-author candidates the
     /// reconcile sweep processes CONCURRENTLY.
@@ -907,6 +989,10 @@ fn default_evidence_absent_backoff_seconds() -> u64 {
     DEFAULT_EVIDENCE_ABSENT_BACKOFF_SECONDS
 }
 
+fn default_trust_memo_ttl_seconds() -> u64 {
+    DEFAULT_TRUST_MEMO_TTL_SECONDS
+}
+
 fn default_heal_on_read_budget_ms() -> u64 {
     5000
 }
@@ -970,6 +1056,8 @@ impl Default for Config {
             contest_two_way_declared: default_true(),
             adopt_before_author: false,
             head_corpus_digest_enabled: false,
+            trust_memo_reads_enabled: false,
+            trust_memo_ttl_seconds: default_trust_memo_ttl_seconds(),
             adopt_contest_fanout: default_adopt_contest_fanout(),
             heal_resolve_fanout: default_heal_resolve_fanout(),
             heal_missing_backoff_seconds: default_heal_missing_backoff_seconds(),

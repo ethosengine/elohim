@@ -392,8 +392,36 @@ impl EprService {
         // path resolves by the reliable `humans.id` column and calls
         // `authorize_reach_for_human` directly. The tier arms live in ONE place.
         let (mut conn, app_ctx, human) = self.resolve_agent(agent_pubkey)?;
-        let trust = crate::trust::TrustGradient::inert();
+        // T9: this is the ONE call site `EprService` builds for its own use
+        // (the http.rs handler builds its own `TrustGradient` directly and is
+        // untouched by this task — see its own T9 breadcrumb comment). When
+        // reads are enabled AND a memo store is actually wired, pass a
+        // memo-carrying gradient; otherwise `inert()`, byte-identical to
+        // before this task.
+        let trust = match self.memo_store() {
+            Some(store) if crate::config::trust_memo_reads_enabled() => {
+                Self::memo_carrying_trust_gradient(store.as_ref())
+            }
+            _ => crate::trust::TrustGradient::inert(),
+        };
         self.authorize_reach_for_human(&mut conn, &app_ctx, reach, &human, content_id, &trust)
+    }
+
+    /// Build a `TrustGradient` identical to [`crate::trust::TrustGradient::inert`]
+    /// except that `memo` carries `memo_store` — without touching `trust::mod`
+    /// (T9's write-set is `trust/memo.rs` + this file + `config.rs`/`main.rs`).
+    /// `Bootstrap` stage + `InertPricer` are the exact values `inert()` uses;
+    /// only `memo` differs, so a caller that flips this on changes nothing
+    /// except whether the `familiar`-tier arm may consult the store.
+    fn memo_carrying_trust_gradient(
+        memo_store: &dyn crate::trust::VerificationMemoStore,
+    ) -> crate::trust::TrustGradient<'_> {
+        static PRICER: crate::trust::pricer::InertPricer = crate::trust::pricer::InertPricer;
+        crate::trust::TrustGradient {
+            stakes: crate::trust::stage::inert_stakes_resolver(),
+            pricer: &PRICER,
+            memo: Some(memo_store),
+        }
     }
 
     /// Reach-authorization core operating on an ALREADY-RESOLVED requester
@@ -417,14 +445,16 @@ impl EprService {
         content_id: &str,
         trust: &crate::trust::TrustGradient<'_>,
     ) -> Result<(), String> {
-        // T6 (head-plane trust-gradient program): `trust` is threaded so
-        // every caller passes a real seam value, but this gate does not yet
-        // CONSULT it — the landing is INERT by construction. Every call site
-        // passes `TrustGradient::inert()`, which reproduces this function's
-        // pre-T6 behavior exactly (Bootstrap stage, InertPricer/FullChain,
-        // no memo). T9 wires the memo; T19 wires live standing. See
+        // T6 (head-plane trust-gradient program) landed `trust` INERT by
+        // construction; T9 makes the `familiar` arm below the first live
+        // consumer of `trust.memo` (behind `config::trust_memo_reads_enabled`
+        // — see `trust_memo_reads_param`). Every OTHER arm still ignores
+        // `trust` entirely, and the `familiar` arm ignores it too whenever
+        // the gate is closed — `TrustGradient::inert()` (every caller except
+        // `check_reach_authorization`'s own memo-carrying construction)
+        // reproduces this function's pre-T6 behavior exactly. T19 wires live
+        // standing. See
         // genesis/docs/content/elohim-protocol/architecture/trust-as-efficiency-signal.md.
-        let _ = trust;
 
         match reach {
             "commons" | "public" => Ok(()),
@@ -445,32 +475,18 @@ impl EprService {
             }
 
             "familiar" => {
-                let steward_human_ids = self.get_steward_human_ids(conn, app_ctx, content_id)?;
-
-                let participations =
-                    crate::db::collectives::get_participations_for_human(conn, app_ctx, &human.id)
-                        .map_err(|e| format!("Participation lookup failed: {}", e))?;
-
-                for participation in &participations {
-                    if participation.consent_state != "consented" {
-                        continue;
-                    }
-                    let members = crate::db::collectives::get_participants_of_collective(
-                        conn,
-                        app_ctx,
-                        &participation.collective_id,
-                    )
-                    .map_err(|e| format!("Members lookup failed: {}", e))?;
-
-                    if members
-                        .iter()
-                        .any(|m| steward_human_ids.contains(&m.human_id))
-                    {
-                        return Ok(());
-                    }
-                }
-
-                Err("No shared collective with content steward".to_string())
+                let memo_active = trust_memo_reads_param(
+                    crate::config::trust_memo_reads_enabled(),
+                    trust.memo.is_some(),
+                );
+                self.authorize_familiar_tier(
+                    conn,
+                    app_ctx,
+                    human,
+                    content_id,
+                    trust.memo,
+                    memo_active,
+                )
             }
 
             "trusted" => {
@@ -611,6 +627,178 @@ impl EprService {
 
         Ok(presences.into_iter().filter_map(|p| p.steward_id).collect())
     }
+
+    /// The `familiar`-tier reach gate, gated by `memo_active` (the caller has
+    /// already combined `config::trust_memo_reads_enabled()` with whether the
+    /// `TrustGradient` carries a store — [`trust_memo_reads_param`]). Split
+    /// out of [`Self::authorize_reach_for_human`] so unit tests can drive the
+    /// memo path directly with an explicit bool, never by flipping the
+    /// process-wide `OnceLock` config flag (that flag is idempotent/
+    /// first-call-wins like every other one in `config.rs` — a test that set
+    /// it would leak into every other test sharing the process).
+    ///
+    /// HIT (a fresh memo — see [`Self::verification_memo_is_fresh`]) returns
+    /// the memoized [`crate::trust::memo::VerificationOutcome`] directly,
+    /// skipping the stewards-times-collectives fan-out entirely. A MISS (no
+    /// memo, or a stale one) runs the fan-out and — when `memo_active` — records
+    /// the result before returning it.
+    fn authorize_familiar_tier(
+        &self,
+        conn: &mut diesel::SqliteConnection,
+        app_ctx: &AppContext,
+        human: &crate::db::models::Human,
+        content_id: &str,
+        memo: Option<&dyn crate::trust::VerificationMemoStore>,
+        memo_active: bool,
+    ) -> Result<(), String> {
+        let evaluator_agent_cid = human
+            .agent_pub_key
+            .clone()
+            .unwrap_or_else(|| human.id.clone());
+
+        if memo_active {
+            if let Some(hit) = memo.and_then(|store| store.get(content_id, &evaluator_agent_cid)) {
+                if Self::verification_memo_is_fresh(&hit) {
+                    return match hit.outcome {
+                        crate::trust::memo::VerificationOutcome::Authorized => Ok(()),
+                        crate::trust::memo::VerificationOutcome::Denied { reason } => Err(reason),
+                    };
+                }
+                // Past the TTL backstop (or, until T19, simply stale in a way
+                // nothing told us about early): fall through and recompute
+                // exactly as a miss would, then re-record below with a fresh
+                // `verified_at`.
+            }
+        }
+
+        let steward_human_ids = self.get_steward_human_ids(conn, app_ctx, content_id)?;
+
+        let participations =
+            crate::db::collectives::get_participations_for_human(conn, app_ctx, &human.id)
+                .map_err(|e| format!("Participation lookup failed: {}", e))?;
+
+        let mut result = Err("No shared collective with content steward".to_string());
+        for participation in &participations {
+            if participation.consent_state != "consented" {
+                continue;
+            }
+            let members = crate::db::collectives::get_participants_of_collective(
+                conn,
+                app_ctx,
+                &participation.collective_id,
+            )
+            .map_err(|e| format!("Members lookup failed: {}", e))?;
+
+            if members
+                .iter()
+                .any(|m| steward_human_ids.contains(&m.human_id))
+            {
+                result = Ok(());
+                break;
+            }
+        }
+
+        if memo_active {
+            if let Some(store) = memo {
+                let outcome = match &result {
+                    Ok(()) => crate::trust::memo::VerificationOutcome::Authorized,
+                    Err(reason) => crate::trust::memo::VerificationOutcome::Denied {
+                        reason: reason.clone(),
+                    },
+                };
+                store.put(
+                    content_id,
+                    &evaluator_agent_cid,
+                    crate::trust::VerificationMemo {
+                        verifier_agent_cid: REACH_AUTHORIZATION_MEMO_VERIFIER.to_string(),
+                        verified_at: chrono::Utc::now(),
+                        lens_manifest_cid: REACH_AUTHORIZATION_MEMO_LENS.to_string(),
+                        depth: crate::trust::pricer::VerificationDepth::FullChain,
+                        epoch: crate::trust::snapshot::TrustEpoch(
+                            REACH_AUTHORIZATION_MEMO_EPOCH.to_string(),
+                        ),
+                        edge_set_digest: REACH_AUTHORIZATION_MEMO_EDGE_DIGEST.to_string(),
+                        outcome,
+                    },
+                );
+            }
+        }
+
+        result
+    }
+
+    /// TTL freshness check for a memo consulted by [`Self::authorize_familiar_tier`].
+    /// Thin wrapper over [`Self::verification_memo_is_fresh_param`] reading the
+    /// REAL config TTL and wall clock — kept separate so tests drive the pure
+    /// form with explicit `now`/`ttl` values instead of sleeping or touching
+    /// the process-wide TTL `OnceLock`.
+    fn verification_memo_is_fresh(memo: &crate::trust::VerificationMemo) -> bool {
+        Self::verification_memo_is_fresh_param(
+            memo.verified_at,
+            crate::config::trust_memo_ttl_seconds(),
+            chrono::Utc::now(),
+        )
+    }
+
+    /// Pure TTL check: is `verified_at` within `ttl_seconds` of `now`?
+    /// `ttl_seconds == 0` means "TTL disabled" — the same "0 is the OFF
+    /// value" convention `config.rs` uses for its other backoff windows —
+    /// which here means every memo is always treated as stale (recorded,
+    /// never replayed), not that staleness never applies.
+    fn verification_memo_is_fresh_param(
+        verified_at: chrono::DateTime<chrono::Utc>,
+        ttl_seconds: u64,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> bool {
+        if ttl_seconds == 0 {
+            return false;
+        }
+        let age = now.signed_duration_since(verified_at);
+        age < chrono::Duration::seconds(ttl_seconds as i64)
+    }
+
+    /// T19 seam: the `standing_projector` FeedbackSignal handler calls this
+    /// after a signal invalidates a subject's cached trust position, so the
+    /// NEXT `authorize_reach_for_human` call recomputes instead of replaying
+    /// a memo that predates the signal. Until T19 lands, nothing calls this
+    /// — TTL (`config::trust_memo_ttl_seconds`) and LRU eviction are the only
+    /// invalidation a memo has. No-op when no memo store is wired.
+    ///
+    /// T19 CALL SITE: wire this into the FeedbackSignal handler once it
+    /// exists, keyed on the subject the signal names.
+    pub fn invalidate_verification_memo_for_subject(&self, subject_cid: &str) {
+        if let Some(store) = self.memo_store() {
+            store.invalidate_for_subject(subject_cid);
+        }
+    }
+}
+
+/// Descriptive verifier identity recorded on every `VerificationMemo` minted
+/// by [`EprService::authorize_familiar_tier`]. `EprService` carries no
+/// self-identity today (that thread lives on `P2PNode::config.self_cid`, a
+/// different struct — see this crate's "Identity & Transport-Identity
+/// Coherence" doc) — this marker is honest about that gap rather than
+/// fabricating a per-node cid. Purely descriptive: no code path compares
+/// against it.
+const REACH_AUTHORIZATION_MEMO_VERIFIER: &str = "epr-service:authorize-reach-for-human";
+
+/// T9's `familiar`-tier memo consumer does not mint or verify a
+/// [`crate::trust::snapshot::HeadSetSnapshot`] (T8's mechanism) — TTL
+/// (`config::trust_memo_ttl_seconds`) is its only staleness gate. This
+/// sentinel lens/epoch/edge-digest triple marks "not backed by a snapshot" so
+/// a future snapshot-aware consumer can tell these memos apart from ones
+/// minted against a real epoch, without adding an `Option` to the type.
+const REACH_AUTHORIZATION_MEMO_LENS: &str = "reach-authorization:unlensed";
+const REACH_AUTHORIZATION_MEMO_EPOCH: &str = "reach-authorization:unscoped";
+const REACH_AUTHORIZATION_MEMO_EDGE_DIGEST: &str = "reach-authorization:no-snapshot";
+
+/// Pure AND-gate: memo consultation requires BOTH the config flag AND a
+/// wired store on the caller's `TrustGradient`. Mirrors
+/// `services::head_adoption::adopt_before_author_param` — a pure `_param`
+/// function so tests can drive both branches directly without touching the
+/// process-wide `OnceLock` behind `config::trust_memo_reads_enabled`.
+pub fn trust_memo_reads_param(config_flag_enabled: bool, gradient_carries_store: bool) -> bool {
+    config_flag_enabled && gradient_carries_store
 }
 
 /// Map a reach-level string to its ordered index. `commons`/`public` is the
@@ -757,6 +945,7 @@ pub fn check_prerequisite_mastery(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::trust::VerificationMemoStore as _;
 
     #[test]
     fn reach_level_index_orders_tiers() {
@@ -818,6 +1007,7 @@ mod tests {
             depth: crate::trust::VerificationDepth::FullChain,
             epoch: crate::trust::TrustEpoch("edge-set-token".to_string()),
             edge_set_digest: "sha256-deadbeef".to_string(),
+            outcome: crate::trust::memo::VerificationOutcome::Authorized,
         };
 
         // Write through svc_a's handle...
@@ -1068,6 +1258,395 @@ mod tests {
         assert!(reach_svc()
             .authorize_reach_for_human(&mut conn, &ctx, "garbage-tier", &h, "c-x", &inert_trust())
             .is_err());
+    }
+
+    // ---- T9: verification-memo consumption in the `familiar` tier ----
+    //
+    // These tests never call `config::set_trust_memo_reads_enabled` or
+    // `config::set_trust_memo_ttl_seconds` — those `OnceLock`s are
+    // idempotent/first-call-wins for the whole test binary (same rationale
+    // as every other flag in `config.rs`), so flipping one here would leak
+    // into every other test sharing the process. Instead:
+    // - the AND-gate and TTL check are proven as PURE functions
+    //   (`trust_memo_reads_param`, `verification_memo_is_fresh_param`);
+    // - the hit/miss/TTL/invalidate/eviction behavior is proven by calling
+    //   `authorize_familiar_tier` directly with an explicit `memo_active`,
+    //   which is exactly what the config-flag-reading production code path
+    //   (`authorize_reach_for_human`'s `familiar` arm) computes before
+    //   delegating to it;
+    // - ONLY the flag-off byte-identical test calls the public
+    //   `authorize_reach_for_human` entry point — safe because it never sets
+    //   the flag, so it observes the untouched default (false) regardless of
+    //   test execution order.
+
+    #[test]
+    fn trust_memo_reads_param_requires_both_conditions() {
+        assert!(trust_memo_reads_param(true, true));
+        assert!(!trust_memo_reads_param(false, true));
+        assert!(!trust_memo_reads_param(true, false));
+        assert!(!trust_memo_reads_param(false, false));
+    }
+
+    #[test]
+    fn verification_memo_is_fresh_param_within_ttl_is_fresh() {
+        let now = chrono::Utc::now();
+        let verified_at = now - chrono::Duration::seconds(100);
+        assert!(EprService::verification_memo_is_fresh_param(
+            verified_at,
+            300,
+            now
+        ));
+    }
+
+    #[test]
+    fn verification_memo_is_fresh_param_past_ttl_is_stale() {
+        let now = chrono::Utc::now();
+        let verified_at = now - chrono::Duration::seconds(301);
+        assert!(!EprService::verification_memo_is_fresh_param(
+            verified_at,
+            300,
+            now
+        ));
+    }
+
+    #[test]
+    fn verification_memo_is_fresh_param_zero_ttl_is_always_stale() {
+        let now = chrono::Utc::now();
+        // Even a memo verified this instant is stale when TTL is disabled.
+        assert!(!EprService::verification_memo_is_fresh_param(now, 0, now));
+    }
+
+    fn fresh_memo(
+        outcome: crate::trust::memo::VerificationOutcome,
+    ) -> crate::trust::VerificationMemo {
+        crate::trust::VerificationMemo {
+            verifier_agent_cid: "test-verifier".to_string(),
+            verified_at: chrono::Utc::now(),
+            lens_manifest_cid: "test-lens".to_string(),
+            depth: crate::trust::VerificationDepth::FullChain,
+            epoch: crate::trust::TrustEpoch("test-epoch".to_string()),
+            edge_set_digest: "test-edge-digest".to_string(),
+            outcome,
+        }
+    }
+
+    /// Counts `get`/`put` calls so the flag-off test can assert the store is
+    /// NEVER touched, not merely that the observable `Result` matches.
+    struct CountingMemoStore {
+        inner: crate::trust::InMemoryVerificationMemoStore,
+        get_calls: std::sync::atomic::AtomicUsize,
+        put_calls: std::sync::atomic::AtomicUsize,
+    }
+
+    impl CountingMemoStore {
+        fn new() -> Self {
+            Self {
+                inner: crate::trust::InMemoryVerificationMemoStore::new(),
+                get_calls: std::sync::atomic::AtomicUsize::new(0),
+                put_calls: std::sync::atomic::AtomicUsize::new(0),
+            }
+        }
+
+        fn get_call_count(&self) -> usize {
+            self.get_calls.load(std::sync::atomic::Ordering::SeqCst)
+        }
+
+        fn put_call_count(&self) -> usize {
+            self.put_calls.load(std::sync::atomic::Ordering::SeqCst)
+        }
+    }
+
+    impl crate::trust::VerificationMemoStore for CountingMemoStore {
+        fn get(
+            &self,
+            subject_cid: &str,
+            evaluator_agent_cid: &str,
+        ) -> Option<crate::trust::VerificationMemo> {
+            self.get_calls
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.inner.get(subject_cid, evaluator_agent_cid)
+        }
+
+        fn put(
+            &self,
+            subject_cid: &str,
+            evaluator_agent_cid: &str,
+            memo: crate::trust::VerificationMemo,
+        ) {
+            self.put_calls
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.inner.put(subject_cid, evaluator_agent_cid, memo);
+        }
+
+        fn invalidate_for_subject(&self, subject_cid: &str) {
+            self.inner.invalidate_for_subject(subject_cid);
+        }
+    }
+
+    /// Flag-off ⇒ byte-identical to pre-T9: even with a REAL store wired on
+    /// the `TrustGradient`, `authorize_reach_for_human`'s `familiar` arm must
+    /// never call `get` or `put` while `config::trust_memo_reads_enabled()`
+    /// reads its untouched default (false), and the returned `Result` must
+    /// match what the fan-out alone (no memo involved) produces — denied,
+    /// since no collective/steward fixture exists.
+    #[test]
+    fn familiar_tier_flag_off_never_touches_memo_store_even_when_wired() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().unwrap();
+        let ctx = AppContext::new("lamad");
+        mk_human(&mut conn, "human-flagoff", Some("uhCAk-flagoff"));
+        let human = crate::db::humans::get_human_by_id(&mut conn, "human-flagoff")
+            .unwrap()
+            .unwrap();
+
+        let store = CountingMemoStore::new();
+        let pricer = crate::trust::pricer::InertPricer;
+        let trust = crate::trust::TrustGradient {
+            stakes: crate::trust::stage::inert_stakes_resolver(),
+            pricer: &pricer,
+            memo: Some(&store as &dyn crate::trust::VerificationMemoStore),
+        };
+
+        let result = reach_svc().authorize_reach_for_human(
+            &mut conn,
+            &ctx,
+            "familiar",
+            &human,
+            "c-flagoff",
+            &trust,
+        );
+
+        assert!(
+            result.is_err(),
+            "byte-identical to pre-T9: no collective ⇒ denied"
+        );
+        assert_eq!(
+            store.get_call_count(),
+            0,
+            "flag-off must never call store.get"
+        );
+        assert_eq!(
+            store.put_call_count(),
+            0,
+            "flag-off must never call store.put"
+        );
+    }
+
+    /// A fresh HIT returns the memoized outcome directly, WITHOUT running the
+    /// stewards-times-collectives fan-out — proven by seeding an Authorized
+    /// memo where ground truth (no collective/steward fixture at all) would
+    /// deny if the fan-out actually ran.
+    #[test]
+    fn familiar_tier_memo_hit_skips_fanout_and_returns_cached_outcome() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().unwrap();
+        let ctx = AppContext::new("lamad");
+        mk_human(&mut conn, "human-hit", Some("uhCAk-hit"));
+        let human = crate::db::humans::get_human_by_id(&mut conn, "human-hit")
+            .unwrap()
+            .unwrap();
+
+        let store = crate::trust::InMemoryVerificationMemoStore::new();
+        store.put(
+            "c-hit",
+            "uhCAk-hit",
+            fresh_memo(crate::trust::memo::VerificationOutcome::Authorized),
+        );
+
+        let svc = reach_svc();
+        let result = svc.authorize_familiar_tier(
+            &mut conn,
+            &ctx,
+            &human,
+            "c-hit",
+            Some(&store as &dyn crate::trust::VerificationMemoStore),
+            true,
+        );
+
+        assert!(
+            result.is_ok(),
+            "a fresh Authorized hit must short-circuit the fan-out, even \
+             though ground truth (no collective fixture) would deny"
+        );
+    }
+
+    /// A MISS runs the fan-out (denying, since no fixture grants access) AND
+    /// records the result so a later lookup would hit.
+    #[test]
+    fn familiar_tier_memo_miss_runs_fanout_and_records_result() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().unwrap();
+        let ctx = AppContext::new("lamad");
+        mk_human(&mut conn, "human-miss", Some("uhCAk-miss"));
+        let human = crate::db::humans::get_human_by_id(&mut conn, "human-miss")
+            .unwrap()
+            .unwrap();
+
+        let store = crate::trust::InMemoryVerificationMemoStore::new();
+        assert!(store.get("c-miss", "uhCAk-miss").is_none(), "sanity: empty");
+
+        let svc = reach_svc();
+        let result = svc.authorize_familiar_tier(
+            &mut conn,
+            &ctx,
+            &human,
+            "c-miss",
+            Some(&store as &dyn crate::trust::VerificationMemoStore),
+            true,
+        );
+
+        assert!(result.is_err(), "no collective fixture ⇒ denied");
+
+        let recorded = store
+            .get("c-miss", "uhCAk-miss")
+            .expect("a miss must record a memo");
+        match recorded.outcome {
+            crate::trust::memo::VerificationOutcome::Denied { .. } => {}
+            other => panic!("expected Denied, got {other:?}"),
+        }
+    }
+
+    /// A memo past the TTL backstop is treated as a miss: the fan-out runs
+    /// again (and, since it re-records, overwrites the stale entry with a
+    /// fresh one carrying ground truth).
+    #[test]
+    fn familiar_tier_stale_memo_forces_recompute() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().unwrap();
+        let ctx = AppContext::new("lamad");
+        mk_human(&mut conn, "human-stale", Some("uhCAk-stale"));
+        let human = crate::db::humans::get_human_by_id(&mut conn, "human-stale")
+            .unwrap()
+            .unwrap();
+
+        let store = crate::trust::InMemoryVerificationMemoStore::new();
+        // A WRONG cached Authorized memo, verified well past the default
+        // 300s TTL (never overridden by any test — see the module note).
+        let stale = crate::trust::VerificationMemo {
+            verified_at: chrono::Utc::now() - chrono::Duration::seconds(301),
+            ..fresh_memo(crate::trust::memo::VerificationOutcome::Authorized)
+        };
+        store.put("c-stale", "uhCAk-stale", stale);
+
+        let svc = reach_svc();
+        let result = svc.authorize_familiar_tier(
+            &mut conn,
+            &ctx,
+            &human,
+            "c-stale",
+            Some(&store as &dyn crate::trust::VerificationMemoStore),
+            true,
+        );
+
+        assert!(
+            result.is_err(),
+            "a stale memo must be ignored — ground truth (no fixture) denies"
+        );
+    }
+
+    /// [`EprService::invalidate_verification_memo_for_subject`] is the T19
+    /// seam: dropping a subject's memo forces the NEXT authorization to
+    /// recompute rather than replay a stale-but-not-yet-expired cache entry.
+    #[test]
+    fn invalidate_verification_memo_for_subject_forces_recompute() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().unwrap();
+        let ctx = AppContext::new("lamad");
+        mk_human(&mut conn, "human-invalidate", Some("uhCAk-invalidate"));
+        let human = crate::db::humans::get_human_by_id(&mut conn, "human-invalidate")
+            .unwrap()
+            .unwrap();
+
+        let store: Arc<dyn crate::trust::VerificationMemoStore> =
+            Arc::new(crate::trust::InMemoryVerificationMemoStore::new());
+        store.put(
+            "c-invalidate",
+            "uhCAk-invalidate",
+            fresh_memo(crate::trust::memo::VerificationOutcome::Authorized),
+        );
+
+        let svc = reach_svc().with_memo_store(Some(store.clone()));
+
+        // HIT: the (WRONG, but fresh) cached Authorized memo short-circuits
+        // the fan-out.
+        assert!(svc
+            .authorize_familiar_tier(
+                &mut conn,
+                &ctx,
+                &human,
+                "c-invalidate",
+                Some(store.as_ref()),
+                true,
+            )
+            .is_ok());
+
+        svc.invalidate_verification_memo_for_subject("c-invalidate");
+
+        // Post-invalidate: the cache is empty for this subject, forcing the
+        // real fan-out, which correctly denies (no fixture grants access).
+        assert!(svc
+            .authorize_familiar_tier(
+                &mut conn,
+                &ctx,
+                &human,
+                "c-invalidate",
+                Some(store.as_ref()),
+                true,
+            )
+            .is_err());
+    }
+
+    #[test]
+    fn invalidate_verification_memo_for_subject_is_noop_without_a_store() {
+        // Must not panic when no memo store is wired.
+        reach_svc().invalidate_verification_memo_for_subject("no-store-wired");
+    }
+
+    /// LRU eviction (the operator's T7/hardening bound) falls back to full
+    /// verification exactly like a TTL-expired memo: evicting a WRONG cached
+    /// Authorized entry and then calling again must ignore it and recompute.
+    #[test]
+    fn familiar_tier_eviction_falls_back_to_full_verification() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().unwrap();
+        let ctx = AppContext::new("lamad");
+        mk_human(&mut conn, "human-evict", Some("uhCAk-evict"));
+        let human = crate::db::humans::get_human_by_id(&mut conn, "human-evict")
+            .unwrap()
+            .unwrap();
+
+        let store = crate::trust::InMemoryVerificationMemoStore::with_capacity(1);
+        store.put(
+            "c-evict",
+            "uhCAk-evict",
+            fresh_memo(crate::trust::memo::VerificationOutcome::Authorized),
+        );
+        // Capacity 1: this second put evicts the first (LRU).
+        store.put(
+            "c-other",
+            "uhCAk-other",
+            fresh_memo(crate::trust::memo::VerificationOutcome::Authorized),
+        );
+        assert!(
+            store.get("c-evict", "uhCAk-evict").is_none(),
+            "sanity: capacity-1 store evicted the first entry"
+        );
+
+        let svc = reach_svc();
+        let result = svc.authorize_familiar_tier(
+            &mut conn,
+            &ctx,
+            &human,
+            "c-evict",
+            Some(&store as &dyn crate::trust::VerificationMemoStore),
+            true,
+        );
+
+        assert!(
+            result.is_err(),
+            "eviction must fall back to full verification, not a stale hit \
+             (which does not exist any more) or a silent allow"
+        );
     }
 
     // ---- Prerequisite-mastery access gate (PREREQUISITE edges + content_mastery) ----
