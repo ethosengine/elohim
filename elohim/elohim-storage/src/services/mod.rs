@@ -68,6 +68,7 @@ pub mod gossip_flood;
 pub mod governance_health;
 pub mod hazard;
 pub mod head_adoption; // adopt-before-author — consult the substrate for an existing canonical head BEFORE minting a local root
+pub mod head_batch_resolver; // L1 — batched head-plane reads (round-trip collapse at flat read-permit cost; caps and concurrency never rise)
 pub mod heal_backoff; // drain lever 2 — replay a known conductor-missing answer instead of re-paying for it (bounded, always-expiring)
 pub mod holochain_humans_replayer;
 pub mod household_backfill;

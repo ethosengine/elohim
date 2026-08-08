@@ -16,8 +16,8 @@
 
 use lazy_static::lazy_static;
 use prometheus::{
-    Encoder, GaugeVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec, Opts, Registry,
-    TextEncoder,
+    Encoder, GaugeVec, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGauge,
+    IntGaugeVec, Opts, Registry, TextEncoder,
 };
 use std::sync::Once;
 
@@ -1235,6 +1235,102 @@ lazy_static! {
         &["kind"],
     )
     .unwrap();
+
+    // ── C8: head-plane BATCH externs (L1, head-plane trust-gradient program) ──
+    //
+    // The five series below make the round-trip collapse CHECKABLE rather than
+    // asserted. Read them together:
+    //
+    //   ids_total / calls_total  = the actual batch yield (the whole claim).
+    //   unattempted_total        = ids the coordinator never started. Rising with
+    //                              a `budget_exhausted` stop reason means the
+    //                              in-wasm deadline is binding; rising with
+    //                              `shared_failure` means the conductor is
+    //                              backpressured and the AIMD controller should
+    //                              already be shrinking `batch_size`.
+    //   queue_wait_ms            = observed RTT MINUS the extern's in-wasm time.
+    //                              THE probe that decides whether the conductor
+    //                              -fork call-deadline patch stays warranted: if
+    //                              this stays small while quiesce falls, the
+    //                              scheduling floor is not the binding cost.
+    //   batch_size               = the AIMD controller's current ask. adam (WAN)
+    //                              converging smaller than matthew (LAN) under
+    //                              the SAME constants is the heterogeneity
+    //                              preservation the design promised.
+
+    /// One batch conductor round-trip. label: extern_name, outcome.
+    pub static ref HEAD_BATCH_CALLS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_head_batch_calls_total",
+            "Batched head-plane conductor round-trips, by extern and outcome.",
+        ),
+        &["extern_name", "outcome"],
+    )
+    .unwrap();
+
+    /// Ids carried by those round-trips. Divided by `calls_total` this IS the
+    /// yield the whole L1 lever exists to raise. label: extern_name.
+    pub static ref HEAD_BATCH_IDS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_head_batch_ids_total",
+            "Ids carried by batched head-plane calls, by extern.",
+        ),
+        &["extern_name"],
+    )
+    .unwrap();
+
+    /// Ids the coordinator NEVER STARTED. Not failures — every one of these went
+    /// back to `pending`. label: extern_name, stop_reason.
+    pub static ref HEAD_BATCH_UNATTEMPTED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_head_batch_unattempted_total",
+            "Ids a batch call never started (ceiling, deadline, or a shared failure's stop \
+             point). NOT failures — these are returned to pending.",
+        ),
+        &["extern_name", "stop_reason"],
+    )
+    .unwrap();
+
+    /// Observed round-trip MINUS the extern's own in-wasm `elapsed_ms`: the time
+    /// a batch call spent queued for a conductor DB read permit rather than doing
+    /// work. Buckets span the sub-millisecond (healthy LAN) to the 10s
+    /// `ACQUIRE_TIMEOUT_MS` ceiling (a fully saturated read pool).
+    pub static ref HEAD_BATCH_QUEUE_WAIT_MS: HistogramVec = HistogramVec::new(
+        HistogramOpts::new(
+            "elohim_head_batch_queue_wait_ms",
+            "Conductor queue-wait per batch call in milliseconds (observed RTT minus in-wasm \
+             elapsed_ms).",
+        )
+        .buckets(vec![
+            1.0, 5.0, 25.0, 100.0, 250.0, 500.0, 1_000.0, 2_000.0, 4_000.0, 8_000.0, 15_000.0,
+        ]),
+        &["extern_name"],
+    )
+    .unwrap();
+
+    /// The AIMD controller's CURRENT batch size. label: extern_name.
+    pub static ref HEAD_BATCH_SIZE: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_head_batch_size",
+            "Current adaptive batch size the head-plane sweep asks for (AIMD).",
+        ),
+        &["extern_name"],
+    )
+    .unwrap();
+
+    /// Single-id fallbacks taken because a conductor cannot serve the batch
+    /// externs. label: why = "unknown_function" | "schema_version_mismatch" |
+    /// "undecodable_output". Expected NON-ZERO before the coordinator hot-swap
+    /// lands, and expected to STOP once it has — a series that keeps ticking
+    /// after the swap means some pod never got it.
+    pub static ref HEAD_BATCH_FALLBACK: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_head_batch_fallback_total",
+            "Single-id fallbacks taken because the conductor cannot serve the batch externs.",
+        ),
+        &["why"],
+    )
+    .unwrap();
 }
 
 /// Register every toolkit collector into [`REGISTRY`]. Idempotent (guarded by a
@@ -1492,7 +1588,63 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(ACQUISITION_PINS_RETIRED.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_PIN_RETIREMENTS.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_IN_SYNC_TOTAL.clone()));
+        let _ = REGISTRY.register(Box::new(HEAD_BATCH_CALLS.clone()));
+        let _ = REGISTRY.register(Box::new(HEAD_BATCH_IDS.clone()));
+        let _ = REGISTRY.register(Box::new(HEAD_BATCH_UNATTEMPTED.clone()));
+        let _ = REGISTRY.register(Box::new(HEAD_BATCH_QUEUE_WAIT_MS.clone()));
+        let _ = REGISTRY.register(Box::new(HEAD_BATCH_SIZE.clone()));
+        let _ = REGISTRY.register(Box::new(HEAD_BATCH_FALLBACK.clone()));
     });
+}
+
+// ── Head-plane batch typed setters (callers never import `prometheus`) ───────
+
+/// Count ONE batch conductor round-trip and the ids it carried, and record the
+/// queue-wait it observed.
+///
+/// **Concerns:** C8 — every call is counted, including the ones that failed, so
+/// the yield ratio (`ids_total / calls_total`) has an honest denominator.
+///
+/// `outcome` is a closed vocabulary supplied by the caller:
+/// `"answered"` | `"call_failed"` | `"fallback"`.
+pub fn observe_head_batch_call(
+    extern_name: &'static str,
+    outcome: &str,
+    ids: usize,
+    queue_wait: std::time::Duration,
+) {
+    HEAD_BATCH_CALLS
+        .with_label_values(&[extern_name, outcome])
+        .inc();
+    HEAD_BATCH_IDS
+        .with_label_values(&[extern_name])
+        .inc_by(ids as u64);
+    HEAD_BATCH_QUEUE_WAIT_MS
+        .with_label_values(&[extern_name])
+        .observe(queue_wait.as_secs_f64() * 1_000.0);
+}
+
+/// Count ids a batch call never started, tagged by WHY admission stopped.
+/// These are returned to `pending`; none of them is a failure.
+pub fn add_head_batch_unattempted(extern_name: &'static str, stop_reason: &str, ids: usize) {
+    if ids == 0 {
+        return;
+    }
+    HEAD_BATCH_UNATTEMPTED
+        .with_label_values(&[extern_name, stop_reason])
+        .inc_by(ids as u64);
+}
+
+/// Publish the AIMD controller's current ask.
+pub fn set_head_batch_size(extern_name: &'static str, size: usize) {
+    HEAD_BATCH_SIZE
+        .with_label_values(&[extern_name])
+        .set(size as i64);
+}
+
+/// Count a single-id fallback (the conductor cannot serve the batch externs).
+pub fn inc_head_batch_fallback(why: &str) {
+    HEAD_BATCH_FALLBACK.with_label_values(&[why]).inc();
 }
 
 /// Render the registry in Prometheus text exposition format (the `/metrics` body).
@@ -3059,6 +3211,47 @@ mod tests {
         assert!(text.contains("outcome=\"no_election\""), "{text}");
         assert!(text.contains("outcome=\"resolve_error\""), "{text}");
         assert!(text.contains("outcome=\"no_courier\""), "{text}");
+    }
+
+    #[test]
+    fn head_batch_series_register_and_increment() {
+        register_all();
+        observe_head_batch_call(
+            "resolve_content_heads_local",
+            "answered",
+            64,
+            std::time::Duration::from_millis(1_500),
+        );
+        observe_head_batch_call(
+            "resolve_canonical_elections",
+            "call_failed",
+            0,
+            std::time::Duration::ZERO,
+        );
+        add_head_batch_unattempted("resolve_content_heads_local", "budget_exhausted", 12);
+        set_head_batch_size("resolve_content_heads_local", 64);
+        inc_head_batch_fallback("unknown_function");
+
+        let text = gather_text();
+        assert!(text.contains("elohim_head_batch_calls_total"), "{text}");
+        assert!(text.contains("outcome=\"answered\""), "{text}");
+        assert!(text.contains("outcome=\"call_failed\""), "{text}");
+        assert!(text.contains("elohim_head_batch_ids_total"), "{text}");
+        assert!(
+            text.contains("elohim_head_batch_unattempted_total"),
+            "{text}"
+        );
+        assert!(text.contains("stop_reason=\"budget_exhausted\""), "{text}");
+        // The histogram is THE probe that decides whether the conductor-fork
+        // call-deadline patch stays warranted — a missing bucket series would
+        // make that question unanswerable.
+        assert!(
+            text.contains("elohim_head_batch_queue_wait_ms_bucket"),
+            "{text}"
+        );
+        assert!(text.contains("elohim_head_batch_size"), "{text}");
+        assert!(text.contains("elohim_head_batch_fallback_total"), "{text}");
+        assert!(text.contains("why=\"unknown_function\""), "{text}");
     }
 
     #[test]

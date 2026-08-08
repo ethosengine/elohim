@@ -645,6 +645,269 @@ pub async fn call_resolve_content_head_local(
     Ok(out)
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// BATCHED head-plane reads (T1b contract, head-plane trust-gradient program L1)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// These are the DECODE MIRRORS of `content_store`'s batch externs
+// (`resolve_content_heads_local`, `resolve_canonical_elections`). Field names,
+// variant names and serde casing MUST match the coordinator EXACTLY — the zome
+// source is the authority and
+// `tests::batch_wire_mirrors_decode_the_coordinator_shapes` pins it against
+// independently-declared replicas of the coordinator structs.
+//
+// SHAPE (revised by operator review 2026-08-08, superseding T1's first landing):
+//   schema_version: u16      — read FIRST; a mismatch is a fallback trigger
+//   attempted:      Vec<{ id, outcome: Resolved(Option<T>) | Failed{reason,phase} }>
+//   unattempted:    Vec<String>   — NEVER STARTED. Not failures. Ask again.
+//   stop_reason:    Option<BudgetExhausted|IdCeiling|SharedFailure(reason)>
+//   elapsed_ms:     u32           — IN-WASM wall time (not the round-trip)
+//
+// The one non-obvious consumer rule: `unattempted` is not evidence about an id
+// in ANY direction, and neither is a call-level `Err`. Both mean "ask again",
+// never "mark it failed" — see `services::head_batch_resolver`.
+
+/// Schema version this build's mirrors decode. A response carrying anything
+/// else is undecodable BY CONTRACT even if serde happens to accept it, and
+/// triggers the single-id fallback exactly once (see
+/// [`crate::services::head_batch_resolver`]).
+pub const BATCH_RESOLVE_SCHEMA_VERSION: u16 = 1;
+
+/// Caller-input wire shape shared by BOTH batch externs
+/// (`content_store::BatchResolveHeadsInput` / `BatchResolveElectionsInput` are
+/// two distinct coordinator types with one identical shape; one mirror is
+/// enough on the encode side and keeps the two call sites honest about being
+/// the same request).
+///
+/// `budget_ms` is the extern's IN-WASM deadline. `None` takes the
+/// coordinator's `BATCH_BUDGET_DEFAULT_MS`; any value is clamped coordinator-side
+/// to `BATCH_BUDGET_CEILING_MS`. `skip_serializing_if` keeps a `None` off the
+/// wire so the coordinator's `#[serde(default)]` sees an absent key.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BatchResolveInput {
+    pub ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget_ms: Option<u32>,
+}
+
+/// Mirror of `content_store::BatchFailureReason` — the typed per-item failure
+/// vocabulary (C14: never free-form text).
+///
+/// The CONTINUE/STOP disposition lives coordinator-side
+/// (`batch_failure_disposition`); what storage needs from the same vocabulary is
+/// a DIFFERENT question — does this failure count against the id, or is it
+/// backpressure that must return the id to pending? — answered by
+/// [`BatchFailureReason::is_backpressure`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BatchFailureReason {
+    /// A link resolved to a valid Content record whose own `id` was NOT the one
+    /// requested (poisoned/misrouted link). DETERMINISTIC.
+    WrongContentId,
+    /// The resolved action was not a Content entry at all. DETERMINISTIC.
+    RecordShape,
+    /// Conductor DB read-permit acquisition timed out — a SATURATED read pool.
+    /// Retryable backpressure, never evidence about the id.
+    PermitTimeout,
+    /// Network/transport-class failure from a delegated call. Backpressure.
+    Transport,
+    /// The conductor's own `sys_time()` host call failed. Backpressure.
+    ClockUnavailable,
+    /// Unrecognised error surface. CONSERVATIVE: treated as backpressure.
+    Unknown,
+}
+
+impl BatchFailureReason {
+    /// Is this failure a shared/conductor-wide backpressure condition rather
+    /// than a deterministic fact about the id?
+    ///
+    /// This is THE routing question for the reconcile arms. A deterministic
+    /// reason (the answer will not change if we ask again) may follow the arm's
+    /// existing failure accounting; a backpressure reason must return the id to
+    /// `pending` — marking it failed would burn `MAX_RETRIES` and poison the
+    /// `MissLedger` for a condition that says nothing at all about the id.
+    ///
+    /// Mirrors the coordinator's `batch_failure_disposition` split exactly
+    /// (Continue ⇔ deterministic, Stop ⇔ backpressure); pinned by
+    /// `tests::the_backpressure_split_matches_the_coordinator_disposition`.
+    pub fn is_backpressure(self) -> bool {
+        match self {
+            BatchFailureReason::WrongContentId | BatchFailureReason::RecordShape => false,
+            BatchFailureReason::PermitTimeout
+            | BatchFailureReason::Transport
+            | BatchFailureReason::ClockUnavailable
+            | BatchFailureReason::Unknown => true,
+        }
+    }
+
+    /// Countable label (C8). Stable — a dashboard contract.
+    pub fn label(self) -> &'static str {
+        match self {
+            BatchFailureReason::WrongContentId => "wrong_content_id",
+            BatchFailureReason::RecordShape => "record_shape",
+            BatchFailureReason::PermitTimeout => "permit_timeout",
+            BatchFailureReason::Transport => "transport",
+            BatchFailureReason::ClockUnavailable => "clock_unavailable",
+            BatchFailureReason::Unknown => "unknown",
+        }
+    }
+}
+
+/// Mirror of `content_store::BatchResolvePhase`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BatchResolvePhase {
+    HeadResolve,
+    Election,
+    Clock,
+}
+
+/// Mirror of `content_store::BatchResolveFailure`.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct BatchResolveFailure {
+    pub reason: BatchFailureReason,
+    pub phase: BatchResolvePhase,
+}
+
+/// Mirror of `content_store::BatchOutcome<T>` — externally tagged, variant names
+/// verbatim (`Resolved` / `Failed`), NO `rename_all` on the coordinator side.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum BatchOutcome<T> {
+    /// `Some` = a genuine answer; `None` = the SAME honest local absence the
+    /// single-id twin reports. Never a failure.
+    Resolved(Option<T>),
+    Failed(BatchResolveFailure),
+}
+
+/// Mirror of `content_store::BatchAttempt<T>`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BatchAttempt<T> {
+    pub id: String,
+    pub outcome: BatchOutcome<T>,
+}
+
+/// Mirror of `content_store::BatchStopReason` — externally tagged, variant names
+/// verbatim.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum BatchStopReason {
+    /// The in-wasm deadline was exhausted. NOT a failure.
+    BudgetExhausted,
+    /// More ids than the coordinator's `BATCH_ID_CEILING`. NOT a failure.
+    IdCeiling,
+    /// A shared/conductor-wide failure stopped admission; the untouched tail is
+    /// in `unattempted`.
+    SharedFailure(BatchFailureReason),
+}
+
+impl BatchStopReason {
+    /// Countable label (C8).
+    pub fn label(&self) -> &'static str {
+        match self {
+            BatchStopReason::BudgetExhausted => "budget_exhausted",
+            BatchStopReason::IdCeiling => "id_ceiling",
+            BatchStopReason::SharedFailure(_) => "shared_failure",
+        }
+    }
+}
+
+/// Mirror of `content_store::BatchResolveHeadsOutput` /
+/// `BatchResolveElectionsOutput` — one generic mirror for two coordinator types
+/// with an identical shape.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BatchResolveOutput<T> {
+    pub schema_version: u16,
+    pub attempted: Vec<BatchAttempt<T>>,
+    pub unattempted: Vec<String>,
+    pub stop_reason: Option<BatchStopReason>,
+    pub elapsed_ms: u32,
+}
+
+/// Does this conductor error mean "the running coordinator has no such
+/// function" — i.e. the batch externs have not been hot-swapped onto this
+/// conductor yet (T2 pending)?
+///
+/// The DNA hash is BLIND to coordinator zomes, so a shipped-but-not-swapped
+/// coordinator is indistinguishable from a landed one except by this error. It
+/// is the ONE error class that licenses the single-id fallback; everything else
+/// (notably `"deadline has elapsed"`, which is DB-pool saturation) is
+/// backpressure and must NOT fall back — falling back would multiply the load on
+/// an already-saturated conductor by the batch size.
+///
+/// **Contract test:** `tests::only_unknown_function_licenses_the_fallback`.
+pub fn is_unknown_function_error(err: &StorageError) -> bool {
+    let text = err.to_string();
+    let lowered = text.to_ascii_lowercase();
+    lowered.contains("unknown function")
+        || lowered.contains("no such function")
+        || lowered.contains("function not found")
+        || lowered.contains("zomefnnotexists")
+        || lowered.contains("zome function not found")
+        // holochain's `RibosomeError::ZomeFnNotExists` renders with the pair of
+        // words below in its Display text.
+        || (lowered.contains("not exist") && lowered.contains("function"))
+}
+
+/// BATCHED [`call_resolve_content_head_local`]: many ids, ONE conductor
+/// round-trip, bounded by an IN-WASM deadline the coordinator enforces itself.
+///
+/// The round-trip collapse is the whole point — the per-tick cap and the
+/// concurrency do NOT rise, only the yield per round-trip.
+///
+/// Returns the raw wire output. Interpreting it (per-item outcomes → C4
+/// `Answer`s, `unattempted` → back-to-pending, `schema_version` → fallback) is
+/// [`crate::services::head_batch_resolver`]'s job, deliberately not this
+/// function's: this layer owns ENCODING and DECODING only.
+pub async fn call_resolve_content_heads_local(
+    hc: &Arc<HcClient>,
+    ids: &[String],
+    budget_ms: Option<u32>,
+) -> Result<BatchResolveOutput<ContentHeadWire>, StorageError> {
+    let input = BatchResolveInput {
+        ids: ids.to_vec(),
+        budget_ms,
+    };
+    let payload = rmp_serde::to_vec_named(&input).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode resolve_content_heads_local: {e}"
+        ))
+    })?;
+    let bytes = hc
+        .call_zome(ZOME_NAME, "resolve_content_heads_local", payload)
+        .await?;
+    rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode BatchResolveOutput<ContentHeadWire>: {e}"
+        ))
+    })
+}
+
+/// BATCHED [`call_resolve_canonical_election`] — same contract as
+/// [`call_resolve_content_heads_local`], answering "what did the DHT elect?"
+/// without needing the winner's bytes.
+pub async fn call_resolve_canonical_elections(
+    hc: &Arc<HcClient>,
+    ids: &[String],
+    budget_ms: Option<u32>,
+) -> Result<BatchResolveOutput<CanonicalElectionWire>, StorageError> {
+    let input = BatchResolveInput {
+        ids: ids.to_vec(),
+        budget_ms,
+    };
+    let payload = rmp_serde::to_vec_named(&input).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode resolve_canonical_elections: {e}"
+        ))
+    })?;
+    let bytes = hc
+        .call_zome(ZOME_NAME, "resolve_canonical_elections", payload)
+        .await?;
+    rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode BatchResolveOutput<CanonicalElectionWire>: {e}"
+        ))
+    })
+}
+
 /// Declare (or advance) the notary HEAD for a content `id` via the
 /// `content_store::declare_content_head` coordinator (lamad role). `head_action_hash =
 /// None` lets the coordinator resolve the author's latest committed action as the HEAD
@@ -1097,5 +1360,281 @@ mod tests {
         assert_eq!(decoded.state, original.state);
         assert_eq!(decoded.event_hash, original.event_hash);
         assert_eq!(decoded.signed_at, original.signed_at);
+    }
+}
+
+#[cfg(test)]
+mod batch_wire_contract_tests {
+    //! DECODE MIRRORS pinned against INDEPENDENTLY-DECLARED replicas of the
+    //! coordinator's own structs.
+    //!
+    //! The replicas below are transcribed from
+    //! `elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs` (the T1b
+    //! contract revision, 2026-08-08). They are deliberately a SECOND
+    //! declaration rather than an import: the zome crate is a WASM-target
+    //! workspace this crate cannot depend on, so the only way to catch a
+    //! field-name or serde-casing drift at `cargo test` time is to encode from
+    //! a replica of the coordinator shape and decode into the production
+    //! mirror. A rename on either side fails these tests.
+
+    use super::{
+        is_unknown_function_error, BatchFailureReason, BatchOutcome, BatchResolveOutput,
+        BatchResolvePhase, BatchStopReason, BATCH_RESOLVE_SCHEMA_VERSION,
+    };
+    use crate::error::StorageError;
+    use serde::{Deserialize, Serialize};
+
+    // ── Coordinator-side replicas (transcribed from content_store) ───────────
+
+    #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+    #[serde(rename_all = "snake_case")]
+    enum ZomeBatchFailureReason {
+        WrongContentId,
+        RecordShape,
+        PermitTimeout,
+        Transport,
+        ClockUnavailable,
+        Unknown,
+    }
+
+    #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+    #[serde(rename_all = "snake_case")]
+    enum ZomeBatchResolvePhase {
+        HeadResolve,
+        Election,
+        Clock,
+    }
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+    struct ZomeBatchResolveFailure {
+        reason: ZomeBatchFailureReason,
+        phase: ZomeBatchResolvePhase,
+    }
+
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    enum ZomeBatchOutcome<T> {
+        Resolved(Option<T>),
+        Failed(ZomeBatchResolveFailure),
+    }
+
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    struct ZomeBatchAttempt<T> {
+        id: String,
+        outcome: ZomeBatchOutcome<T>,
+    }
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+    enum ZomeBatchStopReason {
+        BudgetExhausted,
+        IdCeiling,
+        SharedFailure(ZomeBatchFailureReason),
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    struct ZomeBatchResolveOutput<T> {
+        schema_version: u16,
+        attempted: Vec<ZomeBatchAttempt<T>>,
+        unattempted: Vec<String>,
+        stop_reason: Option<ZomeBatchStopReason>,
+        elapsed_ms: u32,
+    }
+
+    /// A stand-in payload type: the per-item answer shape is exercised
+    /// separately by `ContentHeadWire`'s own round-trip tests, and using a
+    /// tiny type here keeps THIS test about the ENVELOPE (attempted /
+    /// unattempted / stop_reason / schema_version), which is the part the
+    /// contract revision changed.
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+    struct Payload {
+        marker: String,
+    }
+
+    /// The envelope decodes field-for-field, INCLUDING a `stop_reason` present
+    /// case (the field a caller must read to tell backpressure apart from an
+    /// on-schedule budget yield).
+    #[test]
+    fn batch_wire_mirrors_decode_the_coordinator_shapes() {
+        let zome = ZomeBatchResolveOutput {
+            schema_version: BATCH_RESOLVE_SCHEMA_VERSION,
+            attempted: vec![
+                ZomeBatchAttempt {
+                    id: "id-present".to_string(),
+                    outcome: ZomeBatchOutcome::Resolved(Some(Payload {
+                        marker: "head".to_string(),
+                    })),
+                },
+                ZomeBatchAttempt {
+                    id: "id-absent".to_string(),
+                    outcome: ZomeBatchOutcome::Resolved(None),
+                },
+                ZomeBatchAttempt {
+                    id: "id-failed".to_string(),
+                    outcome: ZomeBatchOutcome::Failed(ZomeBatchResolveFailure {
+                        reason: ZomeBatchFailureReason::WrongContentId,
+                        phase: ZomeBatchResolvePhase::HeadResolve,
+                    }),
+                },
+            ],
+            unattempted: vec!["id-never-started".to_string()],
+            stop_reason: Some(ZomeBatchStopReason::SharedFailure(
+                ZomeBatchFailureReason::PermitTimeout,
+            )),
+            elapsed_ms: 3_912,
+        };
+
+        let bytes = rmp_serde::to_vec_named(&zome).expect("encode coordinator shape");
+        let decoded: BatchResolveOutput<Payload> = rmp_serde::from_slice(&bytes)
+            .expect("the storage mirror must decode coordinator bytes");
+
+        assert_eq!(decoded.schema_version, BATCH_RESOLVE_SCHEMA_VERSION);
+        assert_eq!(decoded.elapsed_ms, 3_912);
+        assert_eq!(decoded.unattempted, vec!["id-never-started".to_string()]);
+        assert_eq!(
+            decoded.stop_reason,
+            Some(BatchStopReason::SharedFailure(
+                BatchFailureReason::PermitTimeout
+            )),
+            "stop_reason must survive the trip — it is how the caller tells conductor \
+             backpressure apart from an on-schedule budget yield"
+        );
+        assert_eq!(decoded.attempted.len(), 3);
+        assert_eq!(decoded.attempted[0].id, "id-present");
+        assert!(matches!(
+            &decoded.attempted[0].outcome,
+            BatchOutcome::Resolved(Some(p)) if p.marker == "head"
+        ));
+        assert!(matches!(
+            decoded.attempted[1].outcome,
+            BatchOutcome::Resolved(None)
+        ));
+        match &decoded.attempted[2].outcome {
+            BatchOutcome::Failed(f) => {
+                assert_eq!(f.reason, BatchFailureReason::WrongContentId);
+                assert_eq!(f.phase, BatchResolvePhase::HeadResolve);
+            }
+            other => panic!("expected a typed per-item failure, got {other:?}"),
+        }
+    }
+
+    /// The other two `stop_reason` arms are unit variants — a different
+    /// MessagePack encoding from the newtype `SharedFailure`, so they need
+    /// their own pin.
+    #[test]
+    fn unit_stop_reasons_decode_too() {
+        for (zome, expected) in [
+            (
+                ZomeBatchStopReason::BudgetExhausted,
+                BatchStopReason::BudgetExhausted,
+            ),
+            (ZomeBatchStopReason::IdCeiling, BatchStopReason::IdCeiling),
+        ] {
+            let out = ZomeBatchResolveOutput::<Payload> {
+                schema_version: BATCH_RESOLVE_SCHEMA_VERSION,
+                attempted: Vec::new(),
+                unattempted: Vec::new(),
+                stop_reason: Some(zome),
+                elapsed_ms: 0,
+            };
+            let bytes = rmp_serde::to_vec_named(&out).expect("encode");
+            let decoded: BatchResolveOutput<Payload> =
+                rmp_serde::from_slice(&bytes).expect("decode");
+            assert_eq!(decoded.stop_reason, Some(expected));
+        }
+    }
+
+    /// A `None` stop_reason (every id attempted) round-trips as `None` —
+    /// the quiescent case, and the one a `skip_serializing_if` mistake would
+    /// break silently.
+    #[test]
+    fn an_absent_stop_reason_stays_absent() {
+        let out = ZomeBatchResolveOutput::<Payload> {
+            schema_version: BATCH_RESOLVE_SCHEMA_VERSION,
+            attempted: Vec::new(),
+            unattempted: Vec::new(),
+            stop_reason: None,
+            elapsed_ms: 7,
+        };
+        let bytes = rmp_serde::to_vec_named(&out).expect("encode");
+        let decoded: BatchResolveOutput<Payload> = rmp_serde::from_slice(&bytes).expect("decode");
+        assert!(decoded.stop_reason.is_none());
+    }
+
+    /// The typed reason vocabulary must survive by NAME, not by ordinal — a
+    /// reordered coordinator enum would otherwise silently re-label every
+    /// failure.
+    #[test]
+    fn every_failure_reason_decodes_by_name() {
+        let pairs = [
+            (
+                ZomeBatchFailureReason::WrongContentId,
+                BatchFailureReason::WrongContentId,
+            ),
+            (
+                ZomeBatchFailureReason::RecordShape,
+                BatchFailureReason::RecordShape,
+            ),
+            (
+                ZomeBatchFailureReason::PermitTimeout,
+                BatchFailureReason::PermitTimeout,
+            ),
+            (
+                ZomeBatchFailureReason::Transport,
+                BatchFailureReason::Transport,
+            ),
+            (
+                ZomeBatchFailureReason::ClockUnavailable,
+                BatchFailureReason::ClockUnavailable,
+            ),
+            (ZomeBatchFailureReason::Unknown, BatchFailureReason::Unknown),
+        ];
+        for (zome, expected) in pairs {
+            let bytes = rmp_serde::to_vec_named(&zome).expect("encode");
+            let decoded: BatchFailureReason = rmp_serde::from_slice(&bytes).expect("decode");
+            assert_eq!(decoded, expected, "reason must decode by NAME");
+        }
+    }
+
+    /// The storage-side routing split must mirror the coordinator's
+    /// CONTINUE/STOP disposition exactly. Two vocabularies for one fact is how
+    /// a backpressure failure gets counted as an id's fault.
+    #[test]
+    fn the_backpressure_split_matches_the_coordinator_disposition() {
+        // Coordinator: Continue for the deterministic pair, Stop for the rest.
+        assert!(!BatchFailureReason::WrongContentId.is_backpressure());
+        assert!(!BatchFailureReason::RecordShape.is_backpressure());
+        assert!(BatchFailureReason::PermitTimeout.is_backpressure());
+        assert!(BatchFailureReason::Transport.is_backpressure());
+        assert!(BatchFailureReason::ClockUnavailable.is_backpressure());
+        assert!(
+            BatchFailureReason::Unknown.is_backpressure(),
+            "an unrecognised reason must fail toward backpressure (return the id to pending), \
+             never toward blaming the id"
+        );
+    }
+
+    /// ONLY an unknown-function error licenses the single-id fallback.
+    /// A DB-pool saturation error MUST NOT — falling back there would multiply
+    /// the load on an already-saturated conductor by the batch size, which is
+    /// the exact failure this whole program exists to avoid.
+    #[test]
+    fn only_unknown_function_licenses_the_fallback() {
+        let unknown = StorageError::Internal(
+            "Zome call failed: RibosomeError: Wasm error ... Zome function \
+             resolve_content_heads_local does not exist"
+                .to_string(),
+        );
+        assert!(is_unknown_function_error(&unknown));
+
+        let saturated = StorageError::Internal(
+            "Zome call failed: WasmError { error: Host(\"deadline has elapsed\") }".to_string(),
+        );
+        assert!(
+            !is_unknown_function_error(&saturated),
+            "DB read-permit saturation is BACKPRESSURE — falling back to single-id would \
+             multiply the load on a conductor that is already refusing work"
+        );
+
+        let ws = StorageError::Internal("Zome call failed: Websocket error: Timeout".to_string());
+        assert!(!is_unknown_function_error(&ws));
     }
 }

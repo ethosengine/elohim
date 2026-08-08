@@ -5,6 +5,7 @@
 //! fetcher is a coherence violation.
 
 use std::collections::{HashMap, HashSet};
+use std::time::Duration;
 
 /// Stable fingerprint of a set of pre-formatted entry lines: sort, then hash
 /// with a `\n` delimiter after each entry. Entries containing `\n` use an
@@ -277,9 +278,239 @@ impl DispatchBudget {
     }
 }
 
+/// AIMD batch-size controller for the head-plane batch externs — the SECOND,
+/// orthogonal pacing axis beside [`DispatchBudget`].
+///
+/// The two are deliberately both kept and never merged: `DispatchBudget` bounds
+/// **concurrency** (how many conductor round-trips may be in flight at once),
+/// this bounds **batch size** (how many ids ride ONE round-trip). The write-guard
+/// constraint (`2026-07-20-adam-slow-link-write-guard-saturation.md`) forbids
+/// raising the per-tick cap OR the concurrency; only the per-round-trip YIELD may
+/// rise, which is exactly and only what this controller moves.
+///
+/// ## Why AIMD rather than a token bucket
+///
+/// A token bucket needs a refill RATE, and there is no honest number to put
+/// there: adam (WAN, saturated conductor) and matthew (LAN) differ by an order of
+/// magnitude and the difference is a real fixture property, not noise to be
+/// laundered into one constant. AIMD needs no rate — it needs only a signal that
+/// says "you asked for too much", which the batch extern hands back for free as
+/// `queue_wait` (observed round-trip time MINUS the extern's own in-wasm
+/// `elapsed_ms` — i.e. the time the call spent queued for a conductor DB read
+/// permit rather than doing work). Under the same constants adam converges small
+/// and matthew large, and the heterogeneity survives in the
+/// `elohim_head_batch_size` gauge instead of being averaged away.
+///
+/// ## The control law
+///
+/// [`AdaptiveBatchBudget::next_size`] is a PURE total function — no clock, no
+/// state, no I/O — so the convergence properties are testable without a
+/// conductor:
+///
+/// - `queue_wait <= threshold` ⇒ additive increase (`current + increment`)
+/// - `queue_wait  > threshold` ⇒ multiplicative decrease (`current / 2`)
+/// - always clamped into `[floor, ceiling]`
+///
+/// Defaults: floor 8, ceiling 128, threshold 2s, +16 / ×0.5.
+#[derive(Debug, Clone, Copy)]
+pub struct AdaptiveBatchBudget {
+    current: usize,
+    floor: usize,
+    ceiling: usize,
+    threshold: Duration,
+    increment: usize,
+}
+
+/// Smallest batch the controller will ever ask for. Below this the round-trip
+/// overhead dominates and batching stops paying for itself.
+pub const BATCH_SIZE_FLOOR: usize = 8;
+/// Largest batch the controller will ever ask for. Kept well under the zome's
+/// `BATCH_ID_CEILING` (256) so a ceiling-clamp `unattempted` tail is a
+/// coordinator-side ceiling event, never this controller's doing.
+pub const BATCH_SIZE_CEILING: usize = 128;
+/// Queue-wait above which the conductor is telling us it is backpressured.
+pub const BATCH_QUEUE_WAIT_THRESHOLD: Duration = Duration::from_secs(2);
+/// Additive-increase step.
+pub const BATCH_SIZE_INCREMENT: usize = 16;
+
+impl Default for AdaptiveBatchBudget {
+    fn default() -> Self {
+        Self::new(
+            BATCH_SIZE_FLOOR,
+            BATCH_SIZE_CEILING,
+            BATCH_QUEUE_WAIT_THRESHOLD,
+            BATCH_SIZE_INCREMENT,
+        )
+    }
+}
+
+impl AdaptiveBatchBudget {
+    /// Start at the FLOOR, never the ceiling: an unknown conductor is assumed
+    /// backpressured until it proves otherwise (fail-closed toward the
+    /// write-guard constraint, the same direction `NetworkStage` fails).
+    pub fn new(floor: usize, ceiling: usize, threshold: Duration, increment: usize) -> Self {
+        let floor = floor.max(1);
+        let ceiling = ceiling.max(floor);
+        Self {
+            current: floor,
+            floor,
+            ceiling,
+            threshold,
+            increment,
+        }
+    }
+
+    /// The batch size to ask for on the NEXT call.
+    pub fn current(&self) -> usize {
+        self.current
+    }
+
+    /// Fold one observed `queue_wait` into the controller.
+    pub fn observe(&mut self, queue_wait: Duration) {
+        self.current = Self::next_size(
+            self.current,
+            queue_wait,
+            self.threshold,
+            self.floor,
+            self.ceiling,
+            self.increment,
+        );
+    }
+
+    /// THE control law, pure and total.
+    ///
+    /// **Concerns:** C6a (bounded work — the result is always inside
+    /// `[floor, ceiling]`, for every input including a `current` already outside
+    /// it).
+    ///
+    /// **Contract tests:** `aimd_increases_additively_under_the_threshold`,
+    /// `aimd_halves_over_the_threshold`, `aimd_clamps_into_the_band`,
+    /// `aimd_converges_down_then_back_up`.
+    pub fn next_size(
+        current: usize,
+        queue_wait: Duration,
+        threshold: Duration,
+        floor: usize,
+        ceiling: usize,
+        increment: usize,
+    ) -> usize {
+        let floor = floor.max(1);
+        let ceiling = ceiling.max(floor);
+        let next = if queue_wait > threshold {
+            // MULTIPLICATIVE DECREASE — back off hard and immediately. A
+            // saturated conductor is the one resource the whole pacing layer
+            // exists to protect.
+            current / 2
+        } else {
+            // ADDITIVE INCREASE — probe upward slowly.
+            current.saturating_add(increment)
+        };
+        next.clamp(floor, ceiling)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn aimd_increases_additively_under_the_threshold() {
+        let t = BATCH_QUEUE_WAIT_THRESHOLD;
+        assert_eq!(
+            AdaptiveBatchBudget::next_size(8, Duration::from_millis(10), t, 8, 128, 16),
+            24
+        );
+        // Exactly AT the threshold is not over it — the comparison is strict, so
+        // a conductor sitting on the line is not punished for it.
+        assert_eq!(AdaptiveBatchBudget::next_size(8, t, t, 8, 128, 16), 24);
+    }
+
+    #[test]
+    fn aimd_halves_over_the_threshold() {
+        let t = BATCH_QUEUE_WAIT_THRESHOLD;
+        assert_eq!(
+            AdaptiveBatchBudget::next_size(128, Duration::from_secs(5), t, 8, 128, 16),
+            64
+        );
+        assert_eq!(
+            AdaptiveBatchBudget::next_size(64, Duration::from_secs(5), t, 8, 128, 16),
+            32
+        );
+    }
+
+    #[test]
+    fn aimd_clamps_into_the_band() {
+        let t = BATCH_QUEUE_WAIT_THRESHOLD;
+        // Ceiling clamp on increase.
+        assert_eq!(
+            AdaptiveBatchBudget::next_size(120, Duration::ZERO, t, 8, 128, 16),
+            128
+        );
+        // Floor clamp on decrease — a backpressured conductor must never drive
+        // the batch to zero, which would silently stop the leg.
+        assert_eq!(
+            AdaptiveBatchBudget::next_size(8, Duration::from_secs(60), t, 8, 128, 16),
+            8
+        );
+        assert_eq!(
+            AdaptiveBatchBudget::next_size(1, Duration::from_secs(60), t, 8, 128, 16),
+            8
+        );
+        // A `current` that starts OUTSIDE the band is pulled back in, in both
+        // directions — the clamp is on the RESULT, not on the input.
+        assert_eq!(
+            AdaptiveBatchBudget::next_size(4096, Duration::ZERO, t, 8, 128, 16),
+            128
+        );
+        assert_eq!(
+            AdaptiveBatchBudget::next_size(0, Duration::ZERO, t, 8, 128, 16),
+            16
+        );
+    }
+
+    /// The property that matters operationally: a backpressure burst drives the
+    /// size DOWN monotonically to the floor, and a quiet conductor drives it back
+    /// UP monotonically to the ceiling. Neither direction oscillates or stalls.
+    #[test]
+    fn aimd_converges_down_then_back_up() {
+        let mut b = AdaptiveBatchBudget::default();
+        // Climb to the ceiling on a quiet conductor.
+        let mut last = b.current();
+        for _ in 0..32 {
+            b.observe(Duration::from_millis(1));
+            assert!(b.current() >= last, "additive increase must be monotone");
+            last = b.current();
+        }
+        assert_eq!(b.current(), BATCH_SIZE_CEILING);
+
+        // Now saturate it: halving must reach the floor and STOP there.
+        let mut last = b.current();
+        for _ in 0..32 {
+            b.observe(Duration::from_secs(30));
+            assert!(
+                b.current() <= last,
+                "multiplicative decrease must be monotone"
+            );
+            last = b.current();
+        }
+        assert_eq!(b.current(), BATCH_SIZE_FLOOR);
+    }
+
+    /// The heterogeneity claim from the plan, as a test: the SAME constants must
+    /// separate a slow (WAN) conductor from a fast (LAN) one rather than
+    /// averaging them into one number.
+    #[test]
+    fn the_same_constants_separate_a_slow_conductor_from_a_fast_one() {
+        let mut adam = AdaptiveBatchBudget::default();
+        let mut matthew = AdaptiveBatchBudget::default();
+        for _ in 0..16 {
+            adam.observe(Duration::from_secs(6)); // saturated WAN conductor
+            matthew.observe(Duration::from_millis(40)); // quiet LAN conductor
+        }
+        assert_eq!(adam.current(), BATCH_SIZE_FLOOR);
+        assert_eq!(matthew.current(), BATCH_SIZE_CEILING);
+        assert!(adam.current() < matthew.current());
+    }
 
     #[test]
     fn digest_entry_line_edge_cases_are_byte_pinned() {
