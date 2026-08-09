@@ -47,7 +47,11 @@ STORAGE_IROH="${REGISTRY}/elohim-storage-iroh"
 LOCAL_BUILT="elohim-storage:${IMAGE_TAG}"
 LOCAL_IROH="elohim-storage-iroh:${IMAGE_TAG}"
 STORAGE_BASE="${REGISTRY}/elohim-storage:${STORAGE_TAG}"
-CONDUCTOR_SOURCE="${IROH_CONDUCTOR_SOURCE:-${REGISTRY}/elohim-edgenode-iroh:hc-elohim-0.6.3-iroh}"
+# 2026-08-09: repointed to the relay-fallback conductor (fork e4a1c9bb2 —
+# cross-relay preflight fix, vendored kitsune2_transport_iroh patch). The
+# previous anchor hc-elohim-0.6.3-iroh is UNTOUCHED and remains the D9
+# rollback anchor.
+CONDUCTOR_SOURCE="${IROH_CONDUCTOR_SOURCE:-${REGISTRY}/elohim-edgenode-iroh:hc-elohim-0.6.3-relay-fallback-iroh}"
 
 # Exact-reference existence check (never `nerdctl images | grep -q`: grep -q
 # exits at first match and SIGPIPEs a still-writing nerdctl, which under
