@@ -11,8 +11,9 @@
       "note": "Genesis-pair anchor + doorway backend baseline (matthew). Anchors that also back a heavy doorway + seed traffic (adam) size ABOVE this floor; conductor db read pool = max(2*cpus,8) so >4000m limit lifts max_readers above the 8 floor."
     },
     "device-recycled-laptop": {
+      "$cpuLimitComment": "2026-08-09: 1000m -> 2000m, evidence-based class realignment. Every live instance of this class has required 2000m under real load: 2026-05-27 install-burst crashloop (susan+jessica bumped), 2026-08-03 susan 100% CFS throttle at the 1000m canonical (head_record_degraded budget_elapsed, acab4bf82), 2026-08-08 susan zero kitsune2 gossip attempts with CPU starvation the leading hypothesis (backlog susan-kitsune2-gossip-never-attempts.md). The 2026-07-16 down-realignment to 1000m assumed the failure class was liveness-probe-only; the throttle evidence contradicts that. Physical spec (4 cores i5-8250u, devices.json) comfortably covers 2000m. Per-instance cpu overrides on susan/jessica removed in the same commit (one class, one budget).",
       "cpuRequest": "250m",
-      "cpuLimit": "1000m",
+      "cpuLimit": "2000m",
       "memoryRequest": "768Mi",
       "memoryLimit": "3Gi"
     },
