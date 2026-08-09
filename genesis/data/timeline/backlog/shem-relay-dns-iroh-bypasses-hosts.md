@@ -58,3 +58,29 @@ INFO line on shem conductor pods within seconds of restart; kitsune2
 "home relay URL is known" WARN rate falls to ~zero; gossip rounds begin.
 Residual diagnostic if the probe STILL fails after DNS answers in-cluster:
 capture iroh::net_report at debug on one pod (TLS/SNI vs timeout).
+
+## RESOLVED at the resolver that actually answers (2026-08-09, operator)
+
+Delivery-point corrections from the operator's devops session (the
+diagnosis held; the backlog's named ConfigMap was wrong):
+- kube-system/coredns has been scaled 0/0 since the 2026-06-10 DNS
+  migration (inert); live CoreDNS is coredns-ha — and pods never reach
+  either for external names: every pod resolves via 169.254.20.10
+  (NodeLocal DNSCache, DIRECT mode) forwarding to the node resolv.conf.
+- The hosts block was applied to kube-system/node-local-dns instead:
+  ethosengine-devops e4cb2a2 (gitops/infrastructure/node-local-dns/
+  node-local-dns.yaml), ArgoCD Synced/Healthy, 7/7 pods Ready, reload
+  in place. Verified from a clean pod on shem via 169.254.20.10:
+  relay/apex/signal → 10.99.0.2; example.com still public (fallthrough).
+- CAVEAT for the residual diagnostic: a 404 on /relay/probe is NORMAL
+  (the known-good relay.alpha returns 404 there too) — never treat it
+  as probe failure.
+- CORRECTION: the WAN path was never a timeout — from a shem pod,
+  136.50.16.133:443 hairpins fine at L3 in ~140ms and lands on the
+  WRONG BOX (self-signed cert). A router-level fix would be NAT-hairpin
+  DESTINATION, not ports.
+Remaining trigger: conductors cache the old answer (hickory TTL) — a
+pod restart (any edge deploy) picks up the fixed DNS; then expect the
+"home is now relay https://relay.elohim.host./" INFO per shem pod, WARN
+rate → ~0, gossip rounds, caughtUp=true, shed lifts, divergentAnchor
+drains.
