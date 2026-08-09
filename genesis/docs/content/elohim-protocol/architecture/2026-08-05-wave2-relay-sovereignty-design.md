@@ -15,6 +15,7 @@ cites:
   - genesis/orchestrator/manifests/infra/alpha-coturn-operations.yaml
   - genesis/orchestrator/manifests/infra/alpha-coturn-shem.yaml
   - genesis/data/timeline/backlog/sovereign-turn-relay-transport-commons.md
+  - genesis/data/timeline/backlog/iroh-cross-relay-preflight-fails-closed.md
 memory_anchors:
   - project_two_premises_dns_beacon_owned
   - project_alpha_topology_bootstrap_pair
@@ -147,6 +148,31 @@ need to share one — a peer URL embeds *that peer's* home relay
 (`transport_iroh/src/url.rs:31-52`), and the dialing side connects through
 **the other peer's** relay. Heterogeneous home relays across a fleet are native
 to the protocol. The singular field limits a conductor, not the fleet.
+
+> **CORRECTION (2026-08-09) — true of iroh, FALSE of the kitsune2 transport
+> above it.** The paragraph above describes iroh and the peer-URL encoding
+> correctly, but the transport refuses before iroh is ever asked to dial.
+> `IrohTransport::own_url_for_preflight`
+> (`kitsune2_transport_iroh-0.4.1/src/lib.rs:762-801`) fails **closed** when the
+> remote peer's home relay is not one of ours — and the caller
+> (`src/lib.rs:896-904`) reports that as `Connection attempted before home relay
+> URL is known`, an error naming a *different* condition (no local URL at all).
+> Under D2 that made every cross-doorway initiation fail on a 4/3-split alpha
+> fleet, on conductors whose home relay was confirmed and whose per-space relays
+> had all been inserted — the DHT partitioned along the relay line while the logs
+> pointed at relay registration.
+>
+> Fixed fork-side by vendoring the crate under
+> `elohim/holochain-conductor/patches/kitsune2_transport_iroh` and falling back
+> to our own home-relay URL instead of refusing. D2's routing decision stands;
+> what did not hold was the assumption that the transport implemented the
+> property the design reasoned from. RCA, ship sequence, and the D9
+> rollback-anchor ruling this needs:
+> `genesis/data/timeline/backlog/iroh-cross-relay-preflight-fails-closed.md`.
+>
+> **Standing lesson for this doc:** a claim about what the transport permits is
+> only as good as the function that gates it. Cite the gating function, not just
+> the encoding.
 
 The already-baked static `relay_url: "https://relay.elohim.host"` in five
 config surfaces is inert under tx5 and is superseded by per-human rendering at
@@ -722,6 +748,24 @@ implementing the runtime probes above, or they false-signal on healthy fleets:**
    constructed local_url=https://…` (`transport_iroh/src/lib.rs:967`) fires
    ~2.3s BEFORE the §5.3 `Received a new listening address` sentinel — worth
    adding to the Loki probe as the earliest boots-correctly signal.
+4. **`Connection attempted before home relay URL is known` is an OVERLOADED
+   string — never read it as a relay-registration fault on its own.** Added
+   2026-08-09 after it cost three investigations. Upstream
+   `kitsune2_transport_iroh` emits that one message for two unrelated causes:
+   (a) we genuinely have no local URL yet, and (b) the *peer* homes to a relay
+   we do not home to (`own_url_for_preflight`, `src/lib.rs:762-801`, failing
+   closed — the D2 correction above). The line that discriminates them sits
+   immediately before it and is the one to probe:
+
+   | Loki line | Cause | Meaning |
+   |---|---|---|
+   | `Peer is on unknown relay, failing preflight` (upstream, `lib.rs:795`) | (b) | cross-relay peer refused — DHT partitioned along the per-doorway relay line |
+   | `Peer homes to a relay we do not; advertising our own home-relay URL for preflight` (patched) | (b), cured | the fork patch is live and cross-relay peers are being reached |
+   | `No home-relay URL of our own is known yet, failing preflight` (patched) | (a) | genuinely address-less; the error message is literally true |
+
+   On a conductor whose home relay is confirmed (`home is now relay …`,
+   magicsock `actor.rs:994`) the error can ONLY be cause (b). Reading the two
+   facts as contradictory is the trap — they are simultaneously true.
 
 **Config gate:** `validate-conductor-config.sh` extended per §4.2 — it is the
 render-time form of the n0-contamination test, catching the mistake before it
