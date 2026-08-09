@@ -235,12 +235,24 @@ async fn project_epr_commitment_replicates_to_peer_b() -> Result<()> {
         .await
         .map_err(|e| anyhow::anyhow!("DHT consistency timeout after create_rea_commitment: {e}"))?;
 
+    // --- Initialize B's Wasm runtime before the bounded read. ---
+    // Same idiom (and same reason) as tests/lamad.rs:688: B's FIRST zome call
+    // pays one-time Wasm instantiation of the 13.4MB content_store module —
+    // measured at ~94s in this container (2026-08-09 instrumented run), which
+    // silently consumes the entire 60s poll budget below. export_schema_version
+    // reads nothing from the DHT, so the bounded poll then measures RETRIEVAL,
+    // not instantiation. The same run showed the warm retrieval path answering
+    // in ~12ms — the 2026-07-24 "B cannot retrieve A's entries" attribution was
+    // this warm-up cost wearing a fetch-failure costume.
+    let zome_b = cell_b.zome(ZOME);
+    let schema_version: String = cb.call(&zome_b, "export_schema_version", ()).await;
+    assert_eq!(schema_version, "v1");
+
     // --- Bob resolves the commitment within a bounded window. ---
     // Polling the coordinator read directly exercises the production
     // `get_links` + `get(record)` DHT-fetch path. A transient None (link not
     // visible yet) or zome error (link visible before its target record) is
     // retried; failing the outer bound is the actionable notary-authority red.
-    let zome_b = cell_b.zome(ZOME);
     let fetch_id = commitment_id.clone();
     let bob_output = tokio::time::timeout(Duration::from_secs(60), async {
         loop {
