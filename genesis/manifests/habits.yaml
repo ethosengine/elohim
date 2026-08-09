@@ -208,10 +208,14 @@ habits:
       vendored kitsune2_transport_iroh patch — the overloaded error
       string hid it through three investigations). Post-#1332 deploy:
       BOTH relay error classes at zero fleet-wide (553K-line scanned
-      negatives) and divergentAnchor FALLING (1766→1687 in ~1h) — the
-      first monotone drain of the iroh era. The measure flips on the
-      first suite run after caughtUp: retrigger [build:edge] post-drain
-      (drain accelerator = the content-gap plateau objective). The REA
+      negatives). CORRECTED same day: the initial "divergentAnchor
+      falling" read was a sampling artifact (pool-fanned health endpoint)
+      — 6h of per-pod Prometheus shows content divergence OSCILLATING in
+      bounded bands with no drain (the content-gap limit cycle, evidence
+      in its backlog item). Convergence, caughtUp, the shed lift, and
+      this habit's measure are all gated on the content-gap plateau
+      objective landing — not on time. Retrigger [build:edge] only after
+      that objective moves the cycle. The REA
       sweettest check is GREEN locally after the oracle warm-up fix
       (a183c1a01) — see next delta for the falsification.
       DELTA 2026-08-09 (dev@b3c58d9ca, measured locally): the REA leg of this
