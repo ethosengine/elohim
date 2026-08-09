@@ -152,6 +152,66 @@ fn admission_is_read_method(method: &Method) -> bool {
     *method == Method::GET || *method == Method::HEAD
 }
 
+/// True for the notary HEAD-declare write route (`POST /db/content/{id}/head`) —
+/// the single-author, chain-membership-gated mutation whose 401/403 authority
+/// refusal (`handle_content_head`'s "(a) AUTH FIRST" block) must never be masked
+/// by the blanket admission shed below. This route is carved out of the
+/// top-of-dispatch admission gate (`admission_exempt` in `handle_request`) and
+/// instead applies its OWN admission check — but only AFTER authority is
+/// confirmed (see `handle_content_head`'s post-author-gate `try_acquire_owned`).
+/// A non-author gets refused regardless of write-pool pressure; only a confirmed
+/// author can be shed with the catching-up 503 if the pool is genuinely full.
+///
+/// Deliberately excludes `/head-record` (no author gate; a read surface) and
+/// `/canonical-head` (god-mode staging tier, no author gate — see
+/// `handle_content_canonical_head`'s doc comment) — those stay behind the
+/// blanket gate unchanged.
+fn is_head_declare_write(method: &Method, path: &str) -> bool {
+    *method == Method::POST && path.starts_with("/db/content/") && path.ends_with("/head")
+}
+
+#[cfg(test)]
+mod head_declare_write_admission_carveout_tests {
+    use super::*;
+
+    #[test]
+    fn matches_post_head_declare() {
+        assert!(is_head_declare_write(
+            &Method::POST,
+            "/db/content/some-id/head"
+        ));
+    }
+
+    #[test]
+    fn excludes_get() {
+        assert!(!is_head_declare_write(
+            &Method::GET,
+            "/db/content/some-id/head"
+        ));
+    }
+
+    #[test]
+    fn excludes_head_record() {
+        assert!(!is_head_declare_write(
+            &Method::POST,
+            "/db/content/some-id/head-record"
+        ));
+    }
+
+    #[test]
+    fn excludes_canonical_head() {
+        assert!(!is_head_declare_write(
+            &Method::POST,
+            "/db/content/some-id/canonical-head"
+        ));
+    }
+
+    #[test]
+    fn excludes_unrelated_write_route() {
+        assert!(!is_head_declare_write(&Method::POST, "/db/content/bulk"));
+    }
+}
+
 /// HTTP server state
 pub struct HttpServer {
     blob_store: Arc<BlobStore>,
@@ -969,8 +1029,15 @@ impl HttpServer {
         // stay live under shed. try_acquire (NOT acquire().await): at the ceiling
         // return 503 + Retry-After + X-Available-Permits immediately. The permit
         // is held for the whole request via `_admit` (function-scope binding).
-        let admission_exempt =
-            method == Method::OPTIONS || matches!(path.as_str(), "/health" | "/version");
+        // The notary HEAD-declare write is carved out of the blanket shed: its
+        // authority refusal (401/403, `handle_content_head`'s "AUTH FIRST" block)
+        // must run before any admission decision — a non-author cannot be allowed
+        // to win by racing the shed. Admission still applies to this route, just
+        // AFTER authority is confirmed (see the `try_acquire_owned` call inside
+        // `handle_content_head`, right before the conductor write).
+        let admission_exempt = method == Method::OPTIONS
+            || matches!(path.as_str(), "/health" | "/version")
+            || is_head_declare_write(&method, &path);
         let _admit = if admission_exempt {
             None
         } else {
@@ -5261,15 +5328,6 @@ impl HttpServer {
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         use http_body_util::BodyExt;
 
-        /// POST body: the explicit action to pin as HEAD. Absent (or absent body)
-        /// asks the coordinator to resolve the author's latest committed action.
-        #[derive(serde::Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct DeclareHeadBody {
-            #[serde(default)]
-            head_action_hash: Option<String>,
-        }
-
         let pool = self
             .db_pool
             .as_ref()
@@ -5303,186 +5361,257 @@ impl HttpServer {
                 }
             }
             Method::POST => {
-                // (a) AUTH FIRST — before any existence check. Caller identity is
-                // derived EXCLUSIVELY from the request: the `X-Agent-Cid` header
-                // (doorway injects it only after validating a bearer; Tauri-direct
-                // callers set it themselves). We deliberately do NOT use
-                // `extract_agent_cid`'s `local_sessions` fallback here — genesis pods
-                // mint an ambient active session at boot (genesis_self_heal_identity,
-                // GENESIS_SELF_HEAL_IDENTITY=1 on the alpha manifests), so an
-                // anonymous probe would be silently authenticated on those pods and
-                // fall through to a 404 instead of 401. A notarization write requires
-                // a request-borne credential: no header → 401, before any
-                // DB/conductor access. The header must run while `req` is still intact
-                // (before the body consumes it).
-                let caller_cid = match req
-                    .headers()
-                    .get("X-Agent-Cid")
-                    .and_then(|v| v.to_str().ok())
-                    .map(|s| s.to_string())
-                {
-                    Some(cid) => cid,
-                    None => {
-                        return Ok(response::json_response(
-                            StatusCode::UNAUTHORIZED,
-                            &serde_json::json!({
-                                "error": "authentication required: only the author may move a declared HEAD"
-                            }),
-                        ));
-                    }
-                };
-
-                // (a2) Resolve the caller value to an agent key BEFORE any authorship
-                // comparison. `X-Agent-Cid` may carry either a Holochain agent key
-                // (uhCA…, Tauri-direct) OR a human slug (doorway forwards
-                // `claims.human_id`, e.g. "human-matthew-manager"). These are DISTINCT
-                // identity namespaces — a raw slug-vs-agent-key string compare always
-                // fails (see "Identity & Transport-Identity Coherence" in this crate's
-                // CLAUDE.md: never cross-namespace string-compare; resolve slug →
-                // agent_cid first). Resolve a slug to its `humans.agent_pub_key`; fail
-                // closed (403) on a write when the caller cannot be proven to own an
-                // agent key.
-                let caller_agent_key = if caller_cid.starts_with("uhCA") {
-                    caller_cid.clone()
-                } else {
-                    match crate::db::humans::get_human_by_id(&mut conn, &caller_cid)?
-                        .and_then(|h| h.agent_pub_key)
-                    {
-                        Some(key) => key,
-                        None => {
-                            return Ok(response::forbidden(&serde_json::json!({
-                                "error": "caller identity cannot be resolved to an agent key; cannot prove authorship"
-                            })));
-                        }
-                    }
-                };
-
-                // (b) Parse body { headActionHash?: String } — absent body → None.
+                // Split out so tests can drive the auth/admission ordering without
+                // constructing a `Request<Incoming>` (which cannot be built outside
+                // a real hyper connection — see `test_handle_content_head_post_raw`).
+                // Headers are captured before the body is consumed, preserving the
+                // original ordering guarantee ("the header must run while `req` is
+                // still intact, before the body consumes it").
+                let headers = req.headers().clone();
                 let body_bytes = req
                     .into_body()
                     .collect()
                     .await
                     .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?
                     .to_bytes();
-                let head_action_hash: Option<String> = if body_bytes.is_empty() {
-                    None
-                } else {
-                    match serde_json::from_slice::<DeclareHeadBody>(&body_bytes) {
-                        Ok(b) => b.head_action_hash,
-                        Err(e) => {
-                            return Ok(response::bad_request(&format!("Invalid JSON: {}", e)))
-                        }
-                    }
-                };
-
-                // (c) Resolve the lamad conductor bridge.
-                let hc = match self.hc_registry.as_ref().and_then(|r| r.lamad_client()) {
-                    Some(hc) => hc,
-                    None => {
-                        return Ok(response::service_unavailable(
-                            "Conductor bridge unavailable; cannot declare content head",
-                        ));
-                    }
-                };
-
-                // (d) Resolve the notary HEAD, then author-gate. The comparison is
-                // between `caller_agent_key` (resolved slug→agent_cid in (a2)) and
-                // `head.author` — BOTH now Holochain agent keys (uhCAk…, same
-                // namespace), so the string compare is legal (the earlier "caller_cid
-                // and head.author are both uhCAk" claim was wrong: caller_cid can be a
-                // doorway human slug). A None author fails closed.
-                let head = match crate::services::conductor_writes::call_resolve_content_head(
-                    &hc, content_id,
-                )
-                .await?
-                {
-                    Some(h) => h,
-                    None => {
-                        return Ok(response::not_found(
-                            "content has no version chain on this notary",
-                        ));
-                    }
-                };
-                let is_author =
-                    head.author.as_ref().map(|a| a.as_str()) == Some(caller_agent_key.as_str());
-                if !is_author {
-                    return Ok(response::forbidden(&serde_json::json!({
-                        "error": "caller is not the author of this content"
-                    })));
-                }
-
-                // (e) Declare / advance the HEAD via the conductor. Coordinator
-                // error substrings map to the right HTTP class.
-                let declared = match crate::services::conductor_writes::call_declare_content_head(
-                    &hc,
-                    content_id,
-                    head_action_hash,
-                )
-                .await
-                {
-                    Ok(h) => h,
-                    Err(e) => {
-                        let msg = e.to_string();
-                        if msg.contains("not the author") {
-                            return Ok(response::forbidden(&serde_json::json!({ "error": msg })));
-                        } else if msg.contains("not in the version chain") {
-                            return Ok(response::bad_request(&msg));
-                        } else {
-                            return Ok(response::json_response(
-                                StatusCode::BAD_GATEWAY,
-                                &serde_json::json!({ "error": msg }),
-                            ));
-                        }
-                    }
-                };
-
-                // Eager-stamp the projection so the local read is coherent
-                // immediately (not only once the async projection signal lands) —
-                // mirrors update_via_conductor. Field mapping mirrors the
-                // ContentCommitted projection arm (rea_projection.rs).
-                let content = declared.content;
-                let size_i32 = content
-                    .content_size_bytes
-                    .map(|n| i32::try_from(n).unwrap_or(i32::MAX));
-                let patch = db::content_diesel::ContentProjectionPatch {
-                    blob_cid: content.blob_cid,
-                    content_size_bytes: size_i32,
-                    title: Some(content.title),
-                    description: Some(content.description),
-                    content_type: Some(content.content_type),
-                    content_format: Some(content.content_format),
-                    reach: Some(content.reach),
-                    metadata_json: Some(content.metadata_json),
-                };
-                db::content_diesel::stamp_declared_head(
-                    &mut conn,
-                    app_ctx,
-                    content_id,
-                    declared.head_action_hash.as_str(),
-                    Some(declared.declared_at),
-                    Some(patch),
-                )?;
-
-                // 200 with the fresh HEAD answer, re-read from the stamped row.
-                match db::content_diesel::get_content_with_tags(
-                    &mut conn,
-                    app_ctx,
-                    content_id,
-                    db::content_diesel::MinTrust::Invisible,
-                )? {
-                    Some(cwt) => match crate::views::content_head_view_from_content(&cwt.content) {
-                        Some(view) => Ok(response::ok(&view)),
-                        None => Ok(response::not_found(
-                            "no notarized head declared for this content",
-                        )),
-                    },
-                    None => Ok(response::not_found(&format!(
-                        "Content not found: {}",
-                        content_id
-                    ))),
-                }
+                self.handle_content_head_post_bytes(&headers, &body_bytes, content_id, app_ctx)
+                    .await
             }
             _ => Ok(response::method_not_allowed()),
+        }
+    }
+
+    /// POST body for [`Self::handle_content_head`] — the notary HEAD-declare
+    /// write. Split out (headers + raw body bytes rather than `Request<Incoming>`)
+    /// so it is directly unit-testable: `Incoming` cannot be constructed outside a
+    /// real hyper connection, the same reason `handle_create_pin_bytes` exists.
+    ///
+    /// Ordering is the load-bearing contract this function exists to pin:
+    /// (a)/(a2) authentication + authorship resolution run FIRST, unconditionally
+    /// — a missing credential (401) or a resolved-but-wrong author (403) is
+    /// refused before any admission/backpressure decision. Only once authorship
+    /// is CONFIRMED does (d2) apply write-admission backpressure — a confirmed
+    /// author can still see the catching-up 503 if the write pool is genuinely
+    /// exhausted, but a non-author can never be masked behind that shed. This is
+    /// the fix for the bug where a non-author's move raced the admission shed and
+    /// won with a 503 instead of a 401/403 authority refusal (see
+    /// `head_declare_authority_precedes_catching_up_shed_tests` below and
+    /// `genesis/a2o/features/dataplane/notary-authority.feature`).
+    async fn handle_content_head_post_bytes(
+        &self,
+        headers: &hyper::HeaderMap,
+        body_bytes: &[u8],
+        content_id: &str,
+        app_ctx: &db::AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        /// POST body: the explicit action to pin as HEAD. Absent (or absent body)
+        /// asks the coordinator to resolve the author's latest committed action.
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct DeclareHeadBody {
+            #[serde(default)]
+            head_action_hash: Option<String>,
+        }
+
+        let pool = self
+            .db_pool
+            .as_ref()
+            .ok_or_else(|| StorageError::Internal("Database pool not available".into()))?;
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+
+        // (a) AUTH FIRST — before any existence check, and (per the exemption in
+        // `is_head_declare_write` / `handle_request`) before any admission-shed
+        // decision. Caller identity is derived EXCLUSIVELY from the request: the
+        // `X-Agent-Cid` header (doorway injects it only after validating a
+        // bearer; Tauri-direct callers set it themselves). We deliberately do NOT
+        // use `extract_agent_cid`'s `local_sessions` fallback here — genesis pods
+        // mint an ambient active session at boot (genesis_self_heal_identity,
+        // GENESIS_SELF_HEAL_IDENTITY=1 on the alpha manifests), so an anonymous
+        // probe would be silently authenticated on those pods and fall through to
+        // a 404 instead of 401. A notarization write requires a request-borne
+        // credential: no header → 401, before any DB/conductor access.
+        let caller_cid = match headers
+            .get("X-Agent-Cid")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string())
+        {
+            Some(cid) => cid,
+            None => {
+                return Ok(response::json_response(
+                    StatusCode::UNAUTHORIZED,
+                    &serde_json::json!({
+                        "error": "authentication required: only the author may move a declared HEAD"
+                    }),
+                ));
+            }
+        };
+
+        // (a2) Resolve the caller value to an agent key BEFORE any authorship
+        // comparison. `X-Agent-Cid` may carry either a Holochain agent key
+        // (uhCA…, Tauri-direct) OR a human slug (doorway forwards
+        // `claims.human_id`, e.g. "human-matthew-manager"). These are DISTINCT
+        // identity namespaces — a raw slug-vs-agent-key string compare always
+        // fails (see "Identity & Transport-Identity Coherence" in this crate's
+        // CLAUDE.md: never cross-namespace string-compare; resolve slug →
+        // agent_cid first). Resolve a slug to its `humans.agent_pub_key`; fail
+        // closed (403) on a write when the caller cannot be proven to own an
+        // agent key.
+        let caller_agent_key = if caller_cid.starts_with("uhCA") {
+            caller_cid.clone()
+        } else {
+            match crate::db::humans::get_human_by_id(&mut conn, &caller_cid)?
+                .and_then(|h| h.agent_pub_key)
+            {
+                Some(key) => key,
+                None => {
+                    return Ok(response::forbidden(&serde_json::json!({
+                        "error": "caller identity cannot be resolved to an agent key; cannot prove authorship"
+                    })));
+                }
+            }
+        };
+
+        // (b) Parse body { headActionHash?: String } — absent body → None.
+        let head_action_hash: Option<String> = if body_bytes.is_empty() {
+            None
+        } else {
+            match serde_json::from_slice::<DeclareHeadBody>(body_bytes) {
+                Ok(b) => b.head_action_hash,
+                Err(e) => return Ok(response::bad_request(&format!("Invalid JSON: {}", e))),
+            }
+        };
+
+        // (c) Resolve the lamad conductor bridge.
+        let hc = match self.hc_registry.as_ref().and_then(|r| r.lamad_client()) {
+            Some(hc) => hc,
+            None => {
+                return Ok(response::service_unavailable(
+                    "Conductor bridge unavailable; cannot declare content head",
+                ));
+            }
+        };
+
+        // (d) Resolve the notary HEAD, then author-gate. The comparison is
+        // between `caller_agent_key` (resolved slug→agent_cid in (a2)) and
+        // `head.author` — BOTH now Holochain agent keys (uhCAk…, same
+        // namespace), so the string compare is legal (the earlier "caller_cid
+        // and head.author are both uhCAk" claim was wrong: caller_cid can be a
+        // doorway human slug). A None author fails closed.
+        let head =
+            match crate::services::conductor_writes::call_resolve_content_head(&hc, content_id)
+                .await?
+            {
+                Some(h) => h,
+                None => {
+                    return Ok(response::not_found(
+                        "content has no version chain on this notary",
+                    ));
+                }
+            };
+        let is_author = head.author.as_ref().map(|a| a.as_str()) == Some(caller_agent_key.as_str());
+        if !is_author {
+            return Ok(response::forbidden(&serde_json::json!({
+                "error": "caller is not the author of this content"
+            })));
+        }
+
+        // (d2) NOW apply write-admission backpressure — reached only by a caller
+        // whose authorship has already been confirmed. This route is carved out
+        // of the top-of-dispatch admission gate (`is_head_declare_write` in
+        // `handle_request`) specifically so an unauthorized caller is never shed
+        // before being refused; a confirmed AUTHOR can still be shed here with the
+        // same catching-up 503 the blanket gate would have produced, if the write
+        // pool is genuinely exhausted.
+        let _write_permit = match self.request_semaphore.clone().try_acquire_owned() {
+            Ok(permit) => permit,
+            Err(_) => {
+                let available = self.request_semaphore.available_permits();
+                warn!(
+                    target: "upstream_shed",
+                    counter = "storage_admission_shed_total",
+                    path = "/db/content/{id}/head",
+                    pool = "write",
+                    available,
+                    "storage request admission at ceiling — shedding authorized HEAD-declare write (503 + Retry-After)"
+                );
+                return Ok(crate::services::response::too_many_requests_with_retry(
+                    STORAGE_SHED_RETRY_AFTER_SECS,
+                    available,
+                ));
+            }
+        };
+
+        // (e) Declare / advance the HEAD via the conductor. Coordinator error
+        // substrings map to the right HTTP class.
+        let declared = match crate::services::conductor_writes::call_declare_content_head(
+            &hc,
+            content_id,
+            head_action_hash,
+        )
+        .await
+        {
+            Ok(h) => h,
+            Err(e) => {
+                let msg = e.to_string();
+                if msg.contains("not the author") {
+                    return Ok(response::forbidden(&serde_json::json!({ "error": msg })));
+                } else if msg.contains("not in the version chain") {
+                    return Ok(response::bad_request(&msg));
+                } else {
+                    return Ok(response::json_response(
+                        StatusCode::BAD_GATEWAY,
+                        &serde_json::json!({ "error": msg }),
+                    ));
+                }
+            }
+        };
+
+        // Eager-stamp the projection so the local read is coherent immediately
+        // (not only once the async projection signal lands) — mirrors
+        // update_via_conductor. Field mapping mirrors the ContentCommitted
+        // projection arm (rea_projection.rs).
+        let content = declared.content;
+        let size_i32 = content
+            .content_size_bytes
+            .map(|n| i32::try_from(n).unwrap_or(i32::MAX));
+        let patch = db::content_diesel::ContentProjectionPatch {
+            blob_cid: content.blob_cid,
+            content_size_bytes: size_i32,
+            title: Some(content.title),
+            description: Some(content.description),
+            content_type: Some(content.content_type),
+            content_format: Some(content.content_format),
+            reach: Some(content.reach),
+            metadata_json: Some(content.metadata_json),
+        };
+        db::content_diesel::stamp_declared_head(
+            &mut conn,
+            app_ctx,
+            content_id,
+            declared.head_action_hash.as_str(),
+            Some(declared.declared_at),
+            Some(patch),
+        )?;
+
+        // 200 with the fresh HEAD answer, re-read from the stamped row.
+        match db::content_diesel::get_content_with_tags(
+            &mut conn,
+            app_ctx,
+            content_id,
+            db::content_diesel::MinTrust::Invisible,
+        )? {
+            Some(cwt) => match crate::views::content_head_view_from_content(&cwt.content) {
+                Some(view) => Ok(response::ok(&view)),
+                None => Ok(response::not_found(
+                    "no notarized head declared for this content",
+                )),
+            },
+            None => Ok(response::not_found(&format!(
+                "Content not found: {}",
+                content_id
+            ))),
         }
     }
 
@@ -15319,6 +15448,152 @@ mod session_exchange_tests {
             resp.status, 201,
             "provide pin on a peer-capable node must succeed"
         );
+    }
+}
+
+// =============================================================================
+// POST /db/content/{id}/head — authority-refusal-precedes-catching-up-shed
+// ordering (2026-08-09 bug fix).
+//
+// Measured live on edge #1327's Dataplane Validation: a non-author's move of a
+// declared HEAD, probed while the write-admission pool was exhausted
+// ("catching-up"), returned 503 {"status":"catching-up"} instead of a 401/403
+// authority refusal — the shed raced ahead of `handle_content_head_post_bytes`'s
+// (a)/(a2) auth-first checks and won. These tests pin the fixed ordering: the
+// authority refusal (401 missing credential, 403 unresolvable/wrong identity)
+// is now reachable and correct EVEN with the write-admission pool fully
+// drained, because `is_head_declare_write` (above `admission_is_read_method`)
+// carves this route out of the blanket top-of-dispatch shed in `handle_request`,
+// and the write-admission check moves INSIDE `handle_content_head_post_bytes`,
+// after authorship is confirmed (see its "(d2)" comment). The corresponding
+// a2o assertion (never edited by this fix, per the shift's oracle rule) is
+// `genesis/a2o/steps/dataplane.steps.ts` — "the HEAD authority surface refuses
+// a non-author move ..." — which backs `@concern:notary-authority`
+// (`genesis/a2o/features/dataplane/notary-authority.feature`).
+// =============================================================================
+#[cfg(test)]
+mod head_declare_authority_precedes_catching_up_shed_tests {
+    use super::*;
+    use crate::test_util::test_pool;
+
+    async fn test_server() -> HttpServer {
+        let blob_store = Arc::new(
+            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap()).with_db_pool(test_pool())
+    }
+
+    /// Drain the write-admission pool to zero permits and hold them for the
+    /// caller's scope — models "peer is in the catching-up shed state" (write
+    /// pool genuinely exhausted, e.g. post-restart replication churn).
+    fn drain_write_pool(server: &HttpServer) -> Vec<tokio::sync::OwnedSemaphorePermit> {
+        let mut held = Vec::new();
+        while let Ok(permit) = server.request_semaphore.clone().try_acquire_owned() {
+            held.push(permit);
+        }
+        held
+    }
+
+    /// THE regression this fix closes: an unauthenticated (no `X-Agent-Cid`
+    /// header) HEAD-declare move, probed while the write-admission pool is
+    /// fully exhausted, must still be refused 401 — never masked by the
+    /// catching-up 503. Exercises the exact request shape the a2o step sends
+    /// (`postRaw` with no auth headers).
+    #[tokio::test]
+    async fn non_author_missing_credential_refused_401_even_when_write_pool_exhausted() {
+        let server = test_server().await;
+        let _held = drain_write_pool(&server);
+        assert_eq!(
+            server.request_semaphore.available_permits(),
+            0,
+            "precondition: write-admission pool must be fully exhausted"
+        );
+
+        let ctx = AppContext::default_lamad();
+        let headers = hyper::HeaderMap::new(); // no X-Agent-Cid
+        let resp = server
+            .handle_content_head_post_bytes(
+                &headers,
+                b"",
+                "e2e-notary-authority-nonauthor-probe",
+                &ctx,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            resp.status(),
+            StatusCode::UNAUTHORIZED,
+            "a missing credential must be refused 401 regardless of write-pool pressure — \
+             a catching-up 503 here would let a non-author win the race by exhausting the pool"
+        );
+    }
+
+    /// A credential that cannot be resolved to an agent key (unknown human
+    /// slug) is a 403 — also refused before the write-admission shed, for the
+    /// same reason: authority refusal must never be masked by backpressure.
+    #[tokio::test]
+    async fn non_author_unresolvable_identity_refused_403_even_when_write_pool_exhausted() {
+        let server = test_server().await;
+        let _held = drain_write_pool(&server);
+        assert_eq!(server.request_semaphore.available_permits(), 0);
+
+        let ctx = AppContext::default_lamad();
+        let mut headers = hyper::HeaderMap::new();
+        headers.insert(
+            "X-Agent-Cid",
+            hyper::header::HeaderValue::from_static("human-does-not-exist"),
+        );
+        let resp = server
+            .handle_content_head_post_bytes(
+                &headers,
+                b"",
+                "e2e-notary-authority-nonauthor-probe",
+                &ctx,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            resp.status(),
+            StatusCode::FORBIDDEN,
+            "an unresolvable caller identity must be refused 403 regardless of write-pool pressure"
+        );
+    }
+
+    /// Baseline (pool NOT exhausted): unchanged behavior — same 401 for a
+    /// missing credential, proving the fix didn't alter the happy-path status.
+    #[tokio::test]
+    async fn non_author_missing_credential_refused_401_when_pool_healthy() {
+        let server = test_server().await;
+        assert!(server.request_semaphore.available_permits() > 0);
+
+        let ctx = AppContext::default_lamad();
+        let headers = hyper::HeaderMap::new();
+        let resp = server
+            .handle_content_head_post_bytes(
+                &headers,
+                b"",
+                "e2e-notary-authority-nonauthor-probe",
+                &ctx,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    /// Dispatch-level companion to the two tests above: the predicate that
+    /// exempts this route from the blanket admission gate in `handle_request`
+    /// must match the exact path shape the a2o probe hits.
+    #[test]
+    fn head_declare_route_is_admission_exempt_at_dispatch() {
+        assert!(is_head_declare_write(
+            &Method::POST,
+            "/db/content/e2e-notary-authority-nonauthor-probe/head"
+        ));
     }
 }
 
