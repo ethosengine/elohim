@@ -194,9 +194,16 @@ def is_non_filesystem_shape(
     clean = tok.strip("/")
     if not clean:
         return True
-    # Leading slash and no file extension → HTTP route or absolute host path.
+    # Leading slash and no file extension → HTTP route or absolute host path
+    # — UNLESS the first segment names a real top-level repo directory. That
+    # guard mirrors the two-segment test the VOCAB_OR_ROUTE_RE branch below
+    # already applies, and for the same reason: an absolute-form directory
+    # citation like `/genesis/docs/superpowers/sprints` (a renamed or deleted
+    # subdirectory) must still fall through to be checked, not be dismissed
+    # outright as a route just because it starts with `/`.
     if tok.startswith("/") and not _has_file_extension(clean):
-        return True
+        if clean.split("/", 1)[0] not in top_level:
+            return True
     # Vocabulary triple (`own/ownership/sovereign`, `steward/contributor/authored`)
     # or bare route: all-lowercase segments, no extension — dismissed ONLY when
     # its leading TWO segments do not form a real path. A one-segment guard is
@@ -346,7 +353,15 @@ PROCESS_STATUS_PATTERNS = [
 # indicate it's a tool/code reference rather than narrative status).
 EXEMPT_SUBSTR_WINDOW = 80  # chars on either side
 EXEMPT_SUBSTRINGS = ("TaskUpdate", "status: \"in_progress\"", "status='in_progress'", "in_progress\"")
-NEGATION_WINDOW = 60  # chars before the match, within its clause, to scan for negation
+NEGATION_WINDOW = 60  # chars before the match, within its clause, to scan for framing negation
+BARE_NEGATION_WINDOW = 20  # chars — bare no/not are common general-purpose words; only an
+# occurrence right next to the match plausibly negates it. A 60-char window let an
+# unrelated "no"/"not" earlier in the same (unpunctuated) clause suppress a real finding
+# ("There is no doubt the module is currently under active development" has "no"
+# negating "doubt", not "currently"). "never"/"avoid"/"instead of"/"rather than" are
+# deliberate authorial framing words, not general negators, so they keep the wide window.
+STRONG_NEGATION_RE = re.compile(r"\b(never|avoid|instead of|rather than)\b", re.IGNORECASE)
+BARE_NEGATION_RE = re.compile(r"\b(not|no)\b", re.IGNORECASE)
 
 # `in-flight` is also the PROPER NOUN of a shipped mechanism ("the in-flight
 # hook", "in-flight memory-to-code coherence"). Used as a compound modifier
@@ -380,18 +395,42 @@ def _is_quoted_example(body: str, start: int, end: int) -> bool:
     # match opened inside one.
     if line[:rel].count("`") % 2 == 1:
         return True
-    # Count quote delimiters before the match on its line; an odd count means
-    # the match opened inside a quotation.
-    for q in ('"', "“", "'"):
-        if line.count(q) >= 2 and line[:rel].count(q) % 2 == 1:
-            return True
-    # Explicit negation framing ("never X", "not X", "no X") — but only within
-    # the SAME CLAUSE as the match. A line-wide search suppressed real drift
+    # Paired quote delimiters that straddle the match mean it sits inside a
+    # quotation. Straight `"` is symmetric — an odd count before the match
+    # means the match opened inside one. Curly quotes are NOT symmetric: `“`
+    # opens and `”` closes, so a correctly-paired “…” never produces an odd
+    # count of `“` alone (the old single-character parity test could never
+    # fire) — track opens/closes separately and compare. The ASCII apostrophe
+    # is excluded when it sits directly between two letters — a possessive
+    # (`doorway's`) or contraction (`don't`) — since that shape is never a
+    # quote delimiter and made ordinary possessive prose read as "quoted";
+    # what's left of `'` still pairs like any other quote mark.
+    if line.count('"') >= 2 and line[:rel].count('"') % 2 == 1:
+        return True
+    quote_apostrophes = [
+        i
+        for i, ch in enumerate(line)
+        if ch == "'" and not (0 < i < len(line) - 1 and line[i - 1].isalpha() and line[i + 1].isalpha())
+    ]
+    if len(quote_apostrophes) >= 2 and sum(1 for i in quote_apostrophes if i < rel) % 2 == 1:
+        return True
+    opens_before = line[:rel].count("“")
+    closes_before = line[:rel].count("”")
+    if opens_before > closes_before and "”" in line[rel:]:
+        return True
+    # Explicit negation framing ("never X", "avoid X") — but only within the
+    # SAME CLAUSE as the match. A line-wide search suppressed real drift
     # whenever an unrelated earlier clause happened to contain a negation:
     # "The design is not finalized, and the module is currently under dev."
-    # has `not` negating `finalized`, not the flagged `currently`.
-    clause = re.split(r"[,;:.—]", line[:rel])[-1][-NEGATION_WINDOW:]
-    if re.search(r"\b(never|not|avoid|instead of|rather than|no)\b", clause, re.IGNORECASE):
+    # has `not` negating `finalized`, not the flagged `currently`. Bare
+    # "no"/"not" get a much tighter trailing window within that clause — see
+    # BARE_NEGATION_WINDOW — since they are common general-purpose words that
+    # routinely appear elsewhere in an unpunctuated clause without negating
+    # the flagged phrase at all.
+    clause = re.split(r"[,;:.—]", line[:rel])[-1]
+    if STRONG_NEGATION_RE.search(clause[-NEGATION_WINDOW:]):
+        return True
+    if BARE_NEGATION_RE.search(clause[-BARE_NEGATION_WINDOW:]):
         return True
     return False
 

@@ -495,9 +495,10 @@ def _brand_vocabulary_boundary(write: dict) -> bool:
 
     path = Path(write.get("path") or "")
     normalized_path = path.as_posix().lower()
-    if any(normalized_path.endswith(suffix) for suffix in _BRAND_LINT_INTERNAL_SUFFIXES):
+    rooted_path = f"/{normalized_path.lstrip('/')}"  # repo-relative and absolute paths compare alike
+    if any(rooted_path.endswith(suffix) for suffix in _BRAND_LINT_INTERNAL_SUFFIXES):
         return False  # the validator and its fixtures necessarily enumerate the vocabulary
-    if "/.claude/memory-kit/" in f"/{normalized_path.lstrip('/')}":
+    if "/.claude/memory-kit/" in rooted_path:
         return False  # generated observation ledgers are neither code nor authored configuration
     suffix = path.suffix.lower()
     basename = path.name.lower()
@@ -513,7 +514,7 @@ def _brand_vocabulary_boundary(write: dict) -> bool:
 
     lines = post.splitlines()
     package_body_is_prose = (
-        suffix == ".json" and "/.epr-meta/elohim/packages/" in f"/{normalized_path.lstrip('/')}"
+        suffix == ".json" and "/.epr-meta/elohim/packages/" in rooted_path
     )
     prose_lines = _brand_prose_lines(lines, suffix, package_body_is_prose)
     hits: list[tuple[int, str, str]] = []

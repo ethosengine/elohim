@@ -14,6 +14,7 @@ ROOT = epr_meta.find_repo_root(Path(__file__).resolve())
 POLICIES, POLICY_ERRORS = epr_meta.load_policies(ROOT)
 POLICY_REF = "brand-vocabulary-boundary@1"
 RULE_ID = "brand-vocabulary-boundary"
+GUARD = epr_meta.REFERENCE_VALIDATORS["epr:validator-brand-vocabulary-boundary"]
 
 _failures: list[str] = []
 _passed = 0
@@ -139,6 +140,18 @@ with tempfile.TemporaryDirectory() as td:
         tmp_write(tmp, ".claude/memory-kit/generated-report.json", None, generated_report),
     )
     check("generated memory-kit observation stays silent", v is None, f"got {v}")
+
+    # The validator and its fixtures enumerate the vocabulary by necessity, so they are exempt —
+    # whether the hook hands the write an absolute path or a repo-relative one.
+    self_source = 'MISHPAT_ROLE_NAME = "mishpat"\n'
+    for rel in (
+        ".claude/scripts/_lib/epr_meta.py",
+        ".claude/scripts/_lib/__tests__/brand_vocabulary_guard_test.py",
+        "elohim/eprfs/epr-cli/src/repository_validators.rs",
+    ):
+        for label, path in (("repo-relative", rel), ("absolute", str(ROOT / rel))):
+            fired = GUARD({"path": path, "content": self_source, "is_new": True})
+            check(f"{label} {rel} is self-exempt", not fired, f"fired on {path}")
 
     # Internal compatibility is not an exception while the protocol is still in development.
     marked = (
