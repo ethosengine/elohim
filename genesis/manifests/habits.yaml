@@ -197,8 +197,31 @@ habits:
     active: true
     checks:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
-      - "sweettest rea_commitment_replication (elohim/holochain/tests/sweettest — unignored 837b772c9; isolated late-join conductors, bounded 60s peer-B retrieval; STANDING RED until the Matthew→Adam link-op/fetch seam is cured)"
+      - "sweettest rea_commitment_replication (elohim/holochain/tests/sweettest — unignored 837b772c9; isolated late-join conductors, bounded 60s peer-B retrieval; RED but MIS-ATTRIBUTED per DELTA 2026-08-09 — it measures one-time cold-cell Wasm warm-up, not REA retrieval; do not read it as a fetch-seam probe until it warms peer B)"
     evidence: >
+      DELTA 2026-08-09 (dev@b3c58d9ca, measured locally): the REA leg of this
+      node is MIS-ATTRIBUTED and must stop being read as a fetch red. Direct
+      instrumentation shows REA replication is HEALTHY — ops integrate on both
+      cells 0.5-2.0s after peer exchange and peer B answers get_rea_commitment
+      in 12ms. The 60s budget is spent BEFORE the read: peer B's first zome
+      call costs 94.37s, and Alice pays 100.97s on HER first call while
+      bootstrap-disabled with no peers at all (6.9ms on her second) — a
+      one-time, per-cell, purely LOCAL Wasm instantiation of the 13.4MB
+      content_store.wasm, which cannot be a network cost. The green sibling
+      lamad.rs::resolve_content_head_local_is_nonblocking_and_converges is
+      structurally identical and passes only because it warms B's runtime
+      first, with a comment naming exactly this. The oracle was NOT edited (it
+      is this check); making it measure retrieval is a habit-owner decision.
+      One real substrate finding stands, unproven as the alpha cause: the same
+      reconcile sweep heals content via resolve_content_heads_local (Local)
+      and REA via get_rea_commitment (Network) — projection_reconcile.rs:447
+      vs :2389. A local-first zome variant was built, packed, measured and
+      deliberately REVERTED: it does not fix this red, no test reproduces the
+      empty-arc condition it targets, and its Err->Ok(None) fall-through would
+      re-define the conductor_missing counter the live diagnosis is reading.
+      Full evidence + next legal moves in backlog
+      genesis-pair-cross-conductor-fetch-blocks-canonical-convergence.md.
+      Node stays RED on the a2o scenarios, which are the authoritative probe.
       DELTA 2026-08-09 (edge #1327): MEASURED red — the cucumber suite ran
       (64 scenarios, 37 passed) and @concern:notary-authority went 0
       passed / 3 failed, all three on alpha-A: GET /db/content 503

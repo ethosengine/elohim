@@ -24,6 +24,120 @@ tags: [substrate, kitsune2, tx5, dht-fetch, genesis-pair, notary-authority, f-t1
 
 # Genesis-pair cross-conductor DHT fetch regression
 
+## DELTA 2026-08-09 — the sweettest leg is MIS-ATTRIBUTED: it measures cold-cell warm-up, not REA retrieval
+
+The `rea_commitment_replication` red is **not** evidence that peer B cannot
+retrieve A-authored REA entries. Measured directly tonight (dev@b3c58d9ca,
+lamad.dna repacked from HEAD, isolated conductors, `--nocapture`): B retrieves
+the commitment in **12 ms**. The 60 s budget is spent before the read ever runs.
+
+Instrumented run (scratch harness, since the oracle itself must not be edited):
+
+```text
+DIAG a[first call, no peers]              100.973115492s
+DIAG a[second call =v1]                     6.916181ms
+DIAG: peer info exchanged
+DIAG: await_consistency -> true in        501.578317ms
+DIAG b[warmup export_schema_version=v1]    94.374890630s
+DIAG b[0]  14.518172ms  Ok(Some(diag-project-epr-...))
+DIAG b[1]  13.089584ms  Ok(Some(...))
+DIAG b[2]  11.012296ms  Ok(Some(...))
+DIAG a[control] 14.692262ms ok_some=true
+```
+
+Three facts follow, and they retire the leading hypothesis in the REOPENED
+section below:
+
+1. **DHT replication of REA commitments is healthy.** `await_consistency`
+   reaches integration on both cells in **0.5–2.0 s** after peer exchange. The
+   `IdToCommitment` link op and its target record both arrive. There is no
+   link-op creation, link-target integration, or fetch defect to find here.
+2. **The ~95 s is a one-time, per-cell, purely LOCAL cost.** Alice pays
+   **100.97 s** on her FIRST zome call while `disable_bootstrap = true` and no
+   peer exchange has happened — she has no peers at all, so it cannot be a
+   network cost — and **6.9 ms** on her second. B pays **94.37 s** on
+   `export_schema_version`, a function that reads nothing and returns `"v1"`.
+   This is Wasm module instantiation of the 13.4 MB `content_store.wasm`
+   (3.5 MB packed DNA), not op validation and not a fetch.
+3. **The oracle does not warm B; its green sibling does.** In the same suite,
+   `lamad.rs::resolve_content_head_local_is_nonblocking_and_converges` is
+   structurally identical (isolated conductors, late join, `await_consistency(60)`)
+   and passes — because it first calls `export_schema_version` under the comment
+   *"Initialize B's Wasm runtime without reading its DHT… measures a cold LOCAL
+   VIEW, not one-time Wasm initialization."* `rea_commitment_replication` omits
+   that warm-up, so its 60 s retrieval bound is consumed by a cost that is not
+   retrieval. The 2026-07-25 `await_consistency` barrier was restored to make a
+   poll failure MEAN something; it does — it now proves the ops are already
+   there, which is exactly why the remaining minute cannot be replication.
+
+**Disposition.** The oracle is a habit check and was not edited. Making it
+measure what it claims needs one of: the sibling's warm-up call before the
+bounded poll, or a retrieval bound that excludes one-time cell warm-up. That is
+a habit-owner decision, not a substrate fix. No zome change was landed — see
+below for why the tempting one was rejected.
+
+### The one real substrate finding: content heals LOCAL, REA heals NETWORK
+
+Independent of the test, the same reconcile sweep reads the two streams with
+**different retrieval strategies**:
+
+| leg | extern | strategy | site |
+|---|---|---|---|
+| content heal | `resolve_content_heads_local` | `GetStrategy::Local` | `elohim/elohim-storage/src/p2p/projection_reconcile.rs:447` |
+| REA heal | `get_rea_commitment` | `GetStrategy::default()` = **Network** | `elohim/elohim-storage/src/p2p/projection_reconcile.rs:2389` |
+
+`get_rea_commitment` (`elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs:14894`)
+uses `GetStrategy::default()` for `get_links` and `GetOptions::default()` for
+the record fetch — both `Network`. The content plane was deliberately moved off
+that in July for a documented reason (same file, `resolve_content_head_local`
+doc, lines 3596-3605): *"kitsune2 resets that arc to `Empty` on every conductor
+restart… a `Network` resolve leaves the box and dies on the conductor's 60s
+request timeout — and the heal traffic itself keeps the fetch queue from
+draining, which is what blocks the arc from reconverging."* The REA leg never
+got that cure, while `conductor_writes::get_rea_commitment`'s own doc promises
+the caller *"`Ok(None)` when the entry is not on this conductor's DHT view"* —
+a LOCAL contract served by a NETWORK read.
+
+This is a genuine contract mismatch and the sharpest available lead for the
+alpha `conductor_missing=62 / local_total=0` signature. It is **not yet proven**
+to be its cause: the Loki line shows those 62 counted as *missing* rather than
+as timeouts, which is what a fast empty answer looks like, not a stalled one.
+
+**A local-first variant of `get_rea_commitment` was written, built, packed and
+measured tonight, then deliberately reverted** rather than landed:
+
+- it does not fix the sweettest red (proven above — the red is warm-up), so the
+  oracle could not verify it;
+- no available test reproduces the empty-arc condition it targets (in sweettest
+  B becomes an authority within seconds, so the warm `Network` read is already
+  ~12 ms);
+- the local→network fall-through requires turning "record not retrievable" from
+  `Err` into `Ok(None)`, which **re-defines the `conductor_missing` counter this
+  very investigation is reading**. Changing the meaning of the operator's
+  measuring instrument on an unproven hypothesis is the wrong trade mid-diagnosis.
+
+Next legal move, in order: (1) decide the oracle's warm-up question so the habit
+check measures retrieval; (2) reproduce the empty-arc read on a real cold-arc
+conductor (or instrument `get_rea_commitment` call latency on adam) to confirm
+or refute the Network-strategy lead before changing the zome; (3) if confirmed,
+mirror the content cure properly — add `get_rea_commitment_local` and migrate
+the healer to it (coordinator-only, `update_coordinators` hot-swap, DNA hash
+unchanged), rather than silently re-pointing the existing extern.
+
+### Container note for the next reader
+
+Reproducing this locally needs two env corrections the pool/profile does not
+supply: `RUSTFLAGS=""` for the sweettest workspace (the ambient
+`--cfg getrandom_backend="custom"` forces a full rebuild and re-runs
+`datachannel-sys`'s build script) and
+`BINDGEN_EXTRA_CLANG_ARGS="-I/usr/lib/clang/21/include"` (libclang lives in
+`/usr/lib64` while its resource headers are in `/usr/lib`, so bindgen fails with
+`'stdbool.h' file not found`). The branch-family slot from `cargo-pool key` is
+the warm one. Separately, `nix` is absent from this container and rustc 1.97.1's
+`wasm-ld` rejects the HDK host-import symbols, so a local DNA pack needs
+`-C link-arg=--allow-undefined`; every DNA fails identically without it, so that
+is environmental, not a code regression.
+
 ## REOPENED 2026-07-24 — REA inventory crosses the pair; Adam's conductor cannot fetch the 62-row set
 
 This is the same authority-boundary class this thread resolved for canonical
