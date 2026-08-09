@@ -1,0 +1,1218 @@
+{
+  "computedAt": "2026-08-07T14:14:27+00:00",
+  "computedBy": "Matthew Dowell",
+  "counts": {
+    "byCode": {
+      "clippy::assigning_clones": 2,
+      "clippy::duration_suboptimal_units": 46,
+      "clippy::format_push_string": 20,
+      "clippy::non_std_lazy_statics": 1,
+      "clippy::pub_underscore_fields": 3,
+      "clippy::ref_option": 4,
+      "clippy::semicolon_if_nothing_returned": 2,
+      "clippy::unchecked_time_subtraction": 4,
+      "clippy::unnecessary_literal_bound": 1,
+      "clippy::unnested_or_patterns": 8,
+      "clippy::unused_async": 38,
+      "dead_code": 1,
+      "unused_imports": 1
+    },
+    "total": 131
+  },
+  "derivationKey": "8e7f3fe36e38a4222b34238906b2371faeeee2c5fbccc0c27a974bd9c1b1bc6b",
+  "env": {
+    "cargo_lock": "ea862a66c0bbe747c12801cd816e8f9f8c847a3284443ad7c096bc6636a7f9a9",
+    "clippy": "clippy 0.1.97 (8bab26f4f6 2026-07-14)",
+    "clippy_toml": "6be7ffa1f863624e5998d24d1524fe86e9e6336259ed25e4e0f35e432c2a4009",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "rustflags": ""
+  },
+  "evidence": "claimed",
+  "findings": [
+    {
+      "code": "unused_imports",
+      "endLine": 7,
+      "file": "/projects/elohim/elohim/constitution/src/stack.rs",
+      "level": "warning",
+      "line": 7,
+      "message": "unused import: `std::sync::Arc`",
+      "rendered": "warning: unused import: `std::sync::Arc`\n --> /projects/elohim/elohim/constitution/src/stack.rs:7:5\n  |\n7 | use std::sync::Arc;\n  |     ^^^^^^^^^^^^^^\n  |\n  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n"
+    },
+    {
+      "code": "dead_code",
+      "endLine": 186,
+      "file": "/projects/elohim/elohim/constitution/src/verification.rs",
+      "level": "warning",
+      "line": 186,
+      "message": "field `cached_at` is never read",
+      "rendered": "warning: field `cached_at` is never read\n   --> /projects/elohim/elohim/constitution/src/verification.rs:186:5\n    |\n183 | struct CachedHash {\n    |        ---------- field in this struct\n...\n186 |     cached_at: chrono::DateTime<chrono::Utc>,\n    |     ^^^^^^^^^\n    |\n    = note: `CachedHash` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 74,
+      "file": "src/bootstrap/mod.rs",
+      "level": "warning",
+      "line": 45,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n  --> src/bootstrap/mod.rs:45:1\n   |\n45 | / pub async fn handle_put(\n46 | |     store: Arc<BootstrapStore>,\n47 | |     body: Bytes,\n48 | |     network: &str,\n...  |\n73 | |     msgpack_response(&rmpv::Value::Nil)\n74 | | }"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 107,
+      "file": "src/bootstrap/mod.rs",
+      "level": "warning",
+      "line": 77,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/bootstrap/mod.rs:77:1\n    |\n 77 | / pub async fn handle_random(\n 78 | |     store: Arc<BootstrapStore>,\n 79 | |     body: Bytes,\n 80 | |     network: &str,\n...   |\n106 | |     msgpack_response(&rmpv::Value::Array(values))\n107 | | }"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 114,
+      "file": "src/bootstrap/mod.rs",
+      "level": "warning",
+      "line": 110,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/bootstrap/mod.rs:110:1\n    |\n110 | / pub async fn handle_now() -> Response<Full<Bytes>> {\n111 | |     let now_ms = current_time_ms();\n112 | |     debug!(\"Bootstrap NOW: {}\", now_ms);\n113 | |     msgpack_response(&rmpv::Value::Integer(now_ms.into()))\n114 | | }\n    | |_^\n    |"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 280,
+      "file": "src/bootstrap/store.rs",
+      "level": "warning",
+      "line": 280,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/bootstrap/store.rs:280:24\n    |\n280 |         let interval = Duration::from_secs(60); // Run every minute\n    |                        ^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\n    = note: `-W clippy::duration-suboptimal-units` implied by `-W clippy::pedantic`\n    = help: to override `-W clippy::pedantic` add `#[allow(clippy::duration_suboptimal_units)]`\nhelp: try using from_mins"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 85,
+      "file": "src/cache/delivery_relay.rs",
+      "level": "warning",
+      "line": 85,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n  --> src/cache/delivery_relay.rs:85:30\n   |\n85 |             shard_cache_ttl: Duration::from_secs(86400), // 24 hours\n   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_hours\n   |\n85 -             shard_cache_ttl: Duration::from_secs(86400), // 24 hours"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 319,
+      "file": "src/cache/delivery_relay.rs",
+      "level": "warning",
+      "line": 307,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/cache/delivery_relay.rs:307:5\n    |\n307 | /     pub async fn get_routing_hints(\n308 | |         &self,\n309 | |         _hash: &str,\n310 | |         _requester_ip: Option<&str>,\n...   |\n318 | |         vec![]\n319 | |     }"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 88,
+      "file": "src/cache/mod.rs",
+      "level": "warning",
+      "line": 88,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n  --> src/cache/mod.rs:88:26\n   |\n88 |             content_ttl: Duration::from_secs(3600), // 1 hour\n   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_hours\n   |\n88 -             content_ttl: Duration::from_secs(3600), // 1 hour"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 89,
+      "file": "src/cache/mod.rs",
+      "level": "warning",
+      "line": 89,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n  --> src/cache/mod.rs:89:23\n   |\n89 |             list_ttl: Duration::from_secs(300),     // 5 minutes\n   |                       ^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n   |\n89 -             list_ttl: Duration::from_secs(300),     // 5 minutes"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 90,
+      "file": "src/cache/mod.rs",
+      "level": "warning",
+      "line": 90,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n  --> src/cache/mod.rs:90:23\n   |\n90 |             user_ttl: Duration::from_secs(60),      // 1 minute\n   |                       ^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n   |\n90 -             user_ttl: Duration::from_secs(60),      // 1 minute"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 91,
+      "file": "src/cache/mod.rs",
+      "level": "warning",
+      "line": 91,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n  --> src/cache/mod.rs:91:31\n   |\n91 |             cleanup_interval: Duration::from_secs(60), // Run cleanup every minute\n   |                               ^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n   |\n91 -             cleanup_interval: Duration::from_secs(60), // Run cleanup every minute"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 124,
+      "file": "src/cache/mod.rs",
+      "level": "warning",
+      "line": 124,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/cache/mod.rs:124:31\n    |\n124 |             cleanup_interval: Duration::from_secs(60),\n    |                               ^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n    |\n124 -             cleanup_interval: Duration::from_secs(60),"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 173,
+      "file": "src/cache/resolution.rs",
+      "level": "warning",
+      "line": 165,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/cache/resolution.rs:165:5\n    |\n165 | /     pub async fn set_zome_config(&self, config: ZomeCallConfig) {\n166 | |         // Note: This is a simple approach - in production you might want\n167 | |         // a separate RwLock for the config\n168 | |         info!(\n...   |\n172 | |         );\n173 | |     }"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 113,
+      "file": "src/cache/tiered.rs",
+      "level": "warning",
+      "line": 113,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/cache/tiered.rs:113:31\n    |\n113 |             blob_commons_ttl: Duration::from_secs(24 * 60 * 60),     // 24 hours\n    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_hours\n    |\n113 -             blob_commons_ttl: Duration::from_secs(24 * 60 * 60),     // 24 hours"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 114,
+      "file": "src/cache/tiered.rs",
+      "level": "warning",
+      "line": 114,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/cache/tiered.rs:114:31\n    |\n114 |             blob_private_ttl: Duration::from_secs(7 * 24 * 60 * 60), // 7 days\n    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_hours\n    |\n114 -             blob_private_ttl: Duration::from_secs(7 * 24 * 60 * 60), // 7 days"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 117,
+      "file": "src/cache/tiered.rs",
+      "level": "warning",
+      "line": 117,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/cache/tiered.rs:117:24\n    |\n117 |             chunk_ttl: Duration::from_secs(7 * 24 * 60 * 60), // 7 days\n    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_hours\n    |\n117 -             chunk_ttl: Duration::from_secs(7 * 24 * 60 * 60), // 7 days"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 40,
+      "file": "src/custodial_keys/cache.rs",
+      "level": "warning",
+      "line": 40,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n  --> src/custodial_keys/cache.rs:40:26\n   |\n40 |             default_ttl: Duration::from_secs(3600),    // 1 hour\n   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_hours\n   |\n40 -             default_ttl: Duration::from_secs(3600),    // 1 hour"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 42,
+      "file": "src/custodial_keys/cache.rs",
+      "level": "warning",
+      "line": 42,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n  --> src/custodial_keys/cache.rs:42:31\n   |\n42 |             cleanup_interval: Duration::from_secs(60), // Every minute\n   |                               ^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n   |\n42 -             cleanup_interval: Duration::from_secs(60), // Every minute"
+    },
+    {
+      "code": "clippy::pub_underscore_fields",
+      "endLine": 21,
+      "file": "src/db/schemas/api_key.rs",
+      "level": "warning",
+      "line": 21,
+      "message": "field marked as public but also inferred as unused because it's prefixed with `_`",
+      "rendered": "warning: field marked as public but also inferred as unused because it's prefixed with `_`\n  --> src/db/schemas/api_key.rs:21:5\n   |\n21 |     pub _id: Option<ObjectId>,\n   |     ^^^^^^^\n   |\n   = help: consider removing the underscore, or making the field private\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#pub_underscore_fields\n   = note: `-W clippy::pub-underscore-fields` implied by `-W clippy::pedantic`\n   = help: to override `-W clippy::pedantic` add `#[allow(clippy::pub_underscore_fields)]`"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 133,
+      "file": "src/db/schemas/app_file_cache.rs",
+      "level": "warning",
+      "line": 133,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/db/schemas/app_file_cache.rs:133:39\n    |\n133 |                         .expire_after(std::time::Duration::from_secs(86400))\n    |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_hours\n    |\n133 -                         .expire_after(std::time::Duration::from_secs(86400))"
+    },
+    {
+      "code": "clippy::pub_underscore_fields",
+      "endLine": 35,
+      "file": "src/db/schemas/host.rs",
+      "level": "warning",
+      "line": 35,
+      "message": "field marked as public but also inferred as unused because it's prefixed with `_`",
+      "rendered": "warning: field marked as public but also inferred as unused because it's prefixed with `_`\n  --> src/db/schemas/host.rs:35:5\n   |\n35 |     pub _id: Option<ObjectId>,\n   |     ^^^^^^^\n   |\n   = help: consider removing the underscore, or making the field private\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#pub_underscore_fields\n"
+    },
+    {
+      "code": "clippy::pub_underscore_fields",
+      "endLine": 135,
+      "file": "src/db/schemas/user.rs",
+      "level": "warning",
+      "line": 135,
+      "message": "field marked as public but also inferred as unused because it's prefixed with `_`",
+      "rendered": "warning: field marked as public but also inferred as unused because it's prefixed with `_`\n   --> src/db/schemas/user.rs:135:5\n    |\n135 |     pub _id: Option<ObjectId>,\n    |     ^^^^^^^\n    |\n    = help: consider removing the underscore, or making the field private\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#pub_underscore_fields\n"
+    },
+    {
+      "code": "clippy::assigning_clones",
+      "endLine": 101,
+      "file": "src/hosts/heartbeat.rs",
+      "level": "warning",
+      "line": 101,
+      "message": "assigning the result of `Clone::clone()` may be inefficient",
+      "rendered": "warning: assigning the result of `Clone::clone()` may be inefficient\n   --> src/hosts/heartbeat.rs:101:9\n    |\n101 |         heartbeat.region = self.region.clone();\n    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use `clone_from()`: `heartbeat.region.clone_from(&self.region)`\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#assigning_clones\n    = note: `-W clippy::assigning-clones` implied by `-W clippy::pedantic`\n    = help: to override `-W clippy::pedantic` add `#[allow(clippy::assigning_clones)]`\n"
+    },
+    {
+      "code": "clippy::assigning_clones",
+      "endLine": 102,
+      "file": "src/hosts/heartbeat.rs",
+      "level": "warning",
+      "line": 102,
+      "message": "assigning the result of `Clone::clone()` may be inefficient",
+      "rendered": "warning: assigning the result of `Clone::clone()` may be inefficient\n   --> src/hosts/heartbeat.rs:102:9\n    |\n102 |         heartbeat.version = self.version.clone();\n    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use `clone_from()`: `heartbeat.version.clone_from(&self.version)`\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#assigning_clones\n"
+    },
+    {
+      "code": "clippy::semicolon_if_nothing_returned",
+      "endLine": 1112,
+      "file": "src/main.rs",
+      "level": "warning",
+      "line": 1112,
+      "message": "consider adding a `;` to the last statement for consistent formatting",
+      "rendered": "warning: consider adding a `;` to the last statement for consistent formatting\n    --> src/main.rs:1112:21\n     |\n1112 |                     warn!(\"Hot cache pre-warm failed (degrade-open \u2014 cold-start may firehose): {e}\")\n     |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add a `;` here: `warn!(\"Hot cache pre-warm failed (degrade-open \u2014 cold-start may firehose): {e}\");`\n     |\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#semicolon_if_nothing_returned\n     = note: `-W clippy::semicolon-if-nothing-returned` implied by `-W clippy::pedantic`\n     = help: to override `-W clippy::pedantic` add `#[allow(clippy::semicolon_if_nothing_returned)]`\n"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 1240,
+      "file": "src/main.rs",
+      "level": "warning",
+      "line": 1240,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n    --> src/main.rs:1240:13\n     |\n1240 |             std::time::Duration::from_secs(60), // refresh interval\n     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n     |\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\n     = note: `-W clippy::duration-suboptimal-units` implied by `-W clippy::pedantic`\n     = help: to override `-W clippy::pedantic` add `#[allow(clippy::duration_suboptimal_units)]`\nhelp: try using from_mins"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 1255,
+      "file": "src/main.rs",
+      "level": "warning",
+      "line": 1255,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n    --> src/main.rs:1255:13\n     |\n1255 |             std::time::Duration::from_secs(60),\n     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n     |\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n     |\n1255 -             std::time::Duration::from_secs(60),"
+    },
+    {
+      "code": "clippy::non_std_lazy_statics",
+      "endLine": 220,
+      "file": "src/metrics.rs",
+      "level": "warning",
+      "line": 49,
+      "message": "this macro has been superseded by `std::sync::LazyLock`",
+      "rendered": "warning: this macro has been superseded by `std::sync::LazyLock`\n   --> src/metrics.rs:49:1\n    |\n 49 | / lazy_static! {\n 50 | |     /// The single process-wide registry the `/metrics` endpoint exposes.\n 51 | |     pub static ref REGISTRY: Registry = Registry::new();\n...   |\n219 | |     .unwrap();\n220 | | }\n    | |_^"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 20,
+      "file": "src/nats/client.rs",
+      "level": "warning",
+      "line": 20,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n  --> src/nats/client.rs:20:41\n   |\n20 | const DEFAULT_PING_INTERVAL: Duration = Duration::from_secs(120);\n   |                                         ^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n   |\n20 - const DEFAULT_PING_INTERVAL: Duration = Duration::from_secs(120);"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 81,
+      "file": "src/nats/gateway.rs",
+      "level": "warning",
+      "line": 81,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n  --> src/nats/gateway.rs:81:26\n   |\n81 |                 max_age: Duration::from_secs(3600), // 1 hour\n   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_hours\n   |\n81 -                 max_age: Duration::from_secs(3600), // 1 hour"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 15,
+      "file": "src/nats/routing.rs",
+      "level": "warning",
+      "line": 15,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n  --> src/nats/routing.rs:15:40\n   |\n15 | const HOST_STALE_THRESHOLD: Duration = Duration::from_secs(60);\n   |                                        ^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n   |\n15 - const HOST_STALE_THRESHOLD: Duration = Duration::from_secs(60);"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 58,
+      "file": "src/orchestrator/disaster_recovery.rs",
+      "level": "warning",
+      "line": 45,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n  --> src/orchestrator/disaster_recovery.rs:45:5\n   |\n45 | /     pub async fn start(&self) -> Result<()> {\n46 | |         info!(\"Starting disaster recovery coordinator\");\n47 | |\n48 | |         let state = Arc::clone(&self.state);\n...  |\n57 | |         Ok(())\n58 | |     }"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 161,
+      "file": "src/orchestrator/disaster_recovery.rs",
+      "level": "warning",
+      "line": 161,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/orchestrator/disaster_recovery.rs:161:28\n    |\n161 |         tokio::time::sleep(std::time::Duration::from_secs(60)).await;\n    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n    |\n161 -         tokio::time::sleep(std::time::Duration::from_secs(60)).await;"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 305,
+      "file": "src/orchestrator/disaster_recovery.rs",
+      "level": "warning",
+      "line": 269,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/orchestrator/disaster_recovery.rs:269:1\n    |\n269 | / async fn initiate_blob_transfer(\n270 | |     request: &ReplicateContentRequest,\n271 | |     source_id: &str,\n272 | |     _state: &OrchestratorState,\n...   |\n304 | |     Ok(())\n305 | | }"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 323,
+      "file": "src/orchestrator/disaster_recovery.rs",
+      "level": "warning",
+      "line": 308,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/orchestrator/disaster_recovery.rs:308:1\n    |\n308 | / async fn emit_progress(progress: ReplicationProgress) -> Result<()> {\n309 | |     debug!(\n310 | |         content_id = %progress.content_id,\n311 | |         status = ?progress.status,\n...   |\n322 | |     Ok(())\n323 | | }"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 343,
+      "file": "src/orchestrator/disaster_recovery.rs",
+      "level": "warning",
+      "line": 326,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/orchestrator/disaster_recovery.rs:326:1\n    |\n326 | / pub async fn calculate_recovery_summary(\n327 | |     failed_node_id: &str,\n328 | |     _state: &OrchestratorState,\n329 | | ) -> RecoverySummary {\n...   |\n343 | | }\n    | |_^"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 83,
+      "file": "src/orchestrator/heartbeat.rs",
+      "level": "warning",
+      "line": 67,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n  --> src/orchestrator/heartbeat.rs:67:5\n   |\n67 | /     pub async fn start(&self) -> Result<()> {\n68 | |         info!(\n69 | |             interval_secs = self.config.interval_secs,\n70 | |             failure_threshold = self.config.failure_threshold,\n...  |\n82 | |         Ok(())\n83 | |     }"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 266,
+      "file": "src/orchestrator/heartbeat.rs",
+      "level": "warning",
+      "line": 243,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/orchestrator/heartbeat.rs:243:1\n    |\n243 | / async fn trigger_disaster_recovery_for_node(\n244 | |     node_id: &str,\n245 | |     _state: &OrchestratorState,\n246 | | ) -> Result<()> {\n...   |\n265 | |     Ok(())\n266 | | }"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 112,
+      "file": "src/orchestrator/nats_provisioning.rs",
+      "level": "warning",
+      "line": 71,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/orchestrator/nats_provisioning.rs:71:5\n    |\n 71 | /     pub async fn provision_node(&self, node_id: &str) -> Result<NatsCredentials> {\n 72 | |         info!(node_id = %node_id, \"Provisioning NATS credentials\");\n...   |\n111 | |         Ok(creds)\n112 | |     }\n    | |_____^\n    |"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 123,
+      "file": "src/orchestrator/nats_provisioning.rs",
+      "level": "warning",
+      "line": 115,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/orchestrator/nats_provisioning.rs:115:5\n    |\n115 | /     pub async fn revoke_node(&self, node_id: &str) -> Result<()> {\n116 | |         warn!(node_id = %node_id, \"Revoking NATS credentials\");\n...   |\n122 | |         Ok(())\n123 | |     }\n    | |_____^\n    |"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 93,
+      "file": "src/orchestrator/node_bootstrap.rs",
+      "level": "warning",
+      "line": 76,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n  --> src/orchestrator/node_bootstrap.rs:76:5\n   |\n76 | /     pub async fn start(&self) -> Result<()> {\n77 | |         info!(\n78 | |             service_type = %self.config.mdns_service_type,\n79 | |             \"Starting mDNS listener for node discovery\"\n...  |\n92 | |         Ok(())\n93 | |     }"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 180,
+      "file": "src/orchestrator/node_bootstrap.rs",
+      "level": "warning",
+      "line": 143,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/orchestrator/node_bootstrap.rs:143:1\n    |\n143 | / pub async fn register_self(config: &NodeBootstrapConfig) -> Result<NodeInventory> {\n144 | |     let cpu_cores = std::thread::available_parallelism()\n145 | |         .map(|n| n.get() as u32)\n146 | |         .unwrap_or(1);\n...   |\n179 | |     Ok(inventory)\n180 | | }"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 211,
+      "file": "src/orchestrator/node_bootstrap.rs",
+      "level": "warning",
+      "line": 211,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/orchestrator/node_bootstrap.rs:211:28\n    |\n211 |         tokio::time::sleep(std::time::Duration::from_secs(60)).await;\n    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n    |\n211 -         tokio::time::sleep(std::time::Duration::from_secs(60)).await;"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 352,
+      "file": "src/orchestrator/node_bootstrap.rs",
+      "level": "warning",
+      "line": 324,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/orchestrator/node_bootstrap.rs:324:1\n    |\n324 | / async fn register_with_dna(inventory: &NodeInventory, _admin_port: u16) -> Result<()> {\n325 | |     // Convert inventory to DNA input\n326 | |     let input = inventory.to_registration_input();\n...   |\n351 | |     Ok(())\n352 | | }\n    | |_^"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 367,
+      "file": "src/orchestrator/node_bootstrap.rs",
+      "level": "warning",
+      "line": 355,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/orchestrator/node_bootstrap.rs:355:1\n    |\n355 | / async fn send_credentials_to_node(\n356 | |     node_id: &str,\n357 | |     _creds: &super::nats_provisioning::NatsCredentials,\n358 | |     _state: &OrchestratorState,\n...   |\n366 | |     Ok(())\n367 | | }"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 399,
+      "file": "src/orchestrator/node_bootstrap.rs",
+      "level": "warning",
+      "line": 370,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/orchestrator/node_bootstrap.rs:370:1\n    |\n370 | / async fn auto_assign_custodian(inventory: &NodeInventory, _admin_port: u16) -> Result<()> {\n...   |\n398 | |     Ok(())\n399 | | }\n    | |_^\n    |\n    = help: consider removing the `async` from this function"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 82,
+      "file": "src/projection/storage_events_subscriber.rs",
+      "level": "warning",
+      "line": 82,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n  --> src/projection/storage_events_subscriber.rs:82:27\n   |\n82 |         let max_backoff = Duration::from_secs(60);\n   |                           ^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n   |\n82 -         let max_backoff = Duration::from_secs(60);"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 295,
+      "file": "src/projection/subscriber.rs",
+      "level": "warning",
+      "line": 295,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/projection/subscriber.rs:295:38\n    |\n295 | const MAX_RECONNECT_WAIT: Duration = Duration::from_secs(60);\n    |                                      ^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n    |\n295 - const MAX_RECONNECT_WAIT: Duration = Duration::from_secs(60);"
+    },
+    {
+      "code": "clippy::ref_option",
+      "endLine": 701,
+      "file": "src/routes/admin.rs",
+      "level": "warning",
+      "line": 672,
+      "message": "it is more idiomatic to use `Option<&T>` instead of `&Option<T>`",
+      "rendered": "warning: it is more idiomatic to use `Option<&T>` instead of `&Option<T>`\n   --> src/routes/admin.rs:672:1\n    |\n672 | / fn extract_social_metrics(\n673 | |     social: &Option<SocialMetrics>,\n674 | | ) -> (\n675 | |     Option<String>,\n...   |\n701 | | }\n    | |_^"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 83,
+      "file": "src/routes/admin_cache.rs",
+      "level": "warning",
+      "line": 79,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n  --> src/routes/admin_cache.rs:79:1\n   |\n79 | / pub async fn cache_disable(state: Arc<AppState>) -> Response<Full<Bytes>> {\n80 | |     state.cache_enabled.store(false, Ordering::Relaxed);\n81 | |     info!(\"Admin cache control: cache DISABLED\");\n82 | |     json_response(StatusCode::OK, serde_json::json!({ \"status\": \"disabled\" }))\n83 | | }\n   | |_^\n   |"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 94,
+      "file": "src/routes/admin_cache.rs",
+      "level": "warning",
+      "line": 90,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n  --> src/routes/admin_cache.rs:90:1\n   |\n90 | / pub async fn cache_enable(state: Arc<AppState>) -> Response<Full<Bytes>> {\n91 | |     state.cache_enabled.store(true, Ordering::Relaxed);\n92 | |     info!(\"Admin cache control: cache ENABLED\");\n93 | |     json_response(StatusCode::OK, serde_json::json!({ \"status\": \"enabled\" }))\n94 | | }\n   | |_^\n   |"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 171,
+      "file": "src/routes/admin_cache.rs",
+      "level": "warning",
+      "line": 129,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/routes/admin_cache.rs:129:1\n    |\n129 | / pub async fn cache_warm(state: Arc<AppState>) -> Response<Full<Bytes>> {\n130 | |     let Some(ref projection_store) = state.projection else {\n131 | |         return json_response(\n132 | |             StatusCode::SERVICE_UNAVAILABLE,\n...   |\n171 | | }\n    | |_^"
+    },
+    {
+      "code": "clippy::semicolon_if_nothing_returned",
+      "endLine": 367,
+      "file": "src/routes/admin_users.rs",
+      "level": "warning",
+      "line": 367,
+      "message": "consider adding a `;` to the last statement for consistent formatting",
+      "rendered": "warning: consider adding a `;` to the last statement for consistent formatting\n   --> src/routes/admin_users.rs:367:29\n    |\n367 | ...                   params.permission_level = Some(value.to_string())\n    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add a `;` here: `params.permission_level = Some(value.to_string());`\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#semicolon_if_nothing_returned\n    = note: `-W clippy::semicolon-if-nothing-returned` implied by `-W clippy::pedantic`\n    = help: to override `-W clippy::pedantic` add `#[allow(clippy::semicolon_if_nothing_returned)]`\n"
+    },
+    {
+      "code": "clippy::unnested_or_patterns",
+      "endLine": 640,
+      "file": "src/routes/admin_users.rs",
+      "level": "warning",
+      "line": 640,
+      "message": "unnested or-patterns",
+      "rendered": "warning: unnested or-patterns\n   --> src/routes/admin_users.rs:640:9\n    |\n640 |         (Method::GET, \"\") | (Method::GET, \"/\") => handle_list_users(req, state).await,\n    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnested_or_patterns\n    = note: `-W clippy::unnested-or-patterns` implied by `-W clippy::pedantic`\n    = help: to override `-W clippy::pedantic` add `#[allow(clippy::unnested_or_patterns)]`\nhelp: nest the patterns"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 1870,
+      "file": "src/routes/auth_routes.rs",
+      "level": "warning",
+      "line": 1857,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n    --> src/routes/auth_routes.rs:1857:1\n     |\n1857 | / async fn handle_logout(\n1858 | |     _req: Request<hyper::body::Incoming>,\n1859 | |     _state: Arc<AppState>,\n1860 | | ) -> Response<BoxBody> {\n...    |\n1870 | | }\n     | |_^"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 4161,
+      "file": "src/routes/auth_routes.rs",
+      "level": "warning",
+      "line": 4161,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n    --> src/routes/auth_routes.rs:4161:15\n     |\n4161 |     let ttl = std::time::Duration::from_secs(60);\n     |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n     |\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n     |\n4161 -     let ttl = std::time::Duration::from_secs(60);"
+    },
+    {
+      "code": "clippy::unnested_or_patterns",
+      "endLine": 4546,
+      "file": "src/routes/auth_routes.rs",
+      "level": "warning",
+      "line": 4545,
+      "message": "unnested or-patterns",
+      "rendered": "warning: unnested or-patterns\n    --> src/routes/auth_routes.rs:4545:9\n     |\n4545 | /         (&Method::POST, \"/auth/confirm-stewardship\")\n4546 | |         | (&Method::POST, \"/auth/confirm-sovereignty\") => {\n     | |______________________________________________________^\n     |\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnested_or_patterns\nhelp: nest the patterns\n     |"
+    },
+    {
+      "code": "clippy::unnested_or_patterns",
+      "endLine": 4585,
+      "file": "src/routes/auth_routes.rs",
+      "level": "warning",
+      "line": 4566,
+      "message": "unnested or-patterns",
+      "rendered": "warning: unnested or-patterns\n    --> src/routes/auth_routes.rs:4566:9\n     |\n4566 | /         (_, \"/auth/register\")\n4567 | |         | (_, \"/auth/login\")\n4568 | |         | (_, \"/auth/logout\")\n4569 | |         | (_, \"/auth/refresh\")\n...    |\n4584 | |         | (_, \"/auth/exchange-session\")\n4585 | |         | (_, \"/auth/portal-host\") => json_response("
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 272,
+      "file": "src/routes/blob.rs",
+      "level": "warning",
+      "line": 248,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/routes/blob.rs:248:1\n    |\n248 | / async fn handle_full_content(\n249 | |     cache: Arc<ContentCache>,\n250 | |     hash: &str,\n251 | | ) -> Result<Response<Full<Bytes>>, BlobError> {\n...   |\n271 | |         .unwrap())\n272 | | }"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 312,
+      "file": "src/routes/blob.rs",
+      "level": "warning",
+      "line": 275,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/routes/blob.rs:275:1\n    |\n275 | / async fn handle_range_request(\n276 | |     cache: Arc<ContentCache>,\n277 | |     hash: &str,\n278 | |     range_str: &str,\n...   |\n311 | |         .unwrap())\n312 | | }"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 338,
+      "file": "src/routes/blob.rs",
+      "level": "warning",
+      "line": 315,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/routes/blob.rs:315:1\n    |\n315 | / async fn handle_head_blob(\n316 | |     _req: Request<hyper::body::Incoming>,\n317 | |     cache: Arc<ContentCache>,\n318 | |     hash: &str,\n...   |\n337 | |         .unwrap())\n338 | | }"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 431,
+      "file": "src/routes/blob.rs",
+      "level": "warning",
+      "line": 431,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/routes/blob.rs:431:31\n    |\n431 |                     let ttl = std::time::Duration::from_secs(3600);\n    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_hours\n    |\n431 -                     let ttl = std::time::Duration::from_secs(3600);"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 335,
+      "file": "src/routes/coherence.rs",
+      "level": "warning",
+      "line": 308,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/routes/coherence.rs:308:1\n    |\n308 | / pub async fn handle_federation_coherence(state: Arc<AppState>) -> Response<Full<Bytes>> {\n309 | |     let doorway_id = state\n310 | |         .args\n311 | |         .doorway_id\n...   |\n335 | | }\n    | |_^"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 247,
+      "file": "src/routes/import.rs",
+      "level": "warning",
+      "line": 247,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/routes/import.rs:247:18\n    |\n247 |         .timeout(std::time::Duration::from_secs(60))\n    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n    |\n247 -         .timeout(std::time::Duration::from_secs(60))"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 220,
+      "file": "src/routes/seed.rs",
+      "level": "warning",
+      "line": 220,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/routes/seed.rs:220:25\n    |\n220 |     let seed_blob_ttl = std::time::Duration::from_secs(3600);\n    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_hours\n    |\n220 -     let seed_blob_ttl = std::time::Duration::from_secs(3600);"
+    },
+    {
+      "code": "clippy::unnecessary_literal_bound",
+      "endLine": 174,
+      "file": "src/routes/status.rs",
+      "level": "warning",
+      "line": 174,
+      "message": "returning a `str` unnecessarily tied to the lifetime of arguments",
+      "rendered": "warning: returning a `str` unnecessarily tied to the lifetime of arguments\n   --> src/routes/status.rs:174:29\n    |\n174 |     fn service_id(&self) -> &str {\n    |                             ^^^^ help: try: `&'static str`\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnecessary_literal_bound\n    = note: `-W clippy::unnecessary-literal-bound` implied by `-W clippy::pedantic`\n    = help: to override `-W clippy::pedantic` add `#[allow(clippy::unnecessary_literal_bound)]`\n"
+    },
+    {
+      "code": "clippy::ref_option",
+      "endLine": 93,
+      "file": "src/routes/storage_proxy.rs",
+      "level": "warning",
+      "line": 89,
+      "message": "it is more idiomatic to use `Option<&T>` instead of `&Option<T>`",
+      "rendered": "warning: it is more idiomatic to use `Option<&T>` instead of `&Option<T>`\n  --> src/routes/storage_proxy.rs:89:1\n   |\n89 | / fn record_trial(trial: &Option<crate::routes::upstream_health::BreakerTrial<'_>>, ok: bool) {\n90 | |     if let Some(t) = trial {\n91 | |         t.record(ok);\n92 | |     }\n93 | | }\n   | |_^\n   |"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 127,
+      "file": "src/routes/storage_proxy.rs",
+      "level": "warning",
+      "line": 127,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/routes/storage_proxy.rs:127:35\n    |\n127 | const BLOB_PANTRY_TTL: Duration = Duration::from_secs(3_600); // 1 hour\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_hours\n    |\n127 - const BLOB_PANTRY_TTL: Duration = Duration::from_secs(3_600); // 1 hour"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 204,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 167,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/routes/stream.rs:167:1\n    |\n167 | / pub async fn handle_chunk(\n168 | |     state: Arc<AppState>,\n169 | |     blob_hash: &str,\n170 | |     chunk_index: usize,\n...   |\n203 | |         .unwrap()\n204 | | }"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 237,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 209,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/routes/stream.rs:209:1\n    |\n209 | / pub async fn handle_blob_range(\n210 | |     state: Arc<AppState>,\n211 | |     blob_hash: &str,\n212 | |     range_start: usize,\n...   |\n236 | |     error_response(StatusCode::NOT_FOUND, \"Blob range not available\")\n237 | | }"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 266,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 264,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n   --> src/routes/stream.rs:264:9\n    |\n264 | /         playlist.push_str(&format!(\n265 | |             \"#EXT-X-STREAM-INF:BANDWIDTH={bandwidth}{resolution}\\n\"\n266 | |         ));\n    | |__________^\n    |\n    = note: you may need to import the `std::fmt::Write` trait\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#format_push_string"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 270,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 267,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n   --> src/routes/stream.rs:267:9\n    |\n267 | /         playlist.push_str(&format!(\n268 | |             \"{}/api/stream/hls/{}/{}.m3u8\\n\",\n269 | |             base_url, content_id, variant.label\n270 | |         ));\n    | |__________^\n    |\n    = note: you may need to import the `std::fmt::Write` trait"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 276,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 276,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n   --> src/routes/stream.rs:276:9\n    |\n276 |         playlist.push_str(&format!(\"#EXT-X-STREAM-INF:BANDWIDTH={bandwidth}\\n\"));\n    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: you may need to import the `std::fmt::Write` trait\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#format_push_string\nhelp: consider using `write!` to avoid the extra allocation\n    |"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 279,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 277,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n   --> src/routes/stream.rs:277:9\n    |\n277 | /         playlist.push_str(&format!(\n278 | |             \"{base_url}/api/stream/hls/{content_id}/default.m3u8\\n\"\n279 | |         ));\n    | |__________^\n    |\n    = note: you may need to import the `std::fmt::Write` trait\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#format_push_string"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 307,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 305,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n   --> src/routes/stream.rs:305:5\n    |\n305 | /     playlist.push_str(&format!(\n306 | |         \"#EXT-X-TARGETDURATION:{DEFAULT_TARGET_DURATION}\\n\"\n307 | |     ));\n    | |______^\n    |\n    = note: you may need to import the `std::fmt::Write` trait\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#format_push_string"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 331,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 331,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n   --> src/routes/stream.rs:331:9\n    |\n331 |         playlist.push_str(&format!(\"#EXTINF:{seg_duration:.3},\\n\"));\n    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: you may need to import the `std::fmt::Write` trait\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#format_push_string\nhelp: consider using `write!` to avoid the extra allocation\n    |"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 332,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 332,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n   --> src/routes/stream.rs:332:9\n    |\n332 |         playlist.push_str(&format!(\"{base_url}/api/stream/chunk/{blob_hash}/{i}\\n\"));\n    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: you may need to import the `std::fmt::Write` trait\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#format_push_string\nhelp: consider using `write!` to avoid the extra allocation\n    |"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 365,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 363,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n   --> src/routes/stream.rs:363:5\n    |\n363 | /     mpd.push_str(&format!(\n364 | |         r#\"<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\" type=\"static\" mediaPresentationDuration=\"{duration_iso}\" minBufferTime=\"PT2...\n365 | |     ));\n    | |______^\n    |\n    = note: you may need to import the `std::fmt::Write` trait\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#format_push_string"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 369,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 369,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n   --> src/routes/stream.rs:369:5\n    |\n369 |     mpd.push_str(&format!(r#\"  <Period duration=\"{duration_iso}\">\"#));\n    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: you may need to import the `std::fmt::Write` trait\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#format_push_string\nhelp: consider using `write!` to avoid the extra allocation\n    |"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 384,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 382,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n   --> src/routes/stream.rs:382:9\n    |\n382 | /         mpd.push_str(&format!(\n383 | |             r#\"      <Representation id=\"{i}\" bandwidth=\"{bandwidth}\" width=\"{width}\" height=\"{height}\" codecs=\"avc1.640028\">\"#\n384 | |         ));\n    | |__________^\n    |\n    = note: you may need to import the `std::fmt::Write` trait\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#format_push_string"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 391,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 388,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n   --> src/routes/stream.rs:388:9\n    |\n388 | /         mpd.push_str(&format!(\n389 | |             r#\"        <BaseURL>{}/api/stream/chunk/{}/</BaseURL>\"#,\n390 | |             base_url, variant.hash\n391 | |         ));\n    | |__________^\n    |\n    = note: you may need to import the `std::fmt::Write` trait"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 395,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 393,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n   --> src/routes/stream.rs:393:9\n    |\n393 | /         mpd.push_str(&format!(\n394 | |             r#\"        <SegmentTemplate media=\"$Number$\" startNumber=\"0\" duration=\"{DEFAULT_SEGMENT_DURATION}\" timescale=\"1\"/>\"#\n395 | |         ));\n    | |__________^\n    |\n    = note: you may need to import the `std::fmt::Write` trait\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#format_push_string"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 407,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 405,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n   --> src/routes/stream.rs:405:9\n    |\n405 | /         mpd.push_str(&format!(\n406 | |             r#\"      <Representation id=\"0\" bandwidth=\"{bandwidth}\" codecs=\"avc1.640028\">\"#\n407 | |         ));\n    | |__________^\n    |\n    = note: you may need to import the `std::fmt::Write` trait\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#format_push_string"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 412,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 409,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n   --> src/routes/stream.rs:409:9\n    |\n409 | /         mpd.push_str(&format!(\n410 | |             r#\"        <BaseURL>{}/api/stream/chunk/{}/</BaseURL>\"#,\n411 | |             base_url, metadata.hash\n412 | |         ));\n    | |__________^\n    |\n    = note: you may need to import the `std::fmt::Write` trait"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 416,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 414,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n   --> src/routes/stream.rs:414:9\n    |\n414 | /         mpd.push_str(&format!(\n415 | |             r#\"        <SegmentTemplate media=\"$Number$\" startNumber=\"0\" duration=\"{DEFAULT_SEGMENT_DURATION}\" timescale=\"1\"/>\"#\n416 | |         ));\n    | |__________^\n    |\n    = note: you may need to import the `std::fmt::Write` trait\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#format_push_string"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 436,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 436,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n   --> src/routes/stream.rs:436:9\n    |\n436 |         duration.push_str(&format!(\"{hours}H\"));\n    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: you may need to import the `std::fmt::Write` trait\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#format_push_string\nhelp: consider using `write!` to avoid the extra allocation\n    |"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 439,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 439,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n   --> src/routes/stream.rs:439:9\n    |\n439 |         duration.push_str(&format!(\"{minutes}M\"));\n    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: you may need to import the `std::fmt::Write` trait\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#format_push_string\nhelp: consider using `write!` to avoid the extra allocation\n    |"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 441,
+      "file": "src/routes/stream.rs",
+      "level": "warning",
+      "line": 441,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n   --> src/routes/stream.rs:441:5\n    |\n441 |     duration.push_str(&format!(\"{secs}S\"));\n    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: you may need to import the `std::fmt::Write` trait\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#format_push_string\nhelp: consider using `write!` to avoid the extra allocation\n    |"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 558,
+      "file": "src/server/http.rs",
+      "level": "warning",
+      "line": 558,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/server/http.rs:558:45\n    |\n558 |                 std::time::Instant::now() - std::time::Duration::from_secs(60),\n    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n    |\n558 -                 std::time::Instant::now() - std::time::Duration::from_secs(60),"
+    },
+    {
+      "code": "clippy::unchecked_time_subtraction",
+      "endLine": 558,
+      "file": "src/server/http.rs",
+      "level": "warning",
+      "line": 558,
+      "message": "unchecked subtraction of a `Duration`",
+      "rendered": "warning: unchecked subtraction of a `Duration`\n   --> src/server/http.rs:558:17\n    |\n558 |                 std::time::Instant::now() - std::time::Duration::from_secs(60),\n    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `std::time::Instant::now().checked_sub(std::time::Duration::from_secs(60)).unwrap()`\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unchecked_time_subtraction\n    = note: `-W clippy::unchecked-time-subtraction` implied by `-W clippy::pedantic`\n    = help: to override `-W clippy::pedantic` add `#[allow(clippy::unchecked_time_subtraction)]`\n"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 672,
+      "file": "src/server/http.rs",
+      "level": "warning",
+      "line": 672,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/server/http.rs:672:45\n    |\n672 |                 std::time::Instant::now() - std::time::Duration::from_secs(60),\n    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n    |\n672 -                 std::time::Instant::now() - std::time::Duration::from_secs(60),"
+    },
+    {
+      "code": "clippy::unchecked_time_subtraction",
+      "endLine": 672,
+      "file": "src/server/http.rs",
+      "level": "warning",
+      "line": 672,
+      "message": "unchecked subtraction of a `Duration`",
+      "rendered": "warning: unchecked subtraction of a `Duration`\n   --> src/server/http.rs:672:17\n    |\n672 |                 std::time::Instant::now() - std::time::Duration::from_secs(60),\n    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `std::time::Instant::now().checked_sub(std::time::Duration::from_secs(60)).unwrap()`\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unchecked_time_subtraction\n"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 801,
+      "file": "src/server/http.rs",
+      "level": "warning",
+      "line": 801,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/server/http.rs:801:45\n    |\n801 |                 std::time::Instant::now() - std::time::Duration::from_secs(60),\n    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n    |\n801 -                 std::time::Instant::now() - std::time::Duration::from_secs(60),"
+    },
+    {
+      "code": "clippy::unchecked_time_subtraction",
+      "endLine": 801,
+      "file": "src/server/http.rs",
+      "level": "warning",
+      "line": 801,
+      "message": "unchecked subtraction of a `Duration`",
+      "rendered": "warning: unchecked subtraction of a `Duration`\n   --> src/server/http.rs:801:17\n    |\n801 |                 std::time::Instant::now() - std::time::Duration::from_secs(60),\n    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `std::time::Instant::now().checked_sub(std::time::Duration::from_secs(60)).unwrap()`\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unchecked_time_subtraction\n"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 933,
+      "file": "src/server/http.rs",
+      "level": "warning",
+      "line": 933,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/server/http.rs:933:45\n    |\n933 |                 std::time::Instant::now() - std::time::Duration::from_secs(60),\n    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n    |\n933 -                 std::time::Instant::now() - std::time::Duration::from_secs(60),"
+    },
+    {
+      "code": "clippy::unchecked_time_subtraction",
+      "endLine": 933,
+      "file": "src/server/http.rs",
+      "level": "warning",
+      "line": 933,
+      "message": "unchecked subtraction of a `Duration`",
+      "rendered": "warning: unchecked subtraction of a `Duration`\n   --> src/server/http.rs:933:17\n    |\n933 |                 std::time::Instant::now() - std::time::Duration::from_secs(60),\n    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `std::time::Instant::now().checked_sub(std::time::Duration::from_secs(60)).unwrap()`\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unchecked_time_subtraction\n"
+    },
+    {
+      "code": "clippy::unnested_or_patterns",
+      "endLine": 1573,
+      "file": "src/server/http.rs",
+      "level": "warning",
+      "line": 1573,
+      "message": "unnested or-patterns",
+      "rendered": "warning: unnested or-patterns\n    --> src/server/http.rs:1573:9\n     |\n1573 |         (&Method::GET, \"/health\") | (&Method::GET, \"/healthz\") => {\n     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n     |\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnested_or_patterns\nhelp: nest the patterns\n     |\n1573 -         (&Method::GET, \"/health\") | (&Method::GET, \"/healthz\") => {"
+    },
+    {
+      "code": "clippy::unnested_or_patterns",
+      "endLine": 1577,
+      "file": "src/server/http.rs",
+      "level": "warning",
+      "line": 1577,
+      "message": "unnested or-patterns",
+      "rendered": "warning: unnested or-patterns\n    --> src/server/http.rs:1577:9\n     |\n1577 |         (&Method::GET, \"/ready\") | (&Method::GET, \"/readyz\") => {\n     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n     |\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnested_or_patterns\nhelp: nest the patterns\n     |\n1577 -         (&Method::GET, \"/ready\") | (&Method::GET, \"/readyz\") => {"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 1790,
+      "file": "src/server/http.rs",
+      "level": "warning",
+      "line": 1790,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n    --> src/server/http.rs:1790:9\n     |\n1790 |         std::time::Duration::from_secs(60),\n     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n     |\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n     |\n1790 -         std::time::Duration::from_secs(60),"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 1801,
+      "file": "src/server/http.rs",
+      "level": "warning",
+      "line": 1801,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n    --> src/server/http.rs:1801:9\n     |\n1801 |         std::time::Duration::from_secs(60),\n     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n     |\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n     |\n1801 -         std::time::Duration::from_secs(60),"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 3019,
+      "file": "src/server/http.rs",
+      "level": "warning",
+      "line": 3019,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n    --> src/server/http.rs:3019:9\n     |\n3019 |         out.push_str(&format!(\"  <url><loc>{base}{path}</loc></url>\\n\"));\n     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n     |\n     = note: you may need to import the `std::fmt::Write` trait\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#format_push_string\nhelp: consider using `write!` to avoid the extra allocation\n     |"
+    },
+    {
+      "code": "clippy::format_push_string",
+      "endLine": 3026,
+      "file": "src/server/http.rs",
+      "level": "warning",
+      "line": 3026,
+      "message": "`format!(..)` appended to existing `String`",
+      "rendered": "warning: `format!(..)` appended to existing `String`\n    --> src/server/http.rs:3026:17\n     |\n3026 |                 out.push_str(&format!(\"  <url><loc>{base}{loc}</loc></url>\\n\"));\n     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n     |\n     = note: you may need to import the `std::fmt::Write` trait\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#format_push_string\nhelp: consider using `write!` to avoid the extra allocation\n     |"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 3846,
+      "file": "src/server/http.rs",
+      "level": "warning",
+      "line": 3846,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n    --> src/server/http.rs:3846:21\n     |\n3846 |                     std::time::Duration::from_secs(5 * 60),\n     |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n     |\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n     |\n3846 -                     std::time::Duration::from_secs(5 * 60),"
+    },
+    {
+      "code": "clippy::unnested_or_patterns",
+      "endLine": 4149,
+      "file": "src/server/http.rs",
+      "level": "warning",
+      "line": 4149,
+      "message": "unnested or-patterns",
+      "rendered": "warning: unnested or-patterns\n    --> src/server/http.rs:4149:9\n     |\n4149 |         (Method::GET, \"/health\") | (Method::GET, \"/healthz\") => {\n     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n     |\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnested_or_patterns\nhelp: nest the patterns\n     |\n4149 -         (Method::GET, \"/health\") | (Method::GET, \"/healthz\") => {"
+    },
+    {
+      "code": "clippy::unnested_or_patterns",
+      "endLine": 4155,
+      "file": "src/server/http.rs",
+      "level": "warning",
+      "line": 4155,
+      "message": "unnested or-patterns",
+      "rendered": "warning: unnested or-patterns\n    --> src/server/http.rs:4155:9\n     |\n4155 |         (Method::GET, \"/ready\") | (Method::GET, \"/readyz\") => {\n     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n     |\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnested_or_patterns\nhelp: nest the patterns\n     |\n4155 -         (Method::GET, \"/ready\") | (Method::GET, \"/readyz\") => {"
+    },
+    {
+      "code": "clippy::unnested_or_patterns",
+      "endLine": 4206,
+      "file": "src/server/http.rs",
+      "level": "warning",
+      "line": 4206,
+      "message": "unnested or-patterns",
+      "rendered": "warning: unnested or-patterns\n    --> src/server/http.rs:4206:9\n     |\n4206 |         (Method::GET, \"/identity/did\") | (Method::GET, \"/identity/did.json\") => {\n     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n     |\n     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnested_or_patterns\nhelp: nest the patterns\n     |\n4206 -         (Method::GET, \"/identity/did\") | (Method::GET, \"/identity/did.json\") => {"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 136,
+      "file": "src/server/websocket.rs",
+      "level": "warning",
+      "line": 26,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/server/websocket.rs:26:1\n    |\n 26 | / pub async fn handle_admin_upgrade(\n 27 | |     state: Arc<AppState>,\n 28 | |     req: Request<Incoming>,\n 29 | | ) -> Response<Full<Bytes>> {\n...   |\n136 | | }\n    | |_^"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 199,
+      "file": "src/server/websocket.rs",
+      "level": "warning",
+      "line": 139,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/server/websocket.rs:139:1\n    |\n139 | / pub async fn handle_app_upgrade(\n140 | |     state: Arc<AppState>,\n141 | |     req: Request<Incoming>,\n142 | |     port: u16,\n...   |\n199 | | }\n    | |_^"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 292,
+      "file": "src/services/custodian.rs",
+      "level": "warning",
+      "line": 292,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/services/custodian.rs:292:29\n    |\n292 |             probe_interval: Duration::from_secs(60),\n    |                             ^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n    |\n292 -             probe_interval: Duration::from_secs(60),"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 244,
+      "file": "src/services/dashboard_topology.rs",
+      "level": "warning",
+      "line": 242,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/services/dashboard_topology.rs:242:5\n    |\n242 | /     async fn collect_storage_stewards(&self) -> Result<Vec<DashboardSteward>, DashboardError> {\n243 | |         Ok(vec![])\n244 | |     }\n    | |_____^\n    |\n    = help: consider removing the `async` from this function\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unused_async"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 29,
+      "file": "src/services/did_resolver.rs",
+      "level": "warning",
+      "line": 29,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n  --> src/services/did_resolver.rs:29:24\n   |\n29 |             cache_ttl: Duration::from_secs(300),\n   |                        ^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n   |\n29 -             cache_ttl: Duration::from_secs(300),"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 274,
+      "file": "src/services/discovery.rs",
+      "level": "warning",
+      "line": 268,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/services/discovery.rs:268:5\n    |\n268 | /     async fn discover_import_config(\n269 | |         &self,\n270 | |         _cell: &CellInfo,\n271 | |         _zome_config: &ZomeCallConfig,\n272 | |     ) -> Result<Option<ImportConfig>, String> {\n273 | |         Ok(None)\n274 | |     }"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 286,
+      "file": "src/services/discovery.rs",
+      "level": "warning",
+      "line": 280,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/services/discovery.rs:280:5\n    |\n280 | /     async fn discover_routes(\n281 | |         &self,\n282 | |         _cell: &CellInfo,\n283 | |         _zome_config: &ZomeCallConfig,\n284 | |     ) -> Result<Option<DoorwayRoutes>, String> {\n285 | |         Ok(None)\n286 | |     }"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 644,
+      "file": "src/services/federation.rs",
+      "level": "warning",
+      "line": 644,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/services/federation.rs:644:37\n    |\n644 | pub const PEER_JWKS_TTL: Duration = Duration::from_secs(600);\n    |                                     ^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n    |\n644 - pub const PEER_JWKS_TTL: Duration = Duration::from_secs(600);"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 649,
+      "file": "src/services/federation.rs",
+      "level": "warning",
+      "line": 649,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/services/federation.rs:649:51\n    |\n649 | pub const PEER_JWKS_NEGATIVE_COOLDOWN: Duration = Duration::from_secs(60);\n    |                                                   ^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n    |\n649 - pub const PEER_JWKS_NEGATIVE_COOLDOWN: Duration = Duration::from_secs(60);"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 62,
+      "file": "src/services/import_orchestrator.rs",
+      "level": "warning",
+      "line": 62,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n  --> src/services/import_orchestrator.rs:62:32\n   |\n62 |             zome_call_timeout: Duration::from_secs(60),\n   |                                ^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n   |\n62 -             zome_call_timeout: Duration::from_secs(60),"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 489,
+      "file": "src/services/import_orchestrator.rs",
+      "level": "warning",
+      "line": 489,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/services/import_orchestrator.rs:489:32\n    |\n489 |             tokio::time::sleep(Duration::from_secs(300)).await; // 5 min retention\n    |                                ^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n    |\n489 -             tokio::time::sleep(Duration::from_secs(300)).await; // 5 min retention"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 145,
+      "file": "src/services/pkarr_resolver.rs",
+      "level": "warning",
+      "line": 138,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/services/pkarr_resolver.rs:138:5\n    |\n138 | /     pub async fn persist_to_disk(&self) -> std::io::Result<()> {\n139 | |         let Some(ref dir) = self.config.persist_dir else {\n140 | |             return Ok(());\n141 | |         };\n...   |\n144 | |         Ok(())\n145 | |     }"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 56,
+      "file": "src/services/route_registry.rs",
+      "level": "warning",
+      "line": 56,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n  --> src/services/route_registry.rs:56:31\n   |\n56 |             cleanup_interval: Duration::from_secs(300), // 5 minutes\n   |                               ^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n   |\n56 -             cleanup_interval: Duration::from_secs(300), // 5 minutes"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 172,
+      "file": "src/services/shard_resolver.rs",
+      "level": "warning",
+      "line": 172,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/services/shard_resolver.rs:172:24\n    |\n172 |             cache_ttl: Duration::from_secs(3600), // 1 hour\n    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_hours\n    |\n172 -             cache_ttl: Duration::from_secs(3600), // 1 hour"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 198,
+      "file": "src/services/shard_resolver.rs",
+      "level": "warning",
+      "line": 198,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/services/shard_resolver.rs:198:24\n    |\n198 |             cache_ttl: Duration::from_secs(3600),\n    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_hours\n    |\n198 -             cache_ttl: Duration::from_secs(3600),"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 237,
+      "file": "src/services/storage_registration.rs",
+      "level": "warning",
+      "line": 220,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/services/storage_registration.rs:220:1\n    |\n220 | / async fn register_with_conductor(\n221 | |     conductor_url: &str,\n222 | |     _installed_app_id: &str,\n223 | |     zome_name: &str,\n...   |\n236 | |     Err(\"register_with_conductor not yet implemented\".to_string())\n237 | | }"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 118,
+      "file": "src/services/zome_caller.rs",
+      "level": "warning",
+      "line": 118,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/services/zome_caller.rs:118:46\n    |\n118 | const PRIMARY_UNHEALTHY_COOLDOWN: Duration = Duration::from_secs(60);\n    |                                              ^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_mins\n    |\n118 - const PRIMARY_UNHEALTHY_COOLDOWN: Duration = Duration::from_secs(60);"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 178,
+      "file": "src/signal/mod.rs",
+      "level": "warning",
+      "line": 93,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/signal/mod.rs:93:1\n    |\n 93 | / pub async fn handle_signal_upgrade(\n 94 | |     store: Arc<SignalStore>,\n 95 | |     req: hyper::Request<hyper::body::Incoming>,\n 96 | |     pub_key_str: &str,\n...   |\n177 | |     response.map(|_| Full::new(Bytes::new()))\n178 | | }"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 367,
+      "file": "src/signing/service.rs",
+      "level": "warning",
+      "line": 293,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/signing/service.rs:293:5\n    |\n293 | /     pub async fn sign(&self, request: SignRequest) -> Result<SignResponse, DoorwayError> {\n294 | |         // Check if signing is enabled\n295 | |         if !self.config.enabled {\n296 | |             return Ok(SignResponse::error(\"Signing service is disabled\", 0));\n...   |\n366 | |         Ok(response)\n367 | |     }"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 311,
+      "file": "src/ssr.rs",
+      "level": "warning",
+      "line": 311,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/ssr.rs:311:32\n    |\n311 |             tokio::time::sleep(std::time::Duration::from_secs(3600)).await;\n    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_hours\n    |\n311 -             tokio::time::sleep(std::time::Duration::from_secs(3600)).await;"
+    },
+    {
+      "code": "clippy::ref_option",
+      "endLine": 384,
+      "file": "src/worker/conductor.rs",
+      "level": "warning",
+      "line": 324,
+      "message": "it is more idiomatic to use `Option<&T>` instead of `&Option<T>`",
+      "rendered": "warning: it is more idiomatic to use `Option<&T>` instead of `&Option<T>`\n   --> src/worker/conductor.rs:324:1\n    |\n324 | / async fn run_session(\n325 | |     ws_sink: WsSink,\n326 | |     ws_stream: WsStream,\n327 | |     buffered: Vec<Message>,\n...   |\n383 | |     Some(backoff.next_after_session(session_len))\n384 | | }"
+    },
+    {
+      "code": "clippy::ref_option",
+      "endLine": 407,
+      "file": "src/worker/conductor.rs",
+      "level": "warning",
+      "line": 388,
+      "message": "it is more idiomatic to use `Option<&T>` instead of `&Option<T>`",
+      "rendered": "warning: it is more idiomatic to use `Option<&T>` instead of `&Option<T>`\n   --> src/worker/conductor.rs:388:1\n    |\n388 | / async fn remint_if_due(\n389 | |     token_minter: &Option<TokenMinter>,\n390 | |     token_slot: &Arc<RwLock<Option<Vec<u8>>>>,\n391 | |     last_remint: &mut Option<Instant>,\n...   |\n407 | | }\n    | |_^"
+    },
+    {
+      "code": "clippy::unused_async",
+      "endLine": 152,
+      "file": "src/worker/pool.rs",
+      "level": "warning",
+      "line": 104,
+      "message": "unused `async` for function with no await statements",
+      "rendered": "warning: unused `async` for function with no await statements\n   --> src/worker/pool.rs:104:5\n    |\n104 | /     pub async fn new(config: PoolConfig) -> Result<Self> {\n105 | |         let (request_tx, request_rx) = mpsc::channel::<PoolRequest>(config.max_queue_size);\n106 | |         let request_rx = Arc::new(tokio::sync::Mutex::new(request_rx));\n...   |\n151 | |         })\n152 | |     }\n    | |_____^"
+    },
+    {
+      "code": "clippy::duration_suboptimal_units",
+      "endLine": 188,
+      "file": "src/worker/processor.rs",
+      "level": "warning",
+      "line": 188,
+      "message": "constructing a `Duration` using a smaller unit when a larger unit would be more readable",
+      "rendered": "warning: constructing a `Duration` using a smaller unit when a larger unit would be more readable\n   --> src/worker/processor.rs:188:26\n    |\n188 |                 max_age: Duration::from_secs(3600), // 1 hour\n    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#duration_suboptimal_units\nhelp: try using from_hours\n    |\n188 -                 max_age: Duration::from_secs(3600), // 1 hour"
+    }
+  ],
+  "measure": "clippy-pedantic@1",
+  "schema": "measure-fold@1",
+  "subject": {
+    "crate": "doorway/doorway-service",
+    "tree": "71a1613466648cf624656ab5614bb107fdda0662"
+  }
+}

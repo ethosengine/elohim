@@ -1,32 +1,30 @@
 ---
 id: project-alpha-topology-bootstrap-pair
-name: Alpha cluster topology — 6 peers, bootstrap pair, k8s nodes as household stand-ins
-title: Alpha cluster — 6 peers
-description: 6-peer alpha fabric; adam+matthew bootstrap/seed pair across the node split; shem multi-tenant, others household; check before debugging peer reachability.
+name: Alpha cluster topology — 7 active peers, cast directive, bootstrap pair
+title: Alpha cluster — 7 active peers
+description: 7-peer alpha fabric (4 shem + 3 household) per the 2026-07-02 cast directive; adam+matthew bootstrap pair; deployments.json suspended flag IS the roster — check before debugging peers.
 type: project
 originSessionId: 872c2e1c-02fe-453a-93b3-e69dac1e54e3
 cites:
   - genesis/orchestrator/data/deployments.json
+modified: 2026-08-08T23:58:05.288Z
 ---
-Alpha is a 6-peer test fabric where the k8s node split represents household boundaries (a simulacrum of the real-world household-level network):
+Alpha is a **7-active-peer** test fabric where the k8s node split represents household boundaries. The roster is governed by the `suspended` flag in `deployments.json` under the **operator scope directive 2026-07-02** (minimal coordination-ladder cast, recorded in every suspended human's `$suspendedComment`): one instance per tier — intimacy/family (matthew/jessica/james Dowell household), community/local (gertrude elder household + susan neighbor household), regional (on-prem region vs shem region {adam, gertrude, susan, eve}), global (adam federation anchor).
 
-| Peer | k8s node | Role |
-|---|---|---|
-| adam | shem | genesis peer; bulk seed receiver (paired w/ matthew) |
-| frank | shem | secondary peer (intra-household w/ adam) |
-| pete | shem | secondary peer (intra-household w/ adam) |
-| matthew | ethosengine | other half of bootstrap pair; bulk seed receiver |
-| jessica | intel-nuc | separate household |
-| terrance | thinkc-p0h | separate household |
+| Peer | k8s node | Archetype | Role |
+|---|---|---|---|
+| adam | shem | home-nuc | genesis peer / federation anchor; bulk seed receiver (paired w/ matthew) |
+| eve | shem | home-nuc | second always-on hub steward (Eden Valley household) |
+| gertrude | shem | home-nuc | elder household; reciprocal-recovery counterparty to Dowells |
+| susan | shem | recycled-laptop | Seattle household (Matthew's sister); tri-region backup chain leg — **only recycled-laptop on shem** |
+| matthew | ethosengine | family hub | other half of bootstrap pair; bulk seed receiver |
+| jessica | (household node) | recycled-laptop | Dowell household |
+| james | (household node) | chromebook-floor | Dowell household |
 
-Doorway runs on intel-nuc (`elohim-doorway-alpha`).
+Suspended (replicas 0, stale image, still declared remote): pete, terrance, frank, caleb, daniel, emma, nancy — un-suspend when shem relief lands or an epic scenario `@requires` a wider cast.
 
-**Bootstrap pair = adam + matthew across the node-split.** Both have device archetypes capable of bulk-upload; they're the two seeder targets that share load. Other peers settle the dataplane between themselves at their own pace via P2P (substrate replication — currently Plan 1 partial-ship).
+**Bootstrap pair = adam + matthew across the node-split** — the two bulk-upload seeder targets. **Any "N peers" claim in docs/handoffs should be checked against the suspended flags, not folklore** — the 6-peer framing circulated for ~5 weeks (2026-07-02→2026-08-08) while susan was active the whole time; edge deploys had been reporting "7/7 peers Ready" correctly.
 
-`shem` k8s node is the multi-tenant "expand more peers as needed" surface; the others are family-scale single-pod nodes. The node split is deliberate — it lets us test cross-node flows (real P2P) rather than intra-pod simulations.
+**Update 2026-06-03 — adam's genesis role is substrate-gated at CONSUMPTION, not a static flag.** adam is remote-only (pinned to shem). When shem is down, `genesis/Jenkinsfile runContentSeedStage` HOLDS adam from the genesis set and matthew carries ingest alone; `adam.genesisPeer:true` stays correct-when-shem-is-up because reconciliation happens where the value is READ. See [[project_substrate_scope_runtime_arm]], [[feedback_shem_down_peers_are_held_not_failed]].
 
-**Why:** This was clarified after a debugging session where the prior frame assumed alpha was 3 peers (adam/matthew/frank) and matthew was the singular doorway storage URL. Reality is 6 peers; STORAGE_URLS is fully populated; STORAGE_URL singular = matthew; only frank is steward-registered (separate bug to investigate).
-
-**How to apply:** When debugging alpha symptoms involving "where is this byte / why isn't this peer reachable", consult this topology first. Don't assume single-peer or 3-peer. The bootstrap pair (adam+matthew) is the upload entrypoint; replication-from-genesis-peer to the other 4 peers is currently aspirational pending Plan 2/3 (verifier + reconstruction).
-
-**Update 2026-06-03 — adam's genesis role is now substrate-gated at CONSUMPTION, not a static flag.** adam is remote-only (`nodeTypes:['remote']`, pinned to shem). The bootstrap pair is real only WHEN shem is available; when shem is down, `genesis/Jenkinsfile runContentSeedStage` HOLDS adam from the genesis set (so the seeder doesn't wait on a known-down peer) and matthew (household, the always-on genesis peer) carries ingest alone. So `adam.genesisPeer:true` in `deployments.json` stays correct-when-shem-is-up and no longer drifts as shem comes and goes — the reconciliation happens where the value is READ. Resolves the prior tension with [[project_shem_is_p2p_live_canvas]] (adam shem-resident): both true; the gate just makes adam's pair-role conditional on the substrate. See [[project_substrate_scope_runtime_arm]], [[feedback_shem_down_peers_are_held_not_failed]].
+**How to apply:** When debugging alpha symptoms ("where is this byte / why isn't this peer reachable"), consult this roster first — and remember "N/N peers Ready" in the edge deploy gate is a `:8090` liveness probe, NOT mesh participation (susan sat at zero kitsune2 gossip attempts while Ready, found 2026-08-08).

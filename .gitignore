@@ -112,3 +112,4 @@ genesis/research/repos/
 # epr flow value-chain sidecar — derived/operational (append-only flow records + label index);
 # reconstruction = re-run `epr flow project`. Never source-of-truth.
 .eprfs/
+.stage0-logs/
