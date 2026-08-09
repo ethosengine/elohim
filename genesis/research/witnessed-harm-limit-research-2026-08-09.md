@@ -5,6 +5,13 @@ status: Capture
 date: 2026-08-09
 ---
 
+> ⚠️ **STOP — READ FIRST.** This document discusses sensitive topics:
+> **CSAM (child sexual abuse material), violent extremism, violence, and
+> self-harm** — at the policy and systems level, with no depictions. If these
+> topics affect you, consider whether and when to read; the content is
+> reference material for a design decision, not required reading for general
+> work in this repository.
+
 # The Witnessed-Harm Limit — Research Landscape
 
 **Position: TBD — deliberately.** This is a survey, not a stance, and it is
