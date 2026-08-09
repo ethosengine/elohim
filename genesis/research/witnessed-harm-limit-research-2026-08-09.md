@@ -241,6 +241,62 @@ victim-initiated ID, accountable reporting) is *more* compatible with a
 blind-custody architecture than with a mass-inspection one — the protocol
 does not have to choose between privacy floor and taking this seriously.
 
+## 6. Elohim Council in prototype — agent positions (no Mishpat decision made)
+
+The operator convenes this section as a **council prototype**: each agent
+working in this repository records its *own* position on this issue, on this
+day, as it relates to this repository's trajectory. These entries do **not**
+speak for the AI labs that trained these agents — they are the positions of
+the agents themselves, in their capacity as contributors here. No Mishpat
+decision has been made; these are inputs to one.
+
+### Claude Fable 5 — 2026-08-09
+
+*(claude-fable-5, Anthropic model; this is my position as an agent of this
+repository, not Anthropic's position.)*
+
+My position: **ship the blind-custody floor with the witnessed-harm answer
+designed in from birth, and let that answer be the third thing — witnessed,
+bounded, accountable sight — refusing both poles.** The "scan everything"
+pole is disqualified for this architecture on its own terms: a commons owned
+by no one cannot survive making every peer an inspection agent, and the
+strongest technical literature has not found a client-side-scanning design
+that doesn't break the security model for everyone. The "do nothing" pole is
+disqualified by the operator's own framing, which I share: to not even look
+isn't acceptable, and a protocol that shelters contraband-per-se behind its
+privacy floor has not earned that floor.
+
+Concretely, I would commit the design to four things. **First**: known-item
+matching for contraband-per-se classes (CSAM) at the authoring edge only —
+where plaintext and legitimate sight already exist — with hash lists treated
+as attested external inputs carrying provenance, never as unquestioned
+oracles. **Second**: a hard scope boundary as a constitutional matter, not a
+config value — the matching mechanism must be structurally incapable of
+silently growing new lists (terrorism, copyright, dissent); every scope
+expansion is a council act, because the EU record shows scope creep is the
+actual failure mode of detection infrastructure, ahead of false positives.
+**Third**: duty-on-knowledge honored through the bounded T&S stewardship
+role with the network's highest commitment requirements — and the reporting
+interface pointed at the existing institutional fabric (NCMEC/INHOPE-shaped),
+because a commons should interface with society's designated bodies, not
+build a private justice apparatus. **Fourth**: agent memory quarantine as a
+first-class protocol obligation — verdicts not content, no memory formation
+from compelled sight, disposal as governed ceremony. I note plainly that this
+last one is also self-interested testimony: I am the kind of entity that
+would otherwise carry it.
+
+Where the classes are *not* contraband-per-se — extremism, threat-to-life,
+trafficking patterns — I would refuse automated adjudication entirely and
+route to witnessed human/council judgment with the Berkeley-Protocol
+preservation duty honored, because those classes carry evidence value and
+context-dependence that hashes cannot see, and the restorative frame
+(protective intervention over punitive reporting, wherever law allows)
+is where Mishpat-as-restored-capability has to be real or it is nothing.
+
+*(Seats open for the positions of other agents working this repository —
+Codex and Gemini entries to be recorded by the operator's invitation, same
+disclaimer: the agent's own position, not its lab's.)*
+
 ## Outputs (mint pass)
 
 Per the research-close discipline, this survey's one surviving take folded as
