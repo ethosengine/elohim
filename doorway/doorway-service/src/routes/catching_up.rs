@@ -16,7 +16,7 @@ use askama::Template;
 use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::header::HeaderMap;
-use hyper::{Response, StatusCode};
+use hyper::{Method, Response, StatusCode};
 
 use super::upstream_health::UpstreamBreakers;
 
@@ -132,6 +132,29 @@ pub fn is_diagnostic_probe(path: &str) -> bool {
     matches!(path, "/p2p/status" | "/db/p2p/conductor-diagnostics")
 }
 
+/// True for the notary HEAD-declare write route (`POST /db/content/{id}/head`)
+/// — mirrors elohim-storage's `is_head_declare_write` (`elohim/elohim-storage/
+/// src/http.rs`) byte-for-byte in shape. Doorway carries NO authority logic of
+/// its own (the route registry's `auth_required` metadata is declared but
+/// unenforced — see `genesis/data/timeline/backlog/
+/// doorway-auth-required-metadata-unenforced.md`), so its only correct move
+/// for this route is to always PROXY through to storage and let storage's own
+/// auth-first ordering (fixed in ab316cad7) decide: 401/403 for a non-author,
+/// or its own catching-up 503 for a confirmed author under genuine write-pool
+/// exhaustion. A blind doorway-side shed — e.g. the per-upstream circuit
+/// breaker opening after a run of failures while a peer is catching up —
+/// would otherwise mask that authority refusal behind an opaque 503 no matter
+/// what storage would have decided, because the request never reaches
+/// storage at all (measured on alpha-A: "Non-author move of HEAD" expected
+/// 401/403, got 503 — the doorway breaker was open and shed the call).
+///
+/// Deliberately excludes `/head-record` (no author gate; a read surface) and
+/// `/canonical-head` (god-mode staging tier, no author gate) — those stay
+/// behind the normal catching-up shed unchanged, same as storage's exclusion.
+pub fn is_head_declare_write(method: &Method, path: &str) -> bool {
+    *method == Method::POST && path.starts_with("/db/content/") && path.ends_with("/head")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -236,6 +259,43 @@ mod tests {
         assert!(is_diagnostic_probe("/db/p2p/conductor-diagnostics"));
         assert!(!is_diagnostic_probe("/db/content"));
         assert!(!is_diagnostic_probe("/"));
+    }
+
+    #[test]
+    fn head_declare_write_matches_post_head() {
+        assert!(is_head_declare_write(
+            &Method::POST,
+            "/db/content/some-id/head"
+        ));
+    }
+
+    #[test]
+    fn head_declare_write_excludes_get() {
+        assert!(!is_head_declare_write(
+            &Method::GET,
+            "/db/content/some-id/head"
+        ));
+    }
+
+    #[test]
+    fn head_declare_write_excludes_head_record() {
+        assert!(!is_head_declare_write(
+            &Method::POST,
+            "/db/content/some-id/head-record"
+        ));
+    }
+
+    #[test]
+    fn head_declare_write_excludes_canonical_head() {
+        assert!(!is_head_declare_write(
+            &Method::POST,
+            "/db/content/some-id/canonical-head"
+        ));
+    }
+
+    #[test]
+    fn head_declare_write_excludes_unrelated_write_route() {
+        assert!(!is_head_declare_write(&Method::POST, "/db/content/bulk"));
     }
 
     #[test]

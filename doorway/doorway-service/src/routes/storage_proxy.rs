@@ -171,6 +171,13 @@ where
     // never recorded): the doorway must not blind its own probes during
     // exactly the upstream incident they exist to explain.
     let diag_probe = method == Method::GET && crate::routes::catching_up::is_diagnostic_probe(path);
+    // The notary HEAD-declare write is carved out of the breaker's "shed
+    // without calling storage" branch below (NOT out of breaker recording —
+    // see the `trial` construction). Doorway carries no authority logic of
+    // its own; storage's auth-first ordering (ab316cad7) must always get the
+    // chance to run so a non-author is refused 401/403 rather than masked
+    // behind a blind circuit-open 503 while the peer is catching up.
+    let is_head_declare = crate::routes::catching_up::is_head_declare_write(&method, path);
 
     let mut builder = match method {
         Method::GET => client.get(&full_url),
@@ -241,11 +248,33 @@ where
     // never runs, when this request future is DROPPED mid-send because the
     // client disconnected. Circuit-open sheds WITHOUT calling storage. Keyed by
     // storage_url (per-upstream, single-target dispatch).
+    //
+    // EXCEPT for the notary HEAD-declare write (`is_head_declare`): the doorway
+    // holds no authority logic of its own, so a blind circuit-open shed here
+    // would mask elohim-storage's own auth-first refusal (401/403 for a
+    // non-author) behind an opaque 503 no matter what storage would have
+    // decided — the request would simply never arrive. Measured on alpha-A:
+    // "Non-author move of HEAD" expected 401/403, got 503, because the breaker
+    // was open from a run of failures while the peer was catching up. This
+    // route always attempts the call; if a half-open trial IS available it is
+    // still taken (normal breaker bookkeeping), but a fully-open circuit is not
+    // grounds to skip the call — only to skip taking a trial (no outcome is
+    // recorded for a call this branch would otherwise have shed).
     let trial = if diag_probe {
         None
     } else {
         match breakers.begin(storage_url) {
             Some(t) => Some(t),
+            None if is_head_declare => {
+                debug!(
+                    target: "upstream_shed",
+                    storage_url = %storage_url,
+                    path = %path,
+                    "upstream circuit OPEN but path is the notary HEAD-declare write — \
+                     bypassing the shed so storage's own authority refusal can run"
+                );
+                None
+            }
             None => {
                 warn!(
                     target: "upstream_shed",
@@ -847,6 +876,127 @@ mod tests {
         assert!(
             !breakers.is_open(&storage_url),
             "cooldown elapsed: a fresh trial is admitted after the cancelled one"
+        );
+    }
+
+    /// Build a POST request with an empty body — `forward_to_storage`'s POST
+    /// branch calls `req.collect().await` regardless of body content, so an
+    /// `Empty<Bytes>` body (no `head_action_hash`, resolves the author's
+    /// latest committed action) is a faithful stand-in for these tests.
+    fn make_post_request(uri: &str) -> Request<Empty<Bytes>> {
+        Request::builder()
+            .method(Method::POST)
+            .uri(uri)
+            .body(Empty::new())
+            .unwrap()
+    }
+
+    /// REGRESSION (measured on alpha-A: "Non-author move of HEAD" expected
+    /// 401/403, got 503). While the per-upstream breaker is fully OPEN — the
+    /// shape a run of failures produces while a peer is catching up — the
+    /// notary HEAD-declare write (POST /db/content/{id}/head) must still
+    /// reach storage so storage's own auth-first ordering can run, instead of
+    /// being shed blind by the doorway's circuit breaker. A large cooldown
+    /// keeps the circuit fully OPEN (never half-open) for the whole test, so
+    /// this proves the bypass is not just "waited for the next half-open
+    /// trial" — a real 401 from the mock storage comes through unmasked.
+    #[tokio::test]
+    async fn head_declare_write_bypasses_open_breaker_and_reaches_storage() {
+        let (addr, _handle) = spawn_mock_storage(
+            401,
+            br#"{"error":"authentication required"}"#.to_vec(),
+            "application/json",
+        )
+        .await;
+        let storage_url = format!("http://{addr}");
+        let breakers = UpstreamBreakers::new(1, 9999); // huge cooldown: stays fully open
+        breakers.record(&storage_url, false); // one failure opens the circuit
+        assert_eq!(breakers.snapshot()[0].circuit, "open");
+
+        let path = "/db/content/some-id/head";
+        let resp = forward_to_storage(
+            make_post_request(&format!("http://doorway{path}")),
+            &storage_url,
+            path,
+            &reqwest::Client::new(),
+            &breakers,
+            ForwardCtx::default(),
+        )
+        .await;
+
+        assert_eq!(
+            resp.status(),
+            StatusCode::UNAUTHORIZED,
+            "head-declare write must reach storage (and carry storage's real \
+             answer) even with the breaker fully open — never a doorway-side \
+             catching-up 503"
+        );
+    }
+
+    /// Sibling regression: a content READ against the same open breaker is
+    /// still shed (503 catching-up) WITHOUT ever reaching storage — the
+    /// carve-out is scoped to the exact head-declare write shape, not a
+    /// blanket breaker bypass for the endpoint.
+    #[tokio::test]
+    async fn content_get_still_shed_when_breaker_open() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+
+        let hit_counter = Arc::new(AtomicU32::new(0));
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let counter_clone = Arc::clone(&hit_counter);
+        tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let io = TokioIo::new(stream);
+                let ctr = Arc::clone(&counter_clone);
+                tokio::spawn(async move {
+                    ctr.fetch_add(1, Ordering::SeqCst);
+                    let _ = http1::Builder::new()
+                        .serve_connection(
+                            io,
+                            service_fn(move |_req: Request<hyper::body::Incoming>| async move {
+                                let resp: Result<Response<Full<Bytes>>, Infallible> =
+                                    Ok(Response::builder()
+                                        .status(200u16)
+                                        .header("Content-Type", "application/json")
+                                        .body(Full::new(Bytes::from("{}")))
+                                        .unwrap());
+                                resp
+                            }),
+                        )
+                        .await;
+                });
+            }
+        });
+
+        let storage_url = format!("http://{addr}");
+        let breakers = UpstreamBreakers::new(1, 9999); // huge cooldown: stays fully open
+        breakers.record(&storage_url, false);
+        assert_eq!(breakers.snapshot()[0].circuit, "open");
+
+        let path = "/db/content/some-id";
+        let resp = forward_to_storage(
+            make_get_request(&format!("http://doorway{path}")),
+            &storage_url,
+            path,
+            &reqwest::Client::new(),
+            &breakers,
+            ForwardCtx::default(),
+        )
+        .await;
+
+        assert_eq!(
+            resp.status(),
+            StatusCode::SERVICE_UNAVAILABLE,
+            "a content read must stay shed while the breaker is open"
+        );
+        assert_eq!(
+            hit_counter.load(Ordering::SeqCst),
+            0,
+            "the shed must never reach storage for a non-head-declare route"
         );
     }
 

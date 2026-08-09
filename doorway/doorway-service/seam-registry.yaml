@@ -376,3 +376,58 @@ decisionPoints:
       - path: doorway/doorway-service/src/cache/reach_aware_serving.rs
         testName: test_should_serve_private_content_to_owner
         kind: unit
+
+  - name: is_head_declare_write
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/catching_up.rs
+      modulePath: routes::catching_up::is_head_declare_write
+      line: 154
+    summary: >
+      Exact-shape match for the notary HEAD-declare write (POST /db/content/{id}/head),
+      mirroring elohim-storage's own is_head_declare_write byte-for-byte (excludes
+      /head-record and /canonical-head). Used by storage_proxy::forward_to_storage to carve
+      this one route out of the per-upstream circuit breaker's "shed without calling storage"
+      branch — a confirmed-open breaker (accumulated failures while a peer is catching up) no
+      longer blind-sheds this route; the call always reaches storage so its own auth-first
+      ordering (elohim-storage ab316cad7) can refuse a non-author 401/403 instead of the
+      refusal being masked behind an opaque doorway-side 503.
+    concernIds:
+      - id: C11
+        status: answered
+        justification: >
+          Externally-imposed backpressure (the breaker's circuit-open shed) is bounded to NOT
+          apply to this route: is_head_declare_write_matches_post_head +
+          is_head_declare_write_excludes_* (catching_up.rs) pin the exact-shape match, and
+          head_declare_write_bypasses_open_breaker_and_reaches_storage (storage_proxy.rs) pins
+          that a call is still attempted when the breaker is open.
+      - id: C2
+        status: n-a
+        justification: >
+          Doorway carries no authority logic of its own (route registry auth_required is
+          declared but unenforced — genesis/data/timeline/backlog/
+          doorway-auth-required-metadata-unenforced.md). This predicate only ensures the
+          request reaches the place monotonic authority IS decided (elohim-storage's
+          handle_content_head auth-first block); it does not itself adjudicate authorship.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/catching_up.rs
+        testName: head_declare_write_matches_post_head
+        kind: unit
+      - path: doorway/doorway-service/src/routes/catching_up.rs
+        testName: head_declare_write_excludes_get
+        kind: unit
+      - path: doorway/doorway-service/src/routes/catching_up.rs
+        testName: head_declare_write_excludes_head_record
+        kind: unit
+      - path: doorway/doorway-service/src/routes/catching_up.rs
+        testName: head_declare_write_excludes_canonical_head
+        kind: unit
+      - path: doorway/doorway-service/src/routes/catching_up.rs
+        testName: head_declare_write_excludes_unrelated_write_route
+        kind: unit
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: head_declare_write_bypasses_open_breaker_and_reaches_storage
+        kind: unit
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: content_get_still_shed_when_breaker_open
+        kind: unit
