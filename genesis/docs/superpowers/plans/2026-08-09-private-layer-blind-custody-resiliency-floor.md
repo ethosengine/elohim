@@ -303,6 +303,40 @@ Scenario: A bond fades and custody re-settles without a gap or a penalty
    ciphertext-only relay seam and p2panda's PSI discovery are the named prior art.)
 5. **`p2panda-encryption` adoption.** Consume the crate or build from primitives? Gated on the
    unconfirmed audit; a one-hour check gates a large fork in effort.
+6. **The witnessed-harm limit (operator note, 2026-08-09).** Privacy carries the highest
+   protection here, but it is a *qualified* right (ICCPR Art. 17 bars only arbitrary
+   interference), and the CSAM / violent-crime edge is where it meets its limit. Nobody has
+   resolved this tension; the best available practice *manages* it, and the design should adopt
+   that shape rather than pretend a resolution exists:
+   - **Duty attaches on knowledge, not a duty to scan** (the 18 U.S.C. §2258A / NCMEC
+     CyberTipline shape). Blind custody concentrates this correctly: custodians *cannot* know,
+     so the duty lives at the authoring edge and in explicit roles — never via unsealing custody.
+   - **Content-ID without sight**: perceptual hash-matching against curated lists (PhotoDNA,
+     NCMEC/IWF lists, Project Arachnid, Thorn Safer) at the edge where content is plaintext —
+     the StopNCII shape (victim hashes locally; only hashes travel) is the closest prior art
+     for this architecture.
+   - **Accountable witnessed reporting over mass inspection**: message-franking-style schemes
+     (a party with legitimate sight proves what they saw without platform scanning) — the
+     El Roi witnessed-sight frame, not a panopticon. The unresolved fight is mapped by Apple's
+     withdrawn 2021 NeuralHash client-side scanning, the "Bugs in Our Pockets" rebuttal
+     (Abelson/Rivest/Schneier et al.), the Levy/Robinson counterpoint, and the deadlocked EU
+     CSA Regulation — that corpus ends in disagreement and IS the state of the art.
+   - **Institutional scaffolding** (no single UN operational standard exists): CRC + OPSC,
+     CRC General Comment No. 25 (privacy-vs-protection balancing for children), the 2024 UN
+     Cybercrime Convention CSAM provisions, WeProtect Global Alliance (Model National
+     Response), INHOPE hotline network.
+   - **Agent memory as the frontier gap**: no standard exists. Nearest analog is human
+     moderator practice — exposure minimization (classifier-first, need-to-know, rotation),
+     evidence held only under legal-hold then purged, because possession is itself the harm.
+     Translation for agents: classifiers/hashes see content so agents see *verdicts*; when an
+     agent must see, that context is quarantined (no memory formation), a report artifact is
+     produced, and disposal is a governed ceremony, not retention. What an agent has witnessed
+     is not healthy residue to carry — same as for a person.
+   - **Mishpat framing**: trust-and-safety sight is a *bounded stewardship role* with the
+     highest commitment requirements on the network (content-ID/non-proliferation + T&S, strict
+     need-to-know, witnessed and accountable), never a standing capability of ordinary peers or
+     agents. Same decision family as open question 2 (who may ever see, under what commitment,
+     with what disposal) — council question, not an engineering one.
 
 ## 8. Non-goals
 
