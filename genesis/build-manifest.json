@@ -30,7 +30,7 @@
     "seed-content": {
       "description": "Seed validated content to target environment",
       "inputs": {
-        "sources": [],
+        "sources": ["genesis/manifests/cluster-state.yaml"],
         "buildProcess": ["genesis/Jenkinsfile"]
       },
       "outputs": {
