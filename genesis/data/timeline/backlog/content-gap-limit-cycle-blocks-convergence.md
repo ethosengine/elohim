@@ -469,3 +469,25 @@ alpha's `elohim-storage-iroh:${STORAGE_TAG}` against a tag never pushed
 exposed now its tag is per-commit. Narrow (deliberate operator override only);
 fix shape: extend the DEPLOY_ONLY-style Harbor preflight to the normal-build
 env-file write.
+
+## Post-transport-cure evidence (2026-08-09, convergence-serve-path shift)
+
+The 6h settle-clock after the relay/cross-relay cures (edge #1332,
+T0=13:24Z) answers the "how long to converge" question with: NEVER under
+current dynamics. With the transport fully open (both relay error classes
+at zero fleet-wide), per-pod elohim_projection_reconcile_divergent
+{stream="content"} OSCILLATES in bounded bands for 6h with no trend:
+matthew 1622↔1858, jessica 777↔945, adam 451↔1750, eve 647↔1140,
+gertrude 647↔1072, james 728↔1437; susan swings 0↔3129 (touching ZERO
+twice, then re-spiking — the sweep can measure clean and then re-diverge
+or re-measure a different subset). rea streams flat (6-12/peer),
+collectives 0 everywhere. Two prior same-day "monotone drain" reads were
+SAMPLING ARTIFACTS (pool-fanned /health across peers; sweep-phase
+aliasing) — always read this per-pod from Prometheus, never from a
+fanned endpoint.
+
+Consequence for the head-plane §6.4 memo: the F2 quiesce window is
+UNMEASURABLE until this objective lands — that is the decision input,
+not a minutes-number. This item is now the confirmed gate in front of:
+caughtUp=true fleet-wide, the doorway shed lifting, notary-authority
+3/3, saga ch04/06/10, and the fork-deploy decision.
