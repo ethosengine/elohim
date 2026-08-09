@@ -88,3 +88,24 @@ out, pivot to admin-API list_apps + peer-store dump.
 2026-08-08 ~23:45Z) changes the STS env, forcing a fleet restart that
 re-renders susan onto the current 2000m spec. Post-deploy Loki check:
 susan kitsune2 attempt count nonzero = hypothesis 1 confirmed-and-cured.
+
+## Natural-experiment result (2026-08-09, edge #1327)
+
+The T5-flip deploy restarted susan at 2000m (resourceOverride, deployed
+tree). Post-restart: **the never-attempts signature is gone** — 73,000+
+kitsune2_gossip lines in the observed window, volume matching eve (78,735)
+and gertrude (67,028); DHT model initialised (twice, ~18-24 min each);
+inventory serving normally. She now fails gossip initiation on the SAME
+fleet-wide relay-registration race as her siblings ("Connection attempted
+before home relay URL is known", identical + simultaneous on eve) — i.e.
+she graduated from her unique upstream failure mode into the known shared
+seam. CPU-starvation hypothesis: SUBSTANTIALLY CONFIRMED for the
+never-attempts mode (cured by the CPU raise); the residual relay seam is a
+separate, already-tracked fleet concern. The archetype-level fix (canonical
+2000m, bff33b01f) rides the next wave and supersedes the override.
+
+Loose ends: (1) susan's pod restarted a SECOND time after the #1327
+rollout (container UID changed outside the deploy window) — cause unknown,
+needs kubectl events/OOM check (operator side). (2) DHT model init at
+~18-24 min is long; whether that is churn-normal or another envelope
+symptom is unassessed.
