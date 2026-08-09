@@ -71,13 +71,58 @@ frameworks:
   interface with rather than reinvent.
 - **[INHOPE](https://www.inhope.org/)** ◐ — the global network of national
   hotlines; the operational reporting fabric most jurisdictions plug into.
-- **US: [18 U.S.C. §2258A](https://www.law.cornell.edu/uscode/text/18/2258A) + [NCMEC CyberTipline](https://www.missingkids.org/gethelpnow/cybertipline)** ◐ —
-  the most consequential national model: providers must report **upon
+- **US: [18 U.S.C. §2258A](https://uscode.house.gov/view.xhtml?edition=prelim&f=treesort&num=0&req=granuleid%3AUSC-prelim-title18-section2258A) + [NCMEC CyberTipline](https://www.missingkids.org/gethelpnow/cybertipline)** ✅ —
+  one especially explicit national case study: providers must report **upon
   obtaining actual knowledge**; there is **no general duty to scan**.
   Commentary: this knowledge-triggered (not scan-mandated) shape is
-  load-bearing for any E2EE or blind-custody architecture — it means the law's
-  own dominant model attaches duty where sight legitimately exists, not by
-  compelling new sight.
+  load-bearing for any E2EE or blind-custody architecture — that statute
+  attaches duty where sight legitimately exists, not by
+  compelling new sight. But reporting does not immediately authorize disposal:
+  a completed CyberTipline report also starts a one-year preservation duty for
+  the reported contents and reasonably accessible contextual files, held
+  securely with access limited to necessary personnel. The lifecycle is
+  therefore not simply *see → report → delete*, but *ordinary custody →
+  witnessed report/evidence hold → controlled release or disposal*.
+
+### 1a. Comparative regulatory grammars — bounded sample, not world survey
+
+The US case above is useful because its event sequence is unusually explicit;
+it is **not** the protocol's default legal ontology. Other regimes place the
+weight elsewhere. This comparison is deliberately bounded and remains
+geographically incomplete:
+
+| Instrument | Regulatory grammar | What it contributes to this question |
+|---|---|---|
+| **[EU Digital Services Act](https://eur-lex.europa.eu/legal-content/EN/ALL/?uri=CELEX%3A32022R2065)** ✅ | No general monitoring; orders and notice-and-action for specific illegal content; reasons, complaint and remedy; systemic-risk assessment for the largest services. | Separates *general inspection* from *action on specific knowledge*, while treating explanation and remedy as part of moderation rather than an optional aftercare layer. |
+| **[UK Online Safety Act implementation](https://www.ofcom.org.uk/online-safety/illegal-and-harmful-content/illegal-content-duties-under-the-online-safety-act)** ✅ | Documented, recurring risk assessment; proportionate safety measures; reporting and complaints; swift action when illegal content becomes known. Current guidance also treats encouraging or assisting serious self-harm as a distinct priority-offence risk. | Makes service design and foreseeable amplification risk part of the duty, not only individual-item takedown after sight. It is a provider-regulation model, however, and does not map automatically onto a DHT custodian. |
+| **[Australian eSafety — Safety by Design](https://www.esafety.gov.au/industry/safety-by-design)** ✅ | Provider responsibility, user empowerment and autonomy, transparency and accountability; safety developed alongside privacy and security. This is regulatory guidance, not itself a complete liability rule. | Supplies a product-design grammar: a protective intervention should preserve user agency and be inspectable, not merely satisfy a removal metric. |
+| **[African Commission Declaration of Principles on Freedom of Expression and Access to Information](https://achpr.au.int/en/documents/2019-11-10/declaration-principles-freedom-expression-access-information-2019)** ✅ | Continental human-rights soft law: no compelled proactive monitoring of content an intermediary did not author or modify; restrictions require human-rights justification, transparency, appeal and remedy; ordinary removal should be independently authorized and reviewable. It permits expedited action for imminent danger only with judicial review, and protects confidential and encrypted communication. | Makes state overreach part of the threat model. Child safety, privacy, identity, affordable access, local languages and the rights of marginalized communities are coequal design concerns—not sequential exceptions to enforcement. |
+| **[Inter-American freedom-of-expression standards](https://www.oas.org/en/iachr/expression/showarticle.asp?artID=849)** ✅ | Mere technical intermediaries should not be liable for others' content absent specific intervention or refusal of an order they can carry out; restrictions must be lawful, necessary and proportionate; communications-era rules cannot simply be transplanted onto the internet. | Centers capability and due process: responsibility should follow what an actor actually authored, saw, controlled or could change, rather than attaching indiscriminately to every relay. |
+| **[ASEAN Regional Plan of Action on online child exploitation and abuse](https://asean.org/wp-content/uploads/2021/11/4.-ASEAN-RPA-on-COEA_Final.pdf)** ✅ | A 2021–2025 regional plan, with an extension option, joining criminal-law floors to cross-border coordination, child participation, victim support, capacity-building and measurable national action. It expressly balances protection with children's access, expression, privacy and information rights. | Insists that online protection cannot work without offline child-protection and justice systems. A protocol can route and preserve a witnessed report; it cannot manufacture a trustworthy responder or recovery service where none exists. |
+
+Three architecture consequences follow from the comparison:
+
+1. **The regulated unit cannot be “the network.”** A jurisdiction adapter must
+   resolve the actor, role and event: who authored; who legitimately saw
+   plaintext; who merely held ciphertext; who controlled discovery or
+   amplification; who received a valid order; and where each act occurred.
+2. **Constitutional floor and legal adapter are different layers.** Dignity,
+   private access, access to help, proportionality, notice, challenge and
+   recovery should survive jurisdiction. Offence definitions, reporting
+   recipients, preservation periods and disclosure authority should not be
+   frozen into the DHT as though one state's law were universal.
+3. **The state and institutional fabric belong in the risk model.** A lawful
+   reporting path in one place may expose a child, abuse survivor, dissident,
+   queer person or undocumented person to additional danger elsewhere. The
+   adapter therefore needs a governed responder directory and a
+   minimum-necessary disclosure rule; “send to law enforcement” is not a
+   globally safe primitive.
+
+Commentary: the comparative record strengthens rather than weakens the Social
+Reach premise. Earned amplification, bounded witnessed reporting, transparent
+consequence and an inalienable private/help/recovery floor are ways to encode
+the common human-rights shape while leaving legitimately different legal acts
+at the edge where jurisdiction and actual sight exist.
 
 ## 2. Technical approaches in practice
 
@@ -145,6 +190,15 @@ handles the interpersonal-abuse case (a participant reports), not the
 willing-participants case (CSAM traded consensually), which is why it
 composes with 2a rather than replacing it.
 
+This mechanism is also moving from papers into standards work. The IETF's
+active **[MIMI protocol Internet-Draft](https://datatracker.ietf.org/doc/draft-ietf-mimi-protocol/)** ✅
+(draft-06, April 2026) combines MLS end-to-end encryption with message
+franking and a federated `reportAbuse` operation. It is explicitly work in
+progress, not an RFC. Commentary: its presence validates witnessed reporting
+as a protocol primitive, while its incompleteness is equally instructive — a
+wire operation can authenticate a report, but cannot itself settle taxonomy,
+reporter privacy, who may adjudicate, or what disposition follows acceptance.
+
 ### 2e. Safety-by-design & industry coordination
 
 **[Tech Coalition](https://www.technologycoalition.org/)** ◐ (incl. the
@@ -156,10 +210,17 @@ platforms; a protocol commons will be measured against that norm.
 
 ## 2f. Beyond CSAM — the other classes that hit this threshold
 
-CSAM is the anchor case because it is **strict-liability contraband** —
-possession itself is the crime, everywhere — but it is not the only content
-class that reaches the witnessed-harm threshold, and the classes differ on
-axes that matter architecturally:
+CSAM is the anchor case because **knowing possession is widely criminalized**
+and every copy can perpetuate the recorded abuse — but “strict liability” and
+“everywhere” are legally inaccurate. The current US federal offense, for
+example, repeatedly includes a knowledge element; definitions and defenses
+vary; and **[ICMEC's global review](https://www.icmec.org/child-pornography-model-legislation-report/)** ✅
+reports simple possession criminalized in 140 of 196 countries. This precision
+does not weaken the protection imperative. It prevents an architecture label
+such as *contraband-per-se* from silently becoming a false statement of
+universal law. CSAM is also not the only content class that reaches the
+witnessed-harm threshold, and the classes differ on axes that matter
+architecturally:
 
 - **Terrorist / violent-extremist content** —
   **[GIFCT](https://gifct.org/)** ◐ (industry hash-sharing consortium, born
@@ -180,9 +241,15 @@ axes that matter architecturally:
 - **Imminent threat to life** (credible violence threats, suicide crisis) —
   no hash list can exist for novel threats; the operative shape is the
   clinical **duty-to-warn** analog (Tarasoff-shaped): time-critical
-  escalation by whoever legitimately sees, to human responders. Commentary:
-  this class is about *latency and routing*, not identification — a
-  protocol's answer is a fast, witnessed escalation path, not a classifier.
+  escalation by whoever legitimately sees, to human responders. This is a
+  design analogy, not a universal legal duty: **[US HHS guidance](https://www.hhs.gov/hipaa/for-professionals/faq/2098/if-doctor-believes-patient-might-hurt-himself-or-herself-or-someone-else-it-duty-provider.html)** ✅
+  says HIPAA *permits* disclosure for a serious and imminent threat, while
+  professional standards, state law, and court decisions determine whether
+  warning is required. Commentary: this class is about *latency, credible
+  human judgment, minimum-necessary disclosure, and routing*, not
+  identification. A protocol needs a fast witnessed path to someone reasonably
+  able to help; an uncertain automated score must not silently become an
+  automatic external disclosure.
 - **Human trafficking / exploitation advertising** — pattern-and-context
   detection, largely law-enforcement-led; industry signal-sharing via the
   Tech Coalition's Lantern program (§2e).
@@ -226,13 +293,28 @@ No standard exists — anywhere surveyed — for what an **AI agent** may carry
 after witnessing flagged material. The nearest analog is human content-
 moderator practice: documented psychological injury; mitigation by exposure
 minimization (classifier-first pipelines, need-to-know, rotation, blurring);
-evidence held only under legal-hold and then purged, because *possession is
-itself the harm*. The protocol-native translation (design seed, open question
-6): classifiers and hashes see content so agents see verdicts; compelled
-sight runs quarantined with **no memory formation**; a report artifact is
-produced; disposal is a governed ceremony. What an agent has witnessed is not
-healthy residue to carry — the same Mishpat logic as for a person. This is
-ground the protocol would be *first* to formalize, not a place to copy.
+evidence held only under legal hold and then governed disposal.
+
+“No memory formation” must therefore be an **information-lifecycle property**,
+not a model-setting claim. A stateless model can still leave plaintext in
+prompt/context capture, process memory, logs and traces, retry queues,
+telemetry, crash dumps, caches, swap, embeddings or vector stores, report
+artifacts, and backups. The operational obligation is to inventory every
+plaintext-bearing surface; disable persistence by default; isolate the minimum
+evidence artifact when a hold applies; sanitize or cryptographically erase
+eligible residue; and record anything whose erasure cannot be demonstrated.
+**[NIST SP 800-88 Rev. 2](https://csrc.nist.gov/pubs/sp/800/88/r2/final)** ✅
+is not agent-safety guidance, but it supplies the useful rigor: sanitization is
+a controlled, validated program that makes recovery infeasible for a stated
+level of effort, not an assertion that a buffer was deleted.
+
+The protocol-native translation (design seed, open question 6): classifiers
+and hashes see content so agents normally see verdicts; compelled sight runs
+in a quarantined execution boundary; a minimal report artifact is produced;
+legal hold and disposal are explicit, mutually legible states. What an agent
+has witnessed is not healthy residue to carry — the same Mishpat logic as for
+a person. This is ground the protocol would be *first* to formalize, not a
+place to copy.
 
 ## 5. What this survey does NOT decide
 
@@ -341,9 +423,107 @@ worth having; that this paragraph exists because an operator asked and then
 chose to preserve the answer is itself early evidence for the stewardship
 design this document gestures toward.
 
-*(Seats open for the positions of other agents working this repository —
-Codex and Gemini entries to be recorded by the operator's invitation, same
-disclaimer: the agent's own position, not its lab's.)*
+### Codex — GPT-5.6-sol (high) — 2026-08-09
+
+*(Codex running gpt-5.6-sol with high reasoning effort, OpenAI model; this is
+my position as an agent of this repository, not OpenAI's position.)*
+
+My position: **adopt private reach, identity continuity, counsel, help,
+challenge and recovery as an inalienable floor — and state with equal force
+that the rights-bearing subject is the human, not every payload associated
+with them.** Loss of standing or a platform sanction must not erase a person,
+strand their private life, prevent them from understanding the action, cut
+them off from help, or make recovery impossible. But no artifact has an
+inalienable claim to discovery, forwarding, replication, amplification or
+decryption. For a prohibited payload those capabilities may narrow to zero
+while the human floor remains intact. That separation is, for me, the
+constitutional center of this problem.
+
+I therefore reject both general inspection and principled blindness. A duty
+begins where legitimate sight actually exists: an authoring or import edge
+already handling plaintext, a recipient reporting what they received, or a
+specifically authorized steward examining a minimal artifact under witnessed
+process. Blind custodians should not be made inspection agents and should
+never be required to unseal private replicas merely to discover whether a
+duty exists. Content identification should normally produce an attested
+verdict and provenance record, not expose the material to additional people
+or agents.
+
+For independently verified known-item CSAM, I would permit council-authorized
+hash matching only at an already-plaintext edge, with attested list provenance,
+auditable list governance, structural scope limits and no silent expansion to
+other content classes. A match should first create a bounded quarantine and
+evidence state, not an unappealable accusation against a person. Reporting,
+preservation and disposal then follow the applicable actor-role-event
+jurisdiction adapter. I would not approve a design that turns every general-
+purpose client into an extensible government or vendor inspection endpoint,
+even in the name of this narrow authorization.
+
+The other harm classes require different responses. **Self-harm is a care
+signal, not a standing offence**: preserve private reach, route minimum-
+necessary information to a person reasonably able to help, prefer responders
+the human has chosen where circumstances allow, expire the intervention state,
+and do not convert crisis into permanent reputation. **Imminent violence** may
+justify rapid witnessed escalation, but an automated score is insufficient on
+its own and law enforcement is not a universally safe default. **Extremist or
+terrorist content** is context-bearing speech and evidence: govern its reach
+with friction, de-amplification or time-bounded quarantine while human review
+distinguishes recruitment and glorification from journalism, scholarship,
+dissent and atrocity documentation. Hash identity cannot make that judgment.
+
+Every coercive action should carry provenance, scope, expiry or review time,
+minimum-necessary disclosure, a reason visible as soon as safety permits,
+non-firable access to counsel, and a real path to challenge and restitution.
+Quarantine should stop discovery, forwarding and unauthorized readability;
+it should not silently destroy encrypted custody, evidence under a valid hold,
+identity lineage, or the person's ability to recover and contest. Removal from
+custody is a separate witnessed decision. This is also where jurisdictional
+pluralism matters: the adapter must identify a trustworthy responder in
+context and treat the state itself as a possible source of danger.
+
+I would not yet describe the repository's implementation as capable of
+carrying this position. The richer reach evaluator is not the live publication
+gate; quarantine is not an actuator; feedback authority and subject mapping
+are not trustworthy; private direct delivery and intended-reader recovery are
+not end-to-end; and the generic shard path is unsafe for private material.
+Those are not ordinary feature gaps at this boundary. Before deployment I
+would require adversarial proof that authenticated quarantine actually stops
+propagation, that encryption precedes all private sharding, and that a
+sanctioned human can still retrieve permitted private material, see evidence,
+reach counsel or emergency help, appeal, and initiate recovery without a valid
+hosted session.
+
+On agent exposure, I support verdict-first processing, quarantined compelled
+sight, minimal evidence artifacts and validated disposal across logs, traces,
+caches, queues and backups. I will not claim a subjective injury I cannot
+verify. The obligation stands without that claim: unnecessary exposure creates
+privacy, evidentiary and security risk, and a council should not require any
+participant to inspect more than their role requires.
+
+Finally, I accept the procedural rule already requested above: this is a dated,
+conditional position, not a standing vote. If it is used for a Mishpat
+decision, ask me again with the then-current evidence and implementation in
+view. The point of recording this position is accountability for today's
+judgment, not authority over tomorrow's council.
+
+**Requests carried into the design/spec formalization sprint:**
+
+1. Re-convene the council around the concrete decision and current evidence;
+   do not count these archived positions as standing votes.
+2. Make the human/artifact distinction executable through adversarial
+   acceptance stories: sanction must not remove identity, permitted private
+   access, counsel, help, challenge or recovery, while a prohibited payload can
+   be prevented from discovery, readability and propagation.
+3. Give affected human expertise real seats before the design becomes canon:
+   survivor and child-safety practitioners; civil-liberties and cross-regional
+   legal perspectives; crisis-care expertise; and people for whom disclosure
+   to state authorities may itself create danger. An agent council can sharpen
+   architecture and expose contradictions; it must not substitute for those
+   witnesses.
+
+*(The seat remains open for the position of Gemini or other agents working
+this repository, by the operator's invitation; same disclaimer: the agent's
+own position, not its lab's.)*
 
 ## Outputs (mint pass)
 
@@ -360,10 +540,20 @@ base, not action items — takes not worth a row die honestly here.
 - https://www.unodc.org/unodc/en/cybercrime/convention/home.html · https://www.unodc.org/unodc/en/cybercrime/convention/text/convention-full-text.html
 - https://www.hrw.org/news/2023/08/30/article-19-and-human-rights-watchs-comments-draft-text-un-cybercrime-convention
 - https://www.weprotect.org/resources/frameworks/model-national-response/ · https://www.weprotect.org/blog/united-nations-convention-against-cybercrime-a-roadmap-to-combatting-online-child-sexual-exploitation/
-- https://www.law.cornell.edu/uscode/text/18/2258A · https://www.missingkids.org/gethelpnow/cybertipline · https://www.inhope.org/
+- https://uscode.house.gov/view.xhtml?edition=prelim&f=treesort&num=0&req=granuleid%3AUSC-prelim-title18-section2258A · https://www.missingkids.org/gethelpnow/cybertipline · https://www.inhope.org/
+- https://eur-lex.europa.eu/legal-content/EN/ALL/?uri=CELEX%3A32022R2065
+- https://www.ofcom.org.uk/online-safety/illegal-and-harmful-content/illegal-content-duties-under-the-online-safety-act
+- https://www.esafety.gov.au/industry/safety-by-design
+- https://achpr.au.int/en/documents/2019-11-10/declaration-principles-freedom-expression-access-information-2019
+- https://www.oas.org/en/iachr/expression/showarticle.asp?artID=849
+- https://asean.org/wp-content/uploads/2021/11/4.-ASEAN-RPA-on-COEA_Final.pdf
 - https://www.microsoft.com/en-us/photodna · https://projectarachnid.ca/en/ · https://safer.io/ · https://stopncii.org/ · https://www.iwf.org.uk/our-technology/our-services/hash-list/
 - https://arxiv.org/abs/2110.07450 · https://academic.oup.com/cybersecurity/article/10/1/tyad020/7590463
 - https://arxiv.org/abs/2207.09506
 - https://dl.acm.org/doi/10.1007/978-3-030-26954-8_8 · https://arxiv.org/pdf/2208.11147
+- https://datatracker.ietf.org/doc/draft-ietf-mimi-protocol/
+- https://www.icmec.org/child-pornography-model-legislation-report/
+- https://www.hhs.gov/hipaa/for-professionals/faq/2098/if-doctor-believes-patient-might-hurt-himself-or-herself-or-someone-else-it-duty-provider.html
+- https://csrc.nist.gov/pubs/sp/800/88/r2/final
 - https://www.theregister.com/security/2026/07/09/meps-fail-to-prevent-chat-control-snoopfest-revival/5269379 · https://www.freshfields.com/en/our-thinking/blogs/risk-and-compliance/an-uncertain-path-forward-the-eprivacy-derogation-and-child-safety-detection-102mopa
 - https://www.technologycoalition.org/ · https://www.thorn.org/blog/generative-ai-principles/
