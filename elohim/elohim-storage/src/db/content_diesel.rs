@@ -1063,6 +1063,27 @@ pub fn declared_head_for(
     Ok(found.flatten().filter(|h| !h.trim().is_empty()))
 }
 
+/// Read the content row's CURRENT `reach` tier, if the row exists.
+///
+/// Used by the projection-reconcile heal path's non-narrowing reach guard
+/// (RC-4, `p2p::projection_reconcile::reach_patch_would_narrow`): heal must
+/// know the row's LOCAL reach before deciding whether an incoming conductor
+/// answer's reach would narrow it. `Ok(None)` means no such row (heal is
+/// existing-row-only anyway, so this reads as "nothing to protect").
+pub fn reach_for(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+) -> Result<Option<String>, StorageError> {
+    content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::id.eq(id))
+        .select(content::reach)
+        .first::<String>(conn)
+        .optional()
+        .map_err(|e| StorageError::Internal(format!("reach lookup failed: {e}")))
+}
+
 /// [`declared_head_for`] plus WHETHER A DHT ELECTION STANDS BEHIND IT.
 ///
 /// The second element is `content.canonical_declared_at IS NOT NULL`. The two

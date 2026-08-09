@@ -221,6 +221,11 @@ struct MissEntry {
     evidence: String,
     /// Sweeps spent exhausted, counted toward [`MISS_READMIT_SWEEPS`].
     dormant: u32,
+    /// Whether the id was classified DIVERGENT (vs a plain absence gap) the last
+    /// time it was admitted under the current `evidence`. Backs the persistent
+    /// `elohim_projection_reconcile_known_divergent{stream}` gauge — see
+    /// [`MissLedger::divergent_tracked`].
+    divergent: bool,
 }
 
 /// Cross-sweep miss counts for the reconcile arms — the thing that makes
@@ -265,8 +270,16 @@ impl MissLedger {
     }
 
     /// Record that `id` is STILL a gap this sweep, under `evidence`, and decide
-    /// whether it may be enqueued.
-    pub fn admit(&mut self, stream: &'static str, id: &str, evidence: &str) -> Admission {
+    /// whether it may be enqueued. `divergent` is this sweep's classification of
+    /// the id (anchor-divergent vs a plain absence) — see
+    /// [`MissLedger::divergent_tracked`].
+    pub fn admit(
+        &mut self,
+        stream: &'static str,
+        id: &str,
+        evidence: &str,
+        divergent: bool,
+    ) -> Admission {
         let entries = self.streams.entry(stream).or_default();
         match entries.get_mut(id) {
             None => {
@@ -281,6 +294,7 @@ impl MissLedger {
                         misses: 1,
                         evidence: evidence.to_string(),
                         dormant: 0,
+                        divergent,
                     },
                 );
                 Admission::Retry
@@ -288,11 +302,21 @@ impl MissLedger {
             Some(e) => {
                 if e.evidence != evidence {
                     // New evidence — this is not the claim we gave up on.
+                    // Reclassify from scratch: the divergent bit belongs to the
+                    // evidence being adjudicated, not to a stale claim.
                     e.evidence = evidence.to_string();
                     e.misses = 1;
                     e.dormant = 0;
+                    e.divergent = divergent;
                     return Admission::Retry;
                 }
+                // Same evidence: this sweep's classification may UPGRADE the
+                // entry from gap to divergent (an id first seen as a plain
+                // absence can be reclassified divergent once a local anchor
+                // lands under the SAME peer claim) but never silently downgrade
+                // a divergence the ledger already knows about — the peer's
+                // claim has not changed, so what made it divergent still holds.
+                e.divergent = e.divergent || divergent;
                 if e.misses >= MAX_RETRIES {
                     e.dormant = e.dormant.saturating_add(1);
                     if e.dormant >= MISS_READMIT_SWEEPS {
@@ -316,9 +340,31 @@ impl MissLedger {
         }
     }
 
-    /// Ids currently tracked for `stream` (observability / test assertion).
+    /// Ids currently tracked for `stream` (observability / test assertion) —
+    /// the TOTAL, gap-only plus divergent. Backs
+    /// `elohim_projection_reconcile_known_gaps{stream}` (this minus
+    /// [`Self::divergent_tracked`]).
     pub fn tracked(&self, stream: &'static str) -> usize {
         self.streams.get(stream).map(|e| e.len()).unwrap_or(0)
+    }
+
+    /// Ids currently tracked for `stream` that are classified DIVERGENT (see
+    /// [`MissEntry::divergent`]) — the persistent, cross-sweep counterpart to
+    /// the per-sweep `elohim_projection_reconcile_divergent{stream}` gauge.
+    ///
+    /// Unlike that per-sweep gauge (a rotating-page sample: window = 2000-row
+    /// page, ~3 sweeps/rotation), this reflects the POD-STATE ledger, so it is
+    /// drain-readable — does the known divergent set actually shrink over
+    /// time, not just this page's slice of it. Publishes as
+    /// `elohim_projection_reconcile_known_divergent{stream}`; the honesty
+    /// bound is the same as the ledger's: the union is complete only after one
+    /// full window rotation, and a resolved id's removal lags by one rotation
+    /// too (see [`Self::resolved`]).
+    pub fn divergent_tracked(&self, stream: &'static str) -> usize {
+        self.streams
+            .get(stream)
+            .map(|e| e.values().filter(|entry| entry.divergent).count())
+            .unwrap_or(0)
     }
 }
 
@@ -767,6 +813,22 @@ enum HealOutcomeKind {
     /// rule then answers `Hold` forever. The divergence goes quiet, permanently,
     /// with `elohim_content_head_adopted_total` flat — invisible.
     DeferredToAdopt,
+    /// Content arm: a BATCH conductor call failed at the CALL level (the
+    /// conductor answered nothing for the whole chunk — websocket error,
+    /// decode failure, or similar infrastructure fault). Every id in the
+    /// failed chunk returns to `pending` with backoff; NOT `mark_failed` (that
+    /// would burn `MAX_RETRIES` against a conductor that never spoke about
+    /// these ids at all). Before this outcome existed, a whole-leg `break`
+    /// made this path invisible — it wrote only the head-batch-extern series,
+    /// never the per-row heal-outcome one B1 makes legible.
+    CallFailed,
+    /// The batch resolver never started this id (`HeadBatchResolution::unattempted`
+    /// — a per-chunk budget/ceiling stop, e.g. `BatchStopReason::BudgetExhausted`).
+    /// NEVER a failure and NEVER `mark_failed`: the coordinator declined to even
+    /// look at the id, so spending a retry budget on it would poison the
+    /// [`MissLedger`] for a condition that is purely about the coordinator's
+    /// clock. Left in `pending`, re-attempted next sweep.
+    Unattempted,
 }
 
 impl HealOutcomeKind {
@@ -783,6 +845,8 @@ impl HealOutcomeKind {
             HealOutcomeKind::NoRow => "no_row",
             HealOutcomeKind::Refreshed => "refreshed",
             HealOutcomeKind::DeferredToAdopt => "deferred_to_adopt",
+            HealOutcomeKind::CallFailed => "call_failed",
+            HealOutcomeKind::Unattempted => "unattempted",
         }
     }
 }
@@ -823,6 +887,19 @@ pub(crate) fn gapfill_would_self_elect(
     local_declared: Option<&str>,
 ) -> bool {
     !answer_canonical && peer_advertises_declaration && local_declared.is_none()
+}
+
+/// RC-4: would applying an incoming heal patch's `reach` NARROW a
+/// distribution-safe local row into a scoped tier?
+///
+/// Pure + total so the guard is testable without a pool, mirroring
+/// [`gapfill_would_self_elect`]. `local_reach: None` (no local row, or the
+/// caller's lookup failed/skipped) never narrows — there is no known
+/// distribution-safe row to protect, so the patch proceeds exactly as it did
+/// before this guard existed.
+pub(crate) fn reach_patch_would_narrow(local_reach: Option<&str>, incoming_reach: &str) -> bool {
+    local_reach.is_some_and(crate::db::content_diesel::is_distribution_safe_reach)
+        && !crate::db::content_diesel::is_distribution_safe_reach(incoming_reach)
 }
 
 /// Should a FAILED own-conductor resolve be handed to the adopt-before-author arm
@@ -1496,6 +1573,26 @@ pub async fn run_discovery(
     let content = discover_content(p2p, pool, window, misses).await;
     let collectives = discover_collectives(p2p, pool, window, misses).await;
 
+    // Persistent known-gap / known-divergent gauges, hosted on `misses`
+    // (`MissLedger::tracked` / `divergent_tracked`) — published HERE, not in
+    // `run_heal`, because `misses` is owned here and every arm has just run,
+    // so this publishes even when the lamad bridge is down and no heal leg
+    // runs at all (unlike the per-sweep gauges in `run_heal`, which need a
+    // conductor-adjudicated `divergent_refused` half).
+    for (stream, table) in [
+        ("rea", PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS),
+        ("content", PROJECTION_INVENTORY_TABLE_CONTENT),
+        ("collectives", PROJECTION_INVENTORY_TABLE_COLLECTIVES),
+    ] {
+        let known_divergent = misses.divergent_tracked(table);
+        let known_gaps = misses.tracked(table).saturating_sub(known_divergent);
+        crate::metrics::set_projection_reconcile_known_gauges(
+            stream,
+            known_gaps as u64,
+            known_divergent as u64,
+        );
+    }
+
     tracing::info!(
         target: "elohim_storage::projection_reconcile",
         rea_peers_asked = rea.peers_asked,
@@ -1574,14 +1671,24 @@ pub async fn run_heal(
     // convergence is watchable on `/metrics` without tailing Loki. `exhausted` is
     // the CROSS-SWEEP ledger count, not the per-sweep tracker's (which is
     // structurally 0 — the tracker is rebuilt every sweep).
-    crate::metrics::set_projection_reconcile_gauges(
-        "rea",
-        tracker.counts().pending as u64,
-        local_total as u64,
-        rea_exhausted as u64,
-        rea_divergent as u64,
-        rea_divergent_refused as u64,
-    );
+    //
+    // The `measured` gauge is set UNCONDITIONALLY; the value gauges below are
+    // gated on it. An arm that short-circuited (DB blip, zero peers answered)
+    // returns `ReaDiscovery::empty()` — all-zero counts indistinguishable from
+    // a healthy in-sync arm — so publishing them anyway would write a FALSE
+    // zero over the prior sample. Skipping the write leaves the prior sample
+    // standing, which is honest: "unmeasured" is not "converged".
+    crate::metrics::set_projection_reconcile_measured("rea", rea_measured);
+    if rea_measured {
+        crate::metrics::set_projection_reconcile_gauges(
+            "rea",
+            tracker.counts().pending as u64,
+            local_total as u64,
+            rea_exhausted as u64,
+            rea_divergent as u64,
+            rea_divergent_refused as u64,
+        );
+    }
     let ReaHealOutcome {
         counts,
         divergent_refused: rea_refused_by_conductor,
@@ -1609,14 +1716,18 @@ pub async fn run_heal(
         peer_head_hints,
         measured: content_measured,
     } = content;
-    crate::metrics::set_projection_reconcile_gauges(
-        "content",
-        content_tracker.counts().pending as u64,
-        local_anchored as u64,
-        content_exhausted as u64,
-        content_divergent as u64,
-        content_divergent_refused as u64,
-    );
+    // Same measured-gate as the REA arm above (see its comment for the why).
+    crate::metrics::set_projection_reconcile_measured("content", content_measured);
+    if content_measured {
+        crate::metrics::set_projection_reconcile_gauges(
+            "content",
+            content_tracker.counts().pending as u64,
+            local_anchored as u64,
+            content_exhausted as u64,
+            content_divergent as u64,
+            content_divergent_refused as u64,
+        );
+    }
     let ContentHealOutcome {
         healed: content_healed,
         conductor_missing: content_missing,
@@ -1649,14 +1760,18 @@ pub async fn run_heal(
     // cid is counted and WARN-logged but never enqueued (no declaration-ordering
     // column exists to prove a forward move), so all of it is adjudicated. It
     // does not fold into `publish_sweep` at all; this gauge is its only surface.
-    crate::metrics::set_projection_reconcile_gauges(
-        "collectives",
-        collectives_tracker.counts().pending as u64,
-        collectives_local_anchored as u64,
-        collectives_exhausted as u64,
-        collectives_divergent as u64,
-        collectives_divergent as u64,
-    );
+    // Same measured-gate as the REA arm above (see its comment for the why).
+    crate::metrics::set_projection_reconcile_measured("collectives", collectives_measured);
+    if collectives_measured {
+        crate::metrics::set_projection_reconcile_gauges(
+            "collectives",
+            collectives_tracker.counts().pending as u64,
+            collectives_local_anchored as u64,
+            collectives_exhausted as u64,
+            collectives_divergent as u64,
+            collectives_divergent as u64,
+        );
+    }
     let CollectivesHealOutcome {
         healed: collectives_healed,
         conductor_missing: collectives_missing,
@@ -2305,6 +2420,14 @@ async fn discover_rea(
         sweep_offset,
         max_peer_total,
     );
+    // Window-progress companions: THIS sweep's requested offset and the
+    // clamped corpus size it saw, so a sample reads as "1052 actionable at
+    // offset 2000 of 4440" instead of a bare number with no denominator.
+    crate::metrics::set_projection_reconcile_window_gauges(
+        "rea",
+        u64::from(sweep_offset),
+        max_peer_total.min(MAX_INVENTORY_WINDOW_TOTAL),
+    );
 
     // Build the tracker: local set EXCLUDES anchor-divergent ids so `discover()`
     // admits them alongside genuinely-absent ids. All discovered ids flow
@@ -2334,7 +2457,12 @@ async fn discover_rea(
             continue;
         }
         let evidence = advertised_anchor.get(id).map(String::as_str).unwrap_or("");
-        match misses.admit(PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS, id, evidence) {
+        match misses.admit(
+            PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS,
+            id,
+            evidence,
+            divergent_ids.contains(id),
+        ) {
             Admission::Retry => admitted.push(id.clone()),
             Admission::Exhausted => {
                 exhausted_persistent += 1;
@@ -2944,6 +3072,12 @@ async fn discover_content(
         sweep_offset,
         max_peer_total,
     );
+    // Window-progress companions (see the REA arm's twin call for the why).
+    crate::metrics::set_projection_reconcile_window_gauges(
+        "content",
+        u64::from(sweep_offset),
+        max_peer_total.min(MAX_INVENTORY_WINDOW_TOTAL),
+    );
 
     // (3) One presence query for the whole advertised union (reach-agnostic).
     let advertised_ids: Vec<String> = discovered_by.keys().cloned().collect();
@@ -3044,7 +3178,12 @@ async fn discover_content(
     let mut admitted: Vec<String> = Vec::with_capacity(gap_ids.len());
     for id in gap_ids {
         let evidence = advertised_anchor.get(&id).map(String::as_str).unwrap_or("");
-        match misses.admit(PROJECTION_INVENTORY_TABLE_CONTENT, &id, evidence) {
+        match misses.admit(
+            PROJECTION_INVENTORY_TABLE_CONTENT,
+            &id,
+            evidence,
+            divergent_set.contains(&id),
+        ) {
             Admission::Retry => admitted.push(id),
             Admission::Exhausted => {
                 exhausted_persistent += 1;
@@ -3302,6 +3441,11 @@ async fn heal_content(
                     chunk.len(),
                     Duration::ZERO,
                 );
+                crate::metrics::inc_projection_heal_outcome_by(
+                    "content",
+                    HealOutcomeKind::CallFailed.label(),
+                    chunk.len(),
+                );
                 tracing::warn!(
                     target: "elohim_storage::projection_reconcile",
                     error = %e,
@@ -3311,9 +3455,29 @@ async fn heal_content(
                      — every id in this batch returns to pending (never marked failed: the \
                      conductor said nothing about them), retried next sweep"
                 );
-                // A conductor that will not answer must not be asked for the
-                // rest of the leg either.
-                break;
+                // B1 (drain cure): a single call-level failure no longer sheds
+                // the WHOLE leg — the already-present `HealCircuit` owns that
+                // decision (it just recorded this outcome above). Only shed
+                // once the circuit has actually OPENED (consecutive synthetic
+                // per-attempt timeouts past `circuit_timeout_threshold`);
+                // otherwise give the conductor breathing room and try the
+                // NEXT chunk. `head_batch_fanout`, the AIMD batch size, and the
+                // 120s leg budget are all untouched — only the shed trigger
+                // moves from "1 failure" to "the circuit says so".
+                if circuit.is_open() {
+                    tracing::warn!(
+                        target: "elohim_storage::projection_reconcile",
+                        consecutive_timeouts = circuit.consecutive_timeouts(),
+                        healed,
+                        fanout,
+                        "projection-reconcile[content]: OPENED the unresponsive-conductor circuit \
+                         on a CALL-level failure — shedding the rest of the leg, remaining gaps \
+                         resume next sweep"
+                    );
+                    break;
+                }
+                tokio::time::sleep(pacing.backoff()).await;
+                continue;
             }
         };
         head_batch_budget_observe(resolution.queue_wait);
@@ -3342,6 +3506,16 @@ async fn heal_content(
                     "none",
                     crate::services::conductor_writes::BatchStopReason::label,
                 ),
+                resolution.unattempted.len(),
+            );
+            // A4: the per-row heal-outcome twin of the head-batch-extern series
+            // above — before this, an unattempted id burned budget invisibly on
+            // the `elohim_projection_heal_outcomes_total` surface (it showed up
+            // nowhere; B1 makes it matter more, since a shed-avoided leg can now
+            // reach more chunks that stop early on their own budget).
+            crate::metrics::inc_projection_heal_outcome_by(
+                "content",
+                HealOutcomeKind::Unattempted.label(),
                 resolution.unattempted.len(),
             );
         }
@@ -4282,6 +4456,32 @@ fn heal_content_one(
     let size_i32 = c
         .content_size_bytes
         .map(|n| i32::try_from(n).unwrap_or(i32::MAX));
+    let mut conn = pool
+        .get()
+        .map_err(|e| crate::error::StorageError::Internal(format!("pool: {e}")))?;
+    // RC-4 non-narrowing reach guard: heal converges the HEAD, it must never
+    // relitigate REACH. A conductor answer carrying a scoped reach over a
+    // local row that already holds a distribution-safe one would permanently
+    // evict the row from `list_content_anchor_inventory` (which filters on
+    // `DISTRIBUTION_SAFE_REACH`) while `content_ids_present` still sees it
+    // locally — permanent AnchorGap churn (the likely matthew/jessica
+    // local_total deficit). The canonical `ContentUpdated` projection path
+    // owns legitimate narrowing; this heal path only fills the OTHER patch
+    // fields when it detects one. A read failure degrades to the pre-cure
+    // behaviour (patch proceeds) — conservative in the sense that it never
+    // GUESSES a narrowing risk it cannot prove.
+    let local_reach = crate::db::content_diesel::reach_for(&mut conn, app_ctx, &c.id)
+        .ok()
+        .flatten();
+    let reach_patch = if reach_patch_would_narrow(local_reach.as_deref(), &c.reach) {
+        crate::metrics::inc_projection_reconcile_reach_narrowed(
+            local_reach.as_deref().unwrap_or(""),
+            &c.reach,
+        );
+        None
+    } else {
+        Some(c.reach.clone())
+    };
     let patch = crate::db::content_diesel::ContentProjectionPatch {
         blob_cid: c.blob_cid.clone(),
         content_size_bytes: size_i32,
@@ -4289,12 +4489,9 @@ fn heal_content_one(
         description: Some(c.description.clone()),
         content_type: Some(c.content_type.clone()),
         content_format: Some(c.content_format.clone()),
-        reach: Some(c.reach.clone()),
+        reach: reach_patch,
         metadata_json: Some(c.metadata_json.clone()),
     };
-    let mut conn = pool
-        .get()
-        .map_err(|e| crate::error::StorageError::Internal(format!("pool: {e}")))?;
     // Canonical-aware stamp mode: a CANONICAL answer (the conductor verified
     // the cross-root canonical record) may fill an undeclared row, refresh the
     // same head, or MOVE a declared row FORWARD (provably newer declared_at) —
@@ -4563,6 +4760,12 @@ async fn discover_collectives(
         sweep_offset,
         max_peer_total,
     );
+    // Window-progress companions (see the REA arm's twin call for the why).
+    crate::metrics::set_projection_reconcile_window_gauges(
+        "collectives",
+        u64::from(sweep_offset),
+        max_peer_total.min(MAX_INVENTORY_WINDOW_TOTAL),
+    );
 
     // (3) One presence query for the advertised routing aliases.
     let advertised_ids: Vec<String> = advertised.keys().cloned().collect();
@@ -4658,7 +4861,10 @@ async fn discover_collectives(
     let mut exhausted_persistent = 0usize;
     let mut admitted: Vec<String> = Vec::with_capacity(gap_cids.len());
     for cid in gap_cids {
-        match misses.admit(PROJECTION_INVENTORY_TABLE_COLLECTIVES, &cid, &cid) {
+        // Divergent collectives cids are never enqueued (refused BY
+        // CONSTRUCTION — see the module doc above); every gap admitted here is
+        // a plain absence, never a divergence.
+        match misses.admit(PROJECTION_INVENTORY_TABLE_COLLECTIVES, &cid, &cid, false) {
             Admission::Retry => admitted.push(cid),
             Admission::Exhausted => exhausted_persistent += 1,
         }
@@ -5504,13 +5710,13 @@ mod tests {
         let mut ledger = MissLedger::new();
         for sweep in 1..=MAX_RETRIES {
             assert_eq!(
-                ledger.admit("content", "row-1", "anchor-A"),
+                ledger.admit("content", "row-1", "anchor-A", false),
                 Admission::Retry,
                 "sweep {sweep} is still within budget"
             );
         }
         assert_eq!(
-            ledger.admit("content", "row-1", "anchor-A"),
+            ledger.admit("content", "row-1", "anchor-A", false),
             Admission::Exhausted,
             "budget spent against UNCHANGED evidence — stop asking"
         );
@@ -5522,14 +5728,14 @@ mod tests {
         // anchor is not the thing we gave up on.
         let mut ledger = MissLedger::new();
         for _ in 0..=MAX_RETRIES {
-            ledger.admit("content", "row-1", "anchor-A");
+            ledger.admit("content", "row-1", "anchor-A", false);
         }
         assert_eq!(
-            ledger.admit("content", "row-1", "anchor-A"),
+            ledger.admit("content", "row-1", "anchor-A", false),
             Admission::Exhausted
         );
         assert_eq!(
-            ledger.admit("content", "row-1", "anchor-B"),
+            ledger.admit("content", "row-1", "anchor-B", false),
             Admission::Retry,
             "a DIFFERENT advertised anchor is fresh evidence"
         );
@@ -5542,11 +5748,11 @@ mod tests {
         // process lifetime — trading one dishonest gauge for a real gap.
         let mut ledger = MissLedger::new();
         for _ in 0..MAX_RETRIES {
-            ledger.admit("content", "row-1", "anchor-A");
+            ledger.admit("content", "row-1", "anchor-A", false);
         }
         let mut exhausted_sweeps = 0;
         for _ in 0..MISS_READMIT_SWEEPS {
-            match ledger.admit("content", "row-1", "anchor-A") {
+            match ledger.admit("content", "row-1", "anchor-A", false) {
                 Admission::Exhausted => exhausted_sweeps += 1,
                 Admission::Retry => break,
             }
@@ -5557,7 +5763,7 @@ mod tests {
             "dormant for the cooldown, then re-admitted for another round"
         );
         assert_eq!(
-            ledger.admit("content", "row-1", "anchor-A"),
+            ledger.admit("content", "row-1", "anchor-A", false),
             Admission::Retry,
             "the fresh budget is spendable again"
         );
@@ -5569,12 +5775,12 @@ mod tests {
         // the relapse is new work, not a continuation.
         let mut ledger = MissLedger::new();
         for _ in 0..MAX_RETRIES {
-            ledger.admit("rea", "row-1", "anchor-A");
+            ledger.admit("rea", "row-1", "anchor-A", false);
         }
         ledger.resolved("rea", "row-1");
         assert_eq!(ledger.tracked("rea"), 0);
         assert_eq!(
-            ledger.admit("rea", "row-1", "anchor-A"),
+            ledger.admit("rea", "row-1", "anchor-A", false),
             Admission::Retry,
             "a relapsed row starts from a clean budget"
         );
@@ -5586,16 +5792,98 @@ mod tests {
         // that happen to collide must not spend each other's retries.
         let mut ledger = MissLedger::new();
         for _ in 0..=MAX_RETRIES {
-            ledger.admit("content", "shared-id", "anchor-A");
+            ledger.admit("content", "shared-id", "anchor-A", false);
         }
         assert_eq!(
-            ledger.admit("content", "shared-id", "anchor-A"),
+            ledger.admit("content", "shared-id", "anchor-A", false),
             Admission::Exhausted
         );
         assert_eq!(
-            ledger.admit("rea", "shared-id", "anchor-A"),
+            ledger.admit("rea", "shared-id", "anchor-A", false),
             Admission::Retry,
             "another stream's exhaustion must not bleed across"
+        );
+    }
+
+    // ── A2: MissLedger persistent known-gap / known-divergent tracking ──────
+
+    #[test]
+    fn a_divergent_admit_counts_toward_divergent_tracked_not_plain_tracked() {
+        let mut ledger = MissLedger::new();
+        ledger.admit("content", "row-divergent", "anchor-A", true);
+        assert_eq!(ledger.tracked("content"), 1, "the id is known either way");
+        assert_eq!(
+            ledger.divergent_tracked("content"),
+            1,
+            "admitted as divergent this sweep"
+        );
+    }
+
+    #[test]
+    fn resolved_drains_a_divergent_entry_from_both_tracked_counts() {
+        let mut ledger = MissLedger::new();
+        ledger.admit("content", "row-divergent", "anchor-A", true);
+        ledger.resolved("content", "row-divergent");
+        assert_eq!(ledger.tracked("content"), 0);
+        assert_eq!(
+            ledger.divergent_tracked("content"),
+            0,
+            "a resolved id must drain out of the divergent count too, not just the total"
+        );
+    }
+
+    #[test]
+    fn a_gap_only_admit_counts_in_tracked_but_not_divergent_tracked() {
+        let mut ledger = MissLedger::new();
+        ledger.admit("content", "row-gap", "anchor-A", false);
+        assert_eq!(ledger.tracked("content"), 1);
+        assert_eq!(
+            ledger.divergent_tracked("content"),
+            0,
+            "a plain absence gap must never inflate the divergent count — the two \
+             gauges partition the tracked set"
+        );
+    }
+
+    #[test]
+    fn an_id_upgrades_from_gap_to_divergent_on_re_admit_under_the_same_evidence() {
+        // Same peer claim, later sweep: a local anchor lands and the id is
+        // reclassified divergent. The ledger must pick that up without the
+        // evidence changing (a NEW claim already resets everything, including
+        // `divergent` — this covers the SAME-evidence path).
+        let mut ledger = MissLedger::new();
+        ledger.admit("content", "row-1", "anchor-A", false);
+        assert_eq!(ledger.divergent_tracked("content"), 0, "still just a gap");
+
+        ledger.admit("content", "row-1", "anchor-A", true);
+        assert_eq!(
+            ledger.divergent_tracked("content"),
+            1,
+            "the SAME id, same evidence, upgraded to divergent this sweep"
+        );
+
+        // Never silently downgrades back under the same evidence.
+        ledger.admit("content", "row-1", "anchor-A", false);
+        assert_eq!(
+            ledger.divergent_tracked("content"),
+            1,
+            "a divergence the ledger already knows about must not quietly downgrade \
+             under unchanged evidence"
+        );
+    }
+
+    #[test]
+    fn new_evidence_reclassifies_the_divergent_bit_from_scratch() {
+        let mut ledger = MissLedger::new();
+        ledger.admit("content", "row-1", "anchor-A", true);
+        assert_eq!(ledger.divergent_tracked("content"), 1);
+
+        // A DIFFERENT peer claim resets the entry entirely — including divergent.
+        ledger.admit("content", "row-1", "anchor-B", false);
+        assert_eq!(
+            ledger.divergent_tracked("content"),
+            0,
+            "new evidence is a fresh claim, reclassified from scratch"
         );
     }
 
@@ -5926,11 +6214,21 @@ mod tests {
         // Spend the id's budget against unchanged evidence.
         for _ in 0..MAX_RETRIES {
             assert_eq!(
-                ledger.admit(PROJECTION_INVENTORY_TABLE_CONTENT, "stuck", "anchor-a"),
+                ledger.admit(
+                    PROJECTION_INVENTORY_TABLE_CONTENT,
+                    "stuck",
+                    "anchor-a",
+                    false
+                ),
                 Admission::Retry
             );
         }
-        let verdict = ledger.admit(PROJECTION_INVENTORY_TABLE_CONTENT, "stuck", "anchor-a");
+        let verdict = ledger.admit(
+            PROJECTION_INVENTORY_TABLE_CONTENT,
+            "stuck",
+            "anchor-a",
+            false,
+        );
         assert_eq!(verdict, Admission::Exhausted, "budget spent");
 
         // Discovery admits ONLY the non-exhausted ids, so the adjudicated one
@@ -6051,6 +6349,190 @@ mod tests {
              undeclared row while a peer advertises a declaration — that write is \
              terminal and removes the row from every adopt path"
         );
+    }
+
+    // ── B4: RC-4 non-narrowing reach guard (pure predicate) ──────────────────
+
+    #[test]
+    fn a_scoped_incoming_reach_over_a_safe_local_reach_narrows() {
+        assert!(
+            reach_patch_would_narrow(Some("community"), "private"),
+            "distribution-safe local, scoped incoming — the exact RC-4 trap"
+        );
+    }
+
+    #[test]
+    fn a_safe_to_safe_reach_never_narrows() {
+        for local in ["community", "public", "commons"] {
+            for incoming in ["community", "public", "commons"] {
+                assert!(
+                    !reach_patch_would_narrow(Some(local), incoming),
+                    "both distribution-safe: no narrowing risk ({local} -> {incoming})"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_scoped_local_reach_is_never_reported_as_narrowed() {
+        // The local row was already scoped — there is nothing distribution-safe
+        // to protect, so an equally-scoped (or differently-scoped) incoming
+        // answer is not a narrowing HEAL introduced.
+        assert!(!reach_patch_would_narrow(Some("private"), "private"));
+        assert!(!reach_patch_would_narrow(Some("trusted"), "intimate"));
+    }
+
+    #[test]
+    fn an_unknown_local_reach_never_narrows() {
+        // No local row known (missing, or the lookup failed) — conservative in
+        // the sense that it never GUESSES a narrowing risk it cannot prove; the
+        // patch proceeds exactly as it did before this guard existed.
+        assert!(!reach_patch_would_narrow(None, "private"));
+    }
+
+    // ── B4: RC-4 non-narrowing reach guard (end-to-end through heal_content_one) ──
+
+    /// A minimal `ContentHeadWire` through its real `Deserialize` impl (same
+    /// pattern as `head_adoption::tests::wire`) — the fixture cannot drift from
+    /// the wire shape by construction.
+    fn content_head_wire(
+        id: &str,
+        action_hash: &str,
+        reach: &str,
+    ) -> crate::services::conductor_writes::ContentHeadWire {
+        serde_json::from_value(serde_json::json!({
+            "content_id": id,
+            "head_action_hash": action_hash,
+            "declared_at": 1_700_000_000_000_000i64,
+            "canonical": false,
+            "content": {
+                "id": id,
+                "content_type": "concept",
+                "title": "t",
+                "description": "d",
+                "content_format": "markdown",
+                "reach": reach,
+            },
+        }))
+        .expect("ContentHeadWire fixture must deserialize")
+    }
+
+    fn seed_content_row(pool: &DbPool, ctx: &crate::db::AppContext, id: &str, reach: &str) {
+        let mut conn = pool.get().expect("test pool connection");
+        let input: crate::db::content_diesel::CreateContentInput =
+            serde_json::from_value(serde_json::json!({
+                "id": id,
+                "title": "t",
+                "reach": reach,
+            }))
+            .expect("CreateContentInput fixture must deserialize");
+        crate::db::content_diesel::create_content(&mut conn, ctx, input).expect("seed content row");
+    }
+
+    #[test]
+    fn heal_content_one_drops_a_narrowing_reach_and_still_stamps_the_head() {
+        let pool = crate::test_util::test_pool();
+        let ctx = crate::db::AppContext::new("lamad");
+        seed_content_row(&pool, &ctx, "rc4-narrow", "community");
+
+        // Incoming conductor answer carries a SCOPED reach over a
+        // distribution-safe local row — the exact RC-4 trap.
+        let head = content_head_wire("rc4-narrow", "uhCkk-rc4-narrow-head", "private");
+        let outcome = heal_content_one(&head, &pool, &ctx).expect("heal_content_one succeeds");
+        assert!(
+            matches!(outcome, crate::db::content_diesel::StampOutcome::Stamped),
+            "the head still stamps despite the dropped reach field: {outcome:?}"
+        );
+
+        let mut conn = pool.get().unwrap();
+        let row = crate::db::content_diesel::get_content(
+            &mut conn,
+            &ctx,
+            "rc4-narrow",
+            crate::db::content_diesel::MinTrust::Invisible,
+        )
+        .unwrap()
+        .expect("row exists");
+        assert_eq!(
+            row.reach, "community",
+            "heal must NOT narrow a distribution-safe reach"
+        );
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-rc4-narrow-head"),
+            "the head field is untouched by the reach guard"
+        );
+    }
+
+    #[test]
+    fn heal_content_one_bumps_the_reach_narrowed_counter() {
+        let pool = crate::test_util::test_pool();
+        let ctx = crate::db::AppContext::new("lamad");
+        seed_content_row(&pool, &ctx, "rc4-counter", "public");
+
+        let before = crate::metrics::PROJECTION_RECONCILE_REACH_NARROWED
+            .with_label_values(&["public", "trusted"])
+            .get();
+        let head = content_head_wire("rc4-counter", "uhCkk-rc4-counter-head", "trusted");
+        heal_content_one(&head, &pool, &ctx).expect("heal_content_one succeeds");
+        let after = crate::metrics::PROJECTION_RECONCILE_REACH_NARROWED
+            .with_label_values(&["public", "trusted"])
+            .get();
+
+        assert_eq!(
+            after - before,
+            1,
+            "one narrowing patch must bump the {{from=public,to=trusted}} counter by exactly 1"
+        );
+    }
+
+    #[test]
+    fn heal_content_one_does_not_flag_a_safe_to_safe_reach_pair_as_narrowing() {
+        let pool = crate::test_util::test_pool();
+        let ctx = crate::db::AppContext::new("lamad");
+        seed_content_row(&pool, &ctx, "rc4-safe", "community");
+
+        let before = crate::metrics::PROJECTION_RECONCILE_REACH_NARROWED
+            .with_label_values(&["community", "public"])
+            .get();
+
+        // Both sides distribution-safe: the guard must not fire, and the
+        // conductor-verified head still stamps.
+        let head = content_head_wire("rc4-safe", "uhCkk-rc4-safe-head", "public");
+        let outcome = heal_content_one(&head, &pool, &ctx).expect("heal_content_one succeeds");
+        assert!(
+            matches!(outcome, crate::db::content_diesel::StampOutcome::Stamped),
+            "the head still stamps on a safe-to-safe pair: {outcome:?}"
+        );
+
+        let after = crate::metrics::PROJECTION_RECONCILE_REACH_NARROWED
+            .with_label_values(&["community", "public"])
+            .get();
+        assert_eq!(
+            after, before,
+            "a safe-to-safe pair must never bump the reach-narrowed counter"
+        );
+
+        let mut conn = pool.get().unwrap();
+        let row = crate::db::content_diesel::get_content(
+            &mut conn,
+            &ctx,
+            "rc4-safe",
+            crate::db::content_diesel::MinTrust::Invisible,
+        )
+        .unwrap()
+        .expect("row exists");
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-rc4-safe-head")
+        );
+        // NOTE: `apply_content_patch_fields` (db/content_diesel.rs:740-797) does
+        // not currently apply `ContentProjectionPatch::reach` on the EXISTING-ROW
+        // update path at all — a pre-existing gap distinct from this guard (see
+        // the shift report). The row's `reach` therefore stays at its SEEDED
+        // value regardless of the guard's verdict; this assertion documents that
+        // truth rather than a DB write this guard is not positioned to cause.
+        assert_eq!(row.reach, "community");
     }
 
     /// DECLARED-DIVERGENCE ADMISSION: all four conditions are required. The live
@@ -7040,6 +7522,93 @@ mod tests {
             mock.calls(),
             3,
             "the in-leg retry ladder ran (that IS the backoff), then the leg shed"
+        );
+    }
+
+    /// B1 (drain cure): a call-level failure on the FIRST chunk must not shed
+    /// the WHOLE leg when the circuit is CLOSED — later chunks are still
+    /// attempted. Before the cure, an unconditional `break` in the `Err` arm
+    /// made every leg a single-strike breaker regardless of `HealCircuit`.
+    #[tokio::test]
+    async fn a_failed_first_chunk_does_not_prevent_a_later_chunk_from_being_attempted() {
+        // Enough ids to guarantee multiple chunks even at the AIMD batch-size
+        // ceiling (128) — mirrors `the_batch_arm_respects_its_fanout_ceiling`.
+        let ids = arm_ids("arm2-b1-continue", 300);
+        let mut tracker = GapTracker::new(MAX_RETRIES);
+        tracker.discover(ids.clone());
+
+        let mock = MockHeadBatchResolver::new();
+        // Exactly enough ANSWERED transient failures to exhaust the FIRST
+        // chunk's in-leg retry ladder (test_fast: max_row_retries = 2 -> 3
+        // attempts) and end that one chunk in Err. Nothing further is queued,
+        // so every later chunk succeeds (default Absent answers) — the
+        // circuit stays CLOSED throughout (`HealPacing::test_fast` disables it,
+        // circuit_timeout_threshold = 0).
+        for _ in 0..3 {
+            mock.fail_next_call(crate::error::StorageError::Timeout(
+                "Websocket error: Timeout".into(),
+            ));
+        }
+        let out = run_heal_content_arm(&mut tracker, &mock).await;
+
+        assert!(
+            out.conductor_missing > 0,
+            "conductor_missing is only bumped by a resolved (Answer::Absent) item — a \
+             nonzero count here PROVES a later chunk was actually attempted and answered, \
+             not just retried within the failed first chunk"
+        );
+        assert!(
+            mock.calls() > 3,
+            "more than the first chunk's retry ladder (3) — later chunks were asked \
+             (calls={})",
+            mock.calls()
+        );
+    }
+
+    /// B1's other half: the circuit still sheds the leg once it actually
+    /// OPENS (consecutive SYNTHETIC per-attempt timeouts past
+    /// `circuit_timeout_threshold`) — the shed trigger moved from "1 failure"
+    /// to "the circuit says so", it did not disappear.
+    #[tokio::test]
+    async fn the_circuit_still_sheds_the_leg_once_it_opens() {
+        let ids = arm_ids("arm2-b1-circuit-open", 300);
+        let mut tracker = GapTracker::new(MAX_RETRIES);
+        tracker.discover(ids.clone());
+
+        let mock = MockHeadBatchResolver::new();
+        // A generous supply of SYNTHETIC per-attempt-timeout failures (the
+        // ONLY class `HealCircuit` counts — see `synthetic_timeout_err` above).
+        // The marker text is what `is_synthetic_attempt_timeout` matches on,
+        // so `call_with_retry` never spends an in-leg retry on any of these
+        // (one `fail_next_call` = one chunk = one circuit strike).
+        for _ in 0..50 {
+            mock.fail_next_call(synthetic_timeout_err());
+        }
+        let mut pacing = HealPacing::test_fast();
+        pacing.circuit_timeout_threshold = 3;
+
+        let pool = crate::test_util::test_pool();
+        let hints = crate::services::head_adoption::PeerHeadHints::new();
+        heal_content(
+            &mut tracker,
+            &std::collections::HashMap::new(),
+            &pool,
+            &pacing,
+            &hints,
+            &mock,
+        )
+        .await;
+
+        assert!(
+            mock.calls() < ids.len(),
+            "the circuit must shed the rest of the leg well before every id is asked \
+             (calls={}, ids={})",
+            mock.calls(),
+            ids.len()
+        );
+        assert!(
+            tracker.counts().pending > 0,
+            "shed ids stay pending, resumed next sweep"
         );
     }
 

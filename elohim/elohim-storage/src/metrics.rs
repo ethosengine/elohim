@@ -675,10 +675,19 @@ lazy_static! {
     /// `timeout_exhausted` (still wedged after retries) IS the diagnosis, and it was
     /// previously invisible in Prometheus. labels: stream = "rea" | "content";
     /// outcome = "healed" | "timeout_retried" | "timeout_exhausted" | "missing"
-    ///         | "failed" | "refreshed" | "refused_declared" | "refused_stale"
-    ///         | "no_row".
+    ///         | "missing_deferred" | "failed" | "refreshed" | "refused_declared"
+    ///         | "refused_stale" | "no_row" | "deferred_to_adopt" | "call_failed"
+    ///         | "unattempted".
     ///
-    /// The last four are CONTENT-only and were previously uncounted "so the cure
+    /// `call_failed` (a BATCH conductor call answered nothing for a whole chunk)
+    /// and `unattempted` (the batch resolver never started an id, a per-chunk
+    /// budget/ceiling stop) are the two content-arm paths B1/A4 made legible:
+    /// before, a call-level failure broke the WHOLE heal leg via an unconditional
+    /// `break` and neither series existed, so a struggling conductor read as
+    /// silence rather than as a countable, retried-next-chunk event.
+    ///
+    /// The last four (before these two) are CONTENT-only and were previously
+    /// uncounted "so the cure
     /// signal is not inflated". That reasoning inverted: giving each its own label
     /// keeps `healed` clean (label-filtered) while making the two questions an
     /// operator actually asks answerable from Prometheus alone —
@@ -799,6 +808,114 @@ lazy_static! {
              (heal forbidden to move, or retry budget spent).",
         ),
         &["stream"],
+    )
+    .unwrap();
+
+    /// Whether the last reconcile sweep actually OBSERVED `stream`'s state (1)
+    /// or short-circuited on a DB/query error or zero peers answered (0). Set
+    /// UNCONDITIONALLY every sweep, unlike the value gauges above (`gaps`,
+    /// `local_total`, `exhausted`, `divergent`, `divergent_refused`), which are
+    /// gated on this bit: an unmeasured arm returns all-zero counts that read
+    /// identically to a healthy in-sync arm, so publishing them anyway would
+    /// write a FALSE zero over the last real sample. Watch this beside a
+    /// plateaued value gauge — a flat `gaps` reading could mean "converged" or
+    /// "the measurement stopped landing", and only this series tells them
+    /// apart.
+    pub static ref PROJECTION_RECONCILE_MEASURED: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_projection_reconcile_measured",
+            "Whether the last reconcile sweep observed this stream's state (1) or was unmeasured (0).",
+        ),
+        &["stream"],
+    )
+    .unwrap();
+
+    /// Persistent, cross-sweep known-gap count per reconcile stream — hosted on
+    /// the `MissLedger` pod state (`MissLedger::tracked` minus
+    /// [`Self::PROJECTION_RECONCILE_KNOWN_DIVERGENT`]'s per-stream count), NOT
+    /// the per-sweep discovery tracker `elohim_projection_reconcile_gaps`
+    /// samples.
+    ///
+    /// The distinction matters: `..._gaps` is a ROTATING-PAGE sample (window =
+    /// 2000-row page, ~3 sweeps/rotation) — it tells you what THIS page looked
+    /// like, not whether the backlog is actually draining. This gauge reflects
+    /// the ledger's memory across sweeps, so it is drain-readable: a real cure
+    /// makes it fall over time; a page-rotation artifact does not move it.
+    ///
+    /// Honesty bound: the known set is complete only after one full window
+    /// rotation (~3 sweeps ≈ 15 min at the default sweep interval); an id's
+    /// removal (via [`MissLedger::resolved`]) lags by up to one rotation too,
+    /// since a healed id is only re-observed once its page comes back around.
+    pub static ref PROJECTION_RECONCILE_KNOWN_GAPS: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_projection_reconcile_known_gaps",
+            "Persistent cross-sweep known-gap count by reconcile stream (MissLedger pod state; \
+             complete only after one full window rotation, ~3 sweeps).",
+        ),
+        &["stream"],
+    )
+    .unwrap();
+
+    /// Persistent, cross-sweep known-DIVERGENT count per reconcile stream — the
+    /// divergent partition of [`PROJECTION_RECONCILE_KNOWN_GAPS`]'s ledger
+    /// (`MissLedger::divergent_tracked`). Same honesty bound: complete only
+    /// after one full window rotation, and removal lags by one rotation.
+    pub static ref PROJECTION_RECONCILE_KNOWN_DIVERGENT: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_projection_reconcile_known_divergent",
+            "Persistent cross-sweep known-divergent count by reconcile stream (MissLedger pod \
+             state; complete only after one full window rotation, ~3 sweeps).",
+        ),
+        &["stream"],
+    )
+    .unwrap();
+
+    /// THIS sweep's requested inventory-window offset, by reconcile stream —
+    /// the numerator every other reconcile gauge is missing a denominator for.
+    /// Beside [`PROJECTION_RECONCILE_WINDOW_TOTAL`], a sample reads as "1052
+    /// actionable at offset 2000 of 4440" instead of a bare count with no
+    /// sense of where in the rotating window it was taken.
+    pub static ref PROJECTION_RECONCILE_WINDOW_OFFSET: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_projection_reconcile_window_offset",
+            "This sweep's requested rotating-window offset by reconcile stream.",
+        ),
+        &["stream"],
+    )
+    .unwrap();
+
+    /// THIS sweep's largest peer-reported corpus size, by reconcile stream,
+    /// clamped to `MAX_INVENTORY_WINDOW_TOTAL` (the same clamp
+    /// `InventoryWindow::advance` applies before its wrap test) — a single
+    /// inflated peer `total` can never make this gauge lie about the window's
+    /// real span.
+    pub static ref PROJECTION_RECONCILE_WINDOW_TOTAL: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_projection_reconcile_window_total",
+            "This sweep's clamped peer-reported corpus size by reconcile stream.",
+        ),
+        &["stream"],
+    )
+    .unwrap();
+
+    /// RC-4: content-arm heal patches whose `reach` field was DROPPED because
+    /// the incoming conductor answer would have NARROWED a distribution-safe
+    /// local row into a scoped tier. labels: `from` = the local row's
+    /// (distribution-safe) reach, `to` = the incoming (scoped) reach that was
+    /// refused. See `p2p::projection_reconcile::reach_patch_would_narrow` —
+    /// heal converges the HEAD, it must never relitigate REACH; a narrowing
+    /// write from heal would permanently evict the row from
+    /// `list_content_anchor_inventory` (which filters on distribution-safe
+    /// reach) while `content_ids_present` still sees it locally, producing
+    /// permanent AnchorGap churn. A nonzero rate here is diagnostic, not
+    /// alarming by itself — it means the guard is doing its job.
+    pub static ref PROJECTION_RECONCILE_REACH_NARROWED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_projection_reconcile_reach_narrowed_total",
+            "Content-arm heal patches whose reach field was dropped to avoid narrowing a \
+             distribution-safe local row, by from/to reach tier.",
+        ),
+        &["from", "to"],
     )
     .unwrap();
 
@@ -1540,12 +1657,13 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(IDENTITY_KEY_SUPERSEDE.clone()));
         let _ = REGISTRY.register(Box::new(SHARD_PUSH_PEER_UNRESOLVED.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_HEAL_OUTCOMES.clone()));
-        // Pre-touch every (stream, outcome) combination — 3 streams x 10
-        // `p2p::projection_reconcile::HealOutcomeKind` outcomes = 30 series —
-        // so an outcome that has literally never fired for a stream still
-        // reads as a measured zero, not an absent series. Labels below are the
-        // same vocabulary already used at the `inc_projection_heal_outcome`
-        // call sites in `p2p/projection_reconcile.rs`.
+        // Pre-touch every (stream, outcome) combination — 3 streams x 12
+        // documented `p2p::projection_reconcile::HealOutcomeKind` outcomes = 36
+        // series — so an outcome that has literally never fired for a stream
+        // still reads as a measured zero, not an absent series. Labels below
+        // are the same vocabulary already used at the `inc_projection_heal_outcome`
+        // / `inc_projection_heal_outcome_by` call sites in
+        // `p2p/projection_reconcile.rs`.
         for stream in ["rea", "content", "collectives"] {
             for outcome in [
                 "healed",
@@ -1558,6 +1676,8 @@ pub fn register_all() {
                 "no_row",
                 "refreshed",
                 "deferred_to_adopt",
+                "call_failed",
+                "unattempted",
             ] {
                 PROJECTION_HEAL_OUTCOMES
                     .with_label_values(&[stream, outcome])
@@ -1569,6 +1689,12 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_EXHAUSTED.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_DIVERGENT.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_DIVERGENT_REFUSED.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_MEASURED.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_KNOWN_GAPS.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_KNOWN_DIVERGENT.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_WINDOW_OFFSET.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_WINDOW_TOTAL.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_REACH_NARROWED.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_SWEEPS.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_CONVERGED.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_CONVERGED_BLOCKED_BY.clone()));
@@ -2448,6 +2574,18 @@ pub fn inc_projection_heal_outcome(stream: &str, outcome: &str) {
         .inc();
 }
 
+/// Bulk form of [`inc_projection_heal_outcome`] — one call for a whole batch
+/// (a call-level failure or an unattempted set), rather than looping per id.
+/// A no-op for `count == 0` (mirrors [`add_head_batch_unattempted`]'s guard).
+pub fn inc_projection_heal_outcome_by(stream: &str, outcome: &str, count: usize) {
+    if count == 0 {
+        return;
+    }
+    PROJECTION_HEAL_OUTCOMES
+        .with_label_values(&[stream, outcome])
+        .inc_by(count as u64);
+}
+
 /// Publish a reconcile stream's last-sweep gauges: discovered `gaps` (pending after
 /// discovery) and `local_total` (local projection rows). `stream` is "rea" |
 /// "content" | "collectives".
@@ -2496,6 +2634,49 @@ pub fn set_projection_reconcile_divergent_refused(stream: &str, divergent_refuse
     PROJECTION_RECONCILE_DIVERGENT_REFUSED
         .with_label_values(&[stream])
         .set(divergent_refused as i64);
+}
+
+/// Publish whether the last sweep MEASURED `stream` — see
+/// [`PROJECTION_RECONCILE_MEASURED`]. Set unconditionally, every sweep,
+/// regardless of whether [`set_projection_reconcile_gauges`] also fires this
+/// sweep (it is gated on the same bit the caller passes here).
+pub fn set_projection_reconcile_measured(stream: &str, measured: bool) {
+    PROJECTION_RECONCILE_MEASURED
+        .with_label_values(&[stream])
+        .set(i64::from(measured));
+}
+
+/// Publish the persistent, cross-sweep known-gap / known-divergent gauges for
+/// `stream` — see [`PROJECTION_RECONCILE_KNOWN_GAPS`] /
+/// [`PROJECTION_RECONCILE_KNOWN_DIVERGENT`]. `known_gaps` excludes
+/// `known_divergent` (the two partition the ledger's tracked set; an id is
+/// never double-counted).
+pub fn set_projection_reconcile_known_gauges(stream: &str, known_gaps: u64, known_divergent: u64) {
+    PROJECTION_RECONCILE_KNOWN_GAPS
+        .with_label_values(&[stream])
+        .set(known_gaps as i64);
+    PROJECTION_RECONCILE_KNOWN_DIVERGENT
+        .with_label_values(&[stream])
+        .set(known_divergent as i64);
+}
+
+/// Publish this sweep's rotating-window progress for `stream` — see
+/// [`PROJECTION_RECONCILE_WINDOW_OFFSET`] / [`PROJECTION_RECONCILE_WINDOW_TOTAL`].
+pub fn set_projection_reconcile_window_gauges(stream: &str, offset: u64, total: u64) {
+    PROJECTION_RECONCILE_WINDOW_OFFSET
+        .with_label_values(&[stream])
+        .set(offset as i64);
+    PROJECTION_RECONCILE_WINDOW_TOTAL
+        .with_label_values(&[stream])
+        .set(total as i64);
+}
+
+/// Count ONE content-arm heal patch whose `reach` field was dropped by the
+/// RC-4 non-narrowing guard — see [`PROJECTION_RECONCILE_REACH_NARROWED`].
+pub fn inc_projection_reconcile_reach_narrowed(from: &str, to: &str) {
+    PROJECTION_RECONCILE_REACH_NARROWED
+        .with_label_values(&[from, to])
+        .inc();
 }
 
 /// The terms of the convergence predicate, in publication order. Every one is
