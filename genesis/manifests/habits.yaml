@@ -199,6 +199,21 @@ habits:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
       - "sweettest rea_commitment_replication (elohim/holochain/tests/sweettest — unignored 837b772c9; isolated late-join conductors, bounded 60s peer-B retrieval; RED but MIS-ATTRIBUTED per DELTA 2026-08-09 — it measures one-time cold-cell Wasm warm-up, not REA retrieval; do not read it as a fetch-seam probe until it warms peer B)"
     evidence: >
+      DELTA 2026-08-09 PM (convergence-serve-path shift close, edge
+      #1327-#1332): still red BUT the blocking seam is CURED five layers
+      deep — serve 503s, authority-before-shed (storage ab316cad7 +
+      doorway 85a128997, both test-pinned), gate-banner honesty,
+      node-local-dns hairpin (iroh's resolver ignores /etc/hosts), and
+      the cross-relay preflight fail-closed defect (fork e4a1c9bb2,
+      vendored kitsune2_transport_iroh patch — the overloaded error
+      string hid it through three investigations). Post-#1332 deploy:
+      BOTH relay error classes at zero fleet-wide (553K-line scanned
+      negatives) and divergentAnchor FALLING (1766→1687 in ~1h) — the
+      first monotone drain of the iroh era. The measure flips on the
+      first suite run after caughtUp: retrigger [build:edge] post-drain
+      (drain accelerator = the content-gap plateau objective). The REA
+      sweettest check is GREEN locally after the oracle warm-up fix
+      (a183c1a01) — see next delta for the falsification.
       DELTA 2026-08-09 (dev@b3c58d9ca, measured locally): the REA leg of this
       node is MIS-ATTRIBUTED and must stop being read as a fetch red. Direct
       instrumentation shows REA replication is HEALTHY — ops integrate on both
