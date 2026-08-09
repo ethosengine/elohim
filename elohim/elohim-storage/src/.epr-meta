@@ -116,6 +116,31 @@ cites:
 HTTP handlers, EPR/blob resolution, P2P dataplane, views, and service modules for the
 elohim-storage Rust crate. Editing conventions are in `elohim/elohim-storage/CLAUDE.md`.
 
+## Envelope contract for config knobs (authoritative convention — not gate-enforced here)
+
+**Every config knob's DEFAULT must be viable on the floor archetype**
+(`device-recycled-laptop`: 2000m CPU / 3Gi, 4-core envelope —
+`genesis/data/devices/archetype-resource-budgets.json`), and **any path that
+reduces participation under resource constraint must do so LOUDLY** (WARN + a
+metric/status field), never silently. Cautionary class: a CFS-throttled peer's
+kitsune2 layer skipped gossip initiation at debug level only — the node passed
+every liveness gate while sitting outside the DHT
+(`genesis/data/timeline/backlog/susan-kitsune2-gossip-never-attempts.md`).
+The aspiration this serves: runtime defaults *derived* from the device envelope
+(the device-archetypes design doc's "operational envelope derivation") so small
+peers participate degraded-but-present — like a game deriving recommended
+settings from the hardware. When you meet a hardware limit in the field,
+story-harvest it (parameter-bearing discovery → a2o proof) rather than tuning
+past it in silence. The evidence-bound law for the budget values themselves is
+gate-enforced at the twin manifest: `genesis/data/devices/.epr-meta`
+(rule `budgets-evidence-bound`).
+
+*Why this is body-text, not a rule:* the gate emits ONE verdict per write
+(`combine()` keeps the max-severity/first match), and `config.rs` always trips
+the `dataplane-guide-star` content tokens — a `config.rs`-scoped inject here
+would be permanently shadowed. Convention documented instead; the devices-side
+rule carries the enforcement and links back here.
+
 ## EPR/blob resolution invariant (gate-enforced)
 
 **Peers are the store; doorways are projections with peer-fallback.** The EPR/blob

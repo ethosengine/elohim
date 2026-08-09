@@ -1,0 +1,63 @@
+---
+epr-meta-version: 1
+id: device-archetypes-governance
+root: true
+covers: subtree
+purpose: >
+  Device archetypes — the physical hardware personas of the protocol's device
+  spectrum (smartwatch → home storage rack) and their k8s resource-budget
+  projection. Source docs (*.md) generate devices.json; archetype-resource-
+  budgets.json is the OPERATIONAL budget contract each deployed human's
+  edgenode* resources must honor (validate-deployments.ts + the
+  archetype-resource-alignment policy enforce conformance).
+rules:
+  - id: budgets-evidence-bound
+    class: inject
+    when: { write: "archetype-resource-budgets.json" }
+    dedupe-of: "genesis/data/timeline/backlog/susan-kitsune2-gossip-never-attempts.md (the incident that proved the law's down-direction)"
+    why: >
+      LAW — archetype budget values are EVIDENCE-BOUND IN BOTH DIRECTIONS.
+      Raise a value only on observed failure at the current value (OOM record,
+      CFS-throttle evidence, crashloop trace). Lower a value only with evidence
+      that the ORIGINAL bump's cause is cured — never on the assumption that a
+      co-landed fix (probe, template change) was the whole cause. The 2026-07-16
+      down-realignment of recycled-laptop to 1000m rested on a probe-only
+      assumption; it resurfaced 2026-08-03 as 100% CFS throttle and 2026-08-08
+      as SILENT gossip-dark (kitsune2 skips initiation debug-only on a starved,
+      never-populated peer store — the peer looks Ready while outside the DHT).
+      Record the evidence as a $-comment on the changed value IN THE SAME EDIT.
+      Twin guard at the runtime seam: elohim/elohim-storage/src/.epr-meta
+      (rule config-knobs-honor-the-floor).
+cites:
+  - genesis/data/timeline/backlog/susan-kitsune2-gossip-never-attempts.md
+  - genesis/data/timeline/backlog/archetype-resource-conformance-validation-gap.md
+  - genesis/plans/2026-04-13-device-archetypes-design.md
+---
+# genesis/data/devices/ — device archetypes and their operational envelopes
+
+Physical personas (`*.md` → `devices.json`) and the k8s budget projection
+(`archetype-resource-budgets.json`). Three layers, one contract:
+
+1. **Physical spec** (`*.md` / `devices.json`) — what the device *is*: cores,
+   RAM, storage, network class. Authored narrative, per archetype.
+2. **Operational budget** (`archetype-resource-budgets.json`) — the k8s
+   request/limit projection of that spec: what a conductor+storage stack is
+   *allocated* when this archetype is simulated in the cluster. Canonical per
+   class ("one class, one budget"): per-human deviation requires
+   `resourceOverride:{field, justification}` in deployments.json, enforced by
+   the `archetype-resource-alignment` policy and `validate:deployments`.
+3. **Runtime derivation** (the *not-yet-built* "operational envelope
+   derivation", named in `genesis/plans/2026-04-13-device-archetypes-design.md`)
+   — the vision this directory feeds: like a game deriving "recommended"
+   graphics settings from your GPU, the P2P runtime should derive sensible
+   config defaults (arc factor, gossip concurrency, pool sizes, pacing) from
+   the device envelope, so small peers participate *as best they can* —
+   degraded-but-present, never silently dark. Parameter-bearing limits
+   discovered in the field are story-harvested into a2o scenarios so each
+   floor value carries a proof.
+
+The budgets file is the class's **validated minimum under real load** — its
+values are evidence, not aspiration. The `budgets-evidence-bound` rule above
+carries the law; the cautionary tale is the recycled-laptop 2026-07-16 →
+2026-08-08 regression (down-realigned on an assumption; came back as a peer
+that passed every liveness gate while emitting zero gossip attempts).
