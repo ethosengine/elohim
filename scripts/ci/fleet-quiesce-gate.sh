@@ -50,23 +50,28 @@
 #   1. storage-A /p2p/status: pull.caughtUp === true
 #      (missing/null/unreachable is NOT a pass — keep waiting; never treat
 #      a null/absent field as caught up)
-#   2. storage-B /p2p/status: pull.caughtUp === true — SAME fail-closed rule
-#      as A (missing/null/unreachable is NOT a pass). Decision 2026-08-09
-#      (see genesis/data/timeline/backlog/fleet-quiesce-pass-not-convergence.md):
-#      this gate's name and its downstream readers (the F2-PASS timing
-#      numbers, the fork-deploy go/no-go criterion) treat PASS as fleet
-#      convergence, not "probe A alone converged" — edge #1327 declared
-#      FLEET QUIESCENT while every poll including the terminal PASS carried
-#      B-caughtUp=False, and Dataplane Validation found the fleet still
-#      catching-up minutes later. B was previously telemetry-only on the
-#      theory that an empty pull queue reads caughtUp=false "by design"
-#      (observed 2026-07-31, edge #1283) — but the acquisition-stream
-#      `retired` pin status (elohim-storage/src/p2p/acquisition.rs,
-#      PIN_STATUS_RETIRED) exists precisely to stop pinning pull.caughtUp
-#      false forever, so a B that never catches up is itself real churn/
-#      divergence this gate should keep waiting on, not paper over. Exceeding
-#      the deadline while B never catches up still exits 3 (no-measure, not
-#      a failure) — see Exit codes below.
+#   2. (telemetry only, NOT gating — restored 2026-08-09) storage-B
+#      pull.caughtUp is read and printed but does not gate. History, both
+#      directions, so the next reader doesn't re-fight this:
+#        - 2026-07-31/#1283: B constant-False through a 45-min window
+#          (empty-pull-queue-by-design theory); gating on B wedges the
+#          pipeline. 2026-08-07 integrator decision re-pointed the gate to
+#          the A-QUIESCED predicate precisely to UNBLOCK MEASUREMENT while
+#          B's known content-gap plateau drains under its own objective
+#          (backlog/content-gap-limit-cycle-blocks-convergence — F-B
+#          fan-out + peer-probe widening, deliberately deferred).
+#        - 2026-08-09 (this shift, briefly gated B then reverted same
+#          night): the `retired` pin status (elohim-storage
+#          src/p2p/acquisition.rs PIN_STATUS_RETIRED) means a
+#          permanently-false B is no longer by-design — B-strictness
+#          SHOULD return when the plateau objective lands. Until then,
+#          gating B re-wedges every deploy against a known, deliberately
+#          deferred drain (proven immediately: #1328 no-measured on
+#          B-not-caughtUp for its whole window).
+#      The honesty fix is the BANNER, not the predicate: the pass line
+#      prints A-QUIESCED wording naming B's excluded state, so downstream
+#      readers (F2 timing, fork-deploy go/no-go) cannot mistake PASS for
+#      fleet convergence. See backlog/fleet-quiesce-pass-not-convergence.md.
 #   3. storage-A /metrics: QUIESCED, not perfect (decision 2026-08-07, see
 #      genesis/data/timeline/backlog/content-gap-limit-cycle-blocks-convergence.md):
 #        elohim_projection_reconcile_converged_blocked_by{term="divergent_actionable"} == 0
@@ -322,10 +327,9 @@ PYEOF
   pass=1
   reasons=()
   [ "$a_caught_up" = "True" ] || { pass=0; reasons+=("A-not-caughtUp"); }
-  # B-caughtUp now gates too (2026-08-09 decision, header note 2): PASS means
-  # fleet convergence, not just probe A — same fail-closed rule as A
-  # (missing/null/false is not a pass).
-  [ "$b_caught_up" = "True" ] || { pass=0; reasons+=("B-not-caughtUp"); }
+  # B-caughtUp deliberately NOT gating (restored 2026-08-09 — see header
+  # note 2 for both sides of the history); printed in the summary, and the
+  # pass banner names B's state honestly instead of claiming fleet scope.
   # Quiesced, not perfect (header note 3): actionable==0 AND unmeasured==0,
   # fail-closed on an absent blocked_by series. converged is telemetry only.
   [ "$quiesced_ok" = "True" ] || { pass=0; reasons+=("A-not-quiesced(actionable=${actionable:-null},count=${actionable_count:-null},sum=${actionable_sum:-null},tol=${ACTIONABLE_TOL},unmeasured=${unmeasured:-null})"); }
@@ -351,7 +355,7 @@ PYEOF
       if [ "$elapsed" -ge "$SUSTAIN_SECS" ]; then
         if python3 -c "import sys; sys.exit(0 if float(sys.argv[1]) > float(sys.argv[2]) else 1)" "$sweeps" "$anchor_sweeps" 2>/dev/null; then
           log "PASS ${summary} — sustained ${elapsed}s, sweeps advanced ${anchor_sweeps} -> ${sweeps}"
-          echo "FLEET QUIESCENT"
+          echo "A-QUIESCED (gate scope: probe A converged+sustained; B-caughtUp=${b_caught_up:-null} excluded per 2026-08-07 plateau ruling — PASS is NOT fleet convergence)"
           exit 0
         else
           log "PASS ${summary} — elapsed ${elapsed}s>=sustain but sweeps did not advance (anchor=${anchor_sweeps}); waiting for a fresh sweep"
