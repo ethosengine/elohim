@@ -856,15 +856,30 @@ lazy_static! {
     )
     .unwrap();
 
-    /// Persistent, cross-sweep known-DIVERGENT count per reconcile stream — the
-    /// divergent partition of [`PROJECTION_RECONCILE_KNOWN_GAPS`]'s ledger
-    /// (`MissLedger::divergent_tracked`). Same honesty bound: complete only
-    /// after one full window rotation, and removal lags by one rotation.
+    /// Persistent, cross-sweep known-ACTIONABLE-DIVERGENT count per reconcile
+    /// stream — the divergent partition of [`PROJECTION_RECONCILE_KNOWN_GAPS`]'s
+    /// ledger (`MissLedger::divergent_tracked`), but ONLY the share heal is
+    /// still permitted to move.
+    ///
+    /// EXCLUDES the refused-declared partition (the content arm's
+    /// `declared_ids`, checked at the `admit()` call site) — a refused-declared
+    /// row already carries a DIFFERENT declared head, so heal is FORBIDDEN to
+    /// move it until a canonical channel fires; it is PERMANENT, not a drain
+    /// target. Admitting it here would make this gauge read ≈ the whole
+    /// refused population (a live peer's dominant class — matthew: ~6071) and
+    /// never fall, the same total-shaped trap
+    /// [`PROJECTION_RECONCILE_DIVERGENT_REFUSED`]/`divergent_actionable` exist
+    /// to avoid on the per-sweep gauge. Mirror that split here, on the
+    /// persistent one.
+    ///
+    /// Same honesty bound as [`PROJECTION_RECONCILE_KNOWN_GAPS`]: complete
+    /// only after one full window rotation, and removal lags by one rotation.
     pub static ref PROJECTION_RECONCILE_KNOWN_DIVERGENT: IntGaugeVec = IntGaugeVec::new(
         Opts::new(
             "elohim_projection_reconcile_known_divergent",
-            "Persistent cross-sweep known-divergent count by reconcile stream (MissLedger pod \
-             state; complete only after one full window rotation, ~3 sweeps).",
+            "Persistent cross-sweep known ACTIONABLE-divergent count by reconcile stream \
+             (MissLedger pod state, excludes refused-declared; complete only after one full \
+             window rotation, ~3 sweeps).",
         ),
         &["stream"],
     )
@@ -1657,19 +1672,23 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(IDENTITY_KEY_SUPERSEDE.clone()));
         let _ = REGISTRY.register(Box::new(SHARD_PUSH_PEER_UNRESOLVED.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_HEAL_OUTCOMES.clone()));
-        // Pre-touch every (stream, outcome) combination — 3 streams x 12
-        // documented `p2p::projection_reconcile::HealOutcomeKind` outcomes = 36
-        // series — so an outcome that has literally never fired for a stream
+        // Pre-touch every (stream, outcome) combination — 3 streams x 13
+        // `p2p::projection_reconcile::HealOutcomeKind` variants = 39 series —
+        // so an outcome that has literally never fired for a stream
         // still reads as a measured zero, not an absent series. Labels below
         // are the same vocabulary already used at the `inc_projection_heal_outcome`
         // / `inc_projection_heal_outcome_by` call sites in
-        // `p2p/projection_reconcile.rs`.
+        // `p2p/projection_reconcile.rs`. Keep this list in exact sync with
+        // `HealOutcomeKind::label`'s match arms — a variant missing here still
+        // increments correctly, it just starts absent instead of a measured
+        // zero (this list itself was missing `missing_deferred` before F8).
         for stream in ["rea", "content", "collectives"] {
             for outcome in [
                 "healed",
                 "timeout_retried",
                 "timeout_exhausted",
                 "missing",
+                "missing_deferred",
                 "failed",
                 "refused_declared",
                 "refused_stale",

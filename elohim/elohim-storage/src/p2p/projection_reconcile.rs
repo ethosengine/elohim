@@ -2423,11 +2423,17 @@ async fn discover_rea(
     // Window-progress companions: THIS sweep's requested offset and the
     // clamped corpus size it saw, so a sample reads as "1052 actionable at
     // offset 2000 of 4440" instead of a bare number with no denominator.
-    crate::metrics::set_projection_reconcile_window_gauges(
-        "rea",
-        u64::from(sweep_offset),
-        max_peer_total.min(MAX_INVENTORY_WINDOW_TOTAL),
-    );
+    // Gated on the SAME measured precondition as the value gauges (F4/F9):
+    // `peers_asked == 0` means no peer actually reported a corpus size this
+    // sweep, so publishing `window_total` would write the false 0 A1 exists
+    // to outlaw on the value gauges — leave the prior sample standing.
+    if peers_asked > 0 {
+        crate::metrics::set_projection_reconcile_window_gauges(
+            "rea",
+            u64::from(sweep_offset),
+            max_peer_total.min(MAX_INVENTORY_WINDOW_TOTAL),
+        );
+    }
 
     // Build the tracker: local set EXCLUDES anchor-divergent ids so `discover()`
     // admits them alongside genuinely-absent ids. All discovered ids flow
@@ -2483,7 +2489,13 @@ async fn discover_rea(
         divergent_refused: exhausted_divergent,
         exhausted_persistent,
         local_total,
-        measured: true,
+        // MEASURED means OBSERVED, not merely "no error was thrown": a sweep
+        // where every `view_federate` call errored (peer partition) reaches
+        // here with `peers_asked == 0` and all-zero counts indistinguishable
+        // from a healthy in-sync arm — the N2 false-green this bit exists to
+        // stop. `true` here left a peer-partition sweep publishing gauges
+        // (and the A1/A1b measured bit) as if it had actually measured.
+        measured: peers_asked > 0,
     }
 }
 
@@ -3072,12 +3084,14 @@ async fn discover_content(
         sweep_offset,
         max_peer_total,
     );
-    // Window-progress companions (see the REA arm's twin call for the why).
-    crate::metrics::set_projection_reconcile_window_gauges(
-        "content",
-        u64::from(sweep_offset),
-        max_peer_total.min(MAX_INVENTORY_WINDOW_TOTAL),
-    );
+    // Window-progress companions, measured-gated (see the REA arm's twin call).
+    if peers_asked > 0 {
+        crate::metrics::set_projection_reconcile_window_gauges(
+            "content",
+            u64::from(sweep_offset),
+            max_peer_total.min(MAX_INVENTORY_WINDOW_TOTAL),
+        );
+    }
 
     // (3) One presence query for the whole advertised union (reach-agnostic).
     let advertised_ids: Vec<String> = discovered_by.keys().cloned().collect();
@@ -3182,7 +3196,14 @@ async fn discover_content(
             PROJECTION_INVENTORY_TABLE_CONTENT,
             &id,
             evidence,
-            divergent_set.contains(&id),
+            // ACTIONABLE divergence only — excludes the refused-declared
+            // partition (`declared_ids`, :4c above). A refused-declared id is
+            // PERMANENT (heal is forbidden to move it until a canonical
+            // channel fires), so counting it here would make
+            // `known_divergent{content}` read ≈ the whole refused population
+            // (matthew: ~6071) and never drain — the exact total-shaped trap
+            // `divergent_actionable` exists to avoid on the per-sweep gauge.
+            divergent_set.contains(&id) && !declared_ids.contains(&id),
         ) {
             Admission::Retry => admitted.push(id),
             Admission::Exhausted => {
@@ -3216,7 +3237,10 @@ async fn discover_content(
         ids_discovered,
         local_anchored,
         peer_head_hints,
-        measured: true,
+        // See `ReaDiscovery`'s twin field for the why: OBSERVED, not merely
+        // "no error thrown" — a peer-partition sweep (every `view_federate`
+        // call errored) must not read as measured.
+        measured: peers_asked > 0,
     }
 }
 
@@ -3473,6 +3497,28 @@ async fn heal_content(
                         "projection-reconcile[content]: OPENED the unresponsive-conductor circuit \
                          on a CALL-level failure — shedding the rest of the leg, remaining gaps \
                          resume next sweep"
+                    );
+                    break;
+                }
+                // Per-leg budget (same check as the bottom of the loop below):
+                // `continue` alone would skip straight back to
+                // `resolves.next().await`, bypassing every other exit this loop
+                // has — on a conductor that keeps ANSWERING errors (the circuit
+                // only counts SYNTHETIC per-attempt timeouts, so an answered
+                // `Websocket error: Timeout` never opens it) that made the leg
+                // UNBOUNDED, well past `content_leg_budget`, freezing
+                // `publish_sweep` and starving the REA arm behind it.
+                if leg_start.elapsed() >= pacing.content_leg_budget {
+                    tracing::info!(
+                        target: "elohim_storage::projection_reconcile",
+                        budget_secs = pacing.content_leg_budget.as_secs(),
+                        healed,
+                        fanout,
+                        batch_size,
+                        to_resolve = to_resolve.len(),
+                        replayed = replayed.len(),
+                        "projection-reconcile[content]: heal hit leg budget on a CALL-level \
+                         failure — yielding, remaining gaps resume next sweep"
                     );
                     break;
                 }
@@ -4760,12 +4806,14 @@ async fn discover_collectives(
         sweep_offset,
         max_peer_total,
     );
-    // Window-progress companions (see the REA arm's twin call for the why).
-    crate::metrics::set_projection_reconcile_window_gauges(
-        "collectives",
-        u64::from(sweep_offset),
-        max_peer_total.min(MAX_INVENTORY_WINDOW_TOTAL),
-    );
+    // Window-progress companions, measured-gated (see the REA arm's twin call).
+    if peers_asked > 0 {
+        crate::metrics::set_projection_reconcile_window_gauges(
+            "collectives",
+            u64::from(sweep_offset),
+            max_peer_total.min(MAX_INVENTORY_WINDOW_TOTAL),
+        );
+    }
 
     // (3) One presence query for the advertised routing aliases.
     let advertised_ids: Vec<String> = advertised.keys().cloned().collect();
@@ -4882,7 +4930,9 @@ async fn discover_collectives(
         peers_asked,
         ids_discovered,
         local_anchored,
-        measured: true,
+        // See `ReaDiscovery`'s twin field for the why: OBSERVED, not merely
+        // "no error thrown" — a peer-partition sweep must not read as measured.
+        measured: peers_asked > 0,
     }
 }
 
@@ -7490,12 +7540,31 @@ mod tests {
         }
     }
 
+    /// Serializes the tests that assert on the process-wide
+    /// `elohim_projection_heal_outcomes_total{stream="content",outcome="call_failed"}`
+    /// counter — `PROJECTION_HEAL_OUTCOMES` is a `lazy_static` singleton
+    /// shared by the WHOLE test binary, and `cargo test` runs tests in
+    /// parallel by default, so this counter's value (and any before/after
+    /// delta read against it) is NOT test-local. Without this lock a
+    /// full-suite run pollutes an exact-delta assertion with another
+    /// concurrently-running test's increments (observed under the full
+    /// suite: a delta expected to be exactly the failed chunk's size came
+    /// back 4 higher). Mirrors `SWEEP_GAUGE_LOCK` in `metrics.rs` for the
+    /// same class of shared-counter test. Every test that triggers the
+    /// content arm's CALL-LEVEL `Err` path (the only production site that
+    /// writes this label pair) takes this lock, whether or not it reads the
+    /// counter itself — a silent writer is just as much a pollution source
+    /// as a racing reader.
+    static CONTENT_CALL_FAILED_COUNTER_LOCK: tokio::sync::Mutex<()> =
+        tokio::sync::Mutex::const_new(());
+
     /// A CALL-LEVEL infrastructure failure returns EVERY id to pending, with
     /// backoff (the bounded in-leg retry, then the next sweep). No id is marked
     /// failed — the conductor said nothing about any of them — and the leg sheds
     /// rather than hammering on.
     #[tokio::test]
     async fn a_call_level_failure_returns_every_id_to_pending_with_backoff() {
+        let _guard = CONTENT_CALL_FAILED_COUNTER_LOCK.lock().await;
         let ids = arm_ids("arm2-callfail", 4);
         let mut tracker = GapTracker::new(MAX_RETRIES);
         tracker.discover(ids.clone());
@@ -7529,8 +7598,26 @@ mod tests {
     /// the WHOLE leg when the circuit is CLOSED — later chunks are still
     /// attempted. Before the cure, an unconditional `break` in the `Err` arm
     /// made every leg a single-strike breaker regardless of `HealCircuit`.
+    ///
+    /// REVIEW FIX (F2): the original cut of this test queued 3 ANSWERED
+    /// transient failures and asserted on `mock.calls()`, but
+    /// `resolve_pipeline` runs `fanout=2` chunks CONCURRENTLY — the 3 queued
+    /// failures can split 2/1 across two in-flight chunks' OWN in-leg retry
+    /// ladders (`call_with_retry`, `max_row_retries=2` ⇒ 3 attempts), so
+    /// NEITHER chunk necessarily exhausted to `Err`; the failures likely
+    /// never reached the `Err` arm at all, making the assertions vacuous.
+    /// This recut fixes that by using a SYNTHETIC per-attempt-timeout
+    /// failure instead — see `is_synthetic_attempt_timeout` /
+    /// `should_retry_attempt` — which is NEVER retried in-leg, so one
+    /// queued failure maps 1:1 to exactly one failed chunk with no
+    /// interleaving ambiguity. EMPIRICALLY VERIFIED red on the pre-B1 shape:
+    /// this exact test body, run against the Err arm's unconditional `break`
+    /// restored (the B1 hunk reverted locally, then re-applied), FAILS —
+    /// `conductor_missing` never rises past what the fanout=2 chunks already
+    /// in flight can carry, so `call_failed_delta + conductor_missing < 300`.
     #[tokio::test]
     async fn a_failed_first_chunk_does_not_prevent_a_later_chunk_from_being_attempted() {
+        let _guard = CONTENT_CALL_FAILED_COUNTER_LOCK.lock().await;
         // Enough ids to guarantee multiple chunks even at the AIMD batch-size
         // ceiling (128) — mirrors `the_batch_arm_respects_its_fanout_ceiling`.
         let ids = arm_ids("arm2-b1-continue", 300);
@@ -7538,30 +7625,62 @@ mod tests {
         tracker.discover(ids.clone());
 
         let mock = MockHeadBatchResolver::new();
-        // Exactly enough ANSWERED transient failures to exhaust the FIRST
-        // chunk's in-leg retry ladder (test_fast: max_row_retries = 2 -> 3
-        // attempts) and end that one chunk in Err. Nothing further is queued,
-        // so every later chunk succeeds (default Absent answers) — the
-        // circuit stays CLOSED throughout (`HealPacing::test_fast` disables it,
-        // circuit_timeout_threshold = 0).
-        for _ in 0..3 {
-            mock.fail_next_call(crate::error::StorageError::Timeout(
-                "Websocket error: Timeout".into(),
-            ));
-        }
-        let out = run_heal_content_arm(&mut tracker, &mock).await;
+        mock.fail_next_call(synthetic_timeout_err());
 
+        let before_call_failed = crate::metrics::PROJECTION_HEAL_OUTCOMES
+            .with_label_values(&["content", "call_failed"])
+            .get();
+
+        let mut pacing = HealPacing::test_fast();
+        // High enough that this ONE failure never opens it — the circuit
+        // staying CLOSED is exactly the condition B1 proves continuation
+        // under (a genuinely OPEN circuit is covered separately below by
+        // `the_circuit_still_sheds_the_leg_once_it_opens`).
+        pacing.circuit_timeout_threshold = 10;
+
+        let pool = crate::test_util::test_pool();
+        let hints = crate::services::head_adoption::PeerHeadHints::new();
+        let out = heal_content(
+            &mut tracker,
+            &std::collections::HashMap::new(),
+            &pool,
+            &pacing,
+            &hints,
+            &mock,
+        )
+        .await;
+
+        let call_failed_delta = crate::metrics::PROJECTION_HEAL_OUTCOMES
+            .with_label_values(&["content", "call_failed"])
+            .get()
+            - before_call_failed;
+
+        // A4 coverage: the Err arm must bump the CallFailed outcome counter
+        // by exactly the failed chunk's size.
         assert!(
-            out.conductor_missing > 0,
-            "conductor_missing is only bumped by a resolved (Answer::Absent) item — a \
-             nonzero count here PROVES a later chunk was actually attempted and answered, \
-             not just retried within the failed first chunk"
+            call_failed_delta > 0,
+            "the one synthetic-timeout chunk must bump the CallFailed outcome counter"
         );
+        // The failed chunk can carry at most the AIMD ceiling (128) ids, so
+        // AT LEAST 300 - 128 = 172 ids must have reached a LATER, successful
+        // chunk (default Absent answers → conductor_missing) — a bound old
+        // (pre-B1) code could never clear: an unconditional `break` on the
+        // first Err sheds the rest of the leg immediately, at most the
+        // fanout=2 chunks already dispatched, nowhere near 172.
         assert!(
-            mock.calls() > 3,
-            "more than the first chunk's retry ladder (3) — later chunks were asked \
-             (calls={})",
-            mock.calls()
+            out.conductor_missing >= 300 - 128,
+            "later chunks were attempted and answered (conductor_missing={}) — old code \
+             would shed the leg on the first Err and never get here",
+            out.conductor_missing
+        );
+        // Every id is accounted for by exactly one of the two outcomes: no
+        // id is seeded `MockAnswer::Unattempted` in this scenario, so the
+        // failed chunk (call_failed) and every later chunk (conductor_missing,
+        // all default Absent) must partition the full 300.
+        assert_eq!(
+            call_failed_delta as usize + out.conductor_missing,
+            300,
+            "call_failed + conductor_missing must account for every id"
         );
     }
 
@@ -7571,6 +7690,7 @@ mod tests {
     /// to "the circuit says so", it did not disappear.
     #[tokio::test]
     async fn the_circuit_still_sheds_the_leg_once_it_opens() {
+        let _guard = CONTENT_CALL_FAILED_COUNTER_LOCK.lock().await;
         let ids = arm_ids("arm2-b1-circuit-open", 300);
         let mut tracker = GapTracker::new(MAX_RETRIES);
         tracker.discover(ids.clone());
