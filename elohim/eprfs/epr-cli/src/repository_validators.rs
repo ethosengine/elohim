@@ -24,6 +24,7 @@ impl ValidatorProvider for ElohimRepositoryValidators {
             "epr:validator-p2p-design-gate" => p2p_design_gate(request),
             "epr:validator-brand-vocabulary-boundary" => brand_vocabulary_boundary(request),
             "epr:validator-sovereignty-ontology-guard" => sovereignty_guard(request),
+            "epr:validator-ownership-ontology-guard" => ownership_guard(request),
             "epr:validator-archetype-resource-alignment" => archetype_resource_alignment(request),
             "epr:validator-test-bench-aggregate-capacity" => test_bench_aggregate_capacity(request),
             "epr:validator-eprfs-meta-domain-neutrality" => eprfs_meta_domain_neutrality(request),
@@ -44,19 +45,20 @@ impl ValidatorProvider for ElohimRepositoryValidators {
 fn brand_vocabulary_boundary(request: &ValidatorRequest<'_>) -> Option<String> {
     let path = request.write.path.as_str();
     let normalized_path = path.replace('\\', "/").to_ascii_lowercase();
+    // Repo-relative and absolute write paths must compare alike, so every segment test runs
+    // against a rooted form (mirrors the Python twin's `f"/{normalized_path.lstrip('/')}"`).
+    let rooted_path = format!("/{}", normalized_path.trim_start_matches('/'));
     if [
-        ".claude/scripts/_lib/epr_meta.py",
-        ".claude/scripts/_lib/__tests__/brand_vocabulary_guard_test.py",
-        "elohim/eprfs/epr-cli/src/repository_validators.rs",
+        "/.claude/scripts/_lib/epr_meta.py",
+        "/.claude/scripts/_lib/__tests__/brand_vocabulary_guard_test.py",
+        "/elohim/eprfs/epr-cli/src/repository_validators.rs",
     ]
     .iter()
-    .any(|internal| normalized_path.ends_with(internal))
+    .any(|internal| rooted_path.ends_with(internal))
     {
         return None;
     }
-    if normalized_path.starts_with(".claude/memory-kit/")
-        || normalized_path.contains("/.claude/memory-kit/")
-    {
+    if rooted_path.contains("/.claude/memory-kit/") {
         return None;
     }
     let base = basename(path).to_ascii_lowercase();
@@ -77,9 +79,8 @@ fn brand_vocabulary_boundary(request: &ValidatorRequest<'_>) -> Option<String> {
     }
 
     let lines: Vec<&str> = post.lines().collect();
-    let package_body_is_prose = suffix == ".json"
-        && (normalized_path.starts_with(".epr-meta/elohim/packages/")
-            || normalized_path.contains("/.epr-meta/elohim/packages/"));
+    let package_body_is_prose =
+        suffix == ".json" && rooted_path.contains("/.epr-meta/elohim/packages/");
     let prose = brand_prose_lines(&lines, &suffix, package_body_is_prose);
     let mut hits = Vec::new();
     for (index, line) in lines.iter().enumerate() {
@@ -89,8 +90,9 @@ fn brand_vocabulary_boundary(request: &ValidatorRequest<'_>) -> Option<String> {
         {
             continue;
         }
+        let lowered = line.to_lowercase();
         for (term, replacement) in brand_entries() {
-            if contains_brand_term(line, term) {
+            if contains_brand_term(&lowered, term) {
                 hits.push(format!(
                     "line {} [{term}] `{}`; prefer {replacement}",
                     index + 1,
@@ -150,7 +152,7 @@ fn is_brand_source(suffix: &str, base: &str) -> bool {
     SUFFIXES.contains(&suffix) || BASENAMES.contains(&base)
 }
 
-fn added_lines(prior: &str, post: &str) -> HashSet<String> {
+fn added_lines<'a>(prior: &str, post: &'a str) -> HashSet<&'a str> {
     let mut remaining = HashMap::<&str, usize>::new();
     for line in prior.lines() {
         *remaining.entry(line).or_default() += 1;
@@ -160,7 +162,7 @@ fn added_lines(prior: &str, post: &str) -> HashSet<String> {
         match remaining.get_mut(line) {
             Some(count) if *count > 0 => *count -= 1,
             _ => {
-                added.insert(line.to_string());
+                added.insert(line);
             }
         }
     }
@@ -235,11 +237,12 @@ fn prose_field_value(line: &str, package_body_is_prose: bool) -> Option<&str> {
     None
 }
 
-fn contains_brand_term(line: &str, term: &str) -> bool {
-    let lower = line.to_lowercase();
-    lower
+/// Word-boundary match of an all-lowercase `term` against an ALREADY-LOWERCASED line. The
+/// caller owns the lowercasing so a line is folded once, not once per brand term.
+fn contains_brand_term(lowered_line: &str, term: &str) -> bool {
+    lowered_line
         .match_indices(term)
-        .any(|(index, _)| index == 0 || !lower.as_bytes()[index - 1].is_ascii_alphanumeric())
+        .any(|(index, _)| index == 0 || !lowered_line.as_bytes()[index - 1].is_ascii_alphanumeric())
 }
 
 fn eprfs_meta_domain_neutrality(request: &ValidatorRequest<'_>) -> Option<String> {
@@ -401,6 +404,54 @@ fn sovereignty_guard(request: &ValidatorRequest<'_>) -> Option<String> {
         return None;
     }
     Some("net-new apex-sovereignty framing needs an explicit bounded frame".into())
+}
+
+/// Ownership ontology guard — the sibling drift to sovereignty, same shape. OWNERSHIP is the
+/// enclosure-flavoured apex the protocol subordinates to STEWARDSHIP and CUSTODY. The phrase list
+/// is deliberately narrow (property-flavoured only): English overloads "ownership" for
+/// RESPONSIBILITY too ("take full ownership of this bug"), so `full ownership` and `sole ownership`
+/// are not members. Either frame marker quiets it — the two frames travel together.
+fn ownership_guard(request: &ValidatorRequest<'_>) -> Option<String> {
+    const PHRASES: &[&str] = &[
+        "data ownership",
+        "own your data",
+        "owns their data",
+        "owns your data",
+        "true ownership",
+        "outright ownership",
+        "ownership rights",
+        "ownership of the commons",
+        "owns the commons",
+    ];
+    let post = request
+        .write
+        .content
+        .as_deref()
+        .unwrap_or("")
+        .to_lowercase();
+    if post.contains("stewardship-frame:") || post.contains("sovereignty-frame:") {
+        return None;
+    }
+    let count = |text: &str| {
+        PHRASES
+            .iter()
+            .map(|phrase| text.matches(phrase).count())
+            .sum::<usize>()
+    };
+    let post_count = count(&post);
+    if post_count == 0 {
+        return None;
+    }
+    let prior = request
+        .write
+        .prior_content
+        .as_deref()
+        .unwrap_or("")
+        .to_lowercase();
+    if !request.write.is_new && post_count <= count(&prior) {
+        return None;
+    }
+    Some("net-new apex-ownership framing needs an explicit custody/stewardship frame".into())
 }
 
 fn archetype_resource_alignment(request: &ValidatorRequest<'_>) -> Option<String> {
@@ -794,6 +845,80 @@ mod tests {
             eprfs_meta::resolve_decision(&evaluation.verdicts).decision,
             "permit"
         );
+    }
+
+    fn ownership_flag(prior: Option<&str>, content: &str) -> Option<String> {
+        let dir = TempDir::new().unwrap();
+        let rule = dummy_rule();
+        let mut write = GovernanceWrite::new("genesis/docs/content/elohim-protocol/note.md");
+        write.is_new = prior.is_none();
+        write.prior_content = prior.map(str::to_string);
+        write.content = Some(content.to_string());
+        let request = ValidatorRequest {
+            repo_root: dir.path(),
+            reference: "epr:validator-ownership-ontology-guard",
+            rule: &rule,
+            write: &write,
+        };
+        ownership_guard(&request)
+    }
+
+    #[test]
+    fn ownership_guard_flags_net_new_apex_framing() {
+        assert!(ownership_flag(None, "Members get true data ownership.").is_some());
+        assert!(ownership_flag(None, "The platform grants ownership rights.").is_some());
+        let prior = "Platforms promise true data ownership.\n";
+        let post = format!("{prior}Contributors receive outright ownership.\n");
+        assert!(ownership_flag(Some(prior), &post).is_some());
+    }
+
+    #[test]
+    fn ownership_guard_does_not_trap_maintenance_of_existing_framing() {
+        let prior = "Platforms promise true data ownership and ownership rights.\n";
+        let post = format!("{prior}Custody is stewarded, not held.\n");
+        assert!(ownership_flag(Some(prior), &post).is_none());
+        // Cleaning the framing out is never trapped either.
+        assert!(ownership_flag(Some(prior), "Platforms promise stewardship.\n").is_none());
+    }
+
+    #[test]
+    fn ownership_guard_passes_responsibility_idiom_and_declared_frames() {
+        assert!(ownership_flag(None, "Please take full ownership of this bug.").is_none());
+        assert!(ownership_flag(None, "See LIFECYCLE.md for the full ownership matrix.").is_none());
+        assert!(ownership_flag(None, "The owner of the file is the steward.").is_none());
+        for marker in [
+            "stewardship-frame: adversary",
+            "sovereignty-frame: adversary",
+        ] {
+            assert!(
+                ownership_flag(
+                    None,
+                    &format!("{marker}\nPlatforms promise true data ownership.")
+                )
+                .is_none(),
+                "{marker}"
+            );
+        }
+    }
+
+    #[test]
+    fn ownership_reference_resolves_in_the_native_provider() {
+        let dir = TempDir::new().unwrap();
+        let rule = dummy_rule();
+        let mut write = GovernanceWrite::new("genesis/docs/content/elohim-protocol/note.md");
+        write.is_new = true;
+        write.content = Some("Custody is stewarded, never enclosed.".into());
+        let request = ValidatorRequest {
+            repo_root: dir.path(),
+            reference: "epr:validator-ownership-ontology-guard",
+            rule: &rule,
+            write: &write,
+        };
+        // Not `Unavailable` — that arm would route every such write to an unconditional `ask`.
+        assert!(matches!(
+            ElohimRepositoryValidators.evaluate(&request),
+            ValidatorOutcome::Pass
+        ));
     }
 
     fn write_charter_registry(dir: &TempDir) {

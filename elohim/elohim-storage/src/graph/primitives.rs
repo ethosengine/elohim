@@ -54,6 +54,27 @@ pub mod scripts {
             *epr_edge{from_cid: prev, to_cid: node, rel_type: 'SUPERSEDES'}
     "#;
 
+    /// Hop-counted variant of `VERSION_CHAIN`: follows SUPERSEDES edges forward
+    /// from `$start`, returning each successor node together with its hop depth.
+    ///
+    /// CozoDB sorts result rows lexicographically on the returned tuple, NOT in
+    /// traversal order — callers MUST order by `hops`, never by row position or
+    /// by the node value itself, to recover chain order / find the chain tip.
+    /// A node reachable by more than one path may be derived at multiple depths;
+    /// callers must deduplicate per node keeping the max `hops` before numbering.
+    ///
+    /// Parameters: `$start: String`
+    /// Query head to append: `?[node, hops] := version_chain_depth[node, hops]`
+    pub const VERSION_CHAIN_DEPTH: &str = r#"
+        version_chain_depth[node, hops] :=
+            *epr_edge{from_cid: $start, to_cid: node, rel_type: 'SUPERSEDES'},
+            hops = 1
+        version_chain_depth[node, hops] :=
+            version_chain_depth[prev, prev_hops],
+            *epr_edge{from_cid: prev, to_cid: node, rel_type: 'SUPERSEDES'},
+            hops = prev_hops + 1
+    "#;
+
     /// Filters EPR nodes by minimum reach level (lexicographic comparison on String).
     ///
     /// Parameters: `$reach_floor: String`

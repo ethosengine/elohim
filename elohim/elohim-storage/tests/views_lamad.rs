@@ -181,3 +181,36 @@ fn atom_version_chain_empty_when_no_successors() {
     assert!(view.chain.is_empty(), "no successors means empty chain");
     assert!(view.canonical_cid.is_none());
 }
+
+#[test]
+fn atom_version_chain_orders_by_traversal_depth_not_lexicographic_cid() {
+    let (engine, _tmp) = open_engine();
+    let projector = GraphProjector::new(&engine);
+
+    // Linear chain zzz-a -> mmm-b -> aaa-c via SUPERSEDES.
+    // CIDs are chosen so lexicographic order (aaa-c < mmm-b < zzz-a) is the
+    // REVERSE of chain-traversal order (zzz-a -> mmm-b -> aaa-c). CozoDB
+    // returns result rows sorted lexicographically on the tuple, not in
+    // traversal order — a builder that trusts row order would report
+    // "mmm-b" as canonical instead of the true tip "aaa-c".
+    projector.project_supersedence("zzz-a", "mmm-b").unwrap();
+    projector.project_supersedence("mmm-b", "aaa-c").unwrap();
+
+    let view = atom_version_chain::build(&engine, "zzz-a").expect("build atom_version_chain");
+
+    assert_eq!(view.current_cid, "zzz-a");
+    assert_eq!(view.chain.len(), 2, "chain must include both successors");
+    assert_eq!(view.chain[0].cid, "mmm-b", "first hop in chain order");
+    assert_eq!(view.chain[0].version, 2);
+    assert_eq!(
+        view.chain[1].cid, "aaa-c",
+        "second hop — the true chain tip"
+    );
+    assert_eq!(view.chain[1].version, 3);
+    assert_eq!(
+        view.canonical_cid,
+        Some("aaa-c".to_string()),
+        "canonical_cid must be the chain tip (deepest hop), not the \
+         lexicographically largest CID"
+    );
+}

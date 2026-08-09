@@ -71,9 +71,18 @@ is **no depth cap** — only a cycle guard, and that guard is `visited.contains(
 file, which takes one). `atom_version_chain::build`
 (`elohim/elohim-storage/src/graph_views/lamad/atom_version_chain.rs:37`) materialises the **entire**
 chain into a `Vec` and then takes `canonical_cid = chain.last()` — walking everything to find the
-head. Two latent defects worth noting while you are in there, though neither is this work:
-its `version: (idx + 2)` numbering assumes a **linear** chain and is wrong on a fork, and
-`superseded_at` is hardcoded `None`.
+head. Three latent defects worth noting while you are in there, though none is this work:
+
+1. **`chain.last()` is not the newest version — it is the lexicographically-largest CID.** Cozo
+   sorts result-relation rows by value, not traversal order, so the rows of the recursive
+   `VERSION_CHAIN` rule come back CID-sorted. `canonical_cid = chain.last()` therefore returns a
+   *wrong head on any chain with ≥2 successors, even a linear one*, and the `version: (idx + 2)`
+   numbering is wrong for the same reason. Silent today only because no atom has been versioned
+   twice yet. This one is a correctness bug, not a performance shape — it was pulled out of this
+   handoff and fixed directly (hop-counted rule variant; ordering by depth, not row order).
+2. The numbering additionally assumes a **linear** chain and remains ambiguous on a fork
+   (deterministic after the hop fix, but fork semantics are still an open design question).
+3. `superseded_at` is hardcoded `None`.
 
 **Do not be misled by `max_depth` in `graph_engine.rs`** (default 2, hard-capped at 3 at `:207`).
 That bounds the *relationship* traversal, a different query — and it bounds by **truncation**,
