@@ -50,13 +50,23 @@
 #   1. storage-A /p2p/status: pull.caughtUp === true
 #      (missing/null/unreachable is NOT a pass — keep waiting; never treat
 #      a null/absent field as caught up)
-#   2. (telemetry only, NOT gating) storage-B pull.caughtUp is read and
-#      printed but does not gate: B's pull queue empty-by-design reads
-#      caughtUp=false (the all-retired/empty guard, observed 2026-07-31 and
-#      live-confirmed constant-False through edge #1283's whole 45-min
-#      window) — gating on it would wedge the pipeline forever, and the
-#      saga asserts nothing about B's pull. B's gating legs are serving
-#      (content 200) only.
+#   2. storage-B /p2p/status: pull.caughtUp === true — SAME fail-closed rule
+#      as A (missing/null/unreachable is NOT a pass). Decision 2026-08-09
+#      (see genesis/data/timeline/backlog/fleet-quiesce-pass-not-convergence.md):
+#      this gate's name and its downstream readers (the F2-PASS timing
+#      numbers, the fork-deploy go/no-go criterion) treat PASS as fleet
+#      convergence, not "probe A alone converged" — edge #1327 declared
+#      FLEET QUIESCENT while every poll including the terminal PASS carried
+#      B-caughtUp=False, and Dataplane Validation found the fleet still
+#      catching-up minutes later. B was previously telemetry-only on the
+#      theory that an empty pull queue reads caughtUp=false "by design"
+#      (observed 2026-07-31, edge #1283) — but the acquisition-stream
+#      `retired` pin status (elohim-storage/src/p2p/acquisition.rs,
+#      PIN_STATUS_RETIRED) exists precisely to stop pinning pull.caughtUp
+#      false forever, so a B that never catches up is itself real churn/
+#      divergence this gate should keep waiting on, not paper over. Exceeding
+#      the deadline while B never catches up still exits 3 (no-measure, not
+#      a failure) — see Exit codes below.
 #   3. storage-A /metrics: QUIESCED, not perfect (decision 2026-08-07, see
 #      genesis/data/timeline/backlog/content-gap-limit-cycle-blocks-convergence.md):
 #        elohim_projection_reconcile_converged_blocked_by{term="divergent_actionable"} == 0
@@ -312,8 +322,10 @@ PYEOF
   pass=1
   reasons=()
   [ "$a_caught_up" = "True" ] || { pass=0; reasons+=("A-not-caughtUp"); }
-  # B-caughtUp deliberately NOT gating (empty-queue-by-design reads false;
-  # see header note 2) — still printed in the summary for telemetry.
+  # B-caughtUp now gates too (2026-08-09 decision, header note 2): PASS means
+  # fleet convergence, not just probe A — same fail-closed rule as A
+  # (missing/null/false is not a pass).
+  [ "$b_caught_up" = "True" ] || { pass=0; reasons+=("B-not-caughtUp"); }
   # Quiesced, not perfect (header note 3): actionable==0 AND unmeasured==0,
   # fail-closed on an absent blocked_by series. converged is telemetry only.
   [ "$quiesced_ok" = "True" ] || { pass=0; reasons+=("A-not-quiesced(actionable=${actionable:-null},count=${actionable_count:-null},sum=${actionable_sum:-null},tol=${ACTIONABLE_TOL},unmeasured=${unmeasured:-null})"); }
