@@ -862,6 +862,17 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         // SQLite pool size (consolidated template only). Defaults to '10' (the
         // code default) so an unset node never leaves an unresolved placeholder.
         "s|STORAGE_DB_POOL_SIZE_PLACEHOLDER|${humanConfig.edgenodeDbPoolSize ?: '10'}|g",
+        // k2Gossip round-timeout / accepted-rounds (consolidated template only).
+        // Defaults 60000/4 preserve the household slow-WAN profile baked into
+        // the template for every human that doesn't override — an unset node
+        // renders byte-identically to before this placeholder existed. Per
+        // adam-firstman.yaml's ARC-CONVERGENCE comment, that profile is wrong
+        // for multi-tenant shem conductors; deployments.json overrides
+        // gertrude/susan/eve to adam's proven 15000/10 (2026-08-09: zero
+        // storage-arc-to-full events in 24h at 60000/4 vs 23-24 on household
+        // pods).
+        "s|K2_ROUND_TIMEOUT_PLACEHOLDER|${humanConfig.k2GossipRoundTimeoutMs ?: '60000'}|g",
+        "s|K2_MAX_ACCEPTED_ROUNDS_PLACEHOLDER|${humanConfig.k2GossipMaxAcceptedRounds ?: '4'}|g",
         // Authority arc factor (consolidated template only). Default '1' (full arc =
         // kitsune2 default) so an unset node never leaves an unresolved placeholder;
         // '0' = leecher (deploy-time arc-shrink for a non-anchor OOMing on the full arc).

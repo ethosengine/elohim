@@ -150,10 +150,20 @@ data:
       # re-checking WAN conditions on the affected nodes. Leave initiate
       # intervals at defaults — only round completion and accepted-round
       # concurrency need tuning here.
+      #
+      # Per-human parameterization (2026-08-09): this household 60000ms/4-round
+      # profile is wrong for multi-tenant shem conductors — see
+      # adam-firstman.yaml's ARC-CONVERGENCE comment, which reverted adam to
+      # upstream defaults for exactly this reason. Live evidence the same day:
+      # zero storage-arc-to-full events in 24h on the shem-placed template
+      # trio (gertrude/susan/eve) vs 23-24 on each household pod. The values
+      # below are now placeholders so deployments.json can override per-human
+      # (k2GossipRoundTimeoutMs / k2GossipMaxAcceptedRounds); every human that
+      # doesn't declare them still renders this household default unchanged.
       advanced:
         k2Gossip:
-          roundTimeoutMs: 60000
-          maxConcurrentAcceptedRounds: 4
+          roundTimeoutMs: K2_ROUND_TIMEOUT_PLACEHOLDER
+          maxConcurrentAcceptedRounds: K2_MAX_ACCEPTED_ROUNDS_PLACEHOLDER
     data_root_path: "/var/local/lib/holochain"
     keystore:
       type: lair_server_in_proc

@@ -61,6 +61,8 @@ export interface DeploymentRecord {
   edgenodeCpuLimit?: string;
   edgenodeDbPoolSize?: string;
   edgenodeArcFactor?: string;
+  k2GossipRoundTimeoutMs?: string;
+  k2GossipMaxAcceptedRounds?: string;
 }
 
 interface DeploymentsJson {
@@ -190,6 +192,28 @@ export function validateRecord(
     );
   }
 
+  // k2GossipRoundTimeoutMs / k2GossipMaxAcceptedRounds render the consolidated
+  // template's advanced.k2Gossip block via sed (2026-08-09: per-human override
+  // of the household 60000/4 slow-WAN profile for multi-tenant shem
+  // conductors — see _edgenode-consolidated.template.yaml). Both are
+  // positive-integer strings, same contract as edgenodeDbPoolSize.
+  if (
+    record.k2GossipRoundTimeoutMs !== undefined &&
+    !/^[1-9]\d*$/.test(record.k2GossipRoundTimeoutMs)
+  ) {
+    errors.push(
+      `${tag} k2GossipRoundTimeoutMs must be a positive integer string: ${JSON.stringify(record.k2GossipRoundTimeoutMs)}`,
+    );
+  }
+  if (
+    record.k2GossipMaxAcceptedRounds !== undefined &&
+    !/^[1-9]\d*$/.test(record.k2GossipMaxAcceptedRounds)
+  ) {
+    errors.push(
+      `${tag} k2GossipMaxAcceptedRounds must be a positive integer string: ${JSON.stringify(record.k2GossipMaxAcceptedRounds)}`,
+    );
+  }
+
   // nodeTypes: non-empty, all in allowed set
   if (!Array.isArray(record.nodeTypes) || record.nodeTypes.length === 0) {
     errors.push(`${tag} nodeTypes must be a non-empty array`);
@@ -234,6 +258,8 @@ export function validateRecord(
     "edgenodeCpuLimit",
     "edgenodeDbPoolSize",
     "edgenodeArcFactor",
+    "k2GossipRoundTimeoutMs",
+    "k2GossipMaxAcceptedRounds",
     "humanLabel",
     "humanId",
   ] as const;
