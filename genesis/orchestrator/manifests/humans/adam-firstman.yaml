@@ -353,6 +353,11 @@ spec:
             # a supplier peer, so the both-sides-missing exit needs him on.
             - name: ELOHIM_ADOPT_BEFORE_AUTHOR
               value: "true"
+            # Ghost-declaration decay — hand-rendered like the gate above (adam
+            # is alpha; see the template's inline comment for the evidence
+            # discipline and the 2026-08-10 batch-3 diagnosis).
+            - name: ELOHIM_GHOST_DECLARATION_DECAY
+              value: "true"
             # Evidence-absent backoff — same conservative 6h bake as the
             # template (see its inline comment).
             - name: ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS

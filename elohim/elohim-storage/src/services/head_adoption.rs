@@ -804,6 +804,15 @@ fn evidence_backoff_class(
 /// proven-absent network-wide. Both non-present answers do exactly one thing
 /// today: foreclose the `AdoptLocal` arm, leaving `AdoptPeer` / `ContestPeer` /
 /// `Hold`. Neither asserts network-wide absence.
+///
+/// ONE REFINEMENT, not an exception ([`ghost_decay_authorizes_author`],
+/// operator flag `ELOHIM_GHOST_DECLARATION_DECAY`, default off): the decay arm
+/// may route `Hold`/`ContestPeer` to `Author`, but NEVER on `Absent` alone —
+/// it additionally requires the advertising peer's OWN stated no-record
+/// verdict (the evidence-absent contest backoff) and the absence of a local
+/// canonical election. `Unreachable` never qualifies. What it authors is a
+/// fresh provable root that a later real canonical declaration outranks; it
+/// still asserts nothing about network-wide absence.
 #[derive(Debug, Clone, Copy)]
 pub enum LocalResolve<'a> {
     /// Not yet asked — the pre-flight calls `resolve_content_head` itself.
@@ -1089,6 +1098,52 @@ pub fn decide_head_action(
     }
 }
 
+/// GHOST-DECLARATION DECAY — may a `Hold`/`ContestPeer` decision be downgraded
+/// to `Author` because the declaration evidence holding it is POSITIVELY dead?
+///
+/// The residual this exits (batch-3, diagnosed live 2026-08-10): SQL
+/// projections whose declared heads outlived every conductor incarnation.
+/// Nobody can back the declaration — contest cannot mint (`no_local_chain`),
+/// adoption has no bytes to carry, obey sees no election — yet the
+/// anti-self-election guard keeps blocking the author path on the strength of
+/// that unbackable declaration, forever (the all-`held` ghost-witness sweeps).
+///
+/// Evidence discipline (C1/C4): every input is a POSITIVE observation, never a
+/// missing answer —
+/// - `local_head_observed_absent`: this conductor ANSWERED `resolve_content_
+///   head` with none, this sweep ([`LocalResolve::Resolved`]+[`Answer::Absent`]
+///   only; `Unreachable`/`Probe` never qualify).
+/// - `evidence_absent_backoff_active`: the advertising peer's responder STATED
+///   its own conductor holds no record for the head it advertises, within the
+///   evidence-absent window ([`crate::services::contest_backoff`]).
+/// - `!local_has_canonical_election`: a row obeying a DHT election is settled
+///   and is never decayed.
+///
+/// The flag keeps WHETHER a fleet replaces phantom declarations an operator
+/// decision ([`crate::config::ghost_declaration_decay_enabled`]); dormant is
+/// behaviour-identical. A later real canonical declaration (Declare mode)
+/// outranks the authored root, which bounds the cost of a wrong decay to one
+/// extra election candidate.
+///
+/// **Concerns:** C1 (authors only over a positively-falsified declaration,
+/// flag-gated); C3 (this IS the liveness exit for the phantom-declaration
+/// class); C4 (only observed absences count — an unreachable conductor or an
+/// unanswered fetch never decays anything); C6a (pure predicate, no loop).
+///
+/// **Contract tests:** [`tests::ghost_decay_is_dormant_by_default`],
+/// [`tests::ghost_decay_requires_every_positive_observation`].
+pub fn ghost_decay_authorizes_author(
+    decay_enabled: bool,
+    local_head_observed_absent: bool,
+    local_has_canonical_election: bool,
+    evidence_absent_backoff_active: bool,
+) -> bool {
+    decay_enabled
+        && local_head_observed_absent
+        && !local_has_canonical_election
+        && evidence_absent_backoff_active
+}
+
 /// What the caller should do with this id after the pre-flight ran.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AdoptOutcome {
@@ -1208,6 +1263,43 @@ pub async fn try_adopt_canonical_head(
         local_election,
         adopt.contest_enabled,
     );
+
+    // GHOST-DECLARATION DECAY (operator-reserved, default OFF). A Hold/Contest
+    // produced by a declaration nobody can back is a permanent wedge, not a
+    // safety property — see [`ghost_decay_authorizes_author`] for the evidence
+    // discipline. Checked here, after the obey arm, so a visible election is
+    // always obeyed in preference to authoring.
+    if matches!(decision, HeadDecision::Hold | HeadDecision::ContestPeer) {
+        let local_head_observed_absent =
+            matches!(local_resolve, LocalResolve::Resolved(Answer::Absent));
+        let evidence_absent_backoff_active = matches!(
+            crate::services::contest_backoff::skip_class(
+                id,
+                crate::services::contest_backoff::BackoffWindows::from_config(),
+            ),
+            Some(crate::metrics::ContestSkip::EvidenceAbsentBackoff)
+        );
+        if ghost_decay_authorizes_author(
+            crate::config::ghost_declaration_decay_enabled(),
+            local_head_observed_absent,
+            local_election,
+            evidence_absent_backoff_active,
+        ) {
+            crate::metrics::inc_ghost_declaration_decay_author();
+            tracing::warn!(
+                target: "elohim_storage::head_adoption",
+                content_id = %id,
+                declared = ?local_declared,
+                decision = ?decision,
+                "ghost-declaration-decay: the declaration holding this row is positively \
+                 unbackable (own conductor observed empty this sweep; the advertising peer \
+                 stated no record exists within the evidence-absent window) — releasing the \
+                 author path so the witness sweep can mint a provable root; a later real \
+                 canonical declaration still wins outright"
+            );
+            return AdoptOutcome::Author;
+        }
+    }
 
     match decision {
         HeadDecision::AdoptLocal => {
@@ -2475,6 +2567,50 @@ mod tests {
     /// situations rather than argument lists.
     fn decide(c: bool, p: bool, l: bool, election: bool) -> HeadDecision {
         decide_head_action(c, p, l, election, true)
+    }
+
+    // ── Ghost-declaration decay (C1/C3/C4 contract) ─────────────────────────
+
+    /// Dormant is behaviour-identical: with the flag off, NO combination of
+    /// evidence — including the full positively-falsified state — authorizes
+    /// the author path. This is the regression pin for "off = the pre-flag
+    /// decision table byte-for-byte".
+    #[test]
+    fn ghost_decay_is_dormant_by_default() {
+        for absent in [false, true] {
+            for election in [false, true] {
+                for evidence in [false, true] {
+                    assert!(
+                        !ghost_decay_authorizes_author(false, absent, election, evidence),
+                        "dormant flag must never authorize (absent={absent}, \
+                         election={election}, evidence={evidence})"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Enabled, the decay still requires EVERY positive observation: the own
+    /// conductor's observed absence AND the advertiser's stated no-record
+    /// verdict, and never over a row obeying a local election. Exactly one
+    /// input short → no author (C4: a missing answer is not evidence).
+    #[test]
+    fn ghost_decay_requires_every_positive_observation() {
+        // The one authorized state.
+        assert!(ghost_decay_authorizes_author(true, true, false, true));
+        // Each single defection kills it.
+        assert!(
+            !ghost_decay_authorizes_author(true, false, false, true),
+            "no observed local absence (Probe/Unreachable) must not decay"
+        );
+        assert!(
+            !ghost_decay_authorizes_author(true, true, true, true),
+            "a row obeying a local canonical election is settled, never decayed"
+        );
+        assert!(
+            !ghost_decay_authorizes_author(true, true, false, false),
+            "no stated-absent verdict from the advertiser must not decay"
+        );
     }
 
     // ── C4 contract: LocalResolve on seam_contracts::Answer (plan P1.2) ──

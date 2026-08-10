@@ -402,6 +402,21 @@ spec:
             # when enabled; unset/false is behavior-identical to pre-flag.
             - name: ELOHIM_ADOPT_BEFORE_AUTHOR
               value: "ADOPT_BEFORE_AUTHOR_PLACEHOLDER"
+            # Ghost-declaration decay (head_adoption): lets the witness sweeps
+            # author a fresh provable head over a declaration whose evidence is
+            # POSITIVELY dead — own conductor observed empty this sweep AND the
+            # advertising peer's responder stated no record exists (the
+            # evidence-absent backoff above). The batch-3 phantom-declaration
+            # exit (2026-08-10 live diagnosis: ~2000 declared heads per
+            # household pod outlived every conductor incarnation; every
+            # adopt/contest/obey path starves byte-less, ghost-witness sweeps
+            # run all-held forever). Deliberately REUSES the adopt-before-
+            # author placeholder: same per-env policy (alpha/staging true,
+            # prod false — participation is a governance decision), and the
+            # edge Jenkinsfile's global sed renders both from one variable.
+            # A later real canonical declaration outranks any decayed-in root.
+            - name: ELOHIM_GHOST_DECLARATION_DECAY
+              value: "ADOPT_BEFORE_AUTHOR_PLACEHOLDER"
             # Evidence-absent contest backoff (head_adoption): ids whose
             # advertiser's conductor cleanly holds NO record defer this long
             # before re-contesting (phantom-load relief). Conservative initial

@@ -199,7 +199,29 @@ habits:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
       - "sweettest rea_commitment_replication (elohim/holochain/tests/sweettest — unignored 837b772c9; isolated late-join conductors, bounded 60s peer-B retrieval; RED but MIS-ATTRIBUTED per DELTA 2026-08-09 — it measures one-time cold-cell Wasm warm-up, not REA retrieval; do not read it as a fetch-seam probe until it warms peer B)"
     evidence: >
-      DELTA 2026-08-10 (wedge audit, midday): the flip path was
+      DELTA 2026-08-10 (batch-3 root cause, evening): validate-only run
+      #1339 came 28s from banking — gate anchored PASS at count=2,
+      sustained 302/330s, reset by matthew's actionable jumping 2→11 on
+      the next sweep. Live diagnosis re-framed the batch-3 residual: the
+      "~2000 unanchored rows" are 2028 ANCHORED rows (1987 reach=familiar)
+      whose declared heads are PHANTOMS — they outlived every conductor
+      incarnation, so contest fails no_local_chain (130 on matthew),
+      record fetches degrade budget_elapsed 202/202 on adam (zome
+      get_record_for_action used a network get that searches the fleet for
+      bytes that exist nowhere), elections are invisible (no_election 279),
+      adopt-before-author (already ENABLED fleet-wide) starves byte-less,
+      and ghost-witness sweeps run all-held forever. Cure landed this
+      branch: (1) get_record_for_action -> GetOptions::local() (honest
+      ms no-record answers; coordinator hot-swap, no DNA-hash move);
+      (2) ghost-declaration decay (ELOHIM_GHOST_DECLARATION_DECAY,
+      operator-reserved, alpha-enabled via the adopt-before-author
+      placeholder) — Hold/Contest downgrades to Author only on POSITIVE
+      double falsification (own conductor observed empty + advertiser
+      stated no-record within the evidence-absent window, no local
+      election); metric elohim_content_ghost_decay_author_total. Flip
+      condition unchanged: deploy, watch decay-author + witness authored
+      go nonzero and actionable collapse to 0-2 band, then bank via
+      validate-only. DELTA 2026-08-10 (wedge audit, midday): the flip path was
       MIS-MODELED — the fleet-quiesce gate's predicate reads storage-A
       (matthew) ONLY (caughtUp + actionable<=tol 2 + unmeasured=0 + both
       doorways 200; scripts/ci/fleet-quiesce-gate.sh scope note), so the

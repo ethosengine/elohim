@@ -30,6 +30,55 @@ seamLocus: >
   (src/trust/{stage,pricer,snapshot}.rs; plan §3 L5).
 
 decisionPoints:
+  - name: ghost_decay_authorizes_author
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/head_adoption.rs
+      modulePath: services::head_adoption::ghost_decay_authorizes_author
+      line: 1134
+    summary: >
+      Operator-flag-gated (ELOHIM_GHOST_DECLARATION_DECAY, default off) downgrade of a
+      Hold/ContestPeer decision to Author when the declaration holding the row is POSITIVELY
+      falsified: own conductor observed empty for the id this sweep (LocalResolve::Resolved +
+      Answer::Absent only) AND the advertising peer's responder stated no record exists for
+      the head it advertises (evidence-absent contest backoff active) AND no local canonical
+      election stands. The batch-3 phantom-declaration exit (diagnosed live 2026-08-10).
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          Authors only over a declaration whose backing has been positively falsified twice
+          over (never over a live crown — a visible election is obeyed earlier in the same
+          pre-flight, and a local election disqualifies decay); flag-gated per pod so fleet
+          participation is an operator decision; a later real canonical declaration (Declare
+          mode) outranks the authored root, bounding a wrong decay to one extra election
+          candidate.
+      - id: C3
+        status: answered
+        justification: >
+          This predicate IS the liveness exit for the phantom-declaration class (all-held
+          ghost-witness sweeps, contest_failed{no_local_chain} with byte-less advertisers);
+          without it that class holds forever by construction.
+      - id: C4
+        status: answered
+        justification: >
+          Every input is a positive observation: Answer::Unreachable and LocalResolve::Probe
+          never qualify as local absence, and the advertiser evidence is its own STATED
+          no-record verdict (evidence-absent backoff), never a missing or timed-out answer.
+          Pinned by ghost_decay_requires_every_positive_observation.
+      - id: C6a
+        status: answered
+        justification: >
+          Pure predicate over four booleans — no loop, no retry ladder, no conductor call;
+          the sweeps that consume its Author verdict keep their existing per-tick caps and
+          wall-clock budgets unchanged.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: ghost_decay_is_dormant_by_default
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: ghost_decay_requires_every_positive_observation
+        kind: unit
   - name: decide_head_action
     kind: pure-decision-predicate
     sourceLocation:

@@ -123,6 +123,36 @@ pub fn adopt_before_author_enabled() -> bool {
     *ADOPT_BEFORE_AUTHOR.get().unwrap_or(&false)
 }
 
+/// Process-wide mirror of [`Config::ghost_declaration_decay`] — the
+/// OPERATOR-RESERVED switch that lets the witness sweeps author over a
+/// declaration whose evidence has been POSITIVELY falsified. Same `OnceLock`
+/// rationale as [`CONTEST_TWO_WAY_DECLARED`]; defaults **false** when `main`
+/// never published a value, so an embedded/test use is dormant exactly like a
+/// shipped pod.
+static GHOST_DECLARATION_DECAY: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+/// Publish the ghost-declaration-decay switch. Idempotent (`OnceLock::set`
+/// semantics — the first call wins).
+pub fn set_ghost_declaration_decay(enabled: bool) {
+    let _ = GHOST_DECLARATION_DECAY.set(enabled);
+}
+
+/// May the witness sweeps AUTHOR a fresh head for a row whose standing
+/// declaration evidence is dead — own conductor OBSERVED holding nothing for
+/// the id this sweep, AND the advertising peer's responder has STATED its
+/// conductor holds no record for the head it advertises (the evidence-absent
+/// contest backoff)?
+///
+/// **Default FALSE.** Shipped dormant like [`adopt_before_author_enabled`]:
+/// the decision that a fleet may replace phantom declarations (SQL projections
+/// that outlived their conductor incarnation) with fresh provable roots is an
+/// operator flip (`ELOHIM_GHOST_DECLARATION_DECAY`), not a default. Off, the
+/// pre-flight decision table is byte-for-byte the prior behaviour — see
+/// `services::head_adoption::ghost_decay_authorizes_author`.
+pub fn ghost_declaration_decay_enabled() -> bool {
+    *GHOST_DECLARATION_DECAY.get().unwrap_or(&false)
+}
+
 /// Process-wide mirror of [`Config::head_corpus_digest_enabled`]. The requester
 /// half of the additive digest protocol ships dormant until responders are
 /// fleet-wide; reading this `OnceLock` in the reconcile sweep avoids hot-path
@@ -699,6 +729,26 @@ pub struct Config {
     #[serde(default)]
     pub adopt_before_author: bool,
 
+    /// GHOST-DECLARATION DECAY (operator-reserved): may the witness sweeps
+    /// author a fresh head over a declaration whose evidence is POSITIVELY
+    /// dead — own conductor observed empty for the id this sweep, and the
+    /// advertising peer's responder stated (within the evidence-absent backoff
+    /// window) that its conductor holds no record for the head it advertises?
+    ///
+    /// Default **false**, same operator-decision reasoning as
+    /// [`Self::adopt_before_author`]. The residual it exists for: SQL
+    /// projections whose declared heads outlived every conductor incarnation
+    /// (phantom declarations) wedge the pre-flight at Hold/Contest forever —
+    /// contest cannot mint (`no_local_chain`), adoption has no bytes to carry,
+    /// obey sees no election, and the anti-self-election guard blocks the
+    /// author path on the strength of a declaration nobody can back. This flag
+    /// lets REPEATED positive evidence of that unbackability (never mere
+    /// absence of an answer) restore the author path. A later real canonical
+    /// declaration still wins outright (Declare mode beats witness heals).
+    /// Loaded from env `ELOHIM_GHOST_DECLARATION_DECAY`.
+    #[serde(default)]
+    pub ghost_declaration_decay: bool,
+
     /// T5 head-plane requester rollout switch. When enabled, content inventory
     /// requests carry a digest only after every distribution-safe local row is
     /// DHT-witnessed. During the bulk-seed amber window the field remains absent,
@@ -1060,6 +1110,7 @@ impl Default for Config {
             salvage_diversity_placement: default_true(),
             contest_two_way_declared: default_true(),
             adopt_before_author: false,
+            ghost_declaration_decay: false,
             head_corpus_digest_enabled: false,
             trust_memo_reads_enabled: false,
             trust_memo_ttl_seconds: default_trust_memo_ttl_seconds(),

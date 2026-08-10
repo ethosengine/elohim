@@ -5199,7 +5199,17 @@ pub fn get_record_for_action(
     input: GetRecordForActionInput,
 ) -> ExternResult<Option<CarriedRecordOutput>> {
     let action_hash = ActionHash::from(input.action_hash);
-    let record = match get(action_hash.clone(), GetOptions::default())? {
+    // LOCAL get, deliberately. The question this extern answers is "does THIS
+    // conductor hold the bytes" — the caller is a remote peer that already
+    // exhausted its own view and is asking us as the supplier. A network-
+    // strategy get inverts that contract: for a hash nobody holds (a ghost
+    // declaration from a dead conductor incarnation) it searches the fleet to
+    // the full kitsune timeout, so the responder's wall-clock budget elapses
+    // and the answer degrades to hash-only — every time, fleet-wide
+    // (elohim_content_head_record_degraded{cause="budget_elapsed"}), and the
+    // honest `Ok(None)` that would let requesters record absence evidence is
+    // never produced. Local answers in milliseconds either way.
+    let record = match get(action_hash.clone(), GetOptions::local())? {
         Some(r) => r,
         None => return Ok(None),
     };

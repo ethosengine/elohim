@@ -464,6 +464,31 @@ async fn async_main(
     }
     elohim_storage::config::set_adopt_before_author(config.adopt_before_author);
 
+    // GHOST-DECLARATION DECAY (default OFF — operator-reserved). Env ENABLES
+    // it: 1/true/yes/on. Lets the witness sweeps author a fresh head over a
+    // declaration whose evidence has been POSITIVELY falsified twice over
+    // (own conductor observed empty this sweep + the advertising peer's
+    // responder stated no record exists, within the evidence-absent backoff
+    // window). Off, the pre-flight decision table is the prior behaviour
+    // byte-for-byte.
+    if let Ok(v) = std::env::var("ELOHIM_GHOST_DECLARATION_DECAY") {
+        config.ghost_declaration_decay = matches!(
+            v.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes" | "on"
+        );
+    }
+    if config.ghost_declaration_decay {
+        tracing::warn!(
+            "GHOST-DECLARATION-DECAY is ENABLED — when a row's own declared head is observed \
+             unresolvable by this conductor AND the advertising peer has stated no record \
+             exists for its head (evidence-absent backoff), the witness sweeps may author a \
+             fresh provable head instead of holding forever. A later real canonical \
+             declaration still wins outright; unset ELOHIM_GHOST_DECLARATION_DECAY to return \
+             to the dormant default"
+        );
+    }
+    elohim_storage::config::set_ghost_declaration_decay(config.ghost_declaration_decay);
+
     // T5 HEAD-CORPUS DIGEST REQUESTER (default OFF). The T4 responder field is
     // additive, but senders stay dormant until the fleet has that responder.
     // Even when enabled, projection-reconcile derives amber/readiness from the

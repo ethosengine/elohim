@@ -283,6 +283,18 @@ lazy_static! {
     /// (`dht_anchor_hash` NULL) that now carry a notarized head. Counts fresh
     /// authorings only (already-committed rows recovered via the idempotent
     /// already-exists path are NOT re-authored and are not counted here).
+    /// Hold/Contest decisions downgraded to Author by the ghost-declaration
+    /// decay arm (`head_adoption::ghost_decay_authorizes_author`) — each one is
+    /// a phantom declaration (dead conductor incarnation) positively falsified
+    /// and released to the witness author path. Flag-gated
+    /// (`ELOHIM_GHOST_DECLARATION_DECAY`); a nonzero series on a pod IS the
+    /// evidence the flag is doing work there.
+    pub static ref GHOST_DECLARATION_DECAY_AUTHOR: IntCounter = IntCounter::new(
+        "elohim_content_ghost_decay_author_total",
+        "Pre-flight Hold/Contest decisions released to Author by ghost-declaration decay.",
+    )
+    .unwrap();
+
     pub static ref CONTENT_WITNESS_AUTHORED: IntCounter = IntCounter::new(
         "elohim_content_witness_authored_total",
         "Content heads authored through the conductor by the witness-bootstrap sweep.",
@@ -1545,6 +1557,7 @@ pub fn register_all() {
                     .inc_by(0);
             }
         }
+        let _ = REGISTRY.register(Box::new(GHOST_DECLARATION_DECAY_AUTHOR.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_AUTHORED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_HEAD_ADOPTED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_CANONICAL_ANSWERS.clone()));
@@ -2024,6 +2037,12 @@ pub fn inc_acquisition_outcome(outcome: &str) {
 /// Record `n` content heads freshly authored by the witness-bootstrap sweep.
 pub fn add_content_witness_authored(n: u64) {
     CONTENT_WITNESS_AUTHORED.inc_by(n);
+}
+
+/// Record one Hold/Contest decision released to Author by ghost-declaration
+/// decay (see `head_adoption::ghost_decay_authorizes_author`).
+pub fn inc_ghost_declaration_decay_author() {
+    GHOST_DECLARATION_DECAY_AUTHOR.inc();
 }
 
 /// Record one canonical head ADOPTED (own-conductor resolve, or a peer's head
