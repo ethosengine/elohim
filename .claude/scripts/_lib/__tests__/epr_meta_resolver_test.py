@@ -1,6 +1,6 @@
 """Resolver-hook test (subprocess; verdict JSON on stdout). Run:
 python3 .claude/scripts/_lib/__tests__/epr_meta_resolver_test.py  (exit 0 = pass)"""
-import json, subprocess, sys, tempfile, textwrap
+import hashlib, json, shutil, subprocess, sys, tempfile, textwrap
 from pathlib import Path
 
 here = Path(__file__).resolve()
@@ -191,5 +191,94 @@ with tempfile.TemporaryDirectory() as _td:
     out = json.loads(r.stdout)
     check("a `decide_*` fn returning a *-suffixed enum also fires inject",
           r.returncode == 0 and "additionalContext" in out["hookSpecificOutput"])
+
+# Algedonic phase-1 Task 4: the measure mint graduates to typed evidence. A hard-ceiling write
+# additively mints stock/limit/bound_ref (+ concern when the binding's `params` carries one) onto
+# the SAME fingerprinted architecture finding the pre-slice code filed — and the fingerprint
+# formula (sha256(f"{rule_id}|{rel}")[:12]) is untouched by any of it.
+def _mint_hard_ceiling(with_concern: bool):
+    """Fresh tempdir repo with a policy-bound measure rule (`test-loc-ceiling@1`, loc-hard=5) at
+    root, optionally carrying `params: {concern: "notary-authority"}`. Writes a NON-EXISTENT
+    6-line target so the hard ceiling fires immediately; returns (entry, root)."""
+    _td = tempfile.mkdtemp()
+    root = Path(_td)
+    (root / ".git").mkdir()
+    _wr(root / ".claude" / "epr-meta" / "policies.yaml", """
+        epr-meta-policies-version: 1
+        policies:
+          - id: test-loc-ceiling
+            version: 1
+            class: measure
+            measure:
+              loc-soft: 3
+              loc-hard: 5
+            why: "test ceiling — algedonic Task 4"
+    """)
+    if with_concern:
+        _wr(root / ".epr-meta", """
+            ---
+            epr-meta-version: 1
+            root: true
+            rules:
+              - id: rs-loc-ceiling
+                policy: test-loc-ceiling@1
+                params: { concern: "notary-authority" }
+            ---
+        """)
+    else:
+        _wr(root / ".epr-meta", """
+            ---
+            epr-meta-version: 1
+            root: true
+            rules:
+              - id: rs-loc-ceiling
+                policy: test-loc-ceiling@1
+            ---
+        """)
+    target = root / "big.py"  # non-existent target — nothing pre-exists on disk
+    assert not target.exists()
+    content = "x\n" * 6  # 6 lines >= loc-hard 5
+    r = _hook({"tool_name": "Write", "tool_input": {"file_path": str(target), "content": content}})
+    assert r.returncode == 0, r.stderr
+    # Fixture ledger only — this tempdir's own .claude/data/, never the live repo ledger.
+    ledger = root / ".claude" / "data" / "architecture-findings.jsonl"
+    lines = ledger.read_text().splitlines()
+    assert len(lines) == 1, f"expected exactly one minted finding, got {lines}"
+    return json.loads(lines[0]), root
+
+entry_with, root_with = _mint_hard_ceiling(with_concern=True)
+entry_without, root_without = _mint_hard_ceiling(with_concern=False)
+
+expected_fp = hashlib.sha256("rs-loc-ceiling|big.py".encode()).hexdigest()[:12]
+check("mint (concern) fp matches the documented sha256(rule_id|path)[:12] formula",
+      entry_with["fp"] == expected_fp)
+check("mint (no concern) fp matches the SAME formula",
+      entry_without["fp"] == expected_fp)
+check("fingerprint is IDENTICAL with and without the new evidence/concern fields present",
+      entry_with["fp"] == entry_without["fp"] == expected_fp)
+
+check("mint (concern) carries structured stock (measured LoC)", entry_with["stock"] == 6)
+check("mint (concern) carries structured limit (the ceiling)", entry_with["limit"] == 5)
+check("mint (concern) carries bound_ref = <policy-id>@<version>#<declaring-manifest>",
+      entry_with["bound_ref"] == "test-loc-ceiling@1#.epr-meta")
+check("mint (concern) carries the explicit binding-param concern",
+      entry_with["concern"] == "notary-authority")
+
+check("mint (no concern) carries the SAME structured stock", entry_without["stock"] == 6)
+check("mint (no concern) carries the SAME structured limit", entry_without["limit"] == 5)
+check("mint (no concern) carries the SAME bound_ref shape",
+      entry_without["bound_ref"] == "test-loc-ceiling@1#.epr-meta")
+check("mint (no concern) OMITS the concern key — honest absence, never guessed",
+      "concern" not in entry_without)
+
+# Pre-existing fields survive untouched (append-compat: old ledger rows lack the new keys but
+# every reader uses `.get(...)`; these are the ORIGINAL fields the pre-slice mint always wrote).
+check("mint keeps the original fp/rule/policy/path/detail/status shape",
+      entry_with["rule"] == "rs-loc-ceiling" and entry_with["policy"] == "test-loc-ceiling@1"
+      and entry_with["path"] == "big.py" and entry_with["status"] == "open"
+      and "detail" in entry_with and "first_seen" in entry_with)
+
+shutil.rmtree(root_with, ignore_errors=True)
+shutil.rmtree(root_without, ignore_errors=True)
 
 print(f"\n  {_passed} assertions passed ✅")

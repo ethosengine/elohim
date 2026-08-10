@@ -23,6 +23,7 @@ for _ in range(8):
         break
     _here = _here.parent
 
+from _lib import concern_routes  # noqa: E402
 from _lib import epr_meta  # noqa: E402
 from _lib import store  # noqa: E402
 
@@ -74,6 +75,29 @@ def _advice_debounced(root: Path, key: str) -> bool:
         return False
 
 
+def _bound_ref(policy_ref: str | None, merged: dict, root: Path, rule_id: str) -> str | None:
+    """`<policy-id>@<version>` plus the manifest id when resolvable — the nearest cascade source
+    (`merged["sources"]`, root-first) that actually DECLARES `rule_id`, walked nearest-first so a
+    local override wins over an inherited ancestor binding. `<policy_ref>#<manifest-rel-path>`
+    when a declaring manifest is found on disk; the bare policy_ref otherwise (still honest, just
+    less specific). None only when there is no policy_ref at all (an inline, unpolicied measure
+    rule) — never a guess."""
+    if not policy_ref:
+        return None
+    for src in reversed(merged.get("sources") or []):  # nearest-first
+        try:
+            cfg = epr_meta.load_meta(Path(src))
+        except Exception:  # noqa: BLE001 — resolvable is best-effort, never fatal
+            continue
+        if any(isinstance(r, dict) and r.get("id") == rule_id for r in (cfg.get("rules") or [])):
+            try:
+                manifest_rel = str(Path(src).resolve().relative_to(root))
+            except (ValueError, OSError):
+                manifest_rel = str(src)
+            return f"{policy_ref}#{manifest_rel}"
+    return policy_ref
+
+
 def _handle_measures(measures, merged, root: Path, fp_path: str) -> list[str]:
     """The measure side-channel: file each hard-ceiling verdict as a fingerprinted architecture
     finding (flag→agent→canon→stasis, the deprecation-sentinel pattern). NEW fingerprint →
@@ -120,6 +144,25 @@ def _handle_measures(measures, merged, root: Path, fp_path: str) -> list[str]:
                                  "path": rel, "detail": v.reason[:300],
                                  "first_seen": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                                  "status": "open"}
+                        # Typed-evidence graduation (algedonic phase-1 Task 4): additive fields
+                        # matching the wire schemas' evidence block — never inputs to `fpid` above,
+                        # so existing ledger rows keep their fingerprints byte-for-byte. `stock`/
+                        # `limit` come structurally off the Verdict (never parsed from `detail`
+                        # prose); `bound_ref` names the policy + (when resolvable) the declaring
+                        # manifest; `concern` is explicit-param-only — honest absence omits the key
+                        # rather than guessing (concern_routes.route, slice-1 Task 1).
+                        evidence = getattr(v, "evidence", None) or {}
+                        if isinstance(evidence.get("stock"), int):
+                            entry["stock"] = evidence["stock"]
+                        if isinstance(evidence.get("limit"), int):
+                            entry["limit"] = evidence["limit"]
+                        bound_ref = _bound_ref(rule.get("policy-ref"), merged, root, v.rule_id)
+                        if bound_ref:
+                            entry["bound_ref"] = bound_ref
+                        concern = concern_routes.route(
+                            "measure", {"concern": (rule.get("measure") or {}).get("concern")})
+                        if concern:
+                            entry["concern"] = concern
                         fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
             if is_new is None:
                 continue  # lock contention — another session owns this moment; next edit retries

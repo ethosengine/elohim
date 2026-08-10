@@ -165,7 +165,13 @@ _SEVERITY = {"deny": 3, "ask": 2, "inject": 1, "measure": 0, "dispatch": 0}
 # unresolvable-validator | governance-manifest-malformed | policy-pin-mismatch |
 # escalation-requires-ratification. Defaulted so every existing 3-arg Verdict(...) call site
 # (this module + _lib/epr_meta_git.py) keeps working unchanged.
-Verdict = namedtuple("Verdict", ["cls", "reason", "rule_id", "refer_reason"], defaults=[None])
+# `evidence` (algedonic phase-1 Task 4) is a small optional dict of STRUCTURED numbers a verdict
+# carries alongside its prose `reason` — today just the measure class's {"stock": <measured LoC>,
+# "limit": <ceiling>} — so a consumer (the resolver's architecture-finding mint) threads real
+# values instead of regex-parsing the reason string. Additive + defaulted: every existing 2-4-arg
+# Verdict(...) call site keeps working unchanged, and it is NEVER an input to any fingerprint.
+Verdict = namedtuple("Verdict", ["cls", "reason", "rule_id", "refer_reason", "evidence"],
+                      defaults=[None, None])
 
 # A rule of an enforcing class must carry at least one of these actionable predicate keys, else it
 # fires on nothing (a "deny everything here" that silently allows — the M2 footgun).
@@ -386,7 +392,8 @@ def _eval_rule(rule: dict, write: dict) -> Verdict | None:
         name = Path(write["path"]).name
         if isinstance(hard, int) and loc >= hard:
             return Verdict("measure", f"`{name}` is {loc} lines — at/over the {hard}-line HARD "
-                                      f"LoC ceiling. {why}", rid)
+                                      f"LoC ceiling. {why}", rid,
+                            evidence={"stock": loc, "limit": hard})
         if isinstance(soft, int) and loc >= soft:
             return Verdict("inject", f"`{name}` is {loc} lines — over the {soft}-line soft LoC "
                                      f"ceiling (hard ceiling: {hard}). {why}", rid)
