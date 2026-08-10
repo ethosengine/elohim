@@ -260,6 +260,56 @@ pub fn note(id: &str, class: ContestSkip) {
     mark_dirty();
 }
 
+/// Pure dwell rule for the ghost-declaration-decay consumer: has an
+/// evidence-absent verdict STOOD — still active AND at least `min_dwell` old?
+///
+/// The decay arm must not treat a single sweep's stated-no-record answer as a
+/// fleet-wide fact: post-2026-08-10 the responder's `get_record_for_action`
+/// answers from its LOCAL store only, so a clean no-record can also mean
+/// not-yet-gossiped (full-arc law). The dwell converts one observation into a
+/// standing verdict: the advertiser has had `min_dwell` of gossip time to
+/// acquire the bytes and still stated none exist. `min_dwell == 0` restores
+/// the active-is-enough behaviour (the OFF switch for the dwell alone).
+///
+/// **Concerns:** C4 (one observation is not a standing fact — the dwell is
+/// what upgrades it); C3 (dwell never strands: it only DELAYS eligibility
+/// within an already-finite window).
+///
+/// **Contract test:** [`tests::evidence_absent_stands_only_after_the_dwell`].
+///
+/// Pure and total — takes `elapsed` like [`backoff_is_active`], for the same
+/// reason.
+pub fn evidence_absent_stood(
+    class: ContestSkip,
+    elapsed: Duration,
+    min_dwell: Duration,
+    window: Duration,
+) -> bool {
+    class == ContestSkip::EvidenceAbsentBackoff
+        && backoff_is_active(elapsed, window)
+        && elapsed >= min_dwell
+}
+
+/// Ledger read for the decay arm: has the advertiser's stated-no-record verdict
+/// for `id` stood unrefuted for at least `min_dwell` (and is it still inside
+/// its window)? `recorded_at` is the FIRST observation of the current backoff
+/// episode — while backed off, contests are skipped, so the entry is never
+/// re-noted and the clock is not reset under the id.
+pub fn evidence_absent_stood_for(id: &str, min_dwell: Duration, windows: BackoffWindows) -> bool {
+    let Ok(guard) = ledger().lock() else {
+        return false;
+    };
+    let Some(entry) = guard.get(id) else {
+        return false;
+    };
+    evidence_absent_stood(
+        entry.class,
+        entry.recorded_at.elapsed(),
+        min_dwell,
+        windows.for_class(entry.class),
+    )
+}
+
 /// Is `id` currently backed off? `Some(class)` when it is — the class is the
 /// label the caller reports on `elohim_content_contest_skipped_total`.
 ///
@@ -714,6 +764,43 @@ mod tests {
                 "past the window the backoff must have expired ({secs}s)"
             );
         }
+    }
+
+    /// The decay consumer's dwell contract: an evidence-absent verdict STANDS
+    /// only inside the window AND past the dwell — a fresh observation never
+    /// qualifies, an expired one never qualifies, a non-evidence class never
+    /// qualifies, and dwell 0 restores active-is-enough.
+    #[test]
+    fn evidence_absent_stands_only_after_the_dwell() {
+        let window = Duration::from_secs(21_600);
+        let dwell = Duration::from_secs(3_600);
+        let ea = ContestSkip::EvidenceAbsentBackoff;
+        // Fresh observation: active but not yet standing.
+        assert!(!evidence_absent_stood(ea, Duration::ZERO, dwell, window));
+        // Past the dwell, inside the window: standing.
+        assert!(evidence_absent_stood(ea, dwell, dwell, window));
+        assert!(evidence_absent_stood(
+            ea,
+            window - Duration::from_secs(1),
+            dwell,
+            window
+        ));
+        // Window expired: no longer standing (C3 — never a permanent licence).
+        assert!(!evidence_absent_stood(ea, window, dwell, window));
+        // Wrong class never stands, whatever the clock says.
+        assert!(!evidence_absent_stood(
+            ContestSkip::NoLocalChainBackoff,
+            dwell,
+            dwell,
+            window
+        ));
+        // Dwell 0 = active-is-enough (the dwell's own OFF switch).
+        assert!(evidence_absent_stood(
+            ea,
+            Duration::ZERO,
+            Duration::ZERO,
+            window
+        ));
     }
 
     /// The OFF switch is a real off switch: window 0 restores the pre-F-B

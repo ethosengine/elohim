@@ -278,11 +278,6 @@ lazy_static! {
     )
     .unwrap();
 
-    /// Content heads freshly authored through the conductor by the sweep-driven
-    /// witness-bootstrap step — bulk-seeded rows born un-witnessed
-    /// (`dht_anchor_hash` NULL) that now carry a notarized head. Counts fresh
-    /// authorings only (already-committed rows recovered via the idempotent
-    /// already-exists path are NOT re-authored and are not counted here).
     /// Hold/Contest decisions downgraded to Author by the ghost-declaration
     /// decay arm (`head_adoption::ghost_decay_authorizes_author`) — each one is
     /// a phantom declaration (dead conductor incarnation) positively falsified
@@ -295,6 +290,11 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Content heads freshly authored through the conductor by the sweep-driven
+    /// witness-bootstrap step — bulk-seeded rows born un-witnessed
+    /// (`dht_anchor_hash` NULL) that now carry a notarized head. Counts fresh
+    /// authorings only (already-committed rows recovered via the idempotent
+    /// already-exists path are NOT re-authored and are not counted here).
     pub static ref CONTENT_WITNESS_AUTHORED: IntCounter = IntCounter::new(
         "elohim_content_witness_authored_total",
         "Content heads authored through the conductor by the witness-bootstrap sweep.",

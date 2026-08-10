@@ -415,6 +415,10 @@ spec:
             # prod false — participation is a governance decision), and the
             # edge Jenkinsfile's global sed renders both from one variable.
             # A later real canonical declaration outranks any decayed-in root.
+            # Decay additionally requires a LIVE advertising hint this sweep
+            # and the stated-no-record verdict to have STOOD the decay dwell
+            # (ELOHIM_GHOST_DECAY_MIN_DWELL_SECS, code default 3600) — one
+            # peer's local-cache answer is never read as a fleet fact.
             - name: ELOHIM_GHOST_DECLARATION_DECAY
               value: "ADOPT_BEFORE_AUTHOR_PLACEHOLDER"
             # Evidence-absent contest backoff (head_adoption): ids whose

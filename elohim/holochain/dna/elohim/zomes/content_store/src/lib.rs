@@ -5208,7 +5208,11 @@ pub fn get_record_for_action(
     // and the answer degrades to hash-only — every time, fleet-wide
     // (elohim_content_head_record_degraded{cause="budget_elapsed"}), and the
     // honest `Ok(None)` that would let requesters record absence evidence is
-    // never produced. Local answers in milliseconds either way.
+    // never produced. SEMANTIC NARROWING, stated: `Ok(None)` from this extern
+    // now means "not in THIS conductor's local store right now" — which can
+    // also mean not-yet-gossiped (full-arc law), never fleet-wide absence.
+    // Consumers must treat it as peer-local evidence (the requester-side
+    // evidence-absent backoff + ghost-decay dwell exist for exactly this).
     let record = match get(action_hash.clone(), GetOptions::local())? {
         Some(r) => r,
         None => return Ok(None),

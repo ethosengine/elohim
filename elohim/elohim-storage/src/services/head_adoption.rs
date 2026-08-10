@@ -665,9 +665,11 @@ async fn resolve_peer_evidence(
 ///
 /// **Concerns:** C6a (this predicate IS the amplification gate — every `true`
 /// here is one extra round-trip). C4 (the `no_record` arm is the honest-absence
-/// rule: a stated structural absence is a fact about the FLEET, not about the
-/// peer, so asking elsewhere for bytes that exist nowhere is pure amplification
-/// with no possible payoff).
+/// rule: post-2026-08-10 a stated no-record is a fact about the ADVERTISER's
+/// local store — the responder's get is LOCAL-strategy — not about the fleet;
+/// it still warrants no same-sweep second ask, because the evidence-absent
+/// backoff + the ghost-decay dwell own that population on the slower clock,
+/// and a second ask would just sample another peer's cache).
 ///
 /// **Contract tests:** [`tests::only_a_peer_shaped_failure_warrants_a_second_ask`]
 /// and [`tests::the_disabled_lever_never_warrants_a_second_ask`].
@@ -688,9 +690,14 @@ fn fallback_warrants(state: crate::metrics::AdoptEvidence, enabled: bool) -> boo
     match state {
         // Bytes in hand — nothing to route around.
         AdoptEvidence::Carried => false,
-        // The advertiser's conductor cleanly holds no record. STRUCTURAL: no
-        // other peer's conductor can conjure bytes that are nowhere on the
-        // fleet, and the evidence-absent backoff already owns this population.
+        // The advertiser's conductor cleanly holds no record. Post-2026-08-10
+        // this is a PEER-LOCAL fact, not a fleet-wide one: the responder's
+        // `get_record_for_action` answers from its LOCAL store only, so a
+        // clean no-record can also mean not-yet-gossiped (full-arc law).
+        // Still no fallback here: the evidence-absent backoff owns this
+        // population on the slower clock, and the ghost-decay dwell is what
+        // upgrades a persistent no-record into a standing verdict — a second
+        // same-sweep ask would just sample another peer's cache.
         AdoptEvidence::NoRecord => false,
         // The three PEER-SHAPED failures — saturation, a conductor error, and an
         // answer that established nothing (including unreachable). All say
@@ -808,11 +815,13 @@ fn evidence_backoff_class(
 /// ONE REFINEMENT, not an exception ([`ghost_decay_authorizes_author`],
 /// operator flag `ELOHIM_GHOST_DECLARATION_DECAY`, default off): the decay arm
 /// may route `Hold`/`ContestPeer` to `Author`, but NEVER on `Absent` alone —
-/// it additionally requires the advertising peer's OWN stated no-record
-/// verdict (the evidence-absent contest backoff) and the absence of a local
-/// canonical election. `Unreachable` never qualifies. What it authors is a
-/// fresh provable root that a later real canonical declaration outranks; it
-/// still asserts nothing about network-wide absence.
+/// it additionally requires a LIVE advertising hint this sweep, the
+/// advertising peer's OWN stated no-record verdict having STOOD the decay
+/// dwell (evidence-absent backoff + [`crate::config::ghost_decay_min_dwell`]),
+/// and the absence of a local canonical election. `Unreachable` never
+/// qualifies. What it authors is a fresh provable root that a later real
+/// canonical declaration outranks; it still asserts nothing about
+/// network-wide absence.
 #[derive(Debug, Clone, Copy)]
 pub enum LocalResolve<'a> {
     /// Not yet asked — the pre-flight calls `resolve_content_head` itself.
@@ -1113,9 +1122,18 @@ pub fn decide_head_action(
 /// - `local_head_observed_absent`: this conductor ANSWERED `resolve_content_
 ///   head` with none, this sweep ([`LocalResolve::Resolved`]+[`Answer::Absent`]
 ///   only; `Unreachable`/`Probe` never qualify).
-/// - `evidence_absent_backoff_active`: the advertising peer's responder STATED
-///   its own conductor holds no record for the head it advertises, within the
-///   evidence-absent window ([`crate::services::contest_backoff`]).
+/// - `peer_declared_now`: a peer is advertising a declared head for the id in
+///   THIS sweep's hint window. Without a live advertiser the ledger evidence
+///   below is stale hearsay (its peer may be offline or recovered), and there
+///   is no declaration to falsify — decay never fires off the ledger alone.
+/// - `evidence_absent_stood`: the advertising peer's responder STATED its own
+///   conductor holds no record for the head it advertises, and that verdict
+///   has STOOD un-refreshed for the decay dwell
+///   ([`crate::services::contest_backoff::evidence_absent_stood`],
+///   [`crate::config::ghost_decay_min_dwell`]). One sweep's answer is a fact
+///   about one peer's local cache (the responder's get is LOCAL-strategy — a
+///   clean no-record can also mean not-yet-gossiped, full-arc law); only its
+///   persistence across the dwell upgrades it to a standing fleet verdict.
 /// - `!local_has_canonical_election`: a row obeying a DHT election is settled
 ///   and is never decayed.
 ///
@@ -1127,8 +1145,9 @@ pub fn decide_head_action(
 ///
 /// **Concerns:** C1 (authors only over a positively-falsified declaration,
 /// flag-gated); C3 (this IS the liveness exit for the phantom-declaration
-/// class); C4 (only observed absences count — an unreachable conductor or an
-/// unanswered fetch never decays anything); C6a (pure predicate, no loop).
+/// class); C4 (only observed absences count — an unreachable conductor, an
+/// unanswered fetch, or a merely-fresh no-record answer never decays
+/// anything); C6a (pure predicate, no loop).
 ///
 /// **Contract tests:** [`tests::ghost_decay_is_dormant_by_default`],
 /// [`tests::ghost_decay_requires_every_positive_observation`].
@@ -1136,12 +1155,14 @@ pub fn ghost_decay_authorizes_author(
     decay_enabled: bool,
     local_head_observed_absent: bool,
     local_has_canonical_election: bool,
-    evidence_absent_backoff_active: bool,
+    peer_declared_now: bool,
+    evidence_absent_stood: bool,
 ) -> bool {
     decay_enabled
         && local_head_observed_absent
         && !local_has_canonical_election
-        && evidence_absent_backoff_active
+        && peer_declared_now
+        && evidence_absent_stood
 }
 
 /// What the caller should do with this id after the pre-flight ran.
@@ -1272,18 +1293,17 @@ pub async fn try_adopt_canonical_head(
     if matches!(decision, HeadDecision::Hold | HeadDecision::ContestPeer) {
         let local_head_observed_absent =
             matches!(local_resolve, LocalResolve::Resolved(Answer::Absent));
-        let evidence_absent_backoff_active = matches!(
-            crate::services::contest_backoff::skip_class(
-                id,
-                crate::services::contest_backoff::BackoffWindows::from_config(),
-            ),
-            Some(crate::metrics::ContestSkip::EvidenceAbsentBackoff)
+        let evidence_absent_stood = crate::services::contest_backoff::evidence_absent_stood_for(
+            id,
+            crate::config::ghost_decay_min_dwell(),
+            crate::services::contest_backoff::BackoffWindows::from_config(),
         );
         if ghost_decay_authorizes_author(
             crate::config::ghost_declaration_decay_enabled(),
             local_head_observed_absent,
             local_election,
-            evidence_absent_backoff_active,
+            hint.is_some(),
+            evidence_absent_stood,
         ) {
             crate::metrics::inc_ghost_declaration_decay_author();
             tracing::warn!(
@@ -1292,10 +1312,10 @@ pub async fn try_adopt_canonical_head(
                 declared = ?local_declared,
                 decision = ?decision,
                 "ghost-declaration-decay: the declaration holding this row is positively \
-                 unbackable (own conductor observed empty this sweep; the advertising peer \
-                 stated no record exists within the evidence-absent window) — releasing the \
-                 author path so the witness sweep can mint a provable root; a later real \
-                 canonical declaration still wins outright"
+                 unbackable (own conductor observed empty this sweep; a live advertiser's \
+                 stated no-record verdict has stood the decay dwell) — releasing the author \
+                 path so the witness sweep can mint a provable root; a later real canonical \
+                 declaration still wins outright"
             );
             return AdoptOutcome::Author;
         }
@@ -2579,37 +2599,45 @@ mod tests {
     fn ghost_decay_is_dormant_by_default() {
         for absent in [false, true] {
             for election in [false, true] {
-                for evidence in [false, true] {
-                    assert!(
-                        !ghost_decay_authorizes_author(false, absent, election, evidence),
-                        "dormant flag must never authorize (absent={absent}, \
-                         election={election}, evidence={evidence})"
-                    );
+                for hint in [false, true] {
+                    for evidence in [false, true] {
+                        assert!(
+                            !ghost_decay_authorizes_author(false, absent, election, hint, evidence),
+                            "dormant flag must never authorize (absent={absent}, \
+                             election={election}, hint={hint}, evidence={evidence})"
+                        );
+                    }
                 }
             }
         }
     }
 
     /// Enabled, the decay still requires EVERY positive observation: the own
-    /// conductor's observed absence AND the advertiser's stated no-record
-    /// verdict, and never over a row obeying a local election. Exactly one
-    /// input short → no author (C4: a missing answer is not evidence).
+    /// conductor's observed absence, a LIVE advertising hint this sweep, AND
+    /// the advertiser's stated no-record verdict having STOOD the dwell — and
+    /// never over a row obeying a local election. Exactly one input short →
+    /// no author (C4: a missing answer is not evidence, and stale ledger
+    /// hearsay without a live advertiser is not a declaration to falsify).
     #[test]
     fn ghost_decay_requires_every_positive_observation() {
         // The one authorized state.
-        assert!(ghost_decay_authorizes_author(true, true, false, true));
+        assert!(ghost_decay_authorizes_author(true, true, false, true, true));
         // Each single defection kills it.
         assert!(
-            !ghost_decay_authorizes_author(true, false, false, true),
+            !ghost_decay_authorizes_author(true, false, false, true, true),
             "no observed local absence (Probe/Unreachable) must not decay"
         );
         assert!(
-            !ghost_decay_authorizes_author(true, true, true, true),
+            !ghost_decay_authorizes_author(true, true, true, true, true),
             "a row obeying a local canonical election is settled, never decayed"
         );
         assert!(
-            !ghost_decay_authorizes_author(true, true, false, false),
-            "no stated-absent verdict from the advertiser must not decay"
+            !ghost_decay_authorizes_author(true, true, false, false, true),
+            "no live advertising hint this sweep — stale ledger evidence alone must not decay"
+        );
+        assert!(
+            !ghost_decay_authorizes_author(true, true, false, true, false),
+            "no stood stated-absent verdict (fresh or absent) must not decay"
         );
     }
 
@@ -2944,8 +2972,9 @@ mod tests {
     /// THE AMPLIFICATION GATE, exhaustively. Every `true` here is an extra
     /// conductor round-trip on a fleet whose conductors are the scarce resource,
     /// and the `no_record` arm is the one that must never flip: a stated
-    /// structural absence is a fact about the FLEET, so asking a second peer for
-    /// bytes that exist nowhere is pure cost with no possible payoff.
+    /// no-record is peer-local evidence (local-strategy responder get) whose
+    /// population the evidence-absent backoff + ghost-decay dwell already own —
+    /// a same-sweep second ask is amplification, not new information.
     #[test]
     fn only_a_peer_shaped_failure_warrants_a_second_ask() {
         use crate::metrics::AdoptEvidence;
@@ -3037,10 +3066,11 @@ mod tests {
         crate::services::advertiser_health::reset();
     }
 
-    /// A stated structural absence is never re-asked. This is the amplification
-    /// bound at its most load-bearing: ~61% of the live refusal population is
-    /// phantom ids whose bytes exist NOWHERE, and fanning those out would double
-    /// the cost of the population with the least to gain.
+    /// A stated no-record is never re-asked same-sweep (peer-local evidence;
+    /// the backoff + dwell own it). This is the amplification bound at its
+    /// most load-bearing: ~61% of the live refusal population is phantom ids
+    /// whose bytes exist NOWHERE, and fanning those out would double the cost
+    /// of the population with the least to gain.
     #[tokio::test]
     async fn a_structural_absence_is_never_routed_around() {
         let _exclusive = crate::services::advertiser_health::test_exclusive();

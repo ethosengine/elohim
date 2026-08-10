@@ -488,6 +488,17 @@ async fn async_main(
         );
     }
     elohim_storage::config::set_ghost_declaration_decay(config.ghost_declaration_decay);
+    // Ghost-decay dwell (seconds; default 3600). How long the advertiser's
+    // stated-no-record verdict must have stood before decay may author —
+    // one local-cache answer is never a fleet fact (post local-get semantics).
+    if let Ok(v) = std::env::var("ELOHIM_GHOST_DECAY_MIN_DWELL_SECS") {
+        match v.trim().parse::<u64>() {
+            Ok(secs) => elohim_storage::config::set_ghost_decay_min_dwell_secs(secs),
+            Err(_) => tracing::warn!(
+                "ELOHIM_GHOST_DECAY_MIN_DWELL_SECS is not an integer — keeping the default"
+            ),
+        }
+    }
 
     // T5 HEAD-CORPUS DIGEST REQUESTER (default OFF). The T4 responder field is
     // additive, but senders stay dormant until the fleet has that responder.

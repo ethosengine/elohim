@@ -40,9 +40,12 @@ decisionPoints:
       Operator-flag-gated (ELOHIM_GHOST_DECLARATION_DECAY, default off) downgrade of a
       Hold/ContestPeer decision to Author when the declaration holding the row is POSITIVELY
       falsified: own conductor observed empty for the id this sweep (LocalResolve::Resolved +
-      Answer::Absent only) AND the advertising peer's responder stated no record exists for
-      the head it advertises (evidence-absent contest backoff active) AND no local canonical
-      election stands. The batch-3 phantom-declaration exit (diagnosed live 2026-08-10).
+      Answer::Absent only) AND a peer is advertising a declared head in THIS sweep's hint
+      window AND the advertiser's stated no-record verdict has STOOD the decay dwell
+      (contest_backoff::evidence_absent_stood; config::ghost_decay_min_dwell, default 1h —
+      one local-cache answer is never a fleet fact under the responder's local-strategy get)
+      AND no local canonical election stands. The batch-3 phantom-declaration exit
+      (diagnosed live 2026-08-10; hardened same day per review of a9f9d781b).
     concernIds:
       - id: C1
         status: answered
@@ -63,9 +66,12 @@ decisionPoints:
         status: answered
         justification: >
           Every input is a positive observation: Answer::Unreachable and LocalResolve::Probe
-          never qualify as local absence, and the advertiser evidence is its own STATED
-          no-record verdict (evidence-absent backoff), never a missing or timed-out answer.
-          Pinned by ghost_decay_requires_every_positive_observation.
+          never qualify as local absence; the advertiser evidence is its own STATED no-record
+          verdict (never a missing or timed-out answer) AND must have stood the decay dwell
+          (a single local-strategy answer can mean not-yet-gossiped — full-arc law); a live
+          advertising hint is required this sweep, so stale ledger hearsay alone never fires.
+          Pinned by ghost_decay_requires_every_positive_observation and
+          contest_backoff::tests::evidence_absent_stands_only_after_the_dwell.
       - id: C6a
         status: answered
         justification: >

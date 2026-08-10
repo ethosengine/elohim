@@ -375,6 +375,32 @@ pub fn evidence_absent_backoff_window() -> std::time::Duration {
     )
 }
 
+/// Default ghost-decay dwell: one hour — 12 sweeps at the 300s cadence, and a
+/// sixth of the alpha evidence-absent window (6h). Long enough that ordinary
+/// restart/gossip catch-up (the ~20min churn window) cannot satisfy it.
+const DEFAULT_GHOST_DECAY_MIN_DWELL_SECS: u64 = 3600;
+
+static GHOST_DECAY_MIN_DWELL_SECS: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+
+/// Publish the ghost-decay dwell. Idempotent.
+pub fn set_ghost_decay_min_dwell_secs(seconds: u64) {
+    let _ = GHOST_DECAY_MIN_DWELL_SECS.set(seconds);
+}
+
+/// How long the advertiser's stated-no-record verdict must have STOOD (still
+/// inside its evidence-absent window, never re-refreshed under the id) before
+/// ghost-declaration decay may treat it as a standing fleet fact rather than
+/// one sweep's local-cache answer. See
+/// `services::contest_backoff::evidence_absent_stood` for the pure rule.
+/// `0` restores active-is-enough (the dwell's own OFF switch).
+pub fn ghost_decay_min_dwell() -> std::time::Duration {
+    std::time::Duration::from_secs(
+        *GHOST_DECAY_MIN_DWELL_SECS
+            .get()
+            .unwrap_or(&DEFAULT_GHOST_DECAY_MIN_DWELL_SECS),
+    )
+}
+
 /// Process-wide mirror of [`Config::evidence_fallback_enabled`]. Same `OnceLock`
 /// rationale as [`CONTEST_BACKOFF_SECONDS`]: the reconcile sweep carries no
 /// `Config`, and an env read on the hot path is the parallel-test flake this
