@@ -70,7 +70,13 @@ const DECAY_AT: u32 = 64;
 /// what keeps a fresh peer reachable (an all-zero prior would make the first
 /// peer we ever ask permanently preferred) without letting it displace a proven
 /// courier.
-const UNTRACKED_PRIOR: f64 = 0.5;
+///
+/// `pub(crate)` (2026-08-09, B2a): the trust-gradient adopt-slice ordering in
+/// `p2p::projection_reconcile` reuses this SAME prior for candidates whose
+/// courier has no health record yet, so an unproven courier scores identically
+/// whether the question is "which peer to ask" or "which candidate to try
+/// first" — one constant, not two copies that could drift apart.
+pub(crate) const UNTRACKED_PRIOR: f64 = 0.5;
 
 /// One peer's rolling evidence record: how many of its recent head-record
 /// answers carried bytes, and how many did not.

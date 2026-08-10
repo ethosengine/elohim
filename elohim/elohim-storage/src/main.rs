@@ -572,20 +572,18 @@ async fn async_main(
             ),
         }
     }
-    // CONTENT-HEAL DRAIN LEVERS. The heal leg feeds the adopt arm, and F-B never
-    // reached it: fan-out 1 and window 0 restore the pre-lever sequential leg
-    // exactly. An unparseable value keeps the default rather than silently
+    // CONTENT-HEAL DRAIN LEVER. The heal leg feeds the adopt arm: window 0
+    // restores the pre-lever sequential leg's replay behaviour exactly (always
+    // re-resolve). An unparseable value keeps the default rather than silently
     // disabling the lever (same discipline as the F-B knobs above).
-    if let Ok(v) = std::env::var("HEAL_RESOLVE_FANOUT") {
-        match v.trim().parse::<usize>() {
-            Ok(n) if n >= 1 => config.heal_resolve_fanout = n,
-            _ => tracing::warn!(
-                value = %v,
-                default = config.heal_resolve_fanout,
-                "HEAL_RESOLVE_FANOUT is not a positive integer — keeping the default"
-            ),
-        }
-    }
+    //
+    // (The heal leg's own CONCURRENCY was a second knob here,
+    // `HEAL_RESOLVE_FANOUT` — removed 2026-08-09, R1: the batch head-plane arms
+    // replaced this leg's per-id resolve outright, so `heal_content` has read
+    // `HealPacing::head_batch_fanout` ever since and this one was plumbed but
+    // never consulted. Its historical default lives on only as
+    // `config::DEFAULT_HEAL_RESOLVE_FANOUT`, the fixed baseline one test still
+    // compares the batch fan-out against.)
     if let Ok(v) = std::env::var("HEAL_MISSING_BACKOFF_SECONDS") {
         match v.trim().parse::<u64>() {
             Ok(n) => config.heal_missing_backoff_seconds = n,
@@ -597,20 +595,26 @@ async fn async_main(
         }
     }
     elohim_storage::config::set_adopt_contest_fanout(config.adopt_contest_fanout);
-    elohim_storage::config::set_heal_resolve_fanout(config.heal_resolve_fanout);
     elohim_storage::config::set_heal_missing_backoff_seconds(config.heal_missing_backoff_seconds);
     elohim_storage::config::set_evidence_fallback_max_alternates(
         config.evidence_fallback_max_alternates,
     );
+    // HARD INVARIANT (B2b): the courier ladder widening above must never let
+    // `adopt_contest_fanout * evidence_fallback_max_alternates` exceed 24 — see
+    // `assert_courier_ladder_budget`'s doc for the adam 2026-07-20 write-guard
+    // melt this exists to prevent a repeat of. Fails fast at config load,
+    // before either knob's value can reach a live sweep.
+    elohim_storage::config::assert_courier_ladder_budget(
+        config.adopt_contest_fanout,
+        config.evidence_fallback_max_alternates,
+    );
     tracing::info!(
-        heal_resolve_fanout = config.heal_resolve_fanout,
         heal_missing_backoff_seconds = config.heal_missing_backoff_seconds,
         evidence_fallback_max_alternates = config.evidence_fallback_max_alternates,
-        "content-heal drain levers: the heal leg resolves N ids against its own conductor \
-         concurrently (1 = the pre-lever sequential leg), replays a known conductor-missing \
-         answer for the backoff window instead of re-paying for it (0 = always re-resolve), and \
-         the adopt-evidence path probes up to N alternate advertisers per id (0 = single-ask). \
-         All three are deferrals or bounds — none excludes an id from a sweep"
+        "content-heal drain levers: the heal leg replays a known conductor-missing answer for \
+         the backoff window instead of re-paying for it (0 = always re-resolve), and the \
+         adopt-evidence path probes up to N alternate advertisers per id (0 = single-ask). Both \
+         are deferrals or bounds — neither excludes an id from a sweep"
     );
     elohim_storage::config::set_contest_backoff_seconds(config.contest_backoff_seconds);
     elohim_storage::config::set_evidence_absent_backoff_seconds(

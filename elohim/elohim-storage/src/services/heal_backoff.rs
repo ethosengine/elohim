@@ -2,10 +2,12 @@
 //! re-paying for it, so the content heal leg's fixed wall clock reaches ids
 //! whose answer is NOT already known.
 //!
-//! This is drain lever 2. Its sibling levers are the heal-leg fan-out
-//! ([`crate::config::heal_resolve_fanout`], applied in
-//! [`crate::p2p::projection_reconcile`]) and the widened advertiser probe
-//! ([`crate::config::evidence_fallback_max_alternates`]). Design intent:
+//! This is drain lever 2. Its sibling lever is the widened advertiser probe
+//! ([`crate::config::evidence_fallback_max_alternates`]). (A third sibling,
+//! the heal-leg's own per-id resolve fan-out, was superseded by the batch
+//! head-plane arms and its dead config knob removed 2026-08-09, R1 — see
+//! `HealPacing::head_batch_fanout` in [`crate::p2p::projection_reconcile`]
+//! for what actually paces that leg now.) Design intent:
 //! `genesis/data/timeline/backlog/content-gap-limit-cycle-blocks-convergence.md`
 //! §"RCA v3 → Open residuals → F-B".
 //!

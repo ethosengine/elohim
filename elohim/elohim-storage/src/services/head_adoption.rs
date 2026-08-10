@@ -315,12 +315,21 @@ pub struct PeerHeadHint {
 
 /// How many ALTERNATE advertisers one hint retains.
 ///
-/// Small on purpose. Only ONE alternate is ever asked per evidence resolution
-/// (the bound that keeps this a route-around and not a fan-out), so the list
-/// only needs enough breadth for the health tracker to have a choice when the
-/// best-known peer is itself down. 3 covers a household mesh; the memory cost is
-/// `ids × 3` short strings.
-pub const ALTERNATE_ADVERTISER_CAP: usize = 3;
+/// Bounded, not unbounded: the fallback ladder in [`resolve_peer_evidence`]
+/// walks up to [`crate::config::evidence_fallback_max_alternates`] of these,
+/// healthiest first, per evidence resolution — this cap is what makes that
+/// ladder a FIXED, pre-sized walk rather than a retry loop. Raised 3 → 6
+/// (2026-08-09, B2b, drain lever 4): the household mesh the harvest observes
+/// routinely advertises the same genesis-seeded row from more than 3 couriers,
+/// so the old cap silently discarded plurality the fallback ladder could have
+/// used. The memory cost is `ids × 6` short strings — still bounded by
+/// construction, not by convention.
+///
+/// This cap and [`crate::config::evidence_fallback_max_alternates`] are BOTH
+/// held under the SAME write-guard invariant as `adopt_contest_fanout` — see
+/// `crate::config::assert_courier_ladder_budget`'s doc for the adam
+/// 2026-07-20 melt this exists to prevent a repeat of.
+pub const ALTERNATE_ADVERTISER_CAP: usize = 6;
 
 impl PeerHeadHint {
     /// A hint with no alternates — the shape every construction site had before
@@ -534,14 +543,15 @@ pub trait HeadRecordFetcher: Send + Sync {
 ///
 /// The 2026-08-03 shape asked exactly ONE alternate and then gave up for the
 /// sweep, while the harvest was already retaining up to
-/// [`ALTERNATE_ADVERTISER_CAP`] (3) couriers per id — so two thirds of the
-/// plurality the sweep had paid to collect were never used, and an id whose
-/// second-best courier could serve the bytes waited a full sweep (or a full
-/// backoff window) to find that out. The probe now walks the ranked couriers,
-/// healthiest first, up to [`crate::config::evidence_fallback_max_alternates`]
-/// (default 2). Fill bandwidth per gap id rises with the number of couriers that
-/// actually exist, which is the point: an id converges the moment ANY courier
-/// serves it.
+/// [`ALTERNATE_ADVERTISER_CAP`] (originally 3, widened to 6 2026-08-09 B2b)
+/// couriers per id — so two thirds of the plurality the sweep had paid to
+/// collect were never used, and an id whose second-best courier could serve the
+/// bytes waited a full sweep (or a full backoff window) to find that out. The
+/// probe now walks the ranked couriers, healthiest first, up to
+/// [`crate::config::evidence_fallback_max_alternates`] (default 4, raised from
+/// 2 the same day, held under `crate::config::assert_courier_ladder_budget`).
+/// Fill bandwidth per gap id rises with the number of couriers that actually
+/// exist, which is the point: an id converges the moment ANY courier serves it.
 ///
 /// The bound is structural, not conventional: a FIXED, pre-sized ladder over a
 /// list the harvest already capped — iterated once, never re-asking a peer, with
@@ -598,7 +608,7 @@ async fn resolve_peer_evidence(
 
     // bounded-work: at most `evidence_fallback_max_alternates()` fallback
     // fetches per evidence resolution — hard-clamped to
-    // `ALTERNATE_ADVERTISER_CAP` (3), which is how many couriers the harvest
+    // `ALTERNATE_ADVERTISER_CAP` (6), which is how many couriers the harvest
     // ever retains, so this is a FIXED, pre-sized ladder rather than a retry
     // loop: it iterates a bounded list once, never re-asks a peer, and cannot
     // recurse. Worst case is 1 + N round-trips per candidate per sweep; the
@@ -2946,13 +2956,13 @@ mod tests {
         crate::services::advertiser_health::reset();
     }
 
-    /// A BOUNDED LADDER, never an unbounded one (drain lever 3, 2026-08-07).
-    ///
-    /// Three alternates are offered, the configured breadth is 2, and exactly
-    /// two are asked — the third is never reached however promising it looks.
-    /// That bound is what keeps source-widening from becoming a fan-out against
-    /// a fleet whose conductors are already the scarce resource. The invariant
-    /// this replaces asserted a ladder of ONE; the ladder is now `min(alternates,
+    /// A BOUNDED LADDER, never an unbounded one (drain lever 3, 2026-08-07;
+    /// widened again 2026-08-09, B2b). Five alternates are offered, the
+    /// configured breadth is 4, and exactly four are asked — the fifth is
+    /// never reached however promising it looks. That bound is what keeps
+    /// source-widening from becoming a fan-out against a fleet whose
+    /// conductors are already the scarce resource. The invariant this replaces
+    /// asserted a ladder of ONE; the ladder is now `min(alternates,
     /// evidence_fallback_max_alternates())`, and it must still be a fixed,
     /// pre-sized walk with no retry and no recursion.
     #[tokio::test]
@@ -2976,9 +2986,11 @@ mod tests {
             ),
             ("alt-a", hash_only_answer(RecordAbsentReason::BudgetElapsed)),
             ("alt-b", hash_only_answer(RecordAbsentReason::BudgetElapsed)),
-            ("alt-c", carrying(b"beyond-the-bound")),
+            ("alt-c", hash_only_answer(RecordAbsentReason::BudgetElapsed)),
+            ("alt-d", hash_only_answer(RecordAbsentReason::BudgetElapsed)),
+            ("alt-e", carrying(b"beyond-the-bound")),
         ]);
-        let hint = hint_with("primary", &["alt-a", "alt-b", "alt-c"]);
+        let hint = hint_with("primary", &["alt-a", "alt-b", "alt-c", "alt-d", "alt-e"]);
         let (carried, evidence) = resolve_peer_evidence(Some(&fetcher), &hint, "id").await;
 
         assert_eq!(
@@ -2988,7 +3000,7 @@ mod tests {
              whatever they answer"
         );
         assert!(
-            !fetcher.asked().contains(&"alt-c".to_string()),
+            !fetcher.asked().contains(&"alt-e".to_string()),
             "the courier past the bound must never be asked, even though it holds the bytes"
         );
         assert!(carried.is_some_and(|c| c.record.is_none()));

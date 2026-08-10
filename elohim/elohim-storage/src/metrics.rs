@@ -2692,7 +2692,23 @@ pub fn set_projection_reconcile_window_gauges(stream: &str, offset: u64, total: 
 
 /// Count ONE content-arm heal patch whose `reach` field was dropped by the
 /// RC-4 non-narrowing guard — see [`PROJECTION_RECONCILE_REACH_NARROWED`].
+///
+/// `to` is WIRE-DERIVED — the incoming conductor answer's `reach`, sourced
+/// from a peer's `ContentHeadWire` (2026-08-09, R1) — so it is clamped to the
+/// known [`crate::generated_enums::CORE_REACH_LEVELS`] vocabulary plus
+/// `"other"` before it ever becomes a label value. Without the clamp, one peer
+/// running a future build (or simply misbehaving) could mint an unbounded
+/// number of label combinations on a `IntCounterVec`, which is a Prometheus
+/// cardinality footgun the label's own definition already warned about (this
+/// counter has no such clamp on `from`, which is read from the LOCAL row —
+/// this node's own conductor already validated it against the same
+/// vocabulary at the point it was written).
 pub fn inc_projection_reconcile_reach_narrowed(from: &str, to: &str) {
+    let to = if crate::generated_enums::CORE_REACH_LEVELS.contains(&to) {
+        to
+    } else {
+        "other"
+    };
     PROJECTION_RECONCILE_REACH_NARROWED
         .with_label_values(&[from, to])
         .inc();
@@ -3466,5 +3482,124 @@ mod tests {
         assert!(text.contains("class=\"chain_head_moved\""), "{text}");
         assert!(text.contains("class=\"already_exists\""), "{text}");
         assert!(text.contains("elohim_content_witness_sweep_abandoned_total"));
+    }
+
+    /// A1 (2026-08-09, R1): the measured-gate pattern every `run_heal` arm
+    /// follows (`set_projection_reconcile_measured` fires UNCONDITIONALLY;
+    /// `set_projection_reconcile_gauges` is gated on that same bit), pinned at
+    /// the metrics layer so the honesty floor is provable without spinning up
+    /// a sweep. An unmeasured sweep must publish ONLY `measured=0` and leave
+    /// every value gauge (here: `divergent`, standing in for the whole
+    /// gauge set `set_projection_reconcile_gauges` writes together) exactly as
+    /// the last REAL sample left it — publishing a false zero over it would be
+    /// the N2 false-green this gate exists to prevent. A measured sweep writes
+    /// both.
+    #[test]
+    fn an_unmeasured_sweep_leaves_the_divergent_gauge_untouched_but_a_measured_sweep_writes_both() {
+        let stream = "test-a1-measured-gate";
+
+        // Establish a non-zero baseline via a MEASURED sweep, so "untouched" on
+        // the next (unmeasured) sweep is actually checkable rather than
+        // vacuously true against a default-zero gauge.
+        set_projection_reconcile_measured(stream, true);
+        set_projection_reconcile_gauges(stream, 7, 3, 1, 5, 2);
+        assert_eq!(
+            PROJECTION_RECONCILE_MEASURED
+                .with_label_values(&[stream])
+                .get(),
+            1
+        );
+        assert_eq!(
+            PROJECTION_RECONCILE_DIVERGENT
+                .with_label_values(&[stream])
+                .get(),
+            5
+        );
+
+        // UNMEASURED: only the bit moves.
+        set_projection_reconcile_measured(stream, false);
+        assert_eq!(
+            PROJECTION_RECONCILE_MEASURED
+                .with_label_values(&[stream])
+                .get(),
+            0,
+            "measured must flip to 0 on an unmeasured sweep"
+        );
+        assert_eq!(
+            PROJECTION_RECONCILE_DIVERGENT
+                .with_label_values(&[stream])
+                .get(),
+            5,
+            "the divergent gauge must be UNTOUCHED by an unmeasured sweep — the prior real \
+             sample stands, never overwritten by a false zero"
+        );
+
+        // MEASURED: both the bit and the value gauges move.
+        set_projection_reconcile_measured(stream, true);
+        set_projection_reconcile_gauges(stream, 0, 3, 0, 0, 0);
+        assert_eq!(
+            PROJECTION_RECONCILE_MEASURED
+                .with_label_values(&[stream])
+                .get(),
+            1
+        );
+        assert_eq!(
+            PROJECTION_RECONCILE_DIVERGENT
+                .with_label_values(&[stream])
+                .get(),
+            0,
+            "a measured sweep must overwrite the value gauges with the fresh sample"
+        );
+    }
+
+    /// B4 (2026-08-09, R1): a `to` label OUTSIDE the known reach vocabulary
+    /// must land on the `"other"` bucket, never mint its own label series — the
+    /// cardinality footgun a peer running a future build (or a bug) could
+    /// otherwise trip on a wire-derived value.
+    #[test]
+    fn reach_narrowed_clamps_an_unknown_to_label_to_other() {
+        let before_other = PROJECTION_RECONCILE_REACH_NARROWED
+            .with_label_values(&["public", "other"])
+            .get();
+        let before_raw = PROJECTION_RECONCILE_REACH_NARROWED
+            .with_label_values(&["public", "some-future-reach-tier"])
+            .get();
+
+        inc_projection_reconcile_reach_narrowed("public", "some-future-reach-tier");
+
+        assert_eq!(
+            PROJECTION_RECONCILE_REACH_NARROWED
+                .with_label_values(&["public", "other"])
+                .get(),
+            before_other + 1,
+            "an unrecognised wire reach must be counted under the bounded \"other\" bucket"
+        );
+        assert_eq!(
+            PROJECTION_RECONCILE_REACH_NARROWED
+                .with_label_values(&["public", "some-future-reach-tier"])
+                .get(),
+            before_raw,
+            "the raw wire-derived string must never mint its own label series"
+        );
+    }
+
+    /// Every value in the known reach vocabulary must pass through UNCLAMPED —
+    /// the clamp targets cardinality risk from wire-derived novelty, not the
+    /// protocol's own vocabulary.
+    #[test]
+    fn reach_narrowed_passes_known_reach_values_through_unclamped() {
+        let before = PROJECTION_RECONCILE_REACH_NARROWED
+            .with_label_values(&["public", "commons"])
+            .get();
+
+        inc_projection_reconcile_reach_narrowed("public", "commons");
+
+        assert_eq!(
+            PROJECTION_RECONCILE_REACH_NARROWED
+                .with_label_values(&["public", "commons"])
+                .get(),
+            before + 1,
+            "a known reach value is a real label, not a clamp target"
+        );
     }
 }

@@ -3997,6 +3997,96 @@ struct AdoptCandidate {
     head: Option<crate::services::conductor_writes::ContentHeadWire>,
 }
 
+/// THE TRUST-GRADIENT SCORE for one eligible candidate (2026-08-09, B2a) — the
+/// zero-load throughput lever: reordering WHO fills the eligible class's slots
+/// spends no extra conductor round-trip, unlike widening the class itself.
+///
+/// Returns `(best_carried_share, alternates_len)`: the best carried-share
+/// [`crate::services::advertiser_health`] has recorded for any of this
+/// candidate's couriers — the peer that advertised its declaration
+/// (`PeerHeadHint::peer_id`) plus the alternates the harvest retained for it
+/// (`PeerHeadHint::alternates`) — and the alternates count, used only as a
+/// tiebreak (courier PLURALITY, not health) below.
+///
+/// A courier this node has never asked for bytes scores at
+/// [`crate::services::advertiser_health::UNTRACKED_PRIOR`] (0.5) — unproven,
+/// not proven-bad, the same prior `advertiser_health::choose`/`rank` give an
+/// untracked peer when picking WHICH peer to ask. A candidate with no hint at
+/// all (conductor-missing, never advertised) scores at the same floor: it
+/// carries no evidence either way, which is exactly the "unproven" case the
+/// prior exists for. This is why a hinted candidate whose courier has an
+/// actual carried-share ABOVE 0.5 outranks one with no hint, while a courier
+/// whose carried-share sits BELOW 0.5 (a proven-starved peer) still loses to
+/// an unhinted candidate — the score is honest either direction, never a
+/// thumb on the scale for merely having a hint.
+fn eligible_trust_score(
+    candidate: &AdoptCandidate,
+    hints: &crate::services::head_adoption::PeerHeadHints,
+) -> (f64, usize) {
+    use crate::services::advertiser_health::{health, UNTRACKED_PRIOR};
+
+    let Some(hint) = hints.get(&candidate.id) else {
+        return (UNTRACKED_PRIOR, 0);
+    };
+    let mut best = health(&hint.peer_id)
+        .and_then(|h| h.carried_share())
+        .unwrap_or(UNTRACKED_PRIOR);
+    for alternate in &hint.alternates {
+        let score = health(alternate)
+            .and_then(|h| h.carried_share())
+            .unwrap_or(UNTRACKED_PRIOR);
+        if score > best {
+            best = score;
+        }
+    }
+    (best, hint.alternates.len())
+}
+
+/// Order the ELIGIBLE class (never the deferred one — see
+/// [`compose_adopt_slice`], which this feeds and which is left untouched) by
+/// descending [`eligible_trust_score`], tiebreaking on courier plurality
+/// (`alternates.len()`), tiebreaking AGAIN on stable FIFO — the order
+/// `candidates.iter().partition` produced, which `Vec::sort_by`'s stability
+/// preserves for any pair that ties on both keys.
+///
+/// PURE — no clock, no ledger, no conductor call — because the whole point of
+/// this lever is that it costs NOTHING extra per sweep: the eligible class is
+/// already fully known before this runs, so reordering it only changes WHICH
+/// candidate reaches the front of the fixed-cap slice
+/// [`compose_adopt_slice`] composes, never how many round-trips the sweep
+/// spends. This is what makes it the "zero-load lever" the trust-gradient
+/// design names it.
+///
+/// **Never crosses the class boundary.** This function receives and returns
+/// only the eligible `Vec` — the deferred class (backed-off ids) is never
+/// passed in and cannot appear in the output, so the F-B priority partition
+/// (contestable candidates in front, backed-off ones on the reserved tail) is
+/// exactly as untouched as [`compose_adopt_slice`]'s doc-comment already
+/// promises. Three properties, each pinned by a test:
+///
+/// 1. **A health-ranked candidate precedes an unproven-prior one**
+///    (`tests::a_health_ranked_candidate_precedes_an_unproven_prior_candidate`).
+/// 2. **A tie in health breaks on courier plurality**
+///    (`tests::a_tie_in_health_breaks_on_courier_plurality`).
+/// 3. **Ordering the eligible class never promotes a candidate across classes**
+///    (`tests::ordering_the_eligible_class_never_promotes_a_candidate_across_classes`).
+fn order_eligible_by_trust_gradient<'a>(
+    mut eligible: Vec<&'a AdoptCandidate>,
+    hints: &crate::services::head_adoption::PeerHeadHints,
+) -> Vec<&'a AdoptCandidate> {
+    eligible.sort_by(|a, b| {
+        let (score_a, alts_a) = eligible_trust_score(a, hints);
+        let (score_b, alts_b) = eligible_trust_score(b, hints);
+        // Descending score, then descending courier plurality; `sort_by` is
+        // STABLE, so a tie on both keys keeps the original (FIFO) order — the
+        // third rung of the ordering promise, free of charge.
+        score_b
+            .total_cmp(&score_a)
+            .then_with(|| alts_b.cmp(&alts_a))
+    });
+    eligible
+}
+
 /// Compose one sweep's bounded slice from the two priority classes, reserving a
 /// TAIL of the cap for backoff-deferred candidates.
 ///
@@ -4141,7 +4231,9 @@ fn compose_adopt_slice<'a, T>(
 /// claimed from the start.
 ///
 /// **Lever 2 — bounded fan-out.** Candidates are processed with at most
-/// [`crate::config::adopt_contest_fanout`] (default 8) in flight. The 25ms
+/// [`crate::config::adopt_contest_fanout`] (default 6, lowered from 8
+/// 2026-08-09 B2b to hold the courier-ladder write-guard invariant — see
+/// `crate::config::assert_courier_ladder_budget`) in flight. The 25ms
 /// spacing is kept INSIDE each concurrent task, so a fan-out of 1 reproduces the
 /// old sequential sweep exactly — the knob is its own OFF switch. The
 /// concurrency bound, not the spacing, is now the throttle that matters, and it
@@ -4210,6 +4302,13 @@ async fn adopt_deferred_heads(
             crate::services::contest_backoff::skip_class(&c.id, backoff_windows).is_some()
         });
     let deferred_count = deferred.len();
+    // TRUST-GRADIENT ORDERING (B2a, zero-load lever): within the eligible class
+    // ONLY, pull candidates whose couriers have actually carried bytes ahead of
+    // ones with no such evidence — pure re-ordering of a class already fully
+    // known, so it spends no extra conductor round-trip. Never touches
+    // `deferred`; see `order_eligible_by_trust_gradient`'s doc for why the class
+    // boundary cannot move.
+    let eligible = order_eligible_by_trust_gradient(eligible, adopt.hints);
     // bounded-work: the per-tick slice is exactly WITNESS_MAX_PER_TICK (200)
     // candidates; the concurrency bound is `fanout`; the wall-clock budget is
     // WITNESS_SWEEP_BUDGET (120s) and remains authoritative over both.
@@ -6866,6 +6965,141 @@ mod tests {
         );
     }
 
+    // ── B2a: trust-gradient adopt-slice ordering (the zero-load lever) ──
+
+    /// (a) **A health-ranked candidate precedes an unproven-prior one.** A
+    /// courier with a recorded, above-prior carried share must be pulled ahead
+    /// of a candidate whose courier (or lack of one) has never been asked —
+    /// even against FIFO order, which is the whole point of the lever.
+    #[test]
+    fn a_health_ranked_candidate_precedes_an_unproven_prior_candidate() {
+        let _guard = crate::services::advertiser_health::test_exclusive();
+        crate::services::advertiser_health::reset();
+        crate::services::advertiser_health::record("healthy-peer", true);
+        crate::services::advertiser_health::record("healthy-peer", true);
+        crate::services::advertiser_health::record("healthy-peer", true);
+        // "unproven-peer" is never recorded — it stays at the untracked prior.
+
+        let healthy = AdoptCandidate {
+            id: "healthy-id".to_string(),
+            head: None,
+        };
+        let unproven = AdoptCandidate {
+            id: "unproven-id".to_string(),
+            head: None,
+        };
+        let mut hints = crate::services::head_adoption::PeerHeadHints::new();
+        hints.insert(
+            healthy.id.clone(),
+            crate::services::head_adoption::PeerHeadHint::sole(
+                "action-a".to_string(),
+                None,
+                "healthy-peer".to_string(),
+            ),
+        );
+        hints.insert(
+            unproven.id.clone(),
+            crate::services::head_adoption::PeerHeadHint::sole(
+                "action-b".to_string(),
+                None,
+                "unproven-peer".to_string(),
+            ),
+        );
+
+        // FIFO would put `unproven` first; the trust gradient must invert it.
+        let eligible = vec![&unproven, &healthy];
+        let ordered = order_eligible_by_trust_gradient(eligible, &hints);
+        assert_eq!(
+            ordered.iter().map(|c| c.id.as_str()).collect::<Vec<_>>(),
+            vec![healthy.id.as_str(), unproven.id.as_str()],
+            "the candidate with an actually-carrying courier must lead"
+        );
+        crate::services::advertiser_health::reset();
+    }
+
+    /// (b) **A tie in health breaks on courier plurality.** Two candidates whose
+    /// couriers are both entirely untracked score identically at the untracked
+    /// prior — the tiebreak must then favour the candidate with MORE alternates
+    /// (`alternates.len()`), not fall through to FIFO yet.
+    #[test]
+    fn a_tie_in_health_breaks_on_courier_plurality() {
+        let _guard = crate::services::advertiser_health::test_exclusive();
+        crate::services::advertiser_health::reset();
+
+        let few = AdoptCandidate {
+            id: "few-couriers".to_string(),
+            head: None,
+        };
+        let many = AdoptCandidate {
+            id: "many-couriers".to_string(),
+            head: None,
+        };
+        let mut hints = crate::services::head_adoption::PeerHeadHints::new();
+        hints.insert(
+            few.id.clone(),
+            crate::services::head_adoption::PeerHeadHint::sole(
+                "action-a".to_string(),
+                None,
+                "p1".to_string(),
+            ),
+        );
+        let mut many_hint = crate::services::head_adoption::PeerHeadHint::sole(
+            "action-b".to_string(),
+            None,
+            "p2".to_string(),
+        );
+        many_hint.alternates = vec!["p3".to_string(), "p4".to_string()];
+        hints.insert(many.id.clone(), many_hint);
+
+        // FIFO would put `few` first; untracked couriers tie on health, so
+        // courier plurality must decide.
+        let eligible = vec![&few, &many];
+        let ordered = order_eligible_by_trust_gradient(eligible, &hints);
+        assert_eq!(
+            ordered.iter().map(|c| c.id.as_str()).collect::<Vec<_>>(),
+            vec![many.id.as_str(), few.id.as_str()],
+            "more courier plurality wins a health tie"
+        );
+        crate::services::advertiser_health::reset();
+    }
+
+    /// (c) **Ordering the eligible class never promotes a candidate across
+    /// classes.** [`order_eligible_by_trust_gradient`] receives and returns only
+    /// the eligible `Vec` — it must be a pure permutation of that same set, and
+    /// a deferred id must never appear in its output.
+    #[test]
+    fn ordering_the_eligible_class_never_promotes_a_candidate_across_classes() {
+        let _guard = crate::services::advertiser_health::test_exclusive();
+        crate::services::advertiser_health::reset();
+
+        let all: Vec<AdoptCandidate> = (0..10)
+            .map(|i| AdoptCandidate {
+                id: format!("id-{i}"),
+                head: None,
+            })
+            .collect();
+        let eligible: Vec<&AdoptCandidate> = all[..6].iter().collect();
+        let deferred_ids: std::collections::HashSet<&str> =
+            all[6..].iter().map(|c| c.id.as_str()).collect();
+        let hints = crate::services::head_adoption::PeerHeadHints::new();
+
+        let ordered = order_eligible_by_trust_gradient(eligible.clone(), &hints);
+
+        let ordered_ids: std::collections::HashSet<&str> =
+            ordered.iter().map(|c| c.id.as_str()).collect();
+        let eligible_ids: std::collections::HashSet<&str> =
+            eligible.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(
+            ordered_ids, eligible_ids,
+            "reordering must be a permutation of the SAME set — nothing added, nothing dropped"
+        );
+        assert!(
+            ordered_ids.is_disjoint(&deferred_ids),
+            "ordering the eligible class must never introduce a deferred id"
+        );
+        crate::services::advertiser_health::reset();
+    }
+
     /// The reservation must never widen the bounded-work budget it rides inside:
     /// the slice is capped, the reserve is a fraction of that same cap, and the
     /// 120s wall clock stays authoritative over both (C6a).
@@ -6966,8 +7200,11 @@ mod tests {
     /// conductor's load by the batch size — the forbidden move.
     #[test]
     fn the_batch_fanout_is_lower_than_the_single_id_fanout_it_replaces() {
-        // The single-id heal leg's default fan-out, which the batch arms replace.
-        let single_id_fanout = crate::config::heal_resolve_fanout();
+        // The single-id heal leg's HISTORICAL default fan-out, which the batch
+        // arms replaced (R1, 2026-08-09): the runtime knob was removed as dead
+        // config (plumbed but never read by `heal_content`), but the constant
+        // remains as the fixed baseline this test compares against.
+        let single_id_fanout = crate::config::DEFAULT_HEAL_RESOLVE_FANOUT;
         for (name, pacing) in [
             ("default", HealPacing::default()),
             ("test_fast", HealPacing::test_fast()),

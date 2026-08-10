@@ -200,10 +200,6 @@ static ADOPT_CONTEST_FANOUT: std::sync::OnceLock<usize> = std::sync::OnceLock::n
 /// Process-wide mirror of [`Config::contest_backoff_seconds`].
 static CONTEST_BACKOFF_SECONDS: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
 
-/// Process-wide mirror of [`Config::heal_resolve_fanout`]. Same `OnceLock`
-/// rationale as [`ADOPT_CONTEST_FANOUT`].
-static HEAL_RESOLVE_FANOUT: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
-
 /// Process-wide mirror of [`Config::heal_missing_backoff_seconds`].
 static HEAL_MISSING_BACKOFF_SECONDS: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
 
@@ -231,25 +227,6 @@ pub fn adopt_contest_fanout() -> usize {
     (*ADOPT_CONTEST_FANOUT
         .get()
         .unwrap_or(&DEFAULT_ADOPT_CONTEST_FANOUT))
-    .max(1)
-}
-
-/// Publish the content-heal resolve fan-out for the reconcile sweep. Idempotent.
-pub fn set_heal_resolve_fanout(fanout: usize) {
-    let _ = HEAL_RESOLVE_FANOUT.set(fanout);
-}
-
-/// How many own-conductor head resolves the CONTENT HEAL LEG may have in flight.
-///
-/// The adopt arm got its fan-out in F-B; the heal leg that SUPPLIES it did not,
-/// and remained one conductor round-trip at a time inside a 120s wall clock.
-/// Clamped to at least 1 for the same reason as [`adopt_contest_fanout`]: a zero
-/// would silently turn the leg into a no-op, and `1` is exactly the pre-lever
-/// sequential leg, so this is also the OFF switch.
-pub fn heal_resolve_fanout() -> usize {
-    (*HEAL_RESOLVE_FANOUT
-        .get()
-        .unwrap_or(&DEFAULT_HEAL_RESOLVE_FANOUT))
     .max(1)
 }
 
@@ -288,6 +265,42 @@ pub fn evidence_fallback_max_alternates() -> usize {
         .get()
         .unwrap_or(&DEFAULT_EVIDENCE_FALLBACK_MAX_ALTERNATES))
     .min(crate::services::head_adoption::ALTERNATE_ADVERTISER_CAP)
+}
+
+/// THE WRITE-GUARD INVARIANT (2026-08-09, B2b): `adopt_contest_fanout *
+/// evidence_fallback_max_alternates` may never exceed 24.
+///
+/// Named for the incident it prevents a repeat of: the adam 2026-07-20
+/// slow-link write-guard saturation
+/// (`genesis/docs/content/elohim-protocol/history/2026-07-20-adam-slow-link-write-guard-saturation.md`)
+/// — an unbounded per-candidate peer fan-out overloaded a single conductor's
+/// write path with no ceiling on the TOTAL concurrent round-trips one sweep
+/// tick could put in flight. `adopt_contest_fanout` candidates run
+/// concurrently, and EACH may now fan out into up to
+/// `evidence_fallback_max_alternates` fallback courier fetches
+/// (`services::head_adoption::resolve_peer_evidence`) — so the product, not
+/// either factor alone, is the conductor's real worst-case concurrent load
+/// from this arm. 24 is not a round number chosen for looks: it is the
+/// current default pair (6 × 4) exactly, so widening either knob without
+/// lowering the other trips this assertion rather than silently reproducing
+/// the melt's shape at a new pair of values.
+///
+/// Called ONCE at startup, after both knobs are finalised from their env
+/// overrides (`main.rs`) — fail-FAST, not fail-soft: a violated invariant here
+/// means the process would otherwise boot into the exact unbounded-fan-out
+/// shape this exists to forbid, and a config that cannot hold its own
+/// write-guard is safer refused than run.
+pub fn assert_courier_ladder_budget(fanout: usize, max_alternates: usize) {
+    let product = fanout.saturating_mul(max_alternates);
+    assert!(
+        product <= 24,
+        "courier ladder budget exceeded: adopt_contest_fanout ({fanout}) * \
+         evidence_fallback_max_alternates ({max_alternates}) = {product} > 24 — this is the \
+         write-guard invariant that prevents a repeat of the adam 2026-07-20 slow-link \
+         write-guard saturation melt (an unbounded per-candidate courier fan-out overloaded a \
+         single conductor's write path); lower ADOPT_CONTEST_FANOUT or \
+         ELOHIM_EVIDENCE_FALLBACK_MAX_ALTERNATES so the product holds at or under 24"
+    );
 }
 
 /// Publish the contest-backoff window for the reconcile sweep. Idempotent.
@@ -359,19 +372,30 @@ pub fn evidence_fallback_enabled() -> bool {
 
 /// Conservative default fan-out for the adopt sweep.
 ///
-/// 8, not "as many as fit": every in-flight candidate is a conductor round-trip,
-/// and the heal-pacing machinery in `projection_reconcile` exists because a
-/// saturated conductor (adam, at its read-pool ceiling) is the live constraint.
-/// 8 lifts the per-sweep contest supply roughly 8x while keeping the conductor's
-/// instantaneous load hard-bounded and far below its pool.
-pub const DEFAULT_ADOPT_CONTEST_FANOUT: usize = 8;
+/// Lowered 8 → 6 (2026-08-09, B2b): held under
+/// [`assert_courier_ladder_budget`] alongside the widened
+/// [`DEFAULT_EVIDENCE_FALLBACK_MAX_ALTERNATES`] (2 → 4) so their product stays
+/// at exactly 24 — the write-guard ceiling proven by the adam 2026-07-20 melt.
+/// Every in-flight candidate is a conductor round-trip, and the heal-pacing
+/// machinery in `projection_reconcile` exists because a saturated conductor
+/// (adam, at its read-pool ceiling) is the live constraint; each may now fan out
+/// into up to 4 fallback courier fetches, so the CANDIDATE fan-out must give up
+/// some of its own headroom to keep the conductor's worst-case instantaneous
+/// load unchanged.
+pub const DEFAULT_ADOPT_CONTEST_FANOUT: usize = 6;
 
-/// Conservative default fan-out for the CONTENT HEAL LEG's own-conductor
-/// resolves. Deliberately the SAME 8 as [`DEFAULT_ADOPT_CONTEST_FANOUT`]: the
-/// two legs run sequentially within one sweep (heal, then adopt), so 8 is the
-/// node's instantaneous conductor load either way — a number already proven safe
-/// live by the adopt arm rather than a second, differently-guessed one.
-pub const DEFAULT_HEAL_RESOLVE_FANOUT: usize = 8;
+/// Historical default fan-out for the CONTENT HEAL LEG's own-conductor
+/// resolves — no longer a live knob (the batch head-plane arms replaced this
+/// leg's per-id resolve entirely; `heal_content` reads
+/// [`crate::p2p::projection_reconcile::HealPacing::head_batch_fanout`], never
+/// this constant). Kept ONLY as the fixed historical baseline
+/// `the_batch_fanout_is_lower_than_the_single_id_fanout_it_replaces` compares
+/// against — the number the pre-batch sequential leg actually ran at, so that
+/// test still asserts against ground truth rather than a mirror of itself.
+/// `#[cfg(test)]`: its ONLY reader is that test, so a non-test build must not
+/// carry it (and must not need an `#[allow(dead_code)]` lie to stay quiet).
+#[cfg(test)]
+pub(crate) const DEFAULT_HEAL_RESOLVE_FANOUT: usize = 8;
 
 /// Default heal-leg conductor-missing replay window: 600s.
 ///
@@ -383,15 +407,18 @@ pub const DEFAULT_HEAL_RESOLVE_FANOUT: usize = 8;
 /// the truth that a newly-acquired chain is noticed quickly.
 pub const DEFAULT_HEAL_MISSING_BACKOFF_SECONDS: u64 = 600;
 
-/// Default advertiser-diversity breadth: 2 alternates.
+/// Default advertiser-diversity breadth: 4 alternates.
 ///
-/// Worst case is 3 fetches per evidence resolution (primary + 2), against 2
-/// before this knob existed. Chosen against the live shape: a household mesh
-/// advertising the same genesis-seeded row typically has 2-3 couriers, and the
-/// harvest retains at most [`crate::services::head_adoption::ALTERNATE_ADVERTISER_CAP`]
-/// of them — so 2 reaches most of the plurality that exists while leaving the
-/// third ask for an operator who wants it.
-pub const DEFAULT_EVIDENCE_FALLBACK_MAX_ALTERNATES: usize = 2;
+/// Raised 2 → 4 (2026-08-09, B2b, drain lever 4): worst case is 5 fetches per
+/// evidence resolution (primary + 4), against 3 before this widening. Chosen
+/// against the live shape: a household mesh advertising the same
+/// genesis-seeded row routinely has MORE than 2-3 couriers, and the harvest
+/// now retains up to [`crate::services::head_adoption::ALTERNATE_ADVERTISER_CAP`]
+/// (6) of them — 4 reaches most of that widened plurality while leaving the
+/// last two asks for an operator who wants them. Held under
+/// [`assert_courier_ladder_budget`]: `adopt_contest_fanout * this <= 24`,
+/// which this file's default pair (6 × 4 = 24) sits exactly on.
+pub const DEFAULT_EVIDENCE_FALLBACK_MAX_ALTERNATES: usize = 4;
 
 /// Conservative default backoff window: 3600s.
 ///
@@ -719,24 +746,6 @@ pub struct Config {
     #[serde(default = "default_adopt_contest_fanout")]
     pub adopt_contest_fanout: usize,
 
-    /// DRAIN LEVER 1: how many own-conductor head resolves the CONTENT HEAL LEG
-    /// runs CONCURRENTLY.
-    ///
-    /// F-B gave the adopt arm a fan-out and left the leg that FEEDS it strictly
-    /// sequential: `heal_content` awaited one `resolve_content_head_local` at a
-    /// time inside a 120s wall clock, so at the live ~0.75s conductor latency a
-    /// sweep touched ~160 of ~2.9k pending ids. That single number caps BOTH the
-    /// healed rate and the adopt arm's candidate supply, because every candidate
-    /// list the adopt arm consumes is produced by an outcome of this leg.
-    ///
-    /// `1` restores the exact pre-lever sequential leg (the OFF switch). Raise
-    /// with care for the same reason as [`Self::adopt_contest_fanout`]: each
-    /// in-flight resolve is a conductor round-trip, and a saturated conductor is
-    /// the live constraint the whole pacing layer exists for.
-    /// Loaded from env `HEAL_RESOLVE_FANOUT`.
-    #[serde(default = "default_heal_resolve_fanout")]
-    pub heal_resolve_fanout: usize,
-
     /// DRAIN LEVER 2: how long (seconds) the content heal leg may REPLAY a known
     /// `Ok(None)` own-conductor answer instead of paying the round-trip again
     /// (`services::heal_backoff`).
@@ -973,10 +982,6 @@ fn default_contest_backoff_seconds() -> u64 {
     DEFAULT_CONTEST_BACKOFF_SECONDS
 }
 
-fn default_heal_resolve_fanout() -> usize {
-    DEFAULT_HEAL_RESOLVE_FANOUT
-}
-
 fn default_heal_missing_backoff_seconds() -> u64 {
     DEFAULT_HEAL_MISSING_BACKOFF_SECONDS
 }
@@ -1059,7 +1064,6 @@ impl Default for Config {
             trust_memo_reads_enabled: false,
             trust_memo_ttl_seconds: default_trust_memo_ttl_seconds(),
             adopt_contest_fanout: default_adopt_contest_fanout(),
-            heal_resolve_fanout: default_heal_resolve_fanout(),
             heal_missing_backoff_seconds: default_heal_missing_backoff_seconds(),
             contest_backoff_seconds: default_contest_backoff_seconds(),
             evidence_absent_backoff_seconds: default_evidence_absent_backoff_seconds(),
@@ -1238,5 +1242,39 @@ mod transport_backend_tests {
             let parsed = TransportBackend::from_str(&s).unwrap();
             assert_eq!(parsed, backend);
         }
+    }
+}
+
+#[cfg(test)]
+mod courier_ladder_budget_tests {
+    use super::assert_courier_ladder_budget;
+
+    /// The default pair sits EXACTLY on the ceiling (6 × 4 = 24) — the
+    /// invariant must hold it, not merely tolerate it.
+    #[test]
+    fn the_default_pair_holds_the_budget() {
+        assert_courier_ladder_budget(
+            super::DEFAULT_ADOPT_CONTEST_FANOUT,
+            super::DEFAULT_EVIDENCE_FALLBACK_MAX_ALTERNATES,
+        );
+    }
+
+    /// **The assertion trips on an over-limit pair.** A config that would put
+    /// more than 24 concurrent round-trips in flight from this arm must panic
+    /// at load time rather than boot into the adam 2026-07-20 melt's shape.
+    #[test]
+    #[should_panic(expected = "courier ladder budget exceeded")]
+    fn the_assertion_trips_on_an_over_limit_pair() {
+        assert_courier_ladder_budget(8, 4); // 32 > 24
+    }
+
+    /// The boundary itself must never be mistaken for a violation — an
+    /// off-by-one here would make the shipped default pair panic at every
+    /// boot.
+    #[test]
+    fn a_product_of_exactly_24_is_never_a_violation() {
+        assert_courier_ladder_budget(6, 4);
+        assert_courier_ladder_budget(12, 2);
+        assert_courier_ladder_budget(24, 1);
     }
 }
