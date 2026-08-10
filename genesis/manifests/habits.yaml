@@ -199,7 +199,21 @@ habits:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
       - "sweettest rea_commitment_replication (elohim/holochain/tests/sweettest — unignored 837b772c9; isolated late-join conductors, bounded 60s peer-B retrieval; RED but MIS-ATTRIBUTED per DELTA 2026-08-09 — it measures one-time cold-cell Wasm warm-up, not REA retrieval; do not read it as a fetch-seam probe until it warms peer B)"
     evidence: >
-      DELTA 2026-08-10 (limit-cycle sprint, overnight): DONE-CANDIDATE —
+      DELTA 2026-08-10 (wedge audit, midday): the flip path was
+      MIS-MODELED — the fleet-quiesce gate's predicate reads storage-A
+      (matthew) ONLY (caughtUp + actionable<=tol 2 + unmeasured=0 + both
+      doorways 200; scripts/ci/fleet-quiesce-gate.sh scope note), so the
+      shem-trio stock never gated banking; and the banking verb is a
+      NO-DEPLOY validate run — empty commit tagged [build:edge]
+      [edge:validate-only] (mode live since b2dfd0de2, 2026-07-30) —
+      because a deploy-coupled [build:edge] banking run restarts the
+      fleet it measures. Four-leg preflight (doorway /p2p/status +
+      /db/content x2 + per-pod Prometheus actionable/unmeasured, ~20s)
+      read ALL GREEN with lanes idle post edge #1338; the banking push
+      is prepared and classifier-blocked pending the operator permission
+      rule (sprint wishlist item 1). Preflight-before-push is the
+      discipline: never fire a banking run the four-leg read wouldn't
+      pass. DELTA 2026-08-10 (limit-cycle sprint, overnight): DONE-CANDIDATE —
       @concern:notary-authority 3/3 PASSED locally TWICE across two
       independent fleet deploys (post-declare 13.4s run, then 0.3s re-run
       after edge #1337's full restart: same canonical head on both
