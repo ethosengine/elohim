@@ -3,9 +3,9 @@
 
 use cid::Cid;
 use elohim_epr_rea::{
-    atom_cid, fulfillment, resource_state, AgentRef, Commitment, CommitmentState, FlowEvent,
-    FlowRecord, FlowStore, FlowWalk, Intent, Magnitude, MemoryFlowStore, PinnedRef, Process,
-    ReaVerb, ResourceSpec, SidecarFlowStore,
+    atom_cid, fulfillment, resource_state, AgentRef, AlgedonicEvidence, Bound, Commitment,
+    CommitmentState, FlowEvent, FlowRecord, FlowStore, FlowWalk, Intent, Magnitude,
+    MemoryFlowStore, PinnedRef, Process, ReaVerb, ResourceSpec, SidecarFlowStore,
 };
 
 fn agent(name: &str) -> AgentRef {
@@ -134,6 +134,7 @@ fn fulfillment_ratio_is_fulfilled_over_expected() {
         valid_until: None,
         state: CommitmentState::Active,
         satisfies: vec![],
+        bound: None,
     };
     let c_cid = atom_cid(&commitment).unwrap();
 
@@ -170,6 +171,209 @@ fn fulfillment_ratio_is_fulfilled_over_expected() {
     assert_eq!(status.fulfilled_quantity, 3.0);
     assert_eq!(status.expected_quantity, Some(6.0));
     assert_eq!(status.ratio(), Some(0.5));
+}
+
+// ── Limits live on commitments; pain flows against the promise ──────────────────
+
+/// A promise to stay under a token ceiling. `bound: None` is the unbounded promise.
+fn budget_commitment(scope: &Cid, bound: Option<Bound>) -> Commitment {
+    Commitment {
+        action: ReaVerb::Consume,
+        provider: agent("claude"),
+        receiver: agent("operator"),
+        resource_spec: ResourceSpec {
+            classified_as: vec!["dev:token-budget".into()],
+            quantity: None,
+        },
+        in_scope_of: *scope,
+        valid_from: None,
+        valid_until: None,
+        state: CommitmentState::Active,
+        satisfies: vec![],
+        bound,
+    }
+}
+
+fn token_bound() -> Bound {
+    Bound::new(1000.0, "token".into(), 85.0).expect("valid bound")
+}
+
+/// Spend `value` tokens against `commitment` — the DHT spells this edge `bounded_by`.
+fn spend(scope: &Cid, commitment: Cid, value: f64) -> FlowEvent {
+    event(
+        ReaVerb::Consume,
+        &resource("capability"),
+        count(value, "token"),
+        scope,
+        None,
+        vec![commitment],
+    )
+}
+
+#[test]
+fn stock_crossing_the_band_edge_yields_approach_pain_against_the_commitment() {
+    let scope = resource("epic");
+    let commitment = budget_commitment(&scope, Some(token_bound()));
+    let c_cid = atom_cid(&commitment).unwrap();
+    let events = vec![spend(&scope, c_cid, 600.0), spend(&scope, c_cid, 280.0)];
+
+    let status = fulfillment(&c_cid, &commitment, &events);
+    match status.pain.expect("880 of 1000 is past the 85% band edge") {
+        AlgedonicEvidence::Approach {
+            stock,
+            limit,
+            bound_ref,
+            threshold_pct,
+        } => {
+            assert_eq!(stock, 880.0);
+            assert_eq!(limit, 1000.0);
+            assert_eq!(threshold_pct, 85.0);
+            // The bound IS the commitment: bound_ref is its CID, nothing else.
+            assert_eq!(bound_ref, c_cid.to_string());
+        }
+        other => panic!("expected approach evidence, got {other:?}"),
+    }
+}
+
+#[test]
+fn stock_crossing_the_limit_yields_breach_pain() {
+    let scope = resource("epic");
+    let commitment = budget_commitment(&scope, Some(token_bound()));
+    let c_cid = atom_cid(&commitment).unwrap();
+    let events = vec![spend(&scope, c_cid, 900.0), spend(&scope, c_cid, 300.0)];
+
+    let pain = fulfillment(&c_cid, &commitment, &events)
+        .pain
+        .expect("1200 of 1000 is a breach");
+    assert_eq!(
+        pain,
+        AlgedonicEvidence::Breach {
+            stock: 1200.0,
+            limit: 1000.0,
+            bound_ref: c_cid.to_string(),
+        },
+        "breach evidence carries no band edge — the line itself is the edge"
+    );
+}
+
+#[test]
+fn stock_inside_the_band_is_silence() {
+    let scope = resource("epic");
+    let commitment = budget_commitment(&scope, Some(token_bound()));
+    let c_cid = atom_cid(&commitment).unwrap();
+    let events = vec![spend(&scope, c_cid, 840.0)];
+
+    assert!(
+        fulfillment(&c_cid, &commitment, &events).pain.is_none(),
+        "84% of the limit has not reached the 85% band edge"
+    );
+}
+
+/// Honest absence: a promise that declared no ceiling can never be in pain, however much
+/// flows against it. No bound, no limit, nothing to report.
+#[test]
+fn a_commitment_with_no_bound_never_yields_pain() {
+    let scope = resource("epic");
+    let commitment = budget_commitment(&scope, None);
+    let c_cid = atom_cid(&commitment).unwrap();
+    let events = vec![spend(&scope, c_cid, 9_000_000.0)];
+
+    let status = fulfillment(&c_cid, &commitment, &events);
+    assert_eq!(status.event_count, 1, "the flow is still observed…");
+    assert!(
+        status.pain.is_none(),
+        "…but an unbounded promise has no line"
+    );
+}
+
+/// Stock is what flowed against THIS promise, in the bound's own unit.
+#[test]
+fn stock_counts_only_events_bounded_by_this_commitment_in_the_bound_unit() {
+    let scope = resource("epic");
+    let commitment = budget_commitment(&scope, Some(token_bound()));
+    let c_cid = atom_cid(&commitment).unwrap();
+    let other = atom_cid(&"other-commitment").unwrap();
+
+    let events = vec![
+        spend(&scope, c_cid, 900.0),
+        // Names a different commitment — not this promise's stock.
+        spend(&scope, other, 900.0),
+        // Names this commitment but in another unit — not this bound's stock.
+        event(
+            ReaVerb::Consume,
+            &resource("capability"),
+            count(900.0, "second"),
+            &scope,
+            None,
+            vec![c_cid],
+        ),
+    ];
+
+    let pain = fulfillment(&c_cid, &commitment, &events)
+        .pain
+        .expect("900 of 1000 is past the band edge");
+    assert_eq!(pain.stock(), 900.0, "only the 900 tokens on this promise");
+    assert!(
+        matches!(pain, AlgedonicEvidence::Approach { .. }),
+        "900 < 1000 — approaching, not breached"
+    );
+}
+
+/// The projection: open pain across the store, keyed by the commitment CID.
+#[test]
+fn open_pain_projects_per_commitment_and_stays_silent_where_there_is_no_bound() {
+    let mut store = MemoryFlowStore::new();
+    let scope = resource("epic");
+
+    let hurting = budget_commitment(&scope, Some(token_bound()));
+    let hurting_cid = store.append(FlowRecord::Commitment(hurting)).unwrap();
+
+    // Same bound, different scope ⇒ a distinct commitment — and it is nowhere near its line.
+    let calm_scope = resource("other-epic");
+    let calm = budget_commitment(&calm_scope, Some(token_bound()));
+    let calm_cid = store.append(FlowRecord::Commitment(calm)).unwrap();
+
+    let unbounded_scope = resource("third-epic");
+    let unbounded = budget_commitment(&unbounded_scope, None);
+    let unbounded_cid = store.append(FlowRecord::Commitment(unbounded)).unwrap();
+
+    store
+        .append(FlowRecord::Event(spend(&scope, hurting_cid, 1200.0)))
+        .unwrap();
+    store
+        .append(FlowRecord::Event(spend(&calm_scope, calm_cid, 10.0)))
+        .unwrap();
+    store
+        .append(FlowRecord::Event(spend(
+            &unbounded_scope,
+            unbounded_cid,
+            50_000.0,
+        )))
+        .unwrap();
+
+    let pain = store.open_pain().unwrap();
+    assert_eq!(pain.len(), 1, "exactly one promise is in pain: {pain:?}");
+    let (cid, evidence) = &pain[0];
+    assert_eq!(*cid, hurting_cid, "pain is keyed by the commitment CID");
+    assert_eq!(evidence.bound_ref(), hurting_cid.to_string());
+    assert_eq!(evidence.stock(), 1200.0);
+}
+
+/// A promise that is no longer open cannot be in open pain — same rule the unfulfilled
+/// frontier already applies.
+#[test]
+fn open_pain_ignores_commitments_that_are_no_longer_open() {
+    let mut store = MemoryFlowStore::new();
+    let scope = resource("epic");
+
+    let mut revoked = budget_commitment(&scope, Some(token_bound()));
+    revoked.state = CommitmentState::Revoked;
+    let revoked_cid = store.append(FlowRecord::Commitment(revoked)).unwrap();
+    store
+        .append(FlowRecord::Event(spend(&scope, revoked_cid, 5000.0)))
+        .unwrap();
+
+    assert!(store.open_pain().unwrap().is_empty());
 }
 
 // ── The dev-pipeline mini-chain walk ────────────────────────────────────────────
@@ -216,6 +420,7 @@ fn build_mini_chain() -> MiniChain {
         valid_until: None,
         state: CommitmentState::Active,
         satisfies: vec![intent_cid],
+        bound: None,
     };
     let c1_cid = store.append(FlowRecord::Commitment(c1)).unwrap();
 
@@ -269,6 +474,7 @@ fn build_mini_chain() -> MiniChain {
         valid_until: None,
         state: CommitmentState::Active,
         satisfies: vec![],
+        bound: None,
     };
     let c2_cid = store.append(FlowRecord::Commitment(c2)).unwrap();
 
@@ -359,6 +565,7 @@ fn sidecar_roundtrips_records_with_stable_cids() {
                 valid_until: None,
                 state: CommitmentState::Proposed,
                 satisfies: vec![],
+                bound: None,
             }))
             .unwrap();
         (a, b)

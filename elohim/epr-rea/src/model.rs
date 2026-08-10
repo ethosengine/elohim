@@ -97,6 +97,74 @@ pub enum CommitmentState {
     Revoked,
 }
 
+/// A **ceiling a commitment declares on itself**: the stock level this promise must not
+/// cross, and the band edge at which the approach fires before it.
+///
+/// A limit is only ever a bound on a promise — which is why the algedonic `bound_ref` is the
+/// bounding commitment's own CID rather than a separate atom's, and why this lives as a field
+/// on [`Commitment`] instead of as a fourth record kind. Ceiling semantics only (a floor bound
+/// — pain for a stock falling *below* a line — is not modeled), matching
+/// `elohim_epr::algedonic::AlgedonicEvidence::band_edge`.
+///
+/// `threshold_pct` is a **percentage** (`85.0` means 85%), never a fraction — the same unit the
+/// wire evidence uses. [`Bound::new`] is the sole constructor and refuses anything below `1.0`
+/// precisely because `0.85` is the fraction/percent confusion: read as a percent it puts the
+/// band edge at 0.85% of the limit, so the first unit of stock that flows reads as pain.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Bound {
+    /// The ceiling, denominated in [`Self::unit`].
+    pub limit: f64,
+    /// What the limit measures — only `Magnitude::Count` flows in this unit accumulate
+    /// against it.
+    pub unit: String,
+    /// Band edge as a percentage of the limit (`85.0` = 85%), in `[1, 100]`.
+    pub threshold_pct: f64,
+}
+
+impl Bound {
+    /// Construct a bound, enforcing the unit and range rules. The only validating path —
+    /// the fields are `pub` (the crate's existing convention), so [`Self::validate`] is
+    /// re-checkable on a hand-built or deserialized value.
+    pub fn new(limit: f64, unit: String, threshold_pct: f64) -> Result<Self> {
+        let bound = Self {
+            limit,
+            unit,
+            threshold_pct,
+        };
+        bound.validate()?;
+        Ok(bound)
+    }
+
+    /// Re-check a bound's rules. Never panics — callers decide what to do with a rejection.
+    pub fn validate(&self) -> Result<()> {
+        if !self.limit.is_finite() || self.limit <= 0.0 {
+            return Err(FabricError::InvalidBound(format!(
+                "limit must be a finite positive ceiling, got {}",
+                self.limit
+            )));
+        }
+        if self.unit.trim().is_empty() {
+            return Err(FabricError::InvalidBound(
+                "unit must name what the limit measures".into(),
+            ));
+        }
+        if !self.threshold_pct.is_finite() || !(1.0..=100.0).contains(&self.threshold_pct) {
+            return Err(FabricError::InvalidBound(format!(
+                "threshold_pct is a percent of the limit in [1, 100] (85.0 means 85%), got {} \
+                 — anything below 1.0 is the fraction/percent confusion, not a band edge",
+                self.threshold_pct
+            )));
+        }
+        Ok(())
+    }
+
+    /// The stock level at which the approach fires: `limit × threshold_pct / 100`.
+    pub fn band_edge(&self) -> f64 {
+        self.limit * self.threshold_pct / 100.0
+    }
+}
+
 /// Plan level: a promised flow (VF Commitment). Graduated home: `Mishpat::Commitment`
 /// (cid = entry_hash — never action_hash).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -113,6 +181,13 @@ pub struct Commitment {
     pub state: CommitmentState,
     /// Intent(s) this commitment answers (VF Satisfaction — an edge, not an atom).
     pub satisfies: Vec<Cid>,
+    /// The ceiling this promise declares on itself, if any. `None` is an **unbounded
+    /// promise**: no bound, no pain (honest absence — see [`crate::fold::fulfillment`]).
+    ///
+    /// Skipped when absent so that declaring this vocabulary did not move a single existing
+    /// commitment's CID — pinned by `an_unbounded_commitment_keeps_its_pre_bound_cid`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bound: Option<Bound>,
 }
 
 /// Observation level: what actually happened (granular floor of VF EconomicEvent;
@@ -364,6 +439,101 @@ mod tests {
         assert_eq!(
             cid.to_string(),
             "bafyreigyvgxxtwtsowy7j2nstjaapzfjcwhvixp5o4a4v3xlsxym7x7wzi"
+        );
+    }
+
+    // ── Bound: the ceiling a commitment declares on itself ───────────────────────
+
+    /// The fixture whose CID the golden below pins — a commitment carrying NO bound.
+    fn unbounded_commitment() -> Commitment {
+        Commitment {
+            action: ReaVerb::Produce,
+            provider: agent("claude"),
+            receiver: agent("operator"),
+            resource_spec: ResourceSpec {
+                classified_as: vec!["dev:joint".into()],
+                quantity: Some(Magnitude::Count {
+                    value: 6.0,
+                    unit: "joint".into(),
+                }),
+            },
+            in_scope_of: upstream_cid("epic"),
+            valid_from: None,
+            valid_until: None,
+            state: CommitmentState::Active,
+            satisfies: vec![],
+            bound: None,
+        }
+    }
+
+    #[test]
+    fn bound_band_edge_is_a_percentage_of_the_limit() {
+        let bound = Bound::new(1000.0, "token".into(), 85.0).expect("valid bound");
+        assert_eq!(bound.band_edge(), 850.0);
+
+        // 100% is legal and puts the band edge on the limit itself.
+        let full = Bound::new(1000.0, "token".into(), 100.0).expect("100% is a valid band edge");
+        assert_eq!(full.band_edge(), 1000.0);
+    }
+
+    /// `0.85` is the fraction/percent confusion: read as a percent it puts the band edge at
+    /// 0.85% of the limit, so the first token spent is "pain". The sole constructor refuses it.
+    #[test]
+    fn bound_new_refuses_a_fraction_masquerading_as_a_percent() {
+        let err = Bound::new(1000.0, "token".into(), 0.85)
+            .expect_err("0.85 must be refused as a fraction, not accepted as 0.85%");
+        assert!(
+            err.to_string().contains("percent"),
+            "the refusal must name the unit; got: {err}"
+        );
+        assert!(matches!(err, FabricError::InvalidBound(_)));
+    }
+
+    #[test]
+    fn bound_new_refuses_an_out_of_range_or_non_finite_threshold() {
+        for bad in [0.0, -5.0, 100.5, f64::NAN, f64::INFINITY] {
+            assert!(
+                Bound::new(1000.0, "token".into(), bad).is_err(),
+                "threshold_pct {bad} must be refused"
+            );
+        }
+        Bound::new(1000.0, "token".into(), 1.0).expect("1% is the lowest honest band edge");
+    }
+
+    #[test]
+    fn bound_new_refuses_a_ceiling_that_is_not_a_finite_positive_quantity() {
+        for bad in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert!(
+                Bound::new(bad, "token".into(), 85.0).is_err(),
+                "limit {bad} must be refused"
+            );
+        }
+        assert!(
+            Bound::new(1000.0, "  ".into(), 85.0).is_err(),
+            "a limit measures something — the unit must be named"
+        );
+    }
+
+    /// Declaring the bound vocabulary must not have moved any existing commitment: the field
+    /// is skipped when absent, so an unbounded commitment's canonical bytes are unchanged.
+    /// The golden was computed against the pre-bound `Commitment` struct.
+    #[test]
+    fn an_unbounded_commitment_keeps_its_pre_bound_cid() {
+        let cid = atom_cid(&unbounded_commitment()).expect("cid");
+        assert_eq!(
+            cid.to_string(),
+            "bafyreib77zpf3g4daj54622eqjmkao7cfbv4n27kylnekoous4atg5h52q"
+        );
+    }
+
+    /// …but a bound IS part of the promise, so declaring one is a different commitment.
+    #[test]
+    fn declaring_a_bound_changes_the_commitment_cid() {
+        let mut bounded = unbounded_commitment();
+        bounded.bound = Some(Bound::new(1000.0, "token".into(), 85.0).expect("valid bound"));
+        assert_ne!(
+            atom_cid(&unbounded_commitment()).unwrap(),
+            atom_cid(&bounded).unwrap()
         );
     }
 

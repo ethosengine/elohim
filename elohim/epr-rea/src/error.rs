@@ -16,6 +16,9 @@ pub enum FabricError {
 
     #[error("invalid edge: {0}")]
     InvalidEdge(String),
+
+    #[error("invalid bound: {0}")]
+    InvalidBound(String),
 }
 
 pub type Result<T> = std::result::Result<T, FabricError>;

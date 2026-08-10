@@ -16,6 +16,11 @@ pub enum EprError {
     Coupling(String),
     #[error("invalid envelope: {0}")]
     InvalidEnvelope(String),
+    /// A refusal from [`crate::algedonic`] — a signal whose kind disagrees with its evidence,
+    /// or evidence that names no bound. Pain has its own refusal class because an algedonic
+    /// signal is not an envelope: it is a report against a promise.
+    #[error("algedonic signal: {0}")]
+    Algedonic(String),
 }
 
 pub type Result<T> = std::result::Result<T, EprError>;

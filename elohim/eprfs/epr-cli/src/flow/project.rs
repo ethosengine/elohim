@@ -355,6 +355,7 @@ fn derive_gap_items(root: &Path, abs: &Path, deriv: &mut Derivation) -> FlowResu
                 valid_until: None,
                 state: CommitmentState::Active,
                 satisfies: vec![intent_cid],
+                bound: None,
             };
             let commitment_cid = atom_cid(&commitment)?;
             deriv.stage_record(
@@ -391,6 +392,7 @@ fn derive_scenario(
         valid_until: None,
         state: CommitmentState::Active,
         satisfies: Vec::new(),
+        bound: None,
     };
     let commitment_cid = atom_cid(&commitment)?;
     deriv.stage_record(

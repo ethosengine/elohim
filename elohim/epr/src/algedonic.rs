@@ -28,6 +28,13 @@
 //!   evidence is unrepresentable in [`AlgedonicSignal`] and refused at the wire boundary.
 //! - **One open signal per `(declarer, target, kind)`.** [`open_signal_key`] is that key; pain is
 //!   a held state, not a stream. [`should_emit`] is the hysteresis predicate that enforces it.
+//! - **Evidence is minted, never assembled.** The limit a signal reports is a bound on a
+//!   *promise*, so evidence is derived by the REA fold that owns the bound
+//!   (`elohim_epr_rea::fold::fulfillment`, whose `bound_ref` is the bounding commitment's CID) —
+//!   the single evidence constructor. That is what keeps the extra-key edge theoretical: the
+//!   schemas permit unlisted evidence keys, so a stray `threshold_pct` on a breach payload would
+//!   deserialize as `Approach` and be refused by the coherence check below; nothing on the minted
+//!   path can build one, because the variant is chosen from the crossing.
 //!
 //! # Wire contract
 //!
@@ -258,8 +265,8 @@ impl TryFrom<AlgedonicWire> for AlgedonicSignal {
 
     fn try_from(w: AlgedonicWire) -> Result<Self> {
         if w.signal_kind != w.evidence.kind() {
-            return Err(EprError::InvalidEnvelope(format!(
-                "algedonic signal: signal_kind {} disagrees with its evidence ({})",
+            return Err(EprError::Algedonic(format!(
+                "signal_kind {} disagrees with its evidence ({})",
                 w.signal_kind.as_str(),
                 w.evidence.kind().as_str()
             )));
@@ -306,11 +313,7 @@ pub fn open_signal_key(signal: &AlgedonicSignal) -> OpenSignalKey {
 /// schemas; the *shape* obligations (evidence present, `threshold_pct` on approaches only, no
 /// valence) are already unrepresentable and are deliberately absent from this function.
 pub fn validate(signal: &AlgedonicSignal) -> Result<()> {
-    let refuse = |what: &str| -> Result<()> {
-        Err(EprError::InvalidEnvelope(format!(
-            "algedonic signal: {what}"
-        )))
-    };
+    let refuse = |what: &str| -> Result<()> { Err(EprError::Algedonic(what.to_string())) };
 
     if signal.target.is_empty() {
         return refuse("target (the threatened promise) must be non-empty");
@@ -466,6 +469,10 @@ mod tests {
         };
         let err = validate(&s).expect_err("empty bound_ref must refuse");
         assert!(err.to_string().contains("bound_ref"), "got: {err}");
+        assert!(
+            matches!(err, EprError::Algedonic(_)),
+            "pain has its own refusal class, not the envelope's"
+        );
 
         // …and the valid samples pass, so the refusal is not a blanket one.
         validate(&approach()).expect("valid approach");

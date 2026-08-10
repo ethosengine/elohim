@@ -10,6 +10,14 @@
 //! - **Observation**: [`model::FlowEvent`] — what actually happened, with `fulfills` /
 //!   `satisfies` edges inside the hashed bytes.
 //!
+//! **Limits are bounds on promises.** A [`model::Commitment`] may declare a [`model::Bound`] —
+//! a ceiling on itself — and the flows that discharge the promise (`fulfills`, the edge the DHT
+//! spells `bounded_by`) are the same flows that accumulate against that ceiling. Crossing the
+//! band edge or the limit is therefore an event against the *commitment*, derived by
+//! [`fold::fulfillment`] as `elohim_epr::algedonic` evidence whose `bound_ref` is the
+//! commitment's own CID, and projected per-promise by [`store::FlowStore::open_pain`]. A promise
+//! that declared no bound is never in pain — honest absence, not a zero.
+//!
 //! Resource is NOT an entity: anything content-addressed is a resource; resource *state*
 //! is a pure fold over event history ([`fold`]). Granularity is scale-free here — what
 //! *should* be metered is a governance decision bound via `.epr-meta`, never a constant
@@ -33,7 +41,7 @@ pub use epistemic::{
 pub use error::{FabricError, Result};
 pub use fold::{fulfillment, resource_state, FulfillmentStatus, ResourceState};
 pub use model::{
-    atom_cid, edge_fp, AgentRef, Commitment, CommitmentState, DepEdge, EdgeSpec, EdgeStatus,
+    atom_cid, edge_fp, AgentRef, Bound, Commitment, CommitmentState, DepEdge, EdgeSpec, EdgeStatus,
     FlowEvent, Governor, Intent, PinnedRef, Process, ProcessSpec, ResourceSpec, StageSpec,
     ValidatorRef,
 };
@@ -41,4 +49,5 @@ pub use store::{FlowRecord, FlowStore, MemoryFlowStore, SidecarFlowStore};
 pub use walk::{FlowWalk, Frontier, Lineage};
 
 // Re-export the shared vocabulary so consumers need no direct elohim-epr dep for it.
+pub use elohim_epr::algedonic::{AlgedonicEvidence, AlgedonicKind};
 pub use elohim_epr::witness::{Magnitude, ReaVerb};

@@ -8,9 +8,11 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use cid::Cid;
+use elohim_epr::algedonic::AlgedonicEvidence;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{FabricError, Result};
+use crate::fold::fulfillment;
 use crate::model::{
     atom_cid, edge_fp, Commitment, CommitmentState, DepEdge, FlowEvent, Intent, Process,
     ProcessSpec,
@@ -140,6 +142,26 @@ pub trait FlowStore {
                     && matches!(c.state, CommitmentState::Proposed | CommitmentState::Active)
                     && !discharged.contains(cid)
             })
+            .collect())
+    }
+
+    /// Open pain across the store: for every OPEN commitment (Proposed/Active) that declared a
+    /// [`crate::model::Bound`], the algedonic evidence its folded stock has crossed — keyed by
+    /// the commitment's CID, which IS that evidence's `bound_ref`.
+    ///
+    /// Silence has three honest sources here and none of them is an entry: a promise that
+    /// declared no ceiling, a stock still inside the band, and a promise no longer open (the
+    /// same Proposed/Active rule [`Self::unfulfilled_in_scope`] applies — a revoked or fulfilled
+    /// promise cannot be in *open* pain). Nothing is emitted from this projection; deciding
+    /// whether an entry becomes a signal is the caller's, under
+    /// `elohim_epr::algedonic::should_emit`.
+    fn open_pain(&self) -> Result<Vec<(Cid, AlgedonicEvidence)>> {
+        let events: Vec<FlowEvent> = self.events()?.into_iter().map(|(_, e)| e).collect();
+        Ok(self
+            .commitments()?
+            .into_iter()
+            .filter(|(_, c)| matches!(c.state, CommitmentState::Proposed | CommitmentState::Active))
+            .filter_map(|(cid, c)| fulfillment(&cid, &c, &events).pain.map(|pain| (cid, pain)))
             .collect())
     }
 }
