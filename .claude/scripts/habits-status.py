@@ -22,6 +22,8 @@ Usage:
 Deterministic, read-only, no network. Statuses are DECLARED in habits.yaml (covenant rule
 4: flips require evidence); this script renders, never infers.
 """
+import json
+import re
 import sys
 from pathlib import Path
 
@@ -30,7 +32,68 @@ try:
 except ImportError:
     sys.exit(0)  # never break session start over a dependency
 
-HABITS = Path(__file__).resolve().parents[2] / "genesis" / "manifests" / "habits.yaml"
+_ROOT = Path(__file__).resolve().parents[2]
+HABITS = _ROOT / "genesis" / "manifests" / "habits.yaml"
+
+# The three concern-addressed findings ledgers a habit's pain can live in:
+# CI (ci-harvest), runtime self-heal-exhaustion (runtime-harvest), and the
+# local devspace/architecture plane (epr-meta measure mint). Tests override
+# this list wholesale (`m.LEDGERS = [fixture_path]`) rather than patching
+# individual entries.
+LEDGERS = [
+    _ROOT / ".claude" / "data" / "ci-findings.jsonl",
+    _ROOT / ".claude" / "data" / "runtime-findings.jsonl",
+    _ROOT / ".claude" / "data" / "architecture-findings.jsonl",
+]
+
+# Inline copy of concern_routes.py's tag regex — habits-status is a
+# session-start surface and stays import-free of other _lib modules.
+_CONCERN_TAG = re.compile(r"@concern:([a-z0-9][a-z0-9-]*)")
+
+
+def open_pain() -> dict:
+    """concern -> [fps] over OPEN, concern-addressed entries across LEDGERS.
+
+    Entries without a truthy `concern` are skipped silently (never counted,
+    never a crash). A missing, unreadable, or malformed ledger — or an
+    individual malformed line — contributes nothing; this must never raise
+    at session start.
+    """
+    pain: dict = {}
+    for ledger in LEDGERS:
+        try:
+            ledger = Path(ledger)
+            if not ledger.exists():
+                continue
+            with ledger.open(encoding="utf-8") as fh:
+                for raw in fh:
+                    raw = raw.strip()
+                    if not raw:
+                        continue
+                    try:
+                        entry = json.loads(raw)
+                    except json.JSONDecodeError:
+                        continue
+                    if not isinstance(entry, dict):
+                        continue
+                    if entry.get("status") != "open":
+                        continue
+                    concern = entry.get("concern")
+                    if not concern:
+                        continue
+                    pain.setdefault(concern, []).append(entry.get("fp") or "?")
+        except OSError:
+            continue
+    return pain
+
+
+def _first_concern(checks):
+    """First @concern: tag among a habit's check strings, or None."""
+    for c in checks or []:
+        m = _CONCERN_TAG.search(str(c))
+        if m:
+            return m.group(1)
+    return None
 
 
 def load():
@@ -64,6 +127,11 @@ def headline(habits: dict) -> str:
     elif top.get("status") == "red":
         check = (top.get("checks") or ["(check missing)"])[0]
         nxt = f"top red: {top['id']} → {check}"
+        concern = _first_concern(top.get("checks"))
+        if concern:
+            fps = open_pain().get(concern) or []
+            if fps:
+                nxt += f" · pain: {len(fps)} open @{concern}"
     else:
         nxt = f"top move: {top['id']} is unwired → write its red ({(top.get('first_move') or '').strip().split(':')[0]}…)"
 
@@ -79,6 +147,7 @@ def headline(habits: dict) -> str:
 
 def full(habits: dict) -> str:
     lines = [f"Delivery habits — {HABITS} (updated {habits.get('updated')})", ""]
+    pain = open_pain()
     for n in habits_of(habits):
         mark = {"green": "✅", "red": "🔴", "unwired": "▫️"}.get(n.get("status"), "?")
         act = "  [ACTIVE]" if n.get("active") else ""
@@ -90,6 +159,11 @@ def full(habits: dict) -> str:
             lines.append(f"    first move: {' '.join(str(n['first_move']).split())}")
         if n.get("evidence"):
             lines.append(f"    evidence: {' '.join(str(n['evidence']).split())}")
+        concern = _first_concern(n.get("checks"))
+        fps = pain.get(concern) if concern else None
+        if fps:
+            shown = ", ".join(fps[:3]) + ("…" if len(fps) > 3 else "")
+            lines.append(f"    pain: {len(fps)} open ({shown})")
         lines.append("")
     return "\n".join(lines)
 
