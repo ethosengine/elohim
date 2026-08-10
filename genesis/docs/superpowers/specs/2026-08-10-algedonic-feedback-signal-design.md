@@ -118,7 +118,7 @@ its absence" becomes a validated state, not silence:
 - **One open signal per `(declarer, target, kind)`.** `open_signal_key` is the dedupe key; the escalation test proves an open `Approach` never swallows its `Breach` (`should_emit_lets_escalation_and_unrelated_pain_through`).
 - **Honest absence over a guessed address.** `concern_routes.route` returns `None` when no rule resolves a finding to a concern (`.claude/scripts/_lib/concern_routes.py`, slice-1).
 - **Lightest enforcement class first.** New algedonic authoring surfaces gate via `ask` before `deny`, per the `.epr-meta` compose-gate ladder (`genesis/docs/superpowers/specs/2026-06-25-epr-meta-compose-gate-design.md`, "Enforcement classes").
-- **Addresses/metadata never enter identity.** `concern` is additive routing metadata excluded from `fingerprint()` inputs in both harvesters — a concern-address change never mints a new fingerprint (slice-1 Task 2, `ci-harvest.py`/`runtime-harvest.py`).
+- **Addresses/metadata never enter identity.** `concern` is additive routing metadata excluded from `fingerprint()` inputs in `ci-harvest.py` — a concern-address change never mints a new fingerprint (slice-1 Task 2) (runtime-harvest anchor pending: phase 2 #1 — `_lib/runtime_harvest.py` carries no `concern` field yet).
 
 **DO-NOT**
 

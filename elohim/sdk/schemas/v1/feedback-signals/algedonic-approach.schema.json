@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "epr:schema:feedback-signal/algedonic-approach",
   "title": "AlgedonicApproachFeedbackSignal",
-  "description": "FeedbackSignal kind emitted when a bounding Commitment's stock is approaching its limit (has crossed the band edge but not yet breached). Emission is hysteresis-bounded (no re-fire while the approach remains open) and at most one open signal exists per (declarer, target, kind). Source of truth: Holochain DHT (elohim zome's existing FeedbackSignal entry type via signal_kind vocabulary; no new DHT entry type). standing_impact is fixed 'advisory' — the signal informs, it does not itself withdraw standing.",
+  "description": "FeedbackSignal kind emitted when a bounding Commitment's stock is approaching its limit (has crossed the band edge but not yet breached). Emission is hysteresis-bounded (no re-fire while the approach remains open) and at most one open signal exists per (declarer, target, kind). Source of truth: Holochain DHT (elohim zome's existing FeedbackSignal entry type via signal_kind vocabulary; no new DHT entry type). standing_impact is fixed 'advisory' — the signal informs, it does not itself withdraw standing. Canon: genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md §3.",
   "$comment": "Source of truth: DHT (FeedbackSignal entry); this file is the wire contract only.",
   "type": "object",
   "required": ["signal_kind", "target", "declarer", "evidence", "signed_at"],
@@ -41,6 +41,8 @@
         },
         "threshold_pct": {
           "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100,
           "description": "The band edge (percentage of limit) that was crossed to trigger this signal, per the limit-governor stub."
         }
       }

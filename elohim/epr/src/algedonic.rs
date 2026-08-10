@@ -31,7 +31,7 @@
 //! - **Evidence is minted, never assembled.** The limit a signal reports is a bound on a
 //!   *promise*, so evidence is derived by the REA fold that owns the bound
 //!   (`elohim_epr_rea::fold::fulfillment`, whose `bound_ref` is the bounding commitment's CID) —
-//!   the single evidence constructor. That is what keeps the extra-key edge theoretical: the
+//!   the intended minting path. That is what keeps the extra-key edge theoretical today: the
 //!   schemas permit unlisted evidence keys, so a stray `threshold_pct` on a breach payload would
 //!   deserialize as `Approach` and be refused by the coherence check below; nothing on the minted
 //!   path can build one, because the variant is chosen from the crossing.
@@ -349,7 +349,8 @@ pub fn validate(signal: &AlgedonicSignal) -> Result<()> {
 ///    predicate exists to prevent. An open `Approach` does NOT suppress a `Breach` (different
 ///    kind ⇒ different key ⇒ the escalation gets through).
 ///
-/// `prev` is the currently-open signal for this key, if the caller holds one.
+/// `prev` is a currently-open signal, if the caller holds one — it need not share `new`'s
+/// [`OpenSignalKey`]; rule 2 above is exactly the comparison that decides whether it does.
 pub fn should_emit(prev: Option<&AlgedonicSignal>, new: &AlgedonicSignal) -> bool {
     if !new.evidence.crossed() {
         return false;

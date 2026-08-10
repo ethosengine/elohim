@@ -212,30 +212,40 @@ def _no_measure_concern():
     return concern_routes.route("ci-no-measure", context)
 
 
-def _scan_console(tail, taxonomy, job):
-    """Pure console-tail scan: NO_MEASURE banner detection + taxonomy
-    classification. Takes the tail TEXT directly (the network fetch is the
-    caller's job) so it's unit-testable without hitting Jenkins.
-    Returns a list of finding dicts: {category, ident, display, class,
-    concern?} — concern is omitted (never guessed) unless resolved."""
-    findings = []
-
-    # NO_MEASURE banner is independent of the taxonomy — one banner is
-    # enough; the identifier is FIXED regardless of surrounding console text.
+def _scan_for_banner(tail):
+    """Detect the fixed NO_MEASURE banner in a console tail. Independent of
+    both the failed-test-case pass and the taxonomy scan — a red build that
+    already produced other findings (failed tests, taxonomy matches) can
+    STILL be a gate-skip no-measure, so this must be checked unconditionally
+    rather than gated behind "any findings yet?". One banner is enough; the
+    identifier is FIXED regardless of surrounding console text, so at most
+    one finding is ever returned here (not subject to
+    MAX_CONSOLE_FINDINGS_PER_BUILD, which bounds the taxonomy scan below).
+    Returns a finding dict or None."""
     for line in tail.splitlines():
         if _NO_MEASURE_BANNER in line:
-            findings.append(
-                {
-                    "category": "NO_MEASURE",
-                    "ident": _NO_MEASURE_IDENT,
-                    "display": _NO_MEASURE_BANNER,
-                    "class": "ci-no-measure",
-                    "concern": _no_measure_concern(),
-                }
-            )
-            break
-    if len(findings) >= MAX_CONSOLE_FINDINGS_PER_BUILD:
-        return findings
+            return {
+                "category": "NO_MEASURE",
+                "ident": _NO_MEASURE_IDENT,
+                "display": _NO_MEASURE_BANNER,
+                "class": "ci-no-measure",
+                "concern": _no_measure_concern(),
+            }
+    return None
+
+
+def _scan_console(tail, taxonomy, job):
+    """Pure console-tail taxonomy classification (NO_MEASURE banner
+    detection is a separate, unconditional pass — see _scan_for_banner).
+    Takes the tail TEXT directly (the network fetch is the caller's job) so
+    it's unit-testable without hitting Jenkins.
+    Returns a list of finding dicts: {category, ident, display, class,
+    concern?}. The `concern` key itself is present only when
+    concern_routes resolves one for a taxonomy match; the caller (reconcile)
+    additionally drops a falsy/None concern from the persisted ledger entry
+    — omission-unless-resolved is a property of the PERSISTED entry, not of
+    every dict this function (or _scan_for_banner) returns."""
+    findings = []
 
     cats = [t for t in taxonomy if any(p in job for p in t[1])] or taxonomy
     seen_lines = set()
@@ -264,9 +274,19 @@ def _scan_console(tail, taxonomy, job):
 def collect_build_findings(job, build, taxonomy):
     """Findings for one red build: failed tests first, console classification
     as the fallback/supplement. Returns [{category, ident, display, class,
-    concern?}]."""
+    concern?}].
+
+    The NO_MEASURE banner check (step 2) runs UNCONDITIONALLY on every red
+    build — a build that already has failed-test findings (step 1) can
+    still be a gate-skip no-measure, and a build already at the failed-test
+    cap must not lose the banner by returning early. The taxonomy scan
+    (step 3) stays a fallback/supplement: it only runs when steps 1+2
+    together produced nothing, same as before this fix (the guard's
+    left-hand side just grew to include the banner check's result)."""
     findings = []
     # 1. Failed test cases (UNSTABLE builds usually have a testReport).
+    # Caps at MAX_FAILED_TESTS_PER_BUILD but does NOT return early — step 2
+    # (banner) must still run even when this cap is hit.
     try:
         tr = get_json(
             f"/job/{job}/job/{BRANCH}/{build}/testReport/api/json"
@@ -275,24 +295,33 @@ def collect_build_findings(job, build, taxonomy):
         for suite in tr.get("suites", []):
             for case in suite.get("cases", []):
                 if case.get("status") in ("FAILED", "REGRESSION"):
+                    if len(findings) >= MAX_FAILED_TESTS_PER_BUILD:
+                        break
                     ident = f'{case.get("className", "?")}.{case.get("name", "?")}'
                     findings.append(
                         {"category": "TEST_FAILURE", "ident": ident, "display": ident, "class": "ci-failure"}
                     )
-                    if len(findings) >= MAX_FAILED_TESTS_PER_BUILD:
-                        return findings
     except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
         pass  # no test report — fall through to console classification
 
-    # 2. Console-tail classification via the existing failure taxonomy.
-    if not findings:
-        try:
-            tail = get_console_tail(job, build)
-            findings.extend(_scan_console(tail, taxonomy, job))
-        except (urllib.error.URLError, urllib.error.HTTPError, OSError):
-            pass
+    # 2. NO_MEASURE banner — always checked, independent of step 1's result.
+    # Fetches the tail once and reuses it for step 3 below.
+    tail = None
+    try:
+        tail = get_console_tail(job, build)
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError):
+        tail = None
+    if tail is not None:
+        banner_finding = _scan_for_banner(tail)
+        if banner_finding is not None:
+            findings.append(banner_finding)
 
-    # 3. Nothing classified: record the red at stage granularity if possible.
+    # 3. Console-tail taxonomy classification — fallback/supplement only
+    # when nothing has been classified yet (failed tests nor the banner).
+    if not findings and tail is not None:
+        findings.extend(_scan_console(tail, taxonomy, job))
+
+    # 4. Nothing classified: record the red at stage granularity if possible.
     if not findings:
         stage = None
         try:

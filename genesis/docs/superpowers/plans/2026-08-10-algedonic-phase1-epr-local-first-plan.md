@@ -3,8 +3,8 @@ title: Algedonic Phase 1 — the discipline at the EPR level, local-first
 id: algedonic-phase1-epr-local-first
 status: Draft
 cites:
-  - algedonic-feedback-signal | the D2 spec this plan implements phase-1 of — kinds, evidence contract, slices, non-goals | sha256:3e9c6fd495dfb854 | path: genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md
-  - algedonic-slice1-delivery-flow | predecessor plan; its Tasks 3-5 are re-homed by this plan (3-4 to phase 2, 5 reshaped as local consumer) | sha256:54eeb412f9a85e2a | path: genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md
+  - algedonic-feedback-signal | the D2 spec this plan implements phase-1 of — kinds, evidence contract, slices, non-goals | sha256:d0b1b524dc7240fc | path: genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md
+  - algedonic-slice1-delivery-flow | predecessor plan; its Tasks 3-5 are re-homed by this plan (3-4 to phase 2, 5 reshaped as local consumer) | sha256:66054e651d33f3a4 | path: genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md
   - epr-meta-compose-gate | the mechanism spec for the measure/verdict layer Task 4 graduates to typed evidence | sha256:6052ce071bfec509 | path: genesis/docs/superpowers/specs/2026-06-25-epr-meta-compose-gate-design.md
 domain: protocol
 sprint: operator-directed-2026-08-10

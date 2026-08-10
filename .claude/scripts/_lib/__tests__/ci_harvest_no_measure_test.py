@@ -82,11 +82,16 @@ def with_habits_fixture(fn):
 
 
 check("has HABITS_PATH", hasattr(ci_harvest, "HABITS_PATH"))
+check("has _scan_for_banner helper", hasattr(ci_harvest, "_scan_for_banner"))
 check("has _scan_console helper", hasattr(ci_harvest, "_scan_console"))
+check("has collect_build_findings helper", hasattr(ci_harvest, "collect_build_findings"))
 
-findings = with_habits_fixture(lambda: ci_harvest._scan_console(TAIL_NO_MEASURE, [], "elohim-edge"))
-check("exactly one finding", len(findings) == 1)
-f = findings[0]
+# Banner detection now lives in _scan_for_banner (a single dict or None),
+# separated from _scan_console's taxonomy-only scan — see FIX 3, final
+# whole-arc review 2026-08-10: a red build with pre-existing findings
+# (failed tests) must not swallow the banner.
+f = with_habits_fixture(lambda: ci_harvest._scan_for_banner(TAIL_NO_MEASURE))
+check("banner detected", f is not None)
 check("class == ci-no-measure", f.get("class") == "ci-no-measure")
 check("category == NO_MEASURE", f.get("category") == "NO_MEASURE")
 check("concern == notary-authority", f.get("concern") == "notary-authority")
@@ -99,9 +104,9 @@ check("fingerprint == fixed identifier", got_fp == expected_fp)
 
 # Repeat no-measures (different surrounding console noise, i.e. a later
 # build) still produce the SAME fixed fingerprint — dedupe to ONE finding.
-findings2 = with_habits_fixture(lambda: ci_harvest._scan_console(TAIL_NO_MEASURE_2, [], "elohim-edge"))
-check("second no-measure also one finding", len(findings2) == 1)
-got_fp2 = ci_harvest.fingerprint("elohim-edge", findings2[0]["category"], findings2[0]["ident"])
+f2 = with_habits_fixture(lambda: ci_harvest._scan_for_banner(TAIL_NO_MEASURE_2))
+check("second no-measure also detected", f2 is not None)
+got_fp2 = ci_harvest.fingerprint("elohim-edge", f2["category"], f2["ident"])
 check("fingerprint stable across repeat no-measures", got_fp2 == expected_fp)
 
 # No habits.yaml at all (FileNotFoundError) → concern omitted, never guessed.
@@ -110,11 +115,14 @@ with tempfile.TemporaryDirectory() as td:
     orig = ci_harvest.HABITS_PATH
     ci_harvest.HABITS_PATH = str(missing)
     try:
-        findings3 = ci_harvest._scan_console(TAIL_NO_MEASURE, [], "elohim-edge")
+        f3 = ci_harvest._scan_for_banner(TAIL_NO_MEASURE)
     finally:
         ci_harvest.HABITS_PATH = orig
-check("missing habits.yaml → no finding-breaking crash", len(findings3) == 1)
-check("missing habits.yaml → concern honestly absent", "concern" not in findings3[0] or findings3[0]["concern"] is None)
+check("missing habits.yaml → no finding-breaking crash", f3 is not None)
+check("missing habits.yaml → concern honestly absent (None, not omitted at this layer)", f3.get("concern") is None)
+
+# No banner in tail → None, not a list.
+check("no banner → None", ci_harvest._scan_for_banner("nothing interesting here\n") is None)
 
 # ---------------------------------------------------------------- ordinary ci-failure @concern: attachment
 _taxonomy = [("BUILD_FAILURE", [], re.compile(r"ERROR:"), 5)]
@@ -130,5 +138,53 @@ untagged = next(x for x in ord_findings if x is not tagged)
 check("tagged line class stays ci-failure", tagged.get("class") == "ci-failure")
 check("tagged line gets concern", tagged.get("concern") == "saga-04-doorway-serves")
 check("untagged line has NO concern key (honest absence)", "concern" not in untagged)
+
+# ---------------------------------------------------------------- FIX 3 (final whole-arc review 2026-08-10):
+# a red build that already yielded failed-test findings must NOT swallow the
+# NO_MEASURE banner. collect_build_findings does its own network I/O
+# (get_json for the testReport, get_console_tail for the console) — stub
+# both so this stays offline and deterministic.
+_TEST_REPORT = {
+    "suites": [
+        {"cases": [{"className": "SomeSuite", "name": "test_thing", "status": "FAILED"}]}
+    ]
+}
+
+
+def _fake_get_json(path):
+    if "testReport" in path:
+        return _TEST_REPORT
+    raise AssertionError(f"unexpected get_json call in this test: {path}")
+
+
+def _fake_get_console_tail(job, build):
+    return TAIL_NO_MEASURE
+
+
+def with_stubbed_network(fn):
+    orig_get_json = ci_harvest.get_json
+    orig_get_console_tail = ci_harvest.get_console_tail
+    ci_harvest.get_json = _fake_get_json
+    ci_harvest.get_console_tail = _fake_get_console_tail
+    try:
+        return fn()
+    finally:
+        ci_harvest.get_json = orig_get_json
+        ci_harvest.get_console_tail = orig_get_console_tail
+
+
+combined = with_habits_fixture(
+    lambda: with_stubbed_network(lambda: ci_harvest.collect_build_findings("elohim-edge", 123, []))
+)
+check(
+    "red build + non-empty test findings + banner in tail → BOTH findings present",
+    len(combined) == 2,
+)
+categories = {f["category"] for f in combined}
+check("TEST_FAILURE still present", "TEST_FAILURE" in categories)
+check("NO_MEASURE finding still minted (not swallowed by pre-existing findings)", "NO_MEASURE" in categories)
+no_measure_finding = next(f for f in combined if f["category"] == "NO_MEASURE")
+check("no-measure finding carries the fixed identifier", no_measure_finding["ident"] == "dataplane-validation-did-not-measure")
+check("no-measure finding carries the routed concern", no_measure_finding.get("concern") == "notary-authority")
 
 print(f"ci_harvest_no_measure_test: {_passed} checks passed")

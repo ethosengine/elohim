@@ -23,10 +23,12 @@ import algedonicBreachSchema from '../v1/feedback-signals/algedonic-breach.schem
 
 const ajv = new Ajv2020({ strict: true, allErrors: true });
 const failures = [];
+let caseCount = 0;
 
 function makeChecker(name, schema) {
   const validate = ajv.compile(schema);
   return function check(caseName, value, shouldPass) {
+    caseCount += 1;
     const ok = validate(value);
     if (shouldPass && !ok) failures.push([`${name}: ${caseName}`, validate.errors]);
     else if (!shouldPass && ok) failures.push([`${name}: ${caseName} (should reject)`, null]);
@@ -137,6 +139,24 @@ algedonicApproach(
   false,
 );
 algedonicApproach('extra root field', { ...approachMinimal, mystery: 'no' }, false);
+// Wire tolerance is (0,100] — the [1,100] percent floor is producer-side
+// (Bound::new) discipline, not wire law. threshold_pct:0 and :101 must FAIL;
+// a sub-1 fractional percent like 0.85 must still PASS at the wire.
+algedonicApproach(
+  'threshold_pct 0 rejected (exclusiveMinimum)',
+  { ...approachMinimal, evidence: { ...approachMinimal.evidence, threshold_pct: 0 } },
+  false,
+);
+algedonicApproach(
+  'threshold_pct 101 rejected (maximum 100)',
+  { ...approachMinimal, evidence: { ...approachMinimal.evidence, threshold_pct: 101 } },
+  false,
+);
+algedonicApproach(
+  'threshold_pct 0.85 passes (wire tolerance below producer floor)',
+  { ...approachMinimal, evidence: { ...approachMinimal.evidence, threshold_pct: 0.85 } },
+  true,
+);
 
 // --- algedonic-breach ---
 // Same standing_impact=description-only convention as algedonic-approach above.
@@ -173,5 +193,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  'PASS: Z.D feedback-signals (rate-limit-exceeded, bad-custody, reach-escalation-pending, algedonic-approach, algedonic-breach — 25 cases)',
+  `PASS: Z.D feedback-signals (rate-limit-exceeded, bad-custody, reach-escalation-pending, algedonic-approach, algedonic-breach — ${caseCount} cases)`,
 );
