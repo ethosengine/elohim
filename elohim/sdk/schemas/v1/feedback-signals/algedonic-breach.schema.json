@@ -5,7 +5,7 @@
   "description": "FeedbackSignal kind emitted when a bounding Commitment's limit has been breached (stock has crossed the bound). Emission is hysteresis-bounded (no re-fire while the breach remains open) and at most one open signal exists per (declarer, target, kind). Source of truth: Holochain DHT (elohim zome's existing FeedbackSignal entry type via signal_kind vocabulary; no new DHT entry type). standing_impact is fixed 'advisory' — the signal informs, it does not itself withdraw standing.",
   "$comment": "Source of truth: DHT (FeedbackSignal entry); this file is the wire contract only.",
   "type": "object",
-  "required": ["signal_kind", "target", "declarer", "evidence", "standing_impact", "signed_at"],
+  "required": ["signal_kind", "target", "declarer", "evidence", "signed_at"],
   "additionalProperties": false,
   "properties": {
     "signal_kind": {
@@ -45,10 +45,6 @@
       "type": "string",
       "enum": ["info", "warn", "critical"],
       "default": "warn"
-    },
-    "standing_impact": {
-      "type": "string",
-      "const": "advisory"
     },
     "signed_at": {
       "type": "string",

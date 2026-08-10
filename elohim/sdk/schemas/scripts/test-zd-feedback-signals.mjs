@@ -110,13 +110,17 @@ reachEscal(
 );
 
 // --- algedonic-approach ---
+// standing_impact is fixed 'advisory' for this kind, but per family envelope
+// parity (rate-limit-exceeded / bad-custody / reach-escalation-pending all
+// omit it from properties+required) it is documentation-only here, not a
+// schema field — additionalProperties:false means submitting it is REJECTED,
+// same as any other unrecognized property.
 const algedonicApproach = makeChecker('algedonic-approach', algedonicApproachSchema);
 const approachMinimal = {
   signal_kind: 'algedonic-approach',
   target: 'bafy:threatened-commitment',
   declarer: 'agent:storage-validator',
   evidence: { stock: 27, limit: 30, bound_ref: 'bafy:bounding-commitment', threshold_pct: 90 },
-  standing_impact: 'advisory',
   signed_at: '2026-08-10T08:00:00Z',
 };
 algedonicApproach('minimal valid', approachMinimal, true);
@@ -128,24 +132,20 @@ algedonicApproach(
   false,
 );
 algedonicApproach(
-  'standing_impact not advisory',
-  { ...approachMinimal, standing_impact: 'consequential' },
+  'rejects standing_impact (description-only per family envelope parity)',
+  { ...approachMinimal, standing_impact: 'advisory' },
   false,
 );
-algedonicApproach('missing standing_impact', (() => {
-  const { standing_impact: _drop, ...rest } = approachMinimal;
-  return rest;
-})(), false);
 algedonicApproach('extra root field', { ...approachMinimal, mystery: 'no' }, false);
 
 // --- algedonic-breach ---
+// Same standing_impact=description-only convention as algedonic-approach above.
 const algedonicBreach = makeChecker('algedonic-breach', algedonicBreachSchema);
 const breachMinimal = {
   signal_kind: 'algedonic-breach',
   target: 'bafy:threatened-commitment',
   declarer: 'agent:storage-validator',
   evidence: { stock: 31, limit: 30, bound_ref: 'bafy:bounding-commitment' },
-  standing_impact: 'advisory',
   signed_at: '2026-08-10T08:00:00Z',
 };
 algedonicBreach('minimal valid', breachMinimal, true);
@@ -157,8 +157,8 @@ algedonicBreach(
   false,
 );
 algedonicBreach(
-  'standing_impact not advisory',
-  { ...breachMinimal, standing_impact: 'binding' },
+  'rejects standing_impact (description-only per family envelope parity)',
+  { ...breachMinimal, standing_impact: 'advisory' },
   false,
 );
 algedonicBreach('extra root field', { ...breachMinimal, mystery: 'no' }, false);
@@ -173,5 +173,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  'PASS: Z.D feedback-signals (rate-limit-exceeded, bad-custody, reach-escalation-pending, algedonic-approach, algedonic-breach — 26 cases)',
+  'PASS: Z.D feedback-signals (rate-limit-exceeded, bad-custody, reach-escalation-pending, algedonic-approach, algedonic-breach — 25 cases)',
 );
