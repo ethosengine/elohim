@@ -25,6 +25,7 @@
 //! assert!(epr.verify_with_key(&kp.public_key_bytes()).is_ok());
 //! ```
 
+pub mod algedonic;
 pub mod cbor;
 pub mod cid;
 pub mod coupling;
