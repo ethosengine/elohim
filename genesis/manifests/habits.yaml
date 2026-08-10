@@ -199,9 +199,33 @@ habits:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
       - "sweettest rea_commitment_replication (elohim/holochain/tests/sweettest — unignored 837b772c9; isolated late-join conductors, bounded 60s peer-B retrieval; RED but MIS-ATTRIBUTED per DELTA 2026-08-09 — it measures one-time cold-cell Wasm warm-up, not REA retrieval; do not read it as a fetch-seam probe until it warms peer B)"
     evidence: >
-      DELTA 2026-08-09 PM (convergence-serve-path shift close, edge
-      #1327-#1332): still red BUT the blocking seam is CURED five layers
-      deep — serve 503s, authority-before-shed (storage ab316cad7 +
+      DELTA 2026-08-10 (limit-cycle sprint, overnight): DONE-CANDIDATE —
+      @concern:notary-authority 3/3 PASSED locally TWICE across two
+      independent fleet deploys (post-declare 13.4s run, then 0.3s re-run
+      after edge #1337's full restart: same canonical head on both
+      doorways, notarized tier serving, authority refusal holding). Cure
+      chain: heal-leg break fix + outcome visibility (b96861c1b+31f8a9e89,
+      99% of actionable divergence sat on three pods whose heal leg broke
+      silently on the first failed batch call), CPU/k2Gossip relief for
+      the shem trio (f43e23aa5, 61118ace9), trust-gradient adopt
+      (639ef94e6), and the authorHeadOnce declare cycle (feb0ceb0a) that
+      busted the elohim.host ghost anchor (uhCkkDYpMV… superseded by the
+      elected uhCkkPqUQj…). Actives drained to single digits
+      (james+jessica reached known_divergent=0). STATUS STAYS RED on the
+      strict rule: the named check is the EDGE Dataplane Validation
+      measure and the banking runs have not yet recorded 3/3 there —
+      #1335 measured 1/3 PRE-declare, #1336 was double-fire-aborted,
+      #1337 SUCCESS but its quiesce gate skipped the suite (no-measure).
+      Flip condition: one edge run whose gate completes recording 3/3.
+      Residuals on the board: shem-trio conductors still CPU-pinned
+      (k2Gossip profile deployed, arc-to-full unconfirmed — relay-path
+      gossip rounds still time out fleet-wide, round-2 investigation
+      seeded); matthew converged=0 on failed/pending terms + ~10
+      known-divergent; seed-pod unanchored backlog (~2000 rows, H3
+      confirmed via /db/stats parity) is the named batch-3 cure. Prior
+      delta preserved: DELTA 2026-08-09 PM (convergence-serve-path shift
+      close, edge #1327-#1332): still red BUT the blocking seam is CURED
+      five layers deep — serve 503s, authority-before-shed (storage ab316cad7 +
       doorway 85a128997, both test-pinned), gate-banner honesty,
       node-local-dns hairpin (iroh's resolver ignores /etc/hosts), and
       the cross-relay preflight fail-closed defect (fork e4a1c9bb2,
