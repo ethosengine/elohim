@@ -117,12 +117,46 @@ gate-skip no-measures in one night flags the instrument as the defect.
    concern moves down-ladder (never speculatively). Kill/restart a local peer to
    reproduce churn-window dynamics in minutes.
 5. **Cost accounting + redesign-pressure sentinel** — §4 wiring.
+6. **Concern-address on the algedonic channels** — §7 wiring: one field on the
+   existing finding ledgers, one join in the walker, threshold bypass to the
+   session-start headline.
 
 Habit binding: increments serve `notary-authority` (active) and the saga
 register directly — the first down-ladder migrations are exactly the concerns
 that held the register at 8/11.
 
-## 6. Non-goals
+## 6. Exceptions as algedonic signals (any node → the intention graph)
+
+An exception anywhere in the deployment — a peer's self-heal exhaustion, a
+doorway shed-storm, a CI gate-skip, a local-stack panic — is an **algedonic
+event**: a pain signal that must carry the address of the promise it threatens
+and reach the accountable node directly, bypassing the reporting hierarchy
+(Beer/VSM sense; the scope reconciler already speaks this cybernetic
+vocabulary as a setpoint system).
+
+Three channels already implement the transport as deterministic sentinels
+(flag → ledger fingerprint → background triage dispatch → canonicalized
+backlog): `.claude/data/runtime-findings.jsonl` (nodes SELF-REPORT exhaustion —
+circuit stuck open, shed-storm, projector lag), `ci-findings.jsonl`,
+`deprecations.jsonl`. What they lack is the **address**: a `concern:` field
+resolving the signal to the `@concern` / commitment node it bears on (stamped
+at minting by the triage agent; structural in the canonical backlog item's
+frontmatter). With the address, the walker (§5.3) joins live pain into the
+same row as tier, cost, and evidence — and a threshold crossing bypasses sweep
+cadence to interrupt (session-start headline / push notification), which is
+what makes it algedonic rather than logged.
+
+Design contrast, recorded so it isn't retried: the earlier attempt at this was
+aggregating Jenkins e2e reports (screenshots + logs) for debugging — evidence
+without an address, a reader assumed but never guaranteed (the
+instruments-with-no-reader failure). Signals carry a *pointer* to their
+evidence bundle (report artifact, capture.json, eventually an eprfs blob CID);
+they never carry the bundle. The protocol-native destination is the eprfs
+witnessed-interaction primitive (peer-validated, REA-aggregated,
+attention-denominated) — this dev-loop wiring is a deliberate rehearsal of
+that same pattern on the development plane.
+
+## 7. Non-goals
 
 - No new registers, ledgers, or ranking scripts beyond completing the existing
   walker (2026-08-06 nomenclature-review lesson stands).
