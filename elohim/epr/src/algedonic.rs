@@ -232,6 +232,10 @@ struct AlgedonicWire {
     target: String,
     declarer: String,
     evidence: AlgedonicEvidence,
+    /// Optional on the wire — the schemas omit it from `required` and declare
+    /// `"default": "warn"`. Without `default` here, serde would reject a
+    /// contract-valid document that simply didn't say how loud the pain is.
+    #[serde(default)]
     severity: Severity,
     signed_at: DateTime<Utc>,
 }
@@ -633,11 +637,53 @@ mod tests {
                 "severity {wire} not in schema enum {allowed:?}"
             );
         }
+        // The Rust default agrees with the schema's declared default. This asserts the two
+        // *declarations* line up — it says nothing about the ingest path, which is
+        // `severity_defaults_to_warn_when_the_wire_omits_it`'s job.
         assert_eq!(
-            Severity::default(),
-            Severity::Warn,
-            "the schema's default is warn"
+            declared["properties"]["severity"]["default"]
+                .as_str()
+                .expect("the schema must declare a severity default"),
+            serde_json::to_value(Severity::default())
+                .unwrap()
+                .as_str()
+                .unwrap()
         );
+    }
+
+    /// `severity` is optional on the wire: the schemas leave it out of `required` and declare
+    /// `"default": "warn"`. A producer that omits it is emitting a **contract-valid** document —
+    /// proved here by running it through the schema validator — so ingest must accept it and
+    /// supply the default, not refuse with `missing field 'severity'`.
+    #[test]
+    fn severity_defaults_to_warn_when_the_wire_omits_it() {
+        for (signal, schema_file) in [
+            (approach(), "algedonic-approach.schema.json"),
+            (breach(), "algedonic-breach.schema.json"),
+        ] {
+            let mut wire = serde_json::to_value(&signal).unwrap();
+            wire.as_object_mut()
+                .unwrap()
+                .remove("severity")
+                .expect("the fixture must have carried a severity to remove");
+
+            // It is still a valid document by the contract on disk…
+            assert_conforms(schema_file, &wire);
+
+            // …so it must deserialize, landing on the schema's default rather than refusing.
+            let parsed: AlgedonicSignal = serde_json::from_value(wire).unwrap_or_else(|e| {
+                panic!("{schema_file}: a schema-valid signal without severity must parse: {e}")
+            });
+            assert_eq!(
+                parsed.severity,
+                Severity::Warn,
+                "{schema_file}: an omitted severity must default to warn"
+            );
+
+            // Everything else survived the round-trip through the default.
+            assert_eq!(parsed.evidence, signal.evidence);
+            assert_eq!(parsed.kind(), signal.kind());
+        }
     }
 
     // ── (e) One open signal per (declarer, target, kind) ──────────────
