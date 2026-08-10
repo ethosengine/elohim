@@ -1,9 +1,11 @@
 // Test for Z.D-introduced FeedbackSignal kinds.
 //
-// Three kinds tested:
+// Five kinds tested:
 //   - rate-limit-exceeded
 //   - bad-custody
 //   - reach-escalation-pending
+//   - algedonic-approach
+//   - algedonic-breach
 //
 // All ride on the existing FeedbackSignal DHT entry type via the
 // signal_kind vocabulary mechanism (project_signal_kind_extensible_protocol_class).
@@ -16,6 +18,8 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import rateLimitSchema from '../v1/feedback-signals/rate-limit-exceeded.schema.json' with { type: 'json' };
 import badCustodySchema from '../v1/feedback-signals/bad-custody.schema.json' with { type: 'json' };
 import reachEscalationSchema from '../v1/feedback-signals/reach-escalation-pending.schema.json' with { type: 'json' };
+import algedonicApproachSchema from '../v1/feedback-signals/algedonic-approach.schema.json' with { type: 'json' };
+import algedonicBreachSchema from '../v1/feedback-signals/algedonic-breach.schema.json' with { type: 'json' };
 
 const ajv = new Ajv2020({ strict: true, allErrors: true });
 const failures = [];
@@ -105,6 +109,60 @@ reachEscal(
   false,
 );
 
+// --- algedonic-approach ---
+const algedonicApproach = makeChecker('algedonic-approach', algedonicApproachSchema);
+const approachMinimal = {
+  signal_kind: 'algedonic-approach',
+  target: 'bafy:threatened-commitment',
+  declarer: 'agent:storage-validator',
+  evidence: { stock: 27, limit: 30, bound_ref: 'bafy:bounding-commitment', threshold_pct: 90 },
+  standing_impact: 'advisory',
+  signed_at: '2026-08-10T08:00:00Z',
+};
+algedonicApproach('minimal valid', approachMinimal, true);
+algedonicApproach('with severity', { ...approachMinimal, severity: 'info' }, true);
+algedonicApproach('wrong signal_kind', { ...approachMinimal, signal_kind: 'other' }, false);
+algedonicApproach(
+  'evidence missing threshold_pct',
+  { ...approachMinimal, evidence: { stock: 27, limit: 30, bound_ref: 'bafy:bounding-commitment' } },
+  false,
+);
+algedonicApproach(
+  'standing_impact not advisory',
+  { ...approachMinimal, standing_impact: 'consequential' },
+  false,
+);
+algedonicApproach('missing standing_impact', (() => {
+  const { standing_impact: _drop, ...rest } = approachMinimal;
+  return rest;
+})(), false);
+algedonicApproach('extra root field', { ...approachMinimal, mystery: 'no' }, false);
+
+// --- algedonic-breach ---
+const algedonicBreach = makeChecker('algedonic-breach', algedonicBreachSchema);
+const breachMinimal = {
+  signal_kind: 'algedonic-breach',
+  target: 'bafy:threatened-commitment',
+  declarer: 'agent:storage-validator',
+  evidence: { stock: 31, limit: 30, bound_ref: 'bafy:bounding-commitment' },
+  standing_impact: 'advisory',
+  signed_at: '2026-08-10T08:00:00Z',
+};
+algedonicBreach('minimal valid', breachMinimal, true);
+algedonicBreach('with severity', { ...breachMinimal, severity: 'critical' }, true);
+algedonicBreach('wrong signal_kind', { ...breachMinimal, signal_kind: 'other' }, false);
+algedonicBreach(
+  'evidence missing bound_ref',
+  { ...breachMinimal, evidence: { stock: 31, limit: 30 } },
+  false,
+);
+algedonicBreach(
+  'standing_impact not advisory',
+  { ...breachMinimal, standing_impact: 'binding' },
+  false,
+);
+algedonicBreach('extra root field', { ...breachMinimal, mystery: 'no' }, false);
+
 if (failures.length > 0) {
   console.error('FAIL: Z.D feedback-signals');
   for (const [name, errors] of failures) {
@@ -114,4 +172,6 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log('PASS: Z.D feedback-signals (rate-limit-exceeded, bad-custody, reach-escalation-pending — 13 cases)');
+console.log(
+  'PASS: Z.D feedback-signals (rate-limit-exceeded, bad-custody, reach-escalation-pending, algedonic-approach, algedonic-breach — 26 cases)',
+);

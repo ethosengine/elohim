@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:feedback-signal/algedonic-approach",
+  "title": "AlgedonicApproachFeedbackSignal",
+  "description": "FeedbackSignal kind emitted when a bounding Commitment's stock is approaching its limit (has crossed the band edge but not yet breached). Emission is hysteresis-bounded (no re-fire while the approach remains open) and at most one open signal exists per (declarer, target, kind). Source of truth: Holochain DHT (elohim zome's existing FeedbackSignal entry type via signal_kind vocabulary; no new DHT entry type). standing_impact is fixed 'advisory' — the signal informs, it does not itself withdraw standing.",
+  "$comment": "Source of truth: DHT (FeedbackSignal entry); this file is the wire contract only.",
+  "type": "object",
+  "required": ["signal_kind", "target", "declarer", "evidence", "standing_impact", "signed_at"],
+  "additionalProperties": false,
+  "properties": {
+    "signal_kind": {
+      "type": "string",
+      "const": "algedonic-approach"
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID of the promise (Commitment) threatened by the approach."
+    },
+    "declarer": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID or agent identifier of the agent (typically storage validator or operator's elohim-counsel) that declared the approach."
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["stock", "limit", "bound_ref", "threshold_pct"],
+      "additionalProperties": true,
+      "properties": {
+        "stock": {
+          "type": "number",
+          "description": "The measured stock level at time of the approach signal."
+        },
+        "limit": {
+          "type": "number",
+          "description": "The bound being approached."
+        },
+        "bound_ref": {
+          "type": "string",
+          "description": "CID of the bounding commitment/manifest whose limit is being approached."
+        },
+        "threshold_pct": {
+          "type": "number",
+          "description": "The band edge (percentage of limit) that was crossed to trigger this signal, per the limit-governor stub."
+        }
+      }
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["info", "warn", "critical"],
+      "default": "warn"
+    },
+    "standing_impact": {
+      "type": "string",
+      "const": "advisory"
+    },
+    "signed_at": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
