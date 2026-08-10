@@ -7228,11 +7228,13 @@ mod tests {
         // (d) per-tick cap: bounded so a large un-witnessed corpus (live alpha
         // shows thousands of rows) greens over many ticks instead of storming a
         // saturated conductor in one sweep.
-        assert!(WITNESS_MAX_PER_TICK > 0, "must author some per tick");
-        assert!(
-            WITNESS_MAX_PER_TICK <= 500,
-            "must stay small enough to pace a multi-thousand-row corpus across ticks"
-        );
+        const {
+            assert!(WITNESS_MAX_PER_TICK > 0, "must author some per tick");
+            assert!(
+                WITNESS_MAX_PER_TICK <= 500,
+                "must stay small enough to pace a multi-thousand-row corpus across ticks"
+            );
+        }
     }
 
     #[test]

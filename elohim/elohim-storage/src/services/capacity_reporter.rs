@@ -595,6 +595,9 @@ mod tests {
 
     // ---- run_report_once: end-to-end tick over a real (test) pool + tempdir ----
 
+    // The guard serializes process-global gauges for the entire async test. It
+    // intentionally spans `.await`; releasing it earlier reintroduces flakes.
+    #[allow(clippy::await_holding_lock)]
     #[tokio::test]
     async fn run_report_once_upserts_and_sets_gauges_when_identity_resolves() {
         let _guard = lock_custodian_gauges();
@@ -637,6 +640,9 @@ mod tests {
         );
     }
 
+    // The guard serializes process-global gauges for the entire async test. It
+    // intentionally spans `.await`; releasing it earlier reintroduces flakes.
+    #[allow(clippy::await_holding_lock)]
     #[tokio::test]
     async fn run_report_once_skips_upsert_but_still_sets_gauges_when_no_identity_resolves() {
         let _guard = lock_custodian_gauges();

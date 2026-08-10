@@ -10146,18 +10146,24 @@ impl HttpServer {
     /// POST /account/import - Import an account package
     ///
     /// Accepts an AccountPackageInputView and orchestrates:
-    /// 1. Content reach updates (sets per-content reach levels)
-    /// 2. Human relationship creation
-    /// 3. Stewardship allocation creation
-    /// 4. Collective participation creation
+    /// 1. Human relationship creation
+    /// 2. Stewardship allocation creation
+    /// 3. Collective participation creation
+    ///
+    /// Content assignments in an account package are viewer-relative recovery
+    /// metadata. They must not overwrite the peer-global `content.reach` field.
     ///
     /// This endpoint serves both genesis seeding (initial conditions) and
     /// account recovery (restoring a human's world from a backup).
-    async fn do_account_import(
+    async fn do_account_import<B>(
         &self,
-        req: Request<Incoming>,
+        req: Request<B>,
         pool: DbPool,
-    ) -> Result<Response<Full<Bytes>>, StorageError> {
+    ) -> Result<Response<Full<Bytes>>, StorageError>
+    where
+        B: hyper::body::Body<Data = Bytes> + Unpin,
+        B::Error: std::fmt::Display,
+    {
         let body = req
             .collect()
             .await
@@ -10170,8 +10176,7 @@ impl HttpServer {
         let human_id = package.identity.human_id.clone();
         let ctx = AppContext::default_lamad();
 
-        let item_count =
-            package.content.len() + package.relationships.len() + package.stewardship.len();
+        let item_count = package.relationships.len() + package.stewardship.len();
 
         // Pause P2P sync during bulk import to prevent memory pressure.
         // The guard resumes sync automatically when dropped (even on error/panic).
@@ -10192,52 +10197,19 @@ impl HttpServer {
         );
 
         let mut errors: Vec<String> = Vec::new();
-        let mut content_updated: usize = 0;
+        let content_updated: usize = 0;
         let mut relationships_created: usize = 0;
         let mut stewardship_created: usize = 0;
 
-        // Phase 1: Update content reach levels
-        // The content itself is already seeded — we're updating reach per-human's assignment
         if !package.content.is_empty() {
-            let mut conn = pool
-                .get()
-                .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
-
-            use crate::db::diesel_schema::content;
-            use diesel::prelude::*;
-
-            for assignment in &package.content {
-                let updated = diesel::update(
-                    content::table
-                        .filter(content::h_app_id.eq(&ctx.h_app_id))
-                        .filter(content::id.eq(&assignment.content_id)),
-                )
-                .set(content::reach.eq(&assignment.reach))
-                .execute(&mut *conn);
-
-                match updated {
-                    Ok(n) if n > 0 => content_updated += 1,
-                    Ok(_) => {
-                        // Content doesn't exist yet — not an error, just skip
-                        debug!(content_id = %assignment.content_id, "Content not found for reach update, skipping");
-                    }
-                    Err(e) => {
-                        errors.push(format!(
-                            "Failed to update reach for {}: {}",
-                            assignment.content_id, e
-                        ));
-                    }
-                }
-            }
-
             info!(
                 human_id = %human_id,
-                content_updated = content_updated,
-                "Content reach updates complete"
+                content_assignments_ignored = package.content.len(),
+                "Ignoring viewer-relative content assignments during account import"
             );
         }
 
-        // Phase 2: Create human relationships (idempotent)
+        // Phase 1: Create human relationships (idempotent)
         //
         // Both Adam and Eve's packages may declare the same symmetric edge
         // (e.g. spouse). The directional unique index on human_relationships
@@ -10309,7 +10281,7 @@ impl HttpServer {
             );
         }
 
-        // Phase 3: Create stewardship allocations
+        // Phase 2: Create stewardship allocations
         // Match stewardship seeds to content by category, create allocations
         if !package.stewardship.is_empty() {
             let mut conn = pool
@@ -10374,7 +10346,7 @@ impl HttpServer {
             );
         }
 
-        // Phase 4: Create collective participations
+        // Phase 3: Create collective participations
         let mut collectives_joined: usize = 0;
         if !package.collectives.is_empty() {
             let mut conn = pool
@@ -14215,6 +14187,86 @@ mod tests {
         assert!(
             !patch_needs_conductor(&ssr),
             "serverBlobHash-only PATCH must stay on the diesel-direct path"
+        );
+    }
+
+    #[tokio::test]
+    async fn account_import_keeps_peer_global_content_reach_unchanged() {
+        use crate::db::content_diesel::{self, CreateContentInput, MinTrust};
+        use crate::test_util::test_pool;
+
+        let pool = test_pool();
+        let ctx = AppContext::default();
+        {
+            let mut conn = pool.get().unwrap();
+            content_diesel::create_content(
+                &mut conn,
+                &ctx,
+                CreateContentInput {
+                    id: "shared-learning-node".into(),
+                    title: "Shared learning node".into(),
+                    description: None,
+                    content_type: "concept".into(),
+                    content_format: "markdown".into(),
+                    blob_hash: None,
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "community".into(),
+                    created_by: None,
+                    content_body: None,
+                    tags: Vec::new(),
+                    dht_anchor_hash: None,
+                },
+            )
+            .unwrap();
+        }
+
+        let blob_store = Arc::new(
+            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        let server =
+            HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap()).with_db_pool(pool.clone());
+        let body = serde_json::json!({
+            "schemaVersion": 1,
+            "identity": {
+                "humanId": "human-susan-household",
+                "displayName": "Susan"
+            },
+            "content": [{
+                "contentId": "shared-learning-node",
+                "reach": "familiar",
+                "reason": "affinity",
+                "stewardRatio": null
+            }],
+            "relationships": [],
+            "stewardship": [],
+            "collectives": []
+        });
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/account/import")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(body.to_string())))
+            .unwrap();
+
+        let response = server.do_account_import(req, pool.clone()).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let mut conn = pool.get().unwrap();
+        let row = content_diesel::get_content(
+            &mut conn,
+            &ctx,
+            "shared-learning-node",
+            MinTrust::Invisible,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            row.reach, "community",
+            "viewer-relative account-package reach must not mutate peer-global content reach"
         );
     }
 

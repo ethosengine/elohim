@@ -734,9 +734,9 @@ mod tests {
         party_b: &str,
         rel_type: &str,
         intimacy: &str,
-        consent_a: bool,
-        consent_b: bool,
+        consent: (bool, bool),
     ) {
+        let (consent_a, consent_b) = consent;
         create_human_relationship(
             conn,
             ctx,
@@ -769,7 +769,13 @@ mod tests {
         let ctx = test_ctx();
         // Both parties consented to an intimate family edge.
         insert_relationship_with_consent(
-            &mut conn, &ctx, "victim", "kin", "sibling", "intimate", true, true,
+            &mut conn,
+            &ctx,
+            "victim",
+            "kin",
+            "sibling",
+            "intimate",
+            (true, true),
         );
 
         let rows = get_consented_relationship_between(&mut conn, &ctx, "victim", "kin", None)
@@ -791,7 +797,13 @@ mod tests {
         let mut conn = setup_test_db();
         let ctx = test_ctx();
         insert_relationship_with_consent(
-            &mut conn, &ctx, "mallory", "victim", "sibling", "intimate", true, false,
+            &mut conn,
+            &ctx,
+            "mallory",
+            "victim",
+            "sibling",
+            "intimate",
+            (true, false),
         );
 
         // The raw consent-blind read DOES return it (the bug being fixed)...
@@ -814,7 +826,13 @@ mod tests {
         let mut conn = setup_test_db();
         let ctx = test_ctx();
         insert_relationship_with_consent(
-            &mut conn, &ctx, "adam", "eve", "spouse", "intimate", true, true,
+            &mut conn,
+            &ctx,
+            "adam",
+            "eve",
+            "spouse",
+            "intimate",
+            (true, true),
         );
 
         // Either ordering of the pair finds the both-consented edge.

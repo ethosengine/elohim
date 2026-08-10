@@ -952,6 +952,9 @@ mod tests {
     /// THE ADAM CASE: the local `collectives` projection is EMPTY, yet the pod's
     /// OWN source chain names a household. Discovery reads its members and the
     /// downstream fill has keyed rows to lay — the join lights.
+    // The guard serializes the process-global gauge for the entire async test.
+    // It intentionally spans `.await`; releasing it earlier reintroduces flakes.
+    #[allow(clippy::await_holding_lock)]
     #[tokio::test]
     async fn discovery_fills_from_source_chain_when_projection_empty() {
         let _guard = lock_discovered_cids_gauge();
@@ -1004,6 +1007,9 @@ mod tests {
     /// UNION + DEDUP: a cid present in BOTH the local projection and the source
     /// chain is read ONCE; a cid only in the source chain is added. Both
     /// households' members surface.
+    // The guard serializes the process-global gauge for the entire async test.
+    // It intentionally spans `.await`; releasing it earlier reintroduces flakes.
+    #[allow(clippy::await_holding_lock)]
     #[tokio::test]
     async fn discovery_unions_projection_and_source_chain_deduped() {
         let _guard = lock_discovered_cids_gauge();
@@ -1108,6 +1114,9 @@ mod tests {
     /// DEBUG with no other signal; now the discovered-cid gauge reads 0 (the
     /// warn log itself is not asserted here — `tracing` output is not a return
     /// value — but the gauge is the durable, scrapeable twin of that warn).
+    // The guard serializes the process-global gauge for the entire async test.
+    // It intentionally spans `.await`; releasing it earlier reintroduces flakes.
+    #[allow(clippy::await_holding_lock)]
     #[tokio::test]
     async fn discovery_sets_zero_gauge_when_union_is_empty() {
         let _guard = lock_discovered_cids_gauge();
@@ -1134,6 +1143,9 @@ mod tests {
     /// The healthy case: the gauge tracks the discovered UNION size (not the
     /// member/pair count), so an operator can distinguish "found households but
     /// zero members" from "found nothing at all."
+    // The guard serializes the process-global gauge for the entire async test.
+    // It intentionally spans `.await`; releasing it earlier reintroduces flakes.
+    #[allow(clippy::await_holding_lock)]
     #[tokio::test]
     async fn discovery_sets_gauge_to_union_size_when_cids_found() {
         let _guard = lock_discovered_cids_gauge();
@@ -1188,6 +1200,9 @@ mod tests {
     /// already-healed `humans` row carrying the slug) resolves the membership
     /// join, and the sweep stamps `household-dowell`'s NULL collective_cid from
     /// it, in the SAME pass that lights the membership pairs.
+    // The guard serializes the process-global gauge for the entire async test.
+    // It intentionally spans `.await`; releasing it earlier reintroduces flakes.
+    #[allow(clippy::await_holding_lock)]
     #[tokio::test]
     async fn discovery_gap_fills_local_collectives_row_via_membership_join() {
         let _guard = lock_discovered_cids_gauge();
@@ -1271,6 +1286,9 @@ mod tests {
     /// when only ONE un-anchored family row exists locally. This is the
     /// regression the membership-join rewrite closes: a lone-row shortcut
     /// would have (wrongly, in production) stamped this.
+    // The guard serializes the process-global gauge for the entire async test.
+    // It intentionally spans `.await`; releasing it earlier reintroduces flakes.
+    #[allow(clippy::await_holding_lock)]
     #[tokio::test]
     async fn discovery_does_not_stamp_when_no_member_resolves_a_slug() {
         let _guard = lock_discovered_cids_gauge();
@@ -1314,6 +1332,9 @@ mod tests {
     /// to a DIFFERENT cid than what source-chain discovery names is left
     /// completely untouched — discovery never overwrites a live-authoritative
     /// stamp just because its own read disagrees.
+    // The guard serializes the process-global gauge for the entire async test.
+    // It intentionally spans `.await`; releasing it earlier reintroduces flakes.
+    #[allow(clippy::await_holding_lock)]
     #[tokio::test]
     async fn discovery_never_overwrites_an_already_anchored_collectives_row() {
         let _guard = lock_discovered_cids_gauge();

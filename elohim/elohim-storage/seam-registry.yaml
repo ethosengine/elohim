@@ -284,6 +284,98 @@ decisionPoints:
         kind: unit
         mirrorRisk: false
 
+  - name: AcquisitionReconcileOutcome
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/metrics.rs
+      modulePath: metrics::AcquisitionReconcileOutcome
+      line: 2074
+    summary: >
+      Closed operational vocabulary for every scheduled acquisition-reconcile tick:
+      completed, sync_paused, db_pool_missing, db_pool_unavailable, pin_load_failed, or
+      presence_query_failed. It is the status-honesty seam that distinguishes a completed census
+      observing zero active pins from a pull loop that returned before its first census.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Category C projection-plane telemetry over local acquisition_pins × local content
+          presence. It neither records nor changes custody truth, reach, or canonical heads.
+      - id: C1
+        status: n-a
+        justification: This vocabulary observes a local reconcile and selects no candidate or crown.
+      - id: C2
+        status: n-a
+        justification: It moves no authority-bearing state and compares no clocks.
+      - id: C3
+        status: answered
+        justification: >
+          Every early return leaves the existing fixed-cadence tick enabled; the typed outcome
+          exposes which precondition withheld this pass instead of creating a terminal state.
+      - id: C4
+        status: answered
+        justification: >
+          pull remains null until a DB-backed reconcile completes. After completion, total=0 and
+          active_pins=0 are positive empty observations beside initialized=1, never fabricated
+          defaults. The acquisition-state unit test pins both sides of the distinction.
+      - id: C5
+        status: n-a
+        justification: No transferred evidence or peer claim is accepted by this local census.
+      - id: C6a
+        status: answered
+        justification: >
+          Adds O(1) counter/gauge emission to the existing fixed 60-second tick and no loop,
+          retry, peer request, conductor call, or corpus-proportional work.
+      - id: C6b
+        status: n-a
+        justification: >
+          These counters intentionally count scheduled occurrences; the observed reconcile state
+          remains a replace-in-place in-memory projection and mints no durable effect.
+      - id: C7
+        status: answered
+        justification: >
+          Every advertised label is pre-touched at registration and each variant is returned by a
+          real completed, paused, or early-return branch; the contract test asserts the stable set.
+      - id: C8
+        status: answered
+        justification: >
+          Every scheduled tick increments exactly one label through a ReasonLabel enum, including
+          success. Callers cannot invent raw-string outcome classes.
+      - id: C9
+        status: n-a
+        justification: No identity, key, or lineage state participates in this observation.
+      - id: C10
+        status: answered
+        justification: >
+          The existing nullable pull wire shape is unchanged; its schema now states null-until-
+          first-reconcile semantics, and schema_contract asserts null is explicitly serialized.
+      - id: C11
+        status: answered
+        justification: >
+          Backpressure withholding is a distinct sync_paused outcome rather than an invisible
+          skip, while the established pause policy and cadence remain unchanged.
+      - id: C12
+        status: n-a
+        justification: This observation authorizes no action and crosses no consent boundary.
+      - id: C13
+        status: n-a
+        justification: This is production telemetry, not an authority scaffold or temporary gate.
+      - id: C14
+        status: answered
+        justification: >
+          The completed arm plus every pre-census failure/skip arm is closed in the enum, counted,
+          and warned with branch-specific context; no reconcile early return remains silent.
+    contractTests:
+      - path: elohim/elohim-storage/src/metrics.rs
+        testName: acquisition_reconcile_outcomes_are_stable_pretouched_and_incrementable
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/acquisition.rs
+        testName: pull_is_null_until_a_reconcile_observes_the_desired_set
+        kind: unit
+      - path: elohim/elohim-storage/tests/schema_contract.rs
+        testName: p2p_status_view_with_null_drain_and_uninitialized_pull
+        kind: integration
+
   - name: declared_divergence_should_route_to_contest
     kind: pure-decision-predicate
     sourceLocation:
@@ -745,9 +837,11 @@ decisionPoints:
     summary: >
       Is a contest attempt still held back? Yes iff a configured window is non-zero AND less
       time has elapsed than that window. The F-B throughput lever's skip decision: a contest
-      that failed the zome's target-independent no-chain gate (or had its own self-head
-      refused) cannot succeed on a later sweep either, so re-attempting it burns budget that
-      contestable ids need. Pure and total; the ledger reads the clock, this decides.
+      that failed the zome's target-independent no-chain gate, had its own self-head refused,
+      or hit a generic declare error cannot succeed on every immediate later sweep, so
+      re-attempting it burns budget that contestable ids need. Pure and total; the ledger reads
+      the clock, this decides. Every cause retains a distinct typed label while the generic
+      declare-error class uses the same finite ordinary contest window.
     concernIds:
       - id: C3
         status: answered
@@ -811,6 +905,9 @@ decisionPoints:
         kind: unit
       - path: elohim/elohim-storage/src/services/head_adoption.rs
         testName: releasing_an_unclaimed_pair_is_harmless
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: a_generic_declare_error_enters_the_ordinary_per_id_backoff
         kind: unit
 
   - name: adopt_before_author_param

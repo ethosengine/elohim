@@ -317,9 +317,9 @@ mod tests {
         b: &str,
         rel_type: &str,
         intimacy: &str,
-        consent_a: bool,
-        consent_b: bool,
+        consent: (bool, bool),
     ) {
+        let (consent_a, consent_b) = consent;
         human_relationships::create_human_relationship(
             conn,
             ctx,
@@ -363,8 +363,7 @@ mod tests {
             "subject",
             "colleague",
             "trusted",
-            true,
-            true,
+            (true, true),
         );
 
         let lens = build_profile_lens_view(&mut conn, &ctx, "subject", Some("viewer"))
@@ -395,7 +394,13 @@ mod tests {
         insert_human(&mut conn, "subject", "Subject", Some("a bio"));
         insert_human(&mut conn, "kin", "Kin", None);
         insert_edge(
-            &mut conn, &ctx, "kin", "subject", "sibling", "trusted", true, true,
+            &mut conn,
+            &ctx,
+            "kin",
+            "subject",
+            "sibling",
+            "trusted",
+            (true, true),
         );
 
         let lens = build_profile_lens_view(&mut conn, &ctx, "subject", Some("kin"))
@@ -416,7 +421,13 @@ mod tests {
         insert_human(&mut conn, "mallory", "Mallory", None);
         // Mallory unilaterally inserts a half-consented intimate family edge.
         insert_edge(
-            &mut conn, &ctx, "mallory", "subject", "sibling", "intimate", true, false,
+            &mut conn,
+            &ctx,
+            "mallory",
+            "subject",
+            "sibling",
+            "intimate",
+            (true, false),
         );
 
         let lens = build_profile_lens_view(&mut conn, &ctx, "subject", Some("mallory"))

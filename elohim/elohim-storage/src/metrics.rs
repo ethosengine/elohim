@@ -1184,6 +1184,36 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Acquisition reconcile tick outcomes. This is deliberately separate from
+    /// [`ACQUISITION_OUTCOMES`]: fetch outcomes answer whether requested bytes
+    /// arrived, while this counter answers whether the local desired-set pass
+    /// ran at all. Every scheduled tick lands in exactly one typed outcome.
+    pub static ref ACQUISITION_RECONCILE_OUTCOMES: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_acquisition_reconcile_outcomes_total",
+            "Acquisition reconcile ticks by completed or early-return outcome.",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
+    /// Whether this process has completed at least one acquisition reconcile.
+    /// Read beside ACTIVE_PINS: `initialized=1, active_pins=0` is an observed
+    /// empty desired set; `initialized=0` means no honest pull sample exists.
+    pub static ref ACQUISITION_RECONCILE_INITIALIZED: IntGauge = IntGauge::new(
+        "elohim_acquisition_reconcile_initialized",
+        "1 after the first completed acquisition reconcile in this process; otherwise 0.",
+    )
+    .unwrap();
+
+    /// Active acquisition pins observed by the latest completed reconcile.
+    /// Meaningful only when [`ACQUISITION_RECONCILE_INITIALIZED`] is 1.
+    pub static ref ACQUISITION_ACTIVE_PINS: IntGauge = IntGauge::new(
+        "elohim_acquisition_active_pins",
+        "Active acquisition pins observed by the latest completed reconcile.",
+    )
+    .unwrap();
+
     /// Acquisition pins currently RETIRED — pins whose bytes no connected peer
     /// could supply, held back so they stop pinning `pull.caughtUp` false forever.
     ///
@@ -1743,6 +1773,17 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(SYNC_DOCS_ENUMERATED.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_REQUEST_OUTCOMES.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_OUTCOMES.clone()));
+        let _ = REGISTRY.register(Box::new(ACQUISITION_RECONCILE_OUTCOMES.clone()));
+        {
+            use seam_contracts::ReasonLabel as _;
+            for outcome in AcquisitionReconcileOutcome::ALL {
+                ACQUISITION_RECONCILE_OUTCOMES
+                    .with_label_values(&[outcome.label()])
+                    .inc_by(0);
+            }
+        }
+        let _ = REGISTRY.register(Box::new(ACQUISITION_RECONCILE_INITIALIZED.clone()));
+        let _ = REGISTRY.register(Box::new(ACQUISITION_ACTIVE_PINS.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_PINS_RETIRED.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_PIN_RETIREMENTS.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_IN_SYNC_TOTAL.clone()));
@@ -2022,6 +2063,62 @@ pub fn inc_sync_in_sync() {
     SYNC_IN_SYNC_TOTAL.inc();
 }
 
+/// Why one scheduled acquisition reconcile did or did not complete.
+///
+/// This is a closed operational vocabulary (C8/C14): every tick is counted,
+/// including success, and every early return has its own stable label. That
+/// makes `active_pins=0` distinguishable from a pass that never reached the pin
+/// query. These are Category C observations only; they confer no protocol
+/// authority and are reconstructed after restart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum AcquisitionReconcileOutcome {
+    Completed,
+    SyncPaused,
+    DbPoolMissing,
+    DbPoolUnavailable,
+    PinLoadFailed,
+    PresenceQueryFailed,
+}
+
+impl seam_contracts::ReasonLabel for AcquisitionReconcileOutcome {
+    const ALL: &'static [Self] = &[
+        Self::Completed,
+        Self::SyncPaused,
+        Self::DbPoolMissing,
+        Self::DbPoolUnavailable,
+        Self::PinLoadFailed,
+        Self::PresenceQueryFailed,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            Self::Completed => "completed",
+            Self::SyncPaused => "sync_paused",
+            Self::DbPoolMissing => "db_pool_missing",
+            Self::DbPoolUnavailable => "db_pool_unavailable",
+            Self::PinLoadFailed => "pin_load_failed",
+            Self::PresenceQueryFailed => "presence_query_failed",
+        }
+    }
+}
+
+/// Count one scheduled acquisition-reconcile outcome.
+pub fn inc_acquisition_reconcile_outcome(outcome: AcquisitionReconcileOutcome) {
+    use seam_contracts::ReasonLabel as _;
+    ACQUISITION_RECONCILE_OUTCOMES
+        .with_label_values(&[outcome.label()])
+        .inc();
+}
+
+/// Publish the first/latest completed acquisition sample.
+///
+/// `active_pins=0` is intentionally materialized beside `initialized=1`: it is
+/// the evidence that an empty desired set was observed, rather than assumed.
+pub fn set_acquisition_reconcile_completed(active_pins: usize) {
+    ACQUISITION_ACTIVE_PINS.set(active_pins as i64);
+    ACQUISITION_RECONCILE_INITIALIZED.set(1);
+}
+
 /// Record one acquisition (pull-leg) outcome ("fetched" | "fetch_error" |
 /// "transport_failure" | "blob_unavailable" | "store_failed" | "no_db_pool" |
 /// "no_db_conn" | "unexpected_response").
@@ -2238,6 +2335,11 @@ pub enum ContestSkip {
     /// The chain exists; this row's own declared head is what cannot be
     /// resolved, and that does not change between sweeps either.
     SelfCandidacyBackoff,
+    /// A previous peer-head declaration failed for a conductor reason outside
+    /// the expected not-retrievable refusal. Retrying it every sweep spends the
+    /// same scarce contest budget on the same id, so it uses the ordinary
+    /// finite contest window while retaining its own observable cause.
+    DeclareErrorBackoff,
     /// A previous contest hit the no-chain gate AND the advertising peer's
     /// responder stated that its conductor holds NO record for the head it
     /// advertises ([`HeadRecordDegraded::NoRecord`]). The evidence this arm needs
@@ -2252,6 +2354,7 @@ impl seam_contracts::ReasonLabel for ContestSkip {
     const ALL: &'static [Self] = &[
         ContestSkip::NoLocalChainBackoff,
         ContestSkip::SelfCandidacyBackoff,
+        ContestSkip::DeclareErrorBackoff,
         ContestSkip::EvidenceAbsentBackoff,
     ];
 
@@ -2259,6 +2362,7 @@ impl seam_contracts::ReasonLabel for ContestSkip {
         match self {
             ContestSkip::NoLocalChainBackoff => "no_local_chain_backoff",
             ContestSkip::SelfCandidacyBackoff => "self_candidacy_backoff",
+            ContestSkip::DeclareErrorBackoff => "declare_error_backoff",
             ContestSkip::EvidenceAbsentBackoff => "evidence_absent_backoff",
         }
     }
@@ -3446,6 +3550,53 @@ mod tests {
         assert!(text.contains("outcome=\"no_election\""), "{text}");
         assert!(text.contains("outcome=\"resolve_error\""), "{text}");
         assert!(text.contains("outcome=\"no_courier\""), "{text}");
+    }
+
+    #[test]
+    fn acquisition_reconcile_outcomes_are_stable_pretouched_and_incrementable() {
+        use seam_contracts::ReasonLabel as _;
+
+        let labels: Vec<_> = AcquisitionReconcileOutcome::ALL
+            .iter()
+            .map(|outcome| outcome.label())
+            .collect();
+        assert_eq!(
+            labels,
+            [
+                "completed",
+                "sync_paused",
+                "db_pool_missing",
+                "db_pool_unavailable",
+                "pin_load_failed",
+                "presence_query_failed",
+            ]
+        );
+
+        register_all();
+        for outcome in AcquisitionReconcileOutcome::ALL {
+            inc_acquisition_reconcile_outcome(*outcome);
+        }
+        set_acquisition_reconcile_completed(0);
+
+        let text = gather_text();
+        assert!(
+            text.contains("elohim_acquisition_reconcile_outcomes_total"),
+            "{text}"
+        );
+        for label in labels {
+            assert!(
+                text.contains(&format!("outcome=\"{label}\"")),
+                "reconcile outcome {label:?} was not materialized:\n{text}"
+            );
+        }
+        assert!(
+            text.contains("elohim_acquisition_reconcile_initialized 1"),
+            "{text}"
+        );
+        assert!(
+            text.contains("elohim_acquisition_active_pins 0"),
+            "zero active pins must be an observable completed census:\n{text}"
+        );
     }
 
     #[test]

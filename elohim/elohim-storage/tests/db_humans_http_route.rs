@@ -8,7 +8,6 @@
 
 use std::sync::Arc;
 
-use diesel::prelude::*;
 use diesel::RunQueryDsl;
 
 use elohim_storage::db::diesel_schema::humans;

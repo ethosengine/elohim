@@ -896,8 +896,10 @@ pub struct P2PStatusInfo {
     /// Consumers should treat None as "data not available" (e.g., wait or
     /// avoid using this peer as a load signal), NOT as "caught up".
     pub drain: Option<DrainStatusInfo>,
-    /// Acquisition pull-queue rollup — None when state cannot be computed.
-    /// Consumers treat None as "keep waiting", NEVER as caught up (spec §4.3).
+    /// Acquisition pull-queue rollup — None until the first local active-pin ×
+    /// presence reconcile completes. Some(total=0) means that reconcile ran and
+    /// observed no active desired items. Consumers treat None as "keep waiting",
+    /// NEVER as caught up (spec §4.3).
     pub pull: Option<acquisition::PullStatusInfo>,
     /// P1 projection-reconcile stream status (REA commitments converge from own
     /// conductor; peers as discovery). None when the reconcile task is not
@@ -3072,8 +3074,21 @@ impl P2PNode {
                 }
                 _ = acquisition_reconcile_interval.tick() => {
                     drop(swarm);
-                    if !self.sync_paused.load(Ordering::Acquire) {
-                        self.run_acquisition_reconcile().await;
+                    let outcome = if self.sync_paused.load(Ordering::Acquire) {
+                        warn!(
+                            target: "elohim_storage::acquisition",
+                            "acquisition reconcile skipped: sync backpressure is paused"
+                        );
+                        crate::metrics::AcquisitionReconcileOutcome::SyncPaused
+                    } else {
+                        self.run_acquisition_reconcile().await
+                    };
+                    crate::metrics::inc_acquisition_reconcile_outcome(outcome);
+                    if outcome == crate::metrics::AcquisitionReconcileOutcome::Completed {
+                        // Publish the first honest pull sample immediately;
+                        // otherwise the 30s status ticker leaves a just-completed
+                        // t=0 reconcile looking null for another half minute.
+                        self.refresh_status().await;
                     }
                 }
                 _ = provide_reconcile_interval.tick() => {
@@ -7940,9 +7955,30 @@ impl P2PNode {
     /// wants (Slice 1: head_ref IS the item id; cluster pins are rejected at
     /// POST time), diff against local presence, enqueue gaps priority-ordered.
     /// Pure local computation — no network here (R-H).
-    async fn run_acquisition_reconcile(&self) {
-        let Some(ref pool) = self.db_pool else { return };
-        let Ok(mut conn) = pool.get() else { return };
+    async fn run_acquisition_reconcile(&self) -> crate::metrics::AcquisitionReconcileOutcome {
+        use crate::metrics::AcquisitionReconcileOutcome;
+
+        let first_pass = self.acquisition.rollup_if_initialized().await.is_none();
+        let Some(ref pool) = self.db_pool else {
+            warn!(
+                target: "elohim_storage::acquisition",
+                first_pass,
+                "acquisition reconcile stopped before pin census: DB pool is not configured"
+            );
+            return AcquisitionReconcileOutcome::DbPoolMissing;
+        };
+        let mut conn = match pool.get() {
+            Ok(conn) => conn,
+            Err(e) => {
+                warn!(
+                    target: "elohim_storage::acquisition",
+                    error = %e,
+                    first_pass,
+                    "acquisition reconcile stopped before pin census: DB connection unavailable"
+                );
+                return AcquisitionReconcileOutcome::DbPoolUnavailable;
+            }
+        };
 
         // (0) Cooldown re-admission — the BACKSTOP arm of pin retirement. The
         // primary arm is inventory-driven (a peer advertising a retired pin's
@@ -7955,10 +7991,16 @@ impl P2PNode {
         let pins = match crate::db::acquisition_pins::list_active_pins(&mut conn) {
             Ok(p) => p,
             Err(e) => {
-                debug!(error = %e, "acquisition reconcile: pin load failed");
-                return;
+                warn!(
+                    target: "elohim_storage::acquisition",
+                    error = %e,
+                    first_pass,
+                    "acquisition reconcile stopped: active-pin census failed"
+                );
+                return AcquisitionReconcileOutcome::PinLoadFailed;
             }
         };
+        let active_pin_count = pins.len();
         let pin_wants: Vec<(i32, Vec<String>)> = pins
             .iter()
             .filter(|p| p.kind == "item")
@@ -7976,8 +8018,14 @@ impl P2PNode {
             match crate::db::content_diesel::content_ids_present(&mut conn, &app_ctx, &want_ids) {
                 Ok(set) => set,
                 Err(e) => {
-                    debug!(error = %e, "acquisition reconcile: presence query failed");
-                    return;
+                    warn!(
+                        target: "elohim_storage::acquisition",
+                        error = %e,
+                        first_pass,
+                        active_pins = active_pin_count,
+                        "acquisition reconcile stopped: local-presence query failed"
+                    );
+                    return AcquisitionReconcileOutcome::PresenceQueryFailed;
                 }
             };
         // DB work is done; drop the connection before the reconcile await so
@@ -8007,6 +8055,25 @@ impl P2PNode {
             }
         }
 
+        crate::metrics::set_acquisition_reconcile_completed(active_pin_count);
+        if first_pass {
+            info!(
+                target: "elohim_storage::acquisition",
+                active_pins = active_pin_count,
+                desired_items = want_ids.len(),
+                local_items = local_has.len(),
+                "acquisition reconcile first pass completed"
+            );
+        } else {
+            debug!(
+                target: "elohim_storage::acquisition",
+                active_pins = active_pin_count,
+                desired_items = want_ids.len(),
+                local_items = local_has.len(),
+                "acquisition reconcile completed"
+            );
+        }
+
         // Retire pins the fabric cannot satisfy. Held BACK, not deleted: the pin
         // row survives (a person still wants it) and is re-admitted the moment a
         // peer advertises the content or the cooldown elapses. Without this an
@@ -8015,6 +8082,7 @@ impl P2PNode {
         // failed, caughtUp false for 12h+ with no runtime path to retirement —
         // the only status-flip caller was the HTTP DELETE route).
         self.retire_exhausted_pins().await;
+        AcquisitionReconcileOutcome::Completed
     }
 
     /// Flip pins whose every want exhausted its retry budget to
@@ -8409,7 +8477,7 @@ impl P2PNode {
         };
 
         let (dedup_unique_len, dedup_total_seen) = self.dedup.stats();
-        let pull = Some(self.acquisition.rollup().await);
+        let pull = self.acquisition.rollup_if_initialized().await;
         let projection_reconcile = match &self.projection_reconcile {
             Some(s) => Some(s.status().await),
             None => None,

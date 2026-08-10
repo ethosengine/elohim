@@ -187,7 +187,9 @@ impl BackoffWindows {
     pub fn for_class(&self, class: ContestSkip) -> Duration {
         match class {
             ContestSkip::EvidenceAbsentBackoff => self.evidence_absent,
-            ContestSkip::NoLocalChainBackoff | ContestSkip::SelfCandidacyBackoff => self.contest,
+            ContestSkip::NoLocalChainBackoff
+            | ContestSkip::SelfCandidacyBackoff
+            | ContestSkip::DeclareErrorBackoff => self.contest,
         }
     }
 }
@@ -905,6 +907,11 @@ mod tests {
         assert_eq!(
             windows.for_class(ContestSkip::SelfCandidacyBackoff),
             Duration::from_secs(3600)
+        );
+        assert_eq!(
+            windows.for_class(ContestSkip::DeclareErrorBackoff),
+            Duration::from_secs(3600),
+            "a generic declare error must use the ordinary contest clock"
         );
         assert_eq!(
             windows.for_class(ContestSkip::EvidenceAbsentBackoff),

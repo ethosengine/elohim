@@ -330,7 +330,7 @@ fn p2p_status_view_matches_schema() {
 }
 
 #[test]
-fn p2p_status_view_with_null_drain() {
+fn p2p_status_view_with_null_drain_and_uninitialized_pull() {
     let status = P2PStatusInfo {
         peer_id: "12D3KooWTest".to_string(),
         listen_addresses: vec![],
@@ -357,6 +357,10 @@ fn p2p_status_view_with_null_drain() {
     };
 
     let json = serde_json::to_value(&status).unwrap();
+    assert!(
+        json.get("pull").is_some_and(serde_json::Value::is_null),
+        "an uninitialized acquisition reconcile must serialize pull explicitly as null"
+    );
     validate_against_schema("views/p2p-status-view.schema.json", &json);
 }
 

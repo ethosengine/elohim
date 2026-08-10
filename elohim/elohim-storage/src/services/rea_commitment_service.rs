@@ -695,6 +695,45 @@ impl ReaCommitmentService {
     }
 }
 
+/// Bridge the storage-layer input shape (Option<String> id, single-string
+/// scope fields, includes medium_of_exchange_id) to the DNA wire shape
+/// (required id, Vec<String> scope fields, no medium_of_exchange_id).
+///
+/// For project-epr action specifically, the dropped fields
+/// (medium_of_exchange_id, resource_conforms_to) are not used — verified
+/// by reading the seed-projections.ts canonical payload shape.
+fn to_shefa_input(
+    id: &str,
+    storage: &CreateReaCommitmentInput,
+) -> shefa_types::CreateReaCommitmentInput {
+    shefa_types::CreateReaCommitmentInput {
+        id: id.to_string(),
+        action: storage.action.clone(),
+        provider: storage.provider.clone(),
+        receiver: storage.receiver.clone(),
+        resource_classified_as: storage
+            .resource_classified_as
+            .clone()
+            .map(|s| vec![s])
+            .unwrap_or_default(),
+        resource_quantity_value: storage.resource_quantity_value.map(|v| v as f64),
+        resource_quantity_unit: storage.resource_quantity_unit.clone(),
+        effort_quantity_value: storage.effort_quantity_value.map(|v| v as f64),
+        effort_quantity_unit: storage.effort_quantity_unit.clone(),
+        has_beginning: storage.has_beginning.clone(),
+        has_end: storage.has_end.clone(),
+        due: storage.due.clone(),
+        clause_of: storage.clause_of.clone(),
+        in_scope_of: storage
+            .in_scope_of
+            .clone()
+            .map(|s| vec![s])
+            .unwrap_or_default(),
+        note: storage.note.clone(),
+        metadata_json: storage.metadata_json.clone(),
+    }
+}
+
 // =============================================================================
 // Tests
 // =============================================================================
@@ -1363,44 +1402,5 @@ mod tests {
         let browser = deterministic_custody_id("uhCAk-self", "uhCAk-self", "sha256-browser");
         let server = deterministic_custody_id("uhCAk-self", "uhCAk-self", "sha256-server");
         assert_ne!(browser, server);
-    }
-}
-
-/// Bridge the storage-layer input shape (Option<String> id, single-string
-/// scope fields, includes medium_of_exchange_id) to the DNA wire shape
-/// (required id, Vec<String> scope fields, no medium_of_exchange_id).
-///
-/// For project-epr action specifically, the dropped fields
-/// (medium_of_exchange_id, resource_conforms_to) are not used — verified
-/// by reading the seed-projections.ts canonical payload shape.
-fn to_shefa_input(
-    id: &str,
-    storage: &CreateReaCommitmentInput,
-) -> shefa_types::CreateReaCommitmentInput {
-    shefa_types::CreateReaCommitmentInput {
-        id: id.to_string(),
-        action: storage.action.clone(),
-        provider: storage.provider.clone(),
-        receiver: storage.receiver.clone(),
-        resource_classified_as: storage
-            .resource_classified_as
-            .clone()
-            .map(|s| vec![s])
-            .unwrap_or_default(),
-        resource_quantity_value: storage.resource_quantity_value.map(|v| v as f64),
-        resource_quantity_unit: storage.resource_quantity_unit.clone(),
-        effort_quantity_value: storage.effort_quantity_value.map(|v| v as f64),
-        effort_quantity_unit: storage.effort_quantity_unit.clone(),
-        has_beginning: storage.has_beginning.clone(),
-        has_end: storage.has_end.clone(),
-        due: storage.due.clone(),
-        clause_of: storage.clause_of.clone(),
-        in_scope_of: storage
-            .in_scope_of
-            .clone()
-            .map(|s| vec![s])
-            .unwrap_or_default(),
-        note: storage.note.clone(),
-        metadata_json: storage.metadata_json.clone(),
     }
 }

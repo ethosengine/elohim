@@ -111,3 +111,24 @@ Feature: Acquisition pins — the device pin and the pull queue (slice 1)
     # future budget tuning changes how many failures it takes to wedge.
     # Review after: new ShardResponse variants, changes to
     # MAX_ACQUISITION_INFLIGHT, or any new caller of DispatchBudget.
+
+  @wip @regression
+  Scenario: Pull status distinguishes an unmeasured boot from an observed empty pin set
+    Given a storage peer has restarted and no acquisition reconcile has completed
+    When I GET /p2p/status
+    Then the pull status is null
+    When the first acquisition reconcile completes with zero active pins
+    Then the pull status reports total 0, fetched 0, pending 0, and failed 0
+    And the acquisition reconcile initialized metric is 1
+    And the acquisition active pins metric is 0
+    And the acquisition reconcile outcome "completed" was counted
+    # Constraint: unreadable/unmeasured is not zero. `pull: null` is the boot and
+    # early-return answer; a non-null zero rollup is evidence that the local
+    # active-pin × presence census actually completed and found nothing.
+    # Binding contracts: p2p/acquisition.rs::pull_is_null_until_a_reconcile_observes_the_desired_set,
+    # metrics.rs::acquisition_reconcile_outcomes_are_stable_pretouched_and_incrementable,
+    # tests/schema_contract.rs::p2p_status_view_with_null_drain_and_uninitialized_pull.
+    # Operational parameters: first tokio interval tick at t=0, then every 60s;
+    # the completed first pass refreshes /p2p/status immediately.
+    # Review after: changes to acquisition cadence, status refresh, or any new
+    # early-return branch in run_acquisition_reconcile.

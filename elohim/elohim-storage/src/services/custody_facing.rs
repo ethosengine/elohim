@@ -980,12 +980,12 @@ mod tests {
             .iter()
             .map(|r| (r.shard_cid.as_str(), r.is_fresh))
             .collect();
-        assert_eq!(by_shard["shard-fresh"], true);
-        assert_eq!(
-            by_shard["shard-sqlite"], true,
+        assert!(by_shard["shard-fresh"]);
+        assert!(
+            by_shard["shard-sqlite"],
             "the SQLite datetime('now') first_seen form must parse"
         );
-        assert_eq!(by_shard["shard-stale"], false);
+        assert!(!by_shard["shard-stale"]);
     }
 
     // -- dedup determinism --------------------------------------------------

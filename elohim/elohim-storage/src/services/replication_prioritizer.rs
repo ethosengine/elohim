@@ -228,8 +228,7 @@ mod tests {
         provider: &str,
         recipient_hub_id: &str,
         state: &str,
-        epr_kinds: Option<Vec<&str>>,
-        bytes_per_blob_max: Option<u64>,
+        scope_limits: (Option<Vec<&str>>, Option<u64>),
         dht_anchor_hash: Option<&str>,
     ) {
         use crate::db::diesel_schema::rea_commitments;
@@ -238,6 +237,7 @@ mod tests {
             ProviderRole, RatioAttestation, ReplicatesDwellingPayload, ScopeFilter,
         };
 
+        let (epr_kinds, bytes_per_blob_max) = scope_limits;
         let scope_filter = ScopeFilter {
             epr_kinds: epr_kinds.map(|v| v.into_iter().map(|s| s.to_string()).collect()),
             bytes_per_blob_max,
@@ -295,8 +295,7 @@ mod tests {
             "agent:uhCAkProvider001",
             "collective:uhCkkHub001",
             "active",
-            Some(vec!["markdown", "sophia-quiz-json"]),
-            Some(50_000_000),
+            (Some(vec!["markdown", "sophia-quiz-json"]), Some(50_000_000)),
             Some("comm-001-dht"),
         );
 
@@ -327,8 +326,7 @@ mod tests {
             "agent:uhCAkProvider002",
             "hub:X",
             "cancelled",
-            None,
-            None,
+            (None, None),
             None,
         );
         insert_replicates_dwelling_commitment(
@@ -337,8 +335,7 @@ mod tests {
             "agent:uhCAkProvider002",
             "hub:X",
             "terminated",
-            None,
-            None,
+            (None, None),
             None,
         );
         insert_replicates_dwelling_commitment(
@@ -347,8 +344,7 @@ mod tests {
             "agent:uhCAkProvider002",
             "hub:X",
             "active",
-            None,
-            None,
+            (None, None),
             None,
         );
 
@@ -371,8 +367,7 @@ mod tests {
             "agent:uhCAkProvider003",
             "hub:Y",
             "proposed",
-            None,
-            None,
+            (None, None),
             None, // dht_anchor_hash NULL
         );
 

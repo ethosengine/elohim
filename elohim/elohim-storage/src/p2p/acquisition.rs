@@ -108,6 +108,12 @@ pub struct PinPullStatus {
 
 #[derive(Debug, Default)]
 struct AcquisitionInner {
+    /// True after at least one local pin/presence reconcile completed.
+    ///
+    /// Category C operational state: reconstructed from `acquisition_pins` ×
+    /// local content presence after every process restart. Until this flips,
+    /// `/p2p/status.pull` must stay null — zero is an observation, not a default.
+    initialized: bool,
     /// pin row id → tracker over that pin's resolved item set
     trackers: HashMap<i32, GapTracker>,
     /// pin row id → resolved desired-set size (Slice 1: 1 for item pins)
@@ -178,6 +184,10 @@ impl AcquisitionState {
             tracker.mark_local_wants_satisfied(&want_ids_for_local);
             to_dispatch.extend(gaps);
         }
+        // C4 honest absence: only a completed DB-backed reconcile earns an
+        // observed pull rollup. Early returns before this method leave the state
+        // uninitialized, so callers publish null rather than fabricated zeroes.
+        inner.initialized = true;
         to_dispatch
     }
 
@@ -265,8 +275,7 @@ impl AcquisitionState {
         out
     }
 
-    pub async fn rollup(&self) -> PullStatusInfo {
-        let inner = self.inner.read().await;
+    fn rollup_inner(inner: &AcquisitionInner) -> PullStatusInfo {
         let mut s = PullStatusInfo::default();
         for (pin_id, t) in &inner.trackers {
             let c = t.counts();
@@ -284,6 +293,22 @@ impl AcquisitionState {
         // total == 0 (resolved-empty) is likewise not caught_up.
         s.caught_up = s.total > 0 && s.fetched == s.total;
         s
+    }
+
+    pub async fn rollup(&self) -> PullStatusInfo {
+        let inner = self.inner.read().await;
+        Self::rollup_inner(&inner)
+    }
+
+    /// Honest status boundary for `/p2p/status.pull`.
+    ///
+    /// `None` has exactly one provenance: no local acquisition reconcile has
+    /// completed since process start. Once initialized, `Some(total=0)` is a
+    /// positive observation that the active desired set is empty, never a
+    /// default standing in for unmeasured state.
+    pub async fn rollup_if_initialized(&self) -> Option<PullStatusInfo> {
+        let inner = self.inner.read().await;
+        inner.initialized.then(|| Self::rollup_inner(&inner))
     }
 
     pub async fn per_pin(&self) -> Vec<PinPullStatus> {
@@ -458,6 +483,34 @@ mod tests {
         let pins = acq.per_pin().await;
         assert_eq!(pins.len(), 1);
         assert!(!pins[0].caught_up);
+    }
+
+    #[tokio::test]
+    async fn pull_is_null_until_a_reconcile_observes_the_desired_set() {
+        let acq = AcquisitionState::new();
+        assert!(
+            acq.rollup_if_initialized().await.is_none(),
+            "an unmeasured pull set must be null, never fabricated zeroes"
+        );
+
+        acq.reconcile(vec![], &HashSet::new(), MIN_RETRIES).await;
+        let observed = acq
+            .rollup_if_initialized()
+            .await
+            .expect("a completed empty reconcile is an observed status");
+        assert_eq!(
+            (
+                observed.total,
+                observed.fetched,
+                observed.pending,
+                observed.failed
+            ),
+            (0, 0, 0, 0)
+        );
+        assert!(
+            !observed.caught_up,
+            "an observed empty desired set is still not byte-arrival caught up"
+        );
     }
 
     #[tokio::test]

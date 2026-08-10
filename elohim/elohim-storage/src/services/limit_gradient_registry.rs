@@ -75,9 +75,11 @@ mod tests {
 
     #[test]
     fn clamp_pulls_out_of_wall_values_in() {
-        let mut wild = GradientConfig::default();
-        wild.alpha = 0.0; // tail-blinding attempt
-        wild.k_max = 1.0; // confiscate-everything attempt
+        let wild = GradientConfig {
+            alpha: 0.0, // tail-blinding attempt
+            k_max: 1.0, // confiscate-everything attempt
+            ..GradientConfig::default()
+        };
         let clamped = LimitGradientRegistry::clamp_to_walls(wild);
         assert_eq!(clamped.alpha, ALPHA_WALL.0);
         assert_eq!(clamped.k_max, K_MAX_WALL.1);

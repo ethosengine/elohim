@@ -762,6 +762,12 @@ fn evidence_backoff_class(
     }
 }
 
+/// Record the generic Arm-1 declaration failure on the ordinary finite contest
+/// clock while preserving its distinct C8 reason label.
+fn note_declare_error_backoff(id: &str) {
+    crate::services::contest_backoff::note(id, crate::metrics::ContestSkip::DeclareErrorBackoff);
+}
+
 /// What the pre-flight resolved from the OWN conductor.
 ///
 /// **Concerns:** C4 (honest absence), C0 (plane location — the *subject* of this
@@ -2065,6 +2071,7 @@ async fn contest_peer(
             // subclass self-candidacy answers.
             if !msg.contains(ERR_NOT_RETRIEVABLE) {
                 crate::metrics::inc_contest_failed(crate::metrics::ContestFailure::DeclareError);
+                note_declare_error_backoff(id);
                 tracing::warn!(
                     target: "elohim_storage::head_adoption",
                     content_id = %id,
@@ -2072,7 +2079,8 @@ async fn contest_peer(
                     carried = carried_present,
                     fetcher = fetcher_present,
                     error = %msg,
-                    "adopt-before-author: contest declare failed — holding, retried next sweep"
+                    "adopt-before-author: contest declare failed — holding, retried after the \
+                     contest backoff"
                 );
                 return AdoptOutcome::Held;
             }
@@ -3018,6 +3026,10 @@ mod tests {
     /// the resolution must report `carried`, because the arm downstream acts on
     /// bytes, not on who supplied them.
     #[tokio::test]
+    #[allow(
+        clippy::await_holding_lock,
+        reason = "the process-global advertiser-health table must stay exclusive across each async resolution"
+    )]
     async fn a_degraded_primary_routes_to_a_healthy_alternate() {
         let _exclusive = crate::services::advertiser_health::test_exclusive();
         crate::services::advertiser_health::reset();
@@ -3072,6 +3084,10 @@ mod tests {
     /// whose bytes exist NOWHERE, and fanning those out would double the cost
     /// of the population with the least to gain.
     #[tokio::test]
+    #[allow(
+        clippy::await_holding_lock,
+        reason = "the process-global advertiser-health table must stay exclusive across each async resolution"
+    )]
     async fn a_structural_absence_is_never_routed_around() {
         let _exclusive = crate::services::advertiser_health::test_exclusive();
         crate::services::advertiser_health::reset();
@@ -3108,6 +3124,10 @@ mod tests {
     /// A carried primary is the common converged case, and it must stay a single
     /// round-trip — otherwise the lever taxes the ids that are already working.
     #[tokio::test]
+    #[allow(
+        clippy::await_holding_lock,
+        reason = "the process-global advertiser-health table must stay exclusive across each async resolution"
+    )]
     async fn a_carried_primary_is_never_routed_around() {
         let _exclusive = crate::services::advertiser_health::test_exclusive();
         crate::services::advertiser_health::reset();
@@ -3132,6 +3152,10 @@ mod tests {
     /// evidence_fallback_max_alternates())`, and it must still be a fixed,
     /// pre-sized walk with no retry and no recursion.
     #[tokio::test]
+    #[allow(
+        clippy::await_holding_lock,
+        reason = "the process-global advertiser-health table must stay exclusive across each async resolution"
+    )]
     async fn the_fallback_ladder_is_bounded_by_its_budget() {
         let _exclusive = crate::services::advertiser_health::test_exclusive();
         crate::services::advertiser_health::reset();
@@ -3201,6 +3225,10 @@ mod tests {
     /// `budget_elapsed`, took a backoff, and waited — with the bytes sitting on a
     /// peer the sweep had already harvested and simply never asked.
     #[tokio::test]
+    #[allow(
+        clippy::await_holding_lock,
+        reason = "the process-global advertiser-health table must stay exclusive across each async resolution"
+    )]
     async fn a_second_alternate_can_still_supply_the_bytes() {
         let _exclusive = crate::services::advertiser_health::test_exclusive();
         crate::services::advertiser_health::reset();
@@ -3251,6 +3279,10 @@ mod tests {
     /// `no_alternative`. That series is the one that says HINT PLURALITY is the
     /// wall rather than peer health — a different remedy entirely.
     #[tokio::test]
+    #[allow(
+        clippy::await_holding_lock,
+        reason = "the process-global advertiser-health table must stay exclusive across each async resolution"
+    )]
     async fn no_alternative_returns_the_primary_outcome_and_says_so() {
         let _exclusive = crate::services::advertiser_health::test_exclusive();
         crate::services::advertiser_health::reset();
@@ -3285,6 +3317,10 @@ mod tests {
     /// the primary and the fallback — otherwise the second ask would be a blind
     /// pick forever.
     #[tokio::test]
+    #[allow(
+        clippy::await_holding_lock,
+        reason = "the process-global advertiser-health table must stay exclusive across each async resolution"
+    )]
     async fn both_asks_feed_the_health_tracker() {
         let _exclusive = crate::services::advertiser_health::test_exclusive();
         crate::services::advertiser_health::reset();
@@ -3366,9 +3402,37 @@ mod tests {
         seam_contracts::assert_reason_labels_stable::<crate::metrics::ContestSkip>(&[
             "no_local_chain_backoff",
             "self_candidacy_backoff",
+            "declare_error_backoff",
             "evidence_absent_backoff",
         ]);
         seam_contracts::assert_reason_labels_discriminating::<crate::metrics::ContestSkip>();
+    }
+
+    /// The generic Arm-1 error used to spend fanout on the same id every sweep.
+    /// Exercise the branch's real recording helper and the real ledger read so
+    /// this contract cannot pass from a duplicated classification formula.
+    #[test]
+    fn a_generic_declare_error_enters_the_ordinary_per_id_backoff() {
+        use crate::metrics::ContestSkip;
+        use crate::services::contest_backoff::{self, BackoffWindows};
+
+        let _exclusive = contest_backoff::test_exclusive();
+        contest_backoff::reset();
+        let id = "declare-error:backoff";
+        note_declare_error_backoff(id);
+
+        assert_eq!(
+            contest_backoff::skip_class(
+                id,
+                BackoffWindows {
+                    contest: std::time::Duration::from_secs(3600),
+                    evidence_absent: std::time::Duration::from_secs(86_400),
+                },
+            ),
+            Some(ContestSkip::DeclareErrorBackoff),
+            "the id must be deferred on the next sweep under its distinct typed reason"
+        );
+        contest_backoff::reset();
     }
 
     /// The wire vocabulary round-trips through its type. `wire_str` feeds the

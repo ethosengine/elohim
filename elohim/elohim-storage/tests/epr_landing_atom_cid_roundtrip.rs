@@ -22,8 +22,8 @@
 //!
 //! CID derivation in both Rust and TS:
 //!   - sha2-256 hash seed bytes  →  CIDv1(dag-cbor codec 0x71, sha2-256 multihash)
-//!   This is exactly `elohim_epr::cid::compute_cid(seed_bytes)` on the Rust side
-//!   and `CID.create(1, 0x71, await sha256.digest(seedBytes))` on the TS side.
+//!     This is exactly `elohim_epr::cid::compute_cid(seed_bytes)` on the Rust side
+//!     and `CID.create(1, 0x71, await sha256.digest(seedBytes))` on the TS side.
 
 use chrono::TimeZone;
 use elohim_epr::{cid::compute_cid, proof::AgentKeypair, Coupling, Epr, EprKind, Reach};

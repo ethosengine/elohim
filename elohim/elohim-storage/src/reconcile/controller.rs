@@ -2249,17 +2249,17 @@ mod tests {
 
         // Verify the participation row.
         let mut conn = pool.get().expect("conn");
-        let rows: Vec<(Option<String>, String, Option<String>, Option<String>)> =
-            collective_participations::table
-                .filter(collective_participations::dht_anchor_hash.eq(Some("uhCkkMembership0010")))
-                .select((
-                    collective_participations::member_cid,
-                    collective_participations::member_kind,
-                    collective_participations::role_context,
-                    collective_participations::departed_at,
-                ))
-                .load(&mut conn)
-                .expect("query");
+        type ParticipationRow = (Option<String>, String, Option<String>, Option<String>);
+        let rows: Vec<ParticipationRow> = collective_participations::table
+            .filter(collective_participations::dht_anchor_hash.eq(Some("uhCkkMembership0010")))
+            .select((
+                collective_participations::member_cid,
+                collective_participations::member_kind,
+                collective_participations::role_context,
+                collective_participations::departed_at,
+            ))
+            .load(&mut conn)
+            .expect("query");
 
         assert_eq!(rows.len(), 1, "exactly one participation row");
         let (member_cid, member_kind, role_context, departed_at) = &rows[0];

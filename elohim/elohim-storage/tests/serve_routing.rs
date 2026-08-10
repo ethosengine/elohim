@@ -5,7 +5,7 @@
 //! real column names to verify:
 //! - T4: `load_serve_rows` returns correct ServeRow fields from the multi-table join
 //! - T5: `select_serve_peers` returns capability/diversity-ordered agent_cids,
-//!       and an empty fixture → empty result (caller sheds)
+//!   and an empty fixture → empty result (caller sheds)
 
 use diesel::prelude::*;
 use diesel::RunQueryDsl;
@@ -16,7 +16,7 @@ use elohim_storage::db::diesel_schema::{
 use elohim_storage::db::models::{
     NewHuman, NewNodeStewardship, NewShardLocation, NewStewardedNode,
 };
-use elohim_storage::services::serve_routing::{load_serve_rows, select_serve_peers, MIN_CAP};
+use elohim_storage::services::serve_routing::{load_serve_rows, select_serve_peers};
 use elohim_storage::test_util::test_pool;
 
 // ---------------------------------------------------------------------------

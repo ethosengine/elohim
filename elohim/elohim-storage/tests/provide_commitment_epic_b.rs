@@ -152,7 +152,8 @@ fn replicates_commons_signal_creates_active_provide_row() {
     // The provide row landed: action='provide', state='active', content:commons,
     // provider==commitment provider, dht_anchor_hash==action_hash.
     use db::diesel_schema::rea_commitments as r;
-    let rows: Vec<(String, String, Option<String>, String, Option<String>)> = r::table
+    type ProvideRow = (String, String, Option<String>, String, Option<String>);
+    let rows: Vec<ProvideRow> = r::table
         .filter(r::action.eq("provide"))
         .filter(r::provider.eq("agent:steward-a"))
         .select((

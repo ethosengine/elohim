@@ -417,8 +417,10 @@ mod tests {
 
     /// End-to-end composition through the service seam: `get_graph_query` must
     /// fold BOTH provenance classes into one `ContentGraphView` —
+    ///
     /// - Z via an authored X→Z edge (`inferenceSource == "explicit"`), and
     /// - Y via tag overlap with X, no authored edge (`inferenceSource == "tag"`).
+    ///
     /// This proves `RelationshipService` delegates to the resolver and returns
     /// the promoted ts-rs view, not the retired plain-serde struct.
     #[test]

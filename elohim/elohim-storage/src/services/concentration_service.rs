@@ -181,7 +181,7 @@ mod tests {
             let b = [100_000.0_f64, 100.0, 100.0, 100.0, 100.0];
             b[0] / b.iter().sum::<f64>() // ≈ 0.9960
         };
-        let mut balances = vec![100_000.0_f64, 100.0, 100.0, 100.0, 100.0];
+        let mut balances = [100_000.0_f64, 100.0, 100.0, 100.0, 100.0];
         let mut series = vec![];
         for _ in 0..2000 {
             let mu = balances.iter().sum::<f64>() / balances.len() as f64;
@@ -229,7 +229,7 @@ mod tests {
         );
 
         // (d) SELF-EXTINGUISHING-WHEN-JUST: equal start stays equal, friction at base.
-        let equal = vec![500.0_f32; 5];
+        let equal = [500.0_f32; 5];
         let cc_eq = composite_concentration(&equal, g.alpha, g.q, g.w_e, g.w_s);
         let r_eq = calculate_decay_rate_continuous(1.0, cc_eq, &g);
         assert!(
@@ -243,7 +243,7 @@ mod tests {
         // balance grows without bound — "rate-closable" means the C-SERIES converges,
         // not that absolute values are bounded. The main run above proves C-series
         // closure; this sub-run proves the decay-only attractor is the floor.)
-        let mut balances2 = vec![100_000.0_f32, 100.0, 100.0, 100.0, 100.0];
+        let mut balances2 = [100_000.0_f32, 100.0, 100.0, 100.0, 100.0];
         for _ in 0..2000 {
             let mu2 = balances2.iter().sum::<f32>() / balances2.len() as f32;
             let normed2: Vec<f32> = balances2.iter().map(|&b| b / mu2).collect();
