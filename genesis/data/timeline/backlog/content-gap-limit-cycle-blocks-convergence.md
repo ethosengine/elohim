@@ -491,3 +491,39 @@ UNMEASURABLE until this objective lands — that is the decision input,
 not a minutes-number. This item is now the confirmed gate in front of:
 caughtUp=true fleet-wide, the doorway shed lifting, notary-authority
 3/3, saga ch04/06/10, and the fork-deploy decision.
+
+## 2026-08-10 sprint close — limit cycle BROKEN; residual threads (limit-cycle sprint, overnight)
+
+The oscillation was proven an instrument artifact (rotating-window aliasing;
+gauge now measured-gated with drain-readable known_gaps/known_divergent
+series) wrapped around a real stall: the heal leg broke unconditionally on
+the first failed batch call (fixed budget-bounded, b96861c1b+31f8a9e89) on
+three CPU-starved conductors. Actives drained to single digits (james +
+jessica reached known_divergent=0); notary-authority measured 3/3 locally
+twice across independent deploys after the authorHeadOnce declare cycle
+busted the elohim.host ghost anchor. Remaining threads, each owned:
+
+- **Shem-trio conductor burn (OPEN, blocks the CI quiesce gate + trio
+  drain):** k2Gossip datacenter profile (15000/10) deployed per-human
+  (61118ace9) but the trio still saturates any CPU ceiling and
+  arc-to-full remains unobserved on shem. Round-2 lead: relay-path gossip
+  rounds time out fleet-wide (even matthew, arc=Full, ~4-6 WARNs/min,
+  every dying session relay-mediated, peer_max_op_data_bytes:0) while
+  relay ERROR classes are zero — the round transport works, rounds die
+  anyway. Pyroscope not instrumented (wishlist) — next probe is the
+  rendered-config confirmation + a round-lifecycle trace on one
+  gertrude↔adam session.
+- **Seed-pod unanchored backfill (batch-3 seed):** H3 CONFIRMED via
+  /db/stats parity (matthew 4456 rows ≈ adam 4454; ~2000 rows present but
+  dht_anchor_hash NULL on matthew/jessica) — H2 corpus-split and RC-4
+  reach-narrowing both falsified (apply_content_patch_fields has no reach
+  branch on UPDATE; the shipped guard is inert-but-armed). Cure direction:
+  anchor backfill / AnchorGap stamping from peer-advertised anchors.
+- **Validate-only edge mode (measurement-by-deploy cure):** every
+  [build:edge] validate run rolls all 7 STSs — the measurement restarts
+  the fleet it measures (ch04's structural cause; aborted/gate-skipped
+  banking runs #1336-#1338). Local a2o runs are the iteration loop;
+  the habit bank needs a deploy-decoupled CI measure.
+- **Flip condition (notary-authority habit):** one edge run whose quiesce
+  gate completes recording 3/3 — structurally gated on the trio drain,
+  which is gated on the burn thread above.
