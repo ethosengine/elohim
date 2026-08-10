@@ -40,6 +40,9 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # .claude/scripts
+from _lib import concern_routes  # noqa: E402
+
 JENKINS = "https://jenkins.ethosengine.com"
 BRANCH = "dev"
 JOBS = [
@@ -98,6 +101,14 @@ PROJECT = os.environ.get("CLAUDE_PROJECT_DIR") or os.path.dirname(
 CURSOR_PATH = os.path.join(PROJECT, ".claude", "data", "ci-cursor.json")
 LEDGER_PATH = os.path.join(PROJECT, ".claude", "data", "ci-findings.jsonl")
 TAXONOMY_PATH = os.path.join(PROJECT, ".claude", "data", "failure-taxonomy.json")
+HABITS_PATH = os.path.join(PROJECT, "genesis", "manifests", "habits.yaml")
+
+# The exact banner run-dataplane-validation.sh prints on a gate-skip (no
+# quiesce predicate satisfied — the measure never ran). This is an algedonic
+# signal (pain = a held state), so it gets a FIXED identifier — repeat
+# no-measures dedupe to ONE open finding rather than piling up per-build.
+_NO_MEASURE_BANNER = "=== Dataplane Validation: DID NOT MEASURE ==="
+_NO_MEASURE_IDENT = "dataplane-validation-did-not-measure"
 
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
@@ -190,9 +201,70 @@ def load_cursor():
         return {"jobs": {}, "green": {}}
 
 
+def _no_measure_concern():
+    """Route the no-measure finding to the active habit's @concern: address.
+    Guard FileNotFoundError → empty context (honest absence, never guessed)."""
+    try:
+        with open(HABITS_PATH, encoding="utf-8") as fh:
+            context = {"active_concern": concern_routes.active_concern(fh.read())}
+    except FileNotFoundError:
+        context = {}
+    return concern_routes.route("ci-no-measure", context)
+
+
+def _scan_console(tail, taxonomy, job):
+    """Pure console-tail scan: NO_MEASURE banner detection + taxonomy
+    classification. Takes the tail TEXT directly (the network fetch is the
+    caller's job) so it's unit-testable without hitting Jenkins.
+    Returns a list of finding dicts: {category, ident, display, class,
+    concern?} — concern is omitted (never guessed) unless resolved."""
+    findings = []
+
+    # NO_MEASURE banner is independent of the taxonomy — one banner is
+    # enough; the identifier is FIXED regardless of surrounding console text.
+    for line in tail.splitlines():
+        if _NO_MEASURE_BANNER in line:
+            findings.append(
+                {
+                    "category": "NO_MEASURE",
+                    "ident": _NO_MEASURE_IDENT,
+                    "display": _NO_MEASURE_BANNER,
+                    "class": "ci-no-measure",
+                    "concern": _no_measure_concern(),
+                }
+            )
+            break
+    if len(findings) >= MAX_CONSOLE_FINDINGS_PER_BUILD:
+        return findings
+
+    cats = [t for t in taxonomy if any(p in job for p in t[1])] or taxonomy
+    seen_lines = set()
+    for name, _pipes, rx, _mx in cats:
+        for line in tail.splitlines():
+            if _CMD_ECHO.match(line):
+                continue  # set -x echo — a command, not a failure
+            if _BENIGN_PROGRESS.match(line):
+                continue  # progress chatter of a SUCCEEDING step
+            if rx.search(line):
+                norm = normalize(line)
+                if norm and norm not in seen_lines:
+                    seen_lines.add(norm)
+                    finding = {"category": name, "ident": norm, "display": norm, "class": "ci-failure"}
+                    m = concern_routes._CONCERN_TAG.search(line)
+                    if m:
+                        concern = concern_routes.route("ci-failure", {"concern": m.group(1)})
+                        if concern:
+                            finding["concern"] = concern
+                    findings.append(finding)
+                    if len(findings) >= MAX_CONSOLE_FINDINGS_PER_BUILD:
+                        return findings
+    return findings
+
+
 def collect_build_findings(job, build, taxonomy):
     """Findings for one red build: failed tests first, console classification
-    as the fallback/supplement. Returns [(category, identifier, display)]."""
+    as the fallback/supplement. Returns [{category, ident, display, class,
+    concern?}]."""
     findings = []
     # 1. Failed test cases (UNSTABLE builds usually have a testReport).
     try:
@@ -204,7 +276,9 @@ def collect_build_findings(job, build, taxonomy):
             for case in suite.get("cases", []):
                 if case.get("status") in ("FAILED", "REGRESSION"):
                     ident = f'{case.get("className", "?")}.{case.get("name", "?")}'
-                    findings.append(("TEST_FAILURE", ident, ident))
+                    findings.append(
+                        {"category": "TEST_FAILURE", "ident": ident, "display": ident, "class": "ci-failure"}
+                    )
                     if len(findings) >= MAX_FAILED_TESTS_PER_BUILD:
                         return findings
     except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
@@ -214,21 +288,7 @@ def collect_build_findings(job, build, taxonomy):
     if not findings:
         try:
             tail = get_console_tail(job, build)
-            cats = [t for t in taxonomy if any(p in job for p in t[1])] or taxonomy
-            seen_lines = set()
-            for name, _pipes, rx, _mx in cats:
-                for line in tail.splitlines():
-                    if _CMD_ECHO.match(line):
-                        continue  # set -x echo — a command, not a failure
-                    if _BENIGN_PROGRESS.match(line):
-                        continue  # progress chatter of a SUCCEEDING step
-                    if rx.search(line):
-                        norm = normalize(line)
-                        if norm and norm not in seen_lines:
-                            seen_lines.add(norm)
-                            findings.append((name, norm, norm))
-                            if len(findings) >= MAX_CONSOLE_FINDINGS_PER_BUILD:
-                                return findings
+            findings.extend(_scan_console(tail, taxonomy, job))
         except (urllib.error.URLError, urllib.error.HTTPError, OSError):
             pass
 
@@ -244,7 +304,14 @@ def collect_build_findings(job, build, taxonomy):
         except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
             pass
         ident = f"stage:{stage}" if stage else "unclassified"
-        findings.append(("UNCLASSIFIED", ident, f"red build, {ident}"))
+        findings.append(
+            {
+                "category": "UNCLASSIFIED",
+                "ident": ident,
+                "display": f"red build, {ident}",
+                "class": "ci-failure",
+            }
+        )
     return findings
 
 
@@ -291,10 +358,17 @@ def harvest_job(job, cursor, taxonomy):
         if b["result"] == "SUCCESS":
             out["green"] = max(out["green"] or 0, b["number"])
         elif b["result"] in RED:
-            for category, ident, display in collect_build_findings(job, b["number"], taxonomy):
-                out["new"].append(
-                    {"build": b["number"], "category": category, "ident": ident, "display": display}
-                )
+            for f in collect_build_findings(job, b["number"], taxonomy):
+                entry = {
+                    "build": b["number"],
+                    "category": f["category"],
+                    "ident": f["ident"],
+                    "display": f["display"],
+                    "class": f.get("class", "ci-failure"),
+                }
+                if f.get("concern"):
+                    entry["concern"] = f["concern"]
+                out["new"].append(entry)
     return out
 
 
@@ -326,7 +400,7 @@ def reconcile(results, cursor):
                 entry = {
                     "ts": now,
                     "fp": fp,
-                    "class": "ci-failure",
+                    "class": f.get("class", "ci-failure"),
                     "category": f["category"],
                     "job": r["job"],
                     "line": f["display"][:300],
@@ -334,6 +408,7 @@ def reconcile(results, cursor):
                     "seen": 1,
                     "first_build": f["build"],
                     "last_build": f["build"],
+                    **({"concern": f["concern"]} if f.get("concern") else {}),
                 }
                 by_fp[fp] = entry
                 entries.append(entry)
