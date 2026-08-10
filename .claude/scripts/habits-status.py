@@ -79,10 +79,25 @@ def open_pain() -> dict:
                     if entry.get("status") != "open":
                         continue
                     concern = entry.get("concern")
-                    if not concern:
+                    # Honest absence extends to malformed addresses: a
+                    # non-string concern (e.g. a list) is unhashable and
+                    # cannot be a dict key — skip rather than crash.
+                    if not isinstance(concern, str) or not concern:
                         continue
-                    pain.setdefault(concern, []).append(entry.get("fp") or "?")
-        except OSError:
+                    fp = entry.get("fp")
+                    # A non-string fp (e.g. an int) is valid JSON but would
+                    # crash ", ".join(...) in full() — coerce to the same
+                    # honest placeholder used for a missing fp.
+                    if not isinstance(fp, str) or not fp:
+                        fp = "?"
+                    pain.setdefault(concern, []).append(fp)
+        except (OSError, ValueError, TypeError):
+            # OSError: missing/unreadable ledger. ValueError covers
+            # UnicodeDecodeError (raised mid-iteration on a non-UTF-8 file,
+            # not caught by OSError alone). TypeError is a defensive
+            # catch-all for any other hostile-shape surprise. Any of these
+            # degrade this ledger to an empty contribution — never a crash
+            # at session start.
             continue
     return pain
 

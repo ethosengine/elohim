@@ -99,7 +99,10 @@ with tempfile.TemporaryDirectory() as td:
         full = m.full(HABITS_DOC)
         check_true("full carries pain line", "pain: 5 open (" in full)
         check_true("full caps at 3 fps with ellipsis", "…" in full)
-        check_true("full does not list a 4th/5th fp raw beyond the cap", "aaa004" not in full.split("pain: 5 open (")[1].split(")")[0] or True)
+        pain_str = full.split("pain: 5 open (")[1].split(")")[0]
+        check("full lists exactly the first 3 fps, capped", pain_str, "aaa001, aaa002, aaa003…")
+        check_true("4th/5th fp never listed raw beyond the cap",
+                   "aaa004" not in pain_str and "aaa005" not in pain_str)
     finally:
         m.LEDGERS = orig_ledgers
 
@@ -140,6 +143,59 @@ with tempfile.TemporaryDirectory() as td:
     try:
         headline = m.headline(NO_CONCERN_DOC)
         check_true("no @concern tag on top red -> no crash, no pain line", "pain:" not in headline)
+    finally:
+        m.LEDGERS = orig_ledgers
+
+# ---------------------------------------------------------------- hostile shapes (fix round, task reviewer findings 1-3)
+# FINDING 1: non-hashable `concern` (a list) is valid JSON, status=="open",
+# and truthy — but unhashable, so `pain.setdefault(concern, [])` would raise
+# TypeError inside a block that only caught OSError. Must skip, never crash.
+# FINDING 2: non-string `fp` (an int) is valid JSON and would raise TypeError
+# from `", ".join(fps[:3])` in full(). Must coerce to a safe placeholder so
+# the entry still counts (it IS a real open, concern-addressed finding) but
+# never breaks rendering.
+with tempfile.TemporaryDirectory() as td:
+    hostile = Path(td) / "hostile.jsonl"
+    hostile_lines = [
+        json.dumps({"fp": "list-concern-fp", "status": "open", "concern": ["a", "b"]}),
+        json.dumps({"fp": 12345, "status": "open", "concern": "notary-authority"}),
+    ]
+    hostile.write_text("\n".join(hostile_lines) + "\n", encoding="utf-8")
+    orig_ledgers = m.LEDGERS
+    m.LEDGERS = [hostile]
+    try:
+        pain = m.open_pain()  # must not raise
+        check_true("list concern never becomes a dict key", all(isinstance(k, str) for k in pain))
+        check_true("list-concern entry not counted anywhere",
+                   not any("list-concern-fp" in fps for fps in pain.values()))
+        check_true("int-fp entry IS counted under its real concern", "notary-authority" in pain)
+        int_fp_entries = pain.get("notary-authority", [])
+        check("exactly one entry counted (the int-fp one)", len(int_fp_entries), 1)
+        check_true("int fp coerced to a string placeholder, never raw int",
+                   all(isinstance(f, str) for f in int_fp_entries))
+
+        # Rendering both surfaces past the coerced entry must not raise.
+        headline_hostile = m.headline(HABITS_DOC)
+        check_true("headline renders past coerced fp with no crash",
+                   "· pain: 1 open @notary-authority" in headline_hostile)
+        full_hostile = m.full(HABITS_DOC)
+        check_true("full() renders past coerced fp with no crash", "pain: 1 open (" in full_hostile)
+    finally:
+        m.LEDGERS = orig_ledgers
+
+# FINDING 3: a non-UTF-8 ledger file. UnicodeDecodeError is a ValueError
+# subclass, NOT caught by a bare `except OSError` — it must be caught too,
+# degrading that ledger to an empty (never crashing) contribution.
+with tempfile.TemporaryDirectory() as td:
+    non_utf8 = Path(td) / "non-utf8.jsonl"
+    non_utf8.write_bytes(b"\xff\xfe this is not valid utf-8 \x80\x81\n")
+    orig_ledgers = m.LEDGERS
+    m.LEDGERS = [non_utf8]
+    try:
+        pain = m.open_pain()  # must not raise UnicodeDecodeError
+        check("non-utf8 ledger -> no crash, empty contribution", pain, {})
+        headline_nonutf8 = m.headline(HABITS_DOC)
+        check_true("headline renders past a non-utf8 ledger with no crash", "top red:" in headline_nonutf8)
     finally:
         m.LEDGERS = orig_ledgers
 
