@@ -12,6 +12,8 @@ sprint: operator-directed-2026-08-10
 
 # Algedonic Slice 1 — Delivery Flow Implementation Plan
 
+**Status (2026-08-10):** Tasks 1, 2, 6 landed (`8a05236a7`, `11f334120`, `0a33fc356`+`23d95a96f`). Tasks 3-4 are re-homed to phase 2 — see `genesis/data/timeline/backlog/2026-08-10-algedonic-phase2-network-phase3-dedupe.md`. Task 5 was reshaped and landed as phase-1 Task 5 (`algedonic-phase1-epr-local-first-plan.md`). Task 7 (slice-2 backlog capture) is superseded by the same phase-2/phase-3 capture above.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Wire the algedonic pattern into the development delivery loop first — every finding carries the `@concern` address of the promise it threatens, a CI no-measure becomes an addressed finding instead of silence, measurement-by-deploy becomes unwritable at push time, and the habits renderer joins live pain to each habit.
