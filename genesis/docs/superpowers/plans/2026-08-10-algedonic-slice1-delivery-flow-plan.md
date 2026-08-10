@@ -3,7 +3,7 @@ title: Algedonic Slice 1 — concern-addressed pain in the delivery flow
 id: algedonic-slice1-delivery-flow
 status: Draft
 cites:
-  - algedonic-feedback-signal | Algedonic Feedback Signal | sha256:f93b58ec30d17c66 | path: genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md
+  - algedonic-feedback-signal | Algedonic Feedback Signal | sha256:3e9c6fd495dfb854 | path: genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md
   - evidence-ladder-push-left | Evidence Ladder + Push-Left Pressure | sha256:ac39aeb003dada60 | path: genesis/docs/superpowers/specs/2026-08-10-evidence-ladder-push-left-design.md
   - vision-gap-limit-governor-stub | Vision-Gap STUB | sha256:14ea8f3e81cd87c8 | path: genesis/docs/superpowers/plans/2026-06-14-vision-gap-limit-governor-stub.md
 domain: process-meta

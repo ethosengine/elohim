@@ -109,6 +109,25 @@ its absence" becomes a validated state, not silence:
    surfaces where new `EprKind`s / content-types are born
    (`elohim/epr/src/kind.rs`, `elohim/sdk/domains/*/manifest/`).
 
+## 4b. Design canon (do / do-not)
+
+**DO**
+
+- **Evidence is mandatory.** `stock`/`limit`/`bound_ref` are non-optional fields of `AlgedonicEvidence`; a signal without them refuses to construct or deserialize (`evidence_fields_are_mandatory_on_the_wire`, `elohim/epr/src/algedonic.rs`).
+- **Emission is hysteresis-bounded.** `should_emit` refuses inside-band silence and same-key re-fire (`should_emit_is_false_inside_the_band_and_true_crossing_it`, `should_emit_suppresses_re_fire_while_a_signal_is_open`).
+- **One open signal per `(declarer, target, kind)`.** `open_signal_key` is the dedupe key; the escalation test proves an open `Approach` never swallows its `Breach` (`should_emit_lets_escalation_and_unrelated_pain_through`).
+- **Honest absence over a guessed address.** `concern_routes.route` returns `None` when no rule resolves a finding to a concern (`.claude/scripts/_lib/concern_routes.py`, slice-1).
+- **Lightest enforcement class first.** New algedonic authoring surfaces gate via `ask` before `deny`, per the `.epr-meta` compose-gate ladder (`genesis/docs/superpowers/specs/2026-06-25-epr-meta-compose-gate-design.md`, "Enforcement classes").
+- **Addresses/metadata never enter identity.** `concern` is additive routing metadata excluded from `fingerprint()` inputs in both harvesters — a concern-address change never mints a new fingerprint (slice-1 Task 2, `ci-harvest.py`/`runtime-harvest.py`).
+
+**DO-NOT**
+
+- **No valence on algedonic kinds.** No agree/disagree/position/vote field exists on `AlgedonicSignal` or its evidence — unrepresentable, not merely validated (`no_valence_field_reaches_the_wire`).
+- **No parallel pain pipeline.** Local instruments (Prometheus, dev-plane sentinels) decide WHETHER to emit; the DHT `FeedbackSignal` stays the only cross-node addressed carrier (§6 restated).
+- **No unbounded re-fire.** Dedupe-to-one-open (`open_signal_key` + `should_emit`) closes the re-fire loop; the anti-tolling debounce on the minting side is the other half (anchor pending: Task 4 / epr-meta mint).
+- **No deny-first gates on pain paths.** The `CounterEvidence` floor must stay open to algedonic signals rather than pricing them down at admission (anchor pending: slice 2 — `FloorClass::CounterEvidence` kind-gate).
+- **No guessed addresses.** A finding with no resolvable concern stays unaddressed (`route` → `None`) rather than routed to the nearest guess (`concern_routes.py`).
+
 ## 5. Slices
 
 - **Slice 1 — the development-plane projection (the delivery flow; plan:
