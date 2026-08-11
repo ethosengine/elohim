@@ -24,15 +24,7 @@ export interface DistributionSummary {
   /**
    * Reach band the content is authored at — drives target replica count. Schema-8 vocabulary (elohim/sdk/schemas/v1/enums/reach.schema.json); see reach-vocabulary-frontend-strand backlog for the multi-vocabulary reconciliation history.
    */
-  reachClass:
-    | 'private'
-    | 'self'
-    | 'intimate'
-    | 'trusted'
-    | 'familiar'
-    | 'community'
-    | 'public'
-    | 'commons';
+  reachClass: 'private' | 'self' | 'intimate' | 'trusted' | 'familiar' | 'community' | 'public' | 'commons';
   diversityHint: DiversityHint;
   /**
    * Where the bytes for this fetch came from.

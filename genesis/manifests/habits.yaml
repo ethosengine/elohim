@@ -51,7 +51,7 @@
 #      runnable checks, (c) one-line delta here. Nothing else is a deliverable.
 
 version: 1
-updated: 2026-07-31
+updated: 2026-08-10
 vision: >
   A p2p backplane for a socially resilient, reach-gated substrate — a human-scale,
   capture-resistant foundation for communication that can scale to global
@@ -78,6 +78,9 @@ habits:
       green, `just gate` exit 0 (3199 passed / 0 failed). The bump needed ZERO
       source edits in this crate — 0.10 changed only get_changes' return from
       Vec<&Change> to Vec<Change>, and our sole call site is `.len()`.
+      HELD 2026-08-10: /account/import no longer writes viewer-relative package
+      assignments into peer-global content.reach; red-first handler regression
+      and the full elohim-storage unit/integration inventory are green.
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
       (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach

@@ -85,23 +85,11 @@ export type ElohimStrength =
 /**
  * Kind of server-side renderer a doorway carries. Reserved values are valid claim values; only `angular-ssr` is implemented in elohim-render today. Source of truth: doorway runtime (Category C operational). Not a DHT entry type.
  */
-export type RendererKind =
-  | 'angular-ssr'
-  | 'react-rsc'
-  | 'vue-ssr'
-  | 'svelte-ssr'
-  | 'lit-ssr'
-  | 'static-html';
+export type RendererKind = 'angular-ssr' | 'react-rsc' | 'vue-ssr' | 'svelte-ssr' | 'lit-ssr' | 'static-html';
 /**
  * Kind of server-side renderer a doorway carries. Reserved values are valid claim values; only `angular-ssr` is implemented in elohim-render today. Source of truth: doorway runtime (Category C operational). Not a DHT entry type.
  */
-export type RendererKind1 =
-  | 'angular-ssr'
-  | 'react-rsc'
-  | 'vue-ssr'
-  | 'svelte-ssr'
-  | 'lit-ssr'
-  | 'static-html';
+export type RendererKind1 = 'angular-ssr' | 'react-rsc' | 'vue-ssr' | 'svelte-ssr' | 'lit-ssr' | 'static-html';
 
 /**
  * Devices (nodes) belonging to a household with live peer vitals. Source of truth: computed projection from stewarded_nodes (projects NodeRegistration DHT entry) LEFT JOIN peer_statuses (projects PeerStatus DHT entry). Operational Category C — no persistence, no new entry type.

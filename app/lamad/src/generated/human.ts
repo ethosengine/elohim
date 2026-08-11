@@ -4,15 +4,7 @@
 /**
  * Visibility of this human's profile
  */
-export type Reach =
-  | 'private'
-  | 'self'
-  | 'intimate'
-  | 'trusted'
-  | 'familiar'
-  | 'community'
-  | 'public'
-  | 'commons';
+export type Reach = 'private' | 'self' | 'intimate' | 'trusted' | 'familiar' | 'community' | 'public' | 'commons';
 
 /**
  * Source of truth: DHT (Notarized, Category A). Projection of the imagodei Human DHT entry. Rebuildable via signal replay on HumanCreated/HumanUpdated signals. dhtAnchorHash is null for pre-coherence rows (seeded before DHT was live).
