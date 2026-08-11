@@ -2,6 +2,16 @@
 # .claude/hooks/epr-meta-resolver.py
 """PreToolUse resolver for the .epr-meta compose-gate. Thin: stdin -> _lib.epr_meta -> verdict JSON.
 Fail-open: a guard bug never blocks dev."""
+
+# The intervenor's removal condition (Meadows' shifting-the-burden trap;
+# counted by _lib/intervenor_census.py). A condition, never a date.
+RETIRE_WHEN = (
+    "when the intervenor census (placement-audit --epr-meta) reaches zero live rules — this is "
+    "the EVALUATOR for the compose gate, not a rule of its own, so it retires with the last "
+    "rule it evaluates and never before. Removing it earlier would silently un-enforce every "
+    "manifest at once, which is the fail-open direction this hook already guards against "
+    "internally."
+)
 import hashlib
 import json
 import sys

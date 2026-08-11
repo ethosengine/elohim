@@ -33,6 +33,14 @@ Fail-open by design: any internal error exits 0 silently — a guard bug must
 never block development. Fast path only: statvfs + parsing (no du, no
 network; one short git subprocess only when composing a deny hint).
 """
+
+# The intervenor's removal condition (Meadows' shifting-the-burden trap;
+# counted by _lib/intervenor_census.py). A condition, never a date.
+RETIRE_WHEN = (
+    "when the cargo-pool policy reconciler holds the volume under the soft watermark for a full "
+    "quarter with no deny path firing — the guard exists because reclamation lags allocation, "
+    "so it retires when that lag closes, not when the disk happens to be quiet."
+)
 import json
 import os
 import re

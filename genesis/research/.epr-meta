@@ -8,6 +8,9 @@ rules:
     when: { write: "*cross-pollination*.md", new: true }
     dedupe-of: genesis/research/README.md
     why: "Check the Research Index (README.md) first — this topic may be catalogued (e.g. the hypha* name-collision triple). Extend the entry rather than starting a parallel note."
+    retire-when: >
+      when a new survey is SCAFFOLDED from the Research Index rather than authored beside it —
+      an index you must pass through to create a survey needs no reminder to consult it
   - id: mint-pass-at-close
     class: inject
     when: { write: "*.md", new: true }
@@ -19,6 +22,11 @@ rules:
       of standalone backlog entries. Takes not worth a cluster row die honestly in the survey's
       prose. The survey's Outputs section then points at the clusters it fed. This is the first hop
       of the provenance chain (research → cluster row → spec → code + scenario → chronicle).
+    retire-when: >
+      when the mint pass is MECHANICAL — a survey's graded verdicts folded into cluster rows by
+      tooling at close, so the provenance chain is walked rather than remembered. Until then this
+      is the only thing standing between a survey and being an idea sink with no drain, which is
+      exactly the shape (inflow, no outflow) the doc-corpus stock measures elsewhere.
   - id: sovereignty-frame-declared
     class: ask
     when: { write: "*.md", contains-any: ["sovereign", "Sovereign"], new: true }
@@ -39,6 +47,11 @@ rules:
       only — maintenance of an existing survey is never trapped. The membrane ends at this directory:
       canon (genesis/docs/content/elohim-protocol/) binds the unrelaxed sovereignty-ontology-guard
       policy, where an apex frame would become doctrine rather than a quotation.
+    retire-when: >
+      never, on the same external condition as the sovereignty-ontology-guard policy it relaxes:
+      the surveyed projects keep using the apex-sovereignty frame, so a survey keeps having to
+      quote it in order to disagree. This membrane retires when the field it reads from stops
+      framing identity that way — observable, not ours to cause.
   - id: readme-blind-reader-review
     class: measure
     when: { write: "README*.md" }
@@ -51,6 +64,10 @@ rules:
       stand alone for external audiences. Blind-reader isolation stays mandatory for the
       external-facing surfaces (epics, manifestos, READMEs elsewhere in the repo); this override
       demotes it to observation-only for the Research Index and any research README.
+    retire-when: >
+      with whichever side of the relaxation moves first — this row holds no policy of its own,
+      it only carries a nearer-wins demotion of the repo-root blind-reader rule. If that rule
+      retires, or research/ stops being exempt from it, this row has nothing left to relax.
 ---
 # research — surveys + prior-art
 

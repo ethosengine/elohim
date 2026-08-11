@@ -183,7 +183,7 @@ _ACTIONABLE_KEYS = ("require-frontmatter", "allowed-types", "route-to", "no-new-
 # fallback trigger — see _eval_rule's final branch). Recognized so it never trips the unknown-key
 # check, but excluded from _ACTIONABLE_KEYS so it never trips the >1-actionable-predicate check.
 _KNOWN_RULE_KEYS = {"id", "class", "why", "when", "max-files", "measure",
-                    "policy", "params", "parameters"} | set(_ACTIONABLE_KEYS)
+                    "policy", "params", "parameters", "retire-when"} | set(_ACTIONABLE_KEYS)
 
 # Policy-binding rules (`policy: <id>@<version>`) carry ONLY placement + local variance; the
 # registry policy owns class/predicates/measure-defaults/why. The version pin is REQUIRED —
@@ -200,6 +200,40 @@ _BINDING_KEYS = {"id", "policy", "params", "when", "why"}
 # measure default, with `params` for local variance. A `rate` cannot forget its denominator — it
 # must carry `per:`.
 MEASURE_KIND_VOCAB = {"level", "rate", "ratio"}
+
+# The intervenor's removal condition (Meadows, *Thinking in Systems* ch.5, "Shifting the Burden
+# to the Intervenor"): *"If you are the intervenor, work in such a way as to restore or enhance
+# the system's own ability to solve its problems, THEN REMOVE YOURSELF."*
+#
+# Every rule in every `.epr-meta` is an intervenor — it exists because the system did not
+# reliably do something on its own. A rule with no stated removal condition can only accrete:
+# there is no state of the world that retires it, so the governance layer grows monotonically
+# and the trap closes. `retire-when:` is the exit, and it is deliberately a CONDITION, never a
+# date — "when the habit holds" is checkable; "in six months" is a wish.
+#
+# `never` is a legitimate answer and the whole point of admitting it is that it becomes
+# COUNTABLE rather than silent. A constitutional floor genuinely never retires. But a bare
+# `never` is indistinguishable from not having thought about it, so the honest form carries its
+# reason: `never: <why this is a floor>`. That is the same discipline `status: unwired` applies
+# in habits.yaml — make the uncomfortable state declarable and counted instead of papered over.
+_RETIRE_NEVER_RE = re.compile(r"^never\b", re.IGNORECASE)
+
+
+def _validate_retire_when(value, label: str) -> list[str]:
+    """Shared check for `retire-when:` on both the manifest-rule path and the registry-policy
+    path — one vocabulary, two gates, exactly as MEASURE_KIND_VOCAB is shared. [] = valid.
+
+    Note what is NOT checked: whether the condition is TRUE, or ever becomes true. That is the
+    census's job (and ultimately a human's). This gate only refuses the two shapes that carry
+    no information — an empty condition, and a bare `never` with no reason."""
+    if not isinstance(value, str) or not value.strip():
+        return [f"{label}: `retire-when` must be a non-empty condition string — "
+                f"the state of the world under which this intervenor is REMOVED"]
+    text = value.strip()
+    if _RETIRE_NEVER_RE.match(text) and len(text.split()) < 2:
+        return [f"{label}: a bare `retire-when: never` is indistinguishable from not having "
+                f"asked — an honest never carries its reason (`never: <why this is a floor>`)"]
+    return []
 
 
 def validate_meta(cfg: dict) -> list[str]:
@@ -271,6 +305,8 @@ def validate_meta(cfg: dict) -> list[str]:
             elif kind == "rate" and not m.get("per"):
                 errs.append(f"rules[{i}] (`{rid}`): kind: rate requires per: "
                             f"(second|minute|hour|day|week|month|year)")
+        if "retire-when" in rule:
+            errs.extend(_validate_retire_when(rule["retire-when"], f"rules[{i}] (`{rid}`)"))
     for i, v in enumerate(cfg.get("validators", []) or []):
         if not isinstance(v, dict) or "ref" not in v:
             errs.append(f"validators[{i}] missing `ref`")
@@ -1295,7 +1331,15 @@ POLICY_REGISTRY_REL = ".claude/epr-meta/policies.yaml"
 # fields — status and supersession lineage change without altering what the row governs, so they
 # stay out of the hash; contentHash itself is obviously excluded. Shared by load_policies
 # (verify) and epr-meta-pin.py (compute/write) — the SAME canonicalization, or the two would drift.
-_HASH_EXCLUDE_KEYS = {"contentHash", "status", "superseded_by"}
+# `retire-when` joins the lifecycle keys OUTSIDE the semantic hash, and the reason is a
+# incentive one, not a convenience one. The contentHash pins what a policy DOES to a diff;
+# a removal condition says when the policy stops existing — two different questions, and a
+# binding behaves identically with or without one. If declaring an exit required minting a new
+# policy version (and re-pinning every hash), exits would be the most expensive thing in the
+# registry to add, which is precisely the wrong gradient for the trap this key exists to spring:
+# the accretion is already free, so the exit must be free too. Editing a retire condition is
+# therefore an amendment, not a supersession.
+_HASH_EXCLUDE_KEYS = {"contentHash", "status", "superseded_by", "retire-when"}
 
 
 def policy_content_hash(pol: dict) -> str:
@@ -1381,6 +1425,13 @@ def load_policies(repo_root: Path) -> tuple[dict, list[str]]:
                 errs.append(f"policy `{key}` `measure.kind: rate` requires `measure.per:` "
                             f"(second|minute|hour|day|week|month|year) — NOT loaded")
                 continue
+        # `retire-when` is SEMANTICS, so it belongs to the policy, never to a binding
+        # (`_BINDING_KEYS` admits only id/policy/params/when/why — a binding that tried to
+        # declare its own removal condition would be re-deciding the policy's own exit).
+        # A malformed one is NOT a load-blocker: an unusable retire condition should surface
+        # as an advisory the census counts, not silently un-enforce a live deny.
+        if "retire-when" in pol:
+            errs.extend(_validate_retire_when(pol["retire-when"], f"policy `{key}`"))
         stored_hash = pol.get("contentHash")
         if stored_hash:
             computed = policy_content_hash(pol)

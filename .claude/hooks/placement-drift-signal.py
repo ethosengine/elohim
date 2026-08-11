@@ -24,6 +24,16 @@ Storage: .claude/memory-kit/placement-drift.json (schema_version: 1)
 Hook Type: PostToolUse
 Matcher: Edit|Write
 """
+
+# The intervenor's removal condition (Meadows' shifting-the-burden trap;
+# counted by _lib/intervenor_census.py). A condition, never a date.
+RETIRE_WHEN = (
+    "when decompose-to-zero-residue runs as part of landing a terminal status rather than as a "
+    "later sweep — the accumulator exists because the decompose lags the landing, which is the "
+    "same generation-outruns-absorption shape the doc-corpus stock measures. It retires when "
+    "that stock holds in dynamic equilibrium (emission/absorption <= 1.0, turnover bounded) for "
+    "a quarter."
+)
 from __future__ import annotations
 
 import json

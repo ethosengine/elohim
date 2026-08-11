@@ -447,8 +447,8 @@
       }
     },
     {
-      "citesContentCid": "bafyreibx3qqvfb2ylstgzjfiopse3ntrizql7wxcdxapnz7izk7ygpvfwq",
-      "citesContentSha256": "sha256:37dc215287585ca66ca4a873e44db6714660bfdae21dc0f6e7e8cabf833ea5b4",
+      "citesContentCid": "bafyreicj227uw5pid3tmr3am35kk6tp6plt763wnh3ob44rsbpzc7d2pgi",
+      "citesContentSha256": "sha256:49d6bf4b75e81ee6c8ec0cdf54af4dfe7ae7ff6ecd3edc1e72320bf22f8f4f32",
       "registry": "policies.yaml",
       "precedent": {
         "id": "capability-governance@1",
@@ -573,8 +573,8 @@
       }
     },
     {
-      "citesContentCid": "bafyreiejqiazz4kl24agaomyc7ec2dlimwctfafg7xar7v5eyfk2kb2l44",
-      "citesContentSha256": "sha256:8982019cf14bd70060399817c82d0d6865853280a6fdc11fd7a4c155a5074be7",
+      "citesContentCid": "bafyreifisjkuauwbrhycdlcu2rjlrysrekprlsmol46obdrxr6sjacs5ki",
+      "citesContentSha256": "sha256:a892554052c189f021ac54d452b8e251229f15c98e5f3ce08e378fa4900a5d52",
       "registry": "policies.yaml",
       "precedent": {
         "id": "source-file-loc-ceiling@1",

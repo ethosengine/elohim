@@ -21,6 +21,14 @@ Storage: .claude/memory-kit/memory-coherence-drift.json (schema_version: 1)
 Hook Type: PostToolUse
 Matcher: Edit|Write
 """
+
+# The intervenor's removal condition (Meadows' shifting-the-burden trap;
+# counted by _lib/intervenor_census.py). A condition, never a date.
+RETIRE_WHEN = (
+    "when a memory entry's coherence with the code it cites is verified at read time (recall "
+    "checks its own citations) rather than accumulated as drift between sweeps — the signal is "
+    "a proxy for a check that happens too late."
+)
 from __future__ import annotations
 
 import fnmatch

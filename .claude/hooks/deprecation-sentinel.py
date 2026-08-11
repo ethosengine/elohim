@@ -41,6 +41,15 @@ Fail-safe: any internal error exits 0 silently — the sentinel must
 never break a session.
 """
 
+# The intervenor's removal condition (Meadows' shifting-the-burden trap;
+# counted by _lib/intervenor_census.py). A condition, never a date.
+RETIRE_WHEN = (
+    "when new deprecation warnings fail a CI gate directly rather than being scraped out of "
+    "Bash output in flight, AND the ledger holds at zero open fingerprints across a full "
+    "dependency-bump cycle. This hook is a stand-in for a gate that does not exist yet; the "
+    "gate is the exit."
+)
+
 import hashlib
 import json
 import os

@@ -20,6 +20,14 @@ Storage: .claude/memory-kit/claude-md-drift.json (schema_version: 1)
 Hook Type: PostToolUse
 Matcher: Edit|Write
 """
+
+# The intervenor's removal condition (Meadows' shifting-the-burden trap;
+# counted by _lib/intervenor_census.py). A condition, never a date.
+RETIRE_WHEN = (
+    "when the gospel-tier surfaces are audited on a cadence driven by substrate landings rather "
+    "than by edit-count pressure — the counter approximates 'enough has changed to re-read "
+    "this', and a real trigger retires the approximation."
+)
 from __future__ import annotations
 
 import json

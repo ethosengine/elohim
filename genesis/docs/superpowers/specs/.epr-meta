@@ -8,16 +8,19 @@ rules:
     when: { write: "*.md", new: true }
     require-frontmatter: [id, status, class, context-tier, steward, graduation-trigger, cites]
     why: "Specs need the full lifecycle frontmatter (overrides the base rule, nearest-wins)."
+    retire-when: "with the parent doc-frontmatter-at-birth rule it overrides — a nearest-wins tightening cannot outlive the rule it tightens"
   - id: route-plans-out
     class: ask
     when: { write: "*-plan.md", new: true }
     route-to: { type: "*-plan.md", dest: genesis/docs/superpowers/plans/ }
     why: "Plans live in plans/, not specs/ — routed at creation, not on every edit."
+    retire-when: "when spec/plan placement is decided by the scaffolding command rather than by the author's path choice — a router with nothing mis-routed to it for two quarters is describing a habit, not enforcing one"
   - id: p2p-design-gate
     class: ask
     when: { write: "*.md", contains-any: ["GET /api/v1", "PRIMARY KEY", "uuid"], new: true }
     validator: epr:validator-p2p-design-gate
     why: "New data-entity designs pass the p2p-design-gate (creation-time, not on every edit)."
+    retire-when: "never — externally conditioned like the ontology guards, not permanent: the relational-first reflex (CREATE TABLE, UUID key, REST route) is a training-corpus property of every new agent rather than a habit this repo can acquire, so it re-arrives with each author. It retires when the models writing here stop reaching for a table first"
 validators:
   - ref: epr:validator-p2p-design-gate
     fuel: 200

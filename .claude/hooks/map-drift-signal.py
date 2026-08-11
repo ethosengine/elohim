@@ -29,6 +29,14 @@ Storage: .claude/memory-kit/map-currency-drift.json (schema_version: 1)
 Hook Type: PostToolUse
 Matcher: Edit|Write
 """
+
+# The intervenor's removal condition (Meadows' shifting-the-burden trap;
+# counted by _lib/intervenor_census.py). A condition, never a date.
+RETIRE_WHEN = (
+    "when the MAP is PROJECTED from the architecture seeds rather than hand-maintained beside "
+    "them — a derived map cannot go stale relative to its sources, so a staleness tripwire over "
+    "it has no subject."
+)
 from __future__ import annotations
 
 import json

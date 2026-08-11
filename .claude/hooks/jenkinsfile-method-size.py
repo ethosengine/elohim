@@ -25,6 +25,14 @@ Hook Type: PostToolUse
 Matcher: Edit|Write
 """
 
+# The intervenor's removal condition (Meadows' shifting-the-burden trap;
+# counted by _lib/intervenor_census.py). A condition, never a date.
+RETIRE_WHEN = (
+    "when every root-Jenkinsfile helper body lives in scripts/ci/*.sh and the compiled CPS "
+    "method size has held under half the 64KB JVM limit for two consecutive quarters — the "
+    "heredoc-inlining habit is what this watches for, and a habit held is a hook retired."
+)
+
 import json
 import re
 import sys

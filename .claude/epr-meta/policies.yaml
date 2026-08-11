@@ -40,6 +40,10 @@ policies:
       loc-hard: 7000
       dispatch-agent: rust-architect
     status: active
+    retire-when: >
+      when no first-party .rs file has crossed loc-soft for two consecutive quarters and the
+      god-file modularization queue in genesis/data/timeline/backlog/ is empty — a ceiling that
+      never fires is describing a habit rather than enforcing one
     established_by: operator-2026-07-02
     why: >
       A first-party source file past the hard ceiling is a god-file: it corrodes its own
@@ -61,6 +65,10 @@ policies:
     class: inject
     validator: epr:validator-brand-vocabulary-boundary
     status: active
+    retire-when: >
+      when the net-new validator reports zero findings across a full release cycle AND the
+      pre-compatibility window closes (an external contract ratified, so renames need a migration
+      boundary) — past that point this rule can only obstruct the migration it exists to precede
     established_by: deliberated-2026-08-04-operator+codex
     why: >
       Product and architecture prose may use the protocol's domain brands; compilable artifacts
@@ -84,6 +92,11 @@ policies:
     scope: { write: "*.md", new: true }
     require-frontmatter: [name, title, description]
     status: active
+    retire-when: >
+      never: this is a format precondition, not a habit that can be internalized — a memory
+      without name/title/description cannot enter the generated MEMORY.md index at all. It retires
+      only if the index stops being projected from frontmatter, which would remove its subject
+      rather than teach us anything
     established_by: operator-ratification-pending-2026-07-02
     why: >
       A memory born without name + title + description cannot project into the generated
@@ -103,6 +116,9 @@ policies:
       loc-soft: 200
       loc-hard: 500
     status: active
+    retire-when: >
+      when the package-projection verify runs as a blocking gate on every push (pre-push or CI),
+      making an edit-time observation of the same drift redundant
     established_by: operator-2026-07-10
     why: >
       Packages under `.epr-meta/elohim/packages/{agents,skills}` are the canonical source for
@@ -125,6 +141,12 @@ policies:
     scope: { write: "*.md", contains-any: ["sovereign", "Sovereign"] }
     validator: epr:validator-sovereignty-ontology-guard
     status: active
+    retire-when: >
+      never — but for a reason outside our gift rather than a claim of permanence: the drift this
+      guards is inherited from the training corpus, not authored here, so it re-arrives with each
+      new agent regardless of what this repo learns. It retires if and when apex self-sovereignty
+      stops being the default framing in the models that write here — a condition we can observe
+      but cannot cause
     established_by: operator-ratification-2026-08-05
     why: >
       v2 adds the SIBLING cross-reference and the progressive-disclosure chain; the guard's semantics
@@ -199,6 +221,10 @@ policies:
     scope: { write: "*.md", contains-any: ["ownership", "Ownership"] }
     validator: epr:validator-ownership-ontology-guard
     status: active
+    retire-when: >
+      never — the sibling of sovereignty-ontology-guard and retiring on the same external
+      condition: enclosure framing is a training-corpus default, not a local habit, so it
+      re-arrives with each new author. Not permanent; just not ours to end
     established_by: operator-ratification-2026-08-05
     why: >
       v2 adds a FOURTH frame (inalienable), the SIBLING cross-reference, and the progressive-disclosure
@@ -277,6 +303,10 @@ policies:
     scope: { write: "deployments.json" }
     validator: epr:validator-archetype-resource-alignment
     status: active
+    retire-when: >
+      when per-human resources are DERIVED from archetype-resource-budgets.json at render time
+      rather than hand-written into deployments.json — at that point instance drift is
+      unrepresentable and this check has nothing left to catch
     established_by: operator-ratification-pending-2026-07-16
     why: >
       Per-human conductor resources are a CLASS property (deviceArchetype), not an instance one.
@@ -302,6 +332,9 @@ policies:
     scope: { write: "*.json" }
     validator: epr:validator-test-bench-aggregate-capacity
     status: active
+    retire-when: >
+      when the capacity envelope is computed from live cluster telemetry rather than a
+      hand-promoted ledger, so an impossible portfolio fails at reconcile instead of at review
     established_by: operator-ratification-pending-2026-07-16
     why: >
       A per-human budget can be locally coherent and still make an impossible portfolio. This policy
@@ -323,6 +356,11 @@ policies:
     scope: { write: "*.rs" }
     validator: epr:validator-eprfs-meta-domain-neutrality
     status: active
+    retire-when: >
+      when the neutrality is structural rather than reviewed — ValidatorProvider resolution
+      content-addressed (EPR/WASM) so a concrete epr:validator-* reference in the crate cannot
+      compile. The crate's architecture test is the nearer half; this rule covers the gap until
+      the type system closes it
     established_by: operator-direction-2026-07-16
     why: >
       eprfs-meta defines the ontology and execution interfaces for policies; it must not embed
@@ -480,6 +518,10 @@ policies:
         - "a83b35079 2026-07-29 epr-cli/REA sidecar — 'latest' by APPEND ORDER vs by occurredAt; the commit body names it 'the exact 8a1c531dc bug, reintroduced via replay'"
         - "2026-08-02 conductor plane — stamp guard provably_newer, selector tiebreak, three-clocks-in-one-column"
     status: active
+    retire-when: >
+      when the decision-point census shows C2 answered with a contract test on every registered
+      decision point and seam-contracts' ArbitrationKey is the only path to an ordering — an
+      inject rule teaching what the types already refuse is pure overhead
     established_by: deliberated-2026-08-02-operator+claude
     why: >
       CROSS-FAMILY STATEMENT (the class is older and wider than the dataplane). A self-healing loop
@@ -562,6 +604,9 @@ policies:
         - "1b445b481 2026-08-01 a responder budget compile-asserted strictly below the requester's"
         - "2026-08-02 sweep budgets + per-tick caps across the conductor-plane waves"
     status: active
+    retire-when: >
+      when the decision-point census shows C6a answered with a contract test on every registered
+      loop, sweep and retry ladder — the concern answered by construction retires the reminder
     established_by: deliberated-2026-08-02-operator+claude
     why: >
       The class's teeth are in its scope clause, not its statement: the expensive instances had NO
@@ -594,6 +639,11 @@ policies:
     scope: { write: ".epr-meta" }
     validator: epr:validator-escalation-ladder
     status: active
+    retire-when: >
+      never: this is the charter governing how rules are authored, including this very key. A
+      removal condition on the escalation ladder would be a rule granting itself an exit from
+      ratification — the one place where accretion is the safer failure. It changes only by
+      deliberation at the branch rung, like everything it governs
     established_by: deliberated-2026-07-23-operator+claude
     why: >
       The agency charter: agents self-grant `measure`/`inject` (+ `dispatch` with a named agent

@@ -3,7 +3,8 @@
 //! The Python pin oracle is:
 //!
 //! ```python
-//! body = {k: v for k, v in row.items() if k not in {"contentHash", "status", "superseded_by"}}
+//! body = {k: v for k, v in row.items()
+//!         if k not in {"contentHash", "status", "superseded_by", "retire-when"}}
 //! json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
 //! ```
 //!
@@ -14,7 +15,20 @@
 use serde_yaml::Value;
 
 /// Lifecycle keys excluded from the semantic policy-row pin.
-pub const HASH_EXCLUDE_KEYS: [&str; 3] = ["contentHash", "status", "superseded_by"];
+///
+/// `retire-when` (the intervenor's removal condition) joins them because the pin covers what a
+/// policy DOES to a diff, while a removal condition says when the policy stops existing. If
+/// declaring an exit forced a version bump and a re-pin, exits would be the most expensive thing
+/// in the registry to add and accretion would stay free — the exact inverse of the gradient the
+/// key exists to create.
+///
+/// **This list is a two-implementation invariant.** `_lib/epr_meta.py`'s `_HASH_EXCLUDE_KEYS` is
+/// the other half, and they must agree byte-for-byte in effect: adding the key on one side only
+/// makes every backfilled policy fail its pin on the other, which routes live `deny`/`ask` rules
+/// to judgment instead of enforcing them. That is not hypothetical — it is exactly what the
+/// live-root test in `epr-cli/src/repository_validators.rs` caught when this key landed in the
+/// Python gate first.
+pub const HASH_EXCLUDE_KEYS: [&str; 4] = ["contentHash", "status", "superseded_by", "retire-when"];
 
 /// A value whose Python canonical representation cannot be reproduced safely.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -185,12 +199,32 @@ mod tests {
     fn canonical_body_drops_exactly_the_lifecycle_keys() {
         let row: serde_yaml::Mapping = serde_yaml::from_str(
             "id: x\nversion: 1\ncontentHash: sha256:deadbeef\nstatus: superseded\n\
-             superseded_by: y@2\ntitle: T",
+             superseded_by: y@2\nretire-when: when the habit holds for a quarter\ntitle: T",
         )
         .unwrap();
         assert_eq!(
             String::from_utf8(canonical_body(&row).unwrap()).unwrap(),
             r#"{"id":"x","title":"T","version":1}"#
+        );
+    }
+
+    #[test]
+    fn declaring_an_exit_does_not_move_a_policys_pin() {
+        // The incentive claim, pinned on the Rust half of the two-implementation invariant (the
+        // Python half asserts the same thing in
+        // `.claude/scripts/_lib/__tests__/intervenor_retire_when_test.py`). If the two disagree,
+        // every backfilled policy fails its pin on one side and its live `deny`/`ask` rules get
+        // routed to judgment instead of enforced — a silent un-enforcement, which is the worst
+        // available failure for a governance registry.
+        let base = "id: x\nversion: 1\nclass: measure\ntitle: T";
+        let without: serde_yaml::Mapping = serde_yaml::from_str(base).unwrap();
+        let with: serde_yaml::Mapping = serde_yaml::from_str(&format!(
+            "{base}\nretire-when: when the census holds at zero"
+        ))
+        .unwrap();
+        assert_eq!(
+            canonical_body(&without).unwrap(),
+            canonical_body(&with).unwrap()
         );
     }
 }
