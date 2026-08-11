@@ -191,6 +191,38 @@ def main() -> int:
         print(full(habits))
     else:
         print(headline(habits))
+        # Guarded import (operator resolution, 2026-08-11): habits-status is a
+        # session-start surface and must NEVER break on this — doc_dynamics
+        # shells out to git, and git can fail, be absent, hang, or return
+        # garbage. Import, computation, AND print all live inside one
+        # try/except Exception; any failure degrades to printing no ratio
+        # line at all, never a traceback at session start.
+        try:
+            from _lib.doc_dynamics import generation_absorption_ratio
+            r = generation_absorption_ratio(28)
+            iv = r["confidence"]["interval"]
+            flag = "⚠" if iv["lo"] > 1.0 else ("~" if iv["hi"] > 1.0 else "✅")
+            # Fix round 1 (2026-08-11, operator-ruled): a hardcoded
+            # "(28d, absorption estimated)" suffix threw away everything the
+            # basis actually says. Surface a compressed form of
+            # confidence.basis naming the counted totals, so "confirmed
+            # overshoot" and "we counted nothing" read differently from the
+            # line alone.
+            counted = (
+                f"{r.get('generated')} generated / {r.get('absorbed_counted')} "
+                f"absorbed counted × [1,3] (28d)"
+            )
+            if iv["lo"] == float("-inf") and iv["hi"] == float("inf"):
+                # Honest absence (sealed law L3 — Interval.unknown()): the
+                # ratio is UNKNOWN, not "exactly infinite" — render legibly
+                # rather than printing "inf [-inf–inf]".
+                print(f"  doc dynamics: generation/absorption unknown {flag} "
+                      f"({counted} — zero absorption events, interval unbounded)")
+            else:
+                print(f"  doc dynamics: generation/absorption {r['value']:.2f} "
+                      f"[{iv['lo']:.2f}–{iv['hi']:.2f}] {flag} ({counted})")
+        except Exception:
+            pass
     return 0
 
 

@@ -42,6 +42,8 @@ rules:
   - id: readme-blind-reader-review
     class: measure
     when: { write: "README*.md" }
+    measure:
+      kind: level
     why: >
       Nearer-wins RELAXATION of the repo-root readme-blind-reader-review rule (operator decision
       2026-08-04): research/ is the messy desk of creativity — context leak between the author's head

@@ -31,7 +31,7 @@ policies:
     version: 1
     class: measure
     scope: { write: "*.rs" }
-    measure: { loc-soft: 10, loc-hard: 20 }
+    measure: { kind: level, loc-soft: 10, loc-hard: 20 }
     why: too big.
   - id: fm-at-birth
     version: 1
@@ -117,7 +117,8 @@ with tempfile.TemporaryDirectory() as td:
     epr_meta.expand_policies(m, pols)
     r = m["rules"]["b"]
     check("binding params merge over measure defaults; when overrides scope",
-          r["measure"] == {"loc-soft": 10, "loc-hard": 99} and r["when"] == {"write": "*.py"})
+          r["measure"] == {"kind": "level", "loc-soft": 10, "loc-hard": 99}
+          and r["when"] == {"write": "*.py"})
     m = _merged([{"id": "fm", "policy": "fm-at-birth@1"}])
     epr_meta.expand_policies(m, pols)
     check("binding carries the policy's actionable predicate (require-frontmatter)",

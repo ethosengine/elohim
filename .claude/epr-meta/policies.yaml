@@ -29,12 +29,13 @@ epr-meta-policies-version: 1
 policies:
   - id: source-file-loc-ceiling
     version: 1
-    contentHash: sha256:8982019cf14bd70060399817c82d0d6865853280a6fdc11fd7a4c155a5074be7
+    contentHash: sha256:a892554052c189f021ac54d452b8e251229f15c98e5f3ce08e378fa4900a5d52
     title: Source-file LoC ceiling — architecture-review trigger
     binding: observation
     class: measure
     scope: { write: "*.rs" }
     measure:
+      kind: level
       loc-soft: 3000
       loc-hard: 7000
       dispatch-agent: rust-architect
@@ -92,12 +93,13 @@ policies:
 
   - id: capability-governance
     version: 1
-    contentHash: sha256:37dc215287585ca66ca4a873e44db6714660bfdae21dc0f6e7e8cabf833ea5b4
+    contentHash: sha256:49d6bf4b75e81ee6c8ec0cdf54af4dfe7ae7ff6ecd3edc1e72320bf22f8f4f32
     title: Capability package governance — re-import after editing its projection
     binding: observation
     class: measure
     scope: { write: "*.json" }
     measure:
+      kind: level
       loc-soft: 200
       loc-hard: 500
     status: active

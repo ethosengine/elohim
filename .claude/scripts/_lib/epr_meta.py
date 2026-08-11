@@ -191,6 +191,16 @@ _KNOWN_RULE_KEYS = {"id", "class", "why", "when", "max-files", "measure",
 _POLICY_REF_RE = re.compile(r"^[a-z0-9][a-z0-9-]*@\d+$")
 _BINDING_KEYS = {"id", "policy", "params", "when", "why"}
 
+# Measure ontology (elohim/epr/src/measure.rs MeasureKind, `#[serde(tag = "kind",
+# rename_all = "lowercase")]`): a `class: measure` rule's `kind` lives INSIDE its `measure:`
+# block, never at the rule top level — `measure:` is the policy-owned semantics block (merged
+# through `expand_policies`'s `measure`/`params` merge step below) and a top-level `kind:` would
+# be undeclarable by a policy-binding rule (`_BINDING_KEYS` above admits only
+# id/policy/params/when/why). Nested, it is inherited through the existing merge like every other
+# measure default, with `params` for local variance. A `rate` cannot forget its denominator — it
+# must carry `per:`.
+MEASURE_KIND_VOCAB = {"level", "rate", "ratio"}
+
 
 def validate_meta(cfg: dict) -> list[str]:
     """Hand-rolled, stdlib-only check against the schema contract. [] = valid.
@@ -247,6 +257,20 @@ def validate_meta(cfg: dict) -> list[str]:
             errs.append(f"rules[{i}] (`{rid}`) carries multiple actionable predicates {actionable} "
                         f"— only one predicate per rule is evaluated (first-match wins); split into "
                         f"separate rules")
+        if cls == "measure":
+            m = rule.get("measure") if isinstance(rule.get("measure"), dict) else {}
+            kind = m.get("kind")
+            if kind is None:
+                errs.append(
+                    f"rules[{i}] (`{rid}`): a measure rule must declare kind: "
+                    f"level|rate|ratio (L6) — an undeclared kind is how a rate gets "
+                    f"compared to a cumulative level")
+            elif kind not in MEASURE_KIND_VOCAB:
+                errs.append(f"rules[{i}] (`{rid}`): unknown kind {kind!r}; expected one of "
+                            f"{sorted(MEASURE_KIND_VOCAB)}")
+            elif kind == "rate" and not m.get("per"):
+                errs.append(f"rules[{i}] (`{rid}`): kind: rate requires per: "
+                            f"(second|minute|hour|day|week|month|year)")
     for i, v in enumerate(cfg.get("validators", []) or []):
         if not isinstance(v, dict) or "ref" not in v:
             errs.append(f"validators[{i}] missing `ref`")
@@ -1338,6 +1362,24 @@ def load_policies(repo_root: Path) -> tuple[dict, list[str]]:
                             f"integer loc-soft/loc-hard"
                             + (f" (non-integer: {bad})" if bad else "")
                             + " — it would measure nothing; NOT loaded")
+                continue
+            # L6: the registry loader is the path that actually feeds the evaluator
+            # (resolve() -> merge_rules -> load_policies -> expand_policies -> evaluate), and a
+            # manifest rule that BINDS a registry policy carries no `class`/`measure` of its own
+            # (only `_BINDING_KEYS`) — so validate_meta's `cls == "measure"` branch never sees a
+            # binding, only an inline rule. Skipping the kind check here would leave the registry
+            # as the one path where `kind` isn't required, undermining the very claim that
+            # `measure:` is policy-owned. Same failure mode as the loc-soft/loc-hard check above:
+            # append + NOT loaded, so a binding drops LOUD via expand_policies' unknown-policy
+            # path instead of silently un-enforcing.
+            kind = m.get("kind")
+            if kind not in MEASURE_KIND_VOCAB:
+                errs.append(f"policy `{key}` class `measure` needs `measure.kind` in "
+                            f"{sorted(MEASURE_KIND_VOCAB)} (got {kind!r}) — NOT loaded")
+                continue
+            if kind == "rate" and not m.get("per"):
+                errs.append(f"policy `{key}` `measure.kind: rate` requires `measure.per:` "
+                            f"(second|minute|hour|day|week|month|year) — NOT loaded")
                 continue
         stored_hash = pol.get("contentHash")
         if stored_hash:

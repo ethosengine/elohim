@@ -210,6 +210,7 @@ def _mint_hard_ceiling(with_concern: bool):
             version: 1
             class: measure
             measure:
+              kind: level
               loc-soft: 3
               loc-hard: 5
             why: "test ceiling — algedonic Task 4"

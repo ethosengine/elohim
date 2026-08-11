@@ -140,3 +140,189 @@ Same window: her conductor memory 1m-8m alloc-bucket anomaly (18-90x peers) and
 gossip-timeout-per-5s rate documented in the shift journal. Exit-code/log
 detail not pulled (flagged unverified). If the crash recurs, this entry
 graduates to a conductor-memory investigation with the smaps localizer.
+
+## Addendum 2026-08-11: the circuit now trips — and shedding is what starves the ghost-decay cure
+
+The fix this entry asked for appears to have landed in effect: `HealCircuit` is no
+longer blind. It trips, fleet-wide, **8–12 times per hour** on six of seven pods
+(adam 12, james 12, jessica 12, gertrude 11, eve 8, susan 8; matthew only 2).
+
+That surfaced the NEXT link in the chain, and it re-aims a diagnosis that had been
+pointed at the wrong seam all week.
+
+**Measured 2026-08-11 ~19:45Z, post edge #1341** (which shipped
+`elohim_content_ghost_decay_blocked_total{leg}` — the refusal twin of the decay
+counter). The blocked-leg meter shows `leg="disabled"` = 0 on all seven pods, so
+the ghost-decay flag is live fleet-wide; and yet decay-arm CONSIDERATIONS over
+30 min are matthew 69, james 4, gertrude 1, susan 0, eve 0, adam 0 — against
+known_divergent{content} of susan 1660, eve 647, gertrude 597.
+
+The shem pods are not sweeping less. They sweep MORE (adam 7.1, eve/gertrude 6.1,
+susan 5.1 sweeps/30min vs matthew's 3.1). The rows simply never arrive at a
+`Hold`/`ContestPeer` pre-flight, which is the only place the decay arm runs.
+
+susan's own log says why, in one sweep:
+
+```
+BATCH head resolve failed at the CALL level — every id in this batch returns to
+pending ... error: "Request timeout: heal conductor call exceeded per-attempt
+timeout 15s", ids=8
+OPENED the unresponsive-conductor circuit on a CALL-level failure — shedding the
+rest of the leg, remaining gaps resume next sweep   consecutive_timeouts=3
+heal leg finished   healed=0  conductor_missing=0  to_resolve=2175  batch_size=8
+```
+
+**to_resolve=2175, batch_size=8, three consecutive timeouts, then shed.** susan
+attempts ~24 of 2175 ids per sweep, heals 0, and sheds. Next sweep repeats from a
+corpus that never drains. The conductor 15s per-attempt timeout fires 43–60 times
+per hour on EVERY pod (fleet total 369/hr).
+
+### Why this matters beyond susan
+
+The ghost-declaration decay cure (2026-08-10) was never the bottleneck for the
+shem stock, and neither was evidence starvation at its predicate. Decay lives
+downstream of a heal leg that sheds before adjudicating. matthew is the only pod
+draining phantoms **because it is the only pod whose circuit rarely opens (2/hr)**.
+Tuning decay dwell, evidence windows, or advertiser diversity cannot move a row
+the leg never reaches.
+
+### Not a regression from the 2026-08-11 wave
+
+Chronic, checked explicitly: 321 conductor timeouts fleet-wide in the hour ENDING
+15:00Z (pre-deploy) vs 369 in the hour ending ~19:45Z (post-deploy, and that
+window still carries restart churn). Same order of magnitude; the deploy did not
+cause it.
+
+### Open question this addendum does NOT answer
+
+Whether shedding is correct-but-starving (the circuit is doing its job protecting a
+saturated conductor, and the real lever is conductor capacity / batch sizing /
+in-wasm budget) or whether the shed scope is too broad (shedding the whole leg on
+3 consecutive call-level timeouts, when a smaller batch or a partial-progress
+carry-forward would let a 2175-row corpus drain across sweeps). Both fit the
+evidence. Note `batch_size=8` against a 15s per-attempt timeout, and that
+`HcClient::call_zome` is uncancellable — a caller-side timeout abandons work the
+conductor keeps doing, so retrying the same batch may be adding to the load it is
+reacting to. This is the decision the next shift should make explicitly rather
+than by tuning.
+
+### Closing link (code trace, same day) — `conductor_missing=0` IS the smoking gun
+
+The chain is now closed end-to-end, and susan's own log line already carried the
+proof. `ghost_candidates` is not a SQL selection: it is accumulated one id at a
+time during `heal_content`, and ONLY when the own conductor's
+`resolve_content_head` answers `Absent` (`p2p/projection_reconcile.rs:3782-3792`,
+`conductor_missing += 1; ghost_candidates.push(id.clone())` — the counter and the
+push are the same branch). `witness_ghost_anchors` then short-circuits before
+touching the DB or the conductor (`:2046-2048`):
+
+```rust
+if candidates.is_empty() { return; }
+```
+
+So susan's `heal leg finished  healed=0  conductor_missing=0  to_resolve=2175`
+literally states that zero ghost candidates were produced that sweep. Empty list →
+`witness_ghost_anchors` returns immediately → `try_adopt_canonical_head` is never
+called → the decay arm is never entered. Not "decides Hold and refuses" — **never
+invoked**. That is exactly why `..._blocked_total{leg}` reads 0 on susan rather
+than showing a refusal leg: a refusal would have required the call to happen.
+
+The cause of `conductor_missing=0` is the shed documented above: the leg times out
+and opens the circuit before any row receives an answer of any kind. Un-asked ids
+stay `pending` — they are never classified `Absent`, so they cannot become ghost
+candidates. matthew, whose circuit opens 2×/hr instead of 8–12, gets answers and
+therefore logs `candidates=1..18` per ghost-witness sweep.
+
+**Two competing hypotheses measured and REFUTED**, so they need not be re-explored:
+- *MissLedger exhaustion has parked the cohort* (`Admission::Exhausted`, 3 strikes,
+  ~1h dormancy via `MISS_READMIT_SWEEPS=12`): would predict
+  `elohim_projection_reconcile_exhausted{stream="content"}` ≈ 1660 on susan. It
+  reads **52**. Refuted by measurement.
+- *The decay flag is off on the shem pods*: `leg="disabled"` = 0 fleet-wide.
+  Refuted. (It also could not have produced this signature — the flag only
+  downgrades an already-reached Hold/ContestPeer decision.)
+
+**This narrows the fix fork stated above.** There is NO valid shortcut that makes
+these rows ghost candidates without a conductor answer: C4's positive-absence
+discipline requires an OBSERVED `Absent` (`LocalResolve::Resolved(Answer::Absent)`
+only — `Probe`/`Unreachable` never qualify), and relaxing that would let the decay
+arm author over declarations it has not falsified, which is the one thing the arm
+is designed never to do. Every honest lever therefore aims at the same target:
+**get the conductor to answer for more of the 2175.** Candidates — smaller batches
+against the 15s per-attempt timeout (`batch_size=8` today); partial-progress
+carry-forward so each sweep advances the cursor instead of restarting; conductor
+read-permit/CPU capacity; in-wasm budget so the extern returns partial results
+rather than timing out. Note `HcClient::call_zome` is uncancellable, so today's
+timeout-and-retry abandons work the conductor keeps doing while still holding its
+read permit — retrying the same batch plausibly ADDS to the saturation it reacts
+to. That interaction should be measured before any batch-size change is tuned.
+
+## CORRECTION 2026-08-11 (late): the cause is HOST placement, not the heal-leg code
+
+The two addenda above are correct about the MECHANISM and wrong about the CAUSE.
+A 13-agent adversarial adjudication (six competing theories, each advocated then
+refuted, then judged) overturned all six — including the reading recorded above.
+The discriminator is the Kubernetes node, and it partitions perfectly.
+
+INDEPENDENTLY RE-VERIFIED (not taken from the adjudication):
+
+| pod | node | answered head-batch calls /3h | known_divergent{content} |
+|---|---|---|---|
+| matthew | ethosengine | 283 | 11 |
+| jessica | ethosengine | 64 | 0 |
+| james | ethosengine | 34 | 9 |
+| susan | **shem** | 4 | 1657 |
+| eve | **shem** | **0** | 646 |
+| adam | **shem** | **0** | 27 |
+| gertrude | **shem** | **0** | 592 |
+
+Host telemetry, both boxes 24 cores (`node_load15`, idle-core rate):
+- ethosengine 192.168.86.100 — load15 **13.46**, **13.49 idle cores** — 3/3 pods drain.
+- shem 10.99.0.2 — load15 **41.15**, **4.37 idle cores** — 4/4 pods starve.
+
+Three-for-three and four-for-four. The same binary, constants and control flow run
+on both sides, so no explanation grounded in `projection_reconcile.rs` can produce a
+clean partition on `kube_pod_info{node}`.
+
+**adam is the case that decides it.** Largest CPU limit in the fleet, the only
+meaningful headroom (6.78 of 8.0 cores), just 6% CFS-throttled, third-smallest
+backlog (27 rows) — and ZERO answered calls in 24h. Its cgroup is not the
+constraint; its host is.
+
+**CFS throttle is ANTI-correlated with outcome.** matthew is throttled in ~98.5% of
+periods and is the fleet's best performer. Bounded throttling on an idle host gives
+bounded scheduling latency (you get your cores every period); run-queue starvation
+on an oversubscribed host gives unbounded latency. A 15s caller deadline survives
+the first and cannot survive the second. Every "CPU-pinned shem trio" note in this
+file's history should be re-read in that light.
+
+This retro-explains the 2026-08-09 natural experiment: bumping susan/eve/gertrude
+2000m→3000m added 3 cores of DEMAND to a host with none to give, and the backlog
+grew. Do not raise those limits again.
+
+**Consequence for everything above.** The circuit-shed, `conductor_missing=0`, the
+empty ghost-candidate list and the uninvoked decay arm are all real and all
+correctly traced — but they are the *downstream shape* of a starved host, not the
+cause. The code defects found in the same pass (AIMD blind to call-level failure;
+`AdoptCandidate` provenance collapse mapping an OBSERVED `Ok(None)` to
+`Answer::Unreachable`; witness sweeps reporting authored roots as zero; two leg
+circuits arithmetically unreachable) govern RECOVERY RATE once the host is relieved.
+They are worth fixing. None of them will drain susan today.
+
+**Necessary and alone sufficient:** relieve `shem`'s aggregate runnable load —
+reduce co-tenancy, not limits. Repo surface is `genesis/orchestrator/data/
+deployments.json` and `genesis/manifests/cluster-state.yaml`; the live cluster is
+operator-owned. Real cost: these PVCs are openebs-hostpath and node-pinned, so
+moving a conductor is a DATA MIGRATION, not a reschedule, and a mishandled move
+re-keys an agent (`ALLOW_DNA_REINSTALL` discipline).
+
+**Open question that changes the recommendation.** What consumes ~18 cores on shem?
+Container CPU already accounts for ~15.8 of it (adam 6.78 + susan 2.99 + eve 2.99 +
+gertrude ~3.0) — the conductors themselves are the load. A 60s Pyroscope profile of
+adam's `elohim-node` vs matthew's discriminates three outcomes: kitsune2 gossip
+dominating means 4-way co-location is n²-gossip amplification and reducing
+co-tenancy is sufficient; SQLite/DHT-store dominating means the cost is per-node
+corpus/arc size and moving pods just moves the problem; validation/publish
+dominating means a write-side backlog holds the read pool, which is the
+`2026-07-20-adam-slow-link-write-guard-saturation` class at fleet scale. Take that
+profile before committing to a migration.

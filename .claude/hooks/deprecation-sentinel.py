@@ -587,12 +587,137 @@ _CMD_HISTORY_TREE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Guard Q (2026-08-11) — AGENT-TOOLING SOURCE read through a SINGLE-FILE command.
+#   Guard E dismisses first-party tooling source keyed on a `.claude/…` path
+#   appearing IN THE LINE. But that path only appears when grep is given
+#   MULTIPLE files (or -H): `grep -n <pat> .claude/scripts/foo.py` on ONE file
+#   emits `73:<code>` with no filename at all. So the identical content Guard E
+#   dismisses from a repo-wide scope grep is CAPTURED when an agent greps the
+#   single file directly — and reading one tooling file directly is the more
+#   common act.
+#   This is the exact gap `_CMD_HISTORY_TREE_RE` was introduced to close for the
+#   prose trees, quoted from its own comment: "cat/tail/grep of a single doc
+#   carries no path prefix per line, so the command string is the only signal of
+#   source." Guard Q applies that reasoning to the tooling tree Guard E owns.
+#   Live proof, and it is the capture that dispatched the run which found it:
+#   fp `3054d0cb4bd7` (2026-08-11) — `grep -n "…DEAD_WORDS\s*=…"
+#   .claude/scripts/memory-kit/placement-audit.py` captured
+#   `73:DEAD_WORDS = {"superseded", …, "deprecated", "retired"}`, a plain Python
+#   STATUS-VOCABULARY set literal. The same constant was captured at line 72 as
+#   `802862c393b2` (hand-marked false-positive 2026-06-06) and with no prefix at
+#   all as `5723985e3232` — three fingerprints, one string literal that has
+#   never been a warning. fp-dedupe cannot collapse the class: the `grep -n`
+#   prefix moves whenever the file is edited (Class 3), so every edit re-mints.
+#   Measured live 2026-08-11: 6 of 275 rows are this class. Dispositions are the
+#   zero-true-positive argument, empirical as in Guards O/P: 2 already
+#   hand-marked `false-positive`, 4 `open`, and **0 `triaged`** — no
+#   tooling-source read in the ledger's history ever became an actionable fix.
+#   READ-GATED, deliberately. The command must use a READ utility on the tooling
+#   path; EXECUTING one (`python3 .claude/scripts/memory-kit/…py`) is left
+#   capturable, because our own Python tools genuinely can emit a real
+#   DeprecationWarning and that IS a first-party finding worth having. This is
+#   the Guard-O BuildKit lesson applied before the fact: name the live channel
+#   the guard sits next to, then carve it out.
+_CMD_TOOLING_SOURCE_READ_RE = re.compile(
+    r"\b(?:grep|egrep|fgrep|rg|cat|head|tail|nl|sed|awk|cut|less|more|wc"
+    r"|git\s+(?:diff|show)|diff)\b"
+    # Same COMMAND only — never across `;`, `&&`, `&`, or a newline. Pipes are
+    # deliberately ALLOWED: a grep alternation carries literal `\|` (and `-E`
+    # patterns carry `|`) between the utility and its file operand, so excluding
+    # `|` made the guard blind to its own dispatching capture —
+    # `grep -n "ACTIVE_WORDS\s*=\|…\|DEAD_WORDS\s*=" .claude/scripts/…py`.
+    # Allowing pipes widens the gate to `cargo build | grep … .claude/…`; that
+    # is what the live-channel residual below is for.
+    r"[^;&\n]*?"
+    r"(?:\.claude/(?:hooks|scripts|skills|agents|data|memory)/"
+    r"|(?:^|/|\s)\.epr-meta/"
+    r"|(?:^|/|\s)\.codex/(?:skills|agents|commands)/)",
+)
+
+# Guard A2 — the FINDINGS LEDGERS read through the command, in ANY word order.
+#   Guard A keys on the literal `deprecations.jsonl` appearing in the LINE, but
+#   a ledger ROW read back out is a JSON object that does not contain its own
+#   filename — so `head -1` of the ledger yields a line carrying the ORIGINAL
+#   captured warning text and nothing identifying it as stored data. fp
+#   `18ddd0fb6e64` is exactly that: the GitHub 191-vulnerabilities banner,
+#   re-minted as a fresh security finding by an agent inspecting the ledger
+#   files it had just been dispatched to triage.
+#   Deliberately NOT segment-ordered like Guard Q: the dominant shape is a shell
+#   loop (`for f in .claude/data/*.jsonl; do head -1 $f; done`) which places the
+#   PATH BEFORE the reader, so an ordered regex misses it. Order-insensitivity
+#   is safe here in a way it would not be for Guard Q, because reading a stored
+#   JSONL data file emits no toolchain output of its own — there is no live
+#   channel in this command to protect. It still carries Guard Q's residual, so
+#   a compound `pnpm install && cat .claude/data/x.jsonl` keeps its real
+#   warnings.
+_CMD_FINDINGS_LEDGER_RE = re.compile(r"\.claude/data/[^\s;&|]*\.jsonl")
+
+# The live toolchain channels, as they actually arrive. Guard Q's residual (the
+# Guard-P step-3 property): even under a tooling-read command, a line carrying a
+# real tool's own token is a real warning and must still capture. This is what
+# makes Guard Q safe against a COMPOUND command — `cargo build && grep -n x
+# .claude/scripts/y.py` matches the command gate, but cargo's genuine
+# `warning: use of deprecated …` in that same output survives on its own shape.
+_LIVE_TOOLCHAIN_CHANNEL_RE = re.compile(
+    r"npm\s+warn\s+deprecated"
+    r"|\bwarn\b\s+deprecated"  # pnpm ` WARN  deprecated <pkg>@<ver>`
+    r"|warning:\s*use of deprecated"  # rustc/clippy
+    r"|\bDeprecationWarning\b"
+    r"|\bExperimentalWarning\b"
+    r"|\bDEP\d{4}\b"  # Node DEP codes
+    r"|^\s*#\d+\s+\d+\.\d+\s",  # Docker BuildKit `#12 3.456 …`
+    re.IGNORECASE,
+)
+# Vitest's banner is the one live channel that is only distinguishable by CASE
+# (`DEPRECATED: <prose>`), so it cannot ride the IGNORECASE regex above without
+# re-admitting every lowercase prose mention the guard exists to dismiss.
+_LIVE_VITEST_BANNER_RE = re.compile(r"\bDEPRECATED:\s")
+# Note: the SECURITY live channels (cargo audit / npm audit / the GitHub push
+# banner) are deliberately absent from the residual. None of them is emitted by
+# a file-READ command, so they need no protection under Guard Q — and including
+# the `N vulnerabilities` summary shape would re-admit Guard A2's dominant row,
+# a stored ledger entry quoting that very banner back.
+
+# Guard R (2026-08-11) — Guard D generalized from the MARKER to the INVARIANT.
+#   Guard D dismisses an agent's own ephemeral script output keyed on Python's
+#   `<string>:N:` / `<stdin>:N:` source markers — i.e. `python3 -c "…"` and
+#   stdin. But the moment the agent writes that same script to a scratch FILE
+#   and runs it, the marker becomes a real path and Guard D goes blind, while
+#   the semantics are unchanged: it is still the agent's own ad-hoc code, still
+#   not a live finding about this repo.
+#   The dominant shape is the sharpest one available, because it is
+#   SELF-AMPLIFYING and it targets this very hook: a deprecation-triage run
+#   VERIFYING an echo guard must print an adversarial fixture corpus, and that
+#   corpus is by construction full of warning-shaped lines. Every harness run
+#   therefore mints fingerprints for warnings that do not exist. Measured live
+#   2026-08-11: 7 of 275 rows, every one a triage harness printing its own test
+#   vectors — `[PASS] diff-add of #[deprecated] attr still classifies…`,
+#   `text: let deprecated: Vec<u32> = vec![];`, `text: DEAD_WORDS = {…}`.
+#   Dispositions: 5 `false-positive`, 2 `blocked`, and **0 `triaged`**.
+#   This is Class 8's lesson restated at a new seam: Guard D was keyed on the
+#   syntax it first met (`<string>:`), not on the property that makes the class
+#   dismissible (the code is EPHEMERAL and AGENT-AUTHORED). Keying on the scratch
+#   tree closes it for every interpreter at once.
+#   Unconditional, exactly as Guard D is, and on Guard D's own argument: a
+#   genuine codebase deprecation is emitted by a real toolchain run against the
+#   repo, never by a throwaway script in /tmp. Deliberately NO live-channel
+#   residual here (unlike Guard Q) — a verification harness's whole job is to
+#   print live-channel-shaped fixtures, so a residual would re-admit precisely
+#   the rows this guard exists to stop.
+_CMD_EPHEMERAL_SCRIPT_RE = re.compile(
+    r"\b(?:python3?|node|bash|sh|uv\s+run)\s+[^\s;&|]*"
+    r"(?:/tmp/|/var/tmp/|/private/tmp/|/scratchpad/)"
+    r"[^\s;&|]*\.(?:py|mjs|js|sh)\b"
+)
+
 
 def _is_echo_line(
     line: str,
     cmd_is_git_history: bool,
     cmd_is_history_tree: bool,
     cls: str | None = None,
+    cmd_is_tooling_read: bool = False,
+    cmd_is_ephemeral_script: bool = False,
 ) -> bool:
     """Return True if *line* is a known echo false-positive and must be skipped.
 
@@ -673,6 +798,18 @@ def _is_echo_line(
          into a perpetual dispatch generator. Not diff-exempt (like H2/M).
          Docker BuildKit `#12 3.456 …` is excluded in the opener regex — it
          is a live warning wearing a comment costume.
+      Q) Guard E at COMMAND level — a single-file READ of agent-tooling source
+         (`grep -n <pat> .claude/scripts/foo.py`) emits no path prefix per
+         line, so E's line-keyed regex is blind to content it would dismiss
+         from a repo-wide grep. Read-gated: EXECUTING a `.claude/` script is
+         left capturable (our Python tools can emit a real DeprecationWarning).
+         Carries a live-channel residual so a compound command cannot swallow
+         a genuine warning.
+      R) Guard D at TREE level — an agent-authored throwaway script run from
+         /tmp or a scratchpad. D was keyed on Python's `<string>:`/`<stdin>:`
+         marker; writing the same code to a scratch file defeats it. Dominant
+         shape is self-amplifying: a triage run verifying an echo guard must
+         print a warning-shaped fixture corpus. Unconditional, residual-free.
     """
     # Guard A — ledger self-capture
     if ECHO_LEDGER_PATH.search(line):
@@ -681,6 +818,15 @@ def _is_echo_line(
     # Guard D — ephemeral-script self-capture (<string>:N: / <stdin>:N:).
     # Placed early: cheapest deterministic skip, no command-flag dependency.
     if ECHO_EPHEMERAL_SOURCE_RE.search(line):
+        return True
+
+    # Guard R — Guard D's invariant, keyed on the scratch TREE rather than on
+    # Python's `<string>:`/`<stdin>:` marker: an interpreter running an
+    # agent-authored throwaway script out of /tmp or a scratchpad. Unconditional
+    # (as D is) and deliberately residual-free: a verification harness prints
+    # warning-shaped fixtures by design, so a live-channel carve-out would
+    # re-admit the exact rows this guard exists to stop.
+    if cmd_is_ephemeral_script:
         return True
 
     # Guard F — crates.io `+deprecated` build-metadata self-capture: a
@@ -716,6 +862,19 @@ def _is_echo_line(
     # Guard E — agentic tooling-source echo (.claude/ paths, review-finding
     # markers): our own governance tooling talking about deprecations/vulns.
     if ECHO_TOOLING_SOURCE_RE.search(line):
+        return True
+
+    # Guard Q — Guard E's COMMAND-level counterpart. A single-file read of an
+    # agent-tooling file emits no path prefix per line, so Guard E cannot see
+    # the source; the command string is the only signal (the `cmd_is_history_
+    # tree` argument, applied to the tooling tree). Residual per Guard P step 3:
+    # a line carrying a real toolchain's own token still captures, which is what
+    # keeps a compound `cargo build && grep … .claude/scripts/x.py` honest.
+    if (
+        cmd_is_tooling_read
+        and not _LIVE_TOOLCHAIN_CHANNEL_RE.search(line)
+        and not _LIVE_VITEST_BANNER_RE.search(line)
+    ):
         return True
 
     # Guard G — in-source DEPRECATED section-header / doc-comment self-capture.
@@ -868,6 +1027,11 @@ def main() -> None:
     # Pre-compute command-level echo flags (cheap, done once per call).
     cmd_is_git_history = bool(_CMD_GIT_HISTORY_RE.search(command))
     cmd_is_history_tree = bool(_CMD_HISTORY_TREE_RE.search(command))
+    cmd_is_tooling_read = bool(
+        _CMD_TOOLING_SOURCE_READ_RE.search(command)
+        or _CMD_FINDINGS_LEDGER_RE.search(command)  # Guard A2
+    )
+    cmd_is_ephemeral_script = bool(_CMD_EPHEMERAL_SCRIPT_RE.search(command))
 
     new_entries = []
     reencountered = []  # known, live
@@ -882,7 +1046,14 @@ def main() -> None:
                 continue
             # Anti-echo guards: skip deterministic false-positive line shapes
             # before fingerprinting so they never enter the ledger.
-            if _is_echo_line(line, cmd_is_git_history, cmd_is_history_tree, cls):
+            if _is_echo_line(
+                line,
+                cmd_is_git_history,
+                cmd_is_history_tree,
+                cls,
+                cmd_is_tooling_read,
+                cmd_is_ephemeral_script,
+            ):
                 continue
             fp = fingerprint(line, cls)
             if fp in matched_this_call:

@@ -3,7 +3,7 @@ id: "backlog-deprecation-sentinel-redundant-capture-surfaces"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "deprecation-sentinel fingerprint instability — Class 3 (grep -n prefix) and Class 4 (aggregate-banner drift) remain after Guards J/K/N/O and the Class-5 pid fix landed"
+title: "deprecation-sentinel fingerprint instability — Class 3 (grep -n prefix) and Class 4 (aggregate-banner drift) remain after Guards J/K/N/O/P/Q/R/A2 and the Class-5 pid fix landed"
 slug: "deprecation-sentinel-redundant-capture-surfaces"
 written: "2026-07-30"
 author: "deprecation-triage"
@@ -438,6 +438,158 @@ scope work reformats data constantly. When adding an echo guard, write down the
 invariant first, then the carve-out for the live channel, then a residual check;
 the regex is the last step, not the first.
 
+**Class 9 (observed + CLOSED 2026-08-11) — the guard could see the tree, but not
+the file.** Guard E dismisses first-party tooling source keyed on a
+`.claude/{hooks,scripts,…}/` path **appearing in the line**. But that path is
+only present when grep is given *multiple* files or `-H`. Point grep at ONE
+file and it emits `73:<code>` — no filename at all. So the identical content
+Guard E dismisses from a repo-wide scope grep is **captured** when an agent
+greps the single file directly, which is the more common act.
+
+Live proof, and it is the capture that dispatched the run which found it:
+**`3054d0cb4bd7`** (2026-08-11) —
+
+```
+grep -n "ACTIVE_WORDS\s*=\|…\|DEAD_WORDS\s*=" .claude/scripts/memory-kit/placement-audit.py
+→ 73:DEAD_WORDS = {"superseded", "abandoned", "cancelled", "canceled", "deprecated", "retired"}
+```
+
+That is a plain Python **status-vocabulary set literal** — the placement audit's
+own word list for classifying doc status. It has never been a warning about
+anything. The same constant was already captured at line **72** as
+`802862c393b2` (hand-marked `false-positive` on 2026-06-06) and with no prefix
+at all as `5723985e3232`. **Three fingerprints, one string literal, one Opus
+dispatch each** — and Class 3 guarantees a fourth the next time the file is
+edited, because the `grep -n` prefix moves with it.
+
+This is precisely the gap `_CMD_HISTORY_TREE_RE` was introduced to close for the
+*prose* trees. Quoting its own comment: *"cat/tail/grep of a single doc carries
+no path prefix per line, so the command string is the only signal of source."*
+The tooling tree had no such command-level counterpart.
+
+**Guard Q landed 2026-08-11**, read-gated with a live-channel residual:
+
+```python
+if (cmd_is_tooling_read
+        and not _LIVE_TOOLCHAIN_CHANNEL_RE.search(line)
+        and not _LIVE_VITEST_BANNER_RE.search(line)):
+    return True
+```
+
+Two deliberate narrowings, both of which the Guard-O BuildKit lesson demanded be
+settled *before* the regex:
+
+- **READ-gated, never exec-gated.** The command must use a read utility
+  (`grep`/`cat`/`head`/`sed`/`git diff`/…) on the tooling path. *Executing* one
+  (`python3 .claude/scripts/memory-kit/delivery-status-distribution.py`) stays
+  fully capturable, because our own Python tools genuinely can emit a real
+  `DeprecationWarning` (`datetime.utcnow()`, Python 3.12+) and that IS a
+  first-party finding worth having. Verified: the exec command does **not**
+  match the gate.
+- **A live-channel residual (Guard P step 3).** A line carrying a real tool's
+  own token still captures, so a compound `cargo build && grep …
+  .claude/scripts/x.py` cannot swallow cargo's genuine warning.
+
+**The separator constraint is where the first cut was wrong, and it is the part
+worth carrying forward.** Guard Q originally required the utility and the path
+to sit in one segment via `[^;&|\n]*?` — excluding pipes. That regex **passed a
+harness of twenty hand-written cases and still missed its own dispatching
+capture**, because a `grep` alternation carries literal `\|` characters between
+the utility and its file operand. The harness had used a *simplified*
+stand-in command (`grep -n 'DEAD_WORDS' <path>`) rather than the real one.
+The lesson is sharp and general: **a guard harness must replay the verbatim
+command from the ledger row, not a cleaned-up paraphrase of it** — the
+paraphrase is written by the same understanding that wrote the regex, so it
+inherits the same blind spot. Pipes are now allowed (`[^;&\n]*?`); `;`, `&&` and
+newline still block, and the residual covers what the widening admits.
+
+**Class 10 (observed + CLOSED 2026-08-11) — Guard D knew the marker, not the
+invariant; and the class it misses is aimed at this hook.** Guard D dismisses an
+agent's own ephemeral script output keyed on Python's `<string>:N:` / `<stdin>:N:`
+source markers — i.e. `python3 -c "…"` and stdin. Write that same code to a
+scratch **file** and run it, and D goes blind, while the semantics are unchanged:
+still the agent's own throwaway code, still not a finding about this repo.
+
+The dominant shape is the sharpest self-amplification yet recorded, because it
+targets the triage loop itself: **a deprecation-triage run verifying an echo
+guard must print an adversarial fixture corpus, and that corpus is by
+construction full of warning-shaped lines.** Every harness run mints
+fingerprints for warnings that do not exist. Measured live 2026-08-11: **7 of
+275 rows**, every one a triage harness printing its own test vectors —
+
+```
+[PASS] diff-add of #[deprecated] attr still classifies: got='deprecation'
+text: let deprecated: Vec<u32> = vec![];
+text: 10  warning  `LocalSourceChainService` is deprecated. M-AGGR-2: …
+```
+
+Dispositions: 5 `false-positive`, 2 `blocked`, **0 `triaged`**. Classes 7 and 8
+each noted in passing that "the triage run's own verification minted more"; this
+is that observation promoted to its own class and closed.
+
+**Guard R landed 2026-08-11** — Guard D restated on the property that makes the
+class dismissible (the code is **ephemeral and agent-authored**) rather than on
+the marker syntax D first met, which is Class 8's lesson applied at a new seam:
+
+```python
+_CMD_EPHEMERAL_SCRIPT_RE = re.compile(
+    r"\b(?:python3?|node|bash|sh|uv\s+run)\s+[^\s;&|]*"
+    r"(?:/tmp/|/var/tmp/|/private/tmp/|/scratchpad/)"
+    r"[^\s;&|]*\.(?:py|mjs|js|sh)\b"
+)
+```
+
+Unconditional, exactly as Guard D is, and deliberately **residual-free** — a
+verification harness's whole job is to print live-channel-shaped fixtures, so a
+residual would re-admit precisely the rows the guard exists to stop. This makes
+the guard **self-protecting**: the harness that verified Guards Q/R/A2 ran from
+the scratchpad and minted nothing, where its predecessor minted five rows.
+
+**Class 11 (observed + CLOSED 2026-08-11) — reading the ledger re-mints the
+ledger.** Guard A keys on the literal `deprecations.jsonl` appearing **in the
+line**. But a ledger ROW read back out is a JSON object that does not contain
+its own filename — it contains the *original captured warning text*. So
+inspecting the ledger re-mints its own contents as fresh findings.
+
+Live proof: **`18ddd0fb6e64`** — an agent listing `.claude/data/*.jsonl` captured
+row `c4bc9714e080`'s stored text (the GitHub *191 vulnerabilities* banner) as a
+**new security finding**. The agent was, at the time, dispatched to triage that
+ledger.
+
+**Guard A2 landed 2026-08-11** as a second clause on Guard Q's flag:
+
+```python
+_CMD_FINDINGS_LEDGER_RE = re.compile(r"\.claude/data/[^\s;&|]*\.jsonl")
+```
+
+Deliberately **not** segment-ordered like Guard Q, because the dominant shape is
+a shell loop that puts the **path before the reader**
+(`for f in .claude/data/*.jsonl; do head -1 $f; done`) — an ordered regex misses
+it. Order-insensitivity is safe here in a way it would not be for Guard Q:
+reading a stored JSONL file emits no toolchain output of its own, so there is no
+live channel in the command to protect. It still carries Guard Q's residual, so
+a compound `pnpm install && cat .claude/data/x.jsonl` keeps its real warnings.
+
+### Recorded, not fixed — Guard E eats first-party tool *runtime* warnings
+
+Surfaced by Guard Q's harness and **pre-existing** (Guard E, unchanged by this
+work). Guard E dismisses any line containing a `.claude/…` path — including a
+genuine runtime warning emitted **by** one of our own Python tools, whose
+traceback prefix *is* such a path:
+
+```
+/projects/elohim/.claude/scripts/memory-kit/placement-audit.py:73: DeprecationWarning: datetime.utcnow() is deprecated
+```
+
+Guard E dismisses that today. It is a real blind spot — the memory-kit scripts
+are load-bearing Python and `datetime.utcnow()` is removed in newer Pythons — but
+closing it means **widening** an echo guard, which is a behavioural change of the
+opposite sign to everything else in this entry (narrowing can only lose a
+dismissal; widening can admit noise). It therefore wants its own decision and its
+own measurement. Guard Q was deliberately built read-gated so that it does not
+make this worse, and the harness pins the current disposition so it cannot drift
+silently.
+
 ## Usage inventory
 
 Single file — `.claude/hooks/deprecation-sentinel.py`:
@@ -445,10 +597,18 @@ Single file — `.claude/hooks/deprecation-sentinel.py`:
 - `DEPRECATION_PATTERNS` (~line 58) — `\bDEPRECATED\b` under `re.IGNORECASE`
   matches the bare word `deprecated`, which is what admits the Class-1 summary
   line. Patterns at lines 62–66 are consequently redundant.
-- `_is_echo_line()` — where the structural guards live. Guards A–N are now
+- `_is_echo_line()` — where the structural guards live. Guards A–R are now
   present (J and K from this entry; L and M from the derived-artifact /
   JSDoc-annotation class landed in the same commit; N from the Class-6
-  four-homes gap, folded into Guard E's own regex). No remaining work here.
+  four-homes gap, folded into Guard E's own regex; O and P from Classes 7/8;
+  Q, R and A2 from Classes 9/10/11 — the first three keyed on the COMMAND
+  rather than the line, joining the pre-existing `cmd_is_git_history` /
+  `cmd_is_history_tree` flags). No remaining work here.
+- `_LIVE_TOOLCHAIN_CHANNEL_RE` / `_LIVE_VITEST_BANNER_RE` — the residual Guard Q
+  and A2 consult. This is the first *positive* statement in the hook of what a
+  live warning looks like; every other regex describes what an echo looks like.
+  Anything added to the deprecation channel vocabulary belongs here too, or
+  Guard Q will quietly start eating it.
 - The diff-hunk exemptions in Guards C and G (`not line.startswith(("+","-"))`)
   do **not** cover Class 1: pnpm's summary marker *is* `+`/`-`, so the shape
   must be matched precisely rather than exempted.
@@ -575,8 +735,23 @@ retiring 17 live rows (286 → 269) at zero true-positive cost and closing a
 latent Guard-H2 hole on the way. **Class 8 is CLOSED — Guard P landed
 2026-08-07**, retiring 8 live rows (276 → 268) at zero true-positive cost and
 generalizing Guard F from two hard-coded syntaxes to the invariant F rests on.
+**Classes 9, 10 and 11 are CLOSED — Guards Q, R and A2 landed 2026-08-11**,
+retiring 13 live rows (275 → 262) at zero true-positive cost: 0 rows newly
+captured, and — as in every prior class — **0 `triaged` rows affected**.
 **Classes 3 and 4 remain BLOCKED**, and they are now the entire remaining
 concern.
+
+Classes 9–11 landed from a single dispatch whose entire finding was that a
+Python `DEAD_WORDS = {…, "deprecated", …}` set literal is not a deprecation.
+Taken together they say something the earlier classes had only half-stated:
+**every one of the sentinel's own working surfaces is also one of its capture
+surfaces.** Class 9 is the tooling *source*, Class 10 is the triage harness's
+*fixture corpus*, Class 11 is the *ledger itself*. Class 7 established that
+triaging a blocked dependency generates captures; Classes 9–11 establish that
+**triaging the sentinel generates captures** — reading its code, verifying its
+guards, and inspecting its ledger were all billable acts. The three guards make
+the tool's own maintenance loop free, which is the precondition for Classes 3
+and 4 ever being worked without paying a dispatch tax to do it.
 
 Classes 7 and 8 landed the same day, from the same underlying concern
 (`holochain_sqlite`), and together they say something the earlier classes only
@@ -854,6 +1029,62 @@ so it eats `serde_yaml-0.9.34+deprecated.crate: npm warn deprecated glob@7.2.3�
 registry artifact filename and a live warning on the same line. Folding F into
 P's residual form would close them, but that is a behavioral change to a guard
 with a clean live record and belongs to its own decision.
+
+Harness exit 0, `RESULT: ALL PASS`.
+
+**Classes 9–11 (Guards Q, R, A2) — verified and landed 2026-08-11.** Harness at
+the Class-5/N/O/P standard (loads `deprecation-sentinel.py` directly, driving the
+shipped `classify()` + `_is_echo_line()` with the shipped command-flag
+computation):
+
+- **Positives — 20/20 suppressed.** All three DEAD_WORDS fingerprints
+  (`3054d0cb4bd7` / `802862c393b2` / `5723985e3232`), the memory-prose and
+  `git diff .claude/memory/` captures, the `.epr-meta` and `.codex` homes read
+  via `sed`/`tail`, the ledger-content self-read (`18ddd0fb6e64`), and all five
+  triage-harness fixture rows. Separator coverage carries the Class-9 lesson:
+  the **verbatim** dispatching command with its `\|` alternation, a `grep -E`
+  bare `|`, a read piped into another reader, and multiple tooling operands.
+- **Negatives — 20/20 preserved, zero leaks.** The carve-outs are the point:
+  **compound commands** where a real warning sits beside a tooling read
+  (`cargo build && grep … .claude/scripts/x.py`; `pnpm install && grep -rn …`;
+  `docker build . && head .claude/hooks/…` with a BuildKit-prefixed warning),
+  the `;`/`&&` separators the gate must refuse to cross, the Vitest
+  `DEPRECATED:` banner (case-distinguished, hence its own residual clause),
+  Guard N's directory-local `.epr-meta` manifest **file** negative, a **repo**
+  script and a **repo** python tool that must not read as ephemeral, `/tmp` in
+  argv without an interpreter running a scratch script, and every plain live
+  channel (npm/pnpm/rustc/node/Vitest/tsc/git-push-banner/cargo-audit).
+- **Whole-ledger stability — PASS.** Every live row re-tested under the pre-Q/R
+  flags and the new ones: **13 of 275 change suppression state, all in the
+  newly-suppressed direction, 0 newly captured.** Dispositions of the 13: 7
+  `false-positive`, 4 `open`, 2 `blocked`, and **0 `triaged`**. The 2 `blocked`
+  rows are `text: `-prefixed harness echoes whose concerns
+  (`deprecation-doorway-warm-projection-cache-retire.md`,
+  `deprecation-local-source-chain-service-retire.md`) retain 10 and 5 primary
+  fingerprints respectively, so no citation was orphaned. Per-guard split,
+  measured separately per the Class-5 bundling lesson: **Q 5 rows, R 7 rows,
+  A2 1 row, overlap 0** — three independent fixes, none holding another hostage.
+  All 13 deleted in the landing commit as structurally unreachable (275 → 262).
+- **End-to-end through the hook's real entrypoint — PASS, measured both ways**,
+  against throwaway project dirs:
+
+  | Payload | | rows minted | dispatch |
+  |---|---|---|---|
+  | Q: tooling read + 2 genuine warnings | before (`git show HEAD:`) | **4** (2 junk) | 1 |
+  | | after | **2** (both genuine) | 1 |
+  | R: harness printing its fixture corpus | before (`git show HEAD:`) | **4** (all junk) | 1 |
+  | | after | **0** | none |
+
+  The `before` runs reproduced `3054d0cb4bd7` **and** `078248917097`
+  byte-identically, confirming the harness drives the same path that minted the
+  real captures. The regression that matters is covered by the Q `after` row:
+  both genuine warnings are still captured and still emit the dispatch
+  directive — Guard Q narrows the echo surface, not the warning surface.
+- **Self-protection — PASS, and it is the cleanest demonstration available.**
+  This harness ran from the scratchpad and minted **zero** ledger rows. Its
+  direct predecessor — the Fix-N measurement script of 2026-08-11 — minted
+  **five** (`2c22da9d20b3`, `f420501739eb`, `902442508a27`, `0a652fe0dc60`,
+  `078248917097`). Guard R paid for itself inside the run that landed it.
 
 Harness exit 0, `RESULT: ALL PASS`.
 
