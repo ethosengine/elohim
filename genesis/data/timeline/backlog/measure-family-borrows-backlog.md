@@ -93,9 +93,10 @@ row 18 is this concern paying a dividend: the decomposition *is* the per-decisio
 six laws each anchored to the construct that enforces it — `MeasureKind::Rate { per }` (row 12),
 the dag-cbor canonical-bytes contract (row 16, proven at the serializer level, not yet wired to a
 typed entry point), `Interval::unknown()` (row 16, honest absence), the `Confidence::widen` /
-`NarrowingRefused` asymmetry (row 17, with a recorded field-privacy caveat), and named-but-not-yet-built
-constructs for the uncertainty-propagating fold (row 17, Task 3's `fold::with_uncertainty`) and the
-`.epr-meta` measure-tier gate (row 12's governance analog, Task 4). Rows 13–15 (harvest/regeneration
+`NarrowingRefused` asymmetry (row 17, with a recorded field-privacy caveat), and — landed and
+tested — the uncertainty-propagating fold (row 17, `fold::with_uncertainty` in
+`elohim/epr-rea/src/fold.rs`, Task 3) and the `.epr-meta` measure-tier gate (row 12's governance
+analog, enforced on both the manifest and registry paths, Task 4). Rows 13–15 (harvest/regeneration
 index, turnover/coverage time, the aggregation-facing fold) and row 18 (the uncertainty work-queue)
 remain design-only, exactly as their own Gate/blocker columns already said — they ride L1 (row 12)
 and L5 (row 17) respectively and are not built by this spec. The invariants (interval-inside-the-hash,

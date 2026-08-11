@@ -5,7 +5,7 @@ status: Draft
 class: protocol-canonical
 context-tier: disclosed
 steward: rust-architect
-graduation-trigger: Tasks 3-6 of the measure-ontology-slice1-epr-local-first plan land, each satisfying the law this spec names for it (L5 via fold::with_uncertainty, L6 via the .epr-meta measure-tier kind check, L2's typed canonical-bytes entry point wired) OR the plan is superseded
+graduation-trigger: Tasks 3-6 of the measure-ontology-slice1-epr-local-first plan land, each satisfying the law this spec names for it (L5 via fold::with_uncertainty, L6 via the .epr-meta measure-tier kind check on both the manifest and registry paths) — L2 stays serializer-proven-but-unwired per §4 until slice 2 builds the typed canonical-bytes entry point, which is explicitly not owed by this plan — OR the plan is superseded
 created: 2026-08-11
 domain: D2
 topic: [measure, middot, confidence, interval, uncertainty, dag-cbor, canonical-bytes, epr-meta, rea, meadows]
@@ -87,10 +87,12 @@ a `BTreeMap<String, Ipld>` before calling it: `envelope.rs:87` (`Ipld::Map(map)`
 `Epr`'s fields), `witness.rs:115` and `witness.rs:204` (same pattern for `WitnessedInteraction`
 and `FrameVerdict`). There is today **no function that takes a `Quantity` and returns its
 canonical bytes or CID** through the crate's own API. L2 is proven at the serializer level and
-unwired at the crate's typed API level; Task 6 must add the typed entry point (a
+unwired at the crate's typed API level. Building the typed entry point (a
 `measure::canonical_bytes(&Quantity) -> Result<Vec<u8>>` or equivalent `Ipld`-building function,
-mirroring the `envelope.rs`/`witness.rs` pattern) before any caller can compute or verify a
-measure's own CID.
+mirroring the `envelope.rs`/`witness.rs` pattern) is explicitly **not** a deliverable of this
+plan — §4 ("What slice 2 inherits") names it as an inherited gap for slice 2 to build before any
+caller can compute or verify a measure's own CID, not a Task 6 obligation this document is still
+waiting on.
 
 ### L3 — Honest absence is the degenerate interval, not a nullable field
 
@@ -143,14 +145,26 @@ A fold that sums `Quantity` values carrying `Confidence` and returns a bare `f64
 false precision — the mechanism this spec's own preamble half-quotes ("lies, damn lies, and
 statistics"). A fold over uncertain inputs must return an uncertain output.
 
-**Enforced by: not yet — named for Task 3.** `elohim/epr-rea/src/fold.rs` today folds
-`FlowEvent`s into `ResourceState`/`FulfillmentStatus` over bare `f64` totals
-(`resource_state`, `fold.rs:34-46`); there is no interval-aware fold anywhere in this crate as of
-this spec. Task 3 adds `fold::with_uncertainty` and a closure test asserting the return type
-carries an interval end to end — that test is the enforcing construct once it exists. Until Task
-3 lands, L5 is a stated law with its enforcing construct named and its build committed within
-this plan, not yet live. It is not an open question (§3) because a specific task owns building
-it; it is also not yet true of any code on disk.
+**Enforced by:** `fold::with_uncertainty` (`elohim/epr-rea/src/fold.rs`) — sums the input
+intervals, takes the **weakest** claim among its inputs (`claim_rank` reproduces `ClaimKind`'s
+own declaration order), and refuses to fold quantities of mixed `MeasureKind`
+(`FoldError::MixedKinds`). The crate's original `f64`-only fold, `resource_state`, stands
+untouched alongside it — composition, not a fork. Tests:
+`elohim/epr-rea/tests/uncertainty_closure.rs` (`a_fold_over_intervals_returns_an_interval`,
+`the_aggregate_takes_the_weakest_claim_of_its_inputs`,
+`one_unknown_term_makes_the_aggregate_unknown_not_wrong`, `folding_mixed_kinds_is_refused`,
+`folding_is_deterministic_under_input_reordering`).
+
+It enforces more than the plan's own tests set out to prove: two `Rate` quantities with
+*different* periods also refuse to fold — `MixedKinds(Rate { per: Day }, Rate { per: Year })`
+fires — because `Period` rides inside `MeasureKind`'s derived `PartialEq`, so a period mismatch
+is a kind mismatch by construction. That closes, on a branch the plan never wrote a test for,
+exactly the unit-error class L1 names (a rate compared against a cumulative level with no
+compile-time objection).
+
+Interval arithmetic here is deliberately naive — `[a,b]+[c,d]=[a+c,b+d]` over-widens for
+independent terms (Q1) — and `f64` addition is commutative but not associative, so cross-peer
+reordering determinism is real but explicitly out of scope for slice 1 (§4 item 3).
 
 ### L6 — A measure declaration without `kind` is refused at the gate
 
@@ -162,25 +176,28 @@ or vice versa, with nothing to catch it.
 **Anchor — nested inside the existing policy-owned `measure:` block, not a rule-level `kind:`
 key.** An earlier plan draft proposed a top-level `kind:` key on the `.epr-meta` rule itself; that
 was overruled on architectural grounds. `measure:` is the **policy-owned** semantics block
-(`.claude/scripts/_lib/epr_meta.py:1331`, the class-`measure` validator, currently checking only
-integer `loc-soft`/`loc-hard`). Separately, `_BINDING_KEYS = {id, policy, params, when, why}`
-(`epr_meta.py:192`) causes a policy-**binding** rule (one that references a registry policy via
-`policy: <id>@<version>`) to be rejected for carrying any other top-level key — a rule-level
-`kind:` on a binding rule would therefore be undeclarable by exactly the rules that bind a
-registry policy, giving two homes with no declared precedence between them. `kind` (and `per`,
-for a rate-kind measure) instead live **inside** the `measure:` block: policy-owned, inherited
-through the existing merge (`epr_meta.py:1404-1405`,
-`m = dict(pol.get("measure") or {}); m.update(rule.get("params") or {})`), with a binding's
+(`.claude/scripts/_lib/epr_meta.py`'s `load_policies`, its `class: measure` branch — which, at
+this design's authoring time, checked only integer `loc-soft`/`loc-hard`). Separately,
+`_BINDING_KEYS = {id, policy, params, when, why}` (`epr_meta.py:192`) causes a policy-**binding**
+rule (one that references a registry policy via `policy: <id>@<version>`) to be rejected for
+carrying any other top-level key — a rule-level `kind:` on a binding rule would therefore be
+undeclarable by exactly the rules that bind a registry policy, giving two homes with no declared
+precedence between them. `kind` (and `per`, for a rate-kind measure) instead live **inside** the
+`measure:` block: policy-owned, inherited through `load_policies`' expansion step
+(`m = dict(pol.get("measure") or {}); m.update(rule.get("params") or {})`), with a binding's
 `params` carrying local variance over the policy's declared default.
 
-**Enforced by: not yet — named for Task 4.** The existing `measure:` validator
-(`epr_meta.py:1331-1341`) checks only the pre-existing line-count measure class
-(`loc-soft`/`loc-hard` integers); it does not today require or even recognize `kind`. Task 4
-extends this validation so a measure-family policy or binding whose `measure:` block omits
-`kind` is refused at load (`errs.append(...); continue`, the same reject-and-report shape the
-`loc-soft`/`loc-hard` check already uses at `epr_meta.py:1337-1340`) rather than silently loaded
-with an undeclared kind. Until Task 4 lands, L6 is — like L5 — a stated law with its enforcing
-construct's location and owning task named, not yet live.
+**Enforced by, on both paths:** `validate_meta`'s `class: measure` branch (manifest-declared
+rules, e.g. `genesis/research/.epr-meta`) and `load_policies`'s `class: measure` branch
+(registry-declared policies in `.claude/epr-meta/policies.yaml`) both refuse a `measure:` block
+that omits `kind`, names a `kind` outside the vocabulary, or declares `kind: rate` with no `per:`
+— sharing one vocabulary constant, `MEASURE_KIND_VOCAB = {"level", "rate", "ratio"}`
+(`.claude/scripts/_lib/epr_meta.py`), rather than each path carrying its own copy. The
+manifest-path gate landed at Task 4's first pass; the registry-path gate was added in a fix round
+after review found that a policy-binding rule's *expanded* `measure:` block reached the evaluator
+unvalidated — `validate_meta` never sees an expanded binding, only the raw rule, so the registry
+loader was the one path `kind` wasn't actually required on. Closed as the same mechanism with a
+hole, not forked. Test: `.claude/scripts/_lib/__tests__/epr_meta_measure_ontology_test.py`.
 
 ## 3. Open questions — no enforcing construct, and saying so is the point
 
@@ -284,6 +301,69 @@ plan committed to building one, is written here instead of as a law.
   or an explicitly-justified fixed floor/ceiling, so each future multiplier-based fold does not
   have to rediscover this failure independently. Slice 1 does not build this helper; it is
   recorded as a mechanism, not just Task 5's instance of it.
+- **Q11 — the fold destroys `basis`.** `fold::with_uncertainty` (`elohim/epr-rea/src/fold.rs`)
+  sets the aggregate's `confidence.basis` to `format!("fold of {} terms", items.len())`,
+  discarding every input's own grounding. `Confidence`'s doc comment says "a bare ± is
+  uninterpretable" — the fold's own output basis names no observation, instrument, or window; it
+  is a term count, which is exactly a bare ± with a count attached. L5's law text ("a fold over
+  interval-carrying quantities returns an interval") is satisfied — the interval is real and
+  correctly propagated — but the ontology's own interpretability standard for `basis` is not.
+  This is distinct from Q5 (an empty `basis` reaching *construction* uncaught): Q11 is `basis`
+  being *overwritten* at fold time, discarding real input grounding that did exist, not `basis`
+  being absent from the start. What enforcement would look like, without choosing one: a
+  fold-specific basis-composition rule (concatenating or summarizing each input's basis, bounded
+  by some length or count), a `Confidence` shape that carries a list of contributing bases rather
+  than one string, or treating a term-count summary as sufficient grounding for an *aggregate*
+  specifically — a different interpretability bar than a single observation's. Slice 1 decides
+  none of these.
+- **Q12 — `Interval::is_unknown()` has a false positive on the exact shape L3 forbids.**
+  `Interval::is_unknown()` (`elohim/epr/src/measure.rs`) checks `lo.is_infinite() &&
+  hi.is_infinite()` with no sign check, so `Interval::new(f64::INFINITY, f64::INFINITY)` — a
+  zero-width, same-sign collapse, not the `{-inf, +inf}` shape `Interval::unknown()` actually
+  constructs — reports `is_unknown() == true`. This is the exact degenerate shape Task 5's fix
+  round classified as a conformance bug against L3 (a zero-width `[inf, inf]` asserting spurious
+  certainty at the precise moment data is most absent) when it first appeared in
+  `doc_dynamics.py`'s pre-fix output. This spec names `Interval::is_unknown()` as L3's enforcing
+  detector; concretely, `elohim/epr-rea/tests/uncertainty_closure.rs`'s unknown-term assertion
+  (`out.confidence.interval.is_unknown()`) would pass identically whether the aggregate collapsed
+  to the honest `{-inf, +inf}` or to the dishonest `[inf, inf]` — the detector cannot tell the two
+  apart. Q9 covers `Interval`'s missing `lo <= hi` invariant generally (a malformed interval with
+  no ordering relationship between its own bounds); Q12 is narrower and sharper — this specific
+  same-sign-infinite shape passes L3's own named detector as if it were honest absence. What
+  enforcement would look like, without choosing one: `is_unknown()` additionally requiring
+  `lo.is_sign_negative() && hi.is_sign_positive()` (equivalently, `lo == NEG_INFINITY && hi ==
+  INFINITY` exactly), or a separate `is_degenerate()` predicate flagging the same-sign-infinite
+  case as its own distinguishable state rather than folding it into "unknown." Slice 1 does not
+  decide this.
+- **Q13 — the zero-absorption fix corrected the interval and the display, not the point value.**
+  `.claude/scripts/_lib/doc_dynamics.py`'s `generation_absorption_ratio` still computes `value =
+  ratio(generated, 0) = inf` when `absorbed_counted == 0` — only `confidence.interval`
+  short-circuits to `{-inf, +inf}` (Task 5's fix round, mirroring `Interval::unknown()`), and
+  `habits-status.py` special-cases the printed line to read "unknown" rather than a bare `inf`. A
+  second consumer that reads the documented public return shape (`{"value": ..., "kind": ...,
+  "confidence": {...}}`) directly — rather than going through `habits-status.py`'s display logic
+  — sees `value == float("inf")` and `value > 1.0` evaluates `True`: "confirmed unbounded
+  overshoot," the exact misreading the fix existed to prevent, one layer below where it was
+  fixed. Q7 names the general shape of this gap ("nothing ties `Quantity.value` to its own
+  `confidence.interval`") but does not name this live, already-shipped instance of it. What
+  enforcement would look like, without choosing one: `value` becoming `None`/absent when the
+  interval is `Interval::unknown()`-shaped, a documented contract that callers must check
+  `interval.is_unknown()` before trusting `value`, or `value` computed as the interval's midpoint
+  (undefined for an unbounded interval, which would force the zero-absorption case to make a
+  choice it currently avoids). Slice 1 does not decide this, and no code changes here.
+- **Q14 — the two `class: measure` gates disagree on what a measure rule minimally is.**
+  `validate_meta`'s `class: measure` branch (manifest-declared rules) requires `kind` but no
+  quantity being bounded; `load_policies`'s `class: measure` branch (registry-declared policies)
+  requires integer `loc-soft`/`loc-hard` *and* `kind`. A manifest rule can therefore satisfy L6
+  (declare a valid `kind`) while declaring no quantity a `loc-soft`/`loc-hard`-style measure would
+  actually bound. Consequence on disk: `genesis/research/.epr-meta`'s
+  `readme-blind-reader-review` rule computes nothing — it has no `loc-soft`/`loc-hard` pair; it is
+  an observation-only relaxation of a blind-reader-review rule, not a line-count ceiling — and yet
+  now declares `measure: { kind: level }`, a rule that measures no quantity declaring what kind of
+  quantity it measures. Recorded as the question; **not fixed here** — whether every `class:
+  measure` rule must carry an actual bound/quantity, or whether a bare `kind:` declaration with no
+  bound is a legitimate lighter-weight use of the class, is a design decision this slice does not
+  make.
 
 ## 4. What slice 2 inherits — the network boundary, explicitly not crossed
 
@@ -350,10 +430,10 @@ first — it cannot assume the serializer-level proof already gives it a callabl
 
 ## 5. What this spec seals
 
-The six laws above, and no more, are canon as of this document: L1, L3, L4 (with its Q8 caveat)
-are enforced now by code that exists and is tested. L2 is proven at the dag-cbor serializer level
-and explicitly not yet wired to a typed `Quantity` entry point. L5 and L6 are committed to Tasks 3
-and 4 respectively, named precisely enough that "the law this spec promised" is a checkable
-claim against those tasks' own deliverables, not a vague aspiration. Q1–Q8 are recorded as open
-rather than smuggled in as unenforced laws. Tasks 3–6 build against this vocabulary; none of them
-should re-litigate L1–L6 without citing back here.
+The six laws above, and no more, are canon as of this document: L1, L3, L4 (with its Q8 caveat),
+L5, and L6 (enforced on both the manifest and registry `.epr-meta` paths) are enforced now by
+code that exists and is tested. L2 is proven at the dag-cbor serializer level and explicitly not
+yet wired to a typed `Quantity` entry point — §4 names that gap as an explicit slice-2
+inheritance, not a task this plan still owes. Q1–Q14 are recorded as open rather than smuggled in
+as unenforced laws. Tasks 3–6 built against this vocabulary; nothing downstream should re-litigate
+L1–L6 without citing back here.
