@@ -365,11 +365,44 @@ impl AdaptiveBatchBudget {
         self.current
     }
 
-    /// Fold one observed `queue_wait` into the controller.
+    /// Fold one observed queue-wait into the controller.
+    ///
+    /// The caller supplies the ADMISSION wait
+    /// ([`crate::services::head_batch_resolver::BatchResolution::admission_wait`]),
+    /// not `RTT − in-wasm elapsed_ms`. The latter is not monotonic in batch size
+    /// — it subtracts exactly the interval a stalled extern spends waiting on a
+    /// conductor read permit — so feeding it here made the loop grow the batch
+    /// precisely when the conductor was struggling.
     pub fn observe(&mut self, queue_wait: Duration) {
         self.current = Self::next_size(
             self.current,
             queue_wait,
+            self.threshold,
+            self.floor,
+            self.ceiling,
+            self.increment,
+        );
+    }
+
+    /// Fold a CALL-LEVEL FAILURE into the controller: multiplicative decrease.
+    ///
+    /// A call that never returned an answer is the strongest backpressure
+    /// evidence available — stronger than any queue-wait, because the conductor
+    /// could not complete the round-trip at all. Before this existed the
+    /// controller only ever heard from the `Ok` arm, so on a conductor failing
+    /// every call it kept its batch size forever and additively grew it back the
+    /// moment one call succeeded: the loop was structurally unable to shrink on
+    /// the evidence that mattered most.
+    ///
+    /// Implemented as [`Self::next_size`] over a queue-wait past the threshold,
+    /// so failure and severe backpressure take the SAME decrease path and there
+    /// is only one control law to reason about.
+    ///
+    /// **Contract test:** `aimd_shrinks_on_a_call_level_failure`.
+    pub fn observe_call_failure(&mut self) {
+        self.current = Self::next_size(
+            self.current,
+            self.threshold.saturating_add(Duration::from_millis(1)),
             self.threshold,
             self.floor,
             self.ceiling,
@@ -436,6 +469,25 @@ mod tests {
             AdaptiveBatchBudget::next_size(64, Duration::from_secs(5), t, 8, 128, 16),
             32
         );
+    }
+
+    #[test]
+    fn aimd_shrinks_on_a_call_level_failure() {
+        // The arm that used to be silent. A conductor that cannot complete a
+        // round-trip is the strongest backpressure signal there is.
+        let mut b = AdaptiveBatchBudget::new(8, 128, BATCH_QUEUE_WAIT_THRESHOLD, 16);
+        b.observe(Duration::ZERO); // 8 → 24
+        b.observe(Duration::ZERO); // 24 → 40
+        assert_eq!(b.current(), 40);
+
+        b.observe_call_failure();
+        assert_eq!(b.current(), 20, "a call-level failure must halve the batch");
+
+        // Repeated failures walk it to the floor and stop there — never below.
+        for _ in 0..10 {
+            b.observe_call_failure();
+        }
+        assert_eq!(b.current(), BATCH_SIZE_FLOOR);
     }
 
     #[test]

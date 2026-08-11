@@ -42,6 +42,7 @@
 
 use std::sync::Arc;
 
+use crate::conductor_admission::AdmissionClass;
 use crate::error::StorageError;
 use crate::hc_client::HcClient;
 use crate::rea_projection::ContentEntry;
@@ -822,6 +823,22 @@ pub struct BatchResolveOutput<T> {
     pub elapsed_ms: u32,
 }
 
+/// One batch call's decoded output PLUS what the admission gate observed while
+/// making it.
+///
+/// The timing rides along because the pacing controller downstream needs a
+/// signal that is monotonic in the thing it controls. Batch size ↑ ⇒ permits
+/// held longer ⇒ occupancy ↑ ⇒ `admission_wait` ↑. The older
+/// `RTT − in-wasm elapsed_ms` has no such property: it subtracts precisely the
+/// interval an extern spends blocked on a conductor read permit, so a conductor
+/// stalling *inside* the extern reports ZERO queue-wait and the controller reads
+/// that as headroom.
+#[derive(Debug, Clone)]
+pub struct BatchCall<T> {
+    pub out: BatchResolveOutput<T>,
+    pub timing: crate::hc_client::ZomeCallTiming,
+}
+
 /// Does this conductor error mean "the running coordinator has no such
 /// function" — i.e. the batch externs have not been hot-swapped onto this
 /// conductor yet (T2 pending)?
@@ -861,7 +878,7 @@ pub async fn call_resolve_content_heads_local(
     hc: &Arc<HcClient>,
     ids: &[String],
     budget_ms: Option<u32>,
-) -> Result<BatchResolveOutput<ContentHeadWire>, StorageError> {
+) -> Result<BatchCall<ContentHeadWire>, StorageError> {
     let input = BatchResolveInput {
         ids: ids.to_vec(),
         budget_ms,
@@ -871,14 +888,20 @@ pub async fn call_resolve_content_heads_local(
             "conductor_writes: encode resolve_content_heads_local: {e}"
         ))
     })?;
-    let bytes = hc
-        .call_zome(ZOME_NAME, "resolve_content_heads_local", payload)
+    let (bytes, timing) = hc
+        .call_zome_timed(
+            ZOME_NAME,
+            "resolve_content_heads_local",
+            payload,
+            AdmissionClass::Background,
+        )
         .await?;
-    rmp_serde::from_slice(&bytes).map_err(|e| {
+    let out = rmp_serde::from_slice(&bytes).map_err(|e| {
         StorageError::Serialization(format!(
             "conductor_writes: decode BatchResolveOutput<ContentHeadWire>: {e}"
         ))
-    })
+    })?;
+    Ok(BatchCall { out, timing })
 }
 
 /// BATCHED [`call_resolve_canonical_election`] — same contract as
@@ -888,7 +911,7 @@ pub async fn call_resolve_canonical_elections(
     hc: &Arc<HcClient>,
     ids: &[String],
     budget_ms: Option<u32>,
-) -> Result<BatchResolveOutput<CanonicalElectionWire>, StorageError> {
+) -> Result<BatchCall<CanonicalElectionWire>, StorageError> {
     let input = BatchResolveInput {
         ids: ids.to_vec(),
         budget_ms,
@@ -898,14 +921,20 @@ pub async fn call_resolve_canonical_elections(
             "conductor_writes: encode resolve_canonical_elections: {e}"
         ))
     })?;
-    let bytes = hc
-        .call_zome(ZOME_NAME, "resolve_canonical_elections", payload)
+    let (bytes, timing) = hc
+        .call_zome_timed(
+            ZOME_NAME,
+            "resolve_canonical_elections",
+            payload,
+            AdmissionClass::Background,
+        )
         .await?;
-    rmp_serde::from_slice(&bytes).map_err(|e| {
+    let out = rmp_serde::from_slice(&bytes).map_err(|e| {
         StorageError::Serialization(format!(
             "conductor_writes: decode BatchResolveOutput<CanonicalElectionWire>: {e}"
         ))
-    })
+    })?;
+    Ok(BatchCall { out, timing })
 }
 
 /// Declare (or advance) the notary HEAD for a content `id` via the

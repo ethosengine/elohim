@@ -22,6 +22,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tracing::{debug, info, warn};
 
 use holochain_client::{
@@ -29,7 +30,20 @@ use holochain_client::{
     ClientAgentSigner, ExternIO, ZomeCallTarget,
 };
 
+use crate::conductor_admission::AdmissionClass;
 use crate::error::StorageError;
+
+/// What the admission gate observed about one zome call.
+///
+/// `admission_wait` is the queueing delay for LOCAL capacity; `rtt` is the
+/// round-trip once dispatched. Their sum is the caller's wall-clock.
+#[derive(Debug, Clone, Copy)]
+pub struct ZomeCallTiming {
+    /// How long the call queued at the capacity gate before dispatch.
+    pub admission_wait: Duration,
+    /// Observed round-trip, measured from dispatch (gate wait excluded).
+    pub rtt: Duration,
+}
 
 /// Conductor health information for backpressure decisions
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -352,6 +366,11 @@ impl HcClient {
             payload_len = payload.len(),
             "Making signed zome call (imagodei cell)"
         );
+        // Same gate, same pool: the imagodei cell is a different DNA but the same
+        // conductor, so its calls compete for the same read permits.
+        let _permit = crate::conductor_admission::admission()
+            .acquire(AdmissionClass::Interactive, zome_name)
+            .await?;
         let result = self
             .app_ws
             .call_zome(
@@ -388,6 +407,10 @@ impl HcClient {
             payload_len = payload.len(),
             "Making signed zome call (mishpat cell)"
         );
+        // Same gate, same pool — see `call_zome_imagodei`.
+        let _permit = crate::conductor_admission::admission()
+            .acquire(AdmissionClass::Interactive, zome_name)
+            .await?;
         let result = self
             .app_ws
             .call_zome(
@@ -401,20 +424,55 @@ impl HcClient {
         Ok(result.into_vec())
     }
 
-    /// Make a signed zome call
+    /// Make a signed zome call.
+    ///
+    /// Admitted through the process-wide capacity gate
+    /// ([`crate::conductor_admission`]) as an INTERACTIVE caller. See
+    /// [`Self::call_zome_timed`] when the caller needs the gate's timing back.
     pub async fn call_zome(
         &self,
         zome_name: &str,
         fn_name: &str,
         payload: Vec<u8>,
     ) -> Result<Vec<u8>, StorageError> {
+        self.call_zome_timed(zome_name, fn_name, payload, AdmissionClass::Interactive)
+            .await
+            .map(|(bytes, _timing)| bytes)
+    }
+
+    /// [`Self::call_zome`] with the caller's admission class and the timing the
+    /// gate observed.
+    ///
+    /// The timing is the honest pacing signal for a controller: `admission_wait`
+    /// rises monotonically with offered load, whereas `RTT − in-wasm elapsed_ms`
+    /// subtracts exactly the interval an extern spends blocked on a conductor
+    /// read permit — so a stalling conductor reads as *zero* queue-wait there and
+    /// invites a controller to ask for more.
+    pub async fn call_zome_timed(
+        &self,
+        zome_name: &str,
+        fn_name: &str,
+        payload: Vec<u8>,
+        class: AdmissionClass,
+    ) -> Result<(Vec<u8>, ZomeCallTiming), StorageError> {
         debug!(
             zome = %zome_name,
             fn_name = %fn_name,
             payload_len = payload.len(),
+            class = class.label(),
             "Making signed zome call"
         );
 
+        // ADMISSION BEFORE DISPATCH. The bound below is on acquiring LOCAL
+        // capacity — nothing has crossed the websocket yet, so a shed costs the
+        // conductor nothing. This is deliberately NOT a timeout on the call:
+        // once admitted, the call runs unbounded on our side exactly as before,
+        // bounded on the far side by the extern's own in-wasm deadline.
+        let permit = crate::conductor_admission::admission()
+            .acquire(class, zome_name)
+            .await?;
+
+        let dispatched_at = Instant::now();
         // The holochain_client handles signing automatically
         // Use ExternIO::from() for raw bytes - payload is already MessagePack encoded
         let result = self
@@ -428,8 +486,17 @@ impl HcClient {
             .await
             .map_err(|e| StorageError::Conductor(format!("Zome call failed: {}", e)))?;
 
+        let timing = ZomeCallTiming {
+            admission_wait: permit.wait(),
+            rtt: dispatched_at.elapsed(),
+        };
+        // Held across the whole call on purpose: the permit models capacity the
+        // conductor is still spending, and releasing it early would understate
+        // occupancy by exactly the interval that matters most.
+        drop(permit);
+
         // Return raw bytes - caller will deserialize as needed
-        Ok(result.into_vec())
+        Ok((result.into_vec(), timing))
     }
 
     /// Get the cell ID

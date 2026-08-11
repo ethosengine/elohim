@@ -1448,6 +1448,13 @@ lazy_static! {
     //                              -fork call-deadline patch stays warranted: if
     //                              this stays small while quiesce falls, the
     //                              scheduling floor is not the binding cost.
+    //                              DIAGNOSTIC ONLY — it no longer feeds the AIMD
+    //                              controller, because it is not monotonic in
+    //                              batch size: it subtracts exactly the interval
+    //                              a stalled extern spends waiting on a read
+    //                              permit, so a saturated conductor reads here as
+    //                              headroom. The control input is
+    //                              elohim_conductor_admission_wait_ms.
     //   batch_size               = the AIMD controller's current ask. adam (WAN)
     //                              converging smaller than matthew (LAN) under
     //                              the SAME constants is the heterogeneity
@@ -1524,6 +1531,88 @@ lazy_static! {
             "Single-id fallbacks taken because the conductor cannot serve the batch externs.",
         ),
         &["why"],
+    )
+    .unwrap();
+
+    // ── CONDUCTOR ADMISSION — the capacity contract's own instruments ─────────
+    //
+    // Read these together with `elohim_node_db_max_readers`. Before this gate
+    // existed we exported CAPACITY and ARRIVAL and never OCCUPANCY or HOLD-TIME,
+    // so Little's Law (L = λW) had no L: nothing we emitted could say "the pool
+    // is full", and every diagnosis had to infer it. These four close that.
+    //
+    //   in_flight            = L. The number. Pinned at `capacity` with demand
+    //                          behind it IS the evidence for raising the
+    //                          conductor's db_max_readers; anything less means
+    //                          we were oversubscribing, not undersized.
+    //   hold_ms              = W. How long one call owns capacity.
+    //   wait_ms              = queueing delay AT the gate. Unlike
+    //                          head_batch_queue_wait_ms (RTT − in-wasm elapsed)
+    //                          this is monotonic in offered load, which is what
+    //                          makes it safe to close a control loop over.
+    //   shed_total           = calls refused BEFORE dispatch. Never a conductor
+    //                          failure — the conductor never saw these.
+
+    /// Permits in the gate. Mirrors the conductor's admissible read-pool share.
+    pub static ref CONDUCTOR_ADMISSION_CAPACITY: IntGauge = IntGauge::new(
+        "elohim_conductor_admission_capacity",
+        "Conductor admission permits (db_max_readers minus the conductor's own reserve).",
+    )
+    .unwrap();
+
+    /// **L** — permits currently held. THE occupancy signal.
+    pub static ref CONDUCTOR_ADMISSION_IN_FLIGHT: IntGauge = IntGauge::new(
+        "elohim_conductor_admission_in_flight",
+        "Conductor calls holding an admission permit right now (pool occupancy).",
+    )
+    .unwrap();
+
+    /// Time spent queued at the gate, by caller class.
+    pub static ref CONDUCTOR_ADMISSION_WAIT_MS: HistogramVec = HistogramVec::new(
+        HistogramOpts::new(
+            "elohim_conductor_admission_wait_ms",
+            "Milliseconds a conductor call waited for an admission permit, by class.",
+        )
+        .buckets(vec![
+            1.0, 5.0, 25.0, 100.0, 250.0, 500.0, 1_000.0, 2_000.0, 5_000.0,
+        ]),
+        &["class"],
+    )
+    .unwrap();
+
+    /// **W** — how long a call held capacity, by zome.
+    pub static ref CONDUCTOR_ADMISSION_HOLD_MS: HistogramVec = HistogramVec::new(
+        HistogramOpts::new(
+            "elohim_conductor_admission_hold_ms",
+            "Milliseconds a conductor call held its admission permit (service time), by zome.",
+        )
+        .buckets(vec![
+            5.0, 25.0, 100.0, 250.0, 500.0, 1_000.0, 2_000.0, 4_000.0, 8_000.0, 15_000.0, 30_000.0,
+        ]),
+        &["zome"],
+    )
+    .unwrap();
+
+    /// Permits granted, and how many arrived to a already-full gate. A rising
+    /// `saturated` share is the pool telling us it is the binding constraint.
+    pub static ref CONDUCTOR_ADMISSION_ACQUIRED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_conductor_admission_acquired_total",
+            "Admission permits granted, by class and whether the gate was full on arrival.",
+        ),
+        &["class", "arrival"],
+    )
+    .unwrap();
+
+    /// Calls refused at the gate. NOT conductor failures — nothing was
+    /// dispatched, so these cost the conductor nothing and establish nothing
+    /// about the work.
+    pub static ref CONDUCTOR_ADMISSION_SHED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_conductor_admission_shed_total",
+            "Conductor calls shed at the admission gate before dispatch, by class and zome.",
+        ),
+        &["class", "zome"],
     )
     .unwrap();
 }
@@ -1821,6 +1910,12 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(HEAD_BATCH_IDS.clone()));
         let _ = REGISTRY.register(Box::new(HEAD_BATCH_UNATTEMPTED.clone()));
         let _ = REGISTRY.register(Box::new(HEAD_BATCH_QUEUE_WAIT_MS.clone()));
+        let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_CAPACITY.clone()));
+        let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_IN_FLIGHT.clone()));
+        let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_WAIT_MS.clone()));
+        let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_HOLD_MS.clone()));
+        let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_ACQUIRED.clone()));
+        let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_SHED.clone()));
         let _ = REGISTRY.register(Box::new(HEAD_BATCH_SIZE.clone()));
         let _ = REGISTRY.register(Box::new(HEAD_BATCH_FALLBACK.clone()));
     });
@@ -1874,6 +1969,55 @@ pub fn set_head_batch_size(extern_name: &'static str, size: usize) {
 /// Count a single-id fallback (the conductor cannot serve the batch externs).
 pub fn inc_head_batch_fallback(why: &str) {
     HEAD_BATCH_FALLBACK.with_label_values(&[why]).inc();
+}
+
+// ── Conductor-admission typed setters ────────────────────────────────────────
+
+/// Publish the gate's permit count (once, at boot).
+pub fn set_admission_capacity(capacity: u32) {
+    CONDUCTOR_ADMISSION_CAPACITY.set(i64::from(capacity));
+}
+
+/// Record one granted permit: how long it queued, and whether it arrived to an
+/// already-full gate (the two are different questions — a call can wait because
+/// the gate was full on arrival, or because it filled while the call queued).
+///
+/// Occupancy moves as a DELTA here and in [`observe_admission_release`], never
+/// as an absolute `set`: a concurrent acquire and release would otherwise race
+/// a snapshot into the gauge and leave **L** permanently off by one.
+pub fn observe_admission_acquire(class: &str, wait: std::time::Duration, arrived_saturated: bool) {
+    CONDUCTOR_ADMISSION_IN_FLIGHT.inc();
+    CONDUCTOR_ADMISSION_WAIT_MS
+        .with_label_values(&[class])
+        .observe(wait.as_secs_f64() * 1_000.0);
+    CONDUCTOR_ADMISSION_ACQUIRED
+        .with_label_values(&[
+            class,
+            if arrived_saturated {
+                "saturated"
+            } else {
+                "free"
+            },
+        ])
+        .inc();
+}
+
+/// Record **W** — a permit released after holding capacity for `held`.
+pub fn observe_admission_release(zome: &str, held: std::time::Duration) {
+    CONDUCTOR_ADMISSION_HOLD_MS
+        .with_label_values(&[zome])
+        .observe(held.as_secs_f64() * 1_000.0);
+    // Occupancy falls by exactly one; read as a delta so a release cannot race a
+    // concurrent acquire's absolute `set` into a stale value.
+    CONDUCTOR_ADMISSION_IN_FLIGHT.dec();
+}
+
+/// Count one call shed at the gate. NOT a conductor failure — nothing was
+/// dispatched, so this must never be aggregated with call-level errors.
+pub fn inc_admission_shed(class: &str, zome: &str) {
+    CONDUCTOR_ADMISSION_SHED
+        .with_label_values(&[class, zome])
+        .inc();
 }
 
 /// Render the registry in Prometheus text exposition format (the `/metrics` body).
@@ -3441,6 +3585,16 @@ mod tests {
             inc_acquisition_outcome(outcome);
         }
 
+        // Conductor-admission family. Touched here on purpose: a *Vec collector
+        // with no label values registers but renders NOTHING, so "I registered
+        // it" and "it reaches /metrics" are different claims and only the second
+        // one matters to an operator reading a dashboard.
+        set_admission_capacity(13);
+        observe_admission_acquire("interactive", std::time::Duration::from_millis(4), false);
+        observe_admission_acquire("background", std::time::Duration::from_millis(900), true);
+        observe_admission_release("content_store", std::time::Duration::from_millis(120));
+        inc_admission_shed("background", "content_store");
+
         let text = gather_text();
         assert!(
             text.contains("elohim_node_proc_rss_bytes"),
@@ -3454,6 +3608,39 @@ mod tests {
             text.contains("elohim_node_db_read_pool_last_saturation_ratio{kind=\"dht\"} 226.62")
         );
         assert!(text.contains("elohim_identity_namespace_violation_total"));
+        // Capacity contract: all six series reach the exposition, and the two
+        // that answer "is the pool the binding constraint?" render their labels.
+        assert!(
+            text.contains("elohim_conductor_admission_capacity 13"),
+            "{text}"
+        );
+        assert!(
+            text.contains("elohim_conductor_admission_in_flight"),
+            "{text}"
+        );
+        assert!(
+            text.contains("elohim_conductor_admission_wait_ms_bucket"),
+            "{text}"
+        );
+        assert!(
+            text.contains("elohim_conductor_admission_hold_ms_bucket"),
+            "{text}"
+        );
+        assert!(
+            text.contains("elohim_conductor_admission_acquired_total"),
+            "{text}"
+        );
+        assert!(
+            text.contains("elohim_conductor_admission_shed_total"),
+            "{text}"
+        );
+        assert!(text.contains("arrival=\"saturated\""), "{text}");
+        assert!(text.contains("zome=\"content_store\""), "{text}");
+        // L moved as a DELTA: two acquires, one release ⇒ 1, not a stale snapshot.
+        assert!(
+            text.contains("elohim_conductor_admission_in_flight 1"),
+            "{text}"
+        );
         assert!(text.contains("elohim_node_conductor_anon_bucket_bytes"));
         assert!(text.contains("elohim_node_conductor_anon_bucket_count"));
         // Label rendering sanity (the attribution dimension).

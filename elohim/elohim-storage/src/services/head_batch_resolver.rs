@@ -20,8 +20,14 @@
 //!   (`SharedFailure`) stays distinguishable from "the budget ran out on
 //!   schedule" (`BudgetExhausted`/`IdCeiling`), which is not a failure at all;
 //! - `queue_wait` = observed round-trip time MINUS the extern's own in-wasm
-//!   `elapsed_ms` — the FREE conductor-pressure signal that drives
-//!   [`crate::p2p::reconcile_rails::AdaptiveBatchBudget`];
+//!   `elapsed_ms` — a DIAGNOSTIC only (`elohim_head_batch_queue_wait_ms`). It
+//!   was the AIMD controller's input until it was found to be non-monotonic in
+//!   batch size: it subtracts exactly the interval a stalled extern spends
+//!   waiting on a read permit, so a saturated conductor reads as headroom;
+//! - `admission_wait` = how long the call queued at the LOCAL capacity gate
+//!   ([`crate::conductor_admission`]) — the signal that now drives
+//!   [`crate::p2p::reconcile_rails::AdaptiveBatchBudget`], because it rises with
+//!   the offered load the controller actually governs;
 //! - `schema_version` — read before anything else is believed.
 //!
 //! ## The fallback rule (BINDING — operator review 2026-08-08)
@@ -64,8 +70,8 @@ use std::time::{Duration, Instant};
 
 use crate::error::StorageError;
 use crate::services::conductor_writes::{
-    self, BatchFailureReason, BatchOutcome, BatchResolveOutput, BatchStopReason,
-    CanonicalElectionWire, ContentHeadWire, BATCH_RESOLVE_SCHEMA_VERSION,
+    self, BatchFailureReason, BatchOutcome, BatchStopReason, CanonicalElectionWire,
+    ContentHeadWire, BATCH_RESOLVE_SCHEMA_VERSION,
 };
 
 /// Default in-wasm deadline handed to the batch externs.
@@ -121,10 +127,25 @@ pub struct BatchResolution<T> {
     pub stop_reason: Option<BatchStopReason>,
     /// In-wasm wall time the coordinator spent.
     pub elapsed_ms: u32,
-    /// Observed round-trip MINUS [`Self::elapsed_ms`] — the conductor-pressure
-    /// signal the AIMD controller reads. Saturating: a clock that makes this
-    /// negative reports zero rather than wrapping.
+    /// Observed round-trip MINUS [`Self::elapsed_ms`]. Saturating: a clock that
+    /// makes this negative reports zero rather than wrapping.
+    ///
+    /// Kept as the DIAGNOSTIC it always was (`elohim_head_batch_queue_wait_ms`),
+    /// but NO LONGER the AIMD controller's input — see [`Self::admission_wait`].
     pub queue_wait: Duration,
+    /// How long this call queued at the LOCAL admission gate
+    /// ([`crate::conductor_admission`]) before it was dispatched — the signal
+    /// the AIMD controller folds.
+    ///
+    /// This replaced `queue_wait` as the control input because `queue_wait` is
+    /// NOT monotonic in batch size: it subtracts the extern's own `elapsed_ms`,
+    /// which is exactly where a saturated conductor's read-permit waiting is
+    /// spent. A conductor stalling inside the extern therefore reported *zero*
+    /// queue-wait and the controller read that as headroom and GREW the batch —
+    /// a controller fed a non-monotonic error signal, not an underpowered one.
+    /// Admission wait has the property the loop needs: bigger batches hold
+    /// permits longer ⇒ occupancy rises ⇒ later calls queue longer.
+    pub admission_wait: Duration,
     /// TRUE when this answer was assembled from single-id calls because the
     /// conductor cannot serve the batch externs.
     pub via_single_id_fallback: bool,
@@ -140,6 +161,7 @@ impl<T> BatchResolution<T> {
             stop_reason: None,
             elapsed_ms: 0,
             queue_wait: Duration::ZERO,
+            admission_wait: Duration::ZERO,
             via_single_id_fallback: false,
         }
     }
@@ -199,8 +221,15 @@ pub fn queue_wait_from(rtt: Duration, elapsed_ms: u32) -> Duration {
     rtt.saturating_sub(Duration::from_millis(u64::from(elapsed_ms)))
 }
 
-fn resolution_from_wire<T>(out: BatchResolveOutput<T>, rtt: Duration) -> BatchResolution<T> {
-    let queue_wait = queue_wait_from(rtt, out.elapsed_ms);
+/// Turn one accepted [`conductor_writes::BatchCall`] into the caller vocabulary.
+///
+/// `rtt` comes from the call's own timing (measured FROM DISPATCH), not from a
+/// wall clock started before the admission gate: including gate time in `rtt`
+/// would inflate `queue_wait` with local queueing and quietly change what the
+/// long-standing `elohim_head_batch_queue_wait_ms` series means.
+fn resolution_from_call<T>(call: conductor_writes::BatchCall<T>) -> BatchResolution<T> {
+    let conductor_writes::BatchCall { out, timing } = call;
+    let queue_wait = queue_wait_from(timing.rtt, out.elapsed_ms);
     let items = out
         .attempted
         .into_iter()
@@ -228,6 +257,7 @@ fn resolution_from_wire<T>(out: BatchResolveOutput<T>, rtt: Duration) -> BatchRe
         stop_reason: out.stop_reason,
         elapsed_ms: out.elapsed_ms,
         queue_wait,
+        admission_wait: timing.admission_wait,
         via_single_id_fallback: false,
     }
 }
@@ -253,10 +283,10 @@ pub enum BatchCallDisposition {
 
 /// Classify one raw batch-call result.
 pub fn classify_batch_call<T>(
-    result: &Result<BatchResolveOutput<T>, StorageError>,
+    result: &Result<conductor_writes::BatchCall<T>, StorageError>,
 ) -> BatchCallDisposition {
     match result {
-        Ok(out) if out.schema_version != BATCH_RESOLVE_SCHEMA_VERSION => {
+        Ok(call) if call.out.schema_version != BATCH_RESOLVE_SCHEMA_VERSION => {
             BatchCallDisposition::Fallback("schema_version_mismatch")
         }
         Ok(_) => BatchCallDisposition::Accept,
@@ -446,8 +476,14 @@ fn fallback_resolution<T>(items: Vec<BatchItem<T>>, started: Instant) -> BatchRe
         // as queue wait. That is the HONEST reading for the AIMD controller: a
         // node in fallback mode is paying one round-trip per id and must not be
         // encouraged to ask for bigger batches.
+        //
+        // `admission_wait` (now the control input) carries the SAME whole wall
+        // time for the same reason. Reporting the per-call gate waits — or worse,
+        // zero — would read as headroom and grow the batch on the one path where
+        // a bigger batch buys nothing at all.
         elapsed_ms: 0,
         queue_wait: rtt,
+        admission_wait: rtt,
         via_single_id_fallback: true,
     }
 }
@@ -466,15 +502,15 @@ impl HeadBatchResolver for ConductorHeadBatchResolver {
             return Ok(self.fallback_heads(ids).await);
         }
         let budget_ms = u32::try_from(budget.as_millis()).unwrap_or(u32::MAX);
-        let started = Instant::now();
+        // No wall clock started here: the call carries its own timing, measured
+        // from DISPATCH so the admission-gate wait never leaks into `rtt`.
         let raw =
             conductor_writes::call_resolve_content_heads_local(&self.hc, ids, Some(budget_ms))
                 .await;
         match classify_batch_call(&raw) {
-            BatchCallDisposition::Accept => Ok(resolution_from_wire(
-                raw.expect("Accept implies Ok"),
-                started.elapsed(),
-            )),
+            BatchCallDisposition::Accept => {
+                Ok(resolution_from_call(raw.expect("Accept implies Ok")))
+            }
             BatchCallDisposition::Fallback(why) => {
                 self.latch.latch("resolve_content_heads_local", why);
                 Ok(self.fallback_heads(ids).await)
@@ -497,15 +533,14 @@ impl HeadBatchResolver for ConductorHeadBatchResolver {
             return Ok(self.fallback_elections(ids).await);
         }
         let budget_ms = u32::try_from(budget.as_millis()).unwrap_or(u32::MAX);
-        let started = Instant::now();
+        // See `resolve_heads` — the call carries its own dispatch-relative timing.
         let raw =
             conductor_writes::call_resolve_canonical_elections(&self.hc, ids, Some(budget_ms))
                 .await;
         match classify_batch_call(&raw) {
-            BatchCallDisposition::Accept => Ok(resolution_from_wire(
-                raw.expect("Accept implies Ok"),
-                started.elapsed(),
-            )),
+            BatchCallDisposition::Accept => {
+                Ok(resolution_from_call(raw.expect("Accept implies Ok")))
+            }
             BatchCallDisposition::Fallback(why) => {
                 self.latch.latch("resolve_canonical_elections", why);
                 Ok(self.fallback_elections(ids).await)
@@ -660,13 +695,23 @@ impl MockHeadBatchResolver {
             }
         }
         let stop_reason = (!unattempted.is_empty()).then_some(BatchStopReason::BudgetExhausted);
+        // Locked ONCE. `std::sync::Mutex` is not reentrant, and both temporaries
+        // in a struct literal live to the end of the statement — so taking this
+        // lock twice inside the initializer below self-deadlocks.
+        let scripted_pressure = *self.queue_wait.lock().unwrap();
         BatchResolution {
             schema_version: BATCH_RESOLVE_SCHEMA_VERSION,
             items,
             unattempted,
             stop_reason,
             elapsed_ms: 1,
-            queue_wait: *self.queue_wait.lock().unwrap(),
+            // ONE scripted pressure knob feeds BOTH fields. The mock's
+            // `queue_wait` setter predates the admission gate and is what arm
+            // tests use to script "this conductor is backpressured"; mirroring it
+            // into `admission_wait` keeps that intent driving the AIMD controller
+            // now that the controller reads the admission signal instead.
+            queue_wait: scripted_pressure,
+            admission_wait: scripted_pressure,
             via_single_id_fallback: false,
         }
     }
@@ -750,6 +795,57 @@ mod tests {
         );
     }
 
+    /// Wrap a raw wire output with the admission timing a real call would carry.
+    /// `rtt` is dispatch-relative, exactly as [`crate::hc_client::ZomeCallTiming`]
+    /// reports it.
+    fn call_of<T>(
+        out: conductor_writes::BatchResolveOutput<T>,
+        rtt: Duration,
+        admission_wait: Duration,
+    ) -> conductor_writes::BatchCall<T> {
+        conductor_writes::BatchCall {
+            out,
+            timing: crate::hc_client::ZomeCallTiming {
+                admission_wait,
+                rtt,
+            },
+        }
+    }
+
+    /// WHY `queue_wait` is not the controller's input, stated as arithmetic.
+    ///
+    /// The saturation case is a conductor that spends its whole round-trip
+    /// blocked on a DB read permit INSIDE the extern. That waiting is counted in
+    /// the extern's own `elapsed_ms`, so subtracting it reports near-zero
+    /// queue-wait — a signal that says "plenty of headroom" at the exact moment
+    /// there is none, and drives the AIMD controller to grow the batch. This is
+    /// the sign inversion the admission signal replaced; the metric stays as a
+    /// diagnostic, but nothing closes a loop over it.
+    #[test]
+    fn queue_wait_reads_as_headroom_when_the_conductor_stalls_in_the_extern() {
+        // 9s round-trip, of which the extern reports 8.9s in-wasm — nearly all of
+        // it spent waiting on a read permit it could not get.
+        let signal = queue_wait_from(Duration::from_millis(9_000), 8_900);
+        assert_eq!(signal, Duration::from_millis(100));
+        assert!(
+            signal < crate::p2p::reconcile_rails::BATCH_QUEUE_WAIT_THRESHOLD,
+            "a badly saturated conductor reads as UNDER the backpressure threshold"
+        );
+        // Fed to the control law, that reads as room to grow.
+        assert_eq!(
+            crate::p2p::reconcile_rails::AdaptiveBatchBudget::next_size(
+                32,
+                signal,
+                crate::p2p::reconcile_rails::BATCH_QUEUE_WAIT_THRESHOLD,
+                8,
+                128,
+                16,
+            ),
+            48,
+            "the old signal grows the batch against a stalled conductor"
+        );
+    }
+
     /// The contract-revision mapping, in one test: `Resolved(Some)` → `Present`,
     /// `Resolved(None)` → `Absent` (the honest local absence), `Failed` →
     /// `Unreachable` WITH the typed reason. A `Failed` mapped to `Absent` would
@@ -758,7 +854,7 @@ mod tests {
     fn per_item_outcomes_map_onto_the_c4_vocabulary() {
         #[derive(Debug, Clone, PartialEq, Eq)]
         struct P(u8);
-        let wire = BatchResolveOutput {
+        let wire = conductor_writes::BatchResolveOutput {
             schema_version: BATCH_RESOLVE_SCHEMA_VERSION,
             attempted: vec![
                 BatchAttempt {
@@ -791,7 +887,16 @@ mod tests {
             elapsed_ms: 250,
         };
 
-        let r = resolution_from_wire(wire, Duration::from_millis(1_000));
+        let r = resolution_from_call(call_of(
+            wire,
+            Duration::from_millis(1_000),
+            Duration::from_millis(40),
+        ));
+        // Both signals ride along, and they are NOT the same number: 1000ms RTT
+        // minus 250ms in-wasm is the diagnostic; 40ms at the gate is the control
+        // input.
+        assert_eq!(r.queue_wait, Duration::from_millis(750));
+        assert_eq!(r.admission_wait, Duration::from_millis(40));
 
         assert_eq!(r.items.len(), 4);
         assert_eq!(r.items[0].answer, Answer::Present(P(1)));
@@ -928,25 +1033,28 @@ mod tests {
     /// whole program exists to remove.
     #[test]
     fn the_fallback_rule_has_exactly_two_triggers() {
-        type R = Result<BatchResolveOutput<u8>, StorageError>;
-
-        let good: R = Ok(BatchResolveOutput {
-            schema_version: BATCH_RESOLVE_SCHEMA_VERSION,
+        type R = Result<conductor_writes::BatchCall<u8>, StorageError>;
+        let empty = |schema_version| conductor_writes::BatchResolveOutput::<u8> {
+            schema_version,
             attempted: Vec::new(),
             unattempted: Vec::new(),
             stop_reason: None,
             elapsed_ms: 0,
-        });
+        };
+
+        let good: R = Ok(call_of(
+            empty(BATCH_RESOLVE_SCHEMA_VERSION),
+            Duration::ZERO,
+            Duration::ZERO,
+        ));
         assert_eq!(classify_batch_call(&good), BatchCallDisposition::Accept);
 
         // TRIGGER 1 — schema_version mismatch.
-        let skewed: R = Ok(BatchResolveOutput {
-            schema_version: BATCH_RESOLVE_SCHEMA_VERSION + 1,
-            attempted: Vec::new(),
-            unattempted: Vec::new(),
-            stop_reason: None,
-            elapsed_ms: 0,
-        });
+        let skewed: R = Ok(call_of(
+            empty(BATCH_RESOLVE_SCHEMA_VERSION + 1),
+            Duration::ZERO,
+            Duration::ZERO,
+        ));
         assert_eq!(
             classify_batch_call(&skewed),
             BatchCallDisposition::Fallback("schema_version_mismatch")

@@ -1043,6 +1043,28 @@ async fn async_main(
     // without an embedded conductor (e.g. the identity-namespace violation counter).
     elohim_storage::metrics::register_all();
 
+    // CONDUCTOR ADMISSION — size the capacity gate before anything can call the
+    // conductor. Unconditional and early on purpose: the gate is what makes the
+    // conductor's read pool a represented resource rather than one discovered by
+    // timing out against it, and a call path that reaches the conductor ahead of
+    // boot wiring must be gated, never silently ungated.
+    {
+        use elohim_storage::conductor_admission as admission;
+        let cpus = elohim_storage::services::system_metrics::cpu_count().unwrap_or(0);
+        let db_max_readers = admission::conductor_db_max_readers(cpus);
+        let capacity = admission::configure(admission::default_capacity());
+        info!(
+            target: "elohim_storage::conductor_admission",
+            event = "boot",
+            cpu_count = cpus,
+            db_max_readers,
+            conductor_reserve = admission::CONDUCTOR_RESERVE,
+            admission_capacity = capacity,
+            "conductor admission gate sized (mirrors incoming_request_concurrency_limit = \
+             db_max_readers - reserve); override with ELOHIM_CONDUCTOR_PERMITS"
+        );
+    }
+
     // Memory-attribution sampler — the leak-vs-cache discriminator (P-ARC §B gate).
     // The fused `elohim-node` cgroup hides whether the OOM climb is the conductor
     // child's heap, the storage parent's heap, or the SQLite kernel page cache. Every
@@ -1066,7 +1088,10 @@ async fn async_main(
             let mut prev_smaps_pid: Option<u32> = None;
             let cpus = sm::cpu_count().unwrap_or(0);
             // The conductor's own default: calculate_default_db_max_readers = max(2*cpus, 8).
-            let db_max_readers = (2 * cpus).max(8);
+            // One rule, one home — the admission gate sizes itself from the same
+            // function, so the exported tunable and the gate cannot drift.
+            let db_max_readers =
+                elohim_storage::conductor_admission::conductor_db_max_readers(cpus);
             let cpu_quota = sm::cgroup_cpu_quota_cores();
             metrics::set_boot_tunables(db_max_readers, cpu_quota);
             info!(

@@ -517,11 +517,28 @@ fn head_batch_budget_current() -> usize {
         })
 }
 
-/// Fold one observed conductor queue-wait into the controller.
-fn head_batch_budget_observe(queue_wait: Duration) {
+/// Fold one observed ADMISSION wait into the controller.
+///
+/// Callers pass `resolution.admission_wait`, not `resolution.queue_wait` — see
+/// [`crate::p2p::reconcile_rails::AdaptiveBatchBudget::observe`] for why the
+/// latter is the wrong sign of signal.
+fn head_batch_budget_observe(admission_wait: Duration) {
     if let Ok(mut g) = HEAD_BATCH_BUDGET.lock() {
         g.get_or_insert_with(crate::p2p::reconcile_rails::AdaptiveBatchBudget::default)
-            .observe(queue_wait);
+            .observe(admission_wait);
+    }
+}
+
+/// Fold a CALL-LEVEL FAILURE into the controller (multiplicative decrease).
+///
+/// Every `Err` arm of a batch call must reach this. Before it existed the
+/// controller heard only from the `Ok` arm, so a conductor failing calls outright
+/// left the batch size untouched — the loop could not shrink on its strongest
+/// evidence.
+fn head_batch_budget_penalize() {
+    if let Ok(mut g) = HEAD_BATCH_BUDGET.lock() {
+        g.get_or_insert_with(crate::p2p::reconcile_rails::AdaptiveBatchBudget::default)
+            .observe_call_failure();
     }
 }
 
@@ -3459,6 +3476,12 @@ async fn heal_content(
             // already refusing work by the batch size).
             Err(e) => {
                 let transient = is_transient_conductor_error(&e);
+                // BACK OFF. A call that returned no answer at all is the
+                // strongest backpressure evidence there is, and this arm used to
+                // be silent toward the controller — so a conductor failing every
+                // call kept its batch size and additively grew it back on the
+                // first success.
+                head_batch_budget_penalize();
                 crate::metrics::observe_head_batch_call(
                     HEAD_BATCH_EXTERN_HEADS,
                     "call_failed",
@@ -3526,7 +3549,7 @@ async fn heal_content(
                 continue;
             }
         };
-        head_batch_budget_observe(resolution.queue_wait);
+        head_batch_budget_observe(resolution.admission_wait);
         crate::metrics::observe_head_batch_call(
             HEAD_BATCH_EXTERN_HEADS,
             if resolution.via_single_id_fallback {
@@ -4518,7 +4541,7 @@ async fn batch_probe_elections(
     while let Some((chunk, attempt)) = probes.next().await {
         match attempt.result {
             Ok(resolution) => {
-                head_batch_budget_observe(resolution.queue_wait);
+                head_batch_budget_observe(resolution.admission_wait);
                 crate::metrics::observe_head_batch_call(
                     HEAD_BATCH_EXTERN_ELECTIONS,
                     if resolution.via_single_id_fallback {
@@ -4565,6 +4588,8 @@ async fn batch_probe_elections(
                 }
             }
             Err(e) => {
+                // Same silent arm as the heads sweep — back off on the evidence.
+                head_batch_budget_penalize();
                 crate::metrics::observe_head_batch_call(
                     HEAD_BATCH_EXTERN_ELECTIONS,
                     "call_failed",
