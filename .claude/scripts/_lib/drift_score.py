@@ -46,3 +46,48 @@ def compute_score(entry: dict, weights: dict | None = None) -> float:
     direct_term = w["direct_edits"] * math.log1p(entry.get("direct_edits", 0))
     structural_term = w["structural_edits"] * math.log1p(entry.get("structural_edits", 0))
     return round(age_term + scope_term + direct_term + structural_term, 3)
+
+
+def measure(entry: dict, weights: dict | None = None) -> dict:
+    """`compute_score` as a DECLARED measure — and the declaration is mostly a confession.
+
+    Every term above is dimensionless: `days/90` is a ratio of durations, `log1p(count)` is a
+    bare number. So this passes any dimensional check, including the `MeasureKind::combine_additive`
+    algebra in `elohim/epr/src/measure.rs` — `Ratio + Ratio` is legal. **That is the algebra's
+    limit, not this score's absolution** (sealed spec Q16): dimension and *commensurability* are
+    different questions, and adding normalized time to a log of edit counts is incoherent on the
+    second while passing the first. The weighted sum is a preference ordering wearing a
+    quantity's clothes, and the threshold `3.0` has no interpretation a reader could argue with.
+
+    Meadows made exactly this objection to GNP — an index whose value theory is buried can only
+    be accepted or rejected, never argued with, and both are failures of deliberation. Our own
+    comparative-political-economy trap library reached the same rule from the other direction:
+    prefer observable mechanisms to imputed aggregates.
+
+    So the claim is `modelled`, not `witnessed` or `estimated`, and the interval is **unknown**.
+    The counters underneath ARE witnessed and could each carry an exact interval; the composite
+    cannot, because there is no observation it is an estimate OF. Reporting a tight band around
+    a number whose weights a human re-tunes at will would be the false precision this whole
+    ontology exists to prevent — the score moves when someone changes their mind, not when the
+    world does.
+
+    Kept as a SEPARATE entry point rather than changing `compute_score`'s return: the raw float
+    is what the hooks cache and the audit compares against a threshold, and rewiring that is a
+    behaviour change this declaration does not need to make.
+    """
+    from . import signal_measure as sm
+
+    w = weights or SCORE_WEIGHTS
+    terms = ", ".join(f"{k}x{v}" for k, v in w.items())
+    return sm.measure(
+        compute_score(entry, weights), "ratio", claim="modelled",
+        interval=sm.unknown_interval(),
+        basis=(f"weighted composite of re-tunable terms ({terms}) over witnessed counters "
+               f"(scope_edits={entry.get('scope_edits', 0)}, "
+               f"direct_edits={entry.get('direct_edits', 0)}, "
+               f"structural_edits={entry.get('structural_edits', 0)}, "
+               f"days_since_audit={days_since(entry.get('last_audited')):.0f}). "
+               f"NOT an estimate of any observable: the terms are dimensionless but "
+               f"INCOMMENSURABLE (normalized time added to log-counts), so the interval is "
+               f"unknown by construction and the threshold is a tuning choice, not a limit "
+               f"(spec Q16)"))

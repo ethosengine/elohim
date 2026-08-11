@@ -198,32 +198,53 @@ def main() -> int:
         # try/except Exception; any failure degrades to printing no ratio
         # line at all, never a traceback at session start.
         try:
-            from _lib.doc_dynamics import generation_absorption_ratio
-            r = generation_absorption_ratio(28)
-            iv = r["confidence"]["interval"]
-            flag = "⚠" if iv["lo"] > 1.0 else ("~" if iv["hi"] > 1.0 else "✅")
-            # Fix round 1 (2026-08-11, operator-ruled): a hardcoded
-            # "(28d, absorption estimated)" suffix threw away everything the
-            # basis actually says. Surface a compressed form of
-            # confidence.basis naming the counted totals, so "confirmed
-            # overshoot" and "we counted nothing" read differently from the
-            # line alone.
-            counted = (
-                f"{r.get('generated')} generated / {r.get('absorbed_counted')} "
-                f"absorbed counted × [1,3] (28d)"
-            )
-            if iv["lo"] == float("-inf") and iv["hi"] == float("inf"):
-                # Honest absence (sealed law L3 — Interval.unknown()): the
-                # ratio is UNKNOWN, not "exactly infinite" — render legibly
-                # rather than printing "inf [-inf–inf]".
-                print(f"  doc dynamics: generation/absorption unknown {flag} "
-                      f"({counted} — zero absorption events, interval unbounded)")
-            else:
-                print(f"  doc dynamics: generation/absorption {r['value']:.2f} "
-                      f"[{iv['lo']:.2f}–{iv['hi']:.2f}] {flag} ({counted})")
+            from _lib.doc_dynamics import corpus_dynamics
+            # Slice 2 (C): the WINDOW is part of the measure, not an argument default — in the
+            # first live run the 28d default ALONE decided whether this line read `unknown` or
+            # `3.2`. Absorption here is bursty, so several windows are reported and the shortest
+            # BOUNDED one carries the headline: an unbounded shortest window is honest absence,
+            # not a finding, and letting it be the whole line hides a real overshoot behind it.
+            windows = corpus_dynamics()
+            for line in _dynamics_lines(windows):
+                print(line)
         except Exception:
             pass
     return 0
+
+
+def _dynamics_lines(windows: list) -> list:
+    """Render the doc-corpus stock: the index at the shortest bounded window, its turnover, and
+    which windows were unbounded. Pure — takes the measured stocks, returns strings."""
+    def flag(iv):
+        # lo > 1.0 means overshoot at EVERY plausible absorption rate, not just the central one.
+        return "⚠" if iv["lo"] > 1.0 else ("~" if iv["hi"] > 1.0 else "✅")
+
+    def unknown(iv):
+        return iv["lo"] == float("-inf") and iv["hi"] == float("inf")
+
+    unbounded = [s for s in windows if unknown(s["emission_absorption"]["confidence"]["interval"])]
+    bounded = [s for s in windows
+               if not unknown(s["emission_absorption"]["confidence"]["interval"])]
+    out = []
+    if bounded:
+        s = bounded[0]
+        idx, iv = s["emission_absorption"], s["emission_absorption"]["confidence"]["interval"]
+        c, turn = s["counts"], s["turnover_time"]
+        out.append(
+            f"  doc dynamics: emission/absorption {idx['value']:.2f} "
+            f"[{iv['lo']:.2f}–{iv['hi']:.2f}] {flag(iv)} "
+            f"({s['window_days']}d: {c['generated']} authored / {c['absorbed']} absorbed, "
+            f"level {s['level']['value']:.0f})")
+        if turn["value"] is not None:
+            ti = turn["confidence"]["interval"]
+            out.append(
+                f"    turnover: {turn['value']:.0f}wk [{ti['lo']:.0f}–{ti['hi']:.0f}] — "
+                f"the measure that separates dynamic equilibrium from silting")
+    if unbounded:
+        spans = ", ".join(f"{s['window_days']}d" for s in unbounded)
+        out.append(f"    unbounded at {spans}: zero absorption counted — honest absence, "
+                   f"not a zero")
+    return out
 
 
 if __name__ == "__main__":

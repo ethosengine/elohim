@@ -364,10 +364,30 @@ def _build_state() -> dict:
         score = inv_entry["scenario_count"] * VISION_AXIS_WEIGHTS.get(
             axis, DEFAULT_VISION_WEIGHT
         )
+        # `leverage_score` DECLARED (systems-discipline slice 2). It is
+        # `scenario_count x vision_axis_weight` — a witnessed count scaled by a hand-chosen
+        # weight, which makes it a `level` (a stock of weighted scenarios, not a rate) whose
+        # claim is `modelled`: the number moves when someone re-tunes VISION_AXIS_WEIGHTS, not
+        # when the world does. The interval is unknown because there is no observation this is
+        # an estimate OF — it is a RANKING KEY, and the honest reading is its order, never its
+        # magnitude. Two features scoring 12 and 6 are not "twice as leveraged."
         return {
             **inv_entry,
             "delivery_status_from_deliver_manifest": delivery_lookup.get(slug),
             "leverage_score": round(score, 2),
+            "leverage_measure": {
+                "value": round(score, 2),
+                "kind": "level",
+                "confidence": {
+                    "claim": "modelled",
+                    "interval": {"lo": float("-inf"), "hi": float("inf")},
+                    "basis": (
+                        f"{inv_entry['scenario_count']} scenarios (witnessed) x vision-axis "
+                        f"weight for `{axis}` (a tuning choice). A RANKING KEY: read the order, "
+                        f"not the magnitude — the weights carry no unit and no calibration"
+                    ),
+                },
+            },
         }
 
     orphans = sorted(

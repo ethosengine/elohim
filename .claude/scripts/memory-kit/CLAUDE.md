@@ -287,7 +287,8 @@ Pure-stdlib modules used by scripts AND hooks. Bootstrap pattern: walk up from `
 | `_lib.paths` | `repo_root_from_file`, `reports_root`, `reports_dir_for_today`, `memory_dir` |
 | `_lib.store` | Best-effort JSON load/save with safe defaults — for accumulator state |
 | `_lib.frontmatter` | Minimal YAML-frontmatter parser for memory entries + opt-out markers |
-| `_lib.drift_score` | Canonical drift-score formula (counters → score) |
+| `_lib.drift_score` | Canonical drift-score formula (counters → score); `measure()` declares that score honestly — `claim: modelled`, interval UNKNOWN, because a weighted sum of incommensurable dimensionless terms is a ranking key, not a quantity (spec Q16) |
+| `_lib.signal_measure` | The ONE place a kit signal becomes a declared measure (kind / confidence / basis, mirroring `elohim/epr/src/measure.rs`). These signals decide **when the ceremony fires**, so a mis-denominated one is Meadows' perception-delay sitting on the loop that exists to prevent overshoot. Carries `ratio_of_rates` — the respite/response controllability index, refusing a level in either position and a period mismatch |
 | `_lib.cite_graph` | Content-addressed cite envelopes (`slug \| desc \| fingerprint \| status \| path`); slug-identity survives file moves |
 | `_lib.managed_surfaces` | Edit-time SURFACE axis: given a touched file, which managed-surface class + discipline + tooling apply (ONE registry, never per-hook) |
 | `_lib.env_scope` | Gap-granular substrate-scope resolver — the BLOCKED-BY-ENV / `requires_env` discriminator (honors `iroh ≠ shem`); shared by decompose / placement-audit / scope-reconcile |

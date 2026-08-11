@@ -706,10 +706,32 @@ def stasis_mode():
     at_stasis = score >= thr and hard_ok
 
     if AS_JSON:
-        print(json.dumps({"benchmark": 1.0, "margin": STASIS_MARGIN, "threshold": round(thr, 3),
-                          "score": round(score, 3), "hard_ok": hard_ok, "at_stasis": at_stasis,
-                          "dimensions": {n: round(r, 3) for n, r in measured},
-                          "unmeasured": unmeasured}, indent=1))
+        # The composite as a DECLARED measure. It is a weighted mean of coverage ratios, so
+        # unlike drift_score it is dimensionally AND commensurably coherent — every term is a
+        # ratio of the same kind of thing (covered ÷ total). What it still cannot claim is a
+        # tight interval: the weights are a tuning choice, and averaging ratios over different
+        # denominators is a known aggregation trap (a dimension covering 4 items and one
+        # covering 400 contribute equally at equal weight). So the band is the spread of the
+        # contributing dimensions — honest about the disagreement it is averaging away — and the
+        # claim is `modelled` because a human chose the weights.
+        rs = [r for _, r in measured]
+        payload = {"benchmark": 1.0, "margin": STASIS_MARGIN, "threshold": round(thr, 3),
+                   "score": round(score, 3), "hard_ok": hard_ok, "at_stasis": at_stasis,
+                   "dimensions": {n: round(r, 3) for n, r in measured},
+                   "unmeasured": unmeasured}
+        try:
+            from _lib import signal_measure as _sm
+            payload["measure"] = _sm.measure(
+                round(score, 3), "ratio", claim="modelled",
+                interval={"lo": round(min(rs), 3), "hi": round(max(rs), 3)} if rs else None,
+                basis=(f"weighted mean of {len(measured)} coverage ratios (weights from "
+                       f"context-coverage.yaml); interval is the spread across contributing "
+                       f"dimensions, NOT a sampling band. {len(unmeasured)} dimensions are "
+                       f"UNMEASURED and excluded entirely — full stasis cannot be claimed while "
+                       f"they are unwired, so this score is an upper bound on what is known"))
+        except Exception:  # noqa: BLE001 — the scoreboard never dies on its own declaration
+            pass
+        print(json.dumps(payload, indent=1))
         return 0
 
     print(f"STASIS — composite score vs benchmark 1.0, ±{int(STASIS_MARGIN*100)}% band (at stasis ≥ {thr:.2f})")
@@ -913,6 +935,15 @@ def epr_meta_mode() -> int:
                   f"pressure; new logic likely belongs in a module")
         for e in m.get("errors", []):
             print(f"  ! {e}")
+    # INTERVENOR CENSUS: how many governance mechanisms have no way to end (Meadows'
+    # shifting-the-burden-to-the-intervenor trap). Lands HERE, on a surface that already has a
+    # reader, rather than as a new SessionStart line — a census of un-retired instruments that
+    # minted its own always-on surface would be the joke telling itself.
+    try:
+        from _lib import intervenor_census as _ic
+        print("\n" + _ic.render_census(_ic.census_data(ROOT)))
+    except Exception as e:  # noqa: BLE001 — instrument liveness: say the gate died, never vanish
+        print(f"\nINTERVENOR CENSUS: ⚠ gate-error ({type(e).__name__}: {e})")
     # DECISION-POINT CENSUS (plan P3.2): the derived read-model over every seam-registry.yaml
     # plus both concern-canon homes (policies.yaml + concerns.yaml). Thin wiring only — all
     # logic lives in _lib/seam_census.py.
