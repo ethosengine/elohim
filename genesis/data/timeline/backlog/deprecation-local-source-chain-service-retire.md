@@ -11,7 +11,7 @@ status: "backlog"
 priority: "medium"
 deprecation_status: blocked
 severity: low
-fingerprints: ["f484d562d2b3", "712613235841", "535658148aaf", "0abbd0ab4e34"]
+fingerprints: ["f484d562d2b3", "712613235841", "535658148aaf", "0abbd0ab4e34", "0a652fe0dc60"]
 relatedNodeIds: []
 tags: [deprecation, typescript, angular, elohim-service, lamad, LocalSourceChainService, M-AGGR-2]
 cites:

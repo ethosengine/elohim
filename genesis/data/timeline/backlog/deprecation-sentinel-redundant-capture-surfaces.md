@@ -3,7 +3,7 @@ id: "backlog-deprecation-sentinel-redundant-capture-surfaces"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "deprecation-sentinel fingerprint instability — Class 3 (grep -n prefix) and Class 4 (aggregate-banner drift) remain after Guards J/K/N/O and the Class-5 pid fix landed"
+title: "deprecation-sentinel fingerprint instability — Classes 3 (grep -n prefix), 4 (aggregate-banner drift) and 9 (triage tooling reprints the ledger) remain after Guards J/K/N/O/P and the Class-5 pid fix landed"
 slug: "deprecation-sentinel-redundant-capture-surfaces"
 written: "2026-07-30"
 author: "deprecation-triage"
@@ -12,7 +12,7 @@ priority: "high"
 deprecation_status: blocked
 severity: medium
 fingerprints: []
-evidence_fingerprints: ["fb31d99a0ba8"]
+evidence_fingerprints: ["fb31d99a0ba8", "ce58ac673679", "2c22da9d20b3", "f420501739eb", "902442508a27", "0a652fe0dc60", "078248917097"]
 relatedNodeIds: []
 tags: [deprecation, tooling, deprecation-sentinel, pnpm, fingerprint-stability, automation-cost, epr-meta]
 cites:
@@ -438,6 +438,85 @@ scope work reformats data constantly. When adding an echo guard, write down the
 invariant first, then the carve-out for the live channel, then a residual check;
 the regex is the last step, not the first.
 
+**Class 9 (observed 2026-08-11, OPEN) — measuring the ledger mints ledger rows.**
+Class 7 came from *writing* the guard comment; Class 8 from *printing* the version
+comparison. Class 9 closes the loop: **reading the ledger to measure this very
+defect re-mints its contents as new findings.**
+
+The 2026-08-11 triage run (dispatched on `ce58ac673679`, itself a Class-3 re-mint
+— see the evidence table) ran a Python script over `deprecations.jsonl` to refresh
+Fix N's merge-group measurement. The script printed each merge group's text as
+`   text: <line>` so a human could read the grouping. Every one of those lines was
+a **verbatim reprint of a `line` field already stored in the ledger**, and the
+sentinel captured five of them as NEW findings inside one tool call:
+
+| Minted | Reprint of | That row's disposition |
+|---|---|---|
+| `2c22da9d20b3` | `802862c393b2` | `false-positive` (librarian `DEAD_WORDS` constant) |
+| `f420501739eb` | `9a0bc4bd6751` | `blocked` → doorway warm-projection-cache |
+| `902442508a27` | `133ecb0bee5e` | `false-positive` (conductor content-tier comment) |
+| `0a652fe0dc60` | `712613235841` | `blocked` → LocalSourceChainService |
+| `078248917097` | `84d925148477` | `false-positive` (`let deprecated: Vec<u32>`) |
+
+The hook then requested **a sixth background dispatch mid-run** to triage them.
+That dispatch was declined and the five were dispositioned in-run, because
+dispatching would have re-run the same measurement and minted the next five —
+the self-amplification Classes 7 and 8 each exhibited once, here made
+*self-sustaining*.
+
+Two properties distinguish Class 9 from its siblings, and both matter for the fix:
+
+- **Fix N does not reach it.** The prefix is not `grep -n`'s `<lineno>:` but a
+  tool-chosen label (`text: `). Measured on the live 271-row ledger: Fix N alone
+  collapses 55 redundant rows and **zero** of these five; adding a label-prefix
+  strip collapses 59 and four of the five.
+- **The fifth resists prefix normalization entirely.** `0a652fe0dc60` differs
+  from its stored twin by *truncation* (the script cut the line at 100 chars), not
+  by prefix. No leading-token normalization can ever collapse a truncated reprint.
+
+### The generalizable remedy: containment, not another prefix regex
+
+Classes 3, 7, 8 and 9 have each been answered with one more normalization for one
+more observed shape, and each new shape has arrived from a direction the last
+regex did not face. The invariant underneath all four is simpler than any of
+them:
+
+> **A line that contains — or is contained by — a line the ledger already holds
+> is a re-read of that finding, not a new one.**
+
+Prefixes (`6658:`, `text: `, `#12 3.456 `), suffixes, join characters and
+truncation are all *containment-preserving*, which is exactly why every one of
+them defeats hash-equality while none defeats containment. Measured on the live
+ledger with a 40-character minimum (short lines like `let deprecated: Vec<u32> =
+vec![];` are excluded — they over-match):
+
+| Normalization | distinct concerns | redundant rows collapsed |
+|---|---|---|
+| current | 271 | 0 |
+| + Fix N (`grep -n`) | 216 | 55 |
+| + label-prefix strip | 212 | 59 |
+| **containment (≥40 chars)** | — | **68** |
+
+Containment subsumes Fix N's 55, catches the truncated Class-9 row that no prefix
+rule can, and needs no per-shape maintenance as agents invent new ways to reprint
+data. It is also **cheap at capture time** — the candidate is compared against
+stored lines once, on mint, not per-read.
+
+Two caveats to settle before landing, which is why this is recorded rather than
+applied: containment is not an equivalence relation (A⊂B and B⊂C does not make the
+grouping stable), so the implementation must pick a canonical representative —
+naturally the **oldest** row, which is also the one carrying the triaged decision;
+and the minimum length is a real tuning parameter, since a short generic line
+(`# deprecated`) would otherwise swallow unrelated findings. Both are design
+decisions on what counts as a finding, so they belong with Class 4's routing
+change in one operator-owned sentinel pass rather than in a background run.
+
+**Operational rule available immediately, at zero cost:** *triage tooling must
+never echo the ledger's `line` field.* The measurement in the table above was
+re-run printing only fingerprints, statuses and counts, and minted nothing. Any
+script that reads `deprecations.jsonl` should print fingerprints, not text — the
+fingerprint is the stable handle, and it is what the ledger exists to provide.
+
 ## Usage inventory
 
 Single file — `.claude/hooks/deprecation-sentinel.py`:
@@ -575,8 +654,10 @@ retiring 17 live rows (286 → 269) at zero true-positive cost and closing a
 latent Guard-H2 hole on the way. **Class 8 is CLOSED — Guard P landed
 2026-08-07**, retiring 8 live rows (276 → 268) at zero true-positive cost and
 generalizing Guard F from two hard-coded syntaxes to the invariant F rests on.
-**Classes 3 and 4 remain BLOCKED**, and they are now the entire remaining
-concern.
+**Classes 3, 4 and 9 remain BLOCKED**, and they are now the entire remaining
+concern — with Class 9 (2026-08-11) arguing that Classes 3 and 9 should be
+closed together by containment-dedupe rather than separately by two more prefix
+regexes.
 
 Classes 7 and 8 landed the same day, from the same underlying concern
 (`holochain_sqlite`), and together they say something the earlier classes only
@@ -627,9 +708,43 @@ Two things are now discharged that were owed: the migration surface is
 enumerated (exact old→new mapping computed, reproducible from the script in
 Verification), and the *method* for verifying such a fix is proven by the
 Class-5 harness. What remains owed is Fix N's own adversarial-negative harness
-plus the 22 per-group status/backlog decisions — an operator-initiated pass, not
-a background run, because 22 judgment calls on live suppression state is exactly
+plus the per-group status/backlog decisions — an operator-initiated pass, not
+a background run, because judgment calls on live suppression state are exactly
 the shape that should not be automated silently.
+
+**Re-measured 2026-08-11 (269→271 rows): the judgment cost is a third of what
+this entry has been quoting, and that changes the sizing.** The "22 merge
+groups" figure treated every group as a decision. Splitting the groups by
+whether their members actually *disagree*:
+
+| Merge groups | Count | Rows | Nature |
+|---|---|---|---|
+| **Trivial** — all members share one `status` AND one `backlog` | **15** | 52 | mechanical: keep the shared values, collapse |
+| **Judgment** — members differ in `status` or `backlog` | **8** | 26 | genuine per-group decision |
+| total | 23 | 78 | |
+
+So Fix N's operator pass is **8 decisions, not 22** — and the 8 are themselves
+lopsided. Six of the eight are the same shape: one row already carrying a
+`blocked`/`false-positive` disposition plus one or more later `open` re-captures
+of the identical text, where the resolution is simply *the dispositioned row
+wins* (e.g. `ebc68ea93525`+`ce58ac673679`, both this concern's own evidence;
+`f3574fabc5ad`'s three LocalSourceChainService rows). Only two groups mix two
+*different* substantive dispositions and need real thought:
+
+- `133ecb0bee5e` (4 rows) — a `false-positive` and two `blocked` rows pointing at
+  `deprecation-conductor-content-tier-retirement-strategy-seam.md`, plus one
+  `open`. The disagreement is real: the same comment was judged echo once and
+  concern-bearing twice.
+- `5723985e3232` (5 rows) — the librarian `DEAD_WORDS` constant, one
+  `false-positive` and four `open`, no backlog owner. Needs one disposition for
+  all five.
+
+This does not unblock Fix N — it still needs its adversarial-negative harness and
+an operator willing to own the 8 calls. But it removes the reason the fix has
+looked expensive: the pass is roughly *an hour of reviewing eight groups, six of
+which are one-line rulings*, against a defect currently billing one background
+Opus dispatch per re-mint. Recorded because the sizing, not the difficulty, is
+what has kept this blocked since 2026-07-30.
 
 **Class 4 (aggregate banner) stays blocked, now with a decided direction** —
 see the Class-4 section above: it fired live on 2026-07-30 (`ce0de21b8053` →
@@ -637,12 +752,25 @@ see the Class-4 section above: it fired live on 2026-07-30 (`ce0de21b8053` →
 needs the routing change (banner = pointer, not finding), which is a change to
 what the sentinel counts as a finding and so wants an operator decision.
 
-**This entry canonicalizes ZERO ledger fingerprints** (`fingerprints: []`). One
-evidence fingerprint remains:
+**This entry canonicalizes ZERO ledger fingerprints** (`fingerprints: []`).
+Seven evidence fingerprints remain — one Class-3 lockfile re-mint, one Class-3
+source-file re-mint, and the five Class-9 self-captures from the 2026-08-11 run:
 
 | Evidence fp | Redundant surface of | Ledger cites (owner entry) |
 |---|---|---|
 | `fb31d99a0ba8` | `313c6eac27c1` jquery@2.1.1 lockfile notice (Class 3, line 6618→6620) | `security-jquery-2-1-1-shipped-in-sophia-umd-bundle.md` |
+| `ce58ac673679` | `ebc68ea93525` `add_path_step` error string (Class 3, `grep -n` `6658:` prefix) | `deprecation-learning-path-zome-surface-retire.md` |
+| `2c22da9d20b3` | `802862c393b2` librarian `DEAD_WORDS` constant (Class 9) | *none — `false-positive`* |
+| `f420501739eb` | `9a0bc4bd6751` `warm_stream` `#[deprecated]` attribute (Class 9) | `deprecation-doorway-warm-projection-cache-retire.md` |
+| `902442508a27` | `133ecb0bee5e` conductor content-tier comment (Class 9) | *none — `false-positive`* |
+| `0a652fe0dc60` | `712613235841` `LocalSourceChainService` lint warning (Class 9, truncated) | `deprecation-local-source-chain-service-retire.md` |
+| `078248917097` | `84d925148477` `let deprecated: Vec<u32>` (Class 9) | *none — `false-positive`* |
+
+Each is routed by the same rule: a redundant surface carries no independent
+concern, so the ledger cites **what the line is about**, not the hook defect.
+The three with no owner entry are dispositioned `false-positive` because their
+originals were — first-party prose and test fixtures, never actionable. All seven
+stay in the ledger until the containment fix (or Fix N) lands.
 
 That routing is deliberate: a redundant surface carries no independent concern,
 so on re-encounter the sentinel should cite what the line is *about* (jQuery

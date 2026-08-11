@@ -11,7 +11,7 @@ status: "backlog"
 priority: "low"
 deprecation_status: blocked
 severity: low
-fingerprints: ["9a0bc4bd6751", "f0e2269eabc8", "e76c7bdb8f61", "3366a3891871", "db7cbe42752f", "56ec0bf2de15", "86896c02e2ce", "d14c46c61fdc", "547916f870e3", "25adc26c08ee"]
+fingerprints: ["9a0bc4bd6751", "f0e2269eabc8", "e76c7bdb8f61", "3366a3891871", "db7cbe42752f", "56ec0bf2de15", "86896c02e2ce", "d14c46c61fdc", "547916f870e3", "25adc26c08ee", "f420501739eb"]
 relatedNodeIds: []
 tags: [deprecation, rust, doorway, projection-cache, warm-stream]
 cites:
