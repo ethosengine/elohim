@@ -209,7 +209,208 @@ fn derive_recipe(
         }
     }
 
+    // Observation plane, the OTHER half: artifacts that LEFT a stage → Consume events.
+    derive_absorption(root, recipe, repo_scope, deriv)?;
+
     Ok(())
+}
+
+/// Artifacts that left a resource stage → `Consume` events. The sink half of the projection.
+///
+/// **This function exists because the projection had no sink at all.** Every event minted above
+/// is `ReaVerb::Produce`; `Consume` is in the vocabulary and was never emitted, so the
+/// repository's own ValueFlows model of its own development was source-side only. Meadows:
+/// natural capital is used unsustainably if sources decline **or sinks fill** — and a capacity
+/// declaration that names only a source is half a model. Concretely, it meant the doc corpus had
+/// an inflow and no modelled outflow, so its turnover time was unbounded *by construction*
+/// rather than by observation, and nothing could tell those two apart.
+///
+/// # What counts as absorption, and the distinction that needs the recipe
+///
+/// A deletion is absorption. A rename is the interesting case, and it is where the pre-existing
+/// `git log --diff-filter=DR` heuristic in the session-start instrument is simply wrong: it
+/// counts a move to `held/` (real absorption — the doc left the plate) and an in-place rename
+/// (not absorption at all — same doc, same stage, new filename) as the same event. Nothing in
+/// git distinguishes them, which is why that instrument had to keep its estimate wide.
+///
+/// The recipe does distinguish them. A rename is absorption **iff its destination no longer
+/// matches any resource stage's `paths:` globs** — the artifact left the value chain rather than
+/// moving inside it. That is placement knowledge, it lives in the registry's binding plane, and
+/// it turns a wide estimate into a witnessed count. This is the recipe doing real work rather
+/// than being decoration on a folder layout.
+///
+/// # Identity
+///
+/// The resource CID is the canonical body CID **as of the parent of the removing commit** — the
+/// last revision at which the artifact existed. That is the same identity its `Produce` event
+/// carries whenever the body was unchanged between authoring and removal, so the two events fold
+/// against one resource. When the body was edited in between they are different CIDs, which is
+/// correct and not a bug: content addressing means the thing that was removed is the version
+/// that was there, and a stock counting `produce - consume` over a *versioned* corpus is a
+/// question this projection does not yet answer. Recorded as a known limit rather than papered
+/// over — see the level's own basis in `elohim_epr_rea::stock`.
+fn derive_absorption(
+    root: &Path,
+    recipe: &Recipe,
+    repo_scope: &Cid,
+    deriv: &mut Derivation,
+) -> FlowResult<()> {
+    let patterns = resource_stage_patterns(recipe);
+    if patterns.is_empty() {
+        return Ok(());
+    }
+    let mut pathspecs: Vec<String> = Vec::new();
+    for stage_name in RESOURCE_STAGES {
+        if let Some(stage) = recipe.stage(stage_name) {
+            pathspecs.extend(stage.paths.iter().cloned());
+        }
+    }
+
+    for removal in git_removals(root, &pathspecs) {
+        // A rename INSIDE the value chain is not absorption. This is the discrimination the
+        // git-only heuristic cannot make and the recipe can.
+        if let Some(dest) = &removal.moved_to {
+            if patterns.iter().any(|p| p.matches_with(dest, SEGMENT_WISE)) {
+                continue;
+            }
+        }
+        let Some(text) = git_show(root, &format!("{}^:{}", removal.commit, removal.path)) else {
+            continue; // root commit, or the path was not in the parent tree — no identity to mint
+        };
+        let resource = body_cid(&text);
+        deriv.label(&resource, removal.path.clone());
+        let event = FlowEvent {
+            action: ReaVerb::Consume,
+            provider: AgentRef(removal.author.clone()),
+            receiver: repo_agent(),
+            resource,
+            quantity: Magnitude::Count {
+                value: 1.0,
+                unit: "artifact".to_string(),
+            },
+            // No Process: absorption is not a recipe stage transition. A doc leaving the plate
+            // is the chain ENDING for that artifact, and inventing a process to hang it on would
+            // assert a stage that never ran.
+            process: None,
+            in_scope_of: *repo_scope,
+            fulfills: Vec::new(),
+            satisfies: Vec::new(),
+            occurred_at: removal.occurred_at.clone(),
+        };
+        let event_cid = atom_cid(&event)?;
+        deriv.stage_record(
+            FlowRecord::Event(event),
+            event_cid,
+            format!("consume:{}", removal.path),
+        );
+    }
+    Ok(())
+}
+
+/// `*` stops at a path separator, which is NOT the `glob` crate's default and is load-bearing
+/// here rather than a style preference.
+///
+/// With the default (`require_literal_separator: false`) a `*` crosses `/`, so the stage glob
+/// `docs/*.md` matches `docs/held/moved.md` — and a move into `held/` would be classified as a
+/// rename INSIDE the value chain and silently dropped. That is the single most common real
+/// absorption event in this repo (`scope-reconcile --apply` git-mv's docs to `held/` when a
+/// capability goes down), so the default would have made the outflow read near-zero while
+/// looking like it worked. Caught by the fixture below, which is why the fixture builds all
+/// three removal shapes instead of just a delete.
+const SEGMENT_WISE: glob::MatchOptions = glob::MatchOptions {
+    case_sensitive: true,
+    require_literal_separator: true,
+    require_literal_leading_dot: false,
+};
+
+/// Compiled `paths:` globs across every resource stage — "still on the plate".
+fn resource_stage_patterns(recipe: &Recipe) -> Vec<glob::Pattern> {
+    let mut out = Vec::new();
+    for stage_name in RESOURCE_STAGES {
+        let Some(stage) = recipe.stage(stage_name) else {
+            continue;
+        };
+        for p in &stage.paths {
+            if let Ok(pat) = glob::Pattern::new(p) {
+                out.push(pat);
+            }
+        }
+    }
+    out
+}
+
+/// One artifact leaving a stage: deleted, or renamed to `moved_to`.
+struct Removal {
+    commit: String,
+    author: String,
+    occurred_at: String,
+    path: String,
+    moved_to: Option<String>,
+}
+
+/// `git log --diff-filter=DR --name-status` over the resource-stage pathspecs.
+///
+/// Deterministic and history-derived like every other timestamp on this path — never `now()`.
+/// A git failure yields an empty list rather than an error: absorption we cannot see is honest
+/// absence (the stock's outflow reads zero and its turnover reads *unknown*), whereas failing
+/// the whole projection because history is unreadable would take the source side down with it.
+fn git_removals(root: &Path, pathspecs: &[String]) -> Vec<Removal> {
+    const REC: char = '\u{1}';
+    let mut args: Vec<String> = vec![
+        "log".into(),
+        "--diff-filter=DR".into(),
+        "--name-status".into(),
+        "-M".into(),
+        format!("--format={REC}%H%x1f%ae%x1f%aI"),
+        "--".into(),
+    ];
+    args.extend(pathspecs.iter().cloned());
+    let argv: Vec<&str> = args.iter().map(String::as_str).collect();
+    let Ok(out) = crate::process::build_command("git", &argv, root, &[]).output() else {
+        return Vec::new();
+    };
+    if !out.status.success() {
+        return Vec::new();
+    }
+    let text = String::from_utf8_lossy(&out.stdout);
+    let (mut commit, mut author, mut ts) = (String::new(), String::new(), String::new());
+    let mut removals = Vec::new();
+    for line in text.lines() {
+        if let Some(header) = line.strip_prefix(REC) {
+            let mut parts = header.split('\u{1f}');
+            commit = parts.next().unwrap_or_default().to_string();
+            author = parts.next().unwrap_or_default().to_string();
+            ts = parts.next().unwrap_or_default().to_string();
+            continue;
+        }
+        let mut cols = line.split('\t');
+        let Some(status) = cols.next() else { continue };
+        let Some(path) = cols.next() else { continue };
+        let moved_to = cols.next().map(str::to_string);
+        let is_removal = status.starts_with('D') || status.starts_with('R');
+        if !is_removal || commit.is_empty() {
+            continue;
+        }
+        removals.push(Removal {
+            commit: commit.clone(),
+            author: author.clone(),
+            occurred_at: ts.clone(),
+            path: path.to_string(),
+            moved_to,
+        });
+    }
+    removals
+}
+
+/// `git show <rev>:<path>` — the artifact's bytes at the revision before it left.
+fn git_show(root: &Path, spec: &str) -> Option<String> {
+    let out = crate::process::build_command("git", &["show", spec], root, &[])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    Some(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
 fn derive_process_doc(
