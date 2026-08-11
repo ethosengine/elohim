@@ -140,3 +140,68 @@ Same window: her conductor memory 1m-8m alloc-bucket anomaly (18-90x peers) and
 gossip-timeout-per-5s rate documented in the shift journal. Exit-code/log
 detail not pulled (flagged unverified). If the crash recurs, this entry
 graduates to a conductor-memory investigation with the smaps localizer.
+
+## Addendum 2026-08-11: the circuit now trips — and shedding is what starves the ghost-decay cure
+
+The fix this entry asked for appears to have landed in effect: `HealCircuit` is no
+longer blind. It trips, fleet-wide, **8–12 times per hour** on six of seven pods
+(adam 12, james 12, jessica 12, gertrude 11, eve 8, susan 8; matthew only 2).
+
+That surfaced the NEXT link in the chain, and it re-aims a diagnosis that had been
+pointed at the wrong seam all week.
+
+**Measured 2026-08-11 ~19:45Z, post edge #1341** (which shipped
+`elohim_content_ghost_decay_blocked_total{leg}` — the refusal twin of the decay
+counter). The blocked-leg meter shows `leg="disabled"` = 0 on all seven pods, so
+the ghost-decay flag is live fleet-wide; and yet decay-arm CONSIDERATIONS over
+30 min are matthew 69, james 4, gertrude 1, susan 0, eve 0, adam 0 — against
+known_divergent{content} of susan 1660, eve 647, gertrude 597.
+
+The shem pods are not sweeping less. They sweep MORE (adam 7.1, eve/gertrude 6.1,
+susan 5.1 sweeps/30min vs matthew's 3.1). The rows simply never arrive at a
+`Hold`/`ContestPeer` pre-flight, which is the only place the decay arm runs.
+
+susan's own log says why, in one sweep:
+
+```
+BATCH head resolve failed at the CALL level — every id in this batch returns to
+pending ... error: "Request timeout: heal conductor call exceeded per-attempt
+timeout 15s", ids=8
+OPENED the unresponsive-conductor circuit on a CALL-level failure — shedding the
+rest of the leg, remaining gaps resume next sweep   consecutive_timeouts=3
+heal leg finished   healed=0  conductor_missing=0  to_resolve=2175  batch_size=8
+```
+
+**to_resolve=2175, batch_size=8, three consecutive timeouts, then shed.** susan
+attempts ~24 of 2175 ids per sweep, heals 0, and sheds. Next sweep repeats from a
+corpus that never drains. The conductor 15s per-attempt timeout fires 43–60 times
+per hour on EVERY pod (fleet total 369/hr).
+
+### Why this matters beyond susan
+
+The ghost-declaration decay cure (2026-08-10) was never the bottleneck for the
+shem stock, and neither was evidence starvation at its predicate. Decay lives
+downstream of a heal leg that sheds before adjudicating. matthew is the only pod
+draining phantoms **because it is the only pod whose circuit rarely opens (2/hr)**.
+Tuning decay dwell, evidence windows, or advertiser diversity cannot move a row
+the leg never reaches.
+
+### Not a regression from the 2026-08-11 wave
+
+Chronic, checked explicitly: 321 conductor timeouts fleet-wide in the hour ENDING
+15:00Z (pre-deploy) vs 369 in the hour ending ~19:45Z (post-deploy, and that
+window still carries restart churn). Same order of magnitude; the deploy did not
+cause it.
+
+### Open question this addendum does NOT answer
+
+Whether shedding is correct-but-starving (the circuit is doing its job protecting a
+saturated conductor, and the real lever is conductor capacity / batch sizing /
+in-wasm budget) or whether the shed scope is too broad (shedding the whole leg on
+3 consecutive call-level timeouts, when a smaller batch or a partial-progress
+carry-forward would let a 2175-row corpus drain across sweeps). Both fit the
+evidence. Note `batch_size=8` against a 15s per-attempt timeout, and that
+`HcClient::call_zome` is uncancellable — a caller-side timeout abandons work the
+conductor keeps doing, so retrying the same batch may be adding to the load it is
+reacting to. This is the decision the next shift should make explicitly rather
+than by tuning.
