@@ -5,6 +5,15 @@ through policy bindings — see `_BINDING_KEYS` / `expand_policies` in _lib/epr_
 (elohim/epr/src/measure.rs) is law — the last test reads the real serde config, not a copied
 constant, so it cannot pass on a drifted wire name.
 
+The `validate_meta` tests below cover INLINE manifest rules. `load_policies` is a SEPARATE
+gate covering the `.claude/epr-meta/policies.yaml` REGISTRY — the path that actually feeds the
+evaluator (resolve() -> merge_rules -> load_policies -> expand_policies -> evaluate). A manifest
+rule that BINDS a registry policy (`policy: <id>@<version>`) carries no `class`/`measure` of its
+own, so `validate_meta`'s `cls == "measure"` branch never sees it; only `load_policies`'s own
+measure-class check protects the registry path. The `test_registry_*` tests below cover that
+gate directly, built the way `load_policies` actually consumes it (a real
+`.claude/epr-meta/policies.yaml` file under a repo root, read via `load_policies(repo_root)`).
+
 Run: python3 -m pytest .claude/scripts/_lib/__tests__/epr_meta_measure_ontology_test.py -v
 """
 from __future__ import annotations
@@ -23,7 +32,18 @@ for _ in range(8):
     here = here.parent
 assert REPO is not None, "could not locate repo root (.claude/scripts/_lib) from test file"
 
+from _lib import epr_meta as _epr_meta  # noqa: E402
 from _lib.epr_meta import validate_meta  # noqa: E402
+
+
+def _registry_repo(tmp: Path, registry_yaml: str) -> Path:
+    """Write `registry_yaml` to `<tmp>/.claude/epr-meta/policies.yaml` — the exact path
+    `load_policies(repo_root)` reads (`POLICY_REGISTRY_REL`), mirroring the `_repo()` helper in
+    epr_meta_policy_test.py so the registry-path tests build their fixture the established way."""
+    reg = tmp / _epr_meta.POLICY_REGISTRY_REL
+    reg.parent.mkdir(parents=True, exist_ok=True)
+    reg.write_text(registry_yaml)
+    return tmp
 
 
 def test_measure_rule_without_kind_is_refused():
@@ -98,3 +118,55 @@ def test_kind_vocabulary_matches_the_rust_serde_names():
         f"Rust MeasureKind wire vocabulary {sorted(wire_names)} != YAML `kind:` vocabulary "
         f"{{'level', 'rate', 'ratio'}} — wire parity broken"
     )
+
+
+# ── Registry path (load_policies) — the gate `validate_meta` cannot reach, because a
+# `policy:`-binding manifest rule carries no `class`/`measure` of its own. ──
+
+def test_registry_measure_policy_without_kind_is_refused(tmp_path):
+    _registry_repo(tmp_path, """\
+epr-meta-policies-version: 1
+policies:
+  - id: no-kind-ceiling
+    version: 1
+    class: measure
+    scope: { write: "*.rs" }
+    measure: { loc-soft: 10, loc-hard: 20 }
+    why: too big.
+""")
+    pols, errs = _epr_meta.load_policies(tmp_path)
+    assert "no-kind-ceiling@1" not in pols, "a kind-less measure policy must NOT load"
+    assert any("kind" in e for e in errs), f"expected a kind advisory, got {errs}"
+
+
+def test_registry_measure_policy_rate_without_period_is_refused(tmp_path):
+    _registry_repo(tmp_path, """\
+epr-meta-policies-version: 1
+policies:
+  - id: churn-rate
+    version: 1
+    class: measure
+    scope: { write: "*.rs" }
+    measure: { kind: rate, loc-soft: 10, loc-hard: 20 }
+    why: churn.
+""")
+    pols, errs = _epr_meta.load_policies(tmp_path)
+    assert "churn-rate@1" not in pols, "a rate measure policy with no per: must NOT load"
+    assert any("per" in e for e in errs), f"expected a period advisory, got {errs}"
+
+
+def test_registry_measure_policy_well_formed_loads(tmp_path):
+    _registry_repo(tmp_path, """\
+epr-meta-policies-version: 1
+policies:
+  - id: loc-ceiling
+    version: 1
+    class: measure
+    scope: { write: "*.rs" }
+    measure: { kind: level, loc-soft: 10, loc-hard: 20 }
+    why: too big.
+""")
+    pols, errs = _epr_meta.load_policies(tmp_path)
+    assert errs == []
+    assert "loc-ceiling@1" in pols
+    assert pols["loc-ceiling@1"]["measure"]["kind"] == "level"

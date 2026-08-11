@@ -1362,6 +1362,24 @@ def load_policies(repo_root: Path) -> tuple[dict, list[str]]:
                             + (f" (non-integer: {bad})" if bad else "")
                             + " — it would measure nothing; NOT loaded")
                 continue
+            # L6: the registry loader is the path that actually feeds the evaluator
+            # (resolve() -> merge_rules -> load_policies -> expand_policies -> evaluate), and a
+            # manifest rule that BINDS a registry policy carries no `class`/`measure` of its own
+            # (only `_BINDING_KEYS`) — so validate_meta's `cls == "measure"` branch never sees a
+            # binding, only an inline rule. Skipping the kind check here would leave the registry
+            # as the one path where `kind` isn't required, undermining the very claim that
+            # `measure:` is policy-owned. Same failure mode as the loc-soft/loc-hard check above:
+            # append + NOT loaded, so a binding drops LOUD via expand_policies' unknown-policy
+            # path instead of silently un-enforcing.
+            kind = m.get("kind")
+            if kind not in MEASURE_KIND_VOCAB:
+                errs.append(f"policy `{key}` class `measure` needs `measure.kind` in "
+                            f"{sorted(MEASURE_KIND_VOCAB)} (got {kind!r}) — NOT loaded")
+                continue
+            if kind == "rate" and not m.get("per"):
+                errs.append(f"policy `{key}` `measure.kind: rate` requires `measure.per:` "
+                            f"(second|minute|hour|day|week|month|year) — NOT loaded")
+                continue
         stored_hash = pol.get("contentHash")
         if stored_hash:
             computed = policy_content_hash(pol)
