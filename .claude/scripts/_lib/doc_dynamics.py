@@ -74,12 +74,29 @@ def generation_absorption_ratio(window_days: int = 28, *, count_fn=_git_count) -
 
     # A LARGER absorption denominator gives a SMALLER ratio, so the bounds swap.
     value = ratio(generated, (lo_absorb + hi_absorb) / 2 if absorbed_counted else 0)
+    if absorbed_counted == 0:
+        # Fix round 1 (2026-08-11, operator-ruled): a multiplier-based widening
+        # scheme cannot produce width from a zero base — lo_absorb == hi_absorb
+        # == 0.0 collapses BOTH ratio() bounds onto the same den<=0 branch,
+        # producing a zero-width {inf, inf} interval. That asserts the ratio is
+        # EXACTLY infinite at the precise moment data is most absent, and is
+        # ill-formed under Interval::width() (inf - inf = NaN). Sealed law L3
+        # (elohim/epr/src/measure.rs Interval::unknown(), "the interval that
+        # admits everything") names the canonical shape for honest absence —
+        # mirror it. This APPLIES L3; it does not decide Q6 (whether a ratio's
+        # floor should be 0.0 rather than -inf) — Q6 stays open, [0, inf) is
+        # deliberately NOT implemented here.
+        interval = {"lo": float("-inf"), "hi": float("inf")}
+    else:
+        interval = {"lo": ratio(generated, hi_absorb), "hi": ratio(generated, lo_absorb)}
     return {
         "value": value,
         "kind": "ratio",
+        "generated": generated,
+        "absorbed_counted": absorbed_counted,
         "confidence": {
             "claim": "estimated",
-            "interval": {"lo": ratio(generated, hi_absorb), "hi": ratio(generated, lo_absorb)},
+            "interval": interval,
             "basis": (
                 f"generation witnessed from git log over {window_days}d "
                 f"({generated} added); absorption estimated from {absorbed_counted} "

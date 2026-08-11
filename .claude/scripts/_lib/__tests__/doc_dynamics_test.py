@@ -72,6 +72,27 @@ def test_zero_absorption_yields_an_unbounded_upper_interval():
     assert r["confidence"]["interval"]["hi"] == float("inf")
 
 
+def test_zero_absorption_interval_has_positive_width():
+    # Regression guard, fix round 1 (2026-08-11): lo_absorb == hi_absorb == 0
+    # when absorbed_counted == 0 used to collapse BOTH ratio() bounds onto the
+    # same den<=0 branch, producing a ZERO-WIDTH {inf, inf} interval — a claim
+    # of certainty at the exact moment data is most absent, and ill-formed
+    # under Interval::width() (inf - inf = NaN). The live shape test's
+    # `lo <= hi` alone would NOT have caught this (satisfied by equality), so
+    # this test asserts positive width specifically for the zero-absorption
+    # case. Sealed law L3 (elohim/epr/src/measure.rs Interval::unknown())
+    # requires this epistemic state to render as the interval that admits
+    # everything: lo=-inf, hi=+inf.
+    r = generation_absorption_ratio(window_days=28, count_fn=_fixture_counts(62, 0))
+    iv = r["confidence"]["interval"]
+    assert iv["lo"] == float("-inf")
+    assert iv["hi"] == float("inf")
+    assert iv["hi"] > iv["lo"], (
+        "zero-absorption interval must have positive (unbounded) width, "
+        "never collapse to a zero-width point"
+    )
+
+
 def test_live_ratio_has_well_formed_shape():
     """The one live test: calls the real git-backed implementation. Asserts
     only SHAPE (kind/claim/basis present, interval well-formed) — never a
