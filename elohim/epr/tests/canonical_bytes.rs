@@ -1,6 +1,7 @@
 use chrono::{TimeZone, Utc};
 use cid::Cid;
-use elohim_epr::{cid::compute_cid, Coupling, Envelope, EprKind, Reach, Signature};
+use elohim_epr::measure::*;
+use elohim_epr::{cbor, cid::compute_cid, Coupling, Envelope, EprKind, Reach, Signature};
 
 fn test_cid(b: u8) -> Cid {
     compute_cid(&[b])
@@ -176,4 +177,95 @@ fn reach_canonical_strings_for_all_variants() {
             json
         );
     }
+}
+
+// --- L2: confidence rides inside the canonical bytes (dag-cbor, not JSON) ---
+//
+// L2 is a claim about the content HASH: `cid.rs::compute_cid` hashes exactly
+// the dag-cbor bytes `cbor.rs` produces, so the assertion must run over that
+// path. A JSON assertion would prove nothing about the address itself — JSON
+// is not this crate's canonical-bytes contract.
+//
+// This does NOT exercise a typed `Quantity -> canonical bytes` entry point,
+// because none exists yet in this crate's own API (`cbor::encode` takes only
+// `&Ipld`, and every other canonical-bytes producer — `envelope.rs`,
+// `witness.rs` — hand-builds a `BTreeMap<String, Ipld>` first). What this
+// proves is narrower and still load-bearing: `serde_ipld_dagcbor`'s typed
+// serializer, invoked directly on `Quantity`, produces bytes that are
+// independently canonical by the crate's own `cbor::decode_strict` check —
+// and confidence is inside them. Wiring a typed entry point remains open
+// (see the spec's "What slice 2 inherits" section).
+
+fn quantity(confidence: Confidence) -> Quantity {
+    Quantity {
+        value: 12.0,
+        kind: MeasureKind::Level,
+        confidence,
+    }
+}
+
+#[test]
+fn quantity_canonical_bytes_are_dag_cbor_and_pass_the_crates_own_canonicality_check() {
+    let q = quantity(Confidence::estimated(
+        Interval::new(8.0, 16.0),
+        "3-week sample",
+    ));
+    let bytes = serde_ipld_dagcbor::to_vec(&q).expect("Quantity encodes to dag-cbor");
+
+    // decode_strict re-encodes the decoded Ipld and requires a byte-identical
+    // match against the input — this is the crate's own definition of
+    // "canonical." If the typed serializer ever drifted from that definition
+    // (e.g. producing non-shortest-form integers or unsorted map keys), this
+    // is where it would be caught.
+    cbor::decode_strict(&bytes).expect("typed Quantity encoding is canonical dag-cbor");
+}
+
+#[test]
+fn quantity_canonical_bytes_round_trip_through_dag_cbor() {
+    let q = quantity(Confidence::witnessed(
+        Interval::exact(12.0),
+        "wc -c on disk",
+    ));
+    let bytes = serde_ipld_dagcbor::to_vec(&q).unwrap();
+    let round_tripped: Quantity = serde_ipld_dagcbor::from_slice(&bytes).unwrap();
+    assert_eq!(round_tripped, q, "dag-cbor round trip must be lossless");
+}
+
+#[test]
+fn confidence_is_inside_the_canonical_bytes() {
+    // L2's real property: if two quantities differ ONLY in their confidence
+    // interval, their CANONICAL (dag-cbor, content-addressed) bytes must
+    // differ. If they collided, the interval would be a detachable sibling —
+    // narrowable after the fact without moving the quantity's own CID. Treat
+    // a failure here as a design bug in the ontology, not a test bug.
+    let wide = quantity(Confidence::estimated(
+        Interval::new(8.0, 16.0),
+        "3-week sample",
+    ));
+    let narrow = quantity(Confidence::estimated(
+        Interval::new(11.0, 13.0),
+        "3-week sample",
+    ));
+
+    let wide_bytes = serde_ipld_dagcbor::to_vec(&wide).unwrap();
+    let narrow_bytes = serde_ipld_dagcbor::to_vec(&narrow).unwrap();
+
+    // Both sides of the comparison must themselves be canonical, or the
+    // inequality below would prove nothing about the address space L2
+    // actually governs.
+    cbor::decode_strict(&wide_bytes).expect("wide-interval encoding is canonical");
+    cbor::decode_strict(&narrow_bytes).expect("narrow-interval encoding is canonical");
+
+    assert_ne!(
+        wide_bytes, narrow_bytes,
+        "confidence must be inside the canonical bytes, never a detachable sibling"
+    );
+
+    // And therefore the CIDs the crate would mint over these bytes differ too
+    // — this is the property L2 is actually named for.
+    assert_ne!(
+        compute_cid(&wide_bytes),
+        compute_cid(&narrow_bytes),
+        "quantities differing only in confidence must mint different CIDs"
+    );
 }

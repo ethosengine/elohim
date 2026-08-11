@@ -248,8 +248,107 @@ plan committed to building one, is written here instead of as a law.
   test suite and possibly elsewhere in this plan's later tasks. Slice 1 does not decide this
   either way; it is recorded so Task 6 (or whichever task next touches `measure.rs`'s public
   surface) does not silently narrow it without the tradeoff being named.
+- **Q9 — `Interval` has no invariants of its own, and this is reachable, not just theoretical.**
+  There is no `lo <= hi` check and no sign-consistency check anywhere in `measure.rs`;
+  `Interval::new(f64::INFINITY, f64::NEG_INFINITY)` constructs happily, as does any other
+  malformed pairing. The reachable consequence: a fold that sums a `(-∞)` bound against a `(+∞)`
+  bound produces `NaN`, not an error — `NaN` then silently satisfies neither `contains()` nor any
+  comparison, so a downstream consumer sees an interval that answers `false` to every containment
+  check rather than a visible failure. Today this is reachable only through a directly-constructed
+  malformed `Interval` (`Interval::new` performs no validation), never through any in-crate
+  constructor path — `Interval::exact`, `Interval::unknown`, and every `Confidence` constructor
+  build well-formed intervals. This is a distinct question from Q8: Q8 is scoped to
+  `Confidence`/`Quantity`'s public fields defeating `widen()`'s narrowing refusal; Q9 is about
+  `Interval` itself admitting a value with no ordering relationship between its own two bounds,
+  independent of who or what constructed it. What enforcement would look like, without choosing
+  one: a fallible `Interval::try_new(lo, hi) -> Result<Interval, IntervalError>` that rejects
+  `lo > hi` and non-finite-vs-finite sign mismatches, or accepting `new` as an unchecked
+  low-level constructor and pushing the check to whichever slice-2 fold first combines untrusted
+  intervals from separate peers. Slice 1 does not decide this.
+- **Q10 — a multiplier-based widening scheme can manufacture false precision at a zero base,
+  and the fix is a general mechanism, not a one-off.** Task 5's generation ÷ absorption ratio
+  computed a bound as `counted × [1.0, 3.0]`; when `counted == 0`, both `0 × 1.0` and `0 × 3.0`
+  evaluate to `0`, so the interval collapses to zero width at exactly the moment the underlying
+  count is least trustworthy — the false-precision failure this whole ontology exists to prevent,
+  and the opposite of what a multiplier-based widening scheme is supposed to produce. Task 5's own
+  zero case is fixed (mirroring `Interval::unknown()` when the base is zero rather than
+  multiplying through it), but the general mechanism this exposes is not scoped by any existing
+  question: **any `interval = scalar × [lo_mult, hi_mult]` construction is unsound at
+  `scalar == 0`, regardless of which measure family it is applied to**, because multiplication by
+  zero destroys the multiplier's width information rather than propagating it. This is distinct
+  from Q6, which asks only whether a ratio's floor should be `0` vs `-inf` and presupposes an
+  already-wide interval; Q10 is about the base-value case that makes the interval narrow (or
+  zero-width) in the first place, upstream of what its bounds should be. What a general fix looks
+  like without choosing one: a `Confidence::multiplier_widen(scalar, lo_mult, hi_mult)`-shaped
+  helper that special-cases `scalar == 0` (or any zero-crossing scalar) into `Interval::unknown()`
+  or an explicitly-justified fixed floor/ceiling, so each future multiplier-based fold does not
+  have to rediscover this failure independently. Slice 1 does not build this helper; it is
+  recorded as a mechanism, not just Task 5's instance of it.
 
-## 4. What this spec seals
+## 4. What slice 2 inherits — the network boundary, explicitly not crossed
+
+Slice 1 (Tasks 1–5 of the `2026-08-11-measure-ontology-slice1-epr-local-first` plan) proves the
+ontology holds *locally, single-peer, single-process*. A network rung — sync, gossip, rollup
+across peers — is a different set of guarantees, and this section states the line precisely so
+slice 2 does not have to re-derive what it may assume and what it must still build.
+
+**Inherited — slice 1 guarantees these hold locally, and slice 2 may build on them without
+re-proving them:**
+
+- Every quantity declares its kind (L1) — a rate cannot be constructed without its period.
+- A rate carries its period inside the same value as its magnitude (L1).
+- Confidence rides inside the canonical bytes at the *serializer* level (L2, per Task 6 Step 1's
+  guard: two quantities differing only in confidence produce different dag-cbor bytes, and
+  therefore different CIDs under `cid::compute_cid`).
+- Folds return intervals, not bare scalars, and take the weakest (widest) claim among their
+  inputs (L5, `elohim-epr-rea::fold::with_uncertainty`).
+- Honest absence is the degenerate interval — `Interval::unknown()` — not a nullable field or a
+  third state alongside measured/estimated (L3).
+- A `.epr-meta` measure-tier declaration without a `kind` is refused at the governance gate (L6),
+  so the network layer never has to reconcile an undeclared-kind quantity that slipped past local
+  policy.
+
+**NOT inherited — slice 2 must solve each of these before any network rung, none of them follow
+automatically from the local guarantees above:**
+
+1. **Per-fold anonymity.** A rollup over a sparse holon re-identifies its members — household
+   attribution is near-automatic for exactly the measures a network-wide orchestra most wants. A
+   k-anonymity floor or a differential-privacy noise budget is needed *per fold level*, and the
+   noise budget is itself a depleting stock that wants its own `kind: level` treatment. This
+   **blocks the network rung outright** — [commons-holonic-stewardship-backlog](epr:commons-holonic-stewardship-backlog)
+   row 10 names it as the unsolved half of row 9.
+2. **Correlation-aware interval arithmetic.** Slice 1's naive interval addition
+   (`[a,b] + [c,d] = [a+c, b+d]`, Q1) assumes perfect correlation between terms and therefore
+   over-widens for independent ones. Over-widening never manufactures false precision, so it is
+   safe to ship locally — but it is wasteful once a fold runs at network scale over genuinely
+   independent peer contributions, and a correlation-aware fold is explicitly slice-2 work that
+   must not be faked here.
+3. **Cross-peer determinism at a band edge.** The same ULP-exposure question the `bound_stock`
+   determinism decision names (algedonic-phase2 row 5): two peers computing the same fold over
+   the same inputs must not disagree on whether an interval crosses a threshold, and floating-point
+   interval arithmetic gives no structural guarantee of that today.
+4. **Statistical-method application at the ceiling.** Reconciling divergent estimates —
+   `ComputationAttestation` at a graduated-rigor tier, where a contested narrow interval escalates
+   a tier exactly as a contested clustering does — is elohim-ceiling discernment (Q2), not
+   substrate arithmetic. Slice 1 ships the inputs to that reconciliation; it never performs it.
+5. **Index lenses.** World3 / GNP / GDP / Donut / planetary-boundary lenses over the aggregate
+   dataset ([commons-holonic-stewardship-backlog](epr:commons-holonic-stewardship-backlog) rows 9
+   and 13) need items 1–4 above landed first — a lens over ungoverned anonymity, uncorrelated
+   arithmetic, non-deterministic band edges, and unreconciled contested estimates would just
+   launder those gaps into a headline number.
+
+**Also inherited as an open gap, not a guarantee — the missing typed entry point.** L2 above is
+proven at the *serializer* level (Task 6's guard test operates on
+`serde_ipld_dagcbor::to_vec(&quantity)` directly) but is explicitly **not wired** to this crate's
+own typed API: `cbor::encode` accepts only `&Ipld`, and there is still no
+`measure::canonical_bytes(&Quantity) -> Result<Vec<u8>>` (or equivalent `Ipld`-building function,
+mirroring `envelope.rs`/`witness.rs`'s hand-built `BTreeMap<String, Ipld>` pattern) anywhere in
+this crate. Slice 2 inherits this as unfinished, not as done: **no caller can compute or verify a
+`Quantity`'s own CID through the crate's public API today**, and any network-layer code that
+needs to address a measure by its canonical bytes must build (or wait for) that entry point
+first — it cannot assume the serializer-level proof already gives it a callable function.
+
+## 5. What this spec seals
 
 The six laws above, and no more, are canon as of this document: L1, L3, L4 (with its Q8 caveat)
 are enforced now by code that exists and is tested. L2 is proven at the dag-cbor serializer level
