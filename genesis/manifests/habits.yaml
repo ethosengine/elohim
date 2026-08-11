@@ -49,9 +49,18 @@
 #      candidate for held/, not for writing.
 #   6. Session contract: (a) move reds toward green with proof, (b) file new reds as
 #      runnable checks, (c) one-line delta here. Nothing else is a deliverable.
+#
+# BEST-OBSERVED RATCHET (2026-08-11, convention — not yet a numbered covenant rule; promoting
+# it is the operator's call). An optional `best_observed:` field beside `evidence:` records the
+# STRONGEST run a habit has ever had, alongside the LAST one. Meadows' way out of the *Drift to
+# Low Performance* trap: "keep performance standards absolute — even better, let standards be
+# enhanced by the BEST actual performances instead of being discouraged by the worst." We have a
+# documented eroding-goal channel (PVC-deferral makes "green" mean "deferred, not passed"), and
+# last-observed evidence cannot tell the two apart. A high-water mark makes a later weaker green
+# read as visibly weaker rather than equivalent. First subject: measure-honesty-local.
 
 version: 1
-updated: 2026-08-10
+updated: 2026-08-11
 vision: >
   A p2p backplane for a socially resilient, reach-gated substrate — a human-scale,
   capture-resistant foundation for communication that can scale to global
@@ -581,7 +590,25 @@ habits:
       - "cargo test (elohim/epr) — measure_ontology.rs (L1/L3/L4) + canonical_bytes.rs confidence_is_inside_the_canonical_bytes (L2, asserted at the CID level via compute_cid, not byte-inequality)"
       - "cargo test (elohim/epr-rea) — uncertainty_closure.rs, fold::with_uncertainty (L5); also covers the branch the plan never tested — two rates with DIFFERENT periods refuse to fold, since Period rides inside MeasureKind's derived PartialEq"
       - "python3 -m pytest .claude/scripts/_lib/__tests__/epr_meta_measure_ontology_test.py (L6 on BOTH gates — validate_meta for manifest rules and load_policies for registry policies, sharing one MEASURE_KIND_VOCAB — plus Rust/YAML kind-vocabulary parity read from measure.rs, not a copied constant)"
-      - "python3 -m pytest .claude/scripts/_lib/__tests__/doc_dynamics_test.py (Task 5's index applied to this repo's own corpus, incl. the zero-width regression guard)"
+      - "python3 -m pytest .claude/scripts/_lib/__tests__/doc_dynamics_test.py (the index applied to this repo's own corpus — slice 2 upgraded it from a bare ratio to a STOCK: level + inflow + outflow, declared window, in-place-rename discrimination, and the Q12/Q13 zero-absorption guards mirrored from the Rust)"
+      - "cargo test (elohim/epr) — measure_dimensional.rs: the dimensional algebra (MeasureKind::divide/combine_additive), Q12's sign check, Q10's multiplier_widen, and interval div/sub incl. the float-overflow case that manufactures +inf from two finite operands"
+      - "cargo test (elohim/epr-rea) — stock_dynamics.rs: Stock refuses every incoherent construction, turnover/net-change/emission-absorption/harvest-regeneration, and stock_over_window folded from real FlowEvents"
+      - "cargo test (elohim/eprfs) — flow_absorption.rs: the projection now mints the SINK (ReaVerb::Consume) and discriminates a move out of the value chain from an in-place rename against the recipe's stage globs"
+      - "python3 -m pytest .claude/scripts/_lib/__tests__/intervenor_retire_when_test.py (retire-when on both gates + the census, incl. the two-implementation hash-exclusion invariant with eprfs-meta/src/canonical.rs)"
+    best_observed: >
+      HIGH-WATER MARK, slice 2 (2026-08-11) — the ratchet Meadows prescribes for
+      *Drift to Low Performance*: "let standards be enhanced by the BEST actual
+      performances instead of being discouraged by the worst." `evidence:` records
+      LAST-observed, which cannot distinguish a genuinely green run from a
+      deferred-gate green (the documented PVC-deferral channel). This field
+      records the strongest run this habit has ever had, so a later weaker green
+      reads as visibly weaker rather than equivalent.
+      Best to date: 25 cargo test binaries green across elohim-epr + elohim-epr-rea
+      (0 failed), clippy -D warnings exit 0 and fmt --check exit 0 on both crates;
+      elohim-epr-cli + eprfs-meta full suites green with clippy 0 / fmt 0; 14
+      doc_dynamics + 14 intervenor + 10 epr_meta_measure_ontology python tests
+      passed. ALL GATES RUN, NONE DEFERRED — that last clause is the part the
+      ratchet exists to preserve.
     evidence: >
       GREEN 2026-08-11, verified on the merge tree (not an earlier run):
       cargo test (elohim/epr) 19 suites ok / 0 failed, clippy -D warnings and
@@ -600,6 +627,24 @@ habits:
       flag then emerged from the arithmetic with no change to the flag
       expression. Absorption in this repo is bursty, which is why the window
       matters: 28d → 63/0 (unknown); 90d → 318/98 (≈3.2).
+      HELD AND STRENGTHENED 2026-08-11 (slice 2): the vocabulary now has a
+      SPINE. Q12 and Q10 closed on the type (is_unknown gained its sign check,
+      so [+inf,+inf] no longer reports as honest absence; multiplier_widen
+      yields absence at a zero base); a dimensional algebra landed
+      (MeasureKind::divide/combine_additive) that makes the shipped
+      spatial_capacity.rs error non-silent — level ÷ rate now returns a TIME,
+      which cannot be read as a utilization; and interval div/sub route every
+      divide-by-a-band-admitting-zero to Interval::unknown() rather than +inf,
+      curing at the type what slice 1 patched at one call site. Its own test
+      found a case nobody had named: 1e300/1e-300 OVERFLOWS two finite operands
+      to exactly +inf, which now reports as [f64::MAX, +inf) — a bound we have,
+      not an infinity we claim. Live doc-corpus stock at close (328 live docs):
+      28d 64/0 → unknown; 90d 320/98 → 3.27 [1.09–3.27] with turnover 43wk
+      [14–43]; 365d 427/99 → 4.31 [1.44–4.31]. The 90d and 365d intervals lie
+      ENTIRELY above 1.0 — confirmed overshoot even at 3x the counted
+      absorption, which is a strictly stronger claim than the survey §6.2 rows
+      it replaces (those were levels against ceilings, and §6.2 is now
+      corrected in place).
     guard: >
       Regression risk = a future fold or index that special-cases its own
       zero denominator instead of reaching for the Interval::unknown() shape

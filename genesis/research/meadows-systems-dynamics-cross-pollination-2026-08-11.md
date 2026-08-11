@@ -274,6 +274,24 @@ Every ratio available is above 1.0. `MEMORY.md` is 38% over its own declared cei
 
 That is not a vibe. On Meadows' index it is a formal overshoot reading, and it is measured against *our own declared capacities*, which is the honest form.
 
+> **CORRECTION (2026-08-11, systems-discipline slice 2 — the instrument now disagrees with this section).** The conclusion survives; the proof above does not, and the reason is this survey's own §3.1 finding applied to itself.
+>
+> **Rows 1 and 2 are levels against ceilings, not rate ratios.** `MEMORY.md` bytes ÷ budget and cleanup pressure ÷ threshold are exactly the shape §3.2 diagnoses as a live defect in `spatial_capacity.rs` — a stock compared to a limit, presented as Meadows' index. Her index is a ratio *of two rates*, and its whole diagnostic power is that it is **leading**: it fires when the harvest rate first exceeds the regrowth rate, long before any stock is visibly over a line. A level over a ceiling fires only once the damage has already happened, which is the lagging signal her framing exists to replace. Writing them in the same column asserted a leading reading from lagging evidence.
+>
+> **The real rate ratio, measured (`_lib/doc_dynamics.py`, live on this repo, 2026-08-11):**
+>
+> | Window | Authored | Absorbed | emission/absorption | Interval | Turnover |
+> |---|---|---|---|---|---|
+> | 28d | 64 | 0 | **unknown** | `(-∞, +∞)` | unknown |
+> | 90d | 320 | 98 | **3.27** | `[1.09, 3.27]` | 43 wk `[14–43]` |
+> | 365d | 427 | 99 | **4.31** | `[1.44, 4.31]` | 173 wk `[58–173]` |
+>
+> This is a stronger finding than the one it replaces, in three ways. The **entire interval sits above 1.0** at both bounded windows — so the overshoot holds even at the most generous absorption estimate (3× the counted events, allowing for in-place compaction no ledger sees), rather than resting on a central value with a band straddling the line. It is a **corpus-level stock of 328 live docs** with a measured turnover of 43 weeks at best 14 — the quantity §6.4 argues is the one that separates dynamic equilibrium from silting, and which no level-against-ceiling can produce. And the 28-day row is **honestly unknown rather than infinite**: zero counted absorption is an absence, and the instrument now says so instead of reporting `+∞` and comparing `> 1.0` to true.
+>
+> Two smaller corrections fall out. Row 6 ("Docs in `held/`: 2") understated the outflow — it counted the standing `held/` population, not the *flow* out of the corpus, which is 98 absorption events over 90 days. Same level/rate confusion, opposite direction. And the burstiness is now visible rather than hidden: 98 of the 99 all-time absorption events fall inside 90 days, so **the window is doing more work than the arithmetic**, which is why the instrument reports several and why §6.2's single implied window was never a neutral choice.
+>
+> The `spatial_capacity.rs` defect and this section's error are the same error, and only one of them was in code. That is the argument for L1 being a type rather than a convention.
+
 ### 6.3 The respite/response reading — and why "try harder" is not on the menu
 
 Her controllability index applied here: the problem's growth rate is *new specs, plans, ledger entries, and memories authored per week*; the response rate is *decompose-to-zero-residue, compaction, and held/ moves completed per week*. The un-captured backlog at 146 of 307 and the 7 past-due decompositions say the ratio is well above 1.

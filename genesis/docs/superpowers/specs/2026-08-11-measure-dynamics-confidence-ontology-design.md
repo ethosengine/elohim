@@ -364,6 +364,45 @@ plan committed to building one, is written here instead of as a law.
   measure` rule must carry an actual bound/quantity, or whether a bare `kind:` declaration with no
   bound is a legitimate lighter-weight use of the class, is a design decision this slice does not
   make.
+- **Q15 — a derived duration forgets the period it is denominated in.** (Raised by the
+  systems-discipline slice, 2026-08-11.) `MeasureKind::divide` returns `Level` for `Level ÷ Rate`
+  — turnover and coverage time — but the period the result is counted in survives only in the
+  caller's `basis` string, never in the type. A turnover time of `43` is 43 *weeks* or 43 *years*
+  depending on a divisor the result no longer carries, which is a weaker form of the exact
+  forgetting `Rate { per }` exists to prevent: L1 made a rate unable to lose its denominator, and
+  then the first derived quantity we built loses it again one operation later. What a fix looks
+  like without choosing one: a `Duration { per }` variant, a `Level { per: Option<Period> }`
+  widening, or accepting that a duration's unit is a caller concern and enforcing it in the basis.
+  Minting protocol vocabulary is not an implementer's call, so this is recorded rather than fixed.
+- **Q16 — the algebra catches dimension but not COMMENSURABILITY, and a live composite index
+  exploits the gap.** (Raised 2026-08-11, applying the ontology to the memory kit's own signals.)
+  `MeasureKind::combine_additive` refuses `Level + Rate` and refuses two rates of different
+  periods — a genuine dimensional guard. It cannot refuse
+  `_lib/drift_score.py`'s `1.0×(days/90) + 0.8×log1p(scope_edits) + 2.0×log1p(direct_edits) +
+  5.0×log1p(structural_edits)`, because **every term is dimensionless**: a ratio of durations and
+  a log of a count both reduce to `Ratio`, and `Ratio + Ratio` is legal by construction.
+
+  Dimensionless is not the same as commensurable. Normalized time and log-transformed edit counts
+  share no scale, so the weighted sum is a preference ordering wearing a quantity's clothes, and
+  its threshold (`3.0`) has no interpretation a reader could argue with. This is Meadows' GNP
+  critique exactly — an index whose value theory is buried can only be accepted or rejected, never
+  argued with, and both are failures of deliberation (Indicators; her criteria demand *hierarchical*
+  indicators "so a user can delve down to details if desired"). Our own comparative-political-economy
+  trap library reached the same rule from the other side: prefer observable mechanisms to imputed
+  aggregates.
+
+  The gap is **not closed by more `MeasureKind` variants** — it is a different axis. Sketches, none
+  chosen: a `unit:` or `scale:` tag alongside `kind` with addition requiring equality; a distinct
+  `Composite` kind that is *constructible* but refuses to be compared against a threshold without a
+  declared calibration; or accepting composites as legitimate ranking keys and enforcing that they
+  publish their terms (the hierarchical-indicator requirement) rather than a bare scalar.
+
+  Interim discipline, applied rather than merely proposed: every composite in the memory kit now
+  declares `claim: modelled` with an **unknown interval** and a basis naming its terms and their
+  weights — `drift_score.measure()`, `placement-audit --stasis --json`'s `measure` block, and
+  `story-coverage-audit`'s `leverage_measure`. That does not make them commensurable; it makes the
+  incoherence *readable at the point of use* instead of hidden behind a number, which is the most
+  an ontology can do before the design decision is made.
 
 ## 4. What slice 2 inherits — the network boundary, explicitly not crossed
 
@@ -434,6 +473,6 @@ The six laws above, and no more, are canon as of this document: L1, L3, L4 (with
 L5, and L6 (enforced on both the manifest and registry `.epr-meta` paths) are enforced now by
 code that exists and is tested. L2 is proven at the dag-cbor serializer level and explicitly not
 yet wired to a typed `Quantity` entry point — §4 names that gap as an explicit slice-2
-inheritance, not a task this plan still owes. Q1–Q14 are recorded as open rather than smuggled in
+inheritance, not a task this plan still owes. Q1–Q16 are recorded as open rather than smuggled in
 as unenforced laws. Tasks 3–6 built against this vocabulary; nothing downstream should re-litigate
 L1–L6 without citing back here.
