@@ -120,8 +120,10 @@ producing a new observation to justify the tighter bound.
 (`measure.rs:122-131`), which succeeds iff `self.interval.is_widened_by(&to)`
 (`measure.rs:70-72` — true iff `other.lo <= self.lo && other.hi >= self.hi`, i.e. the argument
 interval is at least as wide as the receiver on both sides), and otherwise returns
-`Err(ConfidenceError::NarrowingRefused)` (`measure.rs:95-96`). Test:
-`widening_is_free_and_narrowing_is_refused` (`tests/measure_ontology.rs:23-36`).
+`Err(ConfidenceError::NarrowingRefused)` at `measure.rs:129` (the `NarrowingRefused` variant
+itself, carrying the message "narrowing an interval requires a new observation, not a mutation",
+is defined at `measure.rs:93-97`). Test: `widening_is_free_and_narrowing_is_refused`
+(`tests/measure_ontology.rs:23-36`).
 
 Naming note: the method is `is_widened_by`, not `is_widening_of` as an earlier plan draft called
 it. The earlier name read backwards — the body returns `true` when the *argument* widens the
