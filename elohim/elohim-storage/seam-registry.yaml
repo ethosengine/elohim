@@ -78,12 +78,29 @@ decisionPoints:
           Pure predicate over four booleans — no loop, no retry ladder, no conductor call;
           the sweeps that consume its Author verdict keep their existing per-tick caps and
           wall-clock budgets unchanged.
+      - id: C8
+        status: answered
+        justification: >
+          BOTH paths are metered. The positive verdict increments
+          elohim_content_ghost_decay_author_total (+ a WARN naming the falsified
+          declaration); the refusal increments elohim_content_ghost_decay_blocked_total{leg}
+          under a closed typed vocabulary (metrics::GhostDecayBlockedLeg — disabled ·
+          local_not_observed_absent · local_election_stands · no_live_advertiser ·
+          evidence_not_stood, all pre-touched) plus a per-row DEBUG carrying every leg input.
+          Closed 2026-08-11 after the overnight soak: three pods held zero decay-authors for
+          17h with no way to separate a missing flag from evidence starvation from a dwell
+          still running — four different operator actions behind one silence. The classifier
+          is pinned to the predicate over the full 2^5 input space so the meter can never
+          explain a behaviour the arm does not have.
     contractTests:
       - path: elohim/elohim-storage/src/services/head_adoption.rs
         testName: ghost_decay_is_dormant_by_default
         kind: unit
       - path: elohim/elohim-storage/src/services/head_adoption.rs
         testName: ghost_decay_requires_every_positive_observation
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: ghost_decay_blocked_leg_agrees_with_the_predicate
         kind: unit
   - name: decide_head_action
     kind: pure-decision-predicate

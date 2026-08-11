@@ -1171,6 +1171,55 @@ pub fn ghost_decay_authorizes_author(
         && evidence_absent_stood
 }
 
+/// WHICH leg of [`ghost_decay_authorizes_author`] blocked — `None` when the arm
+/// authorizes. The observability twin of the predicate, over the same inputs.
+///
+/// A conjunction that refuses says nothing about WHY on its own, and the four
+/// refusal causes call for four different operator actions: `disabled` means the
+/// flag never reached this pod (redeploy), `local_election_stands` means the row
+/// is settled (nothing to do), `no_live_advertiser` means no peer is advertising
+/// the declaration this sweep (a SUPPLY question — the standing state of the
+/// DHT-anchor-gap corpus), and `evidence_not_stood` means the dwell is still
+/// running (wait). Without this the four are one silence, and a pod draining no
+/// phantoms is indistinguishable from a pod that was never asked to.
+///
+/// Legs are reported in the predicate's own evaluation order, so the label names
+/// the FIRST unmet condition rather than an arbitrary one of several; that order
+/// is also triage order (a disabled pod's other legs are not worth reading).
+///
+/// **Concerns:** C8 (observability-per-decision — every refusal is counted under
+/// a typed label); C6a (pure, allocation-free, no loop — safe to call per row on
+/// a full-corpus sweep).
+///
+/// **Contract test:** [`tests::ghost_decay_blocked_leg_agrees_with_the_predicate`]
+/// pins the two functions to the same verdict across the whole 2^5 input space,
+/// so the meter can never disagree with the behaviour it explains.
+pub fn ghost_decay_blocked_leg(
+    decay_enabled: bool,
+    local_head_observed_absent: bool,
+    local_has_canonical_election: bool,
+    peer_declared_now: bool,
+    evidence_absent_stood: bool,
+) -> Option<crate::metrics::GhostDecayBlockedLeg> {
+    use crate::metrics::GhostDecayBlockedLeg as Leg;
+    if !decay_enabled {
+        return Some(Leg::Disabled);
+    }
+    if !local_head_observed_absent {
+        return Some(Leg::LocalNotObservedAbsent);
+    }
+    if local_has_canonical_election {
+        return Some(Leg::LocalElectionStands);
+    }
+    if !peer_declared_now {
+        return Some(Leg::NoLiveAdvertiser);
+    }
+    if !evidence_absent_stood {
+        return Some(Leg::EvidenceNotStood);
+    }
+    None
+}
+
 /// What the caller should do with this id after the pre-flight ran.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AdoptOutcome {
@@ -1304,13 +1353,33 @@ pub async fn try_adopt_canonical_head(
             crate::config::ghost_decay_min_dwell(),
             crate::services::contest_backoff::BackoffWindows::from_config(),
         );
-        if ghost_decay_authorizes_author(
+        // The refusal path is metered too: a pod that decays nothing must say
+        // which leg held it, or "no phantoms drained here" is indistinguishable
+        // from "the arm was never live here" (the 2026-08-11 soak read, where
+        // three pods sat at zero decay-authors over 17h with no way to tell
+        // starvation from a missing flag).
+        if let Some(leg) = ghost_decay_blocked_leg(
             crate::config::ghost_declaration_decay_enabled(),
             local_head_observed_absent,
             local_election,
             hint.is_some(),
             evidence_absent_stood,
         ) {
+            crate::metrics::inc_ghost_decay_blocked(leg);
+            tracing::debug!(
+                target: "elohim_storage::head_adoption",
+                content_id = %id,
+                decision = ?decision,
+                blocked_leg = ?leg,
+                decay_enabled = crate::config::ghost_declaration_decay_enabled(),
+                local_head_observed_absent,
+                local_election,
+                peer_declared_now = hint.is_some(),
+                evidence_absent_stood,
+                "ghost-declaration-decay: considered and refused — the row stays held \
+                 (see blocked_leg for which evidence is missing)"
+            );
+        } else {
             crate::metrics::inc_ghost_declaration_decay_author();
             tracing::warn!(
                 target: "elohim_storage::head_adoption",
@@ -2647,6 +2716,45 @@ mod tests {
             !ghost_decay_authorizes_author(true, true, false, true, false),
             "no stood stated-absent verdict (fresh or absent) must not decay"
         );
+    }
+
+    /// The meter may never disagree with the behaviour it explains: over the
+    /// FULL 2^5 input space, `ghost_decay_blocked_leg` reports `None` exactly
+    /// when `ghost_decay_authorizes_author` authorizes, and names a leg whose
+    /// input is genuinely unmet otherwise. A drifted classifier would be worse
+    /// than no meter — it would send an operator to redeploy a pod whose flag
+    /// was fine.
+    #[test]
+    fn ghost_decay_blocked_leg_agrees_with_the_predicate() {
+        use crate::metrics::GhostDecayBlockedLeg as Leg;
+        for bits in 0u8..32 {
+            let enabled = bits & 1 != 0;
+            let absent = bits & 2 != 0;
+            let election = bits & 4 != 0;
+            let hint = bits & 8 != 0;
+            let stood = bits & 16 != 0;
+
+            let authorized = ghost_decay_authorizes_author(enabled, absent, election, hint, stood);
+            let leg = ghost_decay_blocked_leg(enabled, absent, election, hint, stood);
+
+            assert_eq!(
+                authorized,
+                leg.is_none(),
+                "predicate/leg disagreement at (enabled={enabled}, absent={absent}, \
+                 election={election}, hint={hint}, stood={stood})"
+            );
+
+            // The named leg must be a genuinely unmet input, not merely the
+            // first one the match happened to reach.
+            match leg {
+                None => {}
+                Some(Leg::Disabled) => assert!(!enabled),
+                Some(Leg::LocalNotObservedAbsent) => assert!(!absent),
+                Some(Leg::LocalElectionStands) => assert!(election),
+                Some(Leg::NoLiveAdvertiser) => assert!(!hint),
+                Some(Leg::EvidenceNotStood) => assert!(!stood),
+            }
+        }
     }
 
     // ── C4 contract: LocalResolve on seam_contracts::Answer (plan P1.2) ──

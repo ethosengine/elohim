@@ -290,6 +290,27 @@ lazy_static! {
     )
     .unwrap();
 
+    /// The NEGATIVE twin of [`GHOST_DECLARATION_DECAY_AUTHOR`]: Hold/Contest
+    /// decisions the decay arm considered and did NOT release, by the leg that
+    /// blocked (`head_adoption::ghost_decay_blocked_leg`).
+    ///
+    /// A silent `_author_total` is ambiguous on its own — a pod draining no
+    /// phantoms looks identical whether the flag never reached it, its rows are
+    /// settled, no peer advertises them this sweep, or the advertiser evidence
+    /// has not yet stood the dwell. Those are four different operator actions
+    /// (redeploy · nothing · supply · wait), so the refusal reason is counted
+    /// rather than inferred. `disabled` counting up IS a pod running without the
+    /// flag; `evidence_not_stood` climbing while `author_total` is flat is the
+    /// dwell doing its job, not a stall.
+    pub static ref CONTENT_GHOST_DECAY_BLOCKED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_content_ghost_decay_blocked_total",
+            "Hold/Contest decisions the ghost-declaration decay arm did not release, by blocking leg.",
+        ),
+        &["leg"],
+    )
+    .unwrap();
+
     /// Content heads freshly authored through the conductor by the sweep-driven
     /// witness-bootstrap step — bulk-seeded rows born un-witnessed
     /// (`dht_anchor_hash` NULL) that now carry a notarized head. Counts fresh
@@ -1588,6 +1609,15 @@ pub fn register_all() {
             }
         }
         let _ = REGISTRY.register(Box::new(GHOST_DECLARATION_DECAY_AUTHOR.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_GHOST_DECAY_BLOCKED.clone()));
+        {
+            use seam_contracts::ReasonLabel as _;
+            for leg in GhostDecayBlockedLeg::ALL {
+                CONTENT_GHOST_DECAY_BLOCKED
+                    .with_label_values(&[leg.label()])
+                    .inc_by(0);
+            }
+        }
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_AUTHORED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_HEAD_ADOPTED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_CANONICAL_ANSWERS.clone()));
@@ -2140,6 +2170,70 @@ pub fn add_content_witness_authored(n: u64) {
 /// decay (see `head_adoption::ghost_decay_authorizes_author`).
 pub fn inc_ghost_declaration_decay_author() {
     GHOST_DECLARATION_DECAY_AUTHOR.inc();
+}
+
+/// Why the ghost-declaration decay arm did NOT release a Hold/Contest — the
+/// label vocabulary of [`CONTENT_GHOST_DECAY_BLOCKED`], as a closed type.
+///
+/// One label per leg of `head_adoption::ghost_decay_authorizes_author`, in the
+/// predicate's own evaluation order — which is also the operator's triage order:
+/// a pod that never got the flag is a different problem from a corpus whose
+/// advertisers have gone quiet.
+///
+/// **Concerns:** C8 (observability-per-decision — the refusal reason is a typed
+/// label, never a raw string, and the vocabulary enumerates itself so every
+/// series is pre-touched and a typo cannot mint a sixth).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GhostDecayBlockedLeg {
+    /// `ELOHIM_GHOST_DECLARATION_DECAY` is off on this pod — the arm is dormant
+    /// by operator decision. Behaviour-identical to the pre-decay build.
+    Disabled,
+    /// The own conductor did not ANSWER empty for this id this sweep (it
+    /// answered with a head, or was unreachable/unprobed — neither is the
+    /// positive local absence C4 requires).
+    LocalNotObservedAbsent,
+    /// The row obeys a local canonical election: it is settled, never decayed.
+    LocalElectionStands,
+    /// No peer advertised a declared head for this id in this sweep's hint
+    /// window — there is no live declaration to falsify, and stale ledger
+    /// hearsay alone must never fire the arm.
+    NoLiveAdvertiser,
+    /// A live advertiser states no record, but that verdict has not yet STOOD
+    /// the decay dwell (`config::ghost_decay_min_dwell`). The expected steady
+    /// state for a corpus still inside its dwell — waiting, not stuck.
+    EvidenceNotStood,
+}
+
+impl seam_contracts::ReasonLabel for GhostDecayBlockedLeg {
+    const ALL: &'static [Self] = &[
+        GhostDecayBlockedLeg::Disabled,
+        GhostDecayBlockedLeg::LocalNotObservedAbsent,
+        GhostDecayBlockedLeg::LocalElectionStands,
+        GhostDecayBlockedLeg::NoLiveAdvertiser,
+        GhostDecayBlockedLeg::EvidenceNotStood,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            GhostDecayBlockedLeg::Disabled => "disabled",
+            GhostDecayBlockedLeg::LocalNotObservedAbsent => "local_not_observed_absent",
+            GhostDecayBlockedLeg::LocalElectionStands => "local_election_stands",
+            GhostDecayBlockedLeg::NoLiveAdvertiser => "no_live_advertiser",
+            GhostDecayBlockedLeg::EvidenceNotStood => "evidence_not_stood",
+        }
+    }
+}
+
+/// Record one Hold/Contest decision the decay arm considered and did not
+/// release, by the leg that blocked it.
+///
+/// **Concerns:** C8 — the negative path is as visible as the positive one, so a
+/// pod draining no phantoms says WHY rather than going silent.
+pub fn inc_ghost_decay_blocked(leg: GhostDecayBlockedLeg) {
+    use seam_contracts::ReasonLabel as _;
+    CONTENT_GHOST_DECAY_BLOCKED
+        .with_label_values(&[leg.label()])
+        .inc();
 }
 
 /// Record one canonical head ADOPTED (own-conductor resolve, or a peer's head
