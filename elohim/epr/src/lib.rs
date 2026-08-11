@@ -34,6 +34,7 @@ pub mod epr;
 pub mod error;
 pub mod generated;
 pub mod kind;
+pub mod measure;
 pub mod proof;
 pub mod reach;
 pub mod signature;
