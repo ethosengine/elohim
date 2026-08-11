@@ -47,7 +47,11 @@ export interface PeerCapacityView {
     compliantWithDonut: boolean;
     violations: {
       tier: 'commons' | 'dwelling' | 'collective' | 'free';
-      violationKind: 'below_floor' | 'above_ceiling' | 'below_manifest_target' | 'above_manifest_target';
+      violationKind:
+        | 'below_floor'
+        | 'above_ceiling'
+        | 'below_manifest_target'
+        | 'above_manifest_target';
       currentPct: number;
       boundPct: number;
     }[];

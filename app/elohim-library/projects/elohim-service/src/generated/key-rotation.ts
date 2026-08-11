@@ -10,7 +10,12 @@ export interface KeyRotationView {
   newAgentPubkey: string;
   supersededAgentPubkey: string;
   recoveryRequestHash: string;
-  authorityKind: 'intimateQuorum' | 'communityConsensus' | 'governanceAct' | 'networkWitness' | 'cryptographicQuorum';
+  authorityKind:
+    | 'intimateQuorum'
+    | 'communityConsensus'
+    | 'governanceAct'
+    | 'networkWitness'
+    | 'cryptographicQuorum';
   authorityJson: string;
   rotatedAt: string;
 }

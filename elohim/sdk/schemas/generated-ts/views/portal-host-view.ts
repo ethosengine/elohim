@@ -4,7 +4,15 @@
 /**
  * M5 ships only 'trusted'
  */
-export type Reach = 'private' | 'self' | 'intimate' | 'trusted' | 'familiar' | 'community' | 'public' | 'commons';
+export type Reach =
+  | 'private'
+  | 'self'
+  | 'intimate'
+  | 'trusted'
+  | 'familiar'
+  | 'community'
+  | 'public'
+  | 'commons';
 
 /**
  * Source of truth: DHT (Notarized, Category A). PortalHost declares URLs authorized to render this human's auth portal. Anchored on the Human entry's ActionHash so portal hosts survive KeyRotation. M5 ships only reach=trusted.

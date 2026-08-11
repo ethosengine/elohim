@@ -17,7 +17,15 @@ export type EprKind =
 /**
  * Content reach/visibility level. Ordered from most restrictive to most open. Source of truth: DNA-notarized CORE_REACH_LEVELS constant in content_store_integrity zome. Category A — enumeration values are part of the protocol vocabulary enforced by gateways without parsing payload.
  */
-export type Reach = 'private' | 'self' | 'intimate' | 'trusted' | 'familiar' | 'community' | 'public' | 'commons';
+export type Reach =
+  | 'private'
+  | 'self'
+  | 'intimate'
+  | 'trusted'
+  | 'familiar'
+  | 'community'
+  | 'public'
+  | 'commons';
 
 /**
  * Source of truth: EPR atom (self-notarized via content-address + Ed25519). Wire-string projection of Envelope for HTTP consumers. CIDs are CIDv1 base32 strings. Category A — notarized via content-derived CID + signer proof.
