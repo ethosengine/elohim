@@ -39,8 +39,10 @@ replication: ReplicationStatus,
  */
 drain: DrainStatusInfo | null, 
 /**
- * Acquisition pull-queue rollup — None when state cannot be computed.
- * Consumers treat None as "keep waiting", NEVER as caught up (spec §4.3).
+ * Acquisition pull-queue rollup — None until the first local active-pin ×
+ * presence reconcile completes. Some(total=0) means that reconcile ran and
+ * observed no active desired items. Consumers treat None as "keep waiting",
+ * NEVER as caught up (spec §4.3).
  */
 pull: PullStatusInfo | null, 
 /**

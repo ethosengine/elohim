@@ -4,23 +4,11 @@
 /**
  * Kind of server-side renderer a doorway carries. Reserved values are valid claim values; only `angular-ssr` is implemented in elohim-render today. Source of truth: doorway runtime (Category C operational). Not a DHT entry type.
  */
-export type RendererKind =
-  | 'angular-ssr'
-  | 'react-rsc'
-  | 'vue-ssr'
-  | 'svelte-ssr'
-  | 'lit-ssr'
-  | 'static-html';
+export type RendererKind = 'angular-ssr' | 'react-rsc' | 'vue-ssr' | 'svelte-ssr' | 'lit-ssr' | 'static-html';
 /**
  * Kind of server-side renderer a doorway carries. Reserved values are valid claim values; only `angular-ssr` is implemented in elohim-render today. Source of truth: doorway runtime (Category C operational). Not a DHT entry type.
  */
-export type RendererKind1 =
-  | 'angular-ssr'
-  | 'react-rsc'
-  | 'vue-ssr'
-  | 'svelte-ssr'
-  | 'lit-ssr'
-  | 'static-html';
+export type RendererKind1 = 'angular-ssr' | 'react-rsc' | 'vue-ssr' | 'svelte-ssr' | 'lit-ssr' | 'static-html';
 
 /**
  * Source of truth: auto-derived at doorway startup from on-disk bundles intersected with elohim-storage's manifest of SSR-eligible routes (Operational, Category C). doorway-config.toml may reduce the claim but never inflate it. Layered into PeerStatusView via build_peer_status_view, mirroring the elohimCapability pattern. NOT a DHT entry.

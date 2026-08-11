@@ -4,11 +4,4 @@
 /**
  * Protocol substrate signal categories. Every app signal maps to one of these primitives. These are the resource dimensions the protocol tracks and governs.
  */
-export type SubstrateSignal =
-  | 'attention'
-  | 'compute'
-  | 'storage'
-  | 'bandwidth'
-  | 'energy'
-  | 'time'
-  | 'resource';
+export type SubstrateSignal = 'attention' | 'compute' | 'storage' | 'bandwidth' | 'energy' | 'time' | 'resource';

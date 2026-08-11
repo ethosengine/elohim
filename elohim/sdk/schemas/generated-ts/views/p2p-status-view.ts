@@ -74,7 +74,7 @@ export interface P2PStatusView {
    */
   placementGapsEmittedTotal: number;
   /**
-   * Acquisition pull-queue rollup. null when state cannot be computed — treat as 'keep waiting', NEVER as caught up (spec §4.3).
+   * Acquisition pull-queue rollup. null until a local active-pin × presence reconcile completes — treat as 'keep waiting', NEVER as caught up. Once non-null, total=0 is an observed empty desired set (spec §4.3).
    */
   pull?: {
     total: number;
