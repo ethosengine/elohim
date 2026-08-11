@@ -191,6 +191,15 @@ _KNOWN_RULE_KEYS = {"id", "class", "why", "when", "max-files", "measure",
 _POLICY_REF_RE = re.compile(r"^[a-z0-9][a-z0-9-]*@\d+$")
 _BINDING_KEYS = {"id", "policy", "params", "when", "why"}
 
+# Measure ontology (elohim/epr/src/measure.rs MeasureKind, `#[serde(tag = "kind",
+# rename_all = "lowercase")]`): a `class: measure` rule's `kind` lives INSIDE its `measure:`
+# block, never at the rule top level — `measure:` is the policy-owned semantics block (merged
+# through `expand_policies`, `:1404-1405`) and a top-level `kind:` would be undeclarable by a
+# policy-binding rule (`_BINDING_KEYS` above admits only id/policy/params/when/why). Nested, it
+# is inherited through the existing merge like every other measure default, with `params` for
+# local variance. A `rate` cannot forget its denominator — it must carry `per:`.
+MEASURE_KIND_VOCAB = {"level", "rate", "ratio"}
+
 
 def validate_meta(cfg: dict) -> list[str]:
     """Hand-rolled, stdlib-only check against the schema contract. [] = valid.
@@ -247,6 +256,20 @@ def validate_meta(cfg: dict) -> list[str]:
             errs.append(f"rules[{i}] (`{rid}`) carries multiple actionable predicates {actionable} "
                         f"— only one predicate per rule is evaluated (first-match wins); split into "
                         f"separate rules")
+        if cls == "measure":
+            m = rule.get("measure") if isinstance(rule.get("measure"), dict) else {}
+            kind = m.get("kind")
+            if kind is None:
+                errs.append(
+                    f"rules[{i}] (`{rid}`): a measure rule must declare kind: "
+                    f"level|rate|ratio (L6) — an undeclared kind is how a rate gets "
+                    f"compared to a cumulative level")
+            elif kind not in MEASURE_KIND_VOCAB:
+                errs.append(f"rules[{i}] (`{rid}`): unknown kind {kind!r}; expected one of "
+                            f"{sorted(MEASURE_KIND_VOCAB)}")
+            elif kind == "rate" and not m.get("per"):
+                errs.append(f"rules[{i}] (`{rid}`): kind: rate requires per: "
+                            f"(second|minute|hour|day|week|month|year)")
     for i, v in enumerate(cfg.get("validators", []) or []):
         if not isinstance(v, dict) or "ref" not in v:
             errs.append(f"validators[{i}] missing `ref`")
