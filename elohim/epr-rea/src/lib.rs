@@ -18,6 +18,15 @@
 //! commitment's own CID, and projected per-promise by [`store::FlowStore::open_pain`]. A promise
 //! that declared no bound is never in pain — honest absence, not a zero.
 //!
+//! **Stocks and flows** ([`stock`]) are the dynamics layer over the same events: a level with
+//! what fills and drains it, plus the derived quantities that separate dynamic equilibrium from
+//! silting (turnover time) and name overshoot before it is visible (the emission/absorption and
+//! harvest/regeneration indices, and the respite/response controllability ratio). Where the
+//! `Bound` above is a ceiling on a promise, a stock is the physics the promise sits inside —
+//! Beer's regulator and Meadows' plant, in one crate. Derived like everything else here: a
+//! stock is never stored, so two peers folding the same events mint the same stock with no
+//! shared clock.
+//!
 //! Resource is NOT an entity: anything content-addressed is a resource; resource *state*
 //! is a pure fold over event history ([`fold`]). Granularity is scale-free here — what
 //! *should* be metered is a governance decision bound via `.epr-meta`, never a constant
@@ -31,6 +40,7 @@ pub mod epistemic;
 pub mod error;
 pub mod fold;
 pub mod model;
+pub mod stock;
 pub mod store;
 pub mod walk;
 
@@ -45,6 +55,7 @@ pub use model::{
     FlowEvent, Governor, Intent, PinnedRef, Process, ProcessSpec, ResourceSpec, StageSpec,
     ValidatorRef,
 };
+pub use stock::{respite_response, stock_over_window, Stock, StockError, Window};
 pub use store::{FlowRecord, FlowStore, MemoryFlowStore, SidecarFlowStore};
 pub use walk::{FlowWalk, Frontier, Lineage};
 
