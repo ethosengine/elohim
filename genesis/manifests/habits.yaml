@@ -202,6 +202,27 @@ habits:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
       - "sweettest rea_commitment_replication (elohim/holochain/tests/sweettest — unignored 837b772c9; isolated late-join conductors, bounded 60s peer-B retrieval; RED but MIS-ATTRIBUTED per DELTA 2026-08-09 — it measures one-time cold-cell Wasm warm-up, not REA retrieval; do not read it as a fetch-seam probe until it warms peer B)"
     evidence: >
+      DELTA 2026-08-11 (decay-reach measured, edge #1341 deployed): the
+      overnight soak's open question — why susan/eve/gertrude authored ZERO
+      decays in 17h while holding the largest phantom cohorts — is answered,
+      and BOTH standing hypotheses are refuted. New meter
+      elohim_content_ghost_decay_blocked_total{leg} (the refusal twin of
+      decay_author_total; 5 pre-touched legs) reads, ~2.5h post-restart:
+      leg="disabled" is 0 on ALL SEVEN pods, so the flag is live fleet-wide —
+      it is NOT a missing-flag/deploy problem. Nor is the predicate
+      evidence-starved: it is barely CONSULTED on the shem side. Total
+      considerations vs known_divergent{content} held: matthew 169/11,
+      jessica 28/0, james 12/0, susan 2/1660, gertrude 1/597, eve 0/647,
+      adam 0/27. So the decay arm is reached ~zero times on precisely the pods
+      holding the phantom stock; the bottleneck is UPSTREAM of the predicate
+      (the sweep never brings those rows to a Hold/ContestPeer pre-flight),
+      not inside it. Second finding: where it IS consulted, the dominant
+      refusal is local_not_observed_absent (matthew 109 of 169) — the C4
+      positive-absence leg, which LocalResolve::Probe callers can never
+      satisfy by design (only the ghost-witness caller passes
+      Resolved(Absent)). STATUS STAYS RED: unchanged flip condition (one edge
+      run whose quiesce gate records 3/3); this delta re-aims the next
+      lever from "decay tuning" to sweep REACH on the shem pods.
       DELTA 2026-08-10 (batch-3 root cause, evening): validate-only run
       #1339 came 28s from banking — gate anchored PASS at count=2,
       sustained 302/330s, reset by matthew's actionable jumping 2→11 on
