@@ -1,7 +1,20 @@
 ---
 title: "Measure Ontology Slice 1 — dynamics + confidence at the EPR level, local-first"
 id: measure-ontology-slice1-epr-local-first
-status: Draft
+status: Landed
+landed_commit: b8e611d2f
+verified_by: >
+  All 6 tasks implemented, each closed by a task-scoped review (spec-compliance +
+  quality); 2 required a fix round (Task 4 — L6 was half-enforced, the policy-registry
+  path never checked `kind`; Task 5 — zero absorption produced a zero-width [inf,inf]
+  interval, a conformance bug against sealed L3). Both fixes re-reviewed ADDRESSED.
+  Whole-branch review (opus) returned NO CRITICAL and approved for merge after a
+  documentation-only fix pass; that pass landed as 1ca3f3511/b8e611d2f/c5b572583 and was
+  itself re-reviewed clean. Gates on the merge tree: elohim/epr 19 suites ok, elohim/epr-rea
+  4 suites ok, both clippy -D warnings and fmt --check exit 0; all 10 epr_meta_*.py exit 0;
+  doc_dynamics_test.py 6 passed. Serves habit `measure-honesty-local` (green, minted
+  2026-08-11). Spec carries Q1-Q14 open by design — four (Q11-Q14) were found by the
+  whole-branch review and recorded rather than silently patched.
 domain: D2
 sprint: operator-directed-2026-08-11
 requires_env: [household-nodes]

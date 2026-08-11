@@ -565,3 +565,53 @@ habits:
     refs:
       - "task #9 (sync-timeout peers: 12D3KooWNguL…/GPmV…/Rnj3…) — still unwritten as a health scenario; needs a /health sync-outcome field that does not exist yet, and adding a failing scenario to the edge Dataplane Validation tag set changes what a CI-gated measure counts (operator call, per the blob-durability precedent)"
       - "memory: project_weave_epic_arc (CoverageRollup built, unconsumed)"
+
+  - id: measure-honesty-local
+    invariant: >
+      Every quantity this repo tracks declares its kind (level/rate/ratio), a
+      rate cannot forget its period, confidence rides inside the canonical
+      dag-cbor bytes (never a detachable sibling), a fold over uncertain
+      quantities returns an interval rather than a bare scalar, and the
+      governance gate refuses a measure declaration with no kind — proven both
+      on the type (elohim/epr) and on this repo's own doc corpus
+      (_lib/doc_dynamics.py), not merely asserted in prose.
+    status: green
+    active: false
+    checks:
+      - "cargo test (elohim/epr) — measure_ontology.rs (L1/L3/L4) + canonical_bytes.rs confidence_is_inside_the_canonical_bytes (L2, asserted at the CID level via compute_cid, not byte-inequality)"
+      - "cargo test (elohim/epr-rea) — uncertainty_closure.rs, fold::with_uncertainty (L5); also covers the branch the plan never tested — two rates with DIFFERENT periods refuse to fold, since Period rides inside MeasureKind's derived PartialEq"
+      - "python3 -m pytest .claude/scripts/_lib/__tests__/epr_meta_measure_ontology_test.py (L6 on BOTH gates — validate_meta for manifest rules and load_policies for registry policies, sharing one MEASURE_KIND_VOCAB — plus Rust/YAML kind-vocabulary parity read from measure.rs, not a copied constant)"
+      - "python3 -m pytest .claude/scripts/_lib/__tests__/doc_dynamics_test.py (Task 5's index applied to this repo's own corpus, incl. the zero-width regression guard)"
+    evidence: >
+      GREEN 2026-08-11, verified on the merge tree (not an earlier run):
+      cargo test (elohim/epr) 19 suites ok / 0 failed, clippy -D warnings and
+      fmt --check both exit 0; cargo test (elohim/epr-rea) 4 suites ok / 0
+      failed, clippy and fmt exit 0; all 10 epr_meta_*.py exit 0;
+      doc_dynamics_test.py 6 passed. Live doc-corpus measure at merge:
+      generated=63 (28d window, git-witnessed adds under
+      genesis/docs/superpowers/{specs,plans}), absorbed_counted=0 (zero
+      delete/rename events in that window) → value=Infinity, claim=estimated,
+      interval={lo:-Infinity, hi:Infinity} (Interval::unknown()-shaped),
+      flag `~`. THIS IS THE HABIT'S OWN HONESTY TEST PASSING: an honestly
+      unbounded ratio, not a manufactured number. The first live run of this
+      measure produced a ZERO-WIDTH interval ([inf,inf], NaN width) — the
+      exact false precision the ontology exists to prevent — and that was
+      caught in review and cured by mirroring Interval::unknown(); the `~`
+      flag then emerged from the arithmetic with no change to the flag
+      expression. Absorption in this repo is bursty, which is why the window
+      matters: 28d → 63/0 (unknown); 90d → 318/98 (≈3.2).
+    guard: >
+      Regression risk = a future fold or index that special-cases its own
+      zero denominator instead of reaching for the Interval::unknown() shape
+      (spec Q13's general mechanism: a multiplier-based widening scheme cannot
+      produce width from a zero base), or a caller routing around
+      Confidence::widen() via a direct struct literal (Q8 — the fields are
+      pub, so L4 is enforced by convention, not by the type). Neither is
+      caught by a compiler error today. Note also Q12: Interval::is_unknown()
+      has no sign check, so [+inf,+inf] still reports as honest absence —
+      the detector L3 depends on cannot yet distinguish absence from
+      certainty at infinity.
+    refs:
+      - "spec: genesis/docs/superpowers/specs/2026-08-11-measure-dynamics-confidence-ontology-design.md (six laws L1-L6, each anchored; Q1-Q14 open)"
+      - "plan: genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md"
+      - "NOT covered — slice 2 inherits 6 unsolved items incl. per-fold anonymity (blocks the network rung) and the missing typed measure::canonical_bytes(&Quantity) entry point, so L2 is serializer-proven but UNWIRED"
