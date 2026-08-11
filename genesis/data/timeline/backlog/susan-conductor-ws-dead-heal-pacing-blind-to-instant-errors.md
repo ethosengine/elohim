@@ -256,3 +256,73 @@ rather than timing out. Note `HcClient::call_zome` is uncancellable, so today's
 timeout-and-retry abandons work the conductor keeps doing while still holding its
 read permit — retrying the same batch plausibly ADDS to the saturation it reacts
 to. That interaction should be measured before any batch-size change is tuned.
+
+## CORRECTION 2026-08-11 (late): the cause is HOST placement, not the heal-leg code
+
+The two addenda above are correct about the MECHANISM and wrong about the CAUSE.
+A 13-agent adversarial adjudication (six competing theories, each advocated then
+refuted, then judged) overturned all six — including the reading recorded above.
+The discriminator is the Kubernetes node, and it partitions perfectly.
+
+INDEPENDENTLY RE-VERIFIED (not taken from the adjudication):
+
+| pod | node | answered head-batch calls /3h | known_divergent{content} |
+|---|---|---|---|
+| matthew | ethosengine | 283 | 11 |
+| jessica | ethosengine | 64 | 0 |
+| james | ethosengine | 34 | 9 |
+| susan | **shem** | 4 | 1657 |
+| eve | **shem** | **0** | 646 |
+| adam | **shem** | **0** | 27 |
+| gertrude | **shem** | **0** | 592 |
+
+Host telemetry, both boxes 24 cores (`node_load15`, idle-core rate):
+- ethosengine 192.168.86.100 — load15 **13.46**, **13.49 idle cores** — 3/3 pods drain.
+- shem 10.99.0.2 — load15 **41.15**, **4.37 idle cores** — 4/4 pods starve.
+
+Three-for-three and four-for-four. The same binary, constants and control flow run
+on both sides, so no explanation grounded in `projection_reconcile.rs` can produce a
+clean partition on `kube_pod_info{node}`.
+
+**adam is the case that decides it.** Largest CPU limit in the fleet, the only
+meaningful headroom (6.78 of 8.0 cores), just 6% CFS-throttled, third-smallest
+backlog (27 rows) — and ZERO answered calls in 24h. Its cgroup is not the
+constraint; its host is.
+
+**CFS throttle is ANTI-correlated with outcome.** matthew is throttled in ~98.5% of
+periods and is the fleet's best performer. Bounded throttling on an idle host gives
+bounded scheduling latency (you get your cores every period); run-queue starvation
+on an oversubscribed host gives unbounded latency. A 15s caller deadline survives
+the first and cannot survive the second. Every "CPU-pinned shem trio" note in this
+file's history should be re-read in that light.
+
+This retro-explains the 2026-08-09 natural experiment: bumping susan/eve/gertrude
+2000m→3000m added 3 cores of DEMAND to a host with none to give, and the backlog
+grew. Do not raise those limits again.
+
+**Consequence for everything above.** The circuit-shed, `conductor_missing=0`, the
+empty ghost-candidate list and the uninvoked decay arm are all real and all
+correctly traced — but they are the *downstream shape* of a starved host, not the
+cause. The code defects found in the same pass (AIMD blind to call-level failure;
+`AdoptCandidate` provenance collapse mapping an OBSERVED `Ok(None)` to
+`Answer::Unreachable`; witness sweeps reporting authored roots as zero; two leg
+circuits arithmetically unreachable) govern RECOVERY RATE once the host is relieved.
+They are worth fixing. None of them will drain susan today.
+
+**Necessary and alone sufficient:** relieve `shem`'s aggregate runnable load —
+reduce co-tenancy, not limits. Repo surface is `genesis/orchestrator/data/
+deployments.json` and `genesis/manifests/cluster-state.yaml`; the live cluster is
+operator-owned. Real cost: these PVCs are openebs-hostpath and node-pinned, so
+moving a conductor is a DATA MIGRATION, not a reschedule, and a mishandled move
+re-keys an agent (`ALLOW_DNA_REINSTALL` discipline).
+
+**Open question that changes the recommendation.** What consumes ~18 cores on shem?
+Container CPU already accounts for ~15.8 of it (adam 6.78 + susan 2.99 + eve 2.99 +
+gertrude ~3.0) — the conductors themselves are the load. A 60s Pyroscope profile of
+adam's `elohim-node` vs matthew's discriminates three outcomes: kitsune2 gossip
+dominating means 4-way co-location is n²-gossip amplification and reducing
+co-tenancy is sufficient; SQLite/DHT-store dominating means the cost is per-node
+corpus/arc size and moving pods just moves the problem; validation/publish
+dominating means a write-side backlog holds the read pool, which is the
+`2026-07-20-adam-slow-link-write-guard-saturation` class at fleet scale. Take that
+profile before committing to a migration.
