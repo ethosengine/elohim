@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 
 use cid::Cid;
 use elohim_epr::algedonic::AlgedonicEvidence;
+use elohim_epr::measure::{ClaimKind, Confidence, Interval, MeasureKind, Quantity};
 use elohim_epr::witness::{Magnitude, ReaVerb};
 
 use crate::model::{Bound, Commitment, FlowEvent};
@@ -158,4 +159,69 @@ pub(crate) fn count_in_unit(magnitude: &Magnitude, unit: &str) -> Option<f64> {
         Magnitude::Count { value, unit: u } if u == unit => Some(*value),
         _ => None,
     }
+}
+
+#[derive(Debug, thiserror::Error, PartialEq)]
+pub enum FoldError {
+    #[error("cannot fold mixed measure kinds: {0:?} and {1:?}")]
+    MixedKinds(MeasureKind, MeasureKind),
+    #[error("cannot fold an empty set")]
+    Empty,
+}
+
+/// Rank claim kinds weakest-last so a fold can take the minimum honestly.
+fn claim_rank(c: ClaimKind) -> u8 {
+    match c {
+        ClaimKind::Witnessed => 0,
+        ClaimKind::InstrumentMeasured => 1,
+        ClaimKind::Estimated => 2,
+        ClaimKind::Modelled => 3,
+        ClaimKind::Imputed => 4,
+    }
+}
+
+/// The closure law (L5): a fold over interval-carrying quantities RETURNS an
+/// interval, and never claims to be better-known than its worst input.
+///
+/// Slice-1 interval arithmetic is deliberately naive — `[a,b]+[c,d]=[a+c,b+d]`
+/// assumes perfect correlation and therefore OVER-widens for independent terms.
+/// Over-widening never manufactures precision; a correlation-aware fold is
+/// slice-2 work (spec open question Q1).
+///
+/// Determinism here is narrower than "commutative, therefore order-independent
+/// by construction": `f64` addition is commutative but NOT associative, so a
+/// multi-term sum is order-dependent in general. The reordering regression
+/// test below passes because its fixture bounds are exactly representable in
+/// binary floating point, not because summation order is provably irrelevant.
+/// The weakest-claim reduction IS a genuine order-independent min — `claim_rank`
+/// has no associativity concern. Cross-peer determinism at a band edge, where
+/// two peers could fold the same terms in different orders and land on
+/// different rounding, is explicitly out of scope for slice 1 and is named as
+/// slice-2 work. Do not "fix" this with a canonicalizing sort here — sort order
+/// is a slice-2 decision (event id? timestamp? CID?) this fold does not make.
+pub fn with_uncertainty(items: &[Quantity]) -> Result<Quantity, FoldError> {
+    let first = items.first().ok_or(FoldError::Empty)?;
+    let kind = first.kind;
+    for q in items {
+        if q.kind != kind {
+            return Err(FoldError::MixedKinds(kind, q.kind));
+        }
+    }
+    let value = items.iter().map(|q| q.value).sum();
+    let lo = items.iter().map(|q| q.confidence.interval.lo).sum();
+    let hi = items.iter().map(|q| q.confidence.interval.hi).sum();
+    let weakest = items
+        .iter()
+        .max_by_key(|q| claim_rank(q.confidence.claim))
+        .map(|q| q.confidence.claim)
+        .unwrap_or(ClaimKind::Imputed);
+    Ok(Quantity {
+        value,
+        kind,
+        confidence: Confidence {
+            claim: weakest,
+            interval: Interval::new(lo, hi),
+            basis: format!("fold of {} terms", items.len()),
+        },
+    })
 }
