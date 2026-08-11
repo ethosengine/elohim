@@ -205,3 +205,54 @@ evidence. Note `batch_size=8` against a 15s per-attempt timeout, and that
 conductor keeps doing, so retrying the same batch may be adding to the load it is
 reacting to. This is the decision the next shift should make explicitly rather
 than by tuning.
+
+### Closing link (code trace, same day) — `conductor_missing=0` IS the smoking gun
+
+The chain is now closed end-to-end, and susan's own log line already carried the
+proof. `ghost_candidates` is not a SQL selection: it is accumulated one id at a
+time during `heal_content`, and ONLY when the own conductor's
+`resolve_content_head` answers `Absent` (`p2p/projection_reconcile.rs:3782-3792`,
+`conductor_missing += 1; ghost_candidates.push(id.clone())` — the counter and the
+push are the same branch). `witness_ghost_anchors` then short-circuits before
+touching the DB or the conductor (`:2046-2048`):
+
+```rust
+if candidates.is_empty() { return; }
+```
+
+So susan's `heal leg finished  healed=0  conductor_missing=0  to_resolve=2175`
+literally states that zero ghost candidates were produced that sweep. Empty list →
+`witness_ghost_anchors` returns immediately → `try_adopt_canonical_head` is never
+called → the decay arm is never entered. Not "decides Hold and refuses" — **never
+invoked**. That is exactly why `..._blocked_total{leg}` reads 0 on susan rather
+than showing a refusal leg: a refusal would have required the call to happen.
+
+The cause of `conductor_missing=0` is the shed documented above: the leg times out
+and opens the circuit before any row receives an answer of any kind. Un-asked ids
+stay `pending` — they are never classified `Absent`, so they cannot become ghost
+candidates. matthew, whose circuit opens 2×/hr instead of 8–12, gets answers and
+therefore logs `candidates=1..18` per ghost-witness sweep.
+
+**Two competing hypotheses measured and REFUTED**, so they need not be re-explored:
+- *MissLedger exhaustion has parked the cohort* (`Admission::Exhausted`, 3 strikes,
+  ~1h dormancy via `MISS_READMIT_SWEEPS=12`): would predict
+  `elohim_projection_reconcile_exhausted{stream="content"}` ≈ 1660 on susan. It
+  reads **52**. Refuted by measurement.
+- *The decay flag is off on the shem pods*: `leg="disabled"` = 0 fleet-wide.
+  Refuted. (It also could not have produced this signature — the flag only
+  downgrades an already-reached Hold/ContestPeer decision.)
+
+**This narrows the fix fork stated above.** There is NO valid shortcut that makes
+these rows ghost candidates without a conductor answer: C4's positive-absence
+discipline requires an OBSERVED `Absent` (`LocalResolve::Resolved(Answer::Absent)`
+only — `Probe`/`Unreachable` never qualify), and relaxing that would let the decay
+arm author over declarations it has not falsified, which is the one thing the arm
+is designed never to do. Every honest lever therefore aims at the same target:
+**get the conductor to answer for more of the 2175.** Candidates — smaller batches
+against the 15s per-attempt timeout (`batch_size=8` today); partial-progress
+carry-forward so each sweep advances the cursor instead of restarting; conductor
+read-permit/CPU capacity; in-wasm budget so the extern returns partial results
+rather than timing out. Note `HcClient::call_zome` is uncancellable, so today's
+timeout-and-retry abandons work the conductor keeps doing while still holding its
+read permit — retrying the same batch plausibly ADDS to the saturation it reacts
+to. That interaction should be measured before any batch-size change is tuned.
