@@ -534,6 +534,37 @@ def recordPipelineResult(String name, Map result, Map pipelineBaselines) {
 }
 
 /**
+ * Extract the lowercased, comma-split tokens from every [build:…] tag in a
+ * commit message.
+ *
+ * `@NonCPS` here is LOAD-BEARING, not decoration. `=~` yields a
+ * java.util.regex.Matcher, which is NOT serializable. A Matcher sitting in a CPS
+ * local is harmless only until the next CPS step forces a program save — then
+ * the build dies with `NotSerializableException: java.util.regex.Matcher` at
+ * "End of Pipeline", AFTER every stage has already reported success, so the
+ * failure looks like it came from nowhere. Running the regex inside a @NonCPS
+ * frame keeps the Matcher out of the serialized program entirely; the returned
+ * List<String> is plain serializable data.
+ *
+ * Lived: orchestrator #1666 — adding an `applyConductorTag()` call (which runs
+ * writeFile/sh/readJSON) after the old inline `def tagMatcher = …` block turned
+ * a latent scope violation into an every-push failure that dispatched nothing.
+ * The `[build:all]` branch's readJSON was the same bug, unfired.
+ *
+ * @NonCPS also keeps this regex out of the CPS dispatch method, which matters
+ * for the Jenkinsfile 64KB CPS size ceiling.
+ */
+@NonCPS
+def parseBuildTagTokens(String commitMsg) {
+    def tokens = []
+    def matcher = (commitMsg =~ /(?i)\[build:([a-z,-]+)\]/)
+    while (matcher.find()) {
+        matcher.group(1).split(',').each { token -> tokens.add(token.trim().toLowerCase()) }
+    }
+    return tokens
+}
+
+/**
  * Parse the [conductor:…] commit tag — variant, feature set, canary, fork
  * branches for the custom-conductor image build — and stash it for dispatch.
  *
@@ -1554,20 +1585,21 @@ spec:
                             'steward': 'elohim-steward',
                             'conductor': 'elohim-conductor'
                         ]
-                        def tagMatcher = (commitMsg =~ /(?i)\[build:([a-z,-]+)\]/)
-                        tagMatcher.each { match ->
-                            match[1].split(',').each { tag ->
-                                tag = tag.trim().toLowerCase()
-                                if (tag == 'all') {
-                                    def allNonManual = env.PIPELINE_REGISTRY_JSON
-                                        ? readJSON(text: env.PIPELINE_REGISTRY_JSON).findAll { k, v -> !v.manualOnly }.keySet().toList()
-                                        : []
-                                    buildTags.addAll(allNonManual)
-                                } else if (buildTagAliases[tag]) {
-                                    buildTags.add(buildTagAliases[tag])
-                                } else {
-                                    echo "⚠️  Unknown [build:${tag}] — valid: ${buildTagAliases.keySet().join(', ')}, all"
-                                }
+                        // Tokens come back as a plain List<String> — the Matcher stays
+                        // inside parseBuildTagTokens' @NonCPS frame. Do NOT inline the
+                        // `=~` here: readJSON below and applyConductorTag() are CPS
+                        // steps, and a Matcher in scope at either point kills the build
+                        // at End of Pipeline (orchestrator #1666).
+                        parseBuildTagTokens(commitMsg).each { tag ->
+                            if (tag == 'all') {
+                                def allNonManual = env.PIPELINE_REGISTRY_JSON
+                                    ? readJSON(text: env.PIPELINE_REGISTRY_JSON).findAll { k, v -> !v.manualOnly }.keySet().toList()
+                                    : []
+                                buildTags.addAll(allNonManual)
+                            } else if (buildTagAliases[tag]) {
+                                buildTags.add(buildTagAliases[tag])
+                            } else {
+                                echo "⚠️  Unknown [build:${tag}] — valid: ${buildTagAliases.keySet().join(', ')}, all"
                             }
                         }
                         buildTags.addAll(applyConductorTag(commitMsg))

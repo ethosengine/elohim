@@ -361,6 +361,58 @@ export function lintEnvBridgeSymmetry(text) {
     return orphans;
 }
 
+/**
+ * Flag `=~` used inside a `script{}` block.
+ *
+ * `=~` yields a java.util.regex.Matcher, which is NOT serializable. Inside a CPS
+ * frame it survives only until the next CPS step (sh/readJSON/writeFile/build)
+ * forces a program save — then the build dies with
+ * `NotSerializableException: java.util.regex.Matcher` at "End of Pipeline",
+ * AFTER every stage has reported success and having dispatched nothing. The
+ * damage is silent and total, and the stack trace names only Jenkins internals.
+ *
+ * The cure is to run the regex in an `@NonCPS` helper that returns plain data
+ * (List/Map/String). Those helpers are top-level defs, so they are not inside
+ * any script{} block and this lint never sees them — which is exactly the
+ * boundary we want to enforce.
+ *
+ * Scope of the rule — only a Matcher BOUND TO A NAME is flagged:
+ *
+ *   def m = (msg =~ /x/)      FLAGGED — m lands in BlockScopeEnv.locals and is
+ *                             still there when the next CPS step saves the program.
+ *   if (msg =~ /x/) { }       allowed — the Matcher is a temporary consumed
+ *                             immediately by Groovy's boolean coercion; it is
+ *                             never bound, so it never reaches the serialized
+ *                             locals. Four such conditions have shipped through
+ *                             this Jenkinsfile for many builds without incident,
+ *                             and rewriting them to `==~` would silently change
+ *                             find-semantics to full-match-semantics.
+ *   msg ==~ /x/               allowed — returns a plain boolean.
+ *
+ * Lived: orchestrator #1666.
+ */
+export function lintMatcherInCpsScope(text) {
+    const violations = [];
+    // An assignment `=` that is neither `==` nor the `=~` operator itself.
+    const BINDS_A_NAME = /(?:def\s+)?[A-Za-z_]\w*\s*=(?![=~])/;
+    for (const block of extractScriptBlocks(text)) {
+        const lines = block.body.split('\n');
+        lines.forEach((lineText, idx) => {
+            const code = lineText.replace(/\/\/.*$/, '');
+            const m = /(^|[^=])=~/.exec(code);
+            if (!m) return;
+            // Only flag when the Matcher is bound to a name on this line.
+            const beforeOperator = code.slice(0, m.index + m[1].length);
+            if (!BINDS_A_NAME.test(beforeOperator)) return;
+            violations.push(
+                `${block.stage ?? '<no stage>'} (line ~${block.startLine + idx}): ` +
+                `${code.trim()}`
+            );
+        });
+    }
+    return violations;
+}
+
 // ══════════════════════════════════════════════════════════════════
 // TESTS
 // ══════════════════════════════════════════════════════════════════
@@ -378,6 +430,49 @@ describe('jenkinsfile cps-scope lint', () => {
                 `Execute Builds stage for the canonical example.\n`
             );
         }
+    });
+
+    it('no `=~` Matcher is created inside a script{} block (must live in @NonCPS)', () => {
+        const text = readFileSync(ORCH_JENKINSFILE, 'utf8');
+        const violations = lintMatcherInCpsScope(text);
+        if (violations.length) {
+            assert.fail(
+                `\njava.util.regex.Matcher created inside a CPS script{} block:\n\n  ` +
+                violations.join('\n  ') +
+                `\n\nA Matcher is NOT serializable. It is harmless until the next CPS step ` +
+                `(sh/readJSON/writeFile/build) forces a program save — then the build dies ` +
+                `with NotSerializableException at "End of Pipeline", after every stage has ` +
+                `reported success, having dispatched nothing (orchestrator #1666).` +
+                `\n\nFix: move the regex into a top-level @NonCPS helper that returns plain ` +
+                `data. See parseBuildTagTokens() for the canonical example.\n`
+            );
+        }
+    });
+
+    it('negative control: the Matcher lint catches an inline `=~`, and ignores `==~`', () => {
+        const bad = `
+            stage('A') {
+                steps { script {
+                    def m = (commitMsg =~ /\\[build:([a-z]+)\\]/)
+                    sh 'echo hi'
+                } }
+            }
+        `;
+        assert.equal(lintMatcherInCpsScope(bad).length, 1, 'expected the inline =~ to be flagged');
+
+        const good = `
+            stage('A') {
+                steps { script {
+                    if (commitMsg ==~ /.*\\[skip ci\\].*/) { echo 'skip' }
+                    if (commitMsg =~ /(?i)\\[reseed\\]/) { echo 'reseed' }
+                } }
+            }
+        `;
+        assert.equal(
+            lintMatcherInCpsScope(good).length,
+            0,
+            '==~ is a boolean; an unbound `=~` in an if-condition is a consumed temporary',
+        );
     });
 
     it('every env.X write has at least one env.X read (no orphan bridges)', () => {
