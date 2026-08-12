@@ -746,6 +746,8 @@ mod tests {
             reference: "epr:validator-brand-vocabulary-boundary",
             rule: &rule,
             write: &write,
+            cid: None,
+            fuel: None,
         };
         brand_vocabulary_boundary(&request)
     }
@@ -859,6 +861,8 @@ mod tests {
             reference: "epr:validator-ownership-ontology-guard",
             rule: &rule,
             write: &write,
+            cid: None,
+            fuel: None,
         };
         ownership_guard(&request)
     }
@@ -913,6 +917,8 @@ mod tests {
             reference: "epr:validator-ownership-ontology-guard",
             rule: &rule,
             write: &write,
+            cid: None,
+            fuel: None,
         };
         // Not `Unavailable` — that arm would route every such write to an unconditional `ask`.
         assert!(matches!(
@@ -945,6 +951,8 @@ mod tests {
             reference: "epr:validator-escalation-ladder",
             rule: &rule,
             write: &write,
+            cid: None,
+            fuel: None,
         };
 
         let flag = escalation_ladder(&request).expect("bare deny must be flagged");
@@ -973,6 +981,8 @@ mod tests {
             reference: "epr:validator-escalation-ladder",
             rule: &rule,
             write: &write,
+            cid: None,
+            fuel: None,
         };
 
         assert!(escalation_ladder(&request).is_none());
@@ -990,6 +1000,8 @@ mod tests {
             reference: "epr:validator-escalation-ladder",
             rule: &rule,
             write: &write,
+            cid: None,
+            fuel: None,
         };
 
         assert!(escalation_ladder(&request).is_none());

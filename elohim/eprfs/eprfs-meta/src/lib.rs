@@ -97,6 +97,7 @@ pub fn resolve_path(
 
     let mut rules = BTreeMap::new();
     let mut policies = BTreeMap::new();
+    let mut validators = BTreeMap::new();
     let mut coupling = EprHeadCoupling::default();
 
     for record in &records {
@@ -110,6 +111,12 @@ pub fn resolve_path(
                     policies.insert(policy.id.clone(), policy.clone());
                 }
             }
+            // Same nearest-wins dedupe as rules and policies, keyed on the reference a
+            // `validator:` rule names. Declared once in an ancestor, tightened nearer the
+            // subject.
+            for validator in &governance.validators {
+                validators.insert(validator.reference.clone(), validator.clone());
+            }
         }
     }
 
@@ -118,6 +125,7 @@ pub fn resolve_path(
         records,
         effective_rules: rules.into_values().collect(),
         effective_policies: policies.into_values().collect(),
+        effective_validators: validators.into_values().collect(),
         coupling,
         metadata: Value::Null,
     })

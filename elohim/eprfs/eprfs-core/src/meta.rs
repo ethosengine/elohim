@@ -48,6 +48,15 @@ pub struct EprMetaResolution {
     pub records: Vec<EprMetaRecord>,
     pub effective_rules: Vec<GovernanceRule>,
     pub effective_policies: Vec<GovernancePolicyBinding>,
+    /// Declared validator identities and execution budgets, deduped across the cascade by
+    /// `reference` on the same nearest-wins rule as rules and policies.
+    ///
+    /// Collecting these is what lets a `validator:` rule be evaluated against a DECLARED
+    /// identity (`cid`) and a DECLARED budget (`fuel`) rather than a bare reference string.
+    /// `eprfs-meta` never executes anything — it resolves the declaration and hands it to the
+    /// host's `ValidatorProvider`, which owns execution. Without this the two fields parsed
+    /// fine and reached nobody.
+    pub effective_validators: Vec<GovernanceValidator>,
     pub coupling: EprHeadCoupling,
     pub metadata: Value,
 }

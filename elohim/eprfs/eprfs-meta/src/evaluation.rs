@@ -8,7 +8,10 @@
 
 use std::{collections::BTreeMap, fs, path::Path};
 
-use eprfs_core::{EprMetaResolution, GovernanceRule, GovernanceRuleClass, GovernanceRulePredicate};
+use eprfs_core::{
+    EprMetaResolution, GovernanceRule, GovernanceRuleClass, GovernanceRulePredicate,
+    GovernanceValidator,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
@@ -172,6 +175,22 @@ pub struct ValidatorRequest<'a> {
     pub reference: &'a str,
     pub rule: &'a GovernanceRule,
     pub write: &'a GovernanceWrite,
+    /// The content address declared for this validator, when the cascade declared one.
+    ///
+    /// This is what extends the contract from *what an algorithm asserted* to *what it ran*:
+    /// a bare `reference` names a mechanism by trust, a `cid` names it by content. `None`
+    /// means no manifest declared an identity — honest absence, never "any implementation
+    /// will do". A provider that requires content-addressed execution refuses on `None`
+    /// rather than falling back to a named lookup.
+    pub cid: Option<&'a str>,
+    /// The execution budget declared for this validator, in the host's fuel units.
+    ///
+    /// `eprfs-meta` neither executes nor meters — it resolves the declaration and hands it
+    /// over. But an unmetered mechanism is an unbounded variety amplifier: it can produce
+    /// more distinguishable outcomes than its inputs justify, which is the one component
+    /// able to outrun the regulator that is supposed to bound it. Carrying the declared
+    /// budget to the boundary is what makes bounding it possible at all.
+    pub fuel: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -211,6 +230,7 @@ pub fn evaluate_path_with(
     let resolution = resolve_path(repo_root, target)?;
     let (policies, mut diagnostics) = load_policies(repo_root);
     let mut rules = resolution.effective_rules.clone();
+    let declared_validators = resolution.effective_validators.clone();
     // Verdicts a tampered content pin injects directly, bypassing rule expansion.
     let mut pin_verdicts: Vec<GovernanceVerdict> = Vec::new();
 
@@ -283,7 +303,7 @@ pub fn evaluate_path_with(
     rules.sort_by(|left, right| left.id.cmp(&right.id));
     let mut verdicts: Vec<GovernanceVerdict> = rules
         .iter()
-        .filter_map(|rule| evaluate_rule(repo_root, rule, write, validators))
+        .filter_map(|rule| evaluate_rule(repo_root, rule, write, validators, &declared_validators))
         .collect();
     verdicts.extend(pin_verdicts);
 
@@ -541,6 +561,7 @@ fn evaluate_rule(
     rule: &GovernanceRule,
     write: &GovernanceWrite,
     validators: &dyn ValidatorProvider,
+    declared: &[GovernanceValidator],
 ) -> Option<GovernanceVerdict> {
     if !matches_when(&rule.when, write) {
         return None;
@@ -590,11 +611,18 @@ fn evaluate_rule(
         }
         GovernanceRulePredicate::Validator => {
             let reference = rule.parameters.as_str().unwrap_or("?");
+            // Resolve the reference against what the cascade DECLARED for it. Absent
+            // declaration stays `None` rather than defaulting: "no manifest named an
+            // identity or a budget" and "this validator may run unmetered as anything" are
+            // different claims, and only the first is true here.
+            let declaration = declared.iter().find(|v| v.reference == reference);
             let request = ValidatorRequest {
                 repo_root,
                 reference,
                 rule,
                 write,
+                cid: declaration.and_then(|v| v.cid.as_deref()),
+                fuel: declaration.and_then(|v| v.fuel),
             };
             match validators.evaluate(&request) {
                 ValidatorOutcome::Pass => return None,
@@ -907,5 +935,108 @@ policies:
         assert_eq!(evaluation.verdicts.len(), 1);
         assert!(evaluation.verdicts[0].reason.contains("plans/"));
         assert!(!target.exists());
+    }
+}
+
+#[cfg(test)]
+mod validator_declaration_tests {
+    use std::cell::RefCell;
+    use std::fs;
+
+    use tempfile::TempDir;
+
+    use super::*;
+
+    /// Captures what actually reached the execution boundary.
+    #[derive(Default)]
+    struct Recorder {
+        seen: RefCell<Vec<(Option<String>, Option<u32>)>>,
+    }
+
+    impl ValidatorProvider for Recorder {
+        fn evaluate(&self, request: &ValidatorRequest<'_>) -> ValidatorOutcome {
+            self.seen
+                .borrow_mut()
+                .push((request.cid.map(str::to_string), request.fuel));
+            ValidatorOutcome::Pass
+        }
+    }
+
+    /// Concrete validator identities are built at runtime, never written as literals — a
+    /// literal anywhere in this crate's sources (comments included) trips the
+    /// domain-neutrality architecture test, and rightly so.
+    fn reference() -> String {
+        ["epr:", "validator-metered-example"].concat()
+    }
+
+    fn write_manifest(dir: &TempDir, validators_block: &str) {
+        let reference = reference();
+        fs::write(
+            dir.path().join(".epr-meta"),
+            format!(
+                "---\nepr-meta-version: 1\nid: root\nroot: true\nrules:\n  \
+                 - id: metered\n    class: ask\n    when: {{ write: \"*.rs\" }}\n    \
+                 validator: {reference}\n{validators_block}---\n"
+            ),
+        )
+        .unwrap();
+    }
+
+    /// The declared identity and budget must reach the execution boundary. Before this they
+    /// were parsed into `EprMetaGovernance.validators` and read by nobody: the whole
+    /// content-addressed, metered-execution story was declared and inert.
+    #[test]
+    fn a_declared_cid_and_fuel_reach_the_execution_boundary() {
+        let dir = TempDir::new().unwrap();
+        let reference = reference();
+        write_manifest(
+            &dir,
+            &format!(
+                "validators:\n  - ref: {reference}\n    cid: bafyreiexample\n    fuel: 50000\n"
+            ),
+        );
+
+        let recorder = Recorder::default();
+        let write = GovernanceWrite {
+            path: "thing.rs".into(),
+            content: Some("fn main() {}".into()),
+            prior_content: None,
+            is_new: true,
+            is_new_subdir: false,
+        };
+        evaluate_path_with(dir.path(), dir.path().join("thing.rs"), &write, &recorder).unwrap();
+
+        let seen = recorder.seen.borrow();
+        assert_eq!(seen.len(), 1, "the validator rule must have been evaluated");
+        assert_eq!(
+            seen[0],
+            (Some("bafyreiexample".to_string()), Some(50_000)),
+            "a bare reference names a mechanism by trust; a cid names it by content, and \
+             fuel is what bounds an otherwise-unbounded variety amplifier"
+        );
+    }
+
+    /// An undeclared validator yields `None`, not a default. "No manifest named an identity
+    /// or a budget" and "this may run unmetered as any implementation" are different claims,
+    /// and only the first is true — a provider that requires content-addressed execution must
+    /// be able to refuse rather than silently fall back to a named lookup.
+    #[test]
+    fn an_undeclared_validator_carries_honest_absence_not_a_default() {
+        let dir = TempDir::new().unwrap();
+        write_manifest(&dir, "");
+
+        let recorder = Recorder::default();
+        let write = GovernanceWrite {
+            path: "thing.rs".into(),
+            content: Some("fn main() {}".into()),
+            prior_content: None,
+            is_new: true,
+            is_new_subdir: false,
+        };
+        evaluate_path_with(dir.path(), dir.path().join("thing.rs"), &write, &recorder).unwrap();
+
+        let seen = recorder.seen.borrow();
+        assert_eq!(seen.len(), 1);
+        assert_eq!(seen[0], (None, None));
     }
 }
