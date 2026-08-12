@@ -8,7 +8,7 @@ use elohim_epr::algedonic::AlgedonicEvidence;
 use elohim_epr::measure::{ClaimKind, Confidence, Interval, MeasureKind, Quantity, UnknownReason};
 use elohim_epr::witness::{Magnitude, ReaVerb};
 
-use crate::model::{Bound, Commitment, FlowEvent};
+use crate::model::{Bound, Commitment, FlowEvent, Sense};
 
 /// Derived state of one resource: per-(verb, unit) totals over its event history.
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -81,14 +81,27 @@ impl FulfillmentStatus {
 /// evidence, which the wire coherence check in `elohim_epr::algedonic` refuses — stays
 /// theoretical on this path. `bound_ref` is the bounding commitment's CID and nothing else.
 fn bound_evidence(commitment_cid: &Cid, bound: &Bound, stock: f64) -> Option<AlgedonicEvidence> {
+    // A FLOOR bound mints no evidence yet, and that silence is deliberate.
+    // `elohim_epr::algedonic::AlgedonicEvidence` is ceiling-signed on the wire — its
+    // `crossed()` is `stock >= band_edge`, and the shape is schema-pinned
+    // (`additionalProperties: false`) inside the DHT FeedbackSignal kind whitelist. Emitting a
+    // floor breach through it would produce a signal whose own `crossed()` reads FALSE: pain
+    // that denies itself, which is worse than no pain at all. Making the evidence sense-aware
+    // moves a wire shape and needs its own design gate.
+    //
+    // Honest absence, not a zero: a floor bound is declarable and measurable today, and only
+    // its *signal* is withheld. See `a_floor_bound_withholds_evidence_rather_than_inverting_it`.
+    if bound.sense() == Sense::Floor {
+        return None;
+    }
     let bound_ref = commitment_cid.to_string();
-    if stock >= bound.limit {
+    if bound.breached_by(stock) {
         Some(AlgedonicEvidence::Breach {
             stock,
             limit: bound.limit,
             bound_ref,
         })
-    } else if stock >= bound.band_edge() {
+    } else if bound.approached_by(stock) {
         Some(AlgedonicEvidence::Approach {
             stock,
             limit: bound.limit,

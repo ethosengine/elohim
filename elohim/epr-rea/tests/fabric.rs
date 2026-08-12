@@ -5,7 +5,7 @@ use cid::Cid;
 use elohim_epr_rea::{
     atom_cid, fulfillment, resource_state, AgentRef, AlgedonicEvidence, Bound, Commitment,
     CommitmentState, FlowEvent, FlowRecord, FlowStore, FlowWalk, Intent, Magnitude,
-    MemoryFlowStore, PinnedRef, Process, ReaVerb, ResourceSpec, SidecarFlowStore,
+    MemoryFlowStore, PinnedRef, Process, ReaVerb, ResourceSpec, Sense, SidecarFlowStore,
 };
 
 fn agent(name: &str) -> AgentRef {
@@ -208,6 +208,39 @@ fn spend(scope: &Cid, commitment: Cid, value: f64) -> FlowEvent {
         None,
         vec![commitment],
     )
+}
+
+/// A floor bound is declarable and measurable today, but mints NO algedonic evidence — and
+/// the silence is deliberate, not an oversight.
+///
+/// `AlgedonicEvidence` is ceiling-signed on the wire: its `crossed()` is `stock >= band_edge`,
+/// and the shape is schema-pinned (`additionalProperties: false`) inside the DHT
+/// FeedbackSignal kind whitelist. Pushing a floor breach through it would mint a signal whose
+/// own `crossed()` reads FALSE — pain that denies itself, which is strictly worse than no
+/// pain. Withholding is the honest-absence answer until the evidence becomes sense-aware,
+/// which moves a wire shape and needs its own design gate.
+#[test]
+fn a_floor_bound_withholds_evidence_rather_than_inverting_it() {
+    let scope = resource("epic");
+    let floor = Bound::new(1000.0, "token".into(), 85.0)
+        .expect("valid bound")
+        .with_sense(Sense::Floor);
+    let commitment = budget_commitment(&scope, Some(floor.clone()));
+    let c_cid = atom_cid(&commitment).unwrap();
+
+    // 40 of a 1000 floor is deep in breach territory for a floor…
+    let events = vec![spend(&scope, c_cid, 40.0)];
+    let status = fulfillment(&c_cid, &commitment, &events);
+    assert!(
+        status.pain.is_none(),
+        "a floor must not mint ceiling-signed evidence"
+    );
+
+    // …and the bound itself DOES know it is breached. Only the signal is withheld, so this
+    // is honest absence at the wire, never a claim that the floor is fine.
+    assert!(floor.breached_by(40.0));
+    assert!(floor.approached_by(1100.0));
+    assert_eq!(floor.band_edge(), 1150.0);
 }
 
 #[test]

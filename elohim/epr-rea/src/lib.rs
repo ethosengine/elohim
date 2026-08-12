@@ -40,6 +40,7 @@ pub mod epistemic;
 pub mod error;
 pub mod fold;
 pub mod model;
+pub mod scope;
 pub mod stock;
 pub mod store;
 pub mod walk;
@@ -51,10 +52,11 @@ pub use epistemic::{
 pub use error::{FabricError, Result};
 pub use fold::{fulfillment, resource_state, FulfillmentStatus, ResourceState};
 pub use model::{
-    atom_cid, edge_fp, AgentRef, Bound, Commitment, CommitmentState, DepEdge, EdgeSpec, EdgeStatus,
-    FlowEvent, Governor, Intent, PinnedRef, Process, ProcessSpec, ResourceSpec, StageSpec,
-    ValidatorRef,
+    atom_cid, edge_fp, AgentRef, Bound, Commitment, CommitmentState, Composition, DepEdge,
+    EdgeSpec, EdgeStatus, FlowEvent, Governor, Intent, LimitSource, PinnedRef, Process,
+    ProcessSpec, ResourceSpec, Sense, StageSpec, ValidatorRef,
 };
+pub use scope::{Containers, Scopes};
 pub use stock::{respite_response, stock_over_window, Stock, StockError, Window};
 pub use store::{FlowRecord, FlowStore, MemoryFlowStore, SidecarFlowStore};
 pub use walk::{FlowWalk, Frontier, Lineage};

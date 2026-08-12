@@ -19,6 +19,9 @@ pub enum FabricError {
 
     #[error("invalid bound: {0}")]
     InvalidBound(String),
+
+    #[error("invalid scope relation: {0}")]
+    InvalidScopeRelation(String),
 }
 
 pub type Result<T> = std::result::Result<T, FabricError>;
