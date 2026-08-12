@@ -27,7 +27,15 @@
 //!   evidence ([`AlgedonicEvidence::kind`]), so a signal whose `signal_kind` disagrees with its
 //!   evidence is unrepresentable in [`AlgedonicSignal`] and refused at the wire boundary.
 //! - **One open signal per `(declarer, target, kind)`.** [`open_signal_key`] is that key; pain is
-//!   a held state, not a stream. [`should_emit`] is the hysteresis predicate that enforces it.
+//!   a held state, not a stream. [`should_emit`] is the **latch** that enforces it — and a latch
+//!   is not hysteresis, which this line previously claimed it was. It has a SET condition
+//!   (`crossed()`) and **no reset**: there is no `should_clear`, no second threshold, and no time
+//!   dimension anywhere in this module. Whether pain ever ends is therefore a property of the
+//!   caller, not of this type. Under a caller that closes an open signal on non-crossing, a stock
+//!   oscillating at the band edge re-fires every cycle — precisely the failure hysteresis exists
+//!   to prevent. Naming it correctly is load-bearing: Beer's Fourth Principle of Organization
+//!   (cyclic maintenance "without hiatus or lags") is the one this module does not yet satisfy,
+//!   and calling the latch hysteresis is what let that read as done.
 //! - **Evidence is minted, never assembled.** The limit a signal reports is a bound on a
 //!   *promise*, so evidence is derived by the REA fold that owns the bound
 //!   (`elohim_epr_rea::fold::fulfillment`, whose `bound_ref` is the bounding commitment's CID) —
@@ -40,10 +48,28 @@
 //!
 //! `elohim/sdk/schemas/v1/feedback-signals/algedonic-{approach,breach}.schema.json`. Those
 //! schemas are the **contract only** — the source of truth is the DHT `FeedbackSignal` entry
-//! (elohim zome, `content_store_integrity/src/feedback_signal.rs`), extended by `signal_kind`
-//! vocabulary rather than by a new entry type. Field names here are **snake_case**, matching
-//! those schemas exactly; that is deliberately unlike the crate's camelCase ts-rs types, and is
-//! why nothing in this module derives `TS`: the schemas already own the projection.
+//! (elohim zome, `content_store_integrity/src/feedback_signal.rs`), which is designed to be
+//! extended by `signal_kind` vocabulary rather than by a new entry type. Field names here are
+//! **snake_case**, matching those schemas exactly; that is deliberately unlike the crate's
+//! camelCase ts-rs types, and is why nothing in this module derives `TS`: the schemas already
+//! own the projection.
+//!
+//! **That extension is INTENDED, not shipped** (measured 2026-08-12). `SIGNAL_KINDS` is
+//! `[squelch, correction, retraction, quarantine, vouch, forget-request]` — no algedonic kind is
+//! in it, and no file under `elohim/holochain/` mentions algedonic at all. Read the paragraph
+//! above as the destination; today an algedonic signal has no DHT home, which is the concrete
+//! form of "the control plane emits nothing." Two things follow, and the second is a live hazard:
+//!
+//! 1. Adding the vocabulary is a one-line whitelist change plus its validation, NOT a migration
+//!    of a shipped wire shape. Any ranking that prices it as the latter is inverted.
+//! 2. `properties.evidence` sets **`additionalProperties: true`** in BOTH schemas (the `false`
+//!    sits on the envelope). Unlisted evidence keys are accepted, so a payload carrying a
+//!    not-yet-modelled discriminator — a floor `sense`, say — validates green today and is then
+//!    read as a ceiling by every consumer calling [`AlgedonicEvidence::crossed`], which is
+//!    unconditionally `stock >= band_edge`. Silent acceptance of a meaning nobody declared is the
+//!    C4 shape this family exists to make unrepresentable. Until `Sense` lives in the type, the
+//!    only thing preventing it is that `elohim_epr_rea::fold::bound_evidence` withholds floor
+//!    evidence at the mint.
 
 use crate::error::{EprError, Result};
 use chrono::{DateTime, Utc};

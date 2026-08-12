@@ -79,16 +79,38 @@ it.** That assigns each crate a variety axis rather than merely a layer:
 | `elohim/eprfs` | projection | presence · custody · awareness of where bytes are |
 | `eprfs-meta` + `.claude/epr-meta` | normative | how a rule attaches, evaluates, and retires |
 
-### 1b. Reach IS the attenuator
+### 1b. Reach is the INTENDED attenuator — on one plane of four
 
-Beer's variety attenuation and amplification are already implemented in this repo under a
+> **CORRECTION 2026-08-12 (re-measured).** This section was titled "Reach IS the attenuator" and
+> asserted the mechanism was "already implemented in this repo under a different name." That is
+> the strongest overstatement in this document and it is **rejected**, because it let the
+> hardest unsolved problem in the family read as won plumbing. Three measurements:
+>
+> - **`Reach` appears nowhere in `elohim/epr-rea/src`.** Commitments, flow events, bounds, and
+>   algedonic evidence are entirely un-attenuated. Reach lives on `Epr::Envelope` only — one
+>   plane of the four this document claims compose.
+> - **A monotone ladder is not an audience.** `openness()` 1–8 is a total order, so every reach
+>   is a prefix of a wider one. It cannot express *"visible to the watershed council and the city
+>   finance committee, but not the water broker"* — the most ordinary attenuation decision in
+>   §3's own worked scenario. An ordinal can say *how far*; it cannot say *not that one*.
+> - **`reach-enforced-everywhere` is `unwired`** in `habits.yaml` — no runnable check exists. By
+>   this repo's own covenant that is the weakest state a claim can hold, and it is the falsifier
+>   for the original sentence.
+>
+> This also settles §7 Q5: the two senses of "reach" are **homonyms**, not one mechanism. A
+> *destination* (where a signal must be heard) and an *ordinal openness tier* (how far an
+> artifact may travel) are different types that share a word. Conflating them is what made the
+> consequence paragraph below sound like a small addition; it is a new primitive.
+
+Beer's variety attenuation and amplification have an **intended** home in this repo under a
 different name. `epr::reach::Reach` — `Private → SelfScope → Intimate → Trusted → Familiar →
-Community → Public → Commons`, with `openness()` 1–8 — is the vocabulary deciding how far a
-signal travels. That *is* attenuation upward and amplification downward, so the reach epic is
-not adjacent to this law: it is **conjunct 2 (performance) and conjunct 5 (scale) implemented
-as one mechanism.** How a p2p system stays usable at global scale without collapsing is that
-not everything reaches everywhere, and reach is earned and declared rather than assumed.
-`2026-05-29-epr-reachability-economics.md` is the economic half of the same claim.
+Community → Public → Commons`, with `openness()` 1–8 — is the vocabulary deciding how far an
+artifact travels *on the envelope plane*. Where it is enforced, that is attenuation upward and
+amplification downward, which is why the reach epic is not adjacent to this law: it is
+**conjunct 2 (performance) and conjunct 5 (scale) intended as one mechanism** — and currently
+implemented on one plane of four. How a p2p system stays usable at global scale without
+collapsing is that not everything reaches everywhere, and reach is earned and declared rather
+than assumed. `2026-05-29-epr-reachability-economics.md` is the economic half of the same claim.
 
 The defensible form of the variety claim is already written, and this document adopts it
 verbatim rather than restating it (`2026-07-22-reach-ontology-vocabulary-split-spec.md`):
@@ -107,8 +129,8 @@ being complained about is not a referral."*
 
 ### 1c. Every boundary needs a crossing wide enough for what must cross it
 
-Ashby's law is usually quoted alone. Beer stated **three** channel laws, and the third is the one
-that gets dropped:
+Ashby's law is usually quoted alone. Beer stated **four Principles of Organization** — not three
+channel laws — and the ones that get dropped are the third and the fourth:
 
 1. the regulator needs the variety of what it regulates (Ashby);
 2. the **channel** between them must carry that variety;
@@ -116,6 +138,18 @@ that gets dropped:
    channel** — Beer's term is *transduction*, and he was blunt that this is where
    viable-system implementations actually fail. The channel is fine; the crossing quietly drops
    variety.
+4. **the first three must be maintained cyclically through time, "without hiatus or lags."**
+
+> **CORRECTION 2026-08-12.** This section originally said Beer stated "**three** channel laws"
+> and stopped at transduction. Both halves were wrong: they are four *Principles of
+> Organization*, and dropping the Fourth mattered more than the miscount, because the Fourth is
+> exactly what §4 independently measures as missing — `should_emit` is a latch with a set
+> condition and **no reset**: no `should_clear`, no second threshold, no time dimension anywhere
+> in the module. This document dropped the time principle in §1c and then rediscovered its
+> absence as a finding in §4, without connecting them. That is the §4b failure mode — a real
+> thing present under a name the search did not use — committed by the section that names it,
+> which is the strongest available evidence for §4b's thesis and the reason this correction is
+> recorded inline rather than silently patched.
 
 We use plain words for this rather than minting a term: **the crossing**, and *what survives it*.
 (Beer's "transduction" is named here once so the lineage is findable. The plainer nouns —
@@ -252,6 +286,26 @@ criterion. It is testable, it is failable, and it fails today (§5).
 Note what it demands that a type-check does not: the current system can satisfy every type,
 verify every CID, and still fail, because **a verified derivation is not a walkable one.**
 
+> **GRADUATION BLOCKER, recorded 2026-08-12.** This criterion is currently **unsatisfiable**, not
+> merely unmet — a distinction that matters because the frontmatter `graduation-trigger` pins
+> this document's exit from Draft to it, and an unsatisfiable trigger is a `never` wearing the
+> costume of a test. Two independent reasons:
+>
+> - **The narrowing law forbids the walk-back.** Derived layers may only narrow reach, so a third
+>   party necessarily holds strictly *less* reach than the contracting parties. Walking a
+>   derivation back requires reading its inputs, and a domain-representing agent's inputs are
+>   Private/Intimate by definition. The criterion is therefore satisfiable only for
+>   Commons/Public contracts — the case where disputability matters least.
+> - **No selective-disclosure primitive exists anywhere in the family.** `proof.rs` is bare
+>   ed25519. There is no scheme by which a third party verifies a derivation it is not permitted
+>   to read.
+>
+> Satisfying this needs either a disclosure-preserving derivation attestation (a literature
+> question before a build question — plausibly heavy ZK machinery, plausibly out of reach at this
+> team's scale) **or an explicit weakening of the criterion in writing**. Until one of those
+> lands, treat the trigger as blocked-with-a-named-reason rather than as pending work, and do not
+> schedule against it. See §7 Q5/Q6.
+
 ### 3a. The admission rule — how the ontology grows without over-engineering
 
 > **Admit a new primitive when a SECOND independent framework needs the same missing
@@ -282,7 +336,7 @@ Every row was measured on the tree that day. **Re-measure rather than believe.**
 
 | Claim | Evidence |
 |---|---|
-| Variety is rhetoric, not a quantity | **Zero identifiers** named `variety` in the tree — no struct, field, fn, or metric. No entropy/HHI/cardinality instrument. Only doc-comments, one homonym schema (`SignalVariety`, a disclosure taxonomy with zero consumers), and a string in a findings ledger |
+| Variety is rhetoric, not a quantity | **Zero identifiers** named `variety` in the tree — no struct, field, fn, or metric. Only doc-comments, one homonym schema (`SignalVariety`, a disclosure taxonomy with zero consumers), and a string in a findings ledger. ⚠️ **CORRECTED 2026-08-12:** this row originally continued "No entropy/HHI/cardinality instrument," which is false and was the same §4b error as the limitarian claim below — searching for the *framework's* word. At least four such instruments exist, three production-wired: `measure.rs::ge_alpha` (generalized entropy, α-parameterised) and `::gini`; two normalized-Shannon `consensus_strength` implementations; `elohim-facings::folds::resiliency::diversity_score`. The document's own §4a cites `measure.rs` by name one screen later, so this row was contradicted internally. The defensible claim is narrower and still damning: **concentration/entropy instruments exist and none is connected to variety reasoning** — they are typed as bare `f32`, not as `Quantity`/`Confidence`, which is §4a's finding, not an absence |
 | One genuine cardinality instrument exists, unconnected | `elohim-storage/src/liveness_contract.rs:237` `state_space()` — a 4×2×2×3 = 48-state enumeration asserted `live==13 / terminal==19 / unreachable==16`, with `LivenessBudget::max_states: 4096` (`crates/seam-contracts`). A real Ashby-variety measure, built for deadlock regression, connected to no variety reasoning |
 | Requisite-variety routing is a hardcoded constant | `ReferQuestion.layer`: **3 producers, all literals** (`"community"` ×2 in `reach_earning.rs` / `epistemic.rs`, `"operator"` ×1 in `_lib/epr_meta.py`), **0 readers**, no competence model, no ordering. The ordered `ConstitutionalLayer` with `precedence()`/`can_override()` that could route lives in `elohim/constitution` and is not the type used |
 | The control plane emits nothing | `algedonic::should_emit` has **no production caller**; `cite_gate` / `into_verdict` have **no production callers**; the `eae` crate (MACE, subsidiarity, precedent, anomaly) has **zero consumers**, untouched since 2026-01-13 |
@@ -305,11 +359,27 @@ unreachable or unused. That is one deficit observed three times, not three bugs.
 
 ### 4b. A finding about findability
 
-The code implementing the protocol's limitarian position **contains no occurrence of the word
-"limitarian."** `measure.rs`'s functions are named for the statistics, not the framework. A
+The code implementing the protocol's limitarian position is **not findable by the framework's
+name as a symbol.** `measure.rs`'s functions are named for the statistics, not the framework. A
 grep-driven audit therefore concluded "docs-only, zero code" and was wrong. The
 framework → implementation link is unindexed, which is the concrete reason this document is
 cite-sealed and bound via `.epr-meta` rather than left as prose.
+
+> **CORRECTION 2026-08-12.** The original sentence read: the code "**contains no occurrence of
+> the word 'limitarian.'**" That is refuted by a two-second grep — `grep -nw limitarian
+> elohim/elohim-storage/src/services/measure.rs` returns **2 hits, lines 1 and 3** ("Concentration
+> measures for the per-substrate limitarian governor"), committed 2026-06-10 in `c35137c36`. The
+> word is right there, in the module doc, at the top of the file.
+>
+> The residue is real but different, and the difference is the whole lesson: the link is
+> unindexed **as a symbol**, not absent as text. An LSP/symbol query for `limitarian` finds
+> nothing; a full-text search finds it immediately. The original claim over-generalised from one
+> tool's blind spot to "no occurrence," and that is the same move it was written to warn about.
+>
+> **This document has now committed the finding it names three times** — here, in the §4 variety
+> row above, and in §1c's dropped Fourth Principle. Three is no longer an anecdote; treat it as
+> the base rate for grep-driven audits in this repo and require any future pass to state the
+> surfaces it did *not* search. That requirement is the durable output of §4b, not the parable.
 
 ---
 
@@ -318,10 +388,55 @@ cite-sealed and bound via `.epr-meta` rather than left as prose.
 Conjunct 3 is a repair list. Each break is a variety deficit *at a seam*: the receiving side
 carries less variety than what must cross it.
 
+> **TWO CORRECTIONS TO THE LIST ITSELF, 2026-08-12.**
+>
+> **(a) The ranking is inverted at the top.** Rank 1 was placed first partly because it was
+> priced as the most expensive repair (a shipped wire shape inside a DHT whitelist). Both
+> blockers were re-measured and do not exist — see the correction box under Rank 1. Rank 1 is the
+> **cheapest** of the four *and* the only one whose absence is a live silent-acceptance hazard
+> rather than a missing capability. It should be read as cheap-and-urgent. The other three keep
+> their relative order.
+>
+> **(b) All four ranks are FORWARD crossings, and that is the deeper gap.** Signal out, standing
+> out, number out, telos out — every one carries variety from the substrate toward a decision.
+> **Not one is a RETURN crossing.** §1c states Beer's third principle and then applies it in a
+> single direction. Under §2's abundance premise the asymmetry is structural, not incidental:
+> claim-variety rises without bound while the variety available to whoever must *contest* a claim
+> does not. The attenuation §2 declares dissolved reappears intact at the dispute channel.
+>
+> This makes the dispute channel a candidate **Rank 0** — it is the seam §3's acceptance
+> criterion actually tests, and no rank below addresses it. It is deliberately NOT inserted into
+> the list here, because unlike ranks 1–4 it has no measured defect behind it yet; naming it as a
+> rank without a measurement would be the instrument-with-no-reader shape §6.2 refuses. It is
+> recorded as the list's known blind spot instead.
+
 ### Rank 1 — the substrate cannot signal insufficiency
-`AlgedonicEvidence` is ceiling-signed on the wire: `crossed()` is `stock >= band_edge`, the
-shape is schema-pinned (`additionalProperties: false`) inside the DHT FeedbackSignal whitelist,
-and `algedonic.rs` states plainly that a floor bound *"is not modeled."*
+
+> **CORRECTION 2026-08-12 (re-measured after first publication).** The two blockers this section
+> originally named do not exist, and removing them **inverts this rank's cost**. What was
+> presented as the most expensive of the four repairs is the cheapest, and it is the only one
+> whose absence is a live *hazard* rather than a missing capability. The paragraph below is the
+> corrected statement; §7 Q6 invited exactly this and it arrived against this section first.
+>
+> | Original claim | Measured |
+> |---|---|
+> | shape is schema-pinned `additionalProperties: false` | **`false` on the envelope, `true` on `properties.evidence`** in both `algedonic-{approach,breach}.schema.json` — unlisted evidence keys are accepted today |
+> | inside the DHT FeedbackSignal whitelist | **`SIGNAL_KINDS` holds no algedonic kind** (`squelch, correction, retraction, quarantine, vouch, forget-request`); **zero** files under `elohim/holochain/` mention algedonic at all |
+>
+> **The hazard.** Because evidence accepts unlisted keys, a payload carrying a floor `sense`
+> validates green against both schemas *now* and is then read as a ceiling by every consumer
+> calling `crossed()`, which is unconditionally `stock >= band_edge`. That is silent acceptance
+> of a meaning nobody declared — the C4 shape this family exists to make unrepresentable, sitting
+> in the crate that holds the law. The only thing preventing it is that `fold::bound_evidence`
+> withholds floor evidence at the mint; the schema does not.
+>
+> **The cost.** Not a shipped-wire migration behind a p2p-design-gate pass. A `Sense` in the type,
+> plus a one-line `SIGNAL_KINDS` addition and its validation. The gate is still owed — it moves a
+> wire shape — but it is a small gate, and this rank should be read as *cheap and urgent*, not
+> *expensive and foundational*.
+
+`AlgedonicEvidence` is ceiling-signed **in the type**: `crossed()` is `stock >= band_edge`, and
+`algedonic.rs` states plainly that a floor bound *"is not modeled."*
 
 `Bound` gained `Sense::{Ceiling, Floor}` on 2026-08-12; the signal plane did not. Floor evidence
 is therefore **deliberately withheld** rather than inverted (`fold::bound_evidence` returns

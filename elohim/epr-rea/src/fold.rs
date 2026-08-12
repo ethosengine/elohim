@@ -82,15 +82,32 @@ impl FulfillmentStatus {
 /// theoretical on this path. `bound_ref` is the bounding commitment's CID and nothing else.
 fn bound_evidence(commitment_cid: &Cid, bound: &Bound, stock: f64) -> Option<AlgedonicEvidence> {
     // A FLOOR bound mints no evidence yet, and that silence is deliberate.
-    // `elohim_epr::algedonic::AlgedonicEvidence` is ceiling-signed on the wire — its
-    // `crossed()` is `stock >= band_edge`, and the shape is schema-pinned
-    // (`additionalProperties: false`) inside the DHT FeedbackSignal kind whitelist. Emitting a
-    // floor breach through it would produce a signal whose own `crossed()` reads FALSE: pain
-    // that denies itself, which is worse than no pain at all. Making the evidence sense-aware
-    // moves a wire shape and needs its own design gate.
+    // `elohim_epr::algedonic::AlgedonicEvidence` is ceiling-signed IN THE TYPE: its `crossed()`
+    // is `stock >= band_edge`, so a floor breach emitted through it would produce a signal whose
+    // own `crossed()` reads FALSE — pain that denies itself, which is worse than no pain at all.
+    // That reason stands on its own and is the whole reason for the withholding.
     //
-    // Honest absence, not a zero: a floor bound is declarable and measurable today, and only
-    // its *signal* is withheld. See `a_floor_bound_withholds_evidence_rather_than_inverting_it`.
+    // CORRECTION 2026-08-12 (re-measured; the earlier comment here asserted two blockers that do
+    // not exist, and the correction INVERTS the cost of fixing this):
+    //   * The evidence object is NOT schema-pinned. `additionalProperties` is `false` on the
+    //     signal ENVELOPE but **`true` on `properties.evidence`** in both
+    //     `algedonic-{approach,breach}.schema.json`. A `sense` discriminator is already
+    //     admissible on the wire.
+    //   * There is no whitelist to move. `SIGNAL_KINDS` in
+    //     `content_store_integrity/src/feedback_signal.rs` is
+    //     `[squelch, correction, retraction, quarantine, vouch, forget-request]` — it holds no
+    //     algedonic kind, and NO file under `elohim/holochain/` mentions algedonic at all. The
+    //     DHT extension described in `elohim_epr::algedonic`'s wire-contract section is the
+    //     intended path, not a shipped one.
+    //
+    // So this is not a costly wire migration gated behind a design pass; it is a type change in
+    // this family. The permissiveness is a HAZARD rather than an affordance: a floor payload
+    // would validate green against both schemas TODAY and be read as a ceiling by any consumer
+    // calling `crossed()` — silent acceptance, the C4 shape. The withholding is what keeps that
+    // unreachable, so it stays until `AlgedonicEvidence` carries `Sense` in the type.
+    //
+    // Honest absence, not a zero: a floor bound is declarable and measurable today, and only its
+    // *signal* is withheld. See `a_floor_bound_withholds_evidence_rather_than_inverting_it`.
     if bound.sense() == Sense::Floor {
         return None;
     }

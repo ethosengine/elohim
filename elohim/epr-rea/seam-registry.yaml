@@ -92,11 +92,20 @@ decisionPoints:
         justification: >
           Three distinct silences, none of them a zero: no declared bound (an unbounded promise
           is never in pain), stock inside the band, and — new — a FLOOR bound, whose evidence is
-          withheld because `elohim_epr::algedonic::AlgedonicEvidence` is ceiling-signed on the
-          wire (`crossed()` is `stock >= band_edge`, schema-pinned `additionalProperties: false`,
-          inside the DHT FeedbackSignal kind whitelist). Emitting a floor breach through it would
-          mint a signal whose own `crossed()` reads FALSE — pain that denies itself, strictly
-          worse than silence. The bound still knows it is breached; only the signal is withheld.
+          withheld because `elohim_epr::algedonic::AlgedonicEvidence` is ceiling-signed IN THE
+          TYPE (`crossed()` is unconditionally `stock >= band_edge`). Emitting a floor breach
+          through it would mint a signal whose own `crossed()` reads FALSE — pain that denies
+          itself, strictly worse than silence. The bound still knows it is breached; only the
+          signal is withheld.
+          CORRECTION 2026-08-12: this justification previously also cited "schema-pinned
+          `additionalProperties: false`" and "inside the DHT FeedbackSignal kind whitelist".
+          Both were re-measured and are FALSE. `properties.evidence` is
+          `additionalProperties: true` in both algedonic schemas (the `false` is on the
+          envelope), and `SIGNAL_KINDS` contains no algedonic kind — nothing under
+          `elohim/holochain/` mentions algedonic at all. The withholding is still correct, but
+          it rests ONLY on the type being ceiling-signed. The schemas are permissive enough to
+          accept a floor payload today and let `crossed()` misread it as a ceiling, so the mint-
+          side withholding is the only thing standing between here and a silent acceptance.
       - id: C5
         status: answered
         justification: >
@@ -110,9 +119,16 @@ decisionPoints:
           Advertise/serve symmetry is BROKEN for floors on purpose and the gap is real, not
           theoretical: `Bound` advertises that floors are declarable and measurable, and the
           signal plane cannot yet serve them. Closing it means making `AlgedonicEvidence`
-          sense-aware, which moves a wire shape inside the DHT FeedbackSignal whitelist and needs
-          its own design gate. Recorded as partial rather than answered so the census carries the
-          debt instead of the comment carrying it alone.
+          sense-aware. Recorded as partial rather than answered so the census carries the debt
+          instead of the comment carrying it alone.
+          CORRECTION 2026-08-12: this previously said the fix "moves a wire shape inside the DHT
+          FeedbackSignal whitelist and needs its own design gate". There is no such whitelist
+          entry to move — `SIGNAL_KINDS` holds no algedonic kind, and the evidence object accepts
+          unlisted keys (`additionalProperties: true`). The change is a TYPE change in the epr
+          family plus a one-line vocabulary addition, not a shipped-wire migration. The
+          mis-pricing is why the guidestar spec ranked this fix first as the most expensive of
+          its four; it is in fact the cheapest, and it is the only one of the four whose absence
+          is currently a silent-acceptance hazard rather than a missing capability.
     contractTests:
       - path: elohim/epr-rea/tests/fabric.rs
         testName: a_floor_bound_withholds_evidence_rather_than_inverting_it
