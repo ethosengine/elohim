@@ -25,6 +25,48 @@ names the driver; `elohim-render::Renderer` is the trait a runtime drives).
 3. **The conformance rails** (wired into each app's `lint` script, `app/scripts/`):
    - `lint-route-literals.mjs` — no literal route minting.
    - `lint-ssr-entry.mjs` — the SSR-entry contract (below), checked at authoring time.
+   - `lint-workspace-imports.mjs` — the cross-workspace import ratchet (below).
+
+## Bundle seams are not domain seams
+
+Splitting an app out of `app/elohim-app/` into its own workspace buys ONE thing: an
+independently built, independently served, separately content-addressed bundle. That is a
+**deployment** fact. It does not make the extracted tree a self-contained domain, and it
+does not create a module boundary — because each app's `tsconfig.json` `paths` maps its
+sibling `@app/<pillar>/*` aliases straight at the other workspace's private `src/app/*`.
+Deep paths, both directions, no public API. Two `package.json`s, one TypeScript program.
+
+The failure mode is that the directory *looks* like a boundary, so nobody checks that it
+is one. Each individual cross-workspace import is locally reasonable; the arrow direction
+and the cycle are only visible in aggregate, and nothing was aggregating. `app/lamad/` is
+the lived case: it holds both the learning domain AND the cross-pillar content substrate
+(`models/content-node.model`, `content-io/`, `renderers/`, `parsers/`), five pillars import
+that substrate, `elohim` — the core — is one of them, and `lamad` imports back into six
+elohim-app pillars from `models/`, `services/`, `interfaces/`, `utils/` and `guards/`.
+
+So: **before extracting an app, decide what the extracted tree owns and what it consumes**,
+and give each direction a named entry point. Before adding an import that crosses an
+existing seam, ask whether the type belongs to that bundle's domain or in a home both
+bundles consume. The rail below makes that a decision instead of an accident.
+
+### The cross-workspace import ratchet
+
+`lint-workspace-imports.mjs <appDir>` reads the app's own tsconfig `paths`, keeps the
+`@app/*` aliases that resolve **outside** the app root, and counts every reference to them.
+`app/scripts/workspace-import-baseline.json` records today's set as **declared debt** —
+per-specifier counts, plus a header naming what that debt is. The rail fails on:
+
+- a **new** cross-workspace specifier — an edge nobody declared, or
+- a **higher count** on an existing one — the entanglement deepening.
+
+Shrinking is the only allowed direction; it reports the shrink and asks you to re-baseline
+(`--write-baseline`). When a direction reaches zero, delete its entry — the seam is then
+real and cannot silently reopen. An app with cross-workspace aliases and **no** baseline
+entry fails too: a missing baseline is an unmeasured seam, not a clean one.
+
+The rail deliberately takes no position on which placement is correct — that is an architect
+call (`genesis/data/timeline/backlog/arch-frontend-bundle-seams-backlog.md` row 1). It only
+guarantees the next such drift is chosen rather than accumulated.
 
 ## Adding SSR to an EPR app (four declarative touches)
 

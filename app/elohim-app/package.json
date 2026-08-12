@@ -14,7 +14,7 @@
     "start:staging": "ng serve --configuration=staging",
     "build": "ng build",
     "postbuild": "node scripts/ssr-shim-node.mjs",
-    "lint": "eslint src --ext .ts,.html && node ../scripts/lint-route-literals.mjs src && node ../scripts/lint-ssr-entry.mjs .",
+    "lint": "eslint src --ext .ts,.html && node ../scripts/lint-route-literals.mjs src && node ../scripts/lint-ssr-entry.mjs . && node ../scripts/lint-workspace-imports.mjs .",
     "lint:fix": "NODE_OPTIONS='--max-old-space-size=4096' eslint src --ext .ts,.html --fix",
     "lint:css": "stylelint 'src/**/*.{css,scss}'",
     "lint:css:fix": "stylelint 'src/**/*.{css,scss}' --fix",

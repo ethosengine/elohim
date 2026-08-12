@@ -24,6 +24,15 @@ edit-time prompts would —
   (spec §7.1 epr-route-claims-link-conformance).
 - **Declared route surface**: `src/app/generated/route-claims.ts` is codegen —
   never hand-edit generated files.
+- **Cross-workspace imports**: this bundle's `tsconfig.json` maps `@app/<pillar>/*`
+  at `app/elohim-app`'s private source tree, and elohim-app maps `@app/lamad/*`
+  back — a live cycle, with the cross-pillar content substrate on this side of
+  it. Gated by `app/scripts/lint-workspace-imports.mjs` (in `pnpm run lint`)
+  against the declared debt in `app/scripts/workspace-import-baseline.json`:
+  down-only, a new or deepened edge fails. Scar tissue: the extraction created a
+  BUNDLE seam that then got read as a DOMAIN seam, and the arrow inverted to
+  core → pillar one locally-reasonable import at a time, unobserved because
+  nothing aggregated them. See `app/CLAUDE.md` §Bundle seams are not domain seams.
 
 Dependencies must be declared in this app's own `package.json` — resolution via
 another workspace app's hoist is drift (lived: `vite-tsconfig-paths`,

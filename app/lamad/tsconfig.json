@@ -4,15 +4,22 @@
     "typeRoots": ["node_modules/@types"],
     "paths": {
       "@app/lamad/*": ["./src/app/*"],
-      // Cross-pillar aliases are RETAINED under the Slice 2.1c composition-root
-      // pattern. While lamad source has zero unintentional cross-pillar imports
-      // (all remaining imports are documented composition-root or Slice 2.2b
-      // deferrals), lamad's app.config.ts imports concrete elohim-app pillar
-      // services for LAMAD_* InjectionToken `useExisting` registration. Those
-      // imported files transitively reference @app/{shefa,doorway,avodah,
-      // generated,testing}/*, so lamad's tsconfig must continue to resolve
-      // those alias targets even though lamad itself does not import them.
-      // See genesis/docs/architecture/elohim-sdk.md §composition-root.
+      // Cross-pillar aliases reach BACK into app/elohim-app's private source
+      // tree. This is a live cycle, not a clean composition-root seam — do not
+      // read it as one. The Slice 2.1c intent was that only app.config.ts would
+      // cross (importing concrete pillar services for LAMAD_* InjectionToken
+      // `useExisting` registration, with the transitive graph pulling in
+      // @app/{shefa,doorway,avodah,generated,testing}/*). The tree diverged from
+      // that intent: models/, services/, interfaces/, utils/, guards/ and
+      // quiz-engine/ all import elohim-app directly today. Meanwhile elohim-app
+      // imports back into this workspace, dominated by models/content-node.model.
+      //
+      // Authoritative counts (never this comment):
+      //   app/scripts/workspace-import-baseline.json
+      // The `lint-workspace-imports` rail (in `pnpm run lint`) ratchets both
+      // directions down-only — a new edge or a deeper one fails the gate.
+      // Placement decision is open: see app/CLAUDE.md §Bundle seams are not
+      // domain seams and arch-frontend-bundle-seams-backlog.md row 1.
       "@app/elohim": ["../elohim-app/src/app/elohim/index.ts"],
       "@app/elohim/*": ["../elohim-app/src/app/elohim/*"],
       "@app/imagodei": ["../elohim-app/src/app/imagodei/index.ts"],
