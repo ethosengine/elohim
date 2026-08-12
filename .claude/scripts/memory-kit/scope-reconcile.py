@@ -27,8 +27,10 @@ for _ in range(8):
     _here = _here.parent
 from _lib import env_scope as _es  # noqa: E402
 from _lib import frontmatter as _fm  # noqa: E402
+from _lib import paths as _paths  # noqa: E402
+from _lib import cluster_state as _cs  # noqa: E402
 
-ROOT = next(p for p in Path(__file__).resolve().parents if (p / ".git").exists())
+ROOT = _paths.repo_root_from_file(__file__)
 CLUSTER_STATE = ROOT / "genesis" / "manifests" / "cluster-state.yaml"
 GAP_DIR = ROOT / ".claude" / "memory-kit" / "gap-items"
 # The deployments arm — humans declare nodeTypes (requirement side); cluster-state resources declare
@@ -63,31 +65,13 @@ Managed by `.claude/scripts/memory-kit/scope-reconcile.py`. The mover, not a hum
 
 
 def _parse_cluster() -> tuple:
-    """(all_resource_names, available_names) from cluster-state.yaml. Line-based, not pyyaml — the file
-    carries multi-line unquoted `note:` scalars that strict YAML rejects. We only need
-    `resources: -> <name>: -> available: true`."""
-    alln: set = set()
-    avail: set = set()
-    if not CLUSTER_STATE.is_file():
-        return alln, avail
-    cur, in_resources = None, False
-    for ln in CLUSTER_STATE.read_text(encoding="utf-8", errors="replace").splitlines():
-        if re.match(r"^resources:\s*$", ln):
-            in_resources = True
-            continue
-        if not in_resources:
-            continue
-        if re.match(r"^[A-Za-z]", ln):  # a new top-level key — left the resources block
-            in_resources, cur = False, None
-            continue
-        m = re.match(r"^  ([A-Za-z0-9_-]+):\s*$", ln)  # a resource key (2-space indent, bare)
-        if m:
-            cur = m.group(1)
-            alln.add(cur)
-            continue
-        if cur and re.match(r"^    available:\s*true\b", ln):
-            avail.add(cur)
-    return alln, avail
+    """(all_resource_names, available_names) from cluster-state.yaml. Delegates to the canonical
+    `_lib.cluster_state` parser (agentic-context-tooling-consolidation-queue.md item 6) — this and
+    placement-audit's `load_cluster_state` / focus-baseline's `_cluster_detail` were three
+    independent hand-rolled regex walks of the same block, one of them unscoped; one parser now
+    backs all three so the budget reader and the mover can never disagree."""
+    state = _cs.load(CLUSTER_STATE)
+    return state.all_names(), state.available_names()
 
 
 def available_caps() -> set:
@@ -104,30 +88,20 @@ def known_resources() -> set:
 
 def requires_env(doc: Path) -> list:
     """Parse requires_env, handling the minimal frontmatter parser's quirks: a block list (already a list),
-    an INLINE list `[a, b]` or `[]` (read as a string), or a scalar. Strips inline comments + quotes."""
+    an INLINE list `[a, b]` or `[]` (read as a string), or a scalar. Strips inline comments + quotes.
+    Delegates to `_lib.env_scope.parse_requires_env` (agentic-context-tooling-consolidation-queue.md
+    item 7 — this parse + the `@requires:` regex were extracted to `_lib.env_scope` but the call sites
+    here never switched)."""
     if doc.suffix == ".feature":
         return _feature_requires(doc)  # a2o gherkin has no frontmatter — read @requires:<cap> tags
     v = _fm.parse_file(doc).fields.get("requires_env")
-    if isinstance(v, list):
-        items = v
-    elif isinstance(v, str):
-        s = re.sub(r"\s+#.*$", "", v.strip()).strip()  # strip a trailing inline comment
-        if s.startswith("[") and s.endswith("]"):
-            inner = s[1:-1].strip()
-            items = [x for x in inner.split(",")] if inner else []
-        else:
-            items = [s] if s else []
-    else:
-        items = []
-    return [x.strip().strip("'\"") for x in items if isinstance(x, str) and x.strip()]
-
-
-_REQUIRES_TAG = re.compile(r"@requires:([a-z0-9][a-z0-9-]*)")
+    return _es.parse_requires_env(v)
 
 
 def _feature_requires(doc: Path) -> list:
     """a2o .feature files declare env via `@requires:<cap>` gherkin tags on the feature-level tag line(s)
-    (above the first `Feature:` keyword), NOT frontmatter."""
+    (above the first `Feature:` keyword), NOT frontmatter. Delegates to `_lib.env_scope.requires_tags`
+    for the tag regex itself (item 7)."""
     caps = []
     for ln in doc.read_text(encoding="utf-8", errors="replace").splitlines():
         stripped = ln.lstrip()
@@ -135,7 +109,7 @@ def _feature_requires(doc: Path) -> list:
             break
         if stripped.startswith("#"):  # gherkin comment — prose mentioning a tag is not a tag
             continue
-        caps += _REQUIRES_TAG.findall(ln)
+        caps += _es.requires_tags(ln)
     return caps
 
 
@@ -269,31 +243,8 @@ def compute_drift() -> tuple:
 
 def _parse_provides() -> dict:
     """nodeType -> set(resource) from cluster-state `provides_node_types: [a, b]` (4-space key under a
-    resource). Same lenient line-based walk as _parse_cluster."""
-    mapping: dict = {}
-    if not CLUSTER_STATE.is_file():
-        return mapping
-    cur, in_resources = None, False
-    for ln in CLUSTER_STATE.read_text(encoding="utf-8", errors="replace").splitlines():
-        if re.match(r"^resources:\s*$", ln):
-            in_resources = True
-            continue
-        if not in_resources:
-            continue
-        if re.match(r"^[A-Za-z#]", ln):
-            in_resources, cur = False, None
-            continue
-        m = re.match(r"^  ([A-Za-z0-9_-]+):\s*$", ln)
-        if m:
-            cur = m.group(1)
-            continue
-        m4 = re.match(r"^    provides_node_types:\s*\[(.*)\]\s*$", ln)
-        if cur and m4:
-            for nt in m4.group(1).split(","):
-                nt = nt.strip().strip("'\"")
-                if nt:
-                    mapping.setdefault(nt, set()).add(cur)
-    return mapping
+    resource). Delegates to the canonical `_lib.cluster_state` parser (item 6)."""
+    return _cs.load(CLUSTER_STATE).provides_map()
 
 
 def _humans() -> list:

@@ -25,7 +25,6 @@ Spec §9: genesis/docs/superpowers/specs/2026-06-02-scope-tree-reconciler-design
 from __future__ import annotations
 
 import importlib.util
-import re
 import sys
 from pathlib import Path
 
@@ -46,35 +45,20 @@ ROOT = _sr.ROOT
 CLUSTER_STATE = _sr.CLUSTER_STATE
 A2O_LIVE = ROOT / "genesis" / "a2o" / "features"
 A2O_HELD = ROOT / "genesis" / "a2o" / "held" / "features"
-_REQUIRES_TAG = re.compile(r"@requires:([a-z0-9][a-z0-9-]*)")
+# _sr's exec_module already put .claude/scripts on sys.path — safe to import _lib directly here.
+from _lib import env_scope as _es  # noqa: E402
+from _lib import cluster_state as _cs  # noqa: E402
 
 
 def _cluster_detail() -> tuple[dict, dict]:
-    """{name: available_value} and {name: role} from cluster-state.yaml (line-based, like the mover)."""
-    avail, roles = {}, {}
-    if not CLUSTER_STATE.is_file():
-        return avail, roles
-    cur, in_res = None, False
-    for ln in CLUSTER_STATE.read_text(encoding="utf-8", errors="replace").splitlines():
-        if re.match(r"^resources:\s*$", ln):
-            in_res = True
-            continue
-        if not in_res:
-            continue
-        if re.match(r"^[A-Za-z]", ln):
-            break
-        m = re.match(r"^  ([A-Za-z0-9_-]+):\s*$", ln)
-        if m:
-            cur = m.group(1)
-            continue
-        if cur:
-            a = re.match(r"^    available:\s*(\S+)", ln)
-            if a:
-                avail[cur] = a.group(1)
-            r = re.match(r"^    role:\s*(.+?)\s*$", ln)
-            if r and cur not in roles:
-                roles[cur] = r.group(1).split("#")[0].strip()
-    return avail, roles
+    """{name: available_value} and {name: role} from cluster-state.yaml. Delegates to the canonical
+    `_lib.cluster_state` parser (agentic-context-tooling-consolidation-queue.md item 6) — this used
+    to be a third independent hand-rolled regex walk of the same `resources:` block. The avail map
+    holds only resources that DECLARE `available:` (it feeds `known`, which gates); roles are
+    returned for every resource that names one, including undeclared ones, since roles only supply
+    the human-readable WHY. Pinned through THIS call site by `_lib/__tests__/cluster_state_test.py`."""
+    state = _cs.load(CLUSTER_STATE)
+    return state.available_map(), state.roles()
 
 
 def _subject_of(feature_path: Path, tree: Path) -> str:
@@ -89,14 +73,15 @@ def _feature_caps(path: Path) -> list[str]:
 
 
 def _scenario_caps(path: Path) -> list[str]:
-    """@requires:<cap> tags BELOW the first `Feature:` (scenario-level) — the runtime-held ones."""
+    """@requires:<cap> tags BELOW the first `Feature:` (scenario-level) — the runtime-held ones.
+    Delegates to `_lib.env_scope.requires_tags` (item 7 — the third live copy of this regex)."""
     text, seen_feature, caps = path.read_text(encoding="utf-8", errors="replace"), False, []
     for ln in text.splitlines():
         if ln.lstrip().startswith("Feature:"):
             seen_feature = True
             continue
         if seen_feature:
-            caps += _REQUIRES_TAG.findall(ln)
+            caps += _es.requires_tags(ln)
     return caps
 
 

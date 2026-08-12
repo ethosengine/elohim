@@ -38,9 +38,8 @@ if "--cluster-state" in sys.argv[1:]:
     if i + 1 < len(sys.argv):
         CS_OVERRIDE = sys.argv[i + 1]
         ARGS = [a for a in ARGS if a != CS_OVERRIDE]
-ROOT = Path(ARGS[0]).resolve() if ARGS else Path(__file__).resolve().parents[3]
-
-# _lib bootstrap — env_scope is the gap-granular substrate-scope resolver (shared with decompose/scope-reconcile)
+# _lib bootstrap — env_scope is the gap-granular substrate-scope resolver (shared with decompose/scope-reconcile);
+# cluster_state is the canonical cluster-state.yaml parser (shared with scope-reconcile/focus-baseline).
 _here = Path(__file__).resolve()
 for _ in range(8):
     if (_here / ".claude" / "scripts" / "_lib").is_dir():
@@ -48,6 +47,10 @@ for _ in range(8):
         break
     _here = _here.parent
 from _lib import env_scope as _es  # noqa: E402
+from _lib import paths as _paths  # noqa: E402
+from _lib import cluster_state as _cs  # noqa: E402
+
+ROOT = Path(ARGS[0]).resolve() if ARGS else _paths.repo_root_from_file(__file__)
 
 SURFACES = {
     "ACTIVE:specs": "genesis/docs/superpowers/specs",
@@ -155,20 +158,16 @@ def status_bucket(raw: str):
 
 
 def load_cluster_state(path: Path):
-    avail, updated, cur = {}, "?", None
-    if path.exists():
-        for line in path.read_text().splitlines():
-            u = re.match(r"^updated:\s*(\S+)", line)
-            if u:
-                updated = u.group(1)
-            m = re.match(r"^  ([a-z0-9\-]+):\s*$", line)
-            if m:
-                cur = m.group(1)
-                continue
-            a = re.match(r"^    available:\s*(\S+)", line)
-            if a and cur:
-                avail[cur] = a.group(1).strip().strip("'\"")
-    return avail, updated
+    """(avail: {name -> raw available scalar}, updated: str). Delegates to the canonical
+    `_lib.cluster_state` parser (agentic-context-tooling-consolidation-queue.md item 6) — this
+    used to be an UNSCOPED hand-rolled regex walk with no `resources:` block-boundary check, so a
+    decoy block BEFORE or AFTER `resources:` was folded in as a phantom resource.
+    `avail` holds only resources that DECLARE `available:` (decision 2 in `_lib/cluster_state.py`'s
+    docstring — a role-only block is not a runtime claim and must not gate the budget); this is
+    also the `known` set the gap ledger passes to `env_scope.gap_blocked`.
+    Pinned through THIS call site by `_lib/__tests__/cluster_state_test.py`."""
+    state = _cs.load(path)
+    return state.available_map(), state.updated
 
 
 def load_manifest():
