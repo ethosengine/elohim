@@ -34,6 +34,7 @@ for _ in range(8):
     _here = _here.parent
 
 from _lib import concern_routes  # noqa: E402
+from _lib import epr_client  # noqa: E402
 from _lib import epr_meta  # noqa: E402
 from _lib import store  # noqa: E402
 
@@ -48,6 +49,14 @@ _ADVICE_WINDOW = 4 * 3600
 _ARCH_LEDGER_REL = ".claude/data/architecture-findings.jsonl"
 
 
+# WHICH evaluator produced this process's decision. Set once, after the native
+# evaluator is consulted: the native identity when `epr` answered, Python's when
+# it did not. A module global rather than a threaded parameter because this is a
+# one-shot process with exactly one decision — there is no second value it could
+# hold, and six call sites threading an invariant is noise, not clarity.
+_EVALUATOR: dict | None = None
+
+
 def _witness(root: Path, *, subject, decision: str, cls: str | None, rule_id: str | None = None,
              policy_ref: str | None = None, refer: dict | None = None,
              checks: list | None = None) -> None:
@@ -57,7 +66,7 @@ def _witness(root: Path, *, subject, decision: str, cls: str | None, rule_id: st
     break the gate — epr_meta.witness already wraps its body in try/except)."""
     epr_meta.witness(root, runtime="claude", gate="pre-tool-use", subject=subject,
                       decision=decision, cls=cls, rule_id=rule_id, policy_ref=policy_ref,
-                      refer=refer, checks=checks)
+                      refer=refer, checks=checks, evaluator=_EVALUATOR)
 
 
 def _advice_debounced(root: Path, key: str) -> bool:
@@ -378,6 +387,56 @@ def main():
     result = epr_meta.resolve_write(target, write, root, verdict_filter=_soft_filter)
     advisories += result["advisories"]
     merged = result.get("merged")
+
+    # ── the native evaluator is the DECISION AUTHORITY ────────────────────────
+    # Both hosts evaluate; `epr` decides. Running only one would delete the
+    # dispute path, and a dispute record is the artifact that makes the plane
+    # trustworthy — agreement is the trivial half of the claim.
+    #
+    # Authority applies to the DECISION, not to the advice. When the two agree
+    # (the overwhelmingly common case, measured at 129/129 decisions across
+    # every governed subtree) Python's class/rule/reason are kept, because three
+    # validators are scoped `python` by declaration and their `inject`
+    # advisories exist nowhere else. Single decision authority must not quietly
+    # become less advice. Only a genuine dispute takes Rust's attribution too —
+    # its decision, its reasons.
+    global _EVALUATOR
+    native = epr_client.govern(root, fp, content, is_new, is_new_subdir)
+    if native is None:
+        _EVALUATOR = epr_meta.evaluator_identity()
+        # Announce the missing second opinion only where there was a DECISION to
+        # cross-check. A clean allow — no rule fired, nothing witnessed — is
+        # silent by the polarity law, and nobody disputes a verdict that does not
+        # exist; banner-ing it would break that floor and put a notice on
+        # essentially every governed write. Debounced on top, so even a real
+        # degradation informs once a session instead of nagging per keystroke.
+        if result.get("witnessed") and not _advice_debounced(root, "native-evaluator-degraded"):
+            advisories.append(epr_client.DEGRADED_NOTICE)
+    else:
+        _EVALUATOR = native.get("evaluator")
+        dispute = epr_client.disagreement(result, native)
+        if dispute:
+            # The dispute record names BOTH evaluators by content address, so a
+            # third party can fetch each build and re-derive who was right.
+            _witness(root, subject=fp, decision=native.get("decision"),
+                     cls=native.get("winningClass"), rule_id=native.get("ruleId"),
+                     refer={"layer": "operator", "reason": "evaluator-disagreement"},
+                     checks=[f"EVALUATOR DISAGREEMENT: {dispute}",
+                             f"disputed: {epr_meta.evaluator_identity()}",
+                             f"authority: {native.get('evaluator')}"])
+            advisories.append(
+                f"[.epr-meta] EVALUATOR DISAGREEMENT — {dispute}. The native evaluator (`epr`) "
+                f"is the decision authority and its verdict stands; the dispute is recorded to "
+                f"the governance ledger by name. This is a governance-plane defect, not a "
+                f"content problem: the two hosts must derive the same decision from the same "
+                f"manifest, and one of them is wrong.")
+            result = {**result,
+                      "decision": native.get("decision"),
+                      "cls": native.get("winningClass"),
+                      "rule_id": native.get("ruleId"),
+                      "reason": native.get("reason") or result.get("reason"),
+                      "refer": ({"layer": "operator", "reason": native["referReason"]}
+                                if native.get("referReason") else result.get("refer"))}
 
     # Measure side-channel (observation tier — never blocks): hard-ceiling verdicts become
     # fingerprinted architecture findings + a dispatch directive, sentinel-style. Independent of

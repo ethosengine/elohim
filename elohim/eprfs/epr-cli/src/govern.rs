@@ -24,15 +24,55 @@
 //! exit code is how a gate ends up silently permitting whenever its evaluator
 //! breaks.
 
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::OnceLock,
+};
 
-use eprfs_meta::{evaluate_path_with, resolve_decision, GovernanceWrite};
+use eprfs_meta::{evaluate_path_with, hex_lower, resolve_decision, GovernanceWrite};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 
 use crate::{
     error::{Error, Result},
     repository_validators::ElohimRepositoryValidators,
 };
+
+/// Content address of THIS evaluator build.
+///
+/// A decision that does not name its evaluator cannot be disputed precisely:
+/// "the native evaluator said refuse" is a claim about a moving target, since
+/// the next build may say otherwise for reasons no record captured. Naming the
+/// exact artifact turns a disagreement into something re-derivable — a second
+/// host can state which build it disputes, and a third can fetch that build and
+/// check.
+///
+/// The address is over the BINARY, not its inputs: the manifests and registries
+/// are already named by the decision, and what is in question here is the thing
+/// that read them. Hashing is memoized, so a one-shot `govern` process pays it
+/// once (~60ms on the debug build, less on release).
+fn evaluator_identity() -> Value {
+    static IDENTITY: OnceLock<Value> = OnceLock::new();
+    IDENTITY
+        .get_or_init(|| {
+            let cid = std::env::current_exe()
+                .ok()
+                .and_then(|path| std::fs::read(path).ok())
+                .map(|bytes| {
+                    let mut hasher = Sha256::new();
+                    hasher.update(&bytes);
+                    format!("sha256:{}", hex_lower(&hasher.finalize()))
+                });
+            json!({
+                "id": "elohim-epr-cli",
+                "version": env!("CARGO_PKG_VERSION"),
+                // `None` when the executable cannot be read — honest absence,
+                // never a placeholder that would read as a real address.
+                "cid": cid,
+            })
+        })
+        .clone()
+}
 
 /// Parsed `govern` invocation.
 #[derive(Debug, Default)]
@@ -168,6 +208,7 @@ pub fn evaluate(root: &Path, args: &[String]) -> Result<Value> {
 
     Ok(json!({
         "path": normalized,
+        "evaluator": evaluator_identity(),
         "decision": resolved.decision,
         "winningClass": resolved.winning_class,
         "ruleId": resolved.rule_id,

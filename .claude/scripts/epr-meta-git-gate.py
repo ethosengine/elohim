@@ -26,11 +26,16 @@ for _ in range(8):
         break
     _here = _here.parent
 
+from _lib import epr_client  # noqa: E402
 from _lib import epr_meta  # noqa: E402
 from _lib import epr_meta_git  # noqa: E402
 
+# Exit codes the native decision maps onto, mirroring epr_meta_git.decide's fold:
+# refuse always blocks; refer blocks unless acknowledged; permit allows.
+_NATIVE_BLOCKS = {"refuse", "refer"}
 
-def _witness_file(root: Path, path: str, verdict, *, ack: bool) -> None:
+
+def _witness_file(root: Path, path: str, verdict, *, ack: bool, evaluator: dict | None = None) -> None:
     """Witness ONE file's combined Verdict (or None) via the shared epr_meta.witness helper.
     Mirrors the resolver hook's decision mapping (epr_meta.decision_for), plus the git-only
     EPR_META_ACK downgrade: an acked ask is witnessed as permit + refer{reason: "acked"} — the ask
@@ -41,12 +46,13 @@ def _witness_file(root: Path, path: str, verdict, *, ack: bool) -> None:
     if verdict.cls == "ask" and ack:
         epr_meta.witness(root, runtime="git-gate", gate="git-gate", subject=path,
                           decision="permit", cls="ask", rule_id=verdict.rule_id,
-                          refer={"layer": "operator", "reason": "acked"}, checks=[verdict.reason])
+                          refer={"layer": "operator", "reason": "acked"}, checks=[verdict.reason],
+                          evaluator=evaluator)
         return
     info = epr_meta.decision_for(verdict)
     epr_meta.witness(root, runtime="git-gate", gate="git-gate", subject=path,
                       decision=info["decision"], cls=info["cls"], rule_id=info["rule_id"],
-                      refer=info["refer"], checks=[verdict.reason])
+                      refer=info["refer"], checks=[verdict.reason], evaluator=evaluator)
 
 
 def main(argv: list[str]) -> int:
@@ -62,19 +68,74 @@ def main(argv: list[str]) -> int:
 
     root = epr_meta.find_repo_root(Path.cwd())
     verdicts_by_path: list[tuple[str, object]] = []
+    native_by_path: list[tuple[str, dict | None]] = []
     for path, status in epr_meta_git.changed_files(mode, rng):
         content = epr_meta_git.content_of(mode, rng, path)
         parent_exists = epr_meta_git.head_has_parent(mode, rng, path)
         write = epr_meta_git.build_write(path, status, content, parent_exists)
         verdicts_by_path.append((path, epr_meta_git.verdict_for(path, write)))
+        native_by_path.append((path, epr_client.govern(
+            root, path, write.get("content"), write.get("is_new", False),
+            write.get("is_new_subdir", False))))
 
+    native_lookup = dict(native_by_path)
     for path, v in verdicts_by_path:
         try:
-            _witness_file(root, path, v, ack=ack)
+            native = native_lookup.get(path)
+            _witness_file(root, path, v, ack=ack,
+                          evaluator=(native.get("evaluator") if native
+                                     else epr_meta.evaluator_identity()))
         except Exception:  # noqa: BLE001 — witnessing must never break the gate
             pass
 
     code, msgs = epr_meta_git.decide([v for _, v in verdicts_by_path], ack=ack)
+
+    # ── the native evaluator is the DECISION AUTHORITY ────────────────────────
+    # This gate is the surface that covers EVERY author — Codex, Gemini, a human
+    # driving git — which is the whole reason a native evaluator matters. Both
+    # hosts evaluate each file; `epr` decides; a decision-level dispute is
+    # recorded by name rather than resolved silently. Python's messages are kept
+    # regardless, because three validators are scoped `python` by declaration
+    # and their advisories exist nowhere else.
+    py_by_path = dict(verdicts_by_path)
+    ran, disputes, native_worst = 0, [], None
+    for path, native in native_by_path:
+        if native is None:
+            continue
+        ran += 1
+        verdict = py_by_path.get(path)
+        py_decision = (epr_meta.decision_for(verdict)["decision"] if verdict is not None
+                       else "permit")
+        rs_decision = native.get("decision")
+        if py_decision != rs_decision:
+            disputes.append(f"{path}: python={py_decision} vs rust={rs_decision} "
+                            f"(rule `{native.get('ruleId')}`)")
+            try:
+                epr_meta.witness(root, runtime="git-gate", gate="git-gate", subject=path,
+                                 decision=rs_decision, cls=native.get("winningClass"),
+                                 rule_id=native.get("ruleId"),
+                                 refer={"layer": "operator", "reason": "evaluator-disagreement"},
+                                 evaluator=native.get("evaluator"),
+                                 checks=[f"EVALUATOR DISAGREEMENT: python={py_decision} "
+                                         f"vs rust={rs_decision}",
+                                         f"disputed: {epr_meta.evaluator_identity()}",
+                                         f"authority: {native.get('evaluator')}"])
+            except Exception:  # noqa: BLE001 — witnessing must never break the gate
+                pass
+        if rs_decision in _NATIVE_BLOCKS and not (rs_decision == "refer" and ack):
+            native_worst = "refuse" if rs_decision == "refuse" else (native_worst or "refer")
+            msgs.append(f"[{rs_decision}] (native) {native.get('reason')} "
+                        f"(rule `{native.get('ruleId')}`, path {path})")
+
+    if ran == 0 and native_by_path:
+        msgs.append(epr_client.DEGRADED_NOTICE)
+    for dispute in disputes:
+        msgs.append(f"[.epr-meta] EVALUATOR DISAGREEMENT — {dispute}. The native evaluator is the "
+                    f"decision authority; the dispute is recorded to the governance ledger. Two "
+                    f"hosts must derive the same decision from the same manifest.")
+    if native_worst is not None:
+        code = 1
+
     for m in msgs:
         print(m, file=sys.stderr)
     return code

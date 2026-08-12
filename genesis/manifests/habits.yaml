@@ -743,10 +743,10 @@ habits:
       yields one decision class, not one per implementation that happens to be
       reachable; every decision names the evaluator that produced it; and a
       second host can re-derive that decision and record a disagreement by name.
-    status: red
-    active: true
+    status: green
+    active: false
     checks:
-      - "python3 .claude/scripts/_lib/__tests__/validator_registry_parity_test.py — validator ACCOUNTING against the shared scope registry elohim/sdk/schemas/v1/registries/governance-validators.json: (a) the registry exists, (b) both provider registries parse, (c) no implemented validator is undeclared, (d) each host implements exactly what the registry scopes to it, (e) the Rust evaluator is invoked by at least one gate. (a)-(d) GREEN since 2026-08-12; (e) is the standing red and the remaining work."
+      - "python3 .claude/scripts/_lib/__tests__/validator_registry_parity_test.py — 11 assertions, GREEN 2026-08-12. Validator ACCOUNTING against the shared scope registry (no implemented validator undeclared; each host implements exactly its declared share), WIRING (both live decision surfaces call the native evaluator), and ATTRIBUTION (both hosts name themselves by content address; the ledger stamps an evaluator on every decision; a dispute record names both builds)."
       - "cargo test -p elohim-epr-cli --test governance_parity_vectors — the Rust half of the correspondence theorem over governance-parity-vectors.json, run against the COMPOSED evaluator (library + ElohimRepositoryValidators). GREEN at 12/12, 0 skips. The Python half (python3 .claude/scripts/_lib/__tests__/test_governance_parity.py) is GREEN at 12/12 / 52 assertions. Both hosts now derive the same verdict from the same corpus — correspondence, which is necessary and NOT sufficient for this habit."
       - "cargo test -p elohim-epr-cli --test live_manifest_integrity — the native integrity layer over the LIVE corpus (43 manifests), guarding against an over-strict check that would false-block every write under a subtree. GREEN."
     evidence: >
@@ -802,12 +802,43 @@ habits:
       authoring question at all. Cross-checked at 129 prospective writes across
       all 43 governed subtrees: 129/129 decisions identical, 127/129 identical
       down to rule id, the two differing by declared scope, not drift.
-      REMAINING: no gate invokes the Rust evaluator, so it is parity-tested but
-      never run. That is assertion (e), and it is the whole of what is left.
-      This habit flips green when the registry is one list, every decision
-      carries an evaluator_cid, and one recorded disagreement names the
-      evaluator CID it disputes. Neither red going green alone is sufficient —
-      do NOT flip on the first assertion.
+      GREEN 2026-08-12, same day, against the three-part flip condition stated
+      when it was filed — registry is one list; every decision carries an
+      evaluator_cid; a recorded disagreement names the evaluator CID it disputes.
+      (1) ONE LIST: governance-validators.json, read by both hosts, with the
+      accounting enforced (no undeclared implementation, no unhonoured
+      declaration, and no predicate implemented twice).
+      (2) EVERY DECISION NAMES ITS EVALUATOR: `epr govern` stamps
+      {id, version, cid} where cid is sha256 over the binary itself; the Python
+      evaluator addresses its own source the same way; witness() stamps one on
+      every ledger row. Verified live — a real row now carries
+      cid sha256:ff5d86ed…, the build that decided it.
+      (3) THE DISPUTE PATH PRODUCES THE ARTIFACT: both decision surfaces run
+      both hosts, `epr` is the authority, and a decision-level disagreement is
+      witnessed with refer.reason=evaluator-disagreement plus BOTH content
+      addresses ("disputed:" the losing build, "authority:" the deciding one).
+      Proven by controlled injection — a stub evaluator returning `refuse` where
+      Python returned `permit` — which is the honest way to test a dispute path
+      whose whole purpose was to have no live instances left. Ledger row
+      verified end to end.
+      Two design corrections are load-bearing and are why this is not merely a
+      passing test. Authority applies to the DECISION, not the advice: when the
+      hosts agree, Python's class/rule/reason are kept, because three validators
+      are scoped `python` by declaration and their `inject` advisories exist
+      nowhere else (guard Risk 1b). And the degraded notice fires only where a
+      decision was actually made — a clean allow stays SILENT per the polarity
+      law, and is debounced besides, so a missing binary informs once rather than
+      bannering every governed write.
+      FALLBACK (operator decision 2026-08-12): when `epr` cannot be resolved the
+      Python evaluator decides and says so. `epr` is not on PATH — it is compiled
+      into a branch-scoped cargo-pool slot — so "refer when the binary is
+      missing" would fire on essentially every governed write rather than in a
+      rare outage. Referring is reserved for the genuine absence the polarity law
+      is about: neither host able to answer.
+      NOT CLAIMED: `epr` on PATH by default. Until it is installed (devfile /
+      justfile), the common local state is native-decides-when-warm,
+      Python-decides-otherwise. The dispute path only runs when the binary
+      resolves; that is the honest ceiling of this green.
     guard: >
       Risk 1 — "parity" achieved by deleting the divergent validators rather
       than by unifying the evaluators. That would make the check green and the

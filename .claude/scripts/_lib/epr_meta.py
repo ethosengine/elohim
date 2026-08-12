@@ -1560,9 +1560,23 @@ def combine(verdicts: list[Verdict]) -> Verdict | None:
 FINDINGS_LEDGER_REL = ".claude/data/governance-findings.jsonl"
 
 
+def evaluator_identity() -> dict:
+    """Content address of the PYTHON evaluator — this module's own source.
+
+    The Rust twin addresses its compiled binary; here the source IS the artifact,
+    so it is what gets hashed. Symmetry matters more than the mechanism: both
+    hosts must be able to say WHICH build decided, or a disagreement names two
+    moving targets and cannot be re-derived by anyone."""
+    try:
+        digest = hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest()
+        return {"id": "_lib.epr_meta", "cid": f"sha256:{digest}"}
+    except Exception:  # noqa: BLE001 — an unreadable source is an honest absence, not a fake id
+        return {"id": "_lib.epr_meta", "cid": None}
+
+
 def witness(root: Path, *, runtime: str, gate: str, subject, decision: str, cls: str | None,
             rule_id: str | None = None, policy_ref: str | None = None, refer: dict | None = None,
-            checks: list | None = None) -> None:
+            checks: list | None = None, evaluator: dict | None = None) -> None:
     """Append one JSON line to governance-findings.jsonl — the keel Verdict projected to JSONL.
     Shared by the resolver hook AND the git-gate CLI so both runtimes write the SAME shape.
     Flock-append idiom cloned from the resolver's _handle_measures (best-effort; NEVER raises —
@@ -1579,6 +1593,10 @@ def witness(root: Path, *, runtime: str, gate: str, subject, decision: str, cls:
             "policyRef": policy_ref,
             "refer": refer,
             "witness": checks or [],
+            # WHICH evaluator produced this decision. Defaulted to the Python
+            # evaluator because that is who is running when no caller says
+            # otherwise; a caller that delegated to `epr` passes its identity.
+            "evaluator": evaluator or evaluator_identity(),
         }
         ledger = Path(root) / FINDINGS_LEDGER_REL
         ledger.parent.mkdir(parents=True, exist_ok=True)

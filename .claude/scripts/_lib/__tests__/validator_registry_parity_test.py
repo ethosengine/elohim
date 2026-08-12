@@ -140,31 +140,106 @@ check(
     "\n".join(["The scope map and the implementations disagree:", *[f"    - {m}" for m in missing]]),
 )
 
-# ── is the parity-tested twin actually reachable from any gate? ───────────────
-gate_files = [
-    REPO / ".husky/pre-push",
-    REPO / ".husky/pre-commit",
+# ── is the parity-tested twin actually reachable from every live gate? ────────
+# This looked for a shell `epr check` before 2026-08-12, which was a proxy for the
+# real question ("does the native evaluator RUN here?") written when a subprocess
+# string was the only conceivable mechanism. The wiring is a Python client
+# (`_lib.epr_client.govern`), so the proxy no longer matches the mechanism it was
+# standing in for. It now checks the mechanism itself — at BOTH decision surfaces,
+# because one wired surface and one unwired surface is still a plane where the
+# native evaluator does not decide.
+DECISION_SURFACES = [
     REPO / ".claude/hooks/epr-meta-resolver.py",
     REPO / ".claude/scripts/epr-meta-git-gate.py",
 ]
-invokers = [
+CLIENT = REPO / ".claude/scripts/_lib/epr_client.py"
+
+check(
+    "the native client exists and exposes the prospective-write entry point",
+    CLIENT.is_file() and "def govern(" in CLIENT.read_text(),
+    f"expected {CLIENT.relative_to(REPO)} to provide govern() over `epr govern`",
+)
+
+unwired = [
     p.relative_to(REPO).as_posix()
-    for p in gate_files
-    if p.is_file() and re.search(r"\bepr\s+(check|govern)\b", p.read_text())
+    for p in DECISION_SURFACES
+    if not (p.is_file() and re.search(r"epr_client\.govern\s*\(", p.read_text()))
 ]
 check(
-    "the Rust evaluator is invoked by at least one gate",
-    bool(invokers),
+    "every live decision surface invokes the native evaluator",
+    not unwired,
     "\n".join(
         [
-            "No gate invokes it. The Rust evaluator is parity-tested but never RUN, so a future",
-            "divergence from the live Python evaluator cannot surface in normal use — which is",
-            "how four measured divergences survived until 2026-08-12.",
-            "",
-            "This is the remaining leg of `governance-plane-single-evaluator`: collapse to ONE",
-            "evaluator by making the Python hook a client of `epr`, falling back to REFER —",
-            "never permit — when the binary is absent.",
-            f"Searched: {', '.join(p.relative_to(REPO).as_posix() for p in gate_files if p.is_file())}",
+            "These surfaces still decide without consulting the native evaluator, so a",
+            "divergence there cannot surface in normal use — which is how four measured",
+            "divergences survived until 2026-08-12:",
+            *[f"    - {p}" for p in unwired],
+        ]
+    ),
+)
+
+# A wired surface that cannot report a dispute has not moved the habit: agreement
+# is the trivial half of re-derivability, and the artifact is the disagreement.
+disputeless = [
+    p.relative_to(REPO).as_posix()
+    for p in DECISION_SURFACES
+    if p.is_file() and "evaluator-disagreement" not in p.read_text()
+]
+check(
+    "every wired surface records a decision-level dispute BY NAME "
+    "(agreement is the trivial half; the artifact is the disagreement)",
+    not disputeless,
+    "\n".join(
+        [
+            "These consult the native evaluator but have no dispute path, so a disagreement",
+            "would be resolved silently and leave no record:",
+            *[f"    - {p}" for p in disputeless],
+        ]
+    ),
+)
+
+# ── does every decision name the evaluator that produced it? ──────────────────
+# The invariant is re-derivability, and a decision that does not name its
+# evaluator cannot be disputed precisely: "the native evaluator said refuse" is a
+# claim about a moving target. Naming the exact artifact is what lets a second
+# host state which build it disputes and a third fetch that build and check.
+py_identity = epr_meta.evaluator_identity()
+check(
+    "the Python evaluator can name itself by content address",
+    bool(py_identity.get("id")) and str(py_identity.get("cid", "")).startswith("sha256:"),
+    f"got {py_identity}",
+)
+
+GOVERN_SRC = REPO / "elohim/eprfs/epr-cli/src/govern.rs"
+check(
+    "the native evaluator stamps its identity onto every decision payload",
+    GOVERN_SRC.is_file()
+    and "fn evaluator_identity()" in GOVERN_SRC.read_text()
+    and '"evaluator": evaluator_identity()' in GOVERN_SRC.read_text(),
+    f"expected {GOVERN_SRC.relative_to(REPO)} to emit an `evaluator` block carrying a content address",
+)
+
+WITNESS_SRC = (REPO / ".claude/scripts/_lib/epr_meta.py").read_text()
+check(
+    "the governance ledger records the evaluator on every witnessed decision",
+    '"evaluator": evaluator or evaluator_identity()' in WITNESS_SRC,
+    "witness() must stamp an evaluator; an unattributed decision cannot be disputed",
+)
+
+nameless = [
+    p.relative_to(REPO).as_posix()
+    for p in DECISION_SURFACES
+    if p.is_file()
+    and not ("disputed:" in p.read_text() and "authority:" in p.read_text())
+]
+check(
+    "a recorded disagreement names BOTH evaluators it stands between",
+    not nameless,
+    "\n".join(
+        [
+            "These record that a dispute happened without naming the two builds, so the",
+            "record cannot be re-derived by anyone who was not there:",
+            *[f"    - {p}" for p in nameless],
         ]
     ),
 )
