@@ -39,8 +39,9 @@ from _lib import frontmatter as _fm  # noqa: E402
 from _lib import subject_routing as _sr  # noqa: E402
 from _lib import cite_graph as _cg  # noqa: E402
 from _lib import env_scope as _es  # noqa: E402
+from _lib import paths as _paths  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = _paths.repo_root_from_file(__file__)
 GAP_DIR = ROOT / ".claude/memory-kit/gap-items"
 THRESHOLD = 40
 

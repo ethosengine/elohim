@@ -56,7 +56,19 @@ DEFAULT_OUT_ROOT = _paths.reports_root(REPO_ROOT)
 
 # --- Surface discovery -----------------------------------------------------
 
-CLAUDE_MD_EXCLUDE = ("node_modules", "target", ".cargo-target-pool", "sophia", "held")
+# "worktrees" — .claude/worktrees/ is gitignored ephemeral agent scratch; its CLAUDE.md
+# copies are duplicates of real surfaces and inflate the ranking with phantom rows.
+# "repos" — genesis/research/repos/ holds untracked upstream clones; their CLAUDE.mds are
+# other projects' gospel, not ours to audit or rewrite.
+CLAUDE_MD_EXCLUDE = (
+    "node_modules",
+    "target",
+    ".cargo-target-pool",
+    "sophia",
+    "held",
+    "worktrees",
+    "repos",
+)
 
 
 def discover_agents(root: Path) -> list[Path]:

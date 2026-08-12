@@ -6,7 +6,7 @@ contentFormat: "markdown"
 title: "The vision × readiness sprint roadmap (the maintained prioritization home)"
 slug: "vision-readiness-sprint-roadmap"
 written: "2026-06-02"
-regenerated: "2026-07-30"
+regenerated: "2026-08-11"
 author: "cartographer"
 status: "active"
 target_window: "open-ended"
@@ -39,13 +39,16 @@ tags: [roadmap, prioritization, maintained-artifact, regenerated-each-ceremony, 
 > 3. **the vision axis** — the gospel-tier priority re-mined each cycle (currently
 >    `project_household_living_core_lived_contrast_diffusion`).
 >
-> **Current regeneration: 2026-07-30** (substrate-currency ceremony, Phase 1b). Prior body was
-> written 2026-06-02 and had drifted for ~8 weeks; the drift and its cost are named in
-> "What closed since the last regeneration" below. When any of the three inputs moves — a sprint
-> drains, the operator flips an env flag in `cluster-state.yaml`, or the vision re-mine shifts the
-> #1 axis — re-run the cartographer pass and rewrite the body. The frontmatter `status: active`
-> says "this roadmap is the live prioritization surface," not "this exact ranking is frozen.
-> **If the body is stale against today's `--ledger`/`--focus`, that is drift; close it.**
+> **Current regeneration: 2026-08-11** (substrate-currency ceremony, Phase 1b). Prior regeneration
+> was 2026-07-30, 12 days back — well inside currency. Rankings hold; the numbers moved (ledger
+> pressure grew, decompose coverage widened, one more BLOCKED-BY-ENV gap surfaced) and the standing
+> red habit (`notary-authority`) advanced through three cure batches without yet flipping. This
+> regeneration re-stamps against those live inputs — see "What moved since the last regeneration"
+> below. When any of the three inputs moves — a sprint drains, the operator flips an env flag in
+> `cluster-state.yaml`, or the vision re-mine shifts the #1 axis — re-run the cartographer pass and
+> rewrite the body. The frontmatter `status: active` says "this roadmap is the live prioritization
+> surface," not "this exact ranking is frozen." **If the body is stale against today's
+> `--ledger`/`--focus`, that is drift; close it.**
 
 ---
 
@@ -68,8 +71,9 @@ This axis is the **default reading entry** for the whole roadmap and for the can
 
 ---
 
-## What closed since the last regeneration (do not re-rank these)
+## What moved since the last regeneration (2026-07-30 → 2026-08-11)
 
+**Prior closures stand (do not re-rank these):**
 - **The 2026-06-02 §4 recommendation is DONE.** It named "run ci-investigator on the dwelling-hub /
   mutual-storage-replication first instance." That verification **completed 2026-06-06** — the plan
   now reads `status: landed`, `landed_commit: a169ab72c`, `verified_by: ci-investigator 2026-06-06 —
@@ -81,29 +85,66 @@ This axis is the **default reading entry** for the whole roadmap and for the can
 - **The legibility premise of the old Sprint 5 partly closed**: the Developer-Paths index the old
   body asked for now exists as `genesis/docs/content/elohim-protocol/architecture/MAP.md`.
 
-**The cost of the drift, stated plainly.** For ~8 weeks §4 pointed at a completed action, and every
-sprint it gated drained **zero** OPEN items. A roadmap that names a finished move is worse than no
-roadmap: it reads as a live gate. The structural correction in this regeneration is that **§4 is now
-a forward move and the verification discipline is a named parallel lane (§2) with its own owner** —
-never again a gate that parks the seed.
+**What moved in this 12-day window:**
+- **`notary-authority` (the habits register's top red, `active: true`) advanced through three cure
+  batches on `dev`** — batch-1 drain cure (`b96861c1b`), adversarial-review fixes (`31f8a9e89`),
+  batch-2 trust-gradient adopt (`639ef94e6`), and batch-3 ghost-declaration decay (`a9f9d781b`,
+  hardened `6368847e3`, metered `20d1fe952`) — the phantom-declared-head deadlock that was masquerading
+  as "unanchored rows" is diagnosed and coded-cured. **Status stays RED on the strict rule**: the
+  named check is the edge Dataplane Validation measure, and the banking run (deploy → watch
+  decay-author/witness-authored go nonzero and actionable collapse to 0-2 → validate-only 3/3) has
+  not yet recorded. This is now the single nearest-to-flip red in the register — see §4.
+- **Sprint 1-7's decomposed-plan OPEN counts are UNCHANGED** (verified against
+  `.claude/memory-kit/gap-items/*.json` for all seven drains) — no plan in §1 drained or regressed
+  this window. The §1 ranking below is unchanged, not stale.
+- **A new operator-directed plan landed alongside Sprint 1, not competing with it**:
+  `2026-08-11-measure-ontology-slice1-epr-local-first-plan.md` (measure kind/confidence vocabulary
+  in `elohim/epr`) declares in its own frontmatter that it "composes onto Sprint 1's surface rather
+  than competing with it" — Sprint 1 hardens `epr-rea`'s fold, this slice adds the ontology that fold
+  will carry. `household-nodes`, 0 BLOCKED-BY-ENV, fully testable now. Not ranked as a numbered
+  sprint (operator-directed, not ledger-ranked) but named here so it isn't lost.
+- **The pressure queue grew** 203 → 220 files (MEM-UNLINKED 108→121, UNKNOWN-STATUS 51→55; NEEDS-
+  TRIAGE 28, CLAIMED-ONLY 10, SUPERSEDED 6 all unchanged) — see §2, still a parallel lane not a gate.
+- **BLOCKED-BY-ENV grew** 23 → 26 gaps: the held `iroh-delivery-master` still carries its 22, and
+  `sdk-promise-substrate-program-plan` went from 1 to ~4 gap-level `@requires:alpha-cluster-6peer`
+  tags (more of its live-confirmation legs got tagged since last regen — narrower testable surface
+  for that plan, not a regression; ~37 of its 41 OPEN gaps remain testable on `household-nodes`).
+  Notably, that plan's own flip-condition step names `notary-authority` directly — it is a second
+  source pointing at the same top-red action as §4.
+- **Decompose coverage widened**: 162/308 specs+plans decomposed now (was tracked loosely before),
+  146 UN-CAPTURED backlog remains — see the decompose-loop queue, unchanged priority (librarian lane,
+  not a sprint pick).
+
+**The cost of the 2026-06-02→2026-07-30 drift is still the operating lesson.** For ~8 weeks the old
+§4 pointed at a completed action, and every sprint it gated drained **zero** OPEN items. The
+structural correction that regeneration added — **§4 is a forward move, verification is a named
+parallel lane (§2) with its own owner** — holds this cycle too: notary-authority's bank-and-flip
+action below is itself nearly free (an edge push + observation, not new code), so naming it does not
+repeat the old mistake of gating the seed behind hygiene.
 
 ---
 
-## The ledger in one breath (measured 2026-07-30)
+## The ledger in one breath (measured 2026-08-11)
 
-- **4,164 OPEN decomposed gaps across 212 docs** (was ~3,528 / ~147 at the 2026-06-02 regeneration).
-- **651 CLAIMED gaps** (checked ≠ done — the verify surface).
-- **23 BLOCKED-BY-ENV gaps**: 22 in the held `iroh-delivery-master`, 1 in `sdk-promise-substrate-program-plan`.
-- **Pressure queue: 203 files** — MEM-UNLINKED 108 · UNKNOWN-STATUS 51 · NEEDS-TRIAGE 28 ·
-  CLAIMED-ONLY 10 · SUPERSEDED 6.
-- **All four `genesis/docs/_state/{blockers,regression,unverified,needs-triage}` pressure dirs are empty.**
+- **4,249 OPEN decomposed gaps across 217 docs (226 files scanned)** — was 4,164 / 212 at the
+  2026-07-30 regeneration (~3,528 / ~147 at 2026-06-02). Growth is decompose-coverage widening (162/308
+  specs+plans now decomposed, 146 UN-CAPTURED remain), not new debt — confirmed by re-checking all
+  seven §1 drain plans: **zero** of their OPEN counts moved this window.
+- **651 CLAIMED gaps** (checked ≠ done — the verify surface). Unchanged.
+- **26 BLOCKED-BY-ENV gaps** (was 23): 22 in the held `iroh-delivery-master`, ~4 in
+  `sdk-promise-substrate-program-plan` (up from 1 — more live-confirmation legs tagged
+  `@requires:alpha-cluster-6peer` since last regen; ~37 of its 41 OPEN gaps stay testable).
+- **Pressure queue: 220 files** (was 203) — MEM-UNLINKED 121 (was 108) · UNKNOWN-STATUS 55 (was 51) ·
+  NEEDS-TRIAGE 28 · CLAIMED-ONLY 10 · SUPERSEDED 6 (last three unchanged).
+- **All four `genesis/docs/_state/{blockers,regression,unverified,needs-triage}` pressure dirs are
+  still empty.**
 
-**Read the growth honestly — it is mostly measurement, not debt.** The doc count nearly doubled
-(147→212) because decomposition coverage widened, and a large share of the OPEN total is
-**landed-but-unchecked** work, not work to do. Two proven instances: the dwelling-hub plan carries
-**77 OPEN** and `iroh-recovery-e2e` carries **27 OPEN** — 104 phantom OPEN from two plans that are
-both `verified_by: ci-investigator 2026-06-06`. **The checkbox is not the verdict**; the frontmatter
-`verified_by` is. Treat the OPEN total as an upper bound, never as a workload estimate.
+**Read the growth honestly — it is mostly measurement, not debt.** A large share of the OPEN total is
+still **landed-but-unchecked** work, not work to do. Two proven instances stand from the last
+regeneration: the dwelling-hub plan carries **77 OPEN** and `iroh-recovery-e2e` carries **27 OPEN** —
+104 phantom OPEN from two plans that are both `verified_by: ci-investigator 2026-06-06`. **The
+checkbox is not the verdict**; the frontmatter `verified_by` is. Treat the OPEN total as an upper
+bound, never as a workload estimate.
 
 **One comparison that is NOT apples-to-apples:** the 2026-06-02 body's "2 CLAIMED-ONLY pressure
 items" counted *docs sitting in the `_state/unverified/` dir*; the 651 above counts decomposed
@@ -113,6 +154,12 @@ dir the old §2 pointed at is now empty, so that track's premise is **restated b
 ---
 
 ## §1 — The ranked sprints (by vision × readiness)
+
+**Unchanged this cycle** — re-verified against `.claude/memory-kit/gap-items/*.json` for all seven
+drains on 2026-08-11; every OPEN count below is byte-identical to the 2026-07-30 regeneration. The
+one addition is parallel, not competing: `2026-08-11-measure-ontology-slice1-epr-local-first-plan.md`
+composes onto Sprint 1's surface (extends `epr-rea`'s fold with the kind/confidence vocabulary Sprint
+1 will carry) rather than displacing it — pick either or both, they don't conflict.
 
 ### Sprint 1 — REA rails at the household: economic-event emit + commitment graduation
 - **Pillar:** shefa/elohim (core substrate) · mishpat (bounds)
@@ -177,7 +224,7 @@ dir the old §2 pointed at is now empty, so that track's premise is **restated b
   mcp-servers) — code exists, no `tier: architecture` seed of its own, no decomposed plan. Bridges
   `project_elohim_active_observed_not_flagged` (Phase::ElohimActive from real inference; stub =
   DevContext).
-- **Readiness: PARTIALLY READY — still spec-orphaned** (re-checked 2026-07-30: `elohim-agent` is
+- **Readiness: PARTIALLY READY — still spec-orphaned** (re-checked 2026-08-11: `elohim-agent` is
   referenced across the architecture corpus but owns no architecture seed). Pickable as a `/shift`
   that writes the thin spec **and** wires one real inference path; not a clean checkbox-drain.
 - **Why #5:** One elohim per node is the protocol's irreducible primitive — the whole
@@ -204,7 +251,8 @@ dir the old §2 pointed at is now empty, so that track's premise is **restated b
 
 ## §2 — Verification track, RESTATED: checkbox-vs-verdict reconciliation
 
-The old §2 pointed at the `_state/unverified/` pressure dir. **That dir is empty** (2026-07-30), so
+The old §2 pointed at the `_state/unverified/` pressure dir. **That dir is still empty** (re-verified
+2026-08-11, all four pressure dirs), so
 the old premise is gone. The premise that replaces it is sharper and better-evidenced:
 
 **The ledger's OPEN count is inflated by landed-and-verified work whose checkboxes were never
@@ -239,21 +287,29 @@ never force-shrunk.
 
 ## §3 — BLOCKED-BY-ENV — do NOT pick now
 
-Per `--focus` against `cluster-state.yaml` (schema `updated: 2026-06-04`), read 2026-07-30:
+Per `--focus` against `cluster-state.yaml` (schema `updated: 2026-06-04`), read 2026-08-11:
 **AVAILABLE = harbor-registry, household-nodes, observability, shem. UNAVAILABLE =
-alpha-cluster-6peer (degraded).**
+alpha-cluster-6peer (degraded).** Unchanged from 2026-07-30 — no cluster-state edit this window.
 
-**This section shrank sharply and that is the headline.** The 2026-06-02 body held three resources
-unavailable (harbor false, shem false, alpha degraded); two have since been restored with
+**This section shrank sharply at the 2026-07-30 regeneration and stays shrunk.** The 2026-06-02 body
+held three resources unavailable (harbor false, shem false, alpha degraded); two were restored with
 evidence-backed flips (harbor 2026-06-03, shem operator-confirmed 2026-06-20 — the earlier "offline"
-note had been stale prose contradicting `available: true`). Only one hold remains:
+note had been stale prose contradicting `available: true`). Only one hold remains, and it widened
+slightly this window:
 
 - **`held/plans/2026-05-10-iroh-delivery-master.md`** — 22 gaps needing
   `['harbor-registry','alpha-cluster-6peer']`. **HOLD** (alpha is the blocker; harbor returned).
-- **`2026-07-25-sdk-promise-substrate-program-plan.md`** — 1 gap on `alpha-cluster-6peer`. The other
-  40 OPEN gaps in that plan are testable; **hold the gap, not the plan** (scope is gap-granular).
+  Unchanged.
+- **`2026-07-25-sdk-promise-substrate-program-plan.md`** — now ~4 gaps tagged
+  `@requires:alpha-cluster-6peer` (was 1 at last regen — more live-confirmation legs got tagged since).
+  ~37 of its 41 OPEN gaps remain testable; **hold the gap, not the plan** (scope is gap-granular). This
+  plan's own flip-condition step explicitly targets the `notary-authority` habit ("Flip the habit with
+  evidence — @requires:alpha-cluster-6peer for the live half... only on the habits register's own
+  strict rule: ×2 fresh edge validations on a settled fleet") — the same action named in §4.
 - **Alpha-cluster 6-peer** (degraded, 10/13 peers CrashLooping): the cross-node soak legs of
-  Sprint 2. Keep those legs out of scope; single-household + intimate-circle legs stay in.
+  Sprint 2, and the live-confirmation legs above. Keep those legs out of scope; single-household +
+  intimate-circle legs stay in. Whether the CrashLooping is code or env-down is still UNRESOLVED per
+  `cluster-state.yaml` — no new evidence this window.
 
 **Vocabulary drift to reconcile:** `2026-06-29-p2p-dataplane-validation-suite-plan.md` declares
 `@requires:multi-node` on 3 gaps; `multi-node` is not a resource name in `cluster-state.yaml`, and
@@ -271,8 +327,42 @@ on edit — re-run `--focus` and regenerate this roadmap after any operator topo
 
 ## §4 — Single highest-leverage next move
 
-**Finish and prove Sprint 1 — the REA rails: `2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md`
-(21 OPEN / 0 CLAIMED) on `household-nodes`.**
+**Bank the `notary-authority` flip — the habits register's sole `active: true` habit and its top red.**
+The cure already landed on `dev` across three batches (`b96861c1b` drain cure, `31f8a9e89` review
+fixes, `639ef94e6` trust-gradient adopt, `a9f9d781b`/`6368847e3`/`20d1fe952` ghost-declaration decay).
+The remaining action is operational, not code: deploy, watch `elohim_content_ghost_decay_author_total`
+and witness-authored counters go nonzero and actionable collapse to the 0-2 band, then bank with a
+`[build:edge] [edge:validate-only]` run recording 3/3 on `@concern:notary-authority` — the strict flip
+rule (×2 fresh edge validations on a settled fleet; a single green run during post-deploy churn is the
+exact false signal that regressed scenario 2 in edge #1188).
+
+*Pre-authored Objective (drop-in for `/shift`):* Preflight the fleet-quiesce gate's four legs (matthew
+caughtUp via doorway `/p2p/status`, `divergent_actionable<=2` + `unmeasured=0` via per-pod Prometheus,
+both doorways 200 on `/db/content/elohim-host-landing`), trigger the deploy/measure cycle, and dispatch
+ci-investigator to confirm the 3/3 banking on the resulting edge build. If the fleet is not yet
+settled, this is a watch-and-retrigger loop, not new code — do not write a fourth cure batch before
+confirming the three already landed didn't close it.
+
+**Grounding — why this is the move, and why it agrees with the habits register rather than
+overriding the vision axis:**
+- It is the **literal session contract**: `habits.yaml`'s own covenant reads "sessions serve the
+  habits — move reds green (with evidence)"; `notary-authority` is the sole `active: true` habit and
+  `habits-status.py`'s own top-red line names it directly.
+- It is **household-serving substrate trust, not network-scale breadth**. The invariant is "authority
+  answers come from the notary, never from LWW order" — a single household's own content needs a
+  canonical, non-ghost head exactly as much as a federated one does; the vision axis's "rank DOWN
+  collective coordination" reading does not apply to core substrate correctness the household rides
+  on. This is not an exception carved into the axis — it *is* the household-coherence read.
+- It is **near-free relative to its leverage**: zero new design, zero new decomposed gaps to open —
+  the code is already on `dev`. The cost is a preflight, a push, an observation window, and a
+  validate-only banking run.
+- A **second independent source** points at the same action: `sdk-promise-substrate-program-plan.md`'s
+  own flip-condition step (§3) names `notary-authority` and the identical strict ×2-validation rule —
+  convergent signal, not a single reading.
+
+**Then, as the next forward-sprint pick — unchanged from the 2026-07-30 regeneration — Sprint 1: the
+REA rails** (`2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md`, 21 OPEN / 0 CLAIMED, `household-
+nodes`).
 
 *Pre-authored Objective (drop-in for `/shift`):* Reconcile the slice-2a plan's checkboxes against
 what is already on disk (T2 `call_create_rea_economic_event`, T3 `economic_event_emit_service` —
@@ -281,28 +371,21 @@ T5 the commitment→content scorer-data stub, and T6 the two-conductor sweettest
 `elohim/elohim-storage/tests/rea_event_emit_graduation_e2e.rs` that proves a bounds-validated
 EconomicEvent emits, notarizes, and projects end-to-end. Estimated 2–3 cycles.
 
-**Grounding (why this is real, and satisfiable now):**
-- It is **actually open**: 21 OPEN / 0 CLAIMED in the live ledger, state ACTIVE, and the three
-  headline residuals were each checked against the tree today — no `graduate` fn in
-  `rea_commitment_service.rs`, no `rea_event_emit_graduation_e2e.rs` on disk.
-- It is **satisfiable on the available substrate**: `requires_env: [household-nodes]`, which is
-  AVAILABLE and is the stable floor (`feedback_household_nodes_is_the_stable_floor`). No
-  alpha-cluster dependency, no operator unblock.
-- Its **precondition is already paid**: it cites the dwelling-hub design as the instance-1 whose
-  floor-check gap it unblocks, and that instance was verified 2026-06-06. This is literally the move
-  the previous §4 was sequencing toward.
-
-**Why it beats the runners-up:**
+**Why Sprint 1 still beats the other runners-up** (unchanged reasoning):
 - *vs. Sprint 2 (recovery, 98 OPEN):* higher vision-per-cycle and far better readiness — recovery is
   one undifferentiated 98-item block with an alpha-gated leg; the rails are a 3-task residual on a
   partially-landed foundation.
 - *vs. §2 verification (56 CLAIMED, cheap):* the verification lane is cheaper but it is **hygiene,
-  not seed advance** — and making it §4 is precisely the failure mode of the last regeneration. It
-  runs in parallel with its own owner, and Sprint 1's first act performs it locally anyway.
+  not seed advance** — and making it §4 alone is precisely the failure mode of the 2026-06-02
+  regeneration. It runs in parallel with its own owner, and Sprint 1's first act performs it locally
+  anyway.
 - *vs. Sprint 4 (records-lifecycle spec completion):* that work documents the primitives; this work
   *makes them fire*. Care made computable beats care described.
 
-**Then** continue into Sprint 2 (recovery) as the second forward sprint — same available surface.
+**Why banking notary-authority first doesn't repeat the drift lesson:** the old §4 failure mode was
+naming a *finished* action and gating everything behind it. This action is the opposite shape — the
+habit is still RED, and the deploy/watch/bank cycle is a background trigger, not attention-consuming
+code work, so Sprint 1 is sequenced immediately alongside it, never blocked behind it.
 
 **This is the same move a `next-actions.md` handoff menu should name at the top of the cycle.** If a
 menu and this section ever disagree, the disagreement — not the ranking — is the bug.
@@ -318,17 +401,20 @@ menu and this section ever disagree, the disagreement — not the ranking — is
 - **Alpha-cluster-6peer**: `cluster-state.yaml` records that whether the 10/13 CrashLooping peers are
   a code regression or env-down is **UNRESOLVED**. Until an operator/investigation verdict lands, the
   soak legs stay held and cannot earn a regression cascade.
-- **Horizon scan freshness**: latest is `.claude/memory-kit/horizon-scans/2026-05-14.md` — 77 days
-  old at this regeneration. Under the 90-day gate, so no scan was run; it will trip on the next
-  ceremony after ~2026-08-12.
+- **Horizon scan freshness**: latest is `.claude/memory-kit/horizon-scans/2026-05-14.md` — 89 days
+  old at this regeneration. Still under the 90-day gate by one day, so no scan was run this cycle —
+  it trips on the very next ceremony (2026-08-12 or later). Flagging here so the next cartographer
+  pass doesn't have to recompute: run `/mem-horizon-scan` first thing next time.
 
 ---
 
-## Vision × readiness scoreboard (regeneration 2026-07-30)
+## Vision × readiness scoreboard (regeneration 2026-08-11)
 
 | # | Sprint | Pillar | Vision | Readiness | OPEN drained | Env |
 |---|--------|--------|:------:|:---------:|--------------|-----|
-| 1 | **REA rails — emit + graduation** | shefa/elohim/mishpat | 10 | 9 | 21 (T2/T3 already on disk) | none |
+| ⚑ | **§4 pick — bank `notary-authority`** | elohim (dataplane truth) | 10 | 9 | 0 new (cure already on `dev`; deploy+measure) | none (household-serving trust) |
+| 1 | REA rails — emit + graduation | shefa/elohim/mishpat | 10 | 9 | 21 (T2/T3 already on disk) | none |
+| — | *parallel, not ranked:* measure-ontology slice 1 | elohim (epr) | — | 9 | operator-directed, composes on Sprint 1 | none |
 | 2 | Grandma recovery + mutual-aid pair | imagodei/lamad | 9 | 7 | 98 + audit tails | partial (soak leg alpha-gated) |
 | 3 | Living-memory / records substrate gaps | elohim/imagodei | 9 | 9 | 56 | none |
 | 4 | Records-lifecycle **spec** completion *(demoted)* | elohim | 8 | 9 | 75 (doc-tier) | none |
@@ -336,7 +422,7 @@ menu and this section ever disagree, the disagreement — not the ranking — is
 | 6 | Pillar-EPR decomposition *(demoted, re-sized)* | cross-pillar/doorway | 5 | 7 | 143 | none |
 | 7 | Qahal collective substrate *(cond.)* | qahal/shefa | 5 | 8 | 50 + 4 | none (vision-deferred) |
 | V | Verification lane *(parallel, not a gate)* | — | — | — | 56 CLAIMED + 104 phantom OPEN | none |
-| ⛔ | iroh-delivery-master / sdk-promise 1 gap | infra | — | — | HELD (23 gaps) | alpha-cluster-6peer |
+| ⛔ | iroh-delivery-master / sdk-promise ~4 gaps | infra | — | — | HELD (26 gaps, was 23) | alpha-cluster-6peer |
 | ✅ | ~~dwelling-hub verification~~ · ~~iroh-recovery-e2e~~ | — | — | — | CLOSED 2026-06-06 | — |
 
 ---
@@ -353,11 +439,19 @@ Each memory ceremony (or `/converge` pass), the cartographer rewrites the body a
    principles). If the apex priority shifts, re-rank — UP for single-household-coherence, DOWN for
    network-scale breadth.
 
-**Two disciplines this regeneration added, learned the hard way:**
+**Disciplines learned the hard way, still in force:**
 - **§4 must be re-checked for completion first.** A next-move that has already landed is the most
-  expensive kind of staleness — it reads as a live gate and parks everything behind it.
+  expensive kind of staleness — it reads as a live gate and parks everything behind it (2026-07-30
+  regeneration).
 - **Size a sprint from the plan, not from its design.** Sprint 6 was mis-ranked for 8 weeks because
   the 2026-06-02 body read 6 OPEN off the design while the plan carried 143.
+- **§4 must agree with the habits register's top red, not just the largest ready gap-item block**
+  (2026-08-11 regeneration). The ledger alone would rank Sprint 1 (REA rails) into §4 again this
+  cycle; the habits register's session contract — "move the top red toward green with proof" — pulled
+  `notary-authority`'s bank-and-flip action to the top instead, on the grounds that it is household-
+  serving substrate trust, not network breadth, and near-free relative to Sprint 1's multi-cycle
+  code cost. When the two disagree, check whether the habit action is genuinely household-axis before
+  deferring to it — it will not always be.
 
 The frontmatter stays `status: active`; only the operator retires this entry. A regeneration that
 finds the rankings unchanged still **re-stamps the dated regeneration header** so the next reader
