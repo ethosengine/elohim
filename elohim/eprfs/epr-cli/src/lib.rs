@@ -12,6 +12,7 @@ pub mod error;
 pub mod explain;
 pub mod flow;
 pub mod git;
+pub mod govern;
 pub mod process;
 pub mod ready;
 pub mod report;

@@ -5,7 +5,7 @@ use elohim_epr_cli::{
     error::{Error, Result},
     explain, flow, git,
     git::{ChangeKind, ChangedPath},
-    ready,
+    govern, ready,
     report::{FindingStatus, Report},
     setup,
 };
@@ -30,6 +30,23 @@ fn main() -> ExitCode {
             Ok(code) => code,
             Err(error) => {
                 eprintln!("epr canon-lift: {error}");
+                ExitCode::from(2)
+            }
+        };
+    }
+
+    // `govern` evaluates ONE prospective write and prints a decision payload,
+    // not a Report — so it is dispatched here, before the Report-shaped commands.
+    // Its exit code means "did the evaluator run", never "what did it decide":
+    // a client must be able to tell a refusal from an absence.
+    if raw.first().map(String::as_str) == Some("govern") {
+        return match govern_main(&raw[1..]) {
+            Ok(value) => {
+                println!("{value}");
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("epr govern: {error}");
                 ExitCode::from(2)
             }
         };
@@ -60,6 +77,18 @@ fn main() -> ExitCode {
             ExitCode::from(2)
         }
     }
+}
+
+fn govern_main(args: &[String]) -> Result<String> {
+    let (repo, retained) = global_args(args.to_vec())?;
+    let start = repo.unwrap_or(env::current_dir().map_err(|source| Error::Read {
+        path: PathBuf::from("."),
+        source,
+    })?);
+    let root = git::discover_root(&start)?;
+    let value = govern::evaluate(&root, &retained)?;
+    serde_json::to_string_pretty(&value)
+        .map_err(|error| Error::InvalidArguments(format!("cannot serialize decision: {error}")))
 }
 
 fn run() -> Result<(Report, bool)> {
@@ -204,5 +233,5 @@ fn print_human(report: &Report) {
 }
 
 fn usage() -> &'static str {
-    "usage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|ready [--target REF] [--deep]|flow ...|canon-lift [--check|--write]>"
+    "usage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|flow ...|canon-lift [--check|--write]>"
 }
