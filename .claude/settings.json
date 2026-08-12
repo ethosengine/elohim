@@ -39,6 +39,13 @@
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/delivery-gate.py\"",
             "timeout": 15,
             "statusMessage": "Delivery gate (advisory)..."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/epr-evaluator-guard.py\"",
+            "timeout": 900,
+            "statusMessage": "Native governance evaluator...",
+            "async": true
           }
         ]
       }

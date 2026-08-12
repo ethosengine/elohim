@@ -835,10 +835,27 @@ habits:
       missing" would fire on essentially every governed write rather than in a
       rare outage. Referring is reserved for the genuine absence the polarity law
       is about: neither host able to answer.
-      NOT CLAIMED: `epr` on PATH by default. Until it is installed (devfile /
-      justfile), the common local state is native-decides-when-warm,
-      Python-decides-otherwise. The dispute path only runs when the binary
-      resolves; that is the honest ceiling of this green.
+      CEILING CLOSED 2026-08-12 (same day): `epr` is now established per session
+      by .claude/hooks/epr-evaluator-guard.py, so the native evaluator decides by
+      default rather than when a pool slot happens to be warm. The guard is
+      `async: true` and can never fail a session — the same reasoning that keeps
+      it out of devfile `postStart`, where a failed cargo build aborts
+      whole-workspace startup. It has TWO modes and only one compiles: THIS repo
+      is the evaluator's home, so here the binary is built from the tree and
+      rebuilt when sources move (dogfooding — the repo that authors the evaluator
+      is governed by it at the commit it currently is, and a stale binary would
+      otherwise decide with old law while stamping a CID that says so only after
+      the fact). A CONSUMER workspace receives `epr` PREBAKED in its image; there
+      the guard refuses to build and names the packaging gap, because
+      "compile if missing" as a universal rule turns every consumer into a build
+      host and hides image regressions behind a slow local success. Measured:
+      0.15s when current, ~0.6s to reinstall on a warm slot, and all five paths
+      (present · missing-in-dev · missing-without-sources · stale · idempotent
+      re-run) verified.
+      STILL NOT CLAIMED: the prebaked consumer image itself. No workspace image
+      bakes `epr` today, so a consumer workspace lands on the announced Python
+      fallback and the guard says exactly that. The dev surface is closed; the
+      packaging surface is named, not built.
     guard: >
       Risk 1 — "parity" achieved by deleting the divergent validators rather
       than by unifying the evaluators. That would make the check green and the
