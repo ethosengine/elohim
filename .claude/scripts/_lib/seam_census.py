@@ -99,8 +99,20 @@ REGISTRY_FILENAME = "seam-registry.yaml"
 
 # Discovery bounds: heavy/vendor dirs os.walk must never descend into, plus the two
 # explicitly-excluded trees the P3.2 task names (genesis/research; any `held/`).
+#
+# `.claude/worktrees` is excluded for a correctness reason, not a cost one. Agent worktrees hold
+# whole stale copies of the repo, so a registry deleted, renamed, or broken in the main tree
+# went on being discovered from a worktree — and SATISFIED the census's structural checks with
+# it. That is how `elohim-storage`'s over-cap (dead) main-tree registry kept the "every crate
+# the catalog routes really has a seam-registry.yaml" assertion green for two days: the crate
+# name was supplied by `.claude/worktrees/agent-af23065e7900363e0/`. A census that reads its own
+# scratch copies cannot measure the tree.
 _SKIP_DIR_NAMES = {".git", "node_modules", "target", "dist", "build", "__pycache__",
                    ".venv", "venv", ".cargo-target-pool"}
+
+# Path-specific exclusions (matched on the repo-relative path, never on a bare directory name —
+# `worktrees` is too common a word to prune globally).
+_SKIP_REL_DIRS = {"genesis/research", ".claude/worktrees"}
 
 ALL_CONCERN_IDS = ("C0", "C1", "C2", "C3", "C4", "C5", "C6a", "C6b",
                    "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14")
@@ -113,6 +125,23 @@ _CLEAN_SYMBOL_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9
 
 _MAX_SOURCE_SCAN_BYTES = 2 * 1024 * 1024  # 2MB — generous for a Rust source file; a guard, not a wall
 
+# A registry is NOT a manifest, and must not borrow a manifest's cap.
+#
+# `_em.MAX_MANIFEST_BYTES` (64KB) is documented at its definition as a *parse-DoS guard* for
+# `.epr-meta` manifests — policy files, where largeness is itself pathological. A
+# `seam-registry.yaml` is the opposite artifact: it grows with the number of decision points a
+# crate has registered, so growth is the GOAL. Reusing the manifest cap here punished the
+# best-registered crate in the tree — `elohim/elohim-storage`'s registry crossed 64KB on
+# 2026-08-10 (a9f9d781b, 67,580B) and from that commit contributed ZERO cells to the concern x
+# seam matrix, while the routing check that should have caught it was being satisfied by stale
+# copies under `.claude/worktrees/` (see `_SKIP_DIR_NAMES`). Two days of a governance instrument
+# reading clean over a hole in its largest column.
+#
+# Same framing as the sibling guard ten lines up: a guard, not a wall. 1MB is ~13x the current
+# largest registry, still bounded. The fail-LOUD behaviour is unchanged and is the point — a
+# registry over this cap must surface as an error, never as absence.
+_MAX_REGISTRY_BYTES = 1024 * 1024
+
 
 # ───────────────────────────── discovery ─────────────────────────────
 
@@ -121,8 +150,10 @@ def discover_registry_paths(repo_root: Path) -> list[Path]:
     PRUNED before descending (os.walk's in-place dirnames mutation — never rglob-then-filter,
     which would still pay the cost of descending into node_modules first). Excludes any
     directory literally named `held` (per the substrate-scope convention: docs/specs held
-    for an unavailable capability are out of the planner/runner scan path) and the
-    `genesis/research` tree specifically. Sorted for determinism."""
+    for an unavailable capability are out of the planner/runner scan path), plus the
+    repo-relative trees in `_SKIP_REL_DIRS` (`genesis/research`, and `.claude/worktrees` —
+    stale agent copies of the repo must never stand in for the tree). Sorted for
+    determinism."""
     root = Path(repo_root)
     out: list[Path] = []
     for dirpath, dirnames, filenames in os.walk(root):
@@ -130,7 +161,7 @@ def discover_registry_paths(repo_root: Path) -> list[Path]:
         pruned = []
         for d in dirnames:
             rel_child = d if rel_dir == "." else f"{rel_dir}/{d}"
-            if d in _SKIP_DIR_NAMES or d == "held" or rel_child == "genesis/research":
+            if d in _SKIP_DIR_NAMES or d == "held" or rel_child in _SKIP_REL_DIRS:
                 continue
             pruned.append(d)
         dirnames[:] = pruned
@@ -279,8 +310,8 @@ def _load_registry_file(path: Path) -> tuple[dict | None, list[str]]:
     if yaml is None:
         return None, ["PyYAML unavailable — registry not loaded"]
     try:
-        if path.stat().st_size > _em.MAX_MANIFEST_BYTES:
-            return None, [f"exceeds {_em.MAX_MANIFEST_BYTES // 1024}KB size cap"]
+        if path.stat().st_size > _MAX_REGISTRY_BYTES:
+            return None, [f"exceeds {_MAX_REGISTRY_BYTES // 1024}KB size cap"]
         text = path.read_text()
         if not _em._flow_depth_ok(text):
             return None, ["nesting too deep — refusing to parse"]

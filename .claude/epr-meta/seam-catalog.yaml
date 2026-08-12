@@ -348,6 +348,22 @@ seams:
     # dataplane INSTANCE that consumes it is witnessed at S3.10 through content_store's
     # `select_canonical_winner` adapter row. Same C2 guarantee, two columns, neither standing in
     # for the other.
-    registry_crates: [elohim-seam-contracts]
+    #
+    # `elohim-epr-rea` (elohim/epr-rea) routes here on the SAME rule, and the rule is what makes
+    # the routing honest rather than flattering. Its DESTINATION is S3.11 — the atlas axis_note
+    # above sends "commitment/REA rollup -> 3.11", and the crate's own seamLocus (bounds,
+    # containment, Liebig/harmonic composition) is the limit side of exactly that seam. But its
+    # TODAY-state is this column: measured 2026-08-12, `elohim-epr-rea` has exactly ONE dependent
+    # in the tree — `elohim/eprfs/epr-cli` — which is the "epr-cli/REA developer valueflow
+    # sidecar" this plane_note already names. `elohim-storage` has no Cargo dependency on it at
+    # all. Routing it to S3.11 would let a crate with zero runtime consumers answer runtime-plane
+    # cells, manufacturing precisely the false-clean this file's header says the unexamined-cell
+    # ranking exists to prevent. Left here, S3.11 keeps reading `unexamined`, which is TRUE, and
+    # the reachability gap stays visible as a gap instead of being absorbed as coverage.
+    # Move this entry to S3.11 on the commit that gives a runtime crate a dependency on it —
+    # that dependency, not a design intention, is the event that makes the destination the
+    # present tense. Same discipline as S3.2/S3.3's destination-vs-today note, applied to a
+    # crate-to-column mapping rather than a seam-to-plane one.
+    registry_crates: [elohim-seam-contracts, elohim-epr-rea]
     habits: []
     n_a_concerns: []
