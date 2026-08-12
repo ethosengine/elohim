@@ -736,3 +736,68 @@ habits:
       - "spike: genesis/docs/superpowers/specs/2026-08-08-conductor-call-deadline-capability-spike.md §2 — the cancellable/uncancellable table, and the naming of the gap this closes ('no equivalent ceiling for app-interface zome calls')"
       - "elohim/elohim-storage/src/conductor_admission.rs — the gate; the module doc carries the sizing derivation and the admission-vs-timeout distinction"
       - "NOT covered — the AdoptCandidate provenance collapse (an observed Ok(None) mislabelled Unreachable) and the non-batch background callers still classed Interactive; both named in review, neither addressed here"
+
+  - id: governance-plane-single-evaluator
+    invariant: >
+      The repo's governance plane has exactly ONE evaluator. A given manifest
+      yields one decision class, not one per implementation that happens to be
+      reachable; every decision names the evaluator that produced it; and a
+      second host can re-derive that decision and record a disagreement by name.
+    status: red
+    active: true
+    checks:
+      - "python3 .claude/scripts/_lib/__tests__/validator_registry_parity_test.py — asserts (a) the Python and Rust validator registries hold the SAME set, (b) every divergent validator is covered by a golden parity vector, (c) `epr check` is invoked by at least one gate. All three fail today."
+      - "cargo test --test governance_parity_vectors (elohim/eprfs/eprfs-meta) — the Rust half of the correspondence theorem over elohim/sdk/schemas/v1/registries/governance-parity-vectors.json. RED on vector measure-without-kind-is-malformed. The Python half (python3 .claude/scripts/_lib/__tests__/test_governance_parity.py) is GREEN at 10/10 — the split between these two runners over ONE corpus is the habit."
+    evidence: >
+      RED WRITTEN 2026-08-12, born red, measured not asserted. Two independent
+      reds, and the second is a DEMONSTRATED divergence rather than a
+      structural one.
+      (A) REGISTRY FORK, in both severity directions at once: Python
+      `REFERENCE_VALIDATORS` holds 10, the Rust `ElohimRepositoryValidators`
+      match arm holds 8, overlap 7 — python-only are heal-fills-never-moves,
+      bounded-work, dna-hash-neutrality (unenforced under `epr check`);
+      rust-only is eprfs-meta-domain-neutrality (invisible to the live hook).
+      All FOUR divergent validators appear in ZERO golden vectors, which is how
+      governance-parity-vectors.json read green over a forked plane — the
+      correspondence theorem was asserted over the intersection and silent on
+      the difference. And `epr check` is invoked by NO gate (not
+      .husky/pre-push, not .husky/pre-commit, not the resolver hook, not the git
+      gate), so the parity-tested Rust twin never runs and a divergence has no
+      way to surface in normal use.
+      (B) MEASURED OPPOSITE VERDICTS, found 2026-08-12 while repairing (A). The
+      measure-tier `kind: level|rate|ratio` requirement landed 2026-08-11
+      (8da9b519c) in the Python evaluator only. The golden corpus was last
+      touched 2026-07-23 and still carried a kind-less measure rule, so from
+      8da9b519c the two runners derived OPPOSITE decisions from the same
+      manifest — Python `refer` (malformed, routes to operator), Rust `permit`
+      (accepted the rule and applied it). Nobody saw it because no gate runs
+      either runner. Repaired the fixture to current law AND added vector
+      measure-without-kind-is-malformed to pin the divergence itself, so the
+      fork is now a standing red instead of a silence: Python 10/10 green, Rust
+      fails that one vector with "decision expected refer got permit".
+      This habit flips green when the registry is one list, every decision
+      carries an evaluator_cid, and one recorded disagreement names the
+      evaluator CID it disputes. Neither red going green alone is sufficient —
+      do NOT flip on the first assertion.
+    guard: >
+      Risk 1 — "parity" achieved by deleting the divergent validators rather
+      than by unifying the evaluators. That would make the check green and the
+      governance plane weaker; the three python-only rules are bound by live
+      manifests and are class `inject`.
+      Risk 2 — making the Python hook shell to `epr check` without a
+      fail-closed fallback. When the binary is absent the hook must REFER, never
+      permit; a permit-on-missing-binary turns an evaluator outage into silent
+      blanket approval, which is strictly worse than the fork.
+      Risk 3 — reading this habit as "make the test pass." The failable claim is
+      re-derivability by a SECOND HOST, and agreement is the trivial half. The
+      artifact is the disagreement record; a green parity test with no dispute
+      path has not moved the habit.
+      Risk 4 (WIP fence) — this takes the register to 12/12 and to 2/2 active
+      alongside notary-authority. Covenant rule 3 says finishing beats starting.
+      If notary-authority is the priority, flip this to active: false; it stays
+      a legitimate red either way.
+    refs:
+      - "guidestar: genesis/docs/superpowers/specs/2026-08-12-requisite-variety-guidestar-epr-family-composition.md — §5's repair list; this habit is the adjudicated slice 1, chosen ahead of the standing/Principal primitive because admitting a new primitive into a plane that is currently forked ships it twice, differently"
+      - ".claude/scripts/_lib/epr_meta.py REFERENCE_VALIDATORS (the LIVE registry) vs elohim/eprfs/epr-cli/src/repository_validators.rs (the twin)"
+      - "elohim/sdk/schemas/v1/registries/governance-parity-vectors.json — the 9 vectors; their coverage gap is failure (2) of the check"
+      - "NOT covered here — the standing/proxy-declarer primitive (§5 rank 2), deliberately deferred; and .claude/data/governance-findings.jsonl, 4.3MB written with zero readers, which needs a read path or a stop-write"

@@ -50,11 +50,20 @@
     {
       "name": "measure-never-blocks",
       "manifests": {
-        "m/.epr-meta": "rules:\n  - id: observe-md\n    class: measure\n    when: { write: \"*.md\", new: true }\n    require-frontmatter: [title]\n    why: test"
+        "m/.epr-meta": "rules:\n  - id: observe-md\n    class: measure\n    when: { write: \"*.md\", new: true }\n    measure:\n      kind: level\n    require-frontmatter: [title]\n    why: test"
       },
       "write": { "path": "m/z.md", "new": true, "content": "bare" },
       "expect": { "decision": "permit", "winning_class": "measure", "rule_id": "observe-md", "witnessed": true },
       "law": "Observation tier: fires, is witnessed, never blocks."
+    },
+    {
+      "name": "measure-without-kind-is-malformed",
+      "manifests": {
+        "mk/.epr-meta": "rules:\n  - id: observe-md-no-kind\n    class: measure\n    when: { write: \"*.md\", new: true }\n    require-frontmatter: [title]\n    why: test"
+      },
+      "write": { "path": "mk/z.md", "new": true, "content": "bare" },
+      "expect": { "decision": "refer", "winning_class": "ask", "rule_id": null, "witnessed": true, "refer_reason": "governance-manifest-malformed" },
+      "law": "A measure rule MUST declare measure.kind (level|rate|ratio) — an undeclared kind is how a rate gets compared to a cumulative level (L6, landed 2026-08-11 in 8da9b519c). A rule-integrity failure routes rather than guessing. ADDED 2026-08-12 to pin a MEASURED divergence: the previous form of `measure-never-blocks` carried no kind, and the two evaluators split on it — Python refused the manifest as malformed while Rust accepted it and applied the rule. That is a forked governance plane by this corpus's own definition, and it survived because no gate runs either runner. This vector is expected to PASS in Python and FAIL in Rust until eprfs-meta enforces L6; it is the corpus-level half of the `governance-plane-single-evaluator` habit."
     },
     {
       "name": "dispatch-permits-and-directs",
