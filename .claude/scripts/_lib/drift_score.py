@@ -82,6 +82,12 @@ def measure(entry: dict, weights: dict | None = None) -> dict:
     return sm.measure(
         compute_score(entry, weights), "ratio", claim="modelled",
         interval=sm.unknown_interval(),
+        # Spec Q17, and this is the call site the whole enum was minted for. The paragraph below
+        # already confessed the incommensurability in prose; `unknown_reason` makes it MACHINE
+        # readable, so an uncertainty work-queue can exclude this score structurally instead of
+        # ranking "go measure the composite harder" — the exact false-precision reflex the
+        # confession exists to refuse. `tightenable("incommensurable") == "never"`.
+        unknown_reason="incommensurable",
         basis=(f"weighted composite of re-tunable terms ({terms}) over witnessed counters "
                f"(scope_edits={entry.get('scope_edits', 0)}, "
                f"direct_edits={entry.get('direct_edits', 0)}, "

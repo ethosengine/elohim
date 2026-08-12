@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use cid::Cid;
 use elohim_epr::algedonic::AlgedonicEvidence;
-use elohim_epr::measure::{ClaimKind, Confidence, Interval, MeasureKind, Quantity};
+use elohim_epr::measure::{ClaimKind, Confidence, Interval, MeasureKind, Quantity, UnknownReason};
 use elohim_epr::witness::{Magnitude, ReaVerb};
 
 use crate::model::{Bound, Commitment, FlowEvent};
@@ -194,7 +194,15 @@ fn claim_rank(c: ClaimKind) -> u8 {
 /// test below passes because its fixture bounds are exactly representable in
 /// binary floating point, not because summation order is provably irrelevant.
 /// The weakest-claim reduction IS a genuine order-independent min — `claim_rank`
-/// has no associativity concern. Cross-peer determinism at a band edge, where
+/// has no associativity concern, AND it is injective over the five kinds, so no
+/// two distinct claims can tie and be resolved by position. The unknown-reason
+/// reduction beside it needs a second ingredient to earn the same sentence:
+/// `tightenable()` maps seven reasons onto three responses, so distinct reasons
+/// DO tie, and `max_by_key`'s last-maximum rule would resolve those ties by
+/// input order — two peers folding the same multiset in different orders would
+/// mint `Quantity` values that are not equal. `UnknownReason::reduce` breaks the
+/// tie on `stable_index`, a total order, which restores the property.
+/// Cross-peer determinism at a band edge, where
 /// two peers could fold the same terms in different orders and land on
 /// different rounding, is explicitly out of scope for slice 1 and is named as
 /// slice-2 work. Do not "fix" this with a canonicalizing sort here — sort order
@@ -215,13 +223,41 @@ pub fn with_uncertainty(items: &[Quantity]) -> Result<Quantity, FoldError> {
         .max_by_key(|q| claim_rank(q.confidence.claim))
         .map(|q| q.confidence.claim)
         .unwrap_or(ClaimKind::Imputed);
+    let folded = Interval::new(lo, hi);
+    // The same reduction the weakest-claim line performs, applied to the reason: among the
+    // contributors that are themselves unknown, carry the LEAST tightenable one. An aggregate is
+    // no more improvable than its worst term, so if one contributor is `Incommensurable`, the
+    // aggregate is too — and a work-queue that inherited only "unknown" would happily rank
+    // "measure this harder" against a number no measurement can ever touch.
+    //
+    // Only attached when the fold itself came back unknown, which preserves the field's
+    // invariant. Note the converse does not hold and is not claimed: two bounded-on-one-side
+    // terms ([-inf,5] and [3,+inf]) sum to an unknown with no contributing reason, and `None`
+    // there is the honest answer rather than a guess.
+    //
+    // `UnknownReason::reduce` and not a local `max_by_key` on `tightenable()`: that classifier is
+    // non-injective (seven reasons, three responses), and `max_by_key` keeps the LAST maximum, so
+    // keying on it alone makes an equal-rank pair resolve by INPUT ORDER — the reordering
+    // regression below would still pass while `Quantity` equality across peers quietly broke.
+    // `reduce` breaks the tie on a total order. See the note on determinism above.
+    let unknown_reason = if folded.is_unknown() {
+        UnknownReason::reduce(
+            items
+                .iter()
+                .filter(|q| q.confidence.interval.is_unknown())
+                .filter_map(|q| q.confidence.unknown_reason),
+        )
+    } else {
+        None
+    };
     Ok(Quantity {
         value,
         kind,
         confidence: Confidence {
             claim: weakest,
-            interval: Interval::new(lo, hi),
+            interval: folded,
             basis: format!("fold of {} terms", items.len()),
+            unknown_reason,
         },
     })
 }

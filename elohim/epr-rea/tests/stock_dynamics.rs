@@ -349,3 +349,297 @@ fn a_caller_that_knows_its_projection_is_incomplete_widens_on_the_way_out() {
         .widen(Interval::new(1.5, 2.0))
         .is_err_and(|e| e == ConfidenceError::NarrowingRefused));
 }
+
+#[test]
+fn an_undrained_stock_reports_a_structural_reason_not_a_bare_unknown() {
+    // Q17 at the one call site that most needs it. A stock whose outflow band admits zero has
+    // genuinely unbounded turnover — slice 2 already returned honest absence there rather than
+    // `+inf`. What it could not say is WHY, and the why is the actionable half: this is a
+    // property of the DENOMINATOR's structure (nothing drains), so measuring the level more
+    // carefully will never narrow it. An uncertainty work-queue that saw only `(-inf, +inf)`
+    // would rank it beside "nobody has instrumented this yet," which is the one class more
+    // measurement genuinely fixes.
+    let stock = Stock::new(
+        Quantity {
+            value: 300.0,
+            kind: MeasureKind::Level,
+            confidence: Confidence::witnessed(Interval::exact(300.0), "counted"),
+        },
+        Quantity {
+            value: 10.0,
+            kind: MeasureKind::Rate { per: Period::Day },
+            confidence: Confidence::witnessed(Interval::exact(10.0), "counted"),
+        },
+        Quantity {
+            value: 0.0,
+            kind: MeasureKind::Rate { per: Period::Day },
+            confidence: Confidence::estimated(Interval::new(0.0, 2.0), "outflow band spans zero"),
+        },
+    );
+
+    let turnover = stock
+        .expect("stock is well-formed")
+        .turnover_time()
+        .expect("level / rate is well-formed");
+    assert!(turnover.confidence.interval.is_unknown());
+    assert_eq!(
+        turnover.confidence.unknown_reason,
+        Some(UnknownReason::UndefinedDivision)
+    );
+    assert_eq!(
+        turnover.confidence.unknown_reason.unwrap().tightenable(),
+        Tightenable::ByStructure,
+        "queue it as structural work, never as 'sample the level harder'"
+    );
+
+    // A drained stock divides normally and carries no reason at all.
+    let drained = Stock::new(
+        Quantity {
+            value: 300.0,
+            kind: MeasureKind::Level,
+            confidence: Confidence::witnessed(Interval::exact(300.0), "counted"),
+        },
+        Quantity {
+            value: 10.0,
+            kind: MeasureKind::Rate { per: Period::Day },
+            confidence: Confidence::witnessed(Interval::exact(10.0), "counted"),
+        },
+        Quantity {
+            value: 3.0,
+            kind: MeasureKind::Rate { per: Period::Day },
+            confidence: Confidence::witnessed(Interval::exact(3.0), "counted"),
+        },
+    );
+    let ok = drained
+        .expect("stock is well-formed")
+        .turnover_time()
+        .unwrap();
+    assert!(!ok.confidence.interval.is_unknown());
+    assert_eq!(ok.confidence.unknown_reason, None);
+}
+
+// ------------------------------------ Q17: an OPERAND's reason survives the arithmetic
+
+/// A rate whose confidence declares an unknown interval AND why.
+fn unknown_rate(reason: UnknownReason, per: Period) -> Quantity {
+    Quantity {
+        value: f64::NAN,
+        kind: MeasureKind::Rate { per },
+        confidence: Confidence::unknown_because(reason, "fixture"),
+    }
+}
+
+#[test]
+fn a_turnover_time_over_an_incommensurable_level_reports_incommensurable_not_a_bare_unknown() {
+    // The half the guards cannot see. `div_because` receives two bare INTERVALS, so its only
+    // vocabulary is what its own guards discover — and here no guard fires: the denominator is a
+    // clean 3/day, and the quotient loses its bounds purely because the NUMERATOR arrived
+    // unbounded. Before the operands were threaded through, this returned `unknown` with
+    // `reason: None` — an unclassified absence, free to be ranked by row 18's queue as "go
+    // measure the level harder" against a level that is a preference ordering wearing a
+    // quantity's clothes. That is the exact failure the enum was minted to prevent, reproduced
+    // one layer above the enum.
+    let stock = Stock::new(
+        Quantity {
+            value: f64::NAN,
+            kind: MeasureKind::Level,
+            confidence: Confidence::unknown_because(
+                UnknownReason::Incommensurable,
+                "weighted composite of re-tunable terms",
+            ),
+        },
+        rate(10.0, Period::Day),
+        rate(3.0, Period::Day),
+    )
+    .expect("stock is well-formed");
+
+    let turnover = stock.turnover_time().expect("level / rate is well-formed");
+    assert!(turnover.confidence.interval.is_unknown());
+    assert_eq!(
+        turnover.confidence.unknown_reason,
+        Some(UnknownReason::Incommensurable),
+        "the level's reason is the derived quantity's reason; no guard fired to supply one"
+    );
+    assert_eq!(
+        turnover.confidence.unknown_reason.unwrap().tightenable(),
+        Tightenable::Never,
+        "and so this must never enter a measurement queue at all"
+    );
+}
+
+#[test]
+fn a_net_change_over_an_uninstrumented_inflow_says_so() {
+    // Same defect on the subtraction path. `unknown() - exact()` produces no NaN, so
+    // `sub_because`'s indeterminate-form guard never fires and the result was a reasonless
+    // unknown — indistinguishable from a net change whose window happened to be empty, when in
+    // fact nobody has built the instrument yet. `NotYetInstrumented` is the one class that says
+    // "add a sense", which is precisely what row 18 says the system's own ignorance is for.
+    let stock = Stock::new(
+        level(300.0),
+        unknown_rate(UnknownReason::NotYetInstrumented, Period::Day),
+        rate(3.0, Period::Day),
+    )
+    .expect("stock is well-formed");
+
+    let net = stock.net_change().expect("rate - rate is well-formed");
+    assert!(net.confidence.interval.is_unknown());
+    assert_eq!(
+        net.confidence.unknown_reason,
+        Some(UnknownReason::NotYetInstrumented)
+    );
+    assert_eq!(
+        net.confidence.unknown_reason.unwrap().tightenable(),
+        Tightenable::ByMeasurement,
+        "this one genuinely belongs in the queue — build the sense"
+    );
+
+    // Outflow side, symmetrically: the operand that is unknown is not privileged by position.
+    let other = Stock::new(
+        level(300.0),
+        rate(3.0, Period::Day),
+        unknown_rate(UnknownReason::NoObservations, Period::Day),
+    )
+    .expect("stock is well-formed")
+    .net_change()
+    .unwrap();
+    assert_eq!(
+        other.confidence.unknown_reason,
+        Some(UnknownReason::NoObservations)
+    );
+}
+
+#[test]
+fn when_a_guard_and_an_operand_both_speak_the_least_tightenable_one_wins() {
+    // The documented precedence rule, exercised in both directions so it cannot be mistaken for
+    // "the guard always wins" or "the operand always wins". `UnknownReason::reduce` ranks the
+    // guard's finding as just another contributor: a derived quantity is no more improvable than
+    // the worst thing that fed it.
+
+    // (a) Zero-crossing denominator (UndefinedDivision, ByStructure) + incommensurable numerator
+    //     (Never). Fixing the model would not help — the numerator is not an estimate of
+    //     anything — so the LEVEL's reason must survive the division's own finding.
+    let both = Stock::new(
+        Quantity {
+            value: f64::NAN,
+            kind: MeasureKind::Level,
+            confidence: Confidence::unknown_because(UnknownReason::Incommensurable, "composite"),
+        },
+        rate(10.0, Period::Day),
+        Quantity {
+            value: 0.0,
+            kind: MeasureKind::Rate { per: Period::Day },
+            confidence: Confidence::estimated(Interval::new(0.0, 2.0), "band spans zero"),
+        },
+    )
+    .expect("stock is well-formed")
+    .turnover_time()
+    .unwrap();
+    assert_eq!(
+        both.confidence.unknown_reason,
+        Some(UnknownReason::Incommensurable)
+    );
+
+    // (b) Same denominator, but a numerator that merely lacks observations (ByMeasurement). Now
+    //     the guard's structural finding is the actionable one — sampling the level is exactly
+    //     the useless work — so it wins.
+    let structural = Stock::new(
+        Quantity {
+            value: f64::NAN,
+            kind: MeasureKind::Level,
+            confidence: Confidence::unknown_because(UnknownReason::NoObservations, "empty window"),
+        },
+        rate(10.0, Period::Day),
+        Quantity {
+            value: 0.0,
+            kind: MeasureKind::Rate { per: Period::Day },
+            confidence: Confidence::estimated(Interval::new(0.0, 2.0), "band spans zero"),
+        },
+    )
+    .expect("stock is well-formed")
+    .turnover_time()
+    .unwrap();
+    assert_eq!(
+        structural.confidence.unknown_reason,
+        Some(UnknownReason::UndefinedDivision)
+    );
+}
+
+#[test]
+fn a_bounded_result_never_inherits_an_operand_reason() {
+    // The invariant's guard at the arithmetic boundary. An operand can carry a reason only while
+    // its own interval is unknown, and an unknown operand cannot produce a bounded quotient — but
+    // the threading must not be able to attach one anyway. Bounded in, bounded out, no reason.
+    let ok = Stock::new(
+        level(300.0),
+        rate(10.0, Period::Day),
+        rate(3.0, Period::Day),
+    )
+    .expect("stock is well-formed");
+    let turnover = ok.turnover_time().unwrap();
+    assert!(!turnover.confidence.interval.is_unknown());
+    assert_eq!(turnover.confidence.unknown_reason, None);
+    let net = ok.net_change().unwrap();
+    assert!(!net.confidence.interval.is_unknown());
+    assert_eq!(net.confidence.unknown_reason, None);
+}
+
+#[test]
+fn respite_responses_own_guard_outranks_a_merely_unmeasured_operand() {
+    // NAMED FOR WHAT IT PINS. An earlier revision called this "threads its operands' reasons
+    // too" and asserted `UndefinedDivision` — which `div_because`'s own guard mints unaided, so
+    // deleting `attributed_to` from `stock::divide` left it green. It pins the LOSING half of
+    // the precedence rule, which is worth having; the winning half is the test below.
+    //
+    // The Meadows controllability index is `divide` under another name, and it is the function
+    // `_lib/signal_measure.py::ratio_of_rates` mirrors — so this is the Rust side of the
+    // mint-site parity the Python test pins. An unmeasured response rate is a `ByMeasurement`
+    // finding ("quicken the response rate" is only on the menu once you can see it), not the
+    // reasonless absence it used to be.
+    let out = respite_response(
+        &rate(4.0, Period::Week),
+        &unknown_rate(UnknownReason::NoObservations, Period::Week),
+    )
+    .expect("rate / rate is well-formed");
+    assert!(out.confidence.interval.is_unknown());
+    assert!(out.value.is_nan(), "Q13: an unknowable value is NaN");
+    assert_eq!(
+        out.confidence.unknown_reason,
+        // The denominator's unknown band admits zero, so `div_because` mints UndefinedDivision;
+        // reduced against the operand's ByMeasurement reason, the structural finding wins.
+        Some(UnknownReason::UndefinedDivision)
+    );
+}
+
+#[test]
+fn an_incommensurable_operand_outranks_the_divisions_own_guard() {
+    // The half that actually pins `attributed_to`. Delete the `.attributed_to(...)` call from
+    // `stock::divide` and this test goes red, because `Incommensurable` can ONLY have arrived
+    // from the operand — no guard in `div_because` mints it.
+    //
+    // Why this pair and not another: `Incommensurable` is `Tightenable::Never`, so
+    // `UnknownReason::reduce` returns it against ANY reason the guard might mint. That makes
+    // the assertion independent of which branch of `div_because` fires, so it pins the
+    // precedence rule rather than one arithmetic path.
+    //
+    // This is the case the whole enum exists for. A controllability index whose numerator is a
+    // `drift_score`-style incommensurable composite must not surface as a plain unknown: row 18's
+    // work-queue would rank "measure this harder" against a number no instrument can ever tighten.
+    let out = respite_response(
+        &Quantity {
+            value: f64::NAN,
+            kind: MeasureKind::Rate { per: Period::Week },
+            confidence: Confidence::unknown_because(
+                UnknownReason::Incommensurable,
+                "weighted composite of re-tunable terms — no observation it is an estimate OF",
+            ),
+        },
+        &rate(2.0, Period::Week),
+    )
+    .expect("rate / rate is well-formed");
+    assert!(out.confidence.interval.is_unknown());
+    assert_eq!(
+        out.confidence.unknown_reason,
+        Some(UnknownReason::Incommensurable),
+        "an operand no measurement can tighten must not be laundered into a tightenable finding"
+    );
+}

@@ -269,3 +269,98 @@ fn confidence_is_inside_the_canonical_bytes() {
         "quantities differing only in confidence must mint different CIDs"
     );
 }
+
+#[test]
+fn adding_an_unknown_reason_moves_no_existing_address() {
+    // Q17's hard constraint, and the reason `UnknownReason` does NOT live on `Interval`.
+    //
+    // `Interval` is hash-bearing: it rides inside `Confidence` inside `Quantity`, and the two
+    // tests above are the crate's own proof that those bytes ARE the address. A third field on
+    // `Interval` — or a non-skipped field on `Confidence` — would appear in the canonical
+    // dag-cbor map of every quantity ever encoded and silently re-address all of them. So the
+    // reason rides in the transient `Reasoned` pair through the arithmetic, and reaches the wire
+    // only as an `Option` on `Confidence` that is skipped when `None`.
+    //
+    // The vector below was captured from this exact expression on the commit BEFORE
+    // `unknown_reason` existed. It is not a self-consistency check — a regenerated golden would
+    // prove nothing — it is the pre-change byte string, and it must still match.
+    const PRE_Q17_HEX: &str = "a3646b696e64656c6576656c6576616c7565fb40280000000000006a63\
+6f6e666964656e6365a36562617369736d332d7765656b2073616d706c6565636c61696d69657374696d61746564\
+68696e74657276616ca2626869fb4030000000000000626c6ffb4020000000000000";
+    const PRE_Q17_CID: &str = "bafyreiag43a2arlyomssxfakh3nmqzjewtcifqk6rnfzisnailr4i7bdza";
+
+    let q = quantity(Confidence::estimated(
+        Interval::new(8.0, 16.0),
+        "3-week sample",
+    ));
+    let bytes = serde_ipld_dagcbor::to_vec(&q).unwrap();
+    let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+    assert_eq!(
+        hex, PRE_Q17_HEX,
+        "adding UnknownReason changed the canonical bytes of a quantity that carries none"
+    );
+    assert_eq!(compute_cid(&bytes).to_string(), PRE_Q17_CID);
+
+    // And the converse, which is what makes the field worth putting on the wire at all: when a
+    // reason IS present it lands inside the canonical bytes, keeps them canonical, and moves the
+    // address — because it is strictly more of a claim. That is L2 working as designed.
+    //
+    // Built as a struct literal on purpose. It is NOT a valid domain value — every constructor
+    // upholds "a reason only accompanies an unknown interval" — but it is the only way to
+    // exercise the CODEC, because an unknown interval cannot be dag-cbor encoded at all today
+    // (see `an_unknown_interval_is_not_encodable_on_either_wire_and_that_predates_q17`). Treat
+    // this fixture as a serializer probe, never as an example.
+    let with_reason = quantity(Confidence {
+        claim: ClaimKind::Estimated,
+        interval: Interval::new(8.0, 16.0),
+        basis: "3-week sample".into(),
+        unknown_reason: Some(UnknownReason::Incommensurable),
+    });
+    let reasoned_bytes = serde_ipld_dagcbor::to_vec(&with_reason).unwrap();
+    cbor::decode_strict(&reasoned_bytes).expect("still canonical dag-cbor with the field present");
+    assert_ne!(
+        bytes, reasoned_bytes,
+        "a stated reason is part of the claim and must be part of the address"
+    );
+}
+
+#[test]
+fn an_unknown_interval_is_not_encodable_on_either_wire_and_that_predates_q17() {
+    // Found while wiring Q17, recorded rather than fixed because it is not Q17's defect and the
+    // fix is a codec decision this change has no standing to make.
+    //
+    // dag-cbor (IPLD) admits no non-finite float, so `Interval::unknown()`'s `(-inf, +inf)` —
+    // L3's honest absence, the shape the whole ontology routes absence through — cannot be
+    // encoded at all. `serde_json` differs but is no better: it emits `null` for a non-finite
+    // float and then refuses to read it back.
+    //
+    // The consequence for Q17 is worth stating plainly: `unknown_reason` is real in process and
+    // at the type level, but under the CURRENT codec it can never actually appear in a
+    // quantity's canonical bytes, because the only intervals it may accompany are the ones that
+    // do not encode. The wire placement above is therefore correct-by-construction and inert
+    // until the absence-encoding question is answered (a sentinel? a tagged variant? an
+    // `Option<Interval>` at the boundary only?). Nothing here should be read as claiming a
+    // working unknown-quantity wire format.
+    let unknown = quantity(Confidence::unknown_because(
+        UnknownReason::NoObservations,
+        "empty window",
+    ));
+    assert!(
+        serde_ipld_dagcbor::to_vec(&unknown).is_err(),
+        "if this starts passing, the codec learned non-finite floats — revisit the note above"
+    );
+    let json = serde_json::to_string(&unknown).unwrap();
+    assert!(
+        json.contains("null"),
+        "non-finite bounds degrade to null: {json}"
+    );
+    assert!(
+        serde_json::from_str::<Quantity>(&json).is_err(),
+        "and null does not read back as an f64"
+    );
+    // The reason itself is perfectly encodable — it is the interval that is not.
+    assert_eq!(
+        serde_json::to_string(&UnknownReason::NoObservations).unwrap(),
+        "\"no-observations\""
+    );
+}

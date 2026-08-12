@@ -160,18 +160,34 @@ impl Stock {
                 outflow: self.outflow.kind,
             },
         )?;
+        // `sub_because`, not `sub`: when a net change comes back unbounded, the reason is
+        // structurally known right here (a malformed operand, or ∞−∞ at a bound) and is exactly
+        // what an uncertainty work-queue needs to rank it. Dropping it would make this net
+        // change indistinguishable from one that simply had no observations.
+        //
+        // `attributed_to` is the other half, and without it this line was a half-fix: the guards
+        // see bare INTERVALS, so an inflow that arrived already declaring `NotYetInstrumented`
+        // produced an unbounded net change with no reason at all — an unclassified unknown, which
+        // is the precise thing the vocabulary exists to prevent. Precedence is
+        // `UnknownReason::reduce` (least tightenable wins, guard and operand ranked alike), the
+        // same rule the fold uses.
+        let net = self
+            .inflow
+            .confidence
+            .interval
+            .sub_because(&self.outflow.confidence.interval)
+            .attributed_to([
+                self.inflow.confidence.unknown_reason,
+                self.outflow.confidence.unknown_reason,
+            ]);
         Ok(Quantity {
             value: self.inflow.value - self.outflow.value,
             kind,
-            confidence: Confidence {
-                claim: weaker(self.inflow.confidence.claim, self.outflow.confidence.claim),
-                interval: self
-                    .inflow
-                    .confidence
-                    .interval
-                    .sub(&self.outflow.confidence.interval),
-                basis: compose_basis("net change", &self.inflow, &self.outflow),
-            },
+            confidence: Confidence::from_reasoned(
+                weaker(self.inflow.confidence.claim, self.outflow.confidence.claim),
+                net,
+                compose_basis("net change", &self.inflow, &self.outflow),
+            ),
         })
     }
 
@@ -272,7 +288,25 @@ fn divide(num: &Quantity, den: &Quantity, op: &str) -> Result<Quantity, StockErr
         .kind
         .divide(den.kind)
         .ok_or(StockError::UndefinedDivision(num.kind, den.kind))?;
-    let interval = num.confidence.interval.div(&den.confidence.interval);
+    // `div_because` keeps the distinction the queue is built on: an unbounded turnover time
+    // whose denominator band crosses zero (`UndefinedDivision`) is a STRUCTURE finding — the
+    // stock has no drain — and no amount of better numerator measurement narrows it. Reported
+    // as a bare unknown it would rank beside "nobody has instrumented this yet," which is the
+    // one thing more measurement genuinely fixes.
+    //
+    // `attributed_to` threads the OPERANDS' own reasons in beside the guard's, because
+    // `div_because` only ever sees two bare intervals. Without it, `turnover_time` over a level
+    // that declared `Incommensurable` returned `unknown` with reason `None` — an unclassified
+    // absence sitting in the one queue that must never rank it. Precedence is
+    // `UnknownReason::reduce`: least tightenable wins, and the guard's reason is just another
+    // contributor rather than an override. An `Incommensurable` numerator beats this function's
+    // `UndefinedDivision`; a `NoObservations` numerator loses to it.
+    let outcome = num
+        .confidence
+        .interval
+        .div_because(&den.confidence.interval)
+        .attributed_to([num.confidence.unknown_reason, den.confidence.unknown_reason]);
+    let interval = outcome.interval;
     // Q13, structurally: the VALUE gets the same treatment as the interval. Slice 1 fixed only
     // the interval at a zero denominator and left `value: inf` behind, so a second consumer
     // reading the documented return shape saw `value > 1.0 -> True` and concluded "confirmed
@@ -286,11 +320,11 @@ fn divide(num: &Quantity, den: &Quantity, op: &str) -> Result<Quantity, StockErr
     Ok(Quantity {
         value,
         kind,
-        confidence: Confidence {
-            claim: weaker(num.confidence.claim, den.confidence.claim),
-            interval,
-            basis: compose_basis(op, num, den),
-        },
+        confidence: Confidence::from_reasoned(
+            weaker(num.confidence.claim, den.confidence.claim),
+            outcome,
+            compose_basis(op, num, den),
+        ),
     })
 }
 
@@ -347,29 +381,27 @@ pub fn stock_over_window(
     let rate = |count: f64, what: &str| Quantity {
         value: count / window.periods,
         kind: MeasureKind::Rate { per: window.per },
-        confidence: Confidence {
-            claim: ClaimKind::Witnessed,
-            interval: Interval::exact(count / window.periods),
-            basis: format!(
+        confidence: Confidence::witnessed(
+            Interval::exact(count / window.periods),
+            format!(
                 "{count} {what} events on {unit} witnessed in the flow log over {}",
                 window.label()
             ),
-        },
+        ),
     };
 
     Stock::new(
         Quantity {
             value: produced_all - consumed_all,
             kind: MeasureKind::Level,
-            confidence: Confidence {
-                claim: ClaimKind::Witnessed,
-                interval: Interval::exact(produced_all - consumed_all),
-                basis: format!(
+            confidence: Confidence::witnessed(
+                Interval::exact(produced_all - consumed_all),
+                format!(
                     "{produced_all} produced - {consumed_all} consumed ({unit}), all history \
                      through {}",
                     window.end
                 ),
-            },
+            ),
         },
         rate(produced_win, "produce"),
         rate(consumed_win, "consume"),
