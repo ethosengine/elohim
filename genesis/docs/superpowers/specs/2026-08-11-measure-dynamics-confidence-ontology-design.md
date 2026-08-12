@@ -404,6 +404,87 @@ plan committed to building one, is written here instead of as a law.
   incoherence *readable at the point of use* instead of hidden behind a number, which is the most
   an ontology can do before the design decision is made.
 
+- **Q17 — an unknown interval now says WHY, and what remains open is who must say it.** (Raised
+  2026-08-12, applying row 18's requirements backwards onto L3.) L3 makes absence the degenerate
+  interval, which unified three states that had been special cases — and in doing so made three
+  *different* absences into one indistinguishable shape. `measure.rs` minted `Interval::unknown()`
+  at seven sites where the reason was structurally known at that exact line and discarded one
+  statement later: a malformed operand in `sub`/`div`, a zero-crossing denominator in `div`, the
+  indeterminate forms (`∞/∞`, `∞−∞`, `0·∞`), and the zero base in `multiplier_widen`.
+
+  This is not a legibility complaint. [measure-family-borrows-backlog](epr:backlog-measure-family-borrows-backlog)
+  row 18 wants an aggregate's uncertainty decomposed into a prioritized queue answering *"which
+  edge, if measured better, most tightens this?"* — and that queue is unrankable while three
+  unknowns read identically: **no observations in the window** (build the instrument; it belongs
+  in the queue), **a denominator that crossed zero** (a structure problem; more measurement will
+  not help), and **incommensurable by construction** (`_lib/drift_score.py::measure`'s own
+  confession, Q16 — *nothing* will ever tighten it, and it must never enter the queue at all).
+  Ranked without the distinction, row 18's top recommendation is "go measure the incommensurable
+  composite harder," which is precisely the false-precision reflex this ontology exists to refuse.
+
+  **What landed** (additively — no law amended, no existing address moved): `UnknownReason` with
+  seven variants and a `tightenable()` classifier (`ByMeasurement` / `ByStructure` / `Never`);
+  `Interval::unknown_because` returning a `Reasoned` pair; `sub_because` / `div_because` /
+  `multiplier_widen_because` beside the unchanged `sub` / `div` / `multiplier_widen`;
+  `Confidence.unknown_reason` as a skipped-when-`None` field, so a confidence carrying no reason
+  encodes to byte-identical dag-cbor (pinned by a pre-change golden vector in
+  `tests/canonical_bytes.rs`). The reason deliberately does **not** live on `Interval`: `Interval`
+  is inside the canonical bytes of every quantity (L2), so a field there would re-address all of
+  them.
+
+  **Threading it through the derived quantities took two mechanisms, not one**, and the second was
+  missed on the first pass. A guard inside `sub_because` / `div_because` sees only two bare
+  `Interval`s, so it can mint only the reasons its own arithmetic discovers — which left
+  `turnover_time` over an `Incommensurable` level, and `net_change` over a `NotYetInstrumented`
+  inflow, returning *unclassified* unknowns: precisely the state the vocabulary exists to
+  prevent, reproduced one layer above the vocabulary. `Reasoned::attributed_to` closes it by
+  folding the operands' declared reasons in beside the guard's, and `stock::divide` (hence
+  `turnover_time` / `emission_absorption` / `harvest_regeneration` / `respite_response`) and
+  `Stock::net_change` both call it.
+
+  **One reduction, and it must be a total order.** `UnknownReason::reduce` — least tightenable
+  wins, ties broken on `stable_index` — is the single rule used by `fold::with_uncertainty` across
+  a sum's terms and by `attributed_to` across an operation's guard and operands. There is no
+  precedence between a guard's reason and an operand's; the *least improvable* contributor wins,
+  because that is what the derived quantity is. The tie-break is not a nicety: `tightenable()` is
+  non-injective (seven reasons onto three responses) where the adjacent `claim_rank` is injective
+  over five kinds, and `max_by_key` keeps the LAST maximum — so a reduction keyed on
+  tightenability alone resolved an equal-rank pair by INPUT ORDER, folding `[ZeroBase,
+  UndefinedDivision]` and its reversal to different `Quantity` values under `PartialEq`. That
+  breaks `uncertainty_closure.rs::folding_is_deterministic_under_input_reordering`'s property
+  while the test itself stays green, because it varied only across different ranks; the
+  equal-rank reordering case is now pinned beside it.
+
+  **`Reasoned`'s invariant runs one way only.** `reason.is_some()` implies
+  `interval.is_unknown()`; the converse is false and must not be assumed. `Reasoned::known` is
+  public and accepts any interval, and the arithmetic routes a genuinely unbounded result through
+  it whenever no guard fires — `unknown() − unknown()` computes to `(-∞, +∞)` with no `NaN` and so
+  nothing to explain. `reason.is_none()` therefore means *nothing named a reason*, not *the bounds
+  are finite*, and a reader who treats it as the latter dereferences ±∞.
+
+  **What stays open, and is why this is a question rather than a seventh law:** (a) nothing
+  requires a declared unknown to carry a reason — `Interval::unknown()` and `Confidence::unknown`
+  are unchanged and unenforced, the exact shape of Q5's unenforced `basis`; (b) the invariant *a
+  reason accompanies only an unknown interval* is upheld by every constructor and violable by a
+  struct literal, since the fields stay public (Q8); (c) whether these seven are the canon
+  vocabulary is undecided — `NoObservations` / `NotYetInstrumented` / `Incommensurable` can only
+  ever be **declared** by whoever knows the observation situation, and no construct checks that
+  declaration against reality; (d) the wire placement is correct-by-construction but **inert**,
+  because dag-cbor admits no non-finite float, so `(-∞,+∞)` — L3's honest absence — does not
+  encode at all today and neither, therefore, does any reason attached to it (recorded in
+  `tests/canonical_bytes.rs::an_unknown_interval_is_not_encodable_on_either_wire_and_that_predates_q17`;
+  the fix is a codec decision, not this one's to make). The Python mirror
+  (`_lib/signal_measure.py`) carries the same vocabulary with a test that reads the Rust enum off
+  disk rather than trusting a copy, because a two-declaration vocabulary is the shape that has
+  drifted in this repo before — and the parity guarded is now **vocabulary, tie-break order, and
+  mint site**, not vocabulary alone. Vocabulary parity was not enough: on the day the words
+  landed, the mirror's one arithmetic mint site (`ratio_of_rates`, documented as mirroring
+  `stock::respite_response`) still returned bare unknowns at both of its absence branches, so the
+  side that had the words minted none of them. Order matters for the same reason
+  `stable_index` exists — a list position in `UNKNOWN_REASONS` IS the Python tie-break, so a
+  set-equal-but-reordered vocabulary would reduce an equal-rank multiset differently on the two
+  sides while every set comparison stayed green.
+
 ## 4. What slice 2 inherits — the network boundary, explicitly not crossed
 
 Slice 1 (Tasks 1–5 of the `2026-08-11-measure-ontology-slice1-epr-local-first` plan) proves the
@@ -473,6 +554,7 @@ The six laws above, and no more, are canon as of this document: L1, L3, L4 (with
 L5, and L6 (enforced on both the manifest and registry `.epr-meta` paths) are enforced now by
 code that exists and is tested. L2 is proven at the dag-cbor serializer level and explicitly not
 yet wired to a typed `Quantity` entry point — §4 names that gap as an explicit slice-2
-inheritance, not a task this plan still owes. Q1–Q16 are recorded as open rather than smuggled in
-as unenforced laws. Tasks 3–6 built against this vocabulary; nothing downstream should re-litigate
+inheritance, not a task this plan still owes. Q1–Q17 are recorded as open rather than smuggled in
+as unenforced laws (Q17 arrived after the seal and adds vocabulary beside L3, never inside it —
+`Interval::unknown()` means exactly what this document sealed). Tasks 3–6 built against this vocabulary; nothing downstream should re-litigate
 L1–L6 without citing back here.
