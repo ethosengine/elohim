@@ -746,8 +746,9 @@ habits:
     status: red
     active: true
     checks:
-      - "python3 .claude/scripts/_lib/__tests__/validator_registry_parity_test.py — asserts (a) the Python and Rust validator registries hold the SAME set, (b) every divergent validator is covered by a golden parity vector, (c) `epr check` is invoked by at least one gate. All three fail today."
-      - "cargo test --test governance_parity_vectors (elohim/eprfs/eprfs-meta) — the Rust half of the correspondence theorem over elohim/sdk/schemas/v1/registries/governance-parity-vectors.json. RED on vector measure-without-kind-is-malformed. The Python half (python3 .claude/scripts/_lib/__tests__/test_governance_parity.py) is GREEN at 10/10 — the split between these two runners over ONE corpus is the habit."
+      - "python3 .claude/scripts/_lib/__tests__/validator_registry_parity_test.py — validator ACCOUNTING against the shared scope registry elohim/sdk/schemas/v1/registries/governance-validators.json: (a) the registry exists, (b) both provider registries parse, (c) no implemented validator is undeclared, (d) each host implements exactly what the registry scopes to it, (e) the Rust evaluator is invoked by at least one gate. (a)-(d) GREEN since 2026-08-12; (e) is the standing red and the remaining work."
+      - "cargo test -p elohim-epr-cli --test governance_parity_vectors — the Rust half of the correspondence theorem over governance-parity-vectors.json, run against the COMPOSED evaluator (library + ElohimRepositoryValidators). GREEN at 12/12, 0 skips. The Python half (python3 .claude/scripts/_lib/__tests__/test_governance_parity.py) is GREEN at 12/12 / 52 assertions. Both hosts now derive the same verdict from the same corpus — correspondence, which is necessary and NOT sufficient for this habit."
+      - "cargo test -p elohim-epr-cli --test live_manifest_integrity — the native integrity layer over the LIVE corpus (43 manifests), guarding against an over-strict check that would false-block every write under a subtree. GREEN."
     evidence: >
       RED WRITTEN 2026-08-12, born red, measured not asserted. Two independent
       reds, and the second is a DEMONSTRATED divergence rather than a
@@ -775,6 +776,34 @@ habits:
       measure-without-kind-is-malformed to pin the divergence itself, so the
       fork is now a standing red instead of a silence: Python 10/10 green, Rust
       fails that one vector with "decision expected refer got permit".
+      DELTA 2026-08-12 — the two evaluators now CORRESPOND; the habit stays red
+      because correspondence is not collapse. Four divergences were measured
+      (each a golden vector that failed before and passes after) and closed:
+      (1) Rust returned Ask for ANY unresolvable validator regardless of the
+      rule's declared class, hardening advisory `inject` rules into blocking
+      referrals — the existing vector used `class: deny`, where the two agree by
+      coincidence of severity, so the corpus proved the half that matched;
+      (2) Rust's provider could not tell "declared elsewhere" from "unknown", so
+      the three python-only validators routed to judgment there;
+      (3) the L6 measure.kind split above; and (4) `malformed-manifest-refers`,
+      SKIPPED in Rust with a reason recording the gap as out-of-scope rather
+      than as the fork it was. Directions were opposite — (1)(2) made Rust more
+      blocking, (3)(4) less — so wiring a gate before this would have
+      false-blocked every write under elohim-storage/src while still missing
+      malformed governance. Repaired by ONE shared scope map
+      (governance-validators.json, read by both hosts) plus a native integrity
+      layer mirroring validate_meta check-for-check; verified over the same 123
+      live manifests, both hosts flagging the identical 2 (stale worktree copies
+      predating L6) with matching rule indices and message text. The Rust runner
+      moved to epr-cli because against NoValidators it could not have detected a
+      provider divergence of any kind. `epr govern` now exists — the verb that
+      evaluates a PROSPECTIVE write — which is what "make the hook a client" was
+      always missing: `epr check` reads content from disk and cannot answer the
+      authoring question at all. Cross-checked at 129 prospective writes across
+      all 43 governed subtrees: 129/129 decisions identical, 127/129 identical
+      down to rule id, the two differing by declared scope, not drift.
+      REMAINING: no gate invokes the Rust evaluator, so it is parity-tested but
+      never run. That is assertion (e), and it is the whole of what is left.
       This habit flips green when the registry is one list, every decision
       carries an evaluator_cid, and one recorded disagreement names the
       evaluator CID it disputes. Neither red going green alone is sufficient —
@@ -783,7 +812,18 @@ habits:
       Risk 1 — "parity" achieved by deleting the divergent validators rather
       than by unifying the evaluators. That would make the check green and the
       governance plane weaker; the three python-only rules are bound by live
-      manifests and are class `inject`.
+      manifests and are class `inject`. RESOLVED 2026-08-12, and the resolution
+      is worth stating because the obvious repair was the wrong one: porting
+      each validator to both hosts yields TWO IMPLEMENTATIONS OF ONE PREDICATE,
+      which IS the fork rather than its cure. What must not diverge is the MAP,
+      so the scope registry declares who owns what and each host implements
+      exactly its own share. The first version of the check asserted "same set"
+      and would have driven precisely the wrong repair.
+      Risk 1b (NEW, measured) — a decision-only collapse silently drops the
+      three python-owned `inject` ADVISORIES, which fire on elohim-storage/src.
+      One decision authority need not mean one advisory source; the scope
+      registry already distinguishes them. Do not let "single evaluator" quietly
+      become "less advice".
       Risk 2 — making the Python hook shell to `epr check` without a
       fail-closed fallback. When the binary is absent the hook must REFER, never
       permit; a permit-on-missing-binary turns an evaluator outage into silent
