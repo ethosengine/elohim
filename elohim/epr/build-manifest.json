@@ -9,10 +9,11 @@
   "description": "Elohim EPR codec — canonical CBOR + CIDv1 + Ed25519 for the graph substrate (Rust crate + TS SDK)",
   "steps": {
     "rust-build-test": {
-      "description": "fmt + clippy + nextest for the elohim-epr Rust crate",
+      "description": "fmt + clippy + nextest for the elohim-epr and elohim-epr-rea Rust crates",
       "inputs": {
         "sources": [
           "elohim/epr/**",
+          "elohim/epr-rea/**",
           "elohim/Cargo.toml",
           "elohim/Cargo.lock"
         ],

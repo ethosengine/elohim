@@ -104,8 +104,8 @@ spec:
                 export RUSTFLAGS=""
                 export RUSTC_WRAPPER=""
                 cargo --version
-                cargo fmt -p elohim-epr -- --check
-                cargo clippy -p elohim-epr --all-targets -- -D warnings
+                cargo fmt -p elohim-epr -p elohim-epr-rea -- --check
+                cargo clippy -p elohim-epr -p elohim-epr-rea --all-targets -- -D warnings
               '
             '''
           }
@@ -123,7 +123,7 @@ spec:
                 set -euo pipefail
                 export RUSTFLAGS=""
                 export RUSTC_WRAPPER=""
-                cargo nextest run -p elohim-epr --all-targets
+                cargo nextest run -p elohim-epr -p elohim-epr-rea --all-targets
               '
             '''
           }

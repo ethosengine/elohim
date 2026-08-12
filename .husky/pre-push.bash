@@ -466,7 +466,12 @@ if [ "$USE_MANIFEST" = false ]; then
     "^elohim/elohim-storage/src/api/epr|^elohim/elohim-storage/src/db/epr_atoms|^elohim/elohim-storage/src/services/epr_service|^elohim/elohim-storage/src/services/epr_store|^elohim/elohim-storage/migrations/.*add_epr_tables|^elohim/sdk/schemas/v1/views/epr-|^elohim/sdk/schemas/v1/inputs/epr-|^elohim/sdk/storage-client-ts/tests/epr|^elohim/sdk/storage-client-ts/src/generated/Epr"; then
     PROJECTS="$PROJECTS epr-storage"
   fi
-  if echo "$CHANGED" | grep -qE "^elohim/epr/|^elohim/sdk/epr-ts/"; then
+  # epr-rea is in the SAME cargo workspace as epr and path-deps it, so it rides the
+  # elohim-epr gate rather than minting a second project. Two bugs closed at once: an
+  # epr-rea-only change used to match no glob at all (no manifest entry, no pipeline, no
+  # gate case — it shipped un-gated), and an epr-only change used to ship without ever
+  # compiling its one consumer.
+  if echo "$CHANGED" | grep -qE "^elohim/epr/|^elohim/epr-rea/|^elohim/sdk/epr-ts/"; then
     PROJECTS="$PROJECTS elohim-epr"
   fi
   if echo "$CHANGED" | grep -q "^elohim/elohim-compute/"; then
@@ -698,6 +703,10 @@ run_gate() {
     elohim-storage|epr-storage) GATE_WS="elohim/elohim-storage" ;;
     doorway)                    GATE_WS="doorway/doorway-service" ;;
     steward-node)               GATE_WS="steward/node" ;;
+    # epr/epr-rea are members of the elohim virtual workspace, so the slot is keyed on
+    # the workspace root (matching `cargo-pool key`). Without this the gate built into
+    # the in-tree elohim/target/, outside the pool the disk-guard policy accounts for.
+    elohim-epr)                 GATE_WS="elohim" ;;
   esac
   if [ -n "$GATE_WS" ]; then
     GATE_SLOT="$(gate_pool_slot "$GATE_WS" 2>/dev/null || true)"
@@ -894,8 +903,8 @@ run_gate() {
         # gate. RUSTC_WRAPPER="" bypasses sccache if the cache is poisoned;
         # safe to keep on as the build is fast enough either way.
         RUSTFLAGS="" cargo fmt --check 2>&1 && \
-        RUSTFLAGS="" cargo clippy -p elohim-epr -- -D warnings 2>&1 && \
-        RUSTFLAGS="" cargo test -p elohim-epr --all-targets 2>&1
+        RUSTFLAGS="" cargo clippy -p elohim-epr -p elohim-epr-rea -- -D warnings 2>&1 && \
+        RUSTFLAGS="" cargo test -p elohim-epr -p elohim-epr-rea --all-targets 2>&1
         TS_RC=$?
         # PROJECT_DIR is elohim/epr; sdk/epr-ts lives at elohim/sdk/epr-ts → go up one, then into sdk/epr-ts
         (cd ../sdk/epr-ts && pnpm test) 2>&1
