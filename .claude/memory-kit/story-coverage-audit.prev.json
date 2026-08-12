@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-15T03:43:55.319620+00:00",
+  "generated_at": "2026-05-15T04:12:38.233732+00:00",
   "totals": {
     "features_on_disk": 73,
     "features_canonical_in_some_story": 1,
@@ -624,7 +624,7 @@
     {
       "slug": "the-coop-decides",
       "path": "genesis/data/stories/terrance-tutor--as-collective-steward--coop-decides.md",
-      "author_status": "draft",
+      "author_status": "canonical",
       "canonical_feature_ref": "collective-governance",
       "canonical_feature_resolved": "genesis/a2o/features/qahal/collective-governance.feature",
       "adjacent_count": 2,

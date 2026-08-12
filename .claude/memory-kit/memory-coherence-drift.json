@@ -2,9 +2,9 @@
   "schema_version": 1,
   "entries": {
     "project_local_stack_dht_anchor_gap": {
-      "hits": 128,
+      "hits": 129,
       "last_changed": "elohim/elohim-storage/src/db/content_diesel.rs",
-      "last_signal_at": "2026-08-08T14:28:38Z"
+      "last_signal_at": "2026-08-09T20:10:38Z"
     },
     "project_resilience_snapshot_humans_junction": {
       "hits": 63,
@@ -12,29 +12,29 @@
       "last_signal_at": "2026-07-31T03:17:07Z"
     },
     "project_sprint_branch_not_orchestrator_indexed": {
-      "hits": 19,
+      "hits": 28,
       "last_changed": "genesis/orchestrator/Jenkinsfile",
-      "last_signal_at": "2026-07-31T10:51:50Z"
+      "last_signal_at": "2026-08-11T22:30:59Z"
     },
     "project_ci_playwright_image": {
-      "hits": 19,
+      "hits": 28,
       "last_changed": "genesis/orchestrator/Jenkinsfile",
-      "last_signal_at": "2026-07-31T10:51:50Z"
+      "last_signal_at": "2026-08-11T22:30:59Z"
     },
     "feedback_pvc_threshold_and_recovery": {
-      "hits": 19,
+      "hits": 28,
       "last_changed": "genesis/orchestrator/Jenkinsfile",
-      "last_signal_at": "2026-07-31T10:51:50Z"
+      "last_signal_at": "2026-08-11T22:30:59Z"
     },
     "feedback_cargo_target_dir_for_native_builds": {
-      "hits": 19,
+      "hits": 28,
       "last_changed": "genesis/orchestrator/Jenkinsfile",
-      "last_signal_at": "2026-07-31T10:51:50Z"
+      "last_signal_at": "2026-08-11T22:30:59Z"
     },
     "feedback_multi_agent_pvc_pacing": {
-      "hits": 19,
+      "hits": 28,
       "last_changed": "genesis/orchestrator/Jenkinsfile",
-      "last_signal_at": "2026-07-31T10:51:50Z"
+      "last_signal_at": "2026-08-11T22:30:59Z"
     },
     "feedback_sccache_cache_corruption_recovery": {
       "hits": 17,
@@ -42,9 +42,9 @@
       "last_signal_at": "2026-06-25T19:01:16Z"
     },
     "project_ci_storage_topology": {
-      "hits": 89,
+      "hits": 95,
       "last_changed": "elohim/holochain/Jenkinsfile",
-      "last_signal_at": "2026-08-07T22:18:45Z"
+      "last_signal_at": "2026-08-10T15:56:52Z"
     },
     "feedback_diesel_migration_timestamp_collision": {
       "hits": 13,
@@ -52,9 +52,9 @@
       "last_signal_at": "2026-07-31T03:58:12Z"
     },
     "project_sweettest_native_build_env": {
-      "hits": 39,
-      "last_changed": "elohim/holochain/tests/sweettest/src/tests/lamad.rs",
-      "last_signal_at": "2026-08-08T15:49:19Z"
+      "hits": 45,
+      "last_changed": "elohim/holochain/tests/sweettest/src/tests/rea_commitment_replication.rs",
+      "last_signal_at": "2026-08-09T04:51:15Z"
     },
     "feedback_codegen_prettier_oscillation": {
       "hits": 19,
@@ -62,9 +62,9 @@
       "last_signal_at": "2026-06-27T16:36:31Z"
     },
     "project_alpha_topology_bootstrap_pair": {
-      "hits": 7,
+      "hits": 17,
       "last_changed": "genesis/orchestrator/data/deployments.json",
-      "last_signal_at": "2026-08-09T00:32:41Z"
+      "last_signal_at": "2026-08-09T23:48:55Z"
     },
     "feedback_no_brittle_commands_in_poststart": {
       "hits": 3,
@@ -102,9 +102,9 @@
       "last_signal_at": "2026-07-30T03:13:47Z"
     },
     "feedback_deterministic_flag_agent_canon_stasis_pattern": {
-      "hits": 43,
+      "hits": 55,
       "last_changed": ".claude/hooks/deprecation-sentinel.py",
-      "last_signal_at": "2026-08-07T02:25:57Z"
+      "last_signal_at": "2026-08-11T21:23:30Z"
     }
   }
 }

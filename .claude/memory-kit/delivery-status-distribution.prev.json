@@ -7,7 +7,7 @@
     "active.alpha": 0,
     "wip": 52,
     "refined": 21,
-    "backlog": 166,
+    "backlog": 167,
     "envisioned": 15,
     "unknown": 150,
     "undelivered": 5,
@@ -1799,6 +1799,16 @@
     {
       "slug": "deprecation-helia-webrtc-native-addon-react-native-subtree",
       "path": "/projects/elohim/genesis/data/timeline/backlog/deprecation-helia-webrtc-native-addon-react-native-subtree.md",
+      "author_status": "",
+      "delivery_status": "backlog",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "deprecation-holochain-sqlite-tombstone-crate",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/deprecation-holochain-sqlite-tombstone-crate.md",
       "author_status": "",
       "delivery_status": "backlog",
       "delivery_status_updated": "",
