@@ -17,7 +17,7 @@
     }
   },
   "scope": "project",
-  "serverRefs": ["jenkins"],
+  "serverRefs": ["jenkins", "mempalace"],
   "projections": {
     "claude": { "path": ".mcp.json" },
     "codex": { "path": ".codex/config.toml" }

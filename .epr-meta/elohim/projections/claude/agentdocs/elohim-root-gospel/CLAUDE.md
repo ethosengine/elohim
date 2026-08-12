@@ -81,20 +81,23 @@ The disambiguator you'll reach for most — **what do you ADD?** a *manifest* �
 
 **Operating the live substrate — read the trust contract FIRST when a dataplane probe reds:** `genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md` — the invariants the dataplane holds (verify-locally-then-serve; canonical channels alone move declared heads; heal fills-never-moves; restart churn ≈20min; fresh actions need publish time), the probe watching each one (per-seam smoke in Dataplane Validation, `GET /db/p2p/conductor-diagnostics`, `POST /admin/steward-peers/refresh`, the per-deploy `✓ canonical head propagated` line), and the per-red decision tree. It exists because scenario-2 divergence was five stacked invisible defects; the probes now name them. When the doc and live behavior disagree, the probes are the authority.
 
-### Domain Pillars (app/elohim-app/src/app/)
+### Domain Pillars
 
-The Angular app is organized into Hebrew-named domain pillars, each with its own services, models, and components:
+The Angular client is organized into Hebrew-named domain pillars, each with its own services, models, and components. **Pillars do not all live in one workspace** — `lamad` was extracted into its own EPR-app bundle, and the alias resolves across that workspace boundary:
 
-| Pillar | Path Alias | Domain |
-|--------|-----------|--------|
-| **elohim** | `@app/elohim` | Protocol core - infrastructure, data loading, agents, trust |
-| **imagodei** | `@app/imagodei` | Identity - auth, sessions, profiles, presence, relationships |
-| **lamad** | `@app/lamad` | Learning - content, paths, assessments, mastery, practice |
-| **qahal** | `@app/qahal` | Community - governance, affinity, consent |
-| **shefa** | `@app/shefa` | Economy - stewardship, banking, resource flows |
-| **doorway** | `@app/doorway` | Gateway integration |
+| Pillar | Path Alias | Lives in | Domain |
+|--------|-----------|----------|--------|
+| **elohim** | `@app/elohim` | `app/elohim-app/src/app/elohim/` | Protocol core - infrastructure, data loading, agents, trust |
+| **imagodei** | `@app/imagodei` | `app/elohim-app/src/app/imagodei/` | Identity - auth, sessions, profiles, presence, relationships |
+| **qahal** | `@app/qahal` | `app/elohim-app/src/app/qahal/` | Community - governance, affinity, consent |
+| **shefa** | `@app/shefa` | `app/elohim-app/src/app/shefa/` | Economy - stewardship, banking, resource flows |
+| **avodah** | `@app/avodah` | `app/elohim-app/src/app/avodah/` | Work - projects, stories, contribution |
+| **doorway** | `@app/doorway` | `app/elohim-app/src/app/doorway/` | Gateway integration |
+| **lamad** | `@app/lamad/*` | `app/lamad/src/app/` (separate workspace) | Learning - content, paths, assessments, mastery, practice |
 
-Import via barrel exports: `import { ContentService } from '@app/lamad'`. The `elohim` pillar owns cross-pillar services.
+The in-workspace pillars expose barrel exports (`import { IdentityService } from '@app/imagodei'`). **`lamad` has no barrel** — only the `@app/lamad/*` wildcard is mapped, so imports name a deep path (`@app/lamad/models/content-node.model`). That asymmetry is a symptom, not a convention: `app/lamad/` is a **bundle** seam (an independently served EPR app), and it is being used as a **domain** seam without a public API on either side. See `app/CLAUDE.md` §Bundle seams are not domain seams before adding any import that crosses it.
+
+The `elohim` pillar owns cross-pillar services — **and today it does not hold the cross-pillar content substrate**. `ContentNode`/`ContentType`/`ContentReach` live in `app/lamad/`, so the dependency arrow currently runs core → pillar. The placement decision is open: `genesis/data/timeline/backlog/arch-frontend-bundle-seams-backlog.md` row 1. Don't deepen it; the `lint-workspace-imports` rail will refuse.
 
 ### Data Flow: Rust-to-TypeScript Boundary
 
@@ -182,7 +185,7 @@ Every agent working inside a value chain (a2o chapters, valueflow commitments, s
 
 Before proposing design approaches for ANY feature involving data entities (tables, models, routes, sync messages), invoke the `p2p-design-gate` skill — gates brainstorming step 3. This exists because AI agents default to relational-DB patterns (UUID primary keys, REST-first, CID-as-column); the protocol requires P2P-native thinking (DHT entry types first, content addressing for identity, storage as projection not truth).
 
-**The skill forces you to answer:** (1) Is the entity notarized (A), derived via link (A2), agent-scoped (B), agent-scoped with attestation (B2), or operational (C)? (2) Does a DHT entry type already exist? (Lamad DNA ~73/~100; Mishpat ~11/~100 — check headroom.) (3) Is identity content-derived (CID), agent-composite, or slug (must justify)? (4) What coordinator function creates it; what signal projects it? Answer BEFORE designing the HTTP route. If you're about to write `GET /api/v1/thing` without having answered these, STOP and invoke the skill.
+**The skill forces you to answer:** (1) Is the entity Notarized (A), Linked (A2 — an attribute of something already notarized), Private (B), Attested-Private (B2), or Ephemeral (C)? (2) Does a DHT entry type already exist for it? Read the answer from `#[hdk_entry_types]` in the DNA's integrity zome — **entry-type capacity is NOT the deciding question**, and any headroom tally quoted from a prompt is stale by construction. (3) What is the head-plane cost — how many items at 1 year, and what does that do to quiesce? (4) Is identity content-derived (CID), agent-composite, or slug (must justify)? (5) What coordinator function creates it, in which zome (integrity changes move the DNA hash; coordinator-only changes hot-swap), and what signal projects it? Answer BEFORE designing the HTTP route. If you're about to write `GET /api/v1/thing` without having answered these, STOP and invoke the skill — this summary is a pointer, not a substitute.
 
 ### Memory cleanup trigger (SessionStart)
 
@@ -249,7 +252,7 @@ Central orchestrator pattern: only `genesis/orchestrator/Jenkinsfile` receives G
 
 Pipeline metadata is declared in per-project `build-manifest.json` files. The `genesis/orchestrator/graph-walker.mjs` + `build-graph.groovy` walk these manifests to build a dependency graph and determine which pipelines to trigger. `pipeline-registry.mjs` exposes the metadata to JavaScript consumers.
 
-**Force dispatch:** Use commit tag syntax `[build:edge|dna|app|genesis|sophia|steward|all]` to force-dispatch specific pipelines on any trigger type (webhook, timer, manual, replay). Example: `git commit --allow-empty -m "test E2E [build:edge]"`.
+**Force dispatch:** Use commit tag syntax `[build:edge|dna|app|genesis|sophia|steward|conductor|all]` to force-dispatch specific pipelines on any trigger type (webhook, timer, manual, replay). Example: `git commit --allow-empty -m "test E2E [build:edge]"`. **Measuring without deploying:** to record a Dataplane Validation measure (saga/notary banking) WITHOUT rolling the alpha fleet, pair the dispatch tag with the edge mode tag — `[build:edge] [edge:validate-only]` — which skips build/deploy stages and runs only the validation suite against the live fleet. A bare `[build:edge]` fired "just to measure" restarts the 7 pods it is measuring (~20min churn + hours of catch-up) and is the documented measurement-by-deploy anti-pattern. Preflight the quiesce gate's four legs first (matthew caughtUp via doorway `/p2p/status`, `divergent_actionable<=2` + `unmeasured=0` via per-pod Prometheus, both doorways 200 on `/db/content/elohim-host-landing`) — the gate's predicate reads matthew (storage-A) only.
 
 **Jenkins MCP is anonymous (OIDC-protected):** all `mcp__jenkins__*` READ tools work; `triggerBuild`/`updateBuild` are denied — don't call them. Trigger builds only via a fresh `git push` with a `[build:*]` tag. Never add an `Authorization` header to the MCP registration (it triggers a 50-redirect OIDC login loop).
 
@@ -263,6 +266,9 @@ Pipeline metadata is declared in per-project `build-manifest.json` files. The `g
 | Genesis | `genesis/Jenkinsfile` | `genesis/build-manifest.json` |
 | Sophia | `sophia/Jenkinsfile` | `sophia/build-manifest.json` |
 | Steward | `steward/device/Jenkinsfile` | `steward/device/build-manifest.json` |
+| Conductor image | `che-devworkspaces/jenkins/Jenkinsfile-elohim-edgenode` (job `elohim-edgenode`, SCM: che-devworkspaces) | `elohim/conductor-image/build-manifest.json` |
+
+**The custom conductor reaches the fleet via the submodule pointer.** `elohim/holochain-conductor` and `elohim/tx5` are `update = none` submodules — never cloned by CI. Bumping either in a commit dispatches `elohim-conductor`, which compiles both at those exact SHAs and publishes `elohim-edgenode:conductor-<hc12>-<tx512>` (both forks are in the tag because both determine the binary — tx5 via the fork's `[patch.crates-io]`; `elohim/kitsune2` is neither watched nor in the tag, its path patches being commented out); `elohim-edge` then depends on it and bakes that tag into elohim-storage via `--build-arg CONDUCTOR_SOURCE_IMAGE` (`scripts/ci/build-storage-image.sh`). Nothing is hand-edited to move a conductor — the committed SHA *is* the pin, and if its image is missing the edge build fails with a remediation line rather than deploying a mismatched conductor. Variants (iroh, jemalloc-prof, canary storage, fork-branch overrides) are selected from the commit with `[conductor:…]` — see `elohim/conductor-image/README.md` and `genesis/orchestrator/README.md`. Changes to the Dockerfile or job itself live in the che-devworkspaces submodule and are NOT auto-watched: force them with `[build:conductor]`.
 
 **One DNA pipeline builds every DNA.** There is no per-DNA Jenkinsfile: `elohim/holochain/dna/Jenkinsfile` packs each DNA in turn — lamad (packed from the `dna/elohim/` directory, not `dna/lamad-v1/`), imagodei, infrastructure, node-registry, mishpat — and the DNA manifest's `elohim/holochain/dna/**` watch globs cover all of them. A DNA subdirectory holding only `dna.yaml` + `zomes/` + a `justfile` is normal and fully covered: do not read the absence of a per-DNA Jenkinsfile as missing CI, and do not add one. (`dna/hrea/` is a reserved placeholder — `workdir/` only, no zomes, not packed.)
 

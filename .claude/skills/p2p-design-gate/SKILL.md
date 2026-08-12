@@ -1,5 +1,4 @@
 ---
-id: skill
 name: p2p-design-gate
 description: Mandatory gate for any feature design involving data entities (tables, models, routes, sync messages) OR identity/agency/role/capability framing. Forces P2P-native thinking — DHT entry types, content addressing, source-of-truth classification, and identity-ontology framing (imago-dei, not crypto self-sovereignty) — before proposing design approaches. Use when brainstorming any feature that creates, stores, references, or syncs data entities, or that names an identity/agency tier.
 metadata:

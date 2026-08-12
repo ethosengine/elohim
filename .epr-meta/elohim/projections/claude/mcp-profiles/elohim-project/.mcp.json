@@ -3,6 +3,13 @@
     "jenkins": {
       "type": "http",
       "url": "https://jenkins.ethosengine.com/mcp-server/mcp"
+    },
+    "mempalace": {
+      "command": "mempalace-mcp",
+      "args": [
+        "--palace",
+        "/projects/elohim/.mempalace/palace"
+      ]
     }
   }
 }

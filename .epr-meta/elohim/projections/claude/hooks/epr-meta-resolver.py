@@ -2,6 +2,16 @@
 # .claude/hooks/epr-meta-resolver.py
 """PreToolUse resolver for the .epr-meta compose-gate. Thin: stdin -> _lib.epr_meta -> verdict JSON.
 Fail-open: a guard bug never blocks dev."""
+
+# The intervenor's removal condition (Meadows' shifting-the-burden trap;
+# counted by _lib/intervenor_census.py). A condition, never a date.
+RETIRE_WHEN = (
+    "when the intervenor census (placement-audit --epr-meta) reaches zero live rules — this is "
+    "the EVALUATOR for the compose gate, not a rule of its own, so it retires with the last "
+    "rule it evaluates and never before. Removing it earlier would silently un-enforce every "
+    "manifest at once, which is the fail-open direction this hook already guards against "
+    "internally."
+)
 import hashlib
 import json
 import sys
@@ -23,6 +33,8 @@ for _ in range(8):
         break
     _here = _here.parent
 
+from _lib import concern_routes  # noqa: E402
+from _lib import epr_client  # noqa: E402
 from _lib import epr_meta  # noqa: E402
 from _lib import store  # noqa: E402
 
@@ -37,6 +49,14 @@ _ADVICE_WINDOW = 4 * 3600
 _ARCH_LEDGER_REL = ".claude/data/architecture-findings.jsonl"
 
 
+# WHICH evaluator produced this process's decision. Set once, after the native
+# evaluator is consulted: the native identity when `epr` answered, Python's when
+# it did not. A module global rather than a threaded parameter because this is a
+# one-shot process with exactly one decision — there is no second value it could
+# hold, and six call sites threading an invariant is noise, not clarity.
+_EVALUATOR: dict | None = None
+
+
 def _witness(root: Path, *, subject, decision: str, cls: str | None, rule_id: str | None = None,
              policy_ref: str | None = None, refer: dict | None = None,
              checks: list | None = None) -> None:
@@ -46,7 +66,7 @@ def _witness(root: Path, *, subject, decision: str, cls: str | None, rule_id: st
     break the gate — epr_meta.witness already wraps its body in try/except)."""
     epr_meta.witness(root, runtime="claude", gate="pre-tool-use", subject=subject,
                       decision=decision, cls=cls, rule_id=rule_id, policy_ref=policy_ref,
-                      refer=refer, checks=checks)
+                      refer=refer, checks=checks, evaluator=_EVALUATOR)
 
 
 def _advice_debounced(root: Path, key: str) -> bool:
@@ -72,6 +92,29 @@ def _advice_debounced(root: Path, key: str) -> bool:
         return hit["debounced"]
     except Exception:  # noqa: BLE001 — store trouble → advise rather than suppress
         return False
+
+
+def _bound_ref(policy_ref: str | None, merged: dict, root: Path, rule_id: str) -> str | None:
+    """`<policy-id>@<version>` plus the manifest id when resolvable — the nearest cascade source
+    (`merged["sources"]`, root-first) that actually DECLARES `rule_id`, walked nearest-first so a
+    local override wins over an inherited ancestor binding. `<policy_ref>#<manifest-rel-path>`
+    when a declaring manifest is found on disk; the bare policy_ref otherwise (still honest, just
+    less specific). None only when there is no policy_ref at all (an inline, unpolicied measure
+    rule) — never a guess."""
+    if not policy_ref:
+        return None
+    for src in reversed(merged.get("sources") or []):  # nearest-first
+        try:
+            cfg = epr_meta.load_meta(Path(src))
+        except Exception:  # noqa: BLE001 — resolvable is best-effort, never fatal
+            continue
+        if any(isinstance(r, dict) and r.get("id") == rule_id for r in (cfg.get("rules") or [])):
+            try:
+                manifest_rel = str(Path(src).resolve().relative_to(root))
+            except (ValueError, OSError):
+                manifest_rel = str(src)
+            return f"{policy_ref}#{manifest_rel}"
+    return policy_ref
 
 
 def _handle_measures(measures, merged, root: Path, fp_path: str) -> list[str]:
@@ -120,6 +163,25 @@ def _handle_measures(measures, merged, root: Path, fp_path: str) -> list[str]:
                                  "path": rel, "detail": v.reason[:300],
                                  "first_seen": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                                  "status": "open"}
+                        # Typed-evidence graduation (algedonic phase-1 Task 4): additive fields
+                        # matching the wire schemas' evidence block — never inputs to `fpid` above,
+                        # so existing ledger rows keep their fingerprints byte-for-byte. `stock`/
+                        # `limit` come structurally off the Verdict (never parsed from `detail`
+                        # prose); `bound_ref` names the policy + (when resolvable) the declaring
+                        # manifest; `concern` is explicit-param-only — honest absence omits the key
+                        # rather than guessing (concern_routes.route, slice-1 Task 1).
+                        evidence = getattr(v, "evidence", None) or {}
+                        if isinstance(evidence.get("stock"), int):
+                            entry["stock"] = evidence["stock"]
+                        if isinstance(evidence.get("limit"), int):
+                            entry["limit"] = evidence["limit"]
+                        bound_ref = _bound_ref(rule.get("policy-ref"), merged, root, v.rule_id)
+                        if bound_ref:
+                            entry["bound_ref"] = bound_ref
+                        concern = concern_routes.route(
+                            "measure", {"concern": (rule.get("measure") or {}).get("concern")})
+                        if concern:
+                            entry["concern"] = concern
                         fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
             if is_new is None:
                 continue  # lock contention — another session owns this moment; next edit retries
@@ -325,6 +387,56 @@ def main():
     result = epr_meta.resolve_write(target, write, root, verdict_filter=_soft_filter)
     advisories += result["advisories"]
     merged = result.get("merged")
+
+    # ── the native evaluator is the DECISION AUTHORITY ────────────────────────
+    # Both hosts evaluate; `epr` decides. Running only one would delete the
+    # dispute path, and a dispute record is the artifact that makes the plane
+    # trustworthy — agreement is the trivial half of the claim.
+    #
+    # Authority applies to the DECISION, not to the advice. When the two agree
+    # (the overwhelmingly common case, measured at 129/129 decisions across
+    # every governed subtree) Python's class/rule/reason are kept, because three
+    # validators are scoped `python` by declaration and their `inject`
+    # advisories exist nowhere else. Single decision authority must not quietly
+    # become less advice. Only a genuine dispute takes Rust's attribution too —
+    # its decision, its reasons.
+    global _EVALUATOR
+    native = epr_client.govern(root, fp, content, is_new, is_new_subdir)
+    if native is None:
+        _EVALUATOR = epr_meta.evaluator_identity()
+        # Announce the missing second opinion only where there was a DECISION to
+        # cross-check. A clean allow — no rule fired, nothing witnessed — is
+        # silent by the polarity law, and nobody disputes a verdict that does not
+        # exist; banner-ing it would break that floor and put a notice on
+        # essentially every governed write. Debounced on top, so even a real
+        # degradation informs once a session instead of nagging per keystroke.
+        if result.get("witnessed") and not _advice_debounced(root, "native-evaluator-degraded"):
+            advisories.append(epr_client.DEGRADED_NOTICE)
+    else:
+        _EVALUATOR = native.get("evaluator")
+        dispute = epr_client.disagreement(result, native)
+        if dispute:
+            # The dispute record names BOTH evaluators by content address, so a
+            # third party can fetch each build and re-derive who was right.
+            _witness(root, subject=fp, decision=native.get("decision"),
+                     cls=native.get("winningClass"), rule_id=native.get("ruleId"),
+                     refer={"layer": "operator", "reason": "evaluator-disagreement"},
+                     checks=[f"EVALUATOR DISAGREEMENT: {dispute}",
+                             f"disputed: {epr_meta.evaluator_identity()}",
+                             f"authority: {native.get('evaluator')}"])
+            advisories.append(
+                f"[.epr-meta] EVALUATOR DISAGREEMENT — {dispute}. The native evaluator (`epr`) "
+                f"is the decision authority and its verdict stands; the dispute is recorded to "
+                f"the governance ledger by name. This is a governance-plane defect, not a "
+                f"content problem: the two hosts must derive the same decision from the same "
+                f"manifest, and one of them is wrong.")
+            result = {**result,
+                      "decision": native.get("decision"),
+                      "cls": native.get("winningClass"),
+                      "rule_id": native.get("ruleId"),
+                      "reason": native.get("reason") or result.get("reason"),
+                      "refer": ({"layer": "operator", "reason": native["referReason"]}
+                                if native.get("referReason") else result.get("refer"))}
 
     # Measure side-channel (observation tier — never blocks): hard-ceiling verdicts become
     # fingerprinted architecture findings + a dispatch directive, sentinel-style. Independent of

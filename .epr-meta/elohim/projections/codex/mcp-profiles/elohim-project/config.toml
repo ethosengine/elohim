@@ -6,3 +6,7 @@ url = "https://jenkins.ethosengine.com/mcp-server/mcp"
 required = false
 startup_timeout_sec = 15
 tool_timeout_sec = 60
+
+[mcp_servers.mempalace]
+command = "mempalace-mcp"
+args = ["--palace", "/projects/elohim/.mempalace/palace"]
