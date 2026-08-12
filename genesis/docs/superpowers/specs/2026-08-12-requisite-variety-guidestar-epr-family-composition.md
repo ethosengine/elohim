@@ -105,6 +105,79 @@ to `"advisory"`), and it **knows who to report to**. That last clause is a reach
 string. The same spec already states the law: *"A referral that can only be heard by the thing
 being complained about is not a referral."*
 
+### 1c. Every boundary needs a crossing wide enough for what must cross it
+
+Ashby's law is usually quoted alone. Beer stated **three** channel laws, and the third is the one
+that gets dropped:
+
+1. the regulator needs the variety of what it regulates (Ashby);
+2. the **channel** between them must carry that variety;
+3. **whatever carries meaning across the boundary must have capacity at least equal to the
+   channel** — Beer's term is *transduction*, and he was blunt that this is where
+   viable-system implementations actually fail. The channel is fine; the crossing quietly drops
+   variety.
+
+We use plain words for this rather than minting a term: **the crossing**, and *what survives it*.
+(Beer's "transduction" is named here once so the lineage is findable. The plainer nouns —
+membrane, handoff, carrier, seam, bridge, adapter — are all already load-bearing elsewhere in
+this repo and would collide.)
+
+The other three models name the same boundary differently and each adds something:
+
+- **Maturana/Varela — structural coupling.** A living system produces its own boundary:
+  organizationally closed, structurally coupled. What is outside *perturbs*, it does not
+  *instruct*. That is exactly the relation between `genesis/research/` and these crates — the
+  corpus triggers design responses, it does not dictate types.
+- **Meadows — a boundary is a mental construct.** *"There are no separate systems; where to draw
+  a boundary depends on the purpose of the discussion."* A boundary is chosen, and choosing it
+  badly is itself a leverage failure.
+- **REA / McCarthy — the enterprise boundary.** Inside is transformation; crossing is exchange
+  with an external agent. ValueFlows carries it as `in_scope_of`, made traversable 2026-08-12
+  (`scope::Scopes`).
+
+**This reframes conjunct 3.** "Do the four planes compose?" is really *"do their crossings have
+capacity?"* — and every break in §5 is a crossing that drops something:
+
+| §5 rank | What the crossing drops |
+|---|---|
+| 1 | `AlgedonicEvidence` has no reach — a crossing with **no destination** |
+| 2 | `declarer` cannot say self-report vs proxy — a crossing that drops **who is speaking** |
+| 3 | `ValidatorOutcome::Flag{String}` — a crossing that drops **the number** |
+| 4 | no POSIWID watcher — **no crossing at all** between aggregate behaviour and declared telos |
+
+### 1d. The research corpus crosses into these crates one-way
+
+The repo has **three coupling modalities with three different machineries**, and the one carrying
+external systems models is the weakest. Measured 2026-08-12:
+
+| Edge | Mechanism | Verified? |
+|---|---|---|
+| crate → crate | Cargo dependency | machine-checked |
+| doc → doc, doc → code | cite envelope (sha256, survives moves) | cite-gen gate |
+| **code → spec** | raw path string in a doc comment, **×163 files** | not at all |
+| **code → research** | **absent — zero `.rs` files reference `genesis/research/`** | — |
+| `.epr-meta` → doc | `cites:` field | **cite-gen does not parse it** |
+
+The named thinkers appear inside the two ontology crates only as **names in prose** — 14 Meadows,
+3 Liebig, 1 Beer — never as addressable references. So the crossing from the research corpus into
+the crates carries variety in one direction and has **no reverse channel**.
+
+**The symptom is already recorded at §4b**: a grep-driven audit concluded limitarianism was
+"docs-only, zero code" and was wrong, because `measure.rs` implements it without ever naming it.
+That is not a documentation nicety — it is a one-way crossing producing a false conclusion within
+hours of being tested.
+
+**What this does NOT argue for.** `bridges/` is the repo's existing word for adaptors, and those
+are **protocol** bridges (`did`, `pkarr`, `valueflows`). There must be no `bridges/georgism`: an
+external *ontology* arrives through an agent (§2a) or through a citation, and giving it a crate is
+the union-ontology trap §6.1 refuses.
+
+**What it does argue for** is small and half-built: the per-crate `.epr-meta` `cites:` field is
+already the one structured place code declares which documents it answers to. It is simply not
+parsed. Sealing it makes the crossing bidirectional and content-addressed. Filed as item 19 of
+`genesis/data/timeline/backlog/agentic-context-tooling-consolidation-queue.md` (folded into the
+existing tooling cluster rather than minted standalone, per `cluster-first-at-birth`).
+
 ---
 
 ## 2. The premise that changes the shape: abundant intelligence
