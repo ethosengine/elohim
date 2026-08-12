@@ -9,35 +9,40 @@
 //! Parity law (Global Constraint 5): a vector this runtime genuinely cannot
 //! execute is an EXPLICIT skip with a printed reason — never silent green.
 //!
-//! Provider note: the only validator reference in the corpus
-//! (`epr:validator-does-not-exist`) is deliberately nonexistent so BOTH runtimes
-//! treat it as unresolvable. `NoValidators` returns `Unavailable` for it, which
-//! is exactly what the host's `ElohimRepositoryValidators` returns for an unknown
-//! ref, so the referral outcome is identical either way.
+//! Provider note — WHY THIS LIVES IN `epr-cli` AND NOT `eprfs-meta`. It used to
+//! run against `NoValidators`, on the reasoning that the corpus's only validator
+//! reference was deliberately nonexistent so a null provider and the real one
+//! agreed. That reasoning was circular: a null provider returns `Unavailable` for
+//! EVERY reference, so the harness could not have detected a validator-provider
+//! divergence of any kind, and the corpus had been shaped around exactly that
+//! blind spot. The evaluator whose parity actually matters is the COMPOSED one —
+//! library + `ElohimRepositoryValidators` — which is what the gate runs and what
+//! the hook calls, and it exists here at the composition root.
+//!
+//! Consequence for fixtures: each vector's temp root is a faithful mini-repo, so
+//! the shared validator-scope registry is copied into it. The provider resolves
+//! scope from `repo_root` exactly as it does in production — no test-only path.
 
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
-use eprfs_meta::{evaluate_path_with, resolve_decision, GovernanceWrite, NoValidators};
+use elohim_epr_cli::repository_validators::ElohimRepositoryValidators;
+use eprfs_meta::{evaluate_path_with, resolve_decision, GovernanceWrite};
 use serde::Deserialize;
 use tempfile::TempDir;
 
 /// Vectors this runtime cannot execute, with the reason (printed, never green).
-fn skip_reason(name: &str) -> Option<&'static str> {
-    match name {
-        // eprfs-meta parses `.epr-meta` YAML with serde, which silently ignores
-        // unknown rule keys (no `deny_unknown_fields`). It therefore does not
-        // detect an `unknown-predicate-key` as a rule-integrity failure; the
-        // rule resolves to the inert `Unknown` predicate and produces no verdict
-        // (→ permit), not the `refer`/`governance-manifest-malformed` the corpus
-        // requires. Manifest-integrity (`check_meta`) parity is the Python
-        // surface (plan T1); it is deliberately out of T2's Rust scope.
-        "malformed-manifest-refers" => {
-            Some("eprfs-meta lacks manifest-integrity (unknown-predicate-key) detection; malformed→refer is the Python check_meta surface")
-        }
-        _ => None,
-    }
+///
+/// Empty since 2026-08-12. `malformed-manifest-refers` used to live here: serde
+/// silently ignores unknown rule keys, so eprfs-meta could not detect a
+/// rule-integrity failure and the vector was skipped as "the Python `check_meta`
+/// surface". That skip was load-bearing in the wrong direction — it meant the
+/// native evaluator PERMITTED writes that Python routed to judgment, and the
+/// corpus recorded the gap as out-of-scope rather than as the fork it was.
+/// `eprfs_meta::integrity` closes it.
+fn skip_reason(_name: &str) -> Option<&'static str> {
+    None
 }
 
 #[derive(Debug, Deserialize)]
@@ -76,11 +81,32 @@ struct Expect {
     directive: Option<String>,
 }
 
-fn vectors_path() -> PathBuf {
-    // CARGO_MANIFEST_DIR = elohim/eprfs/eprfs-meta → up two to the elohim/ crate
-    // root, then into the SDK registries.
+/// CARGO_MANIFEST_DIR = elohim/eprfs/epr-cli → up two to the elohim/ crate root,
+/// then into the SDK registries.
+fn registry_path(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../sdk/schemas/v1/registries/governance-parity-vectors.json")
+        .join("../../sdk/schemas/v1/registries")
+        .join(name)
+}
+
+fn vectors_path() -> PathBuf {
+    registry_path("governance-parity-vectors.json")
+}
+
+/// Repo-relative home of the validator-scope map, mirrored into each fixture root
+/// so the provider's own resolution path is what gets exercised.
+const VALIDATOR_SCOPE_REL: &str = "elohim/sdk/schemas/v1/registries/governance-validators.json";
+
+fn seed_validator_scope(root: &std::path::Path) {
+    let source = registry_path("governance-validators.json");
+    let Ok(body) = fs::read_to_string(&source) else {
+        return; // absent registry → provider sees no declarations → routes. Safe direction.
+    };
+    let target = root.join(VALIDATOR_SCOPE_REL);
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent).unwrap();
+    }
+    fs::write(target, body).unwrap();
 }
 
 /// Wrap a vector's bare YAML rules body into a valid `.epr-meta` frontmatter
@@ -120,6 +146,7 @@ fn governance_parity_vectors_hold() {
         }
 
         let dir = TempDir::new().unwrap();
+        seed_validator_scope(dir.path());
         for (rel, body) in &vector.manifests {
             let full = dir.path().join(rel);
             if let Some(parent) = full.parent() {
@@ -133,13 +160,14 @@ fn governance_parity_vectors_hold() {
         write.is_new = vector.write.new;
         write.content = vector.write.content.clone();
 
-        let evaluation = match evaluate_path_with(dir.path(), &target, &write, &NoValidators) {
-            Ok(evaluation) => evaluation,
-            Err(error) => {
-                failures.push(format!("{}: evaluation errored: {error}", vector.name));
-                continue;
-            }
-        };
+        let evaluation =
+            match evaluate_path_with(dir.path(), &target, &write, &ElohimRepositoryValidators) {
+                Ok(evaluation) => evaluation,
+                Err(error) => {
+                    failures.push(format!("{}: evaluation errored: {error}", vector.name));
+                    continue;
+                }
+            };
         let resolved = resolve_decision(&evaluation.verdicts);
 
         let mut mismatches = Vec::new();

@@ -6,6 +6,7 @@
 
 mod canonical;
 mod evaluation;
+mod integrity;
 
 pub use canonical::{canonical_body, canonical_json, hex_lower, CanonError, HASH_EXCLUDE_KEYS};
 
@@ -14,6 +15,8 @@ pub use evaluation::{
     GovernanceEvaluation, GovernanceVerdict, GovernanceWrite, NoValidators, PolicyDiagnostic,
     ResolvedDecision, ValidatorOutcome, ValidatorProvider, ValidatorRequest,
 };
+
+pub use integrity::{cascade_problems, targets_manifest, validate_meta, ManifestProblems};
 
 use std::{
     collections::BTreeMap,
@@ -131,7 +134,7 @@ pub fn resolve_path(
     })
 }
 
-fn collect_cascade(repo_root: &Path, target: &Path) -> Vec<PathBuf> {
+pub(crate) fn collect_cascade(repo_root: &Path, target: &Path) -> Vec<PathBuf> {
     let mut current = if target.is_dir() {
         target.to_path_buf()
     } else {
@@ -256,7 +259,7 @@ fn flow_depth_ok(text: &str) -> bool {
     true
 }
 
-fn frontmatter(text: &str) -> Option<&str> {
+pub(crate) fn frontmatter(text: &str) -> Option<&str> {
     let rest = text.strip_prefix("---\n")?;
     let end = rest.find("\n---")?;
     Some(&rest[..end])

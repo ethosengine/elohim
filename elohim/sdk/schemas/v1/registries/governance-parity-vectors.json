@@ -84,6 +84,24 @@
       "law": "An unresolvable reference must never soften to inject (the pre-slice soundness inversion) and must not hard-deny at authoring polarity: it routes. Declared runtime-scoped validators (e.g. rust-only) are NOT unresolvable — they are Unavailable-by-declaration and skip without downgrading the rule."
     },
     {
+      "name": "unresolvable-validator-on-inject-does-not-harden",
+      "manifests": {
+        "iv/.epr-meta": "rules:\n  - id: advisory-ghost\n    class: inject\n    when: { write: \"*.rs\", new: true }\n    validator: epr:validator-does-not-exist\n    why: test"
+      },
+      "write": { "path": "iv/a.rs", "new": true, "content": "fn main() {}" },
+      "expect": { "decision": "permit", "winning_class": "inject", "rule_id": "advisory-ghost", "witnessed": true },
+      "law": "The soundness inversion has TWO directions and `unresolvable-validator-refers` only pins one. An unresolvable ref must not SOFTEN a rule declared to gate (that vector, class: deny) — and it must not HARDEN one declared advisory. A `class: inject` rule's own text says it never blocks; escalating it to a routed `ask` stops the agent and waits on a human for a rule whose author declared it non-blocking, costing agency instead of buying safety. The verdict is CLAMPED TO THE DECLARED CLASS: route only what was already meant to gate. ADDED 2026-08-12 pinning a MEASURED divergence — Python clamps (permit/inject), Rust returns Ask unconditionally (refer). It survived because the only unresolvable-validator vector used `class: deny`, where the two agree by coincidence of severity."
+    },
+    {
+      "name": "runtime-scoped-validator-skips-clean",
+      "manifests": {
+        "rs/.epr-meta": "rules:\n  - id: scoped-elsewhere\n    class: inject\n    when: { write: \"*.rs\", new: true }\n    validator: epr:validator-dna-hash-neutrality\n    why: test"
+      },
+      "write": { "path": "rs/b.rs", "new": true, "content": "fn main() {}" },
+      "expect": { "decision": "permit", "winning_class": null, "rule_id": null, "witnessed": false },
+      "law": "A validator DECLARED to belong to another runtime is Unavailable-by-declaration, not unresolvable: it skips clean and never downgrades the rule. This is the honest asymmetry a two-host plane is allowed to have — but only when BOTH hosts can tell a declared absence from an unknown one. ADDED 2026-08-12 pinning the other half of the same measured divergence: Python carries `RUNTIME_SCOPED_VALIDATORS` and skips, Rust's provider falls through `_ => Unavailable` and cannot distinguish 'not mine to run' from 'never heard of it', so three Python-owned validators route to judgment there. `epr:validator-dna-hash-neutrality` is the discriminator (Python-owned, live in elohim/holochain/dna/.epr-meta). The fix is a SHARED registry both hosts bind — not a second implementation of each validator, which would double the plane rather than collapse it."
+    },
+    {
       "name": "malformed-manifest-refers",
       "manifests": {
         "bad/.epr-meta": "rules:\n  - id: broken\n    class: deny\n    when: { write: \"*.md\" }\n    unknown-predicate-key: true"

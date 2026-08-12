@@ -14,9 +14,45 @@ use serde_json::Value;
 const ARCHETYPE_BUDGETS: &str = "genesis/data/devices/archetype-resource-budgets.json";
 const CAPACITY_LEDGER: &str = "genesis/data/rakia/compute-capacity.json";
 const DEPLOYMENTS: &str = "genesis/orchestrator/data/deployments.json";
+/// The shared scope map: which host owns which validator reference. Read at the
+/// composition root (never in `eprfs-meta`, which must stay domain-neutral).
+const VALIDATOR_SCOPE: &str = "elohim/sdk/schemas/v1/registries/governance-validators.json";
 
 #[derive(Debug, Default)]
 pub struct ElohimRepositoryValidators;
+
+/// References this host does NOT implement but which the shared registry declares
+/// as owned by another runtime.
+///
+/// Without this distinction every foreign validator falls through to
+/// `Unavailable` and routes to judgment — which is how three Python-owned
+/// `inject` (advisory, never-blocking) validators became blocking under `epr`.
+/// A missing/unreadable registry yields an empty set, which is the SAFE
+/// direction: unknown-and-undeclared routes rather than silently skipping.
+fn declared_elsewhere(repo_root: &Path) -> HashSet<String> {
+    #[derive(Deserialize)]
+    struct Scope {
+        validators: Vec<ScopedValidator>,
+    }
+    #[derive(Deserialize)]
+    struct ScopedValidator {
+        #[serde(rename = "ref")]
+        reference: String,
+        runtime: String,
+    }
+    fs::read_to_string(repo_root.join(VALIDATOR_SCOPE))
+        .ok()
+        .and_then(|raw| serde_json::from_str::<Scope>(&raw).ok())
+        .map(|scope| {
+            scope
+                .validators
+                .into_iter()
+                .filter(|entry| entry.runtime == "python")
+                .map(|entry| entry.reference)
+                .collect()
+        })
+        .unwrap_or_default()
+}
 
 impl ValidatorProvider for ElohimRepositoryValidators {
     fn evaluate(&self, request: &ValidatorRequest<'_>) -> ValidatorOutcome {
@@ -29,7 +65,13 @@ impl ValidatorProvider for ElohimRepositoryValidators {
             "epr:validator-test-bench-aggregate-capacity" => test_bench_aggregate_capacity(request),
             "epr:validator-eprfs-meta-domain-neutrality" => eprfs_meta_domain_neutrality(request),
             "epr:validator-escalation-ladder" => escalation_ladder(request),
-            _ => return ValidatorOutcome::Unavailable,
+            reference => {
+                return if declared_elsewhere(request.repo_root).contains(reference) {
+                    ValidatorOutcome::DeclaredElsewhere
+                } else {
+                    ValidatorOutcome::Unavailable
+                };
+            }
         };
         detail.map_or(ValidatorOutcome::Pass, |reason| ValidatorOutcome::Flag {
             reason,

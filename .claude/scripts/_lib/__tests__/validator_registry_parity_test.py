@@ -8,23 +8,31 @@ WHY THIS EXISTS. The repo runs two implementations of the same governance evalua
   * Rust — `ElohimRepositoryValidators::evaluate`'s match arm in
     `elohim/eprfs/epr-cli/src/repository_validators.rs`, reached via `epr check`.
 
-`governance-parity-vectors.json` already pins that the two agree on nine golden vectors, and
-`test_governance_parity.py` runs them. What nothing checked is whether the two registries contain
-the SAME VALIDATORS — and they do not. A vector suite cannot catch a divergence in the set of
-things it does not have vectors for; the correspondence theorem is asserted over the intersection
-and silent on the difference.
+`governance-parity-vectors.json` pins that the two derive the same decisions from the same
+cascades, and both runners execute it. What a vector suite cannot do is speak about validators it
+has no vector for — so this test asks the structural question instead: is every validator
+reference ACCOUNTED FOR in both hosts?
 
-The divergence is not cosmetic. A validator present in one registry and absent in the other
-returns `Unavailable`/no-op there, so the SAME manifest yields different decision classes
-depending on which evaluator ran — in BOTH severity directions at once (Python enforces three
-rules Rust cannot see; Rust enforces one Python cannot see). Meanwhile `epr check` is invoked by
-no gate at all, so the parity-tested twin never actually runs and the divergence has no way to
-surface in normal use.
+THE LAW, CORRECTED (2026-08-12). The first version of this test asserted that the two registries
+hold the SAME SET. That was the wrong law, and asserting it would have driven exactly the wrong
+repair. Some validators are inherently single-host — `eprfs-meta-domain-neutrality` is a claim
+about the Rust crate's own source; `bounded-work` walks a seam-registry census that lives on the
+Python side. Porting each one to both hosts would produce TWO IMPLEMENTATIONS OF ONE PREDICATE,
+which is the fork itself, not the cure.
 
-THIS TEST IS EXPECTED TO FAIL until the governance plane is collapsed to one evaluator. It is the
-runnable check behind the `governance-plane-single-evaluator` habit in `genesis/manifests/
-habits.yaml` — filed `red` per covenant rule 2 (a red needs a check that EXISTS and fails; an
-unwired habit is one with no check at all). Its failure message is the work item.
+What must not diverge is the MAP. A two-host plane may hold an honest asymmetry, but only while
+both hosts can tell "declared elsewhere, not mine to run" (skip clean, never downgrade the rule)
+from "no host claims this" (route to judgment). So the map lives in ONE place —
+`elohim/sdk/schemas/v1/registries/governance-validators.json` — and this test enforces that each
+host implements exactly what the registry scopes to it, no more and no less. Disagreement becomes
+unrepresentable rather than merely tested-for.
+
+WHAT IS STILL RED. Correspondence is not collapse. Two evaluators that agree today can drift
+tomorrow, and the Rust one is invoked by no gate at all — so it is parity-tested but never RUN,
+and a future divergence has no way to surface in normal use. The habit
+`governance-plane-single-evaluator` closes when the decision has ONE evaluator: the Rust
+`epr` binary, with the Python hook as a client that falls back to REFER — never permit — when
+the binary is absent.
 
 Run: python3 .claude/scripts/_lib/__tests__/validator_registry_parity_test.py  (exit 0 = pass)
 Bespoke assert-based harness — matches this __tests__ dir's convention (pytest is not installed).
@@ -49,7 +57,7 @@ if REPO is None:  # pragma: no cover - only if the tree is moved
 from _lib import epr_meta  # noqa: E402
 
 RUST_PROVIDER = REPO / "elohim/eprfs/epr-cli/src/repository_validators.rs"
-VECTORS = REPO / "elohim/sdk/schemas/v1/registries/governance-parity-vectors.json"
+SCOPE_REGISTRY = REPO / "elohim/sdk/schemas/v1/registries/governance-validators.json"
 
 _passed = 0
 _failures: list[str] = []
@@ -68,74 +76,68 @@ def check(label: str, cond: bool, detail: str = "") -> None:
                 print(f"       {line}")
 
 
-# ── the two registries ────────────────────────────────────────────────────────
-python_refs = set(epr_meta.REFERENCE_VALIDATORS)
+# ── the shared scope map ──────────────────────────────────────────────────────
+scope: dict[str, str] = {}
+if SCOPE_REGISTRY.is_file():
+    for entry in json.loads(SCOPE_REGISTRY.read_text()).get("validators", []):
+        if isinstance(entry, dict) and entry.get("ref"):
+            scope[entry["ref"]] = entry.get("runtime", "?")
 
+# ── what each host actually implements ────────────────────────────────────────
+python_impl = set(epr_meta.REFERENCE_VALIDATORS)
 rust_text = RUST_PROVIDER.read_text()
 # Match-arm literals of the form:  "epr:validator-foo" => foo(request),
-rust_refs = set(re.findall(r'"(epr:validator-[a-z0-9-]+)"\s*=>', rust_text))
+rust_impl = set(re.findall(r'"(epr:validator-[a-z0-9-]+)"\s*=>', rust_text))
 
-print("Validator registries")
-print(f"  python : {len(python_refs)}  ({RUST_PROVIDER.name}'s sibling, _lib/epr_meta.py)")
-print(f"  rust   : {len(rust_refs)}  ({RUST_PROVIDER.relative_to(REPO)})")
+print("Validator accounting")
+print(f"  shared scope registry : {len(scope)}  ({SCOPE_REGISTRY.relative_to(REPO)})")
+print(f"  python implements     : {len(python_impl)}")
+print(f"  rust implements       : {len(rust_impl)}")
 print()
 
 check(
+    "the shared scope registry is present and non-empty "
+    "(without it neither host can tell a declared absence from an unknown reference)",
+    bool(scope),
+    f"expected {SCOPE_REGISTRY.relative_to(REPO)} to declare each validator's owning runtime",
+)
+
+check(
     "both registries were parsed (a zero here means the extractor broke, not that they agree)",
-    bool(python_refs) and bool(rust_refs),
-    f"python={len(python_refs)} rust={len(rust_refs)}",
+    bool(python_impl) and bool(rust_impl),
+    f"python={len(python_impl)} rust={len(rust_impl)}",
 )
 
-python_only = sorted(python_refs - rust_refs)
-rust_only = sorted(rust_refs - python_refs)
-
+# ── no implementation may be undeclared ───────────────────────────────────────
+undeclared = sorted((python_impl | rust_impl) - set(scope))
 check(
-    "ONE evaluator: the Python and Rust validator registries hold the same set",
-    python_refs == rust_refs,
+    "every implemented validator is declared in the shared scope registry",
+    not undeclared,
     "\n".join(
         [
-            "The governance plane is forked. The same manifest yields different decision",
-            "classes depending on which evaluator ran, in both severity directions:",
-            "",
-            f"  python-only ({len(python_only)}) — Rust returns Unavailable, so these go UNENFORCED",
-            f"  under `epr check`:",
-            *[f"    - {r}" for r in python_only],
-            "",
-            f"  rust-only ({len(rust_only)}) — the LIVE Python hook cannot see these at all:",
-            *[f"    - {r}" for r in rust_only],
-            "",
-            "Fix = collapse to one evaluator (Rust via `epr check --json`), with the Python hook",
-            "as a client that falls back to REFER — never permit — when the binary is absent.",
+            "These run in some host but no registry row says who owns them, so the OTHER host",
+            "cannot distinguish them from a typo and will route every write they gate:",
+            *[f"    - {r}" for r in undeclared],
         ]
     ),
 )
 
-# ── do the golden vectors even cover the divergence? ──────────────────────────
-covered: set[str] = set()
-if VECTORS.is_file():
-    raw = json.loads(VECTORS.read_text())
-    blob = json.dumps(raw)
-    for ref in python_refs | rust_refs:
-        if ref in blob:
-            covered.add(ref)
-
-divergent = set(python_only) | set(rust_only)
-uncovered_divergent = sorted(divergent - covered)
+# ── every declaration must be honoured by the host it names ───────────────────
+missing: list[str] = []
+for ref, runtime in sorted(scope.items()):
+    if runtime in ("python", "both") and ref not in python_impl:
+        missing.append(f"{ref}: declared `{runtime}` but NOT implemented in Python")
+    if runtime in ("rust", "both") and ref not in rust_impl:
+        missing.append(f"{ref}: declared `{runtime}` but NOT implemented in Rust")
+    if runtime == "python" and ref in rust_impl:
+        missing.append(f"{ref}: declared `python` but ALSO implemented in Rust (two implementations of one predicate IS the fork)")
+    if runtime == "rust" and ref in python_impl:
+        missing.append(f"{ref}: declared `rust` but ALSO implemented in Python (two implementations of one predicate IS the fork)")
 
 check(
-    "the golden parity vectors cover every DIVERGENT validator "
-    "(a vector suite is silent on what it has no vector for)",
-    not uncovered_divergent,
-    "\n".join(
-        [
-            f"{len(divergent)} validators differ between the registries; "
-            f"{len(uncovered_divergent)} of them appear in NO golden vector:",
-            *[f"    - {r}" for r in uncovered_divergent],
-            "",
-            "This is why governance-parity-vectors.json reads green over a forked plane:",
-            "the correspondence theorem is asserted over the intersection only.",
-        ]
-    ),
+    "each host implements exactly what the registry scopes to it",
+    not missing,
+    "\n".join(["The scope map and the implementations disagree:", *[f"    - {m}" for m in missing]]),
 )
 
 # ── is the parity-tested twin actually reachable from any gate? ───────────────
@@ -148,15 +150,20 @@ gate_files = [
 invokers = [
     p.relative_to(REPO).as_posix()
     for p in gate_files
-    if p.is_file() and re.search(r"\bepr\s+check\b", p.read_text())
+    if p.is_file() and re.search(r"\bepr\s+(check|govern)\b", p.read_text())
 ]
 check(
-    "`epr check` (the Rust evaluator) is invoked by at least one gate",
+    "the Rust evaluator is invoked by at least one gate",
     bool(invokers),
     "\n".join(
         [
-            "No gate invokes it. The Rust evaluator is parity-tested but never RUN, so a",
-            "divergence from the live Python evaluator cannot surface in normal use.",
+            "No gate invokes it. The Rust evaluator is parity-tested but never RUN, so a future",
+            "divergence from the live Python evaluator cannot surface in normal use — which is",
+            "how four measured divergences survived until 2026-08-12.",
+            "",
+            "This is the remaining leg of `governance-plane-single-evaluator`: collapse to ONE",
+            "evaluator by making the Python hook a client of `epr`, falling back to REFER —",
+            "never permit — when the binary is absent.",
             f"Searched: {', '.join(p.relative_to(REPO).as_posix() for p in gate_files if p.is_file())}",
         ]
     ),
@@ -169,4 +176,4 @@ if _failures:
     print("  This test is the runnable red behind habits.yaml "
           "`governance-plane-single-evaluator`.")
     sys.exit(1)
-print(f"  {_passed} validator-registry parity assertions passed ✅")
+print(f"  {_passed} validator-accounting assertions passed ✅")

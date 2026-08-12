@@ -137,7 +137,13 @@ pub fn resolve_decision(verdicts: &[GovernanceVerdict]) -> ResolvedDecision {
             ResolvedDecision {
                 decision: decision.into(),
                 winning_class: Some(class_str(&verdict.class).into()),
-                rule_id: Some(verdict.rule_id.clone()),
+                // An EMPTY rule id means "not attributable to any one rule" — the
+                // manifest-integrity route, where the failure is the manifest
+                // itself rather than a rule inside it. This is unambiguous
+                // because a rule that omits `id` is now caught by integrity and
+                // routes BEFORE evaluation, so no real rule can reach here
+                // nameless.
+                rule_id: Some(verdict.rule_id.clone()).filter(|id| !id.is_empty()),
                 refer_reason: (decision == "refer")
                     .then(|| verdict.refer_reason.clone())
                     .flatten(),
@@ -196,7 +202,18 @@ pub struct ValidatorRequest<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValidatorOutcome {
     Pass,
-    Flag { reason: String },
+    Flag {
+        reason: String,
+    },
+    /// This host DECLARES the reference as belonging to another runtime.
+    ///
+    /// Unavailable-by-declaration: the rule skips clean and is never downgraded.
+    /// A two-host governance plane is allowed exactly this asymmetry — but only
+    /// while both hosts can tell a declared absence from an unknown one, which
+    /// is why this is a distinct variant rather than a flavour of `Unavailable`.
+    DeclaredElsewhere,
+    /// No host claims this reference. It routes to judgment (clamped to the
+    /// rule's declared class — see the `Validator` arm of `evaluate_rule`).
     Unavailable,
 }
 
@@ -227,8 +244,60 @@ pub fn evaluate_path_with(
     validators: &dyn ValidatorProvider,
 ) -> Result<GovernanceEvaluation> {
     let repo_root = repo_root.as_ref();
+    let target = target.as_ref();
     let resolution = resolve_path(repo_root, target)?;
+
+    // Rule integrity BEFORE rule evaluation. A manifest that does not satisfy
+    // the authored schema cannot be evaluated honestly: serde silently drops
+    // keys it does not know, so a typo'd predicate resolves to an inert rule and
+    // enforces nothing while reading as healthy. The gate cannot know what
+    // governance intended, so it routes to judgment rather than guessing.
+    //
+    // The exception is a write that TARGETS a manifest: fixing broken
+    // governance must never be blocked by broken governance. There the problems
+    // are reported as diagnostics and evaluation continues.
+    let malformed = crate::integrity::cascade_problems(repo_root, target);
     let (policies, mut diagnostics) = load_policies(repo_root);
+    if !malformed.is_empty() {
+        let detail = malformed
+            .iter()
+            .map(|entry| {
+                format!(
+                    "{}: {}",
+                    entry.manifest.display(),
+                    entry.problems.join(", ")
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("; ");
+        if crate::integrity::targets_manifest(target) {
+            diagnostics.push(PolicyDiagnostic {
+                code: "manifest.malformed".into(),
+                message: format!(
+                    "malformed governance manifest(s) — {detail}. (editing an .epr-meta is never blocked, so you can fix it.)"
+                ),
+            });
+        } else {
+            return Ok(GovernanceEvaluation {
+                resolution,
+                rules: Vec::new(),
+                verdicts: vec![GovernanceVerdict {
+                    class: GovernanceRuleClass::Ask,
+                    reason: format!(
+                        "governance manifest malformed — {detail}. Fix the manifest to restore full governance here; proceeding now requires confirmation."
+                    ),
+                    // Not attributable to any one rule — see `resolve_decision`.
+                    rule_id: String::new(),
+                    policy_ref: None,
+                    refer_reason: Some("governance-manifest-malformed".into()),
+                }],
+                diagnostics: vec![PolicyDiagnostic {
+                    code: "manifest.malformed".into(),
+                    message: detail,
+                }],
+            });
+        }
+    }
     let mut rules = resolution.effective_rules.clone();
     let declared_validators = resolution.effective_validators.clone();
     // Verdicts a tampered content pin injects directly, bypassing rule expansion.
@@ -629,18 +698,49 @@ fn evaluate_rule(
                 ValidatorOutcome::Flag { reason } => {
                     format!("validator `{reference}` flagged this write: {reason}. {why}")
                 }
+                // Unavailable-by-DECLARATION: the cascade (or the host's scope
+                // registry) says this reference belongs to another runtime. That
+                // is an honest asymmetry, not a resolution failure — it skips
+                // clean and never downgrades the rule. Distinguishing it from a
+                // genuinely unknown reference is the whole point of the variant:
+                // a host that cannot tell "not mine to run" from "never heard of
+                // it" routes every foreign validator to judgment, which is how
+                // three Python-owned validators became blocking here.
+                ValidatorOutcome::DeclaredElsewhere => return None,
                 ValidatorOutcome::Unavailable => {
-                    // Ceiling law: an unresolvable validator reference must NOT
-                    // soften to `inject` (the pre-slice soundness inversion) and
-                    // must not hard-deny at authoring polarity — it routes to
-                    // judgment. A validator declared for another runtime is
-                    // implemented (Pass/Flag) in the host that owns it, so it
-                    // never reaches this arm there; only genuinely unknown refs do.
+                    // Ceiling law, BOTH directions. An unresolvable reference must
+                    // not SOFTEN a rule declared to gate (the pre-slice soundness
+                    // inversion) — and it must not HARDEN one declared advisory.
+                    //
+                    // A `class: inject` rule's own text says it never blocks;
+                    // escalating it to a routed `ask` stops the author and waits on
+                    // a human for a rule whose author declared it non-blocking. That
+                    // is the same inversion pointing the other way, and it costs
+                    // agency instead of buying safety. The advisory text still
+                    // reaches the author — warning without blocking is the rule's
+                    // whole intent.
+                    //
+                    // So: CLAMP TO THE DECLARED CLASS. Route only what was already
+                    // meant to gate.
+                    let gating = matches!(
+                        rule.class,
+                        GovernanceRuleClass::Deny | GovernanceRuleClass::Ask
+                    );
                     return Some(GovernanceVerdict {
-                        class: GovernanceRuleClass::Ask,
-                        reason: format!(
-                            "validator `{reference}` is unresolvable in this host; routing to judgment. {why}"
-                        ),
+                        class: if gating {
+                            GovernanceRuleClass::Ask
+                        } else {
+                            rule.class.clone()
+                        },
+                        reason: if gating {
+                            format!(
+                                "validator `{reference}` is unresolvable in this host; routing to judgment. {why}"
+                            )
+                        } else {
+                            format!(
+                                "validator `{reference}` is unresolvable in this host — advisory only, not evaluated. {why}"
+                            )
+                        },
                         rule_id: rule.id.clone(),
                         policy_ref: rule.policy_ref.clone(),
                         refer_reason: Some("unresolvable-validator".into()),

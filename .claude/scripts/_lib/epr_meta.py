@@ -1201,9 +1201,35 @@ def _dna_hash_neutrality(write: dict) -> bool:
 
 # Declared runtime-scoped validator refs: NOT unresolvable — Unavailable-by-declaration, skips
 # clean without downgrading the rule (constraint 6). Value names the runtime that owns them.
-RUNTIME_SCOPED_VALIDATORS = {
-    "epr:validator-eprfs-meta-domain-neutrality": "rust-only",
-}
+#
+# DERIVED, never hand-written. The scope map lives in ONE place —
+# `elohim/sdk/schemas/v1/registries/governance-validators.json` — which the Rust provider
+# (epr-cli's ElohimRepositoryValidators) reads for the mirror-image question. Two hand-maintained
+# lists that must agree IS the fork this whole surface exists to close; a shared registry makes
+# disagreement unrepresentable rather than merely tested-for.
+#
+# An unreadable/absent registry yields an EMPTY map here — the same degradation the Rust side
+# takes — so the two hosts stay in correspondence even in failure. Empty means "nothing is
+# declared elsewhere", which routes unknown refs rather than silently skipping them: the safe
+# direction, and identical on both sides.
+_VALIDATOR_SCOPE_REL = "elohim/sdk/schemas/v1/registries/governance-validators.json"
+
+
+def _load_runtime_scoped() -> dict:
+    """Refs the SHARED registry assigns to a runtime other than Python."""
+    try:
+        import json as _json
+        root = Path(__file__).resolve().parents[3]
+        with open(root / _VALIDATOR_SCOPE_REL, encoding="utf-8") as fh:
+            registry = _json.load(fh)
+        return {v["ref"]: f"{v['runtime']}-only"
+                for v in registry.get("validators", [])
+                if isinstance(v, dict) and v.get("ref") and v.get("runtime") not in (None, "python", "both")}
+    except Exception:  # noqa: BLE001 — absent/unreadable registry degrades to "nothing declared"
+        return {}
+
+
+RUNTIME_SCOPED_VALIDATORS = _load_runtime_scoped()
 
 # A validator that FLAGS a write can tag the fired Verdict with a specific refer_reason (the
 # ceiling-law vocabulary, constraint 3). Absent here -> decision_for() defaults to "rule-fired".

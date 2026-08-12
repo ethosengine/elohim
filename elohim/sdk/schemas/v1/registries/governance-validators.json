@@ -1,0 +1,67 @@
+{
+  "$id": "epr:registry:governance-validators",
+  "version": 1,
+  "description": "Scope registry for `.epr-meta` validator references — WHICH HOST OWNS WHICH VALIDATOR. The governance plane runs two executors (the Python PreToolUse hook + git-gate; the Rust `epr` evaluator via eprfs-meta's ValidatorProvider). They deliberately do not implement the same set: a validator that reads Rust source belongs where Rust source is parsed, and porting each one to both hosts would DOUBLE the plane rather than collapse it — two implementations of one predicate is the fork, not the cure. What must not diverge is the MAP: every host must be able to tell 'declared elsewhere, not mine to run' (skip clean, never downgrade the rule) from 'no host claims this' (route to judgment). This file is that map, and it is the only place it is written down. A reference absent from this registry is unresolvable in EVERY host by construction. Consumed by _lib.epr_meta (Python) and epr-cli's ElohimRepositoryValidators (Rust); parity enforced by _lib/__tests__/validator_registry_parity_test.py.",
+  "runtimes": {
+    "both": "implemented in the Python reference registry AND the Rust provider; the two must agree, which the golden vectors are what check",
+    "python": "implemented only in _lib.epr_meta.REFERENCE_VALIDATORS; the Rust provider returns DeclaredElsewhere",
+    "rust": "implemented only in epr-cli's ElohimRepositoryValidators; Python skips it via RUNTIME_SCOPED_VALIDATORS"
+  },
+  "validators": [
+    {
+      "ref": "epr:validator-p2p-design-gate",
+      "runtime": "both",
+      "why": "Entity-shape gate on new data entities; both hosts see the same write payload."
+    },
+    {
+      "ref": "epr:validator-brand-vocabulary-boundary",
+      "runtime": "both",
+      "why": "Net-new-only source lint on opaque project vocabulary; pure text, portable."
+    },
+    {
+      "ref": "epr:validator-sovereignty-ontology-guard",
+      "runtime": "both",
+      "why": "Identity-tier framing guard; pure text over the written content."
+    },
+    {
+      "ref": "epr:validator-ownership-ontology-guard",
+      "runtime": "both",
+      "why": "Commons-ownership framing guard; pure text over the written content."
+    },
+    {
+      "ref": "epr:validator-archetype-resource-alignment",
+      "runtime": "both",
+      "why": "Cross-checks a write against the archetype budget ledger; both hosts read the same JSON."
+    },
+    {
+      "ref": "epr:validator-test-bench-aggregate-capacity",
+      "runtime": "both",
+      "why": "Cross-checks declared bench capacity against the compute-capacity ledger."
+    },
+    {
+      "ref": "epr:validator-escalation-ladder",
+      "runtime": "both",
+      "why": "The agency charter — ask/deny authorship needs a ratified policy pin. Constitutional; it must hold in every host that can author governance, so it is deliberately implemented twice and pinned by vectors."
+    },
+    {
+      "ref": "epr:validator-heal-fills-never-moves",
+      "runtime": "python",
+      "why": "Reads the registered-contract-test index and scans Rust stamp-guard symbols in elohim-storage. Python owns it because that is where the contract-test registry is resolved; class is `inject` (advisory), so a declared skip in Rust costs nothing enforceable."
+    },
+    {
+      "ref": "epr:validator-bounded-work",
+      "runtime": "python",
+      "why": "Added-line shape scan for unbounded work inside a REGISTERED seam (an ancestor `seam-registry.yaml`). Deliberately narrow and advisory (`inject`); the seam-registry walk is a Python-side census concern."
+    },
+    {
+      "ref": "epr:validator-dna-hash-neutrality",
+      "runtime": "python",
+      "why": "Classifies DNA-tree diffs as hash-moving (integrity zomes + modifiers) vs hot-swappable (coordinator zomes). Registered machinery with no canon class; `inject` only."
+    },
+    {
+      "ref": "epr:validator-eprfs-meta-domain-neutrality",
+      "runtime": "rust",
+      "why": "Guards eprfs-meta against gaining concrete validator identities — it is a claim ABOUT the Rust crate's own source, so the host that compiles that crate is the only one that can meaningfully assert it."
+    }
+  ]
+}
