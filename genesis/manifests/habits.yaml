@@ -60,7 +60,7 @@
 # read as visibly weaker rather than equivalent. First subject: measure-honesty-local.
 
 version: 1
-updated: 2026-08-11
+updated: 2026-08-12
 vision: >
   A p2p backplane for a socially resilient, reach-gated substrate — a human-scale,
   capture-resistant foundation for communication that can scale to global
@@ -595,6 +595,22 @@ habits:
       - "cargo test (elohim/epr-rea) — stock_dynamics.rs: Stock refuses every incoherent construction, turnover/net-change/emission-absorption/harvest-regeneration, and stock_over_window folded from real FlowEvents"
       - "cargo test (elohim/eprfs) — flow_absorption.rs: the projection now mints the SINK (ReaVerb::Consume) and discriminates a move out of the value chain from an in-place rename against the recipe's stage globs"
       - "python3 -m pytest .claude/scripts/_lib/__tests__/intervenor_retire_when_test.py (retire-when on both gates + the census, incl. the two-implementation hash-exclusion invariant with eprfs-meta/src/canonical.rs)"
+      - "cargo test (elohim/epr-rea) — model.rs: a limit declares WHICH SIDE is safe (Sense::{Ceiling,Floor}) with the band edge mirrored around it, and whether its number was claimed at the container or rolled up from the parts (LimitSource::{Declared,Folded{rule}}); Composition::{Min,Harmonic,Sum} refuses an empty part set rather than returning a capacity of zero"
+      - "cargo test (elohim/epr-rea) — scope.rs + stock_dynamics.rs: a fold can say WHERE. Scopes::contains is transitive and reflexive over containment the DHT already notarizes, refuses cycles rather than depth-capping, and Within::{Anywhere,Scope,Under} makes the selection the fourth term of a stock's identity instead of a silent 'everywhere'"
+    gate_honesty: >
+      CORRECTION, 2026-08-12 — read this before trusting any green above dated
+      earlier. Two of this habit's checks (`uncertainty_closure.rs`,
+      `stock_dynamics.rs`) live in `elohim/epr-rea`, which until 2026-08-12 had
+      NO build-manifest entry, NO pipeline, and NO pre-push case: an epr-rea-only
+      change matched no source glob, so the graph-walker emitted no project and
+      no gate ran. Those two legs were hand-run only, and an epr-only change
+      never compiled its one consumer. Every green this habit recorded before
+      2026-08-12 therefore rests on two checks that CI never executed. The gate
+      is wired now (elohim-epr widened to `-p elohim-epr -p elohim-epr-rea`
+      across manifest, pre-push, and Jenkinsfile), so greens from here carry
+      what earlier ones only claimed. Recorded rather than quietly fixed: this
+      is the same eroding-goal channel `best_observed` exists to expose — a
+      green that means less than it appears to.
     best_observed: >
       HIGH-WATER MARK, slice 2 (2026-08-11) — the ratchet Meadows prescribes for
       *Drift to Low Performance*: "let standards be enhanced by the BEST actual
