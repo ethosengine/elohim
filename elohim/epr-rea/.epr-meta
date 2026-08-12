@@ -1,0 +1,84 @@
+---
+epr-meta-version: 1
+id: epr-rea-ontology-guidestar
+covers: subtree
+purpose: >
+  The flow layer of the epr crate family — agents, events, resources and promises (REA/ValueFlows),
+  the stocks and flows those events fold into (Meadows' plant), the limits a promise declares on
+  itself (Beer's regulator), and — since 2026-08-12 — the containment those limits compose across
+  (`scope::Scopes`). Sibling of `elohim/epr`; the same guidestar governs both, and the same two
+  advisory signals apply because the same two failure modes reach here.
+rules:
+  - id: ontology-admission-guidestar
+    class: inject
+    when:
+      write: "*.rs"
+      new: true
+    dedupe-of: "genesis/docs/superpowers/specs/2026-08-12-requisite-variety-guidestar-epr-family-composition.md (the composition law this crate is authored under)"
+    why: >
+      A NEW module in this crate is a new ontological primitive, which is the one moment the
+      admission rule applies. Read the guidestar first —
+      genesis/docs/superpowers/specs/2026-08-12-requisite-variety-guidestar-epr-family-composition.md.
+      Its §3a: ADMIT a primitive when a SECOND independent framework needs the same missing
+      distinction; never on the first, never speculatively. Worked example carried there: `delay`
+      qualifies today (Meadows' perception delay, Keynes' multiplier lag, Beer's System 2 damping —
+      three frameworks, one absent primitive), while a BAND (floor and ceiling on one quantity,
+      `Commitment.bound` being singular) is still one framework and therefore a hold.
+      Its §6 refusal list, in short: not a union ontology; not a variety metric with no reader; not a
+      second measure ontology; not a trait per validator; not a design that only works if the model
+      is good.
+      Fires only on a NEW file, deliberately — an advisory on every edit would nag, and this one is
+      meant to be read exactly when a primitive is born.
+    retire-when: >
+      when the guidestar's §3 acceptance criterion exists as a runnable check (two agents
+      representing different domains negotiating a contract a third party can walk back) — at that
+      point admission is decided by a failable test rather than by a reader remembering a rule, and
+      an advisory pointing at the rule has nothing left to add
+  - id: hashed-atom-additive-field-discipline
+    class: inject
+    when:
+      write: "*.rs"
+      contains-any: ["skip_serializing_if"]
+    dedupe-of: "elohim/epr-rea/src/model.rs (the `adding_sense_and_source_moves_no_existing_ceiling_bounds_bytes` byte-level assertion)"
+    why: >
+      This file carries a field on a HASHED atom, so its serde shape IS an address. `Commitment`
+      declaring a `Bound` already changes the commitment's CID by design (pinned by
+      `declaring_a_bound_changes_the_commitment_cid`); a field added to `Bound` itself would
+      re-address every bounded commitment ever authored, unless it is `Option<T>` +
+      `skip_serializing_if` with `None` meaning exactly the pre-existing semantics. That is how
+      `sense`/`source` landed on 2026-08-12, asserted at the BYTE level rather than against a golden
+      captured from already-changed code.
+      Second half, easy to miss: one meaning must have exactly ONE encoding. `Bound::validate()`
+      REFUSES `Some(Ceiling)` and `Some(Declared)` — semantically identical to `None`, but a
+      different CID — and the builders normalize instead. A new optional field wants the same
+      refusal, or it silently admits a redundant spelling of an existing meaning.
+    retire-when: >
+      when a proptest or codegen check proves address-stability structurally for every hashed atom
+      (add a field, assert prior fixtures' CIDs are unmoved) rather than per-author discipline — the
+      test then catches what this advisory can only remind
+cites:
+  - requisite-variety-guidestar-epr-family-composition
+---
+
+# `elohim/epr-rea` — the flow layer
+
+Governed by the requisite-variety guidestar. This crate owns the **flow** axis: agents, events,
+resources, promises, stocks, limits, containment.
+
+Three properties of this crate are load-bearing for the law and easy to erode:
+
+- **Nothing is stored.** A `Stock` is derived, never persisted — `stock.rs` states the reason in
+  place: *"A stored level would be a second home for a number that already has one, which is the
+  shape that lets `CarryingCapacity.current_utilization` drift against the events that supposedly
+  produce it."* That is conjunct 4 of the law, and it is the property that makes the substrate
+  policy-agnostic: swap the stewardship lens without migrating data, and two peers folding the same
+  events mint the same stock with no shared clock.
+- **A limit is only ever a bound on a promise.** Not a free-floating fact — which is what gives it
+  a claimant, and what lets pain reference the bounding commitment's own CID.
+- **Containment is single-parent; membership is not.** A farm sits in a watershed, a county and a
+  co-op at once — three relations, not three parents. Hold one `Scopes` per axis so `contains` stays
+  single-valued. A DAG would be the wrong generalization, not a more permissive one.
+
+Known gaps live in the guidestar §5 (ranked), not here — notably that a **floor bound mints no
+algedonic evidence**, because the wire evidence is ceiling-signed and emitting through it would
+produce a signal whose own `crossed()` reads false.
