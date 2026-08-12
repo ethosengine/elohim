@@ -57,7 +57,10 @@ pub use model::{
     ProcessSpec, ResourceSpec, Sense, StageSpec, ValidatorRef,
 };
 pub use scope::{Containers, Scopes};
-pub use stock::{respite_response, stock_over_window, Stock, StockError, Window};
+pub use stock::{
+    respite_response, stock_over_window, stock_over_window_within, Stock, StockError, Window,
+    Within,
+};
 pub use store::{FlowRecord, FlowStore, MemoryFlowStore, SidecarFlowStore};
 pub use walk::{FlowWalk, Frontier, Lineage};
 

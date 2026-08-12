@@ -346,6 +346,62 @@ pub fn stock_over_window(
     window: &Window,
     unit: &str,
 ) -> Result<Stock, StockError> {
+    stock_over_window_within(resource, Within::Anywhere, events, window, unit)
+}
+
+/// Which scopes a fold admits.
+///
+/// Every [`FlowEvent`] carries `in_scope_of` — the container accountable for it — and until
+/// there was a way to say "this container and everything under it", every fold here ignored
+/// the field entirely. Two events for one resource authored in different containers summed
+/// into one level, and the returned [`Stock`] carried no field that could say otherwise.
+///
+/// The three variants are the three real questions, and naming them separately is the point:
+/// [`Within::Scope`] is exact-equality (what `store::unfulfilled_in_scope` does), and
+/// [`Within::Under`] is containment. Conflating them is what made a commitment in a child
+/// scope invisible to a query on its parent.
+#[derive(Debug, Clone, Copy)]
+pub enum Within<'a> {
+    /// Every scope. The pre-containment behaviour, kept because it is genuinely right when
+    /// the resource itself is the whole subject and containment is not the question.
+    Anywhere,
+    /// Exactly this container — flows in scopes it contains are excluded.
+    Scope(&'a Cid),
+    /// This container and everything it contains, per the given relation.
+    Under {
+        scope: &'a Cid,
+        scopes: &'a crate::scope::Scopes,
+    },
+}
+
+impl Within<'_> {
+    /// Does this selection admit a flow authored in `event_scope`?
+    pub fn admits(&self, event_scope: &Cid) -> bool {
+        match self {
+            Within::Anywhere => true,
+            Within::Scope(scope) => event_scope == *scope,
+            Within::Under { scope, scopes } => scopes.contains(scope, event_scope),
+        }
+    }
+}
+
+/// [`stock_over_window`], restricted to the flows a [`Within`] admits.
+///
+/// A stock's identity is `(resource, unit, window, selection)`. The first three were already
+/// load-bearing; the fourth was silently "everything" and is now declared, because a watershed
+/// asking "how much was drawn *here*" and a registry asking "how much was drawn anywhere" are
+/// different questions with the same arithmetic.
+///
+/// `Under` walks up from each event's own scope, so cost is O(events × depth) and depth is
+/// containment depth, not corpus size. A caller folding many resources over one container can
+/// hoist [`crate::scope::Scopes::descendants`] instead.
+pub fn stock_over_window_within(
+    resource: &Cid,
+    within: Within<'_>,
+    events: &[FlowEvent],
+    window: &Window,
+    unit: &str,
+) -> Result<Stock, StockError> {
     // NaN spelled out rather than caught by a negated comparison: a NaN window length would
     // otherwise slip past `<= 0.0` and make every rate NaN with no error anywhere.
     if window.periods.is_nan() || window.periods <= 0.0 {
@@ -353,7 +409,10 @@ pub fn stock_over_window(
     }
     let (mut produced_all, mut consumed_all) = (0.0f64, 0.0f64);
     let (mut produced_win, mut consumed_win) = (0.0f64, 0.0f64);
-    for e in events.iter().filter(|e| &e.resource == resource) {
+    for e in events
+        .iter()
+        .filter(|e| &e.resource == resource && within.admits(&e.in_scope_of))
+    {
         let Some(v) = count_in(&e.quantity, unit) else {
             continue;
         };

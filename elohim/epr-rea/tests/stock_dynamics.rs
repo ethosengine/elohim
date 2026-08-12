@@ -8,7 +8,11 @@ use cid::Cid;
 use elohim_epr::measure::*;
 use elohim_epr::witness::{Magnitude, ReaVerb};
 use elohim_epr_rea::model::{AgentRef, FlowEvent};
-use elohim_epr_rea::stock::{respite_response, stock_over_window, Stock, StockError, Window};
+use elohim_epr_rea::scope::Scopes;
+use elohim_epr_rea::stock::{
+    respite_response, stock_over_window, stock_over_window_within, Stock, StockError, Window,
+    Within,
+};
 
 fn cid_of(seed: &str) -> Cid {
     elohim_epr_rea::atom_cid(&serde_json::json!({ "seed": seed })).unwrap()
@@ -641,5 +645,118 @@ fn an_incommensurable_operand_outranks_the_divisions_own_guard() {
         out.confidence.unknown_reason,
         Some(UnknownReason::Incommensurable),
         "an operand no measurement can tighten must not be laundered into a tightenable finding"
+    );
+}
+
+// ------------------------------------------------------------------- containment selection
+
+/// The fold was scope-blind: it filtered on resource CID and ignored `in_scope_of` entirely,
+/// so flows authored in different containers summed into one level and the returned `Stock`
+/// carried no field that could say otherwise.
+///
+/// Exact-equality scoping is not the fix on its own — that is what made a child's flows
+/// invisible to its parent. Both questions are real, so both are nameable.
+#[test]
+fn a_parent_scope_sees_its_childrens_flows_and_an_exact_scope_does_not() {
+    let corpus = cid_of("corpus");
+    let watershed = cid_of("watershed");
+    let farm = cid_of("farm");
+    let elsewhere = cid_of("elsewhere");
+
+    let scopes = Scopes::from_tree([(farm, watershed)]).expect("a forest");
+
+    let events = vec![
+        event(
+            ReaVerb::Produce,
+            &corpus,
+            "2026-08-02T00:00:00Z",
+            &watershed,
+        ),
+        event(ReaVerb::Produce, &corpus, "2026-08-03T00:00:00Z", &farm),
+        event(
+            ReaVerb::Produce,
+            &corpus,
+            "2026-08-04T00:00:00Z",
+            &elsewhere,
+        ),
+    ];
+    let window = Window {
+        start: "2026-08-01T00:00:00Z".into(),
+        end: "2026-08-08T00:00:00Z".into(),
+        per: Period::Week,
+        periods: 1.0,
+    };
+
+    let anywhere = stock_over_window(&corpus, &events, &window, "doc").unwrap();
+    assert_eq!(
+        anywhere.level.value, 3.0,
+        "scope-blind sums every container"
+    );
+
+    let exact =
+        stock_over_window_within(&corpus, Within::Scope(&watershed), &events, &window, "doc")
+            .unwrap();
+    assert_eq!(
+        exact.level.value, 1.0,
+        "exact-equality admits only flows authored AT the watershed"
+    );
+
+    let under = stock_over_window_within(
+        &corpus,
+        Within::Under {
+            scope: &watershed,
+            scopes: &scopes,
+        },
+        &events,
+        &window,
+        "doc",
+    )
+    .unwrap();
+    assert_eq!(
+        under.level.value, 2.0,
+        "containment admits the farm's flows too — and still excludes `elsewhere`"
+    );
+
+    // The distinction is the whole point: containment must differ from exact equality, and
+    // both must differ from summing the world.
+    assert!(exact.level.value < under.level.value);
+    assert!(under.level.value < anywhere.level.value);
+}
+
+/// An unrelated container contributes nothing rather than silently widening the answer.
+#[test]
+fn a_scope_outside_the_relation_is_excluded_not_defaulted_in() {
+    let corpus = cid_of("corpus");
+    let watershed = cid_of("watershed");
+    let stranger = cid_of("stranger");
+    let scopes = Scopes::default(); // nothing declared at all
+
+    let events = vec![event(
+        ReaVerb::Produce,
+        &corpus,
+        "2026-08-02T00:00:00Z",
+        &stranger,
+    )];
+    let window = Window {
+        start: "2026-08-01T00:00:00Z".into(),
+        end: "2026-08-08T00:00:00Z".into(),
+        per: Period::Week,
+        periods: 1.0,
+    };
+
+    let under = stock_over_window_within(
+        &corpus,
+        Within::Under {
+            scope: &watershed,
+            scopes: &scopes,
+        },
+        &events,
+        &window,
+        "doc",
+    )
+    .unwrap();
+    assert_eq!(
+        under.level.value, 0.0,
+        "an empty relation must not read as 'everything is contained'"
     );
 }
