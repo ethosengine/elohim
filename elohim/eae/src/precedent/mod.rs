@@ -4,7 +4,7 @@
 
 pub mod tracker;
 
-pub use tracker::{Precedent, PrecedentTracker, PrecedentMatch, PrecedentStats};
+pub use tracker::{Precedent, PrecedentMatch, PrecedentStats, PrecedentTracker};
 
 use crate::types::DecisionType;
 

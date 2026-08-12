@@ -83,7 +83,11 @@ impl Refusal {
     }
 
     /// An operational-gate refusal on a named owner's line.
-    pub fn gate(limit_owner: LimitOwner, reason: impl Into<String>, elevate: impl Into<String>) -> Self {
+    pub fn gate(
+        limit_owner: LimitOwner,
+        reason: impl Into<String>,
+        elevate: impl Into<String>,
+    ) -> Self {
         Refusal {
             code: RefusalCode::GateRefused(reason.into()),
             limit_owner,
@@ -248,7 +252,10 @@ mod tests {
         // (which would also fail on headroom) is never reached.
         let r = g
             .decide(
-                &Req { value: 99, cost: 999 },
+                &Req {
+                    value: 99,
+                    cost: 999,
+                },
                 &Grant {
                     max: 10,
                     expires_at: None,
@@ -286,7 +293,9 @@ mod tests {
 
     #[test]
     fn reserved_place_is_always_faith_and_never_a_lever() {
-        let r = Refusal::reserved_place("the center is left empty for the faith no architecture may crowd out");
+        let r = Refusal::reserved_place(
+            "the center is left empty for the faith no architecture may crowd out",
+        );
         assert_eq!(r.code, RefusalCode::ReservedPlace);
         assert_eq!(r.limit_owner, LimitOwner::Faith);
         // Faith is the only owner that is not a lever — the unbuilt place holds.
@@ -299,6 +308,9 @@ mod tests {
         // the gradient reads cleanly across the ts-rs boundary and in findings.
         let json = serde_json::to_string(&LimitOwner::SelfLimit).unwrap();
         assert_eq!(json, "\"self\"");
-        assert_eq!(serde_json::to_string(&LimitOwner::Faith).unwrap(), "\"faith\"");
+        assert_eq!(
+            serde_json::to_string(&LimitOwner::Faith).unwrap(),
+            "\"faith\""
+        );
     }
 }

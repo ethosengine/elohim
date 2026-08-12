@@ -71,7 +71,8 @@ impl SpiralDetector {
                 observation_types: vec![ObservationType::ContentSubmission],
                 min_frequency: 10.0,
                 weight: 0.3,
-                description: "Repetitive content submission may indicate compulsive behavior".to_string(),
+                description: "Repetitive content submission may indicate compulsive behavior"
+                    .to_string(),
             },
             SpiralPattern {
                 name: "behavior_escalation".to_string(),
@@ -85,13 +86,20 @@ impl SpiralDetector {
                 observation_types: vec![ObservationType::SecurityEvent],
                 min_frequency: 3.0,
                 weight: 0.8,
-                description: "Repeated security events may indicate frustration or attack".to_string(),
+                description: "Repeated security events may indicate frustration or attack"
+                    .to_string(),
             },
         ]
     }
 
     /// Add a custom pattern.
-    pub fn add_pattern(&mut self, name: &str, observation_types: Vec<ObservationType>, min_frequency: f32, weight: f32) {
+    pub fn add_pattern(
+        &mut self,
+        name: &str,
+        observation_types: Vec<ObservationType>,
+        min_frequency: f32,
+        weight: f32,
+    ) {
         self.patterns.push(SpiralPattern {
             name: name.to_string(),
             observation_types,
@@ -128,10 +136,12 @@ impl SpiralDetector {
                 "Recommend taking a break. Offer calming content or pause suggestion.".to_string()
             }
             AnomalySeverity::High => {
-                "Strongly suggest break. Consider temporary rate limiting. Offer support resources.".to_string()
+                "Strongly suggest break. Consider temporary rate limiting. Offer support resources."
+                    .to_string()
             }
             AnomalySeverity::Critical => {
-                "Immediate intervention required. Display care message. Enable cooldown period.".to_string()
+                "Immediate intervention required. Display care message. Enable cooldown period."
+                    .to_string()
             }
         }
     }
@@ -169,9 +179,8 @@ impl AnomalyDetector for SpiralDetector {
             }
 
             // Calculate frequency
-            let frequency = self.calculate_frequency(
-                &matching.iter().map(|&o| o.clone()).collect::<Vec<_>>(),
-            );
+            let frequency =
+                self.calculate_frequency(&matching.iter().map(|&o| o.clone()).collect::<Vec<_>>());
 
             if frequency >= pattern.min_frequency {
                 let pattern_score = (frequency / pattern.min_frequency).min(2.0) * pattern.weight;

@@ -3,8 +3,8 @@
 //! Ensures decisions are made at the lowest appropriate level,
 //! only escalating when truly necessary.
 
-use constitution::ConstitutionalLayer;
 use crate::types::{Decision, DecisionType};
+use constitution::ConstitutionalLayer;
 
 /// Result of subsidiarity check.
 #[derive(Debug, Clone)]
@@ -72,7 +72,11 @@ impl SubsidiarityChecker {
     }
 
     /// Check if a decision adheres to subsidiarity.
-    pub fn check(&self, decision: &Decision, context_layer: ConstitutionalLayer) -> SubsidiarityResult {
+    pub fn check(
+        &self,
+        decision: &Decision,
+        context_layer: ConstitutionalLayer,
+    ) -> SubsidiarityResult {
         let decision_layer = decision.reasoning.determining_layer;
 
         // Check if decision layer matches context
@@ -159,7 +163,11 @@ impl SubsidiarityChecker {
     }
 
     /// Check if action scope matches layer.
-    pub fn scope_matches_layer(&self, action_scope: ActionScope, layer: ConstitutionalLayer) -> bool {
+    pub fn scope_matches_layer(
+        &self,
+        action_scope: ActionScope,
+        layer: ConstitutionalLayer,
+    ) -> bool {
         match action_scope {
             ActionScope::Self_ => true, // Self-actions are always appropriate
             ActionScope::Individual => layer >= ConstitutionalLayer::Individual,
@@ -232,11 +240,7 @@ mod tests {
     fn test_appropriate_level() {
         let checker = SubsidiarityChecker::new();
 
-        let decision = make_decision(
-            DecisionType::Allow,
-            ConstitutionalLayer::Individual,
-            0.9,
-        );
+        let decision = make_decision(DecisionType::Allow, ConstitutionalLayer::Individual, 0.9);
 
         let result = checker.check(&decision, ConstitutionalLayer::Individual);
         assert!(result.appropriate);
@@ -246,11 +250,7 @@ mod tests {
     fn test_block_needs_community() {
         let checker = SubsidiarityChecker::new();
 
-        let decision = make_decision(
-            DecisionType::Block,
-            ConstitutionalLayer::Individual,
-            0.9,
-        );
+        let decision = make_decision(DecisionType::Block, ConstitutionalLayer::Individual, 0.9);
 
         let result = checker.check(&decision, ConstitutionalLayer::Community);
         assert!(!result.appropriate);

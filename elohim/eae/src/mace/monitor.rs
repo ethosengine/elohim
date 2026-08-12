@@ -98,7 +98,11 @@ impl Monitor {
     }
 
     /// Record a network signal observation.
-    pub async fn observe_network_signal(&self, source_agent: &str, data: serde_json::Value) -> Result<()> {
+    pub async fn observe_network_signal(
+        &self,
+        source_agent: &str,
+        data: serde_json::Value,
+    ) -> Result<()> {
         let mut observation = Observation::new(
             ObservationSource::NetworkSignal,
             ObservationType::BehaviorPattern,
@@ -127,7 +131,11 @@ impl Monitor {
     }
 
     /// Get observations by type.
-    pub async fn by_type(&self, observation_type: ObservationType, limit: usize) -> Vec<Observation> {
+    pub async fn by_type(
+        &self,
+        observation_type: ObservationType,
+        limit: usize,
+    ) -> Vec<Observation> {
         let buffer = self.buffer.read().await;
         buffer
             .iter()
@@ -255,9 +263,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_monitor_buffer_limit() {
-        let monitor = Monitor::builder()
-            .buffer_size(5)
-            .build();
+        let monitor = Monitor::builder().buffer_size(5).build();
 
         for i in 0..10 {
             let observation = Observation::new(

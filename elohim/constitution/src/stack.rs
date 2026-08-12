@@ -276,8 +276,7 @@ impl ConstitutionalStack {
                         || action_lower.contains("enslave")
                 }
                 BoundaryType::Ecological => {
-                    action_lower.contains("irreversible")
-                        && action_lower.contains("ecological")
+                    action_lower.contains("irreversible") && action_lower.contains("ecological")
                 }
                 BoundaryType::Dignity => {
                     action_lower.contains("dehumanize") || action_lower.contains("exploit")
@@ -297,10 +296,7 @@ impl ConstitutionalStack {
                 violations.push(BoundaryViolation {
                     boundary: boundary.clone(),
                     severity: boundary.enforcement,
-                    explanation: format!(
-                        "Action may violate boundary: {}",
-                        boundary.description
-                    ),
+                    explanation: format!("Action may violate boundary: {}", boundary.description),
                 });
             }
         }

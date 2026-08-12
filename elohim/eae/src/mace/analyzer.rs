@@ -91,8 +91,8 @@ impl Analyzer {
             window.push(observation.clone());
 
             // Prune old observations outside window
-            let cutoff = chrono::Utc::now()
-                - chrono::Duration::seconds(self.config.window_secs as i64);
+            let cutoff =
+                chrono::Utc::now() - chrono::Duration::seconds(self.config.window_secs as i64);
             window.retain(|o| o.timestamp > cutoff);
         }
 

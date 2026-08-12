@@ -8,6 +8,6 @@ mod escalation;
 mod layer_context;
 mod subsidiarity;
 
-pub use escalation::{EscalationManager, EscalationRequest, EscalationReason};
+pub use escalation::{EscalationManager, EscalationReason, EscalationRequest};
 pub use layer_context::{LayerContext, LayerContextBuilder};
 pub use subsidiarity::{SubsidiarityChecker, SubsidiarityResult};

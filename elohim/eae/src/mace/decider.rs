@@ -138,11 +138,8 @@ impl RuleEngine {
 
                 // Generate actions
                 let context = self.build_context(event);
-                let actions: Vec<Action> = rule
-                    .actions
-                    .iter()
-                    .map(|t| t.to_action(&context))
-                    .collect();
+                let actions: Vec<Action> =
+                    rule.actions.iter().map(|t| t.to_action(&context)).collect();
 
                 return Some((rule.clone(), actions));
             }
@@ -247,7 +244,10 @@ impl Decider {
                 actions,
                 reasoning: DecisionReasoning {
                     primary_principle: rule.name.clone(),
-                    interpretation: format!("Rule '{}' matched event {:?}", rule.name, event.event_type),
+                    interpretation: format!(
+                        "Rule '{}' matched event {:?}",
+                        rule.name, event.event_type
+                    ),
                     matched_rules: vec![rule.id.clone()],
                     llm_assisted: false,
                     precedents_considered: vec![],
@@ -311,8 +311,9 @@ impl Decider {
         let content = serde_json::to_string_pretty(&event)
             .map_err(|e| EaeError::DecisionError(e.to_string()))?;
 
-        let request = ElohimRequest::new(ElohimCapability::SpiralDetection, agent_service.agent_id())
-            .with_params(RequestParams::with_content(&content));
+        let request =
+            ElohimRequest::new(ElohimCapability::SpiralDetection, agent_service.agent_id())
+                .with_params(RequestParams::with_content(&content));
 
         let response = agent_service.invoke(request).await?;
 

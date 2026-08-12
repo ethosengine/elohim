@@ -97,11 +97,7 @@ impl PrecedentStore {
 
         by_layer
             .get(&layer)
-            .map(|ids| {
-                ids.iter()
-                    .filter_map(|id| cache.get(id).cloned())
-                    .collect()
-            })
+            .map(|ids| ids.iter().filter_map(|id| cache.get(id).cloned()).collect())
             .unwrap_or_default()
     }
 
@@ -112,11 +108,7 @@ impl PrecedentStore {
 
         by_principle
             .get(principle_id)
-            .map(|ids| {
-                ids.iter()
-                    .filter_map(|id| cache.get(id).cloned())
-                    .collect()
-            })
+            .map(|ids| ids.iter().filter_map(|id| cache.get(id).cloned()).collect())
             .unwrap_or_default()
     }
 
@@ -298,9 +290,7 @@ mod tests {
             .summary(summary)
             .applied_principle("global-dignity")
             .reasoning("Test reasoning")
-            .outcome(PrecedentOutcome::Approved {
-                conditions: vec![],
-            })
+            .outcome(PrecedentOutcome::Approved { conditions: vec![] })
             .weight(0.7)
             .build()
             .unwrap();

@@ -172,9 +172,15 @@ impl ManipulationDetector {
 
         match severity {
             AnomalySeverity::Low => "Monitor closely. Log for review.".to_string(),
-            AnomalySeverity::Medium => "Increase verification requirements. Notify moderators.".to_string(),
-            AnomalySeverity::High => "Suspend suspicious activity. Require re-authentication.".to_string(),
-            AnomalySeverity::Critical => "Block all activity from source. Alert security team.".to_string(),
+            AnomalySeverity::Medium => {
+                "Increase verification requirements. Notify moderators.".to_string()
+            }
+            AnomalySeverity::High => {
+                "Suspend suspicious activity. Require re-authentication.".to_string()
+            }
+            AnomalySeverity::Critical => {
+                "Block all activity from source. Alert security team.".to_string()
+            }
         }
     }
 }

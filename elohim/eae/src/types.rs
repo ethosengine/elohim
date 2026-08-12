@@ -27,7 +27,11 @@ pub struct Observation {
 
 impl Observation {
     /// Create a new observation.
-    pub fn new(source: ObservationSource, observation_type: ObservationType, data: serde_json::Value) -> Self {
+    pub fn new(
+        source: ObservationSource,
+        observation_type: ObservationType,
+        data: serde_json::Value,
+    ) -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             timestamp: Utc::now(),

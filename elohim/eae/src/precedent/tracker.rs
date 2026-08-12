@@ -5,8 +5,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
-use constitution::ConstitutionalLayer;
 use crate::types::{AnalysisEventType, Decision, DecisionType, Result};
+use constitution::ConstitutionalLayer;
 
 /// A stored precedent from a past decision.
 #[derive(Debug, Clone)]
@@ -205,7 +205,11 @@ impl PrecedentTracker {
             .collect();
 
         // Sort by similarity (descending)
-        matches.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+        matches.sort_by(|a, b| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Return top matches
         matches.into_iter().take(limit).collect()
@@ -401,7 +405,11 @@ mod tests {
             .await;
 
         tracker
-            .update_outcome(&matches[0].precedent.id, true, Some("Good decision".to_string()))
+            .update_outcome(
+                &matches[0].precedent.id,
+                true,
+                Some("Good decision".to_string()),
+            )
             .await
             .unwrap();
 

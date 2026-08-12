@@ -7,8 +7,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
-use constitution::ConstitutionalLayer;
 use crate::types::{Decision, EaeError, Result};
+use constitution::ConstitutionalLayer;
 
 /// Reason for escalation.
 #[derive(Debug, Clone)]
@@ -35,8 +35,12 @@ impl EscalationReason {
     /// Get description.
     pub fn description(&self) -> &str {
         match self {
-            EscalationReason::InsufficientAuthority => "Current layer lacks authority for this decision",
-            EscalationReason::ConstitutionalConflict => "Conflict between constitutional principles at this layer",
+            EscalationReason::InsufficientAuthority => {
+                "Current layer lacks authority for this decision"
+            }
+            EscalationReason::ConstitutionalConflict => {
+                "Conflict between constitutional principles at this layer"
+            }
             EscalationReason::NovelSituation => "Novel situation without established precedent",
             EscalationReason::HighImpact => "Decision has high impact requiring higher authority",
             EscalationReason::ConsensusFailure => "Failed to reach consensus at current layer",
@@ -175,7 +179,10 @@ impl EscalationManager {
     }
 
     /// Check if escalation is needed based on decision.
-    pub fn should_escalate(&self, decision: &Decision) -> Option<(ConstitutionalLayer, EscalationReason)> {
+    pub fn should_escalate(
+        &self,
+        decision: &Decision,
+    ) -> Option<(ConstitutionalLayer, EscalationReason)> {
         use crate::types::DecisionType;
 
         // Check confidence threshold

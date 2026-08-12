@@ -75,7 +75,9 @@ impl ConflictResolver {
             match b.effective_weight.partial_cmp(&a.effective_weight) {
                 Some(std::cmp::Ordering::Equal) | None => {
                     // Secondary sort by layer precedence (higher layer = more authoritative)
-                    b.source_layer.precedence().cmp(&a.source_layer.precedence())
+                    b.source_layer
+                        .precedence()
+                        .cmp(&a.source_layer.precedence())
                 }
                 Some(ord) => ord,
             }

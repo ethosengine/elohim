@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DefenderManifest {
-    pub specialist_kind: String,        // const "defender"
-    pub for_humans: Vec<String>,        // Human ActionHashes (b64url)
+    pub specialist_kind: String, // const "defender"
+    pub for_humans: Vec<String>, // Human ActionHashes (b64url)
     pub disclosure_tier: String,
     pub outputs: Vec<String>,
     pub system_prompt_template: String,

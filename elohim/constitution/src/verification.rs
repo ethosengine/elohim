@@ -107,8 +107,8 @@ impl HolochainDhtVerifier {
     ) -> Result<T, VerificationError> {
         // TODO: Implement actual zome call
         // This would use holochain_client::AppWebsocket
-        let _payload_json =
-            serde_json::to_value(payload).map_err(|e| VerificationError::InvalidResponse(e.to_string()))?;
+        let _payload_json = serde_json::to_value(payload)
+            .map_err(|e| VerificationError::InvalidResponse(e.to_string()))?;
 
         tracing::debug!(fn_name = %fn_name, "Calling zome function");
 

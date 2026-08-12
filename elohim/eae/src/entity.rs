@@ -15,9 +15,7 @@ use crate::config::EaeConfig;
 use crate::governance::{EscalationManager, EscalationReason, LayerContext, SubsidiarityChecker};
 use crate::mace::{Analyzer, ConsensusManager, Decider, Executor, MacePipeline, Monitor};
 use crate::precedent::PrecedentTracker;
-use crate::types::{
-    AnalysisEvent, Decision, EaeError, ExecutionResult, Observation, Result,
-};
+use crate::types::{AnalysisEvent, Decision, EaeError, ExecutionResult, Observation, Result};
 
 /// The Elohim Autonomous Entity.
 ///
@@ -73,9 +71,15 @@ impl ElohimAutonomousEntity {
 
         // Create anomaly detectors
         let anomaly_detectors: Vec<Arc<dyn AnomalyDetector>> = vec![
-            Arc::new(SpiralDetector::with_threshold(config.analyzer.spiral_threshold)),
-            Arc::new(ManipulationDetector::with_threshold(config.analyzer.manipulation_threshold)),
-            Arc::new(DriftDetector::with_threshold(config.analyzer.drift_threshold)),
+            Arc::new(SpiralDetector::with_threshold(
+                config.analyzer.spiral_threshold,
+            )),
+            Arc::new(ManipulationDetector::with_threshold(
+                config.analyzer.manipulation_threshold,
+            )),
+            Arc::new(DriftDetector::with_threshold(
+                config.analyzer.drift_threshold,
+            )),
         ];
 
         Self {
@@ -243,7 +247,11 @@ impl ElohimAutonomousEntity {
                 "Decision requires consensus - requesting"
             );
 
-            let request = self.mace.consensus.request_consensus(decision.clone()).await?;
+            let request = self
+                .mace
+                .consensus
+                .request_consensus(decision.clone())
+                .await?;
 
             // In a real implementation, we would wait for consensus
             // For now, we continue with execution

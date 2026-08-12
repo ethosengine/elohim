@@ -105,7 +105,11 @@ impl DriftDetector {
             .count();
 
         let current_rate = compliant_count as f32 / compliance_checks.len() as f32;
-        let baseline_rate = self.baseline.get("compliance_rate").copied().unwrap_or(0.95);
+        let baseline_rate = self
+            .baseline
+            .get("compliance_rate")
+            .copied()
+            .unwrap_or(0.95);
 
         let drift = (baseline_rate - current_rate).abs();
         let direction = if current_rate < baseline_rate {
@@ -168,7 +172,11 @@ impl DriftDetector {
         }
 
         let current_rate = violations as f32 / boundary_observations as f32;
-        let baseline_rate = self.baseline.get("boundary_violations").copied().unwrap_or(0.02);
+        let baseline_rate = self
+            .baseline
+            .get("boundary_violations")
+            .copied()
+            .unwrap_or(0.02);
 
         let drift = (current_rate - baseline_rate).max(0.0);
 
@@ -349,10 +357,8 @@ impl AnomalyDetector for DriftDetector {
 
             let suggestion = self.suggest_response(severity, primary_direction);
 
-            Ok(
-                AnomalyResult::detected(normalized_score, severity, signals)
-                    .with_suggestion(suggestion),
-            )
+            Ok(AnomalyResult::detected(normalized_score, severity, signals)
+                .with_suggestion(suggestion))
         } else {
             Ok(AnomalyResult {
                 score: normalized_score,

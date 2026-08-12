@@ -115,14 +115,8 @@ pub trait SettlementBridge {
     ) -> Result<BridgeReceipt, Self::Error>;
 
     /// Bridge tokens back in from settlement chain to Holochain.
-    fn bridge_in(
-        &self,
-        receipt: BridgeReceipt,
-    ) -> Result<(), Self::Error>;
+    fn bridge_in(&self, receipt: BridgeReceipt) -> Result<(), Self::Error>;
 
     /// Verify that a provenance root is valid on the settlement chain.
-    fn verify_provenance(
-        &self,
-        root: Hash,
-    ) -> Result<bool, Self::Error>;
+    fn verify_provenance(&self, root: Hash) -> Result<bool, Self::Error>;
 }

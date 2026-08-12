@@ -101,7 +101,9 @@ impl PromptAssembler {
         prompt.push_str("  \"primary_principle\": \"<name of primary principle applied>\",\n");
         prompt.push_str("  \"interpretation\": \"<how it applies to this query>\",\n");
         prompt.push_str("  \"values_weighed\": [\n");
-        prompt.push_str("    {\"value\": \"<value>\", \"weight\": 0.0-1.0, \"direction\": \"for|against\"}\n");
+        prompt.push_str(
+            "    {\"value\": \"<value>\", \"weight\": 0.0-1.0, \"direction\": \"for|against\"}\n",
+        );
         prompt.push_str("  ],\n");
         prompt.push_str("  \"confidence\": 0.0-1.0,\n");
         prompt.push_str("  \"precedents\": [\"<relevant precedent IDs if any>\"],\n");
@@ -166,7 +168,8 @@ mod tests {
         let context = StackContext::agent_only("test-agent");
         let stack = ConstitutionalStack::build_defaults(context);
 
-        let prompt = PromptAssembler::build_reasoning_prompt(&stack, "Should I help with this task?");
+        let prompt =
+            PromptAssembler::build_reasoning_prompt(&stack, "Should I help with this task?");
 
         assert!(prompt.contains("CONSTITUTIONAL ANALYSIS REQUEST"));
         assert!(prompt.contains("Should I help with this task?"));

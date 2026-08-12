@@ -6,9 +6,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 use crate::config::ConsensusConfig;
-use crate::types::{
-    ConsensusStatus, ConsensusVote, Decision, EaeError, Result, VoteDecision,
-};
+use crate::types::{ConsensusStatus, ConsensusVote, Decision, EaeError, Result, VoteDecision};
 
 /// Request for consensus from peers.
 #[derive(Debug, Clone)]
@@ -170,14 +168,22 @@ impl ConsensusManager {
                     min_required = self.config.min_participants,
                     "Consensus deadline passed without minimum participants"
                 );
-                return Ok(Some(self.finalize_consensus(request_id, vote_list, false).await));
+                return Ok(Some(
+                    self.finalize_consensus(request_id, vote_list, false).await,
+                ));
             }
             return Ok(None); // Still waiting for votes
         }
 
         // Calculate consensus
-        let approve_count = vote_list.iter().filter(|v| v.vote == VoteDecision::Approve).count();
-        let reject_count = vote_list.iter().filter(|v| v.vote == VoteDecision::Reject).count();
+        let approve_count = vote_list
+            .iter()
+            .filter(|v| v.vote == VoteDecision::Approve)
+            .count();
+        let reject_count = vote_list
+            .iter()
+            .filter(|v| v.vote == VoteDecision::Reject)
+            .count();
         let total_decisive = approve_count + reject_count;
 
         if total_decisive == 0 {
@@ -196,7 +202,10 @@ impl ConsensusManager {
             "Consensus check completed"
         );
 
-        Ok(Some(self.finalize_consensus(request_id, vote_list, reached).await))
+        Ok(Some(
+            self.finalize_consensus(request_id, vote_list, reached)
+                .await,
+        ))
     }
 
     /// Finalize consensus and move to completed.
@@ -209,9 +218,18 @@ impl ConsensusManager {
         let pending = self.pending.read().await;
         let request = pending.get(request_id).unwrap();
 
-        let approve_count = votes.iter().filter(|v| v.vote == VoteDecision::Approve).count();
-        let reject_count = votes.iter().filter(|v| v.vote == VoteDecision::Reject).count();
-        let abstain_count = votes.iter().filter(|v| v.vote == VoteDecision::Abstain).count();
+        let approve_count = votes
+            .iter()
+            .filter(|v| v.vote == VoteDecision::Approve)
+            .count();
+        let reject_count = votes
+            .iter()
+            .filter(|v| v.vote == VoteDecision::Reject)
+            .count();
+        let abstain_count = votes
+            .iter()
+            .filter(|v| v.vote == VoteDecision::Abstain)
+            .count();
 
         let total_decisive = approve_count + reject_count;
         let agreement_ratio = if total_decisive > 0 {
@@ -260,9 +278,9 @@ impl ConsensusManager {
     /// Cancel a pending request.
     pub async fn cancel_request(&self, request_id: &str) -> Result<()> {
         let mut pending = self.pending.write().await;
-        pending
-            .remove(request_id)
-            .ok_or_else(|| EaeError::ConsensusError(format!("No pending request with ID {}", request_id)))?;
+        pending.remove(request_id).ok_or_else(|| {
+            EaeError::ConsensusError(format!("No pending request with ID {}", request_id))
+        })?;
 
         let mut votes = self.votes.write().await;
         votes.remove(request_id);

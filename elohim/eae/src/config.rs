@@ -138,10 +138,7 @@ impl Default for DeciderConfig {
             max_decision_time_ms: 5000,
             use_precedents: true,
             consensus_threshold: 0.67,
-            require_consensus_for: vec![
-                "hard_intervention".to_string(),
-                "block".to_string(),
-            ],
+            require_consensus_for: vec!["hard_intervention".to_string(), "block".to_string()],
         }
     }
 }
