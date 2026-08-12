@@ -1,0 +1,245 @@
+# elohim/epr-rea/seam-registry.yaml
+#
+# Conforms to elohim/sdk/schemas/v1/manifest/seam-registry.schema.json. FIRST registry for this
+# crate. Until now `elohim/epr` and `elohim/epr-rea` were the only decision-bearing crates in the
+# tree with neither a seam-registry.yaml nor an `.epr-meta` — the two crates carrying the
+# protocol's measure and limit ontology sat outside the layer built to catch inadequate models.
+#
+# HONESTY CLAUSE — what is registered here. The rows below are the decision points minted or
+# re-shaped by the 2026-08-12 containment/limit-sense work, registered AT BIRTH as the birth rule
+# requires. The crate's PRE-EXISTING decision surface is NOT yet registered: `epistemic::classify`,
+# `epistemic::cite_gate` (a real verdict fn returning `elohim_epr::verdict::Verdict`),
+# `fold::with_uncertainty`'s MixedKinds refusal, and `Stock::new`'s dimensional refusals all
+# qualify and are pending. They are named here rather than omitted, so the census reads a declared
+# backlog instead of an apparently-complete registry — a silent omission is exactly the failure
+# this file exists to prevent.
+#
+# Every symbol below was grepped, read, and test-run at authoring time (2026-08-12).
+
+seamRegistryVersion: 1
+crate: elohim-epr-rea
+crateRoot: elohim/epr-rea
+seamLocus: >
+  The limit-and-containment decision surface of the REA fabric: whether a stock has crossed a
+  bound a promise declared on itself (`Bound::{breached_by, approached_by}`), whether algedonic
+  evidence may be minted for that crossing (`fold::bound_evidence`), how the bounds of contained
+  scopes compose into their container's (`Composition::fold`), and which container a flow belongs
+  to (`scope::Scopes::contains`, `stock::Within::admits`). These are the predicates that decide
+  whether an allocation is inside an ecological limit — Beer's regulator sitting on Meadows'
+  plant, both in this crate.
+
+decisionPoints:
+  - name: Bound::breached_by / Bound::approached_by
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/model.rs
+      modulePath: elohim_epr_rea::model::Bound
+      line: 268
+    summary: >
+      Decides whether a stock has crossed a declared limit, or reached the band edge before it,
+      on the side `Sense` names. A ceiling is unsafe above; a floor is unsafe below, with the
+      band edge mirrored around the limit so equal percentages give equal headroom.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          Before `Sense`, a floor could only be expressed as a ceiling on a complementary
+          depletion stock — which is arithmetically equivalent and semantically a lie: the
+          `basis`, the `bound_ref` and every rendering then describe a quantity nobody declared.
+          The absent case ("keep at least") was not merely unmodelled, it was mis-modelled.
+          `a_floors_band_edge_mirrors_the_margin_instead_of_sitting_under_the_floor` pins that a
+          floor's warning sits ABOVE the line, since reusing the ceiling formula would place it
+          below and fire only after the breach it exists to precede.
+      - id: C10
+        status: answered
+        justification: >
+          `sense`/`source` are `Option` + `skip_serializing_if`, so a ceiling bound authored
+          before floors existed encodes byte-identically and no bounded commitment is
+          re-addressed — the `Confidence.unknown_reason` discipline (spec Q17). Asserted at the
+          byte level by `adding_sense_and_source_moves_no_existing_ceiling_bounds_bytes` rather
+          than by a golden captured from already-changed code. `validate()` additionally REFUSES
+          `Some(Ceiling)`/`Some(Declared)`, so one meaning has exactly one encoding and a
+          producer minting the redundant spelling learns immediately instead of drifting.
+      - id: C13
+        status: n-a
+        justification: >
+          Graduated authority is about who may decide, and this predicate decides nothing about
+          standing — it reports a geometric fact about a stock and a line. The authority question
+          lives one layer up, at whoever composes this into a verdict.
+    contractTests:
+      - path: elohim/epr-rea/src/model.rs
+        testName: a_floors_band_edge_mirrors_the_margin_instead_of_sitting_under_the_floor
+        kind: unit
+      - path: elohim/epr-rea/src/model.rs
+        testName: adding_sense_and_source_moves_no_existing_ceiling_bounds_bytes
+        kind: unit
+      - path: elohim/epr-rea/src/model.rs
+        testName: declaring_the_v1_default_explicitly_is_refused_so_one_meaning_has_one_encoding
+        kind: unit
+
+  - name: fold::bound_evidence
+    kind: verdict-fn
+    sourceLocation:
+      file: src/fold.rs
+      modulePath: elohim_epr_rea::fold
+      line: 83
+    summary: >
+      Mints algedonic evidence for a bound crossing — Breach at the limit, Approach at the band
+      edge, `None` inside the band. Withholds entirely for a floor bound.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          Three distinct silences, none of them a zero: no declared bound (an unbounded promise
+          is never in pain), stock inside the band, and — new — a FLOOR bound, whose evidence is
+          withheld because `elohim_epr::algedonic::AlgedonicEvidence` is ceiling-signed on the
+          wire (`crossed()` is `stock >= band_edge`, schema-pinned `additionalProperties: false`,
+          inside the DHT FeedbackSignal kind whitelist). Emitting a floor breach through it would
+          mint a signal whose own `crossed()` reads FALSE — pain that denies itself, strictly
+          worse than silence. The bound still knows it is breached; only the signal is withheld.
+      - id: C5
+        status: answered
+        justification: >
+          Evidence is minted, never assembled: the `AlgedonicEvidence` variants have no optional
+          fields, so a crossing cannot be reported without the stock, the limit, and the
+          bounding commitment's own CID as `bound_ref`. The evidence carries no standing
+          consequence — `STANDING_IMPACT` is pinned to "advisory" in the epr crate.
+      - id: C7
+        status: partial
+        justification: >
+          Advertise/serve symmetry is BROKEN for floors on purpose and the gap is real, not
+          theoretical: `Bound` advertises that floors are declarable and measurable, and the
+          signal plane cannot yet serve them. Closing it means making `AlgedonicEvidence`
+          sense-aware, which moves a wire shape inside the DHT FeedbackSignal whitelist and needs
+          its own design gate. Recorded as partial rather than answered so the census carries the
+          debt instead of the comment carrying it alone.
+    contractTests:
+      - path: elohim/epr-rea/tests/fabric.rs
+        testName: a_floor_bound_withholds_evidence_rather_than_inverting_it
+        kind: integration
+      - path: elohim/epr-rea/tests/fabric.rs
+        testName: a_commitment_with_no_bound_never_yields_pain
+        kind: integration
+
+  - name: Composition::fold
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/model.rs
+      modulePath: elohim_epr_rea::model::Composition
+      line: 186
+    summary: >
+      Composes the limits of contained scopes into their container's, by a rule the bound
+      declares — Min (Liebig, a factory bounded by its most-limiting input), Harmonic
+      (worst-off-sensitive, so one badly-served member cannot be averaged away), or Sum (only
+      where parts genuinely add).
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          An empty part set REFUSES rather than returning 0.0 — no parts is no answer, not a
+          capacity of nothing. This is the same discipline as `FulfillmentStatus::ratio`
+          returning `None` and `Interval::unknown`. A zero part is kept rather than refused,
+          because under Harmonic a member with zero capacity correctly drives the whole to zero,
+          which is the entire reason for choosing harmonic over arithmetic.
+      - id: C0
+        status: answered
+        justification: >
+          The rule is DECLARED per bound (`LimitSource::Folded { rule }`), never defaulted.
+          Silently summing is how the shipped carrying-capacity unit error happened, and the
+          aggregation rule is a property of the CONTAINER, not of the measure — a factory takes
+          min over the same resource a community takes harmonic over. Defaulting would put the
+          decision in the wrong plane.
+    contractTests:
+      - path: elohim/epr-rea/src/model.rs
+        testName: min_is_liebig_and_sum_would_overstate_the_whole
+        kind: unit
+      - path: elohim/epr-rea/src/model.rs
+        testName: harmonic_refuses_to_average_away_a_badly_served_member
+        kind: unit
+      - path: elohim/epr-rea/src/model.rs
+        testName: composing_no_parts_is_no_answer_rather_than_a_capacity_of_zero
+        kind: unit
+
+  - name: scope::Scopes::contains
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/scope.rs
+      modulePath: elohim_epr_rea::scope::Scopes
+      line: 152
+    summary: >
+      Decides whether one scope contains another, transitively and reflexively, over a
+      containment relation built from links the DHT already notarizes.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Ephemeral (C) by construction — a read-side index over containment already notarized
+          twice (`Place.parent_place_id` + `ParentToChildPlace` on mishpat; `Collective` +
+          `Membership` on imagodei). Minting a `Holon` entry type would be a second home for an
+          edge the DHT already witnesses, and would add per-item head-plane cost for a
+          relationship that is derivable. No entry type, no head.
+      - id: C6a
+        status: answered
+        justification: >
+          Bounded by construction rather than by a cap. `from_tree` refuses a cyclic or
+          multi-parent edge set in one O(n) colouring pass, so every subsequent walk terminates
+          without a depth limit. A depth cap was rejected deliberately: it converts malformed
+          containment into a quietly truncated answer, where this crate's discipline is to refuse
+          rather than guess.
+      - id: C4
+        status: answered
+        justification: >
+          An empty relation answers only reflexively. An undeclared containment must never read
+          as "everything is contained" (which would silently widen every limit) nor as
+          "everything is unrelated" — a scope with no declared parent still contains its own
+          flows, which is what a leaf agent is.
+    contractTests:
+      - path: elohim/epr-rea/src/scope.rs
+        testName: a_scope_is_contained_by_every_container_not_only_its_parent
+        kind: unit
+      - path: elohim/epr-rea/src/scope.rs
+        testName: a_cycle_is_refused_rather_than_depth_capped
+        kind: unit
+      - path: elohim/epr-rea/src/scope.rs
+        testName: an_empty_scope_tree_answers_only_reflexively
+        kind: unit
+      - path: elohim/epr-rea/src/scope.rs
+        testName: two_different_parents_are_refused_but_a_repeated_edge_is_not
+        kind: unit
+
+  - name: stock::Within::admits
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/stock.rs
+      modulePath: elohim_epr_rea::stock::Within
+      line: 375
+    summary: >
+      Decides which flows a stock fold admits — every scope, exactly one scope, or one scope and
+      everything it contains. The fourth term of a stock's identity, alongside resource, unit and
+      window.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Before this, the selection was silently "everywhere": the fold filtered on resource CID
+          and ignored `in_scope_of` entirely, so flows authored in different containers summed
+          into one level and the `Stock` carried no field that could say otherwise. Exact-equality
+          and containment are kept as SEPARATE variants on purpose — exact equality is what made
+          a commitment in a child scope invisible to a query on its parent, so collapsing them
+          would trade one wrong answer for another.
+      - id: C4
+        status: partial
+        justification: >
+          The selection is honest, but the fold it feeds is not yet: `stock_over_window` over an
+          empty admitted set returns `Confidence::witnessed(Interval::exact(0.0))` — a WITNESSED
+          zero. "No events arrived" and "events netted to zero" remain indistinguishable in the
+          returned type, and this predicate makes the empty case easier to reach, not harder.
+          Pre-existing (the fold has no path to `NoObservations`), unclosed here, and recorded so
+          it is not mistaken for a property this work established.
+    contractTests:
+      - path: elohim/epr-rea/tests/stock_dynamics.rs
+        testName: a_parent_scope_sees_its_childrens_flows_and_an_exact_scope_does_not
+        kind: integration
+      - path: elohim/epr-rea/tests/stock_dynamics.rs
+        testName: a_scope_outside_the_relation_is_excluded_not_defaulted_in
+        kind: integration
