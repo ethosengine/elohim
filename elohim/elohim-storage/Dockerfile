@@ -1,38 +1,36 @@
 # --- Extract holochain binaries from edgenode image ---
 # This copies the conductor binary embedded into elohim-storage (embedded-conductor mode).
-# CONDUCTOR_SOURCE_IMAGE = the jemalloc-PRODUCTION conductor (elohim-edgenode:latest) — jemalloc
-# as the global allocator with C-side malloc interposition (unprefixed_malloc_on_supported_platforms),
-# profiling OFF. This is THE cure for the conductor's native glibc-arena heap leak (OOM ~8GB/~5h):
-# jemalloc's decay/munmap returns the freed pages glibc pinned in chained 64MB secondary arenas.
-# Built by che-devworkspaces jenkins/Jenkinsfile-elohim-edgenode (HC_FEATURES includes `jemalloc`)
-# and published as elohim-edgenode:latest. NOTE: only that job pushes :latest; the edge pipeline
-# pushes :dev-latest (Jenkinsfile:1627-1648), so :latest is unambiguously the jemalloc-prod build,
-# never clobbered (but still a MOVING tag). To refresh, re-run the che-dw elohim-edgenode job
-# (updates :latest), then bump the pinned digest below.
+# CONDUCTOR_SOURCE_IMAGE = the jemalloc-PRODUCTION conductor — jemalloc as the global allocator
+# with C-side malloc interposition (unprefixed_malloc_on_supported_platforms), profiling OFF.
+# This is THE cure for the conductor's native glibc-arena heap leak (OOM ~8GB/~5h): jemalloc's
+# decay/munmap returns the freed pages glibc pinned in chained 64MB secondary arenas.
+# Built by che-devworkspaces jenkins/Jenkinsfile-elohim-edgenode (HC_FEATURES includes `jemalloc`;
+# the isolated -prof and -iroh variant images can never satisfy the production pin).
 #
-# PINNED 2026-06-22 to the jemalloc-prod digest (was the floating `:latest`) so the storage
-# image bakes a REPRODUCIBLE conductor: a later edgenode-job re-run that moves `:latest` can no
-# longer silently change the baked conductor under a normal edge rebuild (the alpha
-# CellWithoutGenesis reproducibility gap). Edgenode builds are rare/on-demand, so a digest pin —
-# not orchestrator auto-rebuild — is the durable fix. The digest is exactly what `:latest`
-# resolved to on 2026-06-22. To bump DELIBERATELY after a new edgenode build:
-#   skopeo inspect docker://harbor.ethosengine.com/ethosengine/elohim-edgenode:latest --format '{{.Digest}}'
-# and update the single ARG line below.
+# WHICH conductor is decided by the BUILD, not by this line. CI passes
+# --build-arg CONDUCTOR_SOURCE_IMAGE=…:conductor-<sha12>, where <sha12> is the commit
+# this repo's `elohim/holochain-conductor` submodule pointer records
+# (scripts/ci/build-storage-image.sh). The elohim-conductor pipeline publishes that
+# tag from the same pointer, so bumping the submodule is the whole act of moving a
+# conductor onto the fleet — see elohim/conductor-image/README.md.
+#
+# The default below is only for LOCAL/manual `docker build` without CI's build-arg. It
+# is a moving tag and is NOT what the fleet gets. CI never falls back to it: if the
+# pinned conductor tag is absent from Harbor the build FAILS with a remediation
+# message, because a storage image whose conductor doesn't match its committed source
+# is precisely the failure this pin exists to prevent.
+#
 # ⚠ ROLLBACK: do NOT roll back to a glibc conductor — ghcr.io/holo-host/edgenode (stock) and any
-# pre-jemalloc edgenode build carry the heap leak. The safe rollback is the PREVIOUS jemalloc
-# :latest, pinned by its dated/git tag (printed in the edgenode job's post log) — still the cure.
-# (History: the tx5 zombie-PeerConnection theory (#194/#199) and go-pion were the WRONG RCA —
-# deployed fleet-wide and the leak persisted. The 2026-06-18 jemalloc-PROF debug build localized
-# it to glibc malloc arenas; the allocator swap is the fix. Details + the superseded-RCA trail:
+# pre-jemalloc edgenode build carry the heap leak. Roll back by moving the submodule pointer to
+# the previous jemalloc conductor commit; the pin tag follows it automatically.
+# (History: this ARG was a hand-edited sha256 digest, bumped by a human after each edgenode
+# build — which meant a rebuilt conductor silently did NOT reach the fleet, and a GC'd digest
+# 404'd the whole edge build with no diagnosis (edge #1261, 2026-07-29). The tx5
+# zombie-PeerConnection theory (#194/#199) and go-pion were the WRONG RCA — deployed fleet-wide
+# and the leak persisted. The 2026-06-18 jemalloc-PROF debug build localized it to glibc malloc
+# arenas; the allocator swap is the fix. Details + the superseded-RCA trail:
 # .claude/data/conductor-leak-jemalloc-prod-changeset-2026-06-19.md.)
-# ⚠ RETENTION: Harbor keeps only the most recent edgenode artifacts — a busy
-# multi-push day evicts older digests, and this pin then 404s the whole edge
-# build (edge #1261, 2026-07-29: pinned digest GC'd between two same-day runs).
-# When repointing: any current-day edgenode digest carries the jemalloc
-# conductor; prefer the dev-latest digest at repoint time. Structural cure
-# (same-run --build-arg + retention-protected pin tag) is backlog
-# ci-storage-conductor-pin-retention.
-ARG CONDUCTOR_SOURCE_IMAGE=harbor.ethosengine.com/ethosengine/elohim-edgenode@sha256:aab8403e63bdeabbe609c099dcd7c093033df0992ff05726c826e8e08e1ca91b
+ARG CONDUCTOR_SOURCE_IMAGE=harbor.ethosengine.com/ethosengine/elohim-edgenode:latest
 FROM ${CONDUCTOR_SOURCE_IMAGE} AS conductor-source
 
 # Build stage

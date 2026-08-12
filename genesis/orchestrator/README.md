@@ -62,12 +62,27 @@ The orchestrator automatically discovers all manifests at startup.
 
 ## Dependency Graph
 
-```
-elohim-holochain ──┬──► elohim-edge ────┐
-                   ├──► elohim (app) ───┼──► elohim-genesis
-                   └──► elohim-steward  │
-                        (manual only)   └──────────────────►
-```
+| Pipeline | Builds | `dependsOn` |
+|---|---|---|
+| `elohim-holochain` | the DNA / hApp bundle | — |
+| `elohim-conductor` | the custom holochain conductor image | — |
+| `elohim-edge` | doorway + storage + edge node image; deploys them | `elohim-holochain`, `elohim-conductor` |
+| `elohim` | the Angular app | — |
+| `elohim-steward` | the desktop/device build (`manualOnly`) | — |
+| `elohim-genesis` | content seeding + validation; runs last, after all builds succeed | (outside the levels loop) |
+
+Pipelines are dispatched in dependency **levels** — topological ranks, run in
+order, with everything in a level running in parallel and a failed level
+aborting the next.
+
+`elohim-conductor` is the one pipeline whose Jenkins job tracks a **different
+repository**: the `elohim-edgenode` job on che-devworkspaces (itself a submodule
+of this repo, at `che-devworkspaces/`). Its manifest therefore pins `jenkinsJob`
+and `jenkinsBranch`, and its dispatch carries a dedicated parameter set rather
+than the standard downstream vocabulary (`FORCE_BUILD`, `DEPLOY_ONLY`,
+`CHANGED_PATHS`) — that job declares none of those. `elohim-edge` depends on it
+because the storage image embeds the conductor binary. Full chain:
+`elohim/conductor-image/README.md`.
 
 ## Health Endpoints
 
@@ -96,6 +111,50 @@ Genesis is triggered automatically after ALL dependent pipelines succeed. It aut
 
 ### Manual-Only Pipelines
 `elohim-steward` is marked `manualOnly: true` - the orchestrator never triggers it automatically.
+
+### Commit-message tags
+Read from the tip commit's message on the push being analyzed.
+
+Force-dispatch a pipeline regardless of changeset:
+`[build:edge|dna|app|genesis|sophia|steward|conductor|all]` (comma-separated,
+e.g. `[build:edge,app]`).
+
+Modes:
+
+| Tag | Effect |
+|---|---|
+| `[skip ci]` (or `[ci skip]`, `[no ci]`) | dispatch nothing at all |
+| `[deploy-only]` | skip build stages, redeploy existing Harbor tags. Webhook-only — a timer/replay on the same HEAD must not silently redeploy |
+| `[reseed]` | genesis wipes `content.db` and reseeds from scratch. Webhook-only, same reason |
+| `[edge:validate-only]` | run only edge's Dataplane Validation against the live fleet — measure without rolling the pods |
+
+**`[conductor:…]`** parameterizes the custom-conductor image build from the
+commit, so a variant no longer needs a hand-filled Jenkins parameter form. It
+implies `[build:conductor]`. Items are comma-separated and the tag repeats:
+
+| Item | Effect |
+|---|---|
+| `iroh` | transport-iroh variant → isolated `elohim-edgenode-iroh` images |
+| `prof` | jemalloc-prof heap-profiling canary → isolated `-prof` images |
+| `canary` | also build the deployable storage image embedding this conductor |
+| `no-push` / `dry` | build only, no Harbor push |
+| `hc=<branch>` | holochain fork branch — consulted **only** if the `elohim/holochain-conductor` submodule pointer is unreadable, since an exact SHA outranks a branch tip |
+| `tx5=<branch>` | tx5 fork branch — same conditional as `hc=` |
+| `features=a+b+c` | raw `HC_FEATURES` (`+` separates — `,` is the item separator) |
+
+```
+git commit --allow-empty -m "build(conductor): iroh canary [conductor:iroh,canary]"
+```
+
+Two things are deliberately not expressible in a tag. The **conductor commit**
+always comes from this repo's submodule pointers, which is what makes the built
+image correspond to committed source. The **default feature set** stays in the
+job — a second copy here would drift, and the feature set without `jemalloc` is
+the one carrying the conductor heap leak, so it must not be reachable by
+mistyping a tag.
+
+Grammar lives in `commit-tag-parser.mjs` (single home; the Jenkinsfile shells out
+to it rather than keeping a third copy).
 
 ### Triggers — webhook double-fire
 **Watch-out — one dev push can produce two orchestrator builds.** When a Jenkinsfile declares an explicit `triggers { githubPush() }` AND the job is a Multibranch item (which fires its own implicit branch-indexing trigger), a single push fires *both*; the first build is immediately superseded (lands `ABORTED` — see measure semantics above) and looks like a phantom failure. The fix is to drop the explicit `triggers { githubPush() }` and rely on the Multibranch implicit trigger alone. A sibling variant is timer/cron collision with the webhook window (a scheduled build colliding with a late-EDT/PDT push) — reschedule the cron off that window. (Backlog: `orchestrator-trigger-dedup`.)

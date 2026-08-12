@@ -60,10 +60,14 @@ export function topoSort(stepIndex) {
  *
  * @param {Array<{path: string, content: object}>} manifests - Loaded manifests
  * @param {string[]} changedFiles - List of changed file paths (relative to repo root)
- * @returns {{ projects: Array<{name: string, dir: string, reasons: string[]}> }}
+ * @returns {{ projects: Array<{name: string, dir: string, reasons: string[]}>,
+ *             pipelines: Array<{name: string, reasons: string[]}> }}
+ *   `projects` = local gate projects (what the pre-push hook builds).
+ *   `pipelines` = pipelines with stale steps (what Jenkins dispatches). These
+ *   are NOT the same set — see Phase 5.
  */
 export function walkGraph(manifests, changedFiles) {
-  if (manifests.length === 0) return { projects: [] };
+  if (manifests.length === 0) return { projects: [], pipelines: [] };
 
   // Phase 1: Build index
   const stepIndex = new Map();
@@ -139,7 +143,24 @@ export function walkGraph(manifests, changedFiles) {
     .sort((a, b) => a[1].minOrder - b[1].minOrder)
     .map(([name, { dir, reasons }]) => ({ name, dir, reasons }));
 
-  return { projects };
+  // Phase 5: Map stale steps to PIPELINES.
+  //
+  // Distinct from Phase 4 on purpose. Gate projects answer "what should the
+  // pre-push hook build locally?"; pipelines answer "what will Jenkins
+  // dispatch?" — which is what build-graph.groovy computes from stale steps.
+  // A pipeline can have zero gate projects and still be dispatched: the custom
+  // conductor image (elohim-conductor) is built in another repo and has no
+  // local gate at all. Without this phase, preview.mjs reports "nothing will
+  // build" for a conductor bump that CI does in fact build.
+  const pipelineMap = new Map();
+  for (const [qualified, reasons] of stale) {
+    const pipeline = stepIndex.get(qualified).pipeline;
+    if (!pipelineMap.has(pipeline)) pipelineMap.set(pipeline, []);
+    pipelineMap.get(pipeline).push(...reasons);
+  }
+  const pipelines = [...pipelineMap.entries()].map(([name, reasons]) => ({ name, reasons }));
+
+  return { projects, pipelines };
 }
 
 // ── CLI mode ─────────────────────────────────────────────────────

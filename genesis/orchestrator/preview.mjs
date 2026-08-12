@@ -68,6 +68,23 @@ function simulate({ changedFiles = [], commitMsg = '' } = {}) {
   const pipelineMatchedFiles = new Map();
   const pipelineSampleFiles = new Map();
 
+  // Pipelines with stale steps but no gate project (the conductor image builds
+  // in another repo, so it has nothing to gate locally). CI dispatches these;
+  // without this pass the preview would report "nothing will build" for them.
+  for (const { name, reasons } of graphResult.pipelines ?? []) {
+    if (!registry.has(name)) continue;
+    triggeredPipelines.add(name);
+    if (!pipelineMatchedFiles.has(name)) {
+      pipelineMatchedFiles.set(name, []);
+      pipelineSampleFiles.set(name, []);
+    }
+    pipelineMatchedFiles.get(name).push(...reasons);
+    const sample = pipelineSampleFiles.get(name);
+    for (const f of reasons.filter(r => r.startsWith('source: ')).map(r => r.slice(8))) {
+      if (sample.length < 5 && !sample.includes(f)) sample.push(f);
+    }
+  }
+
   for (const project of graphResult.projects) {
     const pipelineName = gateProjectToPipeline.get(project.name);
     if (pipelineName) {

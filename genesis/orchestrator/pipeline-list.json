@@ -60,6 +60,12 @@
       "manualOnly": false,
       "triggersGenesis": true,
       "cascades": true
+    },
+    {
+      "name": "elohim-conductor",
+      "manualOnly": false,
+      "triggersGenesis": false,
+      "cascades": true
     }
   ]
 }

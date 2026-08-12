@@ -46,7 +46,9 @@ describe('pipeline-registry', () => {
 
   test('pipelineDependencyMap produces a name → deps map', () => {
     const deps = pipelineDependencyMap(registry);
-    assert.deepStrictEqual(deps.get('elohim-edge'), ['elohim-holochain']);
+    // Edge waits on the DNA (hApp artifact) and on the custom conductor image —
+    // the storage image bakes the conductor, so it must build after it.
+    assert.deepStrictEqual(deps.get('elohim-edge'), ['elohim-holochain', 'elohim-conductor']);
     assert.deepStrictEqual(deps.get('elohim-genesis'), ['elohim-edge', 'elohim']);
     assert.deepStrictEqual(deps.get('elohim-sophia'), []);
   });

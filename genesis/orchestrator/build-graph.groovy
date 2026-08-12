@@ -750,6 +750,13 @@ def walkBuildGraph(List changedFiles) {
 
         pipelineRegistry[name] = [
             jenkinsPath: manifest.jenkinsPath,
+            // Cross-repo dispatch: a pipeline whose Jenkins job tracks a different
+            // repository pins its job name and branch (elohim-conductor → the
+            // elohim-edgenode job on che-devworkspaces). Emitted as '' rather than
+            // null when unset — readJSON turns a null into JSONNull, which is
+            // Groovy-TRUTHY and would route every pipeline down the cross-repo path.
+            jenkinsJob: manifest.jenkinsJob ?: name,
+            jenkinsBranch: manifest.jenkinsBranch ?: '',
             manualOnly: manifest.manualOnly == true,
             triggersGenesis: manifest.triggersGenesis == true,
             cascades: manifest.cascades == null ? true : (manifest.cascades == true),

@@ -51,6 +51,8 @@ export function loadPipelineRegistry(rootDir) {
     registry.set(content.pipeline, {
       pipeline: content.pipeline,
       jenkinsPath: content.jenkinsPath,
+      jenkinsJob: content.jenkinsJob || content.pipeline,
+      jenkinsBranch: content.jenkinsBranch || null,
       manualOnly: content.manualOnly === true,
       triggersGenesis: content.triggersGenesis === true,
       cascades: content.cascades === undefined ? true : content.cascades === true,

@@ -5,7 +5,9 @@
  * Exports:
  *   parseCommitTags(commitMsg, registry) → string[]
  *   parseSkipCi(commitMsg) → boolean
+ *   parseConductorOptions(commitMsg) → object
  *   BUILD_TAG_ALIASES
+ *   CONDUCTOR_FEATURE_PRESETS
  */
 
 import { nonManualPipelines } from './pipeline-registry.mjs';
@@ -17,7 +19,88 @@ export const BUILD_TAG_ALIASES = {
   genesis: 'elohim-genesis',
   sophia: 'elohim-sophia',
   steward: 'elohim-steward',
+  conductor: 'elohim-conductor',
 };
+
+/**
+ * Conductor feature-set presets for the [conductor:<variant>] commit tag.
+ *
+ * These mirror the elohim-edgenode job's HC_FEATURES contract exactly:
+ *   - the default (no variant) is deliberately absent — omitting HC_FEATURES
+ *     lets the job's own default stand, which is the production jemalloc build.
+ *     Never spell the production set out here; two copies drift and the bare
+ *     glibc set is the one that leaked.
+ *   - `prof` and `iroh` push ISOLATED image names and never touch :latest.
+ */
+export const CONDUCTOR_FEATURE_PRESETS = {
+  prof: 'sqlite-encrypted,wasmer_sys,transport-tx5-backend-go-pion,jemalloc-prof',
+  iroh: 'sqlite-encrypted,wasmer_sys,transport-iroh,jemalloc',
+};
+
+/**
+ * Parse the [conductor:...] commit-message tag into elohim-edgenode job
+ * parameters, so a conductor variant is buildable from a commit instead of a
+ * hand-filled Jenkins parameter form.
+ *
+ * Grammar — comma-separated items inside one tag, repeatable:
+ *
+ *   [conductor:iroh]                 transport-iroh variant (isolated images)
+ *   [conductor:prof]                 jemalloc-prof heap-profiling canary (isolated)
+ *   [conductor:canary]               also build the deployable storage image
+ *   [conductor:no-push]              build only, no Harbor push (validation)
+ *   [conductor:hc=<branch>]          override the holochain fork branch
+ *   [conductor:tx5=<branch>]         override the tx5 fork branch
+ *   [conductor:features=a+b+c]       raw HC_FEATURES ('+' separates; ',' is taken
+ *                                    by the item separator). Wins over a preset.
+ *
+ * A branch override (`hc=` / `tx5=`) is only consulted by the job when the
+ * corresponding *_REF is empty, since an exact submodule SHA outranks a branch
+ * tip. Use it to build a fork branch that has no submodule pointer yet.
+ *
+ * @param {string} commitMsg
+ * @returns {{present: boolean, features?: string, hcBranch?: string,
+ *            tx5Branch?: string, canary: boolean, skipPush: boolean,
+ *            unknown: string[]}}
+ */
+export function parseConductorOptions(commitMsg) {
+  const opts = { present: false, canary: false, skipPush: false, unknown: [] };
+  const tagRegex = /\[conductor:([^\]]+)\]/gi;
+  let preset;
+  let explicitFeatures;
+  let match;
+  while ((match = tagRegex.exec(commitMsg)) !== null) {
+    opts.present = true;
+    for (const raw of match[1].split(',')) {
+      const item = raw.trim();
+      if (!item) continue;
+      const eq = item.indexOf('=');
+      if (eq === -1) {
+        const flag = item.toLowerCase();
+        if (flag === 'canary') opts.canary = true;
+        else if (flag === 'no-push' || flag === 'dry') opts.skipPush = true;
+        else if (CONDUCTOR_FEATURE_PRESETS[flag]) preset = CONDUCTOR_FEATURE_PRESETS[flag];
+        else opts.unknown.push(item);
+        continue;
+      }
+      const key = item.slice(0, eq).trim().toLowerCase();
+      const value = item.slice(eq + 1).trim();
+      if (!value) {
+        opts.unknown.push(item);
+      } else if (key === 'hc') {
+        opts.hcBranch = value;
+      } else if (key === 'tx5') {
+        opts.tx5Branch = value;
+      } else if (key === 'features') {
+        explicitFeatures = value.replace(/\+/g, ',');
+      } else {
+        opts.unknown.push(item);
+      }
+    }
+  }
+  const features = explicitFeatures || preset;
+  if (features) opts.features = features;
+  return opts;
+}
 
 /**
  * Parse [build:*] commit-message tags and return the resolved pipeline names.
@@ -54,4 +137,26 @@ export function parseCommitTags(commitMsg, registry) {
  */
 export function parseSkipCi(commitMsg) {
   return /\[(skip ci|ci skip|no ci)\]/i.test(commitMsg);
+}
+
+/**
+ * CLI: emit [conductor:…] options as JSON for the orchestrator Jenkinsfile.
+ *
+ *   node commit-tag-parser.mjs conductor-opts <commit-message-file>
+ *
+ * The Jenkinsfile shells out rather than reimplementing the grammar, because
+ * the [build:*] aliases are already duplicated there and that duplication is a
+ * standing drift source. The message arrives via a FILE, never argv — commit
+ * messages are untrusted multi-line text.
+ */
+if (process.argv[1] && process.argv[1].endsWith('commit-tag-parser.mjs')) {
+  const [, , command, msgFile] = process.argv;
+  if (command === 'conductor-opts') {
+    const { readFileSync } = await import('node:fs');
+    const msg = msgFile ? readFileSync(msgFile, 'utf8') : '';
+    process.stdout.write(JSON.stringify(parseConductorOptions(msg)));
+  } else if (command) {
+    process.stderr.write(`unknown command '${command}' — expected 'conductor-opts'\n`);
+    process.exit(2);
+  }
 }

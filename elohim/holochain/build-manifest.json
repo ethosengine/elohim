@@ -5,7 +5,8 @@
   "manualOnly": false,
   "triggersGenesis": true,
   "dependsOn": [
-    "elohim-holochain"
+    "elohim-holochain",
+    "elohim-conductor"
   ],
   "description": "Edge services \u2014 doorway gateway, storage, conductor, edge image",
   "steps": {
@@ -81,7 +82,9 @@
         ],
         "verify": null
       },
-      "depends": [],
+      "depends": [
+        "elohim-conductor:build-conductor-image"
+      ],
       "executor": {
         "stage": "Build Storage",
         "function": null

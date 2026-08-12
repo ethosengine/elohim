@@ -30,6 +30,14 @@
       "type": "string",
       "description": "Path to the pipeline's Jenkinsfile (relative to repo root). Required for dispatchable pipelines; absent for graph-only pipelines that are never directly dispatched by the orchestrator."
     },
+    "jenkinsJob": {
+      "type": "string",
+      "description": "Jenkins multibranch job name, when it differs from the pipeline name. Defaults to the pipeline name."
+    },
+    "jenkinsBranch": {
+      "type": "string",
+      "description": "Pin the dispatched branch instead of following the orchestrator's own branch. Required for pipelines whose Jenkins job tracks a DIFFERENT repository (e.g. a submodule's job), where this repo's branch name is meaningless."
+    },
     "triggersGenesis": {
       "type": "boolean",
       "default": false,

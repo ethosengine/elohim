@@ -74,6 +74,14 @@ def getPipelineMetadata(String name) {
         if (!(jp instanceof CharSequence) || !jp.toString().trim()) {
             meta.remove('jenkinsPath')
         }
+        // Same JSONNull-is-truthy hazard, and here it is worse: a truthy
+        // jenkinsBranch routes a pipeline down the CROSS-REPO dispatch path,
+        // which would send every pipeline to a wrong job with an empty
+        // parameter set. Normalize to real-nonblank-String-or-absent.
+        def jb = meta.jenkinsBranch
+        if (!(jb instanceof CharSequence) || !jb.toString().trim()) {
+            meta.remove('jenkinsBranch')
+        }
         return meta
     }
     // Pre-build-graph fallback: parse manifests directly.
@@ -99,6 +107,12 @@ def getPipelineMetadata(String name) {
     }
     return [
         jenkinsPath:     m.jenkinsPath,
+        // Job name / branch default to "same as the pipeline, same branch as this
+        // orchestrator run". A pipeline whose Jenkins job tracks a DIFFERENT repo
+        // (elohim-conductor → the elohim-edgenode job on che-devworkspaces) pins
+        // both, because this repo's branch name means nothing over there.
+        jenkinsJob:      m.jenkinsJob ?: m.pipeline,
+        jenkinsBranch:   m.jenkinsBranch,
         manualOnly:      m.manualOnly == true,
         triggersGenesis: m.triggersGenesis == true,
         cascades:        m.cascades == null ? true : (m.cascades == true),
@@ -520,6 +534,117 @@ def recordPipelineResult(String name, Map result, Map pipelineBaselines) {
 }
 
 /**
+ * Parse the [conductor:…] commit tag — variant, feature set, canary, fork
+ * branches for the custom-conductor image build — and stash it for dispatch.
+ *
+ * The grammar has ONE home (genesis/orchestrator/commit-tag-parser.mjs); this
+ * shells out to it rather than adding a third copy alongside the [build:*]
+ * aliases already duplicated in this file. The commit message travels by FILE,
+ * never argv — it is untrusted multi-line text.
+ *
+ * The tag is itself the intent to build, so it force-includes the pipeline; a
+ * separate [build:conductor] is not required.
+ *
+ * @return pipeline names to force-include ([] or ['elohim-conductor'])
+ */
+def applyConductorTag(String commitMsg) {
+    String msgFile = '.orchestrator-commit-msg.txt'
+    writeFile file: msgFile, text: commitMsg
+    def json = sh(
+        script: "node genesis/orchestrator/commit-tag-parser.mjs conductor-opts ${msgFile}",
+        returnStdout: true
+    ).trim()
+    sh "rm -f ${msgFile}"
+    def opts = readJSON(text: json)
+    if (!opts.present) return []
+    env.CONDUCTOR_OPTS_JSON = json
+    echo "🔩 [conductor:*] detected — ${json}"
+    if (opts.unknown) {
+        echo "⚠️  Unrecognized [conductor:*] items ignored: ${opts.unknown.join(', ')}"
+    }
+    return ['elohim-conductor']
+}
+
+/**
+ * Normalize a build() call into the result Map the reporting code expects.
+ *
+ * Fire-and-forget: build() returns the RunWrapper for the queued build but
+ * result/duration are not yet known. Mark as dispatched and let the caller
+ * advance the baseline optimistically — if the build later fails, the next
+ * push touching this pipeline's patterns re-dispatches (failures are visible
+ * in the downstream's own Jenkins view). Tradeoff documented at the
+ * build-manifest.json longRunning flag.
+ */
+def dispatchResult(Object result, boolean waited) {
+    if (!waited) {
+        return [
+            success: true,
+            dispatched: true,
+            result: 'DISPATCHED',
+            duration: 0,
+            url: result?.absoluteUrl ?: "(queued)",
+            buildNumber: result?.number ?: null
+        ]
+    }
+    return [
+        success: result.result in ['SUCCESS', 'UNSTABLE'],
+        unstable: result.result == 'UNSTABLE',
+        result: result.result,
+        duration: result.duration,
+        url: result.absoluteUrl,
+        buildNumber: result.number
+    ]
+}
+
+/**
+ * Parameters for a pipeline whose Jenkins job tracks a different repository.
+ *
+ * elohim-conductor → the elohim-edgenode job (SCM: che-devworkspaces), which
+ * compiles the patched holochain conductor. Two things get forwarded:
+ *
+ *   HC_REF / TX5_REF — the SHAs THIS commit's submodule pointers record. That is
+ *   what makes the built image correspond to committed source: the job publishes
+ *   `elohim-edgenode:conductor-<sha12>`, and the edge pipeline derives the same
+ *   tag from the same pointers when it bakes the storage image. No hand-edited
+ *   digest, no manual job run.
+ *
+ *   The [conductor:…] commit-tag options (parsed into CONDUCTOR_OPTS_JSON) —
+ *   variant, feature set, canary, fork branches. This is the whole point of the
+ *   integration: a conductor variant is buildable from a commit message instead
+ *   of a hand-filled Jenkins parameter form.
+ */
+def crossRepoParams(String name) {
+    if (name != 'elohim-conductor') return []
+    def opts = env.CONDUCTOR_OPTS_JSON ? readJSON(text: env.CONDUCTOR_OPTS_JSON) : [:]
+    def out = []
+    out.add(stringParam(name: 'HC_REF', value: submoduleSha('elohim/holochain-conductor')))
+    out.add(stringParam(name: 'TX5_REF', value: submoduleSha('elohim/tx5')))
+    if (opts.hcBranch)  out.add(stringParam(name: 'HC_BRANCH',  value: opts.hcBranch))
+    if (opts.tx5Branch) out.add(stringParam(name: 'TX5_BRANCH', value: opts.tx5Branch))
+    if (opts.features)  out.add(stringParam(name: 'HC_FEATURES', value: opts.features))
+    out.add(booleanParam(name: 'BUILD_STORAGE_CANARY', value: opts.canary == true))
+    out.add(booleanParam(name: 'SKIP_PUSH', value: opts.skipPush == true))
+    return out
+}
+
+/**
+ * Read a submodule pointer's recorded commit from the current tree.
+ *
+ * `rev-parse HEAD:<path>` reads the gitlink out of the commit object, so this
+ * works for `update = none` submodules that are never cloned in CI — which is
+ * exactly what the conductor forks are. Empty on failure: the downstream job
+ * falls back to a branch-tip build and publishes no pin tag, which the edge
+ * pipeline then reports as a missing conductor rather than silently deploying
+ * the wrong one.
+ */
+def submoduleSha(String path) {
+    return sh(
+        script: "git rev-parse HEAD:${path} 2>/dev/null || true",
+        returnStdout: true
+    ).trim()
+}
+
+/**
  * Trigger a pipeline. Long-running pipelines (config.longRunning) are
  * dispatched fire-and-forget (wait:false) so the orchestrator stays short
  * and the abortPrevious cascade (bug #5 of 2026-05-24 sweettest sprint)
@@ -538,7 +663,10 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
     // Auto-derive wait from longRunning flag unless caller forced it.
     boolean shouldWait = (wait == null) ? !(config.longRunning) : (wait as boolean)
     String waitMode = shouldWait ? 'wait-for-result' : 'fire-and-forget (longRunning)'
-    echo "▶️ Triggering ${name}/${branch} [${waitMode}]..."
+    // A cross-repo pipeline pins its own job name and branch (see getPipelineMetadata).
+    String jobName = config.jenkinsJob ?: name
+    String jobBranch = config.jenkinsBranch ?: branch
+    echo "▶️ Triggering ${jobName}/${jobBranch} [${waitMode}]..."
 
     try {
         // Only send FORCE_DEPLOY to pipelines that actually deploy (have a deploymentCheck)
@@ -550,6 +678,19 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         // visible in Jenkins and keeps the guarantee independent of checkout
         // history depth.
         boolean validateOnlyDownstream = name == 'elohim-edge' && env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true'
+        // Cross-repo pipelines share none of the monorepo's parameter vocabulary —
+        // sending FORCE_BUILD/DEPLOY_ONLY/CHANGED_PATHS to a job that declares none
+        // of them produces undefined-parameter warnings and no behaviour. They get
+        // their own dedicated list instead.
+        if (config.jenkinsBranch) {
+            def result = build(
+                job: "${jobName}/${jobBranch}",
+                wait: shouldWait,
+                propagate: false,
+                parameters: crossRepoParams(name)
+            )
+            return dispatchResult(result, shouldWait)
+        }
         def buildParams = [booleanParam(name: 'FORCE_BUILD', value: !validateOnlyDownstream)]
         if (config.deploymentCheck) {
             buildParams.add(booleanParam(name: 'FORCE_DEPLOY', value: !validateOnlyDownstream))
@@ -582,37 +723,13 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         }
 
         def result = build(
-            job: "${name}/${branch}",
+            job: "${jobName}/${jobBranch}",
             wait: shouldWait,
             propagate: false,
             parameters: buildParams
         )
 
-        // Fire-and-forget: build() returns the RunWrapper for the queued
-        // build but result/duration are not yet known. Mark as dispatched
-        // and advance baseline optimistically — if the build later fails,
-        // the next push that touches this pipeline's patterns will
-        // re-dispatch (failures are visible in the downstream's own
-        // Jenkins view). Tradeoff documented at build-manifest.json longRunning flag.
-        if (!shouldWait) {
-            return [
-                success: true,
-                dispatched: true,
-                result: 'DISPATCHED',
-                duration: 0,
-                url: result?.absoluteUrl ?: "(queued)",
-                buildNumber: result?.number ?: null
-            ]
-        }
-
-        return [
-            success: result.result in ['SUCCESS', 'UNSTABLE'],
-            unstable: result.result == 'UNSTABLE',
-            result: result.result,
-            duration: result.duration,
-            url: result.absoluteUrl,
-            buildNumber: result.number
-        ]
+        return dispatchResult(result, shouldWait)
     } catch (Exception e) {
         // Distinguish "Jenkins job not provisioned" from a real build failure.
         // When a pipeline is registered in build-manifest.json
@@ -1434,7 +1551,8 @@ spec:
                             'app': 'elohim',
                             'genesis': 'elohim-genesis',
                             'sophia': 'elohim-sophia',
-                            'steward': 'elohim-steward'
+                            'steward': 'elohim-steward',
+                            'conductor': 'elohim-conductor'
                         ]
                         def tagMatcher = (commitMsg =~ /(?i)\[build:([a-z,-]+)\]/)
                         tagMatcher.each { match ->
@@ -1452,6 +1570,8 @@ spec:
                                 }
                             }
                         }
+                        buildTags.addAll(applyConductorTag(commitMsg))
+
                         if (buildTags) {
                             env.FORCE_BUILD_PIPELINES = buildTags.unique().join(',')
                             echo "🔧 [build:*] tags detected — force-including: ${env.FORCE_BUILD_PIPELINES}"

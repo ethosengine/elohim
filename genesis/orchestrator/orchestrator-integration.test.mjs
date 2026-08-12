@@ -138,7 +138,8 @@ test('dead change-detection helpers are retired from the Jenkinsfile', () => {
 // ══════════════════════════════════════════════════════════════════
 
 test('pre-push references no deleted orchestrator-strategy module', () => {
-  const hook = readFileSync(new URL('../../.husky/pre-push', import.meta.url), 'utf8');
+  // .husky/pre-push is a POSIX shim that execs pre-push.bash — the gates live there.
+  const hook = readFileSync(new URL('../../.husky/pre-push.bash', import.meta.url), 'utf8');
   assert.equal(hook.includes('orchestrator-strategy'), false,
     'pre-push must not reference the deleted orchestrator-strategy.mjs/.test.mjs');
   assert.ok(/build-manifest\.json/.test(hook) && hook.includes('pipeline-list-fresh'),
