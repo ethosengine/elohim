@@ -9,23 +9,30 @@ export type CapacityCheckResult = {
  */
 isAllowed: boolean, 
 /**
- * Current utilization ratio (0.0 to 1.0+)
+ * Utilization ratio (0.0 to 1.0+), measured over one period of the yield's
+ * denominator when the unit names one. Derived from economic events — this, not
+ * the Place's stored currentUtilization, is the authority for an allocation.
  */
 currentUtilization: number, 
 /**
- * Utilization ratio after the proposed allocation
+ * Utilization ratio after the proposed allocation, on the same basis
  */
 utilizationAfter: number, 
 /**
- * Maximum sustainable yield for this resource category
+ * Maximum sustainable yield for this resource category. A RATE per the period its
+ * unit denominates ("liters/day"), or a LEVEL when the unit names no denominator
+ * ("dwellings") or names an extent rather than a tempo ("people/km2")
  */
 maxSustainableYield: number, 
 /**
- * Unit of measurement
+ * Unit of measurement. A TIME denominator (the "day" in "liters/day") selects the
+ * period usage is measured over; no denominator ("dwellings") or an EXTENT
+ * denominator ("people/km2", a density) is a level and is measured cumulatively
  */
 unit: string, 
 /**
- * Current total usage at this place
+ * Usage at this place — within the yield's period for a rate unit, cumulative for
+ * a level or density unit
  */
 currentUsage: number, 
 /**

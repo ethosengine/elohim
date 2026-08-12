@@ -7,9 +7,19 @@
   "required": ["resourceCategory", "maxSustainableYield", "unit", "currentUtilization", "dataQuality"],
   "properties": {
     "resourceCategory": { "type": "string", "description": "ResourceCategory this limit applies to" },
-    "maxSustainableYield": { "type": "number", "minimum": 0 },
-    "unit": { "type": "string" },
-    "currentUtilization": { "type": "number", "description": "0.0 to 1.0+; >1.0 means exceeding capacity" },
+    "maxSustainableYield": {
+      "type": "number",
+      "minimum": 0,
+      "description": "The limit itself. A RATE per the period `unit` denominates when `unit` carries a time denominator ('liters/day'); a LEVEL — a ceiling on a stock — when it does not ('dwellings'). Which one it is decides how usage is measured against it, so declare `unit` deliberately."
+    },
+    "unit": {
+      "type": "string",
+      "description": "Unit of `maxSustainableYield`. LOAD-BEARING, not decorative: its time denominator is the only declaration of the period the yield is per, and enforcement reads it. A unit with a denominator ('liters/day', 'kWh per year') makes the yield a rate and usage is summed over exactly one such period; a unit with none ('dwellings', 'hectares', 'people') makes it a level and usage is summed cumulatively. So 'liters' and 'liters/day' are not interchangeable — they differ by a 365x swing in what gets counted. Recognized denominators: s/sec/second(s), min/minute(s), h/hr/hour(s), d/day(s), w/wk/week(s), mo/month(s), y/yr/year(s)/annum, spelled with either '/' or ' per '. A denominator outside that list is REFUSED rather than guessed at — the capacity check errors instead of reporting a number with no interpretation."
+    },
+    "currentUtilization": {
+      "type": "number",
+      "description": "NON-AUTHORITATIVE declared snapshot (0.0 to 1.0+; >1.0 means exceeding capacity). This field is a stored value on a DHT-projected object and drifts the moment an economic event lands. The authority for any allocation or governance decision is the utilization DERIVED from the economic-event projection, returned as CapacityCheckResult.currentUtilization — never this field. Consumers that render or threshold this value are reading a declaration, not a measurement."
+    },
     "dataQuality": { "type": "string", "enum": ["measured", "estimated", "manual", "mixed"] },
     "source": { "type": "string", "description": "Source of the capacity estimate" },
     "measuredAt": { "type": "string", "format": "date-time" }

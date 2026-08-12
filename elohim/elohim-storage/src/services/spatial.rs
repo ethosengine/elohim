@@ -165,11 +165,38 @@ pub struct OsmReference {
 pub struct CarryingCapacity {
     /// ResourceCategory this limit applies to (energy, water, food, etc.)
     pub resource_category: String,
-    /// Maximum sustainable yield before degradation
+    /// Maximum sustainable yield before degradation.
+    ///
+    /// A RATE when `unit` carries a time denominator (`"liters/day"`), a LEVEL when it
+    /// does not (`"dwellings"`) or when the denominator names an extent (`"people/km2"`,
+    /// a density). Which one it is comes from `unit` and nowhere else — see below.
     pub max_sustainable_yield: f64,
-    /// Unit of measurement
+    /// Unit of measurement — **LOAD-BEARING, not descriptive.**
+    ///
+    /// Its denominator selects how `max_sustainable_yield` is enforced, so `"liters"` and
+    /// `"liters/day"` are a 365x swing in what gets counted against the limit:
+    /// - **no denominator** (`"dwellings"`, `"liters"`) → a level; usage is summed over all
+    ///   history and compared level-to-level.
+    /// - **a time denominator** (`"liters/day"`, `"tonnes per month"`) → a rate; usage is
+    ///   windowed to exactly one period of that tempo.
+    /// - **an extent denominator** (`"people/km2"`, `"kg/ha"`) → a density, which is still a
+    ///   level; not windowed.
+    /// - **anything else** (`"liters/fortnight"`, a bare `"m"`) → REFUSED, not guessed at.
+    ///   Ambiguity between a tempo and an extent is the case that must error.
+    ///
+    /// Both `/` and ` per ` spellings are read. This is the only signal available without
+    /// changing this DHT-projected shape; declaring the period as its own field is the open
+    /// escalation (it needs a p2p-design-gate pass).
     pub unit: String,
-    /// Current utilization (0.0 to 1.0+; >1.0 means exceeding capacity)
+    /// Current utilization — **a NON-AUTHORITATIVE declared snapshot.**
+    ///
+    /// This is what the projecting peer last wrote down; it drifts by construction and is not
+    /// recomputed on read. The authority is `CapacityCheckResult.current_utilization`, which is
+    /// derived at check time from the event log against the window `unit` selects. Do not gate
+    /// an allocation on this field, and do not compare it against a threshold as if it were
+    /// live — consumers doing so today disagree with the enforcement path and with each other.
+    ///
+    /// Unclamped: `>1.0` means the declared reading exceeds the declared capacity.
     pub current_utilization: f64,
     /// Confidence in the measurement
     pub data_quality: String,
