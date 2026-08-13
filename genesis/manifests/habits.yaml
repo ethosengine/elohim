@@ -518,23 +518,51 @@ habits:
       - "memory: project_rea_compute_commitment_primitive (delegates-compute displaces X-API-Key)"
       - "task #7 (adam has zero Loki streams — the symmetry gap, live)"
 
-  - id: declarative-desired-state
+  - id: dev-system-equilibrium
     invariant: >
-      Peers reconcile signed desired-state (images, config, seeds) the way
-      coordinators hot-swap: a version bump converges every peer without
-      imperative cluster surgery. CI builds and publishes; it does not deploy.
-    status: unwired
+      Every stock in the development system drains at least as fast as it
+      fills — measured as rates over a declared window, never as a level.
+      Equilibrium is drain >= inflow per stock; a check that reads green
+      because it measured nothing is an over-claim, not a green.
+    status: red
     active: false
-    first_move: >
-      Write the red: scenario — bump a signed release manifest; every peer
-      converges (image + config) with no kubectl in the path; a peer that was
-      down converges on wake. (In-protocol precedent: happ_manager::
-      sync_coordinators. Endgame direction: the substrate as filesystem —
-      EPR heads riding files (brit metadata plane → elohimfs/FUSE projection);
-      park until this node is green.)
+    checks:
+      - "epr flow stocks --window <START..END> --per week --stock commitments --check --root /projects/elohim (exit 0 = every declared stock draining; fail-closed: refusals exit non-zero, never green-on-nothing)"
+      - "a2o @concern:dev-system-equilibrium (genesis/a2o/features/devflow/run-plane.feature — 4 scenarios: filling exits non-zero, drain>=inflow exits zero, an unmeasurable window refuses rather than reporting equilibrium, and the @regression guard that a discharge counts as outflow and never as inflow. @wip: no step definitions drive them yet, so this check runs in NO suite today — the CLI clause above is the only executing proof)"
+    evidence: >
+      DELTA 2026-08-13: T8 close-the-loop — a2o scenarios landed
+      (@concern:run-plane-note, @concern:run-plane-projection,
+      @concern:dev-system-equilibrium; step-def wiring NOT written — all 11
+      scenarios dry-run undefined and the feature carries @wip, so the story
+      is authored and blind-read but not yet executing), all tree gates green
+      (a2o LINT/FMT/TSC/GHERKIN/UNIT=0, 180 unit tests; eprfs workspace
+      FMT/CLIPPY/TEST=0), final CHECK=1 (FILLING at 22.000/wk inflow vs
+      0.000/wk outflow, level 560, unchanged from the T2 red).
+      RED WRITTEN 2026-08-13 (T2, commit cae50c1, the unwired->red first_move
+      completed same day as admission): live reading over
+      2026-08-06..2026-08-13 --per week: commitments stock level 560,
+      inflow 22.000/wk, outflow 0.000/wk, net +22.000/wk, verdict FILLING,
+      CHECK=1. Level independently agrees with `epr flow status`
+      unfulfilled (total): 560 — same fulfills-keyed predicate, two readers.
+      Turnover NaN (honest absence, not +inf). Outflow arm v1 = fulfillment
+      discharge only (Dismiss is a regression marker here, NOT a dismissal
+      — counting it would double-drain; printed on every render). Rides
+      Stock{level,inflow,outflow} + MeasureKind::Rate{per} (measure-family
+      rows 12-14); 28 tests; fail-closed on MismatchedPeriods / empty
+      window / NaN rate.
+    guard: >
+      Regression risks: (1) the outflow classifier keys on `fulfills` — a new
+      discharge path that forgets the field silently under-drains (the level
+      parity check with `epr flow status` is the tripwire); (2) discharge
+      dedup is occurred_at-sorted, never append-order (the C2 channel,
+      pinned by the_drain_is_dated_by_occurred_at_never_by_append_order);
+      (3) greening this habit by widening the outflow arm instead of by
+      actually draining commitments is the over-claim the invariant names.
     refs:
-      - "memory: project_brit_next_gen_epr_meta_foundation"
-      - "elohim/holochain/Jenkinsfile — ALLOW_COORDINATOR_UPDATE hot-swap (the model)"
+      - "genesis/docs/superpowers/specs/2026-08-13-dev-system-equilibrium-stocks-design.md"
+      - "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md"
+      - "genesis/data/timeline/backlog/agentic-harness-borrows-backlog.md — row 7"
+      - "displaced: declarative-desired-state → genesis/data/timeline/backlog/declarative-desired-state-parked-habit.md (2026-08-13, operator-directed; returns when its brit/eprfs precondition greens)"
 
   - id: sync-scale-honesty
     invariant: >
