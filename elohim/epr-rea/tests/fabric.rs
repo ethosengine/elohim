@@ -42,6 +42,7 @@ fn event(
         in_scope_of: *scope,
         fulfills,
         satisfies: vec![],
+        classified_as: vec![],
         occurred_at: "2026-07-18T12:00:00Z".into(),
     }
 }

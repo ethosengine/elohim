@@ -1,0 +1,167 @@
+# elohim/eprfs/epr-cli/seam-registry.yaml
+#
+# Conforms to elohim/sdk/schemas/v1/manifest/seam-registry.schema.json. FIRST registry for this
+# crate, minted with the `epr flow note` write leg (2026-08-13, harness-borrows Task 1) under the
+# birth rule: a decision surface is registered when it is created, not when someone notices it.
+#
+# HONESTY CLAUSE — what is registered here, and what is not. The rows below are the decision
+# points minted BY the note leg. The crate's PRE-EXISTING decision surface is NOT yet registered
+# and is a declared backlog, not a silent omission:
+#
+#   - `project::derive_gap_items`' CLAIMED predicate (src/flow/project.rs) — decides which gap
+#     items become Commitments rather than bare Intents, on a case-insensitive textual state
+#     match. It is the sole gate between "a plan mentioned this" and "the repo promised this."
+#   - `edges::edge_verdict` (src/flow/edges.rs) — the staleness verdict over sealed contract
+#     edges (Ok | Governed | Stale | Held | Dangling); a verdict-fn by any reading, and the one
+#     whose red routes real work.
+#   - `walk::status`' unfulfilled fold (src/flow/walk.rs) — decides what counts as an open
+#     promise across every declared scope, and is the number the whole development system quotes.
+#   - `governor::derive_governor` (src/flow/governor.rs) — decides which conformance mechanism an
+#     unspecified `--governor` edge is sealed under, from a registry of rules.
+#
+# Each qualifies and each is pending. They are named here rather than omitted, so the census
+# reads a declared backlog instead of an apparently-complete registry — a silent omission is
+# exactly the failure this file exists to prevent.
+#
+# Every symbol below was grepped, read, and test-run at authoring time (2026-08-13).
+
+seamRegistryVersion: 1
+crate: elohim-epr-cli
+crateRoot: elohim/eprfs/epr-cli
+seamLocus: >
+  The admission surface of the `epr flow` command family — the point at which something outside
+  the repository's derivable state (an authored observation, a CLI-supplied target, a governor
+  override) is admitted into the append-only `.eprfs/status/` sidecar, or refused. Every other
+  leg in this family DERIVES its records from the tree and can be re-run to the same answer; the
+  note leg is the first that accepts a human's assertion, which is why its refusals are the
+  decision points worth registering. The fold and verdict surfaces this crate also owns
+  (`edge_verdict`, the unfulfilled fold) are named in the honesty clause above as pending.
+
+decisionPoints:
+  - name: note::resolve_target
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/flow/note.rs
+      modulePath: elohim_epr_cli::flow::note
+      line: 268
+    summary: >
+      Decides whether a CLI-supplied `--on` argument names something this sidecar can be written
+      against — a known atom CID, or a readable path under the repo root — and refuses everything
+      else rather than minting a record pointing at nothing.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          Unresolvable, unreadable, and escaping-the-root are three distinct refusals, and none
+          of them degrades to an append. The CID arm deliberately verifies MEMBERSHIP rather than
+          well-formedness: a syntactically valid CID for something never recorded is Absent, not
+          Present, and accepting it would mint an observation unreachable from every walk that
+          starts at a real record — a note that reads as evidence and is not. Pinned by
+          `an_unresolvable_target_appends_nothing_and_is_unknown_resource`, which asserts the
+          sidecar line count is unchanged after both refusal arms.
+      - id: C6b
+        status: answered
+        justification: >
+          Replay mints nothing: the note's atom CID is fully determined by its fields, so an
+          identical note appended twice is one record and the second call reports
+          `appended: false` rather than adding a row. Distinct reasons remain distinct records,
+          which is the property that keeps dedup from swallowing genuine second observations.
+          Pinned by `an_identical_note_appended_twice_is_one_record`, which asserts both halves.
+      - id: C0
+        status: answered
+        justification: >
+          Plane located before the interface was drawn: a note is a REPO-PLANE append to the
+          offline floor (`.eprfs/status/flows.jsonl`, CID-verified on read, local and
+          reprojectable) — not a DHT entity, not a projection table. Nothing is published,
+          gossiped, or head-elected, so the head-plane cost is zero. The `run-note` unit is the
+          mechanical expression of the same placement: it keeps notes out of every existing
+          unit-keyed stock fold by construction rather than by a downstream filter someone must
+          remember to write.
+      - id: C1
+        status: n-a
+        justification: >
+          Anti-self-election is about a component crowning what it authored. This predicate
+          crowns nothing — it admits or refuses a reference, and the note it admits carries no
+          authority at all: `fulfills` and `satisfies` stay empty by construction, so a note
+          cannot discharge, promote, or retire the promise it is about. The empty-`fulfills`
+          invariant is the reason this row can honestly claim n-a rather than partial, and it is
+          pinned by `a_note_never_discharges_its_commitment`.
+    notes: >
+      The leg is two-phase (resolve everything, then append once) mirroring `seal::reseal`'s
+      no-partial-write idiom. With one target the phase split is trivially satisfied, but the
+      invariant it protects — the sidecar never observes a half-written act — is what the error
+      arms are ordered to preserve.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/flow_note.rs
+        testName: an_unresolvable_target_appends_nothing_and_is_unknown_resource
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_note.rs
+        testName: a_known_atom_cid_resolves_without_a_path
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_note.rs
+        testName: a_target_outside_the_repo_root_is_refused_rather_than_written_against
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_note.rs
+        testName: an_identical_note_appended_twice_is_one_record
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_note.rs
+        testName: a_note_never_discharges_its_commitment
+        kind: integration
+
+  - name: note::NoteKind
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/flow/note.rs
+      modulePath: elohim_epr_cli::flow::note::NoteKind
+      line: 71
+    summary: >
+      The closed triad of run-scale observation kinds (failed-approach | correction |
+      observation) that becomes a record's `classified_as` slot-0 tag — the vocabulary every
+      downstream reader uses to re-find a note.
+    concernIds:
+      - id: C10
+        status: answered
+        justification: >
+          An unrecognised `--kind` FAILS THE PARSE; it is never defaulted to `observation`. That
+          is C10's guarantee stated at an argument boundary rather than a wire one, and the
+          failure mode it forecloses is this class's type specimen: a defaulted classification
+          produces a record that misdescribes itself and does so quietly, exactly as a renamed
+          field silently read as absent did. The vocabulary being closed is what makes the
+          refusal meaningful — a fourth kind is a spec amendment, not a CLI argument, because the
+          tag IS the semantics of every read that follows.
+          The same additive discipline applies one crate down: `FlowEvent.classified_as` is
+          `#[serde(default, skip_serializing_if = "Vec::is_empty")]`, so declaring this vocabulary
+          moved no already-appended record's CID. That matters more here than for a commitment,
+          because every sidecar line re-verifies its stored CID on read — a moved encoding would
+          turn the whole append-only log into an integrity error rather than a quiet re-address.
+          Pinned in the owning crate by
+          `elohim_epr_rea::model::tests::an_unclassified_event_keeps_its_pre_classified_cid`,
+          whose golden was computed against the pre-`classified_as` struct.
+      - id: C4
+        status: answered
+        justification: >
+          The triad has no residual arm that silently absorbs an unknown value, so "a kind we do
+          not recognise" and "an observation" stay distinct answers. The refusal names the legal
+          set rather than merely rejecting, which is what makes it actionable at the point of
+          authorship.
+      - id: C14
+        status: n-a
+        justification: >
+          Witnessed residual is about exceptions that fit no class being captured with enough
+          context for cross-node RCA. There is no residual here to metabolize: the refusal is
+          synchronous and delivered to the human who typed the flag, in the same process, with
+          the offending token and the legal set in the message. Nothing is dropped to a `debug!`
+          and there is no distributed cause to capsule.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/src/flow/note.rs
+        testName: the_kind_vocabulary_is_closed_and_refuses_a_fourth
+        kind: unit
+      - path: elohim/eprfs/epr-cli/src/flow/note.rs
+        testName: every_kind_mints_a_distinct_run_prefixed_tag
+        kind: unit
+      - path: elohim/eprfs/epr-cli/src/flow/note.rs
+        testName: note_event_cid_is_stable
+        kind: unit
+      - path: elohim/eprfs/epr-cli/tests/flow_note.rs
+        testName: an_empty_reason_is_refused_before_the_store_is_opened
+        kind: integration

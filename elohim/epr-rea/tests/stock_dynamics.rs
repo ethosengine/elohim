@@ -48,6 +48,7 @@ fn event(action: ReaVerb, resource: &Cid, at: &str, scope: &Cid) -> FlowEvent {
         in_scope_of: *scope,
         fulfills: vec![],
         satisfies: vec![],
+        classified_as: vec![],
         occurred_at: at.into(),
     }
 }

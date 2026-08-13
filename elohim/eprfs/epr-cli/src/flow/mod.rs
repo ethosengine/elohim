@@ -9,6 +9,7 @@
 pub mod edges;
 pub mod fulfill;
 pub mod governor;
+pub mod note;
 pub mod project;
 pub mod registry;
 pub mod seal;
@@ -143,6 +144,7 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         "reseal" => run_reseal(&args[1..]),
         "hold" => run_hold(&args[1..]),
         "fulfill" => run_fulfill(&args[1..]),
+        "note" => run_note(&args[1..]),
         other => Err(FlowError::InvalidArguments(format!(
             "unknown flow subcommand `{other}`\n{}",
             usage()
@@ -261,6 +263,32 @@ fn run_fulfill(args: &[String]) -> FlowResult<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
+/// `epr flow note` — the only leg that takes an AUTHORED observation rather than deriving one
+/// from the tree, so all four of its flags are required-or-optional by name and none is
+/// positional. Every one of them is refused when absent or blank rather than defaulted: a note
+/// whose kind, target, or body was guessed is a record that reads as evidence and is not.
+fn run_note(args: &[String]) -> FlowResult<ExitCode> {
+    let (opts, rest) = parse_global(args)?;
+    let on = take_opt(&rest, "--on")?.ok_or_else(|| {
+        FlowError::InvalidArguments("note needs --on <commitment-cid-or-path>".into())
+    })?;
+    let kind = take_opt(&rest, "--kind")?.ok_or_else(|| {
+        FlowError::InvalidArguments(
+            "note needs --kind failed-approach|correction|observation".into(),
+        )
+    })?;
+    let reason = take_opt(&rest, "--reason")?
+        .ok_or_else(|| FlowError::InvalidArguments("note needs --reason <text>".into()))?;
+    let switched_to = take_opt(&rest, "--switched-to")?;
+    let outcome = note::note(&opts.root, &on, &kind, &reason, switched_to.as_deref())?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&outcome)?);
+    } else {
+        outcome.render();
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
 /// Pull `--root` and `--json` out of `args`, returning the remainder untouched.
 fn parse_global(args: &[String]) -> FlowResult<(GlobalOpts, Vec<String>)> {
     let mut root = PathBuf::from(".");
@@ -314,7 +342,10 @@ fn usage() -> String {
      (omit --governor to auto-derive from .claude/epr-meta/governors.yaml)\n  \
      | reseal <file> [--on <upstream>] [--all-stale] [--json] [--root DIR]\n  \
      | hold <file> --on <upstream> --reason <text> [--valid-from <iso8601>] [--json] [--root DIR]\n  \
-     | fulfill <report.json> [--dry-run] [--surface-prefix genesis/a2o] [--json] [--root DIR]\n>"
+     | fulfill <report.json> [--dry-run] [--surface-prefix genesis/a2o] [--json] [--root DIR]\n  \
+     | note --on <commitment-cid-or-path> \
+     --kind failed-approach|correction|observation \
+     --reason <text> [--switched-to <text>] [--json] [--root DIR]\n>"
         .to_string()
 }
 
@@ -541,6 +572,29 @@ pub fn head_commit_epoch(root: &Path) -> Option<i64> {
         return None;
     }
     String::from_utf8_lossy(&out.stdout).trim().parse().ok()
+}
+
+/// The `(author-email, RFC3339 author-date)` of `HEAD` — the whole-tree analogue of
+/// [`producing_commit`], for a record that is about the tree rather than about one path.
+///
+/// One `git log -1` yields both halves, so a caller needing provenance AND a timestamp spawns a
+/// single child process rather than two. `None` when git has no history (a fresh, uncommitted
+/// tree) or when either half comes back empty — an unattributed record is refused by the caller,
+/// never filled in with a placeholder.
+pub fn head_commit_provenance(root: &Path) -> Option<(String, String)> {
+    let out =
+        crate::process::build_command("git", &["log", "-1", "--format=%ae%x1f%aI"], root, &[])
+            .output()
+            .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&out.stdout);
+    let (email, ts) = text.lines().next()?.split_once('\u{1f}')?;
+    if email.is_empty() || ts.is_empty() {
+        return None;
+    }
+    Some((email.to_string(), ts.to_string()))
 }
 
 fn git_log_pairs(root: &Path, extra: &[&str], rel_path: &str) -> Vec<(String, String)> {

@@ -295,6 +295,7 @@ fn derive_absorption(
             in_scope_of: *repo_scope,
             fulfills: Vec::new(),
             satisfies: Vec::new(),
+            classified_as: Vec::new(),
             occurred_at: removal.occurred_at.clone(),
         };
         let event_cid = atom_cid(&event)?;
@@ -497,6 +498,7 @@ fn derive_process_doc(
         in_scope_of,
         fulfills: Vec::new(),
         satisfies: Vec::new(),
+        classified_as: Vec::new(),
         occurred_at,
     };
     let event_cid = atom_cid(&event)?;

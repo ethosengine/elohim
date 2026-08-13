@@ -310,6 +310,7 @@ pub fn fulfill(
                                     in_scope_of: repo_scope,
                                     fulfills: vec![*commit_cid],
                                     satisfies: Vec::new(),
+                                    classified_as: Vec::new(),
                                     occurred_at: report.generated_at.clone(),
                                 };
                                 stage_or_count(
@@ -345,6 +346,7 @@ pub fn fulfill(
                     in_scope_of: repo_scope,
                     fulfills: vec![*commit_cid],
                     satisfies: Vec::new(),
+                    classified_as: Vec::new(),
                     occurred_at: report.generated_at.clone(),
                 };
                 stage_or_count(
@@ -375,6 +377,7 @@ pub fn fulfill(
                     in_scope_of: repo_scope,
                     fulfills: Vec::new(),
                     satisfies: Vec::new(),
+                    classified_as: Vec::new(),
                     occurred_at: report.generated_at.clone(),
                 };
                 // A Dismiss that duplicates one already in the sidecar (same report,
@@ -569,6 +572,7 @@ mod tests {
             in_scope_of: repo_scope,
             fulfills: vec![commitment],
             satisfies: Vec::new(),
+            classified_as: Vec::new(),
             occurred_at: "2026-07-25T00:00:00Z".to_string(),
         };
         let cid = atom_cid(&event).expect("cid");

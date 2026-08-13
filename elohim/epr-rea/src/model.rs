@@ -389,6 +389,27 @@ pub struct FlowEvent {
     pub satisfies: Vec<Cid>,
     /// RFC3339.
     pub occurred_at: String,
+    /// What KIND of observation this is, when the event's own verb and unit cannot say.
+    ///
+    /// [`ResourceSpec::classified_as`] carries this for [`Intent`] and [`Commitment`]; an event
+    /// has no resource spec, so a run-scale observation (`run:failed-approach | run:correction |
+    /// run:observation`) had no carrier at all. The established two-slot convention applies —
+    /// **tag first, subject second** (`["gap:<state>", item.id]`, `["a2o:scenario-green", rel]`,
+    /// read back positionally by `fulfill`) — and slots beyond the second are the authoring
+    /// leg's, prefixed so a reader can tell them from a tag.
+    ///
+    /// Skipped when empty so that declaring this vocabulary did not move a single existing
+    /// event's CID — the verbatim discipline [`Commitment::bound`] uses, pinned here by
+    /// `an_unclassified_event_keeps_its_pre_classified_cid`. That matters more for events than
+    /// for commitments: every sidecar line re-verifies its stored CID on read
+    /// ([`crate::store::SidecarFlowStore::records`]), so a moved encoding would turn the whole
+    /// append-only log into an integrity error rather than a quiet re-address.
+    ///
+    /// The rejected alternative was smuggling the tag into `Magnitude::Count{unit}`, which is a
+    /// FOLD KEY — `crate::stock::count_in` filters on it by exact string match, so a
+    /// classification hidden there would silently partition every stock fold that names a unit.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub classified_as: Vec<String>,
 }
 
 /// A live run of a recipe grouping events (VF Process): consumes/uses `inputs`,
@@ -703,6 +724,68 @@ mod tests {
         assert_eq!(
             cid.to_string(),
             "bafyreib77zpf3g4daj54622eqjmkao7cfbv4n27kylnekoous4atg5h52q"
+        );
+    }
+
+    // ── FlowEvent classification, and the address-stability it must not cost ─────
+
+    /// The fixture whose CID the golden below pins — an event carrying NO classification.
+    /// Shaped like a `run:` note (`Cite`, unit `run-note`, empty `fulfills`) so the pin sits on
+    /// exactly the record the note leg mints.
+    fn unclassified_event() -> FlowEvent {
+        FlowEvent {
+            action: ReaVerb::Cite,
+            provider: agent("claude"),
+            receiver: agent("repo"),
+            resource: upstream_cid("golden-note-target"),
+            quantity: Magnitude::Count {
+                value: 1.0,
+                unit: "run-note".into(),
+            },
+            process: None,
+            in_scope_of: upstream_cid("epic"),
+            fulfills: vec![],
+            satisfies: vec![],
+            classified_as: vec![],
+            occurred_at: "2026-08-13T00:00:00Z".into(),
+        }
+    }
+
+    /// Declaring the `classified_as` vocabulary must not have moved any existing event: the
+    /// field is skipped when empty, so an unclassified event's canonical bytes are unchanged.
+    /// The golden was computed against the pre-`classified_as` `FlowEvent` struct — the sibling
+    /// of `an_unbounded_commitment_keeps_its_pre_bound_cid`, and the reason 4,866 already-
+    /// appended sidecar records still re-verify their stored CIDs on read.
+    #[test]
+    fn an_unclassified_event_keeps_its_pre_classified_cid() {
+        let cid = atom_cid(&unclassified_event()).expect("cid");
+        assert_eq!(
+            cid.to_string(),
+            "bafyreibhg2ciu4hborzezeg4thgluq4vskdm7nzyhzkdk4eokcnqd6slve"
+        );
+        // Byte-level, not just address-level: an absent classification must not appear in the
+        // canonical dag-cbor at all (the `sense`/`source` discipline, asserted the same way).
+        let bytes = canonical_bytes(&unclassified_event()).expect("encodes");
+        assert!(
+            !bytes.windows(12).any(|w| w == b"classifiedAs"),
+            "an empty classification must not appear in the canonical bytes at all"
+        );
+    }
+
+    /// …but a classification IS part of the observation, so declaring one re-addresses it —
+    /// which is exactly what makes two notes with different reasons two distinct records
+    /// rather than one CID-deduped no-op.
+    #[test]
+    fn classifying_an_event_changes_its_cid() {
+        let mut classified = unclassified_event();
+        classified.classified_as = vec!["run:correction".into(), "genesis/plan.md".into()];
+        assert!(canonical_bytes(&classified)
+            .expect("encodes")
+            .windows(12)
+            .any(|w| w == b"classifiedAs"));
+        assert_ne!(
+            atom_cid(&unclassified_event()).unwrap(),
+            atom_cid(&classified).unwrap()
         );
     }
 
