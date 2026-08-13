@@ -12,7 +12,7 @@ metadata:
 This skill orchestrates the four-agent memory team (librarian, historian, cartographer, storyteller) through a coordinated ceremony whose **deliverable is substrate-grounded gospel-tier rewrites**. The ceremony exists because four lenses on a surface produce a better rewrite than one — and because Run #6 proved that the audit-numbers-moving ≠ substrate-coherence-improving. Audit-number hygiene (CLAUDE.md byte budgets, cleanup-scan flags, archive ratios, MEMORY.md size) lives in `/hygiene-sweep` on a separate cadence.
 
 **When to invoke**:
-- Signal: `substrate-currency-audit.py` ranks the gospel-tier surfaces by drift count (path-existence + process-status findings, highest first) and the top of that ranking carries enough drift to warrant a rewrite — there is no fixed numeric threshold; the audit emits a ranked list (plus headline counts and an uncited-recent-memory list) and the operator picks 1-2 off the top
+- Signal: `substrate-currency-audit.py` ranks the gospel-tier surfaces by drift count (path-existence + process-status findings, highest first) and the top of that ranking carries enough drift to warrant a rewrite — there is no fixed numeric threshold; the audit emits a ranked list (plus headline counts and an uncited-recent-memory list) and the ceremony picks 1-2 off the top itself, surfacing the ranking and its picks to the operator as information
 - Substrate landing: a phase ships, a substrate parallel rolls in, a vocabulary lands — and the gospel-tier hasn't absorbed it
 - Operator: when a gospel-tier surface feels stale, before a /shift that will read it as primer
 
@@ -59,9 +59,11 @@ Output: `.claude/memory-kit/<TODAY>/substrate-currency-audit.{json,md}` — rank
 - **PROCESS-STATUS** findings — temporal phrasing violating `[[feedback_agent_prompts_no_process_status]]`
 - **MISSING-CITATION** findings — recent MEMORY.md slugs that the surface's scope plausibly touches but doesn't cite
 
-Surface the top-5 by total drift to the operator. **Operator picks 1-2 surfaces** to rewrite this cycle. Default N=2; default pick the top-2 unless the operator overrides (e.g., "skip rust-architect, do code-reviewer and angular-architect — they touch the next sprint").
+Surface the top-5 by total drift **as information**, then **pick the top-N yourself and proceed** — default N=2. State the picks and one line of why each was picked, and continue into Phase 1b without waiting: the ranking is the ceremony's own instrument, and reading it is an execution decision. The operator keeps a standing **override** — a redirect at any point ("skip rust-architect, do code-reviewer and angular-architect — they touch the next sprint") is an input the ceremony re-picks on, not a gate it stops at. De-escalation is not de-authorization.
 
-If the operator picks 0 (audit numbers are clean, or all top-ranked surfaces are bare-filename-heavy noise): announce that the ceremony has no work this cycle, surface the audit summary, and exit.
+Picking 0 is the ceremony's own call too: if the audit numbers are clean, or all top-ranked surfaces are bare-filename-heavy noise, announce that the ceremony has no work this cycle, surface the audit summary, and exit — decide it, don't ask it.
+
+**Why the pick is not a gate while Phase 3's approval is.** Gate placement follows the planning/execution split: escalate what-counts-as-done, never an execution decision the ceremony's own measure already answers ([context-engineering primary sources](epr:context-engineering-primary-sources-cross-pollination-2026-08-13) §4.5, run as TAKE-4). The two gates that are genuinely the operator's stay untouched: **Phase 3 rewrite approval** (approve / revise / decline per rewrite — what the gospel tier should say is a planning judgment) and the **holds menu for contested edges** (a scope decision the operator owns). Removing either would be the opposite error to the one this de-escalation fixes.
 
 **Edges gauge (sealed contract edges — spec 2026-07-21 §5):** alongside the audit, read `epr flow status --json` (`edges: sealed · governed · stale · held · dangling`). The stale/dangling set is ceremony work, not mechanical cleanup: the librarian drives the mechanical re-verify tier (reseal what still holds — stale-gated, never auto-blessed), and **contested or deviating edges go to the Phase-3 holds menu** for the operator. Governed edges are never stale; ignore them.
 
