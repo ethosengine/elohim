@@ -13,6 +13,7 @@ pub mod note;
 pub mod project;
 pub mod registry;
 pub mod seal;
+pub mod stocks;
 pub mod walk;
 
 use std::collections::BTreeMap;
@@ -145,6 +146,7 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         "hold" => run_hold(&args[1..]),
         "fulfill" => run_fulfill(&args[1..]),
         "note" => run_note(&args[1..]),
+        "stocks" => run_stocks(&args[1..]),
         other => Err(FlowError::InvalidArguments(format!(
             "unknown flow subcommand `{other}`\n{}",
             usage()
@@ -289,6 +291,68 @@ fn run_note(args: &[String]) -> FlowResult<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
+/// `epr flow stocks` — the only leg whose EXIT CODE is a verdict rather than a status.
+///
+/// Two things about the argument handling are deliberate. First, `--window` and `--per` are
+/// **refused when absent** rather than defaulted: `Window` declares its denominator on purpose
+/// (`stock.rs:70-73`), and any default this leg invented would either be a wall-clock read — on
+/// a path whose whole discipline is history-derived time — or a hidden claim about what counts
+/// as "now". Second, `--check` is the only flag that can make this leg exit non-zero, and when
+/// it does, it does so **fail-closed**: a refused fold, an empty window, or a filling stock all
+/// exit non-zero, because "we cannot see the drain" and "the drain is adequate" must never share
+/// an exit code.
+fn run_stocks(args: &[String]) -> FlowResult<ExitCode> {
+    let (opts, rest) = parse_global(args)?;
+    let check = rest.iter().any(|a| a == "--check");
+    // Walk the whole tail once before reading any value: `take_opt` scans for a `--key value`
+    // pair and ignores everything it does not recognise, so a typo'd flag would otherwise be
+    // silently dropped — on a leg whose exit code is a verdict, a mis-typed `--windwo` reading
+    // as "no window declared" is the honest outcome only because this loop refuses it first.
+    let mut i = 0;
+    while i < rest.len() {
+        match rest[i].as_str() {
+            "--check" => i += 1,
+            "--window" | "--per" | "--stock" => i += 2,
+            other => {
+                return Err(FlowError::InvalidArguments(format!(
+                    "unknown stocks argument `{other}`"
+                )))
+            }
+        }
+    }
+    let window_spec = take_opt(&rest, "--window")?.ok_or_else(|| {
+        FlowError::InvalidArguments(
+            "stocks needs --window START..END — a rate whose window is implicit is not a claim"
+                .into(),
+        )
+    })?;
+    let per_raw = take_opt(&rest, "--per")?.ok_or_else(|| {
+        FlowError::InvalidArguments(
+            "stocks needs --per <second|minute|hour|day|week> — the denominator every rate here \
+             carries is declared, never inherited from a subtraction"
+                .into(),
+        )
+    })?;
+    let per = stocks::parse_period(&per_raw)?;
+    let window = stocks::parse_window(&window_spec, per)?;
+    let names = vec![stocks::StockName::parse(
+        take_opt(&rest, "--stock")?
+            .as_deref()
+            .unwrap_or("commitments"),
+    )?];
+
+    let outcome = stocks::stocks(&opts.root, &window, &names)?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&outcome)?);
+    } else {
+        outcome.render();
+    }
+    if check && !outcome.equilibrium {
+        return Ok(ExitCode::FAILURE);
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
 /// Pull `--root` and `--json` out of `args`, returning the remainder untouched.
 fn parse_global(args: &[String]) -> FlowResult<(GlobalOpts, Vec<String>)> {
     let mut root = PathBuf::from(".");
@@ -345,7 +409,10 @@ fn usage() -> String {
      | fulfill <report.json> [--dry-run] [--surface-prefix genesis/a2o] [--json] [--root DIR]\n  \
      | note --on <commitment-cid-or-path> \
      --kind failed-approach|correction|observation \
-     --reason <text> [--switched-to <text>] [--json] [--root DIR]\n>"
+     --reason <text> [--switched-to <text>] [--json] [--root DIR]\n  \
+     | stocks --window START..END --per <second|minute|hour|day|week> \
+     [--stock commitments] [--check] [--json] [--root DIR] \
+     (--check exits non-zero when a stock is filling OR when nothing could be measured)\n>"
         .to_string()
 }
 

@@ -4,9 +4,12 @@
 # crate, minted with the `epr flow note` write leg (2026-08-13, harness-borrows Task 1) under the
 # birth rule: a decision surface is registered when it is created, not when someone notices it.
 #
+# Extended 2026-08-13 (harness-borrows Task 2) with the `epr flow stocks` equilibrium fold — the
+# crate's first REGISTERED verdict surface, and the first row whose red is an exit code.
+#
 # HONESTY CLAUSE — what is registered here, and what is not. The rows below are the decision
-# points minted BY the note leg. The crate's PRE-EXISTING decision surface is NOT yet registered
-# and is a declared backlog, not a silent omission:
+# points minted BY the note leg (Task 1) and the stocks leg (Task 2). The crate's PRE-EXISTING
+# decision surface is NOT yet registered and is a declared backlog, not a silent omission:
 #
 #   - `project::derive_gap_items`' CLAIMED predicate (src/flow/project.rs) — decides which gap
 #     items become Commitments rather than bare Intents, on a case-insensitive textual state
@@ -29,13 +32,17 @@ seamRegistryVersion: 1
 crate: elohim-epr-cli
 crateRoot: elohim/eprfs/epr-cli
 seamLocus: >
-  The admission surface of the `epr flow` command family — the point at which something outside
-  the repository's derivable state (an authored observation, a CLI-supplied target, a governor
-  override) is admitted into the append-only `.eprfs/status/` sidecar, or refused. Every other
-  leg in this family DERIVES its records from the tree and can be re-run to the same answer; the
-  note leg is the first that accepts a human's assertion, which is why its refusals are the
-  decision points worth registering. The fold and verdict surfaces this crate also owns
-  (`edge_verdict`, the unfulfilled fold) are named in the honesty clause above as pending.
+  Two loci in the `epr flow` command family, joined by one sidecar. The first is the ADMISSION
+  surface — the point at which something outside the repository's derivable state (an authored
+  observation, a CLI-supplied target, a governor override) is admitted into the append-only
+  `.eprfs/status/` sidecar, or refused; every other leg here DERIVES its records from the tree
+  and can be re-run to the same answer, and the note leg is the first that accepts a human's
+  assertion. The second is the MEASUREMENT surface over that same log — the derived event view a
+  stock is folded from, and the equilibrium verdict that fold produces. They are one registry
+  because they are one plane: the note leg decides what may enter the record, and the stocks leg
+  decides what the record is allowed to say about the development system. The crate's other fold
+  and verdict surfaces (`edge_verdict`, the unfulfilled fold) are named in the honesty clause
+  above as pending.
 
 decisionPoints:
   - name: note::resolve_target
@@ -165,3 +172,241 @@ decisionPoints:
       - path: elohim/eprfs/epr-cli/tests/flow_note.rs
         testName: an_empty_reason_is_refused_before_the_store_is_opened
         kind: integration
+
+  # ── Task 2 (2026-08-13): the equilibrium fold. The registry's own reason for existing is to
+  # catch inadequate models, and a green/red on "is the development system in equilibrium?" is
+  # precisely that class — so both halves are registered at birth: the predicate that decides
+  # which events move the stock, and the verdict that decides what the exit code says.
+
+  - name: stocks::classify_record
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/flow/stocks.rs
+      modulePath: elohim_epr_cli::flow::stocks::classify_record
+      line: 171
+    summary: >
+      Decides, for the commitments stock, whether one sidecar record is inflow (a promise was
+      minted), outflow (a promise was discharged), or neither — keyed on the `fulfills`
+      fulfillment edge rather than on the event's own REA verb.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Plane located before the arithmetic: this is a REPO-PLANE fold over the offline floor
+          (`.eprfs/status/flows.jsonl`), producing a DERIVED view that is never appended and never
+          stored. A stock is a pure fold — a stored level would be a second home for a number that
+          already has one — so head-plane cost is zero and the truth/projection split stays intact.
+          The read-only property is pinned by `the_fold_is_read_only`, which asserts the sidecar is
+          byte-identical after a fold.
+      - id: C4
+        status: answered
+        justification: >
+          Three absences stay distinct rather than collapsing into "not counted":
+          `NotOpenAtMint` (a Revoked/Fulfilled commitment — structurally unreachable today per
+          Spec B Q-C, and if it appears it reads as absence, never as an inflow that can never
+          drain), `DischargesNothing` (an artifact Produce, a red-run Dismiss, a Cite run-note),
+          and `NotAFlowOfThisStock` (the plan and knowledge planes). Separately, a mint or a
+          discharge whose instant no git history can date is emitted with an EMPTY `occurred_at` —
+          present in the level, absent from every window's rate — and COUNTED as
+          `undated_mints`/`undated_discharges` in the readout, because an unmeasured inflow that
+          silently reads as zero is the exact direction that would make a filling stock look calm.
+          The first shape of this code dropped such records entirely and pushed the level below the
+          `unfulfilled_total`; caught by `an_undatable_mint_is_reported_not_guessed`.
+      - id: C2
+        status: answered
+        justification: >
+          A promise leaves the stock once, and WHICH discharge dates that drain is decided by
+          `occurred_at`, never by position in the append-only log. This crate has shipped the
+          append-order-vs-`occurredAt` bug before — `a83b35079` (2026-07-29), whose commit body
+          reads "the exact `8a1c531dc` bug, reintroduced via replay" — and the re-fulfillment arm
+          plus delayed/backfilled reports make this a genuine second site for it. The dedup sorts
+          edges by normalized timestamp with undated edges last and stable append order breaking
+          ties, the same `(timestamp, then arrival)` shape the zome selector settled on. Pinned by
+          `the_drain_is_dated_by_occurred_at_never_by_append_order`, whose fixture appends the
+          later discharge FIRST so a position-keyed dedup reads the stock as undrained.
+      - id: C10
+        status: answered
+        justification: >
+          The outflow arm reads the `fulfills` EDGE, not the event's verb — which is why a
+          fulfillment minted as `ReaVerb::Produce` (`fulfill.rs:336-352`) counts as discharge
+          rather than inverting the sign of the finding, and why adding a REA verb cannot silently
+          re-file existing records. Both matches are exhaustive over closed enums (`FlowRecord`,
+          `CommitmentState`), so a new variant fails the compile rather than falling into a
+          residual arm that defaults. The unit is bound by ONE constant that mints the view and
+          names the fold, so the two can never be spelled differently. Pinned by
+          `a_produce_fulfillment_is_outflow_not_inflow` and
+          `a_produce_shaped_fulfillment_counts_as_discharge_never_as_inflow`.
+      - id: C7
+        status: answered
+        justification: >
+          What the readout advertises is what the fold served. The `outflow arm: fulfillment only`
+          line is printed on every render precisely because the arm is NARROWER than Spec B §3's
+          "(fulfilled + dismissed + revoked)" — `Dismiss` is a regression marker here with empty
+          `fulfills`, and no projection path mints a Revoked commitment. Saying "drain" while
+          measuring only fulfillment, without saying so, is the asymmetry this class names.
+    notes: >
+      Identity questions — is the named commitment one this stock holds open, has it already been
+      drained — are deliberately NOT in this predicate; they are answered by
+      `derive_commitment_view` with the record set in hand, which is what lets this stay a pure
+      function over one record. The counts it cannot see (`discharges_of_unheld`,
+      `redundant_discharges`) are reported by the view instead of being dropped.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/src/flow/stocks.rs
+        testName: a_produce_fulfillment_is_outflow_not_inflow
+        kind: unit
+      - path: elohim/eprfs/epr-cli/src/flow/stocks.rs
+        testName: a_red_run_dismiss_is_neither_inflow_nor_outflow
+        kind: unit
+      - path: elohim/eprfs/epr-cli/src/flow/stocks.rs
+        testName: a_run_note_moves_the_commitments_stock_in_neither_direction
+        kind: unit
+      - path: elohim/eprfs/epr-cli/src/flow/stocks.rs
+        testName: an_open_commitment_is_inflow_and_a_closed_one_is_absence
+        kind: unit
+      - path: elohim/eprfs/epr-cli/tests/flow_stocks.rs
+        testName: a_produce_shaped_fulfillment_counts_as_discharge_never_as_inflow
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_stocks.rs
+        testName: the_drain_is_dated_by_occurred_at_never_by_append_order
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_stocks.rs
+        testName: the_level_agrees_with_the_unfulfilled_total_every_other_reader_quotes
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_stocks.rs
+        testName: an_undatable_mint_is_reported_not_guessed
+        kind: integration
+
+  - name: stocks::equilibrium_verdict
+    kind: verdict-fn
+    sourceLocation:
+      file: src/flow/stocks.rs
+      modulePath: elohim_epr_cli::flow::stocks::equilibrium_verdict
+      line: 641
+    summary: >
+      Decides whether one stock is in equilibrium over one declared window — drain rate at or
+      above inflow rate — and is the sole determinant of `epr flow stocks --check`'s exit code.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          THE reason this row exists. "We cannot see the drain" and "the drain is adequate" both
+          arrive as `outflow == 0.0`, and the whole measure is worthless if they share an exit
+          code. So the signature takes the observation COUNT beside the fold, and a window that
+          observed nothing is `Refused { NoObservations }` — non-zero, never green. A fold that
+          refused (`MismatchedPeriods` and the other `StockError` arms) is a distinct
+          `FoldRefused { kind, error }` carrying the variant's stable discriminant, and a NaN rate
+          — which `divide` mints exactly where an interval declares the answer unknowable, so that
+          no comparison silently passes — is a third, `NotComparable`. Pinned by
+          `a_window_that_observed_nothing_is_refused_not_passed`,
+          `mismatched_periods_refuse_with_a_typed_reason_and_no_verdict`,
+          `a_nan_rate_is_refused_rather_than_silently_compared`, and end-to-end by
+          `an_empty_window_refuses_with_a_typed_reason_rather_than_greening`.
+      - id: C14
+        status: answered
+        justification: >
+          The outcome set is closed and every arm is witnessed. There is no residual that only a
+          log line sees: a refusal is rendered with its typed reason on stdout, serialized into
+          the `--json` outcome, and carried into the process exit code. `EquilibriumVerdict` and
+          `RefusalReason` are total over the inputs — the fold's `Result` and the observation
+          count — so no unpredicted case can fall through to a silent pass.
+      - id: C8
+        status: partial
+        justification: >
+          Each decision outcome carries a typed reason from an enum rather than a raw string, and
+          failures are reported beside the numbers that produced them, which is the readable half
+          of this class. What is missing is a COUNTER: there is no metrics plane at a CLI leg, so
+          the exit code plus the rendered reason is the entire observation surface and nothing
+          aggregates verdicts across runs. Recorded as partial rather than answered because Spec B
+          §8 names the successor explicitly — one weekly rate line in the SessionStart headline,
+          rendered from THIS fold rather than a parallel implementation. Until that lands, a
+          reader sees each verdict and no trend.
+      - id: C13
+        status: unbound
+        justification: >
+          A green/red on "is the development system in equilibrium?" is a verdict over shared
+          work, and the covenant that would make it authoritative — admission into
+          `habits.yaml` — is explicitly the operator's to grant or refuse (harness-borrows plan
+          Task 4). Today this leg carries no scaffold label and names no successor criterion at
+          the gate site, because it holds no authority yet: nothing consumes its exit code. If it
+          is wired into the pre-push gate or the `elohim-eprfs` pipeline, this binding becomes the
+          open question — what social tier its red may block, and what graduates it.
+      - id: C1
+        status: n-a
+        justification: >
+          Anti-self-election concerns a component crowning what it authored. This function crowns
+          nothing and authors nothing: it reads a fold over records other legs minted and returns
+          a verdict about the repository's own workload. It cannot elect itself into any set it
+          measures — the stock it grades is the set of open promises, and this leg appends none.
+    notes: >
+      Turnover time is deliberately absent from the signature. `Level ÷ Rate` returns a bare
+      `Level` whose period survives only in the `basis` string (`stock.rs:194-207`, spec Q15), so
+      `3.0` is three weeks or three years depending on a divisor the type no longer holds. It is
+      printed as information with its basis attached and can never gate anything until Q15 closes
+      — which is a protocol mint, not an implementer's call.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/src/flow/stocks.rs
+        testName: drain_at_or_above_inflow_is_equilibrium_and_below_it_is_filling
+        kind: unit
+      - path: elohim/eprfs/epr-cli/src/flow/stocks.rs
+        testName: a_window_that_observed_nothing_is_refused_not_passed
+        kind: unit
+      - path: elohim/eprfs/epr-cli/src/flow/stocks.rs
+        testName: mismatched_periods_refuse_with_a_typed_reason_and_no_verdict
+        kind: unit
+      - path: elohim/eprfs/epr-cli/src/flow/stocks.rs
+        testName: a_nan_rate_is_refused_rather_than_silently_compared
+        kind: unit
+      - path: elohim/eprfs/epr-cli/tests/flow_stocks.rs
+        testName: an_empty_window_refuses_with_a_typed_reason_rather_than_greening
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_stocks.rs
+        testName: a_filling_window_is_non_equilibrium_and_names_the_stock
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_stocks.rs
+        testName: a_draining_window_reads_as_equilibrium_and_checks_clean
+        kind: integration
+
+  - name: stocks::RefusalReason
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/flow/stocks.rs
+      modulePath: elohim_epr_cli::flow::stocks::RefusalReason
+      line: 584
+    summary: >
+      The typed vocabulary explaining WHY no equilibrium verdict was reachable — no observations,
+      a refused fold (carrying the `StockError` variant's discriminant), or a NaN rate.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          The enum IS the honest-absence distinction, at the one boundary that would otherwise
+          collapse it. `NoObservations` (nothing of this unit fell in the window — including the
+          unit-typo case, where `count_in`'s exact-string match silently excludes everything) is a
+          different answer from `FoldRefused` (the operands were dimensionally incoherent) and
+          from `NotComparable` (the arithmetic produced a value no comparison may pass). A single
+          "check failed" would make all three unactionable.
+      - id: C10
+        status: answered
+        justification: >
+          `FoldRefused.kind` carries a stable discriminant string mapped exhaustively from
+          `StockError`, so a caller branches on the variant rather than substring-matching a
+          `Display` message that is free to change. Adding a `StockError` variant fails the match
+          arm at compile time instead of silently landing in an existing bucket.
+      - id: C8
+        status: partial
+        justification: >
+          The vocabulary is exactly the shape a labeled counter wants — a closed reason enum, one
+          label per outcome — and it is rendered and serialized on every run. It is not yet
+          COUNTED anywhere, for the same reason as the verdict row above: there is no meter at a
+          CLI leg. The enum is the half of C8 this layer can own; the aggregation is Spec B §8's
+          headline integration.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/flow_stocks.rs
+        testName: a_unit_typo_reports_its_exclusions_and_never_reads_as_drained
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_stocks.rs
+        testName: mismatched_periods_refuse_with_no_partial_verdict
+        kind: integration
+      - path: elohim/eprfs/epr-cli/src/flow/stocks.rs
+        testName: a_unit_typo_reads_as_refused_never_as_a_drained_stock
+        kind: unit
