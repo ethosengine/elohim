@@ -1,4 +1,12 @@
 # STEP DEFINITIONS ARE NOT WIRED YET — this feature is honestly @wip, not green.
+#
+# BLIND-READER LOOP: five fresh-context cycles ran 2026-08-13 (a2o-story profile).
+# Two findings are OPERATOR-DEFERRED (2026-08-13) to the step-def wiring follow-up,
+# where the emitter contract is exercised for real; one final reader runs after
+# that wiring lands: (1) whether a block MARKS a line it could not derive rather
+# than silently omitting it — a real emitter design choice, the reader's
+# false-green argument is recorded and unrebutted; (2) a cold-start scenario for
+# a session whose start-of-session check produced no reading.
 # No step definition in genesis/a2o/steps/ drives either surface below today. The
 # wiring is a named follow-up: a `steps/devflow/run-plane.steps.ts` in the register
 # that steps/seeder.steps.ts already established for a process-driven scenario

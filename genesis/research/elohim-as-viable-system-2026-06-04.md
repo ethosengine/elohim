@@ -94,3 +94,39 @@ That is a real intellectual genealogy, and it is a better frame than "humane tec
 If you need to compress all of this to a paragraph:
 
 Current institutions satisfy Ashby's Law by attenuating human variety in secret and without consent, which is why the woman asking for childcare sounds mad. The Elohim Protocol satisfies the same law the other way, by amplifying regulatory variety with a constitutionally-bounded agent per person, an option that only became affordable when intelligence got cheap. Its genuine innovation is not absorbing all human variety, which is impossible, but making the unavoidable attenuation consensual, legible, and recursive across nested layers of autonomy. The architecture already contains a recognizable Viable System Model, including an algedonic nervous system and a POSIWID drift detector. The work that remains, in Beer's terms, is to strengthen System 2 anti-oscillation at network scale, to keep System 4 adaptive enough that capture resistance does not become rigidity, and to open one un-mediated pain channel from a human straight to the policy layer.
+
+---
+
+## Amendment — 2026-08-13: System 2 was built, and filed under governance
+
+> **Provenance:** Appended 2026-08-13 per the agentic-harness-borrows cluster row 8 (STUDY-6 of the
+> [context-engineering survey](epr:context-engineering-primary-sources-cross-pollination-2026-08-13),
+> §4.3). The 2026-06-04 text above is preserved verbatim; this amendment partly — not wholly —
+> supersedes one finding in §4.
+
+Section 4's first finding — *"System 2 is underbuilt, and your ethos is why"* — was accurate when
+written and needs amending, because the system got built in the intervening ten weeks and was filed
+under a different name. The `.epr-meta` compose-gate cascade is **stigmergic System 2**:
+directory-local, content-addressed rules that fire at the moment of action (PreToolUse), on
+whoever is acting, with **no coordinator and no message-passing**. The rule lives in the place, and
+the place instructs whoever arrives — coordination through the environment, which is precisely the
+anti-oscillation damping §4 asked for, delivered in the one form the protocol's autonomy ethos does
+not resist: no referee, no chokepoint, the damping carried by the substrate at the point of edit.
+
+The external corpus makes the shape legible by contrast. The published answers to write-heavy
+multi-agent conflict are *variety-attenuation by refusal* (Anthropic: split only when context is
+truly isolated — i.e., don't coordinate) and *a single mutable authority* (OpenAI Symphony: one
+orchestrator, isolated per-issue workspaces — i.e., a chokepoint). The one public leaderless
+precedent — sixteen parallel Claudes claiming work by writing lock files into `current_tasks/` —
+is stigmergy limited to task claiming. `.epr-meta` generalizes that same mechanism from task
+claiming to *governance*, with `retire-when:` making each rule declare its own obsolescence — a
+System 2 whose regulators are themselves under System 4 review.
+
+Two of §4's findings stand unamended and are now instrumented rather than prose: the algedonic
+mediation gap (§4's third finding) remains open — though the run-plane write path
+(`epr flow note`, 2026-08-13) now gives a correction a durable channel that outlives the drafting
+layer, which is the *precondition* for an unmediated pain channel, not yet the channel itself; and
+POSIWID-turned-inward (§5) acquired its first rate instrument the same day: the
+`dev-system-equilibrium` habit reads the development system's own stocks as drain-vs-inflow rates
+(first live reading: commitments filling at +22/week against zero counted drain), which is the
+system's *actual* behavior measured against its stated telos — Beer's test, applied to ourselves.
