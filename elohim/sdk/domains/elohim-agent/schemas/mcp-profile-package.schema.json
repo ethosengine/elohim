@@ -55,6 +55,25 @@
       "minItems": 1,
       "uniqueItems": true
     },
+    "runtimeSettings": {
+      "type": "object",
+      "description": "Optional non-MCP runtime configuration this profile also owns in its projected runtime file (top-level TOML keys for codex). Absent means the projection is unchanged.",
+      "properties": {
+        "codex": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "number" },
+              { "type": "boolean" },
+              { "type": "array", "items": { "type": "string" } }
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "projections": {
       "type": "object",
       "required": ["claude", "codex"],

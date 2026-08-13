@@ -5,7 +5,7 @@
     "id": "elohim-project",
     "name": "elohim-project",
     "version": "1.0.0",
-    "description": "Shared project MCP registrations for Claude Code and Codex.",
+    "description": "Shared project MCP registrations for Claude Code and Codex, plus the Codex project-doc instruction budget. project_doc_max_bytes = 65536: Codex's default combined AGENTS.md budget is 32768 B, which truncated our 42327-byte root gospel mid-line; measured 42327 + >=50% headroom = 63490.5, rounded up to the next power-of-two KiB = 65536 (1.548x the root, 23209 B left for the subtree AGENTS.md files the root restructure will add). Mitigation, not cure - the monolith still wants splitting.",
     "sourceRuntime": "elohim-agent",
     "master": "package",
     "runtimeTargets": ["claude", "codex"],
@@ -18,6 +18,11 @@
   },
   "scope": "project",
   "serverRefs": ["jenkins", "mempalace"],
+  "runtimeSettings": {
+    "codex": {
+      "project_doc_max_bytes": 65536
+    }
+  },
   "projections": {
     "claude": { "path": ".mcp.json" },
     "codex": { "path": ".codex/config.toml" }

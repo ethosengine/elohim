@@ -15,6 +15,31 @@ function tomlArray(values) {
   return `[${values.map(tomlString).join(', ')}]`;
 }
 
+function tomlScalar(value) {
+  if (Array.isArray(value)) return tomlArray(value);
+  if (typeof value === 'string') return tomlString(value);
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  throw new Error(`unsupported TOML runtime-setting value: ${JSON.stringify(value)}`);
+}
+
+// Top-level (non-table) Codex settings carried by a profile package, e.g.
+// `project_doc_max_bytes` — the combined AGENTS.md instruction budget Codex
+// applies root-to-cwd (its own default is 32 KiB = 32768 B, which truncates our
+// 42,327-byte root gospel mid-line). Sizing rule: measured chain bytes + >=50%
+// headroom, rounded UP to a power-of-two KiB. 42327 * 1.5 = 63490.5 -> 65536
+// (64 KiB) = 1.548x the measured root, leaving 23,209 B for the subtree
+// AGENTS.md files the restructure will add. Keys are emitted sorted, BEFORE the
+// first `[mcp_servers.*]` table (TOML: a bare key after a table header would be
+// parsed into that table). Absent `runtimeSettings` projects byte-identically to
+// a profile that never declared one.
+function codexRuntimeSettings(profile) {
+  const settings = profile.runtimeSettings?.codex;
+  if (!settings) return '';
+  const keys = Object.keys(settings).sort();
+  if (!keys.length) return '';
+  return `${keys.map((key) => `${key} = ${tomlScalar(settings[key])}`).join('\n')}\n\n`;
+}
+
 function claudeEntry(pkg) {
   const connection = pkg.connection;
   if (connection.transport === 'stdio') {
@@ -113,7 +138,7 @@ export function projectMcpProfile(profile, packages, runtime) {
     const header =
       `# Generated from McpProfilePackage:${profile.metadata.id} by package-projections.mjs.\n` +
       '# Edit .epr-meta/elohim/packages/mcp-{servers,profiles}, not this file.\n\n';
-    return header + servers.map(codexTable).join('\n');
+    return header + codexRuntimeSettings(profile) + servers.map(codexTable).join('\n');
   }
   throw new Error(`${profile.metadata.id}: unsupported MCP runtime ${runtime}`);
 }

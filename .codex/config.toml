@@ -1,6 +1,8 @@
 # Generated from McpProfilePackage:elohim-project by package-projections.mjs.
 # Edit .epr-meta/elohim/packages/mcp-{servers,profiles}, not this file.
 
+project_doc_max_bytes = 65536
+
 [mcp_servers.jenkins]
 url = "https://jenkins.ethosengine.com/mcp-server/mcp"
 required = false
