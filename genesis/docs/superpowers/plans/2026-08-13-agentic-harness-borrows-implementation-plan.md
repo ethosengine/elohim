@@ -7,9 +7,9 @@ domain: D9
 sprint: agentic-harness-borrows
 requires_env: [household-nodes]
 cites:
-  - run-plane-projection-observation-events | Spec A — the write leg (epr flow note) and the per-turn projection emitter this plan implements as Tasks 1 and 3 | sha256:0781aecc53d8a0d0 | path: genesis/docs/superpowers/specs/2026-08-13-run-plane-projection-observation-events-design.md
-  - dev-system-equilibrium-stocks | Spec B — the drain-vs-inflow equilibrium fold and --check verdict this plan implements as Task 2, and whose red is Task 4 first_move | sha256:5306c437d02200f2 | path: genesis/docs/superpowers/specs/2026-08-13-dev-system-equilibrium-stocks-design.md
-  - commitment-dispatch-puller | Spec C — cluster row 4, deliberately NOT built here: sequenced after the write path, cited so the plan names its own boundary | sha256:608803ebc8811e4a | path: genesis/docs/superpowers/specs/2026-08-13-commitment-dispatch-puller-design.md
+  - "run-plane-projection-observation-events | Spec A — the write leg (epr flow note) and the per-turn projection emitter this plan implements as Tasks 1 and 3 | sha256:0781aecc53d8a0d0 | path: genesis/docs/superpowers/specs/2026-08-13-run-plane-projection-observation-events-design.md"
+  - "dev-system-equilibrium-stocks | Spec B — the drain-vs-inflow equilibrium fold and --check verdict this plan implements as Task 2, and whose red is Task 4 first_move | sha256:5306c437d02200f2 | path: genesis/docs/superpowers/specs/2026-08-13-dev-system-equilibrium-stocks-design.md"
+  - "commitment-dispatch-puller | Spec C — cluster row 4, deliberately NOT built here: sequenced after the write path, cited so the plan names its own boundary | sha256:608803ebc8811e4a | path: genesis/docs/superpowers/specs/2026-08-13-commitment-dispatch-puller-design.md"
   - genesis/data/timeline/backlog/agentic-harness-borrows-backlog.md
   - genesis/research/context-engineering-primary-sources-cross-pollination-2026-08-13.md
   - genesis/manifests/habits.yaml
