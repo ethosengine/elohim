@@ -65,10 +65,20 @@ bodies themselves retire to git; the durable mechanism of each pattern lives in 
 
 | 14 | **The measure OVER-reads: a findings-taxonomy token with no error context fingerprints the benign output of a SUCCEEDING step** — trap #1's opposite polarity, on the sentinel arm instead of the pipeline. A bare tool/verb token (`nerdctl`, `rollout`) matches lines that every *healthy* build emits: `set -x` command echoes of a cleanup that worked, and the progress narration `kubectl rollout status` prints two lines above `deployment … successfully rolled out`. Because a stage-level `unstable()` yields no JUnit cases, `ci-harvest` falls through to the console-tail scan, where `MAX_CONSOLE_FINDINGS_PER_BUILD = 4` is spent on the noise — so the false findings don't merely add up, they **crowd out the real cause in the same tail** and each new permutation costs a background triage dispatch. **Diagnostic tell: the captured line is a *progress* or *command* line, and the line 1–3 below it says the step succeeded.** Fix in three layers: the taxonomy token must carry error context (`rollout.*(?:failed\|timed out\|exceeded)`, not `rollout`); a class-level guard skips command echoes (`_CMD_ECHO`) and progress/success chatter (`_BENIGN_PROGRESS`); a test asserts both non-capture of the benign lines AND still-capture of the real failure shapes. Safe because a genuine stall emits a SEPARATE non-progress error line. | 2* | `backlog/ci-harvest-nerdctl-cleanup-echo-overcapture.md` (#1137, INFRASTRUCTURE/`nerdctl`); `backlog/ci-harvest-rollout-progress-overcapture.md` (#1195–#1293, DEPLOYMENT/`rollout` — second category, the surface the first fix could not reach) |
 
+| 15 | **A Jenkins CONTROLLER RESTART orphans the whole dispatched wave — and trap #1's advice is exactly backwards for it** — the controller goes down mid-wave; on resume every in-flight agent pod is gone (`Waiting for reconnection of <pod> before proceeding with build`, `Could not connect to … to send interrupt signal to process`). Three symptoms, one cause, and they look unrelated: the downstream child ends **ABORTED**, a sibling ends **FAILURE**, and the orchestrator ends FAILURE with a **fabricated Groovy syntax error** — `MultipleCompilationErrorsException` naming a line that is valid and that the job's very next build compiles clean, because `FlowExecutionList.resume → loadProgramAsync → parseScript` reparsed a CPS script the hard restart never flushed (tell: the echoed source line **stops mid-token**). Compounding: a declarative `timeout` counts **through the outage**, so a 2h budget is spent entirely on an idle build and fires the instant it resumes — work destroyed by a timer that measured downtime. **Discriminator vs #1: `Resuming build … after Jenkins restart` in the log = restart-orphaned → RETRIGGER (the work was never done); an `abortPrevious` preemption by a newer build number = superseded → IGNORE.** Same ABORTED symptom, opposite remedy. Never edit a Jenkinsfile in response — check whether the job's NEXT build compiles the same file first. | 1* | `backlog/ci-jenkins-controller-restart-orphans-wave.md` (#1669/#1343/#1664, fp `2ec906730fe7`); sibling agent-pod-channel class `backlog/ci-jenkins-k8s-pod-exec-websocket-transient.md` |
+
 \* #6 recurred in 2 shifts but is a full-cycle-cost no-op silencer worth the museum row.
 #12 is likewise 2 occurrences, but of an *identical mechanism against the identical config list*, where
 the second instance ran three weeks intermittently and its GREEN builds were the mis-provenanced ones —
 a silent-corruption failure mode worth the row before a third recurrence. #11 is a first-occurrence (fp `97d7fb9c085c`, #1185–#1197) earning its row as a *new structural class* — JSONNull-survives-truthiness after a writeJSON/readJSON round-trip — not yet a ≥3-shift recurrence; recorded so the next planner does not re-derive it. (Same `net.sf.json` library as the JSONArray note at `Jenkinsfile:1654`.)
+#15 is a first-occurrence (fp `2ec906730fe7`, 2026-08-13) earning its row on the same ground #11 did — a
+*new structural class*, not a recurrence of #1. It is recorded before a second occurrence because it is
+the one entry in this table whose symptom is already covered by another row while its **remedy is the
+exact opposite**: #1 teaches "ABORTED is not a failure, do nothing", which is right for a superseded
+build and wrong for a restart-orphaned one whose work was destroyed and never redone. An agent holding
+only #1 will correctly refuse to panic and then incorrectly refuse to retrigger. Its second hazard is
+worse than a wasted cycle: a fabricated Groovy compile error invites a "fix" to a Jenkinsfile that was
+never broken and is near the CPS size limit (#8).
 #13 is 2 occurrences (#1101 and #1400–#1401) two months and two authors apart against the *same* CI
 stage through the *same* dead-gate mechanism, and it is a **meta-trap**: it is the reason other traps in
 this table keep reaching CI at all, so it earns the row before a third recurrence. Its blast radius is
@@ -94,6 +104,13 @@ amplifying the cascade. NOT_BUILT and superseded are *not* failures; a FAILURE-c
 them is lossy. Confirm against the last **green** commit, not the last *landed* one, and read the actual
 child-build result before treating it as a regression. (This is the same baseline-drift mechanism the
 `deploy-is-not-a-graph-node` record diagnoses from the incident side.)
+
+**But do not over-apply it — read #15 before concluding "ABORTED, therefore nothing to do."** That
+inference holds only when the abort was a *preemption* (a newer build superseded this one). When the
+abort came from a **controller restart**, the identical symptom means the opposite: the work was
+destroyed and never redone, so a retrigger is required, not withheld. The log settles it in one line —
+`Resuming build … after Jenkins restart` (retrigger) versus a newer build number having preempted this
+one (ignore).
 
 The second cluster (**#3/#5/#6**) is the same shape under three disguises: a check that passes on the
 host but fails in CI because the CI environment differs (Docker context, sccache wrapper, `--run-ignored

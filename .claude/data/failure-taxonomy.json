@@ -1,6 +1,23 @@
 {
   "version": "1.0.0",
   "categories": {
+    "CONTROLLER_RESTART": {
+      "pipelines": [
+        "elohim",
+        "elohim-edge",
+        "elohim-genesis",
+        "elohim-holochain",
+        "elohim-orchestrator",
+        "elohim-sophia",
+        "elohim-steward",
+        "elohim-storybook"
+      ],
+      "search": "Failed to load program|Waiting for reconnection of .+ before proceeding with build|Could not connect to .+ to send interrupt signal to process",
+      "ctx": 5,
+      "max": 3,
+      "fix": "Jenkins controller restarted mid-build; the agent pod is gone and any expired stage timeout fires on resume. NOT your code. Retrigger the wave with an empty commit; never 'fix' a Groovy syntax error reported by a resume-time reparse.",
+      "blocks": []
+    },
     "DNA_BUILD": {
       "pipelines": [
         "elohim-holochain"

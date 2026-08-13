@@ -6,7 +6,7 @@ class: process-meta
 process_subdomain: hooks
 topic: [sentinel, deprecation, security, vulnerability, ci, jenkins, harvest, flake, fingerprint, ledger, backlog, stasis, triage, museum]
 cites:
-  - ci-orchestrator-recurring-anti-patterns-museum | the frequency-ranked CI lessons home — instantiation B graduates recurring-trap lessons INTO it (chronicle-equivalent for the ci class), and ci-failure-triage checks its trap list before declaring novel root causes | sha256:cdfa60c5803ca4aa | path: genesis/docs/content/elohim-protocol/history/2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md
+  - ci-orchestrator-recurring-anti-patterns-museum | the frequency-ranked CI lessons home — instantiation B graduates recurring-trap lessons INTO it (chronicle-equivalent for the ci class), and ci-failure-triage checks its trap list before declaring novel root causes | sha256:0e325f2f174689ae | path: genesis/docs/content/elohim-protocol/history/2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md
   - unified-memory-loop-design | the stasis-loop discipline this pattern instantiates per finding class — one scoreboard, measure→dispatch→re-measure | sha256:99100efd20d10129 | path: genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md
   - verification-result-index-design | the system→state-store precedent for closure-by-observation — instantiation B confirms fixes by fingerprint disappearance, the same evidence-over-claim posture | sha256:8d6b292dafc4a44e | path: genesis/docs/superpowers/specs/2026-06-01-verification-result-index-design.md
 informed-by: [genesis/docs/content/elohim-protocol/history/2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md]

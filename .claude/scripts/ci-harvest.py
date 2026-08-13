@@ -139,6 +139,13 @@ def normalize(line):
     line = ANSI.sub("", line)
     line = re.sub(r"\s+", " ", line).strip()
     line = re.sub(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", "#", line)  # IPv4 (worker churn)
+    # Jenkins k8s agent-pod names (<job>-<build>-<5>-<5>-<5>, e.g.
+    # elohim-edge-dev-1343-2xj5w-f2tpg-w93g9). The 5-char suffixes are neither
+    # 7+-hex nor duration-shaped, so without this the hash scrub below misses
+    # them and EVERY controller restart mints a fresh fingerprint for the same
+    # concern — one background triage dispatch per pod name. Runs before the
+    # hash scrub so the whole name is consumed intact.
+    line = re.sub(r"\b[a-z0-9]+(?:-[a-z0-9]+)*-[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}\b", "#", line)
     line = re.sub(r":\d+(?::\d+)?", ":#", line)  # file:line(:col) refs / ports
     line = re.sub(r"\b[0-9a-f]{7,64}\b", "#", line)  # hashes / build ids
     line = re.sub(r"\b\d+(?:\.\d+)?(?:ms|s|m|h)\b", "#", line)  # durations
