@@ -242,6 +242,15 @@ commands:
         ln -sf "$CLAUDE_CONFIG_DIR" /home/user/.claude
         mkdir -p /home/user/.claude/ide
 
+        # Link ~/.gemini to the persistent /projects PVC so Gemini CLI sign-in
+        # (oauth_creds.json), settings, and extensions survive restarts.
+        # Gemini has no CODEX_HOME-style override — its global dir is
+        # hardcoded to homedir()/.gemini — so it needs the Claude-style
+        # symlink, not an env var.
+        mkdir -p /projects/.gemini-config
+        rm -rf /home/user/.gemini 2>/dev/null || true
+        ln -sf /projects/.gemini-config /home/user/.gemini
+
   - id: setup-claude-mcp
     exec:
       component: tools
