@@ -77,8 +77,11 @@ pub struct UserCredential {
 
 /// Forwards Angular SSR `fetch()` calls to the local elohim-storage sidecar.
 ///
-/// Constructed with a shared `reqwest::Client` (from `AppState::ssr_http_client`)
-/// and the storage base URL (e.g. `http://localhost:8090`). Any `fetch()` call
+/// Constructed with the shared pooled storage client (from
+/// `AppState::storage_proxy_client` — the ONE client per storage upstream; a
+/// second SSR-only client to the same upstream fed the shared breaker failure
+/// evidence the proxy path then paid for, the 2026-08-13 `/` shed class) and
+/// the storage base URL (e.g. `http://localhost:8090`). Any `fetch()` call
 /// from the Angular bundle is translated to a `reqwest::Client` request against
 /// that base, stripping any scheme/host from the incoming URL first (the bundle's
 /// fetch calls use relative paths or doorway-originating absolute URLs).

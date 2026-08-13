@@ -218,7 +218,7 @@ fn parse_projector_lag(body: &serde_json::Value) -> Option<i64> {
 async fn fetch_projector_status(state: &Arc<crate::server::AppState>) -> Option<i64> {
     let base = state.args.storage_url.as_ref()?;
     let url = format!("{}/api/v1/status/projector", base.trim_end_matches('/'));
-    let resp = state.ssr_http_client.get(&url).send().await.ok()?;
+    let resp = state.storage_proxy_client.get(&url).send().await.ok()?;
     if !resp.status().is_success() {
         return None;
     }

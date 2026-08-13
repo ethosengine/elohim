@@ -226,12 +226,6 @@ pub struct AppState {
     /// every request — one wasted V8 render each). Empty registry = SSR off;
     /// SSR-eligible routes fall back to the normal storage proxy.
     pub renderer_registry: crate::render::registry::RendererRegistry,
-    /// Shared HTTP client for SSR data-fetching (Task 14 carry-forward).
-    ///
-    /// A single client is allocated at boot and shared via `Arc::clone` by
-    /// every `ResolverFetcher` created during an SSR render. This avoids
-    /// creating a new connection pool per request.
-    pub ssr_http_client: Arc<reqwest::Client>,
     /// Cached render-capability claim derived at startup.
     ///
     /// Served by `GET /admin/capability` so elohim-storage can pull the profile
@@ -372,16 +366,6 @@ fn init_storage_proxy_client() -> Arc<reqwest::Client> {
             .timeout(std::time::Duration::from_secs(
                 crate::routes::storage_proxy::STORAGE_PROXY_REQUEST_TIMEOUT_SECS,
             ))
-            .build()
-            .unwrap_or_default(),
-    )
-}
-
-/// Build the shared HTTP client used by SSR `ResolverFetcher` instances.
-fn init_ssr_http_client() -> Arc<reqwest::Client> {
-    Arc::new(
-        reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(10))
             .build()
             .unwrap_or_default(),
     )
@@ -565,7 +549,6 @@ impl AppState {
             renderer_registry: crate::render::registry::RendererRegistry::from_env(),
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
-            ssr_http_client: init_ssr_http_client(),
             render_capability: None,
             render_semaphore: None,
             pkarr_resolver: None,
@@ -679,7 +662,6 @@ impl AppState {
             renderer_registry: crate::render::registry::RendererRegistry::from_env(),
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
-            ssr_http_client: init_ssr_http_client(),
             render_capability: None,
             render_semaphore: None,
             pkarr_resolver: None,
@@ -808,7 +790,6 @@ impl AppState {
             renderer_registry: crate::render::registry::RendererRegistry::from_env(),
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
-            ssr_http_client: init_ssr_http_client(),
             render_capability: None,
             render_semaphore: None,
             pkarr_resolver: None,
@@ -940,7 +921,6 @@ impl AppState {
             renderer_registry: crate::render::registry::RendererRegistry::from_env(),
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
-            ssr_http_client: init_ssr_http_client(),
             render_capability: None,
             render_semaphore: None,
             pkarr_resolver: None,
@@ -2549,12 +2529,9 @@ fn maybe_inject_chrome(
 /// under 100ms — this is a browser-facing serve, not a background fetch, so
 /// 30s was a blocking wall for a visitor whenever the configured storage peer
 /// was unreachable (e.g. alpha-b's `storage_url` pointed at a
-/// transport-blocked `adam`). `init_ssr_http_client` already bakes a 10s
-/// client-level default into `state.ssr_http_client` for exactly this
-/// browser-facing budget; this call site was silently overriding that
-/// convention with an explicit 30s per-request timeout. Naming it here makes
-/// the override intentional and matches the existing convention instead of
-/// re-deriving a new number.
+/// transport-blocked `adam`). Applied per-request over the shared
+/// `storage_proxy_client` (client default 12s), keeping the browser-facing
+/// budget tighter than the general proxy budget.
 const EPR_DISPATCH_TIMEOUT_SECS: u64 = 10;
 
 /// Fast-fail response for `dispatch_to_projected_epr` when either (a) the
@@ -2712,7 +2689,7 @@ async fn dispatch_to_projected_epr(
     };
 
     match state
-        .ssr_http_client
+        .storage_proxy_client
         .get(&storage_apps_path)
         .timeout(std::time::Duration::from_secs(EPR_DISPATCH_TIMEOUT_SECS))
         .send()
@@ -2800,7 +2777,7 @@ async fn dispatch_to_projected_epr(
             tracing::warn!(
                 epr_id = %projection.epr_id,
                 storage_url = %storage_apps_path,
-                error = %e,
+                error = %error_with_source_chain(&e),
                 "EPR router: storage request failed (connect/timeout) — recording breaker failure and shedding"
             );
             trial.record(false);
@@ -2818,7 +2795,7 @@ mod epr_dispatch_breaker_tests {
     use super::*;
 
     // `dispatch_to_projected_epr` itself is async, requires a live `AppState`
-    // (storage_url, ssr_http_client) and an actual upstream to exercise the
+    // (storage_url, storage_proxy_client) and an actual upstream to exercise the
     // send()/bytes() branches — heavy scaffolding for little marginal
     // coverage over the already-tested `UpstreamBreakers::is_open`/`record`
     // (see `routes::upstream_health` unit tests: `opens_after_threshold_then_sheds`,
@@ -2879,8 +2856,7 @@ mod epr_dispatch_breaker_tests {
     #[test]
     fn dispatch_timeout_is_tightened_well_under_the_old_30s_wall() {
         // The regression this fix closes: a per-request .timeout() override
-        // silently widened past the 10s browser-facing budget already baked
-        // into `init_ssr_http_client`'s client-level default, back up to a
+        // silently widened past the 10s browser-facing budget, back up to a
         // full 30s wall on every dispatch to an unreachable storage peer.
         assert_eq!(EPR_DISPATCH_TIMEOUT_SECS, 10);
         assert!(EPR_DISPATCH_TIMEOUT_SECS < 30);
@@ -3113,7 +3089,7 @@ async fn fetch_ids_for_reach(
     let url =
         format!("{storage_base}/db/content?contentType={content_type}&reach={reach}&limit=500");
     let resp = match state
-        .ssr_http_client
+        .storage_proxy_client
         .get(&url)
         .timeout(std::time::Duration::from_secs(5))
         .send()
@@ -3313,6 +3289,21 @@ fn render_output_is_empty(html: &str) -> bool {
     found_outlet
 }
 
+/// Join an error's `source()` chain into one line (`a: b: c`) so transport
+/// failures name their terminal cause (connect refused vs timed out vs DNS)
+/// instead of stopping at reqwest's opaque "error sending request" Display —
+/// the truncation that kept the 2026-08-13 shell-fetch timeout class opaque.
+fn error_with_source_chain(e: &dyn std::error::Error) -> String {
+    let mut out = e.to_string();
+    let mut cur = e.source();
+    while let Some(s) = cur {
+        out.push_str(": ");
+        out.push_str(&s.to_string());
+        cur = s.source();
+    }
+    out
+}
+
 /// Produce the fallback response for `serve_ssr_route`. Consumes `req` (the
 /// legacy `forward_to_storage` fallbacks need it) and `fallback` (owned so the
 /// `ProjectedEpr` variant can move its `EprProjectionView` into the proxy).
@@ -3442,7 +3433,7 @@ async fn compose_render_with_shell(
     let shell_url = projected_shell_url(storage_url, projection);
     let fetch_started = std::time::Instant::now();
     let shell_html = match state
-        .ssr_http_client
+        .storage_proxy_client
         .get(&shell_url)
         .timeout(std::time::Duration::from_secs(EPR_DISPATCH_TIMEOUT_SECS))
         .send()
@@ -3484,7 +3475,7 @@ async fn compose_render_with_shell(
                 target: "doorway::ssr",
                 shell_url = %shell_url,
                 elapsed_ms = fetch_started.elapsed().as_millis() as u64,
-                error = %e,
+                error = %error_with_source_chain(&e),
                 "SSR shell fetch failed"
             );
             trial.record(false);
@@ -3694,8 +3685,11 @@ async fn serve_ssr_route(
         // cache at all (see below).
         let user_credential = build_ssr_user_credential(&req);
         let fetcher: Arc<dyn elohim_render::DataFetcher> = Arc::new(
-            crate::ssr::ResolverFetcher::new(Arc::clone(&state.ssr_http_client), endpoint.clone())
-                .maybe_with_user_credential(user_credential),
+            crate::ssr::ResolverFetcher::new(
+                Arc::clone(&state.storage_proxy_client),
+                endpoint.clone(),
+            )
+            .maybe_with_user_credential(user_credential),
         );
         // The trust scope of THIS request's fetcher. `Principal` (a credentialed
         // render) is excluded from the render cache in BOTH directions: the
