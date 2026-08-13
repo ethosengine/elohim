@@ -109,6 +109,9 @@ genesis/research/repos/
 .claude/data/push-lease.json
 # epr-meta in-flight coverage-nudge debounce state — ephemeral per-session nudge suppression, regenerable
 .claude/data/epr-meta-advice.json
+# run-plane projection cache — a pure derivation of habits.yaml + the saga + flows.jsonl, keyed on
+# their mtimes/size/HEAD; regenerable by the next SessionStart. Never source-of-truth.
+.claude/data/run-projection-cache.json
 # epr flow value-chain sidecar — derived/operational (append-only flow records + label index);
 # reconstruction = re-run `epr flow project`. Never source-of-truth.
 .eprfs/

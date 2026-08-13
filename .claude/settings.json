@@ -46,6 +46,13 @@
             "timeout": 900,
             "statusMessage": "Native governance evaluator...",
             "async": true
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/run-projection.py\" --event session",
+            "timeout": 60,
+            "statusMessage": "Run-plane projection cache (stocks fold)...",
+            "async": true
           }
         ]
       }
@@ -68,6 +75,11 @@
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/pickup-semantic-surfacing.py\" --event prompt",
             "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/run-projection.py\" --event prompt",
+            "timeout": 5
           }
         ]
       }

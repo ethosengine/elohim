@@ -2,6 +2,60 @@
 epr-meta-version: 1
 id: claude-hooks-governance
 covers: subtree
+rules:
+  - id: per-turn-injector-carries-its-budget
+    class: inject
+    when:
+      write: "*.py"
+      contains-any: ["UserPromptSubmit"]
+    dedupe-of: ".claude/hooks/run-projection.py (the worked example — cache-keyed derivation, event-correct emission, module-level RETIRE_WHEN, measured timeout)"
+    why: >
+      A hook on the PROMPT path is the most expensive intervenor shape in this tree: its cost is
+      paid on EVERY turn, so a 2s derivation is a 2s tax on every exchange for the life of the
+      session, and a hook that blocks a turn is worse than one that says nothing. Four properties
+      make a per-turn injector admissible, and each has already been got wrong somewhere in this
+      tree or its siblings. (1) THE HOT PATH READS A CACHE — keyed on cheap stats, never a
+      subprocess chain; refresh the expensive leg on SessionStart and degrade the per-turn path to
+      an honest `refresh pending` marker rather than blocking. (2) THE EMISSION SHAPE IS
+      EVENT-SPECIFIC — on UserPromptSubmit plain stdout reaches model context, on
+      SessionStart/PreToolUse only the `hookSpecificOutput` JSON wrapper lands; the wrong shape
+      ships a hook that silently never lands (recorded at pickup-semantic-surfacing.py:182-188).
+      (3) THE TIMEOUT IS MEASURED, NOT WISHED — values are SECONDS, and this file already carries
+      a live declared-vs-actual mismatch (load-project-context.py registers 5s while its own
+      internal budget is 25s, unreachable by construction). Measure the cached path, then declare
+      a number the work fits inside; if it does not fit, shrink the derivation. (4) IT DECLARES
+      `RETIRE_WHEN` — a per-turn scaffold is exactly the class that is load-bearing on one model
+      tier and dead weight on the next, so the exit is part of shipping it, not a footnote.
+    retire-when: >
+      when the harness carries durable per-turn run-state injection natively — evidenced by zero
+      `UserPromptSubmit` entries left in .claude/settings.json across two consecutive model-tier
+      landings — at which point there is no per-turn injector in this tree for the advisory to
+      instruct
+  - id: correction-outlives-the-turn
+    class: inject
+    when:
+      write: "*.py"
+      contains-any: ["CORRECTION", "supersede", "no longer", "was wrong", "reverting"]
+    dedupe-of: ".eprfs/status/flows.jsonl via `epr flow note --on <target> --kind correction --reason '...'` (the durable home for a run-scale correction)"
+    why: >
+      This edit reads as a CORRECTION — it reverses or supersedes an earlier decision. The reason
+      for a reversal is the most perishable state in a run: it lands in the conversation, and
+      compaction is lossy summarization of exactly that region, so nothing re-injects it afterward
+      because habits and commitments were never told. Survival then depends on the summarizer's
+      judgment, which is an outdated judgment left in charge. Worse, an operator's mid-run
+      correction IS the algedonic channel: if the pain signal reaches only the current draft and
+      not the state, it was absorbed by the thing that caused it. Write the correction where it
+      outlives the window — `epr flow note --on <target> --kind correction --reason "…"` (or
+      `--kind failed-approach --reason "tried X, it failed because Y" --switched-to "Z"`, so the
+      next session inherits the consequence without re-attempting the dead end). The note
+      ANNOTATES: it never discharges the commitment. This is a teaching signal, not a gate — it
+      fires beside the per-turn projection's footer, which teaches the same write path at read
+      time; the rule is the edit-time half of one discipline.
+    retire-when: >
+      when the write path is habitual rather than prompted — measured as four consecutive weeks in
+      which every `run:correction` / `run:failed-approach` note in .eprfs/status/flows.jsonl was
+      authored in a session where this rule did not fire first (the nudge is describing a habit,
+      not producing one)
 ---
 
 `.claude/hooks/` — the thin hook-transport layer: PreToolUse gates (epr-meta compose-gate,
@@ -9,13 +63,23 @@ managed-surface discipline, sensitive-file/seed/cargo guards) and PostToolUse si
 accumulators (drift counters, sentinels). This manifest CLAIMS full responsibility for the
 subtree (`covers: subtree`): the coverage walk terminates here.
 
-**Considered, no enforcing rule yet (the deliberate opt-in, not a nag).** The real gates on
-this tree are structural, and none is expressible as an enforced `.epr-meta` predicate:
-(1) a hook file is INERT until registered in `.claude/settings.json` — an unregistered hook
-is dead code, and registration is the review surface; (2) hooks are fail-open by contract
+**Still structural, and still not enforceable as a predicate.** The real gates on this tree
+are: (1) a hook file is INERT until registered in `.claude/settings.json` — an unregistered
+hook is dead code, and registration is the review surface; (2) hooks are fail-open by contract
 (any internal error exits 0 silently) with per-entry `timeout` in SECONDS (normalized
 2026-07-02 — values had been written as milliseconds, making the declared 2-15s budgets
 33min-4h no-ops); (3) hooks stay THIN — real logic lives in `.claude/scripts/_lib/` (tested
 under `_lib/__tests__/`) or `.claude/scripts/memory-kit/` (tested under its `__tests__/`),
-so the transport can be swapped (the brit/eprfs direction) without losing the rules. Add a
-rule here only if a NEW recurring, mechanizable drift appears in this tree.
+so the transport can be swapped (the brit/eprfs direction) without losing the rules. None of
+those three is expressible as an enforced `.epr-meta` predicate, and none has been made one.
+
+**Two `class: inject` teaching signals, added 2026-08-13** under this manifest's own admission
+bar ("only if a NEW recurring, mechanizable drift appears in this tree"), both advisory and
+both carrying their exit. `per-turn-injector-carries-its-budget` fires when a hook file names
+`UserPromptSubmit`: the per-turn path is a genuinely new shape here — before the run-plane
+projection landed, this tree had exactly ONE prompt-path hook — and its four admissibility
+properties (cached hot path, event-correct emission shape, measured timeout, declared
+`RETIRE_WHEN`) are each recorded in this tree as an existing miss, not a hypothetical.
+`correction-outlives-the-turn` fires on a correction-shaped edit and points at
+`epr flow note` — the edit-time half of the discipline whose read-time half is the projection
+block's footer. Neither blocks; both retire on a counted condition.
