@@ -1,26 +1,26 @@
 {
  "jobs": {
-  "elohim": 1663,
-  "elohim-edge": 1342,
-  "elohim-genesis": 1466,
+  "elohim": 1664,
+  "elohim-edge": 1345,
+  "elohim-genesis": 1470,
   "elohim-holochain": 1397,
-  "elohim-orchestrator": 1665,
+  "elohim-orchestrator": 1673,
   "elohim-sophia": 146,
   "elohim-steward": 1,
-  "elohim-storybook": 275
+  "elohim-storybook": 276
  },
  "green": {
   "elohim-holochain": 1397,
   "elohim-sophia": 146,
   "elohim-storybook": 275,
   "elohim": 1608,
-  "elohim-edge": 1342,
+  "elohim-edge": 1345,
   "elohim-orchestrator": 1469
  },
  "green_streak": {
   "elohim": 0,
-  "elohim-edge": 6,
-  "elohim-storybook": 15,
+  "elohim-edge": 2,
+  "elohim-storybook": 0,
   "elohim-orchestrator": 0,
   "elohim-genesis": 0,
   "elohim-holochain": 13,
@@ -30,7 +30,6 @@
   "elohim": [
    "UNSTABLE",
    "UNSTABLE",
-   "UNSTABLE",
    "ABORTED",
    "UNSTABLE",
    "ABORTED",
@@ -42,14 +41,12 @@
    "UNSTABLE",
    "UNSTABLE",
    "UNSTABLE",
-   "UNSTABLE"
+   "UNSTABLE",
+   "FAILURE"
   ],
   "elohim-edge": [
    "SUCCESS",
    "SUCCESS",
-   "FAILURE",
-   "SUCCESS",
-   "SUCCESS",
    "SUCCESS",
    "SUCCESS",
    "SUCCESS",
@@ -58,6 +55,9 @@
    "SUCCESS",
    "SUCCESS",
    "SUCCESS",
+   "SUCCESS",
+   "SUCCESS",
+   "ABORTED",
    "SUCCESS",
    "SUCCESS"
   ],
@@ -76,7 +76,7 @@
    "SUCCESS",
    "SUCCESS",
    "SUCCESS",
-   "SUCCESS"
+   "ABORTED"
   ],
   "elohim-orchestrator": [
    "UNSTABLE",
@@ -85,21 +85,17 @@
    "UNSTABLE",
    "UNSTABLE",
    "UNSTABLE",
-   "NOT_BUILT",
+   "UNSTABLE",
+   "FAILURE",
    "UNSTABLE",
    "UNSTABLE",
+   "FAILURE",
    "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
+   "FAILURE",
    "UNSTABLE",
    "UNSTABLE"
   ],
   "elohim-genesis": [
-   "FAILURE",
-   "ABORTED",
-   "ABORTED",
-   "UNSTABLE",
    "UNSTABLE",
    "UNSTABLE",
    "UNSTABLE",
@@ -110,7 +106,11 @@
    "FAILURE",
    "UNSTABLE",
    "UNSTABLE",
-   "FAILURE"
+   "FAILURE",
+   "UNSTABLE",
+   "FAILURE",
+   "UNSTABLE",
+   "UNSTABLE"
   ],
   "elohim-holochain": [
    "SUCCESS",
