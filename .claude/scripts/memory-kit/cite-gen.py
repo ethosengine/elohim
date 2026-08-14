@@ -120,7 +120,9 @@ def emit(target: str) -> str | None:
     title = f.get("title") or doc.stem
     env = {"ref": sid, "legacy_path": False, "desc": title.split(" — ")[0].strip(),
            "fingerprint": cg.fingerprint(doc), "status": "", "path": _rel(doc)}
-    return "- " + cg.serialize_cite(env)
+    # Quote the ENVELOPE only — the "- " list marker is YAML syntax and must stay
+    # outside the scalar, or the whole item (dash included) becomes one string.
+    return "- " + cg.yaml_cite_item(cg.serialize_cite(env))
 
 
 def assign_id(doc: Path) -> bool:
@@ -431,7 +433,7 @@ def main() -> int:
     out = emit(args[0])
     if out is None:
         return 1
-    print(cg.yaml_cite_item(out))
+    print(out)
     return 0
 
 
