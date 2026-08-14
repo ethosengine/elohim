@@ -211,6 +211,22 @@ habits:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
       - "sweettest rea_commitment_replication (elohim/holochain/tests/sweettest — unignored 837b772c9; isolated late-join conductors, bounded 60s peer-B retrieval; RED but MIS-ATTRIBUTED per DELTA 2026-08-09 — it measures one-time cold-cell Wasm warm-up, not REA retrieval; do not read it as a fetch-seam probe until it warms peer B)"
     evidence: >
+      DELTA 2026-08-14 (leg 2, run #1348 banked — SAGA 5/11 -> 6/11): ch10
+      card-tells-truth flipped regressed -> GREEN and ch04 HELD green across
+      two consecutive banked runs, so the doorway cure is stable, not a
+      one-run artifact. Same wave shipped the storage pprof endpoint and
+      Pyroscope now ingests elohim-alpha/elohim-node with symbolized Rust
+      frames — the profiler's eyes are open on the dataplane for the first
+      time. First finding: susan's STORAGE burns 3.3x matthew's CPU (44.86s
+      vs 13.65s / 25min), dominated by P2PNode::run 58% ->
+      handle_behaviour_event 49% -> sqlite3VdbeExec 38%, where matthew shows
+      no P2PNode dominance at all. That forces a correction to the
+      2026-08-11 host-placement pass: 'the conductors themselves are the
+      load' was read off CONTAINER CPU, but conductor and storage share one
+      cgroup, so storage's own P2P path was never separated out. The
+      host-placement partition evidence itself is unaffected. The four still-
+      regressed chapters need A-side convergence, which is gated on the SPIN
+      canonical-channel design decision (above the iteration ceiling).
       DELTA 2026-08-14 (leg 2, run #1347 banked): ch04 doorway-serves flipped
       RED -> GREEN — the f125282a8 pooled-client cure is now proven in a
       BANKED measure, not just a live probe; ch05 co-steward-agreement
