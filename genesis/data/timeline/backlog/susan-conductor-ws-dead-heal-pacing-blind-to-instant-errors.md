@@ -331,11 +331,34 @@ Pyroscope is live (`uid=pyroscope`) and before this change ingested only
 **The honest limit, stated plainly: this profiles elohim-storage, NOT the holochain
 conductor child process.** The discriminating question above — kitsune2 gossip vs
 SQLite/DHT-store vs validation/publish — is a CONDUCTOR question, so the storage
-profile narrows but does not settle it. Getting the conductor profile needs
-pyroscope-rs push-mode built into the `ethosengine/holochain` fork and shipped via
-the `[conductor:*]` variant machinery (the `jemalloc-prof` feature at `d0f505f` is
-the working precedent). That is a fork build + a planned deploy wave, deliberately
-NOT taken as a bare measure-deploy — profiling shem's conductors restarts them.
+profile narrows but does not settle it.
+
+**UPDATE same day — the fork side of that conductor profile now EXISTS.** Commit
+`1dfcf8d3e` on `ethosengine/holochain:elohim-0.6` adds an opt-in `pyroscope-prof`
+Cargo feature: push mode activates only when `PYROSCOPE_SERVER_ADDRESS` is set
+(optional application-name / sample-rate vars), profiles carry the pod hostname, and
+they flush on graceful shutdown. Compiled and linked green at
+`HC_FEATURES=sqlite-encrypted,wasmer_sys,backend-go-pion,jemalloc,pyroscope-prof`,
+with the ordinary non-profiler build still green.
+
+- **Version pin, and why (durable gotcha):** `pyroscope 0.5.8` + `pyroscope_pprofrs
+  0.2.10`. The 2.x line requires UUID >= 1.20, which conflicts with this branch's
+  exact Serde compatibility floor. Do not "upgrade" it without re-deriving that floor.
+- **Deliberately NOT done, and correctly so:** no submodule pointer bump, no image, no
+  manifest, no deployment. The monorepo's conductor pointer stays at `e4a1c9bb2`.
+  Since the orchestrator auto-dispatches `elohim-conductor` on any commit that moves
+  `elohim/holochain-conductor`, bumping the pointer IS the trigger — so the bump is
+  the deliberate act that starts the wave, not a bookkeeping detail.
+
+What remains for option (a): the isolated `[conductor:pyroscope]` image lane (its
+Dockerfile lives in the che-devworkspaces submodule, which is NOT watched here and
+needs `[build:conductor]` to force), a runtime `PYROSCOPE_SERVER_ADDRESS`, the
+pointer bump, and one planned wave. Note the existing `elohim-edgenode-prof`
+precedent publishes NO pin tag — a diagnostic build is deliberately not a deploy
+source — so the profiling conductor reaches a pod via `[conductor:…,canary]`, which
+adds the deployable storage image embedding that variant. Profiling shem's
+conductors restarts them, so this ships as a planned wave, never a bare
+measure-deploy.
 
 Two further constraints the operator already owns, unchanged: the PVCs are
 openebs-hostpath and node-pinned, so moving a conductor is a DATA MIGRATION (with
