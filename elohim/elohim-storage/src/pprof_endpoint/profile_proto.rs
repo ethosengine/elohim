@@ -380,5 +380,86 @@ mod tests {
         let mut buf = Vec::new();
         sample.encode(&mut buf).unwrap();
         assert_eq!(buf, vec![0x12, 0x01, 0x01]);
+
+        // Every REMAINING field google/pprof's decoder reads, asserted as the
+        // raw key byte computed from the spec's field number — NOT from our own
+        // struct. A round-trip test cannot catch a renumbered field (it would
+        // encode and decode the same wrong number); these bytes can. Key is
+        // (field_number << 3) | wire_type, wire_type 0 = varint, 2 = delimited.
+        let cases: Vec<(&str, Profile, u8)> = vec![
+            // sample_type = 1, message -> (1<<3)|2
+            (
+                "sample_type",
+                Profile {
+                    sample_type: vec![ValueType::default()],
+                    ..Default::default()
+                },
+                0x0A,
+            ),
+            // location = 4, message -> (4<<3)|2
+            (
+                "location",
+                Profile {
+                    location: vec![Location::default()],
+                    ..Default::default()
+                },
+                0x22,
+            ),
+            // function = 5, message -> (5<<3)|2
+            (
+                "function",
+                Profile {
+                    function: vec![Function::default()],
+                    ..Default::default()
+                },
+                0x2A,
+            ),
+            // string_table = 6, repeated string -> (6<<3)|2. The empty first
+            // entry is load-bearing in profile.proto (index 0 must be ""), so
+            // one empty string encodes as key + zero length.
+            (
+                "string_table",
+                Profile {
+                    string_table: vec![String::new()],
+                    ..Default::default()
+                },
+                0x32,
+            ),
+            // time_nanos = 9, varint -> (9<<3)|0
+            (
+                "time_nanos",
+                Profile {
+                    time_nanos: 1,
+                    ..Default::default()
+                },
+                0x48,
+            ),
+            // duration_nanos = 10, varint -> (10<<3)|0
+            (
+                "duration_nanos",
+                Profile {
+                    duration_nanos: 1,
+                    ..Default::default()
+                },
+                0x50,
+            ),
+            // period_type = 11, message -> (11<<3)|2
+            (
+                "period_type",
+                Profile {
+                    period_type: Some(ValueType::default()),
+                    ..Default::default()
+                },
+                0x5A,
+            ),
+        ];
+        for (name, profile, want_key) in cases {
+            let bytes = encode(&profile);
+            assert_eq!(
+                bytes.first().copied(),
+                Some(want_key),
+                "{name}: first key byte should be {want_key:#04x} per profile.proto, got {bytes:?}"
+            );
+        }
     }
 }
