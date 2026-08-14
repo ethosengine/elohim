@@ -316,6 +316,39 @@ operator-owned. Real cost: these PVCs are openebs-hostpath and node-pinned, so
 moving a conductor is a DATA MIGRATION, not a reschedule, and a mishandled move
 re-keys an agent (`ALLOW_DNA_REINSTALL` discipline).
 
+## CEILING ITEM 2026-08-14 — the shem remedy choice, with the evidence that exists
+
+Queued for the operator by the saga leg-2 shift. **The decision is not blocked on
+more measurement of the pods; it is blocked on one profile that does not exist yet,
+and on a cost only the operator can accept.**
+
+What the shift ARMED: elohim-storage now serves an env-gated Go-compatible pprof CPU
+endpoint (`GET /debug/pprof/profile`, `ELOHIM_PPROF_ENABLED`, default OFF) and the
+alpha pod template carries the `profiles.grafana.com/cpu.*` scrape annotations.
+Pyroscope is live (`uid=pyroscope`) and before this change ingested only
+`observability/alloy` and `observability/pyroscope` — no elohim service at all.
+
+**The honest limit, stated plainly: this profiles elohim-storage, NOT the holochain
+conductor child process.** The discriminating question above — kitsune2 gossip vs
+SQLite/DHT-store vs validation/publish — is a CONDUCTOR question, so the storage
+profile narrows but does not settle it. Getting the conductor profile needs
+pyroscope-rs push-mode built into the `ethosengine/holochain` fork and shipped via
+the `[conductor:*]` variant machinery (the `jemalloc-prof` feature at `d0f505f` is
+the working precedent). That is a fork build + a planned deploy wave, deliberately
+NOT taken as a bare measure-deploy — profiling shem's conductors restarts them.
+
+Two further constraints the operator already owns, unchanged: the PVCs are
+openebs-hostpath and node-pinned, so moving a conductor is a DATA MIGRATION (with
+`ALLOW_DNA_REINSTALL` re-key discipline), and raising CPU limits on shem is refuted
+by the 2026-08-09 natural experiment. The lever remains **reduce co-tenancy, not
+limits**.
+
+So the choice is: (a) commission the conductor pyroscope variant first and decide on
+evidence, (b) accept the migration cost now on the host-placement evidence already
+gathered (3-for-3 / 4-for-4 partition on `kube_pod_info{node}`, load15 13.5 vs 41.2),
+or (c) hold shem degraded and keep developing against the household floor. Only (a)
+is cheap and it costs a deploy wave.
+
 **Open question that changes the recommendation.** What consumes ~18 cores on shem?
 Container CPU already accounts for ~15.8 of it (adam 6.78 + susan 2.99 + eve 2.99 +
 gertrude ~3.0) — the conductors themselves are the load. A 60s Pyroscope profile of

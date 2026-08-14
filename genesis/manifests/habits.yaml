@@ -211,6 +211,22 @@ habits:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
       - "sweettest rea_commitment_replication (elohim/holochain/tests/sweettest — unignored 837b772c9; isolated late-join conductors, bounded 60s peer-B retrieval; RED but MIS-ATTRIBUTED per DELTA 2026-08-09 — it measures one-time cold-cell Wasm warm-up, not REA retrieval; do not read it as a fetch-seam probe until it warms peer B)"
     evidence: >
+      DELTA 2026-08-14 (leg 2, run #1347 banked): ch04 doorway-serves flipped
+      RED -> GREEN — the f125282a8 pooled-client cure is now proven in a
+      BANKED measure, not just a live probe; ch05 co-steward-agreement
+      regressed in exchange, so the saga holds 5/11. The A-side blocker is
+      now NAMED rather than counted: the ethosengine pods' divergent content
+      rows are the SPIN class — anchor-divergent but UNDECLARED, and both
+      existing levers are structurally unreachable for them (ContestPeer
+      admission requires local_declared; ghost-decay requires an observed
+      Answer::Absent), so sweeps mint Refreshed no-ops forever. Stuck-stable,
+      NOT self-healing: the lever is a canonical channel, which is a design
+      decision in this habit's own domain (heads move via canonical channels
+      only) — backlog/spin-divergent-undeclared-rows-block-a-convergence.md.
+      Do NOT tune sweep cadence/retries/dormancy at it. Overnight the count
+      fell 13/13/13 -> 2/1/14 across a pod-restart cluster, but MissLedger is
+      in-memory so each restart re-climbs from 0 — a post-fix drain only
+      counts if it survives a restart.
       DELTA 2026-08-14 (run #1345 banked, post ethosengine thermal crash +
       cure deploy #1344): notary-authority 0p/3f — all three legs red on
       the CRASH-RECOVERED A side, which never converged during the quiesce
@@ -542,6 +558,25 @@ habits:
       - "epr flow stocks --window <START..END> --per week --stock commitments --check --root /projects/elohim (exit 0 = every declared stock draining; fail-closed: refusals exit non-zero, never green-on-nothing)"
       - "a2o @concern:dev-system-equilibrium (genesis/a2o/features/devflow/run-plane.feature — 4 scenarios: filling exits non-zero, drain>=inflow exits zero, an unmeasurable window refuses rather than reporting equilibrium, and the @regression guard that a discharge counts as outflow and never as inflow. @wip: no step definitions drive them yet, so this check runs in NO suite today — the CLI clause above is the only executing proof)"
     evidence: >
+      DELTA 2026-08-14 (leg 2): the check FAILS OPEN and its green cannot be
+      trusted yet — REPRODUCED: with git unreadable (the dubious-ownership
+      state a fresh container starts in), `epr flow stocks` reads inflow 0.0
+      while level+outflow survive, so outflow >= inflow holds trivially and
+      the verdict reads DRAINING. It asserts "drained" precisely when blind,
+      and did so in the wild (the 17:05Z SessionStart fold cached draining for
+      a stock filling at 23/wk). Control vs HOME=/nonexistent, identical
+      window/stock/binary and byte-identical flows.jsonl (2502991): inflow
+      23.0/filling vs 0.0/draining. This — not the window definition — is
+      what disqualifies equilibrium as a stasis TERMINATION criterion, since
+      this invariant's own words ("a check that reads green because it
+      measured nothing is an over-claim") name exactly this failure.
+      Mitigated fail-closed in run-projection.py (git_readable gate, honest
+      absence); the typed refusal still owed in stocks.rs, so any direct
+      caller of `epr flow stocks --check` remains exposed —
+      backlog/equilibrium-inflow-fails-open-to-false-draining.md. Outflow did
+      NOT move a second time at banked run #1347: still 2.000/wk from the same
+      two events (ch04's recovery was a re-discharge of an already-drained
+      commitment, correctly not counted as outflow). CHECK=1, FILLING.
       DELTA 2026-08-14: FIRST OUTFLOW — banked run #1345 (validate-only,
       quiesce-gated) fulfilled 2 commitments (ch11 pull-queue-retires
       first-ever green + 1); 2026-08-08..2026-08-15 --per week reads
