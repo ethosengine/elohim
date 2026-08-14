@@ -574,6 +574,15 @@ habits:
       - "epr flow stocks --window <START..END> --per week --stock commitments --check --root /projects/elohim (exit 0 = every declared stock draining; fail-closed: refusals exit non-zero, never green-on-nothing)"
       - "a2o @concern:dev-system-equilibrium (genesis/a2o/features/devflow/run-plane.feature — 4 scenarios: filling exits non-zero, drain>=inflow exits zero, an unmeasurable window refuses rather than reporting equilibrium, and the @regression guard that a discharge counts as outflow and never as inflow. @wip: no step definitions drive them yet, so this check runs in NO suite today — the CLI clause above is the only executing proof)"
     evidence: >
+      DELTA 2026-08-14 (leg 2 close, run #1349 banked): OUTFLOW MOVED A SECOND
+      TIME — 2.000/wk -> 3.000/wk on a genuinely NEW consume event (level
+      559->558, consumed 19->20, fulfill ledger 'fulfilled (new): 1'), not the
+      re-discharge that held the reading flat at #1348. Sequence since birth:
+      0.000/wk -> 2.000 (#1345, first ever) -> 3.000 (#1349). That is the
+      event-becoming-a-rate this habit exists to witness. Verdict stays
+      FILLING and the habit stays RED — inflow 23.000/wk against 3.000/wk
+      drain is still a filling stock, and the fail-open defect below is
+      unfixed in epr itself.
       DELTA 2026-08-14 (leg 2): the check FAILS OPEN and its green cannot be
       trusted yet — REPRODUCED: with git unreadable (the dubious-ownership
       state a fresh container starts in), `epr flow stocks` reads inflow 0.0
