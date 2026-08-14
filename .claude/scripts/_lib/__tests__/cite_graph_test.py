@@ -11,6 +11,7 @@ for _ in range(8):
     here = here.parent
 
 from _lib import cite_graph as cg  # noqa: E402
+from _lib import frontmatter as _fm  # noqa: E402
 
 _p = 0
 
@@ -150,5 +151,21 @@ check("absent target + missing fingerprint key → still dead", cg.envelope_verd
 # precedence: a resolvable target with a full-CID token is never remote (ok/held/stale as before)
 check("resolvable target + full-CID token is unaffected (ok, not remote)", cg.envelope_verdict(ok_cite, sidx) == "ok")
 check("resolvable target + mismatched full-CID token stays stale (not remote)", cg.envelope_verdict(stale_cite, sidx) == "stale")
+
+# ── YAML-valid envelope minting (2026-08-13 defect: unquoted `path: ` segment is invalid plain YAML) ──
+env_with_path = "some-slug | a desc | sha256:abcd1234abcd1234 | status: healthy | path: genesis/docs/x.md"
+env_plain = "slug2 | d2 | sha256:ef01ef01ef01ef01"
+check("yaml_cite_item quotes an envelope carrying ': ' segments",
+      cg.yaml_cite_item(env_with_path) == '"' + env_with_path + '"')
+check("yaml_cite_item leaves a plain-safe envelope unquoted", cg.yaml_cite_item(env_plain) == env_plain)
+q_lines, q_ok = cg.set_cites_block(["title: x", "cites:", "  - old"], [env_with_path, env_plain])
+check("set_cites_block quotes at mint", q_ok and any(ln == f'  - "{env_with_path}"' for ln in q_lines))
+q_doc = "---\n" + "\n".join(q_lines) + "\n---\nbody\n"
+q_fm = _fm.parse(q_doc)
+check("frontmatter parse unwraps quoted envelopes", q_fm.fields["cites"][0] == env_with_path)
+check("frontmatter parse keeps unquoted envelopes verbatim", q_fm.fields["cites"][1] == env_plain)
+q_cite = cg.parse_cite('"' + env_with_path + '"')
+check("parse_cite tolerates a raw quoted line",
+      q_cite["ref"] == "some-slug" and q_cite["path"] == "genesis/docs/x.md" and q_cite["status"] == "healthy")
 
 print(f"\n  {_p} assertions passed ✅")

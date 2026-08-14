@@ -160,7 +160,7 @@ def _set_cites(fm_lines, new_items):
             while i < n and _LIST_ITEM.match(fm_lines[i]):
                 i += 1  # drop old items
             for it in new_items:
-                out.append(f"  - {it}")
+                out.append(f"  - {cg.yaml_cite_item(it)}")
             replaced = True
             continue
         out.append(ln)
@@ -431,7 +431,7 @@ def main() -> int:
     out = emit(args[0])
     if out is None:
         return 1
-    print(out)
+    print(cg.yaml_cite_item(out))
     return 0
 
 

@@ -201,6 +201,10 @@ def parse_cite(s: str) -> dict:
     consumed as that keyed field, not as desc — fine for the tool-generated corpus (descs derive from
     titles), one more reason envelopes are never hand-written."""
     raw = _INLINE_COMMENT.sub("", (s or "").strip()).strip()
+    # Tolerate a double/single-quoted envelope (the minted-on-disk YAML form; the
+    # frontmatter parser unwraps these, but defend for callers passing raw lines).
+    if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in ('"', "'"):
+        raw = raw[1:-1].replace('\\"', '"') if raw[0] == '"' else raw[1:-1]
     if "|" not in raw:
         is_path = ("/" in raw) or raw.endswith(_PATH_EXTS)
         return {"ref": raw, "legacy_path": is_path, "desc": "", "fingerprint": "", "status": "", "path": ""}
@@ -333,8 +337,19 @@ def reassemble(fm_lines, body: str) -> str:
     return "---\n" + "\n".join(fm_lines) + "\n---\n" + body + ("\n" if not body.endswith("\n") else "")
 
 
+def yaml_cite_item(s: str) -> str:
+    """Render one cite string as a YAML list-item scalar. An envelope carrying a `: `
+    (its `status:`/`path:` segments) is INVALID as a plain scalar — `path:` starts a
+    mapping mid-scalar and hard-blocks the native frontmatter evaluator — so those are
+    minted double-quoted; anything else stays plain (minimal churn)."""
+    if ": " in s:
+        return '"' + s.replace('"', '\\"') + '"'
+    return s
+
+
 def set_cites_block(fm_lines, items):
-    """Replace the cites: list with `items` (cite strings, no leading '- '). Returns (lines, replaced?)."""
+    """Replace the cites: list with `items` (cite strings, no leading '- '). Items needing
+    YAML quoting (see `yaml_cite_item`) are quoted at mint. Returns (lines, replaced?)."""
     out, i, n, ok = [], 0, len(fm_lines), False
     while i < n:
         if fm_lines[i].strip() == "cites:":
@@ -342,7 +357,7 @@ def set_cites_block(fm_lines, items):
             i += 1
             while i < n and _FM_LIST_ITEM.match(fm_lines[i]):
                 i += 1
-            out += [f"  - {it}" for it in items]
+            out += [f"  - {yaml_cite_item(it)}" for it in items]
             ok = True
             continue
         out.append(fm_lines[i])

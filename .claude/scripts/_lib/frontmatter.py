@@ -63,6 +63,11 @@ def parse(text: str) -> Frontmatter:
         # List continuation
         if pending_list_key and stripped.lstrip().startswith("- "):
             item = stripped.lstrip()[2:].strip()
+            # Quoted list items (cite envelopes carry `path: `/`status: ` segments that are
+            # invalid as YAML plain scalars, so cite-gen mints them double-quoted): unwrap
+            # the quotes so consumers see the bare envelope string.
+            if len(item) >= 2 and item[0] == item[-1] and item[0] in ('"', "'"):
+                item = item[1:-1].replace('\\"', '"') if item[0] == '"' else item[1:-1]
             existing = fm.fields.get(pending_list_key)
             if isinstance(existing, list):
                 existing.append(item)

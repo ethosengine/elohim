@@ -62,7 +62,7 @@ import os
 import shutil
 import subprocess
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 # ── The intervenor's exit (Meadows' Way Out; counted as population 3 of the intervenor census,
@@ -266,6 +266,18 @@ def habit_lines(path: Path) -> list[str]:
 
 # ───────────────────────────── saga frontier ─────────────────────────────
 
+def _report_age(report) -> str:
+    """Human-scale age of the banked saga report ('2.1h old' / '3d old'), or '' when
+    unparseable. Pure arithmetic on the already-loaded report dict — no I/O."""
+    try:
+        raw = (report or {}).get("generatedAt") or ""
+        ts = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        hours = max(0.0, (datetime.now(timezone.utc) - ts).total_seconds() / 3600.0)
+        return f"{hours / 24:.0f}d old" if hours >= 48 else f"{hours:.1f}h old"
+    except (ValueError, TypeError, AttributeError):
+        return ""
+
+
 def saga_line(root: Path) -> str:
     """The saga frontier, from the SAME source the SessionStart headline uses
     (`.claude/scripts/saga-status.py`, called by `load-project-context.py:115-128`) — but IMPORTED
@@ -280,7 +292,16 @@ def saga_line(root: Path) -> str:
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         rows, report, flows_present = module.assemble()
-        return _clip("  " + module.headline(rows, report, flows_present)) if rows else ""
+        if not rows:
+            return ""
+        line = module.headline(rows, report, flows_present)
+        # Report age rides the headline (2026-08-14): a saga verdict quoted without the age of
+        # the banked report behind it reads as "now" when it may be days old. Computed HERE
+        # (projection layer), never in saga-status.py — that script is a shift measure oracle.
+        age = _report_age(report)
+        if age:
+            line += f" · report {age}"
+        return _clip("  " + line)
     except Exception:  # noqa: BLE001 — a projection line is never worth a traceback
         return ""
 
@@ -346,7 +367,13 @@ def run_notes(flows: Path, limit: int = MAX_NOTES) -> list[str]:
 # ───────────────────────────── commitments stock (cached) ─────────────────────────────
 
 def window_for(today: date | None = None) -> tuple[str, str]:
-    end = today or date.today()
+    """Canonical stocks window: WINDOW_DAYS periods, **end-exclusive at tomorrow's midnight**
+    so every event that already happened TODAY is inside the window. With `end = today`
+    (the pre-2026-08-14 shape) the fold's end-exclusive predicate dropped same-day events,
+    so identical flows read REFUSED (no observations yet today) or FILLING (yesterday's
+    inflow visible, today's outflow not) depending on the wall-clock day the check ran —
+    the verdict flap that disqualified equilibrium as a stasis termination criterion."""
+    end = (today or date.today()) + timedelta(days=1)
     return ((end - timedelta(days=WINDOW_DAYS)).isoformat(), end.isoformat())
 
 
@@ -373,10 +400,33 @@ def epr_candidates(root: Path) -> list[Path]:
     return [c for c in cands if c.is_file() and os.access(c, os.X_OK)]
 
 
+def git_readable(root: Path) -> bool:
+    """Can git read this repo RIGHT NOW? Guards the stocks fold against a fail-OPEN defect
+    proven 2026-08-14: with git unreadable (the `dubious ownership` state a fresh container
+    hits before `safe.directory` is set), `epr flow stocks` returns **inflow 0.0** while the
+    outflow arm survives — so `outflow >= inflow` holds trivially and the verdict reads
+    DRAINING. That is a FABRICATED equilibrium: the check reports "drained" precisely when it
+    cannot see inflow, which is the one reading a stasis loop must never trust. Reproduced:
+    same window/stock/log bytes, `HOME=/nonexistent` → inflow 0.0/draining, control →
+    inflow 23.0/filling. The typed refusal belongs in epr's own verdict arm (eprfs is outside
+    this hook's scope — filed as a backlog item); until then this gate keeps the hook honest."""
+    try:
+        proc = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=str(root),
+                              capture_output=True, text=True, timeout=10)
+        return proc.returncode == 0 and bool(proc.stdout.strip())
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def refresh_stocks(root: Path, window: tuple[str, str]) -> dict:
     """Run `epr flow stocks --json` ONCE (SessionStart only). Returns the parsed reading, or an
     honest absence record — never a fabricated equilibrium. A `stocks` leg that is missing from an
     older binary is recorded as absent rather than retried forever."""
+    if not git_readable(root):
+        # Fail CLOSED: no reading at all beats a false DRAINING (see `git_readable`).
+        return {"ok": False, "reason": "git unreadable — inflow arm would silently read 0 "
+                                       "(fabricated equilibrium); refusing the fold",
+                "window": list(window)}
     for binary in epr_candidates(root):
         try:
             proc = subprocess.run(
