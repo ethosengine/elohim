@@ -945,19 +945,33 @@ pub struct AdoptContext<'a> {
     /// `config.contest_two_way_declared` — the per-pod switch for the CONTEST
     /// arm. `false` restores the pre-2026-08-02 `Hold`.
     pub contest_enabled: bool,
+    /// `content_id → advertising peer` for ids this sweep classified as
+    /// ACTIONABLE anchor-divergence (a peer advertised a different non-empty
+    /// anchor; the id passed the MissLedger and is not declared-partitioned).
+    /// The SPIN-discharge evidence — sibling of [`Self::hints`], one authority
+    /// plane down: an anchor advertisement, never a declaration.
+    pub divergent_advertisers: &'a HashMap<String, String>,
+    /// `config.contest_undeclared_divergence` — the per-pod switch for the
+    /// SPIN-discharge arm. `false` restores the pre-2026-08-14 MissLedger spin.
+    pub contest_divergent_enabled: bool,
 }
 
 impl AdoptContext<'_> {
     /// The boot-time shape: no peer inventory yet, no transport to fetch with.
     ///
     /// `contest_enabled: false` is not a policy choice — with no hints there is
-    /// nothing to contest, and the boot pass runs before P2P discovery.
+    /// nothing to contest, and the boot pass runs before P2P discovery. The
+    /// divergence map is empty for the same reason.
     pub fn none() -> AdoptContext<'static> {
         static EMPTY: std::sync::OnceLock<PeerHeadHints> = std::sync::OnceLock::new();
+        static EMPTY_DIVERGENT: std::sync::OnceLock<HashMap<String, String>> =
+            std::sync::OnceLock::new();
         AdoptContext {
             hints: EMPTY.get_or_init(PeerHeadHints::new),
             fetcher: None,
             contest_enabled: false,
+            divergent_advertisers: EMPTY_DIVERGENT.get_or_init(HashMap::new),
+            contest_divergent_enabled: false,
         }
     }
 }
@@ -1020,6 +1034,23 @@ pub enum HeadDecision {
     /// This row already carries a declaration that an election stands behind (or
     /// no peer is advertising anything) — neither adopt, contest, nor author.
     Hold,
+    /// NOTHING is declared anywhere, but a peer advertised a DIVERGENT anchor
+    /// for this id THIS sweep while the own conductor keeps answering this
+    /// node's own root — the SPIN class (2026-08-14): two genuine roots, no
+    /// declaration on either side, so the election has an empty candidate set
+    /// and no other arm can ever supply it. `ContestPeer` requires a local
+    /// declaration; ghost-decay requires an observed-absent conductor; and the
+    /// head-record responder's hint-inflation guard deliberately refuses to
+    /// serve an undeclared anchor as a head, so peer-head candidacy is
+    /// structurally impossible for this class.
+    ///
+    /// The exit is SYMMETRIC SELF-CANDIDACY: nominate THIS node's own
+    /// genuinely-held head as one canonical-election candidate. Same safety
+    /// story as [`Self::ContestPeer`]'s self-head fallback — nothing is
+    /// stamped, the peer's sweep mints its own competing candidate, and
+    /// `select_canonical_winner` picks deterministically from the set; both
+    /// projections then obey the winner through the ordinary canonical heal.
+    ContestDivergent,
     /// Nothing is declared anywhere — mint a (non-declaring) root.
     Author,
 }
@@ -1088,12 +1119,23 @@ fn adopt_retry_bytes(carried_record: Option<&Vec<u8>>) -> Option<Vec<u8>> {
 ///
 /// `contest_enabled` is the per-pod config switch. `false` collapses
 /// `ContestPeer` back into `Hold`, i.e. exactly the pre-2026-08-02 behaviour.
+///
+/// `peer_divergent_anchor` (2026-08-14, SPIN discharge) is "a peer advertised a
+/// DIFFERENT non-empty anchor for this id THIS sweep, and the per-pod
+/// `contest_undeclared_divergence` switch is on" — both facts folded at the
+/// call site, so `false` here is byte-for-byte the pre-flag table. It extends
+/// the table with exactly one row and changes no existing one:
+///
+/// | own conductor canonical | peer declares | local declared | local election | peer divergent anchor | ⇒ |
+/// |---|---|---|---|---|---|
+/// | no | no | no | no | yes | [`HeadDecision::ContestDivergent`] |
 pub fn decide_head_action(
     conductor_canonical: bool,
     peer_declared: bool,
     local_declared: bool,
     local_has_canonical_election: bool,
     contest_enabled: bool,
+    peer_divergent_anchor: bool,
 ) -> HeadDecision {
     if conductor_canonical {
         HeadDecision::AdoptLocal
@@ -1108,6 +1150,12 @@ pub fn decide_head_action(
         } else {
             HeadDecision::Hold
         }
+    } else if peer_divergent_anchor && !local_has_canonical_election && contest_enabled {
+        // SPIN discharge: undeclared on both sides, two genuine roots, live
+        // divergence evidence this sweep — supply the election by
+        // self-candidacy. Gated on the election exactly like `ContestPeer`
+        // (quiescence), and on the same family switch.
+        HeadDecision::ContestDivergent
     } else {
         HeadDecision::Author
     }
@@ -1332,12 +1380,20 @@ pub async fn try_adopt_canonical_head(
         }
     }
 
+    // SPIN-discharge evidence: a peer advertised a DIVERGENT non-empty anchor
+    // for this id THIS sweep AND the per-pod switch is on. Folded into one bool
+    // here so `decide_head_action` stays pure and OFF stays byte-identical.
+    let divergent_peer = adopt
+        .divergent_advertisers
+        .get(id)
+        .filter(|_| adopt.contest_divergent_enabled);
     let decision = decide_head_action(
         canonical_head.is_some(),
         hint.is_some(),
         local_declared.is_some(),
         local_election,
         adopt.contest_enabled,
+        divergent_peer.is_some(),
     );
 
     // GHOST-DECLARATION DECAY (operator-reserved, default OFF). A Hold/Contest
@@ -1409,6 +1465,25 @@ pub async fn try_adopt_canonical_head(
         HeadDecision::ContestPeer => {
             let hint = hint.expect("ContestPeer implies a hint");
             contest_peer(hc, ctx, id, hint, adopt.fetcher, local_declared.as_deref()).await
+        }
+        HeadDecision::ContestDivergent => {
+            // Self-candidacy needs a head to nominate. The SPIN class carries
+            // one by construction (the own conductor answered `Refreshed`
+            // against it), but this pre-flight is also reached from the ghost
+            // and boot sweeps where the local answer can be absent — degrade to
+            // the caller's existing path there rather than minting blind.
+            match head {
+                Some(own) => {
+                    contest_divergent(
+                        hc,
+                        id,
+                        own,
+                        divergent_peer.map(String::as_str).unwrap_or("unknown"),
+                    )
+                    .await
+                }
+                None => AdoptOutcome::Author,
+            }
         }
         HeadDecision::Hold => {
             tracing::debug!(
@@ -2237,6 +2312,132 @@ async fn contest_peer(
     }
 }
 
+/// SPIN DISCHARGE (2026-08-14): supply the canonical election for an UNDECLARED
+/// two-way root divergence by nominating THIS node's own head.
+///
+/// ## The class and why no other arm reaches it
+///
+/// Both peers hold a genuine root for the id; neither ever declared. The own
+/// conductor answers this node's own (non-canonical) head every sweep —
+/// `StampOutcome::Refreshed`, "real work, zero convergence" — and the id cycles
+/// through the [`MissLedger`](crate::p2p::projection_reconcile) forever
+/// (live: `known_divergent{stream="content"}` pinned at 13/13/13 across the
+/// household mesh, zero `Healed` outcomes, saga ch06 blocked). Every existing
+/// lever is structurally out of reach:
+///
+/// - [`HeadDecision::ContestPeer`] requires `local_declared`;
+/// - ghost-decay requires an observed-ABSENT conductor answer;
+/// - PEER-HEAD candidacy is impossible BY DESIGN: the head-record responder's
+///   hint-inflation guard answers `Absent` for anchored-but-undeclared rows,
+///   precisely so a requester can never turn a peer's anchor into a
+///   declaration. This arm honors that boundary by nominating only what this
+///   node itself holds — which is also why there is NO evidence fetch here at
+///   all: the only answer a fetch could return for this class is the absence
+///   we already know.
+///
+/// ## Why self-candidacy is supply, not self-election (C1)
+///
+/// Nothing is stamped. The mint adds ONE candidate to the DHT election on
+/// positive same-sweep divergence evidence (a live peer advertised a different
+/// non-empty anchor); the peer's own sweep mints ITS root as the competing
+/// candidate (both pods default-ON, symmetric); `select_canonical_winner`
+/// arbitrates deterministically — tier, then notarized link clock, then
+/// link-hash tiebreak — and BOTH projections obey the winner through the
+/// ordinary canonical heal (`HealCanonical` fills undeclared rows
+/// unconditionally, moves declared ones only with forward ordering). A later
+/// earned-tier declaration outranks a staging-tier self-candidate outright, so
+/// the cost of a "wrong" nomination is one extra election candidate.
+///
+/// bounded-work (C6a): the `(id, own_head)` candidacy ledger caps mints at one
+/// per process; the contest backoff bounds re-attempts after a failure; the
+/// caller's slice cap and sweep budget bound the population. Zome gates pass by
+/// construction — the chain exists (the conductor just answered this node's own
+/// head) and the target is this node's own action, locally retrievable.
+async fn contest_divergent(
+    hc: &Arc<HcClient>,
+    id: &str,
+    own_head: &ContentHeadWire,
+    divergent_peer: &str,
+) -> AdoptOutcome {
+    // BACKOFF GATE — same ledger as `contest_peer`, same reason: a predictable
+    // repeat failure must not re-consume the sweep budget every 300s.
+    if let Some(reason) = crate::services::contest_backoff::skip_class(
+        id,
+        crate::services::contest_backoff::BackoffWindows::from_config(),
+    ) {
+        crate::metrics::inc_contest_skipped(reason);
+        tracing::debug!(
+            content_id = %id,
+            reason = ?reason,
+            "spin-discharge: contest skipped — this id is serving a backoff for a predictable \
+             repeat failure"
+        );
+        return AdoptOutcome::Held;
+    }
+
+    let target = own_head.head_action_hash.as_str();
+
+    // IDEMPOTENCE — the row is NOT stamped by a contest, so without the claim
+    // this arm would re-mint the identical link every sweep for the whole
+    // window between minting and the election projecting back.
+    if !claim_candidacy(id, target) {
+        tracing::debug!(
+            content_id = %id,
+            "spin-discharge: this node already nominated its own head for this id; \
+             awaiting the election"
+        );
+        return AdoptOutcome::Held;
+    }
+
+    match conductor_writes::call_declare_canonical_content_head(
+        hc,
+        id,
+        target.to_string(),
+        None,
+        false,
+    )
+    .await
+    {
+        Ok(declared) => {
+            crate::metrics::inc_content_canonical_link_minted(
+                crate::metrics::MINTED_SOURCE_CONTEST_DIVERGENT_SELF,
+            );
+            tracing::warn!(
+                target: "elohim_storage::head_adoption",
+                content_id = %id,
+                contested_head = %declared.head_action_hash,
+                divergent_peer = %divergent_peer,
+                "spin-discharge: CONTESTED an undeclared two-way root divergence by nominating \
+                 THIS node's own head — the peer advertises a different root and holds no \
+                 declaration either, so the election had no candidate from any side; both \
+                 sides nominate their own and the DHT election picks; the row is unchanged \
+                 until it does"
+            );
+            AdoptOutcome::Contested
+        }
+        Err(e) => {
+            // C3: hand the claim back and take a BOUNDED backoff — one refusal
+            // must not retire this (id, target) for the life of the process,
+            // and a predictable failure must not be retried every sweep.
+            release_candidacy(id, target);
+            crate::metrics::inc_contest_failed(crate::metrics::ContestFailure::DeclareError);
+            crate::services::contest_backoff::note(
+                id,
+                crate::metrics::ContestSkip::SelfCandidacyBackoff,
+            );
+            tracing::warn!(
+                target: "elohim_storage::head_adoption",
+                content_id = %id,
+                divergent_peer = %divergent_peer,
+                error = %e,
+                "spin-discharge: self-candidacy declare failed — this node could not nominate \
+                 its own head; holding, retried after the contest backoff"
+            );
+            AdoptOutcome::Held
+        }
+    }
+}
+
 /// ADOPT-BEFORE-AUTHOR: mint a canonical-head candidate for an id this conductor
 /// holds **no chain for**, from a carried record the zome proves in wasm.
 ///
@@ -2661,9 +2862,10 @@ mod tests {
     use super::*;
 
     /// Contest ON — the rollout default. Keeps the older tests reading as
-    /// situations rather than argument lists.
+    /// situations rather than argument lists. `peer_divergent_anchor` OFF: the
+    /// legacy table, which the SPIN arm must never change.
     fn decide(c: bool, p: bool, l: bool, election: bool) -> HeadDecision {
-        decide_head_action(c, p, l, election, true)
+        decide_head_action(c, p, l, election, true, false)
     }
 
     // ── Ghost-declaration decay (C1/C3/C4 contract) ─────────────────────────
@@ -3724,9 +3926,85 @@ mod tests {
     #[test]
     fn contest_disabled_restores_the_old_hold() {
         assert_eq!(
-            decide_head_action(false, true, true, false, false),
+            decide_head_action(false, true, true, false, false, false),
             HeadDecision::Hold,
             "per-pod OFF switch must yield exactly the prior behaviour"
+        );
+    }
+
+    // ── SPIN discharge (undeclared two-way root divergence, 2026-08-14) ──────
+
+    /// The new arm fires from exactly ONE corner: nothing declared anywhere,
+    /// no election, live divergence evidence, family switch on.
+    #[test]
+    fn contest_divergent_is_reachable_only_from_the_undeclared_divergent_corner() {
+        for c in [false, true] {
+            for p in [false, true] {
+                for l in [false, true] {
+                    for e in [false, true] {
+                        for enabled in [false, true] {
+                            for d in [false, true] {
+                                if decide_head_action(c, p, l, e, enabled, d)
+                                    == HeadDecision::ContestDivergent
+                                {
+                                    assert!(
+                                        !c && !p && !l && !e && enabled && d,
+                                        "ContestDivergent escaped its corner \
+                                         (canonical={c}, peer={p}, local={l}, election={e}, \
+                                          enabled={enabled}, divergent={d})"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// With the divergence input OFF, the whole 5-input table is byte-for-byte
+    /// the pre-SPIN rule — the regression pin for "off = prior behaviour".
+    #[test]
+    fn spin_arm_off_leaves_every_existing_row_unchanged() {
+        for c in [false, true] {
+            for p in [false, true] {
+                for l in [false, true] {
+                    for e in [false, true] {
+                        for enabled in [false, true] {
+                            assert_ne!(
+                                decide_head_action(c, p, l, e, enabled, false),
+                                HeadDecision::ContestDivergent,
+                                "divergence=false must never produce the new arm \
+                                 (canonical={c}, peer={p}, local={l}, election={e}, \
+                                  enabled={enabled})"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// QUIESCENCE: a row already obeying an election is settled — divergence
+    /// evidence must not re-open it (the same gate that keeps a converged
+    /// corpus minting zero links).
+    #[test]
+    fn spin_arm_defers_to_a_standing_election() {
+        assert_eq!(
+            decide_head_action(false, false, false, true, true, true),
+            HeadDecision::Author,
+            "an election-settled row must not be re-contested by anchor evidence"
+        );
+    }
+
+    /// PRECEDENCE: a peer DECLARATION is stronger evidence than a divergent
+    /// anchor — the adopt arm keeps the id even when both are present.
+    #[test]
+    fn a_peer_declaration_outranks_divergence_evidence() {
+        assert_eq!(
+            decide_head_action(false, true, false, false, true, true),
+            HeadDecision::AdoptPeer,
+            "declaration evidence must win over anchor evidence"
         );
     }
 
@@ -3749,7 +4027,9 @@ mod tests {
                 for l in [false, true] {
                     for e in [false, true] {
                         for enabled in [false, true] {
-                            if decide_head_action(c, p, l, e, enabled) == HeadDecision::Author {
+                            if decide_head_action(c, p, l, e, enabled, false)
+                                == HeadDecision::Author
+                            {
                                 authored += 1;
                                 assert!(
                                     !c && !p && !l,
@@ -3778,14 +4058,17 @@ mod tests {
                 for l in [false, true] {
                     for e in [false, true] {
                         for enabled in [false, true] {
-                            if decide_head_action(c, p, l, e, enabled) == HeadDecision::ContestPeer
-                            {
-                                assert!(
-                                    !c && p && l && !e && enabled,
-                                    "ContestPeer escaped its corner \
-                                     (canonical={c}, peer={p}, local={l}, election={e}, \
-                                      enabled={enabled})"
-                                );
+                            for d in [false, true] {
+                                if decide_head_action(c, p, l, e, enabled, d)
+                                    == HeadDecision::ContestPeer
+                                {
+                                    assert!(
+                                        !c && p && l && !e && enabled,
+                                        "ContestPeer escaped its corner \
+                                         (canonical={c}, peer={p}, local={l}, election={e}, \
+                                          enabled={enabled}, divergent={d})"
+                                    );
+                                }
                             }
                         }
                     }

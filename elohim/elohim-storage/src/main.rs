@@ -443,6 +443,19 @@ async fn async_main(
     // the hot path (see `config::set_contest_two_way_declared`).
     elohim_storage::config::set_contest_two_way_declared(config.contest_two_way_declared);
 
+    // SPIN discharge (default ON; the undeclared sibling of the contest arm
+    // above — an undeclared row spinning `Refreshed` against a peer-advertised
+    // divergent anchor nominates its OWN head so the DHT election finally has a
+    // candidate). Env DISABLES it: 0/false/off/no — off restores the prior
+    // MissLedger spin, which is safe but cannot converge the class.
+    if let Ok(v) = std::env::var("CONTEST_UNDECLARED_DIVERGENCE") {
+        config.contest_undeclared_divergence = !matches!(
+            v.trim().to_ascii_lowercase().as_str(),
+            "0" | "false" | "no" | "off"
+        );
+    }
+    elohim_storage::config::set_contest_undeclared_divergence(config.contest_undeclared_divergence);
+
     // ADOPT-BEFORE-AUTHOR (default OFF — operator-reserved). Env ENABLES it:
     // 1/true/yes/on. This is the both-sides-missing residual's only automated
     // exit, shipped dormant so the decision to participate is a flip, not a

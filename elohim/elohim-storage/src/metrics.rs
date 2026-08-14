@@ -2463,9 +2463,17 @@ pub fn inc_projection_refused_stale(reason: &str) {
 /// mint a permanently-zero series and read as "the operator flip did nothing".
 pub const MINTED_SOURCE_ADOPT_BEFORE_AUTHOR: &str = "adopt_before_author";
 
+/// `source` label for a link minted by the SPIN-discharge arm — an UNDECLARED
+/// row nominating its OWN head against a peer-advertised divergent anchor
+/// (`services::head_adoption::contest_divergent`). Named const for the same
+/// reason as [`MINTED_SOURCE_ADOPT_BEFORE_AUTHOR`]: this label is the arm's
+/// live probe.
+pub const MINTED_SOURCE_CONTEST_DIVERGENT_SELF: &str = "contest_divergent_self";
+
 /// Count a canonical-head declaration LINK minted through this node, by the
 /// channel that caused it (`"adopt_peer"`, `"contest_peer_head"`,
-/// `"contest_self_head"`, [`MINTED_SOURCE_ADOPT_BEFORE_AUTHOR`], `"http"`).
+/// `"contest_self_head"`, [`MINTED_SOURCE_ADOPT_BEFORE_AUTHOR`],
+/// [`MINTED_SOURCE_CONTEST_DIVERGENT_SELF`], `"http"`).
 pub fn inc_content_canonical_link_minted(source: &str) {
     CONTENT_CANONICAL_LINKS_MINTED
         .with_label_values(&[source])

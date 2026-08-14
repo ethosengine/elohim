@@ -107,11 +107,14 @@ decisionPoints:
     sourceLocation:
       file: src/services/head_adoption.rs
       modulePath: services::head_adoption::decide_head_action
-      line: 400
+      line: 1132
     summary: >
-      Total decision rule choosing AdoptLocal / AdoptPeer / ContestPeer / Hold / Author from
-      (own-conductor-canonical, peer-declared, local-declared, local-has-canonical-election,
-      contest-enabled). Presence-based, never timestamp-based.
+      Total decision rule choosing AdoptLocal / AdoptPeer / ContestPeer / ContestDivergent /
+      Hold / Author from (own-conductor-canonical, peer-declared, local-declared,
+      local-has-canonical-election, contest-enabled, peer-divergent-anchor). Presence-based,
+      never timestamp-based. ContestDivergent (2026-08-14, SPIN discharge) fires from exactly
+      one corner — nothing declared anywhere, no election, live divergence evidence, family
+      switch on — and is proven not to change any pre-existing row of the table.
     concernIds:
       - id: C1
         status: answered
@@ -162,6 +165,18 @@ decisionPoints:
         kind: unit
       - path: elohim/elohim-storage/src/services/head_adoption.rs
         testName: contest_is_reachable_only_from_the_two_way_declared_corner
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: contest_divergent_is_reachable_only_from_the_undeclared_divergent_corner
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: spin_arm_off_leaves_every_existing_row_unchanged
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: spin_arm_defers_to_a_standing_election
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: a_peer_declaration_outranks_divergence_evidence
         kind: unit
 
   - name: canonical_move_verdict
@@ -432,6 +447,63 @@ decisionPoints:
         mirrorRisk: false
       - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
         testName: the_declared_axis_is_now_covered_by_exactly_one_route
+        kind: unit
+
+  - name: undeclared_divergence_should_route_to_contest
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/p2p/projection_reconcile.rs
+      modulePath: p2p::projection_reconcile::undeclared_divergence_should_route_to_contest
+      line: 1027
+    summary: >
+      SPIN discharge (2026-08-14): should an UNDECLARED row whose divergence heal just
+      answered Refreshed be handed to the adopt/contest arm? Four required conditions:
+      non-canonical answer, local UNDECLARED, a peer advertised a divergent non-empty
+      anchor this sweep (admitted actionable divergence), and no local canonical election
+      (quiescence). Routes into decide_head_action's ContestDivergent arm — symmetric
+      self-candidacy, the only supply act available to the class (the head-record
+      responder's hint-inflation guard makes peer-head candidacy structurally impossible
+      for an undeclared advertiser).
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          Admits into ContestDivergent, which mints ONE election candidate naming this
+          node's own genuinely-held root and never stamps; select_canonical_winner
+          arbitrates; the peer's symmetric sweep mints the competing candidate; a later
+          earned-tier declaration outranks a staging-tier self-candidate outright.
+      - id: C3
+        status: answered
+        justification: >
+          This IS the liveness exit for the SPIN class — Refreshed was the last refusal
+          outcome with no candidate admission, so the election received a candidate from
+          neither side and known_divergent{content} pinned at 13/13/13 with zero Healed.
+      - id: C4
+        status: answered
+        justification: >
+          Admission requires a Present non-canonical head plus same-sweep positive
+          divergence evidence; the declaration/election DB read fails CLOSED to
+          (None, true), which the predicate refuses — a transient DB error can never
+          admit (nor, one level down, license a mint).
+      - id: C6b
+        status: answered
+        justification: >
+          !local_has_canonical_election is the same quiescence gate as the declared arm;
+          one level down, claim_candidacy's (id, target) ledger plus contest_backoff bound
+          the mint count and re-attempt rate.
+    contractTests:
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: undeclared_divergence_admission_requires_all_four_conditions
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: the_two_contest_admissions_never_both_fire
+        kind: unit
+        mirrorRisk: false
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: contest_divergent_is_reachable_only_from_the_undeclared_divergent_corner
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption.rs
+        testName: spin_arm_off_leaves_every_existing_row_unchanged
         kind: unit
 
   - name: gapfill_would_self_elect

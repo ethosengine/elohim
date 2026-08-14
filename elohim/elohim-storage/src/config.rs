@@ -97,6 +97,28 @@ pub fn contest_two_way_declared_enabled() -> bool {
     *CONTEST_TWO_WAY_DECLARED.get().unwrap_or(&true)
 }
 
+/// Process-wide mirror of [`Config::contest_undeclared_divergence`] — the switch
+/// for the SPIN-discharge arm (undeclared two-way ROOT divergence supplying the
+/// canonical election by self-candidacy). Same `OnceLock` rationale as
+/// [`CONTEST_TWO_WAY_DECLARED`], and the same default-ON reasoning: a node with
+/// a chain nominating its own genuinely-held root is a safe supply act — the
+/// DHT election arbitrates, nothing is stamped.
+static CONTEST_UNDECLARED_DIVERGENCE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+/// Publish the undeclared-divergence contest switch. Idempotent (`OnceLock::set`
+/// semantics — the first call wins).
+pub fn set_contest_undeclared_divergence(enabled: bool) {
+    let _ = CONTEST_UNDECLARED_DIVERGENCE.set(enabled);
+}
+
+/// Is the SPIN-discharge arm enabled — may an UNDECLARED row whose heal keeps
+/// answering `Refreshed` against a peer-advertised divergent anchor nominate its
+/// own head as a canonical-election candidate? Defaults to `true` when `main`
+/// never published a value, matching the config field.
+pub fn contest_undeclared_divergence_enabled() -> bool {
+    *CONTEST_UNDECLARED_DIVERGENCE.get().unwrap_or(&true)
+}
+
 /// Process-wide mirror of [`Config::adopt_before_author`] — the OPERATOR-RESERVED
 /// switch for the both-sides-missing residual. Same `OnceLock` rationale as
 /// [`CONTEST_TWO_WAY_DECLARED`].
@@ -725,6 +747,27 @@ pub struct Config {
     #[serde(default = "default_true")]
     pub contest_two_way_declared: bool,
 
+    /// SPIN DISCHARGE (2026-08-14): may an UNDECLARED row whose heal keeps
+    /// answering `Refreshed` against a peer-advertised DIVERGENT anchor nominate
+    /// its OWN head as a canonical-election candidate?
+    ///
+    /// The class this exits: anchor-divergent + undeclared on BOTH sides — two
+    /// peers each holding a genuine root, neither ever declared. `ContestPeer`
+    /// requires a local declaration, ghost-decay requires an observed-absent
+    /// conductor, and the head-record responder deliberately refuses to serve an
+    /// undeclared anchor as a head (the hint-inflation guard) — so the election
+    /// received a candidate from NEITHER side and the ids spun through the
+    /// MissLedger forever (`known_divergent{stream="content"}` = 13/13/13 on the
+    /// household mesh, zero `Healed` outcomes).
+    ///
+    /// Self-candidacy is symmetric supply, not self-election: nothing is
+    /// stamped, both sides nominate their own genuinely-held root, and
+    /// `select_canonical_winner` arbitrates deterministically on the DHT. Same
+    /// default-ON reasoning as `contest_two_way_declared` above.
+    /// Loaded from env `CONTEST_UNDECLARED_DIVERGENCE`.
+    #[serde(default = "default_true")]
+    pub contest_undeclared_divergence: bool,
+
     /// ADOPT-BEFORE-AUTHOR (operator-reserved): may this node ask the conductor
     /// to declare a canonical head for an id it holds **no local chain** for,
     /// backed by a carried record the zome proves in wasm?
@@ -1135,6 +1178,7 @@ impl Default for Config {
             salvage_recheck_seconds: default_salvage_recheck_seconds(),
             salvage_diversity_placement: default_true(),
             contest_two_way_declared: default_true(),
+            contest_undeclared_divergence: default_true(),
             adopt_before_author: false,
             ghost_declaration_decay: false,
             head_corpus_digest_enabled: false,

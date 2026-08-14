@@ -211,6 +211,17 @@ habits:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
       - "sweettest rea_commitment_replication (elohim/holochain/tests/sweettest — unignored 837b772c9; isolated late-join conductors, bounded 60s peer-B retrieval; RED but MIS-ATTRIBUTED per DELTA 2026-08-09 — it measures one-time cold-cell Wasm warm-up, not REA retrieval; do not read it as a fetch-seam probe until it warms peer B)"
     evidence: >
+      DELTA 2026-08-14 (SPIN discharge landed, local gates green): the A-side
+      blocker named in the deltas below now has its canonical channel — the
+      undeclared two-way root conflict supplies the DHT election by symmetric
+      self-candidacy (contest_divergent; Refreshed-site admission; decide arm
+      ContestDivergent; default ON, kill-switch CONTEST_UNDECLARED_DIVERGENCE;
+      C3 liveness witness proves flag-OFF spins and flag-ON discharges;
+      2,671 tests green). Peer-head candidacy was proven impossible by the
+      hint-inflation guard, which is why self-candidacy is the shape. Flip
+      evidence wanted next: post-deploy known_divergent{content} on
+      matthew/jessica/james drains to <=2 and HOLDS across a pod restart, then
+      a banked validate-only run flips ch06.
       DELTA 2026-08-14 (leg 2, run #1348 banked — SAGA 5/11 -> 6/11): ch10
       card-tells-truth flipped regressed -> GREEN and ch04 HELD green across
       two consecutive banked runs, so the doorway cure is stable, not a

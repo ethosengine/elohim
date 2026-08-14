@@ -81,6 +81,52 @@ This is notary-authority habit domain (heads move via canonical channels only �
 the p2p-design-gate + trust-contract invariants apply). Do NOT tune sweep cadence,
 retries, or dormancy at it — the trace shows retrying converges nothing.
 
+## CURE LANDED (2026-08-14, same session) — symmetric self-candidacy supplies the election
+
+Design answered through the p2p-design-gate (no new entry types, routes, tables,
+or sync messages; coordinator zome untouched — storage-side only), resolving to
+option (b): supply the existing DHT election so canonical-link arrival is what
+moves `resolve_content_head` off the stale root. The doc's objection to (a) held
+and shaped the cure — nothing mints a *declaration*; the mint is an election
+*candidate* (the two authority planes RCA-v3 wall 1 distinguished).
+
+**Decisive code fact:** peer-head candidacy is impossible for this class BY
+DESIGN — the head-record responder's hint-inflation guard (2026-08-02,
+`view_federation.rs`) answers `Absent` for anchored-but-undeclared rows precisely
+so a requester can never turn a peer's anchor into a declaration. So the
+discharge is **symmetric SELF-CANDIDACY**: each side nominates its OWN
+genuinely-held root (`contest_divergent`, zome gates pass by construction —
+chain exists, target locally retrievable), `select_canonical_winner` arbitrates
+deterministically, and both rows converge through the shipped obey/HealCanonical
+paths. Nothing is stamped; the election is the canonical channel.
+
+Mechanism (all elohim-storage):
+- **Admission** — the `Refreshed` heal outcome (the LAST refusal site with no
+  candidate admission) routes actionable-divergent undeclared ids to
+  `adopt_candidates` via the new pure predicate
+  `undeclared_divergence_should_route_to_contest` (`projection_reconcile.rs`);
+  DB read-failure fails closed (never admits).
+- **Decision** — `decide_head_action` gains a sixth input
+  (`peer_divergent_anchor`) and one new arm `ContestDivergent`; exhaustive tests
+  pin that no pre-existing table row changed and the arm fires from exactly one
+  corner.
+- **Execution** — `contest_divergent` (`head_adoption.rs`): backoff-gated,
+  `(id, target)`-idempotent, one declare per id per process, minted under
+  `elohim_content_canonical_links_minted_total{source="contest_divergent_self"}`.
+- **Config** — `contest_undeclared_divergence`, default ON (same reasoning as
+  `contest_two_way_declared`: a node with a chain nominating its own view is a
+  safe supply act); env kill-switch `CONTEST_UNDECLARED_DIVERGENCE=0`.
+- **Formal closure** — the C3 liveness contract gains
+  `the_spin_class_discharge_is_flag_shaped`: flag OFF proves the kill-switch
+  returns the class to its absorbing pre-cure spin (manual-only exit); flag ON
+  (shipped default) proves the discharge via the live predicates. The main
+  48-state table's scope note now names why this class was invisible to it
+  (its peer dimension models declaration advertisements only).
+
+Local gates: 2,671 lib tests + integration green; registered in
+`elohim-storage/seam-registry.yaml`. Status stays **open** until the
+verification hooks below fire live.
+
 ## Verification hooks once a lever exists
 
 - `known_divergent{stream="content"}` on the three ethosengine pods drains to ≤2

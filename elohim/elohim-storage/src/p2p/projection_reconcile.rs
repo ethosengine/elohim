@@ -990,6 +990,52 @@ pub(crate) fn declared_divergence_should_route_to_contest(
         && !local_has_canonical_election
 }
 
+/// Should an UNDECLARED row whose divergence heal just answered `Refreshed` be
+/// handed to the adopt/contest arm? — the SPIN discharge (2026-08-14), sibling
+/// of [`declared_divergence_should_route_to_contest`] one authority plane down.
+///
+/// ## The dead-end this opens
+///
+/// The `Refreshed` outcome was the LAST refusal site with no candidate
+/// admission: an anchor-divergent UNDECLARED row resolves fine (the own
+/// conductor answers the head the row already holds), stamps as a no-op, and is
+/// pushed to NO candidate list — while `ContestPeer` requires `local_declared`
+/// and ghost-decay requires an observed-ABSENT conductor. The DHT election
+/// therefore received a candidate from NEITHER side of an undeclared two-way
+/// root conflict, and the ids cycled through the [`MissLedger`] forever
+/// (`known_divergent{stream="content"}` = 13/13/13 on the household mesh,
+/// zero `Healed` outcomes, membership rotating through admit→exhaust→readmit).
+///
+/// Admitting the row changes NO decision logic: it flows into
+/// [`crate::services::head_adoption::decide_head_action`] as
+/// `(conductor_canonical=false, peer_declared=false, local_declared=false,
+/// election=false, divergent=true)` → `ContestDivergent` — symmetric
+/// self-candidacy, the one supply act available to this class (the head-record
+/// responder's hint-inflation guard makes peer-head candidacy structurally
+/// impossible for an undeclared advertiser, by design).
+///
+/// Four conditions, all required:
+/// - **`!answer_canonical`** — a canonical answer means an election already
+///   exists; the ordinary heal obeys it.
+/// - **`!local_declared`** — the declared half is
+///   [`declared_divergence_should_route_to_contest`]'s case.
+/// - **`peer_advertises_divergent_anchor`** — the live evidence: a peer
+///   advertised a different non-empty anchor for this id THIS sweep and the id
+///   was ADMITTED as actionable divergence.
+/// - **`!local_has_canonical_election`** — QUIESCENCE, same as every contest
+///   gate: a settled row is never re-contested.
+pub(crate) fn undeclared_divergence_should_route_to_contest(
+    answer_canonical: bool,
+    local_declared: bool,
+    peer_advertises_divergent_anchor: bool,
+    local_has_canonical_election: bool,
+) -> bool {
+    !answer_canonical
+        && !local_declared
+        && peer_advertises_divergent_anchor
+        && !local_has_canonical_election
+}
+
 /// Should a CONDUCTOR-MISSING row (`resolve_content_head` answered `Ok(None)`)
 /// also be routed to the adopt-before-author arm?
 ///
@@ -1731,6 +1777,7 @@ pub async fn run_heal(
         ids_discovered: content_ids_discovered,
         local_anchored,
         peer_head_hints,
+        divergent_actionable_advertisers,
         measured: content_measured,
     } = content;
     // Same measured-gate as the REA arm above (see its comment for the why).
@@ -1756,6 +1803,7 @@ pub async fn run_heal(
         pool,
         &pacing,
         &peer_head_hints,
+        &divergent_actionable_advertisers,
         resolver,
     )
     .await;
@@ -1811,6 +1859,8 @@ pub async fn run_heal(
         hints: &peer_head_hints,
         fetcher: Some(&head_record_fetcher),
         contest_enabled: crate::config::contest_two_way_declared_enabled(),
+        divergent_advertisers: &divergent_actionable_advertisers,
+        contest_divergent_enabled: crate::config::contest_undeclared_divergence_enabled(),
     };
 
     // Deferred adoptions FIRST: these are ids the heal leg just refused to
@@ -2784,6 +2834,13 @@ pub struct ContentDiscovery {
     /// has no anchor for is not a "gap" the heal leg tracks, yet it is precisely
     /// the row the witness sweeps are about to mint a competing root for.
     peer_head_hints: crate::services::head_adoption::PeerHeadHints,
+    /// SPIN-discharge evidence (2026-08-14): `content_id → advertising peer`
+    /// for the ACTIONABLE anchor-divergent ids this sweep ADMITTED — the exact
+    /// population `known_divergent{stream="content"}` publishes. One authority
+    /// plane below [`Self::peer_head_hints`]: an anchor advertisement, never a
+    /// declaration. Consumed by the heal leg's `Refreshed` admission and by
+    /// `AdoptContext::divergent_advertisers`.
+    divergent_actionable_advertisers: std::collections::HashMap<String, String>,
     /// This arm actually OBSERVED the state it reports — see
     /// [`ReaDiscovery::measured`].
     measured: bool,
@@ -2804,6 +2861,7 @@ impl ContentDiscovery {
             ids_discovered: 0,
             local_anchored: 0,
             peer_head_hints: crate::services::head_adoption::PeerHeadHints::new(),
+            divergent_actionable_advertisers: std::collections::HashMap::new(),
             measured: false,
         }
     }
@@ -3207,8 +3265,15 @@ async fn discover_content(
     let mut exhausted_divergent = 0usize;
     let divergent_set: std::collections::HashSet<&String> = divergent_ids.iter().collect();
     let mut admitted: Vec<String> = Vec::with_capacity(gap_ids.len());
+    // SPIN-discharge evidence: the ADMITTED share of actionable divergence,
+    // with the peer that advertised each id — exactly the population the
+    // `known_divergent` gauge publishes, which is the population the discharge
+    // arm exists to drain.
+    let mut divergent_actionable_advertisers: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
     for id in gap_ids {
         let evidence = advertised_anchor.get(&id).map(String::as_str).unwrap_or("");
+        let actionable_divergent = divergent_set.contains(&id) && !declared_ids.contains(&id);
         match misses.admit(
             PROJECTION_INVENTORY_TABLE_CONTENT,
             &id,
@@ -3220,9 +3285,16 @@ async fn discover_content(
             // `known_divergent{content}` read ≈ the whole refused population
             // (matthew: ~6071) and never drain — the exact total-shaped trap
             // `divergent_actionable` exists to avoid on the per-sweep gauge.
-            divergent_set.contains(&id) && !declared_ids.contains(&id),
+            actionable_divergent,
         ) {
-            Admission::Retry => admitted.push(id),
+            Admission::Retry => {
+                if actionable_divergent {
+                    if let Some(peer) = discovered_by.get(&id) {
+                        divergent_actionable_advertisers.insert(id.clone(), peer.clone());
+                    }
+                }
+                admitted.push(id)
+            }
             Admission::Exhausted => {
                 exhausted_persistent += 1;
                 // Count ONLY ids the declaration predicate did not already
@@ -3246,6 +3318,7 @@ async fn discover_content(
 
     ContentDiscovery {
         tracker,
+        divergent_actionable_advertisers,
         discovered_by,
         divergent_anchor,
         divergent_refused,
@@ -3372,6 +3445,7 @@ async fn heal_content(
     pool: &DbPool,
     pacing: &HealPacing,
     peer_head_hints: &crate::services::head_adoption::PeerHeadHints,
+    divergent_actionable: &std::collections::HashMap<String, String>,
     resolver: &dyn crate::services::head_batch_resolver::HeadBatchResolver,
 ) -> ContentHealOutcome {
     let app_ctx = crate::db::AppContext::default_lamad();
@@ -3706,6 +3780,51 @@ async fn heal_content(
                                 "content",
                                 HealOutcomeKind::Refreshed.label(),
                             );
+
+                            // SPIN-DISCHARGE ADMISSION (2026-08-14). A Refreshed
+                            // outcome against ACTIONABLE anchor divergence is the
+                            // undeclared two-way root conflict: both sides hold
+                            // genuine roots, neither declared, and this was the
+                            // ONLY refusal site with no candidate admission — the
+                            // election received a candidate from neither side and
+                            // the id spun through the MissLedger forever. Candidate
+                            // ADMISSION only; the decision rule answers
+                            // `ContestDivergent` (symmetric self-candidacy).
+                            //
+                            // The election read is conservative on failure —
+                            // `(None, true)` reads as election-standing, which the
+                            // predicate refuses (a spurious admission re-contests a
+                            // decided question; same rule as the declared arm).
+                            if crate::config::contest_undeclared_divergence_enabled()
+                                && divergent_actionable.contains_key(id.as_str())
+                            {
+                                let (declared, has_election) = pool
+                                    .get()
+                                    .ok()
+                                    .and_then(|mut c| {
+                                        crate::db::content_diesel::declared_head_with_election(
+                                            &mut c, &app_ctx, &id,
+                                        )
+                                        .ok()
+                                    })
+                                    .unwrap_or((None, true));
+                                if undeclared_divergence_should_route_to_contest(
+                                    head.canonical,
+                                    declared.is_some(),
+                                    true,
+                                    has_election,
+                                ) {
+                                    adopt_candidates.push(AdoptCandidate {
+                                        id: id.clone(),
+                                        // The conductor's own (non-canonical) answer,
+                                        // already paid for — the pre-flight reads
+                                        // `canonical=false` from evidence and its
+                                        // divergence input from the same map that
+                                        // admitted this id.
+                                        head: Some(head.clone()),
+                                    });
+                                }
+                            }
                         }
                         Ok(crate::db::content_diesel::StampOutcome::SkippedDeclared) => {
                             // Row already carries a DIFFERENT declared head — the heal
@@ -6739,6 +6858,81 @@ mod tests {
         );
     }
 
+    /// SPIN-DISCHARGE ADMISSION: all four conditions are required. The live
+    /// dead-end (2026-08-14): anchor-divergent UNDECLARED rows on the household
+    /// mesh (`known_divergent{content}` = 13/13/13, zero `Healed`) spun through
+    /// Refreshed→MissLedger forever because the election received a candidate
+    /// from NEITHER side of an undeclared two-way root conflict.
+    #[test]
+    fn undeclared_divergence_admission_requires_all_four_conditions() {
+        // The live SPIN shape: non-canonical answer, undeclared row, actionable
+        // divergence evidence, no election ⇒ admit.
+        assert!(
+            undeclared_divergence_should_route_to_contest(false, false, true, false),
+            "the SPIN class the election never heard from"
+        );
+        assert!(
+            !undeclared_divergence_should_route_to_contest(true, false, true, false),
+            "a canonical answer means an election exists — the ordinary heal obeys it"
+        );
+        assert!(
+            !undeclared_divergence_should_route_to_contest(false, true, true, false),
+            "the DECLARED half belongs to declared_divergence_should_route_to_contest"
+        );
+        assert!(
+            !undeclared_divergence_should_route_to_contest(false, false, false, false),
+            "no live divergence evidence, nothing to contest"
+        );
+        assert!(
+            !undeclared_divergence_should_route_to_contest(false, false, true, true),
+            "QUIESCENCE: a row already obeying an election must never be re-admitted"
+        );
+    }
+
+    /// The two contest admissions PARTITION the divergent space on the declared
+    /// axis: a row is eligible for at most one of them, so no row can be
+    /// double-pushed and no divergent-undeclared or divergent-declared row falls
+    /// through both.
+    #[test]
+    fn the_two_contest_admissions_never_both_fire() {
+        for canonical in [false, true] {
+            for declared in [false, true] {
+                for peer_evidence in [false, true] {
+                    for election in [false, true] {
+                        let declared_route = declared_divergence_should_route_to_contest(
+                            canonical,
+                            declared,
+                            peer_evidence,
+                            election,
+                        );
+                        let undeclared_route = undeclared_divergence_should_route_to_contest(
+                            canonical,
+                            declared,
+                            peer_evidence,
+                            election,
+                        );
+                        assert!(
+                            !(declared_route && undeclared_route),
+                            "a row must not be claimed by both contest routes \
+                             (canonical={canonical}, declared={declared}, \
+                              evidence={peer_evidence}, election={election})"
+                        );
+                        // And together they cover the whole actionable divergent
+                        // space: any non-canonical, evidence-backed, un-settled
+                        // row is claimed by exactly one of them.
+                        if !canonical && peer_evidence && !election {
+                            assert!(
+                                declared_route || undeclared_route,
+                                "an actionable divergent row fell through both \
+                                 contest routes (declared={declared})"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Admission and the gapfill guard PARTITION the divergent space: a row is
     /// eligible for at most one of them, so no row can be double-pushed and no
     /// row in the class falls through both.
@@ -7695,6 +7889,7 @@ mod tests {
             &pool,
             &HealPacing::test_fast(),
             &hints,
+            &std::collections::HashMap::new(),
             resolver,
         )
         .await
@@ -7910,6 +8105,7 @@ mod tests {
             &pool,
             &pacing,
             &hints,
+            &std::collections::HashMap::new(),
             &mock,
         )
         .await;
@@ -7979,6 +8175,7 @@ mod tests {
             &pool,
             &pacing,
             &hints,
+            &std::collections::HashMap::new(),
             &mock,
         )
         .await;

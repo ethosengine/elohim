@@ -79,6 +79,17 @@
 //!   reasoning is why the contest backoff is witnessed as its own two-state table
 //!   ([`tests::the_contest_backoff_is_never_a_permanent_exclusion`]) rather than
 //!   folded in here.
+//! - **Anchor-plane divergence without declarations (the SPIN class).** The table's
+//!   peer dimension models DECLARATION advertisements (`PeerHeadHints`); a peer
+//!   holding a genuinely different ROOT while advertising no declaration is not a
+//!   state it carries — which is exactly how that class stayed an invisible
+//!   absorbing state until 2026-08-14 (`known_divergent{content}` pinned at
+//!   13/13/13, zero `Healed`). Adding the dimension here would force both
+//!   historical reconstructions to model evidence that postdates them (the same
+//!   trade the courier note below declines), so the class gets its own witness
+//!   instead: [`tests::the_spin_class_discharge_is_flag_shaped`], driven by the
+//!   live `undeclared_divergence_should_route_to_contest` + `decide_head_action`
+//!   predicates and parameterised by `config.contest_undeclared_divergence`.
 //! - **Node-level configuration.** Whether this node has a head-record fetcher wired
 //!   at all is a startup fact, not a row state; see the courier note on the
 //!   election-obey arm in [`live_transitions_with`].
@@ -415,7 +426,10 @@ fn live_transitions_with(s: &RowState, contest_enabled: bool) -> Vec<Transition<
         OwnAnswer::Timeout => unreachable!("handled by the transient arm above"),
     };
 
-    // (3) THE DECISION RULE.
+    // (3) THE DECISION RULE. `peer_divergent_anchor` is `false` here because
+    // anchor-plane divergence is not a dimension of this table (see the module
+    // doc's scope note) — the SPIN class is witnessed separately by
+    // [`tests::the_spin_class_discharge_is_flag_shaped`].
     if admitted {
         match decide_head_action(
             answer_canonical,
@@ -423,6 +437,7 @@ fn live_transitions_with(s: &RowState, contest_enabled: bool) -> Vec<Transition<
             s.declared,
             s.election,
             contest_enabled,
+            false,
         ) {
             HeadDecision::AdoptLocal => out.push(
                 Transition::automated(
@@ -470,8 +485,11 @@ fn live_transitions_with(s: &RowState, contest_enabled: bool) -> Vec<Transition<
             }
             // Hold and Author move nothing on this side by design. Whether that is
             // a correct refusal or a deadlock is the question this whole table asks,
-            // and it is answered below rather than asserted here.
-            HeadDecision::Hold | HeadDecision::Author => {}
+            // and it is answered below rather than asserted here. ContestDivergent
+            // is unreachable with `peer_divergent_anchor = false` (pinned by
+            // `contest_divergent_is_reachable_only_from_the_undeclared_divergent_corner`
+            // in `head_adoption`); its liveness claim lives in the SPIN witness.
+            HeadDecision::Hold | HeadDecision::Author | HeadDecision::ContestDivergent => {}
         }
     }
 
@@ -492,7 +510,7 @@ fn live_transitions_with(s: &RowState, contest_enabled: bool) -> Vec<Transition<
                 }),
             );
         } else if declared_divergence_should_route_to_contest(false, true, true, false)
-            && decide_head_action(false, true, true, false, contest_enabled)
+            && decide_head_action(false, true, true, false, contest_enabled, false)
                 == HeadDecision::ContestPeer
         {
             // The peer's own state, run through the peer's own two gates: it is
@@ -641,8 +659,12 @@ fn pre_wave5_transitions(s: &RowState) -> Vec<Transition<RowState>> {
                     );
                 }
             }
-            // No ContestPeer arm existed.
-            HeadDecision::ContestPeer | HeadDecision::Hold | HeadDecision::Author => {}
+            // No ContestPeer arm existed — and no ContestDivergent either (the
+            // SPIN discharge postdates this reconstruction by twelve days).
+            HeadDecision::ContestPeer
+            | HeadDecision::ContestDivergent
+            | HeadDecision::Hold
+            | HeadDecision::Author => {}
         }
     }
 
@@ -1316,6 +1338,129 @@ mod tests {
         assert!(
             report.transitions_enumerated >= 1,
             "the flag-on leg must enumerate the adopt-before-author transition: {report}"
+        );
+    }
+
+    /// **The SPIN class has a discharge, and the discharge is flag-shaped.**
+    ///
+    /// The class (canonicalized 2026-08-14,
+    /// `genesis/data/timeline/backlog/spin-divergent-undeclared-rows-block-a-convergence.md`):
+    /// two peers each hold a genuine root for an id, NEITHER ever declared, and
+    /// each conductor answers its own root every sweep — `StampOutcome::Refreshed`
+    /// forever, `known_divergent{stream="content"}` pinned at 13/13/13 across the
+    /// household mesh with zero `Healed` outcomes. Every pre-existing lever was
+    /// structurally out of reach (ContestPeer needs `local_declared`; ghost-decay
+    /// needs `Answer::Absent`; the responder's hint-inflation guard forecloses
+    /// peer-head candidacy), so the DHT election received a candidate from
+    /// NEITHER side: an absorbing state the main table above is scope-blind to
+    /// (see the module doc's scope note).
+    ///
+    /// The discharge is symmetric SELF-CANDIDACY (`contest_divergent`), gated by
+    /// `config.contest_undeclared_divergence` — default ON, unlike
+    /// adopt-before-author, because a node with a chain nominating its own
+    /// genuinely-held root is a safe supply act. So the two legs here carry the
+    /// INVERSE burden of the residual witness above: leg A proves the
+    /// kill-switch is a true rollback (OFF returns the class to its pre-cure
+    /// manual-only spin), leg B proves the shipped default actually discharges.
+    #[test]
+    fn the_spin_class_discharge_is_flag_shaped() {
+        #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+        enum Spin {
+            /// Undeclared on both sides, anchors genuinely divergent, no election
+            /// — the class that spun through the MissLedger forever.
+            UndeclaredTwoWayRootDivergence,
+            /// A canonical-head candidate exists on the DHT. From here the MAIN
+            /// table owns the row: the minting side's next resolve answers
+            /// canonical (AdoptLocal/HealCanonical fills it), the peer's obey
+            /// arm reads the same election, and the settled-declared rows are
+            /// proven Terminal above.
+            ElectionSupplied,
+        }
+
+        /// Driven by the LIVE predicates, with the config bit folded exactly
+        /// where the production call sites fold it: the `Refreshed`-site
+        /// admission checks `contest_undeclared_divergence_enabled()` before
+        /// consulting the predicate, and the pre-flight folds the same bit into
+        /// `decide_head_action`'s `peer_divergent_anchor` input.
+        fn spin_transitions(flag_on: bool) -> impl Fn(&Spin) -> Vec<Transition<Spin>> {
+            use crate::p2p::projection_reconcile::undeclared_divergence_should_route_to_contest;
+            move |s: &Spin| match s {
+                Spin::ElectionSupplied => vec![],
+                Spin::UndeclaredTwoWayRootDivergence => {
+                    // The live admission: non-canonical answer, undeclared row,
+                    // actionable divergence evidence this sweep, no election.
+                    let admitted = flag_on
+                        && undeclared_divergence_should_route_to_contest(false, false, true, false);
+                    // The live decision, at the shipped contest configuration.
+                    let decision =
+                        decide_head_action(false, false, false, false, CONTEST_ENABLED, admitted);
+                    if admitted && decision == HeadDecision::ContestDivergent {
+                        vec![Transition::automated(
+                            "contest_divergent: nominate THIS node's own genuinely-held head as \
+                             a canonical-election candidate (chain exists — the conductor just \
+                             answered it; target locally retrievable — it is our own action); \
+                             the peer's symmetric sweep nominates its root, \
+                             select_canonical_winner arbitrates, and both rows converge \
+                             through the ordinary canonical heal",
+                        )
+                        .to(Spin::ElectionSupplied)]
+                    } else {
+                        vec![Transition::deploy(
+                            "operator flip of CONTEST_UNDECLARED_DIVERGENCE back on, or a \
+                             manual canonical stamp — with the kill-switch thrown the class \
+                             returns to its pre-2026-08-14 MissLedger spin \
+                             (Refreshed → dormant → re-admitted, forever), which C3 refuses \
+                             to count as an exit",
+                        )
+                        .to(Spin::ElectionSupplied)]
+                    }
+                }
+            }
+        }
+
+        fn classify(s: &Spin) -> StateClass {
+            match s {
+                Spin::ElectionSupplied => StateClass::Terminal(
+                    "a candidate exists; the settled-row machinery proven in the main table \
+                     owns the row from here",
+                ),
+                Spin::UndeclaredTwoWayRootDivergence => StateClass::Live,
+            }
+        }
+
+        const STATES: &[Spin] = &[Spin::UndeclaredTwoWayRootDivergence, Spin::ElectionSupplied];
+
+        // ── LEG A — KILL-SWITCH THROWN. The class must honestly return to its
+        // absorbing pre-cure shape: if this leg ever passes, the flag stopped
+        // gating the arm and the rollback story is a lie.
+        let failure = check_liveness(STATES, classify, spin_transitions(false)).expect_err(
+            "with CONTEST_UNDECLARED_DIVERGENCE off the SPIN class must have no automated \
+             exit — if this passes, the kill-switch no longer gates the discharge",
+        );
+        assert!(
+            failure.has_class(
+                seam_contracts::harness::liveness::LivenessViolationClass::ManualOnlyExit
+            ),
+            "{failure}"
+        );
+
+        // ── LEG B — THE SHIPPED DEFAULT (flag ON). The discharge is real: the
+        // live admission predicate + the live decision rule produce the
+        // ContestDivergent transition, and the harness finds the exit.
+        let report =
+            check_liveness(STATES, classify, spin_transitions(true)).unwrap_or_else(|failure| {
+                panic!(
+                    "contest_divergent is supposed to be the SPIN class's automated exit; the \
+                     harness cannot find one:\n{failure}"
+                )
+            });
+        assert!(
+            report.progress_checked,
+            "the flag-on leg must actually check progress, not merely enumerate: {report}"
+        );
+        assert!(
+            report.transitions_enumerated >= 1,
+            "the flag-on leg must enumerate the contest_divergent transition: {report}"
         );
     }
 }
