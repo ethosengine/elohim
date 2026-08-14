@@ -316,6 +316,33 @@ operator-owned. Real cost: these PVCs are openebs-hostpath and node-pinned, so
 moving a conductor is a DATA MIGRATION, not a reschedule, and a mishandled move
 re-keys an agent (`ALLOW_DNA_REINSTALL` discipline).
 
+## OPEN sub-item 2026-08-14 — adam does not appear in Pyroscope, while every other peer does
+
+After edge #1348 deployed the pprof endpoint fleet-wide (~18:20Z), Pyroscope's
+`{service_name="elohim-alpha/elohim-node"}` lists **6 of 7 pods** — eve, gertrude,
+james, jessica, matthew, susan. **adam is missing**, sustained across a 10-minute
+window, and it is NOT a health or reachability problem: `up{job="elohim-alpha/
+elohim-edgenode", pod="elohim-adam-alpha-0"} == 1`, i.e. Prometheus scrapes adam on
+the very same `storage-http:8090` port the profile scrape targets.
+
+Cause NOT determined. Candidates, in the order worth checking:
+
+1. **Per-human manifest divergence.** adam is a genesis/bootstrap-pair member, and the
+   deploy path already special-cases that pair (STS-unchanged restart skip,
+   `9f9c4aec4`). If adam's rendered pod spec did not pick up the new annotations or
+   `ELOHIM_PPROF_ENABLED`, it would be invisible to the scraper while perfectly
+   healthy. Note matthew is the *other* pair member and DOES appear, so pair
+   membership alone is not the explanation.
+2. **The endpoint failing on adam specifically.** adam is the pod with the largest CPU
+   limit and zero answered head-batch calls; a profile that never completes within the
+   scrape timeout would yield no series.
+3. **An Alloy discovery gap** for that one pod.
+
+Discriminating evidence is operator-side (the rendered pod spec / Alloy targets), which
+is why this is filed rather than guessed. Cheap first check: confirm whether adam's
+running pod carries the `profiles.grafana.com/cpu.*` annotations and the
+`ELOHIM_PPROF_ENABLED` env at all.
+
 ## CEILING ITEM 2026-08-14 — the shem remedy choice, with the evidence that exists
 
 Queued for the operator by the saga leg-2 shift. **The decision is not blocked on
