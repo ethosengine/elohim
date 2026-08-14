@@ -211,6 +211,18 @@ habits:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
       - "sweettest rea_commitment_replication (elohim/holochain/tests/sweettest — unignored 837b772c9; isolated late-join conductors, bounded 60s peer-B retrieval; RED but MIS-ATTRIBUTED per DELTA 2026-08-09 — it measures one-time cold-cell Wasm warm-up, not REA retrieval; do not read it as a fetch-seam probe until it warms peer B)"
     evidence: >
+      DELTA 2026-08-14 (run #1345 banked, post ethosengine thermal crash +
+      cure deploy #1344): notary-authority 0p/3f — all three legs red on
+      the CRASH-RECOVERED A side, which never converged during the quiesce
+      window (A-converged=0.0 throughout; the gate anchored on actionable=0,
+      an exhaustion-quiet, not convergence — gate-predicate gap worth
+      naming). Same run banked ch11 first-green + recorded honest crash
+      regressions on ch02/03/07/10 (matthew-side member rows, served-head/
+      blob coherence, shard custody, stewarding counts). The ch04 doorway
+      code cure (f125282a8, one pooled client per storage upstream — the
+      SSR client's doomed fetches were poisoning the shared breaker) is
+      live-proven (both doorways GET / 200 x-ssr-rendered:1 at 22:52Z);
+      its chapter re-greens when the A-side substrate re-converges.
       DELTA 2026-08-11 (decay-reach measured, edge #1341 deployed): the
       overnight soak's open question — why susan/eve/gertrude authored ZERO
       decays in 17h while holding the largest phantom cohorts — is answered,
@@ -530,6 +542,12 @@ habits:
       - "epr flow stocks --window <START..END> --per week --stock commitments --check --root /projects/elohim (exit 0 = every declared stock draining; fail-closed: refusals exit non-zero, never green-on-nothing)"
       - "a2o @concern:dev-system-equilibrium (genesis/a2o/features/devflow/run-plane.feature — 4 scenarios: filling exits non-zero, drain>=inflow exits zero, an unmeasurable window refuses rather than reporting equilibrium, and the @regression guard that a discharge counts as outflow and never as inflow. @wip: no step definitions drive them yet, so this check runs in NO suite today — the CLI clause above is the only executing proof)"
     evidence: >
+      DELTA 2026-08-14: FIRST OUTFLOW — banked run #1345 (validate-only,
+      quiesce-gated) fulfilled 2 commitments (ch11 pull-queue-retires
+      first-ever green + 1); 2026-08-08..2026-08-15 --per week reads
+      outflow 2.000/wk (was 0.000 since birth), level 561->559, verdict
+      still FILLING (inflow 23.000/wk, net +21), CHECK=1 — the drain arm
+      is witnessed live, the equilibrium target stands.
       DELTA 2026-08-13: T8 close-the-loop — a2o scenarios landed
       (@concern:run-plane-note, @concern:run-plane-projection,
       @concern:dev-system-equilibrium; step-def wiring NOT written — all 11
