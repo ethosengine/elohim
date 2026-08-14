@@ -325,23 +325,35 @@ window, and it is NOT a health or reachability problem: `up{job="elohim-alpha/
 elohim-edgenode", pod="elohim-adam-alpha-0"} == 1`, i.e. Prometheus scrapes adam on
 the very same `storage-http:8090` port the profile scrape targets.
 
-Cause NOT determined. Candidates, in the order worth checking:
+**Not a rollout artifact:** still absent after the fleet settled, checked again 40+
+minutes post-deploy.
 
-1. **Per-human manifest divergence.** adam is a genesis/bootstrap-pair member, and the
-   deploy path already special-cases that pair (STS-unchanged restart skip,
-   `9f9c4aec4`). If adam's rendered pod spec did not pick up the new annotations or
-   `ELOHIM_PPROF_ENABLED`, it would be invisible to the scraper while perfectly
-   healthy. Note matthew is the *other* pair member and DOES appear, so pair
-   membership alone is not the explanation.
-2. **The endpoint failing on adam specifically.** adam is the pod with the largest CPU
-   limit and zero answered head-batch calls; a profile that never completes within the
-   scrape timeout would yield no series.
+**"adam didn't get the build" is REFUTED.** `kube_pod_container_info{container=
+"elohim-node"}` shows all seven pods — adam included — running the identical image
+`harbor.ethosengine.com/ethosengine/elohim-storage-iroh:1.0.0-dev-0fe552ed`, same
+`image_id` digest `sha256:73aee0a8…`. adam carries the pprof binary.
+
+Remaining candidates:
+
+1. **The profile never completes on adam.** The endpoint deliberately BLOCKS for the
+   requested window (default 15s) and does its sampling inside a
+   `tokio::task::spawn_blocking` closure. On a pod whose runtime is saturated, that
+   closure can be delayed past the scraper's timeout, yielding no series at all.
+   **This would make adam's absence itself a symptom of adam's pathology** — the
+   condition we want to profile obstructing its own profiling. adam is precisely the
+   pod with the largest CPU limit, the most headroom on paper, and ZERO answered
+   head-batch calls in 24h, so this candidate is not idle speculation.
+2. **Pod-spec divergence in annotations/env** (not image — that is refuted above).
+   adam is a genesis/bootstrap-pair member and the deploy path special-cases that pair
+   (STS-unchanged restart skip, `9f9c4aec4`). Note matthew is the OTHER pair member and
+   does appear, so pair membership alone does not explain it.
 3. **An Alloy discovery gap** for that one pod.
 
-Discriminating evidence is operator-side (the rendered pod spec / Alloy targets), which
-is why this is filed rather than guessed. Cheap first check: confirm whether adam's
-running pod carries the `profiles.grafana.com/cpu.*` annotations and the
-`ELOHIM_PPROF_ENABLED` env at all.
+Cheap discriminators, in order: does adam's running pod carry the
+`profiles.grafana.com/cpu.*` annotations and `ELOHIM_PPROF_ENABLED` (settles 2);
+does a manual `GET /debug/pprof/profile?seconds=1` from inside the cluster return on
+adam (settles 1 — a short window that still hangs is strong evidence for saturation).
+Both are operator-side, which is why this is filed rather than guessed.
 
 ## CEILING ITEM 2026-08-14 — the shem remedy choice, with the evidence that exists
 
