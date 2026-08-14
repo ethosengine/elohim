@@ -113,6 +113,7 @@ pub mod metadata;
 pub mod metrics; // Durable Prometheus app-metrics surface (/metrics) — design-decision toolkit P0
 pub mod mishpat_projection; // Mishpat commitment projection handler (DHT → SQLite sync, Slice-2a T5)
 pub mod observation; // Observation/Event Layer — peer-witnessed evidence (Track 2 substrate)
+pub mod pprof_endpoint; // Go-compatible /debug/pprof/profile CPU exposition — env-gated, default OFF
 pub mod rea_projection; // REA projection signal handler (DHT → SQLite sync)
 pub mod recursion; // CoverageRollup — aggregate-with-descent keystone (recursive-architecture §2.1)
 pub mod shard_service;

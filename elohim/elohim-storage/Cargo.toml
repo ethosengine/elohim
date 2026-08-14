@@ -301,6 +301,59 @@ cozo = { version = "0.7", default-features = false, features = ["storage-sled", 
 # hyper directly and hand-roll the handler (read body → execute → serialize response).
 async-graphql = { version = "7", optional = true }
 
+# CPU profiling — Go-compatible pprof exposition for the Grafana Alloy /
+# Pyroscope scraper (`GET /debug/pprof/profile?seconds=N`, env-gated by
+# ELOHIM_PPROF_ENABLED, default OFF). See src/pprof_endpoint/.
+#
+# NO CODEC FEATURE — this is load-bearing, not an oversight. BOTH of pprof's
+# protobuf codec features are UNBUILDABLE in this crate, for the same reason:
+#
+#   This crate compiles under RUSTFLAGS='--cfg getrandom_backend="custom"'
+#   (see src/getrandom_custom.rs — the holochain dep family requires it). Cargo
+#   applies RUSTFLAGS to BUILD SCRIPTS too when no explicit `--target` is
+#   passed, and a build-script binary has no access to our `#[no_mangle]
+#   __getrandom_v03_custom` shim (that symbol is linked into the lib/bin, not
+#   into host build artifacts). So ANY build-dependency that transitively links
+#   `getrandom` fails at link time with:
+#       rust-lld: error: undefined symbol: __getrandom_v03_custom
+#         >>> referenced by ... libtempfile-*.rlib
+#
+#   * `protobuf-codec` → build-dep `protobuf-codegen` → `protobuf-parse` →
+#     `tempfile` → `getrandom`. Verified failing 2026-08-14.
+#   * `prost-codec`    → build-dep `prost-build` → `tempfile` → `getrandom`,
+#     AND it pins `prost 0.12`/`prost-build 0.12` against this tree's 0.14.1,
+#     forking a second prost. Doubly rejected.
+#   * The `_protobuf` gate cannot be reached without one of those two features
+#     (pprof's `protos` module is `cfg(prost-codec)` / `cfg(protobuf-codec)`).
+#
+# The escape hatch that DOES work — `cargo build --target x86_64-unknown-linux-gnu`,
+# which stops cargo passing RUSTFLAGS to build scripts (verified: pprof's build
+# script links clean that way) — is deliberately NOT taken here. It would move
+# every artifact path in this crate's Dockerfile, justfile, pre-push gate and
+# edge pipeline. That is a build-convention change for the whole crate, not a
+# profiling-leg change.
+#
+# So: pprof supplies the SAMPLER only (`ProfilerGuardBuilder` → `Report`, whose
+# `data`/`timing` fields are public), and `pprof_endpoint::profile_proto`
+# encodes Google's profile.proto with prost. No build script, no codegen.
+#
+# default-features = false also drops pprof's default `cpp` feature (the
+# symbolic-demangle C++ demangler); Rust symbol demangling is retained via
+# symbolic-demangle's `rust` feature, which pprof declares unconditionally.
+# nix 0.26 (pprof's signal/timer dep) already resolves at 0.26.4 here.
+pprof = { version = "0.15", default-features = false }
+
+# profile.proto encoder for the pprof body above. prost 0.14.1 is ALREADY the
+# resolved version in this tree; declaring it direct adds no new package and no
+# build script (prost-derive is a proc macro with no getrandom in its tree).
+prost = "0.14"
+
+# gzip framing for the pprof body — Go's net/http/pprof returns a
+# gzip-compressed profile.proto, and google/pprof (which Pyroscope parses with)
+# sniffs the gzip magic. Emitting the same framing keeps the endpoint
+# byte-shaped like a Go target. Already in the resolved tree (1.1.5) via zip.
+flate2 = "1"
+
 # Cross-platform filesystem free-space probe (peer-stewarded availability heartbeat)
 fs4 = "0.8"
 

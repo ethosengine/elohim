@@ -1035,8 +1035,19 @@ impl HttpServer {
         // to win by racing the shed. Admission still applies to this route, just
         // AFTER authority is confirmed (see the `try_acquire_owned` call inside
         // `handle_content_head`, right before the conductor write).
+        // `/debug/pprof/profile` is exempt for the opposite reason to /health:
+        // not because it is cheap, but because it deliberately BLOCKS for 1..60s.
+        // Holding a read-admission permit for the whole profile window is exactly
+        // the slot-starvation the split read/write pools exist to prevent. The
+        // endpoint carries its own, stricter admission control — the process-
+        // global `PPROF_BUSY` flag admits exactly one concurrent profile and
+        // answers 429 otherwise — so exempting it here removes a permit leak
+        // without removing backpressure. Inert unless ELOHIM_PPROF_ENABLED.
         let admission_exempt = method == Method::OPTIONS
-            || matches!(path.as_str(), "/health" | "/version")
+            || matches!(
+                path.as_str(),
+                "/health" | "/version" | "/debug/pprof/profile"
+            )
             || is_head_declare_write(&method, &path);
         let _admit = if admission_exempt {
             None
@@ -1106,6 +1117,22 @@ impl HttpServer {
                     .header(header::CONTENT_TYPE, "text/plain; version=0.0.4")
                     .body(Full::new(Bytes::from(body)))
                     .unwrap())
+            }
+
+            // CPU profiling — the Go `net/http/pprof` wire contract, so Grafana
+            // Alloy's `pyroscope.scrape` can treat this peer as an ordinary
+            // Go-pprof CPU target. Blocks for ?seconds=N (default 15, clamped
+            // 1..=60) and answers a gzip-framed profile.proto.
+            //
+            // Env-gated (ELOHIM_PPROF_ENABLED, default OFF): when disabled this
+            // guard fails, the arm never matches, and the route falls through to
+            // the 404 catch-all — which is precisely what a scraper sees from a
+            // peer that does not carry the endpoint. Honest absence, not error.
+            // Body + concurrency guard live in `crate::pprof_endpoint`; this arm
+            // stays a router line (http.rs LoC ceiling, finding a711583b7334).
+            (Method::GET, "/debug/pprof/profile") if crate::pprof_endpoint::is_enabled() => {
+                let seconds = crate::pprof_endpoint::parse_seconds(req.uri().query().unwrap_or(""));
+                Ok(crate::pprof_endpoint::profile_response(seconds).await)
             }
 
             // Shard API

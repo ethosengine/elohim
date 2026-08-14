@@ -215,6 +215,14 @@ spec:
         # FAIL-SAFE: on resolution failure the Jenkinsfile stamps a unique marker,
         # never empty/stale — the deploy still restarts rather than silently skew.
         elohim.host/happ-digest: "HAPP_DIGEST_PLACEHOLDER"
+        # Continuous CPU profiling — Grafana Alloy discovers pods by these
+        # annotations and scrapes the Go-compatible pprof endpoint elohim-storage
+        # serves on the storage-http port (env-gated by ELOHIM_PPROF_ENABLED
+        # below; the binary defaults OFF so non-alpha deployments stay silent).
+        # port_name (not port) so the target follows the named containerPort.
+        profiles.grafana.com/cpu.scrape: "true"
+        profiles.grafana.com/cpu.port_name: "storage-http"
+        profiles.grafana.com/cpu.path: "/debug/pprof/profile"
       labels:
         app: elohim-edgenode
         elohim-human: HUMAN_LABEL_PLACEHOLDER
@@ -485,6 +493,15 @@ spec:
             # Boot sentinel: "Dual: DualGossipPublisher wired into P2PNode". Rollback: "libp2p".
             - name: ELOHIM_TRANSPORT_BACKEND
               value: "dual"
+            # CPU profiling exposition — arms GET /debug/pprof/profile?seconds=N
+            # on the storage-http port for the Alloy/Pyroscope scraper (see the
+            # profiles.grafana.com/cpu.* annotations on this pod template).
+            # Default OFF in the binary; ON here because the alpha fleet IS the
+            # profiling target — the profile is what discriminates the shem
+            # host-starvation remedy (gossip-n² vs corpus-size vs write-backlog).
+            # Sampling is 100Hz for the requested window only, no steady-state cost.
+            - name: ELOHIM_PPROF_ENABLED
+              value: "true"
           ports:
             # Conductor admin WS — exposed via elohim-storage forwarder on
             # 8444 (bridges to 127.0.0.1:4444). See top-of-file Architecture
