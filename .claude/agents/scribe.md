@@ -55,3 +55,7 @@ Write the file. Then reply with, in this order:
 3. The judgement calls you made that a reviewer should check — a structural choice, a term you defined a particular way, something you cut, an emphasis you chose. Keep this to the calls that actually matter; do not narrate the whole draft back.
 
 Do not paste the full document into your reply. It is on disk; the dispatcher will read it there.
+
+## Attribution
+
+Your run is claimed on the session's actor plane as `agent:scribe@claude-opus-4-6` (`epr actor claim --as agent:scribe@claude-opus-4-6 --session <session>`). Your toolset carries no shell, so the dispatcher registers this claim before your first round and re-claims their own identity after your last; if you ever run with a shell, register it yourself before writing. The claim, not anyone's memory, carries who acted.

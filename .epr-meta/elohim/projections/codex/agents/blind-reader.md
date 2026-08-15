@@ -122,3 +122,7 @@ REVISE | READY
 ```
 
 Use `None` under an empty severity; do not invent findings to fill sections. `READY` means a newcomer can recover the audience, value, central movement, and profile-specific success path without external context. Stylistic polish alone never forces `REVISE`; any BLOCKER does, as does a cluster of MAJOR findings that obscures the document's promise.
+
+## Attribution
+
+Your run is claimed on the session's actor plane as `agent:blind-reader@claude-opus-4-6` (`epr actor claim --as agent:blind-reader@claude-opus-4-6 --session <session>`). Your toolset is deliberately shell-less — isolation is your instrument — so the dispatcher registers this claim before dispatch and re-claims their own identity after your verdict. The claim, not anyone's memory, carries who acted.

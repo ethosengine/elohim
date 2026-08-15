@@ -56,6 +56,11 @@ _ARCH_LEDGER_REL = ".claude/data/architecture-findings.jsonl"
 # hold, and six call sites threading an invariant is noise, not clarity.
 _EVALUATOR: dict | None = None
 
+# The claimed-actor answer from the native evaluator's `--session` payload, same lifecycle as
+# _EVALUATOR: set once from `native.get("actor")` when `epr` answered, left None when it did not
+# (no actor plane consulted != unclaimed — that distinction lives in epr_meta.witness).
+_ACTOR: dict | None = None
+
 
 def _witness(root: Path, *, subject, decision: str, cls: str | None, rule_id: str | None = None,
              policy_ref: str | None = None, refer: dict | None = None,
@@ -66,7 +71,7 @@ def _witness(root: Path, *, subject, decision: str, cls: str | None, rule_id: st
     break the gate — epr_meta.witness already wraps its body in try/except)."""
     epr_meta.witness(root, runtime="claude", gate="pre-tool-use", subject=subject,
                       decision=decision, cls=cls, rule_id=rule_id, policy_ref=policy_ref,
-                      refer=refer, checks=checks, evaluator=_EVALUATOR)
+                      refer=refer, checks=checks, evaluator=_EVALUATOR, actor=_ACTOR)
 
 
 def _advice_debounced(root: Path, key: str) -> bool:
@@ -291,6 +296,8 @@ def main():
                  checks=["malformed stdin JSON — failing open"])
         sys.exit(0)  # malformed stdin -> fail open, never silently (polarity law)
 
+    session_id = data.get("session_id")
+
     tool = data.get("tool_name", "")
     if tool not in ("Write", "Edit"):
         sys.exit(0)
@@ -400,8 +407,8 @@ def main():
     # advisories exist nowhere else. Single decision authority must not quietly
     # become less advice. Only a genuine dispute takes Rust's attribution too —
     # its decision, its reasons.
-    global _EVALUATOR
-    native = epr_client.govern(root, fp, content, is_new, is_new_subdir)
+    global _EVALUATOR, _ACTOR
+    native = epr_client.govern(root, fp, content, is_new, is_new_subdir, session=session_id)
     if native is None:
         _EVALUATOR = epr_meta.evaluator_identity()
         # Announce the missing second opinion only where there was a DECISION to
@@ -414,6 +421,7 @@ def main():
             advisories.append(epr_client.DEGRADED_NOTICE)
     else:
         _EVALUATOR = native.get("evaluator")
+        _ACTOR = native.get("actor")
         dispute = epr_client.disagreement(result, native)
         if dispute:
             # The dispute record names BOTH evaluators by content address, so a
