@@ -711,6 +711,24 @@ pub fn head_commit_epoch(root: &Path) -> Option<i64> {
 /// single child process rather than two. `None` when git has no history (a fresh, uncommitted
 /// tree) or when either half comes back empty — an unattributed record is refused by the caller,
 /// never filled in with a placeholder.
+/// Canonical UTC spelling for a git `%aI` timestamp.
+///
+/// Git's strict-ISO output is a moving target across versions: 2.47 prints a UTC author date
+/// as `+00:00`, 2.52 prints `Z`. These bytes reach content-addressed records, so left raw the
+/// SAME commit mints a DIFFERENT CID depending on which git binary ran the projection — caught
+/// live by `flow_coauthors::a_solo_produce_event_keeps_the_cid_…` (green on a 2.52 workstation,
+/// red on a 2.47 CI pod, one commit). Parseable RFC3339 re-encodes as UTC with `Z` at second
+/// precision: the instant is untouched, only the spelling is pinned. Unparseable input passes
+/// through verbatim — a strange date is still provenance, and refusing it would drop the record.
+pub(crate) fn normalize_git_timestamp(ts: &str) -> String {
+    match chrono::DateTime::parse_from_rfc3339(ts) {
+        Ok(dt) => dt
+            .with_timezone(&chrono::Utc)
+            .to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+        Err(_) => ts.to_string(),
+    }
+}
+
 pub fn head_commit_provenance(root: &Path) -> Option<(String, String)> {
     let out =
         crate::process::build_command("git", &["log", "-1", "--format=%ae%x1f%aI"], root, &[])
@@ -724,7 +742,7 @@ pub fn head_commit_provenance(root: &Path) -> Option<(String, String)> {
     if email.is_empty() || ts.is_empty() {
         return None;
     }
-    Some((email.to_string(), ts.to_string()))
+    Some((email.to_string(), normalize_git_timestamp(ts)))
 }
 
 /// Field separator inside one commit's line; record separator between trailer values.
@@ -786,7 +804,7 @@ fn parse_provenance_line(line: &str) -> Option<Provenance> {
     };
     Some(Provenance {
         author: email.to_string(),
-        occurred_at: ts.to_string(),
+        occurred_at: normalize_git_timestamp(ts),
         co_authors,
     })
 }
@@ -906,5 +924,37 @@ mod tests {
     #[test]
     fn an_authorless_line_is_refused_rather_than_attributed_to_nobody() {
         assert!(parse_provenance_line(&line("", "2026-08-15T12:00:00Z", "")).is_none());
+    }
+
+    #[test]
+    fn the_same_instant_spells_identically_whichever_git_printed_it() {
+        // git 2.47 prints a UTC author date as `+00:00`; 2.52 prints `Z`. Both must reach the
+        // record as the SAME bytes or the same commit mints two different CIDs (the live
+        // local-green/CI-red split behind flow_coauthors' solo-CID golden).
+        assert_eq!(
+            normalize_git_timestamp("2026-08-15T12:00:00+00:00"),
+            "2026-08-15T12:00:00Z"
+        );
+        assert_eq!(
+            normalize_git_timestamp("2026-08-15T12:00:00Z"),
+            "2026-08-15T12:00:00Z"
+        );
+    }
+
+    #[test]
+    fn a_non_utc_offset_is_converted_to_the_instant_not_the_spelling() {
+        // The author's own offset is provenance about their clock, but the ADDRESS must be
+        // offset-independent: same instant, same bytes, same CID.
+        assert_eq!(
+            normalize_git_timestamp("2026-08-15T14:00:00+02:00"),
+            "2026-08-15T12:00:00Z"
+        );
+    }
+
+    #[test]
+    fn an_unparseable_timestamp_passes_through_verbatim() {
+        // A strange date is still provenance; refusing it would drop the record entirely.
+        assert_eq!(normalize_git_timestamp("not-a-date"), "not-a-date");
+        assert_eq!(normalize_git_timestamp(""), "");
     }
 }

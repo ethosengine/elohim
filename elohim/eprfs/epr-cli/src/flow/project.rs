@@ -396,7 +396,7 @@ fn git_removals(root: &Path, pathspecs: &[String]) -> Vec<Removal> {
             let mut parts = header.split('\u{1f}');
             commit = parts.next().unwrap_or_default().to_string();
             author = parts.next().unwrap_or_default().to_string();
-            ts = parts.next().unwrap_or_default().to_string();
+            ts = super::normalize_git_timestamp(parts.next().unwrap_or_default());
             continue;
         }
         let mut cols = line.split('\t');
