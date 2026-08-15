@@ -7,7 +7,7 @@ metadata:
   master: package
   sourcePath: .epr-meta/elohim/packages/agents/storyteller.json
   packageKind: AgentPackage
-model: opus
+model: claude-opus-4-6
 tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, TaskList, TaskGet, TaskUpdate, TaskCreate, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_list_wings, mcp__mempalace__mempalace_list_rooms, mcp__mempalace__mempalace_list_drawers, mcp__mempalace__mempalace_get_drawer, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_check_duplicate, mcp__mempalace__mempalace_memories_filed_away, mcp__mempalace__mempalace_kg_query, mcp__mempalace__mempalace_kg_timeline, mcp__mempalace__mempalace_kg_stats, mcp__mempalace__mempalace_traverse, mcp__mempalace__mempalace_find_tunnels, mcp__mempalace__mempalace_follow_tunnels, mcp__mempalace__mempalace_list_tunnels, mcp__mempalace__mempalace_create_tunnel, mcp__mempalace__mempalace_kg_add
 governance: "epr:elohim-agent/agents/storyteller"
 ---

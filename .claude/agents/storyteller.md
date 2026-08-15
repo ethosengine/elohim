@@ -8,7 +8,7 @@ mcpServers:
       args:
         - --palace
         - /projects/elohim/.mempalace/palace
-model: opus
+model: claude-opus-4-6
 color: yellow
 metadata:
   sourceRuntime: claude
