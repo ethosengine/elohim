@@ -410,3 +410,163 @@ decisionPoints:
       - path: elohim/eprfs/epr-cli/src/flow/stocks.rs
         testName: a_unit_typo_reads_as_refused_never_as_a_drained_stock
         kind: unit
+
+  # ── Actor plane (2026-08-15) — registered at birth ──────────────────────────────────────────
+
+  - name: note::resolve_attribution
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/flow/note.rs
+      modulePath: elohim_epr_cli::flow::note
+      line: 386
+    summary: >
+      Whose act a note is, in three arms resolved before anything is appended: a named identity
+      (`--as`) outright, then a session's registered claim from the actor sidecar, then the
+      commit author exactly as this leg always attributed. The agent arms bind the steward
+      (git-signing human) beside the identity as one inseparable claim — an agent-provided note
+      with no steward is precisely the deniable shape.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          Every session-arm failure — no sidecar, no claim, an unreadable or tampered log — is
+          honest absence with a signal: the note falls through to author-attribution with a
+          one-line stderr notice naming the session at the only moment the miss is learnable,
+          and exits 0. The sidecar's existence is checked before open so a read never creates
+          the identity plane it is asking about.
+      - id: C5
+        status: answered
+        justification: >
+          Attribution is evidence riding the note, never authority over it: an enrichment that
+          can veto its subject is a dependency in the wrong direction, so the identity plane can
+          never cost the durable observation. The single refusal is a MALFORMED `--as` —
+          substituting the author for an identity the caller explicitly named would mint a
+          record asserting someone else spoke.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/src/flow/note.rs
+        testName: a_malformed_identity_is_refused_rather_than_replaced_by_the_author
+        kind: unit
+      - path: elohim/eprfs/epr-cli/src/flow/note.rs
+        testName: the_author_arm_carries_no_steward_and_the_agent_arms_always_do
+        kind: unit
+      - path: elohim/eprfs/epr-cli/tests/flow_note.rs
+        testName: note_event_cid_is_stable
+        kind: unit
+
+  - name: govern::actor_stamp
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/govern.rs
+      modulePath: elohim_epr_cli::govern
+      line: 173
+    summary: >
+      Who was acting when a governance decision was asked for, as the identity sidecar answers
+      it: `source` is `"claim"` or `"unclaimed"` and nothing else, because there are only two
+      honest states. The key is emitted only when the caller declared a session — a stamp on
+      every decision would assert "we looked and found nobody" for callers that never asked.
+    concernIds:
+      - id: C5
+        status: answered
+        justification: >
+          The stamp annotates the decision and never produces it. EVERY sidecar read failure —
+          missing file, unreadable log, a tampered line whose CID no longer matches — collapses
+          to `unclaimed` rather than failing the verdict: the identity plane must never break
+          the decision authority, and a tampered claim reads as unclaimed, never as the
+          identity the tamperer wrote.
+      - id: C8
+        status: answered
+        justification: >
+          This IS per-decision observability for the actor plane: the governance ledger row now
+          carries who-acted beside which-evaluator-decided, threaded end to end (hook stdin
+          session_id → `epr govern --session` → `witness(actor=…)`), with key-absence meaning
+          "identity plane not consulted" — a distinct observable state from "consulted,
+          unclaimed".
+    contractTests:
+      - path: elohim/eprfs/epr-cli/src/govern.rs
+        testName: a_decision_asked_without_a_session_carries_no_actor_key_at_all
+        kind: unit
+      - path: elohim/eprfs/epr-cli/src/govern.rs
+        testName: a_session_with_no_sidecar_stamps_unclaimed_without_creating_one
+        kind: unit
+      - path: elohim/eprfs/epr-cli/src/govern.rs
+        testName: a_tampered_sidecar_stamps_unclaimed_and_the_decision_still_lands
+        kind: unit
+
+  - name: project::normalize_co_author / co_author_slots
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/flow/project.rs
+      modulePath: elohim_epr_cli::flow::project
+      line: 604
+    summary: >
+      Per-value admission of a `Co-Authored-By` trailer into projection vocabulary: the two
+      known domains name collaborators by slug (`agent:` / `collective:`), an unknown domain is
+      declined-but-addressed as its own lowercased email, junk drops its own slot and nothing
+      else. Heuristic vocabulary by declaration — never identity resolution, which belongs to
+      graduation (ContributorPresence, DID bridge) and is unreachable by string-matching a
+      domain here.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          Failure is per-value and absence is typed: one malformed trailer yields `None` for its
+          own slot rather than failing a projection that derives thousands of records from
+          history nobody can fix; an empty roster yields `Vec::new()`, which the serializer
+          skips, so a solo commit encodes byte-identically to the pre-vocabulary world.
+      - id: C10
+        status: answered
+        justification: >
+          Contract evolution is pinned at the byte level from BEFORE the change: the solo
+          produce-event golden was computed against the pre-trailer projection, so the empty
+          roster can never quietly start encoding as something — the sidecar re-verifies every
+          stored CID on read, and a moved encoding would turn the whole append-only log into an
+          integrity error. The minted `agent:<name-slug>` term is structurally disjoint from
+          actor-plane `agent:<role>@<model>` refs (no `@` half) and the disjointness is asserted
+          by test, so no string comparison can ever let one vocabulary stand in for the other.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/src/flow/project.rs
+        testName: normalize_co_author_maps_trailers_to_vocabulary_and_declines_the_rest
+        kind: unit
+      - path: elohim/eprfs/epr-cli/src/flow/project.rs
+        testName: the_minted_agent_term_is_not_a_parseable_actor_ref
+        kind: unit
+      - path: elohim/eprfs/epr-cli/tests/flow_coauthors.rs
+        testName: a_solo_produce_event_keeps_the_cid_it_had_before_plural_authorship_was_readable
+        kind: integration
+
+  - name: project::event_key (the act-identity dedupe guard)
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/flow/project.rs
+      modulePath: elohim_epr_cli::flow::project
+      line: 795
+    summary: >
+      What makes two events the SAME ACT independent of what vocabulary they carry — this verb,
+      by this provider, on this resource, in this process, at this instant. CID dedupe answers
+      "is this record already written"; this key answers "is this act already recorded", and the
+      two stopped being one question the moment events grew optional slots.
+    concernIds:
+      - id: C6b
+        status: answered
+        justification: >
+          Re-projection is an idempotent effect over unchanged acts even when the derivation
+          changed: an already-recorded Produce re-derived with a roster addresses differently
+          and would otherwise append as a second production of the same artifact at the same
+          instant, double-counted by every stock that folds produce against consume. Proven by a
+          message-only amend fixture (tree, body CID, process, author, instant all unchanged;
+          only what the commit says about who helped grew) and an empirical guard-bite check.
+      - id: C2
+        status: answered
+        justification: >
+          History is not retro-attributed: the guard refuses the duplicate WITHOUT rewriting the
+          older record, so an event recorded without a roster keeps saying exactly what it said
+          when it was witnessed. Enrichment reaches newly-minted events only; a backfill is a
+          deliberate migration with its own decision behind it, never a side effect of running
+          the projection again.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/flow_coauthors.rs
+        testName: an_act_already_recorded_without_its_roster_is_not_appended_a_second_time_with_one
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_coauthors.rs
+        testName: projecting_twice_over_unchanged_history_mints_nothing_the_second_time
+        kind: integration

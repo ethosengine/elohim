@@ -259,3 +259,83 @@ decisionPoints:
       - path: elohim/epr-rea/tests/stock_dynamics.rs
         testName: a_scope_outside_the_relation_is_excluded_not_defaulted_in
         kind: integration
+
+  # ── Actor plane (2026-08-15) — registered at birth ──────────────────────────────────────────
+
+  - name: ActorClaim::new / parse_agent_ref
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/actor.rs
+      modulePath: elohim_epr_rea::actor
+      line: 85
+    summary: >
+      The admission gate for a claimed identity: `agent:<role>@<model>` with lowercase-only
+      charsets (a case variant of a real role is a free impersonation surface), a non-empty
+      session, a caller-supplied date, and a definition address that is a full digest or absent.
+      One parser owns the shape — the CLI, the note leg, and the govern stamp all resolve
+      through it, so no surface can accept an identity another would refuse.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          Honest absence is load-bearing twice. `definition_cid: None` means "no package could
+          be read" and is omitted from the hashed bytes rather than encoded as null, so a claim
+          made where no package exists addresses identically to one made before the field
+          existed. And a refusal names the exact malformation rather than defaulting: an
+          unparseable identity, an unscoped session, and an undated claim each carry their own
+          message, because a defaulted identity record is a record that lies about who spoke.
+      - id: C9
+        status: partial
+        justification: >
+          The claim IS the session→identity join the harness lacked (the commitment-dispatch
+          puller's C9 hole), but it is session-scoped and honor-system by construction: nothing
+          links one session's claims to the same persona's next run. Durable lineage is the
+          named graduation path (ContributorPresence per persistent agent identity, DID bridge
+          as the cryptographic ceiling) and is deliberately not built at this floor.
+    contractTests:
+      - path: elohim/epr-rea/src/actor.rs
+        testName: an_uppercase_or_punctuated_role_is_refused
+        kind: unit
+      - path: elohim/epr-rea/src/actor.rs
+        testName: a_claim_with_no_definition_cid_omits_the_key_entirely
+        kind: unit
+      - path: elohim/epr-rea/src/actor.rs
+        testName: actor_claim_cid_is_stable
+        kind: unit
+
+  - name: ActorStore::current_for
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/actor.rs
+      modulePath: elohim_epr_rea::actor::ActorStore
+      line: 265
+    summary: >
+      Who is acting in a session right now: the LAST claim appended for it. Append order is the
+      whole ordering rule — claims made in one session against one tree share a timestamp by
+      construction, so only order-of-arrival can order a mid-session persona switch.
+    concernIds:
+      - id: C2
+        status: answered
+        justification: >
+          The store is append-only and supersession is a new record, never a mutation — the
+          superseded claim stays readable as evidence. Authority over "who is current" moves
+          monotonically forward with the log; nothing can rewrite an earlier answer.
+      - id: C4
+        status: answered
+        justification: >
+          `None` is an answer ("this session registered nothing"), never an error — callers must
+          be able to act on unclaimed as a normal state, and the read path distinguishes it from
+          "the log could not be read" (an Err), which demands the opposite response.
+    contractTests:
+      - path: elohim/epr-rea/src/actor.rs
+        testName: current_for_is_the_latest_claim_in_a_session_not_the_first
+        kind: unit
+      - path: elohim/epr-rea/src/actor.rs
+        testName: current_for_never_leaks_across_sessions
+        kind: unit
+      - path: elohim/epr-rea/src/actor.rs
+        testName: a_superseded_claim_is_still_in_the_history
+        kind: unit
+      - path: elohim/epr-rea/src/actor.rs
+        testName: a_tampered_sidecar_line_is_an_integrity_error_not_silent_drift
+        kind: unit

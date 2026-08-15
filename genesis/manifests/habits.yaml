@@ -985,6 +985,19 @@ habits:
       bakes `epr` today, so a consumer workspace lands on the announced Python
       fallback and the guard says exactly that. The dev surface is closed; the
       packaging surface is named, not built.
+      DELTA 2026-08-15 — the ledger row gained WHO-ACTED beside
+      which-evaluator-decided: `epr govern --session` stamps the session's
+      registered ActorClaim ({claimed, definitionCid, source: claim|unclaimed});
+      every identity-sidecar failure reads `unclaimed` — the identity plane
+      never breaks the decision authority, and a tampered claim reads as
+      unclaimed, never as the identity the tamperer wrote. Threaded end to end
+      (resolver stdin session_id / git-gate env → --session → witness(actor=…),
+      key present only when the plane was consulted). First witnessed exhibit:
+      the 15:15:50Z refuse row naming agent:scribe@claude-opus-4-6 by package
+      build (definitionCid sha256:e117a5a9…) during the actor-plane spec's own
+      authoring. Spec: 2026-08-15-actor-plane-inflight-identity-claims-design.md;
+      a2o @concern:agent-identity-claim-and-acceptance
+      (genesis/a2o/features/devflow/, @wip — authored, unstepped).
     guard: >
       Risk 1 — "parity" achieved by deleting the divergent validators rather
       than by unifying the evaluators. That would make the check green and the
