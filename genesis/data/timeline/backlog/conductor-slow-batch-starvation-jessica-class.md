@@ -59,3 +59,22 @@ consecutive-sheds; today the circuit is WARN-log-only.
 Claimable by any agent; read the shift journal
 (.claude/shifts/2026-08-15T00-54-verify-spin-discharge-live.journal.md,
 iteration 4b) for the full quoted evidence before starting.
+
+## RECLASSIFIED 2026-08-15 ~11:40Z — same root cause as the fleet-wide contest failure volume
+
+Overnight id-level attribution (shift iteration 7-8) unified this with matthew's
+contest failures: the throttle is the conductor admission ceiling
+(`conductor_admission.rs` — `content_store`, `class=interactive`,
+`capacity = max(2*cpus,8) - CONDUCTOR_RESERVE(3) = 5` on the ~4-CPU household
+pods, 5s interactive shed), hit identically on matthew/jessica/james with the
+verbatim error string. Jessica's "slower conductor" is the same ceiling seen
+from the batch head-resolve side. Levers, ranked: (1) DEMAND — head-plane L1–L3
+batching (arch-dataplane-refactor-backlog / DATAPLANE-SDK-PATH critical-path #2)
+collapses per-id round-trips; tonight's evidence gives it hard numbers
+(106 shed/timeout failure lines in ~7h on one pod). (2) SUPPLY —
+`ELOHIM_CONDUCTOR_PERMITS` env bump (OPERATOR ceiling decision; cautioned:
+11/27 declare errors were conductor-side websocket timeouts, so the conductor
+itself saturates — over-admission trades shed-at-gate for timeout-in-flight).
+(3) Class audit — contest declares ride `class=interactive` (5s hold burns
+permit time); whether they belong in `Background` (1s defer, cheap retry) is a
+bounded code question.
