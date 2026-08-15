@@ -1583,7 +1583,14 @@ spec:
                             'genesis': 'elohim-genesis',
                             'sophia': 'elohim-sophia',
                             'steward': 'elohim-steward',
-                            'conductor': 'elohim-conductor'
+                            'conductor': 'elohim-conductor',
+                            // Crate pipelines were untaggable before 2026-08-15;
+                            // with no alias, re-running a failed leaf (e.g. a
+                            // Level-0 red blocking the whole graph) had no
+                            // webhook lever at all once its files were inside
+                            // the advanced global baseline.
+                            'eprfs': 'elohim-eprfs',
+                            'epr': 'elohim-epr'
                         ]
                         // Tokens come back as a plain List<String> — the Matcher stays
                         // inside parseBuildTagTokens' @NonCPS frame. Do NOT inline the
