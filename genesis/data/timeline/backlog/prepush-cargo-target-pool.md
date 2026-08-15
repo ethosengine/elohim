@@ -216,3 +216,21 @@ Evidence: the isolated Node suite covers all three behaviors (read-only discover
 heal/fail-closed, status fold-in), and the live read-only command discovers the four
 current dev-family dangling links without modifying them. The fifth-site
 `elohim/target` is traversed but currently healthy, so it is correctly silent.
+
+## REOPENED-EVIDENCE 2026-08-15 — fingerprint-write ENOENT is toolchain×/projects-wide, not per-slot
+
+Reproduced on TWO independent slots the same night: `elohim__elohim-storage/dev`
+(existing, 2,044 fingerprint dirs, 28G — blocked the SPIN discharge push) and
+`crates__elohim-sdk/dev` (created FRESH minutes before the repro — rules out
+slot corruption). Symptom identical to the eprfs gate's documented class:
+`failed to write .../.fingerprint/<crate>-*/...: No such file or directory`;
+warm dep fingerprints serve fine, NEW fingerprint-dir writes fail. Cure applied
+both times: replace the slot dir with a symlink to a /tmp target (the run_gate
+readlink path supports this). Slots now /tmp-backed: eprfs (script-native),
+elohim__elohim-storage → /tmp/spin-gate-target, crates__elohim-sdk →
+/tmp/elohim-sdk-feature-matrix-target. Open deliverable: decide the durable
+posture — either flip ALL native gate slots to /tmp-backed by default (accepting
+cold rebuild after tmp-reaper, self-healed by the readlink guard + doctor
+--heal), or root-cause the toolchain/overlay-fs interaction on /projects.
+Claimable by any agent; `cargo-pool doctor` (above) is the natural home for the
+sweep.
