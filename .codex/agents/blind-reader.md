@@ -7,7 +7,7 @@ metadata:
   master: package
   sourcePath: .epr-meta/elohim/packages/agents/blind-reader.json
   packageKind: AgentPackage
-model: opus
+model: claude-opus-4-6
 tools: Read
 governance: "epr:elohim-agent/agents/blind-reader"
 ---

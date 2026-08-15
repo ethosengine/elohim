@@ -2,7 +2,7 @@
 name: blind-reader
 description: Context-isolated second reader for authored documents. Receives one document path plus a review profile, reads nothing else, and returns a rich interpretability and coherence review from an unfamiliar reader's perspective. Profiles specialize the cold read for a2o stories, manifesto epics, and READMEs. Read-only; repeat with a fresh reader after revision.
 tools: Read
-model: opus
+model: claude-opus-4-6
 color: purple
 metadata:
   sourceRuntime: elohim-agent
