@@ -69,6 +69,7 @@ sourced_from:
 # Content-addressed cites (sealed by cite-gen; never hand-written)
 cites:
   - "actor-plane-implementation-plan | The sealed plan this story narrates the birth of — in-flight honor-system identity claims, acceptance at ratification, evidenced adverse attestation | sha256:3044daacc8d5b48f | path: genesis/docs/superpowers/plans/2026-08-15-actor-plane-implementation-plan.md"
+  - "actor-plane-inflight-identity-claims-design | The design record of the plane this story's closing beat narrates as built — claim, attribution surfaces, acceptance at ratification; carries the evidence (commits, golden CIDs, first live claims) the narrative renders in human register | sha256:6a6dee8249ae76ef | path: genesis/docs/superpowers/specs/2026-08-15-actor-plane-inflight-identity-claims-design.md"
 
 # Memory graduation (storyteller's curate authority)
 graduates_memory: []   # HOLD — the contributor-presence and ratification lessons are load-bearing
@@ -226,6 +227,34 @@ name accruing witnessed proofs over a life — and that is now one pattern for a
 Matthew had started the day noticing that his best model was a worse writer. He ended it
 having designed a way for any worker, human or not, to say honestly what they did — and for
 the rest of us to accept it, or to disagree with evidence.
+
+## The roster's last commit
+
+The four typed names turned out to be the last of their kind. Inside a day the harness had the
+thing the roster had been standing in for: a worker registers its own name before it starts,
+with the human answerable for it attached, on a line nobody afterward edits.
+
+Superseding is how a handoff gets recorded. When the scribe took the pen, its name went on a
+new line at the bottom of the log; when the dispatcher took the pen back, so did its own.
+Nothing was struck out. Read top to bottom, the log is the afternoon itself — who wrote, who
+read cold, who handed back, in order. Each line is stamped with the date of the work in hand
+rather than the clock on whatever machine happened to be running, so that two people holding
+the same history end up holding the same record, instead of two that differ only in when they
+were typed.
+
+The first decision the new stamp ever carried was a refusal. The gate that governs documents
+turned down the very document describing the mechanism — required frontmatter missing — and
+the refusal named the scribe, along with the exact version of the scribe it was. The
+mechanism's first witnessed act was to tell its own author no, out loud, with a name on it.
+
+Then the record of who made what was re-read end to end: four hundred twenty-one entries
+already there, untouched, and one new one — the plan's own, carrying three names. It added. It
+did not go back and revise anything.
+
+This last section was written by a storyteller that registered its own name before the first
+word of it, naming the human answerable for it and superseding the dispatcher that sent it,
+whose claim is still on the line above. A day ago the story had to say that could not happen
+yet. It can.
 
 [^ratify]: Operator correction of 2026-07-23 — ratification is peer acceptance at the branch
 rung by the deliberating community of operator and agents, completing at the merge.
