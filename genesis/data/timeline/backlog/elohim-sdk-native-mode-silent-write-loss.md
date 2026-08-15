@@ -7,7 +7,7 @@ title: "elohim-sdk ClientMode::Native without sync_url silently discards queued 
 slug: "elohim-sdk-native-mode-silent-write-loss"
 written: "2026-08-02"
 author: "readme-revision (seam-concern architecture sprint, Wave B/C)"
-status: "backlog"
+status: "complete"
 priority: "high"
 tags: [elohim-sdk, crates, data-loss, silent-corruption, client-mode, native, concern-c4, concern-c14]
 cites:
@@ -40,7 +40,7 @@ cites:
 - **C7**: the `native` feature + API table advertised a capability the crate does not
   serve (the README now tells the truth; the code still carries the false affordance).
 
-## Fix directions (needs an owner; not attempted in the sprint that found it)
+## Fix directions
 
 1. Minimum honest cure: `flush()` on `Native { sync_url: None }` returns
    `Err(SdkError::InvalidMode)` **before** `take_batch()` — refuse, don't destroy.
@@ -50,8 +50,13 @@ cites:
 3. Add a `ReasonLabel`-carrying counter on every discard/refusal path in the write
    buffer (C8), so the next silent path cannot exist unwitnessed.
 
-The README (`crates/elohim-sdk/README.md`, revised 2026-08-02) now documents the true
-behavior including the data-loss arm — documentation and code currently agree that the
-code is wrong.
+The minimum honest cure landed 2026-08-15. `ContentClient::flush()` now rejects
+`Native { sync_url: None }` before `take_batch()`. The integration test
+`crates/elohim-sdk/tests/native_mode.rs` queues one write, observes the error, and proves
+the pending count remains one. `scripts/ci/elohim-sdk-feature-matrix.sh` runs that test
+through the direct pre-push and edge-pipeline gate.
 
-Status: open, unowned.
+The local-storage implementation and refusal-path telemetry remain separate design work;
+they are not required to close this silent-loss defect.
+
+Status: complete (2026-08-15).

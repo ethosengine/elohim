@@ -92,12 +92,14 @@ labels iroh experimental — the current ambiguity can't ship.
 
 ### 5. The existing SDK artifacts are honesty traps
 
-- `crates/elohim-sdk` `ClientMode::Native` without `sync_url` silently destroys
-  queued writes on `flush()` — open, high priority, C4/C14 class. **Fix
-  immediately regardless of sequencing** — a data-destroying SDK crate is worse
-  than no SDK crate.
+- `crates/elohim-sdk` `ClientMode::Native` without `sync_url` used to destroy
+  queued writes on `flush()`. **Fixed 2026-08-15:** `flush()` now returns
+  `SdkError::InvalidMode` before taking a batch, and a regression test proves the
+  queued write remains.
 - Its `sync`/`full` features were compile-broken since introduction (fixed
-  2026-08-07) — proof the crate seam has zero CI coverage.
+  2026-08-07). **Direct coverage added 2026-08-15:** one shared gate now runs
+  formatting, all-feature clippy, and the no-default/default/isolated-feature/
+  all-feature test matrix from pre-push and the edge pipeline.
 - TS side: `StorageClient` exposes no typed ops over the ~35 dataplane routes;
   every consumer hand-rolls curl+jq (substrate-verify is 594 lines of it).
 - The `.dataplane()` proposal is `ci_status: blocked` on three design questions
@@ -139,4 +141,5 @@ machinery · `epr-composite` containers.
 5. **Decide the transport story** (iroh parity vs pinned-libp2p v1) as an
    explicit contract line, not an ambient state.
 
-And fix the Native-mode silent write loss immediately regardless of sequencing.
+The Native-mode silent write loss and its missing direct CI coverage were closed
+2026-08-15; neither remains on the critical path.

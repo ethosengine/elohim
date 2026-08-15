@@ -211,6 +211,17 @@ def runStorageQualityGate() {
 }
 
 /**
+ * Direct feature-matrix gate for the standalone Rust SDK crate. Keep the Bash
+ * body out of this file: the pipeline's declarative stages method is already
+ * close to the JVM bytecode ceiling.
+ */
+def runElohimSdkFeatureMatrix() {
+    timeout(time: 20, unit: 'MINUTES') {
+        sh "bash '${env.WORKSPACE}/scripts/ci/elohim-sdk-feature-matrix.sh'"
+    }
+}
+
+/**
  * Build Storage — script body extracted verbatim from the stage (own CPS
  * method; the pipeline block sits against the JVM 64KB hard limit).
  */
@@ -1688,14 +1699,30 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
                 expression { !skipBuildStage() }
-                expression { shouldRunStep('cargo-build-storage') }
+                anyOf {
+                    expression { shouldRunStep('cargo-build-storage') }
+                    expression { shouldRunStep('sdk-feature-matrix') }
+                }
             }}
             // Gate rides INSIDE this stage (not its own stage): adding a stage
             // to the declarative model pushed the CPS stages-method past the
             // JVM 64KB bytecode limit (edge #1134 MethodTooLargeException —
-            // string-byte proxies undercount model bytecode). Gate first
-            // (non-blocking UNSTABLE), then the release build.
-            steps { container('builder') { script { runStorageQualityGate(); buildStorageImage() } } }
+            // string-byte proxies undercount model bytecode). The SDK matrix is
+            // blocking; the stabilizing storage gate remains non-blocking, then
+            // the release build runs.
+            steps {
+                container('builder') {
+                    script {
+                        if (shouldRunStep('sdk-feature-matrix')) {
+                            runElohimSdkFeatureMatrix()
+                        }
+                        if (shouldRunStep('cargo-build-storage')) {
+                            runStorageQualityGate()
+                            buildStorageImage()
+                        }
+                    }
+                }
+            }
         }
 
         stage('P2P Simulation Test') {

@@ -151,7 +151,9 @@ Three consequences, which are most of what you need to hold:
 
    In short: steps 1 and 2 need nothing you don't already have; **every path that moves
    real content requires a peer you run yourself.** There is no offline fallback either
-   way — without an endpoint, network calls return `Err(SdkError::Network(..))`.
+   way: an unreachable configured endpoint returns `Err(SdkError::Network(..))`, while
+   `Native` with no `sync_url` refuses `get()` and `flush()` with
+   `Err(SdkError::InvalidMode(..))`.
 5. **For step 3 only** — running your own peer needs a git checkout of the protocol
    monorepo (<https://github.com/ethosengine/elohim>), Node.js with `pnpm`, and whatever
    that repo's own setup requires for a Holochain conductor. **This document cannot bound
@@ -292,24 +294,25 @@ async fn main() {
         Err(SdkError::Network(e)) if e.starts_with("HTTP ") => {
             println!("GOT THROUGH — endpoint rejected the request: {e}")
         }
-        Err(SdkError::Network(e)) => println!("did NOT get through: {e}"),
-        // Not expected on this path: these never reach the wire.
-        Err(e)                    => println!("failed before sending: {e}"),
+        // This can be a transport failure OR a response-body decode failure.
+        Err(SdkError::Network(e)) => println!("request/response failed: {e}"),
+        Err(e)                    => println!("client operation failed: {e}"),
     }
 }
 ```
 
 **Telling the two failures apart.** `SdkError::Network` is overloaded on this path: a
-transport failure (DNS, refused, TLS, timeout) and a non-2xx HTTP answer both land in it,
-which is why the match above discriminates on the `"HTTP "` message prefix rather than on
-the variant. The two read paths are not symmetric about this — `Node`/`Native` reads
-report an HTTP error as `SdkError::Storage` instead, so only `Browser` needs the prefix
-check. A `404` never reaches either arm; it becomes `Ok(None)`.
+transport failure (DNS, refused, TLS, timeout), a response-body decode failure, and a
+non-2xx HTTP answer all land in it. The `"HTTP "` prefix identifies only the last case;
+the variant alone cannot prove whether the endpoint answered. The two read paths are not
+symmetric about this — `Node`/`Native` reads report an HTTP error as
+`SdkError::Storage` instead. A `404` never reaches either arm; it becomes `Ok(None)`.
 
-**This step is a boundary smoke test, not a read.** Its success criterion is reaching the
-endpoint, not receiving content — any outcome except `did NOT get through` means the
-request left your process, resolved a host, completed TLS, and got an HTTP answer back.
-Data comes back in step 3.
+**This step is a boundary smoke test, not a read.** Any `GOT THROUGH` output proves the
+endpoint answered; receiving content is not the criterion. A `request/response failed`
+line is ambiguous because this API maps both transport and response-decode failures to
+`SdkError::Network`; use the `curl` below to resolve which side failed. Data comes back
+in step 3.
 
 Expected output — **this is rough edge 1 showing itself, not a mistake on your part**
 (verified against the alpha on 2026-08-07; the item id is a live-corpus fixture, so if it
@@ -328,9 +331,9 @@ curl -s -o /dev/null -w '%{http_code}\n' \
 
 The SDK misses it because of a casing mismatch (rough edge 1): the doorway indexes the
 type as `Content` and this crate always lowercases it to `content`. If instead you see
-`did NOT get through`, the printed message is the transport error itself — check your own
-network, then whether the alpha is up using the `curl` above. A doorway outage is not a
-crate defect.
+`request/response failed`, run the `curl` above. A failed curl points to your network or
+the alpha doorway; a `200` means the SDK reached the endpoint but could not decode its
+response. A doorway outage is not a crate defect.
 
 ### Step 3 — a real round trip against your own peer
 
@@ -657,7 +660,7 @@ let client = ContentClient::new(
 | dials | a doorway | a peer's `elohim-storage` | a peer's `elohim-storage` | nothing |
 | `get()` | `GET {doorway}/api/v1/cache/{type}/{id}` | `GET {storage}/db/{app}/{type}/{id}` | identical to `Node` | `Err(SdkError::InvalidMode)` |
 | `save()` | queues in memory | queues | queues | queues |
-| `flush()` | `POST {doorway}/db/{app}/{type}/bulk` — but see rough edge 8 | `POST {storage}/db/{app}/{type}/bulk` | identical to `Node` | **drains and discards** the queue, logs a warning, returns `Ok(())` |
+| `flush()` | `POST {doorway}/db/{app}/{type}/bulk` — but see rough edge 8 | `POST {storage}/db/{app}/{type}/bulk` | identical to `Node` | returns `Err(SdkError::InvalidMode)` **without draining** the queue |
 | app scope used? | **writes only** — the cache read route has no app segment | reads and writes | reads and writes | n/a |
 | credential | `api_key` — see [Authentication](#authentication) | none | none | none |
 | write buffer preset | `for_interactive` — 100 ops, flush at 50% | `for_seeding` — 5000 ops, flush at 90% | default — 1000 ops, flush at 80% | default |
@@ -694,9 +697,9 @@ Four call semantics worth stating outright:
   way to fix a rejected batch is to change your struct or its serde attributes.
   Overriding `to_json()` is supported and is the escape hatch when the shape you want to
   send genuinely differs from the shape you want in memory.
-- **`save_immediate()`** queues at `High` priority and then calls `flush()`. Note that
-  `flush()` sends the *whole* buffer, not just your item, and it inherits rough edge 2 —
-  so this is "send now," not "send and confirm."
+- **`save_immediate()`** queues at `High` priority and then calls `flush()`. One flush
+  takes at most the mode preset's batch size, priority-first; it can include other queued
+  items and is not a delivery confirmation. See rough edge 2.
 - **`get_batch(&[&str])`** collects hits into a `HashMap`; misses are simply absent.
 - **`queue()`** on `WriteBuffer` (which `save` calls) returns
   `Err(SdkError::BackpressureFull(100))` once the buffer is at its ceiling. Watch
@@ -739,9 +742,11 @@ tokio::spawn(async move {
     let mut tick = tokio::time::interval(Duration::from_secs(1));
     loop {
         tick.tick().await;
-        // Cheap: flush() returns early when the buffer is empty.
+        // For configured modes, an empty buffer returns early. Native without
+        // sync_url always refuses with InvalidMode; see rough edge 3.
         if let Err(e) = flusher.flush().await {
-            tracing::error!("flush failed: {e}"); // transport only — see rough edge 2
+            // The attempted batch is not requeued. See rough edge 2.
+            tracing::error!("flush failed: {e}");
         }
     }
 });
@@ -749,8 +754,11 @@ tokio::spawn(async move {
 // …your writers now call client.save(&item).await? from anywhere.
 ```
 
-Flush before you drop the client, too — there is no flush-on-drop, so whatever is still
-buffered at shutdown is lost.
+For `Browser`, `Node`, or `Native` with a `sync_url`, one `flush()` attempts at most one
+batch. At shutdown, repeat until the pending counts are empty; there is no flush-on-drop.
+This proves only that every queued batch was attempted, not that it landed — current
+error handling can consume a failed batch (rough edge 2). Native without a `sync_url`
+cannot drain by design; choose a configured mode before using this loop.
 
 **The preset is fixed by the mode**, per the mode table — `Browser` gets
 `for_interactive`, `Node` gets `for_seeding`, `Native` gets `default`. `ContentClient` has
@@ -931,17 +939,18 @@ repository (see [Project links](#project-links)) before working around it.
    `ContentClient`; or use `Node` mode against an
    `elohim-storage` service, whose resource names are lowercase and do line up.
 
-2. **`flush()` returns `Ok(())` even when the endpoint rejects the batch.** Only a
-   transport failure (connection refused, DNS, TLS, timeout) surfaces as `Err`. An HTTP
-   `4xx` or `5xx` is logged at `error` level through `tracing` and swallowed. Two
-   implications: install a `tracing` subscriber, and confirm a write landed by reading it
-   back rather than by trusting the return value. `save_immediate()` calls `flush()`, so
-   it is silent in the same way.
+2. **Configured modes take a batch before they know it landed, and never requeue it.** A
+   transport failure (connection refused, DNS, TLS, timeout) surfaces as `Err`; an HTTP
+   `4xx` or `5xx` is logged at `error` level through `tracing` and swallowed as `Ok(())`.
+   Either way the taken operations are gone from memory. A batch spanning content types
+   can also partly land before a later request fails. Install a tracing subscriber and
+   confirm writes by reading them back; neither `flush()` nor `save_immediate()` is a
+   delivery acknowledgement.
 
-3. **`Native` without a `sync_url` silently discards writes.** `flush()` takes the batch
-   out of the buffer, logs a warning, and returns `Ok(())`. The operations are gone, not
-   deferred to a later flush. `get()` in that configuration returns
-   `SdkError::InvalidMode`.
+3. **`Native` without a `sync_url` has no storage backend.** `get()` and `flush()` return
+   `SdkError::InvalidMode`; `flush()` refuses before taking a batch, so queued operations
+   remain available. The configuration is honest but still not useful for persistence —
+   choose `Node` or supply a `sync_url`.
 
 4. **Nothing here is offline-capable, and several declared surfaces are inert.**
    `storage_path` (on `Node` and `Native`) and `public_url` (on `Node`) are accepted and

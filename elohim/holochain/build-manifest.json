@@ -90,6 +90,31 @@
         "function": null
       }
     },
+    "sdk-feature-matrix": {
+      "description": "Run elohim-sdk tests across its advertised feature sets, plus fmt and clippy",
+      "inputs": {
+        "sources": [
+          "crates/elohim-sdk/**",
+          "crates/elohim-storage-client/**",
+          "crates/doorway-client/**",
+          "crates/seam-contracts/**",
+          "elohim/elohim-views/**",
+          "scripts/ci/elohim-sdk-feature-matrix.sh"
+        ],
+        "buildProcess": [
+          "elohim/holochain/Jenkinsfile"
+        ]
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Build Storage",
+        "function": "runElohimSdkFeatureMatrix"
+      }
+    },
     "build-edge-image": {
       "description": "Package doorway + storage + conductor into edge container image",
       "inputs": {
@@ -169,6 +194,12 @@
   },
   "gate": {
     "projects": {
+      "elohim-sdk": {
+        "dir": "crates/elohim-sdk",
+        "steps": [
+          "sdk-feature-matrix"
+        ]
+      },
       "doorway": {
         "dir": "doorway/doorway-service",
         "steps": [

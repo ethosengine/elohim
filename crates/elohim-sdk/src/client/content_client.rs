@@ -278,6 +278,12 @@ impl ContentClient {
 
     /// Flush pending writes to backend
     pub async fn flush(&self) -> Result<()> {
+        if matches!(&self.mode, ClientMode::Native { sync_url: None, .. }) {
+            return Err(SdkError::InvalidMode(
+                "Native mode without sync_url has no storage backend".into(),
+            ));
+        }
+
         let batch = self.write_buffer.take_batch().await;
         if batch.is_empty() {
             return Ok(());
@@ -298,11 +304,9 @@ impl ContentClient {
             | ClientMode::Node {
                 storage_url: url, ..
             } => self.flush_to_storage(url, &batch).await,
-            ClientMode::Native { sync_url: None, .. } => {
-                // TODO: Local-only flush to SQLite
-                tracing::warn!("Flush to local-only native mode not yet implemented");
-                Ok(())
-            }
+            ClientMode::Native { sync_url: None, .. } => Err(SdkError::InvalidMode(
+                "Native mode without sync_url has no storage backend".into(),
+            )),
         }
     }
 

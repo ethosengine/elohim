@@ -480,6 +480,9 @@ if [ "$USE_MANIFEST" = false ]; then
   if echo "$CHANGED" | grep -q "^steward/node/"; then
     PROJECTS="$PROJECTS steward-node"
   fi
+  if echo "$CHANGED" | grep -qE "^crates/elohim-sdk/|^crates/elohim-storage-client/|^crates/doorway-client/|^crates/seam-contracts/|^elohim/elohim-views/|^scripts/ci/elohim-sdk-feature-matrix.sh$"; then
+    PROJECTS="$PROJECTS elohim-sdk"
+  fi
   if echo "$CHANGED" | grep -q "^app/elohim-library/"; then
     PROJECTS="$PROJECTS elohim-library"
   fi
@@ -634,7 +637,7 @@ fi
 # failing df would otherwise abort the entire hook (review C3) — a trailing
 # `|| echo` after the pipe can't help, pipefail already failed the assignment.
 DISK_PCT=$({ df -P /projects 2>/dev/null || true; } | awk 'NR==2 {gsub("%","",$5); print $5}')
-HEAVY_GATES="elohim-storage epr-storage doorway steward-node elohim-compute elohim-epr sweettest-check domain-types"
+HEAVY_GATES="elohim-storage epr-storage doorway steward-node elohim-sdk elohim-compute elohim-epr sweettest-check domain-types"
 
 if [ -n "${DISK_PCT:-}" ] && [ "$DISK_PCT" -ge "$SOFT_PCT" ] && [ "${CARGO_TARGET_POOL_NO_ENFORCE:-0}" != "1" ]; then
   CARGO_POOL_BIN="$REPO_TOP/genesis/agentic/bin/cargo-pool"
@@ -703,6 +706,7 @@ run_gate() {
     elohim-storage|epr-storage) GATE_WS="elohim/elohim-storage" ;;
     doorway)                    GATE_WS="doorway/doorway-service" ;;
     steward-node)               GATE_WS="steward/node" ;;
+    elohim-sdk)                 GATE_WS="crates/elohim-sdk" ;;
     # epr/epr-rea are members of the elohim virtual workspace, so the slot is keyed on
     # the workspace root (matching `cargo-pool key`). Without this the gate built into
     # the in-tree elohim/target/, outside the pool the disk-guard policy accounts for.
@@ -917,6 +921,13 @@ run_gate() {
         # grep fallback uses); without this case the gate hit "Unknown project:
         # epr-ts" and the push aborted. PROJECT_DIR is elohim/sdk/epr-ts.
         pnpm test 2>&1
+        rc=$?
+        ;;
+      elohim-sdk)
+        # crates/elohim-sdk is a standalone native crate outside the elohim
+        # workspace. Keep one named-feature matrix shared with CI so local and
+        # remote coverage cannot drift.
+        bash ../../scripts/ci/elohim-sdk-feature-matrix.sh 2>&1
         rc=$?
         ;;
       eprfs)
@@ -1159,6 +1170,7 @@ for PROJECT in $PROJECTS; do
       elohim-compute)   PROJECT_DIR="elohim/elohim-compute" ;;
       elohim-epr)       PROJECT_DIR="elohim/epr" ;;
       steward-node)     PROJECT_DIR="steward/node" ;;
+      elohim-sdk)       PROJECT_DIR="crates/elohim-sdk" ;;
       genesis)          PROJECT_DIR="genesis/seeder" ;;
       schema-validate)  PROJECT_DIR="." ;;
       schema-dna)       PROJECT_DIR="." ;;
