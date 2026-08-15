@@ -48,6 +48,16 @@ use crate::hc_client::HcClient;
 use crate::rea_projection::ContentEntry;
 use crate::signals::HoloHashB64;
 
+/// The admission class the un-classed declare wrappers delegate with.
+///
+/// Interactive is the correct default because the callers that kept the short
+/// signatures are the HTTP declare routes — a deliberate operator act with a
+/// person waiting on the answer. Every caller with a cheap deferral path (the
+/// reconcile sweeps) names [`AdmissionClass::Background`] explicitly through the
+/// `_classed` variants, so the lane a person stands in is never occupied by
+/// work that could just as well ride the next sweep.
+pub const DECLARE_DEFAULT_CLASS: AdmissionClass = AdmissionClass::Interactive;
+
 /// Zome name hosting REA commitment + content coordinator functions.
 /// Lives in the `lamad` role of the elohim hApp (see
 /// `elohim/holochain/dna/elohim/workdir/happ.yaml:24`).
@@ -951,6 +961,26 @@ pub async fn call_declare_content_head(
     id: &str,
     head_action_hash: Option<String>,
 ) -> Result<ContentHeadWire, StorageError> {
+    call_declare_content_head_classed(hc, id, head_action_hash, DECLARE_DEFAULT_CLASS).await
+}
+
+/// [`call_declare_content_head`] with the caller's admission class.
+///
+/// A SWEEP declare is not the same caller as an operator's declare route: nobody
+/// is waiting on it, it has a cheap deferral path (the next sweep), and a fleet
+/// of them queueing on the interactive bound is exactly how a background arm
+/// starves the lane a person is standing in. Sweep callers pass
+/// [`AdmissionClass::Background`]; the wrapper above keeps
+/// [`DECLARE_DEFAULT_CLASS`] for the HTTP path.
+///
+/// The gate timing is discarded here (as in [`call_resolve_content_heads_local`]
+/// the declare is a single write, not a batch a controller paces).
+pub async fn call_declare_content_head_classed(
+    hc: &Arc<HcClient>,
+    id: &str,
+    head_action_hash: Option<String>,
+    class: AdmissionClass,
+) -> Result<ContentHeadWire, StorageError> {
     let input = DeclareContentHeadInput {
         id: id.to_string(),
         head_action_hash,
@@ -960,8 +990,8 @@ pub async fn call_declare_content_head(
             "conductor_writes: encode DeclareContentHeadInput: {e}"
         ))
     })?;
-    let bytes = hc
-        .call_zome(ZOME_NAME, "declare_content_head", payload)
+    let (bytes, _timing) = hc
+        .call_zome_timed(ZOME_NAME, "declare_content_head", payload, class)
         .await?;
     let out: ContentHeadWire = rmp_serde::from_slice(&bytes).map_err(|e| {
         StorageError::Serialization(format!(
@@ -1002,6 +1032,37 @@ pub async fn call_declare_canonical_content_head(
     carried_record: Option<Vec<u8>>,
     adopt_before_author: bool,
 ) -> Result<ContentHeadWire, StorageError> {
+    call_declare_canonical_content_head_classed(
+        hc,
+        id,
+        head_action_hash,
+        carried_record,
+        adopt_before_author,
+        DECLARE_DEFAULT_CLASS,
+    )
+    .await
+}
+
+/// [`call_declare_canonical_content_head`] with the caller's admission class.
+///
+/// The sweep-side contest/adopt arms in [`crate::services::head_adoption`] pass
+/// [`AdmissionClass::Background`]: they are reconciler work with a cheap
+/// deferral path (the next sweep), so they take the short wait bound and shed
+/// rather than occupy the lane an operator's declare route is standing in. A
+/// shed is NOT a verdict — nothing was dispatched — and callers must route it
+/// like backpressure (see [`crate::conductor_admission::is_admission_shed`]).
+///
+/// Everything else is byte-identical to the un-classed wrapper: same input, same
+/// verbatim error strings (callers still match the coordinator's guard
+/// substrings), same decode.
+pub async fn call_declare_canonical_content_head_classed(
+    hc: &Arc<HcClient>,
+    id: &str,
+    head_action_hash: String,
+    carried_record: Option<Vec<u8>>,
+    adopt_before_author: bool,
+    class: AdmissionClass,
+) -> Result<ContentHeadWire, StorageError> {
     let input = DeclareCanonicalHeadInput {
         id: id.to_string(),
         head_action_hash,
@@ -1013,8 +1074,8 @@ pub async fn call_declare_canonical_content_head(
             "conductor_writes: encode DeclareCanonicalHeadInput: {e}"
         ))
     })?;
-    let bytes = hc
-        .call_zome(ZOME_NAME, "declare_canonical_content_head", payload)
+    let (bytes, _timing) = hc
+        .call_zome_timed(ZOME_NAME, "declare_canonical_content_head", payload, class)
         .await?;
     let out: ContentHeadWire = rmp_serde::from_slice(&bytes).map_err(|e| {
         StorageError::Serialization(format!(
@@ -1389,6 +1450,21 @@ mod tests {
         assert_eq!(decoded.state, original.state);
         assert_eq!(decoded.event_hash, original.event_hash);
         assert_eq!(decoded.signed_at, original.signed_at);
+    }
+
+    /// The short declare signatures are the HTTP routes' calling convention, and
+    /// those are deliberate operator acts with a person waiting on the answer —
+    /// so the class they delegate with must stay INTERACTIVE. A background
+    /// caller that wants the short wait bound names it explicitly through the
+    /// `_classed` variants (see `head_adoption::SWEEP_DECLARE_CLASS`); flipping
+    /// this constant instead would move the HTTP declare routes onto the 1s
+    /// bound without touching a single call site.
+    #[test]
+    fn the_unclassed_declare_wrappers_stay_interactive() {
+        assert_eq!(
+            super::DECLARE_DEFAULT_CLASS,
+            crate::conductor_admission::AdmissionClass::Interactive
+        );
     }
 }
 

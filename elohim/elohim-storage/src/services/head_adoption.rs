@@ -264,8 +264,10 @@ use std::sync::Arc;
 
 use seam_contracts::{Answer, ReasonLabel};
 
+use crate::conductor_admission::{is_admission_shed, AdmissionClass};
 use crate::db::content_diesel::{self, StampMode, StampOutcome};
 use crate::db::{AppContext, DbPool};
+use crate::error::StorageError;
 use crate::hc_client::HcClient;
 use crate::services::conductor_writes::{self, ContentHeadWire};
 
@@ -766,6 +768,52 @@ fn evidence_backoff_class(
 /// clock while preserving its distinct C8 reason label.
 fn note_declare_error_backoff(id: &str) {
     crate::services::contest_backoff::note(id, crate::metrics::ContestSkip::DeclareErrorBackoff);
+}
+
+/// The admission class EVERY sweep-side declare in this module travels under.
+///
+/// The contest/adopt arms are reconciler work: nobody is waiting on them, and
+/// their deferral path is free (the next sweep, at its own cadence, under its
+/// own slice cap). Standing in the INTERACTIVE lane for them buys nothing and
+/// costs the one thing the gate exists to protect — the wait bound a person's
+/// HTTP declare is holding. The declare ROUTES (`http.rs`) deliberately keep
+/// [`conductor_writes::DECLARE_DEFAULT_CLASS`]: those are operator acts.
+///
+/// The trade this makes explicit: a background caller gives up sooner, so these
+/// arms WILL see sheds under load. That is the intended outcome — see
+/// [`declare_was_shed`] for why a shed must never be booked as a failure.
+const SWEEP_DECLARE_CLASS: AdmissionClass = AdmissionClass::Background;
+
+/// TRUE when a declare failed at the ADMISSION GATE rather than in the conductor.
+///
+/// A shed establishes NOTHING: the call never crossed the websocket, so the
+/// candidate is exactly as eligible as it was a microsecond earlier and the
+/// conductor spent nothing on it. Every sweep-side declare failure path in this
+/// module books a *verdict* — a `contest_failed` count, a per-id backoff window,
+/// or (in `declare_peer_head`) an AUTHOR fallback that mints a competing root —
+/// and each of those is a durable consequence drawn from an answer that was
+/// never given. Routing a shed like backpressure keeps local capacity pressure
+/// from converting into fleet-visible state.
+fn declare_was_shed(e: &StorageError) -> bool {
+    is_admission_shed(e)
+}
+
+/// Book a sweep-side declare failure into the contest backoff ledger UNLESS it
+/// was a gate shed. Returns TRUE when a backoff window was actually recorded.
+///
+/// This is the ONE place the shed/verdict split touches the ledger, so the
+/// contract can be tested against the real ledger rather than a restatement of
+/// the rule (see `a_shed_declare_earns_no_backoff_window`).
+fn note_declare_backoff_unless_shed(
+    id: &str,
+    e: &StorageError,
+    class: crate::metrics::ContestSkip,
+) -> bool {
+    if declare_was_shed(e) {
+        return false;
+    }
+    crate::services::contest_backoff::note(id, class);
+    true
 }
 
 /// What the pre-flight resolved from the OWN conductor.
@@ -2118,12 +2166,13 @@ async fn contest_peer(
     // ARM 1 — PEER-HEAD CANDIDACY. `adopt_before_author: false` — this is the
     // classic attempt, and it must stay the classic attempt: the bypass may only
     // ever run AFTER the no-chain gate has actually refused, never instead of it.
-    match conductor_writes::call_declare_canonical_content_head(
+    match conductor_writes::call_declare_canonical_content_head_classed(
         hc,
         id,
         peer_head.clone(),
         carried_record,
         false,
+        SWEEP_DECLARE_CLASS,
     )
     .await
     {
@@ -2139,6 +2188,21 @@ async fn contest_peer(
             );
         }
         Err(e) => {
+            // ADMISSION SHED — before any classification, because a shed carries
+            // no coordinator verdict to classify. The gate refused LOCAL
+            // capacity; the zome never ran, so neither the no-chain gate nor the
+            // retrievability gate answered. Nothing is counted, nothing is
+            // backed off, and the id rides the very next sweep unchanged.
+            if declare_was_shed(&e) {
+                tracing::debug!(
+                    target: "elohim_storage::head_adoption",
+                    content_id = %id,
+                    from_peer = %hint.peer_id,
+                    "contest declare shed at the admission gate — backpressure, not a verdict; \
+                     the conductor never saw it, so the candidate stays eligible next sweep"
+                );
+                return AdoptOutcome::Held;
+            }
             let msg = e.to_string();
 
             // NO LOCAL CHAIN — terminal for this sweep. The first gate in
@@ -2264,12 +2328,13 @@ async fn contest_peer(
     // AFTER the chain gate has already PASSED (the zome answers `is not
     // retrievable` only downstream of it), so there is no no-chain gate here to
     // bypass — and it carries no record to license one with either.
-    match conductor_writes::call_declare_canonical_content_head(
+    match conductor_writes::call_declare_canonical_content_head_classed(
         hc,
         id,
         own_head.to_string(),
         None,
         false,
+        SWEEP_DECLARE_CLASS,
     )
     .await
     {
@@ -2283,6 +2348,24 @@ async fn contest_peer(
             fetcher_present,
         ),
         Err(e) => {
+            // A SHED is not a refusal. The claim is still handed back (the
+            // candidacy ledger must not retire a pair the conductor never
+            // judged), but nothing is counted and no window opens — the arm is
+            // simply re-attempted next sweep. Ordered claim-release-first so
+            // both paths release exactly once; `inc_contest_failed` and
+            // `release_candidacy` touch unrelated state, so the swap is
+            // behaviour-preserving on the non-shed path.
+            release_candidacy(id, own_head);
+            if declare_was_shed(&e) {
+                tracing::debug!(
+                    target: "elohim_storage::head_adoption",
+                    content_id = %id,
+                    from_peer = %hint.peer_id,
+                    "self-candidacy declare shed at the admission gate — backpressure, not a \
+                     verdict; no backoff recorded, retried on the next sweep"
+                );
+                return AdoptOutcome::Held;
+            }
             crate::metrics::inc_contest_failed(unresolvable_class);
             // C3 REPAIR (2026-08-02, F-B). Hand the claim back and record a
             // BOUNDED backoff instead. Before this pair of lines a failed
@@ -2291,10 +2374,11 @@ async fn contest_peer(
             // mechanism behind the live `contest_self_head=4` vs
             // `fetch_none=603` split. Releasing without the backoff would swing
             // to the other extreme (a predictable failure retried every sweep),
-            // so the two must land together.
-            release_candidacy(id, own_head);
-            crate::services::contest_backoff::note(
+            // so the two must land together. (The release itself moved a few
+            // lines up so the shed path shares it.)
+            note_declare_backoff_unless_shed(
                 id,
+                &e,
                 crate::metrics::ContestSkip::SelfCandidacyBackoff,
             );
             tracing::warn!(
@@ -2389,12 +2473,13 @@ async fn contest_divergent(
         return AdoptOutcome::Held;
     }
 
-    match conductor_writes::call_declare_canonical_content_head(
+    match conductor_writes::call_declare_canonical_content_head_classed(
         hc,
         id,
         target.to_string(),
         None,
         false,
+        SWEEP_DECLARE_CLASS,
     )
     .await
     {
@@ -2420,9 +2505,23 @@ async fn contest_divergent(
             // must not retire this (id, target) for the life of the process,
             // and a predictable failure must not be retried every sweep.
             release_candidacy(id, target);
+            // ...unless the gate SHED it, in which case there was no refusal to
+            // learn from: the conductor never saw the declare, so the arm is
+            // re-attempted next sweep with no window and no failure count.
+            if declare_was_shed(&e) {
+                tracing::debug!(
+                    target: "elohim_storage::head_adoption",
+                    content_id = %id,
+                    divergent_peer = %divergent_peer,
+                    "spin-discharge declare shed at the admission gate — backpressure, not a \
+                     verdict; no backoff recorded, retried on the next sweep"
+                );
+                return AdoptOutcome::Held;
+            }
             crate::metrics::inc_contest_failed(crate::metrics::ContestFailure::DeclareError);
-            crate::services::contest_backoff::note(
+            note_declare_backoff_unless_shed(
                 id,
+                &e,
                 crate::metrics::ContestSkip::SelfCandidacyBackoff,
             );
             tracing::warn!(
@@ -2501,12 +2600,13 @@ async fn try_adopt_before_author(
         return None;
     }
 
-    match conductor_writes::call_declare_canonical_content_head(
+    match conductor_writes::call_declare_canonical_content_head_classed(
         hc,
         id,
         peer_head.to_string(),
         Some(bytes),
         true,
+        SWEEP_DECLARE_CLASS,
     )
     .await
     {
@@ -2536,6 +2636,22 @@ async fn try_adopt_before_author(
             // tail then records the BOUNDED backoff — the same window, cleared
             // the moment an author path lands a chain.
             release_candidacy(id, peer_head);
+            // ...EXCEPT on an admission shed, which is the one failure the
+            // caller's tail must not see. `None` there would hand control back
+            // to the no-chain tail, and that tail's whole job is to record a
+            // backoff window — an evidence-class verdict drawn from a declare
+            // the conductor never received. `Some(Held)` is the same outcome
+            // the tail would have returned, minus the bookkeeping.
+            if declare_was_shed(&e) {
+                tracing::debug!(
+                    target: "elohim_storage::head_adoption",
+                    content_id = %id,
+                    from_peer = %hint.peer_id,
+                    "adopt-before-author declare shed at the admission gate — backpressure, not \
+                     a refusal; no backoff recorded, retried on the next sweep"
+                );
+                return Some(AdoptOutcome::Held);
+            }
             crate::metrics::inc_contest_failed(crate::metrics::ContestFailure::AdoptRefused);
             tracing::warn!(
                 target: "elohim_storage::head_adoption",
@@ -2701,12 +2817,13 @@ async fn declare_peer_head(
     // the evidence retry), and exactly one while the flag is off. Not a retry
     // ladder — the second call is a DIFFERENT request (evidence-backed) made
     // once, only after the first was refused for the one reason it can answer.
-    let attempted = conductor_writes::call_declare_canonical_content_head(
+    let attempted = conductor_writes::call_declare_canonical_content_head_classed(
         hc,
         id,
         head_action_hash.to_string(),
         carried_record.clone(),
         false,
+        SWEEP_DECLARE_CLASS,
     )
     .await;
     let attempted = match attempted {
@@ -2716,12 +2833,13 @@ async fn declare_peer_head(
             match adopt_retry.filter(|_| refused_for_no_chain) {
                 None => Err(first),
                 Some(bytes) => {
-                    match conductor_writes::call_declare_canonical_content_head(
+                    match conductor_writes::call_declare_canonical_content_head_classed(
                         hc,
                         id,
                         head_action_hash.to_string(),
                         Some(bytes),
                         true,
+                        SWEEP_DECLARE_CLASS,
                     )
                     .await
                     {
@@ -2738,6 +2856,23 @@ async fn declare_peer_head(
                                  round-trip is skipped entirely)"
                             );
                             Ok(declared)
+                        }
+                        Err(second) if declare_was_shed(&second) => {
+                            // The evidence retry was SHED, not refused. Counting
+                            // `AdoptRefused` here would blame the record for a
+                            // gate decision. The original no-chain error still
+                            // propagates, so the tail below behaves exactly as
+                            // it does when the flag is off — and the retry is
+                            // simply re-offered on the next sweep.
+                            tracing::debug!(
+                                target: "elohim_storage::head_adoption",
+                                content_id = %id,
+                                from_peer = %hint.peer_id,
+                                "adopt-before-author: the evidence retry was shed at the \
+                                 admission gate — backpressure, not a refusal; falling back to \
+                                 the unchanged author-then-adopt path"
+                            );
+                            Err(first)
                         }
                         Err(second) => {
                             crate::metrics::inc_contest_failed(
@@ -2819,6 +2954,25 @@ async fn declare_peer_head(
             }
         }
         Err(e) => {
+            // ADMISSION SHED — the ONE failure here that must not reach the
+            // tail. Every other branch below ends in `AdoptOutcome::Author` (or
+            // `AuthorThenAdopt`), i.e. MINTING A LOCAL ROOT because the peer's
+            // head could not be declared. A shed says nothing about the peer's
+            // head — the conductor never saw the declare — so authoring on it
+            // would manufacture exactly the competing root this module exists to
+            // stop, out of nothing but local capacity pressure. Hold instead;
+            // the next sweep re-offers the same declare.
+            if declare_was_shed(&e) {
+                tracing::debug!(
+                    target: "elohim_storage::head_adoption",
+                    content_id = %id,
+                    from_peer = %hint.peer_id,
+                    "adopt-before-author: declare shed at the admission gate — backpressure, \
+                     not a verdict; HOLDING rather than authoring a competing root, retried on \
+                     the next sweep"
+                );
+                return AdoptOutcome::Held;
+            }
             let msg = e.to_string();
             if msg.contains(ERR_NO_LOCAL_CHAIN) {
                 // Expected on a genuinely fresh peer — not an error. Author
@@ -3716,6 +3870,90 @@ mod tests {
             "evidence_absent_backoff",
         ]);
         seam_contracts::assert_reason_labels_discriminating::<crate::metrics::ContestSkip>();
+    }
+
+    /// A SHED IS NOT A VERDICT. The gate refused local capacity; the conductor
+    /// never saw the declare, so nothing was learned about this id and nothing
+    /// may be booked against it. Exercised through the real recording helper and
+    /// the real ledger — the same shape as the sibling test below — so it cannot
+    /// pass from a restatement of the rule.
+    ///
+    /// The negative half is the load-bearing one: an ordinary conductor error
+    /// must STILL open its window, or this guard would have silently disabled
+    /// the backoff the sweep budget depends on.
+    #[test]
+    fn a_shed_declare_earns_no_backoff_window() {
+        use crate::conductor_admission::ADMISSION_SHED_MARKER;
+        use crate::metrics::ContestSkip;
+        use crate::services::contest_backoff::{self, BackoffWindows};
+
+        const WINDOWS: BackoffWindows = BackoffWindows {
+            contest: std::time::Duration::from_secs(3600),
+            evidence_absent: std::time::Duration::from_secs(86_400),
+        };
+
+        let _exclusive = contest_backoff::test_exclusive();
+        contest_backoff::reset();
+
+        // The shed the gate actually mints (`AdmissionGate::shed_error`) — same
+        // variant, same marker const, so a change to either fails here.
+        let shed = StorageError::Timeout(format!(
+            "{ADMISSION_SHED_MARKER}: no conductor permit for content_store within 1000ms \
+             (class=background, capacity=5, in_flight=5) — nothing was dispatched"
+        ));
+        assert!(
+            declare_was_shed(&shed),
+            "the gate's own shed error must be recognised as backpressure"
+        );
+        assert!(
+            !note_declare_backoff_unless_shed("shed:id", &shed, ContestSkip::SelfCandidacyBackoff),
+            "a shed must not be recorded as a contest verdict"
+        );
+        assert_eq!(
+            contest_backoff::skip_class("shed:id", WINDOWS),
+            None,
+            "a shed declare must leave the candidate eligible for the very next sweep"
+        );
+
+        // A real conductor answer — dispatched, executed, refused — still earns
+        // its window. Same helper, opposite verdict.
+        let refused = StorageError::Conductor(
+            "Zome call failed: declare_canonical_head: earned head is protected".to_string(),
+        );
+        assert!(
+            !declare_was_shed(&refused),
+            "a conductor refusal is an answer, not a shed"
+        );
+        assert!(
+            note_declare_backoff_unless_shed(
+                "refused:id",
+                &refused,
+                ContestSkip::SelfCandidacyBackoff
+            ),
+            "a genuine declare failure must still be booked"
+        );
+        assert_eq!(
+            contest_backoff::skip_class("refused:id", WINDOWS),
+            Some(ContestSkip::SelfCandidacyBackoff),
+            "a predictable repeat failure must still be deferred under its own class"
+        );
+
+        contest_backoff::reset();
+    }
+
+    /// The sweep declares must not stand in the lane a person is waiting in.
+    /// Pinned as an inequality against the class the HTTP declare routes keep,
+    /// so flipping either constant to match the other fails here rather than
+    /// silently re-merging the two lanes.
+    #[test]
+    fn sweep_declares_do_not_share_the_interactive_lane() {
+        assert_eq!(SWEEP_DECLARE_CLASS, AdmissionClass::Background);
+        assert_ne!(
+            SWEEP_DECLARE_CLASS,
+            conductor_writes::DECLARE_DEFAULT_CLASS,
+            "the reconciler's declares and an operator's declare route must not draw on the \
+             same wait bound"
+        );
     }
 
     /// The generic Arm-1 error used to spend fanout on the same id every sweep.
