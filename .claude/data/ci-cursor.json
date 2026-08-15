@@ -1,10 +1,10 @@
 {
  "jobs": {
   "elohim": 1664,
-  "elohim-edge": 1346,
-  "elohim-genesis": 1470,
+  "elohim-edge": 1349,
+  "elohim-genesis": 1473,
   "elohim-holochain": 1397,
-  "elohim-orchestrator": 1674,
+  "elohim-orchestrator": 1678,
   "elohim-sophia": 146,
   "elohim-steward": 1,
   "elohim-storybook": 276
@@ -14,7 +14,7 @@
   "elohim-sophia": 146,
   "elohim-storybook": 275,
   "elohim": 1608,
-  "elohim-edge": 1345,
+  "elohim-edge": 1348,
   "elohim-orchestrator": 1469
  },
  "green_streak": {
@@ -46,9 +46,6 @@
   ],
   "elohim-edge": [
    "SUCCESS",
-   "SUCCESS",
-   "SUCCESS",
-   "SUCCESS",
    "ABORTED",
    "SUCCESS",
    "SUCCESS",
@@ -59,7 +56,10 @@
    "ABORTED",
    "SUCCESS",
    "SUCCESS",
-   "ABORTED"
+   "ABORTED",
+   "SUCCESS",
+   "SUCCESS",
+   "UNSTABLE"
   ],
   "elohim-storybook": [
    "SUCCESS",
@@ -81,10 +81,6 @@
   "elohim-orchestrator": [
    "UNSTABLE",
    "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
    "FAILURE",
    "UNSTABLE",
    "UNSTABLE",
@@ -93,16 +89,17 @@
    "FAILURE",
    "UNSTABLE",
    "UNSTABLE",
-   "FAILURE"
+   "FAILURE",
+   "UNSTABLE",
+   "NOT_BUILT",
+   "UNSTABLE",
+   "UNSTABLE"
   ],
   "elohim-genesis": [
    "UNSTABLE",
    "UNSTABLE",
    "UNSTABLE",
    "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
    "FAILURE",
    "UNSTABLE",
    "UNSTABLE",
@@ -110,7 +107,10 @@
    "UNSTABLE",
    "FAILURE",
    "UNSTABLE",
-   "UNSTABLE"
+   "UNSTABLE",
+   "ABORTED",
+   "UNSTABLE",
+   "FAILURE"
   ],
   "elohim-holochain": [
    "SUCCESS",
