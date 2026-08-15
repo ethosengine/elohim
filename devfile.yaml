@@ -76,6 +76,12 @@ components:
         # so no ~/.codex symlink is needed (unlike CLAUDE_CONFIG_DIR).
         - name: CODEX_HOME
           value: /projects/.codex-config
+        # Gemini CLI (and any tool honoring the convention): the container has no
+        # browser and no xdg-open, so an OAuth flow that tries to spawn one dies
+        # with ENOENT. NO_BROWSER=true makes such tools print the auth URL for
+        # the operator to open outside the workspace instead.
+        - name: NO_BROWSER
+          value: 'true'
         - name: USER
           value: user
         - name: RUST_BACKTRACE
