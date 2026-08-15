@@ -211,6 +211,21 @@ habits:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
       - "sweettest rea_commitment_replication (elohim/holochain/tests/sweettest — unignored 837b772c9; isolated late-join conductors, bounded 60s peer-B retrieval; RED but MIS-ATTRIBUTED per DELTA 2026-08-09 — it measures one-time cold-cell Wasm warm-up, not REA retrieval; do not read it as a fetch-seam probe until it warms peer B)"
     evidence: >
+      DELTA 2026-08-15b (admission relief deployed edge #1353 ~16:15Z, shift
+      admission-throughput-to-banked-ch06): both demand-side levers live —
+      sweep declares ride Background class w/ shed-aware routing (bccdc643b;
+      also cures a shed→Author competing-root mint), ghost-witness election
+      probes batched through the landed L1 extern (aff6c78bb). Mechanism
+      VERIFIED on matthew ~1h post-restart: interactive lane CLEAR (5 sheds
+      total vs 106/7h baseline), background 169 acquired ≈all <=1ms + 30 cheap
+      1s sheds, AIMD election batch 94 (floor 8, no two-arm collapse). ch06
+      recording still HELD: post-restart conductor catch-up in progress
+      (head-batch call_failed ~45%, deadline class — conductor-side, not gate),
+      healedTotal flat at 68 through ~17:49Z; verdict runbook in shift sprint
+      result. Two CI wiring reds found+fixed in-flight (edge #1351
+      MethodTooLargeException 5c7bd3cbf; #1352 sdk-gate exit-127 → Docker
+      sdk-check target 5af289846); SDK feature-matrix gate now exercises green
+      in CI.
       DELTA 2026-08-15 (SPIN discharge deployed edge #1350, overnight verified):
       the flip evidence wanted below did NOT arrive — known_divergent{content}
       on matthew/jessica/james oscillates 2<->13 (outstanding-set window, no
