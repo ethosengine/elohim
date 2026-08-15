@@ -325,6 +325,34 @@ COPY elohim/sdk /sdk
 RUN cargo fmt --check
 RUN CARGO_INCREMENTAL=0 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib
 
+# ---------------------------------------------------------------------------
+# SDK feature-matrix gate (CI `--target sdk-check` only) — never on the
+# default build path. Same pattern as `check`: the CI builder image carries NO
+# Rust toolchain (by design — see scripts/ci/storage-quality-gate.sh), so the
+# matrix runs in here. Deliberately NOT `FROM deps`: crates/elohim-sdk is its
+# own workspace root whose `../../elohim/elohim-views` path deps expect the
+# REPO shape, not the flattened /app layout — and an independent stage keeps
+# its layer cache keyed on crates/** + elohim-views alone. The script it runs
+# is the SAME file the local pre-push gate runs (single source of matrix
+# truth); inside this stage cargo is on PATH so the script takes its direct
+# path.
+FROM rust:1.94.0-slim-bookworm AS sdk-check
+# libsqlite3-dev: the SDK's `native` feature links SYSTEM sqlite via
+# rusqlite→libsqlite3-sys (no `bundled` feature) — present in the dev
+# container, absent from slim-bookworm.
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    build-essential \
+    libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
+RUN rustup component add rustfmt clippy
+WORKDIR /sdk-gate
+COPY crates ./crates
+COPY elohim/elohim-views ./elohim/elohim-views
+COPY scripts/ci/elohim-sdk-feature-matrix.sh ./scripts/ci/elohim-sdk-feature-matrix.sh
+RUN bash scripts/ci/elohim-sdk-feature-matrix.sh
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Release build stage (the default image path: deps → builder → runtime).
 # ═══════════════════════════════════════════════════════════════════════════

@@ -216,7 +216,9 @@ def runStorageQualityGate() {
  * close to the JVM bytecode ceiling.
  */
 def runElohimSdkFeatureMatrix() {
-    timeout(time: 20, unit: 'MINUTES') {
+    // 30 min: a cold sdk-check image layer compiles the SDK dep graph 8 times
+    // over the feature matrix; warm BuildKit layers finish in seconds.
+    timeout(time: 30, unit: 'MINUTES') {
         sh "bash '${env.WORKSPACE}/scripts/ci/elohim-sdk-feature-matrix.sh'"
     }
 }
