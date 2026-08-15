@@ -234,6 +234,14 @@ Note this survey **supersedes in scope** (not replaces) the two earlier Holepunc
 
 ---
 
+## The Realtime Problem — Backstitch
+
+Is realtime SCM possible? [Backstitch](https://backstitch.dev) (Ink & Switch) is the field's first shipped answer we have surveyed: real-time version control for the Godot engine — branches as Automerge documents, scenes parsed into structured CRDT trees so node-level merges converge by construction, a mandatory Merge Preview → Confirm ceremony at the branch boundary, reverts as forward inverse-commits, save-granularity sync over an optional [samod](https://github.com/inkandswitch/backstitch-sync-server) relay. The one-line verdict: **yes, demonstrated for structured artifacts at small-team scale — and the demonstration is load-bearing for what it is NOT**: not git (zero git objects; "git compatibility" = two uncoordinated VCSs sharing one working directory), not keystroke-realtime, not ceremony-free, and **not identity-bearing** (plaintext usernames, unauthenticated relay) — which is the half this protocol has and backstitch lacks, so the pollination runs both ways. The survey grounds the take against our own Automerge sync plane (same automerge generation, deliberately replication-not-authoring, amber/green authority discipline), the quantified concurrent-sessions-one-worktree pain, and brit — whose covenant plane (trailer grammar, implemented `AgentKey` signing, ratification ceremony) is exactly what a realtime plane composes WITH, parallel planes meeting at the Confirm gate. A brit-native companion note (first entry in `brit/docs/research/`) settles four standing brit questions from its tree: the trailer registry's real shape, `AgentKey`'s implemented status, the deliberately-deferred commit-lift, and the Nexus dependency path.
+
+[Cross-pollination survey →](epr:backstitch-realtime-scm-cross-pollination-2026-08-15) · brit-native composition note: [`brit/docs/research/`](../../elohim/brit/docs/research/backstitch-realtime-scm-brit-composition-2026-08-15.md) · manifest clone: `backstitch`.
+
+---
+
 ## The Collective — Hypha DAO
 
 [Hypha DAO](https://github.com/hypha-dao) is a decade-deep project building tooling for DAOs/DHOs — "Decentralised Human Organisations" — and the closest external mirror for our *autonomous-entity and collectives* work (the recursive-Qahal substrate: `Collective` / `Membership` / `CollabAgreement`).
