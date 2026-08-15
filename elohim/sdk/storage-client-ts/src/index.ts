@@ -42,6 +42,25 @@ export {
 // HTTP Client
 export { StorageClient } from './client';
 
+// Dataplane read/diagnostics facade (per-peer node ops; composes generated
+// View types, never duplicates the Dataplane Read API's typed getters)
+export {
+  DataplaneApi,
+  streamSyncState,
+  VersionInfo,
+  InventoryParity,
+  ReaCommitmentQuery,
+  EconomicEventQuery,
+  StreamName,
+  StreamSyncState,
+} from './api/dataplane';
+
+// Doorway admin/federation HTTP client (one client per doorway)
+export { DoorwayClient, DoorwayConfig, SeedBlobResult } from './doorway';
+
+// Multi-peer dataplane fleet, built from a compact CSV env-var shape
+export { DataplaneFleet, FleetPeer } from './fleet';
+
 // Automerge Sync
 export { AutomergeSync, SyncResult, createSync } from './sync';
 

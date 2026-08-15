@@ -11,6 +11,7 @@ import {
   ListOptions,
 } from './types';
 import { QahalApi } from './api/qahal';
+import { DataplaneApi } from './api/dataplane';
 import type { NetworkPostureView } from './generated/NetworkPostureView';
 import type { PeerListView } from './generated/PeerListView';
 import type { PeerStatusView } from './generated/PeerStatusView';
@@ -46,12 +47,16 @@ export class StorageClient {
   /** Collective + Collab agreement SDK methods */
   readonly qahal: QahalApi;
 
+  /** Dataplane read/diagnostics SDK methods (per-peer node ops) */
+  readonly dataplane: DataplaneApi;
+
   constructor(config: StorageConfig) {
     this.config = {
       timeout: 30000,
       ...config,
     };
     this.qahal = new QahalApi(this);
+    this.dataplane = new DataplaneApi(this);
   }
 
   /**
@@ -362,6 +367,48 @@ export class StorageClient {
    */
   getJson<T>(path: string): Promise<T> {
     return this.request<T>('GET', path);
+  }
+
+  /**
+   * Issue a real GET against `path` and return only the HTTP status code,
+   * discarding the response body. NEVER use HEAD as a substitute: some
+   * paths (e.g. `/blob/{hash}`) trigger heal-on-read server-side only on a
+   * real GET, so a HEAD probe would silently skip that side effect. Never
+   * throws on a non-2xx response — the status code itself is the answer.
+   * A network-level failure (DNS, connection refused, timeout) still throws.
+   * Used by sub-API classes (e.g. DataplaneApi).
+   * @internal
+   */
+  async getStatusDiscardingBody(path: string): Promise<number> {
+    const url = `${this.config.baseUrl}${path}`;
+    const headers: Record<string, string> = {};
+
+    if (this.config.apiKey) {
+      headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      });
+      // Discard the body without transforming it — draining it (rather than
+      // ignoring it) still lets the heal-on-read side effect complete on
+      // servers that stream the body lazily.
+      await response.arrayBuffer();
+      return response.status;
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new StorageError(`Request timeout after ${this.config.timeout}ms`);
+      }
+      throw new StorageError(`Request failed: ${error}`);
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   // ==================== Utility Methods ====================

@@ -1,0 +1,13 @@
+{
+  "$id": "epr:schema:input:economic-event-query",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EconomicEventQuery",
+  "description": "Query params for GET /api/v1/economic-events. Documents the EconomicEventQuery interface hand-declared in elohim/sdk/storage-client-ts/src/api/dataplane.ts — storage-client-ts is not currently wired into schema:codegen:ts (see INTERFACE_FILES in elohim/sdk/schemas/scripts/codegen-ts.mjs), so this schema is the documented contract, not the codegen source, until that wiring is added.",
+  "type": "object",
+  "properties": {
+    "action": { "type": "string", "description": "Filter to economic events with this REA action verb." },
+    "after": { "type": "string", "description": "ISO-8601 timestamp; return only events at/after this point in time." },
+    "limit": { "type": "integer", "minimum": 0, "description": "Maximum number of economic events to return." }
+  },
+  "additionalProperties": false
+}
