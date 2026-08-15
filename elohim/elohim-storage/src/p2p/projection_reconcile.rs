@@ -1876,7 +1876,7 @@ pub async fn run_heal(
     // Ghost-anchor witness: the NULL-anchor sweep above cannot see rows whose
     // anchor string outlived its conductor incarnation. Runs on the same leg,
     // fed by the conductor answers the heal already paid for.
-    witness_ghost_anchors(hc, pool, &ghost_candidates, &adopt, &pacing).await;
+    witness_ghost_anchors(hc, pool, &ghost_candidates, &adopt, &pacing, resolver).await;
 
     // Publish the WHOLE sweep (F-D, 2026-08-01): every arm's post-heal counts
     // folded, alongside the divergent-anchor counter that already folded across
@@ -2103,12 +2103,25 @@ struct ContentHealOutcome {
 /// non-canonical reach or content_type is not re-authorable and would fail
 /// every sweep forever). Self-terminating: once authored, the conductor
 /// resolves the id and it is never a candidate again.
+///
+/// ## Round-trips
+///
+/// TWO-PHASE, the same shape [`adopt_deferred_heads`] uses. Phase 1 resolves
+/// the whole tick's elections in a handful of BATCHED calls
+/// ([`batch_probe_elections`]); phase 2 runs the per-item loop it always ran,
+/// handed the answer instead of buying it. Before this, every ghost that
+/// reached the obey arm spent its own single-id `resolve_canonical_election`
+/// round-trip on the INTERACTIVE lane — up to `witness_max_per_tick` (200) per
+/// tick, the dominant remaining per-id interactive demand on a saturated
+/// conductor. The slice is untouched: this collapses round-trips, it does not
+/// widen the sweep.
 async fn witness_ghost_anchors(
     hc: &Arc<HcClient>,
     pool: &DbPool,
     candidates: &[String],
     adopt: &crate::services::head_adoption::AdoptContext<'_>,
     pacing: &HealPacing,
+    resolver: &dyn crate::services::head_batch_resolver::HeadBatchResolver,
 ) {
     if candidates.is_empty() {
         return;
@@ -2146,6 +2159,23 @@ async fn witness_ghost_anchors(
 
     let total = ghosts.len();
     let ghost_ctx = crate::db::AppContext::default_lamad();
+
+    // ── PHASE 1: BATCH-PROBE THE ELECTIONS ───────────────────────────────────
+    //
+    // Every ghost that reaches the pre-flight below is probe-eligible BY
+    // CONSTRUCTION (`LocalResolve::observed(None)` ⇒ no head answer ⇒
+    // `head_adoption::should_probe_election(false)` is true), so the whole tick's
+    // election reads are known up front and can be bought in 2–4 calls instead
+    // of one per ghost. Scoped by [`ghost_probe_ids`] to exactly the ids the loop
+    // will actually reach — the guarded-away rows are never paid for.
+    //
+    // Runs OUTSIDE `witness_sweep_budget` on purpose, mirroring
+    // `adopt_deferred_heads`: the budget bounds the per-item loop, and each
+    // batch call already carries its OWN in-wasm deadline
+    // (`pacing.batch_extern_budget`) plus the in-leg retry ladder.
+    let probe_ids = ghost_probe_ids(&ghosts, pacing.witness_max_per_tick);
+    let elections = batch_probe_elections(resolver, pacing, &probe_ids, "ghost-witness").await;
+
     let sweep = async {
         let mut authored = 0usize;
         let mut skipped = 0usize;
@@ -2189,16 +2219,33 @@ async fn witness_ghost_anchors(
             // pre-flight goes straight to the peer arm — which is the arm that
             // matters for a ghost, since another peer is usually the one holding
             // the crown this node was about to overwrite.
+            //
+            // PHASE 2's half of the two-phase split: hand the pre-flight the
+            // election phase 1 already paid for, exactly as `adopt_deferred_heads`
+            // does. The three states route identically to the single-id path they
+            // replace:
+            //   - `Some(Some(e))` — an election is visible; obey it.
+            //   - `Some(None)`    — the conductor answered and holds no election
+            //                       (the old `Ok(None)`): carry on with the normal
+            //                       decision.
+            //   - absent from the map — the batch never answered for this id
+            //                       (`unattempted`, a per-item failure, or a
+            //                       shared/call-level stop). `unresolved()` is the
+            //                       old `Err` routing verbatim: no election in
+            //                       hand, never a claim of absence, retried next
+            //                       sweep. Deliberately NOT a per-id `Probe`
+            //                       fallback — that would re-spend the up-to-200
+            //                       interactive round-trips this arm just removed,
+            //                       at the worst possible moment (a conductor that
+            //                       had just failed a batch call).
+            let election_resolve = election_resolve_for(&elections, id);
             let preflight = crate::services::head_adoption::try_adopt_canonical_head(
                 hc,
                 pool,
                 &ghost_ctx,
                 id,
                 crate::services::head_adoption::LocalResolve::observed(None),
-                // `Probe`: the ghost sweep did NOT pay for an election read (the
-                // adopt arm's batch probe covers the adopt candidate list, which
-                // is a different set). Unchanged single-id behaviour here.
-                crate::services::head_adoption::ElectionResolve::Probe,
+                election_resolve,
                 adopt,
             )
             .await;
@@ -2305,6 +2352,7 @@ async fn witness_ghost_anchors(
             tracing::warn!(
                 target: "elohim_storage::projection_reconcile",
                 candidates = total,
+                election_probes = probe_ids.len(),
                 authored,
                 skipped,
                 failed,
@@ -2320,11 +2368,41 @@ async fn witness_ghost_anchors(
                 target: "elohim_storage::projection_reconcile",
                 budget_secs = pacing.witness_sweep_budget.as_secs(),
                 candidates = total,
+                election_probes = probe_ids.len(),
                 "projection-reconcile[ghost-witness]: sweep exceeded wall-clock budget \
                  (likely a slow/saturated conductor) — abandoned, resumes next sweep"
             );
         }
     }
+}
+
+/// The ids one ghost-witness tick will actually hand to the adopt pre-flight —
+/// i.e. exactly the set [`witness_ghost_anchors`]'s phase 1 should buy elections
+/// for.
+///
+/// Mirrors [`adopt_deferred_heads`]'s `probe_ids` scoping, one door over: there
+/// the filter is `should_probe_election(head.is_some())`; here EVERY surviving
+/// ghost is probe-eligible by construction (the sweep passes
+/// `LocalResolve::observed(None)`, so `should_probe_election(false)` is `true`),
+/// and what has to be filtered instead is the pair of guards the per-item loop
+/// applies BEFORE the pre-flight.
+///
+/// Those two guards — non-canonical `reach`, non-canonical `content_type` — are
+/// replayed here WITHOUT their `skipped` counter and warn logs; the loop keeps
+/// sole ownership of those, so the sweep's accounting is byte-identical. This
+/// function only decides what the batch pays for. `take` uses the same
+/// `witness_max_per_tick` cast the loop does, so the two always agree on the
+/// tick's slice.
+fn ghost_probe_ids(ghosts: &[(String, String, String)], max_per_tick: i64) -> Vec<String> {
+    ghosts
+        .iter()
+        .take(max_per_tick as usize)
+        .filter(|(_, reach, content_type)| {
+            crate::generated_enums::CORE_REACH_LEVELS.contains(&reach.as_str())
+                && crate::services::reanchor_backfill::is_canonical_content_type(content_type)
+        })
+        .map(|(id, _, _)| id.clone())
+        .collect()
 }
 
 /// Discovery phase of the REA-commitment reconcile (steps 1–3): build the local
@@ -4472,7 +4550,7 @@ async fn adopt_deferred_heads(
         .filter(|c| crate::services::head_adoption::should_probe_election(c.head.is_some()))
         .map(|c| c.id.clone())
         .collect();
-    let elections = batch_probe_elections(resolver, pacing, &probe_ids).await;
+    let elections = batch_probe_elections(resolver, pacing, &probe_ids, "adopt-deferred").await;
 
     // Atomics, not locals: they live OUTSIDE the future the budget may cancel,
     // so a budget-elapsed sweep still reports what it managed to do.
@@ -4509,11 +4587,7 @@ async fn adopt_deferred_heads(
             // "this id was not probe-eligible" (the pre-flight will not consult
             // it) or "the batch never answered for it" — both correctly become
             // `unresolved()`, which is the old `Err` routing, never a claim.
-            let election_resolve = match elections_ref.get(id.as_str()) {
-                Some(Some(e)) => crate::services::head_adoption::ElectionResolve::observed(Some(e)),
-                Some(None) => crate::services::head_adoption::ElectionResolve::observed(None),
-                None => crate::services::head_adoption::ElectionResolve::unresolved(),
-            };
+            let election_resolve = election_resolve_for(elections_ref, id);
             match crate::services::head_adoption::try_adopt_canonical_head(
                 hc,
                 pool,
@@ -4612,8 +4686,14 @@ async fn adopt_deferred_heads(
     );
 }
 
-/// PHASE 1 of the arm-4 two-phase adopt: resolve every probe-eligible id's DHT
-/// election in BATCHES instead of one round-trip per candidate.
+/// PHASE 1 of the two-phase head-plane arms: resolve every probe-eligible id's
+/// DHT election in BATCHES instead of one round-trip per candidate.
+///
+/// SHARED by both arms that spend elections — [`adopt_deferred_heads`] (the
+/// arm-4 adopt slice) and [`witness_ghost_anchors`] (the ghost tick). `arm` is
+/// the log discriminator ONLY; the metric label is the extern's
+/// ([`HEAD_BATCH_EXTERN_ELECTIONS`]), which is correctly shared because it is
+/// the same conductor extern with the same AIMD budget behind it.
 ///
 /// Returns `id -> Option<election>` where:
 ///
@@ -4633,6 +4713,7 @@ async fn batch_probe_elections(
     resolver: &dyn crate::services::head_batch_resolver::HeadBatchResolver,
     pacing: &HealPacing,
     ids: &[String],
+    arm: &str,
 ) -> std::collections::HashMap<
     String,
     Option<crate::services::conductor_writes::CanonicalElectionWire>,
@@ -4699,7 +4780,7 @@ async fn batch_probe_elections(
                     tracing::warn!(
                         target: "elohim_storage::projection_reconcile",
                         probed = out.len(),
-                        "projection-reconcile[adopt-deferred]: election batch stopped on a \
+                        "projection-reconcile[{arm}]: election batch stopped on a \
                          SHARED conductor failure — the remaining candidates run without an \
                          election in hand (their pre-flight is unchanged), retried next sweep"
                     );
@@ -4719,7 +4800,7 @@ async fn batch_probe_elections(
                     target: "elohim_storage::projection_reconcile",
                     error = %e,
                     ids = chunk.len(),
-                    "projection-reconcile[adopt-deferred]: election batch failed at the CALL \
+                    "projection-reconcile[{arm}]: election batch failed at the CALL \
                      level — those candidates run with no election in hand (never a claim of \
                      absence), retried next sweep"
                 );
@@ -4728,6 +4809,32 @@ async fn batch_probe_elections(
         }
     }
     out
+}
+
+/// The ONE place a [`batch_probe_elections`] answer map is turned into an
+/// [`crate::services::head_adoption::ElectionResolve`].
+///
+/// Shared by BOTH phase-2 loops ([`adopt_deferred_heads`] and
+/// [`witness_ghost_anchors`]) so the three states cannot drift apart between the
+/// arms — the drift that would matter most is the third one, where a
+/// never-answered id must stay `unresolved()` (the old single-id `Err` routing)
+/// and must never become an observed absence.
+fn election_resolve_for<'a>(
+    elections: &'a std::collections::HashMap<
+        String,
+        Option<crate::services::conductor_writes::CanonicalElectionWire>,
+    >,
+    id: &str,
+) -> crate::services::head_adoption::ElectionResolve<'a> {
+    match elections.get(id) {
+        Some(Some(e)) => crate::services::head_adoption::ElectionResolve::observed(Some(e)),
+        Some(None) => crate::services::head_adoption::ElectionResolve::observed(None),
+        // NO ENTRY: either the id was never probe-eligible (the pre-flight will
+        // not consult it) or the batch never answered for it (`unattempted`, a
+        // per-item failure, or a shared/call-level stop). Both correctly become
+        // `unresolved()` — never a claim, always a retry next sweep.
+        None => crate::services::head_adoption::ElectionResolve::unresolved(),
+    }
 }
 
 /// Project ONE conductor-resolved content HEAD into local SQL via the VERIFIED
@@ -8485,5 +8592,194 @@ mod tests {
             1,
             "the id is untouched and still pending"
         );
+    }
+
+    // ═════════════════════════════════════════════════════════════════════
+    // GHOST-WITNESS PHASE 1 — the election batch, driven by the mock resolver
+    // ═════════════════════════════════════════════════════════════════════
+
+    /// A ghost row as the candidate query returns it: `(id, reach, content_type)`.
+    fn ghost_row(id: &str) -> (String, String, String) {
+        (id.to_string(), "public".to_string(), "concept".to_string())
+    }
+
+    /// PHASE 1 SCOPE. The batch must ask for exactly the ids the per-item loop
+    /// will actually hand to the pre-flight — no more (a guarded-away row would
+    /// buy an election nobody reads) and no fewer (a missing id silently
+    /// degrades to `unresolved()` and loses its obey chance for the tick).
+    ///
+    /// The two guards replayed here are the loop's own, and the cap is the
+    /// loop's own; this test is what keeps the two in step, since they are
+    /// written in two places.
+    #[test]
+    fn ghost_probe_ids_scopes_the_batch_to_the_rows_the_loop_will_reach() {
+        let ghosts = vec![
+            ghost_row("keep-a"),
+            // Non-canonical reach: the loop `continue`s before the pre-flight,
+            // so an election for it would be bought and never read.
+            (
+                "skip-reach".to_string(),
+                "not-a-reach".to_string(),
+                "concept".to_string(),
+            ),
+            // Non-canonical content_type: same, by the sibling guard.
+            (
+                "skip-type".to_string(),
+                "public".to_string(),
+                "not-a-type".to_string(),
+            ),
+            ghost_row("keep-b"),
+            // Beyond the cap — this tick never reaches it at all.
+            ghost_row("over-cap"),
+        ];
+
+        let probed = ghost_probe_ids(&ghosts, 4);
+
+        assert_eq!(
+            probed,
+            vec!["keep-a".to_string(), "keep-b".to_string()],
+            "only the rows that survive BOTH guards inside the tick's slice are paid for, \
+             in the sweep's own order"
+        );
+        // The cap is the loop's `take`, not a filter applied after it: an
+        // over-cap row is excluded even though it would pass both guards.
+        assert!(
+            !probed.contains(&"over-cap".to_string()),
+            "witness_max_per_tick bounds the batch exactly as it bounds the loop"
+        );
+        // An extensible content_type prefix is canonical too — the guard is
+        // composed from `reanchor_backfill`, not re-derived here.
+        let attested = vec![(
+            "att".to_string(),
+            "commons".to_string(),
+            "attestation:mastery".to_string(),
+        )];
+        assert_eq!(ghost_probe_ids(&attested, 200), vec!["att".to_string()]);
+    }
+
+    /// THE WHOLE POINT. A tick of N ghosts costs ONE batched conductor call, not
+    /// N single-id `resolve_canonical_election` round-trips on the interactive
+    /// lane. N is the AIMD floor here so the assertion holds wherever the
+    /// process-wide controller currently sits (it can only be >= the floor).
+    #[tokio::test]
+    async fn the_ghost_tick_buys_its_elections_in_one_batched_call_not_one_per_ghost() {
+        let n = crate::p2p::reconcile_rails::BATCH_SIZE_FLOOR;
+        let ghosts: Vec<(String, String, String)> = arm_ids("ghost-batch", n)
+            .iter()
+            .map(|id| ghost_row(id))
+            .collect();
+        let probe_ids = ghost_probe_ids(&ghosts, WITNESS_MAX_PER_TICK);
+        assert_eq!(
+            probe_ids.len(),
+            n,
+            "every ghost in the tick is probe-eligible"
+        );
+
+        let mock = MockHeadBatchResolver::new();
+        let elections =
+            batch_probe_elections(&mock, &HealPacing::test_fast(), &probe_ids, "ghost-witness")
+                .await;
+
+        assert_eq!(
+            mock.calls(),
+            1,
+            "N ghosts must cost ONE batched call — the pre-batch arm spent N interactive \
+             single-id election probes per tick, up to WITNESS_MAX_PER_TICK"
+        );
+        assert_eq!(mock.ids_asked(), n, "and that one call carries every id");
+        assert_eq!(
+            elections.len(),
+            n,
+            "the mock's default answer is Absent, which is an ANSWER — every id is in the map"
+        );
+        for id in &probe_ids {
+            assert!(
+                matches!(
+                    election_resolve_for(&elections, id),
+                    crate::services::head_adoption::ElectionResolve::Resolved(
+                        seam_contracts::Answer::Absent
+                    )
+                ),
+                "{id}: an answered no-election is the honest observed absence, exactly the \
+                 old single-id `Ok(None)` arm"
+            );
+        }
+        // An empty tick must not touch the conductor at all.
+        let none =
+            batch_probe_elections(&mock, &HealPacing::test_fast(), &[], "ghost-witness").await;
+        assert!(none.is_empty());
+        assert_eq!(mock.calls(), 1, "an empty ghost tick costs no round-trip");
+    }
+
+    /// THE DEGRADATION, asserted rather than assumed. An id the batch never
+    /// answered for must be ABSENT from the map, and the shared mapping must
+    /// turn that absence into `unresolved()` — the single-id `Err` routing
+    /// verbatim (fall through to the normal decision, retried next sweep).
+    ///
+    /// The two failures this pins:
+    ///
+    /// 1. a SILENT DROP — mapping a never-answered id to `observed(None)` would
+    ///    claim "the conductor says there is no election" on evidence that does
+    ///    not exist, and the obey arm would stop looking; and
+    /// 2. a PER-ID `Probe` FALLBACK — which would re-spend exactly the
+    ///    interactive round-trips this arm removed, on a conductor that had just
+    ///    declined to answer a batch.
+    #[tokio::test]
+    async fn a_ghost_the_batch_never_answered_for_degrades_to_unresolved_not_a_silent_drop() {
+        let ids = arm_ids("ghost-unattempted", 4);
+        let (answered, unattempted) = (&ids[..2], &ids[2..]);
+
+        let mock = MockHeadBatchResolver::new();
+        // One id carries a real election, one is an honest observed absence
+        // (the mock's default), and the last two were NEVER STARTED.
+        mock.seed_election(
+            &answered[0],
+            MockAnswer::Present(crate::services::conductor_writes::CanonicalElectionWire {
+                winner_target: "uhCkkghost-winner".into(),
+                canonical_declared_at: 42,
+                canonical_earned: true,
+            }),
+        );
+        for id in unattempted {
+            mock.seed_election(id, MockAnswer::Unattempted);
+        }
+
+        let elections =
+            batch_probe_elections(&mock, &HealPacing::test_fast(), &ids, "ghost-witness").await;
+
+        assert!(
+            matches!(
+                election_resolve_for(&elections, &answered[0]),
+                crate::services::head_adoption::ElectionResolve::Resolved(
+                    seam_contracts::Answer::Present(_)
+                )
+            ),
+            "a visible election is handed to the pre-flight to obey"
+        );
+        assert!(
+            matches!(
+                election_resolve_for(&elections, &answered[1]),
+                crate::services::head_adoption::ElectionResolve::Resolved(
+                    seam_contracts::Answer::Absent
+                )
+            ),
+            "an answered no-election stays an observed absence"
+        );
+        for id in unattempted {
+            assert!(
+                !elections.contains_key(id.as_str()),
+                "{id}: a never-started id establishes nothing, so it must not be in the map"
+            );
+            assert!(
+                matches!(
+                    election_resolve_for(&elections, id),
+                    crate::services::head_adoption::ElectionResolve::Resolved(
+                        seam_contracts::Answer::Unreachable
+                    )
+                ),
+                "{id}: absence-from-the-map must route as `unresolved()` — never as an \
+                 observed absence, and never back to a per-id conductor probe"
+            );
+        }
     }
 }
