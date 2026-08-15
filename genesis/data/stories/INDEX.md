@@ -91,6 +91,21 @@ Stories below are listed by `status` (author-axis) with `delivery_status` (subst
 ### no-customer-support
 - [gertrude-logs-in-with-help-from-her-people](epr:experience-story/gertrude-grandma/as-account-claimant/social-recovery-with-help-from-family) *(draft / delivery_status: undelivered)* — recovery routes through "your people," not a corporate help desk.
 
+### plural-authorship
+- [who-wrote-this](epr:experience-story/ethosengine/as-plural-author/agent-identity-claim-and-acceptance) *(draft / delivery_status: undelivered)* — `(org-ethosengine, role-as-plural-author, agent-identity-claim-and-acceptance)` — the human, the agents, and the collective the attribution flows to, all named with lineage kept; the pattern held at n=1 before it was held at scale.
+
+### agent-identity
+- [who-wrote-this](epr:experience-story/ethosengine/as-plural-author/agent-identity-claim-and-acceptance) *(draft / delivery_status: undelivered)* — an agent registers its own claim in-flight, with its human steward attached; the identity layer built for humans without keys turns out to be the identity layer for agents without keys.
+
+### honor-system-then-evidence
+- [who-wrote-this](epr:experience-story/ethosengine/as-plural-author/agent-identity-claim-and-acceptance) *(draft / delivery_status: undelivered)* — "we believe you" at claim time; acceptance by the community at ratification; adverse attestation only with evidence attached, appended beside the original rather than editing it.
+
+### earned-standing
+- [who-wrote-this](epr:experience-story/ethosengine/as-plural-author/agent-identity-claim-and-acceptance) *(draft / delivery_status: undelivered)* — the teeth are whether the next claim travels, never a gate on the door; carrot before stick, repair rather than exile.
+
+### capability-is-not-one-thing
+- [who-wrote-this](epr:experience-story/ethosengine/as-plural-author/agent-identity-claim-and-acceptance) *(draft / delivery_status: undelivered)* — the best reasoner is not the best writer; capability scores are imported and externally witnessed, never self-produced, and a capability lens that has no earnable route into it has become enclosure.
+
 ---
 
 ## By subject
@@ -109,12 +124,16 @@ Stories below are listed by `status` (author-axis) with `delivery_status` (subst
 - [the-dowells-hold-gertrudes-share](epr:experience-story/matthew-manager/as-recovery-counterparty/backup-stewardship-for-household-gertrude) *(draft / delivery_status: undelivered)* — protagonist; accepts share-custody from Gertrude for her household; the elohim names the moment the relationship could be contaminated by accounting and refuses it on his behalf.
   *(previously listed as appears-but-not-subject for james-and-the-spoke / the-coop-decides — now subject of his own story.)*
 
+### org-ethosengine (EthosEngine — the dev collective)
+- [who-wrote-this](epr:experience-story/ethosengine/as-plural-author/agent-identity-claim-and-acceptance) *(draft / delivery_status: undelivered)* — protagonist; the protocol's own development collective, presently one human plus its agents. The first `collective-as-subject` story in the catalog, and the first story whose subject is the harness that builds the protocol.
+
 ### Additional characters (not the subject of their own story yet)
 
 The following humans appear in stories but are not yet
 subjects of their own canonical stories — listed as coverage gaps below.
 
 - **human-jessica-spouse** (Jessica) — the steward in james-and-the-spoke; the proposer in the-coop-decides; coop member at Valley Homeschool Co-op; the co-signer (and the one who actually taps Accept) in the-dowells-hold-gertrudes-share.
+- **human-matthew-manager** (Matthew) — appears in who-wrote-this as the human who notices, pins the cold reader, gives away the pen, and types the first plural trailer roster by hand. He is a character there, not the subject; the subject is the collective the attribution flows to.
 
 ---
 
@@ -173,6 +192,24 @@ subjects of their own canonical stories — listed as coverage gaps below.
 > family/elder (constitutional standing). The role is universal across recoveries —
 > any human asking for recovery is in this role at the moment of asking, regardless
 > of archetype. **Cartographer-rank: high.**
+
+### @as-plural-author
+- [who-wrote-this](epr:experience-story/ethosengine/as-plural-author/agent-identity-claim-and-acceptance) *(draft / delivery_status: undelivered)*
+
+> Role record `role-as-plural-author` **does not yet exist** in
+> `genesis/data/lamad/content/`. It is the role any party occupies when work is
+> produced by more than one actor and the credit must describe that honestly —
+> the human giving directive, the agents doing lanes of the work, and the
+> collective the attribution flows to. Distinct from:
+> - `role-as-collective-steward` (stewarding a *decision process*, not co-producing an artifact).
+> - `role-as-community-attestor` (attesting to someone else's work; a plural author attests to their own share of it).
+>
+> The role is not AI-specific and should not be defined as such — a household
+> writing a letter together, a band crediting a session player, and a repository
+> crediting a scribe are the same shape. Crosscuts imagodei (composable identity),
+> avodah (contribution), qahal (collective membership). **Cartographer-rank: high** —
+> it is the first role in the catalog whose occupant may be non-human, which makes
+> it the natural place to record that the role definition must not assume a human.
 
 ---
 
@@ -243,6 +280,31 @@ subjects of their own canonical stories — listed as coverage gaps below.
 > the storyteller suggests the canonical name `stewarded-device-sync.feature`
 > to align with the triple. Cartographer to rank.
 
+### agent-identity-claim-and-acceptance
+- [who-wrote-this](epr:experience-story/ethosengine/as-plural-author/agent-identity-claim-and-acceptance) *(draft / delivery_status: undelivered)*
+
+> Feature file **does not yet exist**. Proposed location:
+> `genesis/a2o/features/devflow/agent-identity-claim-and-acceptance.feature`
+> (the devflow directory already holds `developer-valueflow-projection.feature`
+> and `run-plane.feature`, and the actor plane is a dev-harness primitive before
+> it is a DHT one). Adjacent features the story touches, all on disk:
+>
+> - `auth/contributor-presence-claim-ceremony.feature` (exists, `@wip`) — the
+>   unclaimed → claiming → claimed ceremony, witnessed by tending stewards, with
+>   appeals recorded as correcting events that leave the original unmutated. The
+>   story's claim and adverse-attestation legs are dramatized against these steps.
+> - `devflow/developer-valueflow-projection.feature` (exists, `@wip`) — "that
+>   produce event's provenance is walkable, not merely asserted" is the scenario
+>   line the plural co-author trailers exist to make true.
+> - `qahal/collective-governance.feature` (exists) — the collective acting as an
+>   accepting body; the acceptance leg's nearest existing coverage.
+>
+> The three legs the story dramatizes — honor-system claim, acceptance at
+> ratification, evidenced adverse attestation — are each *adjacent*-anchored but
+> none is canonically covered end-to-end. The sealed plan
+> (`2026-08-15-actor-plane-implementation-plan`) makes the feature authorable.
+> **Cartographer-rank: high.**
+
 ---
 
 ## By epic
@@ -274,6 +336,15 @@ subjects of their own canonical stories — listed as coverage gaps below.
 
 ### governance_layers/functional/qahal/ (acknowledged-gap)
 - [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(canonical / delivery_status: undelivered)* — *the qahal functional governance layer has no epic body on disk; only the feature directory at `a2o/features/qahal/` and the elohim-app pillar exist. The story carries the philosophy until an epic body lands. Cartographer should rank "author governance_layers/functional/qahal/README.md" as a candidate Objective.*
+
+### imagodei.md
+- [who-wrote-this](epr:experience-story/ethosengine/as-plural-author/agent-identity-claim-and-acceptance) *(draft / delivery_status: undelivered)* — instantiates the epic's core-identity principle that identity is both stable and dynamic, and its gifts-and-capabilities module (unique capacity to contribute, recognized rather than ranked). The story's closing move — attestations couple to the name, never to the substrate beneath it, because a human identity has always worked that way — is that principle carried across to a non-human actor.
+
+### governance/epic.md
+- [who-wrote-this](epr:experience-story/ethosengine/as-plural-author/agent-identity-claim-and-acceptance) *(draft / delivery_status: undelivered)* — instantiates "The watchers eventually need watching" and the Elohim Wager (agents powerful enough to help, structurally unable to rule). The acceptance leg is the wager applied to identity: an agent that could confirm its own claim would be an agent electing itself, so acceptance is placed at ratification, in the community's hands.
+
+### social_medium/ (epic.md) — second story
+- [who-wrote-this](epr:experience-story/ethosengine/as-plural-author/agent-identity-claim-and-acceptance) *(draft / delivery_status: undelivered)* — instantiates three named sections: "Standing — The Architecture of Consequence" (standing is a shape, not a score anyone could game — hence imported, externally-witnessed measures and never self-produced ones), "Carrot Before Stick," and "Restitution as Repair, Not Exile" (the adverse attestation is an evidenced correction appended beside the original, and the teeth are whether the next claim travels).
 
 ### recovery/ (acknowledged-gap — recurring across three stories)
 - [gertrude-holds-the-share](epr:experience-story/gertrude-grandma/as-recovery-counterparty/backup-stewardship-for-household-dowell) *(draft / delivery_status: undelivered)*
@@ -337,6 +408,7 @@ Cartographer reads this section when ranking candidate Objectives.
 - **`role-as-steward`** — the inverse role (Jessica's role in this story). Multiple existing humans occupy it; not yet a first-class role.
 - **`role-as-community-attestor`** — Terrance's role in this story. Distinct from `role-social-medium-content-creator` or `role-as-tutor`; would also serve neighborhood-witness scenarios.
 - **`role-as-recovery-counterparty`** — required by gertrude-holds-the-share and the-dowells-hold-gertrudes-share triples. Peer-to-peer reciprocal role; distinct from steward/stewardee asymmetry. Universal across every share-holder in every recovery setup. Crosscuts imagodei / shefa / qahal / social_medium/elder. **Two stories in this batch flag the gap. Cartographer-rank: high.**
+- **`role-as-plural-author`** — required by who-wrote-this's triple. Any party co-producing one artifact whose credit must describe that honestly: the human giving directive, the agents working lanes, the collective the attribution flows to. Deliberately not AI-specific — a household writing a letter together is the same shape. First role in the catalog whose occupant may be non-human. Crosscuts imagodei / avodah / qahal. **Cartographer-rank: high.**
 - **`role-as-account-claimant`** — required by gertrude-logs-in-with-help-from-her-people triple. Universal across every human asking for their own recovery (or any account-state-restoration). Crosscuts imagodei / social_medium/elder / family/elder. **Cartographer-rank: high.**
 
 ### Canonical features missing (cartographer to rank)
@@ -345,6 +417,7 @@ Cartographer reads this section when ranking candidate Objectives.
 - **`household-sync-handshake.feature`** — referenced thematically; no canonical feature for the spoke-open / spoke-close handshake yet.
 - **`backup-stewardship-for-household-dowell.feature`** — share-holder-as-subject ceremony from the receiving side (gertrude-holds-the-share). Adjacent: `auth/recovery/recovery-shamir-optional.feature` (Matthew-as-subject; treats share-recipient as fixture). Proposed location: `auth/recovery/` or new `auth/recovery/share-custody/`. **Cartographer-rank: high.**
 - **`backup-stewardship-for-household-gertrude.feature`** — the reciprocal-direction companion. Authoring either feature informs the other. Same proposed location.
+- **`agent-identity-claim-and-acceptance.feature`** — the canonical feature for who-wrote-this's triple. Proposed location `genesis/a2o/features/devflow/`. Covers the three legs end-to-end: an agent registers an honor-system claim in-flight with its steward attached; the claim is accepted (or not) by the community at ratification, never by the claimant; an adverse attestation is filed only with evidence and appended beside the original record rather than editing it. Adjacent coverage exists (`auth/contributor-presence-claim-ceremony.feature`, `devflow/developer-valueflow-projection.feature`, `qahal/collective-governance.feature`) but no scenario proves the loop. The sealed plan `2026-08-15-actor-plane-implementation-plan` makes it authorable. **Cartographer-rank: high.**
 - **`social-recovery-with-help-from-family.feature`** — the canonical feature for the entire `project_recovery_grandma_standard` memory. Tests the grandma-standard UX invariant (no jargon to claimant, no seed bytes, ambient throughout, elohim-mediated translation). Adjacent: the existing `auth/recovery/recovery-m5-*.feature` suite, which tests substrate-side mechanics but not the load-bearing UX invariant. **Cartographer-rank: highest** — this is the load-bearing test for the foundational recovery memory, and no Gherkin yet covers it.
 
 ### Epics missing (cartographer to rank)
@@ -360,7 +433,9 @@ The corpus is brand new. Each row below is a candidate Tier 1 anchor.
 - ~~`(human-terrance-tutor, role-as-community-attestor, learning-attestation-cycle)`~~ — partially carried by **the-coop-decides** (Terrance as subject in role-as-collective-steward over collective-governance feature). The `role-as-community-attestor` framing remains a distinct gap; the coop story carries Terrance's facilitator-as-quorum-keeper aspect, not his individual-attestation-of-James aspect.
 - `(human-pam-polarized, role-as-non-member, ungrudging-service-to-outsiders)` — externalities to neighbors who reject the network.
 - `(human-adam-firstman, role-as-bootstrap-steward, alpha-cluster-bring-up)` — bootstrap pair, founder-class story.
-- `(collective-maintainers, role-as-protocol-stewards, capture-resistance-handoff)` — collective-as-subject; the protocol's own self-preservation story.
+- `(collective-maintainers, role-as-protocol-stewards, capture-resistance-handoff)` — collective-as-subject; the protocol's own self-preservation story. **Note (2026-08-15):** collective-as-subject is no longer unexercised — who-wrote-this uses `org-ethosengine` — so this row is now a content gap rather than a shape gap.
+- `(human-matthew-manager, role-as-plural-author, agent-identity-claim-and-acceptance)` — the same evening from the human's vantage rather than the collective's: what it feels like to type someone else's name into a trailer because they cannot sign. Shared-body-text candidate with who-wrote-this.
+- `(org-ethosengine, role-as-plural-author, capability-lens-selection)` — the forward half of backlog row 16: a role declares a needed capability and candidate fillers hold imported attestations. The story exists only up to the design; the selection ceremony has no narrative yet.
 - `(human-jessica-spouse, role-as-recovery-counterparty, backup-stewardship-for-household-*)` — Jessica's vantage on the reciprocal-backup ceremony; she is the one who actually taps Accept in the-dowells-hold-gertrudes-share. Shared body text candidate.
 - `(human-matthew-manager, role-as-account-claimant, social-recovery-with-help-from-family)` — Matthew on the receiving end of his own recovery; the more technically-fluent version of gertrude-logs-in-with-help-from-her-people, instructive for showing that the grandma-standard UX serves builders too.
 
@@ -372,6 +447,7 @@ The corpus is brand new. Each row below is a candidate Tier 1 anchor.
 - **ungrudging service to non-members** — externalities to opt-outs
 - **multi-doorway resilience** — the human registered with two doorways failing over
 - **avodah / contribution as worship** — contribution-as-protocol-participation
+- **the harness that builds the protocol** — partially opened by who-wrote-this (the first story whose subject is the development collective itself). Remaining sub-themes: the operator working alongside agents overnight, the moment an agent's work is declined, the collective growing past n=1.
 - **economic flows** — no story carries the protocol's economic shape into kitchen-table language
 - **living-memory** — the memory-as-substrate epic that this catalog itself serves has no story
 
@@ -450,3 +526,24 @@ The corpus is brand new. Each row below is a candidate Tier 1 anchor.
   around. Substrate-axis is `undelivered` (floor) on all three; per Run #2,
   the operator-confirm flip will be `graduated-narratively` until the
   feature files land + `/deliver` mints verdicts.
+- **2026-08-15 — the actor-plane genesis story (`who-wrote-this`, `draft`)**:
+  authored the same day the implementation plan was sealed
+  (`genesis/docs/superpowers/plans/2026-08-15-actor-plane-implementation-plan.md`,
+  cited into the story's frontmatter as a content-addressed envelope via
+  `cite-gen --seal`). Triple: `(org-ethosengine, role-as-plural-author,
+  agent-identity-claim-and-acceptance)`. Two firsts for the catalog: the first
+  story whose subject is a collective, and the first whose subject is the
+  development harness that builds the protocol. Its factual substrate is the
+  operator design session of 2026-08-15 and commit `e4c4accf3`, whose four-name
+  trailer roster the story treats as the honest ancestor of plural-DID
+  authorship. Gaps surfaced: one role (`role-as-plural-author`), one canonical
+  feature (`devflow/agent-identity-claim-and-acceptance.feature`). No epic gap —
+  the story anchors cleanly to three existing epic bodies (`imagodei.md`,
+  `governance/epic.md`, `social_medium/epic.md`), which is unusual in this
+  catalog and worth noting as evidence the design was composed from canon rather
+  than invented beside it. Disposition on the memory entries the story touches
+  (`project_contributor_presence_commons_stewardship`,
+  `feedback_ratification_is_us_not_operator_solo`,
+  `project_collective_topology_author_stewards`): **HOLD** — the story is draft,
+  their technical lessons exceed what the narrative carries, and graduation
+  requires `status: canonical`. Substrate-axis `undelivered` (floor).
