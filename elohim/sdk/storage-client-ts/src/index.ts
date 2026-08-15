@@ -47,6 +47,9 @@ export { AutomergeSync, SyncResult, createSync } from './sync';
 
 // Generated types from Rust via ts-rs
 export * from './generated/index.js';
+export type { NetworkPostureView } from './generated/NetworkPostureView.js';
+export type { PeerListView } from './generated/PeerListView.js';
+export type { PeerStatusView } from './generated/PeerStatusView.js';
 
 // GraphQL query documents + response types (viewer.hub, viewer.peers)
 export * from './graphql/index.js';

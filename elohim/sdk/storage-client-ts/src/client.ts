@@ -11,6 +11,9 @@ import {
   ListOptions,
 } from './types';
 import { QahalApi } from './api/qahal';
+import type { NetworkPostureView } from './generated/NetworkPostureView';
+import type { PeerListView } from './generated/PeerListView';
+import type { PeerStatusView } from './generated/PeerStatusView';
 
 /**
  * HTTP client for elohim-storage sync API
@@ -183,6 +186,29 @@ export class StorageClient {
   async countDocuments(): Promise<number> {
     const response = await this.listDocuments({ limit: 0 });
     return response.total;
+  }
+
+  // ==================== Dataplane Read API ====================
+
+  /**
+   * List peers currently connected to this storage node.
+   */
+  async listConnectedPeers(): Promise<PeerListView> {
+    return this.getJson<PeerListView>('/p2p/peers');
+  }
+
+  /**
+   * List notarized peer-status records projected by this storage node.
+   */
+  async listPeerStatuses(): Promise<PeerStatusView[]> {
+    return this.getJson<PeerStatusView[]>('/api/v1/peer-statuses');
+  }
+
+  /**
+   * Get the storage node's aggregate network posture projection.
+   */
+  async getNetworkPosture(): Promise<NetworkPostureView> {
+    return this.getJson<NetworkPostureView>('/api/v1/network/posture');
   }
 
   // ==================== Blob API ====================
