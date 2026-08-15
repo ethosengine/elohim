@@ -125,15 +125,30 @@ pub fn project(root: &Path, recipes: &Path) -> FlowResult<ProjectSummary> {
 
     // Dedupe against the existing sidecar, then append the new records.
     let mut store = SidecarFlowStore::open(root)?;
-    let existing: HashSet<Cid> = store.records()?.into_iter().map(|(c, _)| c).collect();
+    let recorded = store.records()?;
+    let existing: HashSet<Cid> = recorded.iter().map(|(cid, _)| *cid).collect();
+    let existing_events: HashSet<EventKey> = recorded
+        .iter()
+        .filter_map(|(_, record)| match record {
+            FlowRecord::Event(event) => Some(event_key(event)),
+            _ => None,
+        })
+        .collect();
     let mut seen: HashSet<Cid> = HashSet::new();
     let mut counts: BTreeMap<String, KindCount> = BTreeMap::new();
 
     for staged in deriv.staged {
         let cid = staged.record.cid()?;
         let kind = kind_name(&staged.record).to_string();
+        // Two questions, not one. "Have I already got this record?" is the CID; "have I already
+        // got this ACT?" is the key. They diverge whenever the vocabulary an event carries grows
+        // — the same production, re-derived, addresses differently.
+        let already_present = existing.contains(&cid)
+            || seen.contains(&cid)
+            || matches!(&staged.record, FlowRecord::Event(event)
+                if existing_events.contains(&event_key(event)));
         let entry = counts.entry(kind).or_default();
-        if existing.contains(&cid) || seen.contains(&cid) {
+        if already_present {
             entry.present += 1;
         } else {
             store.append(staged.record)?;
@@ -482,9 +497,20 @@ fn derive_process_doc(
     );
 
     // The Produce event — provenance is the commit that added the file.
-    let (provider, occurred_at) = producing_commit(root, rel)
-        .map(|(email, ts)| (AgentRef(email), ts))
-        .unwrap_or_else(|| (repo_agent(), String::new()));
+    //
+    // `provider` stays the SIGNING author even when the commit names co-authors. The commit is
+    // the steward's signed envelope: they are the one answerable for what entered the tree, and
+    // moving the provider to a named collaborator would transfer that answerability to someone
+    // who never signed anything. Plurality is additive — it lands in `classified_as` beside the
+    // steward, never in place of them.
+    let (provider, occurred_at, classified_as) = match producing_commit(root, rel) {
+        Some(p) => (
+            AgentRef(p.author),
+            p.occurred_at,
+            co_author_slots(&p.co_authors),
+        ),
+        None => (repo_agent(), String::new(), Vec::new()),
+    };
     let event = FlowEvent {
         action: ReaVerb::Produce,
         provider,
@@ -498,7 +524,7 @@ fn derive_process_doc(
         in_scope_of,
         fulfills: Vec::new(),
         satisfies: Vec::new(),
-        classified_as: Vec::new(),
+        classified_as,
         occurred_at,
     };
     let event_cid = atom_cid(&event)?;
@@ -508,6 +534,116 @@ fn derive_process_doc(
         format!("produce:{rel}"),
     );
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Plural authorship — `Co-Authored-By` trailers → `classified_as` slots
+// ---------------------------------------------------------------------------
+
+/// Prefix on every slot naming someone the signing author worked with.
+///
+/// Prefixed like the other authored slots in this vocabulary so a reader can tell a *person*
+/// from a tag at a glance, and so a fold that wants only the roster can select it by prefix
+/// without knowing how many slots precede it.
+const CO_AUTHOR_SLOT_PREFIX: &str = "co-author:";
+
+/// Raw `Co-Authored-By` values → the sorted, deduped slots a `Produce` event carries.
+///
+/// Sorted because the slot list is part of the event's content address and git preserves the
+/// order the author happened to type; two commits naming the same three collaborators in
+/// different orders describe the same collaboration and must address the same. Deduped because a
+/// repeated trailer, or two spellings that normalize to one identity, is one collaborator named
+/// twice — not two.
+///
+/// An empty roster yields `Vec::new()`, which `FlowEvent::classified_as` skips when serializing.
+/// That is what keeps every trailer-less commit's event byte-identical to what it was before this
+/// vocabulary existed: the sidecar re-verifies each stored CID on read, so a re-encoding here
+/// would turn the whole append-only log into an integrity error.
+fn co_author_slots(raw: &[String]) -> Vec<String> {
+    let mut slots: Vec<String> = raw
+        .iter()
+        .filter_map(|value| normalize_co_author(value))
+        .map(|id| format!("{CO_AUTHOR_SLOT_PREFIX}{id}"))
+        .collect();
+    slots.sort();
+    slots.dedup();
+    slots
+}
+
+/// One `Name <email>` trailer value → the vocabulary term naming that collaborator, or `None`.
+///
+/// # This is vocabulary, not identity resolution
+///
+/// The domain arms are a **heuristic naming convention**, deliberately shallow. They say how this
+/// repository has spelled its collaborators in commit trailers; they do not claim to have
+/// resolved anyone to a durable identity, and nothing downstream may treat them as if they had.
+/// The fallback is what makes that safe: an address from a domain this function has never heard
+/// of becomes its own lowercased self, which misattributes nobody — it just declines to
+/// interpret. Real resolution (`ContributorPresence`, the DID bridge) is a graduation-time
+/// concern with witnesses and consent behind it, and will never be reachable by string-matching
+/// an email domain here.
+///
+/// # The `agent:` form here is NOT an actor-plane ref
+///
+/// `agent:<name-slug>` carries no `@` half, so `parse_agent_ref` — which requires
+/// `agent:<role>@<model>` — refuses it by construction. That structural disjointness is the
+/// point: a trailer is an assertion the *committer* makes about who helped, while an actor claim
+/// is an assertion an agent makes about *itself* in flight. Joining the two vocabularies by
+/// string equality would let either one silently stand in for the other, so they are shaped so
+/// that no comparison can succeed by accident.
+///
+/// # Failure is per-value
+///
+/// `None` for anything unparseable, never an error. A projection derives thousands of records
+/// from history nobody can go back and fix; one malformed trailer dropping its own slot is
+/// containable, and one malformed trailer failing the whole projection is not.
+///
+/// Kept pure and small on purpose: commit-trailer grammar has a native home coming in brit, and
+/// this family migrates there intact. Git's `%(trailers)` already does the RFC-822-shaped work —
+/// all that belongs here is normalizing the values it hands back.
+fn normalize_co_author(raw: &str) -> Option<String> {
+    let raw = raw.trim();
+    let open = raw.find('<')?;
+    let close = raw.rfind('>')?;
+    if close < open {
+        return None;
+    }
+    let email = raw[open + 1..close].trim().to_lowercase();
+    if email.is_empty() {
+        return None;
+    }
+    let name = &raw[..open];
+    match email.as_str() {
+        "noreply@anthropic.com" => Some(format!("agent:{}", name_slug(name)?)),
+        "noreply@ethosengine.com" => Some(format!("collective:{}", name_slug(name)?)),
+        // An unrecognised domain is a person we decline to classify, addressed by the only
+        // identifier the trailer actually established.
+        _ => Some(email),
+    }
+}
+
+/// A display name → the slug half of a vocabulary term.
+///
+/// Restricted to `[a-z0-9-]` — the same character class the actor plane's role segment uses — so
+/// a reader comparing an `agent:` term against an actor ref is comparing like with like rather
+/// than squinting at two different alphabets. Every run of anything else collapses to a single
+/// separator; leading and trailing separators are trimmed. A name with nothing left after that
+/// yields `None`, because a term whose subject is the empty string names everyone.
+fn name_slug(name: &str) -> Option<String> {
+    let mut slug = String::new();
+    for ch in name.chars() {
+        if ch.is_ascii_alphanumeric() {
+            slug.push(ch.to_ascii_lowercase());
+        } else if !slug.ends_with('-') {
+            slug.push('-');
+        }
+    }
+    let trimmed = slug.trim_matches('-');
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
 }
 
 fn derive_gap_items(root: &Path, abs: &Path, deriv: &mut Derivation) -> FlowResult<()> {
@@ -634,6 +770,38 @@ fn push_unique(list: &mut Vec<Cid>, cid: Cid) {
     }
 }
 
+/// What makes two events the SAME ACT, independent of what vocabulary they carry: this verb, by
+/// this provider, on this resource, in this process, at this instant.
+type EventKey = (ReaVerb, AgentRef, Cid, Option<Cid>, String);
+
+/// The identity of an act, as distinct from the identity of a record.
+///
+/// **Why this exists.** CID dedupe alone answers "is this record already written". It cannot
+/// answer "is this act already recorded", and the two stopped being the same question the moment
+/// an event grew optional slots. A `Produce` already in the sidecar, re-derived once its commit's
+/// co-authors are read, is byte-different and therefore CID-different — so a CID-only guard would
+/// append it as a SECOND production of the same artifact, by the same author, at the same
+/// instant. Every stock that folds produce-minus-consume would then double-count it, and the
+/// corpus would appear to grow on being re-measured.
+///
+/// **What it deliberately does not do.** It does not update the recorded event. History here is
+/// append-only and is not retro-attributed: the roster on an act that was recorded without one
+/// is a deliberate migration with its own decision behind it, never a silent side effect of
+/// running the projection again. Enrichment therefore reaches newly-minted events only, and an
+/// older event keeps saying exactly what it said when it was witnessed.
+///
+/// `classified_as` is excluded from the key precisely because it is the field that may grow;
+/// including it would make the key a restatement of the CID and guard nothing.
+fn event_key(event: &FlowEvent) -> EventKey {
+    (
+        event.action,
+        event.provider.clone(),
+        event.resource,
+        event.process,
+        event.occurred_at.clone(),
+    )
+}
+
 fn kind_name(record: &FlowRecord) -> &'static str {
     match record {
         FlowRecord::Spec(_) => "spec",
@@ -644,5 +812,104 @@ fn kind_name(record: &FlowRecord) -> &'static str {
         // `project` never stages an Edge (those come from the seal verbs), but the match
         // must stay exhaustive over `FlowRecord`.
         FlowRecord::Edge(_) => "edge",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The whole normalization contract in one table: the three domain arms, what a slug does to
+    /// a name, and every shape that must decline rather than guess.
+    #[test]
+    fn normalize_co_author_maps_trailers_to_vocabulary_and_declines_the_rest() {
+        let cases: &[(&str, Option<&str>)] = &[
+            // The two known domains name their collaborators by slug.
+            (
+                "Claude Fable 5 <noreply@anthropic.com>",
+                Some("agent:claude-fable-5"),
+            ),
+            (
+                "Claude Opus 4.6 <noreply@anthropic.com>",
+                Some("agent:claude-opus-4-6"),
+            ),
+            (
+                "ethosengine <noreply@ethosengine.com>",
+                Some("collective:ethosengine"),
+            ),
+            // Slug shaping: runs of punctuation and whitespace collapse to one separator, and
+            // leading/trailing junk is trimmed rather than carried into the term.
+            (
+                "  Claude   Sonnet   5  <noreply@anthropic.com>",
+                Some("agent:claude-sonnet-5"),
+            ),
+            (
+                "-- Claude (Fable) 5! -- <noreply@anthropic.com>",
+                Some("agent:claude-fable-5"),
+            ),
+            (
+                "Ada — Lovelace <noreply@ethosengine.com>",
+                Some("collective:ada-lovelace"),
+            ),
+            // An unknown domain is declined-but-addressed: no interpretation, no misattribution.
+            (
+                "Matthew Dowell <MBD06b+GitHub@Gmail.com>",
+                Some("mbd06b+github@gmail.com"),
+            ),
+            ("someone@example.test", None), // no brackets — not a trailer shape
+            ("Nameless <>", None),          // brackets, nothing inside
+            ("Nameless <   >", None),       // whitespace is not an address
+            ("", None),                     // empty-after-trim
+            ("   ", None),
+            (">inverted< <", None), // brackets in the wrong order
+            // A known domain with no name has no slug, and a term whose subject is empty names
+            // everyone — so it is declined rather than minted as a bare `agent:`.
+            ("<noreply@anthropic.com>", None),
+            ("!!! <noreply@ethosengine.com>", None),
+        ];
+        for (raw, expected) in cases {
+            assert_eq!(
+                normalize_co_author(raw).as_deref(),
+                *expected,
+                "normalizing {raw:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_roster_is_sorted_deduped_and_prefixed_so_typing_order_cannot_move_a_cid() {
+        let raw: Vec<String> = [
+            "ethosengine <noreply@ethosengine.com>",
+            "Claude Fable 5 <noreply@anthropic.com>",
+            // The same collaborator named twice, once with sloppier spacing.
+            "Claude  Fable  5 <noreply@anthropic.com>",
+            // One unparseable value must cost only its own slot.
+            "not a trailer at all",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        assert_eq!(
+            co_author_slots(&raw),
+            vec![
+                "co-author:agent:claude-fable-5".to_string(),
+                "co-author:collective:ethosengine".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn an_empty_roster_stays_an_empty_vec_so_a_solo_commit_encodes_as_it_always_did() {
+        assert!(co_author_slots(&[]).is_empty());
+        assert!(co_author_slots(&["<>".to_string()]).is_empty());
+    }
+
+    #[test]
+    fn the_minted_agent_term_is_not_a_parseable_actor_ref() {
+        // Structural disjointness, asserted rather than assumed: a trailer-derived term is an
+        // assertion ABOUT someone, an actor ref is an agent's claim about itself, and no string
+        // comparison may ever let one pass for the other.
+        let term = normalize_co_author("Claude Fable 5 <noreply@anthropic.com>").unwrap();
+        assert!(elohim_epr_rea::parse_agent_ref(&term).is_err());
     }
 }

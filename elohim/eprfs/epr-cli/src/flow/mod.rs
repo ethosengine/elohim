@@ -653,17 +653,41 @@ pub fn cite_status(entry: &str) -> Option<String> {
 // Git provenance
 // ---------------------------------------------------------------------------
 
-/// The `(author-email, iso-timestamp)` of the commit that ADDED `rel_path`, falling back
-/// to the most recent commit touching it. `None` when git has no history for the path.
-pub fn producing_commit(root: &Path, rel_path: &str) -> Option<(String, String)> {
+/// What one commit says about who made it: the signing author, when, and whom the author named
+/// alongside themselves.
+///
+/// The three travel together because they come from one `git log` line and mean one thing —
+/// *this act, by these people, at this instant*. Splitting them across helpers would let a caller
+/// take the timestamp from one commit and the roster from another, which is a plural-authorship
+/// claim nobody made.
+///
+/// `co_authors` holds trailer values **verbatim** (`Claude Fable 5 <noreply@anthropic.com>`).
+/// This layer reads git; it does not interpret it. Turning a raw trailer into projection
+/// vocabulary is the caller's decision and lives where that vocabulary is minted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Provenance {
+    pub author: String,
+    pub occurred_at: String,
+    pub co_authors: Vec<String>,
+}
+
+/// The provenance of the commit that ADDED `rel_path`, falling back to the most recent commit
+/// touching it. `None` when git has no history for the path.
+///
+/// The add-commit is the one that answers "who produced this", which is why the fallback is a
+/// fallback: a doc's most recent toucher is its latest editor, and attributing production to them
+/// would credit whoever fixed the last typo.
+pub fn producing_commit(root: &Path, rel_path: &str) -> Option<Provenance> {
     // Oldest add is the last line of the reverse-chronological add-filtered log.
-    if let Some(pair) = git_log_pairs(root, &["--diff-filter=A"], rel_path)
+    if let Some(found) = git_log_provenance(root, &["--diff-filter=A"], rel_path)
         .into_iter()
         .last()
     {
-        return Some(pair);
+        return Some(found);
     }
-    git_log_pairs(root, &["-1"], rel_path).into_iter().next()
+    git_log_provenance(root, &["-1"], rel_path)
+        .into_iter()
+        .next()
 }
 
 /// The committer-date Unix timestamp of `HEAD` — the git-derived clock the flow family
@@ -703,10 +727,29 @@ pub fn head_commit_provenance(root: &Path) -> Option<(String, String)> {
     Some((email.to_string(), ts.to_string()))
 }
 
-fn git_log_pairs(root: &Path, extra: &[&str], rel_path: &str) -> Vec<(String, String)> {
+/// Field separator inside one commit's line; record separator between trailer values.
+///
+/// Both are control characters no commit message or address carries, so the line is parseable
+/// without quoting rules. `%(trailers:…)` does the RFC-822-shaped work — folded continuations,
+/// case-insensitive key match, the `Key: value` split — which is why nothing here re-implements
+/// trailer grammar.
+const FIELD_SEP: char = '\u{1f}';
+const TRAILER_SEP: char = '\u{1e}';
+
+/// A git too old to know `%(trailers)` prints the specifier **verbatim** rather than failing, so
+/// the third field arrives as literal format text instead of a roster. Detected by its own
+/// opening token and read as "this git cannot tell us" — an empty roster, which is honest
+/// absence. Inventing a co-author out of a format string would be worse than seeing none.
+const UNEXPANDED_TRAILERS: &str = "%(trailers";
+
+fn git_log_provenance(root: &Path, extra: &[&str], rel_path: &str) -> Vec<Provenance> {
     let mut args: Vec<&str> = vec!["log"];
     args.extend_from_slice(extra);
-    args.extend_from_slice(&["--format=%ae%x1f%aI", "--", rel_path]);
+    args.extend_from_slice(&[
+        "--format=%ae%x1f%aI%x1f%(trailers:key=Co-Authored-By,valueonly,separator=%x1e)",
+        "--",
+        rel_path,
+    ]);
     let Ok(out) = crate::process::build_command("git", &args, root, &[]).output() else {
         return Vec::new();
     };
@@ -715,14 +758,37 @@ fn git_log_pairs(root: &Path, extra: &[&str], rel_path: &str) -> Vec<(String, St
     }
     String::from_utf8_lossy(&out.stdout)
         .lines()
-        .filter_map(|line| {
-            let (email, ts) = line.split_once('\u{1f}')?;
-            if email.is_empty() {
-                return None;
-            }
-            Some((email.to_string(), ts.to_string()))
-        })
+        .filter_map(parse_provenance_line)
         .collect()
+}
+
+/// One `git log` line → one [`Provenance`]. Pure, so the shapes that are awkward to provoke from
+/// a real repository — an ancient git, a commit with no trailers at all — are testable directly.
+fn parse_provenance_line(line: &str) -> Option<Provenance> {
+    // `splitn(3)` so a trailer value that itself contained a field separator would land whole in
+    // the roster rather than truncating the line into a different commit.
+    let mut fields = line.splitn(3, FIELD_SEP);
+    let email = fields.next()?;
+    let ts = fields.next()?;
+    let trailers = fields.next().unwrap_or_default();
+    if email.is_empty() {
+        return None;
+    }
+    let co_authors = if trailers.contains(UNEXPANDED_TRAILERS) {
+        Vec::new()
+    } else {
+        trailers
+            .split(TRAILER_SEP)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+            .collect()
+    };
+    Some(Provenance {
+        author: email.to_string(),
+        occurred_at: ts.to_string(),
+        co_authors,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -783,5 +849,62 @@ pub fn short_cid(cid: &Cid) -> String {
         format!("{}…{}", &s[..8], &s[s.len() - 4..])
     } else {
         s
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn line(email: &str, ts: &str, trailers: &str) -> String {
+        format!("{email}{FIELD_SEP}{ts}{FIELD_SEP}{trailers}")
+    }
+
+    #[test]
+    fn a_roster_splits_on_the_record_separator_and_keeps_values_verbatim() {
+        let raw = line(
+            "author@example.test",
+            "2026-08-15T12:00:00Z",
+            "Claude Fable 5 <noreply@anthropic.com>\u{1e}ethosengine <noreply@ethosengine.com>",
+        );
+        let p = parse_provenance_line(&raw).expect("a well-formed line parses");
+        assert_eq!(p.author, "author@example.test");
+        assert_eq!(p.occurred_at, "2026-08-15T12:00:00Z");
+        assert_eq!(
+            p.co_authors,
+            vec![
+                "Claude Fable 5 <noreply@anthropic.com>".to_string(),
+                "ethosengine <noreply@ethosengine.com>".to_string(),
+            ],
+            "trailer values reach the caller exactly as the author wrote them"
+        );
+    }
+
+    #[test]
+    fn a_commit_with_no_trailers_yields_an_empty_roster_not_one_blank_co_author() {
+        // The format leaves a trailing separator with nothing after it, and an empty string is
+        // absence — a roster of one nameless person would classify every solo commit as plural.
+        let p = parse_provenance_line(&line("solo@example.test", "2026-08-15T12:00:00Z", ""))
+            .expect("a trailer-less line still carries provenance");
+        assert!(p.co_authors.is_empty());
+    }
+
+    #[test]
+    fn an_old_git_that_prints_the_format_specifier_is_read_as_no_roster() {
+        // Older git does not fail on an unknown placeholder; it echoes it. Parsed naively, every
+        // commit in such a repository would gain a co-author named after a format string.
+        let raw = line(
+            "author@example.test",
+            "2026-08-15T12:00:00Z",
+            "%(trailers:key=Co-Authored-By,valueonly,separator=%x1e)",
+        );
+        let p = parse_provenance_line(&raw).expect("the first two fields are still usable");
+        assert!(p.co_authors.is_empty());
+        assert_eq!(p.author, "author@example.test");
+    }
+
+    #[test]
+    fn an_authorless_line_is_refused_rather_than_attributed_to_nobody() {
+        assert!(parse_provenance_line(&line("", "2026-08-15T12:00:00Z", "")).is_none());
     }
 }

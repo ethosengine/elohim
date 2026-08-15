@@ -431,7 +431,9 @@ fn mint_instant(
     if let Some(hit) = cache.get(&rel) {
         return hit.clone();
     }
-    let resolved = producing_commit(root, &rel).and_then(|(_, ts)| normalize_utc(&ts));
+    // Only the instant is wanted here: a mint is dated by the artifact's arrival, and who else
+    // was named on that commit says nothing about when the promise started.
+    let resolved = producing_commit(root, &rel).and_then(|p| normalize_utc(&p.occurred_at));
     cache.insert(rel, resolved.clone());
     resolved
 }
