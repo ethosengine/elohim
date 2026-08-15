@@ -962,7 +962,15 @@ def seedProjectionsStage() {
  */
 def substrateVerifyStage(String sub) {
     catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-        sh "bash '${env.WORKSPACE}/genesis/scripts/ci/substrate-verify.sh' '${sub}'"
+        // Facade runner (2026-08-15): substrate-verify migrated from bash+curl+jq
+        // to the typed .dataplane() facade (@elohim/storage-client) — the
+        // dataplane-sdk habit's probe. Report shape/exit codes are parity with
+        // the bash predecessor plus an additive runner:"facade" field.
+        // REPORT_DIR is absolute because the runner's cwd is genesis/a2o, while
+        // archiveArtifacts patterns below stay workspace-relative.
+        dir('genesis/a2o') {
+            sh "REPORT_DIR='${env.WORKSPACE}' CONTENT_PATH='${env.WORKSPACE}/genesis/docs/content/elohim-protocol/manifesto.md' pnpm exec tsx scripts/substrate-verify.ts '${sub}'"
+        }
     }
     archiveArtifacts(artifacts: "substrate-verify-${sub}.json", allowEmptyArchive: true, fingerprint: true)
 }
@@ -1009,7 +1017,9 @@ def uploadBlobContentStage() {
     def seedToken = resolveSeedDoorwayToken()
     catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
         withEnv(["SEED_DOORWAY_TOKEN=${seedToken}"]) {
-            sh "bash '${env.WORKSPACE}/genesis/scripts/ci/substrate-verify.sh' upload"
+            dir('genesis/a2o') {
+                sh "REPORT_DIR='${env.WORKSPACE}' CONTENT_PATH='${env.WORKSPACE}/genesis/docs/content/elohim-protocol/manifesto.md' pnpm exec tsx scripts/substrate-verify.ts upload"
+            }
         }
         env.CONTENT_BLOB_HASH = sh(script: 'cat /tmp/substrate-verify/content_blob_hash', returnStdout: true).trim()
         env.CONTENT_BLOB_SIZE_BYTES = sh(script: 'cat /tmp/substrate-verify/content_blob_size', returnStdout: true).trim()
@@ -1618,6 +1628,11 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         // (PIPELINE_SKIPPED + SEED_DATA); revisit if those ever
                         // diverge.
                         env.PEER_STORAGE_URLS = peerStorageUrlsCsv()
+                        // Runner deps + storage-client build — outside the
+                        // catchError in substrateVerifyStage on purpose: an
+                        // install failure is a pipeline red, not an UNSTABLE
+                        // substrate verdict.
+                        sh "bash '${env.WORKSPACE}/genesis/scripts/ci/install-substrate-runner.sh'"
                         substrateVerifyStage('mesh')
                     }
                 }
