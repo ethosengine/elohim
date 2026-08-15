@@ -14,7 +14,7 @@
 
 use std::path::Path;
 
-use elohim_epr_cli::flow::note::note;
+use elohim_epr_cli::flow::note::{note, NoteActor};
 use elohim_epr_cli::flow::{project, walk, FlowError};
 use elohim_epr_rea::{FlowRecord, FlowStore, ReaVerb, SidecarFlowStore};
 use tempfile::TempDir;
@@ -118,6 +118,7 @@ fn a_note_appends_exactly_one_record_that_round_trips_with_its_cid_reverified() 
         "correction",
         "the doorway probe is per-doorway, not matthew-only",
         None,
+        &NoteActor::default(),
     )
     .expect("note runs");
 
@@ -164,6 +165,7 @@ fn a_failed_approach_carries_its_consequence_in_a_fourth_slot() {
         "failed-approach",
         "Tried Tsit5 for the perturbation ODE, system is too stiff",
         Some("Kvaerno5"),
+        &NoteActor::default(),
     )
     .expect("note runs");
 
@@ -178,9 +180,25 @@ fn a_failed_approach_carries_its_consequence_in_a_fourth_slot() {
 fn an_identical_note_appended_twice_is_one_record() {
     let dir = projected();
     let root = dir.path();
-    let first = note(root, FEATURE, "observation", "same body", None).expect("first");
+    let first = note(
+        root,
+        FEATURE,
+        "observation",
+        "same body",
+        None,
+        &NoteActor::default(),
+    )
+    .expect("first");
     let before = sidecar_lines(root);
-    let second = note(root, FEATURE, "observation", "same body", None).expect("second");
+    let second = note(
+        root,
+        FEATURE,
+        "observation",
+        "same body",
+        None,
+        &NoteActor::default(),
+    )
+    .expect("second");
 
     assert!(first.appended);
     assert!(!second.appended, "a byte-identical note is a true no-op");
@@ -189,7 +207,15 @@ fn an_identical_note_appended_twice_is_one_record() {
     assert_eq!(note_events(root).len(), 1);
 
     // …but a different body is a different observation, so it IS a second record.
-    let other = note(root, FEATURE, "observation", "different body", None).expect("third");
+    let other = note(
+        root,
+        FEATURE,
+        "observation",
+        "different body",
+        None,
+        &NoteActor::default(),
+    )
+    .expect("third");
     assert!(other.appended);
     assert_ne!(other.record_cid, first.record_cid);
     assert_eq!(note_events(root).len(), 2);
@@ -203,15 +229,29 @@ fn an_unresolvable_target_appends_nothing_and_is_unknown_resource() {
     let root = dir.path();
     let before = sidecar_lines(root);
 
-    let err = note(root, "genesis/does-not-exist.md", "correction", "why", None)
-        .expect_err("an unresolvable --on must refuse");
+    let err = note(
+        root,
+        "genesis/does-not-exist.md",
+        "correction",
+        "why",
+        None,
+        &NoteActor::default(),
+    )
+    .expect_err("an unresolvable --on must refuse");
     assert!(matches!(err, FlowError::UnknownResource(_)), "got: {err:?}");
     assert_eq!(sidecar_lines(root), before, "nothing appended");
 
     // A well-formed CID that no record mints or names is equally unresolvable — never an orphan.
     let stranger = elohim_epr_rea::atom_cid(&"never-recorded".to_string()).unwrap();
-    let err = note(root, &stranger.to_string(), "correction", "why", None)
-        .expect_err("an unknown atom CID must refuse");
+    let err = note(
+        root,
+        &stranger.to_string(),
+        "correction",
+        "why",
+        None,
+        &NoteActor::default(),
+    )
+    .expect_err("an unknown atom CID must refuse");
     assert!(matches!(err, FlowError::UnknownResource(_)), "got: {err:?}");
     assert_eq!(sidecar_lines(root), before, "still nothing appended");
 }
@@ -235,6 +275,7 @@ fn a_known_atom_cid_resolves_without_a_path() {
         "correction",
         "scoped to the commitment itself",
         None,
+        &NoteActor::default(),
     )
     .expect("a known commitment CID resolves");
     assert_eq!(outcome.on, commitment_cid.to_string());
@@ -252,8 +293,15 @@ fn an_empty_reason_is_refused_before_the_store_is_opened() {
         "fixture starts with no sidecar"
     );
 
-    let err = note(root, FEATURE, "correction", "   \n\t ", None)
-        .expect_err("an empty --reason must refuse");
+    let err = note(
+        root,
+        FEATURE,
+        "correction",
+        "   \n\t ",
+        None,
+        &NoteActor::default(),
+    )
+    .expect_err("an empty --reason must refuse");
     assert!(
         matches!(err, FlowError::InvalidArguments(_)),
         "got: {err:?}"
@@ -264,8 +312,15 @@ fn an_empty_reason_is_refused_before_the_store_is_opened() {
     );
 
     // An unknown --kind is refused at the same gate, for the same reason.
-    let err = note(root, FEATURE, "regression", "real text", None)
-        .expect_err("a fourth kind must refuse");
+    let err = note(
+        root,
+        FEATURE,
+        "regression",
+        "real text",
+        None,
+        &NoteActor::default(),
+    )
+    .expect_err("a fourth kind must refuse");
     assert!(
         matches!(err, FlowError::InvalidArguments(_)),
         "got: {err:?}"
@@ -285,6 +340,7 @@ fn the_outcome_carries_the_appended_records_cid() {
         "observation",
         "json consumers read this",
         None,
+        &NoteActor::default(),
     )
     .expect("note runs");
 
@@ -328,6 +384,7 @@ fn a_note_never_discharges_its_commitment() {
         "correction",
         "this must not retire the chapter",
         Some("a different approach"),
+        &NoteActor::default(),
     )
     .expect("note runs");
 
@@ -343,6 +400,230 @@ fn a_note_never_discharges_its_commitment() {
     assert!(event.satisfies.is_empty(), "satisfies stays empty");
 }
 
+// attribution ────────────────────────────────────────────────────────────────────────────────
+
+const CLAIMED: &str = "agent:rust-architect@opus-5";
+
+#[test]
+fn a_named_identity_provides_the_note_and_keeps_the_steward_in_the_last_slot() {
+    let dir = projected();
+    let root = dir.path();
+
+    let outcome = note(
+        root,
+        FEATURE,
+        "correction",
+        "the salvage join reads the wrong pillar",
+        None,
+        &NoteActor {
+            as_ref: Some(CLAIMED.to_string()),
+            session: None,
+        },
+    )
+    .expect("note runs");
+
+    let event = note_events(root).pop().expect("one note");
+    assert_eq!(
+        event.provider.0, CLAIMED,
+        "a named identity provides the note outright"
+    );
+    assert_eq!(
+        event.classified_as,
+        vec![
+            "run:correction".to_string(),
+            FEATURE.to_string(),
+            "reason:the salvage join reads the wrong pillar".to_string(),
+            "steward:author@example.test".to_string(),
+        ],
+        "tag, subject, reason, then steward LAST — readers index the leading slots positionally"
+    );
+    assert_eq!(outcome.actor.as_deref(), Some(CLAIMED));
+    assert_eq!(outcome.steward.as_deref(), Some("author@example.test"));
+}
+
+#[test]
+fn the_steward_slot_stays_last_even_when_a_consequence_precedes_it() {
+    let dir = projected();
+    let root = dir.path();
+
+    note(
+        root,
+        FEATURE,
+        "failed-approach",
+        "Tried the household-blind XOR salvage",
+        Some("diversity-first multi-pass"),
+        &NoteActor {
+            as_ref: Some(CLAIMED.to_string()),
+            session: None,
+        },
+    )
+    .expect("note runs");
+
+    let event = note_events(root).pop().expect("one note");
+    assert_eq!(
+        event.classified_as,
+        vec![
+            "run:failed-approach".to_string(),
+            FEATURE.to_string(),
+            "reason:Tried the household-blind XOR salvage".to_string(),
+            "switched-to:diversity-first multi-pass".to_string(),
+            "steward:author@example.test".to_string(),
+        ]
+    );
+}
+
+#[test]
+fn a_malformed_identity_refuses_and_never_falls_back_to_the_git_author() {
+    let dir = projected();
+    let root = dir.path();
+    let before = sidecar_lines(root);
+
+    let err = note(
+        root,
+        FEATURE,
+        "correction",
+        "real text",
+        None,
+        &NoteActor {
+            as_ref: Some("scribe@opus-5".to_string()),
+            session: None,
+        },
+    )
+    .expect_err("a malformed --as must refuse rather than substitute the author");
+
+    assert!(
+        err.to_string().contains("agent:<role>@<model>"),
+        "the refusal must name the legal shape; got: {err}"
+    );
+    assert_eq!(sidecar_lines(root), before, "nothing appended");
+    assert!(
+        note_events(root).is_empty(),
+        "a note attributed to a substituted actor is worse than no note"
+    );
+}
+
+#[test]
+fn a_registered_session_claim_provides_the_note_without_naming_it() {
+    let dir = projected();
+    let root = dir.path();
+    let session = "session-abc123";
+
+    elohim_epr_cli::actor::claim(root, CLAIMED, session).expect("claim registers");
+
+    let outcome = note(
+        root,
+        FEATURE,
+        "observation",
+        "the sidecar answered for this run",
+        None,
+        &NoteActor {
+            as_ref: None,
+            session: Some(session.to_string()),
+        },
+    )
+    .expect("note runs");
+
+    let event = note_events(root).pop().expect("one note");
+    assert_eq!(event.provider.0, CLAIMED, "the session's current claim");
+    assert_eq!(
+        event.classified_as.last().map(String::as_str),
+        Some("steward:author@example.test"),
+        "the signing human stays attached to an attribution that is no longer theirs"
+    );
+    assert_eq!(outcome.actor.as_deref(), Some(CLAIMED));
+}
+
+#[test]
+fn a_session_that_claimed_nothing_falls_through_to_the_author_arm_without_failing() {
+    let dir = projected();
+    let root = dir.path();
+
+    // No actor sidecar at all — the identity plane has never run in this tree.
+    let unattributed = note(
+        root,
+        FEATURE,
+        "observation",
+        "same body either way",
+        None,
+        &NoteActor::default(),
+    )
+    .expect("the author arm runs");
+
+    let unclaimed_session = note(
+        root,
+        FEATURE,
+        "observation",
+        "same body either way",
+        None,
+        &NoteActor {
+            as_ref: None,
+            session: Some("session-nobody-claimed".to_string()),
+        },
+    )
+    .expect("an unregistered session is an answer, never a failure");
+
+    assert_eq!(
+        unclaimed_session.record_cid, unattributed.record_cid,
+        "an unresolvable session must mint the SAME record the author arm does"
+    );
+    assert!(
+        !unclaimed_session.appended,
+        "identical record, so the append is a true no-op"
+    );
+    assert_eq!(unclaimed_session.actor, None);
+    assert_eq!(unclaimed_session.steward, None);
+
+    // …and the same holds once a sidecar EXISTS but holds nothing for this session: a claim
+    // registered by a different run must never leak into it.
+    elohim_epr_cli::actor::claim(root, CLAIMED, "some-other-session").expect("claim registers");
+    let still_unclaimed = note(
+        root,
+        FEATURE,
+        "observation",
+        "same body either way",
+        None,
+        &NoteActor {
+            as_ref: None,
+            session: Some("session-nobody-claimed".to_string()),
+        },
+    )
+    .expect("a populated sidecar with no matching claim is still an answer");
+    assert_eq!(still_unclaimed.record_cid, unattributed.record_cid);
+}
+
+#[test]
+fn an_unattributed_note_carries_no_steward_slot_and_omits_both_payload_keys() {
+    let dir = projected();
+    let root = dir.path();
+
+    let outcome = note(
+        root,
+        FEATURE,
+        "observation",
+        "the arm this leg has always had",
+        None,
+        &NoteActor::default(),
+    )
+    .expect("note runs");
+
+    let event = note_events(root).pop().expect("one note");
+    assert_eq!(event.provider.0, "author@example.test");
+    assert_eq!(event.classified_as.len(), 3, "no steward slot is appended");
+    assert!(
+        !event
+            .classified_as
+            .iter()
+            .any(|slot| slot.starts_with("steward:")),
+        "the author arm has no steward to add — it would only repeat the provider"
+    );
+
+    // The `--json` payload must be byte-identical to the one this leg emitted before the
+    // attribution fields existed: omitted, never null.
+    let json = serde_json::to_string(&outcome).expect("serializes");
+    assert!(!json.contains("\"actor\""), "got: {json}");
+    assert!(!json.contains("\"steward\""), "got: {json}");
+}
+
 // path confinement ───────────────────────────────────────────────────────────────────────────
 
 #[test]
@@ -350,8 +631,15 @@ fn a_target_outside_the_repo_root_is_refused_rather_than_written_against() {
     let dir = projected();
     let root = dir.path();
     let before = sidecar_lines(root);
-    let err = note(root, "../outside.md", "observation", "escape attempt", None)
-        .expect_err("a path escaping the root must refuse");
+    let err = note(
+        root,
+        "../outside.md",
+        "observation",
+        "escape attempt",
+        None,
+        &NoteActor::default(),
+    )
+    .expect_err("a path escaping the root must refuse");
     assert!(
         matches!(err, FlowError::InvalidArguments(_)),
         "got: {err:?}"

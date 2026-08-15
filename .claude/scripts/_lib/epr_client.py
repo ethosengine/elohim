@@ -81,7 +81,8 @@ def resolve_binary() -> str | None:
         return None
 
 
-def govern(root: Path, path: str, content, is_new: bool, is_new_subdir: bool) -> dict | None:
+def govern(root: Path, path: str, content, is_new: bool, is_new_subdir: bool, *,
+           session: str | None = None) -> dict | None:
     """Ask the native evaluator about a PROSPECTIVE write.
 
     Returns the decision payload, or None when the evaluator did not run. The
@@ -100,6 +101,10 @@ def govern(root: Path, path: str, content, is_new: bool, is_new_subdir: bool) ->
         args.append("--new-subdir")
     if content is not None:
         args.append("--content-stdin")
+    if session:
+        # A stale `epr` that doesn't know --session exits nonzero, which the
+        # returncode != 0 -> None path below already treats as absence — deliberate degradation.
+        args.extend(["--session", session])
     try:
         proc = subprocess.run(
             args,

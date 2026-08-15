@@ -30,12 +30,29 @@
 //! honest absence for that record — this leg **refuses** rather than emitting an empty
 //! `occurred_at`: a single deliberate authored act dated with an empty string is invisible to
 //! every window fold and unorderable against its siblings.
+//!
+//! **Attribution** answers "whose act is this" in three arms, resolved before anything is
+//! appended. A named identity (`--as agent:<role>@<model>`) is the provider outright; a resolved
+//! session asks the actor sidecar who registered for it and uses that; neither leaves the note
+//! attributed to the git author exactly as it always was. The two agent arms additionally carry
+//! `steward:<git-author-email>` as the LAST `classified_as` slot, because the human whose key
+//! signs the tree does not stop being answerable for it when an agent authors inside it — the
+//! steward is a property of the commit, not of the claim, and losing it is how attribution turns
+//! into deniability.
+//!
+//! The identity plane is never allowed to break this leg. A session that registered nothing, an
+//! absent sidecar, and an unreadable one all fall through to the author-attributed arm with a
+//! notice on stderr, because a note that refused to record a correction over a missing identity
+//! record would lose the observation to protect the attribution. The one refusal is a MALFORMED
+//! `--as`: substituting the author for an identity the caller explicitly named would mint a
+//! record asserting that someone else spoke.
 
 use std::path::{Path, PathBuf};
 
 use cid::Cid;
 use elohim_epr_rea::{
-    AgentRef, FlowEvent, FlowRecord, FlowStore, Magnitude, ReaVerb, SidecarFlowStore,
+    parse_agent_ref, ActorStore, AgentRef, FlowEvent, FlowRecord, FlowStore, Magnitude, ReaVerb,
+    SidecarActorStore, SidecarFlowStore,
 };
 use serde::Serialize;
 
@@ -59,6 +76,18 @@ const REASON_SLOT_PREFIX: &str = "reason:";
 
 /// Prefix on the optional consequence slot — the second half of a failed approach.
 const SWITCHED_TO_SLOT_PREFIX: &str = "switched-to:";
+
+/// Prefix on the final slot naming the human whose key signs the tree the note was written in.
+///
+/// LAST on purpose, and appended only on the agent-attributed arms: readers index the leading
+/// slots positionally (tag, subject, reason, then the optional consequence), so a steward slot
+/// inserted anywhere earlier would renumber a vocabulary other legs already read.
+const STEWARD_SLOT_PREFIX: &str = "steward:";
+
+/// The actor sidecar, relative to the root. Its EXISTENCE is checked before it is opened, because
+/// [`SidecarActorStore::open`] creates the tree — and a read path that leaves `.eprfs/` behind on
+/// a repository that never had one has written a record of having looked.
+const ACTOR_LOG_REL: &str = ".eprfs/status/actors.jsonl";
 
 /// The closed triad of run-scale observation kinds.
 ///
@@ -102,6 +131,24 @@ impl NoteKind {
     }
 }
 
+/// Who the caller says is acting, as the CLI shell resolved it.
+///
+/// A struct rather than two more positional parameters because the two fields are one question
+/// asked twice — "who is acting, and under which run" — and a caller that supplies neither is
+/// asking for the unattributed behaviour this leg has always had, which [`Default`] states in one
+/// word at every call site that does not care.
+///
+/// Both fields arrive already resolved: `session` in particular has had its environment fallback
+/// applied by the shell, so [`note`] itself reads no environment and two runs given the same
+/// arguments mint the same record.
+#[derive(Debug, Clone, Default)]
+pub struct NoteActor {
+    /// A claimed identity named outright, `agent:<role>@<model>`.
+    pub as_ref: Option<String>,
+    /// The run whose registered claim should be consulted when no identity was named.
+    pub session: Option<String>,
+}
+
 /// The machine-facing result of one `note` act (`--json` consumers read this).
 #[derive(Debug, Serialize)]
 pub struct NoteOutcome {
@@ -114,6 +161,17 @@ pub struct NoteOutcome {
     pub resource: String,
     pub reason: String,
     pub switched_to: Option<String>,
+    /// The claimed identity this note was attributed to, absent when it stayed with the commit
+    /// author. Omitted rather than null so an unattributed note's payload is byte-identical to
+    /// the one it emitted before this field existed — the additive discipline
+    /// `ActorClaim::definition_cid` already holds on the record side.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub actor: Option<String>,
+    /// The git-signing human answerable for the tree, carried only when `actor` is present. On
+    /// the author-attributed arm it would merely repeat the provider, and a field that sometimes
+    /// restates another is a field readers learn to ignore.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub steward: Option<String>,
     /// Git HEAD's author date (RFC3339) — the tree the note was authored against.
     pub occurred_at: String,
     /// The atom CID of the `FlowRecord::Event`.
@@ -133,6 +191,12 @@ impl NoteOutcome {
         println!("        reason: {}", self.reason);
         if let Some(switched) = &self.switched_to {
             println!("        switched to: {switched}");
+        }
+        if let Some(actor) = &self.actor {
+            println!("        actor: {actor}");
+        }
+        if let Some(steward) = &self.steward {
+            println!("        steward: {steward}");
         }
         if !self.appended {
             println!("        (already recorded — no-op)");
@@ -160,6 +224,7 @@ pub fn note(
     kind: &str,
     reason: &str,
     switched_to: Option<&str>,
+    actor: &NoteActor,
 ) -> FlowResult<NoteOutcome> {
     // ── Phase 1: resolve. Nothing below this line touches the sidecar until Phase 2. ──
 
@@ -169,6 +234,7 @@ pub fn note(
     let switched_to = switched_to
         .map(|s| non_empty(s, "--switched-to"))
         .transpose()?;
+    let named = named_identity(actor.as_ref.as_deref())?;
 
     let mut store = SidecarFlowStore::open(root)?;
     let records = store.records()?;
@@ -184,13 +250,21 @@ pub fn note(
         ))
     })?;
 
-    // Tag first, subject second, authored body after — see `FlowEvent::classified_as`.
-    let mut classified_as = Vec::with_capacity(3 + usize::from(switched_to.is_some()));
+    let attribution = resolve_attribution(root, named, actor.session.as_deref(), &author);
+
+    // Tag first, subject second, authored body after, steward last — see
+    // `FlowEvent::classified_as` and `STEWARD_SLOT_PREFIX`.
+    let mut classified_as = Vec::with_capacity(
+        3 + usize::from(switched_to.is_some()) + usize::from(attribution.steward.is_some()),
+    );
     classified_as.push(kind.tag().to_string());
     classified_as.push(label.clone());
     classified_as.push(format!("{REASON_SLOT_PREFIX}{reason}"));
     if let Some(switched) = &switched_to {
         classified_as.push(format!("{SWITCHED_TO_SLOT_PREFIX}{switched}"));
+    }
+    if let Some(steward) = &attribution.steward {
+        classified_as.push(format!("{STEWARD_SLOT_PREFIX}{steward}"));
     }
 
     let event = FlowEvent {
@@ -198,7 +272,7 @@ pub fn note(
         // REFERS TO one. `Produce` would make notes count as output in every fold, and `Dismiss`
         // already means regression on the a2o verdict path.
         action: ReaVerb::Cite,
-        provider: AgentRef(author),
+        provider: AgentRef(attribution.provider(&author)),
         receiver: repo_agent(),
         resource,
         quantity: Magnitude::Count {
@@ -225,6 +299,8 @@ pub fn note(
         resource: resource.to_string(),
         reason: reason.to_string(),
         switched_to: switched_to.map(str::to_string),
+        actor: attribution.actor.clone(),
+        steward: attribution.steward.clone(),
         occurred_at,
         record_cid: record_cid.to_string(),
         appended,
@@ -247,6 +323,116 @@ fn non_empty<'a>(value: &'a str, flag: &str) -> FlowResult<&'a str> {
         )));
     }
     Ok(trimmed)
+}
+
+/// The resolved answer to "whose act is this note, and whose tree was it written in".
+struct Attribution {
+    /// The claimed identity the note is attributed to; `None` leaves it with the commit author.
+    actor: Option<String>,
+    /// The git-signing human, carried on the agent arms only.
+    steward: Option<String>,
+}
+
+impl Attribution {
+    /// The `provider` slot: the claimed identity when there is one, the commit author otherwise.
+    /// One place decides this, so the record and the outcome can never disagree about who acted.
+    fn provider(&self, author: &str) -> String {
+        self.actor.clone().unwrap_or_else(|| author.to_string())
+    }
+
+    /// The unattributed arm — the leg's original behaviour, named so the three arms read as three.
+    fn authored() -> Self {
+        Self {
+            actor: None,
+            steward: None,
+        }
+    }
+
+    /// An agent arm: the identity provides, and the tree's signer is kept beside it. The two are
+    /// set together because they are the same claim — "this agent acted, in this human's tree" —
+    /// and an agent-provided note with no steward is precisely the deniable shape.
+    fn claimed(identity: String, author: &str) -> Self {
+        Self {
+            actor: Some(identity),
+            steward: Some(author.to_string()),
+        }
+    }
+}
+
+/// Validate a `--as` value without resolving anything else.
+///
+/// Separated from [`resolve_attribution`] because it is the one attribution failure that REFUSES,
+/// and it must refuse at the same early gate as `--kind` and `--reason` — before the store is
+/// opened. The refusal is `elohim-epr-rea`'s own, verbatim: one parser owns the shape, so the CLI
+/// cannot accept an identity the store would reject, nor the reverse.
+fn named_identity(as_ref: Option<&str>) -> FlowResult<Option<String>> {
+    match as_ref {
+        Some(raw) => {
+            let trimmed = non_empty(raw, "--as")?;
+            parse_agent_ref(trimmed)?;
+            Ok(Some(trimmed.to_string()))
+        }
+        None => Ok(None),
+    }
+}
+
+/// The three arms, in priority order: a named identity, then a session's registered claim, then
+/// the commit author.
+///
+/// Every failure on the session arm — no sidecar, no claim, an unreadable or tampered log — lands
+/// on the author arm with a notice on stderr rather than an error. The note is the durable thing
+/// here; the attribution is an enrichment of it, and an enrichment that can veto its subject is a
+/// dependency in the wrong direction.
+fn resolve_attribution(
+    root: &Path,
+    named: Option<String>,
+    session: Option<&str>,
+    author: &str,
+) -> Attribution {
+    match (named, session) {
+        (Some(identity), _) => Attribution::claimed(identity, author),
+        (None, Some(session)) => match claimed_for_session(root, session) {
+            Some(identity) => Attribution::claimed(identity, author),
+            None => Attribution::authored(),
+        },
+        (None, None) => Attribution::authored(),
+    }
+}
+
+/// Who registered for `session`, or `None` with one line on stderr saying why.
+///
+/// The sidecar is only opened once its log is known to exist: [`SidecarActorStore::open`] creates
+/// the tree, and this leg must be able to ask the question in a repository that has never had an
+/// identity plane without leaving one behind.
+///
+/// The notice names the session on purpose. "Not attributed to an agent" is indistinguishable
+/// from "attributed to the wrong one" in the record itself, so the only place a caller can learn
+/// that its session was not found is at the moment it was not found.
+fn claimed_for_session(root: &Path, session: &str) -> Option<String> {
+    if !root.join(ACTOR_LOG_REL).exists() {
+        eprintln!(
+            "note: session `{session}` has no actor sidecar — \
+             the note stays attributed to the commit author"
+        );
+        return None;
+    }
+    match SidecarActorStore::open(root).and_then(|store| store.current_for(session)) {
+        Ok(Some((_, claim))) => Some(claim.claimed.0),
+        Ok(None) => {
+            eprintln!(
+                "note: session `{session}` registered no actor claim — \
+                 the note stays attributed to the commit author"
+            );
+            None
+        }
+        Err(error) => {
+            eprintln!(
+                "note: session `{session}` could not be read from the actor sidecar ({error}) — \
+                 the note stays attributed to the commit author"
+            );
+            None
+        }
+    }
 }
 
 /// Resolve `--on` to `(resource CID, human label)`.
@@ -353,6 +539,45 @@ mod tests {
         let err = non_empty("   \n ", "--reason").expect_err("whitespace is not an observation");
         assert!(err.to_string().contains("--reason"));
         assert_eq!(non_empty("  kept  ", "--reason").unwrap(), "kept");
+    }
+
+    #[test]
+    fn a_malformed_identity_is_refused_rather_than_replaced_by_the_author() {
+        // The refusal is `elohim-epr-rea`'s, so the CLI cannot accept a shape the store would
+        // reject. What matters here is that it refuses AT ALL: falling back to the git author
+        // would mint a record asserting that a different actor spoke.
+        let err = named_identity(Some("scribe@opus-5"))
+            .expect_err("a bare role@model is not a claimed identity");
+        assert!(
+            err.to_string().contains("agent:<role>@<model>"),
+            "the refusal must name the legal shape; got: {err}"
+        );
+        assert!(named_identity(Some("   ")).is_err(), "--as needs a value");
+        assert_eq!(
+            named_identity(Some(" agent:rust-architect@opus-5 ")).unwrap(),
+            Some("agent:rust-architect@opus-5".to_string())
+        );
+        assert_eq!(named_identity(None).unwrap(), None);
+    }
+
+    #[test]
+    fn the_author_arm_carries_no_steward_and_the_agent_arms_always_do() {
+        let authored = Attribution::authored();
+        assert_eq!(
+            authored.provider("author@example.test"),
+            "author@example.test"
+        );
+        assert!(
+            authored.steward.is_none(),
+            "a steward slot on the author arm would only repeat the provider"
+        );
+
+        let claimed = Attribution::claimed("agent:scribe@opus-5".into(), "author@example.test");
+        assert_eq!(
+            claimed.provider("author@example.test"),
+            "agent:scribe@opus-5"
+        );
+        assert_eq!(claimed.steward.as_deref(), Some("author@example.test"));
     }
 
     /// Pinned so canonical dag-cbor encoding of a note `FlowEvent` can never silently drift

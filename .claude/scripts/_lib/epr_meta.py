@@ -1576,7 +1576,8 @@ def evaluator_identity() -> dict:
 
 def witness(root: Path, *, runtime: str, gate: str, subject, decision: str, cls: str | None,
             rule_id: str | None = None, policy_ref: str | None = None, refer: dict | None = None,
-            checks: list | None = None, evaluator: dict | None = None) -> None:
+            checks: list | None = None, evaluator: dict | None = None,
+            actor: dict | None = None) -> None:
     """Append one JSON line to governance-findings.jsonl — the keel Verdict projected to JSONL.
     Shared by the resolver hook AND the git-gate CLI so both runtimes write the SAME shape.
     Flock-append idiom cloned from the resolver's _handle_measures (best-effort; NEVER raises —
@@ -1598,6 +1599,10 @@ def witness(root: Path, *, runtime: str, gate: str, subject, decision: str, cls:
             # otherwise; a caller that delegated to `epr` passes its identity.
             "evaluator": evaluator or evaluator_identity(),
         }
+        # Unlike `evaluator`, `actor` has no default — its absence must read as "no identity
+        # plane consulted", never as "unclaimed" (that is a value `actor` itself carries).
+        if actor is not None:
+            entry["actor"] = actor
         ledger = Path(root) / FINDINGS_LEDGER_REL
         ledger.parent.mkdir(parents=True, exist_ok=True)
         with open(ledger, "a", encoding="utf-8", errors="replace") as fh:

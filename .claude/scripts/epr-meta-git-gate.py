@@ -57,6 +57,8 @@ def _witness_file(root: Path, path: str, verdict, *, ack: bool, evaluator: dict 
 
 def main(argv: list[str]) -> int:
     ack = os.environ.get("EPR_META_ACK") == "1"
+    # Best-effort: no error if absent, no validation — the actor plane is advisory here.
+    session = os.environ.get("CLAUDE_SESSION_ID") or os.environ.get("ELOHIM_SESSION_ID") or None
     if "--staged" in argv:
         mode, rng = "staged", None
     elif "--range" in argv:
@@ -76,7 +78,7 @@ def main(argv: list[str]) -> int:
         verdicts_by_path.append((path, epr_meta_git.verdict_for(path, write)))
         native_by_path.append((path, epr_client.govern(
             root, path, write.get("content"), write.get("is_new", False),
-            write.get("is_new_subdir", False))))
+            write.get("is_new_subdir", False), session=session)))
 
     native_lookup = dict(native_by_path)
     for path, v in verdicts_by_path:

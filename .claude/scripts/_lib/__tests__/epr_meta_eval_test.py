@@ -132,4 +132,24 @@ for _blocking in ("ask", "deny"):
     check(f"{_blocking} rule w/ unregistered validator STILL routes to review (S5 law)",
           _v is not None and _v.cls in ("ask", "deny"))
 
+# ── witness(): `actor` is present only when the caller supplies one (the actor plane's
+# absence must read as "not consulted", never as "unclaimed" — that value lives inside the
+# dict itself). Mirrors the `evaluator`-field precedent but with the opposite default.
+import json as _json
+with tempfile.TemporaryDirectory() as _wtd:
+    _wroot = Path(_wtd)
+    _actor = {"claimed": "matthew", "session": "sess-123",
+              "definitionCid": None, "source": "claim"}
+    epr_meta.witness(_wroot, runtime="claude", gate="pre-tool-use", subject="f.py",
+                      decision="permit", cls="inject", actor=_actor)
+    epr_meta.witness(_wroot, runtime="claude", gate="pre-tool-use", subject="g.py",
+                      decision="permit", cls="inject")
+    _lines = (_wroot / epr_meta.FINDINGS_LEDGER_REL).read_text().splitlines()
+    _with_actor = _json.loads(_lines[0])
+    _without_actor = _json.loads(_lines[1])
+    check("witness(actor=...) writes an entry containing the actor dict",
+          _with_actor.get("actor") == _actor)
+    check("witness() without actor= omits the actor key entirely",
+          "actor" not in _without_actor)
+
 print(f"\n{_passed} checks passed")

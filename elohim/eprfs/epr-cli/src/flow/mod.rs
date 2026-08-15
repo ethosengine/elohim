@@ -269,6 +269,12 @@ fn run_fulfill(args: &[String]) -> FlowResult<ExitCode> {
 /// from the tree, so all four of its flags are required-or-optional by name and none is
 /// positional. Every one of them is refused when absent or blank rather than defaulted: a note
 /// whose kind, target, or body was guessed is a record that reads as evidence and is not.
+///
+/// The two attribution flags are the exception to "nothing is inferred": `--session` falls back
+/// to the environment, because the harness that runs an agent knows the session id and the agent
+/// writing a mid-run note should not have to repeat it. The fallback lives HERE, in the shell,
+/// and never in [`note::note`] — a projection whose record changed with an ambient variable would
+/// be neither testable nor reproducible.
 fn run_note(args: &[String]) -> FlowResult<ExitCode> {
     let (opts, rest) = parse_global(args)?;
     let on = take_opt(&rest, "--on")?.ok_or_else(|| {
@@ -282,13 +288,43 @@ fn run_note(args: &[String]) -> FlowResult<ExitCode> {
     let reason = take_opt(&rest, "--reason")?
         .ok_or_else(|| FlowError::InvalidArguments("note needs --reason <text>".into()))?;
     let switched_to = take_opt(&rest, "--switched-to")?;
-    let outcome = note::note(&opts.root, &on, &kind, &reason, switched_to.as_deref())?;
+    let actor = note::NoteActor {
+        as_ref: take_opt(&rest, "--as")?,
+        session: resolve_session(take_opt(&rest, "--session")?),
+    };
+    let outcome = note::note(
+        &opts.root,
+        &on,
+        &kind,
+        &reason,
+        switched_to.as_deref(),
+        &actor,
+    )?;
     if opts.json {
         println!("{}", serde_json::to_string_pretty(&outcome)?);
     } else {
         outcome.render();
     }
     Ok(ExitCode::SUCCESS)
+}
+
+/// The session id a run is acting under: the explicit flag first, then `CLAUDE_SESSION_ID`, then
+/// `ELOHIM_SESSION_ID`.
+///
+/// A BLANK value at any position is absence, never a session named by the empty string. An
+/// exported-but-empty variable is exactly what an un-sessioned harness looks like, and taking it
+/// literally would send every such run asking the actor sidecar who claimed session `""` — a
+/// question that has one answer for everybody.
+fn resolve_session(explicit: Option<String>) -> Option<String> {
+    explicit
+        .into_iter()
+        .chain(
+            ["CLAUDE_SESSION_ID", "ELOHIM_SESSION_ID"]
+                .into_iter()
+                .filter_map(|key| std::env::var(key).ok()),
+        )
+        .map(|value| value.trim().to_string())
+        .find(|value| !value.is_empty())
 }
 
 /// `epr flow stocks` — the only leg whose EXIT CODE is a verdict rather than a status.
@@ -409,7 +445,10 @@ fn usage() -> String {
      | fulfill <report.json> [--dry-run] [--surface-prefix genesis/a2o] [--json] [--root DIR]\n  \
      | note --on <commitment-cid-or-path> \
      --kind failed-approach|correction|observation \
-     --reason <text> [--switched-to <text>] [--json] [--root DIR]\n  \
+     --reason <text> [--switched-to <text>] \
+     [--as agent:<role>@<model>] [--session <id>] [--json] [--root DIR] \
+     (omit --session to fall back to CLAUDE_SESSION_ID/ELOHIM_SESSION_ID; \
+     an agent-attributed note carries steward:<git-author-email> as its last slot)\n  \
      | stocks --window START..END --per <second|minute|hour|day|week> \
      [--stock commitments] [--check] [--json] [--root DIR] \
      (--check exits non-zero when a stock is filling OR when nothing could be measured)\n>"

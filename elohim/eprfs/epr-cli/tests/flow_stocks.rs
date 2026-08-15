@@ -509,6 +509,7 @@ fn a_run_note_moves_no_number_in_this_stock() {
         "correction",
         "the window is declared, not inferred",
         None,
+        &elohim_epr_cli::flow::note::NoteActor::default(),
     )
     .expect("note runs");
 
