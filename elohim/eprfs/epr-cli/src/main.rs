@@ -1,7 +1,7 @@
 use std::{env, path::PathBuf, process::ExitCode};
 
 use elohim_epr_cli::{
-    canon_lift, check, doctor,
+    actor, canon_lift, check, doctor,
     error::{Error, Result},
     explain, flow, git,
     git::{ChangeKind, ChangedPath},
@@ -19,6 +19,19 @@ fn main() -> ExitCode {
             Ok(code) => code,
             Err(error) => {
                 eprintln!("epr flow: {error}");
+                ExitCode::from(2)
+            }
+        };
+    }
+    // `actor` likewise renders its own payload rather than a Report. Its exit code means "did
+    // the command run", never "is there a claim": `current` exits 0 with `claim: null` when a
+    // session registered nothing, because "nobody claimed" is an answer and "I could not find
+    // out" is an absence, and a caller must be able to tell them apart.
+    if raw.first().map(String::as_str) == Some("actor") {
+        return match actor::run(&raw[1..]) {
+            Ok(code) => code,
+            Err(error) => {
+                eprintln!("epr actor: {error}");
                 ExitCode::from(2)
             }
         };
@@ -233,5 +246,5 @@ fn print_human(report: &Report) {
 }
 
 fn usage() -> &'static str {
-    "usage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|flow ...|canon-lift [--check|--write]>"
+    "usage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|flow ...|actor <claim --as agent:<role>@<model> --session ID|current --session ID>|canon-lift [--check|--write]>"
 }

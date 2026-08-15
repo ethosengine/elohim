@@ -4,6 +4,7 @@
 //! reconstructible operational evidence; only the `ready` composition treats a
 //! finding as relevant to a requested reach event.
 
+pub mod actor;
 pub mod authority;
 pub mod canon_lift;
 pub mod check;

@@ -27,6 +27,15 @@
 //! stock is never stored, so two peers folding the same events mint the same stock with no
 //! shared clock.
 //!
+//! **Who is acting** ([`actor`]) is a fourth, orthogonal record: an [`actor::ActorClaim`] is an
+//! honor-system identity an agent registers *for itself, in flight*, session-scoped, superseded
+//! by appending rather than by mutation. It is deliberately not a field on the records above —
+//! attribution written about an actor after the fact cannot be disputed by the party it names,
+//! and cannot be revised mid-run. Nothing here proves the claim; what it buys is that the claim
+//! now EXISTS as an addressable record, so a later attestation has something precise to agree or
+//! disagree with. Its store is a separate sidecar for a load-bearing reason: a reader that
+//! consults identity must be able to fail to read it and still decide.
+//!
 //! Resource is NOT an entity: anything content-addressed is a resource; resource *state*
 //! is a pure fold over event history ([`fold`]). Granularity is scale-free here — what
 //! *should* be metered is a governance decision bound via `.epr-meta`, never a constant
@@ -36,6 +45,7 @@
 //! a fourth REA action enum (reconciliation with the protocol schema enum is tracked in
 //! the spec §8).
 
+pub mod actor;
 pub mod epistemic;
 pub mod error;
 pub mod fold;
@@ -45,6 +55,9 @@ pub mod stock;
 pub mod store;
 pub mod walk;
 
+pub use actor::{
+    parse_agent_ref, ActorClaim, ActorRecord, ActorStore, MemoryActorStore, SidecarActorStore,
+};
 pub use epistemic::{
     cite_gate, classify, fold_standing, CanonizationRef, EpistemicStanding, EpistemicStatus,
     EpistemicThresholds, ReviewEvent,
