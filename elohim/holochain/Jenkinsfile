@@ -222,6 +222,22 @@ def runElohimSdkFeatureMatrix() {
 }
 
 /**
+ * Whole body of the Build Storage stage. Branching lives HERE, not in the
+ * stage's steps block — every element added to the declarative stages model
+ * compiles into the one CPS method that sits against the JVM 64KB bytecode
+ * ceiling (edge #1134, edge #1351 both died there at compile).
+ */
+def runStorageStageBody() {
+    if (shouldRunStep('sdk-feature-matrix')) {
+        runElohimSdkFeatureMatrix()
+    }
+    if (shouldRunStep('cargo-build-storage')) {
+        runStorageQualityGate()
+        buildStorageImage()
+    }
+}
+
+/**
  * Build Storage — script body extracted verbatim from the stage (own CPS
  * method; the pipeline block sits against the JVM 64KB hard limit).
  */
@@ -1696,33 +1712,23 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build Storage') {
-            when { allOf {
-                expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { !skipBuildStage() }
-                anyOf {
-                    expression { shouldRunStep('cargo-build-storage') }
-                    expression { shouldRunStep('sdk-feature-matrix') }
-                }
-            }}
-            // Gate rides INSIDE this stage (not its own stage): adding a stage
-            // to the declarative model pushed the CPS stages-method past the
-            // JVM 64KB bytecode limit (edge #1134 MethodTooLargeException —
-            // string-byte proxies undercount model bytecode). The SDK matrix is
-            // blocking; the stabilizing storage gate remains non-blocking, then
-            // the release build runs.
-            steps {
-                container('builder') {
-                    script {
-                        if (shouldRunStep('sdk-feature-matrix')) {
-                            runElohimSdkFeatureMatrix()
-                        }
-                        if (shouldRunStep('cargo-build-storage')) {
-                            runStorageQualityGate()
-                            buildStorageImage()
-                        }
-                    }
-                }
-            }
+            // ONE expression, no allOf/anyOf: every declarative when-clause
+            // element compiles into the stages-model CPS method, and this model
+            // sits AGAINST the JVM 64KB bytecode limit — the nested anyOf form
+            // of this clause is what broke edge #1351 at compile
+            // (MethodTooLargeException, stageless 2.5s death), same class as
+            // edge #1134.
+            when { expression {
+                env.PIPELINE_SKIPPED != 'true' && !skipBuildStage() &&
+                (shouldRunStep('cargo-build-storage') || shouldRunStep('sdk-feature-matrix'))
+            } }
+            // Gate rides INSIDE this stage (not its own stage) and ALL
+            // branching lives in the helper (runStorageStageBody), keeping the
+            // steps block to a single call: adding model elements here is what
+            // breaches the ceiling — string-byte proxies undercount model
+            // bytecode. The SDK matrix is blocking; the stabilizing storage
+            // gate remains non-blocking, then the release build runs.
+            steps { container('builder') { script { runStorageStageBody() } } }
         }
 
         stage('P2P Simulation Test') {
