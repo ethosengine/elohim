@@ -203,10 +203,11 @@ log_steward_event() {
 }
 
 # Compute disk usage of a directory in bytes (du -sb), or 0 if missing.
+# Dereference symlinks so /tmp-backed slots remain visible to pool accounting.
 dir_disk_bytes() {
   local d="$1"
   [ -d "$d" ] || { echo 0; return; }
-  du -sb "$d" 2>/dev/null | awk '{print $1}'
+  du -sbL "$d" 2>/dev/null | awk '{print $1}'
 }
 
 # Total pool disk usage in bytes.
@@ -240,7 +241,18 @@ list_slots_for_family() {
   local family="$1"
   local fd="$POOL_ROOT/family/$family"
   [ -d "$fd" ] || return 0
-  find "$fd" -mindepth 2 -maxdepth 2 -type d 2>/dev/null | sort
+  find "$fd" -mindepth 2 -maxdepth 2 \( -type d -o -type l \) 2>/dev/null | sort
+}
+
+# Linked slots are valid build targets but their backing directories live
+# outside POOL_ROOT. Account for and lock-check them, but never select them for
+# automatic eviction: removing the link would strand the backing artifacts and
+# falsely report reclaimed bytes. Their lifecycle remains an operator decision.
+family_has_linked_slots() {
+  local family="$1"
+  local fd="$POOL_ROOT/family/$family"
+  [ -d "$fd" ] || return 1
+  find "$fd" -mindepth 2 -maxdepth 2 -type l -print -quit 2>/dev/null | grep -q .
 }
 
 # Resolve a symlink target even when one or more path components do not exist.
@@ -292,12 +304,14 @@ list_cargo_target_links() {
         -not -path "$POOL_ROOT/*" \
         -not -path "*/.git/*" \
         -not -path "$POOL_WORKTREES_DIR/*" \
+        -not -path "*/elohim/holochain/dna/*/target" \
         -printf 'in-tree-target\t%p\n' 2>/dev/null
     else
       find "$root" -maxdepth 6 -type l -name target \
         -not -path "*/node_modules/*" \
         -not -path "$POOL_ROOT/*" \
         -not -path "*/.git/*" \
+        -not -path "*/elohim/holochain/dna/*/target" \
         -printf 'in-tree-target\t%p\n' 2>/dev/null
     fi
   done | sort -u
@@ -337,6 +351,64 @@ heal_cargo_target_link() {
   path_is_preparable "$resolved" || return 1
   mkdir -p -- "$resolved" || return 1
   [ -d "$link" ]
+}
+
+# Create the minimal source crate used by the opt-in fingerprint write probe.
+# The build target itself lives below each slot and is removed after every
+# attempt; the source crate lives in /tmp and is removed by the caller.
+create_cargo_target_write_probe_crate() {
+  local crate_dir="$1"
+  mkdir -p -- "$crate_dir/src" || return 1
+  printf '%s\n' \
+    '[package]' \
+    'name = "cargo-pool-doctor-probe"' \
+    'version = "0.0.0"' \
+    'edition = "2021"' \
+    '' \
+    '[lib]' \
+    'path = "src/lib.rs"' > "$crate_dir/Cargo.toml"
+  printf '%s\n' '#![allow(dead_code)]' 'pub fn probe() {}' > "$crate_dir/src/lib.rs"
+}
+
+# Emit one TSV result for a Cargo-semantic write probe:
+#   <state> <slot> <detail>
+# States: ok | fingerprint-enoent | probe-failed | unavailable.
+# This never rewrites a slot. Only the reserved disposable subtarget created by
+# this function is removed.
+probe_cargo_target_slot() {
+  local slot="$1" crate_dir="$2" probe_target output state detail cargo_bin
+  case "$slot" in
+    "$POOL_ROOT"/family/*) ;;
+    *) printf 'unavailable\t%s\toutside pool root\n' "$slot"; return 0 ;;
+  esac
+  if [ ! -d "$slot" ]; then
+    printf 'unavailable\t%s\tslot does not resolve to a directory\n' "$slot"
+    return 0
+  fi
+
+  probe_target="$slot/.cargo-pool-doctor-probe"
+  cargo_bin="${CARGO:-cargo}"
+  rm -rf -- "$probe_target"
+  if output="$(
+    CARGO_TARGET_DIR="$probe_target" \
+      CARGO_INCREMENTAL=0 \
+      RUSTC_WRAPPER="" \
+      RUSTFLAGS="" \
+      "$cargo_bin" check --manifest-path "$crate_dir/Cargo.toml" --quiet 2>&1
+  )"; then
+    state=ok
+    detail=""
+  elif printf '%s\n' "$output" | grep -q '\.fingerprint/' \
+    && printf '%s\n' "$output" | grep -qE 'No such file or directory|os error 2'; then
+    state=fingerprint-enoent
+    detail="$(printf '%s\n' "$output" | grep '\.fingerprint/' | head -1)"
+  else
+    state=probe-failed
+    detail="$(printf '%s\n' "$output" | head -1)"
+  fi
+  rm -rf -- "$probe_target"
+  detail="${detail//$'\t'/ }"
+  printf '%s\t%s\t%s\n' "$state" "$slot" "$detail"
 }
 
 # ---------------------------------------------------------------------------
@@ -559,11 +631,12 @@ record_slot_watermark() {
 # Called by pool-postflight.sh on Stop.
 record_all_slot_watermarks() {
   [ -d "$POOL_ROOT/family" ] || return 0
-  local slot
-  while IFS= read -r slot; do
-    record_slot_watermark "$slot"
-  done < <(find "$POOL_ROOT/family" -mindepth 3 -maxdepth 3 -type d \
-    \( -name dev -o -name release \) 2>/dev/null)
+  local fam slot
+  for fam in $(list_families); do
+    while IFS= read -r slot; do
+      case "$slot" in */dev|*/release) record_slot_watermark "$slot" ;; esac
+    done < <(list_slots_for_family "$fam")
+  done
 }
 
 # Estimate cost in GB for next cargo invocation in a worktree's slot(s).
@@ -1203,6 +1276,10 @@ enforce_pool() {
   for fam in $(list_families); do
     case " $protected " in *" $fam "*) continue ;; esac
     if family_busy "$fam"; then say "4 $fam: skipped (busy)"; continue; fi
+    if family_has_linked_slots "$fam"; then
+      say "4 $fam: skipped (linked slot lifecycle is operator-owned)"
+      continue
+    fi
     local disp fd fb
     disp="$(policy_family_disposition "$fam")"
     fd="$POOL_ROOT/family/$fam"
@@ -1327,6 +1404,7 @@ trim_family_to_gb() {
     [ -n "$slot" ] || continue
     [ "${size:-0}" -le "$cap_b" ] && break
     [ "$slot" = "$freshest" ] && continue
+    [ -L "$slot" ] && continue
     if slot_locked "$slot"; then continue; fi
     local sb
     sb="$(dir_disk_bytes "$slot")"
@@ -1365,6 +1443,7 @@ pick_lru_slot() {
     while IFS= read -r slot; do
       [ -n "$slot" ] || continue
       case "$skip" in *"$slot"*) continue ;; esac
+      [ -L "$slot" ] && continue
       if slot_locked "$slot"; then continue; fi
       t="$(slot_age_epoch "$slot")"
       case "$slot" in */release) t=$((t - 2592000)) ;; esac

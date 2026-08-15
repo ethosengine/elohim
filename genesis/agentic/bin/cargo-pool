@@ -3,7 +3,8 @@
 #
 # Subcommands:
 #   status                    Tabular family overview (disk + last touched).
-#   doctor [--heal]           Diagnose dangling cargo-target symlinks.
+#   doctor [--heal|--probe-writes]
+#                             Diagnose cargo-target links or fingerprint writes.
 #   steward [--dry-run]       Run stewardship pass against worktrees.
 #   key                       Print the slot path that the current PWD
 #                             would use for native cargo builds.
@@ -31,7 +32,7 @@ cargo-pool — cargo target pool operator CLI
 
 Usage:
   cargo-pool status
-  cargo-pool doctor [--heal]
+  cargo-pool doctor [--heal|--probe-writes]
   cargo-pool steward [--dry-run]
   cargo-pool key
   cargo-pool estimate [worktree-path]
@@ -65,6 +66,9 @@ Env:
 
 doctor is read-only by default. --heal recreates missing directory targets
 only when their resolved path is beneath /tmp; it never rewrites symlinks.
+--probe-writes runs a disposable Cargo check beneath every resolvable pool
+slot, reports fingerprint-ENOENT distinctly, removes every probe target, and
+returns nonzero when any slot fails or cannot be probed.
 
 Design: genesis/docs/plans/cargo-target-pool-design.md
 EOF
@@ -146,13 +150,19 @@ cmd_status() {
 }
 
 cmd_doctor() {
-  local heal=0
-  case "${1:-}" in
-    "") ;;
-    --heal) heal=1 ;;
-    *) echo "cargo-pool doctor: unknown argument: $1" >&2; return 2 ;;
-  esac
-  [ "$#" -le 1 ] || { echo "cargo-pool doctor: too many arguments" >&2; return 2; }
+  local heal=0 probe_writes=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --heal) heal=1 ;;
+      --probe-writes) probe_writes=1 ;;
+      *) echo "cargo-pool doctor: unknown argument: $1" >&2; return 2 ;;
+    esac
+    shift
+  done
+  if [ "$heal" -eq 1 ] && [ "$probe_writes" -eq 1 ]; then
+    echo "cargo-pool doctor: --heal and --probe-writes are mutually exclusive" >&2
+    return 2
+  fi
 
   echo "Cargo target link doctor:"
   local kind state link raw resolved findings=0 healed=0 failed=0
@@ -178,7 +188,70 @@ cmd_doctor() {
   else
     echo "  healed=$healed unpreparable=$failed"
   fi
-  [ "$failed" -eq 0 ]
+
+  local probe_failed=0 probe_unavailable=0
+  if [ "$probe_writes" -eq 1 ]; then
+    echo
+    echo "Cargo fingerprint write probe (temporary; never rewrites slots):"
+    if [ ! -d "$POOL_ROOT/family" ]; then
+      echo "  no pool slots found"
+    else
+      exec 8>>"$POOL_ROOT/.doctor-probe-lock" || {
+        echo "  probe-failed — cannot open probe lock" >&2
+        return 1
+      }
+      if ! flock -n 8 2>/dev/null; then
+        echo "  probe-failed — another doctor write probe is running" >&2
+        exec 8>&-
+        return 1
+      fi
+
+      local probe_src state slot detail probed=0
+      probe_src="$(mktemp -d "${TMPDIR:-/tmp}/cargo-pool-doctor-probe.XXXXXX")" || {
+        echo "  probe-failed — cannot create temporary source crate" >&2
+        exec 8>&-
+        return 1
+      }
+      if ! create_cargo_target_write_probe_crate "$probe_src"; then
+        echo "  probe-failed — cannot prepare temporary source crate" >&2
+        rm -rf -- "$probe_src"
+        exec 8>&-
+        return 1
+      fi
+
+      local fam
+      for fam in $(list_families); do
+        while IFS=$'\t' read -r state slot detail; do
+          [ -n "$slot" ] || continue
+          case "$state" in
+            ok)
+              probed=$((probed + 1))
+              printf '  %-20s %s\n' ok "$slot"
+              ;;
+            unavailable)
+              probe_unavailable=$((probe_unavailable + 1))
+              printf '  %-20s %s — %s\n' unavailable "$slot" "$detail"
+              ;;
+            fingerprint-enoent|probe-failed)
+              probed=$((probed + 1))
+              probe_failed=$((probe_failed + 1))
+              printf '  %-20s %s\n' "$state" "$slot"
+              [ -n "$detail" ] && printf '    %s\n' "$detail"
+              ;;
+          esac
+        done < <(
+          while IFS= read -r slot; do
+            probe_cargo_target_slot "$slot" "$probe_src"
+          done < <(list_slots_for_family "$fam")
+        )
+      done
+      rm -rf -- "$probe_src"
+      exec 8>&-
+      echo "  probed=$probed failed=$probe_failed unavailable=$probe_unavailable"
+    fi
+  fi
+
+  [ "$failed" -eq 0 ] && [ "$probe_failed" -eq 0 ] && [ "$probe_unavailable" -eq 0 ]
 }
 
 cmd_steward() {
@@ -374,19 +447,19 @@ cmd_watermark() {
       echo "Per-slot HWM (FAMILY  WORKSPACE  PROFILE  HWM  CURRENT_SIZE):"
       [ -d "$POOL_ROOT/family" ] || { echo "(no families)"; return 0; }
       local fam ws_dir prof slot wm cur
-      while IFS= read -r slot; do
-        prof="${slot##*/}"
-        ws_dir="$(dirname "$slot")"
-        local ws_flat; ws_flat="${ws_dir##*/}"
-        local fam_dir; fam_dir="$(dirname "$ws_dir")"
-        fam="${fam_dir##*/}"
-        wm="$(read_slot_watermark "$slot")"
-        cur="$(dir_disk_bytes "$slot")"
-        printf '  %-8s %-32s %-8s %8s  %s\n' \
-          "$fam" "$ws_flat" "$prof" \
-          "$(human_bytes "${wm:-0}")" "$(human_bytes "${cur:-0}")"
-      done < <(find "$POOL_ROOT/family" -mindepth 3 -maxdepth 3 -type d \
-        \( -name dev -o -name release \) 2>/dev/null | sort)
+      for fam in $(list_families); do
+        while IFS= read -r slot; do
+          case "$slot" in */dev|*/release) ;; *) continue ;; esac
+          prof="${slot##*/}"
+          ws_dir="$(dirname "$slot")"
+          local ws_flat; ws_flat="${ws_dir##*/}"
+          wm="$(read_slot_watermark "$slot")"
+          cur="$(dir_disk_bytes "$slot")"
+          printf '  %-8s %-32s %-8s %8s  %s\n' \
+            "$fam" "$ws_flat" "$prof" \
+            "$(human_bytes "${wm:-0}")" "$(human_bytes "${cur:-0}")"
+        done < <(list_slots_for_family "$fam")
+      done
       ;;
   esac
 }

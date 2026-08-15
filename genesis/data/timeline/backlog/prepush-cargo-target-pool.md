@@ -234,3 +234,28 @@ cold rebuild after tmp-reaper, self-healed by the readlink guard + doctor
 --heal), or root-cause the toolchain/overlay-fs interaction on /projects.
 Claimable by any agent; `cargo-pool doctor` (above) is the natural home for the
 sweep.
+
+## CODEX IMPLEMENTED 2026-08-15 — detection-only fingerprint probe
+
+`cargo-pool doctor --probe-writes` now runs an opt-in, Cargo-semantic check in a
+reserved disposable subtarget beneath every resolvable pool slot. It reports
+`fingerprint-enoent` separately from other Cargo failures, serializes concurrent
+probe runs, removes its source and target fixtures, and never rewrites or replaces
+a slot. It returns nonzero for both failures and unavailable slots, so incomplete
+coverage cannot read green. Plain `doctor` and `status` remain probe-free.
+
+The same pass made linked `/tmp` slots visible to slot counts, disk accounting,
+lock traversal, and watermark updates. Automatic enforcement treats linked-slot
+lifecycles as operator-owned: linked slots are never selected for eviction and a
+family containing one is not bulk-evicted, avoiding the false claim that removing
+a symlink reclaimed its backing artifacts. DNA/WASM `target -> ../../target`
+links are now excluded from the native-target doctor, removing ten false-positive
+`unpreparable` findings from managed worktrees.
+
+Evidence: the isolated doctor suite passes all six behaviors; the repository-wide
+agentic run passes the cargo-pool tests (its three remaining failures are unrelated
+Haiku output-schema fixture drift). A live probe covered 18 slots with `failed=0`;
+the one dangling angular22 doorway slot was correctly reported `unavailable`, and
+no `.cargo-pool-doctor-probe` directory remained afterward. This evidence says the
+fingerprint-write failure is not active now; it does **not** decide the durable
+all-`/tmp` versus toolchain-root-cause posture, so this backlog item remains open.
