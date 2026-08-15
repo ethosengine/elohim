@@ -44,11 +44,14 @@
     "publish:results": "tsx scripts/publish-results.ts",
     "local:check": "tsx scripts/local-stack.ts",
     "local:seed": "tsx scripts/local-stack.ts --seed",
-    "build:sprint-report": "tsx scripts/build-sprint-report.ts"
+    "build:sprint-report": "tsx scripts/build-sprint-report.ts",
+    "substrate-verify": "tsx scripts/substrate-verify.ts",
+    "substrate-verify:selftest": "tsx scripts/substrate-verify.selftest.ts"
   },
   "dependencies": {
     "@cucumber/cucumber": "^11.2.0",
     "@elohim/identity": "workspace:*",
+    "@elohim/storage-client": "workspace:*",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "playwright": "1.59.1",
