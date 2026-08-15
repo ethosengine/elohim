@@ -97,11 +97,15 @@ budgets sum to 555s > the 300s tick (effective cadence ≥600s under saturation,
    `DISTRIBUTION_SAFE_REACH` inventory/head-record surfaces (content_diesel.rs:1663).
    Attestation-derived reach (`trust.service.ts:109-154`, `enrich-trust` CLI) is
    implemented and has no caller on the seed path.
-2. **The head plane never got the O(changes) cure the CRDT plane got.** No batched
-   head/election externs exist — `resolve_content_head_local`,
-   `resolve_canonical_election`, `validate_carried_head_record` are all 1-id-per-WS-RT
+2. **The head plane never got the O(changes) cure the CRDT plane got.**
+   *(PARTIALLY STALE 2026-08-15 — the batched READ half landed: `resolve_content_heads_local`
+   + `resolve_canonical_elections` externs (T1 `23a887d50`, T1b `9b3979d3b`) with the
+   `head_batch_resolver` storage seam (T3a `d75bfc82d`), Background admission class.
+   Still per-id: the DECLARE half (lever L8 below), and `validate_carried_head_record`
+   by design.)* Original premise: `resolve_content_head_local`,
+   `resolve_canonical_election`, `validate_carried_head_record` were all 1-id-per-WS-RT
    (~0.75s), while the batching pattern is already accepted at the same zome surface
-   (`batch_get_content_by_ids` lib.rs:4928, unused here) and the peer plane batches
+   (`batch_get_content_by_ids` lib.rs:4928) and the peer plane batches
    2000/request (`ProjectionInventory`). `ListDocumentsSince{corpus_digest}`
    (sync_protocol.rs:115, sync_round.rs:131) is the shipped precedent — its module
    doc names the defect generically: "cost O(peers × corpus) instead of O(changes)."
@@ -159,6 +163,20 @@ budgets sum to 555s > the 300s tick (effective cadence ≥600s under saturation,
   (kitsune2 `store_slice_hash` patch) which delivers on our timeline regardless of
   review pace. Decision memo weighs both by delivery need; the substrate owns its
   scheduling floor either way. Planned as T13 in the head-plane trust-gradient plan.
+- **L8 (new lever, 2026-08-15, shift admission-throughput-to-banked-ch06):** batched
+  DECLARE extern — the write half L1 never asked for. 7 per-id
+  `declare_canonical_content_head` RTs in `head_adoption.rs` (contest arms,
+  spin-discharge, adopt-before-author, declare_peer_head) remain 1-admission +
+  1-WS-RT per candidate under the 200/tick sweeps. Not free: declares COMMIT
+  (Update + links), so a batch of N commits needs first-class partial-failure
+  semantics (mirror T1b `attempted/unattempted/stop_reason`), in-wasm budget
+  (`conductor-call-is-uncancellable`), and the T2 rollout ordering (zome hot-swap
+  verified on alpha BEFORE the storage caller lands; `FallbackLatch` covers the
+  window). TRIGGER (falsifier from the 2026-08-15 shift): after sweep declares
+  ride Background class + ghost-witness probes batch, matthew still gate-sheds
+  with declare-attributed failures — `elohim_admission_shed_total{class="background"}`
+  climbing while `content_canonical_link_minted` stalls ⇒ declare VOLUME (not
+  wait class) is the residual bottleneck; take this lever.
 - **L6 (gate update):** p2p-design-gate capacity model is static and count-blind —
   no dimension for conductor-RTs × sweep-cadence × election candidacy (the costs
   that bind); conflates Holochain DHT + Kad plane under one "~3000 entries" number
