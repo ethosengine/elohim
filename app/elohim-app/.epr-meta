@@ -3,7 +3,7 @@ epr-meta-version: 1
 id: elohim-app-dev-lifecycle-governance
 purpose: >
   The Angular app AND the primary home of the local-dev lifecycle scripts (scripts/hc-start.sh,
-  hc-mesh.sh, hc-mesh-quiesce.sh, storage-start.sh, hc-build.sh) plus the heaviest app-side
+  hc-mesh.sh, hc-mesh-quiesce.sh) plus the heaviest app-side
   package.json script surface. Tightens the repo-root dev-lifecycle-context-sync rules with a
   shell-script leg: the *.sh files here ARE the executable form of the local dev-loop that the
   hc-dev-orchestrator skill and root CLAUDE.md describe in prose — when the executable form

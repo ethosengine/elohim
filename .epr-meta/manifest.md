@@ -27,8 +27,9 @@ rules:
       same pass: the hc-dev-orchestrator skill (.claude/skills/hc-dev-orchestrator/SKILL.md,
       local stack lifecycle), the root CLAUDE.md Build & Test Commands section, the root
       justfile recipes, and the script census/consolidation ledger this rule points at. If you
-      added a script: does an existing verb already cover it (census: 362 scripts, build x19,
-      test x16)? If you renamed/removed one: grep docs+CI for the old name. Out-of-date
+      added a script: does one of the eight root verbs already cover it (the census ledger
+      tracks the measured baseline and burn-down)? If you renamed/removed one: grep docs+CI
+      for the old name. Out-of-date
       instructions are cognitive load — the census doc records what is verified-alive.
   - id: dev-lifecycle-context-sync-just
     class: inject

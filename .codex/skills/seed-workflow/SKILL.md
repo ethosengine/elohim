@@ -1,6 +1,6 @@
 ---
 name: seed-workflow
-description: Validate, seed, and verify content in Holochain DHT. Use when seeding content, running validation, checking seed statistics, managing snapshots, or troubleshooting seeding issues.
+description: Validate, seed, and verify Elohim content through the safe root just workflow; includes the no-dry-run safety boundary, statistics, diagnosis, and snapshot cautions.
 metadata:
   runtime: codex
   sourceRuntime: claude
@@ -12,318 +12,95 @@ governance: "epr:elohim-agent/skills/seed-workflow"
 
 # Content Seeding Workflow
 
-This skill manages the complete content seeding pipeline for the Elohim project - from validation through seeding to verification.
+Use the root developer CLI for the common path. Content is validated from
+`genesis/data/lamad`, written through doorway/storage, and anchored through the
+Holochain provenance layer.
 
-## Pipeline Overview
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    Seeding Pipeline                           │
-├──────────────────────────────────────────────────────────────┤
-│                                                               │
-│  1. VALIDATE        Schema + metadata validation              │
-│       ↓                                                       │
-│  2. DRY-RUN         Preview without writing                   │
-│       ↓                                                       │
-│  3. SEED            Write to Holochain DHT                    │
-│       ↓                                                       │
-│  4. VERIFY          Post-seed validation                      │
-│                                                               │
-│  Source: genesis/data/lamad/   →   Target: Holochain DHT      │
-│                                                               │
-└──────────────────────────────────────────────────────────────┘
-```
-
-## Quick Reference
-
-### Complete Workflow (Recommended)
-```bash
-cd /projects/elohim/genesis/seeder
-
-# Step 1: Validate schema
-npm run validate
-
-# Step 2: Preview changes
-npm run seed:dry-run
-
-# Step 3: Seed to local
-npm run seed
-
-# Step 4: Verify
-npm run stats
-```
-
-### Environment-Specific Commands
-
-| Environment | Seed Command | Stats Command |
-|-------------|--------------|---------------|
-| Local | `npm run seed` | `npm run stats` |
-| Dev | `npm run seed:dev` | `npm run stats:dev` |
-| Production | (via CI only) | `npm run stats:prod` |
-
-## Detailed Commands
-
-### Validation
+## Safe workflow
 
 ```bash
-# Quick validation (metadata only)
-npm run validate
-
-# Verbose validation (show all issues)
-npm run validate:verbose
-
-# Validate specific directory
-npx tsx src/schema-validation.ts ../data/lamad/content --verbose
+just seed validate       # schema validation; never writes
+just dev start           # isolated local stack
+just seed apply local    # write content
+just seed stats          # inspect resulting counts
 ```
 
-**What validation checks:**
-- Required fields: `id`, `title`
-- Format hints: `contentFormat`, `contentType`
-- Blob references: `blobHash` integrity
-- JSON syntax errors
+For alpha, use `just seed apply alpha`. Production seeding remains CI-owned.
 
-### Seeding
+## Important safety boundary
+
+There is no content-seed dry-run today. The retired `seed:dry-run` and
+`seed:validate` npm aliases passed flags that `seed.ts` did not parse, so they
+could execute a real seed. Never recreate a preview command until the seeder
+has a tested non-writing execution mode.
+
+`just seed validate` runs `src/schema-validation.ts` directly and is the
+canonical non-writing check.
+
+## Seeder CLI
+
+From `genesis/seeder`, the content seeder supports:
 
 ```bash
-# Full seed (DNA + blobs)
-npm run seed
-
-# Validate only (no writes)
-npm run seed:validate
-
-# Preview changes (dry run)
-npm run seed:dry-run
-
-# Skip blob upload (DNA entries only)
-npm run seed:dna-only
-
-# Skip DNA entries (blobs only)
-npm run seed:blobs-only
+pnpm exec tsx src/seed.ts --limit 50
+pnpm exec tsx src/seed.ts --ids=a,b,c
+pnpm exec tsx src/seed.ts --content-only
+pnpm exec tsx src/seed.ts --paths-only
+pnpm exec tsx src/seed.ts --force
+pnpm exec tsx src/seed.ts --conductor-for <human-id>
 ```
 
-### Statistics & Verification
+Connection inputs are `DOORWAY_URL`, `STORAGE_URL`, and
+`HOLOCHAIN_ADMIN_URL`. Alpha also requires the configured API key.
+
+## Validation
 
 ```bash
-# Show content counts
-npm run stats
-
-# Against dev environment
-npm run stats:dev
-
-# Against production
-npm run stats:prod
+just seed validate
+cd genesis/seeder
+pnpm run validate:verbose
+pnpm run validate:all
 ```
 
-### Migration & Recovery
+Validation checks JSON shape and the domain validators declared by the seeder.
+It does not prove that remote services are reachable.
+
+## Verification and diagnosis
 
 ```bash
-# Run migrations
-npm run migrate
-
-# Preview migrations
-npm run migrate:dry-run
-
-# Verify migration state
-npm run migrate:verify
+just seed stats
+just seed diagnose
+curl -s http://localhost:8888/db/stats | jq .
 ```
 
-### Snapshot Management
+The local ports file is
+`elohim/holochain/local-dev/.hc_ports`. Remote profiles should set explicit
+URLs rather than reading it.
 
-```bash
-# Create snapshot of current state
-npm run snapshot:create
+## Snapshot workflow
 
-# Save snapshot with name
-npm run snapshot:save
+Snapshot commands live in `genesis/seeder/package.json` and operate under
+`elohim/holochain/local-dev`. Treat restore and clean as destructive. Inspect
+status/list first, and do not wrap snapshot operations in the public root CLI
+until their conductor lifecycle is covered by a regression test.
 
-# Restore from snapshot
-npm run snapshot:restore
+## Recovery facts
 
-# List available snapshots
-npm run snapshot:list
+- The bulk content path is skip-on-exists; a stale existing row is not an
+  update. Remove or deliberately update it before reseeding.
+- A content row without a DHT anchor can appear in graph/tag views but return
+  404 from the canonical content route.
+- Paths are `ContentNode`s; there is no `/db/paths` endpoint.
+- Seed data must use lamad manifest formats such as `sophia-quiz-json`, not the
+  broad protocol format `interactive`.
 
-# Check snapshot status
-npm run snapshot:status
-
-# Clean old snapshots
-npm run snapshot:clean
-```
-
-## Data Directory Structure
-
-```
-genesis/data/lamad/
-├── content/           # ContentNode JSON files
-│   ├── manifesto.json
-│   ├── governance-epic.json
-│   └── ...
-├── paths/             # Learning path definitions
-│   ├── index.json
-│   ├── elohim-protocol.json
-│   └── ...
-├── assessments/       # Quiz/assessment files
-│   └── ...
-├── graph/             # Visualization data
-│   └── ...
-└── perseus/           # Interactive quiz format
-    └── ...
-```
-
-## Environment Configuration
-
-### Local Development
-```bash
-# Uses localhost doorway (started via hc:start)
-npm run seed
-```
-
-### Dev Environment
-```bash
-# Preset environment variables
-npm run seed:dev
-
-# Or manually:
-export DOORWAY_URL='https://doorway-alpha.elohim.host'
-export DOORWAY_API_KEY='dev-elohim-auth-2024'
-export HOLOCHAIN_ADMIN_URL='wss://doorway-alpha.elohim.host?apiKey=dev-elohim-auth-2024'
-npm run seed
-```
-
-### Production
-Production seeding is done via CI pipeline only. Use `stats:prod` for read-only verification.
-
-## Troubleshooting
-
-### Validation Failures
-
-**Missing required field:**
-```
-ERROR: content/some-file.json missing required field 'id'
-```
-Fix: Add the missing field to the JSON file.
-
-**Invalid JSON:**
-```
-ERROR: content/some-file.json - Unexpected token
-```
-Fix: Check JSON syntax (trailing commas, missing quotes).
-
-### Connection Issues
-
-**WebSocket timeout:**
-```bash
-# Check doorway is running
-curl http://localhost:8888/health
-
-# Check conductor
-hc sandbox call --running $(cat /projects/elohim/holochain/local-dev/.hc_ports | grep admin_port | grep -o '[0-9]*') list-apps
-```
-
-**Auth failure (remote):**
-```bash
-# Verify API key
-echo $DOORWAY_API_KEY
-
-# Test connection
-curl -H "X-API-Key: $DOORWAY_API_KEY" https://doorway-alpha.elohim.host/health
-```
-
-### Partial Seed Failures
-
-If seeding fails partway through:
-```bash
-# Check what was seeded
-npm run stats
-
-# Resume (idempotent - will skip existing)
-npm run seed
-
-# Or restore from snapshot and retry
-npm run snapshot:restore
-npm run seed
-```
-
-### Large Seed Operations
-
-For bulk seeding:
-```bash
-# Create snapshot first (for rollback)
-npm run snapshot:create
-
-# Seed DNA entries first (faster)
-npm run seed:dna-only
-
-# Then blobs (can be slow)
-npm run seed:blobs-only
-```
-
-## Pre-Seed Validation with hc-rna
-
-For comprehensive schema validation using the Rust tooling:
-
-```bash
-cd /projects/elohim/holochain/rna/rust
-
-# Analyze all seed data
-RUSTFLAGS="" cargo run --features cli --bin hc-rna-fixtures -- \
-  -f /projects/elohim/genesis/data/lamad/content \
-  --analyze
-
-# Specific directory
-RUSTFLAGS="" cargo run --features cli --bin hc-rna-fixtures -- \
-  -f /projects/elohim/genesis/data/lamad/paths \
-  --analyze
-```
-
-## Key Files
+## Canonical files
 
 | File | Purpose |
-|------|---------|
-| `genesis/seeder/src/seed-production.ts` | Main seeding orchestrator |
-| `genesis/seeder/src/schema-validation.ts` | JSON schema validation |
-| `genesis/seeder/src/verification.ts` | Post-seed verification |
-| `genesis/seeder/src/snapshot.ts` | Snapshot management |
-| `genesis/seeder/src/doorway-client.ts` | HTTP client for doorway |
-| `genesis/seeder/src/storage-client.ts` | Blob upload client |
-
-## Common Workflows
-
-### Add New Content
-```bash
-# 1. Create content file
-# genesis/data/lamad/content/new-content.json
-
-# 2. Validate
-npm run validate
-
-# 3. Dry run
-npm run seed:dry-run
-
-# 4. Seed
-npm run seed
-```
-
-### Update Existing Content
-```bash
-# 1. Edit content file
-# 2. Validate
-npm run validate
-
-# 3. Seed (idempotent update)
-npm run seed
-
-# 4. Verify
-npm run stats
-```
-
-### Disaster Recovery
-```bash
-# 1. List available snapshots
-npm run snapshot:list
-
-# 2. Restore
-npm run snapshot:restore
-
-# 3. Verify
-npm run stats
-```
+|---|---|
+| `justfile` | safe public seed entrypoint |
+| `genesis/seeder/src/seed.ts` | content seeding implementation |
+| `genesis/seeder/src/schema-validation.ts` | non-writing validation |
+| `genesis/seeder/src/stats.ts` | content statistics |
+| `genesis/seeder/src/diagnose.ts` | connection/content diagnosis |
+| `genesis/seeder/src/snapshot.ts` | snapshot lifecycle |

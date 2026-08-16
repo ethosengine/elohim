@@ -104,57 +104,55 @@ A plan, spec, or sprint that serves no habit belongs in `held/`, not in flight. 
 
 ## Build & Test Commands
 
-Run `pnpm install` from repo root once (workspace install). Sophia is a git submodule with its own pnpm workspace.
+Install the workspace once with `pnpm install`. Sophia is a git submodule with
+its own pnpm workspace. The root developer interface is intentionally small:
 
-### elohim-app (Angular 19, `app/elohim-app/`)
 ```bash
-pnpm start                         # Dev server :4200 (proxies doorway :8888)
-pnpm run build                     # Production build
-pnpm run lint | lint:fix | lint:css | format:check
-pnpm test                          # Vitest with coverage
-pnpm exec vitest run --config vite.config.ts [pattern]   # CI / single-file
-pnpm run cypress:run               # E2E (Cucumber BDD)
-pnpm run hc:start[:seed]           # Start Holochain + doorway + storage [with seeding]
+just --list
+just gate                     # changed projects, including worktree edits
+just gate elohim-storage      # explicit manifest project or owning path
+just test app                 # focused test family
+just dev start                # isolated conductor + storage + doorway
+just mesh status              # local multi-peer mesh
+just seed validate            # non-writing schema validation
+just look page <url>          # eyes-first render
+just status habits
+just codegen all verify
 ```
 
-### Rust services (RUSTFLAGS override required — see Gotchas)
+The eight stable verbs are `gate`, `test`, `dev`, `mesh`, `seed`,
+`look`, `status`, and `codegen`. Their parameters replace package-specific
+name matrices; package scripts remain implementation details for CI and focused
+specialist work.
+
+`build-manifest.json gate.projects` owns local gate detection and typed
+execution. Both `just gate` and pre-push use
+`genesis/orchestrator/gate-runner.mjs`; do not add a grep detector or a second
+project-name command switch. Native gates resolve explicit cargo-pool slots and
+crate-specific `RUSTFLAGS`. DNA/WASM workspaces remain plain Cargo because
+Holochain packing requires their in-tree `./target`.
+
+Focused escape hatches:
+
 ```bash
-# doorway (doorway/doorway-service/) — native build; has a lib + bins
-RUSTFLAGS="" cargo build --release && cargo test --lib --bins && cargo clippy -- -D warnings && cargo fmt --check
-
-# steward/node — native build. BIN-ONLY (one [[bin]] elohim-node, no src/lib.rs):
-# `cargo test --lib` exits 101 with "no library targets found". Its canonical gate
-# is steward/node/justfile's `gate: fmt-check clippy test` — plain `cargo test`.
-RUSTFLAGS="" cargo build --release && cargo test && cargo clippy -- -D warnings && cargo fmt --check
-
-# elohim/elohim-storage/ — NATIVE binary, but needs the custom getrandom backend
-# (it is not a WASM build; the flag is a dependency requirement, and omitting it
-# fails the build). Its CI home is the EDGE pipeline, not the DNA pipeline.
-RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
-cargo test export_bindings         # Regenerate TypeScript types
-```
-`cargo nextest` is **NOT installed in the dev container** (verified 2026-07-30 twice: `/opt/rust/cargo/bin` holds only rustup shims). Use plain `cargo test`. Where nextest IS available it is preferred for unit/integration runs (parallel, faster on warm caches; same `--lib`/`--test <name>`/filter syntax), but it never replaces `cargo test export_bindings` (separate ts-rs harness) and it skips `#[ignore]` by default like `cargo test`.
-
-**A dependency bump is not verified by `cargo check`.** `cargo check --locked --all-targets` *compiles* tests without running them, so a bump that changes runtime behaviour passes clean — that is exactly how a `diesel 2.3.5→2.3.11` strict-UTF-8 decode change reached `dev` and broke a committed resilience test. Dependency work needs `cargo test`. Two corollaries: never judge a cargo run from piped/tailed output (`| tee` and the background harness have each reported exit 0 while cargo returned 101 — echo `EXIT=$?` on its own line), and a warm target slot can make a gate read green for a build that no longer compiles from cold.
-
-### Other Angular surfaces
-- `doorway/doorway-app/`: `pnpm start | build`; lint via `pnpm exec eslint src --ext .ts,.html`
-- `app/elohim-library/projects/elohim-service/`: `pnpm test` (Vitest)
-
-### sophia (submodule)
-```bash
-cd sophia && pnpm install && pnpm build && pnpm test [-- --filter sophia-core] && pnpm lint && pnpm typecheck
+cd app/elohim-app && pnpm exec vitest run --config vite.config.ts [pattern]
+cd genesis/a2o && pnpm test              # deployed E2E
+cd genesis/a2o && pnpm run test:browser  # browser scenarios
+cd sophia && pnpm build && pnpm test -- --filter sophia-core
 ```
 
-### Schema validation & pre-push
-```bash
-pnpm run schema:{test,validate,check-dna,codegen:ts}
-```
-The `.husky/pre-push` hook auto-detects changed projects and runs their quality gates. Bypass with `git push --no-verify` (NOT `HUSKY=0` — `core.hooksPath=.husky` makes git invoke the hook directly, bypassing the npm wrapper that honors the `HUSKY` env var, so `HUSKY=0` is a no-op here; this doc-vs-behavior drift has cost shift time 4×).
+There is no content-seed dry-run: the retired flags were ignored and could
+write. Use `just seed validate` for a non-writing check. Direct native Cargo
+commands still require the correct `CARGO_TARGET_DIR`; prefer `just gate` so
+the pool and `RUSTFLAGS` contract cannot drift.
 
-**Gates are tiered and PVC-pressure-aware (2026-06-04).** `sweettest-check` is an integration-layer gate: it runs by default only when the push targets `dev`/`main` (force elsewhere: `RUN_SWEETTEST=1`); CI's DNA pipeline is the backstop. Native Rust gates build into per-crate cargo-target-pool slots. Under disk pressure the hook reads `genesis/agentic/pool-policy.json`: at the soft watermark it reclaims first via `cargo-pool enforce --yes` (guarded — never touches the active family or flock'd slots); at the hard ceiling it defers heavy Rust gates with a `DEFERRED-BY-PVC` banner (`FORCE_HEAVY_GATES=1` overrides). The same policy backs a PreToolUse hook that DENIES heavy cargo commands at the hard ceiling and denies native-workspace cargo lacking `CARGO_TARGET_DIR` (DNA/WASM workspaces exempt — they must stay plain cargo).
+**Durable traps in this layer** — `just gate` buries the rest, but these still
+bite when you step outside it:
 
-The hook has TWO project-detection paths that emit DIFFERENT names: manifest-driven (`graph-walker.mjs`, fine-grained names like `epr-ts`) and a grep fallback (coarser names like `elohim-epr`). When adding a sub-project to any `build-manifest.json` `gate.projects` map, also add a matching case to `run_gate`'s fallback `case` statement — a missing case hits the `*) Unknown project` default and aborts the whole push.
+- `cargo nextest` is **NOT installed in this container** (verified 2026-07-30) — use plain `cargo test`.
+- **A dependency bump is not verified by `cargo check`.** `--locked --all-targets` *compiles* tests without running them — that is how a `diesel 2.3.5→2.3.11` strict-UTF-8 decode change reached `dev` green and broke a committed resilience test. Dependency work needs `cargo test`. And never judge a cargo run from piped/tailed output (`| tee` and the background harness have each reported exit 0 while cargo returned 101) — echo `EXIT=$?` on its own line.
+- Bypass the pre-push gate with `git push --no-verify`, **not** `HUSKY=0`: `core.hooksPath=.husky` makes git invoke the hook directly, bypassing the npm wrapper that honors that env var, so it is a no-op here (this doc-vs-behavior drift has cost shift time 4×).
+- Gates are tiered and PVC-pressure-aware. `sweettest-check` runs by default only when the push targets `dev`/`main` (`RUN_SWEETTEST=1` forces it elsewhere, `SKIP_SWEETTEST=1` skips it; CI's DNA pipeline is the backstop). Under disk pressure the hook reads `genesis/agentic/pool-policy.json`: at the soft watermark it reclaims via `cargo-pool enforce --yes`; at the hard ceiling it defers heavy Rust gates with a `DEFERRED-BY-PVC` banner (`FORCE_HEAVY_GATES=1` overrides). The same policy backs a PreToolUse hook that DENIES heavy cargo at the hard ceiling and denies native-workspace cargo lacking `CARGO_TARGET_DIR` (DNA/WASM workspaces exempt).
 
 ## Architecture
 
