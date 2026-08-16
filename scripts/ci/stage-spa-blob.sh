@@ -278,18 +278,38 @@ PATCH_PATH="/db/content/${SLUG}"
 #    Seatbelt: after each PATCH, GET the row and assert the hash field matches
 #    the SHA just written; a drift returns non-zero (→ retried, then NAMED).
 stage_once() {
+    # Re-PUT short-circuit (fixed 2026-08-16, found by the hc-mesh CI quiesce
+    # stage): when the target already holds this content-addressed blob, the
+    # seed route answers 2xx from cache WITHOUT draining the request body, and
+    # curl dies mid-upload with a broken pipe (exit 55 "Failed sending data" /
+    # 56 "Failure receiving data") — i.e. the blob IS stored and the stage
+    # failed anyway, burning the whole retry ladder on a no-op re-stage. Treat
+    # those two exits as "verify by content address" rather than as failure;
+    # every other exit still fails the attempt.
+    local put_rc=0
     curl -fSs -X PUT \
         -H 'Content-Type: application/zip' \
         -H "X-Blob-Hash: ${SPA_HASH}" \
         -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
         --data-binary @spa-bundle.zip \
-        "${DOORWAY_EPR_URL}/admin/seed/blob" || return 1
-    echo "  ✓ [${SLUG}] blob uploaded (via /admin/seed/blob)"
+        "${DOORWAY_EPR_URL}/admin/seed/blob" || put_rc=$?
+    if [ "${put_rc}" -eq 0 ]; then
+        echo "  ✓ [${SLUG}] blob uploaded (via /admin/seed/blob)"
+    elif [ "${put_rc}" -eq 55 ] || [ "${put_rc}" -eq 56 ]; then
+        if curl -fsS -o /dev/null --max-time 60 "${DOORWAY_EPR_URL}/blob/${SPA_HASH}"; then
+            echo "  ✓ [${SLUG}] blob already stored (re-PUT short-circuited by cache; verified by content address ${SPA_HASH})"
+        else
+            echo "  ✗ [${SLUG}] PUT broke (curl ${put_rc}) and ${SPA_HASH} is NOT retrievable — real upload failure" >&2
+            return 1
+        fi
+    else
+        return 1
+    fi
 
     if [ "${DO_PATCH}" = "1" ]; then
         curl -fSs -X PATCH \
             -H 'Content-Type: application/json' \
-            -H "X-API-Key: ${STORAGE_API_KEY_ADMIN}" \
+            -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
             -d "{\"${HASH_FIELD}\":\"${SPA_HASH}\"}" \
             "${DOORWAY_EPR_URL}${PATCH_PATH}" \
             >/dev/null || return 1
@@ -314,7 +334,7 @@ stage_once() {
         #    deploy — any failure here is a loud warning, not a retry/abort.
         local head_hash=""
         head_hash=$(curl -fSs \
-            -H "X-API-Key: ${STORAGE_API_KEY_ADMIN}" \
+            -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
             "${DOORWAY_EPR_URL}/db/content/${SLUG}/head" \
             2>/dev/null \
             | python3 -c "import sys, json; print(json.load(sys.stdin).get('headActionHash',''))" 2>/dev/null) || head_hash=""
@@ -329,7 +349,7 @@ stage_once() {
             local canonical_raw canonical_exit canonical_status canonical_body
             canonical_raw=$(curl -sS -o - -w '\n%{http_code}' -X POST \
                 -H 'Content-Type: application/json' \
-                -H "X-API-Key: ${STORAGE_API_KEY_ADMIN}" \
+                -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
                 -d "{\"headActionHash\":\"${head_hash}\"}" \
                 "${DOORWAY_EPR_URL}/db/content/${SLUG}/canonical-head" \
                 2>&1)

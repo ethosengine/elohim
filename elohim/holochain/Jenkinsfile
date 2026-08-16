@@ -255,6 +255,49 @@ def buildStorageImage() {
 }
 
 /**
+ * hc-mesh-in-CI quiesce measure (minutes-quiesce plan §3 W4.2, task Q9:
+ * genesis/docs/superpowers/plans/2026-08-16-minutes-quiesce-fixture-trust-swarm-plan.md).
+ *
+ * A per-commit, minutes-scale measure of the protocol's convergence machinery
+ * on a 3-peer mesh THIS PIPELINE OWNS, in TWO phases with distinct semantics:
+ *
+ *   PHASE 1 · QUIESCE (bootstrap) — stands the mesh up from the storage/doorway
+ *     binaries + elohim.happ already produced earlier in this same run (nothing
+ *     is compiled here), seeds the fixture corpus under its declared stakes
+ *     grant, authors the landing head, runs the fleet-quiesce gate with a 600s
+ *     deadline, prints `MESH-QUIESCE: PASS rate=<n> rows/min`. Because the mesh
+ *     is ours, the DID-NOT-MEASURE class cannot exist: a gate that does not
+ *     reach sustained PASS FAILS the build — churning IS the regression signal.
+ *   PHASE 2 · E2E (runtime validation) — only after phase 1 passes, on the
+ *     quiesced substrate: `cucumber-js --profile saga` (26 scenarios), printing
+ *     `MESH-E2E: n/26 scenarios`. Its writes are the SUBJECT, so it never
+ *     re-asserts global quiesce metrics, and it is UNSTABLE-grade (reports, does
+ *     not fail) while the global-quiesce step-debt in the saga steps is open.
+ *
+ * A container that cannot host conductors prints one loud
+ * SKIPPED-NO-CONDUCTOR line instead of measuring.
+ *
+ * WHY IT IS NOT ITS OWN STAGE: the declarative `stages {}` model is a single
+ * CPS method at the JVM 64KB ceiling (edge #1134 died at 4423 units / 20
+ * stages; the in-repo size hook HARD-caps this file at 4400 and a new stage
+ * costs ~40). So the measure rides at the tail of `Build Edge Node Image` —
+ * the first point where the storage image, doorway image AND the Harbor-
+ * fetched elohim.happ all exist — via this one-line top-level def, which is
+ * its own CPS method. It still lands where it must: after every build,
+ * BEFORE `Push to Harbor` and every Deploy stage, with no fleet dependence.
+ * Give it its own stage the moment the stage model has headroom again.
+ */
+def runMeshQuiesceMeasure() {
+    // First-landing grade: UNSTABLE, never build-fatal — a new measure stage
+    // hard-failing inside Build Edge Node Image would block the edge deploys
+    // that ship its own fixes (the cascade-deadlock class, cf. runE2ETests'
+    // catchError precedent). Flip to a bare sh call once proven green.
+    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+        sh "bash '${env.WORKSPACE}/scripts/ci/run-mesh-quiesce-stage.sh'"
+    }
+}
+
+/**
  * Run P2P simulation test (advisory — failures don't block pipeline).
  * Requires Docker Compose and the elohim-storage Dockerfile.
  */
@@ -1808,6 +1851,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 echo "Skipping Edge Node image build - no hApp available"
                                 echo "Run the pipeline with FORCE_BUILD after ensuring DNA artifacts exist"
                             }
+
+                            // Per-commit convergence measure on a mesh we own.
+                            // Rides here (not its own stage) because the stages
+                            // model is at the 64KB CPS ceiling — see the def.
+                            runMeshQuiesceMeasure()
                         }
                     }
                 }
