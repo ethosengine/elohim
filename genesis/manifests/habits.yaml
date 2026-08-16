@@ -78,6 +78,20 @@ habits:
       - "a2o @concern:content-sync, @concern:blob-replication, @concern:peer-mesh, @concern:epr-projection-fallback, @concern:reconcile-inventory (edge Dataplane Validation stage)"
       - "cargo test --test sync_libp2p_convergence (elohim/elohim-storage)"
     evidence: >
+      DELTA 2026-08-16 (shift dataplane-facade-first-consumer): the genesis
+      substrate-validation suite — the mesh/propagation/custody-convergence/
+      delivery probes that keep this habit honest — now runs on the typed
+      .dataplane() facade (genesis/a2o/scripts/substrate-verify.ts consuming
+      @elohim/storage-client; 616-line bash+curl+jq retired from the pipeline,
+      kept in-tree one cycle as revert lever). Verified green ×2 across fresh
+      triggers (genesis #1477 + #1478: 5/7 subcommands failed=0, projection+
+      federation failing only on unconverged-fleet env state, byte-for-byte
+      the bash baseline). Every artifact stamps runner:"facade" — the PROPOSED
+      dataplane-sdk habit's probe is GREEN and mintable; register is at the
+      12-cap, so the mint (which habit yields a slot) is an operator decision
+      surfaced in the shift sprint result. Found+fixed in-flight: event CIDs
+      depended on the git binary's %aI date spelling (2.47 +00:00 vs 2.52 Z) —
+      normalize_git_timestamp now pins canonical UTC-Z (afa001d0b, eprfs #22).
       edge #1135 2026-07-02: four standing-red concerns flipped green; elohim.host
       200 with blobHash converged from matthew (zero manual PATCH); 1838 lib tests.
       HELD 2026-08-06 across the automerge 0.5.12 → 0.10.0 bump (host-verified,

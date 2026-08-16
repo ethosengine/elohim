@@ -3,26 +3,62 @@ id: "backlog-arch-dataplane-sdk-proposal"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "Dataplane SDK proposal — typed .dataplane() facade on @elohim/storage-client; CI substrate-verify as first consumer (NEEDS /brainstorm: 3 design questions)"
+title: "Dataplane SDK — .dataplane() facade LANDED with CI substrate-verify as first consumer; residue: codegen-consumer wiring, http.rs input validation, legacy snake_case types.ts, bash-script retirement"
 slug: "arch-dataplane-sdk-proposal"
 written: "2026-06-11"
 author: "agentic-developer (dataplane architecture review, operator-requested)"
 status: "backlog"
-priority: "high"
-ci_status: blocked
+priority: "medium"
+ci_status: verified
 tags: [architecture, dataplane, sdk, api-surface, design-gate, brainstorm]
 cites:
   - elohim/sdk/storage-client-ts/src/client.ts
   - genesis/scripts/ci/substrate-verify.sh
 ---
 
-# Dataplane SDK proposal (for /brainstorm)
+# Dataplane SDK proposal — LANDED 2026-08-16 (shift dataplane-facade-first-consumer)
+
+**Current decision / state:** the facade shipped and is daily-proven. The three
+design questions were answered on standing evidence (operator skip-the-gates
+preference) and are recorded in DATAPLANE-SDK-PATH.md critical path #3: (1)
+multi-peer addressing via `DataplaneFleet` (PEER_STORAGE_URLS CSV), doorway as
+single-target `DoorwayClient`; (2) healing stays a node primitive — the
+proposal's `healBlobConcurrent` client fan-out was deliberately NOT built; (3)
+`schemas/v1/inputs/` extended as the convention (rea-commitment-query +
+economic-event-query schemas). CI evidence: genesis #1477/#1478 — all 7
+substrate-verify subcommands run `genesis/a2o/scripts/substrate-verify.ts` on
+`@elohim/storage-client`, artifacts stamp `runner:"facade"`, 5/7 failed=0
+(projection/federation env-fails match the bash baseline byte-for-byte).
+
+**Residual rows (the open work; each bounded):**
+
+1. **Wire storage-client-ts as a schema-codegen consumer** — the two inputs/
+   schemas exist but INTERFACE_FILES doesn't emit into storage-client-ts, so
+   `ReaCommitmentQuery`/`EconomicEventQuery` are hand-declared in
+   `src/api/dataplane.ts` with schema pointers. Wire the consumer, replace the
+   hand declarations with generated re-exports.
+2. **`http.rs` input validation** — `handle_db_rea_commitments` (and the
+   economic-events list handler) still loose-parse their query params; wire
+   the new input schemas into request validation per the views/ discipline.
+3. **Legacy snake_case surface in storage-client-ts `src/types.ts`** — the
+   sync/blob response types (`doc_id`, `blob_hash`, …) predate the ts-rs View
+   convention and violate "snake_case never leaves the Rust boundary"; needs
+   Rust-side View types + generated replacements (breaking change for
+   consumers of those fields — coordinate with elohim-app usage).
+4. **Retire `genesis/scripts/ci/substrate-verify.sh`** — un-invoked since the
+   Jenkinsfile swap (c1ee43081); kept one cycle as the revert lever. Remove
+   after the facade runner survives a week of genesis runs (or the next
+   substrate-verify feature change, whichever first).
+
+Original proposal (op surface, staged adoption, the three questions as asked)
+preserved below for provenance.
+
+---
 
 Operator intent: "an API/SDK surface that helps cure our capabilities over
 this dataplane substrate" — let developers and agents PLAY with custody,
 healing, pinning, posture, adjacency, federation, not just prove them in
-bash+jq. ci_status blocked = the three design questions below are the
-gate; implementation must not start before /brainstorm answers them.
+bash+jq.
 
 # ARTIFACT 2 — DATAPLANE SDK PROPOSAL (for /brainstorm)
 

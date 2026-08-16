@@ -116,8 +116,23 @@ Genesis is triggered automatically after ALL dependent pipelines succeed. It aut
 Read from the tip commit's message on the push being analyzed.
 
 Force-dispatch a pipeline regardless of changeset:
-`[build:edge|dna|app|genesis|sophia|steward|conductor|all]` (comma-separated,
-e.g. `[build:edge,app]`).
+`[build:edge|dna|app|genesis|sophia|steward|conductor|eprfs|epr|all]`
+(comma-separated, e.g. `[build:edge,app]`).
+
+Three semantics that have each cost a build cycle (2026-08-15, #1684-#1686):
+
+- **`[build:*]` force-INCLUDES, never subtracts.** Changeset analysis still
+  adds every pipeline with stale per-pipeline baselines or matching changed
+  files. Only an empty commit with no baseline debt dispatches exactly the
+  tag set.
+- **`[edge:validate-only]` isolates.** It suppresses the whole dependency
+  graph INCLUDING force-included `[build:*]` pipelines on the same commit —
+  by design (a recording run must not perturb the substrate). Use a separate
+  push for anything else.
+- **Tag regexes scan the full commit body** (`git log -1 --format=%B`), so
+  QUOTING a tag in prose arms it — a commit body must never mention a
+  bracketed tag it does not intend (tag-quote-poisoning; #1686 re-armed
+  validate-only from an explanatory sentence).
 
 Modes:
 

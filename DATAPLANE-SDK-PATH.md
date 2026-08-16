@@ -9,7 +9,7 @@ written: "2026-08-14"
 author: "claude (dataplane blockers survey, operator-directed)"
 status: "active"
 priority: "high"
-habit: "dataplane-sdk (PROPOSED — probe: CI substrate-verify migrated to the .dataplane() facade and green; until minted, this doc's honesty anchor is the convergence work in flight under notary-authority)"
+habit: "dataplane-sdk (PROPOSED, PROBE GREEN 2026-08-16 — CI substrate-verify runs on the .dataplane() facade, green ×2 across fresh triggers, genesis #1477/#1478; mint blocked only by the 12-habit cap — operator decides which habit yields the slot)"
 cites:
   - genesis/data/timeline/backlog/eprfs-ipfs-analog-dataplane-sdk-surface.md
   - genesis/data/timeline/backlog/arch-dataplane-sdk-proposal.md
@@ -136,6 +136,16 @@ machinery · `epr-composite` containers.
 3. **One brainstorm** answering the three blocked design questions, then the
    `.dataplane()`/eprfs facade with CI (substrate-verify migration) as first
    consumer — the SDK gets proven daily instead of aspirationally.
+   **DONE 2026-08-16** (shift dataplane-facade-first-consumer): questions
+   answered (multi-peer `DataplaneFleet` addressing · healing stays a node
+   primitive, client observes only · `schemas/v1/inputs/` extended as the
+   convention); facade landed in `@elohim/storage-client` (dataplane sub-API +
+   `DoorwayClient` + `DataplaneFleet` + tri-state `streamSyncState`); the
+   616-line bash substrate-verify re-expressed as
+   `genesis/a2o/scripts/substrate-verify.ts`, green ×2 in the genesis pipeline
+   with `runner:"facade"` artifact attribution. Residue routed: codegen-consumer
+   wiring + `http.rs` input validation → backlog (the TS query interfaces are
+   hand-declared with schema pointers until then).
 4. **Factor the minimal seam set** (codec crate, P2PDispatcher, EprValidator) in
    parallel with 3.
 5. **Decide the transport story** (iroh parity vs pinned-libp2p v1) as an
