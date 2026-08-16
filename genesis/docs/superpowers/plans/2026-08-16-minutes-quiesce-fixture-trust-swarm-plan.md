@@ -184,6 +184,7 @@ DHT gossip converges at test cadence, not prod cadence.
 | Q8 | Dev-tier pacing profile block in `hc-mesh.sh` + T5 digest flip locally | Sonnet | Q1 |
 | Q9 | Jenkins hc-mesh quiesce stage (build-manifest + Jenkinsfile leg; bash in `scripts/ci/`, heredoc-free) | Opus | Q1–Q8 green locally |
 | Q10 | Saga re-run local (target: ch03/04/05/09/10 unpinned by Q2; register evidence) + story-harvest the constraints | Sonnet | Q2–Q8 |
+| Q11 | Atomic timing budget (operator directive 2026-08-16): declare the ~8 convergence-path atoms (put_record, inventory page, batched head extern per-id share, ContentHeadRecord verify, adopt/declare, shard fetch, manifest persist, digest fold), give each a wall-clock histogram (`elohim_atom_duration_ms{atom=...}`; reuse existing elapsed_ms/queue_wait where present), and write the budget table `quiesce ≈ Σ count×cost÷parallelism` beside the measure — prediction recorded before each measured run, residual = named design concern. Composes the program plan §6 falsifiable-prediction rule; micro-bench pure atoms (criterion or bench bins), runtime histograms for I/O atoms | Sonnet | Q7 (same hot files) |
 
 Per-task DoD: touched tree's gate clauses green from clean state (fmt, clippy -D
 warnings, `cargo test` with echoed `EXIT=$?`); commit-only, integrator pushes; all work
