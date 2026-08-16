@@ -25,6 +25,7 @@ const SCHEMA_PATH = join(PKG_DIR, 'account-package.schema.json');
 const SKIP_FILES = new Set([
   'account-package.schema.json',
   'conductor-groups.json',
+  'corpus.json', // corpus trust declaration (see corpus-trust.ts), not a package
   'index.json',
 ]);
 

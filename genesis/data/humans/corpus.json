@@ -1,0 +1,14 @@
+{
+  "id": "genesis-humans",
+  "title": "Genesis Fixture Humans",
+  "environment": "preproduction",
+  "realism": {
+    "rung": 0,
+    "why": "Fixture persona definitions registered through the doorway HTTP surface (seed-humans.ts), not authored by each persona's own conductor. The identity-binding acts that MUST climb to rung 3 live elsewhere — seed-conductor-identities.ts and seed-agent-bindings.ts — and read conductors, not this corpus."
+  },
+  "trustBootstrap": {
+    "stage": "simulacra",
+    "grantor": "human-adam-firstman",
+    "scope": "genesis-humans"
+  }
+}

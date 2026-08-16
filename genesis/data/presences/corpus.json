@@ -1,0 +1,14 @@
+{
+  "id": "genesis-presences",
+  "title": "Genesis Contributor Presences",
+  "environment": "preproduction",
+  "realism": {
+    "rung": 0,
+    "why": "Contributor-presence records seeded through the doorway (seed-presences.ts) in the witness-without-authority shape: created on behalf of parties who have not claimed them. Stewarded, not agreed — no inter-party consent is being simulated here, so the rung-3 obligation does not attach."
+  },
+  "trustBootstrap": {
+    "stage": "simulacra",
+    "grantor": "human-adam-firstman",
+    "scope": "genesis-presences"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "id": "genesis-lamad",
+  "title": "Genesis Lamad Corpus",
+  "environment": "preproduction",
+  "realism": {
+    "rung": 0,
+    "why": "Corpus body stays rung 0 forever (qahal-epr-household-lattice design §5): replication carries the bytes, and anchoring a 50-minute corpus is a non-goal. Nothing here is an inter-party agreement, consent act, or identity binding — those climb to rung 3 in seed-conductor-identities / seed-agent-bindings / seed-household-formation, which do not read this corpus."
+  },
+  "trustBootstrap": {
+    "stage": "simulacra",
+    "grantor": "human-adam-firstman",
+    "scope": "genesis-lamad"
+  }
+}

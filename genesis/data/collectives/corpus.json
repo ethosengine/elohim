@@ -1,0 +1,14 @@
+{
+  "id": "genesis-collectives",
+  "title": "Genesis Fixture Collectives",
+  "environment": "preproduction",
+  "realism": {
+    "rung": 0,
+    "why": "Collective definitions POSTed through the doorway (seed-collectives.ts) as scaffolding so downstream corpora can reference them. The real inter-party formation act — charter, invite, affirm — is rung 3 and is authored on each persona's own conductor by seed-household-formation.ts; this corpus never stands in for that."
+  },
+  "trustBootstrap": {
+    "stage": "simulacra",
+    "grantor": "human-adam-firstman",
+    "scope": "genesis-collectives"
+  }
+}

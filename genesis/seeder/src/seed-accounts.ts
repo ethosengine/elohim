@@ -39,8 +39,15 @@ import { loadDeploymentRegistry, parseDeployedHumansArg } from './deployment-reg
 // =============================================================================
 
 function loadPackages(packagesDir: string, humanFilter?: string): AccountPackageInputView[] {
+  // `corpus.json` is the corpus trust declaration (see corpus-trust.ts) — sibling
+  // metadata for the whole directory, never an account package.
   const files = readdirSync(packagesDir).filter(
-    f => f.endsWith('.json') && f !== 'index.json' && f !== 'conductor-groups.json' && !f.endsWith('.schema.json')
+    f =>
+      f.endsWith('.json') &&
+      f !== 'index.json' &&
+      f !== 'conductor-groups.json' &&
+      f !== 'corpus.json' &&
+      !f.endsWith('.schema.json')
   );
 
   const packages: AccountPackageInputView[] = [];

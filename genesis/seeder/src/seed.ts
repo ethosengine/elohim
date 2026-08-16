@@ -51,6 +51,14 @@ import {
 } from './seed-operator-bindings.js';
 import { seedProjections, defaultProjectionSeeds, createProjectionClient } from './seed-projections.js';
 import { seedLandingEprAtom } from './seed-epr-atom.js';
+import {
+  loadCorpusDeclaration,
+  buildStakesDeclaration,
+  emitStakesDeclaration,
+  stakesDeclarationLogLine,
+  CorpusDeclarationError,
+  type LoadedCorpusDeclaration,
+} from './corpus-trust.js';
 // ========================================
 // PERFORMANCE TIMING UTILITIES
 // ========================================
@@ -329,6 +337,15 @@ const GENESIS_DIR = path.resolve(SEEDER_DIR, '..'); // Go up from seeder/ to gen
 const DATA_DIR = process.env.DATA_DIR || path.join(GENESIS_DIR, 'data', 'lamad');
 const BLOBS_DIR = path.join(GENESIS_DIR, 'blobs');
 const GENESIS_MANIFEST_PATH = path.join(BLOBS_DIR, 'manifest.json');
+
+// Canonical artifact filename from build-artifacts.json — the same single source
+// of truth the Jenkinsfiles and sibling seeders read (see seed-household-formation.ts).
+const BUILD_ARTIFACTS = JSON.parse(
+  fs.readFileSync(path.join(GENESIS_DIR, 'orchestrator', 'build-artifacts.json'), 'utf8'),
+);
+const STAKES_DECLARATION_FILE: string =
+  BUILD_ARTIFACTS.genesis?.stakesDeclaration ?? 'stakes-declaration.json';
+const STAKES_DECLARATION_PATH = path.join(SEEDER_DIR, STAKES_DECLARATION_FILE);
 
 // Genesis blob pack manifest (pre-computed content addresses)
 interface GenesisManifestEntry {
@@ -1976,6 +1993,38 @@ async function seed() {
     process.exit(1);
   }
 
+  // ========================================
+  // CORPUS TRUST DECLARATION (minutes-quiesce Q5 / trust-gradient T10)
+  // ========================================
+  // Read BEFORE any network work so a malformed declaration fails the run before
+  // a single row is written. Absence is legal and silent-but-safe: nothing is
+  // minted, and the runtime resolves NetworkStage::Bootstrap (fail-closed).
+  // The grant is never inferred from repo origin, hostname, or DEV_MODE.
+  let loadedCorpus: LoadedCorpusDeclaration | null = null;
+  try {
+    loadedCorpus = loadCorpusDeclaration(DATA_DIR);
+  } catch (error) {
+    if (error instanceof CorpusDeclarationError) {
+      console.error('\n❌ Corpus trust declaration is invalid — seeding aborted');
+      console.error(`   ${error.message}`);
+      console.error('   See genesis/seeder/README.md § Corpus trust declaration');
+      process.exit(1);
+    }
+    throw error;
+  }
+  if (!loadedCorpus) {
+    console.log(`\n🔒 No corpus.json in ${DATA_DIR} — no trust grant declared, nothing minted`);
+    console.log('   (runtime resolves NetworkStage::Bootstrap via StakesProvenance::BootstrapDefault)');
+  } else if (!loadedCorpus.declaration.trustBootstrap) {
+    console.log(`\n🔒 ${loadedCorpus.declaration.id} declares no trustBootstrap — nothing minted`);
+    console.log('   (runtime resolves NetworkStage::Bootstrap via StakesProvenance::BootstrapDefault)');
+  } else {
+    const g = loadedCorpus.declaration.trustBootstrap;
+    console.log(`\n🔑 Corpus trust declared: ${loadedCorpus.declaration.id}`);
+    console.log(`   environment=${loadedCorpus.declaration.environment} stage=${g.stage} grantor=${g.grantor}`);
+    console.log(`   realism rung ${loadedCorpus.declaration.realism.rung} — ${loadedCorpus.declaration.realism.why}`);
+  }
+
   console.log(`🌐 Doorway: ${DOORWAY_URL}`);
   console.log(`   Flow: Seeder → Doorway → elohim-storage → Conductor`);
   if (IDS.length > 0) console.log(`🎯 Filtering to IDs: ${IDS.join(', ')}`);
@@ -2127,6 +2176,30 @@ async function seed() {
   } else if (seedResult.contentSucceeded !== seedResult.contentAttempted) {
     // Even without verification, warn if doorway reported failures
     console.warn(`\n⚠️ Seeding completed with issues: ${seedResult.contentSucceeded}/${seedResult.contentAttempted} content items succeeded`);
+  }
+
+  // ========================================
+  // STAKES DECLARATION (the deploy-time mint)
+  // ========================================
+  // One grant per deploy/environment covering the whole corpus — per-peer, not
+  // per-EPR. Emitted as a machine-readable artifact because no write route for a
+  // policy manifest exists yet; see STAKES-DECLARATION-SEAM-Q6 in corpus-trust.ts
+  // for the exact contract the runtime half (Q6) should accept.
+  if (loadedCorpus) {
+    const artifact = buildStakesDeclaration(loadedCorpus, {
+      seedTarget: DOORWAY_URL,
+      declaredBy: path.relative(path.resolve(GENESIS_DIR, '..'), loadedCorpus.sourcePath),
+      itemsDeclared: seedResult.contentAttempted,
+    });
+    if (artifact) {
+      emitStakesDeclaration(artifact, STAKES_DECLARATION_PATH);
+      console.log(`\n${stakesDeclarationLogLine(artifact)}`);
+      console.log(`   manifestCid: ${artifact.manifestCid}`);
+      console.log(`   artifact: ${STAKES_DECLARATION_PATH}`);
+      console.log(`   runtime (Q6): ELOHIM_NETWORK_STAKES=${artifact.operatorConfig.ELOHIM_NETWORK_STAKES}`);
+      // STAKES-DECLARATION-SEAM-Q6: when a manifest write route lands, POST this
+      // exact object to it here and log the response. Nothing else changes.
+    }
   }
 
   // ========================================

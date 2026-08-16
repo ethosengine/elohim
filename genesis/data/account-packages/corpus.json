@@ -1,0 +1,14 @@
+{
+  "id": "genesis-account-packages",
+  "title": "Genesis Account Packages",
+  "environment": "preproduction",
+  "realism": {
+    "rung": 0,
+    "why": "Generated artifact (account-package.ts) derived from genesis-humans + genesis-lamad: per-human reach levels, relationships, and stewardship allocations imported through the doorway. It inherits its rung from its sources and adds no independent act; the reciprocity and consent it describes are only real once authored at rung 3 on each persona's conductor."
+  },
+  "trustBootstrap": {
+    "stage": "simulacra",
+    "grantor": "human-adam-firstman",
+    "scope": "genesis-account-packages"
+  }
+}
