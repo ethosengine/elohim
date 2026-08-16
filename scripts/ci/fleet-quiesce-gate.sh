@@ -186,6 +186,15 @@ while :; do
 import json, os, re
 
 def caught_up(raw):
+    # Two satisfying shapes (2026-08-16, local-mesh measure evidence):
+    #   caughtUp === true            — the backfill shape (total>0, all fetched)
+    #   resolved-empty               — total==0 with pending==0 and failed==0 on an
+    #     INITIALIZED pull object (a null/absent `pull` still fails). The runtime
+    #     deliberately excludes total==0 from its own caughtUp ("zero is an
+    #     observation, not a default"); on a fresh-seed bring-up the whole corpus
+    #     arrives via replication/drain and the pull queue is never asked anything,
+    #     so gating on caughtUp alone is structurally unsatisfiable there. The
+    #     object being non-null proves at least one acquisition reconcile ran.
     if not raw:
         return False
     try:
@@ -195,7 +204,13 @@ def caught_up(raw):
     p = d.get("pull")
     if not isinstance(p, dict):
         return False
-    return p.get("caughtUp") is True
+    if p.get("caughtUp") is True:
+        return True
+    return (
+        p.get("total") == 0
+        and p.get("pending") == 0
+        and p.get("failed") == 0
+    )
 
 def metric_value(text, name):
     # Exact metric-name boundary — the char right after the name must be

@@ -106,6 +106,16 @@ CONTEST_BACKOFF_SECONDS="${MESH_CONTEST_BACKOFF:-120}"
 HEAL_MISSING_BACKOFF_SECONDS="${MESH_HEAL_MISSING_BACKOFF:-60}"
 ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS="${MESH_EVIDENCE_ABSENT_BACKOFF:-600}"
 ELOHIM_HEAD_CORPUS_DIGEST="${MESH_HEAD_CORPUS_DIGEST:-1}"
+# Adopt-before-author pre-flight ON for the mesh: without it cross-peer head
+# divergence has no adopt discharge and accumulates into contest grind (the
+# 2026-08-16 measure's 23→81 actionable plateau); the overnight converged run
+# had it live (adopt_peer canonical links). Prod default stays off.
+ELOHIM_ADOPT_BEFORE_AUTHOR="${MESH_ADOPT_BEFORE_AUTHOR:-1}"
+# Serialize adopt/contest declares on the mesh: concurrent declares race the
+# conductor source-chain head ("bundle head has moved", 2026-08-16 measure) and
+# every collision costs a fallback + next-sweep retry — fanout 1 lands first-try.
+# Declared profile difference vs alpha (6); attributed in the transfer ratio.
+ADOPT_CONTEST_FANOUT="${MESH_ADOPT_FANOUT:-1}"
 # Explicit preproduction Simulacra declaration for the local mesh's storage peers
 # (never a default — see the comment block above).
 ELOHIM_NETWORK_STAKES="${MESH_NETWORK_STAKES:-simulacra}"
@@ -379,6 +389,8 @@ PYEOF
       HEAL_MISSING_BACKOFF_SECONDS="$HEAL_MISSING_BACKOFF_SECONDS" \
       ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS="$ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS" \
       ELOHIM_HEAD_CORPUS_DIGEST="$ELOHIM_HEAD_CORPUS_DIGEST" \
+      ELOHIM_ADOPT_BEFORE_AUTHOR="$ELOHIM_ADOPT_BEFORE_AUTHOR" \
+      ADOPT_CONTEST_FANOUT="$ADOPT_CONTEST_FANOUT" \
       ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
       nohup "$STORAGE_BIN" --http-port "$(http_port $i)" > "$LOGDIR/$name.log" 2>&1 &
       echo "storage $name: http=$(http_port $i) p2p=$(p2p_port $i) agent=${agent:0:16}..."
