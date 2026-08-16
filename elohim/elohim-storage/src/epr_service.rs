@@ -672,7 +672,7 @@ impl EprService {
         app_ctx: &AppContext,
         human: &crate::db::models::Human,
         content_id: &str,
-        memo: Option<&dyn crate::trust::VerificationMemoStore>,
+        memo: Option<&(dyn crate::trust::VerificationMemoStore + Send + Sync)>,
         memo_active: bool,
     ) -> Result<(), String> {
         let evaluator_agent_cid = human

@@ -24,9 +24,20 @@
 //!   T7 — nothing calls `get`/`put` yet; T9 wires consumption).
 //! - [`manifest_resolver`] — `ManifestStakesResolver` (T10, IMPURE — diesel +
 //!   env; the production `StakesResolver` `stage.rs`'s doc comments defer to).
-//!   Constructed once at boot in `main.rs` and observed only (Q7 is the task
-//!   that lets a resolved stage change a pricing decision).
+//!   Constructed once at boot in `main.rs`; the reconcile sweep borrows it.
+//! - [`adoption_pricing`] — Q7's IMPURE **pricing consumption point**: the one
+//!   place a resolved stage changes what an adoption sweep does. It prices a
+//!   sweep's adopt slice and the head-plane arms consult the verdicts; the
+//!   WRITE path is untouched (declared heads still move only through the own
+//!   conductor's declare extern).
+//!
+//! Note the split this preserves: `inert()` remains the default at every call
+//! site that has not been given a resolver, and
+//! [`TrustGradient::declared`] is the only constructor that can produce a
+//! non-`FullChain` verdict — and only under an explicit `Simulacra`
+//! declaration.
 
+pub mod adoption_pricing;
 pub mod manifest_resolver;
 pub mod memo;
 pub mod pricer;
@@ -34,11 +45,12 @@ pub mod snapshot;
 pub mod snapshot_source;
 pub mod stage;
 
+pub use adoption_pricing::{price_adopt_slice, AdoptionPricingPlan};
 pub use manifest_resolver::ManifestStakesResolver;
 pub use memo::{InMemoryVerificationMemoStore, VerificationMemo, VerificationMemoStore};
 pub use pricer::{
-    FloorClass, InertPricer, PricedVerification, PricingInput, PricingReason, VerificationDepth,
-    VerificationPricer,
+    DeclaredStakesPricer, FloorClass, InertPricer, PricedVerification, PricingInput, PricingReason,
+    VerificationDepth, VerificationPricer,
 };
 pub use snapshot::{
     compare_epochs, head_set_delta, mint_snapshot, verify_snapshot, verify_wire_snapshot,
@@ -56,14 +68,21 @@ pub use stage::{FixedStakesResolver, NetworkStage, StakesProvenance, StakesResol
 /// [`crate::services::head_adoption::AdoptContext`]. IoC here is NOT via the
 /// `Services` registry (all-concrete); callers borrow exactly the seam
 /// pieces they need for the duration of one call, same as `AdoptContext`.
+///
+/// The `+ Send + Sync` bounds are on the BORROWS, not on the traits: a
+/// `TrustGradient` is held across an `.await` inside `tokio::spawn`ed reconcile
+/// sweeps (Q7), so the referents must be shareable. Constraining the traits
+/// themselves would be a stronger claim than the seam needs — a future
+/// single-threaded implementor stays legal, it just cannot ride a spawned
+/// sweep.
 pub struct TrustGradient<'a> {
-    pub stakes: &'a dyn StakesResolver,
-    pub pricer: &'a dyn VerificationPricer,
+    pub stakes: &'a (dyn StakesResolver + Send + Sync),
+    pub pricer: &'a (dyn VerificationPricer + Send + Sync),
     /// `None` means "no memo store wired" — every lookup misses, so the
     /// caller always falls through to full verification. This is the
     /// INERT default; a real store arrives `Arc`'d process-lifetime from
     /// `main.rs` in T7.
-    pub memo: Option<&'a dyn VerificationMemoStore>,
+    pub memo: Option<&'a (dyn VerificationMemoStore + Send + Sync)>,
 }
 
 impl TrustGradient<'_> {
@@ -77,6 +96,29 @@ impl TrustGradient<'_> {
         static PRICER: InertPricer = InertPricer;
         TrustGradient {
             stakes: stage::inert_stakes_resolver(),
+            pricer: &PRICER,
+            memo: None,
+        }
+    }
+}
+
+impl<'a> TrustGradient<'a> {
+    /// Q7's LIVE shape: a real [`StakesResolver`] joined to
+    /// [`DeclaredStakesPricer`].
+    ///
+    /// Still behavior-neutral by construction at every stage the resolver does
+    /// not resolve to `Simulacra` — `DeclaredStakesPricer` answers exactly what
+    /// [`InertPricer`] answers there
+    /// (`pricer::tests::declared_stakes_pricer_matches_inert_depth_at_every_non_simulacra_stage`).
+    /// The gradient only ever becomes observable through an explicit
+    /// declaration, which is the whole premise of the seam.
+    ///
+    /// `memo: None` — the head-plane consumer records no
+    /// [`VerificationMemo`] yet; see `adoption_pricing`'s module doc.
+    pub fn declared(stakes: &'a (dyn StakesResolver + Send + Sync)) -> TrustGradient<'a> {
+        static PRICER: DeclaredStakesPricer = DeclaredStakesPricer;
+        TrustGradient {
+            stakes,
             pricer: &PRICER,
             memo: None,
         }
@@ -106,6 +148,7 @@ mod tests {
             floor: FloorClass::None,
             reach: Reach::Commons,
             standing: Standing::Unknown,
+            provenance_carried: true,
         });
         assert_eq!(priced.depth, VerificationDepth::FullChain);
         assert_eq!(priced.reason, PricingReason::PricerInert);

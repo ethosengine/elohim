@@ -1788,6 +1788,72 @@ pub fn list_content_anchor_inventory(
     Ok((entries, total))
 }
 
+/// The projection facts ONE content id contributes to a trust-pricing decision
+/// (Q7, `trust::adoption_pricing`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContentHeadPricingRow {
+    pub id: String,
+    /// Raw reach string — parsed by
+    /// `services::floor_protections::content_head_floor_class`, never here. An
+    /// unparseable value must reach the classifier so it can decline to price
+    /// the id; swallowing it in this layer would fail OPEN.
+    pub reach: String,
+    /// The row's current declaration. `None` (undeclared) is the ONLY state in
+    /// which a peer-advertised head can be adopted directly — see
+    /// `head_adoption::decide_head_action`'s `AdoptPeer` corner.
+    pub declared_head_action_hash: Option<String>,
+}
+
+/// Batch-read the pricing inputs for a sweep's adopt slice — ONE local SQL
+/// read for the whole slice, ZERO conductor or peer round-trips.
+///
+/// This is deliberately a batch, not a per-id helper: the pricing decision
+/// exists to REMOVE round-trips, so buying one query per candidate to decide
+/// whether to skip one RPC per candidate would be self-defeating.
+///
+/// Ids absent from the result (no row for this `h_app_id`) are absent from the
+/// returned vec — the caller must treat an absent id as UNPRICEABLE (full
+/// verification), never as "no floor applies."
+///
+/// Chunked at 500 bound parameters, comfortably under SQLite's 999 default
+/// `SQLITE_MAX_VARIABLE_NUMBER`; the caller's slice is capped at
+/// `WITNESS_MAX_PER_TICK` (200) today, so this is defensive rather than load-
+/// bearing — but a future cap raise must not turn into a runtime bind error.
+pub fn content_head_pricing_inputs(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    ids: &[String],
+) -> Result<Vec<ContentHeadPricingRow>, StorageError> {
+    const CHUNK: usize = 500;
+    let mut out = Vec::with_capacity(ids.len());
+    for chunk in ids.chunks(CHUNK) {
+        let rows: Vec<(String, String, Option<String>)> = content::table
+            .filter(content::h_app_id.eq(&ctx.h_app_id))
+            .filter(content::id.eq_any(chunk))
+            .select((
+                content::id,
+                content::reach,
+                content::declared_head_action_hash,
+            ))
+            .load(conn)
+            .map_err(|e| {
+                StorageError::Internal(format!("content head pricing inputs load failed: {e}"))
+            })?;
+        out.extend(rows.into_iter().map(|(id, reach, declared)| {
+            ContentHeadPricingRow {
+                id,
+                reach,
+                // An empty-string declaration is a corrupt write, not a
+                // declaration — the same normalization
+                // `list_content_anchor_inventory` applies to the advertised
+                // hint, so the two sides of the AdoptPeer corner agree.
+                declared_head_action_hash: declared.filter(|h| !h.trim().is_empty()),
+            }
+        }));
+    }
+    Ok(out)
+}
+
 /// Head-plane corpus digest (T4, head-plane trust-gradient program plan §3
 /// L2): a stable fingerprint of every anchored, distribution-safe content
 /// row's `(id, dhtAnchorHash)` pair — the SAME relation

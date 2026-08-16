@@ -26,7 +26,7 @@ rules:
       is the ALREADY-DERIVED read model; nothing downstream should cache its own copy of
       a number that must always be recomputed from the live edge set.
   - id: stage-cannot-cheapen-the-floor
-    class: ask
+    class: dispatch
     when:
       write: "pricer.rs"
       contains-any: ["impl VerificationPricer", "fn price(", "FloorClass::"]
@@ -35,18 +35,26 @@ rules:
       every_in_crate_pricer_forces_full_chain_across_the_entire_product_space +
       conformance_harness_rejects_a_floor_cheapening_mutant +
       floor_forces_full_chain_even_at_simulacra)
+    parameters:
+      dispatch-agent: red-team
+      dispatch-prompt: >
+        Adversarially review the proposed pricer.rs change only. Verify that every non-None
+        FloorClass still forces FullChain at every NetworkStage, that every in-crate pricer is
+        registered in the product-space property test, and that the mutant/conformance tests
+        still cover the edited decision surface. Report a concise PASS or concrete counterexample
+        to the editing agent; do not edit files and do not broaden into a general architecture review.
     why: >
       THE safety keystone this program reviews before accepting any change here: a
       FloorClass other than None (Constitutional, LocalRelationship, CounterEvidence)
       forces VerificationDepth::FullChain at EVERY NetworkStage, including Simulacra —
       the "cheap dev/staging" stage is the one most tempted to cheapen it. Before landing
       a new VerificationPricer implementor or touching price()/FloorClass: (1) add the
-      new implementor to tests::in_crate_pricers so the 4x4x8x6=768-case property test
+      new implementor to tests::in_crate_pricers so the 4x4x8x6x2=1536-case property test
       actually exercises it — an implementor absent from that registry is invisible to
       the keystone; (2) re-run
       every_in_crate_pricer_forces_full_chain_across_the_entire_product_space and
       conformance_harness_rejects_a_floor_cheapening_mutant and confirm both still pass.
-      This is the strongest class this seam's rules carry (ask, not inject) because a
+      This is the strongest nonblocking review this seam's rules carry because a
       silent floor-cheapening regression here is exactly the failure mode
       trust-as-efficiency-signal.md exists to prevent: trust must reduce verification
       cost, never eliminate it where a floor applies.
@@ -111,14 +119,14 @@ This manifest is nested under elohim/elohim-storage/src/.epr-meta, which already
 covers: subtree for the whole src/ tree — these four rules are additive edit-time
 teaching on top of that coverage, not a separate coverage claim.
 
-## The four rules
+## The five rules
 
 - **no-stored-score** (inject) — catches a `pub score:`-shaped field anywhere in this
   seam, the exact drift memo.rs's own module doc names as what its .epr-meta rail
   exists to catch. Standing is always re-derived, never cached as a bare number.
-- **stage-cannot-cheapen-the-floor** (ask — the strongest class this manifest carries)
-  — any edit touching a VerificationPricer implementor, price(), or FloorClass prompts a
-  confirmation to re-run the keystone property test
+- **stage-cannot-cheapen-the-floor** (dispatch — nonblocking adversarial review)
+  — any edit touching a VerificationPricer implementor, price(), or FloorClass sends a
+  bounded review to red-team to check the keystone property test
   (every_in_crate_pricer_forces_full_chain_across_the_entire_product_space +
   conformance_harness_rejects_a_floor_cheapening_mutant) and to register any new
   implementor in tests::in_crate_pricers. A floor class other than None must force
@@ -132,10 +140,10 @@ teaching on top of that coverage, not a separate coverage claim.
   crates/trust-gradient (the module doc's named C13 successor) is a move, not a
   rewrite, and so the floor property test never needs a conductor to run.
 
-## Why ask, not deny, even for the floor rule
+## Why dispatch, not a pilot stop, even for the floor rule
 
-Per the .epr-meta skill's class ladder, deny is reserved for genuinely-broken states (a
-doc that cannot be linked into the substrate). Touching pricer.rs is not itself broken —
-the 768-case property test is the real enforcement, and it runs at cargo test time
-regardless of this rail. ask is the strongest class this manifest authors: one keystroke
-lets a deliberate, tested change through; it never blocks a fix-in-progress.
+Touching pricer.rs is not itself broken. The 768-case property test is the real
+enforcement, and it runs at cargo test time regardless of this rail. The review is
+therefore a sidecar: red-team reports a PASS or counterexample while the editing agent
+continues. The pilot is not asked to adjudicate a property the code and specialist review
+can prove directly.

@@ -151,15 +151,40 @@ impl ManifestRegistry {
             ) else {
                 continue;
             };
-            let supersedes = match new_stakes.get(scope) {
-                Some((_, _, existing_revision)) => row.revision > *existing_revision,
-                None => true,
-            };
-            if supersedes {
-                new_stakes.insert(
-                    scope.to_string(),
-                    (stage_raw.to_string(), row.cid.clone(), row.revision),
-                );
+            // SCOPE-KEY RECONCILIATION, leg 2 (Q7). A stakes declaration is
+            // scoped by CORPUS id (`genesis-lamad`), while the runtime resolves
+            // stakes by `h_app_id` (`lamad`) — so a grant keyed only by the
+            // corpus id can never match the traffic it was minted for. A
+            // declaration may therefore ALSO name the `h_app_id` it applies to,
+            // and when it does, it is indexed under BOTH keys.
+            //
+            // DECLARED, never inferred: no prefix-stripping, no
+            // `declaredBy`-path parsing, no substring match. The seeder does not
+            // emit `stakes.hAppId` today, so this leg is correct-but-dormant
+            // (leg 3, `ELOHIM_NETWORK_STAKES_SCOPE_ALIASES` in
+            // `trust::manifest_resolver`, is the operator-declared bridge until
+            // it does). When the seeder starts declaring it, the grant joins
+            // h_app_id traffic with zero Rust change.
+            //
+            // On a key collision between two rows (a corpus id and an h_app_id
+            // that happen to be the same string), the existing highest-revision
+            // rule arbitrates — the SAME rule, not a second one.
+            let h_app_id = stakes
+                .get("hAppId")
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty() && *s != scope);
+            for key in std::iter::once(scope).chain(h_app_id) {
+                let supersedes = match new_stakes.get(key) {
+                    Some((_, _, existing_revision)) => row.revision > *existing_revision,
+                    None => true,
+                };
+                if supersedes {
+                    new_stakes.insert(
+                        key.to_string(),
+                        (stage_raw.to_string(), row.cid.clone(), row.revision),
+                    );
+                }
             }
         }
         {

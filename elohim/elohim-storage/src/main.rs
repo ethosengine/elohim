@@ -3560,6 +3560,13 @@ async fn async_main(
     // to seal predecessor records in SQLite. In production, they should be loaded
     // from a persisted node-key file so predecessor records survive process
     // restart. See TODO(T22-followup) in api/epr.rs::UnsealingKeyBundle.
+    // Q7: the boot-resolved declared-stakes resolver, hoisted OUT of the
+    // `db_pool` block below so the projection-reconcile loop (spawned much
+    // later, outside that block) can borrow the SAME instance the HTTP layer
+    // gets. One env read, one registry cache — a route and a heal sweep must
+    // never disagree about the declared stage.
+    let mut reconcile_stakes_resolver: Option<Arc<elohim_storage::trust::ManifestStakesResolver>> =
+        None;
     if let Some(ref pool) = db_pool {
         use dryoc::classic::crypto_box::crypto_box_seed_keypair;
         use elohim_storage::api::epr::{EprFanOutCtx, SealingKeyPair, UnsealingKeyBundle};
@@ -3617,6 +3624,11 @@ async fn async_main(
             );
             resolver
         });
+        // Q7: the projection-reconcile heal leg is the FIRST consumer of the
+        // resolved stage — it borrows this same Arc per sweep to build a
+        // `TrustGradient`. Published to the hoisted binding because
+        // `network_stakes_resolver` is moved into the HTTP server below.
+        reconcile_stakes_resolver = network_stakes_resolver.clone();
 
         // Ephemeral 2-of-2 sealing keys for local dev.
         // TODO(T22-followup): load from persisted node-key file so predecessor
@@ -4379,6 +4391,10 @@ async fn async_main(
                 // flag skips a fresh spawn while one is still in flight.
                 let heal_inflight = StdArc::new(AtomicBool::new(false));
 
+                // Q7: moved into the reconcile loop so every heal sweep can
+                // borrow the boot-resolved declared-stakes resolver.
+                let reconcile_stakes = reconcile_stakes_resolver.clone();
+
                 tokio::spawn(async move {
                     use elohim_storage::p2p::projection_reconcile::{
                         heal_decision, run_discovery, run_heal, HealAction, InventoryWindow,
@@ -4455,6 +4471,11 @@ async fn async_main(
                                             // declaration, so it needs the same
                                             // handle discovery just used.
                                             let heal_p2p = handle.clone();
+                                            // Q7: the declared-stakes resolver,
+                                            // per-spawn clone of the ONE boot
+                                            // instance (see
+                                            // `reconcile_stakes_resolver`).
+                                            let heal_stakes = reconcile_stakes.clone();
                                             let flag = heal_inflight.clone();
                                             tokio::spawn(async move {
                                                 // RAII release: the guard's Drop
@@ -4467,6 +4488,25 @@ async fn async_main(
                                                 // any await — silently freezing every
                                                 // future heal tick fleet-wide.
                                                 let _guard = HealFlag(flag);
+                                                // Q7: build the borrowed trust
+                                                // seam for THIS sweep. No
+                                                // resolver (no DB at boot) ⇒
+                                                // inert ⇒ today's behavior; a
+                                                // resolver ⇒ the declared
+                                                // pricer, which is still
+                                                // FullChain at every stage but
+                                                // an explicit Simulacra
+                                                // declaration.
+                                                let trust = match heal_stakes.as_ref() {
+                                                    Some(r) => {
+                                                        elohim_storage::trust::TrustGradient::declared(
+                                                            r.as_ref(),
+                                                        )
+                                                    }
+                                                    None => {
+                                                        elohim_storage::trust::TrustGradient::inert()
+                                                    }
+                                                };
                                                 run_heal(
                                                     plan,
                                                     &hc,
@@ -4474,6 +4514,7 @@ async fn async_main(
                                                     &heal_state,
                                                     &heal_provide,
                                                     &heal_p2p,
+                                                    &trust,
                                                 )
                                                 .await;
                                             });

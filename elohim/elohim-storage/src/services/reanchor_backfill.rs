@@ -288,6 +288,11 @@ pub async fn run_once(
             // `Probe` for the same reason: this sweep has paid for neither read.
             crate::services::head_adoption::ElectionResolve::Probe,
             adopt,
+            // UNPRICED (Q7). The boot re-anchor pass runs before P2P discovery,
+            // so it has no peer hints and therefore no provenance to accept —
+            // the inert verdict is not a policy choice here, it is the only
+            // honest one.
+            crate::trust::PricedVerification::inert(),
         )
         .await;
         let pending_adopt = match preflight {

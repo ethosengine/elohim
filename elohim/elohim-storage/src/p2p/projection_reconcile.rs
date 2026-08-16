@@ -1870,6 +1870,11 @@ pub async fn run_discovery(
 /// (bulk-seeded, `dht_anchor_hash` NULL) so they can green. It rides this leg's
 /// single-flight guard + OnceLock conductor gate — never running bridge-absent
 /// or concurrently — and publishes its progress to `provide_state`.
+/// `trust` is the declared-stakes seam (Q7). `TrustGradient::inert()` is the
+/// behavior-neutral default and is what a node with no `ManifestStakesResolver`
+/// passes; `TrustGradient::declared(..)` joins the boot-resolved resolver to
+/// `DeclaredStakesPricer`, which still answers `FullChain` at every stage that
+/// is not an explicit `Simulacra` declaration.
 pub async fn run_heal(
     plan: SweepPlan,
     hc: &Arc<HcClient>,
@@ -1877,6 +1882,7 @@ pub async fn run_heal(
     state: &ProjectionReconcileState,
     provide_state: &ProvideLoopState,
     p2p: &P2PHandle,
+    trust: &crate::trust::TrustGradient<'_>,
 ) {
     let SweepPlan {
         rea,
@@ -2039,7 +2045,16 @@ pub async fn run_heal(
     // GapFill, and they are unreachable by both witness sweeps below (anchored,
     // and conductor-resolvable). Running them here is what turns the refusal
     // into convergence rather than into a permanent gap.
-    adopt_deferred_heads(hc, pool, &adopt_candidates, &adopt, &pacing, resolver).await;
+    adopt_deferred_heads(
+        hc,
+        pool,
+        &adopt_candidates,
+        &adopt,
+        &pacing,
+        resolver,
+        trust,
+    )
+    .await;
 
     // GAP 1.5: green the un-witnessed seeded corpus. Composed onto (not forked
     // from) the content arm — same conductor gate + single-flight guard.
@@ -2419,6 +2434,13 @@ async fn witness_ghost_anchors(
                 crate::services::head_adoption::LocalResolve::observed(None),
                 election_resolve,
                 adopt,
+                // UNPRICED (Q7). The ghost sweep's whole population is rows the
+                // own conductor answered EMPTY for; its convergence depends on
+                // the very election probe and evidence fetch that
+                // `AcceptWithProvenance` skips, so pricing it cheap would be
+                // removing the arm's only evidence. Deliberately full chain at
+                // every stage.
+                crate::trust::PricedVerification::inert(),
             )
             .await;
             let pending_adopt = match preflight {
@@ -4669,6 +4691,7 @@ async fn adopt_deferred_heads(
     adopt: &crate::services::head_adoption::AdoptContext<'_>,
     pacing: &HealPacing,
     resolver: &dyn crate::services::head_batch_resolver::HeadBatchResolver,
+    trust: &crate::trust::TrustGradient<'_>,
 ) {
     use futures::stream::StreamExt as _;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -4711,17 +4734,50 @@ async fn adopt_deferred_heads(
         compose_adopt_slice(eligible, deferred, pacing.witness_max_per_tick as usize);
     let attempted = work.len();
 
+    // ── TRUST PRICING (Q7) ───────────────────────────────────────────────────
+    //
+    // ONE local SQL read for the whole slice, and only under a declared
+    // Simulacra grant — pricing must never itself cost a round-trip, or it
+    // cannot pay for the ones it removes. Everywhere else this is a pure fold
+    // that answers `FullChain` for every id, so the two skips below are
+    // structurally unreachable and the sweep is byte-for-byte what it was.
+    let priced_ids: Vec<String> = work.iter().map(|c| c.id.clone()).collect();
+    let pricing = crate::trust::price_adopt_slice(pool, &app_ctx, &priced_ids, adopt.hints, trust);
+
     // ── PHASE 1: BATCH-PROBE THE ELECTIONS ───────────────────────────────────
     //
     // Only ids whose own-conductor head answer was ABSENT can be served by the
     // obey arm (`head_adoption::should_probe_election`), so only those are
     // asked. Scoping the probe here rather than inside the per-item loop is the
     // whole round-trip collapse: 200 probes become 2–4 calls.
+    //
+    // SKIP-POINT 1 (Q7), priced `AcceptWithProvenance`: an id the pricer
+    // accepted is one whose local row declares NOTHING while a peer advertises
+    // a declaration — the `AdoptPeer` corner of `decide_head_action`, which is
+    // reached whether or not an election is visible. Probing its election
+    // therefore buys a conductor round-trip whose answer the declared grant has
+    // already decided not to re-derive. The id's `ElectionResolve` becomes
+    // `unresolved()`, which is the SAME routing a never-answered batch id gets
+    // (`election_resolve_for`) — the obey arm falls through and the decision
+    // rule runs, so nothing is claimed and nothing is held.
+    //
+    // Note what is NOT skipped: an accepted id still pays the own-conductor
+    // HEAD resolve the heal leg already made (it is what built the candidate),
+    // and still pays the declare. Only the EVIDENCE probe goes.
     let probe_ids: Vec<String> = work
         .iter()
-        .filter(|c| crate::services::head_adoption::should_probe_election(c.head.is_some()))
+        .filter(|c| {
+            should_batch_probe_election(c.head.is_some(), pricing.accepts_with_provenance(&c.id))
+        })
         .map(|c| c.id.clone())
         .collect();
+    let election_probes_skipped = work
+        .iter()
+        .filter(|c| {
+            crate::services::head_adoption::should_probe_election(c.head.is_some())
+                && pricing.accepts_with_provenance(&c.id)
+        })
+        .count();
     let elections = batch_probe_elections(resolver, pacing, &probe_ids, "adopt-deferred").await;
 
     // Atomics, not locals: they live OUTSIDE the future the budget may cancel,
@@ -4733,6 +4789,7 @@ async fn adopt_deferred_heads(
 
     let app_ctx_ref = &app_ctx;
     let elections_ref = &elections;
+    let pricing_ref = &pricing;
     let (adopted_ref, contested_ref, held_ref, retry_ref) = (&adopted, &contested, &held, &retry);
 
     let sweep = futures::stream::iter(work.iter().copied()).for_each_concurrent(
@@ -4768,6 +4825,11 @@ async fn adopt_deferred_heads(
                 local_resolve,
                 election_resolve,
                 adopt,
+                // SKIP-POINT 2 (Q7) rides in here: an `AcceptWithProvenance`
+                // verdict tells the `AdoptPeer` arm to declare the advertised
+                // head without the per-id `ContentHeadRecord` verify RPC. The
+                // write path is unchanged either way.
+                pricing_ref.for_id(id),
             )
             .await
             {
@@ -4800,6 +4862,31 @@ async fn adopt_deferred_heads(
             // rather than guessing a constant.)
         },
     );
+
+    // TRUST-PRICING SWEEP SUMMARY (Q7). Emitted BEFORE the per-item sweep runs
+    // (and therefore before the wall-clock budget can cut it short), because
+    // the pricing is complete by this point and cost no conductor call — so a
+    // budget-elapsed sweep still says exactly what it priced. `info!` (not
+    // `warn!`) and only when a grant actually compressed something: a Bootstrap
+    // fleet must not log a line per sweep saying nothing happened.
+    if pricing.compressed_anything() {
+        tracing::info!(
+            target: "elohim_storage::projection_reconcile",
+            scope = %pricing.scope,
+            stage = ?pricing.stage,
+            provenance = ?pricing.provenance,
+            priced = attempted,
+            accept_with_provenance = pricing.accept_with_provenance,
+            delta_verify = pricing.delta_verify,
+            full_chain = pricing.full_chain,
+            unpriceable = pricing.unpriceable,
+            election_probes_skipped,
+            "projection-reconcile[adopt-deferred]: trust-priced this sweep's adopt slice — \
+             accept_with_provenance candidates skip the per-id election probe and the peer \
+             ContentHeadRecord verify RPC; the declare→stamp write path is unchanged \
+             (canonical channels alone move declared heads)"
+        );
+    }
 
     let budget_elapsed = tokio::time::timeout(pacing.witness_sweep_budget, sweep)
         .await
@@ -4856,6 +4943,29 @@ async fn adopt_deferred_heads(
          of those actually rode the reserved tail this sweep — the field that makes \
          'priority, not exclusion' checkable instead of asserted)"
     );
+}
+
+/// SKIP-POINT 1 as a pure predicate (Q7): should phase 1 spend an election
+/// probe on this candidate?
+///
+/// Two independent gates, ANDed:
+///
+/// 1. `head_adoption::should_probe_election` — the pre-existing scope rule
+///    (only a candidate whose own conductor gave NO head answer can be served
+///    by the obey arm). Unchanged, and still the outer gate.
+/// 2. NOT priced `AcceptWithProvenance` — the declared grant has decided not to
+///    re-derive an election for a candidate whose advertised declaration is
+///    directly adoptable.
+///
+/// Pure + total, matching the sibling routing predicates in this file
+/// (`gapfill_would_self_elect`, `should_probe_election`), because the scope rule
+/// is the part worth testing without a conductor.
+///
+/// **Contract tests:** [`tests::an_accepted_candidate_skips_its_election_probe`],
+/// [`tests::pricing_never_widens_the_probe_scope`].
+fn should_batch_probe_election(head_answer_present: bool, accepts_with_provenance: bool) -> bool {
+    crate::services::head_adoption::should_probe_election(head_answer_present)
+        && !accepts_with_provenance
 }
 
 /// PHASE 1 of the two-phase head-plane arms: resolve every probe-eligible id's
@@ -7381,6 +7491,40 @@ mod tests {
             );
             // With nothing truncated, EVERY deferred candidate is still in the slice.
             assert_eq!(deferred_in_slice, deferred_n.min(cap - eligible_n));
+        }
+    }
+
+    /// SKIP-POINT 1 (Q7): a candidate the trust gradient accepted with
+    /// provenance does not spend an election probe. It is the ONLY thing the
+    /// pricing verdict removes from phase 1 — the outer scope rule is
+    /// untouched.
+    #[test]
+    fn an_accepted_candidate_skips_its_election_probe() {
+        // head absent (probe-eligible) + accepted -> skipped.
+        assert!(!should_batch_probe_election(false, true));
+        // head absent + not accepted -> probed, exactly as before Q7.
+        assert!(should_batch_probe_election(false, false));
+    }
+
+    /// The pricing verdict can only ever NARROW the probe scope, never widen
+    /// it: a candidate whose conductor DID answer is out of scope for the obey
+    /// arm and stays out regardless of what the pricer said.
+    #[test]
+    fn pricing_never_widens_the_probe_scope() {
+        for accepted in [false, true] {
+            assert!(
+                !should_batch_probe_election(true, accepted),
+                "a head-present candidate must never be probed (accepted={accepted})"
+            );
+        }
+        // And the composed predicate is exactly the old one when nothing is
+        // accepted — the behavior-neutral case.
+        for head_present in [false, true] {
+            assert_eq!(
+                should_batch_probe_election(head_present, false),
+                crate::services::head_adoption::should_probe_election(head_present),
+                "unpriced behavior must be byte-identical (head_present={head_present})"
+            );
         }
     }
 

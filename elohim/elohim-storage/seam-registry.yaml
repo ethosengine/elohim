@@ -1373,23 +1373,201 @@ decisionPoints:
         testName: simulacra_is_never_produced_without_an_explicit_declaration
         kind: unit
 
+  - name: should_batch_probe_election
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/p2p/projection_reconcile.rs
+      modulePath: p2p::projection_reconcile::should_batch_probe_election
+      line: 4966
+    summary: >
+      SKIP-POINT 1 of the Q7 ceremony compression — should phase 1 of the adopt sweep spend a
+      conductor election probe on this candidate? head_adoption::should_probe_election (the
+      pre-existing scope rule: only a candidate whose own conductor gave NO head answer) ANDed
+      with NOT priced AcceptWithProvenance. The pricing verdict can only NARROW the probe scope;
+      with nothing accepted the predicate is byte-identical to the pre-Q7 one. A skipped id's
+      ElectionResolve becomes unresolved(), which is the SAME routing a never-answered batch id
+      already gets (election_resolve_for) — never a claim, never a hold.
+    concernIds:
+      - id: C6a
+        status: answered
+        justification: >
+          Strictly removes round-trips from a fixed-size slice; the cap, the fan-out, and the
+          120s wall-clock budget are untouched.
+      - id: C4
+        status: answered
+        justification: >
+          A skipped probe produces no answer state at all — the id routes through
+          ElectionResolve::unresolved(), which asserts nothing about whether an election exists.
+    contractTests:
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: an_accepted_candidate_skips_its_election_probe
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: pricing_never_widens_the_probe_scope
+        kind: unit
+
+  - name: adopt_peer_with_provenance
+    kind: verdict-fn
+    sourceLocation:
+      file: src/services/head_adoption.rs
+      modulePath: services::head_adoption::adopt_peer_with_provenance
+      line: 1694
+    summary: >
+      SKIP-POINT 2 of the Q7 ceremony compression — declare a peer's ADVERTISED head through the
+      OWN conductor with no ContentHeadRecord verify RPC. The write path is byte-identical to the
+      full-chain arm (declare_peer_head -> call_declare_canonical_content_head_classed ->
+      stamp_declared_head_mode with StampMode::Declare over the CONDUCTOR's answer); only the
+      per-id evidence fetch is removed. Bounded by the path it replaces: an Author /
+      AuthorThenAdopt outcome (the conductor could not stand the declaration up itself) triggers
+      ONE fallback that buys the skipped evidence and re-offers the same declare, so worst-case
+      cost equals full chain and never exceeds it.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          Nothing is stamped from the advertised pair — the conductor's declare_canonical_head
+          answer is still the only thing written, and select_canonical_winner still arbitrates.
+          The skip removes this node's re-derivation of the courier's claim, never the notary's.
+      - id: C6a
+        status: answered
+        justification: >
+          At most one extra declare + one evidence resolution on the fallback leg, once, never a
+          retry ladder — the same bounded shape declare_peer_head's own evidence retry already
+          carries.
+    contractTests: null
+    gapNote: >
+      Not unit-tested directly: the branch requires an HcClient (a live conductor), which this
+      crate has no in-process double for. What IS pinned without one — the gate that reaches this
+      function (trust::adoption_pricing's seven pricing tests, incl. the floor and
+      already-declared refusals) and PricedVerification::accepts_with_provenance (the single
+      predicate every consumer reads,
+      trust::pricer::tests::priced_verification_inert_is_exactly_the_inert_pricer_answer). The
+      untested half is the fallback's ordering, which the local hc-mesh measure exercises.
+
+  - name: price_adopt_slice
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/trust/adoption_pricing.rs
+      modulePath: trust::adoption_pricing::price_adopt_slice
+      line: 160
+    summary: >
+      Q7's PRICING CONSUMPTION POINT — the one place a resolved NetworkStage changes what a
+      head-plane adoption sweep does. Prices one sweep's adopt slice from ONE local SQL read
+      (content.reach -> floor_protections::content_head_floor_class, plus
+      content.declared_head_action_hash) and the sweep's peer hint window; no conductor call and
+      no peer call, because pricing must never itself cost a round-trip. An AcceptWithProvenance
+      verdict is emitted ONLY in the AdoptPeer corner (a peer advertises a declaration AND the
+      local row declares nothing) under an explicit Simulacra declaration on an unprotected
+      floor. It licenses exactly two SKIPS in projection_reconcile::adopt_deferred_heads /
+      head_adoption::adopt_peer — the per-id election probe and the per-id ContentHeadRecord
+      verify RPC — and NEVER touches write authority: declared heads still move only through the
+      own conductor's declare_canonical_head extern and content_diesel::stamp_declared_head_mode.
+      The projection read is UNCONDITIONAL (adversarial review 2026-08-16): an earlier shape
+      skipped it at non-Simulacra stages and handed the pricer fabricated permissive inputs
+      (floor None / reach Commons), which a trait-conformant future pricer on the dyn seam could
+      have cheapened against. Every PricingInput is now derived from the real row at every stage,
+      and VerificationPricer carries a stated STAGE obligation (non-Simulacra => FullChain) pinned
+      registry-wide. Every DECISION outside an explicit Simulacra declaration is therefore
+      unchanged; the only new cost at those stages is one read-only primary-key SELECT per sweep.
+    concernIds:
+      - id: C12
+        status: answered
+        justification: >
+          Floor protection is proven END TO END here, not only in the pricer unit: the floor class
+          is read from the real projection rather than hardcoded OR fabricated, at every stage;
+          an unclassifiable reach is refused a price entirely (full chain by refusal, counted
+          apart as `unpriceable`, and comparable across stages because the read is
+          unconditional); and a DB failure yields an empty row map — i.e. full chain — so no
+          error path can cheapen.
+      - id: C8
+        status: answered
+        justification: >
+          Every priced decision increments elohim_trust_priced_adoptions_total{depth}, whose three
+          labels are pre-touched at registration so accept_with_provenance reads as a measured
+          zero rather than an absent series; the per-sweep info! line names scope, stage,
+          provenance and the accept/full/unpriceable split plus election_probes_skipped.
+    contractTests:
+      - path: elohim/elohim-storage/src/trust/adoption_pricing.rs
+        testName: a_simulacra_declaration_prices_an_adoptable_hinted_id_accept_with_provenance
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/adoption_pricing.rs
+        testName: a_private_reach_row_is_never_priced_cheap_even_at_simulacra
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/adoption_pricing.rs
+        testName: an_unparseable_reach_is_refused_a_price
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/adoption_pricing.rs
+        testName: an_already_declared_row_is_never_priced_cheap
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/adoption_pricing.rs
+        testName: an_unhinted_id_is_never_priced_cheap
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/adoption_pricing.rs
+        testName: every_non_simulacra_stage_prices_the_whole_slice_full_chain
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/adoption_pricing.rs
+        testName: the_inert_pricer_never_cheapens_even_under_a_simulacra_declaration
+        kind: unit
+
+  - name: content_head_floor_class
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/floor_protections.rs
+      modulePath: services::floor_protections::content_head_floor_class
+      line: 56
+    summary: >
+      Maps a content projection row's raw reach string onto the FloorClass that applies to its
+      head-adoption decision, via the canonical services::epr_kind::parse_reach_key (never a
+      second reach vocabulary). Returns None for an UNCLASSIFIABLE reach — the caller must then
+      decline to price the id at all, because a floor that cannot be evaluated is not a floor
+      that can be shown absent. LocalRelationship is the reachable floor on this plane;
+      Constitutional and CounterEvidence are not content rows and are deliberately never emitted
+      here, while the pricer keeps refusing to cheapen them so a future supplier is protected
+      without a change to this predicate.
+    concernIds:
+      - id: C12
+        status: answered
+        justification: >
+          Fail-closed by construction — an unparseable reach yields None (no price) rather than
+          FloorClass::None (priceable), which is the fail-open the typed Reach on PricingInput
+          exists to prevent.
+    contractTests:
+      - path: elohim/elohim-storage/src/trust/adoption_pricing.rs
+        testName: a_private_reach_row_is_never_priced_cheap_even_at_simulacra
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/adoption_pricing.rs
+        testName: an_unparseable_reach_is_refused_a_price
+        kind: unit
+
   - name: VerificationPricer::price
     kind: verdict-fn
     sourceLocation:
       file: src/trust/pricer.rs
       modulePath: trust::pricer::VerificationPricer::price
       line: 113
-    summary: Prices (stage, floor, reach, standing) into (depth, reason). THE safety invariant — floor != None forces FullChain at EVERY stage including Simulacra. InertPricer is the only shipped implementor.
+    summary: Prices (stage, floor, reach, standing, provenance_carried) into (depth, reason). THE safety invariant — floor != None forces FullChain at EVERY stage including Simulacra. Two shipped implementors — InertPricer (always FullChain) and DeclaredStakesPricer (Q7; AcceptWithProvenance only under an explicit Simulacra declaration, on an unprotected decision point that actually carries provenance).
     concernIds:
       - id: C12
         status: answered
-        justification: every_in_crate_pricer_forces_full_chain_across_the_entire_product_space iterates the full 4x4x8x6=768-case product; conformance_harness_rejects_a_floor_cheapening_mutant proves the harness has teeth.
+        justification: every_in_crate_pricer_forces_full_chain_across_the_entire_product_space iterates the full 4x4x8x6x2=1536-case product for BOTH implementors (registered via tests::in_crate_pricers); conformance_harness_rejects_a_floor_cheapening_mutant proves the harness has teeth; declared_stakes_pricer_labels_a_floor_save_as_floor_protected pins that a floor save is labelled as one rather than as an absent declaration.
     contractTests:
       - path: elohim/elohim-storage/src/trust/pricer.rs
         testName: every_in_crate_pricer_forces_full_chain_across_the_entire_product_space
         kind: unit
       - path: elohim/elohim-storage/src/trust/pricer.rs
+        testName: every_in_crate_pricer_is_full_chain_at_every_non_simulacra_stage
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/pricer.rs
         testName: conformance_harness_rejects_a_floor_cheapening_mutant
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/pricer.rs
+        testName: every_pricing_dimension_is_covered_by_its_array
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/pricer.rs
+        testName: declared_stakes_pricer_matches_inert_depth_at_every_non_simulacra_stage
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/pricer.rs
+        testName: declared_stakes_pricer_labels_a_floor_save_as_floor_protected
         kind: unit
 
   - name: PricingReason
@@ -1398,11 +1576,11 @@ decisionPoints:
       file: src/trust/pricer.rs
       modulePath: trust::pricer::PricingReason
       line: 84
-    summary: Closed, countable outcome vocabulary for a pricing decision — single-variant today (PricerInert), legitimate per seam_contracts::ReasonLabel's own doc.
+    summary: Closed, countable outcome vocabulary for a pricing decision — PricerInert (the inert default) plus the four DeclaredStakesPricer answers (FloorProtected, StageRequiresFullChain, NoProvenanceCarried, DeclaredSimulacraProvenance), so "why is nothing cheapening?" is answered by a label rather than by reading the source.
     concernIds:
       - id: C8
         status: answered
-        justification: pricing_reason_is_reason_label_conformant asserts trait conformance and label stability.
+        justification: pricing_reason_is_reason_label_conformant asserts trait conformance and pins all five labels for stability.
     contractTests:
       - path: elohim/elohim-storage/src/trust/pricer.rs
         testName: pricing_reason_is_reason_label_conformant

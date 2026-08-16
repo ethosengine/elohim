@@ -270,6 +270,7 @@ use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
 use crate::hc_client::HcClient;
 use crate::services::conductor_writes::{self, ContentHeadWire};
+use crate::trust::pricer::PricedVerification;
 
 /// Zome guard substring meaning "I cannot declare a head for this id because I
 /// have no local content chain for it" (`content_store::declare_canonical_head_inner`).
@@ -1344,6 +1345,24 @@ pub enum AdoptOutcome {
 
 /// Pre-flight for ONE content id. Never errors: every failure degrades to
 /// [`AdoptOutcome::Author`] (or `Held`) and is retried on the next sweep.
+///
+/// `priced` is the trust gradient's verdict for THIS id
+/// (`trust::adoption_pricing`). [`PricedVerification::inert`] — full chain — is
+/// what every call site passed before Q7 and what the boot and ghost sweeps
+/// still pass, so the parameter is a visible, greppable statement of which
+/// paths are priced rather than an invisible default. The ONLY thing a
+/// non-inert verdict may change is verification DEPTH; it never widens write
+/// authority, and the declare→stamp path below is identical either way.
+///
+/// The `too_many_arguments` allow is a stated decision, not a suppression: the
+/// three "what the caller already paid for" parameters (`local_resolve`,
+/// `election_resolve`, `priced`) are cohesive and want a `PreflightEvidence<'a>`
+/// bundle, which is the right follow-up — but bundling them rewrites this
+/// crate's most-referenced signature and its prose, so it is a deliberate
+/// standalone change rather than a rider on the pricing landing. The same
+/// allow appears at ten comparable orchestration boundaries in this crate
+/// (`reconcile::custody`, `services::replicates_dwelling_service`, ...).
+#[allow(clippy::too_many_arguments)]
 pub async fn try_adopt_canonical_head(
     hc: &Arc<HcClient>,
     pool: &DbPool,
@@ -1352,6 +1371,7 @@ pub async fn try_adopt_canonical_head(
     local_resolve: LocalResolve<'_>,
     election_resolve: ElectionResolve<'_>,
     adopt: &AdoptContext<'_>,
+    priced: PricedVerification,
 ) -> AdoptOutcome {
     // (0) What does this row already claim? A pool failure is not a licence to
     // author — treat an unreadable row as declared (Hold) so a transient DB
@@ -1508,7 +1528,7 @@ pub async fn try_adopt_canonical_head(
         }
         HeadDecision::AdoptPeer => {
             let hint = hint.expect("AdoptPeer implies a hint");
-            adopt_peer(hc, pool, ctx, id, hint, adopt.fetcher).await
+            adopt_peer(hc, pool, ctx, id, hint, adopt.fetcher, priced).await
         }
         HeadDecision::ContestPeer => {
             let hint = hint.expect("ContestPeer implies a hint");
@@ -1599,6 +1619,32 @@ fn adopt_local(pool: &DbPool, ctx: &AppContext, id: &str, head: &ContentHeadWire
 /// Verified-fetch a peer's head record, then declare it through the OWN
 /// conductor. Returns [`AdoptOutcome::AuthorThenAdopt`] when the conductor
 /// refuses for lack of a local chain.
+///
+/// # SKIP-POINT 2 (Q7): the per-id `ContentHeadRecord` verify RPC
+///
+/// When `priced` is `AcceptWithProvenance` the evidence fetch below is SKIPPED
+/// entirely — one view-federation round-trip per candidate, plus up to
+/// `config::evidence_fallback_max_alternates` more on the courier ladder. The
+/// declare then runs record-less, on the peer's ADVERTISED head hash.
+///
+/// **What that does and does not give up.** It gives up the peer serving the
+/// bytes that PROVE the advertised action, i.e. this node's own re-derivation
+/// of the courier's claim. It does NOT give up verification: the record-less
+/// declare succeeds only if this conductor can retrieve the target itself, and
+/// the declaration is still minted by `declare_canonical_head` and arbitrated
+/// by `select_canonical_winner` on the DHT. The write path is byte-identical —
+/// `StampMode::Declare` over the CONDUCTOR's answer, never over the hint. That
+/// is exactly what "the declared grant lets us accept the peer's provenance
+/// instead of re-deriving it" means, and it is why the skip is licensed by a
+/// declared stage rather than by a config flag.
+///
+/// **Bounded by the path it replaces.** If the conductor cannot retrieve the
+/// target (`ERR_NOT_RETRIEVABLE`) or has no local chain (`ERR_NO_LOCAL_CHAIN`),
+/// the skip would have turned a convergence into a root-mint — strictly worse
+/// than full chain. So it falls back ONCE: buy the evidence that was skipped
+/// and re-offer the declare. Worst case is therefore the full-chain cost, never
+/// more, and the common case (a fixture corpus the conductor already holds)
+/// pays nothing.
 async fn adopt_peer(
     hc: &Arc<HcClient>,
     pool: &DbPool,
@@ -1606,7 +1652,11 @@ async fn adopt_peer(
     id: &str,
     hint: &PeerHeadHint,
     fetcher: Option<&dyn HeadRecordFetcher>,
+    priced: PricedVerification,
 ) -> AdoptOutcome {
+    if priced.accepts_with_provenance() {
+        return adopt_peer_with_provenance(hc, pool, ctx, id, hint, fetcher).await;
+    }
     // Verified fetch: ask the ADVERTISING peer for the serialized Record behind
     // its head. Absent fetcher (boot pass) or an old peer that cannot serve one
     // both degrade to a record-less declare, which succeeds iff this conductor
@@ -1630,6 +1680,80 @@ async fn adopt_peer(
     };
 
     declare_peer_head(hc, pool, ctx, id, &head_action_hash, carried_record, hint).await
+}
+
+/// The `AcceptWithProvenance` half of [`adopt_peer`] — declare the peer's
+/// ADVERTISED head through the own conductor with NO evidence round-trip, and
+/// fall back to the full-chain path exactly once if the conductor cannot serve
+/// the declaration itself.
+///
+/// Kept as its own function rather than as branches inside `adopt_peer` so the
+/// compressed path is readable end-to-end and so the fallback cannot be
+/// mistaken for a retry ladder: it is one re-offer of the SAME declare with the
+/// evidence the fast path chose not to buy.
+async fn adopt_peer_with_provenance(
+    hc: &Arc<HcClient>,
+    pool: &DbPool,
+    ctx: &AppContext,
+    id: &str,
+    hint: &PeerHeadHint,
+    fetcher: Option<&dyn HeadRecordFetcher>,
+) -> AdoptOutcome {
+    let outcome = declare_peer_head(
+        hc,
+        pool,
+        ctx,
+        id,
+        &hint.head_action_hash,
+        // NO carried record — the skip. The conductor still verifies what it
+        // declares; nothing is stamped from the advertised pair.
+        None,
+        hint,
+    )
+    .await;
+
+    // `Author` / `AuthorThenAdopt` are the two outcomes that mean "this
+    // conductor could not stand the declaration up on its own" — precisely the
+    // cases the skipped bytes exist to serve. Everything else (Adopted, Held,
+    // Contested) is a settled answer the evidence could not improve.
+    if !matches!(
+        outcome,
+        AdoptOutcome::Author | AdoptOutcome::AuthorThenAdopt { .. }
+    ) {
+        return outcome;
+    }
+
+    let (carried, _evidence) = resolve_peer_evidence(fetcher, hint, id).await;
+    let Some(carried) = carried else {
+        // No courier could serve the bytes either — the record-less answer
+        // stands, exactly as the full-chain path's own no-bytes case would.
+        tracing::debug!(
+            target: "elohim_storage::head_adoption",
+            content_id = %id,
+            from_peer = %hint.peer_id,
+            "accept-with-provenance: the record-less declare did not stand and no courier \
+             served the Record either — same outcome the full-chain path would have reached"
+        );
+        return outcome;
+    };
+    tracing::info!(
+        target: "elohim_storage::head_adoption",
+        content_id = %id,
+        from_peer = %hint.peer_id,
+        "accept-with-provenance: the record-less declare did not stand (this conductor could \
+         not retrieve the head itself) — buying the evidence the fast path skipped and \
+         re-offering the declare ONCE; total cost is bounded by the full-chain path"
+    );
+    declare_peer_head(
+        hc,
+        pool,
+        ctx,
+        id,
+        &carried.head_action_hash,
+        carried.record,
+        hint,
+    )
+    .await
 }
 
 /// ELECTION-OBEY: move a row to the head the DHT elected, when this conductor can

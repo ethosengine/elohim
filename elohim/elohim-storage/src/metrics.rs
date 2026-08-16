@@ -502,6 +502,26 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Head-plane adoption decisions the trust gradient PRICED, by the
+    /// verification depth it chose (Q7 — `trust::adoption_pricing`).
+    ///
+    /// This is the probe that says whether ceremony compression is actually
+    /// biting. `accept_with_provenance` moving means a declared Simulacra
+    /// grant is removing per-id evidence round-trips (the election probe and
+    /// the peer `ContentHeadRecord` fetch); a fleet sitting entirely on
+    /// `full_chain` is verifying exactly as it did before the seam existed.
+    /// `delta_verify` is a measured zero on this consumer — the head plane has
+    /// no delta path to route to, and the series exists so that stays visible
+    /// rather than absent.
+    pub static ref TRUST_PRICED_ADOPTIONS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_trust_priced_adoptions_total",
+            "Head-plane adoption decisions priced by the trust gradient, by verification depth.",
+        ),
+        &["depth"],
+    )
+    .unwrap();
+
     /// Rows whose head MOVED to obey a DHT election this node could SEE but
     /// could not resolve locally — the last-mile of convergence for the
     /// conductor-missing class.
@@ -1825,6 +1845,19 @@ pub fn register_all() {
                     .inc_by(0);
             }
         }
+        let _ = REGISTRY.register(Box::new(TRUST_PRICED_ADOPTIONS.clone()));
+        {
+            use seam_contracts::ReasonLabel as _;
+            // Pre-touch all three depths so a fleet that has never cheapened
+            // anything reads as a MEASURED zero on `accept_with_provenance`,
+            // not as a missing series (the difference between "the grant is
+            // not biting" and "the seam was never deployed here").
+            for depth in TrustPricedDepth::ALL {
+                TRUST_PRICED_ADOPTIONS
+                    .with_label_values(&[depth.label()])
+                    .inc_by(0);
+            }
+        }
         let _ = REGISTRY.register(Box::new(CONTENT_ELECTION_OBEYED.clone()));
         CONTENT_ELECTION_OBEYED
             .with_label_values(&["carried"])
@@ -2900,6 +2933,53 @@ impl seam_contracts::ReasonLabel for AdoptSweepOutcome {
             AdoptSweepOutcome::BudgetElapsed => "budget_elapsed",
         }
     }
+}
+
+/// The verification depth a trust-priced adoption decision chose — the label
+/// vocabulary of [`TRUST_PRICED_ADOPTIONS`], as a closed type.
+///
+/// A mirror of `trust::pricer::VerificationDepth`, kept SEPARATE for the same
+/// reason every other label vocabulary in this file is: `metrics` owns the wire
+/// strings a dashboard queries, and a rename in the domain enum must be a
+/// deliberate decision here rather than a silent series rename.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrustPricedDepth {
+    /// The declared grant licensed accepting carried provenance — the per-id
+    /// evidence round-trips were skipped.
+    AcceptWithProvenance,
+    /// Verify only what changed. No head-plane consumer routes here today.
+    DeltaVerify,
+    /// Re-derive and verify everything — today's behavior, and the answer at
+    /// every stage that is not an explicit Simulacra declaration.
+    FullChain,
+}
+
+impl seam_contracts::ReasonLabel for TrustPricedDepth {
+    const ALL: &'static [Self] = &[
+        TrustPricedDepth::AcceptWithProvenance,
+        TrustPricedDepth::DeltaVerify,
+        TrustPricedDepth::FullChain,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            TrustPricedDepth::AcceptWithProvenance => "accept_with_provenance",
+            TrustPricedDepth::DeltaVerify => "delta_verify",
+            TrustPricedDepth::FullChain => "full_chain",
+        }
+    }
+}
+
+/// Count ONE priced adoption decision at the depth the pricer chose.
+///
+/// **Concerns:** C8 — every priced decision is counted, including the
+/// full-chain ones, so `accept_with_provenance / (sum of all)` reads directly
+/// as the share of the sweep the declared grant actually compressed.
+pub fn inc_trust_priced_adoption(depth: TrustPricedDepth) {
+    use seam_contracts::ReasonLabel as _;
+    TRUST_PRICED_ADOPTIONS
+        .with_label_values(&[depth.label()])
+        .inc();
 }
 
 /// Count one completed adopt sweep by how it ended.
