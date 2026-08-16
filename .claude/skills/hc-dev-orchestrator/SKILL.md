@@ -49,10 +49,30 @@ just mesh stop
 ```
 
 `mesh quiesce` measures an already-running mesh and records its bounded result
-under `${MESH_DIR:-/tmp/elohim-local-mesh}`. It never starts or stops peers.
-The underlying maintained interfaces are `hc-mesh.sh start|stop|status|probe`
-and `hc-mesh-quiesce.sh`; do not copy their pacing environment into new npm
-aliases.
+(one line per run, including the wall-clock, verdict, knobs and an io_baseline
+write-throughput probe) under `${MESH_DIR:-/tmp/elohim-local-mesh}`. It never
+starts or stops peers. The underlying maintained interfaces are
+`hc-mesh.sh start|stop|status|probe` and `hc-mesh-quiesce.sh`; do not copy
+their pacing environment into new npm aliases.
+
+The mesh runs a declared dev-tier pacing profile (a preproduction-stakes
+declaration, never a prod default) exported to the storage peers by
+`hc-mesh.sh` — each knob overridable via its `MESH_*` twin:
+`PROJECTION_RECONCILE_SECS=30`, `CONTEST_BACKOFF_SECONDS=120`,
+`HEAL_MISSING_BACKOFF_SECONDS=60`, `ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS=600`,
+`ELOHIM_HEAD_CORPUS_DIGEST=1`, `ELOHIM_ADOPT_BEFORE_AUTHOR=1` (cross-peer
+head divergence has no adopt discharge without it), `ADOPT_CONTEST_FANOUT=1`
+(concurrent declares race the conductor chain head; serialized lands
+first-try), `ELOHIM_NETWORK_STAKES=simulacra` (the explicit Simulacra
+declaration). The conductor side gets kitsune2 `k2Gossip` intervals patched
+to 1000ms test cadence post-generate. The profile block in `hc-mesh.sh` is
+the authoritative knob list.
+
+`just mesh monitor` (hc-mesh-monitor.py, port 4210 via the `mesh-monitor`
+devfile endpoint; honors `MESH_MONITOR_PORT`) serves the one-page live
+dashboard: component liveness, per-peer convergence gauges, a gate-legs
+panel mirroring `fleet-quiesce-gate.sh`'s exact PASS predicate, log tails,
+and a phase/progress status bar.
 
 ## Build and gate
 

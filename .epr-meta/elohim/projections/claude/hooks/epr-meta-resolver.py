@@ -460,8 +460,9 @@ def main():
     # Dispatch side-channel (never blocks, class dispatch): the NEW capability this slice adds —
     # pre-slice, a fired `class: dispatch` verdict was silently dropped (never messaged, never
     # witnessed). Independent of the overall decision, same as measures — witnessed even when a
-    # deny/ask elsewhere wins; the directive text only reaches the model when dispatch itself is
-    # the winning (permitting) outcome, since a deny/ask response has no room for it.
+    # deny/ask elsewhere wins. Every PERMIT outcome carries all dispatch directives; an unrelated
+    # inject advisory must not shadow the reviewer obligation. Refuse/refer still omit directives
+    # because those responses have no permitting continuation to review.
     if result["dispatches"]:
         for v in result["dispatches"]:
             rule = merged["rules"].get(v.rule_id, {}) if merged else {}
@@ -469,7 +470,7 @@ def main():
             _witness(root, subject=fp, decision="permit", cls="dispatch", rule_id=v.rule_id,
                      policy_ref=rule.get("policy-ref"),
                      checks=[f"dispatch-agent={params.get('dispatch-agent', '?')}"])
-        if result["cls"] == "dispatch":
+        if result["decision"] == "permit":
             advisories += _handle_dispatches(result["dispatches"], merged, fp)
 
     decision = result["decision"]
