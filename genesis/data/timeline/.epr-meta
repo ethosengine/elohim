@@ -4,9 +4,15 @@ id: timeline-data-governance
 purpose: "Timeline data (backlog, chronicle, roadmap). Every new entry carries id + kind so it is citable and schema-typed (see CONVENTIONS.md)."
 rules:
   - id: timeline-entry-frontmatter
-    class: ask
+    class: dispatch
     when: { write: "*.md", new: true }
     require-frontmatter: [id, kind]
+    parameters:
+      dispatch-agent: librarian
+      dispatch-prompt: >
+        Check this new timeline entry against CONVENTIONS.md, identify the missing id/kind fields
+        and any likely existing artifact it duplicates, then report a minimal correction to the
+        editing agent. Do not edit or expand the document.
     why: "New timeline entries need `id` (citation slug) and `kind` (schema type). See genesis/data/timeline/CONVENTIONS.md."
 ---
 # timeline data — backlog / chronicle / roadmap

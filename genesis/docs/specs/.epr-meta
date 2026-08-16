@@ -4,9 +4,15 @@ id: docs-specs-legacy-routing
 purpose: "Legacy/parallel specs dir. New design specs belong in the governed home genesis/docs/superpowers/specs/ (full lifecycle gate)."
 rules:
   - id: route-specs-to-governed-home
-    class: ask
+    class: dispatch
     when: { write: "*.md", new: true }
     route-to: { dest: genesis/docs/superpowers/specs/ }
+    parameters:
+      dispatch-agent: librarian
+      dispatch-prompt: >
+        Confirm whether this is genuinely a new specification and name the governed destination
+        or an existing artifact to merge into. Report ROUTE, MERGE, or DROP to the editing agent;
+        do not move or create files and do not derail implementation.
     why: "New specs go to genesis/docs/superpowers/specs/ where the lifecycle frontmatter gate lives — not this ungoverned legacy dir."
 ---
 # docs/specs (legacy)

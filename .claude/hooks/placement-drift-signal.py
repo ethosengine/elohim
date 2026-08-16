@@ -25,6 +25,8 @@ Hook Type: PostToolUse
 Matcher: Edit|Write
 """
 
+from __future__ import annotations
+
 # The intervenor's removal condition (Meadows' shifting-the-burden trap;
 # counted by _lib/intervenor_census.py). A condition, never a date.
 RETIRE_WHEN = (
@@ -34,7 +36,6 @@ RETIRE_WHEN = (
     "that stock holds in dynamic equilibrium (emission/absorption <= 1.0, turnover bounded) for "
     "a quarter."
 )
-from __future__ import annotations
 
 import json
 import os

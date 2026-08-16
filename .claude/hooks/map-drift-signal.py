@@ -30,6 +30,8 @@ Hook Type: PostToolUse
 Matcher: Edit|Write
 """
 
+from __future__ import annotations
+
 # The intervenor's removal condition (Meadows' shifting-the-burden trap;
 # counted by _lib/intervenor_census.py). A condition, never a date.
 RETIRE_WHEN = (
@@ -37,7 +39,6 @@ RETIRE_WHEN = (
     "them — a derived map cannot go stale relative to its sources, so a staleness tripwire over "
     "it has no subject."
 )
-from __future__ import annotations
 
 import json
 import os

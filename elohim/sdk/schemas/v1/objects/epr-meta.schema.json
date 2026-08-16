@@ -23,9 +23,15 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "class"],
+        "required": ["id"],
+        "oneOf": [
+          { "required": ["class"], "not": { "required": ["policy"] } },
+          { "required": ["policy"], "not": { "required": ["class"] } }
+        ],
         "properties": {
           "id": { "type": "string" },
+          "policy": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*@[1-9][0-9]*$" },
+          "params": { "type": "object" },
           "class": { "type": "string", "enum": ["deny", "ask", "inject", "measure", "dispatch"] },
           "why": { "type": "string" },
           "when": { "type": "object" },
@@ -37,6 +43,11 @@
           "dedupe-of": { "type": "string" },
           "max-files": { "type": "object" },
           "measure": { "type": "object" },
+          "parameters": {
+            "type": "object",
+            "description": "Dispatch-side configuration such as dispatch-agent and dispatch-prompt; it does not replace the rule's actionable predicate."
+          },
+          "retire-when": { "type": ["string", "object"] },
           "validator": { "type": "string" }
         }
       }

@@ -13,9 +13,15 @@ rules:
   - id: memory-frontmatter-at-birth
     policy: memory-frontmatter-at-birth@1
   - id: memory-index-is-generated
-    class: ask
+    class: dispatch
     when: { write: "MEMORY.md" }
     dedupe-of: .claude/scripts/memory-kit/memory-index-projector.py
+    parameters:
+      dispatch-agent: librarian
+      dispatch-prompt: >
+        Check whether this MEMORY.md edit belongs in a topic file's title/description frontmatter
+        and identify the exact source file or projector command that should own it. Report the
+        correction to the editing agent without editing files; do not pause the current task.
     why: >
       MEMORY.md is GENERATED — hand edits are overwritten on the next projection. Put the
       change in the topic file's title:/description: frontmatter, then run

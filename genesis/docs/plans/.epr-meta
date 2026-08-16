@@ -4,9 +4,15 @@ id: docs-plans-legacy-routing
 purpose: "Legacy/parallel plans dir (stalled since May). New plans belong in genesis/docs/superpowers/plans/ where the gate lives."
 rules:
   - id: route-plans-to-governed-home
-    class: ask
+    class: dispatch
     when: { write: "*.md", new: true }
     route-to: { dest: genesis/docs/superpowers/plans/ }
+    parameters:
+      dispatch-agent: librarian
+      dispatch-prompt: >
+        Confirm whether this is genuinely a new plan and name the governed destination or an
+        existing artifact to merge into. Report ROUTE, MERGE, or DROP to the editing agent; do not
+        move or create files and do not derail implementation.
     why: "New plans go to genesis/docs/superpowers/plans/ (governed) — not this stalled legacy dir."
 ---
 # docs/plans (legacy)

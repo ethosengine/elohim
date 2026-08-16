@@ -39,6 +39,15 @@ policies:
     scope: { write: "*.md", new: true }
     require-frontmatter: [name]
     why: unrecallable.
+  - id: routed-review
+    version: 1
+    class: dispatch
+    scope: { write: "*.md", new: true }
+    dedupe-of: README.md
+    parameters:
+      dispatch-agent: librarian
+      dispatch-prompt: review for duplication
+    why: keep the corpus lean.
 """
 
 
@@ -60,7 +69,7 @@ with tempfile.TemporaryDirectory() as td:
     # ── load_policies ──
     pols, errs = epr_meta.load_policies(tmp)
     check("load_policies keys by id@version, no errors",
-          set(pols) == {"loc-ceiling@1", "fm-at-birth@1"} and errs == [])
+          set(pols) == {"loc-ceiling@1", "fm-at-birth@1", "routed-review@1"} and errs == [])
     check("load_policies: missing registry is legitimate → ({}, [])",
           epr_meta.load_policies(Path(td) / "nowhere") == ({}, []))
     (tmp / epr_meta.POLICY_REGISTRY_REL).write_text(
@@ -124,6 +133,12 @@ with tempfile.TemporaryDirectory() as td:
     check("binding carries the policy's actionable predicate (require-frontmatter)",
           m["rules"]["fm"]["require-frontmatter"] == ["name"]
           and m["rules"]["fm"]["class"] == "deny")
+    m = _merged([{"id": "review", "policy": "routed-review@1",
+                  "params": {"dispatch-agent": "cartographer"}}])
+    epr_meta.expand_policies(m, pols)
+    check("dispatch binding preserves policy prompt and permits a local reviewer override",
+          m["rules"]["review"]["parameters"] == {
+              "dispatch-agent": "cartographer", "dispatch-prompt": "review for duplication"})
     m = _merged([{"id": "ghost", "policy": "no-such@1"}])
     errs = epr_meta.expand_policies(m, pols)
     check("unknown policy → rule DROPPED + loud error",
@@ -239,6 +254,21 @@ with tempfile.TemporaryDirectory() as td:
     check("resolver: soft ceiling → inject advisory", "soft LoC ceiling" in ctx)
     ctx2 = run_resolver(w_soft).get("additionalContext", "")
     check("resolver: soft advisory debounced on repeat", "soft LoC ceiling" not in ctx2)
+
+    # An inject and a dispatch may fire on the same permitting write. The advisory must compose
+    # with the reviewer directive instead of shadowing it.
+    (tmp / ".epr-meta").write_text(
+        "---\nepr-meta-version: 1\nid: r\nroot: true\nrules:\n"
+        "  - id: note\n    class: inject\n    when: { write: '*.md' }\n"
+        "    dedupe-of: README.md\n    why: advisory\n"
+        "  - id: review\n    class: dispatch\n    when: { write: '*.md' }\n"
+        "    dedupe-of: README.md\n    parameters: { dispatch-agent: librarian, "
+        "dispatch-prompt: 'review it' }\n    why: sidecar\n---\n")
+    combo = run_resolver({"tool_name": "Write", "tool_input": {
+        "file_path": str(tmp / "combo.md"), "content": "body"}})
+    combo_ctx = combo.get("additionalContext", "")
+    check("resolver: inject advisory composes with dispatch directive",
+          "advisory" in combo_ctx and "DISPATCH NOW" in combo_ctx and "librarian" in combo_ctx)
 
     # ── ledger race: N threads filing the SAME fingerprint concurrently → exactly one row ──
     import importlib.util

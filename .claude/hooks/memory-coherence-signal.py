@@ -22,6 +22,8 @@ Hook Type: PostToolUse
 Matcher: Edit|Write
 """
 
+from __future__ import annotations
+
 # The intervenor's removal condition (Meadows' shifting-the-burden trap;
 # counted by _lib/intervenor_census.py). A condition, never a date.
 RETIRE_WHEN = (
@@ -29,7 +31,6 @@ RETIRE_WHEN = (
     "checks its own citations) rather than accumulated as drift between sweeps — the signal is "
     "a proxy for a check that happens too late."
 )
-from __future__ import annotations
 
 import fnmatch
 import json

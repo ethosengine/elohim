@@ -1473,8 +1473,9 @@ def load_policies(repo_root: Path) -> tuple[dict, list[str]]:
 
 def expand_policies(merged: dict, policies: dict) -> list[str]:
     """Resolve `policy:` bindings in merged rules to concrete rules, in place. The policy owns
-    class / predicates / measure defaults / why; the binding owns `when` override + `params`
-    (merged over the policy's `measure`). An unknown or unpinned ref DROPS the rule and reports —
+    class / predicates / measure or dispatch defaults / why; the binding owns `when` override +
+    `params` (merged over the policy's `measure` or dispatch `parameters`). An unknown or unpinned
+    ref DROPS the rule and reports —
     fail-loud-not-silent (a deny that silently vanishes is silent-allow). An inline rule whose id
     shadows a registry policy id gets a dedupe advisory. Idempotent: already-expanded rules
     (carrying `policy-ref`) pass through untouched."""
@@ -1520,6 +1521,11 @@ def expand_policies(merged: dict, policies: dict) -> list[str]:
         for k in _ACTIONABLE_KEYS:
             if k in pol:
                 exp[k] = pol[k]
+        if exp["class"] == "dispatch":
+            params = dict(pol.get("parameters") or {})
+            params.update(rule.get("params") or {})
+            if params:
+                exp["parameters"] = params
         m = dict(pol.get("measure") or {})
         m.update(rule.get("params") or {})
         if m:

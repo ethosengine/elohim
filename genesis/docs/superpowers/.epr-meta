@@ -13,15 +13,27 @@ rules:
     why: "No doc born without id + status + cites (the .epr-meta law)."
     retire-when: "when doc frontmatter is GENERATED at creation by the scaffolding path (cite-gen minting id/status/cites) rather than hand-authored — a doc without it becomes unconstructible, and a gate against an unconstructible shape is dead weight"
   - id: ssr-doorway-boundary
-    class: ask
+    class: dispatch
     when: { write: "*ssr*.md", contains-any: ["doorway"], new: true }
     dedupe-of: genesis/docs/superpowers/specs/2026-07-30-render-delivery-manifest-adapter-design.md
+    parameters:
+      dispatch-agent: rust-architect
+      dispatch-prompt: >
+        Review only the proposed SSR/doorway boundary against the render-delivery adapter spec
+        section 3e. Report ALIGNED or the exact sentence that wrongly makes doorway a render
+        dependency. Do not edit files or redesign adjacent architecture.
     why: "Doorway is a projector, never a render dependency — the renderer is an optional feature of the peer runtime (storage `ssr` feature), and a zero-doorway mesh must retain full SSR delivery. The boundary is settled in the render-delivery adapter spec §3e; frame the serving side as 'serving peer' and cite that spec rather than re-deriving doorway-as-SSR-dependency."
     retire-when: "when the render-delivery adapter spec §3e is cited by every live SSR doc and the boundary has gone two consecutive quarters without being re-derived — a settled boundary nobody re-opens needs no teacher"
   - id: render-doorway-boundary
-    class: ask
+    class: dispatch
     when: { write: "*render*.md", contains-any: ["doorway"], new: true }
     dedupe-of: genesis/docs/superpowers/specs/2026-07-30-render-delivery-manifest-adapter-design.md
+    parameters:
+      dispatch-agent: rust-architect
+      dispatch-prompt: >
+        Review only the proposed render/doorway boundary against the render-delivery adapter spec
+        section 3e. Report ALIGNED or the exact sentence that wrongly makes doorway a render
+        dependency. Do not edit files or redesign adjacent architecture.
     why: "Doorway is a projector, never a render dependency — the renderer is an optional feature of the peer runtime (storage `ssr` feature), and a zero-doorway mesh must retain full SSR delivery. The boundary is settled in the render-delivery adapter spec §3e; frame the serving side as 'serving peer' and cite that spec rather than re-deriving doorway-as-SSR-dependency."
     retire-when: "same condition as ssr-doorway-boundary, and they should retire together — two `when` patterns over one settled boundary, not two boundaries"
 validators: []

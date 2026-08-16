@@ -21,6 +21,8 @@ Hook Type: PostToolUse
 Matcher: Edit|Write
 """
 
+from __future__ import annotations
+
 # The intervenor's removal condition (Meadows' shifting-the-burden trap;
 # counted by _lib/intervenor_census.py). A condition, never a date.
 RETIRE_WHEN = (
@@ -28,7 +30,6 @@ RETIRE_WHEN = (
     "than by edit-count pressure — the counter approximates 'enough has changed to re-read "
     "this', and a real trigger retires the approximation."
 )
-from __future__ import annotations
 
 import json
 import math

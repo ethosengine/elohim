@@ -81,9 +81,10 @@ Before you commit a rule, run it through five questions. If it fails any, it's n
 1. **Does it name a *real, recurring* drift you have actually seen here?** Not a hypothetical. The rule
    is the canon you write *after* cleaning the drift the first (or third) time. No lived drift → no rule.
 2. **Is it the *lightest intervention* that addresses the drift?** The ladder is `inject` (advise) →
-   `ask` (prompt — *prevention starts here*; only `ask`/`deny` can actually block) → `deny` (block).
-   Most directory hygiene wants `ask`. Reaching for `deny` first is the anti-pattern — it traps the
-   fix-path and (by convention) demands an operator round-trip for a concern a prompt would have solved.
+   `dispatch` (continue + named background reviewer) → `ask` (stop for the pilot) → `deny` (block).
+   Most directory hygiene wants `dispatch`: placement, duplication, generated-file discipline,
+   architecture coaching, and ontology review are advisor work. Reserve `ask` for consequential
+   authority, confidentiality, resource, irreversibility, or genuine unresolved vision decisions.
 3. **Does its `why:` teach the fix?** The author hits the `why:` *as an instruction* — it must name the
    destination, the missing field, the canonical path. "Plans live in `plans/`, not `specs/`" converges;
    "invalid location" nags.
@@ -130,7 +131,6 @@ currently fire on nothing.** Treat them as documentation of intent, not enforcem
 |---|---|---|
 | `allowed-types: [globs]` | **Phantom** — no `_eval_rule` branch; validates clean, counts as "actionable", produces no verdict | express the intent with `route-to` (misplaced type → dest) or `require-frontmatter`; do **not** rely on `allowed-types` to block anything |
 | `measure: { count, emit }` / `max-files: {…}` | **Inert** — only the LoC-ceiling keys (`loc-soft`/`loc-hard`) are wired; count-shaped measures and `max-files` produce no verdict | if you need a count signal now, emit it from a deterministic script into `.claude/data/*.jsonl` |
-| `class: dispatch` | **Inert** — no host-side background fire runs (the `measure` hard-ceiling directive instructs the *session agent* to dispatch; the hook never spawns) | use `inject` for an advisory; defer true dispatch to the wiring slice |
 | `max-cascade-depth: N` (top-level) | **Inert** — `collect_cascade` always bounds on the hardcoded `MAX_CASCADE_DEPTH = 32`; the per-manifest key is parsed and discarded (there is no "default 8") | rely on `root: true` to terminate the cascade; the depth cap is a fixed 32 you cannot tune per-directory |
 | `extends: <path>` (top-level) | **Inert** — the cascade parent is pure filesystem ancestry; `extends:` is never read (a non-ancestor pointer is a silent no-op) | place a directory under the governed tree to inherit; shared/non-ancestor governance is a deferred slice |
 | self-hardening `bad-rule` override counter | **Not wired** — overrides aren't counted | rely on review |
@@ -139,20 +139,19 @@ currently fire on nothing.** Treat them as documentation of intent, not enforcem
 **Enforcement classes (the ladder, per rule):**
 
 - `deny` — block the write.
-- `ask` — prompt; the human can proceed. The workhorse for directory hygiene.
+- `ask` — stop for the pilot. Consequential decisions only.
 - `inject` — advise and proceed (adds context, never blocks). Free to author.
 - `measure` — the observation tier: never blocks, feeds signal ledgers. **Live for LoC ceilings**
   (soft → debounced nudge; hard → fingerprinted architecture finding + dispatch directive, the
   flag→agent→canon→stasis shape). Count-shaped measures remain reserved.
-- `dispatch` — **Reserved** (above).
+- `dispatch` — permit plus a mandatory named background-review directive. The current session agent
+  launches it through the Agent tool; the hook itself cannot spawn an agent process.
 
-> **Authority is a norm, not a wired gate.** Convention: an agent may author `inject`/`ask` rules
-> autonomously; a new `deny` is a governance act → you should **surface it to the operator and let them
-> ratify** before relying on it. But be clear-eyed: **nothing in v1 enforces this.** A `deny` rule binds
-> the moment the `.epr-meta` lands on disk — `collect_cascade` reads it on the very next write — and
-> authoring an `.epr-meta` is itself currently ungoverned (no rule matches the `.epr-meta` basename).
-> There is no safety net catching an over-aggressive `deny`; the discipline is yours. That is exactly
-> why question 4 above pushes you toward `ask`.
+> **Authority is gate-enforced.** Agents may author `inject`/`measure`/`dispatch` rules autonomously.
+> Introducing `ask` or `deny` requires a version-pinned registry policy with deliberation provenance;
+> the repo-root `governance-escalation-ladder` routes an unbacked introduction to pilot review. This is
+> also the interruption budget: routine judgment belongs in dispatch, and a new pilot stop must name
+> the consequential authority it protects.
 
 ## The policy registry — define once, bind many
 
@@ -221,8 +220,9 @@ For the directory in front of you:
    existing directory, and can't see an inline `#[cfg(test)]` test. When no predicate fits the actual
    drift, decline and document.
 
-4. **Pick the lightest class that addresses it.** Default to `ask`. Justify any `deny` and surface it
-   to the operator (a convention you uphold — the gate won't).
+4. **Pick the lightest class that addresses it.** Default routine judgment to `dispatch` with an
+   existing packaged agent and a bounded, report-only prompt. Use `ask` only when the editing agent and
+   reviewer cannot safely decide for the pilot; `ask` and `deny` require a ratified policy binding.
 5. **Write the `why:` as the fix instruction** — name the dest/field/path the author needs.
 6. **Scope the `when:`.** `write: "<glob>"` matches the **filename only** (basename, case-insensitive).
    Add `new: true` for birth-time concerns. Add `contains-any: [...]` for content-triggered rules

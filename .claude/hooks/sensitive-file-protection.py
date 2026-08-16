@@ -14,23 +14,20 @@ import os
 import re
 from pathlib import Path
 
-# Files that should be BLOCKED (never edit automatically)
-BLOCKED_PATTERNS = [
-    r'\.env$',
-    r'\.env\.[^/]+$',
+# Sensitive paths are context, not proof. Path names alone never interrupt development; a
+# high-confidence content detector below owns the operator boundary. This avoids treating
+# `.env.example`, public certificates, test fixtures, and identifiers named `private_key` as
+# secrets while still warning the editing agent to inspect the destination carefully.
+WARN_PATTERNS = [
+    r'\.env(?:\.[^/]+)?$',
     r'credentials\.json$',
     r'secrets?\.json$',
-    r'\.pem$',
-    r'\.key$',
+    r'\.(?:pem|key)$',
     r'/\.ssh/',
     r'/secrets/',
     r'/private/',
     r'id_rsa',
     r'id_ed25519',
-]
-
-# Files that should trigger a WARNING (proceed with caution)
-WARN_PATTERNS = [
     r'Jenkinsfile$',           # May contain credential references
     r'\.gitlab-ci\.yml$',
     r'docker-compose.*\.yml$',
@@ -41,15 +38,32 @@ WARN_PATTERNS = [
     r'flake\.lock$',           # Nix lock file
 ]
 
-# Specific patterns in content that indicate secrets
-SECRET_CONTENT_PATTERNS = [
-    r'password\s*[=:]\s*["\'][^"\']+["\']',
-    r'api[_-]?key\s*[=:]\s*["\'][^"\']+["\']',
-    r'secret\s*[=:]\s*["\'][^"\']+["\']',
-    r'token\s*[=:]\s*["\'][^"\']+["\']',
-    r'private[_-]?key',
-    r'BEGIN\s+(RSA|EC|OPENSSH)\s+PRIVATE\s+KEY',
-]
+# Detector IDs are safe to disclose in hook output. The matched values never are.
+PRIVATE_KEY_BLOCK = re.compile(
+    r"-----BEGIN\s+(?:(?:RSA|EC|OPENSSH|DSA|ENCRYPTED)\s+)?PRIVATE\s+KEY-----",
+    re.IGNORECASE,
+)
+LIVE_TOKEN_PATTERNS = {
+    "github-token": re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}\b"),
+    "github-fine-grained-token": re.compile(r"\bgithub_pat_[A-Za-z0-9_]{40,}\b"),
+    "aws-access-key": re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"),
+    "slack-token": re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{20,}\b"),
+    "stripe-live-key": re.compile(r"\b(?:sk|rk)_live_[A-Za-z0-9]{20,}\b"),
+}
+ASSIGNMENT = re.compile(
+    r'''(?imx)
+    ["']?(?P<name>
+      password|passwd|pwd|api[_-]?key|secret(?:[_-]?key)?|access[_-]?token|
+      refresh[_-]?token|auth[_-]?token|client[_-]?secret|private[_-]?key
+    )["']?\s*(?:=|:)\s*
+    (?P<quote>["']?)(?P<value>[^\s,"'\]}#;]+)(?P=quote)
+    ''',
+)
+PLACEHOLDER_WORDS = {
+    "", "changeme", "change-me", "dummy", "example", "fake", "fixture", "placeholder",
+    "redacted", "replace-me", "secret", "test", "todo", "unset", "your-key-here",
+}
+PLACEHOLDER_FRAGMENTS = ("example", "dummy", "fake", "fixture", "placeholder", "redact", "test-")
 
 
 def matches_pattern(file_path: str, patterns: list) -> tuple[bool, str]:
@@ -60,12 +74,33 @@ def matches_pattern(file_path: str, patterns: list) -> tuple[bool, str]:
     return False, ""
 
 
+def _looks_like_live_value(value: str) -> bool:
+    """Precision-biased secret-value test. Ambiguous short values remain advisory-only."""
+    value = value.strip().strip('"\'')
+    lowered = value.lower()
+    if lowered in PLACEHOLDER_WORDS or any(part in lowered for part in PLACEHOLDER_FRAGMENTS):
+        return False
+    if value.startswith(("${", "{{", "<")) or lowered.startswith(("env:", "vault:")):
+        return False
+    if len(value) < 20:
+        return False
+    classes = sum(
+        bool(re.search(pattern, value))
+        for pattern in (r"[a-z]", r"[A-Z]", r"\d", r"[^A-Za-z0-9]")
+    )
+    return classes >= 2 and len(set(value)) >= 8
+
+
 def check_content_for_secrets(content: str) -> list[str]:
-    """Check if content contains potential secrets."""
+    """Return redaction-safe IDs for high-confidence secret material only."""
     found = []
-    for pattern in SECRET_CONTENT_PATTERNS:
-        if re.search(pattern, content, re.IGNORECASE):
-            found.append(pattern)
+    if PRIVATE_KEY_BLOCK.search(content):
+        found.append("private-key-block")
+    for detector_id, pattern in LIVE_TOKEN_PATTERNS.items():
+        if pattern.search(content):
+            found.append(detector_id)
+    if any(_looks_like_live_value(match.group("value")) for match in ASSIGNMENT.finditer(content)):
+        found.append("high-entropy-secret-assignment")
     return found
 
 
@@ -88,48 +123,45 @@ def main():
         except ValueError:
             rel_path = file_path
 
-        # Check for blocked patterns
-        is_blocked, blocked_pattern = matches_pattern(file_path, BLOCKED_PATTERNS)
-        if is_blocked:
-            output = {
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": "deny",
-                    "permissionDecisionReason": f"BLOCKED: '{rel_path}' matches sensitive file pattern '{blocked_pattern}'. This file likely contains secrets or credentials and should not be modified automatically. If you need to modify this file, please ask the user to do it manually."
-                }
-            }
-            print(json.dumps(output))
-            sys.exit(0)
-
-        # Check for warning patterns
-        is_warning, warn_pattern = matches_pattern(file_path, WARN_PATTERNS)
-        if is_warning:
-            # Don't block, but add context
-            output = {
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "additionalContext": f"CAUTION: '{rel_path}' is a sensitive configuration file (matched: {warn_pattern}). Proceed carefully and verify changes don't expose secrets."
-                }
-            }
-            print(json.dumps(output))
-            sys.exit(0)
-
         # For Write/Edit operations, check if new content contains secrets
         # (Edit carries the pasted text in new_string — the 2026-07-02 review
         # found the Edit path entirely uninspected).
         if tool_name in ('Write', 'Edit'):
             content = tool_input.get('content') or tool_input.get('new_string') or ''
-            secret_patterns = check_content_for_secrets(content)
-            if secret_patterns:
+            detector_ids = check_content_for_secrets(content)
+            if detector_ids:
                 output = {
                     "hookSpecificOutput": {
                         "hookEventName": "PreToolUse",
                         "permissionDecision": "ask",
-                        "permissionDecisionReason": f"WARNING: The content being written to '{rel_path}' appears to contain sensitive data (matched patterns: {', '.join(secret_patterns[:3])}). Please confirm this is intentional."
+                        "permissionDecisionReason": (
+                            f"CONFIDENTIALITY STOP: the proposed content for '{rel_path}' contains "
+                            "high-confidence secret material (detectors: "
+                            f"{', '.join(detector_ids[:3])}). The matched value is intentionally "
+                            "redacted. Confirm whether writing real credential/private-key material "
+                            "is authorized."
+                        )
                     }
                 }
                 print(json.dumps(output))
                 sys.exit(0)
+
+        # A sensitive-looking path or deployment config is useful context, but path names and
+        # credential references are not secret material. Advise without stopping development.
+        is_warning, warn_pattern = matches_pattern(file_path, WARN_PATTERNS)
+        if is_warning:
+            output = {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "additionalContext": (
+                        f"CAUTION: '{rel_path}' is a sensitive configuration path "
+                        f"(matched: {warn_pattern}). No high-confidence secret material was "
+                        "detected; proceed carefully."
+                    )
+                }
+            }
+            print(json.dumps(output))
+            sys.exit(0)
 
         # No issues found
         sys.exit(0)

@@ -1,34 +1,33 @@
 {
  "jobs": {
-  "elohim": 1665,
-  "elohim-edge": 1353,
-  "elohim-genesis": 1476,
-  "elohim-holochain": 1397,
-  "elohim-orchestrator": 1683,
+  "elohim": 1666,
+  "elohim-edge": 1359,
+  "elohim-genesis": 1483,
+  "elohim-holochain": 1399,
+  "elohim-orchestrator": 1693,
   "elohim-sophia": 146,
   "elohim-steward": 1,
-  "elohim-storybook": 276
+  "elohim-storybook": 277
  },
  "green": {
-  "elohim-holochain": 1397,
+  "elohim-holochain": 1399,
   "elohim-sophia": 146,
-  "elohim-storybook": 275,
+  "elohim-storybook": 277,
   "elohim": 1608,
-  "elohim-edge": 1348,
+  "elohim-edge": 1355,
   "elohim-orchestrator": 1469
  },
  "green_streak": {
   "elohim": 0,
   "elohim-edge": 0,
-  "elohim-storybook": 0,
+  "elohim-storybook": 1,
   "elohim-orchestrator": 0,
   "elohim-genesis": 0,
-  "elohim-holochain": 13,
+  "elohim-holochain": 1,
   "elohim-sophia": 1
  },
  "recent": {
   "elohim": [
-   "UNSTABLE",
    "ABORTED",
    "UNSTABLE",
    "ABORTED",
@@ -42,16 +41,11 @@
    "UNSTABLE",
    "UNSTABLE",
    "FAILURE",
+   "UNSTABLE",
    "UNSTABLE"
   ],
   "elohim-edge": [
    "SUCCESS",
-   "SUCCESS",
-   "SUCCESS",
-   "SUCCESS",
-   "ABORTED",
-   "SUCCESS",
-   "SUCCESS",
    "ABORTED",
    "SUCCESS",
    "SUCCESS",
@@ -59,6 +53,12 @@
    "UNSTABLE",
    "FAILURE",
    "FAILURE",
+   "UNSTABLE",
+   "SUCCESS",
+   "SUCCESS",
+   "UNSTABLE",
+   "UNSTABLE",
+   "UNSTABLE",
    "UNSTABLE"
   ],
   "elohim-storybook": [
@@ -75,34 +75,27 @@
    "SUCCESS",
    "SUCCESS",
    "SUCCESS",
-   "SUCCESS",
-   "ABORTED"
+   "ABORTED",
+   "SUCCESS"
   ],
   "elohim-orchestrator": [
+   "UNSTABLE",
+   "UNSTABLE",
+   "FAILURE",
    "FAILURE",
    "UNSTABLE",
    "FAILURE",
    "UNSTABLE",
    "UNSTABLE",
-   "FAILURE",
+   "UNSTABLE",
+   "UNSTABLE",
    "UNSTABLE",
    "NOT_BUILT",
-   "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
-   "FAILURE",
-   "FAILURE",
+   "NOT_BUILT",
+   "NOT_BUILT",
    "UNSTABLE"
   ],
   "elohim-genesis": [
-   "UNSTABLE",
-   "FAILURE",
-   "UNSTABLE",
-   "UNSTABLE",
-   "FAILURE",
-   "UNSTABLE",
-   "FAILURE",
    "UNSTABLE",
    "UNSTABLE",
    "ABORTED",
@@ -110,11 +103,17 @@
    "FAILURE",
    "UNSTABLE",
    "UNSTABLE",
+   "UNSTABLE",
+   "UNSTABLE",
+   "UNSTABLE",
+   "UNSTABLE",
+   "ABORTED",
+   "ABORTED",
+   "ABORTED",
    "UNSTABLE"
   ],
   "elohim-holochain": [
    "SUCCESS",
-   "NOT_BUILT",
    "SUCCESS",
    "SUCCESS",
    "SUCCESS",
@@ -127,6 +126,7 @@
    "SUCCESS",
    "SUCCESS",
    "SUCCESS",
+   "FAILURE",
    "SUCCESS"
   ],
   "elohim-sophia": [

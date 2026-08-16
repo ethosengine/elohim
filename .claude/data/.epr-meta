@@ -12,9 +12,16 @@ purpose: >
   the scar tissue).
 rules:
   - id: route-prose-to-canon
-    class: ask
+    class: dispatch
     when: { write: "*.md", new: true }
     route-to: { dest: genesis/data/timeline/backlog/ }
+    parameters:
+      dispatch-agent: librarian
+      dispatch-prompt: >
+        Review the proposed new markdown artifact for context-pollution. Return exactly one
+        recommendation—KEEP HERE, ROUTE with a canonical destination, MERGE into an existing
+        artifact, or DROP as conversation-scoped—with the shortest supporting reason. Do not
+        create, move, or rewrite files; report to the editing agent and let development continue.
     why: >
       .claude/data is for machine-owned ledgers (*.jsonl, *.json), not prose.
       A concern/RCA/analysis doc belongs in genesis/data/timeline/backlog/
@@ -33,5 +40,5 @@ flag→agent→canon→stasis automation reads and writes. New ledger files for 
 sentinels are legitimate births. Prose `.md` files are not: they are the
 memory-dump drift wearing a data-directory costume, and every one that lands
 here bypasses the reconciliation rails (decompose, cites, timeline status).
-The `ask` at birth routes them to a canon home while the context still exists
-to place them correctly.
+The background librarian review classifies them while the context still exists,
+without stopping the active development pass.

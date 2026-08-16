@@ -78,3 +78,157 @@ itself saturates — over-admission trades shed-at-gate for timeout-in-flight).
 (3) Class audit — contest declares ride `class=interactive` (5s hold burns
 permit time); whether they belong in `Background` (1s defer, cheap retry) is a
 bounded code question.
+
+## Ghost-trio remediation prep (2026-08-15; commands are not yet run)
+
+This section is an operator runbook, not evidence that any live repair ran. The
+shift classified two exact FCT ids and one member of the
+`scenario-public-observer-parent-*` family as real-seed `no_record` candidates.
+There is a source-record gap for the third id: iteration 8 says only
+"one scenario-public-observer-parent doc" (journal lines 129–134), and the
+morning menu repeats that family-only wording (line 156). No exact suffix occurs
+anywhere in that journal. **Do not choose one of the 39 matching scenario seed
+files by guess.** Recover the investigator's omitted id first, then replace the
+held row and command below.
+
+### Declare-cycle membership: none of the trio is automatic
+
+`stage-spa-blob.sh` is capable of declaring any one caller-supplied slug:
+
+> `Usage: stage-spa-blob.sh <dist-dir> <slug> <doorway-epr-url> [kind]`
+> (`scripts/ci/stage-spa-blob.sh:10`)
+
+In `DECLARE_ONLY=1`, it resolves that slug's `headActionHash` from the source
+doorway (`:44–55`), asks for the matching serialized record (`:86–98`), and
+POSTs the declaration to the target doorway's
+`/db/content/${SLUG}/canonical-head` (`:132–136`). That makes the script a
+usable *manual* channel for arbitrary ids; it does not define the automatic
+membership set.
+
+The caller defines that set. The app pipeline's complete `bundles` literal is:
+
+> `slug: "elohim-host-landing"` (browser and server) and
+> `slug: "lamad-spa"` (browser and server)
+> (`Jenkinsfile:511–515`)
+
+Phase 2 iterates only that literal (`Jenkinsfile:527–535`), and
+`authorHeadOnce` passes only `bundle.slug` into `DECLARE_ONLY`
+(`Jenkinsfile:342–352`). Therefore neither FCT id nor any
+`scenario-public-observer-parent-*` id belongs to the normal declare-cycle.
+An ordinary app deploy will not re-declare them.
+
+### Seed provenance and prepared repair per id
+
+#### `fct-bible-galatians-6-4-5`
+
+- **Seed JSON:**
+  `genesis/data/lamad/content/fct-bible-galatians-6-4-5.json`.
+- **Authored source:** the JSON says
+  `"sourcePath": "fct/Module 13 - Helping People Thrive - A Christian Definition .md"`
+  (line 8), which resolves under `genesis/docs/content/`. The authored verse is
+  present at that markdown file's line 141. This is the documented
+  `genesis/docs/content/` → `elohim-import` → `genesis/data/lamad/content/`
+  transformation pipeline, followed by the deterministic genesis seeder.
+- **DECLARE_ONLY coverage:** **no**; its id is absent from the four-entry
+  `Jenkinsfile:511–515` bundle set.
+- **Prepared targeted re-seed/re-author command:** run the helper in the next
+  subsection with this exact invocation:
+
+  ```bash
+  reseed_one 'fct-bible-galatians-6-4-5'
+  ```
+
+#### `fct-bible-psalm-101-5`
+
+- **Seed JSON:**
+  `genesis/data/lamad/content/fct-bible-psalm-101-5.json`.
+- **Authored source:** the JSON says
+  `"sourcePath": "fct/Module 10 - Creating Shared Understanding - Recognize Distortions.md"`
+  (line 8), which resolves under `genesis/docs/content/`. The authored verse is
+  present at that markdown file's line 98. It follows the same
+  source → `elohim-import` → seed JSON → genesis seeder pipeline.
+- **DECLARE_ONLY coverage:** **no**; its id is absent from the four-entry
+  `Jenkinsfile:511–515` bundle set.
+- **Prepared targeted re-seed/re-author command:** run:
+
+  ```bash
+  reseed_one 'fct-bible-psalm-101-5'
+  ```
+
+#### `scenario-public-observer-parent-*` — exact id HELD
+
+- **Seed JSON/source:** unresolved until the omitted suffix is recovered. The
+  39 candidate JSON files are under `genesis/data/lamad/content/`; each embeds
+  one of four source paths under
+  `genesis/docs/content/elohim-protocol/public_observer/parent/scenarios/`:
+  `community.feature`, `district.feature`, `educational.feature`, or
+  `municipality.feature`. Family membership is not enough to select one.
+- **DECLARE_ONLY coverage:** **no for every candidate**; no member of this
+  family appears in `Jenkinsfile:511–515`.
+- **Prepared command after evidence recovery:** replace `<EXACT-ID-FROM-INVESTIGATOR>`
+  only with the omitted, peer-confirmed id, then run:
+
+  ```bash
+  reseed_one '<EXACT-ID-FROM-INVESTIGATOR>'
+  ```
+
+### Targeted re-seed/re-author helper (integrator, alpha builder context)
+
+Run this from the repository root in a shell that can resolve the alpha
+cluster's internal Matthew storage service. It stages exactly one seed JSON in
+a temporary `DATA_DIR`; it does not widen the operation to the whole corpus.
+
+```bash
+reseed_one() {
+  content_id="$1"
+  source_json="/projects/elohim/genesis/data/lamad/content/${content_id}.json"
+  seed_dir="$(mktemp -d /tmp/elohim-ghost-reseed.XXXXXX)"
+  test -f "$source_json"
+  mkdir -p "$seed_dir/content"
+  cp "$source_json" "$seed_dir/content/"
+  cd /projects/elohim/genesis/seeder
+  STORAGE_URL='http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090' \
+    DATA_DIR="$seed_dir" \
+    SKIP_BLOB_UPLOAD=true \
+    pnpm exec tsx src/seed-sqlite.ts --content-only
+}
+```
+
+Why this helper, rather than `pnpm seed:dev -- --ids=… --force`: the live CI
+content path is `seed-genesis-peer.sh` → `seed-sqlite.ts`, and
+`/db/content/bulk` is explicitly skip-on-exists. `seed-sqlite.ts` follows the
+bulk call with a reach PATCH for every transformed row
+(`genesis/seeder/src/seed-sqlite.ts:982–1004`). The conductor-backed PATCH has
+the dead-incarnation repair: when the old anchor has no DHT entry, storage logs
+`stale dht_anchor_hash ... healing via create_content re-publish` and calls
+`create_content` from the existing SQL row
+(`elohim/elohim-storage/src/services/content_service.rs:399–417`). That creates
+a fresh servable record; the plain bulk insert cannot.
+
+Treat a seeder summary alone as insufficient because the reach PATCH is
+best-effort. For each invocation require the named stale-anchor-heal log (or a
+successful live update if the record had already recovered), then verify the
+fresh head record before using the manual declaration fan-out below.
+
+### Manual re-declare fan-out after a source has a servable head record
+
+This is not a substitute for re-authoring a true `no_record` ghost. Use it only
+after `${SOURCE}/db/content/${ID}/head-record` returns the record matching
+`${SOURCE}/db/content/${ID}/head`, and require the script log to say
+`carrying head record`; its documented hash-only fallback leaves permanent
+absence possible (`scripts/ci/stage-spa-blob.sh:103–109`). Run once per target
+doorway:
+
+```bash
+ID='<EXACT-ID>'
+SOURCE='https://alpha.elohim.host'
+TARGET='https://elohim.host'
+DECLARE_ONLY=1 \
+SOURCE_DOORWAY_URL="$SOURCE" \
+STORAGE_API_KEY_ADMIN="$STORAGE_API_KEY_ADMIN" \
+DECLARE_MAX_ATTEMPTS=24 \
+bash scripts/ci/stage-spa-blob.sh - "$ID" "$TARGET" browser
+```
+
+Reverse `SOURCE`/`TARGET` only when the other doorway is the one proven to hold
+the matching servable record. Do not run both directions speculatively.

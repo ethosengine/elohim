@@ -4,9 +4,15 @@ id: research-governance
 purpose: "Cross-pollination surveys and prior-art notes. README.md is the catalog; new surveys fold there rather than proliferating as near-duplicates."
 rules:
   - id: cross-pollination-dedupe
-    class: ask
+    class: dispatch
     when: { write: "*cross-pollination*.md", new: true }
     dedupe-of: genesis/research/README.md
+    parameters:
+      dispatch-agent: librarian
+      dispatch-prompt: >
+        Search the Research Index for an existing treatment of this topic. Report EXTEND with the
+        matching entry, KEEP if it is genuinely distinct, or DROP if it adds no durable signal.
+        Do not create or merge documents; keep the current research pass moving.
     why: "Check the Research Index (README.md) first — this topic may be catalogued (e.g. the hypha* name-collision triple). Extend the entry rather than starting a parallel note."
     retire-when: >
       when a new survey is SCAFFOLDED from the Research Index rather than authored beside it —
@@ -28,9 +34,16 @@ rules:
       is the only thing standing between a survey and being an idea sink with no drain, which is
       exactly the shape (inflow, no outflow) the doc-corpus stock measures elsewhere.
   - id: sovereignty-frame-declared
-    class: ask
+    class: dispatch
     when: { write: "*.md", contains-any: ["sovereign", "Sovereign"], new: true }
     require-frontmatter: [sovereignty-frame]
+    parameters:
+      dispatch-agent: storyteller
+      dispatch-prompt: >
+        Review the proposed survey's use of sovereignty against the Elohim imago-dei and
+        community-backstopped agency frame. Check that sovereignty-frame is declared and that
+        quotation/bridge language cannot leak into doctrine. Report ALIGNED or a concise reframe;
+        do not edit the survey or expand its scope.
     why: >
       The MEMBRANE rule (operator decision 2026-08-05). Surveys must quote, reason inside, and argue
       against the prevailing self-sovereignty ontology, because nearly every project we survey still

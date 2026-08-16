@@ -29,5 +29,8 @@ check("requires epr-meta-version", "epr-meta-version" in s["required"])
 check("rule class enum is the canonical 5",
       s["properties"]["rules"]["items"]["properties"]["class"]["enum"]
       == ["deny", "ask", "inject", "measure", "dispatch"])
+rule_schema = s["properties"]["rules"]["items"]
+check("rule schema admits package-style policy bindings", "policy" in rule_schema["properties"])
+check("rule schema admits tailored dispatch parameters", "parameters" in rule_schema["properties"])
 
 print(f"\n  {_passed} assertions passed ✅")

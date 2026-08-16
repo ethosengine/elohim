@@ -38,12 +38,14 @@ v = epr_meta.combine(epr_meta.evaluate(merged,
         {"path": str(SPECS / "zzz-new-spec.md"), "content": "no frontmatter", "is_new": True}))
 check("specs/ denies a frontmatter-less new spec", v is not None and v.cls == "deny")
 
-# A frontmatter-COMPLETE *-plan.md: the frontmatter rule is satisfied, so only route-to fires (ask).
+# A frontmatter-COMPLETE *-plan.md: the frontmatter rule is satisfied, so only the
+# nonblocking placement review fires.
 complete_fm = ("---\nid: x\nstatus: Draft\nclass: process-meta\ncontext-tier: disclosed\n"
                "steward: cartographer\ngraduation-trigger: t\ncites:\n  - y\n---\n")
-v = epr_meta.combine(epr_meta.evaluate(merged,
-        {"path": str(SPECS / "zzz-foo-plan.md"), "content": complete_fm, "is_new": True}))
-check("specs/ asks to route a frontmatter-complete *-plan.md out",
-      v is not None and v.cls == "ask" and "plans/" in v.reason)
+verdicts = epr_meta.evaluate(merged,
+        {"path": str(SPECS / "zzz-foo-plan.md"), "content": complete_fm, "is_new": True})
+check("specs/ dispatches placement review for a frontmatter-complete *-plan.md",
+      len(verdicts) == 1 and verdicts[0].cls == "dispatch" and "plans/" in verdicts[0].reason
+      and epr_meta.combine(verdicts) is None)
 
 print(f"\n  {_passed} assertions passed ✅")

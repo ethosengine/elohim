@@ -259,3 +259,33 @@ the one dangling angular22 doorway slot was correctly reported `unavailable`, an
 no `.cargo-pool-doctor-probe` directory remained afterward. This evidence says the
 fingerprint-write failure is not active now; it does **not** decide the durable
 all-`/tmp` versus toolchain-root-cause posture, so this backlog item remains open.
+
+## CODEX IMPLEMENTED 2026-08-15 — opt-in fingerprint-ENOENT conversion
+
+`cargo-pool doctor --heal-fingerprint-enoent` now couples the existing probe to a
+strictly opt-in conversion: only a slot that reports the exact fingerprint ENOENT
+class is moved intact to `/tmp/pool-<flatname>-target` and replaced by a symlink.
+The move preserves its warm artifacts. Every planned or completed conversion prints
+their measured size and the lifecycle cost explicitly: if `/tmp` reaps the target,
+the next build is cold. Plain `doctor`, `status`, and `--probe-writes` still never
+convert a slot.
+
+The conversion refuses both a flock'd slot and any slot in the active/protected
+family unless the operator supplies `--force`. It also refuses an existing
+deterministic target rather than merging or overwriting it. `--dry-run` performs the
+probe and lists would-convert/refusal decisions without moving or relinking anything.
+The already-landed linked-slot accounting and eviction exclusions continue to own the
+healed shape.
+
+Evidence: the focused Node suite passes 10/10 behaviors, including dry-run,
+warm-artifact-preserving conversion, active-family refusal, flock refusal, and a
+forced conversion across both guards; `bash -n` passes for `cargo-pool` and
+`pool-lib.sh`. The repository-wide agentic run passes all cargo-pool cases and
+remains 49/52 overall only because of the same unrelated Haiku output-schema
+fixture drift recorded above. The live command
+`cargo-pool doctor --heal-fingerprint-enoent --dry-run` probed 18 slots with
+`failed=0`, found no conversion candidates, and applied none
+(`converted=0 would-convert=0 refused=0`). It retained the fail-closed exit because
+the pre-existing dangling angular22 doorway slot was `unavailable=1`; a follow-up
+scan found no disposable `.cargo-pool-doctor-probe` directories. This capability is
+decision-neutral: the durable all-`/tmp` versus root-cause posture remains open.

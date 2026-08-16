@@ -133,6 +133,33 @@ policies:
       referenced asset or a second package rather than balloon.
 
   - id: sovereignty-ontology-guard
+    version: 3
+    contentHash: sha256:8079c81249fc362244593df2067e5f9c5edcdf98106126e33a033a597b93b048
+    title: Sovereignty ontology guard — background vision review, never assert the apex
+    binding: binding-local
+    class: dispatch
+    scope: { write: "*.md", contains-any: ["sovereign", "Sovereign"] }
+    validator: epr:validator-sovereignty-ontology-guard
+    parameters:
+      dispatch-agent: storyteller
+      dispatch-prompt: >
+        Review only the net-new sovereignty framing against stewardship-over-sovereignty and the
+        imago-dei, community-backstopped agency floor. Report ALIGNED, or quote the smallest passage
+        that asserts crypto self-sovereignty as an apex and propose a concise reframe. Do not edit
+        files, expand the document, or interrupt the active development pass.
+    status: active
+    retire-when: >
+      the same external condition as @2: apex self-sovereignty stops re-arriving as a training-corpus
+      default, so the reviewer sees no live instances over two consecutive quarters
+    established_by: deliberated-2026-08-16-operator+agents
+    why: >
+      @3 preserves @2's validator and ontology but changes the response from pilot interruption to
+      a bounded storyteller sidecar. The editing agent and a vision-specialist can resolve wording
+      against settled canon; no operator authority is exercised unless the review exposes a genuine
+      unresolved vision fork. Legitimate frames remain ADVERSARY, BOUNDED, and BRIDGE-LEGIBILITY;
+      `sovereignty-frame:` remains the explicit declaration that silences the guard.
+
+  - id: sovereignty-ontology-guard
     version: 2
     contentHash: sha256:d168f97031b22fe45175c94c7c569916d1f52ce0f1ff04b356864752d73bb2e7
     title: Sovereignty ontology guard — affirm the frame, never assert the apex
@@ -140,7 +167,8 @@ policies:
     class: ask
     scope: { write: "*.md", contains-any: ["sovereign", "Sovereign"] }
     validator: epr:validator-sovereignty-ontology-guard
-    status: active
+    status: superseded
+    superseded_by: sovereignty-ontology-guard@3
     retire-when: >
       never — but for a reason outside our gift rather than a claim of permanence: the drift this
       guards is inherited from the training corpus, not authored here, so it re-arrives with each
@@ -213,6 +241,32 @@ policies:
       review: the protocol governing the bytes of its own repo.
 
   - id: ownership-ontology-guard
+    version: 3
+    contentHash: sha256:4778db5e19f8b4867cca5241237d3fb10a875990da1665f18e4f28fa0e0a5b59
+    title: Ownership ontology guard — background stewardship review, never enclosure
+    binding: binding-local
+    class: dispatch
+    scope: { write: "*.md", contains-any: ["ownership", "Ownership"] }
+    validator: epr:validator-ownership-ontology-guard
+    parameters:
+      dispatch-agent: storyteller
+      dispatch-prompt: >
+        Review only the net-new ownership framing against stewardship, custody, rights, and the
+        inalienable-body exception. Report ALIGNED, or quote the smallest enclosure-shaped passage
+        and propose a concise reframe. Do not edit files, broaden the document, or interrupt the
+        active development pass.
+    status: active
+    retire-when: >
+      the same external condition as @2: enclosure framing stops re-arriving as a training-corpus
+      default, so the reviewer sees no live instances over two consecutive quarters
+    established_by: deliberated-2026-08-16-operator+agents
+    why: >
+      @3 preserves @2's validator and four legitimate frames but changes the response from pilot
+      interruption to a bounded storyteller sidecar. The settled distinction can be reviewed from
+      canon without operator authority: ADVERSARY, BOUNDED, EXTERNAL-LEGIBILITY, and INALIENABLE;
+      `stewardship-frame:` remains the explicit declaration that silences the guard.
+
+  - id: ownership-ontology-guard
     version: 2
     contentHash: sha256:a06531b3d39fb2cec4844cff80fd43e1a0eb5a9cd2ac8a4e7b6c27c6ec287692
     title: Ownership ontology guard — stewardship and custody, never enclosure
@@ -220,7 +274,8 @@ policies:
     class: ask
     scope: { write: "*.md", contains-any: ["ownership", "Ownership"] }
     validator: epr:validator-ownership-ontology-guard
-    status: active
+    status: superseded
+    superseded_by: ownership-ontology-guard@3
     retire-when: >
       never — the sibling of sovereignty-ontology-guard and retiring on the same external
       condition: enclosure framing is a training-corpus default, not a local habit, so it
@@ -348,6 +403,32 @@ policies:
       agency and explicitly ratifies any intentional overcommit at reach.
 
   - id: eprfs-meta-domain-neutrality
+    version: 2
+    contentHash: sha256:307b4f47ccc93aeb4bf58cfcdf0e4756d18cb768fc6e279f4638370ff09b09da
+    title: EPRFS meta evaluator stays policy-domain neutral — background code review
+    binding: binding-local
+    class: dispatch
+    scope: { write: "*.rs" }
+    validator: epr:validator-eprfs-meta-domain-neutrality
+    parameters:
+      dispatch-agent: code-reviewer
+      dispatch-prompt: >
+        Review only the net-new concrete validator identity or repository-domain logic in
+        eprfs-meta. Confirm that policy meaning remains behind ValidatorProvider and cite the exact
+        violating line if not. Report PASS or one bounded finding; do not edit files or redesign the
+        crate while the current implementation continues.
+    status: active
+    retire-when: >
+      when ValidatorProvider resolution is structurally content-addressed so a concrete validator
+      identity in the publishable crate cannot compile
+    established_by: deliberated-2026-08-16-operator+agents
+    why: >
+      @2 preserves @1's domain-neutrality validator and architecture-test floor but routes the
+      review to code-reviewer. This is a mechanically reviewable module-boundary question, not a
+      pilot authority decision; only an intentional change to the evaluator's domain boundary would
+      need separate architectural deliberation.
+
+  - id: eprfs-meta-domain-neutrality
     version: 1
     contentHash: sha256:97b0cd767d6b8a90acb4035c6f6596aab5b33cdff3b1b6b57a632e944b90ebf2
     title: EPRFS meta evaluator stays policy-domain neutral
@@ -355,7 +436,8 @@ policies:
     class: ask
     scope: { write: "*.rs" }
     validator: epr:validator-eprfs-meta-domain-neutrality
-    status: active
+    status: superseded
+    superseded_by: eprfs-meta-domain-neutrality@2
     retire-when: >
       when the neutrality is structural rather than reviewed — ValidatorProvider resolution
       content-addressed (EPR/WASM) so a concrete epr:validator-* reference in the crate cannot

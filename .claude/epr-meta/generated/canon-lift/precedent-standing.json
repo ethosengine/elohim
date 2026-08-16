@@ -479,13 +479,34 @@
         "binding": "binding-local",
         "scope_json": "{\"scope\":{\"write\":\"*.rs\"}}",
         "citations": null,
-        "status": "active",
+        "status": "superseded",
         "established_by": "operator-direction-2026-07-16",
+        "established_at": null,
+        "superseded_by": "eprfs-meta-domain-neutrality@2",
+        "created_at": null,
+        "updated_at": null,
+        "metadata_json": "{\"enforcementClass\":\"ask\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-eprfs-meta-domain-neutrality\",\"version\":1}"
+      }
+    },
+    {
+      "citesContentCid": "bafyreibqpnhuptgjhlvux5mm7tpq4r2w2gglo2h4nytz6rryg4h7bgyj3i",
+      "citesContentSha256": "sha256:307b4f47ccc93aeb4bf58cfcdf0e4756d18cb768fc6e279f4638370ff09b09da",
+      "registry": "policies.yaml",
+      "precedent": {
+        "id": "eprfs-meta-domain-neutrality@2",
+        "title": "EPRFS meta evaluator stays policy-domain neutral — background code review",
+        "summary": "EPRFS meta evaluator stays policy-domain neutral — background code review",
+        "full_reasoning": "@2 preserves @1's domain-neutrality validator and architecture-test floor but routes the review to code-reviewer. This is a mechanically reviewable module-boundary question, not a pilot authority decision; only an intentional change to the evaluator's domain boundary would need separate architectural deliberation.",
+        "binding": "binding-local",
+        "scope_json": "{\"scope\":{\"write\":\"*.rs\"}}",
+        "citations": null,
+        "status": "active",
+        "established_by": "deliberated-2026-08-16-operator+agents",
         "established_at": null,
         "superseded_by": null,
         "created_at": null,
         "updated_at": null,
-        "metadata_json": "{\"enforcementClass\":\"ask\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-eprfs-meta-domain-neutrality\",\"version\":1}"
+        "metadata_json": "{\"enforcementClass\":\"dispatch\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-eprfs-meta-domain-neutrality\",\"version\":2}"
       }
     },
     {
@@ -563,13 +584,34 @@
         "binding": "binding-local",
         "scope_json": "{\"scope\":{\"contains-any\":[\"ownership\",\"Ownership\"],\"write\":\"*.md\"}}",
         "citations": null,
-        "status": "active",
+        "status": "superseded",
         "established_by": "operator-ratification-2026-08-05",
+        "established_at": null,
+        "superseded_by": "ownership-ontology-guard@3",
+        "created_at": null,
+        "updated_at": null,
+        "metadata_json": "{\"enforcementClass\":\"ask\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-ownership-ontology-guard\",\"version\":2}"
+      }
+    },
+    {
+      "citesContentCid": "bafyreichpdnv4gpywsdhzsssierx2p5rbkdvteg2czs7ddspfd5a4cs3le",
+      "citesContentSha256": "sha256:4778db5e19f8b4867cca5241237d3fb10a875990da1665f18e4f28fa0e0a5b59",
+      "registry": "policies.yaml",
+      "precedent": {
+        "id": "ownership-ontology-guard@3",
+        "title": "Ownership ontology guard — background stewardship review, never enclosure",
+        "summary": "Ownership ontology guard — background stewardship review, never enclosure",
+        "full_reasoning": "@3 preserves @2's validator and four legitimate frames but changes the response from pilot interruption to a bounded storyteller sidecar. The settled distinction can be reviewed from canon without operator authority: ADVERSARY, BOUNDED, EXTERNAL-LEGIBILITY, and INALIENABLE; `stewardship-frame:` remains the explicit declaration that silences the guard.",
+        "binding": "binding-local",
+        "scope_json": "{\"scope\":{\"contains-any\":[\"ownership\",\"Ownership\"],\"write\":\"*.md\"}}",
+        "citations": null,
+        "status": "active",
+        "established_by": "deliberated-2026-08-16-operator+agents",
         "established_at": null,
         "superseded_by": null,
         "created_at": null,
         "updated_at": null,
-        "metadata_json": "{\"enforcementClass\":\"ask\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-ownership-ontology-guard\",\"version\":2}"
+        "metadata_json": "{\"enforcementClass\":\"dispatch\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-ownership-ontology-guard\",\"version\":3}"
       }
     },
     {
@@ -626,13 +668,34 @@
         "binding": "binding-local",
         "scope_json": "{\"scope\":{\"contains-any\":[\"sovereign\",\"Sovereign\"],\"write\":\"*.md\"}}",
         "citations": null,
-        "status": "active",
+        "status": "superseded",
         "established_by": "operator-ratification-2026-08-05",
+        "established_at": null,
+        "superseded_by": "sovereignty-ontology-guard@3",
+        "created_at": null,
+        "updated_at": null,
+        "metadata_json": "{\"enforcementClass\":\"ask\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-sovereignty-ontology-guard\",\"version\":2}"
+      }
+    },
+    {
+      "citesContentCid": "bafyreieaphebesp4gyreiwj56idh4x44l3on7gaqmetogoqdhjmxxe5qja",
+      "citesContentSha256": "sha256:8079c81249fc362244593df2067e5f9c5edcdf98106126e33a033a597b93b048",
+      "registry": "policies.yaml",
+      "precedent": {
+        "id": "sovereignty-ontology-guard@3",
+        "title": "Sovereignty ontology guard — background vision review, never assert the apex",
+        "summary": "Sovereignty ontology guard — background vision review, never assert the apex",
+        "full_reasoning": "@3 preserves @2's validator and ontology but changes the response from pilot interruption to a bounded storyteller sidecar. The editing agent and a vision-specialist can resolve wording against settled canon; no operator authority is exercised unless the review exposes a genuine unresolved vision fork. Legitimate frames remain ADVERSARY, BOUNDED, and BRIDGE-LEGIBILITY; `sovereignty-frame:` remains the explicit declaration that silences the guard.",
+        "binding": "binding-local",
+        "scope_json": "{\"scope\":{\"contains-any\":[\"sovereign\",\"Sovereign\"],\"write\":\"*.md\"}}",
+        "citations": null,
+        "status": "active",
+        "established_by": "deliberated-2026-08-16-operator+agents",
         "established_at": null,
         "superseded_by": null,
         "created_at": null,
         "updated_at": null,
-        "metadata_json": "{\"enforcementClass\":\"ask\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-sovereignty-ontology-guard\",\"version\":2}"
+        "metadata_json": "{\"enforcementClass\":\"dispatch\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-sovereignty-ontology-guard\",\"version\":3}"
       }
     },
     {
