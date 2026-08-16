@@ -59,7 +59,20 @@ impl ProxyOutcome {
     pub fn classify(status: u16) -> ProxyOutcome {
         match status {
             200..=299 => ProxyOutcome::Ok,
-            429 => ProxyOutcome::Failure,
+            // Backpressure (429 / 503): the upstream ANSWERED with its own
+            // flow-control shed. Liveness is proven — the breaker exists to
+            // protect against a dead or hanging upstream, and storage's
+            // admission layer already provides the flow control. Counting
+            // these as Failure made every storage catching-up window OPEN the
+            // doorway breaker, which then shed ALL proxied routes — the
+            // catching-up amplification class, reproduced on the 2026-08-16
+            // local mesh (breaker streak 10 against a healthy-but-catching-up
+            // peer took the whole /db surface down with it). Same error-class
+            // discipline as the storage-side conductor classifier
+            // (f76378b2e): deadline/busy is a busy signal that breaks no
+            // circuit; only never-answered (connect error / timeout — the
+            // `Err` arms below) trips it.
+            429 | 503 => ProxyOutcome::Neutral,
             500..=599 => ProxyOutcome::Failure,
             _ => ProxyOutcome::Neutral, // 4xx incl 404 = neutral
         }
@@ -303,7 +316,11 @@ where
             // catching-up to the browser, preserving the upstream Retry-After
             // (else the breaker cooldown) so the client does not hammer.
             if matches!(status_u16, 429 | 503) {
-                record_trial(&trial, false);
+                // Breaker-neutral: honored backpressure proves the upstream is
+                // ALIVE (see ProxyOutcome::classify — busy is not broken). The
+                // client still gets the catching-up response below; the
+                // breaker stays closed so unrelated routes keep flowing.
+                record_trial(&trial, true);
                 let upstream_ra = response
                     .headers()
                     .get(reqwest::header::RETRY_AFTER)
@@ -654,9 +671,20 @@ mod tests {
             "blob miss never opens breaker"
         );
         assert_eq!(ProxyOutcome::classify(400), ProxyOutcome::Neutral);
-        assert_eq!(ProxyOutcome::classify(429), ProxyOutcome::Failure);
-        assert_eq!(ProxyOutcome::classify(503), ProxyOutcome::Failure);
+        assert_eq!(
+            ProxyOutcome::classify(429),
+            ProxyOutcome::Neutral,
+            "backpressure is a busy signal from a LIVE upstream — never opens the breaker"
+        );
+        assert_eq!(
+            ProxyOutcome::classify(503),
+            ProxyOutcome::Neutral,
+            "catching-up shed is flow control, not death — counting it as failure \
+             amplified every catch-up window into a full doorway shed"
+        );
         assert_eq!(ProxyOutcome::classify(500), ProxyOutcome::Failure);
+        assert_eq!(ProxyOutcome::classify(502), ProxyOutcome::Failure);
+        assert_eq!(ProxyOutcome::classify(504), ProxyOutcome::Failure);
     }
 
     #[test]

@@ -459,3 +459,32 @@ decisionPoints:
       - path: doorway/doorway-service/src/services/route_registry.rs
         testName: test_install_steward_routes_is_idempotent_per_peer
         kind: unit
+
+  - name: ProxyOutcome::classify
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/storage_proxy.rs
+      modulePath: routes::storage_proxy::ProxyOutcome::classify
+      line: 59
+    summary: >
+      Classifies an upstream HTTP status for breaker accounting: 2xx Ok, 4xx
+      (incl. 404 blob miss) Neutral, 429/503 Neutral (honored backpressure —
+      a LIVE upstream's flow control must not open the liveness breaker; the
+      pre-2026-08-16 Failure mapping amplified every storage catching-up
+      window into a full doorway shed), 500/502/504 Failure. Transport
+      errors/timeouts are recorded as failures at the call sites' Err arms —
+      the breaker protects against dead/hanging upstreams only. Mirrors the
+      storage-side conductor error classifier (f76378b2e): busy is a signal,
+      never-answered trips the circuit.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          proxy_outcome_classifies_failures pins every class boundary,
+          including that backpressure statuses are Neutral (with the
+          amplification rationale in the assertion messages) and that
+          502/504 remain Failure.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: proxy_outcome_classifies_failures
+        kind: unit
