@@ -134,3 +134,5 @@ by count alone; the next removal requires a consumer migration or deadness proof
 - package-first projections for the root gospel, hc-dev-orchestrator, and
   seed-workflow regenerate cleanly; the full verifier has one pre-existing,
   unrelated stale runtime projection (`agentic-developer`).
+
+- 2026-08-16: `just mesh monitor` added — unified mesh system monitor (`app/elohim-app/scripts/hc-mesh-monitor.py`, stdlib python, default :4210 = devfile `mesh-monitor` endpoint, `MESH_MONITOR_PORT` override). Reader over existing probe surfaces; gate-leg panel mirrors fleet-quiesce-gate.sh.

@@ -85,7 +85,8 @@ mesh action="status":
     case "{{ action }}" in
       start|stop|status|probe) exec "{{ app_dir }}/scripts/hc-mesh.sh" "{{ action }}" ;;
       quiesce) exec "{{ app_dir }}/scripts/hc-mesh-quiesce.sh" ;;
-      *) echo "mesh action must be start|stop|status|probe|quiesce" >&2; exit 2 ;;
+      monitor) exec python3 "{{ app_dir }}/scripts/hc-mesh-monitor.py" ;;
+      *) echo "mesh action must be start|stop|status|probe|quiesce|monitor" >&2; exit 2 ;;
     esac
 
 # Seed content or validate a corpus facet. False content dry-run modes are intentionally absent.

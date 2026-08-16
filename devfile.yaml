@@ -207,6 +207,13 @@ components:
           targetPort: 6006
           exposure: public
           protocol: http
+        # Unified local-mesh system monitor (reader over the existing probe
+        # surfaces: peer /p2p/status + /metrics, doorway health, quiesce log).
+        # Started on demand via `just mesh monitor` — never from postStart.
+        - name: mesh-monitor
+          targetPort: 4210
+          exposure: public
+          protocol: http
       volumeMounts:
         - name: persistent
           path: /nix
