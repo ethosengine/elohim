@@ -68,6 +68,18 @@ app_port()   { echo $((4445 + 10 * $1)); }
 http_port()  { echo $((8090 + $1)); }
 p2p_port()   { echo $((9701 + $1)); }
 
+# Alpha identity model (edgenode template): each storage node self-heals its
+# own human's agent_pub_key from its conductor cell key, NULL-only. Without
+# this env the saga ch02 finish line (non-null agentPubKey) can never light.
+human_id() {
+  case "$1" in
+    matthew) echo human-matthew-manager ;;
+    jessica) echo human-jessica-spouse ;;
+    james)   echo human-james-son ;;
+    *)       echo "human-$1" ;;
+  esac
+}
+
 peer_csv() { # name=host:port CSV for substrate-verify / PEER_STORAGE_URLS
   local out="" i=0
   for name in "${PEERS[@]}"; do
@@ -120,6 +132,35 @@ probe_all() {
 start_all() {
   mkdir -p "$MESH_DIR" "$LOGDIR" "$LOCAL_DEV_DIR"
 
+  # Peer policy: the storage binary loads ./config/peer-policy.toml relative to
+  # ITS CWD; a missing file silently disables the whole heartbeat + signal-
+  # subscriber + genesis-self-heal block ("PeerStatus heartbeat disabled" —
+  # found 2026-08-16 as the root of NULL agent keys + zero peer-status rows on
+  # the mesh). Generate a minimal local policy and pass it explicitly.
+  POLICY_FILE="$MESH_DIR/peer-policy.toml"
+  if [ ! -f "$POLICY_FILE" ]; then
+    cat > "$POLICY_FILE" <<'EOF'
+[pool]
+accept_general_traffic = "auto"
+min_free_storage_pct = 5
+require_conductor_healthy = true
+
+[stewardship]
+accept_new_reserves = "auto"
+max_storage_pct = 80
+
+[network]
+# All peers share one netns locally — conductor stays loopback-only, no
+# forwarders (they would EADDRINUSE across the three peers). The bind/port
+# fields are required by the TOML schema even when the switch is off.
+expose_conductor_externally = false
+conductor_external_bind = "0.0.0.0:8445"
+conductor_internal_port = 4445
+conductor_admin_external_bind = "0.0.0.0:8444"
+conductor_admin_internal_port = 4444
+EOF
+  fi
+
   for bin in "$STORAGE_BIN" "$DOORWAY_BIN"; do
     [ -x "$bin" ] || { echo "missing binary: $bin (build it first — see CLAUDE.md pool-slot paths)"; exit 1; }
   done
@@ -139,6 +180,9 @@ start_all() {
       else extras+="${extras:+,}http://localhost:$(http_port $i)"; fi
       i=$((i+1))
     done
+    # DOORWAY_ID models alpha's alpha-elohim-host: the EPR router filters
+    # projections by doorway_id, so an unset id matches ZERO seeded rows.
+    DOORWAY_ID="${DOORWAY_ID:-alpha-elohim-host}" \
     nohup "$DOORWAY_BIN" --dev-mode --listen "0.0.0.0:$DOORWAY_PORT" \
       --conductor-url "ws://localhost:$(admin_port 0)" \
       --storage-url "$primary" ${extras:+--storage-urls "$extras"} \
@@ -190,6 +234,10 @@ start_all() {
       ENABLE_CONTENT_DB=true ENABLE_IMPORT_API=true \
       ENABLE_P2P=true P2P_PORT="$(p2p_port $i)" \
       AGENT_PUBKEY="$agent" RELAY_MODE=server \
+      GENESIS_SELF_HEAL_IDENTITY=1 SELF_HUMAN_ID="$(human_id "$name")" \
+      HOUSEHOLD_ID=household-dowell \
+      DEVICE_ARCHETYPE=device-family-node-base \
+      ELOHIM_STORAGE_PEER_POLICY_PATH="$MESH_DIR/peer-policy.toml" \
       nohup "$STORAGE_BIN" --http-port "$(http_port $i)" > "$LOGDIR/$name.log" 2>&1 &
       echo "storage $name: http=$(http_port $i) p2p=$(p2p_port $i) agent=${agent:0:16}..."
     else

@@ -7,8 +7,8 @@
  * Drift here causes cluster_view + reciprocity_view to silently return empty results.
  */
 
-import { describe, it, expect } from 'vitest';
-import { deterministicPeerId, type Archetype } from '../peer-id.js';
+import { describe, it, expect, afterEach } from 'vitest';
+import { deterministicPeerId, storageUrlForHuman, type Archetype } from '../peer-id.js';
 
 describe('deterministicPeerId', () => {
   it('returns 46-char string with 12D3KooW prefix', () => {
@@ -39,5 +39,36 @@ describe('deterministicPeerId', () => {
     // Locked snapshot — if this changes, all bindings AND commitments diverge.
     const id = deterministicPeerId('human-matthew-manager', 'desktop');
     expect(id).toMatch(/^12D3KooW[a-f0-9]{38}$/);
+  });
+});
+
+describe('storageUrlForHuman', () => {
+  afterEach(() => {
+    delete process.env.PEER_STORAGE_URLS;
+    delete process.env.PEER_STORAGE_URL_TEMPLATE;
+  });
+
+  it('resolves per-peer host:port from the PEER_STORAGE_URLS CSV (hc-mesh ports differ per peer)', () => {
+    process.env.PEER_STORAGE_URLS =
+      'matthew=localhost:8090,jessica=localhost:8091,james=localhost:8092';
+    expect(storageUrlForHuman('human-jessica-spouse')).toBe('http://localhost:8091');
+    expect(storageUrlForHuman('human-matthew-manager')).toBe('http://localhost:8090');
+  });
+
+  it('keeps a scheme already present in a CSV entry', () => {
+    process.env.PEER_STORAGE_URLS = 'matthew=https://storage.example:8443';
+    expect(storageUrlForHuman('human-matthew-manager')).toBe('https://storage.example:8443');
+  });
+
+  it('falls through to the template for names absent from the CSV', () => {
+    process.env.PEER_STORAGE_URLS = 'matthew=localhost:8090';
+    process.env.PEER_STORAGE_URL_TEMPLATE = 'http://elohim-{name}-x:8090';
+    expect(storageUrlForHuman('human-adam-firstman')).toBe('http://elohim-adam-x:8090');
+  });
+
+  it('uses the alpha default when neither env var is set', () => {
+    expect(storageUrlForHuman('human-matthew-manager')).toBe(
+      'http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090'
+    );
   });
 });

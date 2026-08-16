@@ -882,7 +882,10 @@ async function main(): Promise<void> {
         fn_name: 'create_stewardship_grant',
         payload: {
           subject_id: minor.humanId,
-          authority_basis: 'parental',
+          // Must be a member of imagodei_integrity's AUTHORITY_BASES
+          // (stewardship.rs) — 'parental' was never in that vocabulary; the
+          // guardian-of-minor basis is 'minor_guardianship'.
+          authority_basis: 'minor_guardianship',
           evidence_hash: null,
           verified_by: 'household-formation-ceremony',
           content_filtering: true,
@@ -895,7 +898,9 @@ async function main(): Promise<void> {
           review_in_days: 90,
         },
       });
-      console.log(`[+] stewardship grant: ${founder.humanId} -> ${minor.humanId} (parental)`);
+      console.log(
+        `[+] stewardship grant: ${founder.humanId} -> ${minor.humanId} (minor_guardianship)`
+      );
     } catch (err) {
       console.warn(
         `[!] create_stewardship_grant (non-fatal): ${err instanceof Error ? err.message : err}`,

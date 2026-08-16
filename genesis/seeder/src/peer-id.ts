@@ -65,10 +65,31 @@ const DEFAULT_STORAGE_URL_TEMPLATE =
 /** Default timeout for one /p2p/status probe. */
 const DEFAULT_RESOLVE_TIMEOUT_MS = 5000;
 
-/** Storage-pod base URL for a human, following the alpha naming convention. */
+/**
+ * Storage-pod base URL for a human. Resolution order:
+ *   1. PEER_STORAGE_URLS — the `name=host:port` CSV convention shared with
+ *      substrate-verify / seed-provide-rows / the Jenkinsfile's
+ *      peerStorageUrlsCsv(). Ports may differ per peer (the local hc-mesh
+ *      runs matthew=8090, jessica=8091, james=8092), which a single {name}
+ *      template cannot express.
+ *   2. PEER_STORAGE_URL_TEMPLATE — `{name}`-substituted template.
+ *   3. The alpha cluster-local default.
+ */
 export function storageUrlForHuman(humanId: string): string {
-  const template = process.env.PEER_STORAGE_URL_TEMPLATE || DEFAULT_STORAGE_URL_TEMPLATE;
   const shortName = humanId.replace(/^human-/, '').split('-')[0];
+  const csv = process.env.PEER_STORAGE_URLS;
+  if (csv) {
+    for (const entry of csv.split(',')) {
+      const trimmed = entry.trim();
+      const eq = trimmed.indexOf('=');
+      if (eq <= 0) continue;
+      if (trimmed.slice(0, eq) === shortName) {
+        const hostPort = trimmed.slice(eq + 1);
+        return hostPort.includes('://') ? hostPort : `http://${hostPort}`;
+      }
+    }
+  }
+  const template = process.env.PEER_STORAGE_URL_TEMPLATE || DEFAULT_STORAGE_URL_TEMPLATE;
   return template.replaceAll('{name}', shortName);
 }
 
