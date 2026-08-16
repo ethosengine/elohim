@@ -287,7 +287,39 @@ async fn forward_to_storage(state: &AppState, hash: &str, body: Option<&Bytes>) 
     {
         Ok(response) => {
             if response.status().is_success() {
-                true
+                // Read-back verification: a 2xx PUT alone has been observed
+                // reporting `forwarded_to_storage: true` while the bytes never
+                // became durably servable (2026-08-16 local mesh: an 18MB SPA
+                // bundle vanished while three sibling blobs from the same run
+                // survived; storage accepts the same bytes fine when PUT
+                // directly). Until that class has a root cause, "forwarded"
+                // means storage SERVES the blob, not that a PUT returned 200.
+                let verify_url = format!("{}/blob/{}", storage_url.trim_end_matches('/'), hash);
+                match client
+                    .get(&verify_url)
+                    .timeout(std::time::Duration::from_secs(30))
+                    .send()
+                    .await
+                {
+                    Ok(check) if check.status().is_success() => true,
+                    Ok(check) => {
+                        error!(
+                            hash = %hash,
+                            status = %check.status(),
+                            "seed-blob forward read-back FAILED — storage accepted the PUT \
+                             but does not serve the blob; reporting forwarded=false"
+                        );
+                        false
+                    }
+                    Err(e) => {
+                        error!(
+                            hash = %hash,
+                            error = %e,
+                            "seed-blob forward read-back unreachable — reporting forwarded=false"
+                        );
+                        false
+                    }
+                }
             } else {
                 let status = response.status();
                 let body = response.text().await.unwrap_or_default();
