@@ -79,6 +79,19 @@ When(
 
     const id = content.id as string;
     this.contentIds.set(contentAlias, id);
+
+    // Federation scenarios register one-off humans whose backing conductors do
+    // not survive the test run. Remove the content projection while its
+    // authenticated authoring client is still available, otherwise each run
+    // leaves another e2e-<uuid> source candidate that can become permanently
+    // unservable after that conductor disappears.
+    this.onCleanup(async () => {
+      try {
+        await device.client.deleteContent(id);
+      } catch {
+        // best-effort cleanup
+      }
+    });
   }
 );
 

@@ -5,89 +5,73 @@
 # notary-authority.feature's "resolves the same canonical head across peers" step
 # for the same distinction at the notary layer).
 #
-# Proof signal (local): alpha-A's own reconcile pass reports caughtUp=true, its
-#   own per-sweep convergence gauge (elohim_projection_reconcile_converged)
-#   reads 1 (2026-07-26 reframe — see below), and has healed at least once
-#   (elohim_projection_heal_outcomes_total{outcome="healed"}).
+# Stage split (2026-08-16, operator directive): the CI mesh leg is two
+# stages — (1) quiesce/bootstrap, which waits out post-deploy churn and
+# proves the SUBSTRATE ITSELF reached a caught-up/converged state, and (2)
+# this suite, which runs only after stage 1 passes and proves agent ACTIONS
+# flow through the already-quiesced substrate within bounded windows. This
+# chapter previously duplicated stage-1 predicates here: a scenario asserted
+# alpha-A's whole-node `/health p2p.caughtUp`, the per-sweep
+# `elohim_projection_reconcile_converged` gauge, and the
+# `elohim_projection_heal_outcomes_total{outcome="healed"}` counter — none of
+# which name a specific piece of content, so a red there could never say
+# WHICH flow broke. Those same substrate-wide predicates are gated pre-suite
+# by scripts/ci/fleet-quiesce-gate.sh (bounded wait for post-deploy churn)
+# and defended against regression by scripts/ci/post-deploy-saga-probe.sh's
+# own "converged=1 with divergent>=1" honesty fence (the exact check a prior
+# scenario here duplicated — see the removed-scenario note below). This
+# chapter now proves only the FLOW: alpha-A's own declared head becomes
+# alpha-A's own served head (first scenario — local, unconditional, no
+# polling needed because it runs after stage-1 quiesce already settled it),
+# extended across peers by the cross-node scenario at the bottom.
 #
-# Ordering + strictness (2026-07-31): the converged-gauge assertion runs
-# BEFORE the healed-outcome assertion, and the healed-outcome assertion uses
-# the "strictly" labelled-metric wording. Both changes close the same false-
-# green channel: the lenient labelled-metric step returns 'pending' (not a
-# hard failure) when the healed{outcome} series has never been observed
-# (e.g. right after a restart, before the first successful heal) — and a
-# 'pending' step makes cucumber SKIP every remaining step in the scenario,
-# so the converged assertion below it never ran and the scenario could read
-# green/pending while convergence was actually 0. "strictly" makes an absent
-# series a measured zero (assert-and-fail) once /metrics has proven
-# reachable, rather than an unobserved 'pending'; reordering additionally
-# guarantees the always-materialised converged gauge (registered at process
-# start, never legitimately "not yet observable") is checked first and can
-# never be shadowed by any predecessor's pending, strict or not.
 # Proof signal (cross-node): the served head for elohim-host-landing matches the
 #   declared head on BOTH alpha-A and elohim.host (reused verbatim from
 #   served-projected-head.feature's Track-4 T4-2 step).
-#
-# Reframe (2026-07-26): the local scenario previously asserted `/health
-# divergentAnchor <= 0` — a value the health handler recomputes from a live
-# ~2000-row windowed scan on every single request, so it oscillates between
-# requests even when the mesh's TRUE convergence state is stable (chronic
-# flappiness, not a real regression). elohim-storage's own reconcile sweep
-# already folds the same pending/exhausted/divergent bookkeeping into
-# `elohim_projection_reconcile_converged` (elohim-storage/src/metrics.rs) —
-# an IntGauge set ONCE per sweep, not once per HTTP poll — plus the
-# `elohim_projection_heal_outcomes_total{stream,outcome}` counter (outcome ∈
-# healed | timeout_retried | timeout_exhausted | missing | failed | refreshed
-# | refused_declared | refused_stale | no_row) that names WHICH class of row
-# outcome is happening, not merely a folded pass/fail bit. Reading the
-# per-sweep gauge and the monotonic heal counter instead of the per-request
-# windowed field keeps the same invariant (this peer isn't stuck divergent)
-# while dropping the sampling noise.
 #
 # Status today: GREEN locally. The cross-node scenario needs the full alpha fabric
 # to be meaningful (comparing two independently-operated federation doorways), so it
 # is tagged @requires:alpha-cluster-6peer.
 @e2e @dataplane @concern:saga-06-heads-converge
 Feature: Chapter 6 — blobs sync to one head
+  A visitor reaching elohim-host-landing (the household's public landing page) through
+  a different doorway than matthew's must see the SAME page matthew published, not a
+  stale or half-propagated copy served with no warning that anything diverged — two
+  peers each green over DIFFERENT heads is a false-green nobody is told about.
   Convergence means every peer that serves elohim-host-landing serves the SAME head,
-  not merely "a" head. This chapter proves the local reconcile pass is caught up and
-  divergence-free on matthew's own peer, then extends the same
-  served-head-matches-declared-head proof across the federation.
+  not merely "a" head. This chapter proves the declared head becomes the served head
+  on matthew's own peer, then extends the same served-head-matches-declared-head
+  proof across the federation.
 
   Background:
     Given peer "alpha-A" at "alpha-A"
 
-  Scenario: alpha-A's reconcile pass is healing forward and locally converged
-    Then peer "alpha-A" /health p2p.caughtUp is true
-    And metric "elohim_projection_reconcile_converged" on peer "alpha-A" >= 1
-    And labeled metric "elohim_projection_heal_outcomes_total" with label "outcome" "healed" on peer "alpha-A" strictly >= 1
+  Scenario: a locally declared head becomes alpha-A's own served head
+    Then the served head for EPR "elohim-host-landing" matches the declared head on peer "alpha-A"
 
-  # HONESTY GUARD (added 2026-07-31, with the divergence-classification cure).
+  # REMOVED (2026-08-16, stage-1/stage-2 split — see the header note above).
   #
-  # `elohim_projection_reconcile_converged` was gated on the divergence TOTAL,
-  # and the dominant class of divergence on a live peer is one heal is FORBIDDEN
-  # to move: the local row already carries a different declared head, so only a
-  # canonical channel may move it (fills-never-moves). matthew logged 6071
-  # `refused_declared` outcomes against 8 `healed` in 12h — the refusals are
-  # correct and permanent until a canonical channel fires, so the gauge could
-  # never reach 1 no matter how well the heal leg worked. It read 0 fleet-wide
-  # for 12h+. Convergence now excludes only ADJUDICATED divergence (refused, or
-  # retry-budget-spent) and still fails on unadjudicated divergence.
-  #
-  # This scenario is the fence against the cure becoming a whitewash. It asserts
-  # BOTH sides at once: divergence is still MEASURED and published (>= 1 proves
-  # the total was not quietly zeroed to make the gauge green), AND convergence is
-  # reachable in the same breath. A future change that "fixes" convergence by
-  # suppressing the divergence count fails here; so does one that re-gates
-  # convergence on the total.
-  #
-  # The adjudicated share is separately readable as
-  # `elohim_projection_reconcile_divergent_refused{stream}`, so an operator can
-  # always subtract to get exactly what convergence is gated on:
+  # A scenario here previously asserted `elohim_projection_reconcile_divergent`
+  # with label "content" >= 1 AND `elohim_projection_reconcile_converged` >= 1
+  # in the same breath — a fence added 2026-07-31 against the converged gauge
+  # being "fixed" by quietly suppressing the divergence count (history: the
+  # dominant divergence class is a heal FORBIDDEN to move a row that already
+  # carries a different declared head — fills-never-moves — so matthew logged
+  # 6071 `refused_declared` outcomes against 8 `healed` in 12h; convergence had
+  # to learn to exclude only ADJUDICATED divergence, never all divergence, or
+  # it could never reach 1). That fence asserts a property of the substrate's
+  # OWN bootstrap-quiesce gauge computation, not any one piece of content's
+  # flow — a stage-1 concern with an existing stage-1 home:
+  # scripts/ci/post-deploy-saga-probe.sh runs the identical
+  # "converged=1 with divergent>=1" honesty fence as a one-shot post-deploy
+  # probe, independent of this suite. No flow-form translation preserves this
+  # scenario's intent (it is inherently about the gauge's own arithmetic, not
+  # about any content id propagating) — forcing one here would just re-hide
+  # the same global predicate behind a different step name, so it is deleted
+  # rather than converted. The adjudicated share remains separately readable
+  # as `elohim_projection_reconcile_divergent_refused{stream}` for an operator
+  # who wants to subtract it out by hand:
   #   elohim_projection_reconcile_divergent - elohim_projection_reconcile_divergent_refused
-  Scenario: convergence excludes only adjudicated divergence, never unresolved divergence
-    Then labeled metric "elohim_projection_reconcile_divergent" with label "stream" "content" on peer "alpha-A" >= 1
-    And metric "elohim_projection_reconcile_converged" on peer "alpha-A" >= 1
 
   # Station (minted 2026-07-26): the interstitial node the cure sprint could only
   # find by log archaeology. Both projections CLAIM a notarized anchor for the

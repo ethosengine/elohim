@@ -23,9 +23,15 @@ rules:
       visible after writes; it is one review loop per completed authoring pass, not one subagent
       dispatch per edit.
   - id: new-feature-subdir-needs-meta
-    class: ask
+    class: dispatch
     when: { write: ".epr-meta", new: true }
     require-sibling: ".epr-meta"
+    parameters:
+      dispatch-agent: librarian
+      dispatch-prompt: >
+        Review the new a2o subtree boundary and say whether it needs its own .epr-meta or inherits
+        an adequate nearest ancestor. Cite one existing sibling as precedent. Report only; do not
+        author governance or interrupt the current development pass.
     why: >
       A new subdirectory under genesis/a2o/ must be born with its own .epr-meta —
       place one alongside the first file so governance is never silently dropped by

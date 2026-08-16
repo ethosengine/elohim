@@ -114,21 +114,35 @@
 Feature: Chapter 11 — the pull queue can finish
   A want no peer can satisfy must not hold the pull queue open forever — left
   unfixed, this node would silently stop co-stewarding content the household
-  depends on. This chapter proves the live node's queue is currently caught
-  up, and that the two retirement-accounting series (a count and a labeled
-  reason total) are published rather than absent — visible to an OPERATOR
-  today, so "everything arrived" can be told apart from "unsatisfiable wants
-  were set aside." (A person-facing notice is a separate, unclosed gap — see
-  Residue below.) The two @wip scenarios below NAME the causal proof this live
-  lane cannot construct — a pin actually exhausting its budget, retiring, and
-  being counted — but do not yet run one; they are blocked on a fixture that
-  does not exist yet (see their station comments).
+  depends on. This chapter proves the household's own ask — elohim-host-landing,
+  the pin alpha-A actually holds — has flowed through the pull queue to
+  caught-up within a bounded window, and that the two retirement-accounting
+  series (a count and a labeled reason total) are published rather than
+  absent — visible to an OPERATOR today, so "everything arrived" can be told
+  apart from "unsatisfiable wants were set aside." (A person-facing notice is
+  a separate, unclosed gap — see Residue in the header comment above.) The two @wip scenarios below
+  NAME the causal proof this live lane cannot construct — a pin actually
+  exhausting its budget, retiring, and being counted — but do not yet run
+  one; they are blocked on a fixture that does not exist yet (see their
+  station comments).
 
   Background:
     Given peer "alpha-A" at "alpha-A"
 
-  Scenario: the live pull queue reaches caught-up instead of holding open forever
-    Then peer "alpha-A" /p2p/status pull.caughtUp is true
+  # Stage split (2026-08-16, operator directive): this scenario previously
+  # asserted alpha-A's WHOLE-NODE `/p2p/status pull.caughtUp` — every pin on
+  # the node, not any one of them. Whole-node pull.caughtUp is a stage-1
+  # bootstrap-quiesce predicate, gated pre-suite by
+  # scripts/ci/fleet-quiesce-gate.sh (which bounded-waits out post-deploy
+  # churn on exactly this field before any measurement run is allowed); a
+  # regression there should red the quiesce gate, not this saga. This chapter
+  # instead proves the FLOW its own story is about: the specific pin
+  # (`epr:elohim-host-landing`, the content this household's story tracks
+  # throughout the saga — see 05-co-steward-agreement.feature, which proves
+  # the pin exists) reaches caught-up within a bounded window, using the same
+  # per-item polling step chapter 5 already uses for the same content id.
+  Scenario: the household's pin for elohim-host-landing reaches caught-up within a bounded window
+    Then within 60 seconds doorway "alpha-A" reports the pull for "elohim-host-landing" is caught up
     And metric "elohim_acquisition_pins_retired" on peer "alpha-A" >= 0
 
   Scenario: both retirement reasons are published as distinct series
