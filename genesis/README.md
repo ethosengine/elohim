@@ -62,14 +62,19 @@ Schema-aligned JSON produced by the import pipeline (`elohim-import`). This is w
 
 ### seeder/ — Seeding Tools
 
-TypeScript scripts that load seed data into a running Holochain instance via doorway. Includes validation, dry-run mode, and snapshot management.
+TypeScript tools that validate seed data, load it through doorway, and manage
+specialist snapshots. There is intentionally no dry-run: the retired flags were
+ignored by the implementation and could perform a real write.
 
 ```bash
-cd genesis/seeder
-npm run seed              # Full seed
-npm run seed:validate     # Validate without seeding
-npm run seed:dry-run      # Preview what would be seeded
+just seed validate        # Schema validation; never writes
+just dev start            # Start conductor + storage + doorway
+just seed apply local     # Seed the local stack
+just seed stats           # Verify the result
 ```
+
+See [`seeder/README.md`](./seeder/README.md) for prerequisites, focused seeding,
+diagnostics, and snapshot operations.
 
 ### a2o/ — Alpha-to-Omega Validation
 
@@ -79,11 +84,11 @@ No build dependency on implementation code. Tests hit deployed doorway endpoints
 
 ```bash
 cd genesis/a2o
-npm test                          # Run @e2e tagged scenarios
-npm run test:federation           # Federation-specific tests
-npm run test:genesis:dry          # Dry-run genesis scenarios (find gaps)
-npm run scan:coverage             # BDD coverage gap analysis
-npm run explore                   # Interactive exploration session
+pnpm test                          # Run @e2e tagged scenarios
+pnpm run test:federation           # Federation-specific tests
+pnpm run test:genesis:dry          # Find scenario gaps; does not seed
+pnpm run scan:coverage             # BDD coverage gap analysis
+pnpm run explore                   # Interactive exploration session
 ```
 
 ### orchestrator/ — CI/CD Controller

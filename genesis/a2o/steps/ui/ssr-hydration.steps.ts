@@ -24,11 +24,11 @@
  *   - E2E_DEVICE_MODE=playwright
  *   - E2E_DOORWAY_ALPHA pointing to a doorway with SSR_BUNDLE_PATH set
  *   - The concept "elohim-protocol-overview" seeded in elohim-storage
- *   - pnpm run hc:start:seed (or equivalent) before running
+ *   - just dev start isolated true before running
  *
  * Tag: @wip — cannot be exercised in CI without the full local cluster.
  * To run locally:
- *   cd app/elohim-app && pnpm run hc:start:seed
+ *   just dev start isolated true
  *   cd genesis/a2o && E2E_DEVICE_MODE=playwright E2E_DOORWAY_ALPHA=http://localhost:8888 \
  *     npx cucumber-js --tags '@browser and @ssr and not @wip' features/ssr/*.feature
  * Remove @wip from the scenario tag once the cluster is available in CI.

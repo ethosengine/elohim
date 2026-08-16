@@ -60,7 +60,7 @@
 # read as visibly weaker rather than equivalent. First subject: measure-honesty-local.
 
 version: 1
-updated: 2026-08-12
+updated: 2026-08-16
 vision: >
   A p2p backplane for a socially resilient, reach-gated substrate — a human-scale,
   capture-resistant foundation for communication that can scale to global
@@ -644,6 +644,12 @@ habits:
       - "epr flow stocks --window <START..END> --per week --stock commitments --check --root /projects/elohim (exit 0 = every declared stock draining; fail-closed: refusals exit non-zero, never green-on-nothing)"
       - "a2o @concern:dev-system-equilibrium (genesis/a2o/features/devflow/run-plane.feature — 4 scenarios: filling exits non-zero, drain>=inflow exits zero, an unmeasurable window refuses rather than reporting equilibrium, and the @regression guard that a discharge counts as outflow and never as inflow. @wip: no step definitions drive them yet, so this check runs in NO suite today — the CLI clause above is the only executing proof)"
     evidence: >
+      DELTA 2026-08-16 (developer CLI drain; no status flip): the committed
+      command stock fell 362→322 while its public surface converged to eight
+      root verbs; 32 local gates now have one manifest-declared detector and
+      executor, eliminating the pre-push two-map inflow. This is a local tooling
+      outflow, not evidence that the commitments stock itself is draining;
+      habit remains RED on its existing measured rate.
       DELTA 2026-08-14 (leg 2 close, run #1349 banked): OUTFLOW MOVED A SECOND
       TIME — 2.000/wk -> 3.000/wk on a genuinely NEW consume event (level
       559->558, consumed 19->20, fulfill ledger 'fulfilled (new): 1'), not the

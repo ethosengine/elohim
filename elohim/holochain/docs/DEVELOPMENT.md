@@ -1,208 +1,120 @@
 # Holochain Development Workflow
 
-This document describes how to set up, reset, and work with the Holochain development environment.
+The repository-root `justfile` is the supported entrypoint for the local
+conductor, storage service, Doorway, seeding, and health checks. Its lifecycle
+commands discover dynamic conductor ports and route native Rust builds through
+the cargo target pool.
 
 ## Quick Start
 
-From the `elohim-app` directory:
+From the repository root:
 
 ```bash
-# Full reset and fresh start
-npm run hc:reset
-npm run hc:start
-
-# Bootstrap node steward account
-npm run hc:bootstrap -- --email steward@elohim.host --password secureSteward123 --name "Node Steward"
-
-# Seed content (optional)
-npm run hc:seed:sample
+just dev start                         # isolated conductor + storage + Doorway
+just seed validate local content       # non-writing content validation
+just seed apply local content 10       # explicitly seed ten content records
+just dev app                           # Angular app in a second terminal
 ```
 
-## Architecture Overview
-
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   Angular App   │────▶│    Doorway      │────▶│    Holochain    │
-│   (Browser)     │     │   (Port 8888)   │     │   Conductor     │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-        │                       │
-        │                       ▼
-        │               ┌─────────────────┐
-        │               │   Auth (JWT)    │
-        │               │  + Worker Pool  │
-        │               └─────────────────┘
-        ▼
-┌─────────────────┐
-│  localStorage   │
-│ (Session/Token) │
-└─────────────────┘
-```
-
-### Components
-
-- **Angular App**: Frontend UI, runs at `localhost:4200` (or via Che endpoint)
-- **Doorway Gateway**: Rust WebSocket gateway with JWT auth and worker pool
-- **Holochain Conductor**: DHT node running the elohim hApp
-
-## Commands Reference
-
-### Lifecycle Commands
-
-| Command | Description |
-|---------|-------------|
-| `npm run hc:start` | Start Holochain sandbox + Doorway |
-| `npm run hc:stop` | Stop all Holochain services |
-| `npm run hc:reset` | Full reset (clears all data) |
-| `npm run hc:status` | Check service status |
-
-### User Management
-
-| Command | Description |
-|---------|-------------|
-| `npm run hc:bootstrap -- [options]` | Create node steward account |
-| `npm run hc:seed` | Seed all content from data/lamad |
-| `npm run hc:seed:sample` | Seed sample content (10 items) |
-
-### Bootstrap Options
+To build the native services before starting, or seed the full content corpus
+during startup:
 
 ```bash
-npm run hc:bootstrap -- \
-  --email <email>          # Required: Login email
-  --password <password>    # Required: Password (min 8 chars)
-  --name <name>            # Required: Display name
-  --bio <bio>              # Optional: User bio
-  --affinities <list>      # Optional: Comma-separated interests
+just dev start isolated false true     # build, then start
+just dev start isolated true true      # build, start, and seed
 ```
 
-### Snapshot Management
+The default forms are safe inspections: `just dev` reports runtime status and
+`just seed` validates content without writing it.
 
-| Command | Description |
-|---------|-------------|
-| `npm run hc:snapshot:save` | Save current state |
-| `npm run hc:snapshot:restore` | Restore from snapshot |
-| `npm run hc:snapshot:list` | List available snapshots |
-| `npm run hc:start:snapshot` | Start from saved snapshot |
+## Components
 
-## Workflows
+```text
+Angular app (:4200) -> Doorway (:8888) -> Holochain conductor (dynamic admin port)
+                              |
+                              +----------> elohim-storage (:8090)
+```
 
-### 1. Fresh Development Setup
+- `hc-start.sh` owns the single-peer conductor/service lifecycle.
+- `just dev` supplies the supported public interface.
+- `build-manifest.json` supplies native gate commands and explicit cargo-pool
+  workspace mappings.
+- `genesis/seeder` owns schema validation, seed application, diagnostics, and
+  snapshots.
+
+## Command Reference
+
+| Command | Effect |
+|---|---|
+| `just dev` | Report local runtime status |
+| `just dev start` | Start the isolated local stack |
+| `just dev start alpha` | Join the alpha network profile |
+| `just dev conductor` | Start only the conductor |
+| `just dev app` | Start the Angular app |
+| `just dev stop` | Stop the local conductor and service ports |
+| `just status runtime` | Probe Doorway, storage, and mesh state |
+| `just seed validate local content` | Validate content without writing |
+| `just seed validate local all` | Run all structured-data validators |
+| `just seed apply local content [limit]` | Seed local content explicitly |
+| `just seed stats local` | Read local seed statistics |
+| `just seed diagnose local` | Diagnose the local seed surface |
+
+`just seed apply alpha ...` is a deliberate remote write. Production seeding is
+CI/operator-owned and is not exposed as a local profile.
+
+## Snapshots and Clean Slates
+
+Snapshot operations remain specialist seeder commands:
 
 ```bash
-# From elohim-app directory
-npm run hc:reset              # Clean slate
-npm run hc:start              # Start services (wait for ready)
-
-# Create node steward (you)
-npm run hc:bootstrap -- \
-  --email steward@elohim.host \
-  --password secureSteward123 \
-  --name "Node Steward"
-
-# Optionally seed content
-npm run hc:seed:sample
-
-# Start Angular
-npm start
+cd genesis/seeder
+pnpm run snapshot:status
+pnpm run snapshot:save
+pnpm run snapshot:restore
+pnpm run snapshot:list
 ```
 
-### 2. Resume After Restart
-
-If you stopped the services but didn't reset:
+There is intentionally no destructive root `reset` verb. If a clean conductor
+is required, save anything needed first, stop the stack, and use the explicit
+compatibility reset from `app/elohim-app`:
 
 ```bash
-npm run hc:start              # Services restore state automatically
-# Auth credentials persist in data/users.json
-# Holochain data persists in conductor-data/
+just dev stop
+cd app/elohim-app
+pnpm run hc:reset
 ```
 
-### 3. Add a Hosted User
-
-After node steward is set up, additional users can be created:
-
-```bash
-npm run hc:bootstrap -- \
-  --email user@example.com \
-  --password userPassword123 \
-  --name "Test User" \
-  --affinities "governance,learning"
-```
-
-### 4. Full Reset (Clean Slate)
-
-```bash
-npm run hc:reset              # Clears everything
-npm run hc:start              # Fresh start
-# Must re-bootstrap and re-seed
-```
-
-## User Types
-
-### Node Steward (You)
-- Operates the edge node infrastructure
-- Has access to all admin functions
-- Created via bootstrap script
-
-### Hosted Human
-- Regular user with email/password login
-- Data stored in Holochain DHT
-- Auth via JWT tokens from Doorway
-
-### Session Visitor (Future)
-- Browses without account
-- Data stored locally in browser
-- Can convert to Hosted Human (preserving session data)
-
-## Eclipse Che Environment
-
-In Che, the Angular app auto-detects the environment and routes to:
-- **Admin WebSocket**: `wss://<workspace>-hc-dev.code.ethosengine.com/admin`
-- **App WebSocket**: `wss://<workspace>-hc-dev.code.ethosengine.com/app/<port>`
-- **Auth HTTP**: `https://<workspace>-hc-dev.code.ethosengine.com/auth/*`
+That reset deletes local conductor and storage state. See
+[`genesis/seeder/README.md`](../../../genesis/seeder/README.md) before snapshot or
+seed recovery work.
 
 ## Troubleshooting
 
-### "Conductor not running"
+Start with the read-only probes:
+
 ```bash
-npm run hc:stop
-npm run hc:start
+just status runtime
+just seed diagnose local
 ```
 
-### "Auth credentials already exist"
+If a service is down, stop and restart the coordinated stack instead of killing
+one process or launching a binary from a hard-coded `target/release` path:
+
 ```bash
-npm run hc:reset:auth
-# Then re-bootstrap
+just dev stop
+just dev start
 ```
 
-### "Human already registered"
-This is normal - bootstrap will use the existing Holochain human.
+Native Rust commands outside the manifest runner must have the correct
+`CARGO_TARGET_DIR`; DNA/WASM builds are the exception and remain unredirected.
 
-### CORS errors in browser
-Check that Doorway is running and the Angular app detected the Che environment:
-```bash
-curl http://localhost:8888/health
-```
+## Canonical Paths
 
-### WebSocket connection failures
-Verify the conductor admin port:
-```bash
-ss -tlnp | grep holochain
-# Use the port shown for CONDUCTOR_URL
-```
-
-## File Locations
-
-| Path | Description |
-|------|-------------|
-| `holochain/local-dev/conductor-data/` | Holochain persistent data |
-| `holochain/local-dev/.hc_ports` | Dynamic port assignments |
-| `holochain/seeder/data/lamad/` | Content seed data |
-| `holochain/dna/elohim/` | Holochain hApp source (multi-DNA) |
-| `holochain/doorway/` | Doorway gateway (Rust) |
-
-## Test Credentials
-
-Default node steward (after bootstrap):
-- Email: `steward@elohim.host`
-- Password: `secureSteward123`
-
-These can be changed via the bootstrap command options.
+| Path | Purpose |
+|---|---|
+| `elohim/holochain/local-dev/` | Local conductor state and discovered ports |
+| `elohim/holochain/dna/elohim/` | Lamad DNA/hApp source and workdir |
+| `doorway/doorway-service/` | Doorway Rust service |
+| `elohim/elohim-storage/` | Storage Rust service |
+| `genesis/data/lamad/` | Content source data |
+| `genesis/seeder/` | Validation, seeding, diagnostics, and snapshots |

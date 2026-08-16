@@ -137,7 +137,7 @@ Token generation from economic events. Insurance mutual claim filing. P2P sync b
 
 **Stories**:
 
-1. **As a developer, I want to run `npm run hc:start:seed` and get a working app with real content, so that I have a reliable demo environment.**
+1. **As a developer, I want to run `just dev start isolated true` and get a working app with real content, so that I have a reliable demo environment.**
    - Acceptance: Fresh seed completes without errors. All 7 paths load. Content renders. Blobs resolve.
    - Run full seed pipeline. Fix any broken references.
    - Validate blob content resolution for sparse/blob pattern entries
@@ -150,7 +150,7 @@ Token generation from economic events. Insurance mutual claim filing. P2P sync b
    - Size: M (2 points)
 
 3. **As a developer, I want a smoke test that validates the seeded content, so that I know when the seed is broken.**
-   - Acceptance: `npm run seed:verify` checks all paths resolve, all content loads, all blob references are valid
+   - Acceptance: `just seed validate local content` and `just seed validate local all` pass before applying data
    - Implement using existing `verify-seed.ts` in genesis/seeder
    - Size: M (2 points)
 
@@ -283,8 +283,8 @@ Token generation from economic events. Insurance mutual claim filing. P2P sync b
    - Fix any discovered issues in the path definition or content
    - Size: L (3 points)
 
-2. **As a developer, I want Cypress E2E tests for the learning journey, so that regressions are caught automatically.**
-   - Acceptance: `npm run cypress:run` passes. Covers: login, start path, view content, complete assessment, check progress.
+2. **As a developer, I want Playwright/Cucumber E2E tests for the learning journey, so that regressions are caught automatically.**
+   - Acceptance: `cd genesis/a2o && pnpm run test:browser` passes. Covers: login, start path, view content, complete assessment, check progress.
    - Implement step definitions for existing `learning_journey.feature`
    - Add assessment completion scenario
    - Size: XL (5 points)

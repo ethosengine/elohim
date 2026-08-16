@@ -266,7 +266,7 @@ async function main() {
 
   if (!allHealthy) {
     console.error(
-      '\nSome services are not healthy. Start them with: pnpm run hc:start' +
+      '\nSome services are not healthy. Start them with: just dev start' +
         ' (app/elohim-app — scripts/hc-start.sh owns the stack surface)'
     );
     process.exit(1);

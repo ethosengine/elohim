@@ -1194,8 +1194,10 @@ In `genesis/a2o/features/shefa/m1-matthew-terrance-delivery.feature` line 26, de
 - [ ] **Step 4: Run the a2o scenario locally (if Playwright stack is up)**
 
 ```bash
-cd /projects/elohim/app/elohim-app
-pnpm run cypress:run -- --spec 'genesis/a2o/features/shefa/m1-matthew-terrance-delivery.feature' 2>&1 | tail -30
+cd /projects/elohim/genesis/a2o
+E2E_DEVICE_MODE=playwright pnpm exec cucumber-js \
+  features/shefa/m1-matthew-terrance-delivery.feature \
+  --name 'Reciprocity page shows inflow from Terrance'
 ```
 
 If the local stack isn't running, document the gate as "pending CI green on Jenkins genesis pipeline" and proceed to commit. (Per memory `feedback_shift_measure_jenkins`, the truth measure is Jenkins, not local.)

@@ -2,7 +2,7 @@
 //!
 //! Spawns elohim-storage as a child process with `kill_on_drop(true)` so it
 //! dies automatically when the Tauri app exits. Health-checks the /health
-//! endpoint before returning, matching the storage-start.sh pattern.
+//! endpoint before returning, matching the local stack's health-polling contract.
 
 use std::path::PathBuf;
 use tokio::process::{Child, Command};
@@ -34,7 +34,7 @@ pub struct StorageConfig {
 impl StorageProcess {
     /// Spawn elohim-storage and wait for it to become healthy.
     ///
-    /// Polls GET /health up to 15 times (1s apart), matching storage-start.sh.
+    /// Polls GET /health up to 15 times (1s apart), matching the local stack contract.
     /// Returns Err if the process exits early or never becomes healthy.
     pub async fn spawn(config: StorageConfig) -> Result<Self, String> {
         let mut cmd = Command::new(&config.binary_path);

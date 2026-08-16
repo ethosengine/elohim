@@ -34,11 +34,11 @@
  *   - E2E_DEVICE_MODE=playwright (or omit for HTTP-only mode — no browser needed here)
  *   - E2E_DOORWAY_ALPHA pointing to a doorway with SSR_BUNDLE_PATH set
  *   - elohim-storage seeded with "elohim-protocol-overview" concept and "elohim-protocol" path
- *   - pnpm run hc:start:seed (or equivalent) before running
+ *   - just dev start isolated true before running
  *
  * Tag: @wip — cannot be exercised in CI without the full local cluster.
  * To run locally:
- *   cd app/elohim-app && pnpm run hc:start:seed
+ *   just dev start isolated true
  *   cd genesis/a2o && E2E_DOORWAY_ALPHA=http://localhost:8888 \
  *     npx cucumber-js --tags '@ssr and not @wip' features/ssr/*.feature
  * Remove @wip from the scenario tag once the cluster is available in CI.
@@ -296,7 +296,7 @@ Given('doorway is running with SSR enabled', async function (this: E2EWorld) {
   assert.ok(
     status === 200,
     `Doorway at ${doorwayUrl} is not reachable (status ${status}). ` +
-      'Start the local stack with: cd app/elohim-app && pnpm run hc:start:seed'
+      'Start the local stack with: just dev start isolated true'
   );
 
   // Best-effort SSR check: if the health response contains `ssr_enabled`, assert it.
@@ -331,7 +331,7 @@ Given(
     assert.ok(
       status === 200,
       `Concept "${conceptId}" is not in elohim-storage (status ${status}). ` +
-        'Run: cd app/elohim-app && pnpm run hc:start:seed'
+        'Run: just dev start isolated true'
     );
     this.contentIds.set('currentConceptId', conceptId);
   }
@@ -353,7 +353,7 @@ Given(
     assert.ok(
       status === 200,
       `Learning path "${pathId}" is not in elohim-storage (status ${status}). ` +
-        'Run: cd app/elohim-app && pnpm run hc:start:seed'
+        'Run: just dev start isolated true'
     );
     this.contentIds.set('currentPathId', pathId);
   }

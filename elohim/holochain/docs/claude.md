@@ -31,29 +31,23 @@ Browser (Angular) → Che Endpoint (hc-dev) → Doorway (:8888) → Local Conduc
 
 ### Starting the Local Stack
 
-The recommended way to start the local stack:
+Run the repository-root developer CLI. Its safe default reports status; starting
+is explicit:
 
 ```bash
-# From elohim-app directory - starts sandbox + Doorway automatically
-npm run hc:start
+# From the repository root
+just dev start
 
-# Or with Doorway specifically
-npm run hc:start:doorway
+# Build first, then start and seed the isolated local stack
+just dev start isolated true true
 ```
 
-Manual startup (if needed):
+The root recipe owns cargo-pool selection and artifact paths. Do not bypass it
+with a plain native `cargo build` or a hard-coded `target/release` path. For a
+conductor-only session:
 
 ```bash
-# 1. Start sandbox with hApp
-cd /projects/elohim/holochain/local-dev
-hc sandbox generate --app-id elohim --in-process-lair -r=4445 ../dna/elohim/elohim.happ
-
-# 2. Start Doorway gateway (uses dynamic admin port from .hc_ports file)
-ADMIN_PORT=$(cat .hc_ports | grep admin_port | cut -d= -f2)
-../doorway/target/release/doorway --dev-mode --listen 0.0.0.0:8888 --conductor-url ws://localhost:$ADMIN_PORT
-
-# 3. (Optional) Start Holochain Playground
-npx @holochain-playground/cli ws://localhost:8888/admin &
+just dev conductor
 ```
 
 ### Doorway Gateway
@@ -170,14 +164,10 @@ kubectl port-forward -n ethosengine deploy/elohim-edgenode-dev 4444:8444
 
 ### Doorway Remote Mode
 
-Doorway can proxy to a remote conductor (useful for debugging remote issues):
-
-```bash
-# Start Doorway pointing to remote conductor
-./holochain/doorway/target/release/doorway \
-  --listen 0.0.0.0:8888 \
-  --conductor-url wss://holochain-dev.elohim.host
-```
+The root lifecycle deliberately starts Doorway against its coordinated local
+conductor. Remote dataplane debugging uses the deployed Doorway endpoints and
+the trust-contract probes; do not launch an in-tree `target/release` binary with
+a hard-coded conductor URL.
 
 ---
 
@@ -479,7 +469,7 @@ hc app pack workdir/
 ## Development Workflow (Eclipse Che)
 
 1. Edit code in Che workspace
-2. Run `npm run start` in elohim-app
+2. Run `just dev app` from the repository root
 3. Angular app connects to `wss://holochain-dev.elohim.host` (accessible from Che internal network)
 4. HolochainClientService handles admin/app WebSocket connections
 5. No port-forward needed when working from Eclipse Che
@@ -819,25 +809,21 @@ const findContentByPattern = (pattern: string): string | null => {
 
 ### Process Management
 
-**Killing Doorway**: Use port-based killing:
+Use the root lifecycle command to stop the local conductor, Doorway, and storage
+ports together:
 
 ```bash
-fuser -k 8888/tcp 2>/dev/null
-# Or use npm script
-npm run doorway:stop
+just dev stop
 ```
 
-### NPM Scripts for Holochain Dev Stack
+### Developer CLI for the Holochain Dev Stack
 
-```json
-{
-  "hc:start": "./scripts/hc-start.sh",
-  "hc:stop": "pkill -f 'holochain.*conductor' ; fuser -k 8888/tcp ; rm -f ../holochain/local-dev/.hc_live_* ; echo 'Stopped'",
-  "hc:reset": "npm run hc:stop && rm -rf ../holochain/local-dev/.hc* && echo 'Cleared sandbox data'",
-  "doorway:start": "../holochain/doorway/target/release/doorway --dev-mode --listen 0.0.0.0:8888 --conductor-url ws://localhost:4444",
-  "doorway:stop": "fuser -k 8888/tcp && echo 'Stopped Doorway'",
-  "doorway:build": "cd ../holochain/doorway && RUSTFLAGS='' cargo build --release"
-}
+```bash
+just dev                 # safe status default
+just dev start           # isolated conductor + services
+just dev start alpha     # join the alpha network profile
+just dev stop
+just status runtime
 ```
 
 ### Automated Startup Script Pattern

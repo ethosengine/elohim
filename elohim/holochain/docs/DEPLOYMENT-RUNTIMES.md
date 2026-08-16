@@ -60,7 +60,7 @@ This guide explains the different runtime environments for developing and deploy
 
 **Start the stack:**
 ```bash
-npm run hc:start  # In app/elohim-app/
+just dev start  # From the repository root
 ```
 
 ---
@@ -290,21 +290,19 @@ The seeder populates Holochain with structured content from `/data/lamad`.
 ### Local Seeding
 
 ```bash
-# From app/elohim-app/
-npm run hc:seed              # Full seed
-npm run hc:seed:sample       # Sample (10 items)
+# From the repository root
+just seed apply local              # Full local seed
+just seed apply local content 10   # Sample (10 items)
 ```
 
 ### Remote Seeding
 
 ```bash
-# Dev environment (holochain-dev.elohim.host)
-npm run hc:seed:dev
-npm run hc:seed:dev:sample   # Test with 10 items first
+# Alpha environment
+just seed apply alpha
+just seed apply alpha content 10   # Test with 10 items first
 
-# Production (holochain.elohim.host)
-export ELOHIM_PROD_API_KEY="your-production-api-key"
-npm run hc:seed:prod
+# Production seeding is CI/operator-owned; there is no public production profile.
 ```
 
 ### How Remote Seeding Works
@@ -332,17 +330,17 @@ npm run hc:seed:prod
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-**Important:** Only set `HOLOCHAIN_ADMIN_URL` for remote seeding. The seeder
-automatically resolves the app URL using the `/app/:port` routing pattern.
+The named profile supplies the alpha doorway, storage, and conductor endpoints.
+Do not recreate environment-specific npm aliases.
 
 ### Checking Content Stats
 
 ```bash
-npm run hc:stats:dev         # Dev environment
-npm run hc:stats:prod        # Production
+just seed stats alpha        # Alpha environment
+cd genesis/seeder && pnpm run stats:prod  # Operator-only production read
 ```
 
-For detailed seeder documentation, see `holochain/seeder/README.md`.
+For detailed seeder documentation, see `genesis/seeder/README.md`.
 
 ---
 
