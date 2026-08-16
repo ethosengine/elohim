@@ -219,6 +219,22 @@ before investing.
     the same failure one layer down — a path-cite that dies on a move. Whether Rust doc comments
     should carry sealed cites at all is a larger question; do not fold it in.
 
+20. **Developer CLI surface: 362 npm scripts across 25 packages + a drifted root justfile.**
+    Census + consolidation direction in
+    [dev-cli-hygiene-script-census](../backlog/2026-08-16-dev-cli-hygiene-script-census.md)
+    (2026-08-16). Four surfaces carry 63% (seeder 69 · elohim-app 62 · root 54 · a2o 42);
+    `build`×19 / `test`×16 / `lint`×10 name fragmentation; the existing root justfile
+    (last touched 2026-06-23) has zero cargo-pool awareness so its native-cargo recipes are
+    denied by the disk-guard or mint rogue legacy `target/`s. Direction: revive the root
+    justfile with ~8 manifest-driven verbs (`gate` resolves `build-manifest.json
+    gate.projects` — kills the pre-push two-detection-path drift class), bury RUSTFLAGS/pool
+    gotchas in recipes, collapse the seeder's verb×corpus×env matrix to parameterized verbs,
+    prune by census with a deprecation-echo cycle. First surgical pass ran 2026-08-16
+    (broken `build:sophia` path fixed; obsolete `sonar:preview` removed; census doc carries
+    the verified-alive list so the next pass doesn't re-derive it). Gospel drift found, not
+    yet fixed: root CLAUDE.md documents `pnpm run cypress:run` in elohim-app — no such
+    script exists (E2E moved to `genesis/a2o`; the live aliases are `e2e`/`e2e:browser`).
+
 ## Exit criteria
 
 Each item lands as its own bounded change (or an explicit won't-fix note here), with the

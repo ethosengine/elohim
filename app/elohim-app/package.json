@@ -7,7 +7,7 @@
     "prebuild": "pnpm --filter @elohim/storage-client build && bash scripts/check-sophia.sh && bash scripts/fetch-fonts.sh && pnpm run build:sw && pnpm run build:wasm",
     "build:sw": "esbuild src/apps-sw.ts --bundle --outfile=src/assets/apps-sw.js --format=iife --target=es2020",
     "build:wasm": "bash scripts/build-wasm.sh",
-    "build:sophia": "cd ../sophia && pnpm install && pnpm build && pnpm build:umd",
+    "build:sophia": "cd ../../sophia && pnpm install && pnpm build && pnpm build:umd",
     "start": "ng serve --proxy-config proxy.conf.mjs",
     "start:alpha": "ng serve --proxy-config proxy.conf.alpha.mjs",
     "stop": "pkill -f 'ng serve' 2>/dev/null && echo 'Stopped Angular dev server' || echo 'Angular dev server not running'",
@@ -62,7 +62,6 @@
     "diagnose": "cd ../../genesis/seeder && npm run diagnose",
     "diagnose:dev": "cd ../../genesis/seeder && npm run diagnose:dev",
     "sonar": "SONAR_TOKEN=$SONARQUBE_TOKEN sonar-scanner",
-    "sonar:preview": "SONAR_TOKEN=$SONARQUBE_TOKEN sonar-scanner -Dsonar.analysis.mode=preview",
     "quality": "npm run lint && npm run format:check && npm run test && npm run sonar"
   },
   "private": true,
