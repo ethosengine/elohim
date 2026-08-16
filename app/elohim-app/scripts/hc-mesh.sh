@@ -26,6 +26,13 @@
 #   STORAGE_BIN     elohim-storage binary (default: pool release slot)
 #   DOORWAY_BIN     doorway binary (default: pool debug slot)
 #
+#   Dev-tier pacing profile (see the block below the port-scheme helpers —
+#   minutes-quiesce plan W3): MESH_RECONCILE_SECS, MESH_CONTEST_BACKOFF,
+#   MESH_HEAL_MISSING_BACKOFF, MESH_EVIDENCE_ABSENT_BACKOFF,
+#   MESH_HEAD_CORPUS_DIGEST override the storage peers' reconcile/backoff
+#   cadence; the conductor sandboxes also get a fixed kitsune2 gossip
+#   acceleration patch (k2Gossip initiate=1000ms) after generate, before run.
+#
 # LOAD-BEARING FACTS (verified against holochain 0.6.0 / hc 0.6.0):
 #   - `hc sandbox --piped` reads the lair passphrase from stdin: the old
 #     socat/PTY wrapper is obsolete.
@@ -67,6 +74,41 @@ admin_port() { echo $((4444 + 10 * $1)); }
 app_port()   { echo $((4445 + 10 * $1)); }
 http_port()  { echo $((8090 + $1)); }
 p2p_port()   { echo $((9701 + $1)); }
+
+# ---------------------------------------------------------------------------
+# dev-tier pacing profile (declared preproduction stakes — see minutes-quiesce
+# plan W3: genesis/docs/superpowers/plans/2026-08-16-minutes-quiesce-fixture-
+# trust-swarm-plan.md §3). Same reconcile/backoff machinery elohim-storage
+# runs everywhere — never a parallel dev path — just tuned to a declared
+# preproduction cadence so the 3-peer local mesh converges in minutes
+# instead of the ~90min baseline (.claude/shifts/2026-08-16T04-15-local-
+# mesh-saga-delivery.journal.md). Every knob overrides via its own MESH_*
+# var; defaults below are the dev-tier stakes, never applied silently in
+# prod (this file is dev-only). Names verified against elohim-storage/src/
+# {main.rs,config.rs} 2026-08-16 — these are the exact env vars the storage
+# binary reads, not aliases:
+#   PROJECTION_RECONCILE_SECS            reconcile sweep cadence (prod default 300s)
+#   CONTEST_BACKOFF_SECONDS               contest-backoff ladder rung (prod default 3600s)
+#   HEAL_MISSING_BACKOFF_SECONDS          heal-missing backoff rung (prod default 600s)
+#   ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS   evidence-absent backoff rung (prod default 86400s)
+#   ELOHIM_HEAD_CORPUS_DIGEST             T5 digest-requester flip (prod default off/0)
+#   ELOHIM_NETWORK_STAKES                 T10 declared-stakes operator-config leg (prod:
+#                                          unset -> Bootstrap fail-closed default). The
+#                                          explicit Simulacra declaration for THIS local
+#                                          preproduction mesh only — Simulacra is never a
+#                                          default and never derived from DEV_MODE; it is
+#                                          reached only by this positive declaration
+#                                          (trust::manifest_resolver::ManifestStakesResolver,
+#                                          T10 runtime half, §3 W2 task Q6).
+# ---------------------------------------------------------------------------
+PROJECTION_RECONCILE_SECS="${MESH_RECONCILE_SECS:-30}"
+CONTEST_BACKOFF_SECONDS="${MESH_CONTEST_BACKOFF:-120}"
+HEAL_MISSING_BACKOFF_SECONDS="${MESH_HEAL_MISSING_BACKOFF:-60}"
+ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS="${MESH_EVIDENCE_ABSENT_BACKOFF:-600}"
+ELOHIM_HEAD_CORPUS_DIGEST="${MESH_HEAD_CORPUS_DIGEST:-1}"
+# Explicit preproduction Simulacra declaration for the local mesh's storage peers
+# (never a default — see the comment block above).
+ELOHIM_NETWORK_STAKES="${MESH_NETWORK_STAKES:-simulacra}"
 
 # Alpha identity model (edgenode template): each storage node self-heals its
 # own human's agent_pub_key from its conductor cell key, NULL-only. Without
@@ -176,8 +218,8 @@ EOF
   if ! curl -s -m 2 "http://localhost:$DOORWAY_PORT/health" >/dev/null; then
     local i=0 primary="" extras=""
     for name in "${PEERS[@]}"; do
-      if [ $i -eq 0 ]; then primary="http://localhost:$(http_port $i)"
-      else extras+="${extras:+,}http://localhost:$(http_port $i)"; fi
+      if [ $i -eq 0 ]; then primary="http://127.0.0.1:$(http_port $i)"
+      else extras+="${extras:+,}http://127.0.0.1:$(http_port $i)"; fi
       i=$((i+1))
     done
     # DOORWAY_ID models alpha's alpha-elohim-host: the EPR router filters
@@ -215,8 +257,8 @@ EOF
     SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
     nohup "$DOORWAY_BIN" --dev-mode --listen "0.0.0.0:$DOORWAY_B_PORT" \
       --conductor-url "ws://localhost:$(admin_port 1)" \
-      --storage-url "http://localhost:$(http_port 1)" \
-      --storage-urls "http://localhost:$(http_port 0),http://localhost:$(http_port 2)" \
+      --storage-url "http://127.0.0.1:$(http_port 1)" \
+      --storage-urls "http://127.0.0.1:$(http_port 0),http://127.0.0.1:$(http_port 2)" \
       > "$LOGDIR/doorway-b.log" 2>&1 &
     for _ in $(seq 1 20); do
       curl -s -m 2 "http://localhost:$DOORWAY_B_PORT/health" >/dev/null && break; sleep 1
@@ -226,24 +268,87 @@ EOF
     echo "doorway B already up on :$DOORWAY_B_PORT"
   fi
 
-  # 2. Conductors: one hc sandbox generate, N sandboxes, pinned ports,
-  #    discovery via the local doorway.
+  # 2. Conductors: hc sandbox generate (installs the happ + writes each
+  #    sandbox's conductor-config.yaml, but does NOT launch the conductor —
+  #    only `-r`/`run` does that per `hc sandbox generate --help`), THEN
+  #    patch the dev-tier gossip config into each written config, THEN run.
+  #    Splitting generate from run (the old code combined them via
+  #    `generate -r=$rports`) creates the window the pacing profile needs:
+  #    the conductor must not boot until the patch has landed, or its first
+  #    kitsune2 gossip round starts at prod cadence.
   if [ "$(ss -tln | grep -cE "127.0.0.1:$(admin_port 0) ")" -eq 0 ]; then
     cd "$LOCAL_DEV_DIR" || exit 2
-    rm -rf .hc .sandbox_log "${PEERS[@]}"
+    rm -rf .hc .sandbox_log .sandbox_run_log "${PEERS[@]}"
     local fports="" rports=""
     local i=0
     for _ in "${PEERS[@]}"; do
       fports+="${fports:+,}$(admin_port $i)"; rports+="${rports:+,}$(app_port $i)"; i=$((i+1))
     done
-    nohup sh -c "echo test | hc sandbox --piped -f $fports generate -n ${#PEERS[@]} \
-      --app-id elohim --in-process-lair -r=$rports --root \"\$PWD\" -d $MESH_PEERS \
+
+    echo -n "generating ${#PEERS[@]} conductor sandboxes (cold install can take ~2-4 min)"
+    timeout 300 sh -c "echo test | hc sandbox --piped -f $fports generate -n ${#PEERS[@]} \
+      --app-id elohim --in-process-lair --root \"\$PWD\" -d $MESH_PEERS \
       \"$HAPP_PATH\" network --bootstrap http://localhost:$DOORWAY_PORT/bootstrap \
-      webrtc ws://signal.localhost:$DOORWAY_PORT" > .sandbox_log 2>&1 &
-    echo -n "waiting for ${#PEERS[@]} conductors (cold install can take ~2-4 min)"
+      webrtc ws://signal.localhost:$DOORWAY_PORT" > .sandbox_log 2>&1
+    gen_status=$?
+    echo " done"
+    if [ "$gen_status" -ne 0 ] || grep -qa "Payload: Could not" .sandbox_log; then
+      echo "conductor generate failed (exit=$gen_status) — see $LOCAL_DEV_DIR/.sandbox_log"
+      exit 1
+    fi
+
+    # -------------------------------------------------------------------
+    # dev-tier gossip acceleration (declared preproduction stakes — see
+    # minutes-quiesce plan W3). Holochain 0.6's ConductorConfig.network.
+    # advanced JSON passes straight through to kitsune2
+    # (holochain-conductor crates/holochain_conductor_api/src/config/
+    # conductor.rs with_gossip_*_interval_ms; the k2Gossip module name and
+    # camelCase keys are its wire shape). initiateIntervalMs /
+    # minInitiateIntervalMs at 1000ms match what SweetConductorConfig::
+    # standard() sets for upstream tests (sweettest/sweet_conductor_
+    # config.rs:82-84) — vs prod defaults of 120_000ms / 300_000ms
+    # (elohim/kitsune2 crates/gossip/src/config.rs). initialInitiateIntervalMs
+    # (first-round-only interval; same struct, same file — confirmed present
+    # under `#[serde(rename_all = "camelCase")]` before wiring it here) is
+    # set explicitly for clarity — its default is already 1000ms.
+    # Boot-verified 2026-08-16: a scratch single-sandbox conductor patched
+    # with this exact block came up clean (admin port live, `list-apps`
+    # returned the installed happ, no config-parse errors) before this loop
+    # was wired to run for real.
+    # -------------------------------------------------------------------
+    for name in "${PEERS[@]}"; do
+      python3 - "$LOCAL_DEV_DIR/$name/conductor-config.yaml" <<'PYEOF'
+import sys
+import yaml
+
+path = sys.argv[1]
+with open(path) as f:
+    cfg = yaml.safe_load(f)
+
+network = cfg.setdefault("network", {})
+advanced = network.get("advanced") or {}
+k2gossip = advanced.get("k2Gossip") or {}
+k2gossip["initiateIntervalMs"] = 1000
+k2gossip["minInitiateIntervalMs"] = 1000
+k2gossip["initialInitiateIntervalMs"] = 1000
+advanced["k2Gossip"] = k2gossip
+network["advanced"] = advanced
+
+with open(path, "w") as f:
+    yaml.safe_dump(cfg, f, default_flow_style=False, sort_keys=False)
+PYEOF
+      if [ $? -ne 0 ]; then
+        echo "gossip-config patch failed for $name — see $LOCAL_DEV_DIR/$name/conductor-config.yaml"
+        exit 1
+      fi
+    done
+    echo "dev-tier gossip config patched into ${#PEERS[@]} conductor-config.yaml (k2Gossip initiate=1000ms)"
+
+    nohup sh -c "echo test | hc sandbox --piped -f $fports run -a -p=$rports" > .sandbox_run_log 2>&1 &
+    echo -n "waiting for ${#PEERS[@]} conductors to boot"
     for _ in $(seq 1 90); do
       [ "$(ss -tln | grep -cE "127.0.0.1:($(echo "$fports" | tr ',' '|')) ")" -ge ${#PEERS[@]} ] && break
-      grep -qa "Payload: Could not" .sandbox_log && { echo; echo "conductor failed — see $LOCAL_DEV_DIR/.sandbox_log"; exit 1; }
+      grep -qa "Payload: Could not" .sandbox_run_log && { echo; echo "conductor run failed — see $LOCAL_DEV_DIR/.sandbox_run_log"; exit 1; }
       printf "."; sleep 3
     done
     echo " up"
@@ -269,6 +374,12 @@ EOF
       HOUSEHOLD_ID=household-dowell \
       DEVICE_ARCHETYPE=device-family-node-base \
       ELOHIM_STORAGE_PEER_POLICY_PATH="$MESH_DIR/peer-policy.toml" \
+      PROJECTION_RECONCILE_SECS="$PROJECTION_RECONCILE_SECS" \
+      CONTEST_BACKOFF_SECONDS="$CONTEST_BACKOFF_SECONDS" \
+      HEAL_MISSING_BACKOFF_SECONDS="$HEAL_MISSING_BACKOFF_SECONDS" \
+      ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS="$ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS" \
+      ELOHIM_HEAD_CORPUS_DIGEST="$ELOHIM_HEAD_CORPUS_DIGEST" \
+      ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
       nohup "$STORAGE_BIN" --http-port "$(http_port $i)" > "$LOGDIR/$name.log" 2>&1 &
       echo "storage $name: http=$(http_port $i) p2p=$(p2p_port $i) agent=${agent:0:16}..."
     else
