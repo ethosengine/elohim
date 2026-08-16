@@ -210,6 +210,12 @@ codegen target="all" mode="verify":
 
 # ---- Private manifest runners -------------------------------------------------
 
+# Executable contract probe for run-local-gate.sh's env handling. Not registered
+# in any manifest; invoked directly by gate-runner.test.mjs so that
+# `rustflags: ""` collapsing back to inherit can never regress silently.
+_gate-selftest-env:
+    @echo "RUSTFLAGS=[${RUSTFLAGS-<unset>}] CARGO_TARGET_DIR=[${CARGO_TARGET_DIR-<unset>}]"
+
 _gate-elohim-library:
     cd app/elohim-library && pnpm exec eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src
     cd app/elohim-library/projects/elohim-service && pnpm exec tsc --noEmit && pnpm exec vitest run

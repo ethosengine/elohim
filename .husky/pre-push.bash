@@ -308,8 +308,12 @@ PROJECTS=""
 if command -v node >/dev/null 2>&1; then
   # One manifest registry owns both detection and execution. New gate-only
   # checks declare `gate.projects[*].inputs`; there is no second grep map.
-  PROJECTS=$(echo "$CHANGED" | node genesis/orchestrator/gate-runner.mjs --changed-file-list --names 2>/dev/null | tr '\n' ' ')
-  [ $? -eq 0 ] || { echo "[pre-push] manifest gate selection failed"; exit 1; }
+  # stderr is NOT suppressed: selection is now fail-CLOSED (a malformed manifest
+  # or an unregistered gate project blocks every push), so the reason must be
+  # visible. Swallowing it would trade the old "Unknown project" abort for a
+  # silent one.
+  PROJECTS=$(echo "$CHANGED" | node genesis/orchestrator/gate-runner.mjs --changed-file-list --names | tr '\n' ' ')
+  [ $? -eq 0 ] || { echo "[pre-push] manifest gate selection failed (see error above)"; exit 1; }
 else
   echo "[pre-push] node unavailable — manifest gate selection skipped (CI backstop)."
 fi

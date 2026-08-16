@@ -10,7 +10,12 @@ recipe="$5"
 workspace="${6:-}"
 target_dir="${7:-}"
 profile="${8:-dev}"
-rustflags="${9:-__inherit__}"
+# `${9-...}` (unset-only), NOT `${9:-...}` (unset-or-EMPTY). `rustflags: ""` is
+# the single most common declaration in the manifests — it is how a native crate
+# clears the ambient WASM `--cfg getrandom_backend="custom"`. With `:-` the empty
+# string collapsed to __inherit__, RUSTFLAGS was left alone, and every native gate
+# died at link time with `undefined symbol: __getrandom_v03_custom`.
+rustflags="${9-__inherit__}"
 
 if [[ -n "$workspace" && -n "$target_dir" ]]; then
   echo "gate $project_name: cargo workspace and targetDir are mutually exclusive" >&2

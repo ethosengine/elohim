@@ -1,6 +1,7 @@
 import { describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
@@ -59,6 +60,27 @@ describe('manifest-driven local gate registry', () => {
       const selected = projectsForChanges(ROOT, [changed]).map(project => project.name);
       assert.ok(selected.includes(expected), `${changed} must select ${expected}`);
     }
+  });
+
+  test('an empty rustflags declaration CLEARS RUSTFLAGS instead of inheriting', () => {
+    // Regression: run-local-gate.sh used ${9:-__inherit__}, so `rustflags: ""`
+    // — how every native crate drops the ambient WASM getrandom cfg — collapsed
+    // back to inherit and each native gate died at link time with
+    // `undefined symbol: __getrandom_v03_custom`.
+    const probe = (rustflags) => spawnSync(
+      'bash',
+      [resolve(ROOT, 'genesis/orchestrator/run-local-gate.sh'),
+        ROOT, 'selftest', '.', 'root-just', '_gate-selftest-env', '', '', 'dev', rustflags],
+      { encoding: 'utf8', env: { ...process.env, RUSTFLAGS: '--cfg getrandom_backend="custom"' } }
+    );
+
+    assert.match(probe('').stdout, /RUSTFLAGS=\[\]/);
+    assert.match(probe('__inherit__').stdout, /RUSTFLAGS=\[--cfg getrandom_backend="custom"\]/);
+
+    // Every manifest that declares an empty rustflags depends on the above.
+    const clearing = [...registry.values()]
+      .filter(project => project.run.cargo && project.run.cargo.rustflags === '');
+    assert.ok(clearing.length >= 8, `expected native gates that clear RUSTFLAGS, got ${clearing.length}`);
   });
 
   test('unknown targets fail instead of silently running the wrong gate', () => {
