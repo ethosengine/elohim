@@ -28,7 +28,7 @@ import {
   matchesCiIgnore,
   CI_IGNORE_PATTERNS,
 } from './ci-ignore.mjs';
-import { loadPipelineRegistry } from './pipeline-registry.mjs';
+import { loadGateRegistry, loadPipelineRegistry } from './pipeline-registry.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '../..');
@@ -137,13 +137,18 @@ test('dead change-detection helpers are retired from the Jenkinsfile', () => {
 // pre-push guard: no references to deleted orchestrator-strategy module
 // ══════════════════════════════════════════════════════════════════
 
-test('pre-push references no deleted orchestrator-strategy module', () => {
+test('pre-push uses the manifest gate registry and no deleted strategy module', () => {
   // .husky/pre-push is a POSIX shim that execs pre-push.bash — the gates live there.
   const hook = readFileSync(new URL('../../.husky/pre-push.bash', import.meta.url), 'utf8');
   assert.equal(hook.includes('orchestrator-strategy'), false,
     'pre-push must not reference the deleted orchestrator-strategy.mjs/.test.mjs');
-  assert.ok(/build-manifest\.json/.test(hook) && hook.includes('pipeline-list-fresh'),
-    'pipeline-list-fresh must trigger on build-manifest.json / pipeline-registry.mjs changes');
+  assert.ok(hook.includes('gate-runner.mjs --changed-file-list'),
+    'pre-push must select projects through the shared manifest gate runner');
+
+  const pipelineList = loadGateRegistry(ROOT).get('pipeline-list-fresh');
+  assert.ok(pipelineList, 'pipeline-list-fresh must remain manifest-declared');
+  assert.deepEqual(pipelineList.inputs.sources, ['**/build-manifest.json']);
+  assert.ok(pipelineList.inputs.buildProcess.includes('genesis/orchestrator/pipeline-registry.mjs'));
 });
 
 // ══════════════════════════════════════════════════════════════════

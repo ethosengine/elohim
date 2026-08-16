@@ -50,8 +50,32 @@
   },
   "gate": {
     "projects": {
-      "elohim-epr": { "dir": "elohim/epr", "steps": ["rust-build-test"] },
-      "epr-ts": { "dir": "elohim/sdk/epr-ts", "steps": ["ts-test"] }
+      "elohim-epr": {
+        "dir": "elohim/epr",
+        "steps": ["rust-build-test"],
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-elohim-epr",
+          "cargo": { "workspace": "elohim", "profile": "dev", "rustflags": "" }
+        }
+      },
+      "epr-ts": {
+        "dir": "elohim/sdk/epr-ts",
+        "steps": ["ts-test"],
+        "run": { "kind": "root-just", "recipe": "_gate-epr-ts" }
+      },
+      "seam-contracts": {
+        "dir": "crates/seam-contracts",
+        "inputs": {
+          "sources": ["crates/seam-contracts/**"],
+          "buildProcess": []
+        },
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-seam-contracts",
+          "cargo": { "workspace": "crates/seam-contracts", "profile": "dev", "rustflags": "" }
+        }
+      }
     }
   },
   "deployment": {}

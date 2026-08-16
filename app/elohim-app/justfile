@@ -69,5 +69,5 @@ lint-a11y-strict *DIRS:
 deps:
     pnpm --filter @elohim/storage-client build
 
-# Quality gate: route-literal lint + a11y-color ratchet + dep freshness + build + test
-gate: lint-routes lint-a11y deps build test
+# Quality gate: ESLint + route/a11y rails + dep freshness + build + test.
+gate: lint lint-routes lint-a11y deps build test

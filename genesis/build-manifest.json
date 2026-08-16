@@ -134,15 +134,57 @@
     "projects": {
       "genesis": {
         "dir": "genesis/seeder",
-        "steps": ["validate-seeds", "seed-content", "gate-genesis"]
+        "steps": ["validate-seeds", "seed-content", "gate-genesis"],
+        "run": { "kind": "just", "recipe": "gate" }
       },
-      "schema-validate": { "dir": ".", "steps": ["schema-validate"] },
-      "schema-codegen": { "dir": ".", "steps": ["schema-codegen"] },
-      "constants-sync": { "dir": ".", "steps": ["constants-sync"] },
-      "genesis-a2o": { "dir": "genesis/a2o", "steps": ["lint-a2o"] },
+      "schema-validate": {
+        "dir": ".",
+        "steps": ["schema-validate"],
+        "run": { "kind": "root-just", "recipe": "_gate-schema-validate" }
+      },
+      "schema-codegen": {
+        "dir": ".",
+        "steps": ["schema-codegen"],
+        "run": { "kind": "root-just", "recipe": "_gate-schema-codegen" }
+      },
+      "constants-sync": {
+        "dir": ".",
+        "steps": ["constants-sync"],
+        "run": { "kind": "root-just", "recipe": "_gate-constants-sync" }
+      },
+      "genesis-a2o": {
+        "dir": "genesis/a2o",
+        "steps": ["lint-a2o"],
+        "run": { "kind": "root-just", "recipe": "_gate-genesis-a2o" }
+      },
       "gherkin-prepush-lint": {
         "dir": "genesis/a2o",
-        "steps": ["gherkin-prepush-lint"]
+        "steps": ["gherkin-prepush-lint"],
+        "run": { "kind": "root-just", "recipe": "_gate-gherkin-prepush-lint" }
+      },
+      "reach-drift": {
+        "dir": ".",
+        "inputs": {
+          "sources": [
+            "genesis/data/lamad/content/**",
+            "genesis/data/lamad/paths/**",
+            "elohim/sdk/schemas/v1/enums/reach.schema.json"
+          ],
+          "buildProcess": ["genesis/seeder/scripts/check-reach-drift.mjs"]
+        },
+        "run": { "kind": "root-just", "recipe": "_gate-reach-drift" }
+      },
+      "domain-types": {
+        "dir": ".",
+        "inputs": {
+          "sources": ["elohim/sdk/**"],
+          "buildProcess": []
+        },
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-domain-types",
+          "cargo": { "workspace": "elohim", "profile": "dev", "rustflags": "" }
+        }
       }
     }
   },

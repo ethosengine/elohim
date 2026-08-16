@@ -91,7 +91,7 @@
           "type": "object",
           "additionalProperties": {
             "type": "object",
-            "required": ["dir"],
+            "required": ["dir", "run"],
             "additionalProperties": false,
             "properties": {
               "dir": {
@@ -102,6 +102,13 @@
                 "type": "array",
                 "items": { "type": "string" },
                 "description": "Which manifest steps trigger this gate project (default: all steps)"
+              },
+              "inputs": {
+                "$ref": "#/$defs/inputs",
+                "description": "Gate-only change inputs. These select a local check without creating a Jenkins pipeline step."
+              },
+              "run": {
+                "$ref": "#/$defs/gateRun"
               }
             }
           },
@@ -111,6 +118,54 @@
     }
   },
   "$defs": {
+    "inputs": {
+      "type": "object",
+      "required": ["sources", "buildProcess"],
+      "additionalProperties": false,
+      "properties": {
+        "sources": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "buildProcess": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^@]+(@[a-zA-Z][a-zA-Z0-9_]*)?$"
+          }
+        }
+      }
+    },
+    "gateRun": {
+      "type": "object",
+      "required": ["kind", "recipe"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["just", "root-just"],
+          "description": "Run a recipe from the project's justfile or the repository-root justfile."
+        },
+        "recipe": {
+          "type": "string",
+          "pattern": "^_?[a-z][a-z0-9-]*$"
+        },
+        "cargo": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "workspace": { "type": "string" },
+            "targetDir": { "type": "string" },
+            "profile": { "type": "string", "enum": ["dev", "release"], "default": "dev" },
+            "rustflags": { "type": "string" }
+          },
+          "oneOf": [
+            { "required": ["workspace"], "not": { "required": ["targetDir"] } },
+            { "required": ["targetDir"], "not": { "required": ["workspace"] } }
+          ]
+        }
+      }
+    },
     "step": {
       "type": "object",
       "required": ["description", "inputs", "outputs", "depends", "executor"],
@@ -119,26 +174,7 @@
         "description": {
           "type": "string"
         },
-        "inputs": {
-          "type": "object",
-          "required": ["sources", "buildProcess"],
-          "additionalProperties": false,
-          "properties": {
-            "sources": {
-              "type": "array",
-              "items": { "type": "string" },
-              "description": "Glob patterns for source files (relative to repo root)"
-            },
-            "buildProcess": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "pattern": "^[^@]+(@[a-zA-Z][a-zA-Z0-9_]*)?$"
-              },
-              "description": "References to build logic — 'File@functionName' for function hash, 'File' for whole-file hash"
-            }
-          }
-        },
+        "inputs": { "$ref": "#/$defs/inputs" },
         "outputs": {
           "type": "object",
           "required": ["artifacts"],

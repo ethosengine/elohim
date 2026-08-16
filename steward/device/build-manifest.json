@@ -35,7 +35,14 @@
   },
   "gate": {
     "projects": {
-      "steward-node": { "dir": "steward/node" }
+      "steward-node": {
+        "dir": "steward/node",
+        "run": {
+          "kind": "just",
+          "recipe": "gate",
+          "cargo": { "workspace": "steward/node", "profile": "dev", "rustflags": "" }
+        }
+      }
     }
   },
   "deployment": {}

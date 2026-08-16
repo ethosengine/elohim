@@ -76,8 +76,27 @@
   },
   "gate": {
     "projects": {
-      "elohim-app": { "dir": "app/elohim-app", "steps": ["build-angular", "build-site-image"] },
-      "elohim-library": { "dir": "app/elohim-library", "steps": ["lint-library"] }
+      "elohim-app": {
+        "dir": "app/elohim-app",
+        "steps": ["build-angular", "build-site-image"],
+        "run": { "kind": "just", "recipe": "gate" }
+      },
+      "elohim-library": {
+        "dir": "app/elohim-library",
+        "steps": ["lint-library"],
+        "run": { "kind": "root-just", "recipe": "_gate-elohim-library" }
+      },
+      "elements-codegen": {
+        "dir": ".",
+        "inputs": {
+          "sources": [
+            "app/elohim-elements/*/src/**/*.ts",
+            "app/elohim-elements/*/custom-elements-manifest.config.mjs"
+          ],
+          "buildProcess": ["tools/check-cem-fresh.mjs"]
+        },
+        "run": { "kind": "root-just", "recipe": "_gate-elements-codegen" }
+      }
     }
   },
   "deployment": {

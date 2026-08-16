@@ -8,6 +8,7 @@ import {
   dispatchablePipelines,
   pipelinesThatTriggerGenesis,
   pipelineDependencyMap,
+  loadGateRegistry,
 } from './pipeline-registry.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -67,5 +68,12 @@ describe('pipeline-registry', () => {
     assert.ok(edge.deploymentCheck.alpha, 'should have alpha endpoint');
     const sophia = registry.get('elohim-sophia');
     assert.strictEqual(sophia.deploymentCheck, null, 'sophia has no deployment');
+  });
+
+  test('gate registry preserves manifest-local execution contracts', () => {
+    const gates = loadGateRegistry(ROOT);
+    assert.ok(gates.size >= 23, `expected ≥23 gates, got ${gates.size}`);
+    assert.strictEqual(gates.get('doorway').dir, 'doorway/doorway-service');
+    assert.strictEqual(gates.get('doorway').run.kind, 'just');
   });
 });

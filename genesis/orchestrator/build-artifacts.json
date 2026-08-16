@@ -10,6 +10,7 @@
     "conductorReadiness": "conductor-readiness.json",
     "seedResultsConductorIdentities": "seed-results-conductor-identities.json",
     "seedResultsAgentBindings": "seed-results-agent-bindings.json",
-    "seedResultsHouseholdFormation": "seed-results-household-formation.json"
+    "seedResultsHouseholdFormation": "seed-results-household-formation.json",
+    "stakesDeclaration": "stakes-declaration.json"
   }
 }

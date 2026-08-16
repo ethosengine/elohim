@@ -26,7 +26,15 @@
   },
   "gate": {
     "projects": {
-      "elohim-compute": { "dir": "elohim/elohim-compute", "steps": ["build-compute"] }
+      "elohim-compute": {
+        "dir": "elohim/elohim-compute",
+        "steps": ["build-compute"],
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-elohim-compute",
+          "cargo": { "workspace": "elohim", "profile": "dev", "rustflags": "" }
+        }
+      }
     }
   },
   "deployment": {}

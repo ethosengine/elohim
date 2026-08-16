@@ -6,7 +6,6 @@
   "description": "Alpha-to-omega validation: E2E tests that verify deployed artifacts match genesis intent",
   "scripts": {
     "test": "cucumber-js --tags '@e2e'",
-    "test:practical": "cucumber-js --tags '@e2e'",
     "test:auth": "cucumber-js --tags '@e2e and @auth'",
     "test:content": "cucumber-js --tags '@e2e and @content'",
     "test:basics": "cucumber-js --tags '@e2e and (@auth or @content)'",

@@ -117,9 +117,33 @@
   },
   "gate": {
     "projects": {
-      "schema-dna": { "dir": ".", "steps": ["schema-dna"] },
-      "manifest-hygiene": { "dir": ".", "steps": ["manifest-hygiene"] },
-      "sweettest-check": { "dir": ".", "steps": ["sweettest-check"] }
+      "schema-dna": {
+        "dir": ".",
+        "steps": ["schema-dna"],
+        "run": { "kind": "root-just", "recipe": "_gate-schema-dna" }
+      },
+      "manifest-hygiene": {
+        "dir": ".",
+        "steps": ["manifest-hygiene"],
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-manifest-hygiene",
+          "cargo": { "targetDir": "/tmp/manifest-hygiene-gate-target", "profile": "dev", "rustflags": "" }
+        }
+      },
+      "sweettest-check": {
+        "dir": ".",
+        "steps": ["sweettest-check"],
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-sweettest-check",
+          "cargo": {
+            "workspace": "elohim/holochain/tests/sweettest",
+            "profile": "dev",
+            "rustflags": ""
+          }
+        }
+      }
     }
   },
   "deployment": {}

@@ -2,20 +2,30 @@
 // Shared utilities for build manifest discovery, loading, and resolution.
 // Used by both validate-manifests.mjs and graph-walker.mjs.
 
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
-import { execSync } from 'child_process';
+import { readFileSync, readdirSync } from 'fs';
+import { resolve, relative, sep } from 'path';
 
 /**
  * Discover all build-manifest.json files under rootDir.
  * Returns relative paths (e.g., './app/elohim-app/build-manifest.json').
  */
 export function discoverManifests(rootDir) {
-  const output = execSync(
-    "find . -name 'build-manifest.json' -not -path '*/node_modules/*' -not -path '*/.superpowers/*' -not -path '*/.claude/*'",
-    { cwd: rootDir, encoding: 'utf8' }
-  );
-  return output.trim().split('\n').filter(Boolean);
+  const root = resolve(rootDir);
+  const found = [];
+  const skipped = new Set(['.claude', '.git', '.superpowers', 'node_modules']);
+
+  function visit(dir) {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (!skipped.has(entry.name)) visit(resolve(dir, entry.name));
+      } else if (entry.isFile() && entry.name === 'build-manifest.json') {
+        found.push(`.${sep}${relative(root, resolve(dir, entry.name))}`);
+      }
+    }
+  }
+
+  visit(root);
+  return found.sort();
 }
 
 /**

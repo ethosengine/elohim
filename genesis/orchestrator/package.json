@@ -3,7 +3,7 @@
   "private": true,
   "description": "CI/CD orchestrator - Jenkinsfile linting and pipeline management",
   "scripts": {
-    "test": "node --test pipeline-registry.test.mjs commit-tag-parser.test.mjs orchestrator-integration.test.mjs jenkinsfile-cps-scope.test.mjs validate-only-pipeline.test.mjs graph-walker.test.mjs cargo-target-coverage.test.mjs",
+    "test": "node --test pipeline-registry.test.mjs gate-runner.test.mjs commit-tag-parser.test.mjs orchestrator-integration.test.mjs jenkinsfile-cps-scope.test.mjs validate-only-pipeline.test.mjs graph-walker.test.mjs cargo-target-coverage.test.mjs",
     "test:integration": "node --test orchestrator-integration.test.mjs",
     "test:graph": "node --test graph-walker.test.mjs",
     "test:cargo-coverage": "node --test cargo-target-coverage.test.mjs",

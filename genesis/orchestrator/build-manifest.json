@@ -30,7 +30,50 @@
   },
   "gate": {
     "projects": {
-      "orchestrator": { "dir": "genesis/orchestrator", "steps": ["lint-jenkinsfiles"] }
+      "orchestrator": {
+        "dir": "genesis/orchestrator",
+        "steps": ["lint-jenkinsfiles"],
+        "run": { "kind": "just", "recipe": "gate" }
+      },
+      "rakia-codegen": {
+        "dir": ".",
+        "inputs": {
+          "sources": [
+            "elohim/rakia/schemas/**",
+            "elohim/rakia/rakia-core/src/generated_types.rs",
+            "elohim/rakia/rakia-core/src/manifest.rs"
+          ],
+          "buildProcess": ["elohim/rakia/schemas/scripts/codegen-rs.mjs"]
+        },
+        "run": { "kind": "root-just", "recipe": "_gate-rakia-codegen" }
+      },
+      "rakia-validate": {
+        "dir": ".",
+        "inputs": {
+          "sources": ["**/build-manifest.json", "elohim/rakia/schemas/v1/build-manifest.schema.json"],
+          "buildProcess": ["elohim/rakia/schemas/scripts/validate.mjs"]
+        },
+        "run": { "kind": "root-just", "recipe": "_gate-rakia-validate" }
+      },
+      "cargo-coverage": {
+        "dir": ".",
+        "inputs": {
+          "sources": ["**/Cargo.toml", "**/build-manifest.json"],
+          "buildProcess": ["genesis/orchestrator/cargo-target-coverage.mjs"]
+        },
+        "run": { "kind": "root-just", "recipe": "_gate-cargo-coverage" }
+      },
+      "pipeline-list-fresh": {
+        "dir": ".",
+        "inputs": {
+          "sources": ["**/build-manifest.json"],
+          "buildProcess": [
+            "genesis/orchestrator/pipeline-registry.mjs",
+            "genesis/orchestrator/scripts/generate-pipeline-list.mjs"
+          ]
+        },
+        "run": { "kind": "root-just", "recipe": "_gate-pipeline-list-fresh" }
+      }
     }
   },
   "deployment": {}

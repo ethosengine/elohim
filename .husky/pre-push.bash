@@ -29,8 +29,9 @@
 # patterns; -u is unsafe given the optional toolchain vars (NVM_DIR etc.).
 set -o pipefail
 
-# Detects which projects changed and runs `just gate` in each.
-# Each project's justfile defines its own quality checks:
+# Detects projects and executes typed gate recipes from build-manifest.json.
+# The shared runner supplies cargo-pool/RUSTFLAGS context for native workspaces.
+# Representative projects:
 #   app/elohim-app/          → eslint + build + unit tests
 #   doorway/                 → cargo fmt + clippy + tests
 #   doorway/doorway-app/     → eslint + build
@@ -53,15 +54,8 @@ set -o pipefail
 #   gherkin-prepush-lint     → Parse every executable A2O feature before E2E can abort blank
 #   genesis/orchestrator/    → Jenkinsfile linting (any *Jenkinsfile* change)
 #
-# Falls back to inline commands if `just` is not installed.
-# Fallback arms exist only for projects without a justfile gate (elohim-compute,
-# elohim-epr, epr-storage, epr-ts, elohim-library, genesis-a2o), for deferred
-# projects whose fallback does more than their justfile gate (elohim-app, genesis,
-# orchestrator — see DEFERRED comments inside), and for virtual/orchestrator-defined
-# gates (schema-validate, constants-sync, rakia-codegen, etc.) that have no
-# per-project justfile. Projects with a sufficient justfile gate run ONLY via
-# `just gate`; their fallback arms have been removed.
-# This prevents pushing broken code that wastes CI time.
+# There is no project-name shell switch or grep fallback: adding a local gate is
+# one manifest edit, and both `just gate` and pre-push consume the same registry.
 
 # ── Load toolchains (git hooks run in minimal shell) ────────────
 export NVM_DIR="$HOME/.nvm"
@@ -76,55 +70,6 @@ PNPM_HOME="${PNPM_HOME:-/nix/xdg/cache/pnpm}"
 
 
 ZERO_SHA="0000000000000000000000000000000000000000"
-
-# ── pooled target slots (L3 — keep gate builds warm AND bounded) ──
-# Gate builds that land in-tree become "legacy targets" that cleanup reclaims
-# under disk pressure (wiping warm caches → cold multi-minute rebuilds), and
-# they balloon the PVC outside pool policy. Redirect every native Rust gate
-# into its cargo-target-pool slot — the same place every other native build
-# lands, governed by pool-policy.json + `cargo-pool enforce`.
-#
-# Inlined (not sourced from pool-lib.sh — that file's callers set `set -u`,
-# unsafe here). Formula mirrors pool-lib.sh slot_path(); fail-open (empty →
-# in-tree default). Do NOT swap this for dynamic `cargo-pool key` — it
-# mis-keys storage and offers slots for DNA workspaces that must stay
-# un-redirected (hc dna pack canonicalizes ./target).
-# Family detection — mirrors pool-lib.sh detect_family (env override →
-# .family file → branch with feat/fix/chore/worktree- prefix strip → first
-# [-/] token, lowercased). Keeping these in sync matters: a drifted family
-# here would build gates into a slot the pool's protection logic doesn't
-# associate with this push (review C8).
-detect_push_family() {
-  if [ -n "${CARGO_TARGET_POOL_FAMILY:-}" ]; then
-    echo "$CARGO_TARGET_POOL_FAMILY"; return 0
-  fi
-  local top
-  top="$(git rev-parse --show-toplevel 2>/dev/null)" || return 1
-  if [ -f "$top/.family" ]; then
-    tr -d '[:space:]' < "$top/.family"; return 0
-  fi
-  local branch
-  branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" || return 1
-  [ -n "$branch" ] && [ "$branch" != "HEAD" ] || return 1
-  case "$branch" in
-    feat/*|feature/*|fix/*|chore/*) branch="${branch#*/}" ;;
-    worktree-*) branch="${branch#worktree-}" ;;
-  esac
-  echo "${branch%%[-/]*}" | tr '[:upper:]' '[:lower:]'
-}
-
-gate_pool_slot() {
-  local ws_rel="$1"
-  local root="${CARGO_TARGET_POOL_ROOT:-/projects/.cargo-target-pool}"
-  [ -d "$root/family" ] || return 1
-  local family flat
-  family="$(detect_push_family)" || return 1
-  [ -n "$family" ] || return 1
-  flat="$(echo "$ws_rel" | tr '/' '_' | sed 's/__*/__/g')"
-  echo "$root/family/$family/$flat/dev"
-}
-
-sweettest_pool_slot() { gate_pool_slot "elohim/holochain/tests/sweettest"; }
 
 # ── Lockfile Consistency Check ────────────────────────────────────
 # Catch uncommitted lockfile changes that would break CI's --frozen-lockfile
@@ -186,7 +131,7 @@ fi
 # when CI doesn't build.
 #
 # Pure node (package-projections.mjs verify), no cargo — PVC-pressure-neutral,
-# never routed through run_gate/HEAVY_GATES. Fail-open if node is absent
+# never part of HEAVY_GATES. Fail-open if node is absent
 # (degraded shell) — same posture as the node-guarded blocks below.
 if echo "$CHANGED" | grep -qE "^\.epr-meta/elohim/|^\.claude/skills/|^\.claude/agents/|^\.codex/"; then
   if command -v node >/dev/null 2>&1; then
@@ -212,8 +157,8 @@ fi
 #
 # Drop files that are listed in repo-root .ci-ignore (CLAUDE.md, .claude/,
 # .github/, .husky/, etc.) BEFORE any project-detection runs. Same parser
-# the Jenkinsfile and graph-walker use, so the manifest path, the fallback
-# grep path, and CI all agree on what counts as a "source" change.
+# the Jenkinsfile and graph-walker use, so the local manifest selector and CI
+# agree on what counts as a "source" change.
 #
 # If node isn't on PATH (degraded shell), skip filtering — fail-open is
 # safer than refusing to push.
@@ -318,66 +263,6 @@ if echo "$CHANGED" | grep -qE "genesis/data/account-packages/|genesis/data/human
   echo "[pre-push] account-packages validation ✓"
 fi
 
-# ── eprfs native workspace gate (excluded from the monorepo workspace) ──────
-#
-# elohim/eprfs is its OWN native Rust workspace (excluded in elohim/Cargo.toml, like elohim-storage),
-# so the manifest-driven graph-walker / run_gate machinery does not cover it. Gate it as a standalone
-# block (NOT routed through run_gate — avoids the Unknown-project abort) when its sources change.
-# Native build: RUSTFLAGS="" (the WASM getrandom flag breaks the link) + a /tmp CARGO_TARGET_DIR (the
-# /projects cargo-pool slot trips the invoked.timestamp ENOENT on this toolchain). Pure-cargo, fast,
-# PVC-exempt by omission.
-# eprfs-agent dry-run (not part of this gate): cargo run -p eprfs-agent --example project_agents -- <repo-root>
-if echo "$CHANGED" | grep -qE "^elohim/eprfs/"; then
-  echo "[pre-push] Gating eprfs workspace (fmt + clippy -D + build + test)..."
-  ( cd elohim/eprfs \
-    && CARGO_TARGET_DIR=/tmp/eprfs-gate-target RUSTFLAGS="" cargo fmt --check \
-    && CARGO_TARGET_DIR=/tmp/eprfs-gate-target RUSTFLAGS="" cargo clippy --workspace --all-targets -- -D warnings \
-    && CARGO_TARGET_DIR=/tmp/eprfs-gate-target RUSTFLAGS="" cargo test --workspace ) || exit 1
-  echo "[pre-push] eprfs gate ✓"
-fi
-
-# ── crates/seam-contracts native workspace gate (excluded from the monorepo workspace) ──
-#
-# crates/seam-contracts declares its own explicit `[workspace]` table (a nested
-# single-crate root — the `crates/` siblings each wire via path deps, there is no
-# root monorepo workspace over crates/) and, like elohim/eprfs, no
-# build-manifest.json anywhere covers `crates/**` — the manifest-driven
-# graph-walker / run_gate machinery cannot see it. Gate it as a standalone block
-# (NOT routed through run_gate/PROJECTS), for two reasons: it avoids the
-# Unknown-project abort, AND it avoids the USE_MANIFEST bypass — the PROJECTS
-# grep-fallback section below only runs when the manifest path detected zero
-# projects, so a mixed push that ALSO touches a manifest-covered project would
-# otherwise skip a crates/-only detection living in that section entirely.
-# CARGO_TARGET_DIR resolves via the same pooled-slot helper every other native
-# gate uses (gate_pool_slot — family-keyed off genesis/agentic's pool policy,
-# same as elohim-storage/doorway/steward-node in run_gate — never a hardcoded
-# family); fails open to cargo's in-tree default if the pool isn't present.
-# Native build: RUSTFLAGS="" (the WASM getrandom flag breaks the link here too).
-# The wasm32 build with --no-default-features proves the crate's std-free leaf
-# claim (its Cargo.toml doc comment) actually holds under a no_std-shaped target.
-if echo "$CHANGED" | grep -qE "^crates/seam-contracts/"; then
-  echo "[pre-push] Gating crates/seam-contracts workspace (test + clippy -D + fmt + wasm32 build)..."
-  (
-    cd crates/seam-contracts || exit 1
-    SEAM_CONTRACTS_SLOT="$(gate_pool_slot "crates/seam-contracts" 2>/dev/null || true)"
-    # Resolve through the slot symlink before creating — a /tmp-backed slot
-    # left dangling by a reboot/tmp-reaper must self-heal here, not fail
-    # `mkdir -p` silently (genesis/data/timeline/backlog/prepush-cargo-target-pool.md,
-    # reopened 2026-08-05).
-    if [ -n "${SEAM_CONTRACTS_SLOT:-}" ] && mkdir -p "$(readlink -f "$SEAM_CONTRACTS_SLOT")" 2>/dev/null; then
-      export CARGO_TARGET_DIR="$SEAM_CONTRACTS_SLOT"
-      echo "  [seam-contracts] pooled target: $SEAM_CONTRACTS_SLOT"
-    else
-      [ -n "${SEAM_CONTRACTS_SLOT:-}" ] && echo "  ⚠ POOL SLOT UNAVAILABLE — building in-tree: $SEAM_CONTRACTS_SLOT"
-    fi
-    RUSTFLAGS="" cargo test --all-features \
-      && RUSTFLAGS="" cargo clippy --all-features -- -D warnings \
-      && RUSTFLAGS="" cargo fmt --check \
-      && RUSTFLAGS="" cargo build --target wasm32-unknown-unknown --no-default-features
-  ) || exit 1
-  echo "[pre-push] crates/seam-contracts gate ✓"
-fi
-
 # ── .ci-ignore freshness (projected from the .epr-meta manifest ci-trigger cascade) ──
 #
 # When any .epr-meta manifest or the generated .ci-ignore changes, ensure .ci-ignore is
@@ -400,7 +285,7 @@ fi
 # The commit-time gate (.husky/pre-commit) is the primary; this is the backstop for commits made
 # with --no-verify at commit time but pushed normally. Same pure engine (_lib/epr_meta.py) over the
 # push range instead of the staged set. Pure-python (~ms), so it is PVC-EXEMPT BY OMISSION: never in
-# HEAVY_GATES, never routed through run_gate/drop_project, never deferrable. Fail-open if python3 OR
+# HEAVY_GATES and never deferrable. Fail-open if python3 OR
 # the gate script is absent (a branch predating the gate must never be blocked).
 if command -v python3 >/dev/null 2>&1 && [ -f .claude/scripts/epr-meta-git-gate.py ]; then
   RANGE_BASE=$(git merge-base origin/dev HEAD 2>/dev/null || echo "HEAD~1")
@@ -419,173 +304,30 @@ fi
 # node is unavailable or no manifests exist.
 
 PROJECTS=""
-USE_MANIFEST=false
 
 if command -v node >/dev/null 2>&1; then
-  # Two-line TSV (PROJECTS\t..., DIRS\t...) — parsed via awk without eval to
-  # avoid the silent-partial-failure surface of eval'ing a shell-constructed
-  # string. See genesis/orchestrator/graph-walker.mjs --shell-lines.
-  MANIFEST_LINES=$(echo "$CHANGED" | node genesis/orchestrator/graph-walker.mjs --shell-lines 2>/dev/null)
-  if [ $? -eq 0 ] && [ -n "$MANIFEST_LINES" ]; then
-    PROJECTS=$(echo "$MANIFEST_LINES" | awk -F'\t' '$1=="PROJECTS"{print $2}')
-    MANIFEST_DIRS=$(echo "$MANIFEST_LINES" | awk -F'\t' '$1=="DIRS"{print $2}')
-    if [ -n "$PROJECTS" ]; then
-      USE_MANIFEST=true
-    fi
-  fi
+  # One manifest registry owns both detection and execution. New gate-only
+  # checks declare `gate.projects[*].inputs`; there is no second grep map.
+  PROJECTS=$(echo "$CHANGED" | node genesis/orchestrator/gate-runner.mjs --changed-file-list --names 2>/dev/null | tr '\n' ' ')
+  [ $? -eq 0 ] || { echo "[pre-push] manifest gate selection failed"; exit 1; }
+else
+  echo "[pre-push] node unavailable — manifest gate selection skipped (CI backstop)."
 fi
 
-# Pipeline-list freshness: if any build-manifest.json or pipeline-registry.mjs
-# changed, the generated pipeline-list.json must be regenerated and committed.
-if echo "$CHANGED" | grep -qE "(^|/)build-manifest\.json$|^genesis/orchestrator/pipeline-registry\.mjs$"; then
-  PROJECTS="$PROJECTS pipeline-list-fresh"
-fi
-
-# Fallback: grep-based project detection
-if [ "$USE_MANIFEST" = false ]; then
-  # doorway-app must be checked BEFORE doorway (prefix overlap)
-  if echo "$CHANGED" | grep -q "^doorway/doorway-app/"; then
-    PROJECTS="$PROJECTS doorway-app"
-  fi
-  if echo "$CHANGED" | grep "^doorway/" | grep -qv "^doorway/doorway-app/"; then
-    PROJECTS="$PROJECTS doorway"
-  fi
-  if echo "$CHANGED" | grep -q "^app/elohim-app/"; then
-    PROJECTS="$PROJECTS elohim-app"
-  fi
-  if echo "$CHANGED" | grep -q "^sophia/"; then
-    PROJECTS="$PROJECTS sophia"
-  fi
-  if echo "$CHANGED" | grep -q "^elohim/elohim-storage/"; then
-    PROJECTS="$PROJECTS elohim-storage"
-  fi
-  # EPR-specific quality gate: runs when EPR implementation paths or schemas change.
-  # Also triggered for storage-client-ts EPR tests that elohim-storage gate doesn't cover.
-  # Runs: cargo build + schema_contract + schema_contract_diesel_epr + pnpm test.
-  if echo "$CHANGED" | grep -qE \
-    "^elohim/elohim-storage/src/api/epr|^elohim/elohim-storage/src/db/epr_atoms|^elohim/elohim-storage/src/services/epr_service|^elohim/elohim-storage/src/services/epr_store|^elohim/elohim-storage/migrations/.*add_epr_tables|^elohim/sdk/schemas/v1/views/epr-|^elohim/sdk/schemas/v1/inputs/epr-|^elohim/sdk/storage-client-ts/tests/epr|^elohim/sdk/storage-client-ts/src/generated/Epr"; then
-    PROJECTS="$PROJECTS epr-storage"
-  fi
-  # epr-rea is in the SAME cargo workspace as epr and path-deps it, so it rides the
-  # elohim-epr gate rather than minting a second project. Two bugs closed at once: an
-  # epr-rea-only change used to match no glob at all (no manifest entry, no pipeline, no
-  # gate case — it shipped un-gated), and an epr-only change used to ship without ever
-  # compiling its one consumer.
-  if echo "$CHANGED" | grep -qE "^elohim/epr/|^elohim/epr-rea/|^elohim/sdk/epr-ts/"; then
-    PROJECTS="$PROJECTS elohim-epr"
-  fi
-  if echo "$CHANGED" | grep -q "^elohim/elohim-compute/"; then
-    PROJECTS="$PROJECTS elohim-compute"
-  fi
-  if echo "$CHANGED" | grep -q "^steward/node/"; then
-    PROJECTS="$PROJECTS steward-node"
-  fi
-  if echo "$CHANGED" | grep -qE "^crates/elohim-sdk/|^crates/elohim-storage-client/|^crates/doorway-client/|^crates/seam-contracts/|^elohim/elohim-views/|^scripts/ci/elohim-sdk-feature-matrix.sh$"; then
-    PROJECTS="$PROJECTS elohim-sdk"
-  fi
-  if echo "$CHANGED" | grep -q "^app/elohim-library/"; then
-    PROJECTS="$PROJECTS elohim-library"
-  fi
-  # elohim-storybook: registry-defined paths include graphos source content
-  # (genesis/docs/content/elohim-protocol/**, genesis/graphos/**, genesis/a2o/features/**)
-  # — keep this grep aligned with pipeline-registry.mjs changePatterns for elohim-storybook.
-  if echo "$CHANGED" | grep -qE "^app/elohim-library/|^genesis/docs/content/elohim-protocol/|^genesis/graphos/|^genesis/a2o/features/"; then
-    PROJECTS="$PROJECTS elohim-storybook"
-  fi
-  if echo "$CHANGED" | grep -q "^genesis/"; then
-    PROJECTS="$PROJECTS genesis"
-  fi
-  if echo "$CHANGED" | grep -q "^genesis/\|^elohim/sdk/schemas/"; then
-    PROJECTS="$PROJECTS schema-validate"
-  fi
-  if echo "$CHANGED" | grep -q "^elohim/holochain/\|^elohim/sdk/schemas/"; then
-    PROJECTS="$PROJECTS schema-dna"
-  fi
-  if echo "$CHANGED" | grep -qE "^elohim/holochain/dna/[^/]+/dna\.yaml|^elohim/holochain/dna/elohim/workdir/happ\.yaml|^elohim/holochain/tests/manifest-hygiene/"; then
-    PROJECTS="$PROJECTS manifest-hygiene"
-  fi
-  # Scope the sweettest trigger to compilation-affecting paths, matching the
-  # build-manifest.json `sweettest-check` source globs (sweettest/src/** +
-  # Cargo.toml). The previous bare `tests/sweettest/` prefix over-triggered on
-  # README/scripts/.config/Cargo.lock/target — forcing a full Holochain
-  # cargo check for doc-only edits in the degraded (no-node) fallback path.
-  if echo "$CHANGED" | grep -qE "^elohim/holochain/dna/[^/]+/zomes/.*\.rs$|^elohim/holochain/tests/sweettest/(src/|Cargo\.toml)"; then
-    PROJECTS="$PROJECTS sweettest-check"
-  fi
-  if echo "$CHANGED" | grep -q "^genesis/data/\|^elohim/sdk/schemas/.*enum\|generated/schema-enums"; then
-    PROJECTS="$PROJECTS constants-sync"
-  fi
-  # reach-drift: canonical-value compiler check (G7). Fail the build if any
-  # seed content/path authors a reach value outside the 8-level reach enum.
-  if echo "$CHANGED" | grep -qE "^genesis/data/lamad/(content|paths)/|^elohim/sdk/schemas/v1/enums/reach.schema.json"; then
-    PROJECTS="$PROJECTS reach-drift"
-  fi
-  if echo "$CHANGED" | grep -qE "^elohim/sdk/schemas/|^elohim/sdk/domains/[^/]+/manifest\.json$|^app/lamad/src/app/generated/route-claims\.ts$|^app/elohim-app/src/app/generated/route-claims\.ts$|^genesis/seeder/src/generated/route-claims\.ts$"; then
-    PROJECTS="$PROJECTS schema-codegen"
-  fi
-  if echo "$CHANGED" | grep -qE "^app/elohim-elements/[^/]+/src/.*\.ts$|^app/elohim-elements/[^/]+/custom-elements-manifest\.config\.mjs$"; then
-    PROJECTS="$PROJECTS elements-codegen"
-  fi
-  if echo "$CHANGED" | grep -qE "^elohim/rakia/schemas/|^elohim/rakia/rakia-core/src/(generated_types|manifest)\.rs$"; then
-    PROJECTS="$PROJECTS rakia-codegen"
-  fi
-  if echo "$CHANGED" | grep -qE "(^|/)build-manifest\.json$|^elohim/rakia/schemas/v1/build-manifest\.schema\.json$"; then
-    PROJECTS="$PROJECTS rakia-validate"
-  fi
-  # Cargo target coverage — any Cargo.toml or build-manifest.json change
-  # could shift the set of declared [[bin/bench/example]] targets or the
-  # set of source globs that cover them. Cheap to run (<1s).
-  if echo "$CHANGED" | grep -qE "(^|/)Cargo\.toml$|(^|/)build-manifest\.json$|^genesis/orchestrator/cargo-target-coverage\.mjs$"; then
-    PROJECTS="$PROJECTS cargo-coverage"
-  fi
-  if echo "$CHANGED" | grep -q "Jenkinsfile"; then
-    PROJECTS="$PROJECTS orchestrator"
-  fi
-  if echo "$CHANGED" | grep -qE "^genesis/orchestrator/.*\.(mjs|json)$"; then
-    PROJECTS="$PROJECTS orchestrator"
-  fi
-  if echo "$CHANGED" | grep -q "^genesis/a2o/"; then
-    PROJECTS="$PROJECTS genesis-a2o"
-  fi
-  if echo "$CHANGED" | grep -q "^elohim/sdk/"; then
-    PROJECTS="$PROJECTS domain-types"
-  fi
-fi
-
+# No grep fallback: build manifests are the sole positive gate detector.
 # Trim leading space
 PROJECTS=$(echo "$PROJECTS" | sed 's/^ //')
 
-# ── Lockstep project filter ───────────────────────────────────────
-# The gate loop pairs PROJECTS with MANIFEST_DIRS POSITIONALLY
-# (`set -- $MANIFEST_DIRS; PROJECT_DIR="$1"; shift`). Removing an entry
-# from PROJECTS without removing its paired dir mis-maps every later
-# project onto the wrong directory (e.g. drop elohim-storage and
-# schema-dna suddenly runs inside elohim/elohim-storage). ALL filters
-# below MUST go through this helper. (Positional params are
-# function-local in POSIX sh, so the `set --` here cannot clobber the
-# script's own.)
+# ── Project filter ────────────────────────────────────────────────
+# Projects are stable manifest keys; the shared runner resolves directories.
 drop_project() {
   DROP_NAME="$1"
   NEW_P=""
-  NEW_D=""
-  if [ "$USE_MANIFEST" = true ]; then
-    set -- $MANIFEST_DIRS
-  fi
   for p in $PROJECTS; do
-    if [ "$USE_MANIFEST" = true ]; then
-      d="${1:-}"
-      [ "$#" -gt 0 ] && shift
-    else
-      d=""
-    fi
     [ "$p" = "$DROP_NAME" ] && continue
     NEW_P="$NEW_P $p"
-    [ -n "$d" ] && NEW_D="$NEW_D $d"
   done
   PROJECTS=$(echo "$NEW_P" | sed 's/^ //')
-  if [ "$USE_MANIFEST" = true ]; then
-    MANIFEST_DIRS=$(echo "$NEW_D" | sed 's/^ //')
-  fi
 }
 
 # ── Selective gate skip (SKIP_SWEETTEST) ──────────────────────────
@@ -628,16 +370,16 @@ fi
 # tens of GB mid-push. FORCE_HEAVY_GATES=1 overrides the deferral.
 REPO_TOP="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 POOL_POLICY="$REPO_TOP/genesis/agentic/pool-policy.json"
-SOFT_PCT=75; HARD_PCT=85
+SOFT_PCT=88; HARD_PCT=92
 if command -v jq >/dev/null 2>&1 && [ -f "$POOL_POLICY" ]; then
-  SOFT_PCT=$(jq -r '.volume_soft_pct // 75' "$POOL_POLICY" 2>/dev/null || echo 75)
-  HARD_PCT=$(jq -r '.volume_hard_pct // 85' "$POOL_POLICY" 2>/dev/null || echo 85)
+  SOFT_PCT=$(jq -r '.volume_soft_pct // 88' "$POOL_POLICY" 2>/dev/null || echo 88)
+  HARD_PCT=$(jq -r '.volume_hard_pct // 92' "$POOL_POLICY" 2>/dev/null || echo 92)
 fi
 # df wrapped in `|| true` INSIDE the substitution: under `sh -e` + pipefail a
 # failing df would otherwise abort the entire hook (review C3) — a trailing
 # `|| echo` after the pipe can't help, pipefail already failed the assignment.
 DISK_PCT=$({ df -P /projects 2>/dev/null || true; } | awk 'NR==2 {gsub("%","",$5); print $5}')
-HEAVY_GATES="elohim-storage epr-storage doorway steward-node elohim-sdk elohim-compute elohim-epr sweettest-check domain-types"
+HEAVY_GATES="elohim-storage epr-storage doorway steward-node elohim-sdk elohim-compute elohim-epr eprfs seam-contracts sweettest-check domain-types"
 
 if [ -n "${DISK_PCT:-}" ] && [ "$DISK_PCT" -ge "$SOFT_PCT" ] && [ "${CARGO_TARGET_POOL_NO_ENFORCE:-0}" != "1" ]; then
   CARGO_POOL_BIN="$REPO_TOP/genesis/agentic/bin/cargo-pool"
@@ -647,7 +389,13 @@ if [ -n "${DISK_PCT:-}" ] && [ "$DISK_PCT" -ge "$SOFT_PCT" ] && [ "${CARGO_TARGE
     # from a checkout outside .claude/worktrees, protected_families would
     # otherwise not associate the pushing branch's family with a live
     # session — the env override makes the protection authoritative.
-    PUSH_FAMILY="$(detect_push_family 2>/dev/null || true)"
+    PUSH_FAMILY=""
+    if [ -f "$REPO_TOP/genesis/agentic/bin/pool-lib.sh" ]; then
+      # Use the pool's family authority here too; do not maintain a second
+      # branch-name parser in the hook.
+      source "$REPO_TOP/genesis/agentic/bin/pool-lib.sh"
+      PUSH_FAMILY="$(detect_family "$REPO_TOP" 2>/dev/null || true)"
+    fi
     if command -v timeout >/dev/null 2>&1; then
       CARGO_TARGET_POOL_FAMILY="${PUSH_FAMILY:-}" timeout 300 bash "$CARGO_POOL_BIN" enforce --yes --quiet 2>/dev/null || true
     else
@@ -663,7 +411,7 @@ if [ -n "${DISK_PCT:-}" ] && [ "$DISK_PCT" -ge "$HARD_PCT" ] && [ "${FORCE_HEAVY
   for h in $HEAVY_GATES; do
     if echo "$PROJECTS" | grep -qw "$h"; then
       DEFERRED="$DEFERRED $h"
-      drop_project "$h"   # lockstep: keeps MANIFEST_DIRS pairing intact
+      drop_project "$h"
     fi
   done
   if [ -n "$DEFERRED" ]; then
@@ -685,396 +433,7 @@ if [ -z "$PROJECTS" ]; then
   exit 0
 fi
 
-# ── Gate Runner ──────────────────────────────────────────────────
-#
-# Each project has a justfile with a `gate` recipe that defines its
-# quality checks. The fallback paths below are kept for environments
-# where `just` is not installed.
-
-run_gate() {
-  PROJECT_NAME="$1"
-  PROJECT_DIR="$2"
-
-  cd "$PROJECT_DIR" || return 1
-
-  # L3 (all native Rust gates): build into the pooled slot so gate builds
-  # are bounded by pool policy instead of ballooning in-tree. Subshell-scoped
-  # (run_gate is invoked as `(run_gate ...)`), so the export cannot leak to
-  # other gates. Resolves genesis/data/timeline/backlog/prepush-cargo-target-pool.md.
-  GATE_WS=""
-  case "$PROJECT_NAME" in
-    elohim-storage|epr-storage) GATE_WS="elohim/elohim-storage" ;;
-    doorway)                    GATE_WS="doorway/doorway-service" ;;
-    steward-node)               GATE_WS="steward/node" ;;
-    elohim-sdk)                 GATE_WS="crates/elohim-sdk" ;;
-    # epr/epr-rea are members of the elohim virtual workspace, so the slot is keyed on
-    # the workspace root (matching `cargo-pool key`). Without this the gate built into
-    # the in-tree elohim/target/, outside the pool the disk-guard policy accounts for.
-    elohim-epr)                 GATE_WS="elohim" ;;
-  esac
-  if [ -n "$GATE_WS" ]; then
-    GATE_SLOT="$(gate_pool_slot "$GATE_WS" 2>/dev/null || true)"
-    # Resolve through the slot symlink before creating — a /tmp-backed slot
-    # left dangling by a reboot/tmp-reaper must self-heal here, not fail
-    # `mkdir -p` silently (genesis/data/timeline/backlog/prepush-cargo-target-pool.md,
-    # reopened 2026-08-05).
-    if [ -n "${GATE_SLOT:-}" ] && mkdir -p "$(readlink -f "$GATE_SLOT")" 2>/dev/null; then
-      export CARGO_TARGET_DIR="$GATE_SLOT"
-      echo "  [$PROJECT_NAME] pooled target: $GATE_SLOT"
-    else
-      [ -n "${GATE_SLOT:-}" ] && echo "  ⚠ POOL SLOT UNAVAILABLE — building in-tree: $GATE_SLOT"
-    fi
-  fi
-
-  # Schema checks run pnpm scripts directly — no justfile needed
-  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ] || [ "$PROJECT_NAME" = "constants-sync" ] || [ "$PROJECT_NAME" = "reach-drift" ] || [ "$PROJECT_NAME" = "domain-types" ] || [ "$PROJECT_NAME" = "rakia-codegen" ] || [ "$PROJECT_NAME" = "rakia-validate" ] || [ "$PROJECT_NAME" = "cargo-coverage" ] || [ "$PROJECT_NAME" = "manifest-hygiene" ] || [ "$PROJECT_NAME" = "sweettest-check" ] || [ "$PROJECT_NAME" = "elements-codegen" ] || [ "$PROJECT_NAME" = "pipeline-list-fresh" ] || [ "$PROJECT_NAME" = "gherkin-prepush-lint" ]; then
-    case "$PROJECT_NAME" in
-      schema-validate)
-        echo "[$PROJECT_NAME] Validating seed data against protocol schemas..."
-        pnpm run schema:validate 2>&1
-        rc=$?
-        ;;
-      schema-dna)
-        echo "[$PROJECT_NAME] Checking DNA constants against protocol schemas..."
-        pnpm run schema:check-dna 2>&1
-        rc=$?
-        ;;
-      schema-codegen)
-        echo "[$PROJECT_NAME] Verifying schema codegen freshness..."
-        pnpm run schema:codegen:ts -- --verify 2>&1 && \
-        pnpm run schema:codegen:rs -- --verify 2>&1 && \
-        pnpm run route-claims:codegen:verify 2>&1
-        rc=$?
-        ;;
-      rakia-codegen)
-        echo "[$PROJECT_NAME] Verifying rakia generated_types.rs is fresh..."
-        pnpm run rakia:codegen:rs:verify 2>&1
-        rc=$?
-        ;;
-      rakia-validate)
-        echo "[$PROJECT_NAME] Validating build-manifest.json files against rakia schema..."
-        pnpm run rakia:schema:validate 2>&1
-        rc=$?
-        ;;
-      cargo-coverage)
-        echo "[$PROJECT_NAME] Checking cargo [[bin/bench/example]] targets are covered by manifest source globs..."
-        pnpm run validate:cargo-coverage 2>&1
-        rc=$?
-        ;;
-      constants-sync)
-        echo "[$PROJECT_NAME] Running constants sync (schema ↔ generated enums ↔ seed data)..."
-        # Verify codegen freshness first — a stale generated/schema-enums.ts
-        # would make the seed-vs-enum equality check below a tautology.
-        pnpm run schema:codegen:ts -- --verify 2>&1 && \
-        (cd genesis/seeder && pnpm exec vitest run src/__tests__/constants-sync.test.ts) 2>&1
-        rc=$?
-        ;;
-      reach-drift)
-        echo "[$PROJECT_NAME] Verifying reach values are canonical..."
-        node genesis/seeder/scripts/check-reach-drift.mjs 2>&1
-        rc=$?
-        ;;
-      domain-types)
-        echo "[$PROJECT_NAME] Checking all 6 domain types crates compile..."
-        rc=0
-        for types_crate in \
-          elohim/sdk/domains/imagodei/types \
-          elohim/sdk/domains/infrastructure/types \
-          elohim/sdk/domains/lamad/types \
-          elohim/sdk/domains/qahal/types \
-          elohim/sdk/domains/shefa/types \
-          elohim/sdk/domains/avodah/types; do
-          crate_name=$(basename "$(dirname "$types_crate")")-types
-          echo "  cargo check $crate_name..."
-          if ! RUSTFLAGS="" cargo check --manifest-path "$types_crate/Cargo.toml" 2>&1; then
-            echo "  FAILED: $crate_name"
-            rc=1
-          fi
-        done
-        ;;
-      manifest-hygiene)
-        echo "[$PROJECT_NAME] Running DNA manifest hygiene schema contract tests..."
-        RUSTFLAGS="" cargo test --manifest-path elohim/holochain/tests/manifest-hygiene/Cargo.toml 2>&1
-        rc=$?
-        ;;
-      sweettest-check)
-        echo "[$PROJECT_NAME] Running sweettest compile check..."
-        # Che devcontainer needs BINDGEN_EXTRA_CLANG_ARGS to point at clang
-        # resource dir; Nix/Jenkins provide it automatically. The glob picks
-        # the highest-versioned clang include dir so this survives image
-        # clang-version bumps (caught 2026-05-27: image went 20→21).
-        #
-        # OPENSSL_NO_VENDOR=1 tells openssl-sys to use system OpenSSL via
-        # pkg-config instead of building vendored. (datachannel-sys's *own*
-        # vendored OpenSSL build is independent of this env var and still
-        # runs — that's expected; its cmake/ZLIB issue is patched at image
-        # build time, see che-devworkspaces:containers/udi-plus-mem-rust-nix.)
-        #
-        # sccache (RUSTC_WRAPPER=sccache from the devfile env) is left intact
-        # — verified 2026-05-27 to work without crashing in this image
-        # (Garage S3 backend, both cache-hit and cache-miss paths).
-        # L3: redirect into the pooled slot (this case runs in its own
-        # subshell, so the export does not leak to other gates). Fail-open:
-        # no pool → in-tree target/ as before.
-        SWT_SLOT="$(sweettest_pool_slot 2>/dev/null || true)"
-        # Resolve through the slot symlink before creating — self-heal a
-        # dangling /tmp-backed slot instead of failing `mkdir -p` silently
-        # (genesis/data/timeline/backlog/prepush-cargo-target-pool.md, reopened 2026-08-05).
-        if [ -n "${SWT_SLOT:-}" ] && mkdir -p "$(readlink -f "$SWT_SLOT")" 2>/dev/null; then
-          export CARGO_TARGET_DIR="$SWT_SLOT"
-          echo "  [sweettest-check] pooled target: $SWT_SLOT"
-        else
-          [ -n "${SWT_SLOT:-}" ] && echo "  ⚠ POOL SLOT UNAVAILABLE — building in-tree: $SWT_SLOT"
-        fi
-        BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I$(ls -1d /usr/lib/clang/*/include 2>/dev/null | sort -V | tail -1)}" \
-        RUSTFLAGS="" \
-        OPENSSL_NO_VENDOR=1 \
-          cargo check --manifest-path elohim/holochain/tests/sweettest/Cargo.toml --tests 2>&1
-        rc=$?
-        ;;
-      elements-codegen)
-        echo "[$PROJECT_NAME] Verifying elohim-elements manifest freshness + running unit tests..."
-        pnpm run elements:codegen:verify 2>&1 && \
-        pnpm --filter elohim-core test 2>&1
-        rc=$?
-        ;;
-      pipeline-list-fresh)
-        echo "[$PROJECT_NAME] Verifying pipeline-list.json is fresh..."
-        node genesis/orchestrator/scripts/generate-pipeline-list.mjs >/dev/null
-        if ! git diff --quiet -- genesis/orchestrator/pipeline-list.json; then
-          echo "ERROR: pipeline-list.json is stale relative to build-manifest.json / pipeline-registry.mjs"
-          echo "  Run: just -d genesis/orchestrator ci-pipeline-list && git add genesis/orchestrator/pipeline-list.json"
-          rc=1
-        else
-          rc=0
-        fi
-        ;;
-      gherkin-prepush-lint)
-        echo "[$PROJECT_NAME] Parsing A2O Gherkin feature files..."
-        pnpm run lint:gherkin 2>&1
-        rc=$?
-        ;;
-    esac
-  elif command -v just >/dev/null 2>&1 && [ -f justfile ]; then
-    echo "[$PROJECT_NAME] Running quality gate via just..."
-    # RUSTC_WRAPPER="" bypasses sccache for the local pre-push gate to avoid
-    # the unisolated sccache 0.15.0 stdin/UTF-8 bug (see memory
-    # feedback_sccache_cache_corruption_recovery). Affects only the local
-    # husky hook; CI build pods in jenkins ns still use sccache via their
-    # envFrom: secretRef: name: sccache-credentials. No-op for TS/JS gates
-    # (RUSTC_WRAPPER unused); slows down Rust gates by the sccache hit rate
-    # (acceptable, per the elohim-epr precedent earlier in this file).
-    RUSTC_WRAPPER="" just gate 2>&1
-    rc=$?
-  else
-    # Fallback case arms below are for projects without a justfile gate, or
-    # for synthesized virtual gates (schema-validate, constants-sync, etc.) that
-    # are orchestrator-defined rather than per-project. Anything with a justfile
-    # MUST be invoked via `just gate` — do not duplicate logic here.
-    echo "[$PROJECT_NAME] just not found, using fallback..."
-    case "$PROJECT_NAME" in
-      elohim-app)
-        # Rebuild @elohim/storage-client dist first (gitignored; type
-        # changes in its src/generated/ don't reach consumers otherwise).
-        # Mirrors the `deps` step in app/elohim-app/justfile.
-        # DEFERRED: fallback includes eslint lint step that justfile gate omits.
-        # Delete only after app/elohim-app/justfile gate: adds lint.
-        pnpm --filter @elohim/storage-client build 2>&1 && \
-        pnpm exec eslint src --ext .ts,.html 2>&1 && \
-        pnpm exec ng build --configuration=development 2>&1 && \
-        pnpm exec vitest run --config vite.config.ts 2>&1
-        rc=$?
-        ;;
-      epr-storage)
-        # EPR-specific quality gate: build + EPR schema contracts + TS client smoke tests.
-        # Runs in addition to the main elohim-storage gate when EPR implementation paths change.
-        RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build 2>&1 && \
-        RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --test schema_contract 2>&1 && \
-        RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --test schema_contract_diesel_epr 2>&1 && \
-        (cd ../../sdk/storage-client-ts && pnpm test) 2>&1
-        rc=$?
-        ;;
-      elohim-compute)
-        cargo fmt --check 2>&1 && \
-        cargo clippy -- -D warnings 2>&1 && \
-        cargo test 2>&1
-        rc=$?
-        ;;
-      elohim-epr)
-        # elohim-epr is a native crate; the system-wide RUSTFLAGS
-        # `--cfg getrandom_backend="custom"` (set for Holochain WASM in
-        # elohim-storage) breaks native linking here. Reset it for the
-        # gate. RUSTC_WRAPPER="" bypasses sccache if the cache is poisoned;
-        # safe to keep on as the build is fast enough either way.
-        RUSTFLAGS="" cargo fmt --check 2>&1 && \
-        RUSTFLAGS="" cargo clippy -p elohim-epr -p elohim-epr-rea -- -D warnings 2>&1 && \
-        RUSTFLAGS="" cargo test -p elohim-epr -p elohim-epr-rea --all-targets 2>&1
-        TS_RC=$?
-        # PROJECT_DIR is elohim/epr; sdk/epr-ts lives at elohim/sdk/epr-ts → go up one, then into sdk/epr-ts
-        (cd ../sdk/epr-ts && pnpm test) 2>&1
-        rc=$((TS_RC | $?))
-        ;;
-      epr-ts)
-        # Sub-project gate for the epr-ts TypeScript SDK. When the manifest-driven
-        # path detects only TS-side changes (elohim/sdk/epr-ts/**) it emits
-        # 'epr-ts' as a standalone project (vs the combined 'elohim-epr' name the
-        # grep fallback uses); without this case the gate hit "Unknown project:
-        # epr-ts" and the push aborted. PROJECT_DIR is elohim/sdk/epr-ts.
-        pnpm test 2>&1
-        rc=$?
-        ;;
-      elohim-sdk)
-        # crates/elohim-sdk is a standalone native crate outside the elohim
-        # workspace. Keep one named-feature matrix shared with CI so local and
-        # remote coverage cannot drift.
-        bash ../../scripts/ci/elohim-sdk-feature-matrix.sh 2>&1
-        rc=$?
-        ;;
-      eprfs)
-        # eprfs is a native crate workspace (5 library crates + the eprfs-agent
-        # adapter, which is an out-of-tree workspace member under sdk/). Like
-        # elohim-epr, reset the WASM getrandom RUSTFLAGS for native linking and
-        # clear any poisoned sccache wrapper. CWD is elohim/eprfs (the manifest's
-        # gate.projects dir); --workspace covers all members including the adapter.
-        # Emitted ONLY by the manifest-driven path (gate.projects key 'eprfs');
-        # the grep fallback has no eprfs pattern, so it never reaches here.
-        RUSTFLAGS="" RUSTC_WRAPPER="" cargo fmt --check 2>&1 && \
-        RUSTFLAGS="" RUSTC_WRAPPER="" cargo clippy --workspace --all-targets -- -D warnings 2>&1 && \
-        RUSTFLAGS="" RUSTC_WRAPPER="" cargo test --workspace --all-targets 2>&1
-        rc=$?
-        ;;
-      elohim-library)
-        pnpm exec eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src 2>&1 && \
-        (cd projects/elohim-service && pnpm exec tsc --noEmit) 2>&1 && \
-        (cd projects/elohim-service && pnpm exec vitest run) 2>&1
-        rc=$?
-        ;;
-      elohim-storybook)
-        echo "[$PROJECT_NAME] Running Storybook 10 build (validates .storybook config + story discovery + index)..."
-        pnpm run build-storybook 2>&1
-        rc=$?
-        # Per-story runtime smoke pass via @storybook/test-runner. The build
-        # step above only checks that the static bundle compiles and that
-        # index.json gets emitted; it can NOT see that every story crashes
-        # with "Cannot destructure property 'id' of 'e' as it is undefined"
-        # in `processCSFFileWithCache`. test-runner drives chromium through
-        # every entry in index.json and asserts each one renders.
-        if [ "$rc" -eq 0 ]; then
-          echo "[$PROJECT_NAME] Smoke-testing every story via @storybook/test-runner..."
-          pnpm run test-storybook:ci 2>&1
-          rc=$?
-        fi
-        ;;
-      genesis)
-        # REACHABILITY WARNING: this whole `case` block is the `just not found`
-        # branch. `just` IS installed in the dev image, so a DEFERRED note here
-        # describes coverage NOBODY GETS — the justfile gate is the only local
-        # gate that actually runs. Never let a step live only in this arm.
-        # (Cost: `pnpm run typecheck` sat here while genesis/seeder/justfile's
-        # gate omitted it — genesis CI red twice, #1101 and #1400/#1401. Fixed
-        # 2026-07-31 by adding `check` to that justfile's `gate`.)
-        # DEFERRED: fallback still includes python3 validate-human-ids.py that
-        # the genesis/seeder justfile gate omits.
-        # Delete only after genesis/seeder/justfile gate: adds that step.
-        python3 genesis/scripts/validate-human-ids.py 2>&1 && \
-        pnpm install --frozen-lockfile --ignore-scripts 2>&1 && \
-        pnpm run validate 2>&1 && \
-        pnpm run typecheck 2>&1 && \
-        pnpm exec vitest run 2>&1
-        rc=$?
-        ;;
-      orchestrator)
-        # DEFERRED: fallback runs node --test *.mjs tests that the
-        # genesis/orchestrator justfile gate (gate: lint) omits.
-        # Delete only after genesis/orchestrator/justfile gate: adds node tests.
-        bash scripts/lint-jenkinsfiles-fast.sh 2>&1 && \
-        node --test graph-walker.test.mjs orchestrator-integration.test.mjs jenkinsfile-cps-scope.test.mjs 2>&1
-        rc=$?
-        ;;
-      schema-validate)
-        pnpm run schema:validate 2>&1
-        rc=$?
-        ;;
-      schema-dna)
-        pnpm run schema:check-dna 2>&1
-        rc=$?
-        ;;
-      constants-sync)
-        echo "Running constants sync (schema ↔ generated enums ↔ seed data)..."
-        # --verify (not mutate) so a stale generated/schema-enums.ts fails the
-        # gate locally instead of silently regenerating + passing here but
-        # failing CI on the missing commit.
-        pnpm run schema:codegen:ts -- --verify 2>&1 && \
-        (cd genesis/seeder && pnpm exec vitest run src/__tests__/constants-sync.test.ts) 2>&1
-        rc=$?
-        ;;
-      schema-codegen)
-        echo "Verifying schema codegen freshness..."
-        pnpm run schema:codegen:ts -- --verify 2>&1 && \
-        pnpm run schema:codegen:rs -- --verify 2>&1
-        rc=$?
-        ;;
-      rakia-codegen)
-        echo "Verifying rakia generated_types.rs is fresh..."
-        pnpm run rakia:codegen:rs:verify 2>&1
-        rc=$?
-        ;;
-      rakia-validate)
-        echo "Validating build-manifest.json files against rakia schema..."
-        pnpm run rakia:schema:validate 2>&1
-        rc=$?
-        ;;
-      cargo-coverage)
-        echo "Checking cargo [[bin/bench/example]] targets are covered by manifest source globs..."
-        pnpm run validate:cargo-coverage 2>&1
-        rc=$?
-        ;;
-      genesis-a2o)
-        pnpm run lint 2>&1 && pnpm run format:check 2>&1 && pnpm run typecheck 2>&1
-        rc=$?
-        ;;
-      gherkin-prepush-lint)
-        pnpm run lint:gherkin 2>&1
-        rc=$?
-        ;;
-      manifest-hygiene)
-        # Fast schema contract test over the 5 DNA manifests + happ.yaml.
-        # Pure YAML parsing, no holochain dep, runs in milliseconds.
-        echo "[$PROJECT_NAME] Running DNA manifest hygiene schema contract tests..."
-        RUSTFLAGS="" cargo test --manifest-path elohim/holochain/tests/manifest-hygiene/Cargo.toml 2>&1
-        rc=$?
-        ;;
-      sweettest-check)
-        echo "[$PROJECT_NAME] Running sweettest compile check..."
-        # L3: redirect into the pooled slot (subshell-scoped export; fail-open).
-        # Resolve through the slot symlink before creating — self-heal a
-        # dangling /tmp-backed slot instead of failing `mkdir -p` silently
-        # (genesis/data/timeline/backlog/prepush-cargo-target-pool.md, reopened 2026-08-05).
-        SWT_SLOT="$(sweettest_pool_slot 2>/dev/null || true)"
-        if [ -n "${SWT_SLOT:-}" ] && mkdir -p "$(readlink -f "$SWT_SLOT")" 2>/dev/null; then
-          export CARGO_TARGET_DIR="$SWT_SLOT"
-          echo "  [sweettest-check] pooled target: $SWT_SLOT"
-        else
-          [ -n "${SWT_SLOT:-}" ] && echo "  ⚠ POOL SLOT UNAVAILABLE — building in-tree: $SWT_SLOT"
-        fi
-        BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I$(ls -1d /usr/lib/clang/*/include 2>/dev/null | sort -V | tail -1)}" \
-        RUSTFLAGS="" \
-          cargo check --manifest-path elohim/holochain/tests/sweettest/Cargo.toml --tests 2>&1
-        rc=$?
-        ;;
-      *)
-        echo "  Unknown project: $PROJECT_NAME"
-        rc=1
-        ;;
-    esac
-  fi
-
-  # CWD is now contained by the subshell wrapper around the run_gate call —
-  # no manual restoration needed.
-  return $rc
-}
-
-# ── Resource Guard ────────────────────────────────────────────────
+# Resource Guard — pause rust-analyzer during manifest-declared gates.
 #
 # Pause rust-analyzer during gate runs to free ~8.8GB of active RAM.
 # SIGSTOP freezes the process (no new allocations, OS can reclaim pages).
@@ -1146,53 +505,11 @@ FAILED=""
 RESULTS=""
 INDEX=0
 
-if [ "$USE_MANIFEST" = true ]; then
-  set -- $MANIFEST_DIRS
-fi
-
 for PROJECT in $PROJECTS; do
   INDEX=$((INDEX + 1))
   PROJECT_START=$(date +%s)
 
-  # Map project name to directory
-  if [ "$USE_MANIFEST" = true ]; then
-    PROJECT_DIR="$1"
-    shift
-  else
-    case "$PROJECT" in
-      elohim-app)       PROJECT_DIR="app/elohim-app" ;;
-      elohim-library)   PROJECT_DIR="app/elohim-library" ;;
-      sophia)           PROJECT_DIR="sophia" ;;
-      doorway)          PROJECT_DIR="doorway/doorway-service" ;;
-      doorway-app)      PROJECT_DIR="doorway/doorway-app" ;;
-      elohim-storage)   PROJECT_DIR="elohim/elohim-storage" ;;
-      epr-storage)      PROJECT_DIR="elohim/elohim-storage" ;;
-      elohim-compute)   PROJECT_DIR="elohim/elohim-compute" ;;
-      elohim-epr)       PROJECT_DIR="elohim/epr" ;;
-      steward-node)     PROJECT_DIR="steward/node" ;;
-      elohim-sdk)       PROJECT_DIR="crates/elohim-sdk" ;;
-      genesis)          PROJECT_DIR="genesis/seeder" ;;
-      schema-validate)  PROJECT_DIR="." ;;
-      schema-dna)       PROJECT_DIR="." ;;
-      schema-codegen)   PROJECT_DIR="." ;;
-      constants-sync)   PROJECT_DIR="." ;;
-      reach-drift)      PROJECT_DIR="." ;;
-      genesis-a2o)      PROJECT_DIR="genesis/a2o" ;;
-      gherkin-prepush-lint) PROJECT_DIR="genesis/a2o" ;;
-      orchestrator)     PROJECT_DIR="genesis/orchestrator" ;;
-      domain-types)     PROJECT_DIR="." ;;
-      rakia-codegen)    PROJECT_DIR="." ;;
-      rakia-validate)   PROJECT_DIR="." ;;
-      cargo-coverage)   PROJECT_DIR="." ;;
-      manifest-hygiene) PROJECT_DIR="." ;;
-      sweettest-check) PROJECT_DIR="." ;;
-      elements-codegen)    PROJECT_DIR="." ;;
-      pipeline-list-fresh) PROJECT_DIR="." ;;
-      *)                   PROJECT_DIR="$PROJECT" ;;
-    esac
-  fi
-
-  (run_gate "$PROJECT" "$PROJECT_DIR")
+  node genesis/orchestrator/gate-runner.mjs --target "$PROJECT"
   GATE_EXIT=$?
 
   PROJECT_END=$(date +%s)

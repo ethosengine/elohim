@@ -29,7 +29,11 @@
   },
   "gate": {
     "projects": {
-      "doorway-app": { "dir": "doorway/doorway-app", "steps": ["build-doorway-app"] }
+      "doorway-app": {
+        "dir": "doorway/doorway-app",
+        "steps": ["build-doorway-app"],
+        "run": { "kind": "just", "recipe": "gate" }
+      }
     }
   },
   "deployment": {}

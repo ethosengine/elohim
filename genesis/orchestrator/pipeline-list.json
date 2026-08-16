@@ -2,18 +2,6 @@
   "generatedFrom": "build-manifest.json files via pipeline-registry.mjs",
   "pipelines": [
     {
-      "name": "elohim-genesis",
-      "manualOnly": false,
-      "triggersGenesis": false,
-      "cascades": true
-    },
-    {
-      "name": "elohim-orchestrator",
-      "manualOnly": false,
-      "triggersGenesis": false,
-      "cascades": false
-    },
-    {
       "name": "elohim",
       "manualOnly": false,
       "triggersGenesis": true,
@@ -26,14 +14,8 @@
       "cascades": false
     },
     {
-      "name": "elohim-sophia",
+      "name": "elohim-conductor",
       "manualOnly": false,
-      "triggersGenesis": false,
-      "cascades": true
-    },
-    {
-      "name": "elohim-steward",
-      "manualOnly": true,
       "triggersGenesis": false,
       "cascades": true
     },
@@ -62,8 +44,26 @@
       "cascades": true
     },
     {
-      "name": "elohim-conductor",
+      "name": "elohim-genesis",
       "manualOnly": false,
+      "triggersGenesis": false,
+      "cascades": true
+    },
+    {
+      "name": "elohim-orchestrator",
+      "manualOnly": false,
+      "triggersGenesis": false,
+      "cascades": false
+    },
+    {
+      "name": "elohim-sophia",
+      "manualOnly": false,
+      "triggersGenesis": false,
+      "cascades": true
+    },
+    {
+      "name": "elohim-steward",
+      "manualOnly": true,
       "triggersGenesis": false,
       "cascades": true
     }

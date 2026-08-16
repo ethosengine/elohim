@@ -59,10 +59,19 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(dirname "$SCRIPT_DIR")"
+REPO_ROOT="$(cd "$APP_DIR/../.." && pwd)"
 HC_DIR="$APP_DIR/../../elohim/holochain"
 LOCAL_DEV_DIR="$HC_DIR/local-dev"
 HAPP_PATH="$HC_DIR/dna/elohim/workdir/elohim.happ"
 HC_PORTS_FILE="$LOCAL_DEV_DIR/.hc_ports"
+
+# Native binaries belong in the governed cargo pool. DNA/WASM builds below
+# deliberately remain in-tree because `hc dna pack` canonicalizes ./target.
+source "$REPO_ROOT/genesis/agentic/bin/pool-lib.sh"
+POOL_FAMILY="$(detect_family "$REPO_ROOT")"
+STORAGE_TARGET_DIR="$(slot_path "$POOL_FAMILY" "elohim/elohim-storage" release)"
+DOORWAY_TARGET_DIR="$(slot_path "$POOL_FAMILY" "doorway/doorway-service" release)"
+mkdir -p "$(readlink -m "$STORAGE_TARGET_DIR")" "$(readlink -m "$DOORWAY_TARGET_DIR")"
 
 # Environment with defaults
 : "${STORAGE_PORT:=8090}"
@@ -372,13 +381,14 @@ echo "└───────────────────────�
 # elohim-storage binary reads STORAGE_DIR from the environment as its DATA
 # directory (src/main.rs), so a user-set STORAGE_DIR must pass through untouched.
 STORAGE_CRATE_DIR="$HC_DIR/../elohim-storage"
-STORAGE_BIN="$STORAGE_CRATE_DIR/target/release/elohim-storage"
+STORAGE_BIN="$STORAGE_TARGET_DIR/release/elohim-storage"
 
 # Build if needed
 if [ ! -f "$STORAGE_BIN" ] || [ "$FORCE_BUILD" = true ]; then
     echo "   🔨 Building elohim-storage..."
     cd "$STORAGE_CRATE_DIR"
-    RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
+    CARGO_TARGET_DIR="$STORAGE_TARGET_DIR" \
+      RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
     echo "   ✅ Build complete"
 fi
 
@@ -469,13 +479,13 @@ echo "└───────────────────────�
 
 # doorway-service is the Rust crate; `doorway/` is the umbrella with subprojects.
 DOORWAY_DIR="$APP_DIR/../../doorway/doorway-service"
-DOORWAY_BIN="$DOORWAY_DIR/target/release/doorway"
+DOORWAY_BIN="$DOORWAY_TARGET_DIR/release/doorway"
 
 # Build if needed
 if [ ! -f "$DOORWAY_BIN" ] || [ "$FORCE_BUILD" = true ]; then
     echo "   🔨 Building doorway..."
     cd "$DOORWAY_DIR"
-    RUSTFLAGS="" cargo build --release
+    CARGO_TARGET_DIR="$DOORWAY_TARGET_DIR" RUSTFLAGS="" cargo build --release
     echo "   ✅ Build complete"
 fi
 

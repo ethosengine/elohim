@@ -198,19 +198,65 @@
         "dir": "crates/elohim-sdk",
         "steps": [
           "sdk-feature-matrix"
-        ]
+        ],
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-elohim-sdk",
+          "cargo": { "workspace": "crates/elohim-sdk", "profile": "dev", "rustflags": "" }
+        }
       },
       "doorway": {
         "dir": "doorway/doorway-service",
         "steps": [
           "cargo-build-doorway"
-        ]
+        ],
+        "run": {
+          "kind": "just",
+          "recipe": "gate",
+          "cargo": { "workspace": "doorway/doorway-service", "profile": "dev", "rustflags": "" }
+        }
       },
       "elohim-storage": {
         "dir": "elohim/elohim-storage",
         "steps": [
           "cargo-build-storage"
-        ]
+        ],
+        "run": {
+          "kind": "just",
+          "recipe": "gate",
+          "cargo": {
+            "workspace": "elohim/elohim-storage",
+            "profile": "dev",
+            "rustflags": "--cfg getrandom_backend=\"custom\""
+          }
+        }
+      },
+      "epr-storage": {
+        "dir": "elohim/elohim-storage",
+        "inputs": {
+          "sources": [
+            "elohim/elohim-storage/src/api/epr*.rs",
+            "elohim/elohim-storage/src/api/epr/**",
+            "elohim/elohim-storage/src/db/epr_atoms.rs",
+            "elohim/elohim-storage/src/services/epr_service.rs",
+            "elohim/elohim-storage/src/services/epr_store.rs",
+            "elohim/elohim-storage/migrations/*add_epr_tables*/**",
+            "elohim/sdk/schemas/v1/views/epr-*.schema.json",
+            "elohim/sdk/schemas/v1/inputs/epr-*.schema.json",
+            "elohim/sdk/storage-client-ts/tests/epr*",
+            "elohim/sdk/storage-client-ts/src/generated/Epr*"
+          ],
+          "buildProcess": []
+        },
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-epr-storage",
+          "cargo": {
+            "workspace": "elohim/elohim-storage",
+            "profile": "dev",
+            "rustflags": "--cfg getrandom_backend=\"custom\""
+          }
+        }
       }
     }
   },

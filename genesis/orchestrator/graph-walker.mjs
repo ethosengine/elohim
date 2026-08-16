@@ -55,6 +55,27 @@ export function topoSort(stepIndex) {
   return order;
 }
 
+function matchInputs(inputs, changedFiles) {
+  const reasons = [];
+  if (!inputs) return reasons;
+
+  for (const pattern of inputs.sources || []) {
+    const matcher = picomatch(pattern);
+    for (const file of changedFiles) {
+      if (matcher(file)) {
+        reasons.push(`source: ${file}`);
+        break;
+      }
+    }
+  }
+
+  for (const ref of inputs.buildProcess || []) {
+    const fileName = ref.split('@')[0];
+    if (changedFiles.includes(fileName)) reasons.push(`buildProcess: ${ref}`);
+  }
+  return reasons;
+}
+
 /**
  * Walk the build graph to determine which gate projects are affected by changed files.
  *
@@ -82,24 +103,7 @@ export function walkGraph(manifests, changedFiles) {
   const stale = new Map();
 
   for (const [qualified, { step }] of stepIndex) {
-    const reasons = [];
-
-    for (const pattern of step.inputs.sources) {
-      const matcher = picomatch(pattern);
-      for (const file of changedFiles) {
-        if (matcher(file)) {
-          reasons.push(`source: ${file}`);
-          break;
-        }
-      }
-    }
-
-    for (const ref of step.inputs.buildProcess) {
-      const fileName = ref.split('@')[0];
-      if (changedFiles.includes(fileName)) {
-        reasons.push(`buildProcess: ${ref}`);
-      }
-    }
+    const reasons = matchInputs(step.inputs, changedFiles);
 
     if (reasons.length > 0) {
       stale.set(qualified, reasons);
@@ -119,8 +123,8 @@ export function walkGraph(manifests, changedFiles) {
     if (!content.gate?.projects) continue;
 
     for (const [projectName, config] of Object.entries(content.gate.projects)) {
-      const triggerSteps = config.steps || Object.keys(content.steps);
-      const reasons = [];
+      const triggerSteps = config.steps || (config.inputs ? [] : Object.keys(content.steps));
+      const reasons = matchInputs(config.inputs, changedFiles);
       let minOrder = Infinity;
 
       for (const stepName of triggerSteps) {

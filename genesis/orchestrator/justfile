@@ -31,10 +31,16 @@ lint-fix:
 test-jenkinsfile-lints:
     node --test jenkinsfile-cps-scope.test.mjs validate-only-pipeline.test.mjs
 
-# Quality gate: validate Jenkinsfiles against Jenkins itself + run the
-# Jenkinsfile static lints. Pre-push hook calls `just gate` on any
-# orchestrator change.
-gate: lint test-jenkinsfile-lints
+# Quality gate: validate Jenkinsfiles against Jenkins itself, run the
+# Jenkinsfile static lints, and run the orchestrator suite. The suite is
+# non-optional here: gate-runner.mjs / pipeline-registry.mjs / graph-walker.mjs
+# are now the ONLY local gate detector+executor, so a break in them aborts
+# every push in the repo. Pre-push calls `just gate` on any orchestrator change.
+gate: lint test-jenkinsfile-lints test-suite
+
+# Full orchestrator node --test suite (registry, gate runner, graph walker, …).
+test-suite:
+    pnpm test
 
 # Regenerate pipeline-list.json from build-manifest.json / pipeline-registry.mjs.
 # Run after editing PIPELINES.

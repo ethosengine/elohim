@@ -1,263 +1,305 @@
-# Elohim Dev Workflows
+# Elohim developer CLI — one discoverable root entrypoint.
 #
-# Prerequisites: nix develop ./steward --accept-flake-config
-# Usage:         just --list
-#
-# All recipes assume you are inside the steward nix shell.
-# Paths are relative to this justfile (project root).
+# Public surface: gate · test · dev · mesh · seed · look · status · codegen
+# Project-specific mechanics stay in private recipes and build-manifest.json.
 
 set dotenv-load := false
 
-# Project root (where this justfile lives)
 root := justfile_directory()
+app_dir := root / "app" / "elohim-app"
+a2o_dir := root / "genesis" / "a2o"
+seeder_dir := root / "genesis" / "seeder"
 
-# Key directories
-elohim_dir  := root / "elohim"
-app_dir     := root / "app" / "elohim-app"
-steward_dir := root / "steward" / "device"
-doorway_dir := root / "doorway"
-node_dir    := root / "steward" / "node"
-genesis_dir := root / "genesis"
-sophia_dir  := root / "app" / "sophia"
+[private]
+default:
+    @just --list
 
-# Derived paths
-local_dev   := elohim_dir / "holochain" / "local-dev"
-ports_file  := local_dev / ".hc_ports"
-storage_bin := elohim_dir / "elohim-storage/target/release/elohim-storage"
-doorway_bin := doorway_dir / "target/release/doorway"
-happ_path   := elohim_dir / "holochain/dna/elohim/workdir/elohim.happ"
+# Run the manifest-declared quality gate for changed files, a project name, or a path.
+gate target="changed" base="origin/dev":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ "{{ target }}" != "changed" ]]; then
+      exec node "{{ root }}/genesis/orchestrator/gate-runner.mjs" --target "{{ target }}"
+    fi
+    changes="$(mktemp)"
+    trap 'rm -f "$changes"' EXIT
+    if git rev-parse --verify "{{ base }}" >/dev/null 2>&1; then
+      merge_base="$(git merge-base HEAD "{{ base }}")"
+      git diff --name-only "$merge_base"...HEAD >> "$changes"
+    else
+      git diff-tree --no-commit-id --name-only -r HEAD >> "$changes"
+    fi
+    git diff --name-only >> "$changes"
+    git diff --cached --name-only >> "$changes"
+    git ls-files --others --exclude-standard >> "$changes"
+    sort -u "$changes" | node "{{ root }}/genesis/orchestrator/gate-runner.mjs" --changed-file-list
 
-# Default ports
-storage_port := env("STORAGE_PORT", "8090")
-doorway_port := "8888"
+# Run one test family. `changed` delegates to the same manifest gate as pre-push.
+test target="changed":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case "{{ target }}" in
+      changed) exec just --justfile "{{ root }}/justfile" gate ;;
+      app) cd "{{ app_dir }}"; exec pnpm test ;;
+      a2o) cd "{{ a2o_dir }}"; exec pnpm run test:unit ;;
+      seeder) cd "{{ seeder_dir }}"; exec pnpm test ;;
+      storage) exec node "{{ root }}/genesis/orchestrator/gate-runner.mjs" --target elohim-storage ;;
+      doorway) exec node "{{ root }}/genesis/orchestrator/gate-runner.mjs" --target doorway ;;
+      node) exec node "{{ root }}/genesis/orchestrator/gate-runner.mjs" --target steward-node ;;
+      sophia) cd "{{ root }}/sophia"; exec pnpm test --ci ;;
+      *) echo "test target must be changed|app|a2o|seeder|storage|doorway|node|sophia" >&2; exit 2 ;;
+    esac
 
-# ─────────────────────────────────────────────────────────────────────
-# Status / Health
-# ─────────────────────────────────────────────────────────────────────
+# Manage the single-peer local stack. Safe default: status.
+dev action="status" profile="isolated" seed="false" build="false":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case "{{ action }}" in
+      start)
+        args=()
+        [[ "{{ seed }}" == "true" ]] && args+=(--seed)
+        [[ "{{ build }}" == "true" ]] && args+=(--build)
+        case "{{ profile }}" in
+          isolated) export NETWORK_PROFILE=isolated ;;
+          alpha) export NETWORK_PROFILE=join-alpha ;;
+          *) echo "dev profile must be isolated|alpha" >&2; exit 2 ;;
+        esac
+        exec "{{ app_dir }}/scripts/hc-start.sh" "${args[@]}"
+        ;;
+      conductor) exec "{{ app_dir }}/scripts/hc-start.sh" --conductor ;;
+      app) cd "{{ app_dir }}"; exec pnpm start ;;
+      stop)
+        pkill -x holochain 2>/dev/null || true
+        fuser -k 8888/tcp 8090/tcp 8095/tcp 2>/dev/null || true
+        find "{{ root }}/elohim/holochain/local-dev" -maxdepth 1 -name '.hc_live_*' -delete 2>/dev/null || true
+        echo "local stack stopped"
+        ;;
+      status) just --justfile "{{ root }}/justfile" status runtime ;;
+      *) echo "dev action must be start|conductor|app|stop|status" >&2; exit 2 ;;
+    esac
 
-# Show health of all services
-status:
-    @echo "=== Storage (port {{storage_port}}) ==="
-    @curl -sf http://localhost:{{storage_port}}/health 2>/dev/null \
-        && echo "  UP" && curl -s http://localhost:{{storage_port}}/db/stats 2>/dev/null | head -5 \
-        || echo "  DOWN"
-    @echo ""
-    @echo "=== Doorway (port {{doorway_port}}) ==="
-    @curl -sf http://localhost:{{doorway_port}}/health 2>/dev/null \
-        && echo "  UP" && curl -s http://localhost:{{doorway_port}}/status 2>/dev/null | head -10 \
-        || echo "  DOWN"
-    @echo ""
-    @echo "=== Session ==="
-    @curl -sf http://localhost:{{storage_port}}/session 2>/dev/null \
-        || echo "  No active session"
-    @echo ""
-    @echo "=== Conductor ==="
-    @if [ -f "{{ports_file}}" ]; then \
-        ADMIN_PORT=$(grep admin_port "{{ports_file}}" | grep -o '[0-9]*' | head -1); \
-        if hc sandbox call --running "$ADMIN_PORT" list-apps >/dev/null 2>&1; then \
-            echo "  UP (admin: $ADMIN_PORT, app: 4445)"; \
-        else \
-            echo "  DOWN (stale ports file)"; \
-        fi; \
-    else \
-        echo "  DOWN"; \
+# Manage or measure the local multi-peer mesh. Safe default: status.
+mesh action="status":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case "{{ action }}" in
+      start|stop|status|probe) exec "{{ app_dir }}/scripts/hc-mesh.sh" "{{ action }}" ;;
+      quiesce) exec "{{ app_dir }}/scripts/hc-mesh-quiesce.sh" ;;
+      *) echo "mesh action must be start|stop|status|probe|quiesce" >&2; exit 2 ;;
+    esac
+
+# Seed content or validate a corpus facet. False content dry-run modes are intentionally absent.
+seed action="validate" profile="local" scope="content" limit="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd "{{ seeder_dir }}"
+    export CONDUCTOR_URLS="${CONDUCTOR_URLS:-ws://localhost:4445}"
+    case "{{ profile }}" in
+      local) ;;
+      alpha)
+        export DOORWAY_URL=https://doorway-alpha.elohim.host
+        export DOORWAY_API_KEY=dev-elohim-auth-2024
+        export STORAGE_URL=https://storage-alpha.elohim.host
+        export HOLOCHAIN_ADMIN_URL='wss://doorway-alpha.elohim.host?apiKey=dev-elohim-auth-2024'
+        export ADMIN_PROXY_URL=https://doorway-alpha.elohim.host
+        ;;
+      *) echo "seed profile must be local|alpha" >&2; exit 2 ;;
+    esac
+    case "{{ action }}" in
+      validate)
+        case "{{ scope }}" in
+          content) exec pnpm exec tsx src/schema-validation.ts ../data/lamad/content ;;
+          all) exec pnpm run validate:all ;;
+          collectives|humans|presences|account-packages|devices|deployments|corpora)
+            exec pnpm run "validate:{{ scope }}"
+            ;;
+          *) echo "validation scope must be content|all|collectives|humans|presences|account-packages|devices|deployments|corpora" >&2; exit 2 ;;
+        esac
+        ;;
+      apply)
+        case "{{ scope }}" in
+          content)
+            args=()
+            if [[ -n "{{ limit }}" ]]; then
+              [[ "{{ limit }}" =~ ^[0-9]+$ ]] || { echo "seed limit must be a positive integer" >&2; exit 2; }
+              args+=(--limit "{{ limit }}")
+            fi
+            exec pnpm exec tsx src/seed.ts "${args[@]}"
+            ;;
+          conductors) exec pnpm exec tsx src/seed-conductor-identities.ts ;;
+          agent-bindings) exec pnpm exec tsx src/seed-agent-bindings.ts ;;
+          humans) exec pnpm exec tsx src/seed-humans.ts ;;
+          collectives) exec pnpm exec tsx src/seed-collectives.ts ;;
+          presences) exec pnpm exec tsx src/seed-presences.ts ;;
+          accounts) exec pnpm exec tsx src/seed-accounts.ts ;;
+          nodes) exec pnpm exec tsx src/seed-nodes.ts ;;
+          epr-atoms) exec pnpm exec tsx src/seed-epr-atom.ts ;;
+          commitments) exec pnpm exec tsx src/seed-commitments.ts ;;
+          household) exec pnpm exec tsx src/seed-household-formation.ts ;;
+          delegates) exec pnpm exec tsx src/seed-delegates-compute.ts ;;
+          test-admin) exec pnpm exec tsx src/seed-test-admin.ts ;;
+          *) echo "apply scope must be content|conductors|agent-bindings|humans|collectives|presences|accounts|nodes|epr-atoms|commitments|household|delegates|test-admin" >&2; exit 2 ;;
+        esac
+        ;;
+      stats) exec pnpm exec tsx src/stats.ts ;;
+      diagnose) exec pnpm exec tsx src/diagnose.ts ;;
+      *) echo "seed action must be validate|apply|stats|diagnose" >&2; exit 2 ;;
+    esac
+
+# Render a page or the Graphos component system.
+look kind="page" target="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd "{{ a2o_dir }}"
+    case "{{ kind }}" in
+      page) [[ -n "{{ target }}" ]] || { echo "usage: just look page <url>" >&2; exit 2; }; exec pnpm look "{{ target }}" ;;
+      graphos) [[ -n "{{ target }}" ]] || { echo "usage: just look graphos <list|story|sheet>" >&2; exit 2; }; exec pnpm graphos "{{ target }}" ;;
+      *) echo "look kind must be page|graphos" >&2; exit 2 ;;
+    esac
+
+# Show the runtime, habits, saga, CI preview, or seed state.
+status view="all":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    runtime() {
+      for endpoint in 'Doorway|http://localhost:8888/health' 'Storage|http://localhost:8090/health'; do
+        name="${endpoint%%|*}"; url="${endpoint#*|}"
+        if curl -sf -m 2 "$url" >/dev/null; then printf '%-10s UP\n' "$name"; else printf '%-10s down\n' "$name"; fi
+      done
+      "{{ app_dir }}/scripts/hc-mesh.sh" status 2>/dev/null || true
+    }
+    case "{{ view }}" in
+      runtime) runtime ;;
+      habits) python3 "{{ root }}/.claude/scripts/habits-status.py" --full ;;
+      saga) python3 "{{ root }}/.claude/scripts/saga-status.py" ;;
+      ci) node "{{ root }}/genesis/orchestrator/preview.mjs" origin/dev ;;
+      seed) cd "{{ seeder_dir }}"; exec pnpm exec tsx src/stats.ts ;;
+      all) runtime; python3 "{{ root }}/.claude/scripts/habits-status.py" ;;
+      *) echo "status view must be all|runtime|habits|saga|ci|seed" >&2; exit 2 ;;
+    esac
+
+# Generate or verify derived interfaces. Safe default: verify.
+codegen target="all" mode="verify":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [[ "{{ mode }}" == "verify" || "{{ mode }}" == "write" ]] || { echo "codegen mode must be verify|write" >&2; exit 2; }
+    run_target() {
+      case "$1:{{ mode }}" in
+        schema:verify) pnpm run schema:codegen:ts -- --verify; pnpm run schema:codegen:rs -- --verify ;;
+        schema:write) pnpm run schema:codegen:ts; pnpm run schema:codegen:rs ;;
+        domains:verify) pnpm run manifest:codegen:verify; pnpm run lamad:codegen:verify; pnpm run imagodei:codegen:verify; pnpm run shefa:codegen:verify; pnpm run qahal:codegen:verify; pnpm run avodah:codegen:verify ;;
+        domains:write) pnpm run lamad:codegen; pnpm run imagodei:codegen; pnpm run shefa:codegen; pnpm run qahal:codegen; pnpm run avodah:codegen ;;
+        routes:verify) pnpm run route-claims:codegen:verify ;;
+        routes:write) pnpm run route-claims:codegen ;;
+        agents:verify) node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs verify ;;
+        agents:write) node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs project --write-fixtures --write-runtime ;;
+        wire-types:verify) pnpm run wire-types:generate; git diff --exit-code -- elohim/sdk/storage-client-ts/src/generated ;;
+        wire-types:write) pnpm run wire-types:generate ;;
+        elements:verify) pnpm run elements:codegen:verify ;;
+        elements:write) pnpm run elements:codegen ;;
+        rakia:verify) pnpm run rakia:codegen:rs:verify ;;
+        rakia:write) pnpm run rakia:codegen:rs ;;
+        *) echo "codegen target must be all|schema|domains|routes|agents|wire-types|elements|rakia" >&2; exit 2 ;;
+      esac
+    }
+    if [[ "{{ target }}" == all ]]; then
+      for target in schema domains routes agents elements rakia; do run_target "$target"; done
+    else
+      run_target "{{ target }}"
     fi
 
-# ─────────────────────────────────────────────────────────────────────
-# Steward Desktop
-# ─────────────────────────────────────────────────────────────────────
+# ---- Private manifest runners -------------------------------------------------
 
-# Build + run steward Tauri app in dev mode
-steward-dev:
-    cd {{steward_dir}} && pnpm run tauri:dev
+_gate-elohim-library:
+    cd app/elohim-library && pnpm exec eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src
+    cd app/elohim-library/projects/elohim-service && pnpm exec tsc --noEmit && pnpm exec vitest run
 
-# Production build of steward
-steward-build:
-    cd {{steward_dir}} && pnpm run tauri:build
+_gate-elohim-storybook:
+    cd app/elohim-library && pnpm run build-storybook && pnpm run test-storybook:ci
 
-# Production bundle: build storage binary, then steward (which bundles it)
-# TAURI_CONFIG injects bundle.resources so elohim-storage is included in the package
-steward-bundle:
-    just storage-build
-    TAURI_CONFIG='{"bundle":{"resources":{"../elohim/elohim-storage/target/release/elohim-storage":"bin/"}}}' just steward-build
+_gate-elements-codegen:
+    pnpm run elements:codegen:verify
+    pnpm --filter elohim-core test
 
-# ─────────────────────────────────────────────────────────────────────
-# Storage
-# ─────────────────────────────────────────────────────────────────────
+_gate-elohim-compute:
+    cd elohim/elohim-compute && cargo fmt --check && cargo clippy -- -D warnings && cargo test
 
-# Build elohim-storage binary (delegates to per-project justfile)
-storage-build:
-    just --justfile {{elohim_dir}}/elohim-storage/justfile --working-directory {{elohim_dir}}/elohim-storage build
+_gate-elohim-epr:
+    cd elohim && cargo fmt --check && cargo clippy -p elohim-epr -p elohim-epr-rea -- -D warnings && cargo test -p elohim-epr -p elohim-epr-rea --all-targets
 
-# Start elohim-storage (wraps existing script)
-storage-start:
-    cd {{app_dir}} && ./scripts/storage-start.sh
+_gate-epr-ts:
+    cd elohim/sdk/epr-ts && pnpm test
 
-# Stop elohim-storage
-storage-stop:
-    @fuser -k {{storage_port}}/tcp 2>/dev/null && echo "Stopped elohim-storage" || echo "elohim-storage not running"
+# elohim/eprfs is its own native workspace with no per-project justfile; the
+# recipe lives here so the manifest's typed contract has a real target.
+_gate-eprfs:
+    cd elohim/eprfs && cargo fmt --check
+    cd elohim/eprfs && cargo clippy --workspace --all-targets -- -D warnings
+    cd elohim/eprfs && cargo test --workspace
 
-# ─────────────────────────────────────────────────────────────────────
-# Session Management
-# ─────────────────────────────────────────────────────────────────────
+_gate-seam-contracts:
+    cd crates/seam-contracts && cargo test --all-features
+    cd crates/seam-contracts && cargo clippy --all-features -- -D warnings
+    cd crates/seam-contracts && cargo fmt --check
+    cd crates/seam-contracts && cargo build --target wasm32-unknown-unknown --no-default-features
 
-# Show current active session
-session:
-    @curl -sf http://localhost:{{storage_port}}/session 2>/dev/null \
-        && echo "" \
-        || echo "No active session (storage may not be running)"
+_gate-epr-storage:
+    cd elohim/elohim-storage && cargo build && cargo test --test schema_contract && cargo test --test schema_contract_diesel_epr
+    cd elohim/sdk/storage-client-ts && pnpm test
 
-# Create a dev session for local testing
-session-seed agent_pub_key="uhCAk_dev_agent_placeholder":
+_gate-elohim-sdk:
+    bash scripts/ci/elohim-sdk-feature-matrix.sh
+
+_gate-schema-dna:
+    pnpm run schema:check-dna
+
+_gate-manifest-hygiene:
+    cargo test --manifest-path elohim/holochain/tests/manifest-hygiene/Cargo.toml
+
+_gate-sweettest-check:
     #!/usr/bin/env bash
-    echo "Creating dev session..."
-    curl -sf -X POST http://localhost:{{storage_port}}/session \
-        -H "Content-Type: application/json" \
-        -d '{
-            "humanId": "dev-human-local",
-            "agentPubKey": "{{agent_pub_key}}",
-            "doorwayUrl": "http://localhost:{{doorway_port}}",
-            "identifier": "dev@local",
-            "displayName": "Local Developer"
-        }' | head -40
-    echo ""
+    set -euo pipefail
+    clang_include="$(ls -1d /usr/lib/clang/*/include 2>/dev/null | sort -V | tail -1)"
+    BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I$clang_include}" OPENSSL_NO_VENDOR=1 \
+      cargo check --manifest-path elohim/holochain/tests/sweettest/Cargo.toml --tests
 
-# Delete active session
-session-delete:
-    @curl -sf -X DELETE http://localhost:{{storage_port}}/session 2>/dev/null \
-        && echo "" \
-        || echo "No session to delete (or storage not running)"
+_gate-schema-validate:
+    pnpm run schema:validate
 
-# List all sessions (including inactive)
-session-list:
-    @curl -sf http://localhost:{{storage_port}}/session/all 2>/dev/null \
-        && echo "" \
-        || echo "Storage not running"
+_gate-schema-codegen:
+    pnpm run schema:codegen:ts -- --verify
+    pnpm run schema:codegen:rs -- --verify
+    pnpm run route-claims:codegen:verify
 
-# ─────────────────────────────────────────────────────────────────────
-# Doorway Stack (wraps existing pnpm scripts)
-# ─────────────────────────────────────────────────────────────────────
+_gate-constants-sync:
+    pnpm run schema:codegen:ts -- --verify
+    cd genesis/seeder && pnpm exec vitest run src/__tests__/constants-sync.test.ts
 
-# Start full stack (conductor + storage + doorway)
-stack-start:
-    cd {{app_dir}} && ./scripts/hc-start.sh
+_gate-genesis-a2o:
+    cd genesis/a2o && pnpm run lint && pnpm run format:check && pnpm run typecheck
 
-# Start full stack + seed content
-stack-start-seed:
-    cd {{app_dir}} && ./scripts/hc-start.sh --seed
+_gate-gherkin-prepush-lint:
+    cd genesis/a2o && pnpm run lint:gherkin
 
-# Stop all services
-stack-stop:
+_gate-reach-drift:
+    node genesis/seeder/scripts/check-reach-drift.mjs
+
+_gate-domain-types:
     #!/usr/bin/env bash
-    echo "Stopping all Elohim services..."
-    pkill -f 'holochain.*conductor' 2>/dev/null || true
-    fuser -k {{doorway_port}}/tcp 2>/dev/null || true
-    fuser -k {{storage_port}}/tcp 2>/dev/null || true
-    rm -f {{local_dev}}/.hc_live_*
-    echo "All services stopped"
+    set -euo pipefail
+    for domain in imagodei infrastructure lamad qahal shefa avodah; do
+      cargo check --manifest-path "elohim/sdk/domains/$domain/types/Cargo.toml"
+    done
 
-# Stop + clear data + restart
-stack-reset:
-    #!/usr/bin/env bash
-    echo "Resetting Elohim stack..."
-    just stack-stop
-    rm -rf {{local_dev}}/.hc* {{local_dev}}/.sandbox* {{local_dev}}/conductor-data /tmp/elohim-storage
-    echo "Data cleared, restarting..."
-    just stack-start
+_gate-rakia-codegen:
+    pnpm run rakia:codegen:rs:verify
 
-# ─────────────────────────────────────────────────────────────────────
-# Build
-# ─────────────────────────────────────────────────────────────────────
+_gate-rakia-validate:
+    pnpm run rakia:schema:validate
 
-# Build all Holochain DNAs + pack hApp (delegates to per-project justfiles)
-dna-build: dna-lamad dna-imagodei dna-infrastructure dna-node-registry
-    #!/usr/bin/env bash
-    set -e
-    WORKDIR="{{elohim_dir}}/holochain/dna/elohim/workdir"
-    echo "Packing elohim.happ..."
-    hc app pack "$WORKDIR" -o "$WORKDIR/elohim.happ"
-    echo "DNAs built (lamad + imagodei + infrastructure + node-registry)"
+_gate-cargo-coverage:
+    pnpm run validate:cargo-coverage
 
-# Build lamad DNA
-dna-lamad:
-    just --justfile {{elohim_dir}}/holochain/dna/elohim/justfile --working-directory {{elohim_dir}}/holochain/dna/elohim pack
-
-# Build imagodei DNA
-dna-imagodei:
-    just --justfile {{elohim_dir}}/holochain/dna/imagodei/justfile --working-directory {{elohim_dir}}/holochain/dna/imagodei pack
-
-# Build infrastructure DNA
-dna-infrastructure:
-    just --justfile {{elohim_dir}}/holochain/dna/infrastructure/justfile --working-directory {{elohim_dir}}/holochain/dna/infrastructure pack
-
-# Build node-registry DNA
-dna-node-registry:
-    just --justfile {{elohim_dir}}/holochain/dna/node-registry/justfile --working-directory {{elohim_dir}}/holochain/dna/node-registry pack
-
-# Build doorway gateway (delegates to per-project justfile)
-doorway-build:
-    just --justfile {{doorway_dir}}/justfile --working-directory {{doorway_dir}} build
-
-# Build elohim-node P2P runtime (delegates to per-project justfile)
-node-build:
-    just --justfile {{node_dir}}/justfile --working-directory {{node_dir}} build
-
-# Build sophia assessment UMD bundle
-sophia-build:
-    cd {{sophia_dir}} && pnpm install && pnpm build && pnpm build:umd
-
-# Verify sophia build artifacts exist
-sophia-check:
-    bash {{root}}/app/elohim-app/scripts/check-sophia.sh
-
-# ─────────────────────────────────────────────────────────────────────
-# Content
-# ─────────────────────────────────────────────────────────────────────
-
-# Seed content to local stack
-seed:
-    cd {{genesis_dir}}/seeder && pnpm exec tsx src/seed.ts
-
-# Validate seed data without writing
-seed-dry-run:
-    cd {{genesis_dir}}/seeder && pnpm exec tsx src/seed.ts --dry-run
-
-# ─────────────────────────────────────────────────────────────────────
-# Angular Dev
-# ─────────────────────────────────────────────────────────────────────
-
-# Start Angular dev server (proxy to doorway)
-app-dev:
-    cd {{app_dir}} && pnpm exec ng serve --proxy-config proxy.conf.mjs --disable-host-check
-
-# Production build of elohim-app
-app-build:
-    cd {{app_dir}} && pnpm exec ng build
-
-# ─────────────────────────────────────────────────────────────────────
-# CI Preview
-# ─────────────────────────────────────────────────────────────────────
-
-# Preview what the orchestrator will decide for current changes
-ci-preview base="origin/dev":
-    @node {{genesis_dir}}/orchestrator/preview.mjs {{base}}
-
-# ─────────────────────────────────────────────────────────────────────
-# Gate #8 — iroh latency stress (10,000 round-trips per transport)
-# ─────────────────────────────────────────────────────────────────────
-
-# Run the Gate #8 iroh blob stress bench (10k round-trips, p99 acceptance).
-# Requires --release for representative numbers; debug adds 5-10x overhead.
-bench-stress:
-    #!/usr/bin/env bash
-    set -e
-    echo "=== Gate #8: iroh blob latency stress (10,000 round-trips per transport) ==="
-    echo "This takes several minutes. Use --nocapture output to see progress."
-    echo ""
-    cd {{elohim_dir}}/elohim-storage
-    RUSTFLAGS='--cfg getrandom_backend="custom"' \
-    cargo test \
-        --release \
-        --features "p2p p2p-iroh" \
-        --test bench_blob_stress_10k \
-        -- --ignored --nocapture
+_gate-pipeline-list-fresh:
+    node genesis/orchestrator/scripts/generate-pipeline-list.mjs
+    git diff --exit-code -- genesis/orchestrator/pipeline-list.json

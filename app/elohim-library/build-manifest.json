@@ -70,7 +70,11 @@
   },
   "gate": {
     "projects": {
-      "elohim-storybook": { "dir": "app/elohim-library", "steps": ["build-storybook", "build-storybook-image"] }
+      "elohim-storybook": {
+        "dir": "app/elohim-library",
+        "steps": ["build-storybook", "build-storybook-image"],
+        "run": { "kind": "root-just", "recipe": "_gate-elohim-storybook" }
+      }
     }
   },
   "deployment": {

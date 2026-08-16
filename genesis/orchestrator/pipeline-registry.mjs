@@ -10,6 +10,7 @@
  * 2026-05-28-orchestrator-clean-build-triggers.
  */
 
+import { resolve, relative } from 'path';
 import { loadManifests } from './manifest-utils.mjs';
 
 /**
@@ -90,4 +91,55 @@ export function pipelineDependencyMap(registry) {
     map.set(p.pipeline, p.dependsOn);
   }
   return map;
+}
+
+/**
+ * Load the local quality-gate registry from build manifests.
+ *
+ * Unlike the pipeline registry, this preserves the gate execution contract.
+ * Humans (`just gate`) and the pre-push hook both consume this map, so adding a
+ * gate project never requires a second project-name switch in shell.
+ *
+ * @returns {Map<string, {name: string, dir: string, pipeline: string,
+ *   steps: string[], inputs: object|null, run: object, manifestPath: string}>}
+ */
+export function loadGateRegistry(rootDir) {
+  const manifests = loadManifests(rootDir);
+  const registry = new Map();
+  const root = resolve(rootDir);
+
+  for (const { path, content } of manifests) {
+    for (const [name, config] of Object.entries(content.gate?.projects || {})) {
+      if (registry.has(name)) {
+        throw new Error(
+          `Duplicate gate project '${name}' in ${path} and ${registry.get(name).manifestPath}`
+        );
+      }
+
+      const dir = resolve(root, config.dir);
+      const rel = relative(root, dir);
+      if (rel.startsWith('..') || resolve(root, rel) !== dir) {
+        throw new Error(`Gate project '${name}' escapes the repository: ${config.dir}`);
+      }
+
+      const steps = config.steps || (config.inputs ? [] : Object.keys(content.steps));
+      for (const step of steps) {
+        if (!Object.hasOwn(content.steps, step)) {
+          throw new Error(`Gate project '${name}' references unknown step '${step}' in ${path}`);
+        }
+      }
+
+      registry.set(name, {
+        name,
+        dir: config.dir,
+        pipeline: content.pipeline,
+        steps,
+        inputs: config.inputs || null,
+        run: config.run,
+        manifestPath: path,
+      });
+    }
+  }
+
+  return registry;
 }

@@ -31,7 +31,15 @@
   },
   "gate": {
     "projects": {
-      "eprfs": { "dir": "elohim/eprfs", "steps": ["rust-build-test"] }
+      "eprfs": {
+        "dir": "elohim/eprfs",
+        "steps": ["rust-build-test"],
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-eprfs",
+          "cargo": { "targetDir": "/tmp/eprfs-gate-target", "profile": "dev", "rustflags": "" }
+        }
+      }
     }
   },
   "deployment": {}
