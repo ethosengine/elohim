@@ -28,8 +28,17 @@ provide / resolve` by CID over the blob + CRDT planes
 (`eprfs-ipfs-analog-dataplane-sdk-surface.md`) — with the `.dataplane()` typed
 facade (`arch-dataplane-sdk-proposal.md`) as the TS half.
 
-**Where we are (2026-08-14):** digging into blocker 1 — closing the convergence
-algebra. This doc exists so the rest of the path stays visible while we do.
+**Where we are (2026-08-16):** the dev-loop story (blocker 6's non-negotiable)
+went LIVE — `app/elohim-app/scripts/hc-mesh.sh` runs the alpha-shaped 3-peer
+mesh (3 conductors on a local island DHT via the doorway's own bootstrap +
+signal, 3 storage peers, two doorways with SSR materialized from substrate)
+in one Che container, seeded by the pipeline's own seed legs, measured by the
+same facade runner CI runs. First full desk convergence proof: 3,439-row
+corpus + staged bundles reached `converged=1, known_divergent=0` across 3
+peers in ~90min (adopt-before-author minting canonical links live). The mesh
+immediately cornered a HIGH dataplane bug the fleet had been masking:
+>16MB chunked blobs are memory-resident (restart-fatal) and invisible to the
+/apps extraction path — `chunked-blob-over-16mb-not-durable-mesh-repro.md`.
 
 ## Blockers, ranked by how structurally they block packaging (not by effort)
 
@@ -114,6 +123,9 @@ labels iroh experimental — the current ambiguity can't ship.
   deliberately inert — so there's no "simulacra" collapse for dev networks,
   meaning an SDK developer's inner loop pays live-network trust compute or gets
   nothing. A dev-loop story is non-negotiable for an SDK.
+  **Dev-loop story DELIVERED 2026-08-16** (`hc-mesh.sh` — full local 3-peer
+  substrate, pipeline-identical seeding + probes, minute-scale iteration);
+  the trust-gradient/dev_mode-socket half of this blocker stands.
 - No draft→graduate content path exists (Category B drafts prescribed by the
   p2p-design-gate, unimplemented) — "author locally, publish when ready" has no
   substrate verb.

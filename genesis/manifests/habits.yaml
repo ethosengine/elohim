@@ -625,6 +625,12 @@ habits:
       can now be proven at the desk before any fleet deploy. Status stays
       unwired: the first_move red (commitment-gated verb scenario) is not
       written.
+      DELTA 2026-08-16 (overnight): the mesh proved full convergence at desk
+      scale (3,439 rows × 3 peers → converged=1, known_divergent=0, ~90min,
+      adopt-before-author minting live) and cornered the >16MB chunked-blob
+      durability/serving bug the fleet masks (backlog
+      chunked-blob-over-16mb-not-durable-mesh-repro, HIGH — pins saga
+      ch03/04/05/09/10 on any bundle over the threshold).
 
   - id: dev-system-equilibrium
     invariant: >
