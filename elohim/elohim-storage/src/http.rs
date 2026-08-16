@@ -294,6 +294,15 @@ pub struct HttpServer {
     /// project_signal + back_prop_one_hop + flood_feedback end-to-end.
     /// When absent (no P2P swarm, test fixtures), fan-out steps are skipped gracefully.
     fan_out_ctx: Option<Arc<crate::api::epr::EprFanOutCtx>>,
+    /// T10 (head-plane trust-gradient program §3 L5 / minutes-quiesce §3 W2
+    /// task Q6): declared-stakes resolver, wired at startup via
+    /// `with_network_stakes_resolver`. Shares the same `ManifestRegistry`
+    /// Arc as `fan_out_ctx.manifest_registry` (constructed once, cloned).
+    /// Used by `PUT /admin/seed/network-stakes` to refresh the registry
+    /// cache after an insert; NOT yet consulted by any pricing decision —
+    /// `TrustGradient::inert()` still governs every `authorize_reach_for_human`
+    /// call (Q7 is the task that wires a resolved stage into a decision).
+    network_stakes_resolver: Option<Arc<crate::trust::ManifestStakesResolver>>,
     /// SSR renderer (ssr feature only). Constructed once at startup from SSR_BUNDLE_PATH.
     /// None when the feature is off or the bundle failed to load — handlers return 503.
     #[cfg(feature = "ssr")]
@@ -592,6 +601,7 @@ impl HttpServer {
             conductor_manager: None,
             admin_websocket: None,
             fan_out_ctx: None,
+            network_stakes_resolver: None,
             #[cfg(feature = "ssr")]
             ssr_state: None,
             self_cid: String::new(),
@@ -731,6 +741,18 @@ impl HttpServer {
     /// require missing dependencies are skipped gracefully.
     pub fn with_fan_out_ctx(mut self, ctx: Arc<crate::api::epr::EprFanOutCtx>) -> Self {
         self.fan_out_ctx = Some(ctx);
+        self
+    }
+
+    /// Wire the declared-stakes resolver (T10). `PUT /admin/seed/network-stakes`
+    /// uses it to refresh the `ManifestRegistry` cache after an insert. Absent
+    /// = the seed route still writes durably (just without the immediate
+    /// same-process cache refresh) and no boot-time stage is logged.
+    pub fn with_network_stakes_resolver(
+        mut self,
+        resolver: Arc<crate::trust::ManifestStakesResolver>,
+    ) -> Self {
+        self.network_stakes_resolver = Some(resolver);
         self
     }
 
@@ -1361,6 +1383,28 @@ impl HttpServer {
             (Method::POST, "/admin/seed/delegates-compute") => {
                 if let Some(pool) = self.db_pool.as_ref() {
                     crate::api::seed_delegates_compute::handle(req, pool).await
+                } else {
+                    Ok(response::service_unavailable("db pool not available"))
+                }
+            }
+
+            // Operator/seed write of a declared network-stakes manifest — T10 runtime
+            // half (head-plane trust-gradient program §3 L5; minutes-quiesce fixture-
+            // trust-swarm plan §3 W2, task Q6). Accepts the seeder's stakes-declaration
+            // artifact (`genesis/seeder/src/corpus-trust.ts`, STAKES-DECLARATION-SEAM-Q6
+            // contract) and stores it into `manifests` (manifest_kind="network-stakes")
+            // — local-only, unsigned, NOT DHT-published, same bootstrap-local posture as
+            // `services::bootstrap_manifests`. Flag-gated (ALLOW_SEED_NETWORK_STAKES=1);
+            // deliberately NOT in build_manifest() (never doorway-proxied).
+            // `ManifestStakesResolver::stage_for` is the read side.
+            (Method::PUT, "/admin/seed/network-stakes") => {
+                if let Some(pool) = self.db_pool.as_ref() {
+                    crate::api::seed_network_stakes::handle(
+                        req,
+                        pool,
+                        self.network_stakes_resolver.clone(),
+                    )
+                    .await
                 } else {
                     Ok(response::service_unavailable("db pool not available"))
                 }
@@ -2514,6 +2558,70 @@ impl HttpServer {
             .unwrap()
     }
 
+    /// Resolve the shard manifest for a canonical `sha256-{hex}` blob hash.
+    ///
+    /// The in-process `manifests` map only ever holds what THIS process minted:
+    /// a restart, or a peer whose shards arrived by replication rather than by
+    /// ingest, has no entry even though every shard sits on local disk. Since
+    /// `put_blob_bytes` never stores the composite under its own name, a
+    /// `>16MB` blob was unservable everywhere except its minting process.
+    ///
+    /// The durable projection (`shard_manifests`) is the fallback; a hit
+    /// hydrates the map so subsequent reads stay warm. Lazy — not a boot
+    /// reload — because the manifest is a Category-C projection: paying for it
+    /// on the first read of a given blob is cheaper and correct for blobs whose
+    /// rows land after startup (replication, backfill).
+    async fn resolve_manifest(&self, hash: &str) -> Option<ShardManifest> {
+        if let Some(manifest) = self.manifests.read().await.get(hash).cloned() {
+            return Some(manifest);
+        }
+
+        let pool = self.db_pool.as_ref()?;
+        let mut conn = pool.get().ok()?;
+        let row = crate::db::shard_manifests::get_manifest_by_blob_hash(&mut conn, hash)
+            .map_err(|e| warn!(hash = %hash, error = %e, "shard manifest lookup failed"))
+            .ok()
+            .flatten()?;
+        let manifest = crate::db::shard_manifests::hydrate_manifest(&row)
+            .map_err(|e| warn!(hash = %hash, error = %e, "shard manifest hydration failed"))
+            .ok()?;
+
+        debug!(
+            hash = %hash,
+            encoding = %manifest.encoding,
+            shards = manifest.shard_hashes.len(),
+            "shard manifest rehydrated from durable projection"
+        );
+        self.manifests
+            .write()
+            .await
+            .insert(hash.to_string(), manifest.clone());
+        Some(manifest)
+    }
+
+    /// Reassemble a manifest's blob from locally-stored shards.
+    ///
+    /// On a local miss returns the offending `(index, shard_hash)` so callers
+    /// can name which shard is absent instead of reporting the composite as
+    /// simply "not found".
+    async fn reassemble_from_local_shards(
+        &self,
+        manifest: &ShardManifest,
+    ) -> Result<Vec<u8>, (usize, String)> {
+        let mut data = Vec::with_capacity(manifest.total_size as usize);
+
+        for (index, shard_hash) in manifest.shard_hashes.iter().enumerate() {
+            match self.blob_store.get(shard_hash).await {
+                Ok(shard_data) => data.extend_from_slice(&shard_data),
+                Err(_) => return Err((index, shard_hash.clone())),
+            }
+        }
+
+        // Truncate to actual size (last shard may be padded)
+        data.truncate(manifest.total_size as usize);
+        Ok(data)
+    }
+
     /// GET /blob/{hash} - Reassemble blob from shards
     /// Checks policy enforcement if agent_id is provided
     async fn handle_get_blob(
@@ -2708,8 +2816,8 @@ impl HttpServer {
             }
         }
 
-        // Get manifest
-        let manifest = self.manifests.read().await.get(hash).cloned();
+        // Get manifest — in-process cache first, durable projection on miss.
+        let manifest = self.resolve_manifest(hash).await;
         let manifest = match manifest {
             Some(m) => m,
             None => {
@@ -2776,15 +2884,30 @@ impl HttpServer {
         };
 
         // Reassemble from shards
-        let mut data = Vec::with_capacity(manifest.total_size as usize);
-
-        for shard_hash in &manifest.shard_hashes {
-            let shard_data = self.blob_store.get(shard_hash).await?;
-            data.extend_from_slice(&shard_data);
-        }
-
-        // Truncate to actual size (last shard may be padded)
-        data.truncate(manifest.total_size as usize);
+        let data = match self.reassemble_from_local_shards(&manifest).await {
+            Ok(data) => data,
+            Err((index, shard_hash)) => {
+                // Naming the absent shard keeps a partially-replicated composite
+                // distinguishable from an unknown blob (both were opaque before:
+                // the propagating `?` reported a 500).
+                warn!(
+                    hash = %hash,
+                    shard_index = index,
+                    shard_hash = %shard_hash,
+                    shards = manifest.shard_hashes.len(),
+                    "Blob manifest resolved but a shard is missing locally"
+                );
+                return Ok(Self::with_cors_headers(Response::builder())
+                    .status(StatusCode::NOT_FOUND)
+                    .body(Full::new(Bytes::from(format!(
+                        "Blob incomplete: shard {} of {} ({}) missing",
+                        index,
+                        manifest.shard_hashes.len(),
+                        shard_hash
+                    ))))
+                    .unwrap());
+            }
+        };
 
         info!(
             hash = %hash,
@@ -2844,7 +2967,46 @@ impl HttpServer {
                 };
             }
             Err(_) => {
-                // Local miss — fall through to the peer-heal attempt below.
+                // Local miss — fall through to the manifest + peer-heal attempts below.
+            }
+        }
+
+        // Sharded composites are never stored under their own name (see
+        // `put_blob_bytes`), so the local read above ALWAYS misses for
+        // `encoding != "none"`. Consulting the manifest before racing peers is
+        // what makes `/apps/{slug}` (and every other `get_blob_or_heal` caller)
+        // able to serve a `>16MB` blob at all — previously a 404 by
+        // construction. `"none"` manifests name the composite itself, so
+        // reassembly there would just repeat the read that already failed.
+        if let Some(manifest) = self.resolve_manifest(hash).await {
+            if manifest.encoding != "none" {
+                match self.reassemble_from_local_shards(&manifest).await {
+                    Ok(bytes) => {
+                        debug!(
+                            hash = %hash,
+                            encoding = %manifest.encoding,
+                            shards = manifest.shard_hashes.len(),
+                            "blob reassembled from local shards via manifest"
+                        );
+                        return BlobHealOutcome::Bytes {
+                            bytes,
+                            healed_from: None,
+                        };
+                    }
+                    Err((index, shard_hash)) => {
+                        // Shards are ordinary content-addressed blobs, so the
+                        // peer-heal below still has a path — it just races on the
+                        // composite hash, which no peer holds. Naming the gap
+                        // keeps the eventual 404 diagnosable.
+                        warn!(
+                            hash = %hash,
+                            shard_index = index,
+                            shard_hash = %shard_hash,
+                            shards = manifest.shard_hashes.len(),
+                            "blob heal: manifest resolved but shard missing locally"
+                        );
+                    }
+                }
             }
         }
 
@@ -3003,20 +3165,56 @@ impl HttpServer {
                 let pool_bg = pool.clone();
                 let blob_store_bg = self.blob_store.clone();
                 let self_cid_bg = self.self_cid.clone();
+                let fresh_after_task = fresh_after.clone();
                 let heal_task = tokio::spawn(async move {
-                    let is_connected = move |peer: &str| connected_set.contains(peer);
-                    let outcome = crate::p2p::blob_fetch::race_fetch(
+                    // Q3/Q4 (minutes-quiesce W1.2/W1.3): this is the exact
+                    // cross-process 404 class Q2 closed LOCALLY (a sharded
+                    // composite's bytes exist only under its shard hashes,
+                    // never under the composite hash itself) — here it is
+                    // cross-PEER: a connected peer may hold every shard
+                    // without holding the composite's manifest cache. Plain
+                    // `race_fetch` on the composite hash would 404 forever in
+                    // that case; `race_fetch_with_swarm` accepts a
+                    // manifest-only reply, persists it, and spreads the shard
+                    // fetch across the known holder set instead of dead-ending.
+                    let mut conn = match pool_bg.get() {
+                        Ok(c) => c,
+                        Err(e) => {
+                            error!(
+                                hash = %hash_owned,
+                                error = %e,
+                                "T20/Q3: pool exhausted, cannot race-fetch"
+                            );
+                            return BlobHealOutcome::FinalizeFailed(FinalizeFailure::PoolExhausted);
+                        }
+                    };
+                    let swarm_params = crate::p2p::blob_swarm::SwarmFetchParams {
+                        cmd_tx: &cmd_tx,
+                        connected: &connected_set,
+                        per_shard_parallelism: parallelism,
+                        per_peer_timeout,
+                        // Modest total-inflight bound on CONCURRENT shard
+                        // races (distinct from `parallelism`, which bounds
+                        // peers raced WITHIN one shard) — mirrors the
+                        // `fetch_blob_parallelism * ~4` sizing
+                        // `RaceFetchKicker::kick_semaphore` already uses
+                        // elsewhere for a similar fan-out bound.
+                        total_inflight: parallelism.max(1) * 4,
+                        self_cid: &self_cid_bg,
+                        blob_store: &blob_store_bg,
+                    };
+                    let outcome = crate::p2p::blob_swarm::race_fetch_with_swarm(
                         &hash_owned,
                         candidates,
-                        &cmd_tx,
-                        is_connected,
-                        parallelism,
-                        per_peer_timeout,
+                        &mut conn,
+                        &fresh_after_task,
+                        &swarm_params,
                     )
                     .await;
+                    drop(conn);
 
                     match outcome {
-                        crate::p2p::blob_fetch::FetchOutcome::Hit { bytes, source_peer } => {
+                        crate::p2p::blob_swarm::SwarmRaceOutcome::Hit { bytes, source_peer } => {
                             // T20: persist + SQL collapse into a single async
                             // `finalize_fetch_success` call.
                             //
@@ -3032,6 +3230,31 @@ impl HttpServer {
                             // the blob is not yet durably accounted for through
                             // this gateway, and callers return 503 (not 404) to
                             // preserve retry semantics on the downstream cache.
+                            //
+                            // `source_peer == "swarm"` names a Q4 reassembly:
+                            // no single peer served the whole composite (each
+                            // shard was already persisted + REA-booked
+                            // individually inside `fetch_shards_via_swarm`),
+                            // so finalizing again here would falsely claim a
+                            // peer literally named "swarm" served every byte.
+                            // The composite is already durable via its
+                            // manifest + shards (Q2's philosophy: never store
+                            // the composite a second time under its own
+                            // name) — just serve the bytes.
+                            if source_peer == "swarm" {
+                                info!(
+                                    hash_prefix = %hash_prefix_task,
+                                    size = bytes.len(),
+                                    candidate_count,
+                                    source = candidate_source,
+                                    "blob heal: Q4 swarm shard-fetch HIT — composite reassembled from shards"
+                                );
+                                return BlobHealOutcome::Bytes {
+                                    bytes,
+                                    healed_from: Some(source_peer),
+                                };
+                            }
+
                             let mut conn = match pool_bg.get() {
                                 Ok(c) => c,
                                 Err(e) => {
@@ -3077,7 +3300,29 @@ impl HttpServer {
                                 healed_from: Some(source_peer),
                             }
                         }
-                        crate::p2p::blob_fetch::FetchOutcome::Miss => {
+                        // Q3: a manifest was received and persisted, but at
+                        // least one shard could not be swarm-fetched this
+                        // round. The manifest is durable regardless — a
+                        // later request (this same path again, replication
+                        // landing the missing shard, or Q2's local
+                        // reassembly) can complete it without repeating the
+                        // manifest round-trip. 404 for THIS request; do not
+                        // conflate with a plain Miss in the log line.
+                        crate::p2p::blob_swarm::SwarmRaceOutcome::ManifestPersistedIncomplete {
+                            manifest,
+                            missing_shards,
+                        } => {
+                            info!(
+                                hash_prefix = %hash_prefix_task,
+                                total_shards = manifest.shard_hashes.len(),
+                                missing_shards,
+                                candidate_count,
+                                source = candidate_source,
+                                "blob heal: Q3/Q4 manifest persisted but swarm shard-fetch incomplete; returning 404"
+                            );
+                            BlobHealOutcome::NotFound
+                        }
+                        crate::p2p::blob_swarm::SwarmRaceOutcome::Miss => {
                             info!(
                                 hash_prefix = %hash_prefix_task,
                                 candidate_count,
@@ -3086,7 +3331,7 @@ impl HttpServer {
                             );
                             BlobHealOutcome::NotFound
                         }
-                        crate::p2p::blob_fetch::FetchOutcome::NoCandidates => {
+                        crate::p2p::blob_swarm::SwarmRaceOutcome::NoCandidates => {
                             // candidate_count > 0 here, but none were connected at
                             // race time (the inventory rows pointed at peers that
                             // have since disconnected). Distinct from the empty-set
@@ -3149,7 +3394,7 @@ impl HttpServer {
                 .unwrap());
         }
 
-        let manifest = self.manifests.read().await.get(hash).cloned();
+        let manifest = self.resolve_manifest(hash).await;
 
         match manifest {
             Some(m) => {
@@ -11172,6 +11417,22 @@ impl HttpServer {
                 status: 500,
                 body: bytes::Bytes::from(format!("error: {e}")),
             },
+        }
+    }
+
+    /// Drop the in-process shard-manifest cache, simulating a restart (or a
+    /// peer that never minted the blob) without tearing down the server.
+    pub async fn clear_manifest_cache_for_test(&self) {
+        self.manifests.write().await.clear();
+    }
+
+    /// Drive `get_blob_or_heal` directly — the path `/apps/{slug}` resolution
+    /// takes. Returns the bytes only on the `Bytes` outcome so a test can tell
+    /// "served" from every degraded outcome.
+    pub async fn test_get_blob_or_heal(&self, hash: &str) -> Option<Vec<u8>> {
+        match self.get_blob_or_heal(hash).await {
+            BlobHealOutcome::Bytes { bytes, .. } => Some(bytes),
+            _ => None,
         }
     }
 

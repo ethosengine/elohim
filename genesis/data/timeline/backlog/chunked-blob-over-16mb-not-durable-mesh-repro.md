@@ -134,3 +134,49 @@ store root logged at both call sites decides it.
   shard_manifest_backfill, salvage recheck, inventory broadcast).
 - Saga ch04 root-serve stays green across two measure runs 1h apart on the
   mesh without re-staging.
+
+## Status 2026-08-16 — manifest-durability fix landed (Q2, minutes-quiesce W1.1)
+
+Three of this record's suspicions are now resolved against the source, and
+two of them were wrong in a way worth preserving:
+
+1. **Bytes were never lost.** Chunked shards ARE persisted, as ordinary
+   content-addressed blobs under `blobs/blobs/<prefix>` — one per 1MB shard,
+   each under its OWN hash. What never exists on disk is an artifact named
+   for the COMPOSITE hash: `put_blob_bytes` (`http.rs`) stores each shard and
+   never stores the whole blob under its own name. So "no `889c…` prefix dir"
+   is expected, not evidence of memory-only storage. `blob_store.rs`'s internal
+   `.d/`/`.chunks` chunker is dead code on this path — it is never invoked by
+   the HTTP ingest route, which is why no such artifact ever appeared.
+2. **The /apps-vs-/blob split was neither (a) two BlobStore roots nor (b) a
+   hash-form divergence.** `get_blob_or_heal` read the COMPOSITE hash from
+   `blob_store` — a guaranteed local miss for any `encoding != "none"` blob,
+   because the composite is never stored. `/blob` hit only because it consulted
+   the in-process manifest map first and reassembled; `/apps` never consulted a
+   manifest at all. 404 by construction, no instrumented run needed.
+3. **The ~40-minute loss is NOT in-process eviction.** The manifest map is
+   insert-only: no `remove`/`clear`/`retain` call exists anywhere in the crate,
+   and exactly one `HttpServer` is constructed per process (`main.rs`). An
+   entry cannot be evicted or overwritten out of it in-flight. The remaining
+   candidates are (i) a storage process restart not observed at the time, or
+   (ii) the probe reaching a DIFFERENT storage process than the PUT did — the
+   local mesh runs one storage per peer and doorway B carries its own
+   single-target storage URL, so an A-minted composite is structurally
+   unservable from B. (ii) is the same cross-process class this fix addresses
+   locally and W1.2 (manifest propagation) addresses across peers. Honest
+   status: not decided between (i) and (ii) from this record's evidence.
+
+**Fix (working tree, elohim-storage):** the durable `shard_manifests`
+projection — already written at ingest, never read on the serving path — is
+now the fallback. `resolve_manifest()` checks the in-process map, then
+`db::shard_manifests::get_manifest_by_blob_hash()`, hydrating the map on a
+hit; `GET /blob/{hash}`, `GET /manifest/{hash}` and `get_blob_or_heal` all
+route through it, and `get_blob_or_heal` reassembles from local shards before
+racing peers. Restart-fatal and `/apps`-404-by-construction are both closed;
+a shard-level local miss now 404s naming the missing shard index/hash instead
+of reporting the composite as simply absent. Regression tests:
+`tests/chunked_blob_manifest_durability.rs`.
+
+Still open from this record: cross-PEER serving of a composite (a peer holding
+replicated shards has no manifest row until W1.2 propagates one), and the
+blobHash-rotation restamp path that orphaned the first staging attempt.

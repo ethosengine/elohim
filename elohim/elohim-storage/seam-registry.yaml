@@ -1323,14 +1323,54 @@ decisionPoints:
       file: src/trust/stage.rs
       modulePath: trust::stage::StakesResolver::stage_for
       line: 99
-    summary: Resolves the declared NetworkStage + StakesProvenance for a scope. Only shipped implementor is FixedStakesResolver (always Bootstrap/BootstrapDefault); ManifestStakesResolver is T10.
+    summary: Resolves the declared NetworkStage + StakesProvenance for a scope. Trait contract; FixedStakesResolver (always Bootstrap/BootstrapDefault, tests + inert landing) and ManifestStakesResolver (T10, production) are the two shipped implementors.
     concernIds:
       - id: C13
-        status: partial
-        justification: StakesProvenance::Manifest{cid} names its own successor before T10 builds the reader; fixed_resolver_reports_bootstrap_default_provenance pins today's only answer.
+        status: answered
+        justification: T10 landed ManifestStakesResolver (trust::manifest_resolver) — see its own decisionPoint entry below for the precedence contract; fixed_resolver_reports_bootstrap_default_provenance still pins the test-double's only answer.
     contractTests:
       - path: elohim/elohim-storage/src/trust/stage.rs
         testName: fixed_resolver_reports_bootstrap_default_provenance
+        kind: unit
+
+  - name: ManifestStakesResolver::stage_for
+    kind: verdict-fn
+    sourceLocation:
+      file: src/trust/manifest_resolver.rs
+      modulePath: trust::manifest_resolver::ManifestStakesResolver::stage_for
+      line: 97
+    summary: T10's production StakesResolver. Precedence over a scope's declared NetworkStage — (a) a network-stakes manifest row via ManifestRegistry, Manifest{cid} provenance; (b) ELOHIM_NETWORK_STAKES, read once at construction, OperatorConfig provenance; (c) neither -> Bootstrap/BootstrapDefault. Both present + disagree -> the STRICTER stage wins with a warn! naming both; an unrecognized stage string on either leg is a parse rejection (treated as absent), never a guess. Simulacra is reachable only via an explicit declaration on one of the two legs.
+    concernIds:
+      - id: C13
+        status: answered
+        justification: Closes StakesResolver::stage_for's own C13 gap — the production reader now exists, is fail-closed on absence/malformation, and never resolves Simulacra without a positive declaration (pinned by simulacra_is_never_produced_without_an_explicit_declaration over every absence-path scope tried).
+    contractTests:
+      - path: elohim/elohim-storage/src/trust/manifest_resolver.rs
+        testName: manifest_only_resolves_declared_stage_with_manifest_provenance
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/manifest_resolver.rs
+        testName: env_only_resolves_declared_stage_with_operator_config_provenance
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/manifest_resolver.rs
+        testName: both_agree_resolves_that_stage_with_manifest_provenance
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/manifest_resolver.rs
+        testName: both_disagree_resolves_to_the_stricter_stage_manifest_stricter
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/manifest_resolver.rs
+        testName: both_disagree_resolves_to_the_stricter_stage_env_stricter
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/manifest_resolver.rs
+        testName: absent_both_resolves_bootstrap_default
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/manifest_resolver.rs
+        testName: unknown_manifest_stage_string_is_rejected_not_guessed_falls_to_bootstrap
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/manifest_resolver.rs
+        testName: unrecognized_env_value_is_rejected_at_construction_falls_to_bootstrap
+        kind: unit
+      - path: elohim/elohim-storage/src/trust/manifest_resolver.rs
+        testName: simulacra_is_never_produced_without_an_explicit_declaration
         kind: unit
 
   - name: VerificationPricer::price

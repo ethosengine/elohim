@@ -22,13 +22,19 @@
 //! - [`memo`] — `VerificationMemo` type, `VerificationMemoStore` trait, and
 //!   [`memo::InMemoryVerificationMemoStore`] (process-lifetime plumbing only,
 //!   T7 — nothing calls `get`/`put` yet; T9 wires consumption).
+//! - [`manifest_resolver`] — `ManifestStakesResolver` (T10, IMPURE — diesel +
+//!   env; the production `StakesResolver` `stage.rs`'s doc comments defer to).
+//!   Constructed once at boot in `main.rs` and observed only (Q7 is the task
+//!   that lets a resolved stage change a pricing decision).
 
+pub mod manifest_resolver;
 pub mod memo;
 pub mod pricer;
 pub mod snapshot;
 pub mod snapshot_source;
 pub mod stage;
 
+pub use manifest_resolver::ManifestStakesResolver;
 pub use memo::{InMemoryVerificationMemoStore, VerificationMemo, VerificationMemoStore};
 pub use pricer::{
     FloorClass, InertPricer, PricedVerification, PricingInput, PricingReason, VerificationDepth,

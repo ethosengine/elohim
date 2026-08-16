@@ -207,6 +207,52 @@ impl FetchKicker for RaceFetchKicker {
                         );
                     }
                 }
+                // Q3: no bytes, but a peer named a durable manifest for this
+                // (composite) hash. Persist it — same write path a direct
+                // ingest uses — so a LATER kick (or Q2's local reassembly,
+                // once the remaining shards land via ordinary replication)
+                // can serve it without repeating this manifest round-trip.
+                // Deliberately NOT chaining into a full Q4 swarm shard-fetch
+                // here: custody-sweep kicks are a low-priority background
+                // nudge already retried every sweep tick, and the
+                // interactive callers (`get_blob_or_heal`,
+                // `p2p::mod::run_custody_reconcile`'s acquisition pull) are
+                // where the user-facing latency actually lives.
+                FetchOutcome::Manifest { manifest, .. } => {
+                    let mut conn = match pool.get() {
+                        Ok(c) => c,
+                        Err(e) => {
+                            warn!(
+                                target: "elohim_storage::reconcile",
+                                hash = %hash_owned,
+                                error = %e,
+                                "T23/Q3: pool exhausted; cannot persist kicked manifest"
+                            );
+                            return;
+                        }
+                    };
+                    let content_id = format!("blob:{}", manifest.blob_cid);
+                    if let Err(e) = crate::db::shard_manifests::record_generated_manifest(
+                        &mut conn,
+                        &content_id,
+                        "lamad",
+                        &manifest,
+                    ) {
+                        warn!(
+                            target: "elohim_storage::reconcile",
+                            hash = %hash_owned,
+                            error = %e,
+                            "T23/Q3: failed to persist manifest from kicked fetch"
+                        );
+                    } else {
+                        debug!(
+                            target: "elohim_storage::reconcile",
+                            hash = %hash_owned,
+                            shards = manifest.shard_hashes.len(),
+                            "T23/Q3: race-fetch returned a manifest; persisted for later reassembly"
+                        );
+                    }
+                }
                 FetchOutcome::Miss => {
                     debug!(
                         target: "elohim_storage::reconcile",

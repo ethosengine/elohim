@@ -3593,6 +3593,31 @@ async fn async_main(
             }
         };
 
+        // T10 (head-plane trust-gradient program §3 L5 / minutes-quiesce §3 W2
+        // task Q6): construct the declared-stakes resolver on the SAME
+        // ManifestRegistry Arc as `fan_out_ctx.manifest_registry` below (clone
+        // before the move into EprFanOutCtx's field-init shorthand). Reads
+        // ELOHIM_NETWORK_STAKES exactly once here (construction time), never on
+        // a hot path. Behavior-neutral landing: the resolved stage is COMPUTED
+        // and LOGGED for the default scope only — nothing consumes it for a
+        // pricing decision yet (`TrustGradient::inert()` is unchanged; Q7 wires
+        // consumption). "lamad" is the default scope: the h_app_id every
+        // unheadered request in this HTTP layer already falls back to
+        // (`extract_app_context`, `api/mod.rs`).
+        let network_stakes_resolver = manifest_registry.clone().map(|registry| {
+            let resolver = Arc::new(elohim_storage::trust::ManifestStakesResolver::new(registry));
+            let (stage, provenance) =
+                elohim_storage::trust::StakesResolver::stage_for(resolver.as_ref(), "lamad");
+            info!(
+                scope = "lamad",
+                stage = ?stage,
+                provenance = ?provenance,
+                "T10: declared-stakes resolver constructed (observed only — no pricing \
+                 decision consults this yet)"
+            );
+            resolver
+        });
+
         // Ephemeral 2-of-2 sealing keys for local dev.
         // TODO(T22-followup): load from persisted node-key file so predecessor
         // records survive process restart. Ephemeral keys are acceptable for dev
@@ -3724,6 +3749,10 @@ async fn async_main(
 
         http_server = http_server.with_fan_out_ctx(fan_out_ctx);
         info!("T22: EprFanOutCtx constructed and injected — FeedbackSignal fan-out active");
+
+        if let Some(resolver) = network_stakes_resolver {
+            http_server = http_server.with_network_stakes_resolver(resolver);
+        }
     }
 
     // Wire HcClientRegistry into HTTP server for zome forwarding (Phase 11 Task 5).

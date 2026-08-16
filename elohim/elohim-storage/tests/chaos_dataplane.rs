@@ -186,11 +186,11 @@ async fn spawn_node(holdings: HashMap<String, Vec<u8>>, request_timeout: Duratio
                             } => {
                                 let resp = match holdings.get(&request.hash) {
                                     Some(bytes) => {
-                                        elohim_storage::p2p::BlobFetchResponse::Found(
+                                        elohim_storage::p2p::BlobFetchResponse::found(
                                             bytes.clone(),
                                         )
                                     }
-                                    None => elohim_storage::p2p::BlobFetchResponse::NotFound,
+                                    None => elohim_storage::p2p::BlobFetchResponse::not_found(),
                                 };
                                 let _ = swarm
                                     .behaviour_mut()

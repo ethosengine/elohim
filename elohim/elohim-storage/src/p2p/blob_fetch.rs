@@ -31,6 +31,7 @@ use crate::db::diesel_schema::economic_events;
 use crate::db::models::NewEconomicEvent;
 use crate::db::peer_blob_inventory::record_fetch_success;
 use crate::error::StorageError;
+use crate::sharding::ShardManifest;
 use chrono::Utc;
 use diesel::Connection;
 use diesel::RunQueryDsl;
@@ -40,15 +41,54 @@ use sha2::{Digest, Sha256};
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 
+/// Internal reply payload carried by `P2PCommand::FetchBlob`'s oneshot channel.
+///
+/// **Not a wire type** — the wire type is `blob_protocol::BlobFetchResponse`.
+/// This is the in-process contract between the swarm event loop (which
+/// resolves the wire response) and `race_fetch` (which never sees the wire
+/// bytes). Q3 adds `Manifest`: a peer with no direct bytes for a sharded
+/// composite hash can still answer usefully with the durable manifest it
+/// resolved, so `race_fetch` treats that as a distinct outcome from a plain
+/// miss instead of discarding it.
+#[derive(Debug, Clone)]
+pub enum BlobFetchReply {
+    /// Verified-pending bytes for the requested hash.
+    Bytes(Vec<u8>),
+    /// No direct bytes, but the peer resolved a durable manifest for the
+    /// hash. Boxed — see the size-note on `FetchOutcome::Manifest`.
+    Manifest(Box<ShardManifest>),
+}
+
 /// Outcome of a race-fetch.
 #[derive(Debug)]
 pub enum FetchOutcome {
     /// Bytes fetched and verified.
     Hit { bytes: Vec<u8>, source_peer: String },
-    /// All candidates exhausted; no peer served verified bytes.
+    /// Q3: no peer served bytes, but a peer answered with a durable
+    /// `ShardManifest` for the requested (composite) hash — the caller can
+    /// pivot to a swarm shard-fetch (`p2p::blob_swarm`, Q4) instead of
+    /// treating this as a dead-end miss. `manifest.blob_hash` is verified to
+    /// equal the requested hash before this variant is ever returned. Boxed:
+    /// `ShardManifest` (~240 bytes) would otherwise bloat every `FetchOutcome`
+    /// to its size regardless of variant (clippy::large_enum_variant).
+    Manifest {
+        manifest: Box<ShardManifest>,
+        source_peer: String,
+    },
+    /// All candidates exhausted; no peer served verified bytes or a manifest.
     Miss,
     /// Inventory had no candidates to try (either empty or none connected).
     NoCandidates,
+}
+
+/// Case-insensitive, prefix-tolerant match between a manifest's own
+/// `blob_hash` and the hash `race_fetch` requested. Mirrors
+/// `verify_blob_hash`'s normalization so a canonical `sha256-<hex>` on one
+/// side and raw hex on the other still compare equal. A mismatch here means
+/// the peer answered for the wrong blob — never trust it.
+fn manifest_hash_matches(manifest: &ShardManifest, requested_hash: &str) -> bool {
+    let norm = |s: &str| s.strip_prefix("sha256-").unwrap_or(s).to_lowercase();
+    norm(&manifest.blob_hash) == norm(requested_hash)
 }
 
 /// Race a fetch across the candidates known to host the blob.
@@ -115,7 +155,7 @@ pub async fn race_fetch(
                     return (peer_label, Err("swarm channel closed".to_string()));
                 }
                 match tokio::time::timeout(timeout, reply_rx).await {
-                    Ok(Ok(Ok(bytes))) => (peer_label, Ok(bytes)),
+                    Ok(Ok(Ok(reply))) => (peer_label, Ok(reply)),
                     Ok(Ok(Err(e))) => (peer_label, Err(e)),
                     Ok(Err(_)) => (peer_label, Err("oneshot dropped".to_string())),
                     Err(_) => (peer_label, Err("timeout".to_string())),
@@ -123,39 +163,72 @@ pub async fn race_fetch(
             }));
         }
 
-        // Drain in completion order; first verified hit wins. Mismatches and
-        // errors are skipped — keep polling the remaining futures.
+        // Drain in completion order; first verified hit (or first
+        // hash-verified manifest, Q3) wins. Mismatches and errors are
+        // skipped — keep polling the remaining futures.
         while let Some(joined) = in_flight.next().await {
-            if let Ok((peer, Ok(bytes))) = joined {
-                if verify_blob_hash(&bytes, blob_hash) {
-                    // Gate #5 cross-stack transport observability.
-                    // `race_fetch` is the libp2p fetch path; transport = "libp2p".
-                    // The iroh blob path (IrohBlobStore) emits its own receipt
-                    // when that path is wired in Phase 11 backend graduation.
-                    // Structured field `transport` feeds the parity-soak (gate #6)
-                    // so reviewers can confirm cross-stack delivery happened.
-                    // PII check: `peer` is the libp2p PeerId string (already public
-                    // per the peer-map); `blob_hash` is content-addressed.
-                    tracing::debug!(
-                        target: "recovery::transport",
-                        blob_hash = %blob_hash,
+            let Ok((peer, Ok(reply))) = joined else {
+                continue;
+            };
+            match reply {
+                BlobFetchReply::Bytes(bytes) => {
+                    if verify_blob_hash(&bytes, blob_hash) {
+                        // Gate #5 cross-stack transport observability.
+                        // `race_fetch` is the libp2p fetch path; transport = "libp2p".
+                        // The iroh blob path (IrohBlobStore) emits its own receipt
+                        // when that path is wired in Phase 11 backend graduation.
+                        // Structured field `transport` feeds the parity-soak (gate #6)
+                        // so reviewers can confirm cross-stack delivery happened.
+                        // PII check: `peer` is the libp2p PeerId string (already public
+                        // per the peer-map); `blob_hash` is content-addressed.
+                        tracing::debug!(
+                            target: "recovery::transport",
+                            blob_hash = %blob_hash,
+                            source_peer = %peer,
+                            transport = "libp2p",
+                            "share-blob received"
+                        );
+                        // Returning here drops `in_flight`, which stops awaiting
+                        // the remaining JoinHandles. The detached tokio tasks
+                        // continue running to completion (bounded by
+                        // per_peer_timeout) — see Stage 2 note on the spawn
+                        // block above.
+                        return FetchOutcome::Hit {
+                            bytes,
+                            source_peer: peer,
+                        };
+                    }
+                    // Hash mismatch: never trust it, keep polling the batch.
+                }
+                BlobFetchReply::Manifest(manifest) => {
+                    // Integrity gate (Q3 design #1): a manifest naming a
+                    // DIFFERENT blob than requested must never be accepted —
+                    // reject and keep polling rather than substituting it.
+                    if manifest_hash_matches(&manifest, blob_hash) {
+                        crate::metrics::inc_blob_swarm_manifest_received();
+                        tracing::debug!(
+                            target: "elohim_storage::blob_swarm",
+                            blob_hash = %blob_hash,
+                            source_peer = %peer,
+                            shards = manifest.shard_hashes.len(),
+                            "Q3: peer answered with a shard manifest instead of bytes"
+                        );
+                        return FetchOutcome::Manifest {
+                            manifest,
+                            source_peer: peer,
+                        };
+                    }
+                    tracing::warn!(
+                        target: "elohim_storage::blob_swarm",
+                        requested_hash = %blob_hash,
+                        manifest_hash = %manifest.blob_hash,
                         source_peer = %peer,
-                        transport = "libp2p",
-                        "share-blob received"
+                        "Q3: manifest blob_hash mismatch — rejecting, not substituting"
                     );
-                    // Returning here drops `in_flight`, which stops awaiting
-                    // the remaining JoinHandles. The detached tokio tasks
-                    // continue running to completion (bounded by
-                    // per_peer_timeout) — see Stage 2 note on the spawn
-                    // block above.
-                    return FetchOutcome::Hit {
-                        bytes,
-                        source_peer: peer,
-                    };
                 }
             }
         }
-        // All in batch failed (timeout, error, or hash mismatch); try next batch.
+        // All in batch failed (timeout, error, or hash/manifest mismatch); try next batch.
     }
 }
 
@@ -704,5 +777,108 @@ mod tests {
             .get_result(&mut conn)
             .unwrap();
         assert_eq!(count, 0, "no serve-blob event for a discarded draw");
+    }
+
+    /// A libp2p `PeerId` that round-trips through the `String` parse
+    /// `race_fetch` performs on each candidate (mirrors
+    /// `reconcile::controller::tests::test_peer_id`).
+    fn test_peer_id() -> libp2p::PeerId {
+        libp2p::PeerId::from(libp2p::identity::Keypair::generate_ed25519().public())
+    }
+
+    fn fixture_manifest(blob_hash: &str) -> ShardManifest {
+        ShardManifest {
+            blob_cid: format!("bafkrei-{blob_hash}"),
+            blob_hash: blob_hash.to_string(),
+            total_size: 10,
+            mime_type: "application/octet-stream".to_string(),
+            encoding: "chunked".to_string(),
+            data_shards: 2,
+            total_shards: 2,
+            shard_size: 5,
+            shard_hashes: vec!["sha256-s0".to_string(), "sha256-s1".to_string()],
+            reach: "commons".to_string(),
+            author_id: None,
+            created_at: "2026-08-16T00:00:00Z".to_string(),
+            verified_at: None,
+        }
+    }
+
+    /// Q3 requester test #1: a peer that answers `FetchBlob` with a manifest
+    /// whose `blob_hash` matches the requested hash must be ACCEPTED —
+    /// `race_fetch` returns `FetchOutcome::Manifest`, not `Miss`, so the
+    /// caller can pivot to a swarm shard-fetch instead of dead-ending.
+    #[tokio::test]
+    async fn race_fetch_accepts_matching_manifest_reply() {
+        let peer = test_peer_id();
+        let hash = "sha256-composite-target".to_string();
+        let manifest = fixture_manifest(&hash);
+        let manifest_for_responder = manifest.clone();
+
+        let (cmd_tx, mut cmd_rx) = mpsc::channel::<crate::p2p::P2PCommand>(4);
+        let responder = tokio::spawn(async move {
+            if let Some(crate::p2p::P2PCommand::FetchBlob { reply, .. }) = cmd_rx.recv().await {
+                let _ = reply.send(Ok(BlobFetchReply::Manifest(Box::new(
+                    manifest_for_responder,
+                ))));
+            }
+        });
+
+        let outcome = race_fetch(
+            &hash,
+            vec![peer.to_string()],
+            &cmd_tx,
+            |_| true,
+            1,
+            Duration::from_secs(2),
+        )
+        .await;
+        responder.await.expect("responder task");
+
+        match outcome {
+            FetchOutcome::Manifest {
+                manifest: m,
+                source_peer,
+            } => {
+                assert_eq!(m.blob_hash, hash);
+                assert_eq!(source_peer, peer.to_string());
+            }
+            other => panic!("expected Manifest outcome, got {other:?}"),
+        }
+    }
+
+    /// Q3 requester test #2 (integrity reject): a peer that answers with a
+    /// manifest naming a DIFFERENT `blob_hash` than requested must be
+    /// REJECTED, not substituted. With a single candidate and no other batch
+    /// to try, the race exhausts to `Miss` — proving the mismatched manifest
+    /// was discarded rather than silently accepted for the wrong blob.
+    #[tokio::test]
+    async fn race_fetch_rejects_manifest_hash_mismatch() {
+        let peer = test_peer_id();
+        let requested_hash = "sha256-composite-target".to_string();
+        let wrong_manifest = fixture_manifest("sha256-a-totally-different-blob");
+
+        let (cmd_tx, mut cmd_rx) = mpsc::channel::<crate::p2p::P2PCommand>(4);
+        let responder = tokio::spawn(async move {
+            if let Some(crate::p2p::P2PCommand::FetchBlob { reply, .. }) = cmd_rx.recv().await {
+                let _ = reply.send(Ok(BlobFetchReply::Manifest(Box::new(wrong_manifest))));
+            }
+        });
+
+        let outcome = race_fetch(
+            &requested_hash,
+            vec![peer.to_string()],
+            &cmd_tx,
+            |_| true,
+            1,
+            Duration::from_secs(2),
+        )
+        .await;
+        responder.await.expect("responder task");
+
+        assert!(
+            matches!(outcome, FetchOutcome::Miss),
+            "a manifest naming the wrong blob must be rejected, not returned as a Manifest outcome; got {outcome:?}"
+        );
     }
 }

@@ -116,6 +116,70 @@ pub fn get_manifest(
         .map_err(StorageError::from)
 }
 
+/// Resolve the durable manifest projection for a blob's canonical hash.
+///
+/// The serving path only ever holds a `sha256-{hex}` address, while rows are
+/// keyed by `(content_id, h_app_id)` — ingest files them under a
+/// `blob:{blob_cid}` projection id, distribution under the application content
+/// id. Both carry the same `blob_hash`, and the encoding is deterministic from
+/// the bytes, so any row for the hash names the same shard set. `created_at`
+/// ordering makes the pick stable rather than storage-order dependent.
+pub fn get_manifest_by_blob_hash(
+    conn: &mut SqliteConnection,
+    blob_hash: &str,
+) -> Result<Option<ShardManifestRow>, StorageError> {
+    shard_manifests::table
+        .filter(shard_manifests::blob_hash.eq(blob_hash))
+        .order(shard_manifests::created_at.desc())
+        .first(conn)
+        .optional()
+        .map_err(StorageError::from)
+}
+
+/// Rehydrate the in-memory [`ShardManifest`] from its durable row.
+///
+/// `author_id` / `verified_at` are not columns on the projection, so they come
+/// back `None` — neither participates in reassembly.
+pub fn hydrate_manifest(row: &ShardManifestRow) -> Result<ShardManifest, StorageError> {
+    let shard_hashes: Vec<String> = serde_json::from_str(&row.shard_hashes_json)?;
+
+    Ok(ShardManifest {
+        blob_cid: row.blob_cid.clone().unwrap_or_default(),
+        blob_hash: row.blob_hash.clone(),
+        total_size: row.total_size_bytes.max(0) as u64,
+        mime_type: row.mime_type.clone(),
+        encoding: row.encoding.clone(),
+        data_shards: row.data_shard_count.max(0) as u8,
+        total_shards: (row.data_shard_count.max(0) + row.parity_shard_count.max(0)) as u8,
+        shard_size: row.shard_size_bytes.max(0) as u64,
+        shard_hashes,
+        reach: row.reach.clone(),
+        author_id: None,
+        created_at: row.created_at.clone(),
+        verified_at: None,
+    })
+}
+
+/// Resolve + hydrate a shard manifest for a blob hash directly from the
+/// durable projection — no in-process cache. Q2's `HttpServer::resolve_manifest`
+/// checks its own `manifests` map first and falls back to
+/// `get_manifest_by_blob_hash` + `hydrate_manifest` here; this function IS
+/// that fallback, exposed standalone so callers with no `HttpServer` (the P2P
+/// blob-fetch responder, `src/p2p/mod.rs`, which runs in a separate actor with
+/// no access to `HttpServer`'s cache) get the same durable answer without
+/// duplicating the lookup-then-hydrate glue. Errors are logged and folded to
+/// `None` — a manifest miss is a normal "I don't have this" outcome, not a
+/// caller-visible failure.
+pub fn resolve_manifest_by_hash(conn: &mut SqliteConnection, hash: &str) -> Option<ShardManifest> {
+    let row = get_manifest_by_blob_hash(conn, hash)
+        .map_err(|e| tracing::warn!(hash = %hash, error = %e, "shard manifest lookup failed"))
+        .ok()
+        .flatten()?;
+    hydrate_manifest(&row)
+        .map_err(|e| tracing::warn!(hash = %hash, error = %e, "shard manifest hydration failed"))
+        .ok()
+}
+
 pub fn list_manifests_by_encoding(
     conn: &mut SqliteConnection,
     h_app_id: &str,
@@ -126,4 +190,57 @@ pub fn list_manifests_by_encoding(
         .filter(shard_manifests::encoding.eq(encoding))
         .load(conn)
         .map_err(StorageError::from)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::test_pool;
+
+    fn fixture_manifest(blob_hash: &str) -> ShardManifest {
+        ShardManifest {
+            blob_cid: format!("bafkrei-{blob_hash}"),
+            blob_hash: blob_hash.to_string(),
+            total_size: 2_000_000,
+            mime_type: "application/octet-stream".to_string(),
+            encoding: "chunked".to_string(),
+            data_shards: 2,
+            total_shards: 2,
+            shard_size: 1_000_000,
+            shard_hashes: vec!["sha256-shardA".to_string(), "sha256-shardB".to_string()],
+            reach: "commons".to_string(),
+            author_id: None,
+            created_at: "2026-08-16T00:00:00Z".to_string(),
+            verified_at: None,
+        }
+    }
+
+    /// `resolve_manifest_by_hash` — Q3's shared, `HttpServer`-free lookup —
+    /// must find a manifest persisted under ANY `(content_id, h_app_id)` key,
+    /// since rows are addressed by `blob_hash` here, not by the caller's own
+    /// projection id (mirrors `get_manifest_by_blob_hash`'s doc comment).
+    #[test]
+    fn resolve_manifest_by_hash_finds_persisted_manifest() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let manifest = fixture_manifest("sha256-composite-a");
+        record_generated_manifest(&mut conn, "blob:composite-a", "lamad", &manifest)
+            .expect("persist manifest");
+
+        let resolved = resolve_manifest_by_hash(&mut conn, "sha256-composite-a")
+            .expect("manifest must resolve from the durable projection");
+        assert_eq!(resolved.blob_hash, manifest.blob_hash);
+        assert_eq!(resolved.shard_hashes, manifest.shard_hashes);
+        assert_eq!(resolved.encoding, "chunked");
+    }
+
+    /// A hash with no persisted manifest resolves to `None`, not an error —
+    /// this is the normal "I don't have this" answer the P2P responder relies
+    /// on to fall through to a plain `NotFound` reply.
+    #[test]
+    fn resolve_manifest_by_hash_returns_none_when_absent() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        assert!(resolve_manifest_by_hash(&mut conn, "sha256-never-persisted").is_none());
+    }
 }

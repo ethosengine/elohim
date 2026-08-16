@@ -375,8 +375,8 @@ mod libp2p_bench {
                                 ..
                             }) => {
                                 let response = match holdings.get(&request.hash) {
-                                    Some(bytes) => BlobFetchResponse::Found(bytes.clone()),
-                                    None => BlobFetchResponse::NotFound,
+                                    Some(bytes) => BlobFetchResponse::found(bytes.clone()),
+                                    None => BlobFetchResponse::not_found(),
                                 };
                                 let _ = swarm
                                     .behaviour_mut()
@@ -393,6 +393,9 @@ mod libp2p_bench {
                                         BlobFetchResponse::Found(bytes) => Ok(bytes),
                                         BlobFetchResponse::NotFound => Err("not found".into()),
                                         BlobFetchResponse::Error(e) => Err(e),
+                                        BlobFetchResponse::Manifest(_) => {
+                                            Err("manifest not bytes".into())
+                                        }
                                     };
                                     let _ = tx.send(result);
                                 }

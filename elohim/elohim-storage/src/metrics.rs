@@ -1617,6 +1617,43 @@ lazy_static! {
     .unwrap();
 }
 
+// Q3/Q4 (minutes-quiesce W1.2/W1.3): blob-swarm shard-manifest propagation +
+// swarm-spread reassembly. A separate block for the same recursion-limit
+// reason as the block above.
+lazy_static! {
+    /// A blob-fetch response answered with a durable `ShardManifest` instead
+    /// of bytes (Q3) — the requester had no direct-byte hit but the peer
+    /// could still name the shard set. Flat-zero after Q3 lands means no
+    /// composite hash ever misses a peer that actually holds a manifest for
+    /// it (either every composite is servable directly, or manifests never
+    /// propagate — cross-check against `elohim_blob_swarm_composite_completed_total`).
+    pub static ref BLOB_SWARM_MANIFESTS_RECEIVED: IntCounter = IntCounter::new(
+        "elohim_blob_swarm_manifests_received_total",
+        "Blob-fetch responses that returned a shard manifest instead of bytes (Q3).",
+    )
+    .unwrap();
+
+    /// Per-shard fetch outcomes during a Q4 swarm-spread composite
+    /// reassembly. label: outcome = "hit" | "miss" | "no_candidates".
+    pub static ref BLOB_SWARM_SHARDS_FETCHED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_blob_swarm_shards_fetched_total",
+            "Per-shard fetch outcomes during a swarm-spread composite reassembly, by outcome.",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
+    /// Composite blobs fully reassembled from swarm-fetched shards (Q4) — the
+    /// denominator the exponential-curve measure (W4.3, time-to-N-replicas)
+    /// reads alongside the per-completion `distinct_source_peers` log field.
+    pub static ref BLOB_SWARM_COMPOSITE_COMPLETED: IntCounter = IntCounter::new(
+        "elohim_blob_swarm_composite_completed_total",
+        "Composite blobs fully reassembled from swarm-fetched shards.",
+    )
+    .unwrap();
+}
+
 /// Register every toolkit collector into [`REGISTRY`]. Idempotent (guarded by a
 /// `Once`), so calling it more than once at boot is safe. Call exactly once early
 /// in storage startup; `/metrics` reads the registry thereafter.
@@ -1918,6 +1955,9 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_SHED.clone()));
         let _ = REGISTRY.register(Box::new(HEAD_BATCH_SIZE.clone()));
         let _ = REGISTRY.register(Box::new(HEAD_BATCH_FALLBACK.clone()));
+        let _ = REGISTRY.register(Box::new(BLOB_SWARM_MANIFESTS_RECEIVED.clone()));
+        let _ = REGISTRY.register(Box::new(BLOB_SWARM_SHARDS_FETCHED.clone()));
+        let _ = REGISTRY.register(Box::new(BLOB_SWARM_COMPOSITE_COMPLETED.clone()));
     });
 }
 
@@ -2018,6 +2058,29 @@ pub fn inc_admission_shed(class: &str, zome: &str) {
     CONDUCTOR_ADMISSION_SHED
         .with_label_values(&[class, zome])
         .inc();
+}
+
+// ── Blob swarm (Q3/Q4, minutes-quiesce W1.2/W1.3) ────────────────────────────
+
+/// Record one blob-fetch response that answered with a shard manifest
+/// instead of bytes (Q3). Called from `p2p::blob_fetch::race_fetch` — the
+/// single choke point every manifest-bearing reply passes through,
+/// regardless of which caller issued the fetch.
+pub fn inc_blob_swarm_manifest_received() {
+    BLOB_SWARM_MANIFESTS_RECEIVED.inc();
+}
+
+/// Record one per-shard fetch outcome during a Q4 swarm-spread reassembly.
+/// `outcome`: "hit" | "miss" | "no_candidates".
+pub fn inc_blob_swarm_shard_fetched(outcome: &str) {
+    BLOB_SWARM_SHARDS_FETCHED
+        .with_label_values(&[outcome])
+        .inc();
+}
+
+/// Record one composite blob fully reassembled from swarm-fetched shards (Q4).
+pub fn inc_blob_swarm_composite_completed() {
+    BLOB_SWARM_COMPOSITE_COMPLETED.inc();
 }
 
 /// Render the registry in Prometheus text exposition format (the `/metrics` body).

@@ -35,6 +35,7 @@ pub mod behaviour;
 pub mod binding_cross_signature;
 pub mod blob_fetch;
 pub mod blob_protocol;
+pub mod blob_swarm;
 pub mod conductor_agent_info_gossip;
 pub mod custody_announce;
 pub mod dedup;
@@ -205,7 +206,7 @@ type PendingBlobFetchMap = Arc<
     tokio::sync::Mutex<
         std::collections::HashMap<
             request_response::OutboundRequestId,
-            oneshot::Sender<Result<Vec<u8>, String>>,
+            oneshot::Sender<Result<crate::p2p::blob_fetch::BlobFetchReply, String>>,
         >,
     >,
 >;
@@ -1161,17 +1162,23 @@ pub enum P2PCommand {
     /// In a live swarm this issues a `/elohim/blob/1.0.0` request-response exchange
     /// to the named peer (see `p2p/blob_protocol.rs`). The reply oneshot is delivered
     /// when the response arrives, the outbound times out, or the connection fails —
-    /// all three cases produce a deterministic `Result<Vec<u8>, String>` the helper
-    /// can act on. The error string in the failure path encodes the
-    /// `OutboundFailure` variant ("timeout", "connection_closed", "dial_failure",
-    /// "unsupported_protocols", or "io_error: …") so the consumer can classify it.
+    /// all three cases produce a deterministic
+    /// `Result<blob_fetch::BlobFetchReply, String>` the helper can act on. The
+    /// error string in the failure path encodes the `OutboundFailure` variant
+    /// ("timeout", "connection_closed", "dial_failure", "unsupported_protocols",
+    /// or "io_error: …") so the consumer can classify it.
+    ///
+    /// # Q3 (minutes-quiesce W1.2)
+    /// `BlobFetchReply::Manifest` carries a durable `ShardManifest` when the
+    /// peer had no direct bytes for a sharded composite hash but resolved a
+    /// manifest for it instead — see `blob_protocol::BlobFetchResponse::manifest_only`.
     ///
     /// The `for_testing()` stub still returns `Err("FetchBlob not yet implemented;
     /// Stage 1 placeholder")` because no real swarm runs in unit tests.
     FetchBlob {
         peer_id: libp2p::PeerId,
         hash: String,
-        reply: tokio::sync::oneshot::Sender<Result<Vec<u8>, String>>,
+        reply: tokio::sync::oneshot::Sender<Result<crate::p2p::blob_fetch::BlobFetchReply, String>>,
     },
     /// T23 review fix #2: trigger a custody reconcile pass from the
     /// `ConnectionEstablished` swarm event, decoupling the reconcile work
@@ -5281,17 +5288,51 @@ impl P2PNode {
                                         size = bytes.len(),
                                         "T21: serving blob to peer"
                                     );
-                                    BlobFetchResponse::Found(bytes)
+                                    BlobFetchResponse::found(bytes)
                                 }
                                 Err(StorageError::NotFound(_))
                                 | Err(StorageError::BlobNotFound(_)) => {
-                                    debug!(
-                                        target: "elohim_storage::blob_fetch",
-                                        peer = %peer,
-                                        hash = %request.hash,
-                                        "T21: blob not found locally; replying NotFound"
-                                    );
-                                    BlobFetchResponse::NotFound
+                                    // Q3 (minutes-quiesce W1.2): no direct bytes under this
+                                    // hash — before giving up, consult the durable shard
+                                    // manifest projection. This peer runs as a separate
+                                    // actor with no access to `HttpServer::manifests`
+                                    // (Q2's in-process cache), so it always falls straight
+                                    // to `resolve_manifest_by_hash`'s DB read — the same
+                                    // fallback `HttpServer::resolve_manifest` uses on its
+                                    // own cache miss. `encoding == "none"` manifests name
+                                    // the composite itself (no shards to reassemble from),
+                                    // so those are not useful to hand back — the responder
+                                    // demonstrably has no bytes for that name either.
+                                    let manifest = match self.db_pool.as_ref() {
+                                        Some(pool) => pool.get().ok().and_then(|mut conn| {
+                                            crate::db::shard_manifests::resolve_manifest_by_hash(
+                                                &mut conn,
+                                                &request.hash,
+                                            )
+                                        }),
+                                        None => None,
+                                    };
+                                    match manifest {
+                                        Some(m) if m.encoding != "none" => {
+                                            debug!(
+                                                target: "elohim_storage::blob_swarm",
+                                                peer = %peer,
+                                                hash = %request.hash,
+                                                shards = m.shard_hashes.len(),
+                                                "Q3: no direct bytes; replying with shard manifest"
+                                            );
+                                            BlobFetchResponse::manifest_only(m)
+                                        }
+                                        _ => {
+                                            debug!(
+                                                target: "elohim_storage::blob_fetch",
+                                                peer = %peer,
+                                                hash = %request.hash,
+                                                "T21: blob not found locally; replying NotFound"
+                                            );
+                                            BlobFetchResponse::not_found()
+                                        }
+                                    }
                                 }
                                 Err(e) => {
                                     warn!(
@@ -5301,7 +5342,7 @@ impl P2PNode {
                                         error = %e,
                                         "T21: blob fetch error; replying Error"
                                     );
-                                    BlobFetchResponse::Error(e.to_string())
+                                    BlobFetchResponse::error(e.to_string())
                                 }
                             },
                             Err(_) => {
@@ -5311,7 +5352,7 @@ impl P2PNode {
                                     hash = %request.hash,
                                     "T21: rejected blob request with invalid content address"
                                 );
-                                BlobFetchResponse::NotFound
+                                BlobFetchResponse::not_found()
                             }
                         };
                     let mut swarm = self.swarm.write().await;
@@ -5344,7 +5385,8 @@ impl P2PNode {
                                     size = bytes.len(),
                                     "T21: blob fetch returned Found"
                                 );
-                                let _ = reply.send(Ok(bytes));
+                                let _ = reply
+                                    .send(Ok(crate::p2p::blob_fetch::BlobFetchReply::Bytes(bytes)));
                             }
                             BlobFetchResponse::NotFound => {
                                 debug!(
@@ -5362,6 +5404,22 @@ impl P2PNode {
                                     "T21: blob fetch returned Error"
                                 );
                                 let _ = reply.send(Err(msg));
+                            }
+                            // Q3: no direct bytes, but the peer resolved a
+                            // durable manifest for this hash — a valid
+                            // outcome the caller pivots on (Q4 swarm-fetch),
+                            // not a failure.
+                            BlobFetchResponse::Manifest(manifest) => {
+                                debug!(
+                                    target: "elohim_storage::blob_swarm",
+                                    request_id = ?request_id,
+                                    blob_hash = %manifest.blob_hash,
+                                    shards = manifest.shard_hashes.len(),
+                                    "Q3: blob fetch returned a shard manifest instead of bytes"
+                                );
+                                let _ = reply.send(Ok(
+                                    crate::p2p::blob_fetch::BlobFetchReply::Manifest(manifest),
+                                ));
                             }
                         }
                     } else {
@@ -7265,7 +7323,8 @@ impl P2PNode {
     /// commitment-scored placement; plain freshness-windowed inventory order
     /// is enough and keeps this path free of the transport-manifest seam.
     async fn heal_blob_bytes_if_absent(&self, doc_id: &str) {
-        use crate::p2p::blob_fetch::{finalize_fetch_success, race_fetch, FetchOutcome};
+        use crate::p2p::blob_fetch::finalize_fetch_success;
+        use crate::p2p::blob_swarm::{race_fetch_with_swarm, SwarmFetchParams, SwarmRaceOutcome};
 
         let Ok(hash) = self
             .sync_manager
@@ -7304,6 +7363,13 @@ impl P2PNode {
         let parallelism = self.config.fetch_blob_parallelism.max(1);
         let timeout = std::time::Duration::from_secs(self.config.fetch_blob_timeout_seconds.max(1));
         let doc_id_owned = doc_id.to_string();
+        // Q4: same gossip publisher + sequence allocator `broadcast_inventory_snapshot`
+        // uses — the composite hash is never on disk under its own name (Q2), so it
+        // can NEVER appear in a periodic snapshot's `blob_store.list_hashes()` walk;
+        // only an explicit delta on the shared per-peer sequence can advertise it.
+        let gossip_publisher = self.gossip_publisher.clone();
+        let inventory_seq = self.inventory_seq.clone();
+        let local_peer_id = self.peer_id().to_string();
         let fresh_after = chrono::Utc::now()
             .checked_sub_signed(chrono::Duration::seconds(
                 self.config.inventory_freshness_seconds as i64,
@@ -7335,20 +7401,103 @@ impl P2PNode {
                     }
                 })
                 .collect();
-            let is_connected = move |peer: &str| connected_set.contains(peer);
 
-            let outcome = race_fetch(
-                &hash,
-                candidates,
-                &cmd_tx,
-                is_connected,
-                parallelism,
-                timeout,
-            )
-            .await;
+            // Q3/Q4: this is the two-hop pull chain (acquisition GetContent →
+            // this blob pull) `epr-acquisition-pull-queue-design` names as
+            // the seam Q4's shard-swarm spread extends. A plain race on the
+            // composite hash 404s forever when the content's bytes live only
+            // as shards on connected peers with no minted composite manifest
+            // cache; `race_fetch_with_swarm` accepts a manifest-only reply
+            // and completes the pull by racing shards across the holder set.
+            let mut conn = match pool.get() {
+                Ok(c) => c,
+                Err(e) => {
+                    warn!(
+                        doc_id = %doc_id_owned, hash = %hash, error = %e,
+                        "bytes-heal/Q3: pool exhausted, cannot race-fetch"
+                    );
+                    return;
+                }
+            };
+            let swarm_params = SwarmFetchParams {
+                cmd_tx: &cmd_tx,
+                connected: &connected_set,
+                per_shard_parallelism: parallelism,
+                per_peer_timeout: timeout,
+                // Same modest fan-out bound as the HTTP GET-miss heal path
+                // (`http.rs::get_blob_or_heal`) — see that call site's
+                // comment for the `RaceFetchKicker::kick_semaphore` parity.
+                total_inflight: parallelism.max(1) * 4,
+                self_cid: &self_cid,
+                blob_store: &blob_store,
+            };
+            let outcome =
+                race_fetch_with_swarm(&hash, candidates, &mut conn, &fresh_after, &swarm_params)
+                    .await;
+            drop(conn);
 
             match outcome {
-                FetchOutcome::Hit { bytes, source_peer } => {
+                SwarmRaceOutcome::Hit { bytes, source_peer } => {
+                    // `source_peer == "swarm"` — Q4 reassembled the composite
+                    // from independently-fetched shards, each already
+                    // persisted + REA-booked to its real source peer inside
+                    // `fetch_shards_via_swarm`. Finalizing again here under a
+                    // synthetic "swarm" peer would double-book a delivery
+                    // that never happened from a single peer.
+                    if source_peer == "swarm" {
+                        info!(
+                            doc_id = %doc_id_owned, hash = %hash,
+                            "bytes-heal/Q4: pointer-heal completed via swarm shard-fetch (serve path warm)"
+                        );
+                        // Q4: advertise the now-servable composite hash
+                        // immediately (event-driven `BlobInventoryDelta`,
+                        // reusing `inventory_broadcaster::build_delta` +
+                        // the SAME gossip publish call
+                        // `broadcast_inventory_snapshot` uses) so the holder
+                        // set — and aggregate swarm bandwidth — compounds
+                        // without waiting for the next periodic snapshot
+                        // tick (which would never include it anyway; see
+                        // the capture-site comment above).
+                        match crate::p2p::inventory_gossip::BlobAddress::new(hash.clone()) {
+                            Ok(addr) => {
+                                let delta = crate::p2p::inventory_broadcaster::build_delta(
+                                    &local_peer_id,
+                                    vec![addr],
+                                    vec![],
+                                    &inventory_seq,
+                                    chrono::Utc::now().timestamp_micros(),
+                                    vec![],
+                                );
+                                match delta.to_bytes() {
+                                    Ok(bytes) => {
+                                        if let Err(e) = gossip_publisher.publish(
+                                            crate::p2p::inventory_gossip::INVENTORY_TOPIC,
+                                            bytes,
+                                        ) {
+                                            warn!(
+                                                doc_id = %doc_id_owned, hash = %hash, error = %e,
+                                                "bytes-heal/Q4: composite delta publish failed (often: no subscribed peers yet)"
+                                            );
+                                        } else {
+                                            debug!(
+                                                doc_id = %doc_id_owned, hash = %hash,
+                                                "bytes-heal/Q4: advertised swarm-completed composite via inventory delta"
+                                            );
+                                        }
+                                    }
+                                    Err(e) => warn!(
+                                        doc_id = %doc_id_owned, hash = %hash, error = %e,
+                                        "bytes-heal/Q4: failed to serialize composite delta"
+                                    ),
+                                }
+                            }
+                            Err(e) => warn!(
+                                doc_id = %doc_id_owned, hash = %hash, error = ?e,
+                                "bytes-heal/Q4: composite hash is not canonical wire-shaped; skipping delta advertise"
+                            ),
+                        }
+                        return;
+                    }
                     if let Ok(mut c) = pool.get() {
                         match finalize_fetch_success(
                             &mut c,
@@ -7371,6 +7520,14 @@ impl P2PNode {
                         }
                     }
                 }
+                SwarmRaceOutcome::ManifestPersistedIncomplete {
+                    manifest,
+                    missing_shards,
+                } => debug!(
+                    doc_id = %doc_id_owned, hash = %hash,
+                    total_shards = manifest.shard_hashes.len(), missing_shards,
+                    "bytes-heal/Q3: manifest persisted but swarm shard-fetch incomplete (next sync round retries)"
+                ),
                 other => debug!(
                     doc_id = %doc_id_owned, hash = %hash, outcome = ?other,
                     "bytes-heal: no bytes pulled this round (next sync round retries)"

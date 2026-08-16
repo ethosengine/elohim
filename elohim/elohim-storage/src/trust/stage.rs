@@ -67,6 +67,27 @@ impl NetworkStage {
     ];
 }
 
+/// EXACT lowercase-variant-name parsing — the single vocabulary both
+/// `ManifestStakesResolver` (T10, `trust::manifest_resolver`) and the
+/// `PUT /admin/seed/network-stakes` route validator parse against, so the
+/// wire contract can never drift between "what the resolver accepts" and
+/// "what the route accepts." No case-folding, no aliasing ("dev" is not
+/// `Simulacra`) — an unrecognized string is `Err`, never a best-effort
+/// guess. Still PURE: no I/O, just string matching.
+impl std::str::FromStr for NetworkStage {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "simulacra" => Ok(NetworkStage::Simulacra),
+            "bootstrap" => Ok(NetworkStage::Bootstrap),
+            "coordinated" => Ok(NetworkStage::Coordinated),
+            "enforced" => Ok(NetworkStage::Enforced),
+            _ => Err(()),
+        }
+    }
+}
+
 /// Provenance of a resolved [`NetworkStage`] — travels with every stage
 /// verdict so a downstream consumer (metrics, audit trail, `.epr-meta`
 /// review) can distinguish "declared in a manifest" from "declared via
@@ -227,5 +248,25 @@ mod tests {
         let (stage, provenance) = inert_stakes_resolver().stage_for("ignored");
         assert_eq!(stage, NetworkStage::Bootstrap);
         assert_eq!(provenance, StakesProvenance::BootstrapDefault);
+    }
+
+    #[test]
+    fn from_str_accepts_exact_lowercase_variant_names() {
+        assert_eq!("simulacra".parse(), Ok(NetworkStage::Simulacra));
+        assert_eq!("bootstrap".parse(), Ok(NetworkStage::Bootstrap));
+        assert_eq!("coordinated".parse(), Ok(NetworkStage::Coordinated));
+        assert_eq!("enforced".parse(), Ok(NetworkStage::Enforced));
+    }
+
+    #[test]
+    fn from_str_rejects_case_variants_and_aliases() {
+        // No case-folding, no "dev"/"staging" aliasing — an unrecognized
+        // string is Err, never a best-effort guess.
+        for bad in ["Simulacra", "SIMULACRA", "dev", "staging", "dev-mode", ""] {
+            assert!(
+                bad.parse::<NetworkStage>().is_err(),
+                "{bad:?} must not parse as a NetworkStage"
+            );
+        }
     }
 }

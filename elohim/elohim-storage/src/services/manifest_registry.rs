@@ -59,6 +59,15 @@ pub struct ManifestRegistry {
     /// content-addressed row (see [`ManifestRegistry::from_payload_json`]);
     /// an unpinned policy must emit no ref rather than a name it cannot back.
     standing_policy_cid: Mutex<Option<String>>,
+    /// Declared `network-stakes` manifests (T10, head-plane trust-gradient
+    /// program plan §3 L5 / minutes-quiesce plan §3 W2 task Q6):
+    /// `scope -> (stage_raw, cid)`. Populated by `load_from_db` from rows
+    /// with `manifest_kind == "network-stakes"`; `stage_raw` is the
+    /// UNPARSED string from the row's `payload_json.stakes.stage` field —
+    /// this registry stays free of a `crate::trust` dependency, so parsing
+    /// (and the exact-lowercase-match rejection rule) belongs to
+    /// `trust::manifest_resolver::ManifestStakesResolver`, not here.
+    network_stakes: Mutex<HashMap<String, (String, String)>>,
 }
 
 impl ManifestRegistry {
@@ -67,6 +76,7 @@ impl ManifestRegistry {
             cache: Arc::new(RwLock::new(HashMap::new())),
             standing_policy_payload: Mutex::new(None),
             standing_policy_cid: Mutex::new(None),
+            network_stakes: Mutex::new(HashMap::new()),
         }
     }
 
@@ -121,7 +131,61 @@ impl ManifestRegistry {
             }
         }
 
+        // Load declared network-stakes manifests (T10). Rebuilt fresh each
+        // call (replace, not merge — same semantics as the pillar cache
+        // above). When more than one row declares the SAME scope, the
+        // HIGHEST `revision` wins — the same "later declaration supersedes"
+        // rule standing-policy/tending-policy already carry.
+        let stakes_rows = fetch_manifests_by_kind(conn, "network-stakes").unwrap_or_default();
+        let mut new_stakes: HashMap<String, (String, String, i32)> = HashMap::new();
+        for row in &stakes_rows {
+            let Ok(payload) = serde_json::from_str::<serde_json::Value>(&row.payload_json) else {
+                continue;
+            };
+            let Some(stakes) = payload.get("stakes") else {
+                continue;
+            };
+            let (Some(scope), Some(stage_raw)) = (
+                stakes.get("scope").and_then(|v| v.as_str()),
+                stakes.get("stage").and_then(|v| v.as_str()),
+            ) else {
+                continue;
+            };
+            let supersedes = match new_stakes.get(scope) {
+                Some((_, _, existing_revision)) => row.revision > *existing_revision,
+                None => true,
+            };
+            if supersedes {
+                new_stakes.insert(
+                    scope.to_string(),
+                    (stage_raw.to_string(), row.cid.clone(), row.revision),
+                );
+            }
+        }
+        {
+            let mut cache = self
+                .network_stakes
+                .lock()
+                .expect("network_stakes lock poisoned");
+            *cache = new_stakes
+                .into_iter()
+                .map(|(scope, (stage_raw, cid, _revision))| (scope, (stage_raw, cid)))
+                .collect();
+        }
+
         Ok(count)
+    }
+
+    /// Returns `(stage_raw, cid)` for the declared `network-stakes` manifest
+    /// scoped to `scope`, or `None` when none is registered. `stage_raw` is
+    /// the UNPARSED string — see the `network_stakes` field doc for why
+    /// parsing lives in `trust::manifest_resolver`, not here.
+    pub fn network_stakes_for_scope(&self, scope: &str) -> Option<(String, String)> {
+        self.network_stakes
+            .lock()
+            .expect("network_stakes lock poisoned")
+            .get(scope)
+            .cloned()
     }
 
     // -------------------------------------------------------------------------
@@ -674,5 +738,75 @@ mod tests {
     fn unknown_treatment_defaults_when_missing() {
         let r = ManifestRegistry::default();
         assert_eq!(r.unknown_treatment(), UnknownTreatment::Conservative);
+    }
+
+    // -------------------------------------------------------------------------
+    // T10 — network-stakes cache (head-plane trust-gradient program §3 L5 /
+    // minutes-quiesce plan §3 W2 task Q6)
+    // -------------------------------------------------------------------------
+
+    fn stakes_row(cid: &str, scope: &str, stage: &str, revision: i32) -> ManifestRow {
+        let payload = serde_json::json!({
+            "manifestKind": "network-stakes",
+            "stakes": { "stage": stage, "scope": scope, "grantor": "g", "environment": "production" },
+        })
+        .to_string();
+        ManifestRow {
+            cid: cid.to_string(),
+            manifest_kind: "network-stakes".to_string(),
+            pillar: None,
+            payload_json: payload,
+            schema_ref: None,
+            signer_pubkey: vec![0u8; 32],
+            created_at: "2026-08-16T00:00:00Z".to_string(),
+            verified_at: None,
+            revision,
+        }
+    }
+
+    #[test]
+    fn network_stakes_for_scope_returns_none_when_unregistered() {
+        let registry = ManifestRegistry::new();
+        assert_eq!(registry.network_stakes_for_scope("genesis-lamad"), None);
+    }
+
+    #[test]
+    fn network_stakes_for_scope_returns_raw_stage_and_cid_after_load() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        insert_manifest(
+            &mut conn,
+            &stakes_row("stakes:a:1", "genesis-lamad", "coordinated", 1),
+        )
+        .unwrap();
+        let registry = ManifestRegistry::new();
+        registry.load_from_db(&mut conn).unwrap();
+        assert_eq!(
+            registry.network_stakes_for_scope("genesis-lamad"),
+            Some(("coordinated".to_string(), "stakes:a:1".to_string()))
+        );
+    }
+
+    #[test]
+    fn network_stakes_for_scope_highest_revision_wins_on_duplicate_scope() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        insert_manifest(
+            &mut conn,
+            &stakes_row("stakes:old:1", "genesis-lamad", "bootstrap", 1),
+        )
+        .unwrap();
+        insert_manifest(
+            &mut conn,
+            &stakes_row("stakes:new:2", "genesis-lamad", "enforced", 2),
+        )
+        .unwrap();
+        let registry = ManifestRegistry::new();
+        registry.load_from_db(&mut conn).unwrap();
+        assert_eq!(
+            registry.network_stakes_for_scope("genesis-lamad"),
+            Some(("enforced".to_string(), "stakes:new:2".to_string())),
+            "higher-revision declaration must supersede the lower one for the same scope"
+        );
     }
 }

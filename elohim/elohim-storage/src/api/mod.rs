@@ -64,6 +64,7 @@ pub mod risk;
 pub mod routing;
 pub mod schedules;
 pub mod seed_delegates_compute;
+pub mod seed_network_stakes;
 pub mod signal_emit;
 pub mod source_chain;
 pub mod spatial;
