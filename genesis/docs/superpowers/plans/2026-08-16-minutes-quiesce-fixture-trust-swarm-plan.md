@@ -189,15 +189,26 @@ Per-task DoD: touched tree's gate clauses green from clean state (fmt, clippy -D
 warnings, `cargo test` with echoed `EXIT=$?`); commit-only, integrator pushes; all work
 in /projects/elohim.
 
-## 5. Falsifiable targets
+## 5. Falsifiable targets — the quiesce RATE (operator directive 2026-08-16)
 
-- Local: 3.4k-row corpus × 3 peers quiesces (gate PASS, sustained) in **≤10 min**
-  (baseline ~90 min).
-- Jenkins: the new stage returns a hard verdict in **≤15 min** every run.
+The measure is a **rate, not a wall-clock**: `quiesce_rate = fixture items ÷
+time-to-sustained-PASS` (items/min), recorded at both recursion levels. The
+local-dev rate — maximized while **respecting** the trust requirements (ceremony
+compressed under a declared grant, never skipped) — is the predictor of the
+deployed rate; the local:deployed **ratio is the transfer coefficient**. Protocol
+wins move both rates and hold the ratio; environment costs (WAN write-guard,
+arc fraction, restart churn) show up as ratio divergence, cleanly attributed.
+A local rate won by bypassing ceremony over-predicts and invalidates the
+transfer — the viable-systems condition on the whole measure.
+
+- Local: 3,439 rows × 3 peers, baseline ≈ **38 rows/min** (~90 min); target
+  ≥ **344 rows/min** (≤10 min), gate PASS sustained.
+- Jenkins mesh stage: same rate reported per run; hard verdict in **≤15 min**.
+- Alpha (deferred, operator-gated): baseline ≈ 23 rows/min (~3.5k heads /
+  ~2.5h); predicted rate rises with `PTxnGuard` rate FLAT (round-trips cut,
+  pressure not raised); transfer ratio recorded per measured deploy.
 - Swarm: 18MB blob time-to-3rd-replica < time-to-1st-replica × 3 (super-linear
   aggregate).
-- Alpha (deferred, operator-gated): predicted gate-quiesce falls with `PTxnGuard` rate
-  FLAT (round-trips cut, pressure not raised).
 
 ## 6. Guards
 
