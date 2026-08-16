@@ -621,8 +621,14 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
 
     // Register all steward storage peers in the route registry.
     // Fetches GET {url}/manifest for each and compiles the returned routes.
-    // Non-fatal: if a storage peer is not yet up, its routes are simply unavailable until
-    // the operator restarts doorway or peers register manually.
+    // A peer that is not yet up at boot is retried in the background until it
+    // registers — doorway and storage restart independently (a pod restart, a
+    // deploy, the local hc-mesh), and the previous boot-once behavior left the
+    // registry EMPTY until an operator restarted doorway (the
+    // restart-doorway-epr.sh crutch; reproduced live on the 2026-08-16 local
+    // mesh: "registered:0 failed:3", totalRoutes 0, every /db/* 404).
+    // Registration is idempotent (install replaces that peer's routes), so the
+    // retry can never duplicate.
     let mut peer_urls: Vec<String> = Vec::new();
     if let Some(ref storage_url) = state.args.storage_url {
         peer_urls.push(storage_url.clone());
@@ -635,7 +641,7 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
     }
 
     let mut registered = 0usize;
-    let mut failed = 0usize;
+    let mut pending_peers: Vec<String> = Vec::new();
     for storage_url in &peer_urls {
         match state
             .route_registry
@@ -654,14 +660,50 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
                 tracing::warn!(
                     error = %e,
                     storage_url = %storage_url,
-                    "Failed to register steward peer — its routes unavailable"
+                    "Failed to register steward peer — will retry in background until it registers"
                 );
-                failed += 1;
+                pending_peers.push(storage_url.clone());
             }
         }
     }
     if !peer_urls.is_empty() {
-        tracing::info!(registered, failed, "Steward peer registration complete");
+        tracing::info!(
+            registered,
+            pending = pending_peers.len(),
+            "Steward peer registration complete"
+        );
+    }
+    if !pending_peers.is_empty() {
+        let registry = state.route_registry.clone();
+        tokio::spawn(async move {
+            const RETRY_SECS: u64 = 15;
+            let mut remaining = pending_peers;
+            while !remaining.is_empty() {
+                tokio::time::sleep(std::time::Duration::from_secs(RETRY_SECS)).await;
+                let mut still_pending = Vec::new();
+                for storage_url in remaining {
+                    match registry.register_steward_peer(&storage_url).await {
+                        Ok(count) => {
+                            tracing::info!(
+                                routes = count,
+                                storage_url = %storage_url,
+                                "Steward peer registered (late — background retry)"
+                            );
+                        }
+                        Err(e) => {
+                            tracing::debug!(
+                                error = %e,
+                                storage_url = %storage_url,
+                                "Steward peer still unreachable — will keep retrying"
+                            );
+                            still_pending.push(storage_url);
+                        }
+                    }
+                }
+                remaining = still_pending;
+            }
+            tracing::info!("All steward peers registered — background retry task done");
+        });
     }
 
     // Derive render-capability profile from SSR bundles directory (Task 15).

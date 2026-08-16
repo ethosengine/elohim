@@ -431,3 +431,31 @@ decisionPoints:
       - path: doorway/doorway-service/src/routes/storage_proxy.rs
         testName: content_get_still_shed_when_breaker_open
         kind: unit
+
+  - name: install_steward_routes
+    kind: state-transition
+    sourceLocation:
+      file: src/services/route_registry.rs
+      modulePath: services::route_registry::RouteRegistry::install_steward_routes
+      line: 705
+    summary: >
+      Installs a steward peer's manifest-compiled routes into the registry,
+      REPLACING that peer's previous routes (idempotent per storage_url). This
+      is the primitive that makes the boot-time retry-until-registered loop in
+      main.rs safe: the previous append-only install meant any re-registration
+      duplicated routes, so registration had to be boot-once — and a storage
+      peer that was down at doorway boot left the registry empty until an
+      operator restarted doorway (reproduced 2026-08-16 on the local mesh:
+      registered:0/3, totalRoutes 0, every /db/* 404).
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          test_install_steward_routes_is_idempotent_per_peer proves re-install
+          replaces rather than duplicates, and that one peer's re-install never
+          disturbs another peer's routes — so repeated registration (retry loop,
+          future periodic manifest refresh) converges instead of accreting.
+    contractTests:
+      - path: doorway/doorway-service/src/services/route_registry.rs
+        testName: test_install_steward_routes_is_idempotent_per_peer
+        kind: unit

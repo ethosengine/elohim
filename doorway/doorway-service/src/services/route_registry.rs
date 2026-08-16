@@ -695,6 +695,18 @@ impl RouteRegistry {
             .await
             .map_err(|e| format!("Failed to parse manifest JSON: {e}"))?;
 
+        Ok(self.install_steward_routes(storage_url, &manifest).await)
+    }
+
+    /// Compile a fetched steward manifest and install its routes, REPLACING any
+    /// routes previously installed for the same `storage_url`. Idempotent by
+    /// construction, which is what makes retry-until-registered (and any future
+    /// periodic manifest refresh) safe — re-installing never duplicates.
+    pub async fn install_steward_routes(
+        &self,
+        storage_url: &str,
+        manifest: &DoorwayRoutes,
+    ) -> usize {
         let mut new_routes: Vec<CompiledRoute> = Vec::new();
 
         for route in &manifest.routes {
@@ -736,6 +748,9 @@ impl RouteRegistry {
         let count = new_routes.len();
 
         let mut compiled = self.compiled_routes.write().await;
+        compiled.retain(|r| {
+            !matches!(&r.source, RouteSource::StewardPeer { storage_url: s } if s == storage_url)
+        });
         compiled.extend(new_routes);
 
         let mut last = self.last_compiled.write().await;
@@ -747,7 +762,7 @@ impl RouteRegistry {
             "Steward peer routes compiled"
         );
 
-        Ok(count)
+        count
     }
 
     // =========================================================================
@@ -1108,5 +1123,53 @@ mod tests {
             "GET mastery should not require auth"
         );
         assert!(routes[1].auth_required, "POST mastery should require auth");
+    }
+
+    /// install_steward_routes must REPLACE a peer's previous routes, never
+    /// append duplicates — this is what makes the boot-time
+    /// retry-until-registered loop (main.rs) and any future periodic manifest
+    /// refresh safe to call repeatedly.
+    #[tokio::test]
+    async fn test_install_steward_routes_is_idempotent_per_peer() {
+        let registry = RouteRegistry::with_defaults();
+        let manifest: DoorwayRoutes = serde_json::from_value(serde_json::json!({
+            "routes": [
+                {"method": "GET", "path": "/db/content/{id}", "handler": "get_content"},
+                {"method": "GET", "path": "/db/stats", "handler": "get_stats"}
+            ]
+        }))
+        .expect("manifest json");
+
+        let first = registry
+            .install_steward_routes("http://localhost:8090", &manifest)
+            .await;
+        let second = registry
+            .install_steward_routes("http://localhost:8090", &manifest)
+            .await;
+        assert_eq!(first, 2);
+        assert_eq!(second, 2);
+        assert_eq!(
+            registry.get_routes().await.len(),
+            2,
+            "re-install of the same peer must replace, not duplicate"
+        );
+
+        // A different peer's install is additive, and re-installing peer A
+        // leaves peer B's routes untouched.
+        registry
+            .install_steward_routes("http://localhost:8091", &manifest)
+            .await;
+        registry
+            .install_steward_routes("http://localhost:8090", &manifest)
+            .await;
+        let routes = registry.get_routes().await;
+        assert_eq!(routes.len(), 4, "two peers × two routes");
+        let peer_b_count = routes
+            .iter()
+            .filter(|r| {
+                matches!(&r.source, RouteSource::StewardPeer { storage_url } if storage_url == "http://localhost:8091")
+            })
+            .count();
+        assert_eq!(peer_b_count, 2, "peer B's routes survive peer A re-install");
     }
 }
