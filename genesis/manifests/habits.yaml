@@ -613,6 +613,18 @@ habits:
       - "task #10 (operator directive 2026-07-02)"
       - "memory: project_rea_compute_commitment_primitive (delegates-compute displaces X-API-Key)"
       - "task #7 (adam has zero Loki streams — the symmetry gap, live)"
+    evidence: >
+      DELTA 2026-08-16: the dev-loop substrate for this habit's verbs now
+      exists — app/elohim-app/scripts/hc-mesh.sh brings up the alpha-shaped
+      3-peer mesh in one Che container (3 hc-0.6 sandbox conductors on a LOCAL
+      island DHT via the doorway's own bootstrap+signal, 3 storage peers on a
+      libp2p mDNS mesh with proven cross-peer blob replication, dev-mode
+      doorway), and the facade runner substrate-verify.ts scores 5/7 green
+      against it — the same floor as CI's Dataplane Validation, with the two
+      reds in CI's own env-state classes. Runtime verbs built on .dataplane()
+      can now be proven at the desk before any fleet deploy. Status stays
+      unwired: the first_move red (commitment-gated verb scenario) is not
+      written.
 
   - id: dev-system-equilibrium
     invariant: >

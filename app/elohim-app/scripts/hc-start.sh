@@ -392,11 +392,13 @@ else
 
     # Start storage with content database enabled
     export HOLOCHAIN_ADMIN_URL="ws://localhost:$ADMIN_PORT"
-    export HTTP_PORT="$STORAGE_PORT"
     export ENABLE_IMPORT_API=true
     export ENABLE_CONTENT_DB=true
 
-    "$STORAGE_BIN" &
+    # NOTE: the binary ignores the HTTP_PORT env var — the port must be the
+    # --http-port flag (verified 2026-08-16; the old export was a silent no-op
+    # that only worked because 8090 is also the binary's default).
+    "$STORAGE_BIN" --http-port "$STORAGE_PORT" &
 
     echo -n "   ⏳ Waiting for storage"
     for i in {1..15}; do

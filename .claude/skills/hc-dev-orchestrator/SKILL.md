@@ -38,6 +38,59 @@ This skill manages the local development stack for the Elohim Protocol. The fram
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+## Multi-Peer Local Mesh — `hc-mesh.sh` (verified 2026-08-16)
+
+The alpha-shaped topology runs entirely inside one Che container, all loopback,
+no k8s, no external services: **1 doorway + N conductors + N storage peers**
+(default 3: matthew/jessica/james). The doorway serves `/bootstrap` and
+`/signal` for a local island DHT; storage peers form a libp2p mesh via mDNS.
+On first bring-up the CI Dataplane Validation probes (`substrate-verify.ts`)
+scored 5/7 green against this fleet — the same floor as the pipeline.
+
+```bash
+app/elohim-app/scripts/hc-mesh.sh start    # bring up the whole mesh
+app/elohim-app/scripts/hc-mesh.sh status   # ports + health + probe env line
+app/elohim-app/scripts/hc-mesh.sh probe    # run ALL 7 CI probes against it
+app/elohim-app/scripts/hc-mesh.sh stop
+```
+
+Load-bearing facts (all verified against holochain/hc 0.6.0 — several
+invalidate older assumptions in this skill):
+
+- **`hc sandbox --piped`** reads the lair passphrase from stdin. The socat/PTY
+  wrapper still used by `hc-start.sh` is obsolete (kept there for inertia, not
+  necessity).
+- **`-f p1,p2,…` pins admin ports; `-r=a1,a2,…` pins app ports;
+  `-n N -d name,…` generates N sandboxes in one command.** No more log-scraping
+  for dynamic ports — `.hc_ports` parsing is legacy.
+- **tx5 rejects a signal URL that has a path** (`parsing tx5 sig url …
+  InvalidLastSymbol`): use the pathless subdomain form
+  `ws://signal.localhost:8888`. The doorway routes signal traffic by Host
+  header prefix `signal.`, and `signal.localhost` resolves to loopback with no
+  /etc/hosts changes.
+- **The default (no `network` section) sandbox is NOT isolated** on hc 0.6: it
+  points at the public `dev-test-bootstrap2.holochain.org`. Real isolation
+  requires `network --bootstrap http://localhost:8888/bootstrap webrtc
+  ws://signal.localhost:8888` against the local doorway
+  (`--bootstrap-enabled --signal-enabled`).
+- **Conductor interfaces bind loopback only**; the conductor config exposes
+  `danger_bind_addr` for cross-pod topologies. Inside one container, loopback
+  is correct — conductor WebRTC gossip flows through the local signal relay
+  regardless of bind address.
+- **elohim-storage ignores the `HTTP_PORT` env var** — pass `--http-port`.
+  Storage HTTP binds `0.0.0.0`; conductors do not.
+- Storage p2p per node: `ENABLE_P2P=true P2P_PORT=<port>
+  AGENT_PUBKEY=<that conductor's agent key>`; mDNS discovery works
+  container-internally (peers appear on the pod interface within ~30s).
+- Doorway multi-peer registration: `--storage-url <primary>
+  --storage-urls <extra,extra>`.
+
+Known local reds on an unseeded mesh (env-state, matching CI's failure
+classes): `propagation.custody-manifest` (no Seed Custody Commitments leg run),
+`federation.doorways` (doorway DHT self-registration), `resilience.*`
+(peer-status heartbeats need the identity/role env the alpha manifests set).
+These are now debuggable at the desk instead of through fleet redeploys.
+
 ## Quick Start Commands
 
 ```bash
@@ -97,7 +150,7 @@ the bring-up ladder below).
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `STORAGE_PORT` | 8090 | elohim-storage HTTP port |
+| `STORAGE_PORT` | 8090 | elohim-storage HTTP port (passed as `--http-port`; the binary ignores the `HTTP_PORT` env var) |
 | `STORAGE_DIR` | /tmp/elohim-storage | Storage data directory |
 | `SEED_LIMIT` | 20 | Items to seed with --seed flag |
 | `ADMIN_PORT` | (auto) | Override conductor admin port |
