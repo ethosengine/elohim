@@ -417,10 +417,12 @@ const HEAL_ATTEMPT_TIMEOUT: Duration = Duration::from_secs(15);
 /// the two can never drift apart.
 const HEAL_SYNTHETIC_TIMEOUT_MARKER: &str = "heal conductor call exceeded per-attempt timeout";
 
-/// Consecutive synthetic per-attempt timeouts that OPEN the leg circuit and shed
-/// the remainder of the leg. At the 15s per-attempt deadline this is ~45s of leg
-/// budget spent proving the conductor is not answering; past that, further rows
-/// only stack more abandoned-but-still-executing calls on it.
+/// Consecutive NEVER-ANSWERED calls that OPEN the leg circuit and shed the
+/// remainder of the leg. At the 15s per-attempt deadline a hung-call streak is
+/// ~45s of leg budget spent proving the conductor is not answering; past that,
+/// further rows only stack more abandoned-but-still-executing calls on it. A
+/// dead-socket streak costs milliseconds instead of seconds and opens for the
+/// same reason: the calls are not reaching a conductor at all.
 const HEAL_CIRCUIT_TIMEOUT_THRESHOLD: u32 = 3;
 
 /// In-leg retry backoff floor / span for a transient row (jittered in `[min, min+span)`).
@@ -454,8 +456,9 @@ pub struct HealPacing {
     pub rea_leg_budget: Duration,
     pub content_leg_budget: Duration,
     pub collectives_leg_budget: Duration,
-    /// Consecutive synthetic per-attempt timeouts that shed the rest of a leg.
-    /// `0` disables the circuit (never opens).
+    /// Consecutive NEVER-ANSWERED calls (synthetic per-attempt timeout, or a
+    /// dead/refused conductor socket) that shed the rest of a leg. `0` disables
+    /// the circuit (never opens).
     pub circuit_timeout_threshold: u32,
     /// Per-tick candidate cap for the witness/adopt sweeps (folded here from the
     /// former free-standing `WITNESS_MAX_PER_TICK` const). **This number does
@@ -626,25 +629,153 @@ impl HealPacing {
     }
 }
 
-/// True when a conductor error is a TRANSIENT class worth a bounded in-leg retry —
-/// a websocket timeout from a saturated conductor (adam's steady ~1/min WS
-/// timeouts), NOT a definitive miss (`Ok(None)`, retried next SWEEP) nor a
-/// decode/logic error (never retried, no free-window will fix it). The conductor
-/// client preserves the error text verbatim (`Zome call failed: Websocket error:
-/// Timeout`), so this is a substring match on that text plus the explicit
-/// [`StorageError::Timeout`] variant.
-fn is_transient_conductor_error(err: &crate::error::StorageError) -> bool {
-    use crate::error::StorageError;
-    match err {
-        StorageError::Timeout(_) => true,
-        StorageError::Conductor(m)
-        | StorageError::HolochainClient(m)
-        | StorageError::Connection(m) => {
-            let m = m.to_ascii_lowercase();
-            m.contains("timeout") || m.contains("timed out")
-        }
-        _ => false,
+/// Marker for the conductor's OWN internal budget elapsing mid-call. Arrives as
+/// verbatim text on two live shapes (matthew, 2026-08-15, ~45% of head-batch
+/// calls during post-restart catch-up): `Source chain error: deadline has
+/// elapsed` on a zome call, and `WasmError { error: Host("deadline has
+/// elapsed") }` from `host_fn/get.rs`. The same string is already the
+/// `PermitTimeout` discriminator in
+/// [`crate::services::head_batch_resolver`]'s single-id fallback — this is the
+/// heal leg's reading of the same signal, deliberately spelled the same way.
+const CONDUCTOR_DEADLINE_ELAPSED_MARKER: &str = "deadline has elapsed";
+
+/// Error texts meaning the call NEVER REACHED a conductor that could answer it:
+/// the local storage↔conductor websocket is closed, or the connect was refused
+/// or reset. susan's Loki signature (2026-07-31) is the canonical shape —
+/// `Conductor error: Zome call failed: Websocket error: Websocket closed: No
+/// connection`, twelve of them inside 3ms.
+///
+/// These are matched lower-cased, so entries must be lower-case.
+const NEVER_ANSWERED_MARKERS: [&str; 6] = [
+    "websocket closed",
+    "connection closed",
+    "connection refused",
+    "connection reset",
+    "no connection",
+    "broken pipe",
+];
+
+/// How a failed conductor call is classified for pacing purposes.
+///
+/// The axis that matters is NOT "did this row fail" — it is **did the conductor
+/// answer at all**, and if it answered, was the answer a busy signal. Those two
+/// bits drive three different machines (in-leg retry, adopt-rescue routing, and
+/// [`HealCircuit`]'s unresponsiveness streak), and before this enum existed they
+/// were derived from one substring test for `"timeout"`, which collapsed a dead
+/// socket into the same bucket as a decode error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ConductorErrorClass {
+    /// Our own admission gate shed the call: no permit inside the class bound,
+    /// so **nothing was dispatched** (see
+    /// [`crate::conductor_admission::is_admission_shed`]). Classified FIRST and
+    /// separately from everything below because a shed is LOCAL backpressure and
+    /// establishes nothing about the conductor's responsiveness — routing it as
+    /// never-answered would let local capacity pressure open the circuit and
+    /// shed a leg that a responsive conductor was serving fine.
+    AdmissionShed,
+    /// The conductor came back to us with a timeout of its own (`Websocket
+    /// error: Timeout` — adam's steady ~1/min class). It is responsive and busy,
+    /// so a bounded in-leg retry genuinely re-tries.
+    AnsweredTimeout,
+    /// The conductor came back to us having blown its OWN internal budget
+    /// (`deadline has elapsed`). Semantically an answered timeout: the box is
+    /// responsive (so the unresponsiveness streak must NOT count it) but this is
+    /// a busy signal, not a verdict about the row — so it earns the same retry
+    /// eligibility and adopt routing an answered timeout gets.
+    DeadlineElapsed,
+    /// No answer of any kind arrived: either our own synthetic per-attempt
+    /// timeout (`tokio::time::timeout` elapsed on an uncancellable call) or a
+    /// dead/refused local socket. This is exactly the streak [`HealCircuit`]
+    /// exists to detect — the two shapes share the one property that matters,
+    /// "the conductor never had a chance to answer."
+    NeverAnswered,
+    /// The conductor ANSWERED with a decode/logic/validation verdict. Responsive,
+    /// and no free window will change the answer: no retry, no adopt, no streak.
+    Other,
+}
+
+/// Classify one conductor error. Pure + total, so the three pacing machines can
+/// be tested without a conductor.
+///
+/// Ordering is load-bearing: an admission shed and our synthetic per-attempt
+/// timeout are BOTH [`StorageError::Timeout`] carrying a marker, so they are
+/// recognised by marker before any text matching runs.
+fn classify_conductor_error(err: &crate::error::StorageError) -> ConductorErrorClass {
+    use crate::error::StorageError as E;
+    // A shed never reached the conductor, but it is LOCAL pressure — keep it out
+    // of the never-answered class (tripwire: `bccdc643b` routes sheds as pure
+    // backpressure everywhere).
+    if crate::conductor_admission::is_admission_shed(err) {
+        return ConductorErrorClass::AdmissionShed;
     }
+    if is_synthetic_attempt_timeout(err) {
+        return ConductorErrorClass::NeverAnswered;
+    }
+    match err {
+        // The explicit timeout variant is transient BY CONSTRUCTION: a bare
+        // `Timeout` from any layer stays answered-timeout-shaped unless its text
+        // says otherwise (pinned by
+        // `synthetic_attempt_timeout_is_distinguished_from_an_answered_one`).
+        E::Timeout(m) => {
+            classify_conductor_error_text(m).unwrap_or(ConductorErrorClass::AnsweredTimeout)
+        }
+        // `Internal` is in this list because the batch resolver surfaces the
+        // conductor's own `deadline has elapsed` through it.
+        E::Conductor(m) | E::HolochainClient(m) | E::Connection(m) | E::Internal(m) => {
+            classify_conductor_error_text(m).unwrap_or(ConductorErrorClass::Other)
+        }
+        _ => ConductorErrorClass::Other,
+    }
+}
+
+/// Text-only half of [`classify_conductor_error`]. `None` = "no marker matched",
+/// so each variant arm can pick its own default.
+fn classify_conductor_error_text(msg: &str) -> Option<ConductorErrorClass> {
+    let m = msg.to_ascii_lowercase();
+    if NEVER_ANSWERED_MARKERS
+        .iter()
+        .any(|marker| m.contains(marker))
+    {
+        Some(ConductorErrorClass::NeverAnswered)
+    } else if m.contains(CONDUCTOR_DEADLINE_ELAPSED_MARKER) {
+        Some(ConductorErrorClass::DeadlineElapsed)
+    } else if m.contains("timeout") || m.contains("timed out") {
+        Some(ConductorErrorClass::AnsweredTimeout)
+    } else {
+        None
+    }
+}
+
+/// True when a conductor error is a TRANSIENT class — the conductor's own
+/// condition, not a verdict about the row — as opposed to a definitive miss
+/// (`Ok(None)`, retried next SWEEP) or a decode/logic error (no free window will
+/// fix it).
+///
+/// THREE classes qualify, not one (2026-08-15). The original predicate matched
+/// only `"timeout"` / `"timed out"` / [`StorageError::Timeout`], which left a
+/// dead local socket and the conductor's own `deadline has elapsed` classified
+/// like decode errors: no retry, and — because
+/// [`timeout_should_route_to_adopt`] takes this bit as its first argument — no
+/// adopt-rescue either, so such a row was silently re-dropped every sweep.
+///
+/// This is the bit that feeds `timeout_should_route_to_adopt`: an answered
+/// timeout, a `deadline has elapsed`, and a closed/refused socket ALL route to
+/// the adopt arm when a peer advertises a declaration. A closed socket is not
+/// identical to a timeout — it means "reconnect now might help" where a timeout
+/// means "the conductor is busy, wait" — but both leave a verified peer path as
+/// the only way forward, which is precisely what adoption is.
+fn is_transient_conductor_error(err: &crate::error::StorageError) -> bool {
+    !matches!(classify_conductor_error(err), ConductorErrorClass::Other)
+}
+
+/// True when the conductor never had a chance to answer — our own synthetic
+/// per-attempt timeout, or a dead/refused local socket. This is the streak
+/// [`HealCircuit`] counts.
+fn is_never_answered(err: &crate::error::StorageError) -> bool {
+    matches!(
+        classify_conductor_error(err),
+        ConductorErrorClass::NeverAnswered
+    )
 }
 
 /// True for the SYNTHETIC per-attempt timeout this module manufactures when
@@ -667,20 +798,31 @@ fn is_synthetic_attempt_timeout(err: &crate::error::StorageError) -> bool {
 
 /// Whether a failed heal attempt is worth ANOTHER attempt within the leg.
 ///
-/// Transient (timeout-class) AND answered — i.e. the conductor came back to us,
-/// so a retry genuinely re-tries. Our own synthetic per-attempt timeout is
-/// explicitly excluded (see [`is_synthetic_attempt_timeout`]): abandoning does not
-/// cancel the in-flight call, so a retry only amplifies load on an unresponsive
-/// conductor. Such a row stays a `mark_failed` gap and is re-discovered next
-/// sweep, exactly as an exhausted row always has been.
+/// Transient AND answered — i.e. the conductor came back to us, so a retry
+/// genuinely re-tries. That means [`ConductorErrorClass::AnsweredTimeout`],
+/// [`ConductorErrorClass::DeadlineElapsed`] (the conductor answered, with a busy
+/// signal) and [`ConductorErrorClass::AdmissionShed`] (unchanged: a shed is
+/// backpressure and the next attempt may find a permit).
+///
+/// [`ConductorErrorClass::NeverAnswered`] is excluded, and deliberately so for
+/// BOTH its shapes. For our own synthetic per-attempt timeout the reason is
+/// unchanged since 2026-07-29 — abandoning does not cancel the in-flight call, so
+/// a retry only stacks load on an unresponsive conductor. For a dead/refused
+/// socket it is a transient-equivalent class but NOT an equivalent of a timeout:
+/// a closed socket earns the adopt route and the circuit streak, not an
+/// immediate in-leg re-dial that would spend a 2–5s backoff proving the socket
+/// is still gone (the circuit now sheds the leg instead, which is the pacing
+/// this row actually needed). Such a row stays a
+/// `mark_failed` gap and is re-discovered next sweep, exactly as an exhausted
+/// row always has been.
 fn should_retry_attempt(err: &crate::error::StorageError) -> bool {
-    is_transient_conductor_error(err) && !is_synthetic_attempt_timeout(err)
+    is_transient_conductor_error(err) && !is_never_answered(err)
 }
 
-/// Per-leg circuit breaker over CONSECUTIVE synthetic per-attempt timeouts.
+/// Per-leg circuit breaker over CONSECUTIVE NEVER-ANSWERED calls.
 ///
 /// Purpose: stop feeding an unresponsive conductor. Once `threshold` heal calls in
-/// a row have been abandoned at the per-attempt deadline, the remainder of the leg
+/// a row have failed without the conductor answering, the remainder of the leg
 /// is shed — un-attempted rows are re-discovered next sweep (the tracker is
 /// per-sweep), so nothing is lost, and the conductor gets a quiet window in which
 /// its own gossip/fetch queue can drain. On the alpha fleet that queue draining is
@@ -689,8 +831,23 @@ fn should_retry_attempt(err: &crate::error::StorageError) -> bool {
 ///
 /// The circuit is created fresh per leg invocation, so "open" means "yield THIS
 /// leg", never a durable trip. Any ANSWERED call (success, or a failure the
-/// conductor returned) breaks the streak — the signal is unresponsiveness, not
-/// row-level failure.
+/// conductor returned — including `deadline has elapsed`, which IS an answer)
+/// breaks the streak — the signal is unresponsiveness, not row-level failure.
+///
+/// COUNTS TWO SHAPES, not one (2026-08-15). It began counting only our synthetic
+/// per-attempt timeout, so susan's dead local socket — twelve
+/// `Websocket closed: No connection` failures inside 3ms — landed in the
+/// "conductor ANSWERED" arm and RESET the streak. The 120s leg budget was
+/// unreachable at 3ms/row and the streak never advanced, so susan walked its
+/// entire pending set (tens of thousands of ids) every sweep with zero yield:
+/// exactly the unpaced feeding of an unresponsive conductor this circuit exists
+/// to prevent, just wearing a different error text than the one it was tuned
+/// against. The shared property is [`ConductorErrorClass::NeverAnswered`] — "the
+/// conductor never had a chance to answer" — which is the streak's real subject.
+///
+/// An ADMISSION SHED is deliberately NOT in the streak: it never reached the
+/// conductor either, but it is LOCAL capacity pressure, and letting it open the
+/// circuit would shed a leg a perfectly responsive conductor was serving.
 #[derive(Debug)]
 struct HealCircuit {
     threshold: u32,
@@ -715,14 +872,19 @@ impl HealCircuit {
                 self.consecutive_timeouts = 0;
                 self.open = false;
             }
-            Err(e) if is_synthetic_attempt_timeout(e) => {
+            // NEVER ANSWERED — our synthetic per-attempt timeout (the conductor
+            // is hung) or a dead/refused local socket (the call never left the
+            // box). Both mean the conductor had no chance to answer.
+            Err(e) if is_never_answered(e) => {
                 self.consecutive_timeouts = self.consecutive_timeouts.saturating_add(1);
                 if self.threshold > 0 && self.consecutive_timeouts >= self.threshold {
                     self.open = true;
                 }
             }
-            // The conductor ANSWERED (even if with an error): it is responsive, so
-            // the unresponsiveness streak breaks.
+            // The conductor ANSWERED (even if with an error, including a busy
+            // `deadline has elapsed`): it is responsive, so the unresponsiveness
+            // streak breaks. An admission shed lands here too — local pressure is
+            // not evidence about the conductor.
             Err(_) => {
                 self.consecutive_timeouts = 0;
             }
@@ -925,11 +1087,21 @@ pub(crate) fn reach_patch_would_narrow(local_reach: Option<&str>, incoming_reach
 /// Pure + total so the routing rule is testable without a conductor (same reason
 /// [`gapfill_would_self_elect`] is extracted).
 ///
-/// YES exactly when the failure was TRANSIENT (timeout-class — our conductor is
-/// unresponsive, not authoritative-ly denying the row) AND a peer advertises a
-/// declaration for the id, i.e. there is a verified peer path to try. A
-/// non-transient failure is a decode/logic error that adoption cannot fix, and
-/// without a peer hint there is nothing to adopt FROM.
+/// YES exactly when the failure was TRANSIENT (our conductor's own condition, not
+/// an authoritative denial of the row) AND a peer advertises a declaration for
+/// the id, i.e. there is a verified peer path to try. A non-transient failure is
+/// a decode/logic error that adoption cannot fix, and without a peer hint there
+/// is nothing to adopt FROM.
+///
+/// The `transient` bit is [`is_transient_conductor_error`]-shaped wherever a
+/// [`crate::error::StorageError`] is the input, so ALL THREE transient classes
+/// route here: an answered timeout ("busy, wait"), a `deadline has elapsed`
+/// ("busy, my own budget blew"), and a closed/refused socket ("reconnect now
+/// might help"). The last is the 2026-08-15 addition — a row whose socket was
+/// dead reached neither the ghost list (that needs an observed `Ok(None)`) nor
+/// this route, so it was re-dropped every sweep forever. Batch call sites pass
+/// the coordinator's typed backpressure bit instead, which is the same
+/// distinction expressed in the batch vocabulary.
 ///
 /// This closes the drop-forever hole: before this, a timed-out row landed in
 /// NEITHER the ghost list (that needs `Ok(None)`) nor the adopt list, so an
@@ -3679,7 +3851,7 @@ async fn heal_content(
                 // `continue` alone would skip straight back to
                 // `resolves.next().await`, bypassing every other exit this loop
                 // has — on a conductor that keeps ANSWERING errors (the circuit
-                // only counts SYNTHETIC per-attempt timeouts, so an answered
+                // only counts NEVER-ANSWERED calls, so an answered
                 // `Websocket error: Timeout` never opens it) that made the leg
                 // UNBOUNDED, well past `content_leg_budget`, freezing
                 // `publish_sweep` and starving the REA arm behind it.
@@ -7927,6 +8099,230 @@ mod tests {
             "a decode/logic error is not something adoption can fix"
         );
         assert!(!timeout_should_route_to_adopt(false, false));
+    }
+
+    // ---- 2026-08-15: the three-class conductor-error taxonomy ---------------
+    //
+    // susan (2026-07-31) failed ~64.6k rows in 12h against ~5k that reached the
+    // `Ok(None)` branch: her storage→own-conductor websocket was gone, and every
+    // one of those failures classified as non-transient (no retry, no adopt) AND
+    // reset `HealCircuit`'s streak, so she walked her whole pending set every
+    // sweep at 3ms/row with zero yield. matthew (2026-08-15) added the second
+    // misroute: `deadline has elapsed` — the conductor ANSWERING with its own
+    // blown budget — matched nothing and was treated like a decode error.
+
+    /// The verbatim susan Loki text, the shape this taxonomy exists for.
+    fn ws_closed_err() -> crate::error::StorageError {
+        crate::error::StorageError::Conductor(
+            "Zome call failed: Websocket error: Websocket closed: No connection".into(),
+        )
+    }
+
+    /// The shape an admission shed takes (`conductor_admission::shed_error`).
+    fn admission_shed_err() -> crate::error::StorageError {
+        crate::error::StorageError::Timeout(format!(
+            "{}: no conductor permit for content_store within 1000ms \
+             (class=background, capacity=8, in_flight=8) — nothing was dispatched",
+            crate::conductor_admission::ADMISSION_SHED_MARKER
+        ))
+    }
+
+    #[test]
+    fn never_answered_texts_are_transient_but_never_retried() {
+        use crate::error::StorageError;
+        for err in [
+            ws_closed_err(),
+            StorageError::Conductor("Zome call failed: Connection refused (os error 111)".into()),
+            StorageError::HolochainClient("connection reset by peer".into()),
+            StorageError::Connection("Connection closed".into()),
+            synthetic_timeout_err(),
+        ] {
+            assert_eq!(
+                classify_conductor_error(&err),
+                ConductorErrorClass::NeverAnswered,
+                "the conductor never had a chance to answer: {err}"
+            );
+            assert!(
+                is_transient_conductor_error(&err),
+                "a dead socket is our conductor's condition, not a verdict about \
+                 the row — it must reach the adopt route: {err}"
+            );
+            assert!(is_never_answered(&err), "{err}");
+            assert!(
+                !should_retry_attempt(&err),
+                "an in-leg re-dial only spends the backoff proving the socket is \
+                 still gone (and for the synthetic shape, stacks load): {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn deadline_elapsed_is_an_answered_busy_signal() {
+        use crate::error::StorageError;
+        // Both live shapes, matthew 2026-08-15: the zome-call text and the
+        // `host_fn/get.rs` wasm-host text (which the batch resolver surfaces
+        // through `StorageError::Internal`).
+        for err in [
+            StorageError::Conductor(
+                "Zome call failed: Source chain error: deadline has elapsed".into(),
+            ),
+            StorageError::Internal("WasmError { error: Host(\"deadline has elapsed\") }".into()),
+        ] {
+            assert_eq!(
+                classify_conductor_error(&err),
+                ConductorErrorClass::DeadlineElapsed,
+                "{err}"
+            );
+            assert!(
+                is_transient_conductor_error(&err),
+                "the conductor's own blown budget is a busy signal, not a decode \
+                 error: {err}"
+            );
+            assert!(
+                should_retry_attempt(&err),
+                "it ANSWERED, so a retry genuinely re-tries: {err}"
+            );
+            assert!(
+                !is_never_answered(&err),
+                "it ANSWERED — the unresponsiveness streak must not count it: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn admission_shed_stays_backpressure_shaped() {
+        // TRIPWIRE (bccdc643b): a shed is LOCAL capacity pressure and says
+        // nothing about the conductor. It must not slide into the
+        // never-answered class, where it could open the circuit and shed a leg
+        // a perfectly responsive conductor was serving.
+        let shed = admission_shed_err();
+        assert!(crate::conductor_admission::is_admission_shed(&shed));
+        assert_eq!(
+            classify_conductor_error(&shed),
+            ConductorErrorClass::AdmissionShed
+        );
+        assert!(!is_never_answered(&shed), "a shed must not feed the streak");
+        assert!(
+            is_transient_conductor_error(&shed),
+            "unchanged: backpressure"
+        );
+        assert!(
+            should_retry_attempt(&shed),
+            "unchanged: the next attempt may find a permit"
+        );
+    }
+
+    #[test]
+    fn logic_errors_stay_outside_every_transient_class() {
+        use crate::error::StorageError;
+        for err in [
+            StorageError::Validation("bad enum".into()),
+            StorageError::Conductor("Guest(\"not the author\")".into()),
+        ] {
+            assert_eq!(classify_conductor_error(&err), ConductorErrorClass::Other);
+            assert!(!is_transient_conductor_error(&err), "{err}");
+            assert!(!should_retry_attempt(&err), "{err}");
+            assert!(!is_never_answered(&err), "{err}");
+        }
+    }
+
+    #[test]
+    fn adopt_routing_covers_every_transient_class() {
+        use crate::error::StorageError;
+        // The gate takes the `is_transient_conductor_error` bit, so this is the
+        // table-test for "which error texts can be rescued by a peer".
+        let routed = |err: &StorageError, hint: bool| {
+            timeout_should_route_to_adopt(is_transient_conductor_error(err), hint)
+        };
+
+        let answered_timeout =
+            StorageError::Conductor("Zome call failed: Websocket error: Timeout".into());
+        let deadline = StorageError::Conductor(
+            "Zome call failed: Source chain error: deadline has elapsed".into(),
+        );
+        let ws_closed = ws_closed_err();
+
+        for (label, err) in [
+            ("answered timeout", &answered_timeout),
+            ("deadline has elapsed", &deadline),
+            ("websocket closed / no connection", &ws_closed),
+        ] {
+            assert!(
+                routed(err, true),
+                "{label}: our conductor's own condition + a peer advertising a \
+                 declaration ⇒ hand to the adopt arm"
+            );
+            assert!(
+                !routed(err, false),
+                "{label}: no peer hint ⇒ nothing to adopt FROM"
+            );
+        }
+
+        // Unchanged: adoption cannot fix a decode/logic verdict.
+        assert!(!routed(&StorageError::Validation("bad enum".into()), true));
+    }
+
+    #[test]
+    fn heal_circuit_trips_on_a_dead_socket_streak() {
+        // The susan case: twelve instant `Websocket closed` failures in 3ms used
+        // to RESET the streak (read as "the conductor answered"), so the circuit
+        // never opened and the leg never yielded.
+        let mut c = HealCircuit::new(3);
+        for i in 1..3 {
+            c.record::<i32>(&Err(ws_closed_err()));
+            assert!(!c.is_open(), "must not open before the threshold (i={i})");
+        }
+        c.record::<i32>(&Err(ws_closed_err()));
+        assert!(c.is_open(), "a dead-socket streak opens the circuit");
+        assert_eq!(c.consecutive_timeouts(), 3);
+    }
+
+    #[test]
+    fn heal_circuit_streak_mixes_both_never_answered_shapes() {
+        // One streak, not two: a hung call and a dead socket are the same
+        // evidence — the conductor never had a chance to answer.
+        let mut c = HealCircuit::new(3);
+        c.record::<i32>(&Err(synthetic_timeout_err()));
+        c.record::<i32>(&Err(ws_closed_err()));
+        assert!(!c.is_open());
+        c.record::<i32>(&Err(synthetic_timeout_err()));
+        assert!(c.is_open(), "the two shapes share one streak");
+        assert_eq!(c.consecutive_timeouts(), 3);
+    }
+
+    #[test]
+    fn heal_circuit_answered_busy_signals_break_the_streak() {
+        use crate::error::StorageError;
+        let mut c = HealCircuit::new(3);
+        c.record::<i32>(&Err(ws_closed_err()));
+        c.record::<i32>(&Err(synthetic_timeout_err()));
+        // `deadline has elapsed` came FROM the conductor: it is responsive
+        // (busy, but responsive), so the unresponsiveness streak breaks.
+        c.record::<i32>(&Err(StorageError::Conductor(
+            "Zome call failed: Source chain error: deadline has elapsed".into(),
+        )));
+        assert_eq!(
+            c.consecutive_timeouts(),
+            0,
+            "an ANSWER — even a busy one — breaks the streak"
+        );
+        assert!(!c.is_open());
+        // So does an admission shed (local pressure, not conductor evidence).
+        c.record::<i32>(&Err(ws_closed_err()));
+        c.record::<i32>(&Err(admission_shed_err()));
+        assert_eq!(
+            c.consecutive_timeouts(),
+            0,
+            "a shed must not feed the streak"
+        );
+        // And the streak still restarts cleanly afterwards.
+        for _ in 0..3 {
+            c.record::<i32>(&Err(ws_closed_err()));
+        }
+        assert!(
+            c.is_open(),
+            "the streak restarted and reached the threshold"
+        );
     }
 
     // =========================================================================
