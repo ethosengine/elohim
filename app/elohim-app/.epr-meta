@@ -1,0 +1,33 @@
+---
+epr-meta-version: 1
+id: elohim-app-dev-lifecycle-governance
+purpose: >
+  The Angular app AND the primary home of the local-dev lifecycle scripts (scripts/hc-start.sh,
+  hc-mesh.sh, hc-mesh-quiesce.sh, storage-start.sh, hc-build.sh) plus the heaviest app-side
+  package.json script surface. Tightens the repo-root dev-lifecycle-context-sync rules with a
+  shell-script leg: the *.sh files here ARE the executable form of the local dev-loop that the
+  hc-dev-orchestrator skill and root CLAUDE.md describe in prose — when the executable form
+  changes, the prose form is stale until proven otherwise.
+rules:
+  - id: dev-lifecycle-script-sync
+    class: inject
+    when: { write: "*.sh" }
+    dedupe-of: .claude/skills/hc-dev-orchestrator/SKILL.md
+    why: >
+      This shell script is part of the local-dev lifecycle (stack bring-up, mesh, seeding,
+      quiesce measure). Its authoritative prose lives in the hc-dev-orchestrator skill and the
+      root CLAUDE.md Build & Test Commands section — sync them in the same pass if behavior,
+      flags, env vars, or ports changed, and record knob conventions (e.g. the dev-tier pacing
+      profile) where the next agent will look first. Stale lifecycle prose is the cognitive
+      load this rule exists to keep at zero.
+cites:
+  - 2026-08-16-dev-cli-hygiene-script-census
+---
+
+# app/elohim-app — dev-lifecycle governance
+
+The `scripts/*.sh` files here are the executable local-dev lifecycle; the hc-dev-orchestrator
+skill and root CLAUDE.md are its prose projection. The inject rule keeps the two coupled at
+edit time. Repo-root rules (`dev-lifecycle-context-sync-npm`) already cover `package.json`
+script edits via the cascade — this manifest adds only the shell-script leg (tighten downward,
+don't bloat upward).

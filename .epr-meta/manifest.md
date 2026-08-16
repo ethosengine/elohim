@@ -17,6 +17,29 @@ rules:
     policy: governance-escalation-ladder@1
   - id: brand-vocabulary-boundary
     policy: brand-vocabulary-boundary@1
+  - id: dev-lifecycle-context-sync-npm
+    class: inject
+    when: { write: "package.json" }
+    dedupe-of: genesis/data/timeline/backlog/2026-08-16-dev-cli-hygiene-script-census.md
+    why: >
+      You are editing a dev command surface (package.json scripts). The local-dev lifecycle
+      context is COUPLED to it and drifts when it changes silently — keep them in sync in the
+      same pass: the hc-dev-orchestrator skill (.claude/skills/hc-dev-orchestrator/SKILL.md,
+      local stack lifecycle), the root CLAUDE.md Build & Test Commands section, the root
+      justfile recipes, and the script census/consolidation ledger this rule points at. If you
+      added a script: does an existing verb already cover it (census: 362 scripts, build x19,
+      test x16)? If you renamed/removed one: grep docs+CI for the old name. Out-of-date
+      instructions are cognitive load — the census doc records what is verified-alive.
+  - id: dev-lifecycle-context-sync-just
+    class: inject
+    when: { write: "justfile" }
+    dedupe-of: genesis/data/timeline/backlog/2026-08-16-dev-cli-hygiene-script-census.md
+    why: >
+      justfile recipes are the consolidation target for the dev CLI (census doc). When a recipe
+      changes, sync the coupled context: root CLAUDE.md Build & Test Commands, the
+      hc-dev-orchestrator skill, and the census ledger. Native-cargo recipes MUST set
+      CARGO_TARGET_DIR at the cargo-pool slot (the disk-guard denies plain native cargo) —
+      the pre-2026-08 root justfile drifted exactly here.
   - id: readme-blind-reader-review
     class: inject
     when: { write: "README*.md" }
