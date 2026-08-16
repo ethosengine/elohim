@@ -169,6 +169,20 @@ DHT gossip converges at test cadence, not prod cadence.
    write-guard or arc-fraction effects (local mesh runs full-arc, no cgroup ceiling).
    Alpha numbers are measured only on the alpha gate; the alpha Simulacra activation
    leg stays operator-gated (T10's `@requires:alpha-cluster-6peer` leg).
+5. **Shared-substrate I/O ceiling (operator directive 2026-08-16):** co-located
+   fixture peers share ONE device's r/w throughput (local: 3 storage DBs +
+   3 fsync-heavy conductor chains + doorways on one container FS/PVC; alpha: 7
+   pods on node-pinned hostpath volumes) — a hard external ceiling a real
+   deployment does not have (each peer owns its device). Consequences the measure
+   carries: every I/O atom's cost is inflated by neighbor contention; aggregate
+   swarm parallelism is capped by one disk queue; per-chain declare serialization
+   is amplified. Therefore (a) each measure records a one-shot substrate
+   throughput baseline (harness probe) as the run's infra context; (b) Q11's
+   budget expresses I/O atoms against that baseline (the environment
+   denominator) so the transfer coefficient separates protocol cost from
+   infrastructure artifact; (c) measures never run concurrently with cargo
+   builds or other heavy I/O on the shared volume — a contended measure is a
+   discarded measure.
 
 ## 4. Tasks
 

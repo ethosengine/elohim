@@ -84,6 +84,19 @@ export QUIESCE_DEADLINE_SECS="${QUIESCE_DEADLINE_SECS:-1200}"
 echo "hc-mesh-quiesce: doorway-a=$DOORWAY_A doorway-b=$DOORWAY_B storage-a=$STORAGE_A storage-b=$STORAGE_B content=$CONTENT_ID"
 echo "hc-mesh-quiesce: QUIESCE_POLL_SECS=$QUIESCE_POLL_SECS QUIESCE_SUSTAIN_SECS=$QUIESCE_SUSTAIN_SECS QUIESCE_ACTIONABLE_TOLERANCE=$QUIESCE_ACTIONABLE_TOLERANCE QUIESCE_DEADLINE_SECS=$QUIESCE_DEADLINE_SECS (reconcile=$RECONCILE_SECS)"
 
+# One-shot shared-substrate I/O baseline (plan W4.4 #5): all mesh peers share
+# ONE volume, so every run records the substrate's write throughput as its
+# infra context. 64MB fdatasync'd write into the mesh workdir, then removed.
+# A degraded baseline vs prior log lines means the run was infra-contended —
+# discard it, don't tune against it. Skip with MESH_IO_PROBE=0.
+io_baseline="skipped"
+if [ "${MESH_IO_PROBE:-1}" = "1" ]; then
+  probe_file="$MESH_DIR/.io-probe.tmp"
+  io_baseline=$(dd if=/dev/zero of="$probe_file" bs=1M count=64 conv=fdatasync 2>&1 \
+    | tail -1 | grep -o '[0-9.]* [MG]B/s' || echo "unmeasured")
+  rm -f "$probe_file"
+fi
+
 start_iso="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 start_epoch=$(date +%s)
 
@@ -102,7 +115,7 @@ else
   verdict="FAIL(exit=$gate_exit)"
 fi
 
-record="$start_iso wall=${wall_secs}s verdict=$verdict content=$CONTENT_ID reconcile=${RECONCILE_SECS}s contest_backoff=${MESH_CONTEST_BACKOFF:-120}s heal_missing_backoff=${MESH_HEAL_MISSING_BACKOFF:-60}s evidence_absent_backoff=${MESH_EVIDENCE_ABSENT_BACKOFF:-600}s head_corpus_digest=${MESH_HEAD_CORPUS_DIGEST:-1} sustain=${SUSTAIN_SECS}s poll=${QUIESCE_POLL_SECS}s tolerance=${QUIESCE_ACTIONABLE_TOLERANCE} deadline=${QUIESCE_DEADLINE_SECS}s"
+record="$start_iso wall=${wall_secs}s verdict=$verdict content=$CONTENT_ID reconcile=${RECONCILE_SECS}s contest_backoff=${MESH_CONTEST_BACKOFF:-120}s heal_missing_backoff=${MESH_HEAL_MISSING_BACKOFF:-60}s evidence_absent_backoff=${MESH_EVIDENCE_ABSENT_BACKOFF:-600}s head_corpus_digest=${MESH_HEAD_CORPUS_DIGEST:-1} sustain=${SUSTAIN_SECS}s poll=${QUIESCE_POLL_SECS}s tolerance=${QUIESCE_ACTIONABLE_TOLERANCE} deadline=${QUIESCE_DEADLINE_SECS}s io_baseline=${io_baseline// /}"
 
 echo "$record" | tee -a "$LOG_FILE"
 
