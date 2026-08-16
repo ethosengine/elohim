@@ -5,7 +5,8 @@
 import { AdminWebsocket, AppWebsocket, encodeHashToBase64, CellId } from '@holochain/client';
 import * as fs from 'fs';
 
-const HC_PORTS_FILE = process.env.HC_PORTS_FILE || '/projects/elohim/holochain/local-dev/.hc_ports';
+const HC_PORTS_FILE =
+  process.env.HC_PORTS_FILE || '/projects/elohim/elohim/holochain/local-dev/.hc_ports';
 const APP_ID = 'elohim';
 // Role name is auto-detected - support both 'elohim' and legacy 'lamad'
 const ZOME_NAME = 'content_store';

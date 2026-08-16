@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   chmodSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readlinkSync,
@@ -10,8 +11,9 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { basename, dirname, join } from 'node:path';
+import { spawn, spawnSync } from 'node:child_process';
+import { once } from 'node:events';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -27,8 +29,10 @@ function fixture() {
   mkdirSync(worktrees, { recursive: true });
   mkdirSync(join(pool, 'family/dev/storage'), { recursive: true });
 
+  const fixtureId = basename(root);
   const healthyDirSlot = join(pool, 'family/dev/healthy/dev');
-  const brokenDirSlot = join(pool, 'family/dev/broken/dev');
+  const brokenFlatname = `broken-${fixtureId}`;
+  const brokenDirSlot = join(pool, `family/dev/${brokenFlatname}/dev`);
   const genericFailDirSlot = join(pool, 'family/dev/generic-fail/dev');
   mkdirSync(healthyDirSlot, { recursive: true });
   mkdirSync(brokenDirSlot, { recursive: true });
@@ -43,6 +47,7 @@ function fixture() {
   mkdirSync(healthyTarget, { recursive: true });
   writeFileSync(join(healthyTarget, 'artifact'), 'warm\n');
   writeFileSync(join(healthyDirSlot, 'artifact'), 'warm\n');
+  writeFileSync(join(brokenDirSlot, 'warm-artifact'), 'preserve me\n');
   writeFileSync(blocker, 'not a directory\n');
 
   const healthyLink = join(pool, 'family/dev/storage/release');
@@ -67,7 +72,7 @@ function fixture() {
     `#!/usr/bin/env bash
 printf '%s\\n' "\${CARGO_TARGET_DIR:-unset}" >> "\${FAKE_CARGO_LOG}"
 case "\${CARGO_TARGET_DIR:-}" in
-  */broken/dev/.cargo-pool-doctor-probe)
+  */broken-*/dev/.cargo-pool-doctor-probe)
     echo "error: failed to write \`\${CARGO_TARGET_DIR}/debug/.fingerprint/cargo-pool-doctor-probe/invoked.timestamp\`: No such file or directory (os error 2)" >&2
     exit 101
     ;;
@@ -91,9 +96,20 @@ esac
     POOL_WORKTREES_DIR: worktrees,
     CARGO: fakeCargo,
     FAKE_CARGO_LOG: cargoLog,
+    CARGO_TARGET_POOL_FAMILY: 'active',
   };
   const run = (...args) =>
     spawnSync(cargoPool, args, { env, encoding: 'utf8' });
+  const runWithEnv = (overrides, ...args) =>
+    spawnSync(cargoPool, args, {
+      env: { ...env, ...overrides },
+      encoding: 'utf8',
+    });
+  const fingerprintHealTarget = `/tmp/pool-${brokenFlatname}-target`;
+  const cleanup = () => {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(fingerprintHealTarget, { recursive: true, force: true });
+  };
   return {
     root,
     healthyDirSlot,
@@ -111,8 +127,39 @@ esac
     treeTarget,
     wasmTargetLink,
     cargoLog,
+    fingerprintHealTarget,
+    cleanup,
     run,
+    runWithEnv,
   };
+}
+
+async function holdSlotLock(slot) {
+  const lock = join(slot, 'debug/.cargo-lock');
+  mkdirSync(dirname(lock), { recursive: true });
+  const holder = spawn(
+    'bash',
+    [
+      '-c',
+      'exec 9>>"$1"; flock -x 9; echo ready; read -r _',
+      'cargo-pool-doctor-lock-holder',
+      lock,
+    ],
+    { stdio: ['pipe', 'pipe', 'pipe'] },
+  );
+  const [ready] = await once(holder.stdout, 'data');
+  assert.match(String(ready), /ready/);
+  return async () => {
+    holder.stdin.end('\n');
+    if (holder.exitCode === null) await once(holder, 'exit');
+  };
+}
+
+function removeUnrelatedProbeFailures(f) {
+  rmSync(f.genericFailDirSlot, { recursive: true, force: true });
+  rmSync(f.slotLink, { force: true });
+  rmSync(f.blockedLink, { force: true });
+  rmSync(f.outsideTmpLink, { force: true });
 }
 
 test('doctor reports every dangling slot and in-tree target without touching them', (t) => {
@@ -231,4 +278,80 @@ test('watermark update includes healthy symlink-backed slots', (t) => {
   assert.equal(result.status, 0, result.stderr);
   assert.equal(existsSync(join(f.healthyTarget, '.peak-size')), true);
   assert.equal(existsSync(join(f.healthyDirSlot, '.peak-size')), true);
+});
+
+test('--heal-fingerprint-enoent dry-runs, then converts only the failing slot', (t) => {
+  const f = fixture();
+  t.after(f.cleanup);
+  removeUnrelatedProbeFailures(f);
+
+  const dryRun = f.run('doctor', '--heal-fingerprint-enoent', '--dry-run');
+  assert.equal(dryRun.status, 1);
+  assert.match(dryRun.stdout, /would-heal/);
+  assert.match(dryRun.stdout, /the next build is cold/);
+  assert.match(dryRun.stdout, /converted=0 would-convert=1 refused=0/);
+  assert.equal(existsSync(f.fingerprintHealTarget), false);
+  assert.equal(existsSync(f.brokenDirSlot), true);
+  assert.equal(lstatSync(f.brokenDirSlot).isSymbolicLink(), false);
+
+  const result = f.run('doctor', '--heal-fingerprint-enoent');
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /healed/);
+  assert.match(result.stdout, /converted=1 would-convert=0 refused=0/);
+  assert.equal(readlinkSync(f.brokenDirSlot), f.fingerprintHealTarget);
+  assert.equal(
+    existsSync(join(f.fingerprintHealTarget, 'warm-artifact')),
+    true,
+    'conversion preserves the warm slot at its /tmp target',
+  );
+});
+
+test('--heal-fingerprint-enoent refuses an active family without --force', (t) => {
+  const f = fixture();
+  t.after(f.cleanup);
+  removeUnrelatedProbeFailures(f);
+
+  const result = f.runWithEnv(
+    { CARGO_TARGET_POOL_FAMILY: 'dev' },
+    'doctor',
+    '--heal-fingerprint-enoent',
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /refused.*active family 'dev'/);
+  assert.match(result.stdout, /converted=0 would-convert=0 refused=1/);
+  assert.equal(existsSync(f.fingerprintHealTarget), false);
+  assert.equal(existsSync(f.brokenDirSlot), true);
+});
+
+test('--heal-fingerprint-enoent refuses a flock\'d slot without --force', async (t) => {
+  const f = fixture();
+  t.after(f.cleanup);
+  removeUnrelatedProbeFailures(f);
+  const release = await holdSlotLock(f.brokenDirSlot);
+  t.after(release);
+
+  const result = f.run('doctor', '--heal-fingerprint-enoent');
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /refused.*slot is flock'd/);
+  assert.match(result.stdout, /converted=0 would-convert=0 refused=1/);
+  assert.equal(existsSync(f.fingerprintHealTarget), false);
+});
+
+test('--force converts a fingerprint-ENOENT slot despite active-family and flock guards', async (t) => {
+  const f = fixture();
+  t.after(f.cleanup);
+  removeUnrelatedProbeFailures(f);
+  const release = await holdSlotLock(f.brokenDirSlot);
+  t.after(release);
+
+  const result = f.runWithEnv(
+    { CARGO_TARGET_POOL_FAMILY: 'dev' },
+    'doctor',
+    '--heal-fingerprint-enoent',
+    '--force',
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /healed/);
+  assert.match(result.stdout, /converted=1 would-convert=0 refused=0/);
+  assert.equal(readlinkSync(f.brokenDirSlot), f.fingerprintHealTarget);
 });

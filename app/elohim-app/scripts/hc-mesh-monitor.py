@@ -169,7 +169,66 @@ def collect_state():
     except Exception:
         state["quiesce_log"] = []
 
+    # Phase + x-of-y progress for the status bar. Derived, never stored.
+    peers_up = sum(1 for p in state["peers"] if p["health"] == 200)
+    conductors_up = sum(1 for p in state["peers"] if p["conductor_up"])
+    drains = [p["drain"] for p in state["peers"] if isinstance(p.get("drain"), dict)]
+    drain_pub = sum(d.get("published") or 0 for d in drains)
+    drain_tot = sum(d.get("total") or 0 for d in drains)
+    healed = sum(
+        (p["reconcile"] or {}).get("healedTotal") or 0
+        for p in state["peers"]
+        if p.get("reconcile")
+    )
+    if legs["would_pass"]:
+        phase = "QUIESCED"
+    elif peers_up == 0 and conductors_up > 0:
+        phase = "conductors only — storage peers down"
+    elif peers_up < len(PEERS):
+        phase = f"bring-up ({peers_up}/{len(PEERS)} storage peers)"
+    elif drain_tot == 0:
+        phase = "up, unseeded (drain empty)"
+    elif drain_pub < drain_tot:
+        phase = "authoring/publishing"
+    else:
+        phase = "converging"
+    state["status"] = {
+        "phase": phase,
+        "peers_up": peers_up,
+        "peers_total": len(PEERS),
+        "conductors_up": conductors_up,
+        "drain_published": drain_pub,
+        "drain_total": drain_tot,
+        "healed_total": healed,
+        "actionable": actionable,
+    }
     return state
+
+
+def log_files():
+    d = os.path.join(MESH_DIR, "logs")
+    try:
+        return sorted(
+            f[:-4] for f in os.listdir(d) if f.endswith(".log")
+        )
+    except Exception:
+        return []
+
+
+def tail_log(name, n=80):
+    # Whitelisted to actual files in $MESH_DIR/logs — no path traversal.
+    if name not in log_files():
+        return []
+    path = os.path.join(MESH_DIR, "logs", name + ".log")
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, 2)
+            size = f.tell()
+            f.seek(max(0, size - 64 * 1024))
+            lines = f.read().decode("utf-8", "replace").splitlines()
+            return lines[-n:]
+    except Exception:
+        return []
 
 
 PAGE = """<!doctype html>
@@ -197,12 +256,15 @@ PAGE = """<!doctype html>
         padding:.6rem .8rem; overflow-x:auto; color:#9aa4b8; font-size:12px; }
   .ts { color:#6b7488; font-size:11px; }
 </style></head><body>
-<h1>hc-mesh monitor <small>— local 3-peer mesh · refreshes every 5s · <span id="ts" class="ts"></span></small></h1>
+<h1>hc-mesh monitor <small>— local 3-peer mesh · refreshes every 3s · <span id="ts" class="ts"></span></small></h1>
+<div class="card" id="statusbar" style="margin-bottom:.9rem">loading…</div>
 <div class="grid" id="gate-row"></div>
 <div class="grid" id="peers"></div>
 <div class="grid" id="doorways"></div>
 <h1>quiesce log <small>(last 5 runs)</small></h1>
 <pre id="qlog">loading…</pre>
+<h1>logs <small id="logbtns"></small></h1>
+<pre id="logview" style="max-height:22rem;overflow-y:auto">(pick a log)</pre>
 <script>
 const dot = ok => `<span class="dot ${ok===true?'up':ok===false?'down':'warn'}"></span>`;
 const row = (k,v) => `<tr><td>${k}</td><td class="v">${v ?? '—'}</td></tr>`;
@@ -240,8 +302,27 @@ async function tick() {
     <div class="card"><h2>${dot(d.health===200)}${d.name} <span class="ts">:${d.port}</span></h2>
       <table>${row('/health', d.health)} ${row('landing content', d.content)}</table></div>`).join('');
   document.getElementById('qlog').textContent = (s.quiesce_log||[]).join('\\n') || '(no runs recorded yet)';
+  const st = s.status || {};
+  const pct = st.drain_total ? Math.round(100*st.drain_published/st.drain_total) : 0;
+  document.getElementById('statusbar').innerHTML =
+    `<b>${st.phase||'—'}</b> &nbsp; peers ${st.peers_up}/${st.peers_total} · conductors ${st.conductors_up}/${st.peers_total}`+
+    ` · drain ${st.drain_published}/${st.drain_total} (${pct}%) · healed ${st.healed_total} · actionable ${st.actionable??'—'}`+
+    `<div style="background:#2a3040;border-radius:4px;height:8px;margin-top:.4rem">`+
+    `<div style="background:${s.gate.would_pass?'#3fb26f':'#7aa7d6'};height:8px;border-radius:4px;width:${s.gate.would_pass?100:pct}%"></div></div>`;
+  if(!window._logInit){ window._logInit=true;
+    const bt = (s.logs||[]).map(n=>`<a href="#" onclick="window._log='${n}';return false" style="color:#7aa7d6;margin-right:.7em">${n}</a>`).join('');
+    document.getElementById('logbtns').innerHTML = bt || '(no log files yet)';
+  }
+  if(window._log){
+    try{ const L = await (await fetch('/api/logs?f='+window._log)).json();
+      const el=document.getElementById('logview');
+      const stick = el.scrollTop+el.clientHeight >= el.scrollHeight-20;
+      el.textContent = L.lines.join('\\n')||'(empty)';
+      if(stick) el.scrollTop = el.scrollHeight;
+    }catch(e){}
+  }
 }
-tick(); setInterval(tick, 5000);
+tick(); setInterval(tick, 3000);
 </script></body></html>
 """
 
@@ -249,7 +330,17 @@ tick(); setInterval(tick, 5000);
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/api/state":
-            body = json.dumps(collect_state()).encode()
+            st = collect_state()
+            st["logs"] = log_files()
+            body = json.dumps(st).encode()
+            ctype = "application/json"
+        elif self.path.startswith("/api/logs"):
+            from urllib.parse import parse_qs, urlparse
+
+            q = parse_qs(urlparse(self.path).query)
+            name = (q.get("f") or [""])[0]
+            n = int((q.get("n") or ["80"])[0])
+            body = json.dumps({"name": name, "lines": tail_log(name, n)}).encode()
             ctype = "application/json"
         elif self.path in ("/", "/index.html"):
             body = PAGE.encode()

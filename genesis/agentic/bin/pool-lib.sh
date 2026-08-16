@@ -411,6 +411,107 @@ probe_cargo_target_slot() {
   printf '%s\t%s\t%s\n' "$state" "$slot" "$detail"
 }
 
+# Deterministic backing path for a pool slot converted after a fingerprint
+# ENOENT probe. The workspace's existing flat name is intentionally stable
+# across invocations; an existing target is a collision and is never reused.
+fingerprint_heal_target_for_slot() {
+  local slot="$1" rel family rest flat profile
+  case "$slot" in
+    "$POOL_ROOT"/family/*) rel="${slot#"$POOL_ROOT/family/"}" ;;
+    *) return 1 ;;
+  esac
+  family="${rel%%/*}"
+  rest="${rel#*/}"
+  flat="${rest%%/*}"
+  profile="${rest#*/}"
+  [ -n "$family" ] && [ -n "$flat" ] && [ -n "$profile" ] || return 1
+  [ "$rest" != "$profile" ] || return 1
+  case "$profile" in */*) return 1 ;; esac
+  printf '/tmp/pool-%s-target\n' "$flat"
+}
+
+# Convert one regular pool slot to its deterministic /tmp-backed symlink.
+# The caller must have observed fingerprint-enoent for this exact slot while
+# holding the doctor probe lock. Results are returned in the three globals so
+# the mutation occurs in the caller shell rather than a command-substitution
+# subshell.
+#
+# heal_fingerprint_enoent_slot <slot> <protected-families> <force:0|1> <apply:0|1>
+heal_fingerprint_enoent_slot() {
+  local slot="$1" protected=" ${2:-} " force="${3:-0}" apply="${4:-1}"
+  local rel family target bytes warm_cost
+  FINGERPRINT_HEAL_STATE=failed
+  FINGERPRINT_HEAL_TARGET=""
+  FINGERPRINT_HEAL_DETAIL=""
+
+  case "$slot" in
+    "$POOL_ROOT"/family/*) rel="${slot#"$POOL_ROOT/family/"}" ;;
+    *) FINGERPRINT_HEAL_DETAIL="outside pool root"; return 1 ;;
+  esac
+  family="${rel%%/*}"
+  if [ ! -d "$slot" ] || [ -L "$slot" ]; then
+    FINGERPRINT_HEAL_DETAIL="slot is not a regular directory"
+    return 1
+  fi
+  target="$(fingerprint_heal_target_for_slot "$slot" 2>/dev/null)" || {
+    FINGERPRINT_HEAL_DETAIL="slot does not have family/<family>/<flatname>/<profile> shape"
+    return 1
+  }
+  FINGERPRINT_HEAL_TARGET="$target"
+
+  if [ "$force" != "1" ]; then
+    case "$protected" in
+      *" $family "*)
+        FINGERPRINT_HEAL_STATE=refused
+        FINGERPRINT_HEAL_DETAIL="active family '$family' (override with --force)"
+        return 1
+        ;;
+    esac
+    if slot_locked "$slot"; then
+      FINGERPRINT_HEAL_STATE=refused
+      FINGERPRINT_HEAL_DETAIL="slot is flock'd (override with --force)"
+      return 1
+    fi
+  fi
+  if [ -e "$target" ] || [ -L "$target" ]; then
+    FINGERPRINT_HEAL_STATE=refused
+    FINGERPRINT_HEAL_DETAIL="deterministic target already exists; refusing to merge or overwrite it"
+    return 1
+  fi
+
+  bytes="$(dir_disk_bytes "$slot")"
+  warm_cost="$(human_bytes "${bytes:-0}") of warm artifacts; if /tmp reaps the target, the next build is cold"
+  if [ "$apply" != "1" ]; then
+    FINGERPRINT_HEAL_STATE=would-heal
+    FINGERPRINT_HEAL_DETAIL="$warm_cost"
+    return 0
+  fi
+
+  # Recheck the live lock at the last responsible moment. --force is an
+  # explicit operator override for both this guard and active-family guard.
+  if [ "$force" != "1" ] && slot_locked "$slot"; then
+    FINGERPRINT_HEAL_STATE=refused
+    FINGERPRINT_HEAL_DETAIL="slot became flock'd before conversion (override with --force)"
+    return 1
+  fi
+  if ! mv -- "$slot" "$target"; then
+    FINGERPRINT_HEAL_DETAIL="could not move slot to deterministic /tmp target"
+    return 1
+  fi
+  if ! ln -s -- "$target" "$slot"; then
+    if mv -- "$target" "$slot"; then
+      FINGERPRINT_HEAL_DETAIL="could not create symlink; original slot restored"
+    else
+      FINGERPRINT_HEAL_DETAIL="could not create symlink or restore slot; artifacts remain at $target"
+    fi
+    return 1
+  fi
+
+  FINGERPRINT_HEAL_STATE=healed
+  FINGERPRINT_HEAL_DETAIL="$warm_cost"
+  return 0
+}
+
 # ---------------------------------------------------------------------------
 # Disk-pressure probe — substrate-agnostic. Reports on the volume containing
 # $POOL_PARENT_REPO. Used by preflight for warn/critical banners. Also used by

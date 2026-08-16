@@ -1,119 +1,65 @@
 # Genesis Seeder
 
-Seeds pre-structured JSON content from `/genesis/data/lamad` into Holochain.
+Validates and seeds the structured corpus under `genesis/data/lamad` through
+doorway/storage, with Holochain providing the provenance anchors.
 
-Part of the **Genesis project** - the meta-infrastructure layer for source → seed → validate → feedback.
+## Prerequisites
 
-## Pipeline
+Use the repository development environment, with `just`, Node.js, pnpm, Rust,
+and the Holochain CLI available. Run `pnpm install` once from the repository
+root before the first seed. `jq` is optional and is used only to pretty-print
+the example HTTP response below.
 
-```
-genesis/docs/ → Claude + MCP → genesis/data/lamad/ → genesis/seeder → Holochain DHT
-```
+## First successful local run
 
-## Quick Start
-
-### Local Development
-
-Seed to local Holochain sandbox:
+From the repository root:
 
 ```bash
-# From elohim-app directory
-npm run hc:seed              # Full seed
-npm run hc:seed:sample       # Sample (10 items)
-
-# Or from seeder directory
-cd genesis/seeder
-npm run seed                 # Full seed
-npm run seed:sample          # Sample (10 items)
+just seed validate       # schema check; never writes
+just dev start           # isolated conductor + storage + doorway
+just seed apply local    # seed the corpus
+just seed stats          # verify counts
 ```
 
-### Remote Seeding
+The positional seed parameters are `action [profile] [scope] [limit]`. Named profiles are
+`local` and `alpha`; specialist corpus facets use a scope instead of a new
+environment-suffixed npm alias, for example `just seed apply alpha humans` or
+`just seed validate local deployments`. The optional numeric limit applies to
+the `content` scope, for example `just seed apply alpha content 10`.
 
-Seed to deployed Holochain conductors:
+There is intentionally no seed dry-run. The retired `--dry-run` and
+`--validate-only` aliases were ignored by `seed.ts` and could perform a real
+write. Do not add a preview command until the seeder has a tested non-writing
+execution mode.
+
+## Focused seeder interface
+
+Specialists can run the implementation directly from `genesis/seeder`:
 
 ```bash
-# Dev environment (holochain-dev.elohim.host)
-npm run hc:seed:dev          # Full seed
-npm run hc:seed:dev:sample   # Sample (10 items)
-npm run hc:stats:dev         # View stats
-
-# Production (holochain.elohim.host)
-# Requires ELOHIM_PROD_API_KEY environment variable
-export ELOHIM_PROD_API_KEY="your-production-api-key"
-npm run hc:seed:prod
-npm run hc:stats:prod
+pnpm exec tsx src/seed.ts --limit 50
+pnpm exec tsx src/seed.ts --ids=a,b,c
+pnpm exec tsx src/seed.ts --content-only
+pnpm exec tsx src/seed.ts --paths-only
+pnpm exec tsx src/seed.ts --force
+pnpm exec tsx src/seed.ts --conductor-for <human-id>
 ```
 
-### Manual Remote Seeding
+Supported connection inputs are `DOORWAY_URL`, `STORAGE_URL`, and
+`HOLOCHAIN_ADMIN_URL`. Local conductor ports are read from
+`elohim/holochain/local-dev/.hc_ports`. Alpha seeding is available through
+`just seed apply alpha`; production seeding is CI-owned.
 
-For custom configurations:
+## Verify and diagnose
 
 ```bash
-# Only HOLOCHAIN_ADMIN_URL is required for remote seeding
-# The seeder automatically builds the app URL via /app/:port routing
-HOLOCHAIN_ADMIN_URL="wss://holochain-dev.elohim.host?apiKey=dev-elohim-auth-2024" \
-  npx tsx src/seed.ts
+just seed stats
+just seed diagnose
+curl -s http://localhost:8888/db/stats | jq .
 ```
 
-## Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `HOLOCHAIN_ADMIN_URL` | Admin WebSocket URL | `ws://localhost:4444` (from .hc_ports) |
-| `HOLOCHAIN_APP_URL` | App WebSocket URL (optional) | Auto-resolved from admin URL |
-| `DATA_DIR` | Path to lamad data | `/projects/elohim/genesis/data/lamad` |
-| `LOCAL_DEV_DIR` | Local dev directory | `/projects/elohim/holochain/local-dev` |
-| `HC_PORTS_FILE` | Ports file for local dev | `$LOCAL_DEV_DIR/.hc_ports` |
-
-## Remote URL Resolution
-
-When connecting to remote Holochain instances through Doorway:
-
-1. Connect to admin interface: `wss://hostname?apiKey=...`
-2. Seeder calls `listAppInterfaces()` to get dynamic port (e.g., 43733)
-3. Seeder builds app URL: `wss://hostname/app/43733?apiKey=...`
-4. Doorway routes `/app/:port` to `ws://localhost:port` inside pod
-
-**Important:** Do NOT set `HOLOCHAIN_APP_URL` for remote seeding. The seeder's
-`resolveAppUrl()` function automatically builds the correct URL with the dynamic
-port returned by the conductor.
-
-## Available Scripts
-
-### Seeding
-
-| Script | Description |
-|--------|-------------|
-| `seed` | Full seed to local conductor |
-| `seed:sample` | Sample seed (10 items) to local |
-| `seed:dev` | Full seed to dev environment |
-| `seed:dev:sample` | Sample seed to dev environment |
-| `seed:prod` | Full seed to production |
-
-### Statistics
-
-| Script | Description |
-|--------|-------------|
-| `stats` | Show stats from local conductor |
-| `stats:dev` | Show stats from dev environment |
-| `stats:prod` | Show stats from production |
-
-### Snapshots (Local Only)
-
-| Script | Description |
-|--------|-------------|
-| `snapshot:save` | Save current conductor state |
-| `snapshot:restore` | Restore from snapshot |
-| `snapshot:status` | Show snapshot status |
-| `snapshot:list` | List available snapshots |
-
-### Migrations
-
-| Script | Description |
-|--------|-------------|
-| `migrate` | Run DNA migrations |
-| `migrate:dry-run` | Preview migrations |
-| `migrate:verify` | Verify migration state |
+Snapshot operations remain specialist commands in this package. `restore` and
+`clean` are destructive; inspect `snapshot:status` or `snapshot:list` first.
 
 ## Data Structure
 
@@ -254,7 +200,7 @@ Validate every declaration under `genesis/data/` without seeding anything:
 
 ```bash
 cd genesis/seeder
-npm run validate:corpora     # also runs as part of npm run validate:all
+pnpm run validate:corpora     # also runs as part of pnpm run validate:all
 ```
 
 It prints one line per corpus and exits non-zero if any declaration is invalid.
