@@ -29,6 +29,12 @@ const base = {
 export default function () {
   return {
     default: { ...base, paths: ['features/**/*.feature'] },
+    // Scoped saga profile: cucumber-js MERGES a profile's paths with CLI
+    // positionals instead of replacing them, so running the saga dir under
+    // `default` executes ~800+ scenarios (content ingests included) — a heavy
+    // write event that re-churns the mesh being measured (2026-08-16 Q10
+    // finding). Measure saga with `--profile saga`, never bare CLI paths.
+    saga: { ...base, paths: ['features/dataplane/resiliency-saga/**/*.feature'] },
     alpha: { ...base, paths: ['features/**/*.feature'], worldParameters: { env: 'alpha' } },
     local: { ...base, paths: ['features/**/*.feature'], worldParameters: { env: 'local' } },
     browser: {
