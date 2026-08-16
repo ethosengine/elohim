@@ -13874,6 +13874,34 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/epr core surface (api/epr.rs). The controller has served
+        // GET list/:cid and PUT :cid since Phase 3.5, but only the three
+        // projection reads below were ever declared — so the doorway's
+        // manifest matcher 404'd every core-EPR call (seed-epr-atoms failed
+        // 5/5 on the 2026-08-16 local mesh; the storage handler was never
+        // reached). Declare what the controller serves.
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/epr")
+                .handler("list_epr")
+                .cache_ttl(10)
+                .public_if_reach("commons")
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/epr/{cid}")
+                .handler("get_epr")
+                .cache_ttl(30)
+                .public_if_reach("commons")
+                .build(),
+        )
+        .route(
+            Route::put("/api/v1/epr/{cid}")
+                .handler("put_epr")
+                .auth_required()
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/epr/:cid/nav-context — EPR nav-context projection (Category C read-only)
         // Zero new DHT entry types; zero new tables; zero migrations.
         // =====================================================================

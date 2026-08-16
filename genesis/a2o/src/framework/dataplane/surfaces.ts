@@ -62,7 +62,11 @@ export function resolvePeerUrl(peerName: string): string {
     case 'alpha-A':
       return process.env['E2E_DOORWAY_ALPHA'] ?? 'https://doorway-alpha.elohim.host';
     case 'elohim.host':
-      return 'https://elohim.host';
+      // E2E_DOORWAY_B is already CI vocabulary (run-dataplane-validation.sh
+      // passes it to the quiesce gate); wiring it here lets a local mesh
+      // stand in a second doorway instead of every B-leg probing the LIVE
+      // production doorway from the desk. Default unchanged.
+      return process.env['E2E_DOORWAY_B'] ?? 'https://elohim.host';
     case 'shem': {
       const url = process.env['E2E_SHEM_HOST'];
       if (!url) throw new Error('E2E_SHEM_HOST not set — cannot resolve shem peer');

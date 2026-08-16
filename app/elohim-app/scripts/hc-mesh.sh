@@ -110,7 +110,7 @@ status_all() {
   printf "doorway  :%s " "$DOORWAY_PORT"
   curl -s -m 2 "http://localhost:$DOORWAY_PORT/health" >/dev/null && echo UP || echo down
   echo
-  echo "probe env:  PEER_STORAGE_URLS=\"$(peer_csv)\" INTERNAL_DOORWAY_URL=\"localhost:$DOORWAY_PORT\""
+  echo "probe env:  PEER_STORAGE_URLS=\"$(peer_csv)\" INTERNAL_DOORWAY_URL=\"localhost:$DOORWAY_PORT\" E2E_DOORWAY_B=\"http://localhost:${DOORWAY_B_PORT:-8889}\""
 }
 
 probe_all() {
@@ -182,7 +182,15 @@ EOF
     done
     # DOORWAY_ID models alpha's alpha-elohim-host: the EPR router filters
     # projections by doorway_id, so an unset id matches ZERO seeded rows.
+    # SSR env mirrors genesis/orchestrator/manifests/doorway/alpha.yaml: the
+    # RendererRegistry materializes each slug's server bundle from the
+    # substrate (serverBlobHash staged via scripts/ci/stage-spa-blob.sh); an
+    # unstaged slug degrades to CSR with x-ssr-skipped. The landing browser
+    # bundle carries only index.csr.html, so WITHOUT SSR the / mount 404s.
     DOORWAY_ID="${DOORWAY_ID:-alpha-elohim-host}" \
+    SSR_BUNDLE_PATH="${SSR_BUNDLE_PATH:-$REPO_ROOT/app/elohim-app/dist/elohim-app/server/main.server.mjs}" \
+    SSR_BUNDLE_SLUG="${SSR_BUNDLE_SLUG:-elohim-host-landing}" \
+    SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
     nohup "$DOORWAY_BIN" --dev-mode --listen "0.0.0.0:$DOORWAY_PORT" \
       --conductor-url "ws://localhost:$(admin_port 0)" \
       --storage-url "$primary" ${extras:+--storage-urls "$extras"} \
@@ -193,6 +201,29 @@ EOF
     echo "doorway up on :$DOORWAY_PORT (bootstrap+signal enabled)"
   else
     echo "doorway already up on :$DOORWAY_PORT"
+  fi
+
+  # 1b. Doorway B (apex/elohim.host stand-in): jessica-primary, NO bootstrap/
+  # signal (A owns discovery — two mem-bootstrap doorways would partition the
+  # island DHT). Gives the saga's cross-doorway legs a LOCAL target instead of
+  # bleeding to the live production doorway (E2E_DOORWAY_B).
+  DOORWAY_B_PORT="${DOORWAY_B_PORT:-8889}"
+  if ! curl -s -m 2 "http://localhost:$DOORWAY_B_PORT/health" >/dev/null; then
+    DOORWAY_ID="${DOORWAY_B_ID:-apex-elohim-host}" \
+    SSR_BUNDLE_PATH="${SSR_BUNDLE_PATH:-$REPO_ROOT/app/elohim-app/dist/elohim-app/server/main.server.mjs}" \
+    SSR_BUNDLE_SLUG="${SSR_BUNDLE_SLUG:-elohim-host-landing}" \
+    SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
+    nohup "$DOORWAY_BIN" --dev-mode --listen "0.0.0.0:$DOORWAY_B_PORT" \
+      --conductor-url "ws://localhost:$(admin_port 1)" \
+      --storage-url "http://localhost:$(http_port 1)" \
+      --storage-urls "http://localhost:$(http_port 0),http://localhost:$(http_port 2)" \
+      > "$LOGDIR/doorway-b.log" 2>&1 &
+    for _ in $(seq 1 20); do
+      curl -s -m 2 "http://localhost:$DOORWAY_B_PORT/health" >/dev/null && break; sleep 1
+    done
+    echo "doorway B up on :$DOORWAY_B_PORT (apex stand-in, jessica-primary)"
+  else
+    echo "doorway B already up on :$DOORWAY_B_PORT"
   fi
 
   # 2. Conductors: one hc sandbox generate, N sandboxes, pinned ports,
