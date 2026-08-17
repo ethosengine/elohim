@@ -30,6 +30,14 @@ import { waitForDrain } from './wait-for-drain.js';
 import { applyPathThumbnail } from './path-thumbnail.js';
 import { recordBlobUploadOutcome } from './blob-upload-result.js';
 import { computeCid } from './doorway-client.js';
+import {
+  buildStakesDeclaration,
+  emitStakesDeclaration,
+  loadCorpusDeclaration,
+  parsePeerStorageUrls,
+  seedNetworkStakes,
+  stakesDeclarationLogLine,
+} from './corpus-trust.js';
 
 // Directory setup
 const __filename = fileURLToPath(import.meta.url);
@@ -1469,6 +1477,56 @@ async function main() {
   console.log(`   Total skipped: ${formatCount(totalSkipped)}`);
   console.log(`   Total errors: ${totalErrors.length}`);
   console.log(`   Total time: ${timer.elapsed()}`);
+
+  // ========================================
+  // STAKES DECLARATION (deploy-time mint + Q6 write-route fan-out)
+  // ========================================
+  // Twin of the block in seed.ts (the doorway-path entrypoint): the alpha
+  // pipeline seeds THROUGH THIS FILE (scripts/ci/seed-genesis-peer.sh ->
+  // seed-sqlite.ts), so the corpus trustBootstrap grant must mint and fan
+  // out here too or the deployed fleet never receives it (edge #1361/genesis
+  // #1486 proved the gap: grants seeded locally, silence in CI). Membership
+  // in the content set does not gate the grant, so this runs regardless of
+  // per-item errors; DRY_RUN skips the network fan-out but still mints.
+  try {
+    const loadedCorpus = loadCorpusDeclaration(DATA_DIR);
+    if (!loadedCorpus?.declaration.trustBootstrap) {
+      console.log(
+        `\n🔒 No corpus trustBootstrap in ${DATA_DIR} — nothing minted (peers stay fail-closed Bootstrap)`,
+      );
+    } else {
+      const artifact = buildStakesDeclaration(loadedCorpus, {
+        seedTarget: STORAGE_URL || 'sqlite-direct',
+        declaredBy: path.relative(path.resolve(GENESIS_DIR, '..'), loadedCorpus.sourcePath),
+        itemsDeclared: totalInserted + totalSkipped,
+      })!;
+      emitStakesDeclaration(artifact, path.join(SEEDER_DIR, 'stakes-declaration.json'));
+      console.log(`\n${stakesDeclarationLogLine(artifact)}`);
+      console.log(`   manifestCid: ${artifact.manifestCid}`);
+      if (DRY_RUN) {
+        console.log('   stakes manifest NOT seeded (dry run)');
+      } else {
+        let stakesPeers = parsePeerStorageUrls(process.env.PEER_STORAGE_URLS);
+        if (stakesPeers.length === 0 && STORAGE_URL) {
+          stakesPeers = [{ name: 'seed-target', url: STORAGE_URL }];
+        }
+        const stakesResult = await seedNetworkStakes(artifact, stakesPeers);
+        console.log(
+          `   stakes manifest seeded on ${stakesResult.seeded.length}/${stakesPeers.length} peer(s)` +
+            (stakesResult.seeded.length > 0 ? `: ${stakesResult.seeded.join(', ')}` : '') +
+            (stakesResult.failed.length > 0
+              ? ` — failed (stay Bootstrap): ${stakesResult.failed.join(', ')}`
+              : ''),
+        );
+      }
+    }
+  } catch (err) {
+    // The grant is a performance lever, never a seed-correctness gate: a
+    // malformed declaration is loud, but content seeding stays authoritative.
+    console.warn(
+      `   stakes declaration step failed (peers stay fail-closed Bootstrap): ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 
   if (totalErrors.length > 0) {
     console.log(`\nErrors (first 10):`);
