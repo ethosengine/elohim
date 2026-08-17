@@ -798,7 +798,10 @@ export async function getRawRidingCatchUp(
   opts: {
     timeoutMs?: number;
     /** Injection seams for unit tests — production callers omit all three. */
-    fetchFn?: (url: string) => Promise<{ status: number; text: string }>;
+    fetchFn?: (
+      url: string,
+      fetchOpts?: { timeoutMs?: number }
+    ) => Promise<{ status: number; text: string }>;
     sleepFn?: (ms: number) => Promise<void>;
     nowFn?: () => number;
   } = {}
@@ -808,24 +811,58 @@ export async function getRawRidingCatchUp(
   const sleepFn = opts.sleepFn ?? defaultSleep;
   const nowFn = opts.nowFn ?? Date.now;
 
+  // timeoutMs is a TRUE wall-clock bound: every per-fetch timeout and every
+  // sleep is clamped to the remaining budget, so the worst case is
+  // ~timeoutMs total, never timeoutMs + stragglers (the pre-fix shape let a
+  // last-moment fetch + sleep run ~30s past the deadline, blowing derived
+  // step ceilings). rodeCatchUpMs reports WALL time spent riding, not the
+  // sum of sleeps, so operators sizing ceilings from logs see the truth.
   const start = nowFn();
-  let rodeMs = 0;
+  let rode = false;
   for (;;) {
-    const res = await fetchFn(url);
+    const remainingForFetch = timeoutMs - (nowFn() - start);
+    const res = await fetchFn(url, {
+      timeoutMs: Math.max(1_000, Math.min(CATCHUP_RIDE_MAX_INTERVAL_MS, remainingForFetch)),
+    });
     const shedding = res.status === 503 && isCatchingUpBody(res.text);
     if (!shedding) {
-      return rodeMs > 0 ? { ...res, rodeCatchUpMs: rodeMs } : res;
+      return rode ? { ...res, rodeCatchUpMs: nowFn() - start } : res;
     }
-    if (nowFn() - start >= timeoutMs) {
-      return { ...res, rodeCatchUpMs: rodeMs };
+    rode = true;
+    const remaining = timeoutMs - (nowFn() - start);
+    if (remaining <= 0) {
+      return { ...res, rodeCatchUpMs: nowFn() - start };
     }
     const waitMs = Math.min(
       parseRetryAfterMs(res.text) ?? CATCHUP_RIDE_MAX_INTERVAL_MS,
-      CATCHUP_RIDE_MAX_INTERVAL_MS
+      CATCHUP_RIDE_MAX_INTERVAL_MS,
+      remaining
     );
     await sleepFn(waitMs);
-    rodeMs += waitMs;
   }
+}
+
+/**
+ * Step-ceiling for any cucumber step whose body makes ONE ridden read: the
+ * ride cap + one bounded fetch + assertion margin. Derive step timeouts from
+ * this instead of hand-typing milliseconds — cucumber's 30s default kills the
+ * ride mid-flight otherwise (the edge #1360 review class).
+ */
+export const CATCHUP_RIDE_STEP_TIMEOUT_MS =
+  CATCHUP_RIDE_TIMEOUT_MS + CATCHUP_RIDE_MAX_INTERVAL_MS + 30_000;
+
+/**
+ * The one shared phrasing for "this read rode the shed" — appended to
+ * failure messages. Names the runbook class ONLY when the FINAL answer is
+ * still the catching-up shed; a genuine 404/500 after a transient shed says
+ * so without misrouting triage to the admission runbook.
+ */
+export function describeCatchUpRide(res: RiddenRawResponse): string {
+  if (res.rodeCatchUpMs === undefined) return '';
+  const secs = Math.round(res.rodeCatchUpMs / 1000);
+  return res.status === 503 && isCatchingUpBody(res.text)
+    ? ` (still catching-up after riding the admission shed for ${secs}s — runbook "Content view sheds 503 catching-up")`
+    : ` (after a transient catching-up shed of ${secs}s)`;
 }
 
 /**
@@ -839,15 +876,13 @@ export async function probeContent(
   contentId: string
 ): Promise<ProbeResult<ContentItemSurface>> {
   const url = `${peerUrl}/db/content/${encodeDocId(contentId)}`;
-  const { status, text, rodeCatchUpMs } = await getRawRidingCatchUp(url);
-  if (status < 200 || status >= 300) {
-    const rode =
-      rodeCatchUpMs === undefined
-        ? ''
-        : ` (still catching-up after riding the admission shed for ${Math.round(rodeCatchUpMs / 1000)}s — runbook "Content view sheds 503 catching-up")`;
-    throw new Error(`GET ${url} returned ${status}: ${text.slice(0, 200)}${rode}`);
+  const res = await getRawRidingCatchUp(url);
+  if (res.status < 200 || res.status >= 300) {
+    throw new Error(
+      `GET ${url} returned ${res.status}: ${res.text.slice(0, 200)}${describeCatchUpRide(res)}`
+    );
   }
-  return { status, body: JSON.parse(text) as ContentItemSurface };
+  return { status: res.status, body: JSON.parse(res.text) as ContentItemSurface };
 }
 
 /** Result of GET /db/content/{id}/head — the notary HEAD answer. */

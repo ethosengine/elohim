@@ -420,6 +420,17 @@ spec:
             # resolves nothing, and the resolver stays fail-closed Bootstrap.
             - name: ELOHIM_NETWORK_STAKES_SCOPE_ALIASES
               value: "genesis-lamad=lamad,genesis-humans=imagodei"
+            # CPU niceness for the spawned conductor child (elohim-storage
+            # conductor/process_manager.rs). Storage + conductor share one
+            # container cgroup; under CFS-quota saturation (2026-08-17
+            # kitsune2 fetch storm: reads shed catching-up 503s for hours
+            # while rows were correct) the conductor's DHT churn must lose
+            # the CPU race to storage's short read handlers. "0" disables;
+            # this env entry IS the per-fleet rollback lever — edit + deploy,
+            # no code change. Storage WARNs at spawn when the effective
+            # niceness differs from this intent.
+            - name: ELOHIM_CONDUCTOR_NICE
+              value: "10"
             # Adopt-before-author gate (head_adoption): lets a node with NO
             # local chain for a content id declare a canonical head from a
             # carried record the zome fully re-proves in wasm (signature +

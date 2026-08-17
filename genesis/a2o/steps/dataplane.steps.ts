@@ -59,6 +59,9 @@ import {
   agentKeyMatchesDiagnosticAgent,
   pollForGauge,
   GAUGE_SWEEP_POLL_TIMEOUT_MS,
+  getRawRidingCatchUp,
+  describeCatchUpRide,
+  CATCHUP_RIDE_STEP_TIMEOUT_MS,
   type ParsedMetrics,
 } from '../src/framework/dataplane/surfaces.js';
 import { E2EWorld } from '../src/framework/world.js';
@@ -400,6 +403,9 @@ Then(
  */
 Then(
   'EPR {string} blobHash is non-null on peer {string}',
+  // probeContent rides the bounded catching-up shed; cucumber's 30s default
+  // would kill the ride mid-flight, so the ceiling derives from the ride cap.
+  { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS },
   async function (this: E2EWorld, eprId: string, peerName: string) {
     const url = getPeerUrl(this, peerName);
     const { body } = await probeContent(url, eprId);
@@ -434,6 +440,9 @@ Then(
  */
 Then(
   'the served head for EPR {string} matches the declared head on peer {string}',
+  // One ridden probeContent + two bounded health fetches — ceiling derives
+  // from the ride cap plus the extra fetches' own 15s timeouts.
+  { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS + 30_000 },
   async function (this: E2EWorld, eprId: string, peerName: string) {
     const url = getPeerUrl(this, peerName);
 
@@ -630,13 +639,17 @@ Then(
  */
 Then(
   'no HOUSEHOLD-member human on peer {string} is missing its agentPubKey',
+  // STATE assertion over durable rows — rides the bounded catching-up shed
+  // (the edge #1360 class: breaker-open shed while the rows were correct).
+  { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS },
   async function (this: E2EWorld, peerName: string) {
     const url = getPeerUrl(this, peerName);
-    const { status, text } = await getRaw(`${url}/db/humans`);
+    const res = await getRawRidingCatchUp(`${url}/db/humans`);
+    const { status, text } = res;
     assert.strictEqual(
       status,
       200,
-      `GET /db/humans on ${peerName}: expected HTTP 200, got ${status} (body: ${text.slice(0, 120)})`
+      `GET /db/humans on ${peerName}: expected HTTP 200, got ${status} (body: ${text.slice(0, 120)})${describeCatchUpRide(res)}`
     );
     let body: { items?: Record<string, unknown>[] };
     try {
@@ -689,14 +702,18 @@ Then(
  */
 Then(
   'every observable HOUSEHOLD-member human on peer {string} has a non-fossil agentPubKey',
+  // The humans read is a STATE assertion and rides the shed; the follow-up
+  // conductor-diagnostics probe keeps its honest-pass-on-non-200 semantics.
+  { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS + 30_000 },
   async function (this: E2EWorld, peerName: string) {
     const url = getPeerUrl(this, peerName);
 
-    const { status: humansStatus, text: humansText } = await getRaw(`${url}/db/humans`);
+    const humansRes = await getRawRidingCatchUp(`${url}/db/humans`);
+    const { status: humansStatus, text: humansText } = humansRes;
     assert.strictEqual(
       humansStatus,
       200,
-      `GET /db/humans on ${peerName}: expected HTTP 200, got ${humansStatus} (body: ${humansText.slice(0, 120)})`
+      `GET /db/humans on ${peerName}: expected HTTP 200, got ${humansStatus} (body: ${humansText.slice(0, 120)})${describeCatchUpRide(humansRes)}`
     );
     let humansBody: { items?: Record<string, unknown>[] };
     try {

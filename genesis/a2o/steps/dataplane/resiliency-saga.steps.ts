@@ -52,6 +52,9 @@ import { runLook, type LookResult } from '../../scripts/look.js';
 import {
   getRaw,
   getRawRidingCatchUp,
+  describeCatchUpRide,
+  CATCHUP_RIDE_TIMEOUT_MS,
+  CATCHUP_RIDE_STEP_TIMEOUT_MS,
   resolveStorageUrl,
   parseLabeledPrometheusMetric,
   pollForGauge,
@@ -433,19 +436,19 @@ Then(
  */
 Then(
   'doorway {string} has an active item pin whose head references {string}',
-  // The shed ride is bounded by CATCHUP_RIDE_TIMEOUT_MS (90s); cucumber's
-  // default 30s step timer would kill it first (see the poll-budget constraint
-  // note above), so the step declares its own ceiling above that bound.
-  { timeout: 105_000 },
+  // The shed ride is wall-clock-bounded by CATCHUP_RIDE_TIMEOUT_MS; the
+  // ceiling derives from the ride cap (cucumber's default 30s would kill it).
+  { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS },
   async function (this: E2EWorld, peerName: string, contentId: string) {
     const doorway = this.getDoorway(peerName);
     const url = `${doorway.url}/api/v1/pins`;
-    const { status, text, rodeCatchUpMs } = await getRawRidingCatchUp(url);
-    const rode =
-      rodeCatchUpMs === undefined
-        ? ''
-        : ` (still catching-up after riding the admission shed for ${Math.round(rodeCatchUpMs / 1000)}s)`;
-    assert.strictEqual(status, 200, `GET /api/v1/pins on ${peerName}: HTTP ${status}${rode}`);
+    const res = await getRawRidingCatchUp(url);
+    const { status, text } = res;
+    assert.strictEqual(
+      status,
+      200,
+      `GET /api/v1/pins on ${peerName}: HTTP ${status}${describeCatchUpRide(res)}`
+    );
 
     let payload: unknown;
     try {
@@ -903,21 +906,23 @@ Then('the rendered card capture has no HTTP errors and a screenshot', function (
 async function fetchHumansRow(
   world: E2EWorld,
   peerName: string,
-  rowId: string
+  rowId: string,
+  opts: { rideTimeoutMs?: number } = {}
 ): Promise<Record<string, unknown>> {
   const doorway = world.getDoorway(peerName);
   // These are STATE assertions (durable rows), not admission assertions — ride
   // the bounded catching-up shed like ch03/ch05 (edge #1360 redded this chapter
   // on a breaker-open shed window while the rows themselves were correct).
-  const { status, text, rodeCatchUpMs } = await getRawRidingCatchUp(`${doorway.url}/db/humans`);
-  const rode =
-    rodeCatchUpMs === undefined
-      ? ''
-      : ` (still catching-up after riding the admission shed for ${Math.round(rodeCatchUpMs / 1000)}s)`;
+  // Callers polling under retry() pass their REMAINING budget as
+  // rideTimeoutMs so the ride never stacks on top of the retry deadline.
+  const res = await getRawRidingCatchUp(`${doorway.url}/db/humans`, {
+    timeoutMs: opts.rideTimeoutMs,
+  });
+  const { status, text } = res;
   assert.strictEqual(
     status,
     200,
-    `GET /db/humans on ${peerName}: HTTP ${status} (body: ${text.slice(0, 120)})${rode}`
+    `GET /db/humans on ${peerName}: HTTP ${status} (body: ${text.slice(0, 120)})${describeCatchUpRide(res)}`
   );
   let parsed: unknown;
   try {
@@ -950,9 +955,15 @@ Then(
   'the humans row {string} on doorway {string} has {string} set',
   { timeout: 165_000 },
   async function (this: E2EWorld, rowId: string, peerName: string, fieldName: string) {
+    const retryDeadline = Date.now() + 60_000;
     await retry(
       async () => {
-        const row = await fetchHumansRow(this, peerName, rowId);
+        const row = await fetchHumansRow(this, peerName, rowId, {
+          rideTimeoutMs: Math.min(
+            CATCHUP_RIDE_TIMEOUT_MS,
+            Math.max(5_000, retryDeadline - Date.now())
+          ),
+        });
         const value = row[fieldName];
         assert.ok(
           value !== null && value !== undefined && value !== '',
@@ -986,9 +997,15 @@ Then(
     fieldName: string,
     expected: string
   ) {
+    const retryDeadline = Date.now() + 60_000;
     await retry(
       async () => {
-        const row = await fetchHumansRow(this, peerName, rowId);
+        const row = await fetchHumansRow(this, peerName, rowId, {
+          rideTimeoutMs: Math.min(
+            CATCHUP_RIDE_TIMEOUT_MS,
+            Math.max(5_000, retryDeadline - Date.now())
+          ),
+        });
         assert.strictEqual(
           String(row[fieldName]),
           expected,

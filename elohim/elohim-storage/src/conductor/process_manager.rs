@@ -44,6 +44,16 @@ fn resolve_conductor_nice(raw: Option<&str>) -> i32 {
     }
 }
 
+/// Read a live process's scheduling niceness from `/proc/<pid>/stat`
+/// (field 19 — the 17th field after the `)` closing the comm name, which may
+/// itself contain spaces/parens). `None` when the read/parse fails.
+#[cfg(target_os = "linux")]
+fn read_proc_nice(pid: u32) -> Option<i32> {
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    let after_comm = stat.rsplit_once(')')?.1;
+    after_comm.split_whitespace().nth(16)?.parse().ok()
+}
+
 #[derive(Debug, PartialEq)]
 struct DbPoolSaturation {
     kind: &'static str,
@@ -228,6 +238,34 @@ impl ConductorManager {
         }
 
         let pid = child.id().unwrap_or(0);
+        // Log the EFFECTIVE niceness, not the intended one: setpriority in
+        // pre_exec is best-effort and can fail (EPERM when lowering the nice
+        // VALUE below the parent's without CAP_SYS_NICE / under RLIMIT_NICE),
+        // and a silently un-deprioritized conductor is exactly the
+        // participation-vs-protection tradeoff that must be LOUD (this
+        // crate's .epr-meta: reduced-participation paths never go quiet).
+        #[cfg(target_os = "linux")]
+        match read_proc_nice(pid) {
+            Some(effective) if effective == nice => {
+                info!(pid = pid, nice = effective, "Conductor process spawned");
+            }
+            Some(effective) => {
+                warn!(
+                    pid = pid,
+                    intended_nice = nice,
+                    effective_nice = effective,
+                    "Conductor spawned at UNEXPECTED niceness — setpriority likely failed                      (EPERM/RLIMIT_NICE); storage-read protection under CPU contention is                      NOT in effect at the intended level"
+                );
+            }
+            None => {
+                info!(
+                    pid = pid,
+                    nice = nice,
+                    "Conductor process spawned (niceness unverified — /proc read failed)"
+                );
+            }
+        }
+        #[cfg(not(target_os = "linux"))]
         info!(pid = pid, nice = nice, "Conductor process spawned");
 
         self.child = Some(child);
@@ -491,18 +529,19 @@ mod tests {
         // pre_exec runs between fork and exec; give the child a moment.
         sleep(Duration::from_millis(200)).await;
 
-        let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).unwrap();
-        // nice is the 17th field after the ")" that closes the comm name.
-        let after_comm = stat.rsplit_once(')').unwrap().1;
-        let nice: i32 = after_comm
-            .split_whitespace()
-            .nth(16)
-            .unwrap()
-            .parse()
-            .unwrap();
+        let nice = read_proc_nice(pid).expect("child /proc stat readable");
+        // The spawn resolves the AMBIENT env var (a CI shell exporting the
+        // documented ELOHIM_CONDUCTOR_NICE override must not red this test),
+        // and setpriority cannot LOWER the nice value below the parent's
+        // without CAP_SYS_NICE — a parent already running nicer than the
+        // target leaves the child at the inherited value.
+        let resolved =
+            resolve_conductor_nice(std::env::var("ELOHIM_CONDUCTOR_NICE").ok().as_deref());
+        let parent_nice = read_proc_nice(std::process::id()).expect("parent /proc stat readable");
+        let expected = resolved.max(parent_nice);
         assert_eq!(
-            nice, CONDUCTOR_NICE_DEFAULT,
-            "conductor child must run at the deprioritized default niceness"
+            nice, expected,
+            "conductor child must run at the resolved (env-aware) niceness,              floored by the parent's own niceness (EPERM rule)"
         );
 
         mgr.stop().await.unwrap();
