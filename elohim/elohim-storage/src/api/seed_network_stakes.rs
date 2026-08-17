@@ -69,10 +69,19 @@ use super::{get_conn, parse_body};
 // Flag gate
 // ---------------------------------------------------------------------------
 
-/// Returns `true` when `ALLOW_SEED_NETWORK_STAKES=1` is set in the environment.
+/// Returns `true` when `ALLOW_SEED_NETWORK_STAKES` is `1`/`true` in the
+/// environment — the same accepted spellings as the sibling
+/// `ALLOW_SEED_SHARD_MANIFEST` gate, because both are stamped from the same
+/// deploy-template placeholder vocabulary (`true`/`false`).
 /// Exposed for direct test coverage of the flag-gate logic.
 pub fn is_seed_allowed() -> bool {
-    std::env::var("ALLOW_SEED_NETWORK_STAKES").as_deref() == Ok("1")
+    gate_value_allows(std::env::var("ALLOW_SEED_NETWORK_STAKES").ok().as_deref())
+}
+
+/// Pure half of the gate: which env-var spellings count as opt-in.
+/// Kept env-free so tests never mutate process globals.
+fn gate_value_allows(value: Option<&str>) -> bool {
+    matches!(value, Some(v) if v == "1" || v.eq_ignore_ascii_case("true"))
 }
 
 // ---------------------------------------------------------------------------
@@ -255,4 +264,27 @@ pub async fn handle(
         "stage": validated.stage_raw,
         "state": "seeded",
     })))
+}
+
+#[cfg(test)]
+mod gate_tests {
+    use super::gate_value_allows;
+
+    #[test]
+    fn the_gate_accepts_the_deploy_template_spellings() {
+        // The deploy template stamps "true"/"false"; operators hand-set "1".
+        // Same accepted vocabulary as the sibling ALLOW_SEED_SHARD_MANIFEST gate.
+        assert!(gate_value_allows(Some("1")));
+        assert!(gate_value_allows(Some("true")));
+        assert!(gate_value_allows(Some("TRUE")));
+    }
+
+    #[test]
+    fn the_gate_fails_closed_on_everything_else() {
+        assert!(!gate_value_allows(None));
+        assert!(!gate_value_allows(Some("")));
+        assert!(!gate_value_allows(Some("false")));
+        assert!(!gate_value_allows(Some("0")));
+        assert!(!gate_value_allows(Some("yes")));
+    }
 }

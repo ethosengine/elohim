@@ -55,6 +55,8 @@ import {
   loadCorpusDeclaration,
   buildStakesDeclaration,
   emitStakesDeclaration,
+  parsePeerStorageUrls,
+  seedNetworkStakes,
   stakesDeclarationLogLine,
   CorpusDeclarationError,
   type LoadedCorpusDeclaration,
@@ -2197,8 +2199,26 @@ async function seed() {
       console.log(`   manifestCid: ${artifact.manifestCid}`);
       console.log(`   artifact: ${STAKES_DECLARATION_PATH}`);
       console.log(`   runtime (Q6): ELOHIM_NETWORK_STAKES=${artifact.operatorConfig.ELOHIM_NETWORK_STAKES}`);
-      // STAKES-DECLARATION-SEAM-Q6: when a manifest write route lands, POST this
-      // exact object to it here and log the response. Nothing else changes.
+      // STAKES-DECLARATION-SEAM-Q6 write route (PUT /admin/seed/network-stakes,
+      // gated by ALLOW_SEED_NETWORK_STAKES on each peer): fan the grant to the
+      // FULL roster — the adopting peers, not just this run's seed target, are
+      // where declared-stakes ceremony pricing pays. Fail-soft per peer.
+      let stakesPeers = parsePeerStorageUrls(process.env.PEER_STORAGE_URLS);
+      if (stakesPeers.length === 0 && STORAGE_URL) {
+        stakesPeers = [{ name: 'seed-target', url: STORAGE_URL }];
+      }
+      if (stakesPeers.length > 0) {
+        const stakesResult = await seedNetworkStakes(artifact, stakesPeers);
+        console.log(
+          `   stakes manifest seeded on ${stakesResult.seeded.length}/${stakesPeers.length} peer(s)` +
+            (stakesResult.seeded.length > 0 ? `: ${stakesResult.seeded.join(', ')}` : '') +
+            (stakesResult.failed.length > 0 ? ` — failed (stay Bootstrap): ${stakesResult.failed.join(', ')}` : ''),
+        );
+      } else {
+        console.log(
+          '   stakes manifest NOT seeded: no PEER_STORAGE_URLS/STORAGE_URL — every peer stays fail-closed Bootstrap',
+        );
+      }
     }
   }
 

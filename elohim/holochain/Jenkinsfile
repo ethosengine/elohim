@@ -777,6 +777,16 @@ def resolveStorageImage(String humanEnv, versions) {
 }
 
 /**
+ * The shared non-prod-true rendering for operator/seed lever gates
+ * (DNA reinstall, shard-manifest seed, adopt-before-author, network-stakes
+ * seed). Its own CPS method keeps deployHumanManifest under the method-size
+ * ceiling.
+ */
+def nonProdTrueGate(String env) {
+    return (env == 'prod') ? 'false' : 'true'
+}
+
+/**
  * Deploy a human manifest with topology-aware placeholder substitution.
  * Uses | as sed delimiter because URLs contain /.
  */
@@ -827,21 +837,16 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     // deploys outside us-central — at that point, move to deployments.json.
     def region = 'us-central'
 
-    // DNA-content drift auto-reinstall gate (happ_manager). True for ephemeral
-    // re-seeded envs (alpha/staging) so a changed-DNA bundle redeploys onto the
-    // conductor's persistent PVC; false for prod, where DNA upgrades go through
-    // migration/lineage, not a blind reinstall that mints a new agent identity.
-    def allowDnaReinstall = (humanConfig.env == 'prod') ? 'false' : 'true'
-
-    // Deterministic /admin/seed/shard-manifest lever gate (blob-durability
-    // a2o suite + resilience-card "stewarding" column). Same non-prod-true
-    // rendering as allowDnaReinstall — see the template's inline comment.
-    def allowSeedShardManifest = (humanConfig.env == 'prod') ? 'false' : 'true'
-
-    // Adopt-before-author gate (both-sides-missing canonical-head exit).
-    // Same non-prod-true rendering — prod participation is a governance
-    // decision, not a default. See the template's inline comment.
-    def adoptBeforeAuthor = (humanConfig.env == 'prod') ? 'false' : 'true'
+    // One non-prod-true gate value feeds the four operator/seed levers:
+    // DNA-content drift auto-reinstall (happ_manager; prod DNA upgrades go
+    // through migration/lineage, never a blind reinstall that mints a new
+    // agent identity), the /admin/seed/shard-manifest lever, the
+    // adopt-before-author canonical-head exit, and the declared
+    // network-stakes seed lever (corpus trustBootstrap grants ->
+    // ManifestStakesResolver adoption-ceremony pricing; the endpoint
+    // additionally refuses simulacra outside environment=preproduction).
+    // Per-lever rationale lives in the template's inline comments.
+    def nonProdGate = nonProdTrueGate(humanConfig.env)
 
     // Per-human primary doorway selection. When the env declares doorwayA +
     // doorwayB sub-maps (alpha today), route based on nodeTypes containing
@@ -909,9 +914,10 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         // Topology placeholders
         "s|NAMESPACE_PLACEHOLDER|${humanConfig.namespace}|g",
         "s|ENV_PLACEHOLDER|${humanConfig.env}|g",
-        "s|ALLOW_DNA_REINSTALL_PLACEHOLDER|${allowDnaReinstall}|g",
-        "s|ALLOW_SEED_SHARD_MANIFEST_PLACEHOLDER|${allowSeedShardManifest}|g",
-        "s|ADOPT_BEFORE_AUTHOR_PLACEHOLDER|${adoptBeforeAuthor}|g",
+        "s|ALLOW_DNA_REINSTALL_PLACEHOLDER|${nonProdGate}|g",
+        "s|ALLOW_SEED_SHARD_MANIFEST_PLACEHOLDER|${nonProdGate}|g",
+        "s|ALLOW_SEED_NETWORK_STAKES_PLACEHOLDER|${nonProdGate}|g",
+        "s|ADOPT_BEFORE_AUTHOR_PLACEHOLDER|${nonProdGate}|g",
         "s|RESOURCE_PREFIX_PLACEHOLDER|${humanConfig.resourcePrefix}|g",
         "s|INSTANCE_PLACEHOLDER|${humanConfig.instance}|g",
         "s|BOOTSTRAP_URL_PLACEHOLDER|${primaryDoorway.bootstrapUrl}|g",

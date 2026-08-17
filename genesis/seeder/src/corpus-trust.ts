@@ -403,3 +403,91 @@ export function emitStakesDeclaration(artifact: StakesDeclarationArtifact, outpu
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
 }
+
+// =============================================================================
+// Q6 write-route fan-out — seed the declared grant onto every peer
+// =============================================================================
+//
+// The runtime half landed: `PUT /admin/seed/network-stakes` (elohim-storage,
+// `api/seed_network_stakes.rs`, gated by ALLOW_SEED_NETWORK_STAKES) stores the
+// artifact into the per-peer `manifests` projection that
+// `ManifestStakesResolver` prices adoption ceremony from. The grant is a
+// per-peer LOCAL manifest — the ADOPTING peers (not just the genesis seed
+// targets) are where declared-stakes pricing pays — so the seeder fans the
+// same artifact to the full roster. Failures are soft by design: a peer that
+// misses the PUT simply stays fail-closed Bootstrap until a later seed run.
+
+/** One peer target for the stakes fan-out. */
+export interface PeerStorageTarget {
+  name: string;
+  url: string;
+}
+
+/**
+ * Parse the `name=host:port` CSV convention shared with
+ * `storageUrlForHuman()` / the genesis Jenkinsfile's `peerStorageUrlsCsv()`.
+ * Malformed entries are dropped, never guessed at.
+ */
+export function parsePeerStorageUrls(csv: string | undefined): PeerStorageTarget[] {
+  if (!csv) return [];
+  const targets: PeerStorageTarget[] = [];
+  for (const entry of csv.split(',')) {
+    const trimmed = entry.trim();
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) continue;
+    const hostPort = trimmed.slice(eq + 1);
+    if (!hostPort) continue;
+    targets.push({
+      name: trimmed.slice(0, eq),
+      url: hostPort.includes('://') ? hostPort : `http://${hostPort}`,
+    });
+  }
+  return targets;
+}
+
+export interface SeedNetworkStakesResult {
+  seeded: string[];
+  failed: string[];
+}
+
+/**
+ * PUT the stakes-declaration artifact to every peer's
+ * `/admin/seed/network-stakes`. Never throws: per-peer failures (gate off,
+ * peer down, non-2xx) are logged and reported in `failed` — the seed run must
+ * not die because one adopter is unreachable.
+ */
+export async function seedNetworkStakes(
+  artifact: StakesDeclarationArtifact,
+  peers: ReadonlyArray<PeerStorageTarget>,
+  fetchImpl: typeof fetch = fetch,
+): Promise<SeedNetworkStakesResult> {
+  const seeded: string[] = [];
+  const failed: string[] = [];
+  for (const peer of peers) {
+    const endpoint = `${peer.url.replace(/\/+$/, '')}/admin/seed/network-stakes`;
+    try {
+      const response = await fetchImpl(endpoint, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(artifact),
+      });
+      if (response.ok) {
+        seeded.push(peer.name);
+      } else {
+        const detail = await response.text().catch(() => '');
+        console.warn(
+          `   stakes seed ${peer.name}: HTTP ${response.status} — peer stays fail-closed Bootstrap` +
+            (response.status === 403 ? ' (ALLOW_SEED_NETWORK_STAKES not enabled on that peer)' : '') +
+            (detail ? ` — ${detail.slice(0, 200)}` : ''),
+        );
+        failed.push(peer.name);
+      }
+    } catch (err) {
+      console.warn(
+        `   stakes seed ${peer.name}: ${err instanceof Error ? err.message : String(err)} — peer stays fail-closed Bootstrap`,
+      );
+      failed.push(peer.name);
+    }
+  }
+  return { seeded, failed };
+}

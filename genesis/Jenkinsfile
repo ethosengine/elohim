@@ -413,6 +413,12 @@ def probeSubstrateScope() {
  * Any skip marks the build UNSTABLE (loud signal), never silently green.
  */
 def runContentSeedStage() {
+    // Full-roster storage URLs for the seeder's network-stakes fan-out: the
+    // corpus trustBootstrap grant is a per-peer local manifest, and the
+    // ADOPTING peers (not just the genesis seed targets) are where declared-
+    // stakes ceremony pricing pays. Down/suspended peers fail soft in the
+    // seeder (they stay fail-closed Bootstrap until a later seed run).
+    env.PEER_STORAGE_URLS = peerStorageUrlsCsv()
     def humans = getHumanStorageUrls('alpha')
     // Authoritative suspension gate: deployments.json `suspended` is the single source of truth for
     // is-this-human-exercise-able. Drop suspended humans (e.g. adam, suspendedBy:scope-reconcile:shem)

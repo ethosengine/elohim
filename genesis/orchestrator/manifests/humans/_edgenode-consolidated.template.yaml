@@ -398,6 +398,28 @@ spec:
             # test/demo-seeded), false for prod.
             - name: ALLOW_SEED_SHARD_MANIFEST
               value: "ALLOW_SEED_SHARD_MANIFEST_PLACEHOLDER"
+            # Gate for the declared network-stakes seed lever
+            # (PUT /admin/seed/network-stakes, seed_network_stakes.rs) — the
+            # genesis seeder PUTs the corpus-declared trustBootstrap grant
+            # (corpus.json, e.g. simulacra scoped to genesis-lamad, granted by
+            # human-adam-firstman) so ManifestStakesResolver prices adoption
+            # ceremony from the MODELED trust relationship instead of full
+            # bootstrap scrutiny. Off (403) by default; the endpoint itself
+            # also refuses stage=simulacra unless environment=preproduction.
+            # Same per-env rendering as ALLOW_SEED_SHARD_MANIFEST: true for
+            # alpha/staging, false for prod.
+            - name: ALLOW_SEED_NETWORK_STAKES
+              value: "ALLOW_SEED_NETWORK_STAKES_PLACEHOLDER"
+            # Corpus-key -> h_app_id bridge for the stakes resolver
+            # (trust/manifest_resolver.rs leg 3): a grant is scoped by corpus
+            # id (genesis-lamad) but the adoption hot path resolves by
+            # h_app_id (lamad). Only the DOCUMENTED mappings — aliases are
+            # explicit declarations, never derived (genesis-humans' h_app_id
+            # is imagodei, so prefix arithmetic is wrong in general). Static
+            # across envs: without a seeded grant manifest the alias leg
+            # resolves nothing, and the resolver stays fail-closed Bootstrap.
+            - name: ELOHIM_NETWORK_STAKES_SCOPE_ALIASES
+              value: "genesis-lamad=lamad,genesis-humans=imagodei"
             # Adopt-before-author gate (head_adoption): lets a node with NO
             # local chain for a content id declare a canonical head from a
             # carried record the zome fully re-proves in wasm (signature +

@@ -14,6 +14,8 @@ import {
   parseCorpusDeclaration,
   stakesDeclarationLogLine,
   type CorpusDeclaration,
+  parsePeerStorageUrls,
+  seedNetworkStakes,
 } from '../corpus-trust.js';
 import { findCorpusDirs, validateCorpora } from '../validate-corpora.js';
 
@@ -357,5 +359,105 @@ describe('validateCorpora', () => {
       grantor: 'human-adam-firstman',
       scope: 'genesis-lamad',
     });
+  });
+});
+
+describe('parsePeerStorageUrls', () => {
+  it('parses the name=host:port CSV convention (scheme added when absent)', () => {
+    expect(
+      parsePeerStorageUrls('matthew=localhost:8090, jessica=http://svc:8091,james=svc.ns:8092'),
+    ).toEqual([
+      { name: 'matthew', url: 'http://localhost:8090' },
+      { name: 'jessica', url: 'http://svc:8091' },
+      { name: 'james', url: 'http://svc.ns:8092' },
+    ]);
+  });
+
+  it('returns empty on undefined/empty/malformed-only input', () => {
+    expect(parsePeerStorageUrls(undefined)).toEqual([]);
+    expect(parsePeerStorageUrls('')).toEqual([]);
+    expect(parsePeerStorageUrls('=8090,noequals')).toEqual([]);
+  });
+});
+
+describe('seedNetworkStakes — the Q6 write-route fan-out', () => {
+  const artifact = () =>
+    buildStakesDeclaration(
+      {
+        declaration: parseCorpusDeclaration(decl(), SRC),
+        sourcePath: SRC,
+        sha256: 'b'.repeat(64),
+      },
+      {
+        seedTarget: 'http://localhost:8888',
+        declaredBy: 'genesis/data/lamad/corpus.json',
+        itemsDeclared: 1,
+        mintedAt: '2026-08-16T12:00:00.000Z',
+      },
+    )!;
+
+  it('PUTs the artifact verbatim to every peer /admin/seed/network-stakes', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return { ok: true, status: 201, text: async () => '' } as Response;
+    }) as unknown as typeof fetch;
+
+    const result = await seedNetworkStakes(
+      artifact(),
+      [
+        { name: 'matthew', url: 'http://m:8090' },
+        { name: 'jessica', url: 'http://j:8091/' },
+      ],
+      fetchImpl,
+    );
+
+    expect(result).toEqual({ seeded: ['matthew', 'jessica'], failed: [] });
+    expect(calls.map((c) => c.url)).toEqual([
+      'http://m:8090/admin/seed/network-stakes',
+      'http://j:8091/admin/seed/network-stakes',
+    ]);
+    for (const c of calls) {
+      expect(c.init.method).toBe('PUT');
+      expect(JSON.parse(c.init.body as string)).toEqual(artifact());
+    }
+  });
+
+  it('a non-2xx peer is recorded failed and does NOT throw (fail-soft: that peer stays Bootstrap)', async () => {
+    const fetchImpl = (async (url: string) =>
+      url.includes('8090')
+        ? ({ ok: false, status: 403, text: async () => 'disabled' } as Response)
+        : ({ ok: true, status: 201, text: async () => '' } as Response)) as unknown as typeof fetch;
+
+    const result = await seedNetworkStakes(
+      artifact(),
+      [
+        { name: 'matthew', url: 'http://m:8090' },
+        { name: 'jessica', url: 'http://j:8091' },
+      ],
+      fetchImpl,
+    );
+    expect(result).toEqual({ seeded: ['jessica'], failed: ['matthew'] });
+  });
+
+  it('a thrown network error is recorded failed and does NOT throw', async () => {
+    const fetchImpl = (async () => {
+      throw new Error('ECONNREFUSED');
+    }) as unknown as typeof fetch;
+
+    const result = await seedNetworkStakes(artifact(), [{ name: 'gertrude', url: 'http://g:8090' }], fetchImpl);
+    expect(result).toEqual({ seeded: [], failed: ['gertrude'] });
+  });
+
+  it('an empty peer list makes no calls', async () => {
+    let called = 0;
+    const fetchImpl = (async () => {
+      called += 1;
+      return { ok: true, status: 201, text: async () => '' } as Response;
+    }) as unknown as typeof fetch;
+
+    const result = await seedNetworkStakes(artifact(), [], fetchImpl);
+    expect(result).toEqual({ seeded: [], failed: [] });
+    expect(called).toBe(0);
   });
 });
