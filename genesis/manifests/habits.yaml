@@ -245,7 +245,18 @@ habits:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
       - "sweettest rea_commitment_replication (elohim/holochain/tests/sweettest — unignored 837b772c9; isolated late-join conductors, bounded 60s peer-B retrieval; RED but MIS-ATTRIBUTED per DELTA 2026-08-09 — it measures one-time cold-cell Wasm warm-up, not REA retrieval; do not read it as a fetch-seam probe until it warms peer B)"
     evidence: >
-      DELTA 2026-08-16 (head-batch budget starvation cured, integrator batch):
+      DELTA 2026-08-17 (heal cure DEPLOYED-PROVEN, edge #1360): the proof asked
+      for below arrived — matthew, restored after a 13h node outage (ethosengine
+      NFS-hardmount wedge, operator-fixed), drained its divergence backlog
+      12->0 actionable in ~15min under the new budget/AIMD path;
+      fleet-quiesce sustained-PASS 368s, deploy-churn->quiesce ~27min. Habit
+      stays RED on its own legs: notary-authority 0p/3f, all A-side —
+      blobHash null / trust not notarized / heads unconverged / household
+      agentPubKey missing-or-fossil post-restore — and A-converged=0.0
+      throughout the PASS window: SECOND reproduction of the 2026-08-13
+      gate-predicate gap (gate anchors on exhaustion-quiet, not convergence).
+      Next lever is convergence + A-side identity coherence, not heal
+      throughput. DELTA 2026-08-16 (head-batch budget starvation cured, integrator batch):
       live fleet reads showed matthew healing 0/hr against a 2,510-row backlog
       — unattempted 2,447/hr all budget_exhausted, batch pinned at floor 8:
       the 4s BATCH_EXTERN_BUDGET admitted id #0 (a saturated cascading()
