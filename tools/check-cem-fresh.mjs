@@ -77,11 +77,21 @@ for (const dir of dirs) {
         failed = true;
         continue;
       }
-      // Normalize: parse + re-stringify to ignore whitespace-only diffs.
+      // Normalize: parse + re-stringify to ignore whitespace-only diffs, and
+      // sort modules by path — cem emits modules in glob-expansion order,
+      // which follows filesystem/collation order and differs across
+      // environments (observed 2026-08-17: localize/ vs loader/ first), so an
+      // order-sensitive diff makes this gate flake on identical content.
+      const byPath = (m) => {
+        if (Array.isArray(m?.modules)) {
+          m.modules.sort((x, y) => (x.path ?? '').localeCompare(y.path ?? ''));
+        }
+        return m;
+      };
       const a = await readFile(committed, 'utf8');
       const b = await readFile(fresh, 'utf8');
-      const aNorm = JSON.stringify(JSON.parse(a), null, 2);
-      const bNorm = JSON.stringify(JSON.parse(b), null, 2);
+      const aNorm = JSON.stringify(byPath(JSON.parse(a)), null, 2);
+      const bNorm = JSON.stringify(byPath(JSON.parse(b)), null, 2);
       if (aNorm !== bNorm) {
         console.error(
           `[cem-fresh] ${name}: dist/custom-elements.json is STALE. ` +
