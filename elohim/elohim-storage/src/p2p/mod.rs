@@ -4324,10 +4324,18 @@ impl P2PNode {
                 // await, move the call out of the lock or reacquire per batch.
                 let put_result = {
                     let mut swarm = self.swarm.write().await;
-                    swarm
+                    // Q11 atomic timing budget: ONLY the put_record call, not
+                    // the write-lock acquisition above it.
+                    let put_record_started = std::time::Instant::now();
+                    let result = swarm
                         .behaviour_mut()
                         .kademlia
-                        .put_record(record, libp2p::kad::Quorum::One)
+                        .put_record(record, libp2p::kad::Quorum::One);
+                    crate::metrics::observe_atom_duration(
+                        crate::metrics::ConvergenceAtom::PutRecord,
+                        put_record_started.elapsed(),
+                    );
+                    result
                 };
 
                 match put_result {

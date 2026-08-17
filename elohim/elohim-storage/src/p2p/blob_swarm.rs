@@ -179,6 +179,9 @@ pub async fn fetch_shards_via_swarm(
 
     let results: Vec<(usize, String, FetchOutcome)> = stream::iter(to_race)
         .map(|(index, shard_hash, candidates)| async move {
+            // Q11 atomic timing budget: ONE shard's race, not the surrounding
+            // `buffer_unordered` fan-out.
+            let shard_fetch_started = Instant::now();
             let outcome = race_fetch(
                 &shard_hash,
                 candidates,
@@ -188,6 +191,10 @@ pub async fn fetch_shards_via_swarm(
                 params.per_peer_timeout,
             )
             .await;
+            crate::metrics::observe_atom_duration(
+                crate::metrics::ConvergenceAtom::ShardFetch,
+                shard_fetch_started.elapsed(),
+            );
             (index, shard_hash, outcome)
         })
         .buffer_unordered(params.total_inflight.max(1))

@@ -279,6 +279,9 @@ pub async fn run_once(
         // the substrate whether one is already crowned. `Probe` because this
         // sweep has NOT paid for a resolve (unlike the ghost sweep, which
         // classifies its candidates from exactly that answer).
+        // Q11 atomic timing budget: the whole per-candidate adopt/declare
+        // decision — this is where the chain-head collision cost shows.
+        let adopt_declare_started = std::time::Instant::now();
         let preflight = crate::services::head_adoption::try_adopt_canonical_head(
             hc,
             pool,
@@ -295,6 +298,10 @@ pub async fn run_once(
             crate::trust::PricedVerification::inert(),
         )
         .await;
+        crate::metrics::observe_atom_duration(
+            crate::metrics::ConvergenceAtom::AdoptDeclare,
+            adopt_declare_started.elapsed(),
+        );
         let pending_adopt = match preflight {
             AdoptOutcome::Adopted => {
                 report.record(RowOutcome::Adopted);

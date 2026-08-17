@@ -1554,6 +1554,35 @@ lazy_static! {
     )
     .unwrap();
 
+    // ── Q11: ATOMIC CONVERGENCE-PATH TIMING BUDGET (operator directive 2026-08-16,
+    // minutes-quiesce plan §5/§8) ───────────────────────────────────────────────
+    //
+    // ONE histogram family for the ~8 atoms the quiesce prediction
+    // `quiesce ≈ Σ count×cost÷parallelism` is built from: `put_record`,
+    // `inventory_page`, `head_batch_per_id`, `head_record_verify`,
+    // `adopt_declare`, `shard_fetch`, `manifest_persist`, `digest_fold`. Buckets
+    // span 0.1ms (a pure fold) to 30s (a saturated conductor round-trip) on a
+    // roughly log scale, so both ends of the atom roster land inside a bucket
+    // rather than pinning the tail.
+    //
+    // `head_batch_per_id` is DERIVED, not double-instrumented: the batched head
+    // externs already carry `elapsed_ms` (`HeadBatchResolver`,
+    // `elohim_head_batch_queue_wait_ms`) — this series records that same
+    // in-wasm time divided by the ids it covered, which is what the budget
+    // table's per-atom "cost" column needs (a per-call number, not a per-batch
+    // one) without a second `Instant` wrapping the same round-trip.
+    pub static ref ATOM_DURATION_MS: HistogramVec = HistogramVec::new(
+        HistogramOpts::new(
+            "elohim_atom_duration_ms",
+            "Wall-clock cost of one convergence-path atom (Q11 atomic timing budget), by atom.",
+        )
+        .buckets(vec![
+            0.1, 0.5, 1.0, 5.0, 25.0, 100.0, 500.0, 1_000.0, 5_000.0, 15_000.0, 30_000.0,
+        ]),
+        &["atom"],
+    )
+    .unwrap();
+
     // ── CONDUCTOR ADMISSION — the capacity contract's own instruments ─────────
     //
     // Read these together with `elohim_node_db_max_readers`. Before this gate
@@ -1991,6 +2020,19 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(BLOB_SWARM_MANIFESTS_RECEIVED.clone()));
         let _ = REGISTRY.register(Box::new(BLOB_SWARM_SHARDS_FETCHED.clone()));
         let _ = REGISTRY.register(Box::new(BLOB_SWARM_COMPOSITE_COMPLETED.clone()));
+        let _ = REGISTRY.register(Box::new(ATOM_DURATION_MS.clone()));
+        // Pre-touch all 8 atoms so a run that has never hit one (e.g. no
+        // `shard_fetch` on a mesh with no >16MB blob) reads as a MEASURED zero,
+        // not an absent series — the same "measured vs never-deployed"
+        // distinction `TRUST_PRICED_ADOPTIONS` pre-touches for.
+        {
+            use seam_contracts::ReasonLabel as _;
+            for atom in ConvergenceAtom::ALL {
+                ATOM_DURATION_MS
+                    .with_label_values(&[atom.label()])
+                    .observe(0.0);
+            }
+        }
     });
 }
 
@@ -2042,6 +2084,84 @@ pub fn set_head_batch_size(extern_name: &'static str, size: usize) {
 /// Count a single-id fallback (the conductor cannot serve the batch externs).
 pub fn inc_head_batch_fallback(why: &str) {
     HEAD_BATCH_FALLBACK.with_label_values(&[why]).inc();
+}
+
+// ── Q11: convergence-path atoms — the label vocabulary of [`ATOM_DURATION_MS`] ─
+
+/// The convergence-path atoms Q11's budget table sums over. Closed vocabulary,
+/// kept separate from any call-site type for the same reason every other label
+/// enum in this file is: `metrics` owns the wire string `/metrics` shows, so a
+/// rename is a deliberate decision here, never a silent series rename.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConvergenceAtom {
+    /// One `kademlia.put_record` on the drain ticker
+    /// (`p2p::mod::ElohimP2P::drain_publish_queue`).
+    PutRecord,
+    /// One `ProjectionInventory` page fetch — per peer, per table
+    /// (`projection_reconcile`'s discovery legs).
+    InventoryPage,
+    /// One id's share of a batched head-plane extern round-trip
+    /// (`elapsed_ms / ids`) — DERIVED from the batch resolver's own timing, not
+    /// a second `Instant` around the same call.
+    HeadBatchPerId,
+    /// One `ContentHeadRecord` verify RPC (`head_record_client::PeerHeadRecordFetcher`).
+    HeadRecordVerify,
+    /// One `try_adopt_canonical_head` per-candidate decision — the atom where
+    /// the chain-head collision cost shows under fan-out.
+    AdoptDeclare,
+    /// One shard fetch race (`blob_swarm::fetch_shards_via_swarm`'s per-shard
+    /// `race_fetch`).
+    ShardFetch,
+    /// One `shard_manifests::upsert_manifest` durable write + read-back.
+    ManifestPersist,
+    /// One `digest_of_entry_lines` fold — pure, expected sub-millisecond.
+    DigestFold,
+}
+
+impl seam_contracts::ReasonLabel for ConvergenceAtom {
+    const ALL: &'static [Self] = &[
+        ConvergenceAtom::PutRecord,
+        ConvergenceAtom::InventoryPage,
+        ConvergenceAtom::HeadBatchPerId,
+        ConvergenceAtom::HeadRecordVerify,
+        ConvergenceAtom::AdoptDeclare,
+        ConvergenceAtom::ShardFetch,
+        ConvergenceAtom::ManifestPersist,
+        ConvergenceAtom::DigestFold,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            ConvergenceAtom::PutRecord => "put_record",
+            ConvergenceAtom::InventoryPage => "inventory_page",
+            ConvergenceAtom::HeadBatchPerId => "head_batch_per_id",
+            ConvergenceAtom::HeadRecordVerify => "head_record_verify",
+            ConvergenceAtom::AdoptDeclare => "adopt_declare",
+            ConvergenceAtom::ShardFetch => "shard_fetch",
+            ConvergenceAtom::ManifestPersist => "manifest_persist",
+            ConvergenceAtom::DigestFold => "digest_fold",
+        }
+    }
+}
+
+/// Record one convergence-path atom's wall-clock cost. The only function that
+/// touches [`ATOM_DURATION_MS`], so a new call site never imports `prometheus`
+/// directly — pass the already-elapsed [`std::time::Duration`].
+pub fn observe_atom_duration(atom: ConvergenceAtom, elapsed: std::time::Duration) {
+    use seam_contracts::ReasonLabel as _;
+    ATOM_DURATION_MS
+        .with_label_values(&[atom.label()])
+        .observe(elapsed.as_secs_f64() * 1_000.0);
+}
+
+/// Same, taking an already-computed millisecond value — for `head_batch_per_id`,
+/// which is a DERIVED share (`elapsed_ms / ids`) rather than a `Duration`
+/// measured fresh at the call site.
+pub fn observe_atom_duration_ms(atom: ConvergenceAtom, ms: f64) {
+    use seam_contracts::ReasonLabel as _;
+    ATOM_DURATION_MS
+        .with_label_values(&[atom.label()])
+        .observe(ms);
 }
 
 // ── Conductor-admission typed setters ────────────────────────────────────────
@@ -3982,6 +4102,91 @@ mod tests {
         assert!(text.contains("outcome=\"no_election\""), "{text}");
         assert!(text.contains("outcome=\"resolve_error\""), "{text}");
         assert!(text.contains("outcome=\"no_courier\""), "{text}");
+    }
+
+    // ── Q11: atomic convergence-path timing budget ───────────────────────────
+
+    /// All 8 atoms must exist in the scrape from registration alone, same
+    /// discipline as `TRUST_PRICED_ADOPTIONS` above: a run that never hits one
+    /// atom (e.g. `shard_fetch` on a mesh with no >16MB blob) must read as a
+    /// MEASURED zero, not an absent series — the distinction the budget table's
+    /// `count × cost` terms depend on (zero cost from zero occurrences is a
+    /// real reading; a missing series is an unasked question). Iterating
+    /// `ConvergenceAtom::ALL` (rather than a literal list) means a 9th atom
+    /// cannot be added to the enum without also being pre-touched here.
+    #[test]
+    fn atom_duration_all_eight_atoms_are_pretouched_at_boot() {
+        use seam_contracts::ReasonLabel as _;
+        register_all();
+
+        let text = gather_text();
+        assert!(
+            text.contains("elohim_atom_duration_ms_bucket"),
+            "Q11 atom-duration histogram missing:\n{text}"
+        );
+        for atom in ConvergenceAtom::ALL {
+            assert!(
+                text.contains(&format!("atom=\"{}\"", atom.label())),
+                "Q11 atom {:?} not pre-touched at registration — an absent series is \
+                 indistinguishable from an atom nobody ever wired up:\n{text}",
+                atom.label()
+            );
+        }
+        // Exactly 8 — the plan names the atom roster closed, not open-ended.
+        assert_eq!(ConvergenceAtom::ALL.len(), 8);
+    }
+
+    /// Both recording paths land in the SAME series: a `Duration` measured at
+    /// a call site, and a derived millisecond share (`head_batch_per_id`).
+    #[test]
+    fn observe_atom_duration_and_ms_share_the_same_series() {
+        register_all();
+        observe_atom_duration(
+            ConvergenceAtom::PutRecord,
+            std::time::Duration::from_millis(7),
+        );
+        observe_atom_duration_ms(ConvergenceAtom::HeadBatchPerId, 3.5);
+
+        let text = gather_text();
+        assert!(text.contains("atom=\"put_record\""), "{text}");
+        assert!(text.contains("atom=\"head_batch_per_id\""), "{text}");
+    }
+
+    /// The digest-fold smoke test: `digest_of_entry_lines` (pure, expected
+    /// sub-millisecond) must actually record a sample when invoked — the
+    /// atom this sprint expects to stay near-zero, proven rather than assumed.
+    #[test]
+    fn digest_fold_atom_records_a_timing_sample() {
+        use seam_contracts::ReasonLabel as _;
+        register_all();
+
+        let before = digest_fold_sample_count(&gather_text());
+        let _ = crate::p2p::reconcile_rails::digest_of_entry_lines(vec![
+            "a=1".to_string(),
+            "b=2".to_string(),
+        ]);
+        let after = digest_fold_sample_count(&gather_text());
+
+        assert!(
+            after > before,
+            "digest_of_entry_lines must record a {:?} sample: before={before} after={after}",
+            ConvergenceAtom::DigestFold.label()
+        );
+    }
+
+    /// Parse the `elohim_atom_duration_ms_count{atom="digest_fold"}` sample
+    /// count out of a `/metrics` scrape. Tests run in parallel threads of ONE
+    /// process against a process-global registry, so this reads the counter
+    /// rather than asserting an absolute value.
+    fn digest_fold_sample_count(text: &str) -> u64 {
+        text.lines()
+            .find(|l| {
+                l.starts_with("elohim_atom_duration_ms_count") && l.contains("atom=\"digest_fold\"")
+            })
+            .and_then(|l| l.rsplit(' ').next())
+            .and_then(|v| v.parse::<f64>().ok())
+            .map(|v| v as u64)
+            .unwrap_or(0)
     }
 
     #[test]

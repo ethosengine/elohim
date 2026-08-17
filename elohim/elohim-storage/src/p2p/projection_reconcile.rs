@@ -409,7 +409,15 @@ const MAX_ROW_RETRIES: u32 = 2;
 /// conductor client's own ~60s WS timeout: a wedged call is abandoned fast and
 /// retried (or the next row attempted) rather than burning ~60s of the leg budget
 /// on a single hung row. `HcClient::call_zome` has no timeout of its own.
-const HEAL_ATTEMPT_TIMEOUT: Duration = Duration::from_secs(15);
+///
+/// 25s, not 15s (2026-08-16, with the extern-budget raise): it must outlast
+/// `BATCH_EXTERN_BUDGET` (12s) PLUS one in-flight id's worst-case overshoot
+/// (~10s read-permit acquire) — the coordinator checks its deadline per-id, so
+/// a legitimately-working extern can run to budget + one saturated id before
+/// returning partial results, and a caller timeout inside that window would
+/// discard them. Pinned by
+/// [`tests::the_extern_budget_outlasts_a_saturated_read_permit_acquire`].
+const HEAL_ATTEMPT_TIMEOUT: Duration = Duration::from_secs(25);
 
 /// Stable marker embedded in the SYNTHETIC per-attempt timeout this module
 /// manufactures when `tokio::time::timeout` elapses on a heal call. Used both to
@@ -418,8 +426,8 @@ const HEAL_ATTEMPT_TIMEOUT: Duration = Duration::from_secs(15);
 const HEAL_SYNTHETIC_TIMEOUT_MARKER: &str = "heal conductor call exceeded per-attempt timeout";
 
 /// Consecutive NEVER-ANSWERED calls that OPEN the leg circuit and shed the
-/// remainder of the leg. At the 15s per-attempt deadline a hung-call streak is
-/// ~45s of leg budget spent proving the conductor is not answering; past that,
+/// remainder of the leg. At the 25s per-attempt deadline a hung-call streak is
+/// ~75s of leg budget spent proving the conductor is not answering; past that,
 /// further rows only stack more abandoned-but-still-executing calls on it. A
 /// dead-socket streak costs milliseconds instead of seconds and opens for the
 /// same reason: the calls are not reaching a conductor at all.
@@ -520,15 +528,17 @@ fn head_batch_budget_current() -> usize {
         })
 }
 
-/// Fold one observed ADMISSION wait into the controller.
+/// Fold one COMPLETED batch call into the controller.
 ///
-/// Callers pass `resolution.admission_wait`, not `resolution.queue_wait` — see
+/// Callers pass `resolution.admission_wait` (not `resolution.queue_wait` — see
 /// [`crate::p2p::reconcile_rails::AdaptiveBatchBudget::observe`] for why the
-/// latter is the wrong sign of signal.
-fn head_batch_budget_observe(admission_wait: Duration) {
+/// latter is the wrong sign of signal) AND `resolution.unattempted.len()`: a
+/// call whose tail the coordinator refused must not read as headroom — see
+/// [`crate::p2p::reconcile_rails::AdaptiveBatchBudget::observe_batch_outcome`].
+fn head_batch_budget_observe(admission_wait: Duration, unattempted: usize) {
     if let Ok(mut g) = HEAD_BATCH_BUDGET.lock() {
         g.get_or_insert_with(crate::p2p::reconcile_rails::AdaptiveBatchBudget::default)
-            .observe(admission_wait);
+            .observe_batch_outcome(admission_wait, unattempted);
     }
 }
 
@@ -2426,6 +2436,9 @@ async fn witness_ghost_anchors(
             //                       at the worst possible moment (a conductor that
             //                       had just failed a batch call).
             let election_resolve = election_resolve_for(&elections, id);
+            // Q11 atomic timing budget: the whole per-candidate adopt/declare
+            // decision — this is where the chain-head collision cost shows.
+            let adopt_declare_started = std::time::Instant::now();
             let preflight = crate::services::head_adoption::try_adopt_canonical_head(
                 hc,
                 pool,
@@ -2443,6 +2456,10 @@ async fn witness_ghost_anchors(
                 crate::trust::PricedVerification::inert(),
             )
             .await;
+            crate::metrics::observe_atom_duration(
+                crate::metrics::ConvergenceAtom::AdoptDeclare,
+                adopt_declare_started.elapsed(),
+            );
             let pending_adopt = match preflight {
                 crate::services::head_adoption::AdoptOutcome::Adopted => {
                     adopted += 1;
@@ -2679,7 +2696,15 @@ async fn discover_rea(
             inventory_offset: Some(sweep_offset),
             head_corpus_digest: None,
         };
-        let resp = match p2p.view_federate(peer_id, request, PEER_TIMEOUT).await {
+        // Q11 atomic timing budget: the inventory-page RPC itself, per peer
+        // per table — timed regardless of outcome (a timeout is a real cost).
+        let inventory_page_started = std::time::Instant::now();
+        let call_result = p2p.view_federate(peer_id, request, PEER_TIMEOUT).await;
+        crate::metrics::observe_atom_duration(
+            crate::metrics::ConvergenceAtom::InventoryPage,
+            inventory_page_started.elapsed(),
+        );
+        let resp = match call_result {
             Ok(r) => r,
             Err(_) => continue, // peer offline/timeout — discovery is best-effort
         };
@@ -3314,7 +3339,15 @@ async fn discover_content(
             inventory_offset: Some(sweep_offset),
             head_corpus_digest: requester_head_corpus_digest.clone(),
         };
-        let resp = match p2p.view_federate(peer_id, request, PEER_TIMEOUT).await {
+        // Q11 atomic timing budget: the inventory-page RPC itself, per peer
+        // per table — timed regardless of outcome (a timeout is a real cost).
+        let inventory_page_started = std::time::Instant::now();
+        let call_result = p2p.view_federate(peer_id, request, PEER_TIMEOUT).await;
+        crate::metrics::observe_atom_duration(
+            crate::metrics::ConvergenceAtom::InventoryPage,
+            inventory_page_started.elapsed(),
+        );
+        let resp = match call_result {
             Ok(r) => r,
             Err(_) => continue, // peer offline/timeout — discovery is best-effort
         };
@@ -3895,7 +3928,7 @@ async fn heal_content(
                 continue;
             }
         };
-        head_batch_budget_observe(resolution.admission_wait);
+        head_batch_budget_observe(resolution.admission_wait, resolution.unattempted.len());
         crate::metrics::observe_head_batch_call(
             HEAD_BATCH_EXTERN_HEADS,
             if resolution.via_single_id_fallback {
@@ -3906,6 +3939,15 @@ async fn heal_content(
             chunk.len(),
             resolution.queue_wait,
         );
+        // Q11 atomic timing budget: DERIVED from the resolution's own
+        // `elapsed_ms`, never a second `Instant` around the same round-trip —
+        // one id's share of the batch's in-wasm time.
+        if !chunk.is_empty() {
+            crate::metrics::observe_atom_duration_ms(
+                crate::metrics::ConvergenceAtom::HeadBatchPerId,
+                f64::from(resolution.elapsed_ms) / chunk.len() as f64,
+            );
+        }
         // ── UNATTEMPTED: NEVER STARTED, NEVER A FAILURE ──────────────────────
         //
         // These ids are left in `pending` untouched. `mark_failed` here is THE
@@ -4817,7 +4859,10 @@ async fn adopt_deferred_heads(
             // it) or "the batch never answered for it" — both correctly become
             // `unresolved()`, which is the old `Err` routing, never a claim.
             let election_resolve = election_resolve_for(elections_ref, id);
-            match crate::services::head_adoption::try_adopt_canonical_head(
+            // Q11 atomic timing budget: the whole per-candidate adopt/declare
+            // decision — this is where the chain-head collision cost shows.
+            let adopt_declare_started = std::time::Instant::now();
+            let adopt_outcome = crate::services::head_adoption::try_adopt_canonical_head(
                 hc,
                 pool,
                 app_ctx_ref,
@@ -4831,8 +4876,12 @@ async fn adopt_deferred_heads(
                 // write path is unchanged either way.
                 pricing_ref.for_id(id),
             )
-            .await
-            {
+            .await;
+            crate::metrics::observe_atom_duration(
+                crate::metrics::ConvergenceAtom::AdoptDeclare,
+                adopt_declare_started.elapsed(),
+            );
+            match adopt_outcome {
                 crate::services::head_adoption::AdoptOutcome::Adopted => {
                     adopted_ref.fetch_add(1, Ordering::Relaxed);
                 }
@@ -5023,7 +5072,7 @@ async fn batch_probe_elections(
     while let Some((chunk, attempt)) = probes.next().await {
         match attempt.result {
             Ok(resolution) => {
-                head_batch_budget_observe(resolution.admission_wait);
+                head_batch_budget_observe(resolution.admission_wait, resolution.unattempted.len());
                 crate::metrics::observe_head_batch_call(
                     HEAD_BATCH_EXTERN_ELECTIONS,
                     if resolution.via_single_id_fallback {
@@ -5034,6 +5083,14 @@ async fn batch_probe_elections(
                     chunk.len(),
                     resolution.queue_wait,
                 );
+                // Q11 atomic timing budget: same derivation as the heads sweep
+                // — one id's share of this call's in-wasm `elapsed_ms`.
+                if !chunk.is_empty() {
+                    crate::metrics::observe_atom_duration_ms(
+                        crate::metrics::ConvergenceAtom::HeadBatchPerId,
+                        f64::from(resolution.elapsed_ms) / chunk.len() as f64,
+                    );
+                }
                 crate::metrics::add_head_batch_unattempted(
                     HEAD_BATCH_EXTERN_ELECTIONS,
                     resolution.stop_reason.as_ref().map_or(
@@ -5384,7 +5441,15 @@ async fn discover_collectives(
             inventory_offset: Some(sweep_offset),
             head_corpus_digest: None,
         };
-        let resp = match p2p.view_federate(peer_id, request, PEER_TIMEOUT).await {
+        // Q11 atomic timing budget: the inventory-page RPC itself, per peer
+        // per table — timed regardless of outcome (a timeout is a real cost).
+        let inventory_page_started = std::time::Instant::now();
+        let call_result = p2p.view_federate(peer_id, request, PEER_TIMEOUT).await;
+        crate::metrics::observe_atom_duration(
+            crate::metrics::ConvergenceAtom::InventoryPage,
+            inventory_page_started.elapsed(),
+        );
+        let resp = match call_result {
             Ok(r) => r,
             Err(_) => continue, // peer offline/timeout — discovery is best-effort
         };
@@ -5942,7 +6007,17 @@ pub async fn reconcile_shard_locations_from_peers(p2p: &P2PHandle, pool: &DbPool
             inventory_offset: None,
             head_corpus_digest: None,
         };
-        let resp = match p2p.view_federate(peer_id, request, PEER_TIMEOUT).await {
+        // Q11 atomic timing budget: same inventory-page atom as the wired
+        // discovery legs above (this one is dormant — see the doc comment on
+        // `reconcile_shard_locations_from_peers` — but the RPC shape and cost
+        // are identical, so it feeds the same series).
+        let inventory_page_started = std::time::Instant::now();
+        let call_result = p2p.view_federate(peer_id, request, PEER_TIMEOUT).await;
+        crate::metrics::observe_atom_duration(
+            crate::metrics::ConvergenceAtom::InventoryPage,
+            inventory_page_started.elapsed(),
+        );
+        let resp = match call_result {
             Ok(r) => r,
             Err(_) => continue, // peer offline/timeout — catch-up is best-effort
         };
@@ -7834,6 +7909,58 @@ mod tests {
                  unattempted"
             );
         }
+    }
+
+    /// The saturated-conductor band, as a test (2026-08-16, matthew 0/hr):
+    /// `get_links` → `cascading()` blocks on a semaphore-gated read permit with
+    /// a 10s `ACQUIRE_TIMEOUT_MS` (documented at the coordinator's
+    /// `batch_deadline_admission`), so on a saturated conductor ONE id can cost
+    /// ~10s. A 4s extern budget therefore admitted id #0, blew the whole budget
+    /// on it, and refused ids #1..N — every call `budget_exhausted`, healed
+    /// 0/hr, forever. Three bounds make the batch plane survive that regime:
+    ///
+    /// 1. budget > 10s — a second id is admitted even when the first ate a full
+    ///    permit-acquire timeout, so a batch is never structurally reduced to a
+    ///    single-id call;
+    /// 2. budget ≤ the coordinator's 15s `BATCH_BUDGET_CEILING_MS` — asking for
+    ///    more is silently clamped, which would make this constant a lie;
+    /// 3. attempt_timeout > budget + 10s — the coordinator's admission overshoot
+    ///    is bounded by exactly one in-flight id (per-id `sys_time()` checks),
+    ///    so the caller-side timeout must outlast budget + one worst-case id or
+    ///    it fires on a legitimately-working extern and manufactures a synthetic
+    ///    failure out of a call that was about to return partial results.
+    #[test]
+    fn the_extern_budget_outlasts_a_saturated_read_permit_acquire() {
+        // The conductor's `ACQUIRE_TIMEOUT_MS` on the cascading read-permit
+        // semaphore — the worst-case cost of ONE id on a saturated conductor.
+        let read_permit_acquire = Duration::from_secs(10);
+        // The coordinator's `BATCH_BUDGET_CEILING_MS` clamp.
+        let coordinator_ceiling = Duration::from_millis(15_000);
+
+        let pacing = HealPacing::default();
+        assert!(
+            pacing.batch_extern_budget > read_permit_acquire,
+            "extern budget {:?} must outlast one saturated permit-acquire ({:?}) \
+             or a saturated conductor degenerates every batch to one attempted id",
+            pacing.batch_extern_budget,
+            read_permit_acquire,
+        );
+        assert!(
+            pacing.batch_extern_budget <= coordinator_ceiling,
+            "extern budget {:?} above the coordinator ceiling {:?} is silently \
+             clamped — the constant would lie about the deadline actually enforced",
+            pacing.batch_extern_budget,
+            coordinator_ceiling,
+        );
+        assert!(
+            pacing.attempt_timeout > pacing.batch_extern_budget + read_permit_acquire,
+            "attempt_timeout {:?} must exceed extern budget {:?} + one in-flight \
+             id's worst-case overshoot ({:?}) — otherwise the caller-side timeout \
+             fires on a legitimately-working extern and discards its partial results",
+            pacing.attempt_timeout,
+            pacing.batch_extern_budget,
+            read_permit_acquire,
+        );
     }
 
     /// The concurrency half of the write-guard constraint, as a test: the batch

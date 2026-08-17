@@ -107,11 +107,18 @@ impl HeadRecordFetcher for PeerHeadRecordFetcher {
             head_corpus_digest: None,
         };
 
-        let resp = match self
+        // Q11 atomic timing budget: the ContentHeadRecord verify RPC itself,
+        // timed regardless of outcome (a timeout is a real per-id cost).
+        let head_record_verify_started = std::time::Instant::now();
+        let call_result = self
             .p2p
             .view_federate(peer, request, HEAD_RECORD_TIMEOUT)
-            .await
-        {
+            .await;
+        crate::metrics::observe_atom_duration(
+            crate::metrics::ConvergenceAtom::HeadRecordVerify,
+            head_record_verify_started.elapsed(),
+        );
+        let resp = match call_result {
             Ok(r) => r,
             Err(e) => {
                 // Covers BOTH "peer is offline/slow" and "peer is too old to

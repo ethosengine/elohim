@@ -76,13 +76,22 @@ use crate::services::conductor_writes::{
 
 /// Default in-wasm deadline handed to the batch externs.
 ///
-/// Mirrors the coordinator's `BATCH_BUDGET_DEFAULT_MS`. It MUST stay strictly
-/// below `HealPacing::attempt_timeout` (15s): the extern bounds itself from the
+/// 12s, deliberately ABOVE the conductor's 10s read-permit `ACQUIRE_TIMEOUT_MS`
+/// and below its 15s `BATCH_BUDGET_CEILING_MS` (2026-08-16, matthew 0/hr): on a
+/// saturated conductor `get_links` → `cascading()` can spend ~10s blocked on a
+/// read permit, so the earlier 4s mirror of `BATCH_BUDGET_DEFAULT_MS` admitted
+/// id #0, blew the whole budget on it, and refused the rest — ~8 `unattempted`
+/// per call, healed 0/hr, with 11s of coordinator-permitted headroom unused.
+/// This budget guarantees a second id is admitted even in that regime.
+///
+/// It MUST stay strictly below `HealPacing::attempt_timeout` — with margin for
+/// one in-flight id's overshoot — because the extern bounds itself from the
 /// inside and returns partial results, whereas the caller-side timeout leaves
 /// the conductor executing with nobody listening (`HcClient::call_zome` has no
 /// cancellation). Pinned by
-/// `projection_reconcile::tests::the_attempt_timeout_stays_above_the_extern_budget`.
-pub const BATCH_EXTERN_BUDGET: Duration = Duration::from_secs(4);
+/// `projection_reconcile::tests::the_attempt_timeout_stays_above_the_extern_budget`
+/// and `…::the_extern_budget_outlasts_a_saturated_read_permit_acquire`.
+pub const BATCH_EXTERN_BUDGET: Duration = Duration::from_secs(12);
 
 /// One id's answer from a batch call.
 ///

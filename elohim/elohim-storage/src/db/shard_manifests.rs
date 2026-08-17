@@ -92,15 +92,25 @@ pub fn upsert_manifest(
     conn: &mut SqliteConnection,
     manifest: &NewShardManifest,
 ) -> Result<ShardManifestRow, StorageError> {
-    diesel::replace_into(shard_manifests::table)
-        .values(manifest)
-        .execute(conn)?;
+    // Q11 atomic timing budget: the durable write + read-back, the whole
+    // "manifest persist" atom every generation/receipt path shares.
+    let manifest_persist_started = std::time::Instant::now();
+    let result: Result<ShardManifestRow, StorageError> = (|| {
+        diesel::replace_into(shard_manifests::table)
+            .values(manifest)
+            .execute(conn)?;
 
-    shard_manifests::table
-        .filter(shard_manifests::content_id.eq(manifest.content_id))
-        .filter(shard_manifests::h_app_id.eq(manifest.h_app_id))
-        .first(conn)
-        .map_err(StorageError::from)
+        shard_manifests::table
+            .filter(shard_manifests::content_id.eq(manifest.content_id))
+            .filter(shard_manifests::h_app_id.eq(manifest.h_app_id))
+            .first(conn)
+            .map_err(StorageError::from)
+    })();
+    crate::metrics::observe_atom_duration(
+        crate::metrics::ConvergenceAtom::ManifestPersist,
+        manifest_persist_started.elapsed(),
+    );
+    result
 }
 
 pub fn get_manifest(

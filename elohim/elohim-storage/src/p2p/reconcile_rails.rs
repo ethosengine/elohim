@@ -26,6 +26,9 @@ use std::time::Duration;
 /// test forbids a `sha2` dependency.
 pub fn digest_of_entry_lines(mut entries: Vec<String>) -> String {
     use sha2::{Digest, Sha256};
+    // Q11 atomic timing budget: the whole fold. Pure and expected
+    // sub-millisecond — the histogram exists to PROVE that, not assume it.
+    let digest_fold_started = std::time::Instant::now();
     entries.sort();
     let mut h = Sha256::new();
     for e in &entries {
@@ -38,7 +41,12 @@ pub fn digest_of_entry_lines(mut entries: Vec<String>) -> String {
         h.update(e.as_bytes());
         h.update(b"\n");
     }
-    format!("sha256:{:x}", h.finalize())
+    let digest = format!("sha256:{:x}", h.finalize());
+    crate::metrics::observe_atom_duration(
+        crate::metrics::ConvergenceAtom::DigestFold,
+        digest_fold_started.elapsed(),
+    );
+    digest
 }
 
 /// Generic gap state machine: known-local / pending / completed / failed(retries).
@@ -365,6 +373,30 @@ impl AdaptiveBatchBudget {
         self.current
     }
 
+    /// Fold one COMPLETED batch call into the controller: the partial-Ok arm.
+    ///
+    /// A call can be admitted instantly (empty local gate) and still attempt
+    /// almost nothing — the coordinator's in-wasm deadline refuses the tail
+    /// (`budget_exhausted`), or its id ceiling does. Feeding only
+    /// `admission_wait` read exactly that call as headroom → additive increase:
+    /// the controller GREW on the strongest evidence it should shrink. This is
+    /// the same defect class as the once-silent `Err` arm
+    /// ([`Self::observe_call_failure`]) — there the controller heard nothing;
+    /// here it heard the wrong half of the story.
+    ///
+    /// A refused tail (`unattempted > 0`) takes the decrease path regardless of
+    /// admission wait; a fully-attempted call folds `admission_wait` as before.
+    /// One control law either way ([`Self::next_size`]).
+    ///
+    /// **Contract test:** `a_budget_starved_batch_shrinks_even_with_instant_admission`.
+    pub fn observe_batch_outcome(&mut self, admission_wait: Duration, unattempted: usize) {
+        if unattempted > 0 {
+            self.observe_call_failure();
+        } else {
+            self.observe(admission_wait);
+        }
+    }
+
     /// Fold one observed queue-wait into the controller.
     ///
     /// The caller supplies the ADMISSION wait
@@ -486,6 +518,39 @@ mod tests {
         // Repeated failures walk it to the floor and stop there — never below.
         for _ in 0..10 {
             b.observe_call_failure();
+        }
+        assert_eq!(b.current(), BATCH_SIZE_FLOOR);
+    }
+
+    #[test]
+    fn a_budget_starved_batch_shrinks_even_with_instant_admission() {
+        // The partial-Ok blind spot: a call can be ADMITTED instantly (local
+        // gate empty) and still attempt almost nothing because the coordinator's
+        // in-wasm deadline refused the tail (`budget_exhausted`). Feeding only
+        // `admission_wait` reads that call as headroom → additive increase —
+        // growth on the exact evidence that should shrink it.
+        let mut b = AdaptiveBatchBudget::new(8, 128, BATCH_QUEUE_WAIT_THRESHOLD, 16);
+        b.observe(Duration::ZERO); // 8 → 24
+        b.observe(Duration::ZERO); // 24 → 40
+        assert_eq!(b.current(), 40);
+
+        // Instant admission + a refused tail must take the DECREASE path.
+        b.observe_batch_outcome(Duration::ZERO, 32);
+        assert_eq!(
+            b.current(),
+            20,
+            "a batch with a refused (unattempted) tail must halve even when \
+             admission was instant — the coordinator declining ids IS the \
+             backpressure signal"
+        );
+
+        // With no refused tail the same call folds admission_wait as before.
+        b.observe_batch_outcome(Duration::ZERO, 0);
+        assert_eq!(b.current(), 36, "a fully-attempted batch keeps the AI path");
+
+        // Repeated starvation walks to the floor and never below.
+        for _ in 0..10 {
+            b.observe_batch_outcome(Duration::ZERO, 8);
         }
         assert_eq!(b.current(), BATCH_SIZE_FLOOR);
     }
