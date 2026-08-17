@@ -1,7 +1,13 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { agentKeyMatchesDiagnosticAgent, parsePrometheusMetrics } from '../surfaces.js';
+import {
+  agentKeyMatchesDiagnosticAgent,
+  getRawRidingCatchUp,
+  parsePrometheusMetrics,
+  CATCHUP_RIDE_MAX_INTERVAL_MS,
+  CATCHUP_RIDE_TIMEOUT_MS,
+} from '../surfaces.js';
 
 void describe('parsePrometheusMetrics', () => {
   void it('parses a plain metric line', () => {
@@ -93,5 +99,113 @@ void describe('agentKeyMatchesDiagnosticAgent', () => {
     assert.equal(agentKeyMatchesDiagnosticAgent(humanKey, '12D3KooWtransport'), false);
     // A too-short humans value can't carry prefix+core.
     assert.equal(agentKeyMatchesDiagnosticAgent('uhCAkshort', diagAgent), false);
+  });
+});
+
+/* eslint-disable @typescript-eslint/require-await -- the injected fetch/sleep stubs carry async signatures by contract but resolve synchronously under the fake clock */
+void describe('getRawRidingCatchUp', () => {
+  const CATCHING_UP = 'catching-up';
+  const CONTENT_URL = 'https://peer.test/db/content/x';
+  const catchingUp = (retryAfter?: number) => ({
+    status: 503,
+    text: JSON.stringify(
+      retryAfter === undefined ? { status: CATCHING_UP } : { status: CATCHING_UP, retryAfter }
+    ),
+  });
+  const ok = { status: 200, text: '{"id":"x"}' };
+
+  /** Fake clock: sleeps advance time instantly and are recorded. */
+  function fakeClock() {
+    let now = 0;
+    const sleeps: number[] = [];
+    return {
+      nowFn: () => now,
+      sleepFn: async (ms: number) => {
+        sleeps.push(ms);
+        now += ms;
+      },
+      sleeps,
+    };
+  }
+
+  void it('returns a 200 immediately without sleeping', async () => {
+    const clock = fakeClock();
+    const res = await getRawRidingCatchUp(CONTENT_URL, {
+      fetchFn: async () => ok,
+      ...clock,
+    });
+    assert.equal(res.status, 200);
+    assert.deepEqual(clock.sleeps, []);
+  });
+
+  void it('returns a 404 immediately — only the catching-up shed is ridden', async () => {
+    const clock = fakeClock();
+    const res = await getRawRidingCatchUp(CONTENT_URL, {
+      fetchFn: async () => ({ status: 404, text: 'not found' }),
+      ...clock,
+    });
+    assert.equal(res.status, 404);
+    assert.deepEqual(clock.sleeps, []);
+  });
+
+  void it('returns a non-catching-up 503 immediately — a plain outage is not ridden', async () => {
+    const clock = fakeClock();
+    const res = await getRawRidingCatchUp(CONTENT_URL, {
+      fetchFn: async () => ({ status: 503, text: 'upstream unavailable' }),
+      ...clock,
+    });
+    assert.equal(res.status, 503);
+    assert.deepEqual(clock.sleeps, []);
+  });
+
+  void it('rides a catching-up shed honoring retryAfter, then returns the 200', async () => {
+    const clock = fakeClock();
+    const responses = [catchingUp(30), ok];
+    const res = await getRawRidingCatchUp(CONTENT_URL, {
+      fetchFn: async () => responses.shift()!,
+      ...clock,
+    });
+    assert.equal(res.status, 200);
+    assert.deepEqual(clock.sleeps, [15_000]); // retryAfter=30s clamped to the interval cap
+    assert.equal(res.rodeCatchUpMs, 15_000);
+  });
+
+  void it('clamps an absent retryAfter to the interval cap', async () => {
+    const clock = fakeClock();
+    const responses = [catchingUp(), ok];
+    const res = await getRawRidingCatchUp(CONTENT_URL, {
+      fetchFn: async () => responses.shift()!,
+      ...clock,
+    });
+    assert.equal(res.status, 200);
+    assert.deepEqual(clock.sleeps, [CATCHUP_RIDE_MAX_INTERVAL_MS]);
+  });
+
+  void it('honors a small retryAfter as-is', async () => {
+    const clock = fakeClock();
+    const responses = [catchingUp(3), ok];
+    const res = await getRawRidingCatchUp(CONTENT_URL, {
+      fetchFn: async () => responses.shift()!,
+      ...clock,
+    });
+    assert.equal(res.status, 200);
+    assert.deepEqual(clock.sleeps, [3_000]);
+  });
+
+  void it('gives up at the deadline and returns the last catching-up 503 honestly', async () => {
+    const clock = fakeClock();
+    let calls = 0;
+    const res = await getRawRidingCatchUp(CONTENT_URL, {
+      fetchFn: async () => {
+        calls += 1;
+        return catchingUp(30);
+      },
+      ...clock,
+    });
+    assert.equal(res.status, 503);
+    assert.ok(res.text.includes('catching-up'));
+    // Bounded: deadline / clamped interval, +1 for the initial probe.
+    assert.equal(calls, Math.ceil(CATCHUP_RIDE_TIMEOUT_MS / CATCHUP_RIDE_MAX_INTERVAL_MS) + 1);
+    assert.ok((res.rodeCatchUpMs ?? 0) >= CATCHUP_RIDE_TIMEOUT_MS);
   });
 });

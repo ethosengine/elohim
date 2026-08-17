@@ -245,6 +245,31 @@ habits:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
       - "sweettest rea_commitment_replication (elohim/holochain/tests/sweettest — unignored 837b772c9; isolated late-join conductors, bounded 60s peer-B retrieval; RED but MIS-ATTRIBUTED per DELTA 2026-08-09 — it measures one-time cold-cell Wasm warm-up, not REA retrieval; do not read it as a fetch-seam probe until it warms peer B)"
     evidence: >
+      DELTA 2026-08-17c (saga ch05 red — same shed class as ch03, desk-proven):
+      edge #1360's ch05 co-steward-agreement red (Station A, 2p/1f) was also
+      NOT the A-side identity cluster — pin #433 (epr:elohim-host-landing,
+      active/item) and its pull rollup (caughtUp:true) held live; the red was
+      the catching-up admission shed 503 on the chain's ONE unretried read
+      (GET /api/v1/pins — "single read, not a poll" was correct for the pin
+      claim, wrong for surface availability). The pin step now rides the shed
+      via the same getRawRidingCatchUp primitive (shed-only; any other non-200
+      still fails on first read; step ceiling 105s over the 90s ride bound).
+      Live saga-profile run 3/3 PASS 2026-08-17. With ch03+ch05 reclassified,
+      the A-side identity cluster's remaining saga evidence is ch02/ch07 —
+      the identity-coherence reds stand on their own probes, not on these.
+      DELTA 2026-08-17b (saga ch03 red mis-attributed; measure hardened, desk-proven):
+      edge #1360's ch03 eprfs-upload red was NOT the A-side identity cluster —
+      the chapter's own invariants held live (blobHash attached, served head ==
+      declared sha256-7ce8…ec93 status=current); the red was the mid-run
+      catching-up admission shed (503+retryAfter while /health stays healthy —
+      runbook class, quiesce gate only covers stage START). probeContent now
+      rides the shed bounded 90s honoring retryAfter (getRawRidingCatchUp:
+      only the shed body signature is ridden; 200/404/plain-503/connect-error
+      still fail on first read; deadline expiry returns the shed 503 honestly).
+      Unit-pinned (7 new tests, 187/187 suite), gate green, live ch03 run 3/3
+      PASS. ch03 (and its step reuse in federation-deploy/served-projected-head
+      A-baselines) leaves the A-side identity cluster; the identity-coherence
+      reds stand on their own evidence. Next banked edge run is the flip proof.
       DELTA 2026-08-17 (heal cure DEPLOYED-PROVEN, edge #1360): the proof asked
       for below arrived — matthew, restored after a 13h node outage (ethosengine
       NFS-hardmount wedge, operator-fixed), drained its divergence backlog

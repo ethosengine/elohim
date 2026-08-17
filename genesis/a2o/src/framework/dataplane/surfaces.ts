@@ -749,15 +749,105 @@ export async function probeBlob(peerUrl: string, hash: string): Promise<number> 
   }
 }
 
+// ---------------------------------------------------------------------------
+// Catching-up-riding GET (resiliency-saga chapter 3 — mid-run admission shed)
+// ---------------------------------------------------------------------------
+
+/**
+ * The quiesce gate proves the fleet converged at STAGE START, but a doorway can
+ * flap back into the catching-up admission shed mid-run (503 +
+ * `{"status":"catching-up","retryAfter":30}` while /health stays healthy —
+ * runbook "Content view sheds 503 catching-up", churn invariant I6; edge #1360
+ * redded chapter 3 on exactly this). Content-materialization assertions measure
+ * a different plane than admission, so they ride the shed bounded instead of
+ * failing on the first refusal.
+ *
+ * Measurement hardening ONLY — same contract as waitForDoorwayReady: only the
+ * documented catching-up shed is ridden (matched by its own body signature);
+ * every other answer (200, 404, plain 503, connect error) propagates
+ * immediately, and on deadline expiry the last catching-up 503 is returned so
+ * the caller's assertion still fails honestly.
+ */
+export const CATCHUP_RIDE_TIMEOUT_MS = 90_000;
+export const CATCHUP_RIDE_MAX_INTERVAL_MS = 15_000;
+
+export interface RiddenRawResponse {
+  status: number;
+  text: string;
+  /** Total ms spent waiting through catching-up sheds; absent when none was hit. */
+  rodeCatchUpMs?: number;
+}
+
+/** Extract the shed body's retryAfter (seconds) as ms; undefined when absent/invalid. */
+function parseRetryAfterMs(text: string): number | undefined {
+  try {
+    const retryAfter = (JSON.parse(text) as Record<string, unknown>)['retryAfter'];
+    if (typeof retryAfter === 'number' && retryAfter > 0) return retryAfter * 1000;
+  } catch {
+    // fall through — caller uses the default interval
+  }
+  return undefined;
+}
+
+async function defaultSleep(ms: number): Promise<void> {
+  await new Promise<void>(resolve => setTimeout(resolve, ms));
+}
+
+export async function getRawRidingCatchUp(
+  url: string,
+  opts: {
+    timeoutMs?: number;
+    /** Injection seams for unit tests — production callers omit all three. */
+    fetchFn?: (url: string) => Promise<{ status: number; text: string }>;
+    sleepFn?: (ms: number) => Promise<void>;
+    nowFn?: () => number;
+  } = {}
+): Promise<RiddenRawResponse> {
+  const timeoutMs = opts.timeoutMs ?? CATCHUP_RIDE_TIMEOUT_MS;
+  const fetchFn = opts.fetchFn ?? getRaw;
+  const sleepFn = opts.sleepFn ?? defaultSleep;
+  const nowFn = opts.nowFn ?? Date.now;
+
+  const start = nowFn();
+  let rodeMs = 0;
+  for (;;) {
+    const res = await fetchFn(url);
+    const shedding = res.status === 503 && isCatchingUpBody(res.text);
+    if (!shedding) {
+      return rodeMs > 0 ? { ...res, rodeCatchUpMs: rodeMs } : res;
+    }
+    if (nowFn() - start >= timeoutMs) {
+      return { ...res, rodeCatchUpMs: rodeMs };
+    }
+    const waitMs = Math.min(
+      parseRetryAfterMs(res.text) ?? CATCHUP_RIDE_MAX_INTERVAL_MS,
+      CATCHUP_RIDE_MAX_INTERVAL_MS
+    );
+    await sleepFn(waitMs);
+    rodeMs += waitMs;
+  }
+}
+
 /**
  * GET /db/content/{id} on the given peer.
  * contentId is encoded with encodeDocId() which preserves ':' (namespace separator).
+ * Rides the bounded catching-up admission shed (getRawRidingCatchUp) — this
+ * surface asserts content materialization, not admission state.
  */
 export async function probeContent(
   peerUrl: string,
   contentId: string
 ): Promise<ProbeResult<ContentItemSurface>> {
-  return getJson<ContentItemSurface>(`${peerUrl}/db/content/${encodeDocId(contentId)}`);
+  const url = `${peerUrl}/db/content/${encodeDocId(contentId)}`;
+  const { status, text, rodeCatchUpMs } = await getRawRidingCatchUp(url);
+  if (status < 200 || status >= 300) {
+    const rode =
+      rodeCatchUpMs === undefined
+        ? ''
+        : ` (still catching-up after riding the admission shed for ${Math.round(rodeCatchUpMs / 1000)}s — runbook "Content view sheds 503 catching-up")`;
+    throw new Error(`GET ${url} returned ${status}: ${text.slice(0, 200)}${rode}`);
+  }
+  return { status, body: JSON.parse(text) as ContentItemSurface };
 }
 
 /** Result of GET /db/content/{id}/head — the notary HEAD answer. */

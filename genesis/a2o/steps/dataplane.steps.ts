@@ -126,6 +126,21 @@ Given(
   }
 );
 
+/**
+ * Documentary precondition (resiliency-saga ch03): names the deploy-time
+ * upload (the root pipeline's stageSpaBlob stage) as the prior action the
+ * scenario's Then steps verify, without repeating it. No runtime effect —
+ * the assertions carry the proof; this step exists so the Gherkin itself
+ * shows the causal chain (a Given/Then-only scenario reads as a bare state
+ * assertion with an invisible trigger).
+ */
+Given(
+  'EPR {string} was uploaded to peer {string} at deploy time',
+  function (this: E2EWorld, _eprId: string, _peerName: string) {
+    // Documentary only — the upload happened in the deploy pipeline.
+  }
+);
+
 // ---------------------------------------------------------------------------
 // When — generic surface query
 // ---------------------------------------------------------------------------
