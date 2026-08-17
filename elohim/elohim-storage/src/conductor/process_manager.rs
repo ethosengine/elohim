@@ -17,6 +17,33 @@ use tracing::{error, info, warn};
 
 const DB_POOL_SATURATION_MARKER: &str = "Database read connection is saturated. Util ";
 
+/// Default CPU niceness for the spawned conductor child.
+///
+/// Storage and the conductor share one container cgroup (elohim-node
+/// consolidation), so a conductor-side DHT storm competes head-to-head with
+/// storage's HTTP runtime for the same CPU quota. The 2026-08-17 alpha outage
+/// aftermath proved the failure shape: a sustained kitsune2 op-fetch storm
+/// pinned the shared quota at 100% CFS throttle, storage's read handlers
+/// stopped getting scheduled, the doorway breaker opened on never-answered,
+/// and every /db read shed catching-up 503s for hours while the humans rows
+/// themselves were correct. Niceness only matters under contention: an idle
+/// node still gives the conductor everything, but when the quota saturates,
+/// storage's short read handlers outweigh the conductor's churn threads and
+/// verify-locally-then-serve keeps holding.
+const CONDUCTOR_NICE_DEFAULT: i32 = 10;
+
+/// Resolve the conductor niceness from an `ELOHIM_CONDUCTOR_NICE` value.
+/// Clamped to [0, 19] — the conductor is never boosted ABOVE storage (a
+/// negative nice would need CAP_SYS_NICE anyway); unparseable input keeps the
+/// safe default.
+fn resolve_conductor_nice(raw: Option<&str>) -> i32 {
+    match raw.map(str::parse::<i32>) {
+        Some(Ok(n)) => n.clamp(0, 19),
+        Some(Err(_)) => CONDUCTOR_NICE_DEFAULT,
+        None => CONDUCTOR_NICE_DEFAULT,
+    }
+}
+
 #[derive(Debug, PartialEq)]
 struct DbPoolSaturation {
     kind: &'static str,
@@ -159,15 +186,29 @@ impl ConductorManager {
             "Starting Holochain conductor"
         );
 
-        let mut child = Command::new(&self.conductor_binary)
-            .arg("--config-path")
+        let nice = resolve_conductor_nice(std::env::var("ELOHIM_CONDUCTOR_NICE").ok().as_deref());
+        let mut cmd = Command::new(&self.conductor_binary);
+        cmd.arg("--config-path")
             .arg(&self.config_path)
             .arg("--piped")
             .env("HOLOCHAIN_DATA_DIR", &self.data_dir)
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
-            .kill_on_drop(true)
+            .kill_on_drop(true);
+        // CPU-deprioritize the conductor relative to storage's HTTP runtime in
+        // the shared cgroup (see CONDUCTOR_NICE_DEFAULT). Best-effort: a failed
+        // setpriority must never fail the spawn.
+        #[cfg(unix)]
+        if nice != 0 {
+            unsafe {
+                cmd.pre_exec(move || {
+                    libc::setpriority(libc::PRIO_PROCESS, 0, nice);
+                    Ok(())
+                });
+            }
+        }
+        let mut child = cmd
             .spawn()
             .map_err(|e| ConductorError::SpawnFailed(e.to_string()))?;
 
@@ -187,7 +228,7 @@ impl ConductorManager {
         }
 
         let pid = child.id().unwrap_or(0);
-        info!(pid = pid, "Conductor process spawned");
+        info!(pid = pid, nice = nice, "Conductor process spawned");
 
         self.child = Some(child);
         Ok(())
@@ -406,6 +447,67 @@ pub enum ConductorError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn conductor_nice_defaults_to_deprioritized_and_env_overrides() {
+        // Default: the conductor runs CPU-deprioritized so storage's HTTP reads
+        // stay schedulable inside the shared cgroup quota during DHT churn.
+        assert_eq!(resolve_conductor_nice(None), CONDUCTOR_NICE_DEFAULT);
+        // Operator override, including full disable (0) and clamping to the
+        // valid nice range.
+        assert_eq!(resolve_conductor_nice(Some("0")), 0);
+        assert_eq!(resolve_conductor_nice(Some("19")), 19);
+        assert_eq!(resolve_conductor_nice(Some("40")), 19);
+        assert_eq!(resolve_conductor_nice(Some("-7")), 0);
+        assert_eq!(
+            resolve_conductor_nice(Some("bogus")),
+            CONDUCTOR_NICE_DEFAULT
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn spawned_conductor_child_runs_at_the_resolved_niceness() {
+        use std::os::unix::fs::PermissionsExt;
+
+        // Stand-in conductor binary: a script that just sleeps, so we can read
+        // the live child's scheduling niceness from /proc.
+        let dir = std::env::temp_dir().join(format!("elohim_nice_test_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let script = dir.join("fake-conductor.sh");
+        std::fs::write(&script, "#!/bin/sh\nsleep 30\n").unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let mut mgr = ConductorManager::new(
+            script,
+            dir.join("conductor-config.yaml"),
+            dir.clone(),
+            4499,
+            Duration::from_secs(5),
+        );
+        mgr.start().unwrap();
+        let pid = mgr.child_pid().expect("child pid after start");
+
+        // pre_exec runs between fork and exec; give the child a moment.
+        sleep(Duration::from_millis(200)).await;
+
+        let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).unwrap();
+        // nice is the 17th field after the ")" that closes the comm name.
+        let after_comm = stat.rsplit_once(')').unwrap().1;
+        let nice: i32 = after_comm
+            .split_whitespace()
+            .nth(16)
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert_eq!(
+            nice, CONDUCTOR_NICE_DEFAULT,
+            "conductor child must run at the deprioritized default niceness"
+        );
+
+        mgr.stop().await.unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn child_pid_is_none_before_start() {
