@@ -463,6 +463,47 @@ enum BlobHealOutcome {
     Syncing { started: bool },
 }
 
+/// Outcome of [`HttpServer::read_local_blob`] — the ONE local-read answer every
+/// blob-serving path shares.
+///
+/// A blob we hold locally can be on disk in either of two shapes, and every
+/// caller must accept both:
+///
+/// - **As manifest-named shards.** `put_blob_bytes` stores each shard under its
+///   own hash and never stores the composite under its own name, so a raw
+///   `BlobStore` probe on the composite of a `>16MB` blob always answers
+///   "absent" for bytes we fully hold.
+/// - **Whole, under its own name.** A composite healed from a peer is persisted
+///   by `finalize_fetch_success` after reassembly (and a small blob is always
+///   this shape), while the shards a manifest row names may never have arrived.
+///
+/// Checking only one shape is how `/blob` and the `/apps` resolver came to
+/// disagree about the same bytes.
+#[derive(Debug)]
+enum LocalBlobRead {
+    /// Bytes we hold. `manifest` is carried when one participated in the read so
+    /// the `/blob` route can keep reporting the recorded mime type and ETag.
+    /// Boxed: a `ShardManifest` is an order of magnitude larger than the other
+    /// variants, and every local read moves this enum.
+    Bytes {
+        bytes: Vec<u8>,
+        manifest: Option<Box<ShardManifest>>,
+    },
+    /// A manifest resolved, a shard it names is absent, and the composite is not
+    /// held whole either. Carries the gap so callers name the missing shard
+    /// instead of reporting the composite as simply absent — AND the manifest
+    /// itself, because this is the variant that precedes a peer heal: the bytes
+    /// a peer supplies are described by exactly this manifest, so its mime type
+    /// must reach the response rather than being recomputed or dropped.
+    MissingShard {
+        manifest: Box<ShardManifest>,
+        index: usize,
+        shard_hash: String,
+    },
+    /// No manifest and no bytes under this address.
+    Absent,
+}
+
 /// The two finalize failure legs the `/blob` route distinguishes, each with its
 /// own 503 body (preserved verbatim from the pre-refactor handler).
 #[derive(Debug)]
@@ -2622,6 +2663,96 @@ impl HttpServer {
         Ok(data)
     }
 
+    /// Read a blob from local storage, whatever shape it is held in.
+    ///
+    /// This is the single local-read seam behind `GET /blob/{hash}` and the
+    /// `/apps/{slug}` resolver (via `get_blob_or_heal`). Both shapes are tried:
+    /// the manifest's shards first (the shape `put_blob_bytes` leaves for
+    /// anything over `SINGLE_SHARD_MAX`, and the one that carries the recorded
+    /// mime type), then the composite under its own name (a small blob, or a
+    /// `>16MB` composite reassembled from peers and persisted by
+    /// `finalize_fetch_success`).
+    ///
+    /// Trying only one shape is exactly how the two routes came to disagree
+    /// about the same bytes: the `/blob` route resolved a manifest and 404'd on
+    /// a shard gap without ever reading the composite it held whole, while the
+    /// apps resolver read the composite and served it.
+    ///
+    /// `hash` MUST already be canonical `sha256-{hex}` (both callers normalize
+    /// first) — `resolve_manifest` and `peer_blob_inventory` are keyed on it.
+    async fn read_local_blob(&self, hash: &str) -> LocalBlobRead {
+        let manifest = self.resolve_manifest(hash).await.map(Box::new);
+
+        // `"none"` manifests name the composite itself, so reassembling one is
+        // just the direct read below with an extra copy.
+        let reassembled = match manifest.as_ref() {
+            Some(m) if m.encoding != "none" => Some(self.reassemble_from_local_shards(m).await),
+            _ => None,
+        };
+
+        let gap = match reassembled {
+            Some(Ok(bytes)) => {
+                debug!(
+                    hash = %hash,
+                    size = bytes.len(),
+                    "blob read locally by reassembling manifest shards"
+                );
+                return LocalBlobRead::Bytes { bytes, manifest };
+            }
+            Some(Err(gap)) => Some(gap),
+            None => None,
+        };
+
+        if let Ok(bytes) = self.blob_store.get(hash).await {
+            return LocalBlobRead::Bytes { bytes, manifest };
+        }
+
+        // A gap can only come from a manifest, so the two are always both
+        // present here; the `match` keeps that provable rather than asserted.
+        match (gap, manifest) {
+            (Some((index, shard_hash)), Some(manifest)) => LocalBlobRead::MissingShard {
+                manifest,
+                index,
+                shard_hash,
+            },
+            _ => LocalBlobRead::Absent,
+        }
+    }
+
+    /// Do we hold this blob locally, without reading it?
+    ///
+    /// The presence twin of [`Self::read_local_blob`]: metadata probes only, so
+    /// a caller that just needs "yes/no" does not pull an 18MB bundle into
+    /// memory. Same two shapes, same answer — a raw `exists_by_address` probe
+    /// on a sharded composite reports absence for bytes we fully hold, which
+    /// would silently exclude every oversized bundle from the declared-head
+    /// serve preference.
+    async fn blob_available_locally(&self, address: &str) -> bool {
+        let hash = match crate::blob_store::BlobStore::parse_content_address(address) {
+            Ok(hex) => format!("sha256-{hex}"),
+            Err(_) => return false,
+        };
+
+        if self.blob_store.exists(&hash).await {
+            return true;
+        }
+
+        match self.resolve_manifest(&hash).await {
+            Some(manifest) if manifest.encoding != "none" => {
+                if manifest.shard_hashes.is_empty() {
+                    return false;
+                }
+                for shard_hash in &manifest.shard_hashes {
+                    if !self.blob_store.exists(shard_hash).await {
+                        return false;
+                    }
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
     /// GET /blob/{hash} - Reassemble blob from shards
     /// Checks policy enforcement if agent_id is provided
     async fn handle_get_blob(
@@ -2816,117 +2947,168 @@ impl HttpServer {
             }
         }
 
-        // Get manifest — in-process cache first, durable projection on miss.
-        let manifest = self.resolve_manifest(hash).await;
-        let manifest = match manifest {
-            Some(m) => m,
-            None => {
-                // Try direct blob lookup (for non-sharded blobs), healing from
-                // peers on a local miss (T17). The shared `get_blob_or_heal`
-                // helper encapsulates the local-read + race-fetch + finalize
-                // sequence; this arm maps its outcome back to the exact same
-                // responses (metrics counters, headers, distinct 503 bodies)
-                // the inline implementation produced before the extraction.
-                match self.get_blob_or_heal(hash).await {
-                    BlobHealOutcome::Bytes { bytes, healed_from } => {
-                        self.blob_libp2p_served_count
-                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        if healed_from.is_some() {
-                            debug!(hash = %hash, backend = "libp2p", "blob served from legacy backend (race-fetch)");
-                        } else {
-                            debug!(hash = %hash, backend = "libp2p", "blob served from legacy backend (direct)");
-                        }
-                        return Ok(Self::with_cors_headers(Response::builder())
-                            .status(StatusCode::OK)
-                            .header(header::CONTENT_TYPE, "application/octet-stream")
-                            .header(header::CONTENT_LENGTH, bytes.len())
-                            .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
-                            .body(Full::new(Bytes::from(bytes)))
-                            .unwrap());
-                    }
-                    BlobHealOutcome::FinalizeFailed(FinalizeFailure::PoolExhausted) => {
-                        return Ok(Self::with_cors_headers(Response::builder())
-                            .status(StatusCode::SERVICE_UNAVAILABLE)
-                            .body(Full::new(Bytes::from("Storage unavailable; retry")))
-                            .unwrap());
-                    }
-                    BlobHealOutcome::FinalizeFailed(FinalizeFailure::Persist) => {
-                        return Ok(Self::with_cors_headers(Response::builder())
-                            .status(StatusCode::SERVICE_UNAVAILABLE)
-                            .body(Full::new(Bytes::from(
-                                "Blob fetched from peer but local persist failed; retry",
-                            )))
-                            .unwrap());
-                    }
-                    BlobHealOutcome::Syncing { started } => {
-                        // Fix B: the peer-heal exceeded its in-request budget; the
-                        // fetch continues in the background. Degrade with a
-                        // syncing 503 + Retry-After (distinct JSON body from the
-                        // FinalizeFailed plain-text 503s above) instead of
-                        // blocking the request open for the full cross-peer race.
-                        debug!(hash = %hash, background_fetch = started, "Fix B: heal budget expired — returning syncing 503");
-                        return Ok(Self::with_cors_headers(Response::builder())
-                            .status(StatusCode::SERVICE_UNAVAILABLE)
-                            .header(header::RETRY_AFTER, "5")
-                            .header(header::CONTENT_TYPE, "application/json")
-                            .body(Full::new(Bytes::from(syncing_blob_body(hash))))
-                            .unwrap());
-                    }
-                    BlobHealOutcome::NotFound => {
-                        debug!(hash = %hash, "T17: race-fetch miss — returning 404");
-                        return Ok(Self::with_cors_headers(Response::builder())
-                            .status(StatusCode::NOT_FOUND)
-                            .body(Full::new(Bytes::from("Blob not found")))
-                            .unwrap());
-                    }
-                }
+        // One local read for both shapes a held blob can take (manifest shards
+        // or the composite under its own name) — the same seam `/apps` reads
+        // through, so the two routes cannot disagree about the same bytes.
+        //
+        // The manifest is kept past this point: when the local read comes up
+        // short and a peer supplies the bytes instead, those bytes are the ones
+        // THIS manifest describes, so its mime type still governs the response.
+        let (local_gap, manifest_ctx) = match self.read_local_blob(hash).await {
+            LocalBlobRead::Bytes { bytes, manifest } => {
+                info!(
+                    hash = %hash,
+                    size = bytes.len(),
+                    shards = manifest.as_ref().map(|m| m.shard_hashes.len()).unwrap_or(1),
+                    "Serving reassembled blob"
+                );
+                debug!(hash = %hash, backend = "libp2p", "blob served from legacy backend (local)");
+                return Ok(self.blob_ok_response(hash, bytes, manifest.as_deref()));
             }
-        };
-
-        // Reassemble from shards
-        let data = match self.reassemble_from_local_shards(&manifest).await {
-            Ok(data) => data,
-            Err((index, shard_hash)) => {
-                // Naming the absent shard keeps a partially-replicated composite
-                // distinguishable from an unknown blob (both were opaque before:
-                // the propagating `?` reported a 500).
+            // A resolved manifest whose shards are absent is NOT a terminal
+            // answer: the bytes may still be reachable from a peer. Falling
+            // straight to 404 here (as the pre-unification manifest arm did)
+            // silently retired peer-heal for every blob whose manifest row
+            // outlives its bytes — a restart, or a manifest that arrived by
+            // projection ahead of the shards. Keep the gap so the eventual 404
+            // still names the missing shard.
+            LocalBlobRead::MissingShard {
+                manifest,
+                index,
+                shard_hash,
+            } => {
                 warn!(
                     hash = %hash,
                     shard_index = index,
                     shard_hash = %shard_hash,
                     shards = manifest.shard_hashes.len(),
-                    "Blob manifest resolved but a shard is missing locally"
+                    "blob heal: manifest resolved but shard missing locally"
                 );
-                return Ok(Self::with_cors_headers(Response::builder())
-                    .status(StatusCode::NOT_FOUND)
-                    .body(Full::new(Bytes::from(format!(
-                        "Blob incomplete: shard {} of {} ({}) missing",
-                        index,
-                        manifest.shard_hashes.len(),
-                        shard_hash
-                    ))))
-                    .unwrap());
+                (Some((index, shard_hash)), Some(manifest))
             }
+            LocalBlobRead::Absent => (None, None),
         };
 
-        info!(
-            hash = %hash,
-            size = data.len(),
-            shards = manifest.shard_hashes.len(),
-            "Serving reassembled blob"
-        );
+        // Local miss — heal from peers (T17). `heal_from_peers` is the same
+        // race-fetch + finalize leg `get_blob_or_heal` runs; calling it directly
+        // keeps the local read we already performed from happening twice.
+        let outcome = self.heal_from_peers(hash).await;
+        Ok(self.blob_response_for_heal(hash, outcome, local_gap, manifest_ctx.as_deref()))
+    }
 
+    /// The 200 response for blob bytes — one builder for every arm that serves
+    /// them, so a locally-read blob and a peer-healed one cannot describe the
+    /// same bytes differently.
+    ///
+    /// With a manifest the recorded mime type and an ETag are reported; without
+    /// one (bytes we hold but have no manifest row for) it degrades to
+    /// `application/octet-stream`, the historical shape for that case.
+    fn blob_ok_response(
+        &self,
+        hash: &str,
+        bytes: Vec<u8>,
+        manifest: Option<&ShardManifest>,
+    ) -> Response<Full<Bytes>> {
         self.blob_libp2p_served_count
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        debug!(hash = %hash, backend = "libp2p", "blob served from legacy backend (reassembled)");
-        Ok(Self::with_cors_headers(Response::builder())
+
+        let builder = Self::with_cors_headers(Response::builder())
             .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, &manifest.mime_type)
-            .header(header::CONTENT_LENGTH, data.len())
-            .header(header::ETAG, format!("\"{}\"", hash))
-            .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
-            .body(Full::new(Bytes::from(data)))
-            .unwrap())
+            .header(header::CONTENT_LENGTH, bytes.len())
+            .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable");
+        let builder = match manifest {
+            Some(m) => builder
+                .header(header::CONTENT_TYPE, &m.mime_type)
+                .header(header::ETAG, format!("\"{}\"", hash)),
+            None => builder.header(header::CONTENT_TYPE, "application/octet-stream"),
+        };
+        builder.body(Full::new(Bytes::from(bytes))).unwrap()
+    }
+
+    /// Map a peer-heal outcome onto the `/blob` route's response shape.
+    ///
+    /// `local_gap` and `manifest` carry forward what the local read already
+    /// learned: the gap names the missing shard in a terminal 404, and the
+    /// manifest supplies the mime type/ETag for bytes a peer just supplied —
+    /// the arm this diff's shard-gap→peer-heal fall-through newly reaches.
+    fn blob_response_for_heal(
+        &self,
+        hash: &str,
+        outcome: BlobHealOutcome,
+        local_gap: Option<(usize, String)>,
+        manifest: Option<&ShardManifest>,
+    ) -> Response<Full<Bytes>> {
+        match outcome {
+            BlobHealOutcome::Bytes { bytes, healed_from } => {
+                if healed_from.is_some() {
+                    debug!(hash = %hash, backend = "libp2p", "blob served from legacy backend (race-fetch)");
+                } else {
+                    debug!(hash = %hash, backend = "libp2p", "blob served from legacy backend (direct)");
+                }
+                // The manifest the local read resolved describes exactly these
+                // bytes, so a healed composite reports the same mime type and
+                // ETag a locally-read one does. Without it, a `>16MB` bundle
+                // served as opaque octets purely because it arrived by heal.
+                self.blob_ok_response(hash, bytes, manifest)
+            }
+            BlobHealOutcome::FinalizeFailed(FinalizeFailure::PoolExhausted) => {
+                Self::with_cors_headers(Response::builder())
+                    .status(StatusCode::SERVICE_UNAVAILABLE)
+                    .body(Full::new(Bytes::from("Storage unavailable; retry")))
+                    .unwrap()
+            }
+            BlobHealOutcome::FinalizeFailed(FinalizeFailure::Persist) => {
+                Self::with_cors_headers(Response::builder())
+                    .status(StatusCode::SERVICE_UNAVAILABLE)
+                    .body(Full::new(Bytes::from(
+                        "Blob fetched from peer but local persist failed; retry",
+                    )))
+                    .unwrap()
+            }
+            BlobHealOutcome::Syncing { started } => {
+                // Fix B: the peer-heal exceeded its in-request budget; the
+                // fetch continues in the background. Degrade with a
+                // syncing 503 + Retry-After (distinct JSON body from the
+                // FinalizeFailed plain-text 503s above) instead of
+                // blocking the request open for the full cross-peer race.
+                debug!(hash = %hash, background_fetch = started, "Fix B: heal budget expired — returning syncing 503");
+                Self::with_cors_headers(Response::builder())
+                    .status(StatusCode::SERVICE_UNAVAILABLE)
+                    .header(header::RETRY_AFTER, "5")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(syncing_blob_body(hash))))
+                    .unwrap()
+            }
+            // Nothing local, nothing from peers. Naming the absent shard keeps
+            // a partially-replicated composite distinguishable from an unknown
+            // blob — the peer race has now been tried either way.
+            BlobHealOutcome::NotFound => match local_gap {
+                Some((index, shard_hash)) => {
+                    let total_shards = manifest.map(|m| m.shard_hashes.len()).unwrap_or(0);
+                    warn!(
+                        hash = %hash,
+                        shard_index = index,
+                        shard_hash = %shard_hash,
+                        shards = total_shards,
+                        "Blob manifest resolved but a shard is missing locally and no peer served it"
+                    );
+                    Self::with_cors_headers(Response::builder())
+                        .status(StatusCode::NOT_FOUND)
+                        .body(Full::new(Bytes::from(format!(
+                            "Blob incomplete: shard {} of {} ({}) missing",
+                            index, total_shards, shard_hash
+                        ))))
+                        .unwrap()
+                }
+                None => {
+                    debug!(hash = %hash, "T17: race-fetch miss — returning 404");
+                    Self::with_cors_headers(Response::builder())
+                        .status(StatusCode::NOT_FOUND)
+                        .body(Full::new(Bytes::from("Blob not found")))
+                        .unwrap()
+                }
+            },
+        }
     }
 
     /// Read a blob locally, healing from peers on a local miss (T17).
@@ -2959,58 +3141,55 @@ impl HttpServer {
         // `Err(_)` catch-all exactly (preserving its observable behavior) and
         // is the more resilient choice for the apps resolver: a locally corrupt
         // ZIP blob re-heals from a peer rather than 404ing.
-        match self.blob_store.get(hash).await {
-            Ok(data) => {
+        // Sharded composites are never stored under their own name (see
+        // `put_blob_bytes`), so a bare `blob_store` read ALWAYS misses for
+        // `encoding != "none"`. `read_local_blob` is the shared seam that tries
+        // both shapes — manifest shards and the composite itself — and is what
+        // makes `/apps/{slug}` (and every other `get_blob_or_heal` caller) able
+        // to serve a `>16MB` blob at all: previously a 404 by construction.
+        match self.read_local_blob(hash).await {
+            LocalBlobRead::Bytes { bytes, .. } => {
                 return BlobHealOutcome::Bytes {
-                    bytes: data,
+                    bytes,
                     healed_from: None,
                 };
             }
-            Err(_) => {
-                // Local miss — fall through to the manifest + peer-heal attempts below.
+            LocalBlobRead::MissingShard {
+                manifest,
+                index,
+                shard_hash,
+            } => {
+                // Shards are ordinary content-addressed blobs, so the peer-heal
+                // below still has a path — it just races on the composite hash.
+                // Naming the gap keeps the eventual 404 diagnosable.
+                warn!(
+                    hash = %hash,
+                    shard_index = index,
+                    shard_hash = %shard_hash,
+                    shards = manifest.shard_hashes.len(),
+                    "blob heal: manifest resolved but shard missing locally"
+                );
+            }
+            LocalBlobRead::Absent => {
+                // Local miss — fall through to the peer-heal attempt below.
             }
         }
 
-        // Sharded composites are never stored under their own name (see
-        // `put_blob_bytes`), so the local read above ALWAYS misses for
-        // `encoding != "none"`. Consulting the manifest before racing peers is
-        // what makes `/apps/{slug}` (and every other `get_blob_or_heal` caller)
-        // able to serve a `>16MB` blob at all — previously a 404 by
-        // construction. `"none"` manifests name the composite itself, so
-        // reassembly there would just repeat the read that already failed.
-        if let Some(manifest) = self.resolve_manifest(hash).await {
-            if manifest.encoding != "none" {
-                match self.reassemble_from_local_shards(&manifest).await {
-                    Ok(bytes) => {
-                        debug!(
-                            hash = %hash,
-                            encoding = %manifest.encoding,
-                            shards = manifest.shard_hashes.len(),
-                            "blob reassembled from local shards via manifest"
-                        );
-                        return BlobHealOutcome::Bytes {
-                            bytes,
-                            healed_from: None,
-                        };
-                    }
-                    Err((index, shard_hash)) => {
-                        // Shards are ordinary content-addressed blobs, so the
-                        // peer-heal below still has a path — it just races on the
-                        // composite hash, which no peer holds. Naming the gap
-                        // keeps the eventual 404 diagnosable.
-                        warn!(
-                            hash = %hash,
-                            shard_index = index,
-                            shard_hash = %shard_hash,
-                            shards = manifest.shard_hashes.len(),
-                            "blob heal: manifest resolved but shard missing locally"
-                        );
-                    }
-                }
-            }
-        }
+        self.heal_from_peers(hash).await
+    }
 
-        // Local miss — attempt peer fallback. T17: race-fetch helper.
+    /// The peer-heal leg on its own: inventory → race-fetch → finalize.
+    ///
+    /// Split out of [`Self::get_blob_or_heal`] so a caller that has ALREADY
+    /// performed the local read (the `/blob` route, which needs the manifest
+    /// context the read produced) can race peers without repeating it.
+    /// `get_blob_or_heal` remains the local-read + heal composition every other
+    /// caller uses.
+    ///
+    /// `hash` MUST already be canonical `sha256-{hex}` — `peer_blob_inventory`
+    /// and `verify_blob_hash` are keyed on that form.
+    async fn heal_from_peers(&self, hash: &str) -> BlobHealOutcome {
+        // Attempt peer fallback. T17: race-fetch helper.
         // Requires P2P feature + db pool; otherwise we degrade to NotFound,
         // exactly as the pre-refactor handler did.
         #[cfg(feature = "p2p")]
@@ -7615,12 +7794,13 @@ impl HttpServer {
         }
         // Local-presence gate — NEVER fan out to fetch a declared head we don't
         // hold; degrade to the own row and let the replication plane heal.
-        if self
-            .blob_store
-            .exists_by_address(&head_blob)
-            .await
-            .unwrap_or(false)
-        {
+        //
+        // Manifest-aware by way of `blob_available_locally`: a `>16MB` bundle is
+        // held as its manifest's shards, never as a file under the composite's
+        // own name, so a raw `exists_by_address` probe answered "absent" for
+        // every oversized declared head — which meant no oversized bundle could
+        // ever be served as its notary-declared head.
+        if self.blob_available_locally(&head_blob).await {
             Some(head_blob)
         } else {
             None
@@ -11424,6 +11604,46 @@ impl HttpServer {
     /// peer that never minted the blob) without tearing down the server.
     pub async fn clear_manifest_cache_for_test(&self) {
         self.manifests.write().await.clear();
+    }
+
+    /// Drive the `/blob` route's peer-heal response mapping with bytes a peer
+    /// supplied.
+    ///
+    /// No in-process peer exists in tests, so the peer race itself cannot be
+    /// driven end-to-end; everything else is the production path — the local
+    /// read runs for real and supplies the gap + manifest context, and the
+    /// response is built by the same `blob_response_for_heal` the route calls.
+    /// Returns `(status, content_type, etag)`.
+    pub async fn test_blob_response_for_healed_bytes(
+        &self,
+        hash: &str,
+        bytes: Vec<u8>,
+    ) -> (u16, Option<String>, Option<String>) {
+        let (local_gap, manifest_ctx) = match self.read_local_blob(hash).await {
+            LocalBlobRead::Bytes { manifest, .. } => (None, manifest),
+            LocalBlobRead::MissingShard {
+                manifest,
+                index,
+                shard_hash,
+            } => (Some((index, shard_hash)), Some(manifest)),
+            LocalBlobRead::Absent => (None, None),
+        };
+        let outcome = BlobHealOutcome::Bytes {
+            bytes,
+            healed_from: Some("test-peer".to_string()),
+        };
+        let resp = self.blob_response_for_heal(hash, outcome, local_gap, manifest_ctx.as_deref());
+        let header = |name: header::HeaderName| {
+            resp.headers()
+                .get(name)
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_string)
+        };
+        (
+            resp.status().as_u16(),
+            header(header::CONTENT_TYPE),
+            header(header::ETAG),
+        )
     }
 
     /// Drive `get_blob_or_heal` directly — the path `/apps/{slug}` resolution
@@ -16324,6 +16544,68 @@ mod c3_serve_head_preference_tests {
             got.as_deref(),
             Some(head_hash.as_str()),
             "declared head blob is distinct + local → serve it over the own row"
+        );
+    }
+
+    /// (a2) Declared head is a `>16MB` composite: its bytes live only as the
+    /// manifest-named shards, never under the composite's own name. A raw
+    /// filesystem probe therefore answers "absent" for a blob `/blob/{head}`
+    /// serves in full, so the local-presence gate must read through the same
+    /// manifest-aware seam the serving path uses — otherwise no oversized
+    /// bundle can EVER be served as its notary-declared head.
+    #[tokio::test]
+    async fn serves_declared_head_blob_when_only_its_shards_are_local() {
+        let dir = tempfile::tempdir().unwrap();
+        let blob_store = Arc::new(BlobStore::new(dir.path()).await.unwrap());
+
+        // The shards are ordinary content-addressed blobs; the composite is not
+        // stored under its own name — exactly what `put_blob_bytes` leaves.
+        let shard_a = blob_store.store(b"HEAD-SHARD-A").await.unwrap().hash;
+        let shard_b = blob_store.store(b"HEAD-SHARD-B").await.unwrap().hash;
+        let head_hash = well_formed_absent_addr("1a");
+
+        let pool = crate::test_util::test_pool();
+        {
+            let mut conn = pool.get().unwrap();
+            let manifest = ShardManifest {
+                blob_cid: String::new(),
+                blob_hash: head_hash.clone(),
+                total_size: 24,
+                mime_type: "application/zip".to_string(),
+                encoding: "chunked".to_string(),
+                data_shards: 2,
+                total_shards: 2,
+                shard_size: 12,
+                shard_hashes: vec![shard_a, shard_b],
+                reach: "commons".to_string(),
+                author_id: None,
+                created_at: "2026-08-16T00:00:00Z".to_string(),
+                verified_at: None,
+            };
+            crate::db::shard_manifests::record_generated_manifest(
+                &mut conn,
+                &format!("blob:{head_hash}"),
+                "lamad",
+                &manifest,
+            )
+            .expect("persist declared-head manifest");
+        }
+
+        let (sync, _t) = sync_with_head_doc("epr-c3-a2", &head_hash, "uhCkkDECLARED").await;
+        let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap())
+            .with_sync_manager(sync)
+            .with_db_pool(pool);
+
+        let row = content_row(
+            "epr-c3-a2",
+            Some(&well_formed_absent_addr("cd")),
+            Some("uhCkkDECLARED"),
+        );
+        assert_eq!(
+            server.declared_head_served_blob(&row).await.as_deref(),
+            Some(head_hash.as_str()),
+            "a sharded declared head whose shards are ALL local counts as locally \
+             present — the composite is never a file, so a raw exists() probe lies"
         );
     }
 
