@@ -51,6 +51,7 @@ import { When, Then } from '@cucumber/cucumber';
 import { runLook, type LookResult } from '../../scripts/look.js';
 import {
   getRaw,
+  getRawRidingCatchUp,
   resolveStorageUrl,
   parseLabeledPrometheusMetric,
   pollForGauge,
@@ -417,19 +418,34 @@ Then(
  * every pin that ever existed. This step accepts EITHER spelling deliberately:
  * the assertion is "a pin references this content", not "a pin spells it my way".
  *
- * Single read, not a poll: a pin either exists or it does not — there is no
- * settling window to wait out.
+ * Single read for the pin CLAIM, riding the catching-up admission shed for the
+ * read itself: a pin either exists or it does not — no settling window for the
+ * claim — but a 503 whose body is {"status":"catching-up","retryAfter":30} is
+ * not an answer about the pin at all; it is the peer explicitly asking the
+ * client to retry while it catches up (runbook churn invariant I6). Edge #1360
+ * redded this station on exactly that shed during the post-outage restore while
+ * pin #433 sat healthy the whole time. getRawRidingCatchUp rides ONLY the
+ * documented shed body (chapter 3 was cured with the same primitive); any other
+ * non-200 still fails on the first read.
  *
  * Example:
  *   Then doorway "alpha-A" has an active item pin whose head references "elohim-host-landing"
  */
 Then(
   'doorway {string} has an active item pin whose head references {string}',
+  // The shed ride is bounded by CATCHUP_RIDE_TIMEOUT_MS (90s); cucumber's
+  // default 30s step timer would kill it first (see the poll-budget constraint
+  // note above), so the step declares its own ceiling above that bound.
+  { timeout: 105_000 },
   async function (this: E2EWorld, peerName: string, contentId: string) {
     const doorway = this.getDoorway(peerName);
     const url = `${doorway.url}/api/v1/pins`;
-    const { status, text } = await getRaw(url);
-    assert.strictEqual(status, 200, `GET /api/v1/pins on ${peerName}: HTTP ${status}`);
+    const { status, text, rodeCatchUpMs } = await getRawRidingCatchUp(url);
+    const rode =
+      rodeCatchUpMs === undefined
+        ? ''
+        : ` (still catching-up after riding the admission shed for ${Math.round(rodeCatchUpMs / 1000)}s)`;
+    assert.strictEqual(status, 200, `GET /api/v1/pins on ${peerName}: HTTP ${status}${rode}`);
 
     let payload: unknown;
     try {
