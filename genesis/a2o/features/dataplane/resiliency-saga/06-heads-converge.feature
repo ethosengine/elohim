@@ -43,6 +43,16 @@ Feature: Chapter 6 — blobs sync to one head
   on matthew's own peer, then extends the same served-head-matches-declared-head
   proof across the federation.
 
+  Terms this chapter leans on: a peer's DECLARED head is the version it announces
+  as canonical for a piece of content; its SERVED head is the version its doorway
+  actually delivers to a visitor — this chapter proves the two are the same, on one
+  peer and then across peers. "alpha-A" is matthew's storage conductor, the peer
+  that publishes elohim-host-landing; "elohim.host" is the second doorway-serving
+  peer that must agree with it. "EPR" names a content entry by its protocol slug.
+  These scenarios run only after the stage-1 quiesce gate has passed — post-deploy
+  churn has settled and the substrate reports caught-up — so they prove
+  content-level flow on a settled substrate, never substrate bootstrap itself.
+
   Background:
     Given peer "alpha-A" at "alpha-A"
 
@@ -147,7 +157,10 @@ Feature: Chapter 6 — blobs sync to one head
   #     the fresh-declaration channel — at which point either peer may again
   #     be genuinely headless (adopt applies) or both converge to the same
   #     declared value (the assertion holds trivially).
-  Scenario: elohim.host adopts alpha-A's declared head after a restart
+  # OBSERVATIONAL, not causal: no step here triggers a restart. The restart +
+  # adopt-before-author sweep are stage-1 preconditions (deploy/quiesce cycle);
+  # this scenario proves the state those mechanisms must leave behind.
+  Scenario: elohim.host's declared head converges with alpha-A's
     Given peer "elohim.host" at "elohim.host"
     Then peer "elohim.host" resolves the declared head for content "elohim-host-landing" equal to peer "alpha-A"
 
@@ -199,13 +212,18 @@ Feature: Chapter 6 — blobs sync to one head
   #     work is measurable instead of Loki archaeology.
   # ---------------------------------------------------------------------------
 
-  Scenario: Chain-contention livelock on a busy writer chain is counted, not silent
+  # These three prove REGISTRATION, not firing: >= 0 asserts the label series
+  # exists and is queryable from boot (pre-touched at registration), so an
+  # operator can alert on it without tailing Loki. Proving a COUNT requires
+  # inducing each failure class, which would pollute the quiesced stage-2
+  # substrate — deliberately deferred to fault-injection scenarios.
+  Scenario: the chain-contention failure counter is registered and queryable
     Then labeled metric "elohim_content_witness_reauthor_failed_total" with label "class" "chain_head_moved" on peer "alpha-A" >= 0
 
-  Scenario: Stale-anchor re-author collisions with existing local content are counted
+  Scenario: the stale-anchor collision counter is registered and queryable
     Then labeled metric "elohim_content_witness_reauthor_failed_total" with label "class" "already_exists" on peer "alpha-A" >= 0
 
-  Scenario: A wall-clock-budget-exceeded sweep is visible without tailing Loki
+  Scenario: the sweep-abandoned counter is registered and queryable
     Then metric "elohim_content_witness_sweep_abandoned_total" on peer "alpha-A" >= 0
 
   @requires:alpha-cluster-6peer
