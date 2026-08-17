@@ -10,15 +10,27 @@ rules:
     why: "Specs need the full lifecycle frontmatter (overrides the base rule, nearest-wins)."
     retire-when: "with the parent doc-frontmatter-at-birth rule it overrides — a nearest-wins tightening cannot outlive the rule it tightens"
   - id: route-plans-out
-    class: ask
+    class: dispatch
     when: { write: "*-plan.md", new: true }
     route-to: { type: "*-plan.md", dest: genesis/docs/superpowers/plans/ }
+    parameters:
+      dispatch-agent: librarian
+      dispatch-prompt: >
+        Decide whether this artifact is a plan misfiled as a spec, a duplicate, or unnecessary.
+        Report ROUTE, MERGE, or DROP with one canonical path; do not move or rewrite files.
     why: "Plans live in plans/, not specs/ — routed at creation, not on every edit."
     retire-when: "when spec/plan placement is decided by the scaffolding command rather than by the author's path choice — a router with nothing mis-routed to it for two quarters is describing a habit, not enforcing one"
   - id: p2p-design-gate
-    class: ask
+    class: dispatch
     when: { write: "*.md", contains-any: ["GET /api/v1", "PRIMARY KEY", "uuid"], new: true }
     validator: epr:validator-p2p-design-gate
+    parameters:
+      dispatch-agent: rust-architect
+      dispatch-prompt: >
+        Run the P2P design-gate review on the proposed new data-entity design: classify truth,
+        check existing integrity entry types, head-plane cost, identity form, coordinator owner,
+        and projection signal. Report missing answers or PASS to the editing agent; do not edit the
+        spec and do not stop unrelated implementation.
     why: "New data-entity designs pass the p2p-design-gate (creation-time, not on every edit)."
     retire-when: "never — externally conditioned like the ontology guards, not permanent: the relational-first reflex (CREATE TABLE, UUID key, REST route) is a training-corpus property of every new agent rather than a habit this repo can acquire, so it re-arrives with each author. It retires when the models writing here stop reaching for a table first"
 validators:
