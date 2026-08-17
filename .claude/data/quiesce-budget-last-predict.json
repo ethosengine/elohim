@@ -1,0 +1,86 @@
+{
+  "predicted_total_secs": 200.34277075970238,
+  "per_atom": {
+    "put_record": {
+      "count": 3439.0,
+      "count_source": "rows-model",
+      "unit_ms": 50.0,
+      "cost_source": "fallback",
+      "observed_n": 0.0,
+      "parallelism": 3,
+      "contribution_s": 57.31666666666666
+    },
+    "inventory_page": {
+      "count": 24,
+      "count_source": "rows-model",
+      "unit_ms": 75.0612299047619,
+      "cost_source": "observed",
+      "observed_n": 21.0,
+      "parallelism": 6,
+      "contribution_s": 0.3002449196190476
+    },
+    "head_batch_per_id": {
+      "count": 6878,
+      "count_source": "rows-model",
+      "unit_ms": 20.0,
+      "cost_source": "fallback",
+      "observed_n": 0.0,
+      "parallelism": 6,
+      "contribution_s": 22.926666666666666
+    },
+    "head_record_verify": {
+      "count": 2063.4,
+      "count_source": "rows-model",
+      "unit_ms": 80.0,
+      "cost_source": "fallback",
+      "observed_n": 0.0,
+      "parallelism": 12,
+      "contribution_s": 13.756
+    },
+    "adopt_declare": {
+      "count": 6878,
+      "count_source": "rows-model",
+      "unit_ms": 40.0,
+      "cost_source": "fallback",
+      "observed_n": 0.0,
+      "parallelism": 3,
+      "contribution_s": 91.70666666666666
+    },
+    "shard_fetch": {
+      "count": 687.8000000000001,
+      "count_source": "rows-model",
+      "unit_ms": 120.0,
+      "cost_source": "fallback",
+      "observed_n": 0.0,
+      "parallelism": 9,
+      "contribution_s": 9.17066666666667
+    },
+    "manifest_persist": {
+      "count": 1031.7,
+      "count_source": "rows-model",
+      "unit_ms": 15.0,
+      "cost_source": "fallback",
+      "observed_n": 0.0,
+      "parallelism": 3,
+      "contribution_s": 5.1585
+    },
+    "digest_fold": {
+      "count": 10317,
+      "count_source": "rows-model",
+      "unit_ms": 0.0021399166666666663,
+      "cost_source": "observed",
+      "observed_n": 12.0,
+      "parallelism": 3,
+      "contribution_s": 0.007359173416666666
+    }
+  },
+  "rows": 3439,
+  "peers_n": 3,
+  "reachable": [
+    "matthew",
+    "jessica",
+    "james"
+  ],
+  "unreachable": [],
+  "timestamp": "2026-08-17T01:04:39.356203Z"
+}

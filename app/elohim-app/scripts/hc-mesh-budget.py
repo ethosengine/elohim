@@ -338,22 +338,35 @@ def expected_counts(rows, peers_n, pending_total, drain_backlog_total):
             return rows * peers_n
         raise AssertionError(atom)
 
+    # A live gauge wins only when it carries signal (> 0): a zero gauge on a
+    # pre-seed mesh means the work is not yet ENQUEUED, not that no work is
+    # coming — predicting 0s from it would make the prediction vacuous. The
+    # rows-model is the honest pre-run estimate; live gauges refine any
+    # re-prediction taken mid-run.
+    def live_or_rows(atom, live_value, label):
+        if live_value is not None and live_value > 0:
+            return (live_value, label)
+        return (rows_model(atom), "rows-model")
+
     for atom in ATOMS:
-        if atom == "put_record" and drain_backlog_total is not None:
-            out[atom] = (max(drain_backlog_total, 0.0), "live:drain_backlog")
-        elif atom == "inventory_page" and pending_total is not None:
-            out[atom] = (
-                math.ceil(max(pending_total, 0.0) / PAGE_SIZE) * remote_edges,
-                "live:pending/page",
+        if atom == "put_record":
+            out[atom] = live_or_rows(atom, drain_backlog_total, "live:drain_backlog")
+        elif atom == "inventory_page":
+            pages = (
+                math.ceil(max(pending_total, 0.0) / PAGE_SIZE) * remote_edges
+                if pending_total is not None
+                else None
             )
-        elif atom == "head_batch_per_id" and pending_total is not None:
-            out[atom] = (max(pending_total, 0.0), "live:pending")
-        elif atom == "head_record_verify" and pending_total is not None:
-            out[atom] = (max(pending_total, 0.0) * VERIFY_FRACTION, "live:pending*frac")
-        elif atom == "adopt_declare" and pending_total is not None:
-            out[atom] = (max(pending_total, 0.0), "live:pending")
-        elif atom == "digest_fold" and pending_total is not None:
-            out[atom] = (max(pending_total, 0.0), "live:pending")
+            out[atom] = live_or_rows(atom, pages, "live:pending/page")
+        elif atom == "head_batch_per_id":
+            out[atom] = live_or_rows(atom, pending_total, "live:pending")
+        elif atom == "head_record_verify":
+            scaled = pending_total * VERIFY_FRACTION if pending_total is not None else None
+            out[atom] = live_or_rows(atom, scaled, "live:pending*frac")
+        elif atom == "adopt_declare":
+            out[atom] = live_or_rows(atom, pending_total, "live:pending")
+        elif atom == "digest_fold":
+            out[atom] = live_or_rows(atom, pending_total, "live:pending")
         else:
             out[atom] = (rows_model(atom), "rows-model")
     return out
@@ -369,7 +382,10 @@ def pooled_unit_cost_ms(per_peer_hist, atom):
             s, c = hist[atom]
             total_sum += s
             total_count += c
-    if total_count > 0:
+    # Each atom's series is pre-touched once per boot with observe(0.0) so the
+    # label exists in /metrics; a histogram with observations but ZERO total
+    # duration is that boot-touch, not evidence the atom is free.
+    if total_count > 0 and total_sum > 0:
         return total_sum / total_count, "observed", total_count
     return FALLBACK_UNIT_COST_MS[atom], "fallback", 0.0
 

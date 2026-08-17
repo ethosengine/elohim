@@ -78,7 +78,16 @@ habits:
       - "a2o @concern:content-sync, @concern:blob-replication, @concern:peer-mesh, @concern:epr-projection-fallback, @concern:reconcile-inventory (edge Dataplane Validation stage)"
       - "cargo test --test sync_libp2p_convergence (elohim/elohim-storage)"
     evidence: >
-      DELTA 2026-08-17 (chunked-blob local-read unification, desk-proven): the
+      DELTA 2026-08-17b (W4.1 definitive local quiesce measure, uncontended,
+      io_baseline 528MB/s): seed-to-sustained-PASS 94s for 3,432 rows =
+      2,190 rows/min — 57x the 38 rows/min baseline, 6.4x past the >=344
+      target; quiesce leg 82s incl. 41s sustain. Q11 prediction (200.34s,
+      recorded pre-run) settled +113% over with the residual NAMED:
+      bootstrap-vs-repair count conflation (adopt_declare 516 actual vs 6,878
+      modeled — Q7 ceremony compression working as designed; head_batch 24 vs
+      6,878) + uncalibrated fallback costs (put_record 0.61ms actual vs 50ms).
+      Scope honest per the plateau ruling: probe-A converged+sustained, not
+      fleet convergence. DELTA 2026-08-17 (chunked-blob local-read unification, desk-proven): the
       >16MB serving split — /blob 404ing composites /apps served, and an
       oversized notary-declared head never winning declared_head_served_blob's
       raw file probe (18MB landing bundle class) — is cured by one
