@@ -78,7 +78,18 @@ habits:
       - "a2o @concern:content-sync, @concern:blob-replication, @concern:peer-mesh, @concern:epr-projection-fallback, @concern:reconcile-inventory (edge Dataplane Validation stage)"
       - "cargo test --test sync_libp2p_convergence (elohim/elohim-storage)"
     evidence: >
-      DELTA 2026-08-16 (shift dataplane-facade-first-consumer): the genesis
+      DELTA 2026-08-17 (chunked-blob local-read unification, desk-proven): the
+      >16MB serving split — /blob 404ing composites /apps served, and an
+      oversized notary-declared head never winning declared_head_served_blob's
+      raw file probe (18MB landing bundle class) — is cured by one
+      read_local_blob seam over both on-disk shapes (manifest-shards |
+      whole-composite), with /blob's shard-gap arm falling through to peer
+      heal. RCA falsified the memory-resident theory: bytes were durable,
+      agreement wasn't. Pinned by tests/chunked_blob_local_read_unification.rs
+      (RED->GREEN both legs); 2744 lib tests green. Surfaced separate open
+      hole: >64MB RS-band ingest hashes erasure-coded shards wrong
+      (warn-only) — backlog addendum in
+      chunked-blob-over-16mb-not-durable-mesh-repro.md.       DELTA 2026-08-16 (shift dataplane-facade-first-consumer): the genesis
       substrate-validation suite — the mesh/propagation/custody-convergence/
       delivery probes that keep this habit honest — now runs on the typed
       .dataplane() facade (genesis/a2o/scripts/substrate-verify.ts consuming
@@ -225,7 +236,22 @@ habits:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
       - "sweettest rea_commitment_replication (elohim/holochain/tests/sweettest — unignored 837b772c9; isolated late-join conductors, bounded 60s peer-B retrieval; RED but MIS-ATTRIBUTED per DELTA 2026-08-09 — it measures one-time cold-cell Wasm warm-up, not REA retrieval; do not read it as a fetch-seam probe until it warms peer B)"
     evidence: >
-      DELTA 2026-08-15b (admission relief deployed edge #1353 ~16:15Z, shift
+      DELTA 2026-08-16 (head-batch budget starvation cured, integrator batch):
+      live fleet reads showed matthew healing 0/hr against a 2,510-row backlog
+      — unattempted 2,447/hr all budget_exhausted, batch pinned at floor 8:
+      the 4s BATCH_EXTERN_BUDGET admitted id #0 (a saturated cascading()
+      read-permit acquire costs ~10s), blew the whole budget, refused the rest,
+      while the AIMD controller read each instantly-admitted partial-Ok as
+      headroom. Two-part cure in elohim-storage: observe_batch_outcome routes
+      a refused (unattempted) tail down the decrease path, and the extern
+      budget rises 4s→12s (above one permit-acquire, below the coordinator's
+      15s ceiling) with attempt_timeout 15s→25s to outlast budget + one
+      in-flight id's overshoot. Pinned by
+      a_budget_starved_batch_shrinks_even_with_instant_admission +
+      the_extern_budget_outlasts_a_saturated_read_permit_acquire; 2743 lib
+      tests green. Proof wanted next deploy: healed/hr > 0 on matthew,
+      unattempted{budget_exhausted} collapsing, head_batch_size lifting off
+      the floor. DELTA 2026-08-15b (admission relief deployed edge #1353 ~16:15Z, shift
       admission-throughput-to-banked-ch06): both demand-side levers live —
       sweep declares ride Background class w/ shed-aware routing (bccdc643b;
       also cures a shed→Author competing-root mint), ghost-witness election

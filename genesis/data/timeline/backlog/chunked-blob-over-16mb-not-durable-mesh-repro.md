@@ -180,3 +180,37 @@ of reporting the composite as simply absent. Regression tests:
 Still open from this record: cross-PEER serving of a composite (a peer holding
 replicated shards has no manifest row until W1.2 propagates one), and the
 blobHash-rotation restamp path that orphaned the first staging attempt.
+
+## Resolution addendum (2026-08-17) — the headline theory was wrong; the class is closed locally
+
+RCA against source corrected this record's headline: bytes were never
+memory-resident-only — **agreement about them was.** After the Q2 manifest
+durability landed, three call sites still asked three different "do we hold
+this blob" questions over the two legitimate on-disk shapes of a >16MB
+composite (manifest-shards-only from ingest vs whole-composite from a peer
+heal): `GET /blob` resolved manifest-first and 404'd on a shard gap without
+reading the composite or attempting peer heal; `get_blob_or_heal` probed in
+the opposite order and served exactly what `/blob` 404'd; and
+`declared_head_served_blob` used a raw composite-file existence probe that is
+false by construction for shard-shape composites, so an oversized
+notary-declared head (the 18MB landing bundle) could never win the serving
+preference.
+
+Cure (elohim-storage `http.rs`): one local-read seam — `LocalBlobRead` +
+`read_local_blob` (manifest shards first, whole composite second, then the
+named gap) + `blob_available_locally` (metadata-only presence) — consumed by
+all three call sites; `/blob`'s shard-gap arm now falls through to peer heal
+before 404ing. Pinned by `tests/chunked_blob_local_read_unification.rs`
+(RED→GREEN: /blob 404-vs-200 on a whole-composite; declared-head preference
+on shard-shape) alongside the existing durability pins.
+
+Residuals surfaced by the RCA, still open here:
+- **>64MB RS-band blobs are broken at ingest**: `put_blob_bytes` slices raw
+  data by shard_size for any `encoding != "none"`, but an rs-4-7 manifest's
+  hashes are of erasure-coded shards — mismatch is warn-only and the bytes
+  land under wrong hashes, unreassemblable. Separate hole, needs its own fix.
+- Shard-only composites never appear in inventory snapshots
+  (`BlobStore::list_hashes` walks the disk) — owned by the in-flight Q4
+  swarm work.
+- Cross-peer manifest propagation (W1.2) and the blobHash-rotation restamp
+  orphan remain open as recorded above.
