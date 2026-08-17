@@ -906,11 +906,18 @@ async function fetchHumansRow(
   rowId: string
 ): Promise<Record<string, unknown>> {
   const doorway = world.getDoorway(peerName);
-  const { status, text } = await getRaw(`${doorway.url}/db/humans`);
+  // These are STATE assertions (durable rows), not admission assertions — ride
+  // the bounded catching-up shed like ch03/ch05 (edge #1360 redded this chapter
+  // on a breaker-open shed window while the rows themselves were correct).
+  const { status, text, rodeCatchUpMs } = await getRawRidingCatchUp(`${doorway.url}/db/humans`);
+  const rode =
+    rodeCatchUpMs === undefined
+      ? ''
+      : ` (still catching-up after riding the admission shed for ${Math.round(rodeCatchUpMs / 1000)}s)`;
   assert.strictEqual(
     status,
     200,
-    `GET /db/humans on ${peerName}: HTTP ${status} (body: ${text.slice(0, 120)})`
+    `GET /db/humans on ${peerName}: HTTP ${status} (body: ${text.slice(0, 120)})${rode}`
   );
   let parsed: unknown;
   try {
@@ -941,7 +948,7 @@ async function fetchHumansRow(
  */
 Then(
   'the humans row {string} on doorway {string} has {string} set',
-  { timeout: 75_000 },
+  { timeout: 165_000 },
   async function (this: E2EWorld, rowId: string, peerName: string, fieldName: string) {
     await retry(
       async () => {
@@ -971,7 +978,7 @@ Then(
  */
 Then(
   'the humans row {string} on doorway {string} has {string} equal to {string}',
-  { timeout: 75_000 },
+  { timeout: 165_000 },
   async function (
     this: E2EWorld,
     rowId: string,

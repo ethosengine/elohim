@@ -245,6 +245,29 @@ habits:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
       - "sweettest rea_commitment_replication (elohim/holochain/tests/sweettest — unignored 837b772c9; isolated late-join conductors, bounded 60s peer-B retrieval; RED but MIS-ATTRIBUTED per DELTA 2026-08-09 — it measures one-time cold-cell Wasm warm-up, not REA retrieval; do not read it as a fetch-seam probe until it warms peer B)"
     evidence: >
+      DELTA 2026-08-17d (ch02 red root-caused to CPU-starved storage, shed cured
+      at the substrate, local-proven): ch02 household-forms leaves the A-side
+      identity cluster too — the rows were CORRECT live (all three
+      agentPubKey set, householdId=household-dowell, probed 19:5xZ); #1360's
+      red was doorway-A breaker OPEN 18:39-18:50+ (storage forward failed
+      connect/timeout, breaker_open_total 0->29 at 18:40, backpressure_honored
+      0) while elohim-node sat at its CPU limit with 100% CFS-throttled
+      periods for hours (still pinned 20:40Z) under a kitsune2 single-op
+      fetch storm (relay peer 31875c13, ~320 log lines/s, conductor sqlite
+      read pool Util 750-1700%). caughtUp flap = same starvation seen from
+      reconcile. Substrate cure: conductor child now spawns CPU-deprioritized
+      (nice 10, ELOHIM_CONDUCTOR_NICE, process_manager.rs) so storage's read
+      handlers outweigh conductor churn in the shared cgroup — local mesh A/B
+      (storage pinned 1 core, 256-way contention): /db/humans p90 349ms
+      max 536ms at nice-0 vs p90 23ms at nice-10, near-baseline; spawn
+      niceness pinned by /proc test. ch02 humans-row steps also ride the
+      catching-up shed (getRawRidingCatchUp) like ch03/ch05 with 165s
+      ceilings. With ch02 reclassified, the identity cluster's saga evidence
+      is ch07 alone; the A-side reds' common cause is the fetch-storm
+      saturation — next fleet lever is bounding that storm (fork: single-op
+      fetch batching + kitsune2 debug-log volume), not identity repair.
+      Deploy proof wanted: conductor pid at nice 10 on matthew, breaker
+      stays closed through the next post-churn Dataplane run, ch02 green.
       DELTA 2026-08-17c (saga ch05 red — same shed class as ch03, desk-proven):
       edge #1360's ch05 co-steward-agreement red (Station A, 2p/1f) was also
       NOT the A-side identity cluster — pin #433 (epr:elohim-host-landing,
