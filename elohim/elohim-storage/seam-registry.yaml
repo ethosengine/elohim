@@ -1708,11 +1708,15 @@ decisionPoints:
       modulePath: api::operator_verbs::perform_reconcile_verb
       line: 141
     summary: >
-      Commitment-gated operator verb (habit operator-runtime-surface, slice 1): the peer
+      Commitment-gated operator verb (habit operator-runtime-surface, slices 1+2): the peer
       authorizes the caller itself via the shared authorize_operation gate (active
-      delegates-compute grant, scope operator-reconcile, 7-check bounds), then kicks the
-      existing projection-reconcile loop and answers with an attestation naming the
-      commitment CID it acted under. Accepted / Refused(reason) / LoopUnavailable.
+      delegates-compute grant, scope operator-reconcile, 7-check bounds INCLUDING the
+      now-live rate window), then — emit-then-act — records the use as an economic_events
+      row (bounded_by = grant CID, the column DieselRateHistory counts) BEFORE kicking the
+      existing projection-reconcile loop, and answers with an attestation naming the
+      commitment CID and the recorded event id. An unrecordable use is refused, never
+      executed unaccounted. Accepted / Refused(reason) / LoopUnavailable /
+      AccountingUnavailable.
     concernIds:
       - id: C2
         status: answered
@@ -1728,7 +1732,10 @@ decisionPoints:
         status: answered
         justification: >
           kick_is_bounded_and_idempotent proves the capacity-1 kick channel coalesces an
-          authorized flood into at most one queued extra sweep of the single-flight loop.
+          authorized flood into at most one queued extra sweep of the single-flight loop;
+          the_rate_ceiling_refuses_the_use_past_the_grant_limit proves the grant's
+          rate_per_hour bound is enforced from recorded uses (the previously-inert check 6
+          is live on this path).
       - id: C6b
         status: answered
         justification: >
@@ -1757,6 +1764,18 @@ decisionPoints:
         kind: integration
       - path: elohim/elohim-storage/tests/operator_verbs.rs
         testName: authorized_but_loop_unavailable_is_an_honest_503
+        kind: integration
+      - path: elohim/elohim-storage/tests/operator_verbs.rs
+        testName: an_accepted_verb_records_its_use_bounded_by_the_grant
+        kind: integration
+      - path: elohim/elohim-storage/tests/operator_verbs.rs
+        testName: the_rate_ceiling_refuses_the_use_past_the_grant_limit
+        kind: integration
+      - path: elohim/elohim-storage/tests/operator_verbs.rs
+        testName: a_refusal_records_no_use
+        kind: integration
+      - path: elohim/elohim-storage/tests/operator_verbs.rs
+        testName: a_loopless_peer_charges_no_use
         kind: integration
       - path: elohim/elohim-storage/src/api/operator_verbs.rs
         testName: kick_is_bounded_and_idempotent

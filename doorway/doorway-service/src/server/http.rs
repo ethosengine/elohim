@@ -27,6 +27,7 @@ use crate::db::MongoClient;
 use crate::nats::{HostRouter, NatsClient};
 use crate::orchestrator::OrchestratorState;
 use crate::projection::{ProjectionConfig, ProjectionStore};
+use crate::render::warm_shell::ShellProvenance;
 use crate::routes;
 use crate::server::websocket;
 use crate::services::{
@@ -226,6 +227,13 @@ pub struct AppState {
     /// every request — one wasted V8 render each). Empty registry = SSR off;
     /// SSR-eligible routes fall back to the normal storage proxy.
     pub renderer_registry: crate::render::registry::RendererRegistry,
+    /// Warm-boot shell cache — the projected app's bundle-carrying shell served
+    /// from the doorway's OWN last-reconciled projection instead of a
+    /// per-request upstream fetch (Task 3.4). Boot-hydrated from the
+    /// Mongo-backed `app_file_cache`, which outlives the pod; without that
+    /// archive the store is inert and the shell path is exactly today's.
+    /// See `crate::render::warm_shell`.
+    pub warm_shell: Arc<crate::render::warm_shell::WarmShellStore>,
     /// Cached render-capability claim derived at startup.
     ///
     /// Served by `GET /admin/capability` so elohim-storage can pull the profile
@@ -547,6 +555,7 @@ impl AppState {
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
             renderer_registry: crate::render::registry::RendererRegistry::from_env(),
+            warm_shell: Arc::new(crate::render::warm_shell::WarmShellStore::inert()),
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
             render_capability: None,
@@ -660,6 +669,7 @@ impl AppState {
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
             renderer_registry: crate::render::registry::RendererRegistry::from_env(),
+            warm_shell: Arc::new(crate::render::warm_shell::WarmShellStore::inert()),
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
             render_capability: None,
@@ -788,6 +798,7 @@ impl AppState {
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
             renderer_registry: crate::render::registry::RendererRegistry::from_env(),
+            warm_shell: Arc::new(crate::render::warm_shell::WarmShellStore::inert()),
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
             render_capability: None,
@@ -871,6 +882,16 @@ impl AppState {
             Some(Arc::new(svc))
         };
 
+        // Warm-boot shell cache (Task 3.4): the projected app's bundle-carrying
+        // shell served from THIS archive — which outlives the pod — instead of a
+        // per-request upstream fetch that a catching-up peer cannot answer.
+        // Boot-hydrated in main.rs once the EPR router knows its mounts.
+        let warm_shell = Arc::new(crate::render::warm_shell::WarmShellStore::new(
+            app_file_cache
+                .clone()
+                .map(|c| c as Arc<dyn crate::render::warm_shell::ShellArchive>),
+        ));
+
         Ok(Self {
             args,
             mongo: Some(mongo),
@@ -919,6 +940,9 @@ impl AppState {
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
             renderer_registry: crate::render::registry::RendererRegistry::from_env(),
+            // Warm-boot shell cache over the Mongo archive that already holds
+            // the last reconciled bundle. Hydrated at boot in main.rs.
+            warm_shell,
             render_trace_stats: Arc::new(elohim_render::RenderTraceStats::new()),
             ssr_render_breaker: crate::render::breaker::SsrRenderBreaker::new(),
             render_capability: None,
@@ -1190,22 +1214,65 @@ enum OpGateDecision {
     Deny403,
 }
 
+/// Header carrying the doorway-verified performer to storage on the internal
+/// hop (operator-runtime-surface slice 1). Stripped from every inbound request
+/// and re-injected from the verified JWT — the storage-side operator verbs
+/// re-authorize for themselves using this performer.
+const X_ELOHIM_VERIFIED_PERFORMER: &str = "x-elohim-verified-performer";
+
+/// Which `delegates-compute` capability (commitment `scope`) gates this
+/// request, if any. Pure over `(method, path)`.
+///
+/// - `POST /db/content{,/bulk}` → `orchestrate-node` (Che op-gate Slice 1).
+/// - `POST /api/v1/operator/reconcile` → `operator-reconcile`
+///   (operator-runtime-surface slice 1; per-verb capability strings).
+/// - Anything else → not gated by capability. NOTE: an *unknown*
+///   `/api/v1/operator/*` path still fails closed — see
+///   [`is_operator_verb_path`] at the call site.
+fn op_gate_capability(method: &Method, path: &str) -> Option<&'static str> {
+    if method != Method::POST {
+        return None;
+    }
+    match path {
+        "/db/content" | "/db/content/bulk" => Some("orchestrate-node"),
+        "/api/v1/operator/reconcile" => Some("operator-reconcile"),
+        _ => None,
+    }
+}
+
+/// Operator runtime verbs live under this prefix and are ALWAYS enforced —
+/// a born-gated route class with no ungated traffic to preserve, so neither
+/// `DELEGATES_COMPUTE_OP_GATE=off|observe` nor `dev_mode` softens them.
+fn is_operator_verb_path(path: &str) -> bool {
+    path.starts_with("/api/v1/operator/")
+}
+
+/// The gate mode that actually governs `path`: operator verbs force `Enforce`;
+/// everything else uses the configured mode.
+fn effective_op_gate_mode(configured: &OpGateMode, path: &str) -> OpGateMode {
+    if is_operator_verb_path(path) {
+        OpGateMode::Enforce
+    } else {
+        configured.clone()
+    }
+}
+
 /// Compute the op-gate decision from `(mode, method, path, verdict)`.
 ///
 /// This is the pure decision kernel — no I/O, no state.
 ///
 /// `verdict`: `Ok(true)` = allowed, `Ok(false)` = denied, `Err(_)` = infra failure.
 /// In `Enforce` mode, both `Ok(false)` and `Err(_)` produce `Deny403` (fail-closed).
-/// The gate only fires for `POST /db/content` and `POST /db/content/bulk`.
+/// The gate fires for the capability-gated writes named by
+/// [`op_gate_capability`].
 fn compute_op_gate_decision(
     mode: &OpGateMode,
     method: &Method,
     path: &str,
     verdict: &Result<bool, String>,
 ) -> OpGateDecision {
-    // Only POST to the two content-write routes triggers the gate.
-    let is_gated_write =
-        method == Method::POST && (path == "/db/content" || path == "/db/content/bulk");
+    // Only capability-gated writes trigger the gate.
+    let is_gated_write = op_gate_capability(method, path).is_some();
     if !is_gated_write || matches!(mode, OpGateMode::Off) {
         return OpGateDecision::Allow;
     }
@@ -2549,6 +2616,44 @@ fn epr_dispatch_shed_response(
     routes::catching_up::shed_response(wants_html, retry_after_secs, cause)
 }
 
+/// Stock a freshly-proxied shell document into the warm-boot cache under the
+/// head the doorway's own projection declares. Best-effort and non-fatal: with
+/// no declared head there is no content address to key it under, so only the
+/// in-process hot layer takes it (the archive write is skipped rather than
+/// inventing an address).
+async fn stock_warm_shell(
+    state: &AppState,
+    projection: &elohim_views::projection::EprProjectionView,
+    bytes: Vec<u8>,
+    content_type: &str,
+) {
+    let declared = match state.app_file_cache.as_ref() {
+        Some(cache) => cache.resolve_blob_hash(&projection.epr_id).await,
+        None => None,
+    };
+    match declared {
+        Some(hash) => {
+            state
+                .warm_shell
+                .stock(
+                    &projection.epr_id,
+                    &projection.entry_file,
+                    &hash,
+                    content_type,
+                    bytes,
+                )
+                .await;
+        }
+        None => {
+            tracing::debug!(
+                target: "doorway::ssr",
+                epr_id = %projection.epr_id,
+                "warm shell not archived — the projection declares no blob hash for this app"
+            );
+        }
+    }
+}
+
 /// Dispatch a request to a projected EPR (B13).
 ///
 /// MVP scope (§8.1 + §8.2):
@@ -2636,6 +2741,59 @@ async fn dispatch_to_projected_epr(
         projection.spa_fallback,
     );
 
+    // Warm-boot shell cache (Task 3.4), SHELL DOCUMENT ONLY. A browser
+    // navigation resolves to the projection's entry file; that document is the
+    // one thing a person cannot be served without, and it is exactly what the
+    // Mongo-backed archive already holds from the last reconciliation. Serving
+    // it from there is what keeps `/` answering 200 through the upstream's
+    // catch-up window instead of riding a doomed EPR_DISPATCH_TIMEOUT_SECS
+    // fetch and then shedding. Assets (.js/.css/images) and every other
+    // sub-path fall through to the unchanged proxy below, so the honest-shed
+    // contract for data reads is untouched.
+    if sub_path == projection.entry_file {
+        let (class, warm) = state
+            .warm_shell
+            .lookup(&projection.epr_id, &projection.entry_file)
+            .await;
+        let upstream_available = !state.upstream_breakers.is_open(&storage_url);
+        // Serve warm whenever the decision says so; an upgrade/fetch falls
+        // through to the proxy below, which stocks nothing but behaves exactly
+        // as it does today.
+        if let (crate::render::warm_shell::ShellPlan::ServeWarm, Some(shell)) = (
+            crate::render::warm_shell::decide_shell_serve(class, upstream_available),
+            warm,
+        ) {
+            tracing::debug!(
+                request_path = %request_path,
+                epr_id = %projection.epr_id,
+                head = %shell.blob_hash,
+                upstream_available,
+                "EPR router: shell served from the warm-boot cache — no upstream fetch"
+            );
+            let (body_bytes, chrome_injected) = maybe_inject_chrome(
+                200,
+                &shell.content_type,
+                Bytes::from(shell.bytes),
+                chrome_context_json,
+            );
+            let mut builder = Response::builder()
+                .status(StatusCode::OK)
+                .header("content-type", &shell.content_type)
+                .header("x-epr-router", "dispatched");
+            if chrome_injected {
+                // Same cache-control parity as the proxied arm: an injected page
+                // carries this request's omnibar context.
+                builder = builder.header("cache-control", "no-store");
+            }
+            return with_bundle_provenance_header(
+                builder
+                    .body(Full::new(body_bytes))
+                    .expect("infallible warm shell response"),
+                ShellProvenance::LastReconciled,
+            );
+        }
+    }
+
     // Proxy to storage's /apps/{epr_id}/{sub_path} — the existing bundle-serving surface.
     // Storage's slug_index and AppFileCacheService handle caching; doorway proxies, not owns.
     //
@@ -2717,6 +2875,14 @@ async fn dispatch_to_projected_epr(
                         crate::routes::storage_proxy::ProxyOutcome::classify(status.as_u16())
                             != crate::routes::storage_proxy::ProxyOutcome::Failure,
                     );
+                    // Warm-boot shell cache write-on-fetch: a clean read of the
+                    // shell document is what makes the NEXT catch-up window
+                    // survivable. Stocked PRE-injection — the chrome island is
+                    // request-specific and must never be baked into the archive.
+                    if status.is_success() && sub_path == projection.entry_file {
+                        stock_warm_shell(state, &projection, body_bytes.to_vec(), &content_type)
+                            .await;
+                    }
                     // Native runtime chrome: an HTML page served via this proxy is
                     // an EPR-router HTML serve (the landing `/`, a pillar mount),
                     // and must carry the omnibar trust surface — the same island
@@ -3215,6 +3381,25 @@ fn with_ssr_skipped_header(
     resp
 }
 
+/// Tag a composed SSR response (or a warm bundle serve) with the shell's
+/// provenance. A shell served from the doorway's OWN last-reconciled projection
+/// — no upstream read in this request — carries
+/// `x-elohim-bundle: last-reconciled`: honest, machine-readable, possibly
+/// one-behind. A shell confirmed against the upstream this request carries no
+/// marker, so the header DROPS the moment the upstream answers again. Pure.
+fn with_bundle_provenance_header(
+    mut resp: Response<Full<Bytes>>,
+    provenance: ShellProvenance,
+) -> Response<Full<Bytes>> {
+    if let Some(value) = provenance.header_value() {
+        resp.headers_mut().insert(
+            "x-elohim-bundle",
+            hyper::header::HeaderValue::from_static(value),
+        );
+    }
+    resp
+}
+
 /// At the EPR-router dispatch: divert to the V8 SSR engine only when the route
 /// classified SSR-eligible AND a renderer is loaded. A non-SSR disposition, or a
 /// renderer-absent doorway, serves the projected bundle directly — the cheapest
@@ -3411,7 +3596,7 @@ async fn compose_render_with_shell(
     state: &AppState,
     fallback: &SsrFallback,
     rendered_html: &str,
-) -> Result<String, SsrFallbackReason> {
+) -> Result<(String, ShellProvenance), SsrFallbackReason> {
     let SsrFallback::ProjectedEpr(projection) = fallback else {
         return Err(SsrFallbackReason::ShellNoProjection);
     };
@@ -3420,42 +3605,129 @@ async fn compose_render_with_shell(
         .storage_url
         .as_deref()
         .ok_or(SsrFallbackReason::ShellNoProjection)?;
-    // Endpoint key shared with the gate below — `begin()` consumes a half-open
-    // trial when it admits one, and whoever consumes a trial MUST resolve its
-    // outcome on every terminal path or the breaker parks in HalfOpen forever
-    // (no further trial is ever admitted). The returned guard resolves it even
-    // when this future is dropped mid-fetch. The `None` arm records nothing —
-    // the gate shed the request; no attempt was made.
+    let (shell_html, provenance) = resolve_projected_shell(state, projection, storage_url).await?;
+    elohim_render::compose_ssr_with_shell(rendered_html, &shell_html)
+        .map_err(SsrFallbackReason::Compose)
+        .map(|composed| (composed, provenance))
+}
+
+/// Resolve the projected app's bundle-carrying shell — **cache-first**.
+///
+/// Task 3.4's cure for the born-red apex scenario. The shell used to be fetched
+/// from the storage upstream on EVERY `/` request under the full
+/// `EPR_DISPATCH_TIMEOUT_SECS` wall; during post-deploy catch-up that is a
+/// doomed 10s stall on the browser hot path (10.07s/200 on doorway-alpha,
+/// 20.08s/503 on the apex, verified 2026-08-18) while the same doorway's
+/// `/db/content` path shed honestly in 63ms.
+///
+/// Now: a shell held in the doorway's own last-reconciled projection is served
+/// with NO upstream read at all; a cold cache with an unreachable upstream sheds
+/// IMMEDIATELY through the existing catching-up contract (the caller's fallback
+/// path), never a stall. Only the shell document moves — data routes keep their
+/// shed contract untouched.
+async fn resolve_projected_shell(
+    state: &AppState,
+    projection: &elohim_views::projection::EprProjectionView,
+    storage_url: &str,
+) -> Result<(String, ShellProvenance), SsrFallbackReason> {
+    // Endpoint key shared with `forward_to_storage`/the EPR dispatch, so one
+    // breaker per storage peer governs every path. `is_open` only READS the
+    // circuit — a warm serve must never consume a half-open trial it isn't
+    // going to resolve (the 2026-07-20 half-open LATCH shape).
     let endpoint = storage_url.trim_end_matches('/');
-    let Some(trial) = state.upstream_breakers.begin(endpoint) else {
-        return Err(SsrFallbackReason::ShellBreakerOpen);
-    };
+    let upstream_available = !state.upstream_breakers.is_open(endpoint);
     let shell_url = projected_shell_url(storage_url, projection);
+
+    let outcome = crate::render::warm_shell::resolve_shell(
+        &state.warm_shell,
+        &projection.epr_id,
+        &projection.entry_file,
+        upstream_available,
+        |budget| fetch_shell_from_upstream(state, endpoint, &shell_url, budget),
+    )
+    .await;
+
+    match outcome {
+        crate::render::warm_shell::ShellOutcome::Warm(shell) => {
+            tracing::debug!(
+                target: "doorway::ssr",
+                app = %projection.epr_id,
+                head = %shell.blob_hash,
+                "SSR shell served from the warm-boot cache — no upstream fetch"
+            );
+            Ok((shell.html(), ShellProvenance::LastReconciled))
+        }
+        crate::render::warm_shell::ShellOutcome::Fresh(shell) => {
+            Ok((shell.html(), ShellProvenance::DeclaredHead))
+        }
+        crate::render::warm_shell::ShellOutcome::Unavailable => {
+            // Cold cache AND no upstream answer. Name which one so the shed
+            // accounting keeps distinguishing "circuit already open" (no attempt
+            // made) from "the attempt failed".
+            if upstream_available {
+                Err(SsrFallbackReason::ShellFetchFailed)
+            } else {
+                Err(SsrFallbackReason::ShellBreakerOpen)
+            }
+        }
+    }
+}
+
+/// The upstream half of the shell read, run ONLY when the warm cache cannot
+/// answer (cold) or is provably one behind (upgrade). Owns the breaker trial:
+/// whoever consumes a trial MUST resolve its outcome on every terminal path or
+/// the breaker parks in HalfOpen forever.
+async fn fetch_shell_from_upstream(
+    state: &AppState,
+    endpoint: &str,
+    shell_url: &str,
+    budget: crate::render::warm_shell::FetchBudget,
+) -> Option<crate::render::warm_shell::FetchedShell> {
+    use crate::render::warm_shell::{FetchBudget, FetchedShell};
+
+    // An upgrade already holds a serviceable answer — it must never gamble the
+    // full dispatch wall on a marginally fresher one.
+    let timeout_secs = match budget {
+        FetchBudget::Full => EPR_DISPATCH_TIMEOUT_SECS,
+        FetchBudget::Upgrade => crate::render::warm_shell::SHELL_UPGRADE_TIMEOUT_SECS,
+    };
+    let trial = state.upstream_breakers.begin(endpoint)?;
     let fetch_started = std::time::Instant::now();
-    let shell_html = match state
+    match state
         .storage_proxy_client
-        .get(&shell_url)
-        .timeout(std::time::Duration::from_secs(EPR_DISPATCH_TIMEOUT_SECS))
+        .get(shell_url)
+        .timeout(std::time::Duration::from_secs(timeout_secs))
         .send()
         .await
     {
-        Ok(resp) if resp.status().is_success() => match resp.text().await {
-            Ok(text) => {
-                trial.record(true);
-                text
+        Ok(resp) if resp.status().is_success() => {
+            let content_type = resp
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("text/html")
+                .to_string();
+            match resp.bytes().await {
+                Ok(bytes) => {
+                    trial.record(true);
+                    Some(FetchedShell {
+                        bytes: bytes.to_vec(),
+                        content_type,
+                    })
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        target: "doorway::ssr",
+                        shell_url = %shell_url,
+                        elapsed_ms = fetch_started.elapsed().as_millis() as u64,
+                        error = %e,
+                        "SSR shell fetch: body read failed"
+                    );
+                    trial.record(false);
+                    None
+                }
             }
-            Err(e) => {
-                tracing::warn!(
-                    target: "doorway::ssr",
-                    shell_url = %shell_url,
-                    elapsed_ms = fetch_started.elapsed().as_millis() as u64,
-                    error = %e,
-                    "SSR shell fetch: body read failed"
-                );
-                trial.record(false);
-                return Err(SsrFallbackReason::ShellFetchFailed);
-            }
-        },
+        }
         Ok(resp) => {
             tracing::warn!(
                 target: "doorway::ssr",
@@ -3465,25 +3737,24 @@ async fn compose_render_with_shell(
                 "SSR shell fetch: non-success status"
             );
             trial.record(false);
-            return Err(SsrFallbackReason::ShellFetchFailed);
+            None
         }
         Err(e) => {
-            // A stalled upstream rides the full EPR_DISPATCH_TIMEOUT here — the
-            // elapsed_ms field is what distinguishes a 10s timeout (peer stall)
-            // from an instant connect refusal in the shed accounting.
+            // A stalled upstream rides the budget above — the elapsed_ms field
+            // distinguishes a timeout (peer stall) from an instant connect
+            // refusal in the shed accounting.
             tracing::warn!(
                 target: "doorway::ssr",
                 shell_url = %shell_url,
+                budget_secs = timeout_secs,
                 elapsed_ms = fetch_started.elapsed().as_millis() as u64,
                 error = %error_with_source_chain(&e),
                 "SSR shell fetch failed"
             );
             trial.record(false);
-            return Err(SsrFallbackReason::ShellFetchFailed);
+            None
         }
-    };
-    elohim_render::compose_ssr_with_shell(rendered_html, &shell_html)
-        .map_err(SsrFallbackReason::Compose)
+    }
 }
 
 /// Serve a `render:"angular-ssr"` route through the V8 SSR engine, gated by the
@@ -3715,12 +3986,15 @@ async fn serve_ssr_route(
             // shed to the hydratable bundle fallback rather than serve a
             // bundle-less document.
             return match compose_render_with_shell(state, &fallback, &cached_html).await {
-                Ok(composed) => ssr_html_response_with_observability(
-                    composed,
-                    "HIT",
-                    state.render_capability.as_ref(),
-                    None,
-                    Some(&chrome_context_json),
+                Ok((composed, provenance)) => with_bundle_provenance_header(
+                    ssr_html_response_with_observability(
+                        composed,
+                        "HIT",
+                        state.render_capability.as_ref(),
+                        None,
+                        Some(&chrome_context_json),
+                    ),
+                    provenance,
                 ),
                 Err(reason) => {
                     tracing::warn!(
@@ -3843,12 +4117,15 @@ async fn serve_ssr_route(
                 // Compose the render into the bundle-carrying shell so it can
                 // hydrate; on failure shed to the hydratable bundle fallback.
                 match compose_render_with_shell(state, &fallback, &html).await {
-                    Ok(composed) => ssr_html_response_with_observability(
-                        composed,
-                        "MISS",
-                        state.render_capability.as_ref(),
-                        Some(&trace),
-                        Some(&chrome_context_json),
+                    Ok((composed, provenance)) => with_bundle_provenance_header(
+                        ssr_html_response_with_observability(
+                            composed,
+                            "MISS",
+                            state.render_capability.as_ref(),
+                            Some(&trace),
+                            Some(&chrome_context_json),
+                        ),
+                        provenance,
                     ),
                     Err(reason) => {
                         tracing::warn!(
@@ -5092,15 +5369,33 @@ async fn handle_request(
                     }
 
                     // ── delegates-compute op-gate ─────────────────────────────
-                    // Gate POST /db/content and POST /db/content/bulk before
-                    // forwarding.  Off → no storage call (exact passthrough).
-                    // Observe → log verdict, always forward.
+                    // Gate POST /db/content{,/bulk} (capability "orchestrate-node",
+                    // mode from DELEGATES_COMPUTE_OP_GATE) and the operator runtime
+                    // verbs POST /api/v1/operator/* (per-verb capability, ALWAYS
+                    // Enforce — born-gated route class; dev_mode does not soften it).
+                    // Off → no storage call (exact passthrough; operator verbs never
+                    // see Off).  Observe → log verdict, always forward.
                     // Enforce → allowed → forward; denied|error → 403 fail-closed.
+                    let mut verified_performer_for_forward: Option<String> = None;
                     {
-                        let gate_mode = state.args.op_gate_mode.clone();
-                        let is_gated_write = *req.method() == Method::POST
-                            && (p == "/db/content" || p == "/db/content/bulk");
-                        if gate_mode != OpGateMode::Off && is_gated_write {
+                        let configured_mode = state.args.op_gate_mode.clone();
+                        let gate_mode = effective_op_gate_mode(&configured_mode, p);
+                        let capability = op_gate_capability(req.method(), p);
+                        // Unknown /api/v1/operator/* verb: fail closed rather than
+                        // forwarding an ungated mutation to storage.
+                        if is_operator_verb_path(p) && capability.is_none() {
+                            warn!(
+                                path = %p,
+                                "op-gate: unknown operator verb; denying (fail-closed)"
+                            );
+                            return Ok(to_boxed(make_op_gate_forbidden()));
+                        }
+                        let gated_capability = if gate_mode == OpGateMode::Off {
+                            None
+                        } else {
+                            capability
+                        };
+                        if let Some(capability) = gated_capability {
                             // performer = doorway-verified human_id (never the client
                             // X-Agent-Cid header, which is trivially spoofable — C8).
                             // The authorize call runs ONLY when a performer exists; the
@@ -5116,7 +5411,7 @@ async fn handle_request(
                                         &state.storage_proxy_client,
                                         bearer.as_deref(),
                                         &performer,
-                                        "orchestrate-node",
+                                        capability,
                                         &endpoint,
                                     )
                                     .await;
@@ -5130,7 +5425,15 @@ async fn handle_request(
                                         p,
                                         &allowed_result,
                                     ) {
-                                        OpGateDecision::Allow => { /* fall through to forward */ }
+                                        OpGateDecision::Allow => {
+                                            // Operator verbs: storage re-authorizes
+                                            // for itself; hand it the verified
+                                            // performer on the internal hop.
+                                            if is_operator_verb_path(p) {
+                                                verified_performer_for_forward =
+                                                    Some(performer.clone());
+                                            }
+                                        }
                                         OpGateDecision::AllowWithWarn => {
                                             let summary = match &verdict {
                                                 Ok(v) if v.allowed => {
@@ -5191,6 +5494,39 @@ async fn handle_request(
                         }
                     }
                     // ── end op-gate ───────────────────────────────────────────
+
+                    // Strip the internal-hop performer header from every inbound
+                    // request (a client-supplied value must never reach storage),
+                    // then inject the doorway-verified performer for an allowed
+                    // operator verb — storage's verb handlers re-authorize for
+                    // themselves against this performer.
+                    let mut req = req;
+                    {
+                        let headers = req.headers_mut();
+                        headers.remove(X_ELOHIM_VERIFIED_PERFORMER);
+                        if let Some(vp) = verified_performer_for_forward.as_deref() {
+                            match hyper::header::HeaderValue::from_str(vp) {
+                                Ok(value) => {
+                                    headers.insert(
+                                        hyper::header::HeaderName::from_static(
+                                            X_ELOHIM_VERIFIED_PERFORMER,
+                                        ),
+                                        value,
+                                    );
+                                }
+                                Err(_) => {
+                                    // A performer that can't ride a header can't be
+                                    // authorized downstream — refuse rather than
+                                    // forward an unattributed operator mutation.
+                                    warn!(
+                                        path = %p,
+                                        "op-gate: performer not header-safe; denying"
+                                    );
+                                    return Ok(to_boxed(make_op_gate_forbidden()));
+                                }
+                            }
+                        }
+                    }
 
                     return Ok(to_boxed(
                         routes::forward_to_storage(
@@ -6274,6 +6610,36 @@ mod ssr_session_tests {
     // dispatch's decision surface too.
 
     #[test]
+    fn warm_shell_serve_is_marked_and_a_confirmed_head_drops_the_marker() {
+        // The wire half of Task 3.4. A shell served from the doorway's own
+        // last-reconciled projection is TRUE content that may be one behind, so
+        // it says so; a shell confirmed against the upstream this request says
+        // nothing — which is how the marker DROPS the moment the upstream
+        // answers again (the reconcile-upgrade path, observable from outside).
+        let body = || {
+            Response::builder()
+                .status(200)
+                .header("content-type", "text/html; charset=utf-8")
+                .body(Full::new(Bytes::from_static(b"<app-root></app-root>")))
+                .unwrap()
+        };
+
+        let warm = with_bundle_provenance_header(body(), ShellProvenance::LastReconciled);
+        assert_eq!(
+            warm.headers().get("x-elohim-bundle").unwrap(),
+            "last-reconciled",
+            "a cache-served shell must declare its staleness class"
+        );
+        assert_eq!(warm.status(), 200);
+
+        let fresh = with_bundle_provenance_header(body(), ShellProvenance::DeclaredHead);
+        assert!(
+            fresh.headers().get("x-elohim-bundle").is_none(),
+            "a shell confirmed against the upstream carries no staleness marker"
+        );
+    }
+
+    #[test]
     fn epr_ssr_fallback_carries_skip_header_and_single_island() {
         // The EPR→SSR fallback serves the projected bundle: the chrome island is
         // spliced INSIDE dispatch_to_projected_epr (via maybe_inject_chrome), and
@@ -7355,5 +7721,99 @@ mod op_gate_tests {
             NoCredentialDecision::Forward,
             "off maps to forward for totality (gate never fires in Off)"
         );
+    }
+
+    // ── operator runtime verbs (operator-runtime-surface slice 1) ────────────
+
+    use super::{effective_op_gate_mode, is_operator_verb_path, op_gate_capability};
+
+    #[test]
+    fn operator_reconcile_maps_to_its_own_capability() {
+        assert_eq!(
+            op_gate_capability(&Method::POST, "/api/v1/operator/reconcile"),
+            Some("operator-reconcile"),
+            "the operator verb carries a per-verb capability, not orchestrate-node"
+        );
+        // Content writes keep the original capability.
+        assert_eq!(
+            op_gate_capability(&Method::POST, "/db/content"),
+            Some("orchestrate-node")
+        );
+        // Non-POST and unknown paths are not capability-gated here.
+        assert_eq!(
+            op_gate_capability(&Method::GET, "/api/v1/operator/reconcile"),
+            None
+        );
+        assert_eq!(
+            op_gate_capability(&Method::POST, "/api/v1/operator/unknown"),
+            None
+        );
+    }
+
+    #[test]
+    fn operator_paths_force_enforce_regardless_of_configured_mode() {
+        for configured in [OpGateMode::Off, OpGateMode::Observe, OpGateMode::Enforce] {
+            assert_eq!(
+                effective_op_gate_mode(&configured, "/api/v1/operator/reconcile"),
+                OpGateMode::Enforce,
+                "operator verbs are a born-gated class: {configured:?} must not soften them"
+            );
+        }
+        // Non-operator paths keep the configured mode.
+        assert_eq!(
+            effective_op_gate_mode(&OpGateMode::Observe, "/db/content"),
+            OpGateMode::Observe
+        );
+    }
+
+    #[test]
+    fn operator_verb_denied_verdict_is_fail_closed() {
+        let verdict = Ok(false);
+        assert_eq!(
+            compute_op_gate_decision(
+                &OpGateMode::Enforce,
+                &Method::POST,
+                "/api/v1/operator/reconcile",
+                &verdict
+            ),
+            OpGateDecision::Deny403,
+            "a caller without an active grant must be refused"
+        );
+        let infra: Result<bool, String> = Err("storage unreachable".into());
+        assert_eq!(
+            compute_op_gate_decision(
+                &OpGateMode::Enforce,
+                &Method::POST,
+                "/api/v1/operator/reconcile",
+                &infra
+            ),
+            OpGateDecision::Deny403,
+            "infra failure on an operator verb must deny (fail-closed)"
+        );
+    }
+
+    #[test]
+    fn operator_verb_allowed_verdict_forwards() {
+        let verdict = Ok(true);
+        assert_eq!(
+            compute_op_gate_decision(
+                &OpGateMode::Enforce,
+                &Method::POST,
+                "/api/v1/operator/reconcile",
+                &verdict
+            ),
+            OpGateDecision::Allow,
+            "a commitment holder's verb must forward to the peer"
+        );
+    }
+
+    #[test]
+    fn unknown_operator_paths_are_recognized_for_fail_closed_handling() {
+        // The dispatch path denies any /api/v1/operator/* whose verb has no
+        // registered capability — this pins the recognizer both helpers share.
+        assert!(is_operator_verb_path("/api/v1/operator/reconcile"));
+        assert!(is_operator_verb_path("/api/v1/operator/anything-future"));
+        assert!(!is_operator_verb_path("/api/v1/operators"));
+        assert!(!is_operator_verb_path("/db/content"));
     }
 }

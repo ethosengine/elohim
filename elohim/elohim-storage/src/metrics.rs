@@ -222,6 +222,27 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Active bindings that were SELF-ASSERTED at the moment an economic
+    /// attribution join asked for them (habit `identity-cross-signed`).
+    ///
+    /// This is the measure that makes the habit's red honest. An
+    /// `AgentPeerBinding` claims "agent X owns transport endpoint Y"; today that
+    /// claim carries `STAGE1_SIGNATURE_SENTINEL`, so a gossiped spoof
+    /// (agent_cid = attacker, transport_id = victim) would credit the attacker
+    /// for the victim's work. label: posture = "observe" (counted and served —
+    /// the default, so nothing on a fleet changes) | "enforce" (counted and
+    /// REFUSED). The flip to green is this counter reaching zero under
+    /// `posture="enforce"` — i.e. every binding an attribution join touches is
+    /// cross-signed, not merely that nobody looked.
+    pub static ref ATTRIBUTION_UNVERIFIED_BINDINGS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_attribution_unverified_bindings_total",
+            "Self-asserted (non-cross-signed) peer identity bindings reaching an economic attribution join.",
+        ),
+        &["posture"],
+    )
+    .unwrap();
+
     // ── View-federation outcome attribution (the notary-authority spine) ──
 
     /// Outbound view-federation request outcomes at the resolution site. Before
@@ -685,6 +706,35 @@ lazy_static! {
     pub static ref SALVAGE_PROVIDER_UNRESOLVED: IntCounter = IntCounter::new(
         "elohim_salvage_provider_unresolved_total",
         "Salvage author ticks skipped because no agent_cid self-provider was resolvable.",
+    )
+    .unwrap();
+
+    /// Custody pledges ROTATED: a successor `custody-blob` commitment naming the
+    /// content's CURRENT blob was notarized AND its stale predecessor was marked
+    /// `superseded`. The complete-ceremony success series — a rotation that
+    /// authored but failed to supersede counts
+    /// [`CustodyRotationSkip::SupersedeFailed`] instead, so this counter never
+    /// over-reports a half-applied rotation.
+    ///
+    /// Denominator partner: [`CUSTODY_ROTATION_SKIPPED`] (every examined pledge
+    /// that did not rotate, by typed reason), so a rotation rate is readable
+    /// rather than inferred from a bare success count.
+    pub static ref CUSTODY_ROTATION_AUTHORED: IntCounter = IntCounter::new(
+        "elohim_custody_rotation_authored_total",
+        "Custody pledges rotated onto the content's current blob (successor notarized + predecessor superseded).",
+    )
+    .unwrap();
+
+    /// Examined custody pledges that did NOT rotate, by
+    /// [`CustodyRotationSkip`]. Every label combination is pre-touched at
+    /// registration (see `register_all`) so each series reads as a measured zero
+    /// from boot rather than an absent series.
+    pub static ref CUSTODY_ROTATION_SKIPPED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_custody_rotation_skipped_total",
+            "Custody pledges examined but not rotated, by reason (no_content_id | content_blob_absent | not_divergent | successor_exists | bytes_absent | author_failed | supersede_failed).",
+        ),
+        &["reason"],
     )
     .unwrap();
 
@@ -1740,6 +1790,20 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_ANON_BUCKET_COUNT.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CORPUS_DOCS.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_NAMESPACE_VIOLATIONS.clone()));
+        let _ = REGISTRY.register(Box::new(ATTRIBUTION_UNVERIFIED_BINDINGS.clone()));
+        // Pre-touch the posture this deployment actually runs, so "no
+        // self-asserted binding reached an attribution join" reads as a measured
+        // 0 rather than an absent series. Only the live posture is pre-touched:
+        // a 0 on the *other* label would read as "enforce is on and refusing
+        // nothing", which is the exact false-green this counter exists to deny.
+        ATTRIBUTION_UNVERIFIED_BINDINGS
+            .with_label_values(&[
+                match crate::db::peer_identity_bindings::attribution_posture() {
+                    crate::db::peer_identity_bindings::AttributionPosture::Enforce => "enforce",
+                    crate::db::peer_identity_bindings::AttributionPosture::Observe => "observe",
+                },
+            ])
+            .inc_by(0);
         let _ = REGISTRY.register(Box::new(SIGNAL_DECODE_MISS_TOTAL.clone()));
         // Pre-touch the three signal families so zero-misses reads as a
         // measured 0, never as an absent series (the exact ambiguity the
@@ -1930,6 +1994,19 @@ pub fn register_all() {
             .inc_by(0);
         let _ = REGISTRY.register(Box::new(PROVIDE_PROVIDER_UNRESOLVED.clone()));
         let _ = REGISTRY.register(Box::new(SALVAGE_PROVIDER_UNRESOLVED.clone()));
+        let _ = REGISTRY.register(Box::new(CUSTODY_ROTATION_AUTHORED.clone()));
+        let _ = REGISTRY.register(Box::new(CUSTODY_ROTATION_SKIPPED.clone()));
+        // Pre-touch every reason so all seven series exist in `/metrics` from
+        // boot — an outcome that has never fired reads as a measured zero, not
+        // an absent series.
+        {
+            use seam_contracts::ReasonLabel as _;
+            for reason in CustodyRotationSkip::ALL {
+                CUSTODY_ROTATION_SKIPPED
+                    .with_label_values(&[reason.label()])
+                    .inc_by(0);
+            }
+        }
         let _ = REGISTRY.register(Box::new(IDENTITY_KEY_SUPERSEDE.clone()));
         let _ = REGISTRY.register(Box::new(SHARD_PUSH_PEER_UNRESOLVED.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_HEAL_OUTCOMES.clone()));
@@ -3191,6 +3268,89 @@ pub fn inc_election_obey_probe(outcome: ElectionObeyProbe) {
     CONTENT_ELECTION_OBEY_PROBE
         .with_label_values(&[outcome.label()])
         .inc();
+}
+
+/// Why a custody-rotation pass did NOT author a successor pledge for one
+/// examined `custody-blob` commitment.
+///
+/// A closed vocabulary so every examined row lands in exactly one bucket beside
+/// the [`CUSTODY_ROTATION_AUTHORED`] success series — a rotation rate is
+/// readable, not inferred. Variant order is the order
+/// [`crate::services::custody_rotation`] evaluates them: the detection
+/// decisions first, then the acting ones.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CustodyRotationSkip {
+    /// The pledge's `metadata_json` resolves no `contentId` — absent,
+    /// unparseable, or carrying no such key. We never guess which content a
+    /// pledge meant (C4).
+    NoContentId,
+    /// The bound content row is missing in this scope, or its blob column for
+    /// the pledge's artifact role is NULL/empty.
+    ContentBlobAbsent,
+    /// The pledge already names the content's current blob — the healthy
+    /// steady state, and the denominator's dominant series.
+    NotDivergent,
+    /// A successor for `(provider, receiver, current blob)` already exists;
+    /// replaying the pass mints nothing (C6b).
+    SuccessorExists,
+    /// The local pantry does not hold the current bytes — a node never pledges
+    /// custody of bytes it cannot serve.
+    BytesAbsent,
+    /// The notarized successor create (or its activation) failed; retried next
+    /// tick, predecessor left standing.
+    AuthorFailed,
+    /// The successor was authored but the predecessor's supersession mark
+    /// failed.
+    SupersedeFailed,
+}
+
+impl seam_contracts::ReasonLabel for CustodyRotationSkip {
+    const ALL: &'static [Self] = &[
+        CustodyRotationSkip::NoContentId,
+        CustodyRotationSkip::ContentBlobAbsent,
+        CustodyRotationSkip::NotDivergent,
+        CustodyRotationSkip::SuccessorExists,
+        CustodyRotationSkip::BytesAbsent,
+        CustodyRotationSkip::AuthorFailed,
+        CustodyRotationSkip::SupersedeFailed,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            CustodyRotationSkip::NoContentId => "no_content_id",
+            CustodyRotationSkip::ContentBlobAbsent => "content_blob_absent",
+            CustodyRotationSkip::NotDivergent => "not_divergent",
+            CustodyRotationSkip::SuccessorExists => "successor_exists",
+            CustodyRotationSkip::BytesAbsent => "bytes_absent",
+            CustodyRotationSkip::AuthorFailed => "author_failed",
+            CustodyRotationSkip::SupersedeFailed => "supersede_failed",
+        }
+    }
+}
+
+/// Count one custody-rotation successor authored AND its predecessor superseded
+/// (the complete ceremony — a partial rotation counts a
+/// [`CustodyRotationSkip`], never this).
+pub fn inc_custody_rotation_authored() {
+    CUSTODY_ROTATION_AUTHORED.inc();
+}
+
+/// Count one examined custody pledge that did NOT rotate, by typed reason.
+pub fn inc_custody_rotation_skipped(reason: CustodyRotationSkip) {
+    use seam_contracts::ReasonLabel as _;
+    CUSTODY_ROTATION_SKIPPED
+        .with_label_values(&[reason.label()])
+        .inc();
+}
+
+/// Current value of one [`CUSTODY_ROTATION_SKIPPED`] series. The counter is
+/// process-wide, so callers compare a before/after delta rather than an
+/// absolute.
+pub fn custody_rotation_skipped_count(reason: CustodyRotationSkip) -> u64 {
+    use seam_contracts::ReasonLabel as _;
+    CUSTODY_ROTATION_SKIPPED
+        .with_label_values(&[reason.label()])
+        .get()
 }
 
 /// Count one requester-side head-record fetch outcome, by

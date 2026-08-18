@@ -32,3 +32,23 @@ Change `project_commitment_from_wire` to persist the full list (`serde_json::to_
 `Vec`), not `first_or_none`. TDD: a signal-projected commitment round-trips its full classification
 list; an operate-doorway signal preserves all capabilities. Then the column is uniformly a list at
 every producer and the accessor's bare-tolerance becomes purely defensive (in-flight legacy only).
+
+## Live confirmation + new producer/symptom evidence (2026-08-18, ch07 rotation session)
+
+Mesh-observed on the local 3-peer mesh while validating `services/custody_rotation.rs`
+(rotation-authored custody-blob successor, conductor path via `ReaCommitmentService::create`):
+
+- **Third encoding shape live**: the rotation author passes a bare scalar into the db-layer
+  input; `to_shefa_input` wraps it (`vec![s]`) so the ZOME stores the correct JSON list — but
+  the eager projection (`create_via_conductor`, Gap-F arm) applies the same
+  `first_or_none(parse_json_strings(...))` reduction as the signal arm, landing the row
+  bare-scalar. Meanwhile the HTTP-create path double-encodes (input view JSON-encodes the
+  Vec, `to_shefa_input` wraps the encoded string again) and survives only because
+  `first_or_none` unwraps one layer. Three shapes in the column, all from live producers.
+- **Symptoms**: `ReaCommitmentView` renders a bare-scalar row as `resourceClassifiedAs: null`
+  (fold classification unaffected — `classifications_of` is bare-tolerant, and the ch07
+  stocked gauge lit correctly); the resilience card's commitments join reads
+  `activePeers: 0` for rotation-authored pledges.
+- Fix shape unchanged (persist the full list at every producer, incl. BOTH
+  `create_via_conductor`'s eager arm and the signal arm); add the double-encoding HTTP path
+  to the TDD list.

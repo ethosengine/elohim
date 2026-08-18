@@ -14,6 +14,7 @@ pub mod breaker;
 pub mod capability;
 pub mod registry;
 pub mod types;
+pub mod warm_shell;
 
 pub use breaker::SsrRenderBreaker;
 

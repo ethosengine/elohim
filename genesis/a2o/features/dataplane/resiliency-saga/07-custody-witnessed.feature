@@ -40,15 +40,47 @@
 # Probe: /api/v1/weave then /metrics; current state: sweep fires (station green
 # once the When lands), shard_manifests resolution empty (red), custody-blob
 # commitment absent (red). The finish line stays exactly where it was.
+#
+# Station named at RCA (2026-08-18) — the commitment station's red is ROTATION:
+# active custody-blob commitments exist (seeded 2026-08-15) but classify the
+# blob hashes of THAT DAY's bundles; every SSR-bundle redeploy rotates
+# content.blob_hash/server_blob_hash underneath them, and nothing re-stated the
+# pledge (the seeder's own comment declares that reconcile pass out of scope).
+# Cure: services/custody_rotation.rs — level-triggered rotation pass (5min tick,
+# CUSTODY_ROTATION_ENABLED default on) authors the successor via the notarized
+# create-then-ACTIVATE path (DNA create stamps state="created"; the fold only
+# reads state='active') and retires the predecessor through the projection-layer
+# supersession ceremony. Probe: rea_commitments shows the successor active with
+# metadata.origin="rotation" and the predecessor state='superseded'; then this
+# scenario's gauge assertion. Residual (separate node, not this finish line):
+# location rows under superseded shard hashes keep class="unknown" high (1543
+# on alpha-A at RCA) until peer-announced orphan hygiene exists.
 @e2e @dataplane @concern:saga-07-custody-witnessed
 Feature: Chapter 7 — custody is witnessed
-  A shard's custody state is not real until it is OBSERVED and classified, not
-  merely intended. The operational-weave fold already computes
-  none/shelved/stocked/stocked_warm/unknown/observed_lost counts from custody
-  observation rows; this chapter proves that classification is visible on the live
-  surface as a labeled gauge. The gauge is wired (rides the /api/v1/weave sweep,
-  gated on an active local session) — red here means the sweep hasn't populated
-  the series on alpha yet, not that the gauge is missing.
+  A household entrusts its content — a family's writings, a learner's record —
+  to peers who PROMISE to hold the bytes. Until some peer OBSERVES that holding
+  and classifies it, the promise is unfalsifiable: availability can rot silently
+  and no one is entitled to reassurance. The resiliency saga proves, chapter by
+  chapter, that the dataplane's availability story holds under real operational
+  conditions; this chapter is its custody-observability leg.
+
+  "Witnessed" here is a real chain, not a metaphor: peers record custody
+  observation rows (self-held / verified / announced possession evidence); the
+  operational-weave fold joins each observed shard-holder pair against the
+  holder's ACTIVE custody promise and classifies it — none, shelved, stocked,
+  stocked_warm, unknown, or observed_lost; and the storage peer "alpha-A" (the
+  author-side storage node of the alpha deployment pair) publishes those counts
+  as a labeled Prometheus gauge. Reading "/api/v1/weave" is not a passive fetch:
+  that request IS the trigger that runs the sweep and populates the series.
+
+  "stocked" is the strongest honest class — an active promise PLUS
+  locally-witnessed possession of the promised bytes. One stocked shard proves
+  the whole witnessing mechanism end-to-end (observation -> promise join ->
+  classification -> visible gauge); full-coverage classification of every
+  observed shard is a subsequent concern, tracked in the header notes. In
+  particular, observed shards left under superseded deployments' hashes remain
+  honestly "unknown" — that residual is a separate hygiene chapter, not this
+  finish line.
 
   Background:
     Given peer "alpha-A" at "alpha-A"

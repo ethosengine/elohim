@@ -119,8 +119,17 @@ pnpm install --frozen-lockfile --filter "@elohim/a2o..."
 # a2o-playwright-device-hardfail-topology.
 cd "${A2O_DIR}"
 CUCUMBER_EXIT=0
+# B-side env reaches the suite too: the quiesce gate above already receives the
+# pair, but fixtures resolve the second doorway as E2E_DOORWAY_BETA (household
+# fixtures / doorway-footprint-convergence) or E2E_DOORWAY_B (surfaces.ts) —
+# without these exports the beta-leg scenarios hard-fail on URL resolution
+# ("Cannot resolve doorway URL from: E2E_DOORWAY_BETA", edge #1362) instead of
+# probing the live pair.
 E2E_DOORWAY_ALPHA="${DOORWAY}" \
 E2E_STORAGE_URL="${STORAGE_URL}" \
+E2E_DOORWAY_B="${E2E_DOORWAY_B:-https://elohim.host}" \
+E2E_DOORWAY_BETA="${E2E_DOORWAY_BETA:-${E2E_DOORWAY_B:-https://elohim.host}}" \
+E2E_STORAGE_URL_B="${E2E_STORAGE_URL_B:-http://elohim-adam-alpha.elohim-alpha.svc.cluster.local:8090}" \
   pnpm exec cucumber-js \
     --format "json:${CUCUMBER_OUT}" \
     --tags '@dataplane and not @wip and not @browser-only' \

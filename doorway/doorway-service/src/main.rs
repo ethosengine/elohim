@@ -889,6 +889,33 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         }
     }
 
+    // Warm-boot shell cache hydration (Task 3.4).
+    //
+    // The SSR hot cache is in-memory and dies with the pod; the shell it needs
+    // used to be re-fetched from a still-catching-up upstream on every `/`
+    // request, which is a doomed 10s stall on the browser hot path. The
+    // Mongo-backed app_file_cache OUTLIVES the pod and already holds the last
+    // reconciled bundle, so hydrate each mounted projection's entry file from it
+    // NOW — before the upstream has answered anything — and `/` is servable from
+    // the first request. Best-effort: a cold archive hydrates 0 and the lazy
+    // path still converges.
+    {
+        let targets: Vec<(String, String)> = state
+            .epr_router
+            .mount_url_paths()
+            .into_iter()
+            .filter_map(|p| state.epr_router.dispatch(&p))
+            .map(|projection| (projection.epr_id, projection.entry_file))
+            .collect();
+        if !targets.is_empty() {
+            let hydrated = state.warm_shell.hydrate(&targets).await;
+            info!(
+                mounts = targets.len(),
+                hydrated, "Warm-boot shell cache hydration complete"
+            );
+        }
+    }
+
     // Periodic EPR-router self-heal refresh (operator-free recovery).
     //
     // The B12 boot-fetch above is a one-shot with a 10s timeout. If storage is

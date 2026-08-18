@@ -202,6 +202,20 @@ Scenario 2/3 run against the live pair (organic shed windows are real red eviden
 > ROOT-DOCUMENT serve only. (c) New Task 3.4 (warm-boot shell cache) is the
 > repo-side cure for that leg.
 
+> **Task 3.1 constraint evidence (2026-08-18 attempt, diff reverted per the
+> revision above).** Two facts the operator decision must carry, verified
+> against the in-repo `relay-addr-beacon` source (`src/config.rs:100-106`,
+> `main.rs:79-89`, `sinks/cloudflare.rs`): (1) `--shared-record-name` /
+> `--record-owner` are `Option<String>` — NOT repeatable; a second flag
+> silently last-value-wins, so one beacon leg cannot contribute to BOTH
+> `doorways.elohim.host` and the apex. Apex multi-A via this mechanism means
+> either a beacon change (repeatable shared lanes) or sacrificing
+> `doorways.elohim.host` maintenance — the latter breaks the already-shipped
+> doorway-set failover. (2) The staged Wave-2 manifest
+> `manifests/infra/alpha-relay-addr-beacons.yaml` duplicates the pre-3.1
+> beacon args (shem's exclusive apex ownership) and must receive the same
+> treatment when applied, or it silently reverts the apex ownership model.
+
 ### Task 3.1: Apex multi-A manifest diff (operator-gated apply) — **tier: Sonnet**
 **Files:** Modify `genesis/orchestrator/manifests/infra/alpha-coturn-shem.yaml`, `genesis/orchestrator/manifests/infra/alpha-coturn-operations.yaml`.
 **Spec:** Add `--shared-record-name elohim.host --record-owner <shem|operations>` contribution to BOTH beacon legs (exact flag shape copied from the working `doorways.elohim.host` stanzas at `alpha-coturn-shem.yaml:227-234` / `alpha-coturn-operations.yaml:232-239`), REPLACING the shem leg's exclusive `--record-name elohim.host` ownership. Header comment documents rollback (revert to single-owner) and the ingress precondition: doorway-A's ingress must accept the `elohim.host` host (add the host to `alpha.yaml`'s ingress + TLS SAN — include that diff) or A answers 404 for apex traffic. **This lands as a committed, ready-to-apply diff; the operator decides when the pipeline reconciles it** (outward-facing DNS semantics change — §Operator menu item 2).

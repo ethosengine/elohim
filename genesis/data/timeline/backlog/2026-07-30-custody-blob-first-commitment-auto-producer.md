@@ -128,3 +128,15 @@ artifacts ever get their own runtime distribution path distinct from the
 browser artifact for the same content id, the sweep will cancel a still-live
 pledge for the sibling artifact; that needs an artifact-address discriminator
 when it arises.
+
+## Residual found 2026-08-18 (ch07 rotation session): salvage author never ACTIVATES
+
+The completion claim above covers the shared deterministic-id helper but not the
+create-then-activate step: `SalvageCommitmentAuthor::author_custody_blob` calls the bare
+`conductor_writes::call_create_rea_commitment`, and the DNA stamps every fresh commitment
+`state: "created"` — which the custody fold (and every `state='active'` consumer) never
+reads. Salvage-authored pledges are therefore inert to custody classification until an
+activation step mirrors `ensure_active_self_custody` / the rotation author
+(`services/custody_rotation.rs::ConductorRotationAuthor`, which does
+`ReaCommitmentService::create` + `update_state`). Completion-claim gap flagged for
+/deliver re-judgement — status left as-is here per the authority boundary.

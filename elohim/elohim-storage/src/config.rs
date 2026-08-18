@@ -1023,6 +1023,27 @@ pub struct Config {
     /// env `MANIFEST_BACKFILL_ENABLED`.
     #[serde(default = "default_true")]
     pub manifest_backfill_enabled: bool,
+
+    /// Custody-commitment rotation
+    /// (`services::custody_rotation::run_rotation_pass`): when a content's blob
+    /// rotates under a `custody-blob` pledge this node PROVIDES, author a
+    /// successor pledge naming the current blob and mark the stale predecessor
+    /// `superseded`.
+    ///
+    /// Default **true**, deliberately, and NOT tied to
+    /// `salvage_capacity_enabled` — same reasoning as
+    /// [`Config::manifest_backfill_enabled`]: salvage volunteers a node for NEW
+    /// custody it does not yet hold (the imago-dei consent floor keeps that
+    /// opt-in), while rotation only re-states a promise this node ALREADY made,
+    /// over bytes it verifiably holds. That is reconciliation, not conscription.
+    /// A rotation is only ever authored when the local pantry holds the current
+    /// bytes.
+    ///
+    /// To disable: set env `CUSTODY_ROTATION_ENABLED` to `0`/`false`/`off` (or
+    /// `custody_rotation_enabled = false` in config.toml). Loaded from env
+    /// `CUSTODY_ROTATION_ENABLED`.
+    #[serde(default = "default_true")]
+    pub custody_rotation_enabled: bool,
 }
 
 fn default_peer_policy_path() -> PathBuf {
@@ -1193,6 +1214,7 @@ impl Default for Config {
             demand_autopin_enabled: default_true(),
             demand_autopin_throttle_seconds: default_demand_autopin_throttle_seconds(),
             manifest_backfill_enabled: default_true(),
+            custody_rotation_enabled: default_true(),
         }
     }
 }
@@ -1328,6 +1350,15 @@ mod transport_backend_tests {
         // custody — unlike `salvage_capacity_enabled` this ships ON. A flipped
         // default must not pass silently.
         assert!(super::Config::default().manifest_backfill_enabled);
+    }
+
+    #[test]
+    fn custody_rotation_defaults_on() {
+        // Re-stating a promise already made over bytes already held is
+        // reconciliation, not conscription — so unlike `salvage_capacity_enabled`
+        // this ships ON. A default-OFF rotation would leave every custody pledge
+        // stale after the first redeploy, silently.
+        assert!(super::Config::default().custody_rotation_enabled);
     }
 
     #[test]

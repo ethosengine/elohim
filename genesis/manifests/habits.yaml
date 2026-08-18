@@ -658,6 +658,33 @@ habits:
     checks:
       - "a2o @concern:doorway-failover (genesis/a2o/features/dataplane/doorway-failover.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
     evidence: >
+      DELTA 2026-08-18 (ch07+failover session): Task 3.4 warm-boot shell cache
+      LANDED desk-proven (doorway gate green: 943 lib/bin tests, clippy, fmt) —
+      / is cache-first (ServeWarm / UpgradeThenWarm-2s / Fetch / instant-Shed
+      decision matrix in render/warm_shell.rs, x-elohim-bundle:last-reconciled
+      marker, boot hydration from app_file_cache, mongo-less degrade = today's
+      path, 9 new tests incl x-ssr-fetches-free warm serve). Kills the live
+      defect measured this session: / stalled 10s (A, 200 shell-fetch-failed)
+      / 20s (B, 503) on EVERY request through catch-up — the suite's
+      HeadersTimeoutError. Local-mesh proof: both local doorways shed in 1-4ms
+      (was 10-20s class) and the @concern suite runs 0.18s with the
+      classification scenario green. Also: E2E_DOORWAY_BETA/_B/_STORAGE_URL_B
+      now reach the cucumber env (reconcile-inventory's beta-leg red was env
+      plumbing); Task 3.2 apex-build client fallbacks configured
+      (environment.prod.ts). Task 3.1 apex multi-A attempted and REVERTED per
+      the WS3 revision — new hard evidence in the plan: relay-addr-beacon's
+      shared-record lane is single-slot (clap last-value-wins), so apex
+      multi-A needs a beacon change or sacrifices doorways.elohim.host;
+      operator menu item 2 now carries that constraint. Sibling saga ch07
+      (custody-witnessed): rotation cure landed (elohim-storage
+      services/custody_rotation.rs, gate green 2772 tests) and PROVEN on the
+      local 3-peer mesh end-to-end through public surfaces: stale pledge ->
+      rotation tick 150s -> notarized+ACTIVATED successor (origin:rotation,
+      dht-anchored) -> predecessor superseded -> self-held evidence ->
+      elohim_custody_class_count{class="stocked"} 0->1. Both cures reach alpha
+      on the next edge deploy; the a2o scenarios remain the flip authority.
+      Prior evidence below.
+
       RED WRITTEN 2026-07-31 (doorway-federation-failover sprint session,
       live-probed in-session): elohim.host / -> 503 catching-up shed (adam
       post-deploy arc-convergence window) while doorway-alpha / -> 200. The
@@ -714,9 +741,31 @@ habits:
     status: red
     active: true
     checks:
-      - "a2o @concern:operator-runtime-surface (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — @wip-tagged, so EXCLUDED from the edge Dataplane Validation rollup until the operator drops @wip; measure locally with A2O_RUN_WIP=1 npx cucumber-js --tags '@concern:operator-runtime-surface')"
-      - "cargo test --test operator_verbs (elohim/elohim-storage — storage-side verb halves: holder accepted + attestation names the grant cid; no-grant refused; revoked refused; no verified performer refused; loopless peer honest 503)"
+      - "a2o @concern:operator-runtime-surface (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — @wip DROPPED 2026-08-18 by operator decision: COUNTS in the edge Dataplane Validation byConcern rollup; also runnable locally with npx cucumber-js --tags '@concern:operator-runtime-surface')"
+      - "cargo test --test operator_verbs (elohim/elohim-storage — 9 tests: holder accepted + attestation names grant cid AND recorded event id; no-grant refused; revoked refused; no verified performer refused; loopless peer honest 503 with no phantom rate charge; accepted use recorded bounded_by the grant; refusals record nothing; rate_per_hour ceiling refuses the over-limit use)"
     evidence: >
+      DELTA 2026-08-18b (operator decisions executed: @wip dropped + slice 2
+      landed desk-proven): the concern now COUNTS in CI — @wip removed from the
+      feature (operator authorization this turn; the born-red 3f/1pending joins
+      the next edge run's byConcern rollup, stage advisory). Slice 2 emit-then-
+      act: an accepted verb RECORDS its use as an economic_events row
+      (bounded_by = grant cid, the COLUMN DieselRateHistory counts —
+      db::economic_events::record_operator_verb_event, the first legitimate
+      producer against the dormant compute-fulfilled emitter's HELD boundary:
+      the peer records its OWN authorized execution, parties pre-verified,
+      consumption scoped to rate accounting + audit; economic-consequence
+      consumption stays HELD pending cross-signing per identity-cross-signed)
+      BEFORE kicking, so bounds_validator check 6 is LIVE on this path: 9/9
+      integration tests incl. the_rate_ceiling_refuses_the_use_past_the_grant_
+      limit (rate_per_hour=2 grant: uses 1-2 accepted+recorded, use 3 refused
+      "rate-limit-exceeded", not recorded, no kick) and no-phantom-charge legs
+      (refusals + loopless-peer 503 record nothing). Attestation body now
+      carries attestationEventId. Blind-reader loop run per a2o .epr-meta
+      (2 rounds): round-2 verdict REVISE with NO blockers; comment-level
+      repairs applied; the remaining MAJORs all want step-TEXT observability
+      (observable reconcile side-effect step; attestation/directness phrased
+      positively in steps) — surfaced to the operator as the named deferral
+      set, since they re-wire live step definitions.
       DELTA 2026-08-18 (unwired -> RED, slice-1 cure landed desk-proven; first
       local measure recorded): the red is now RUNNABLE — step definitions wired
       for all 4 scenarios (steps/dataplane/operator-commitment-gated-verbs.steps.ts;

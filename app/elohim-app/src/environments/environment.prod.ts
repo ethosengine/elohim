@@ -21,11 +21,12 @@ export const environment: Environment = {
   // ElohimClient configuration (new - mode-aware content client)
   client: {
     doorwayUrl: DOORWAY_PROD_HTTPS,
-    // doorwayFallbacks: intentionally unset here — multi-host failover
-    // ("logical anycast", 2026-07-16 dual-WAN utility-plane failover design
-    // §3a) is an operator decision per family, and cross-family content
-    // parity isn't guaranteed. See environment.alpha.ts for the populated
-    // example.
+    // Apex doorway falls over to alpha's doorway-A on a status-0 (network-
+    // level) failure of the primary ("logical anycast", 2026-07-16 dual-WAN
+    // utility-plane failover design §3a; sprint plan Task 3.2). The
+    // apiBaseUrlInterceptor retries GET/HEAD only; writes are never
+    // auto-retried. See genesis/orchestrator/manifests/doorway/alpha.yaml.
+    doorwayFallbacks: ['https://alpha.elohim.host'],
     apiKey: PROD_API_KEY,
     nodeUrls: [],
     holochainHAppId: 'elohim',

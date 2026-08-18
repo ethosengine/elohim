@@ -147,6 +147,39 @@ impl AppFileCacheService {
         })
     }
 
+    /// Look up the most recently cached copy of a file at ANY blob_hash.
+    ///
+    /// The warm-boot shell cache's "last reconciled bundle" read: when the
+    /// declared head is unknown, or known but not yet stocked, the newest
+    /// archived copy is still true (content-addressed, possibly one-behind)
+    /// content — and serving it beats riding a doomed upstream fetch on the `/`
+    /// hot path. Local-only, like every other method here.
+    pub async fn latest_file(&self, slug: &str, file_path: &str) -> Option<CachedFile> {
+        let db = self.mongo.inner().database(self.mongo.db_name());
+        let collection = db.collection::<AppFileCacheDoc>(APP_FILE_CACHE_COLLECTION);
+
+        let options = mongodb::options::FindOneOptions::builder()
+            .sort(doc! { "cached_at": -1 })
+            .build();
+
+        match collection
+            .find_one(doc! { "slug": slug, "file_path": file_path })
+            .with_options(options)
+            .await
+        {
+            Ok(Some(doc)) => Some(CachedFile {
+                data: doc.data,
+                content_type: doc.content_type,
+                blob_hash: doc.blob_hash,
+            }),
+            Ok(None) => None,
+            Err(e) => {
+                warn!(slug = %slug, file_path = %file_path, error = %e, "latest_file lookup failed");
+                None
+            }
+        }
+    }
+
     /// Insert or update a cached file.
     ///
     /// Uses upsert semantics — if the file already exists with the same
