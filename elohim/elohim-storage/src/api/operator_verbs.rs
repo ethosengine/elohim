@@ -28,11 +28,14 @@
 //! is an ingress property") and is exactly the Tauri/localhost self-operator
 //! path. The commitment gate still runs for every caller.
 //!
-//! ## Attestation (slice 1 = response attestation)
+//! ## Attestation (slice 2 = emit-then-act)
 //!
-//! The 200 body names the commitment CID the peer acted under. Slice 2 emits
-//! the corresponding REA `EconomicEvent` (`bounded_by` = the grant CID), which
-//! also makes `bounds_validator`'s rate check live for operator verbs.
+//! The 200 body names the commitment CID the peer acted under, AND the verb's
+//! execution is recorded as an `economic_events` row (`bounded_by` = the grant
+//! CID, the COLUMN) **before** the kick fires. Emit-then-act makes the grant's
+//! `rate_per_hour` ceiling fail-closed and REAL: `bounds_validator` check 6
+//! counts those rows on the NEXT authorization, and a use that cannot be
+//! accounted is refused, never executed unaccounted.
 
 use bytes::Bytes;
 use http_body_util::Full;
@@ -68,6 +71,10 @@ pub struct OperatorVerbAttestation {
     pub attested_by: String,
     /// ISO-8601 wall-clock of the authorization decision.
     pub requested_at: String,
+    /// Id of the `economic_events` row recording this use of the grant
+    /// (`bounded_by` = `commitment_cid`) — the durable audit half of the
+    /// attestation, and what the rate ceiling counts.
+    pub attestation_event_id: String,
 }
 
 /// Response body for a refused operator verb.
@@ -130,15 +137,32 @@ pub enum ReconcileVerbOutcome {
     Accepted(OperatorVerbAttestation),
     Refused(OperatorVerbRefusal),
     LoopUnavailable,
+    /// Authorized, but the use could not be RECORDED (economic-event insert
+    /// failed). Emit-then-act: an unaccountable use is refused (503), never
+    /// executed unaccounted.
+    AccountingUnavailable,
 }
 
-/// Authorize and execute the reconcile verb for `performer`.
+/// Authorize, account, and execute the reconcile verb for `performer`.
 ///
 /// `performer: None` (no verified-performer header) is an immediate refusal —
 /// there is nothing to authorize (fail-closed, C12). The commitment gate runs
-/// for every named performer; only an allowed verdict reaches the kick.
+/// for every named performer; only an allowed verdict reaches accounting, and
+/// only an accounted use reaches the kick (emit-then-act):
+///
+/// 1. `authorize_operation` — grant lookup + 7-check bounds, INCLUDING the
+///    rate window over prior recorded uses (`economic_events.bounded_by`).
+/// 2. Loop availability pre-check — an authorized verb on a loopless peer is
+///    an honest 503 BEFORE anything is recorded (no phantom rate charge).
+/// 3. `record_operator_verb_event` — the use lands in `economic_events`
+///    (`bounded_by` = grant CID); insert failure refuses the verb (503).
+/// 4. Kick. The post-record shutdown race (channel closes between the
+///    pre-check and the send) returns LoopUnavailable and deliberately leaves
+///    the recorded row — over-counting is the safe direction for a rate
+///    ceiling, and the row honestly records an authorized attempt.
 pub async fn perform_reconcile_verb(
     pool: &DbPool,
+    ctx: &crate::db::AppContext,
     performer: Option<&str>,
     kick: Option<&tokio::sync::mpsc::Sender<()>>,
     self_cid: &str,
@@ -188,16 +212,60 @@ pub async fn perform_reconcile_verb(
         .commitment_cid
         .unwrap_or_else(|| "unknown-commitment".into());
 
+    // Loop availability pre-check BEFORE accounting: an authorized verb on a
+    // loopless peer is an honest 503 with no phantom rate charge (C4).
+    let loop_available = matches!(kick, Some(tx) if !tx.is_closed());
+    if !loop_available {
+        tracing::warn!(
+            performer,
+            %commitment_cid,
+            "operator-verb reconcile authorized but reconcile loop unavailable"
+        );
+        return ReconcileVerbOutcome::LoopUnavailable;
+    }
+
+    // Emit-then-act: record this use of the grant so the rate window counts
+    // it on the NEXT authorization. An unrecordable use is refused (503) —
+    // never executed unaccounted.
+    let event_id = format!("ee-opverb-{}", uuid::Uuid::new_v4());
+    {
+        let mut conn = match pool.get() {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!(performer, %commitment_cid, error = %e,
+                    "operator-verb reconcile: accounting pool unavailable — refusing");
+                return ReconcileVerbOutcome::AccountingUnavailable;
+            }
+        };
+        if let Err(e) = crate::db::economic_events::record_operator_verb_event(
+            &mut conn,
+            ctx,
+            &event_id,
+            OPERATOR_RECONCILE_CAPABILITY,
+            performer,
+            self_cid,
+            &commitment_cid,
+            &now_iso,
+        ) {
+            tracing::warn!(performer, %commitment_cid, error = %e,
+                "operator-verb reconcile: use not recordable — refusing (emit-then-act)");
+            return ReconcileVerbOutcome::AccountingUnavailable;
+        }
+    }
+
     let outcome = match kick_reconcile(kick) {
         KickOutcome::Scheduled => "reconcile-scheduled",
         KickOutcome::AlreadyPending => "reconcile-already-pending",
         KickOutcome::Unavailable => {
-            // Authorized but the loop is off — honest absence (C4), never a
-            // 200 that did nothing.
+            // Shutdown race: the channel closed between the pre-check and the
+            // send. The recorded row deliberately stands — over-counting is
+            // the safe direction for a rate ceiling, and it honestly records
+            // an authorized attempt.
             tracing::warn!(
                 performer,
                 %commitment_cid,
-                "operator-verb reconcile authorized but reconcile loop unavailable"
+                %event_id,
+                "operator-verb reconcile: loop closed after accounting (shutdown race)"
             );
             return ReconcileVerbOutcome::LoopUnavailable;
         }
@@ -206,8 +274,9 @@ pub async fn perform_reconcile_verb(
     tracing::info!(
         performer,
         %commitment_cid,
+        %event_id,
         outcome,
-        "operator-verb reconcile ACCEPTED (commitment-gated)"
+        "operator-verb reconcile ACCEPTED (commitment-gated, use recorded)"
     );
 
     ReconcileVerbOutcome::Accepted(OperatorVerbAttestation {
@@ -217,6 +286,7 @@ pub async fn perform_reconcile_verb(
         outcome,
         attested_by: self_cid.to_string(),
         requested_at: now_iso,
+        attestation_event_id: event_id,
     })
 }
 
@@ -239,11 +309,20 @@ pub async fn handle_reconcile(
 
     let now_iso = chrono::Utc::now().to_rfc3339();
 
-    match perform_reconcile_verb(pool, performer.as_deref(), kick, self_cid, now_iso).await {
+    // Operator verbs are node-scoped shared infrastructure — their accounting
+    // events land in the `elohim` app scope (the projector-status precedent),
+    // independent of any X-App-Id a client sends. The rate window counts by
+    // `bounded_by` alone, so the scope choice never affects enforcement.
+    let ctx = crate::db::AppContext::default_elohim();
+
+    match perform_reconcile_verb(pool, &ctx, performer.as_deref(), kick, self_cid, now_iso).await {
         ReconcileVerbOutcome::Accepted(att) => Ok(response::ok(&att)),
         ReconcileVerbOutcome::Refused(refusal) => Ok(response::forbidden(&refusal)),
         ReconcileVerbOutcome::LoopUnavailable => Ok(response::service_unavailable(
             "reconcile loop unavailable on this peer (projection-reconcile disabled)",
+        )),
+        ReconcileVerbOutcome::AccountingUnavailable => Ok(response::service_unavailable(
+            "operator-verb accounting unavailable (use could not be recorded); refusing to act unaccounted",
         )),
     }
 }

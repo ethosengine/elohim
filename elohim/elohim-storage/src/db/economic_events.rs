@@ -703,6 +703,97 @@ pub fn list_compute_fulfilled_events(
         .map_err(|e| StorageError::Internal(format!("compute-fulfilled query failed: {e}")))
 }
 
+/// Record an operator-verb execution EconomicEvent bounded by its authorizing
+/// `delegates-compute` grant (habit operator-runtime-surface, slice 2).
+///
+/// Same focused-insert pattern as [`record_compute_fulfilled_event`] (the
+/// action is outside `rea_actions::ALL`, and `bounded_by` must land in the
+/// COLUMN — [`crate::services::rate_history::DieselRateHistory`] counts the
+/// column, so this write is what makes `bounds_validator` check 6 (the grant's
+/// `rate_per_hour` ceiling) REAL for operator verbs.
+///
+/// `action` is the verb's capability string (e.g. `"operator-reconcile"`) —
+/// deliberately NOT `"compute-fulfilled"`, so the REA facing's
+/// observed-`mutual_compute` fold (which lists that action) is not polluted by
+/// operator-verb accounting.
+///
+/// # Why this producer is legitimate against the HELD boundary above
+///
+/// [`record_compute_fulfilled_event`]'s HELD note forbids wiring a producer
+/// until forgeability is addressed. This fn's one caller
+/// (`api::operator_verbs::perform_reconcile_verb`) satisfies the conditions
+/// for its OWN consumption purpose:
+/// (1) the trigger is the peer's own authorized verb execution — the writer IS
+///     the service-providing peer recording its own decision, not a
+///     counterparty attributing work to someone else;
+/// (2) parties are pre-verified — `provider` is the performer that
+///     `authorize_operation` already proved equal to the grant's `recipient`,
+///     and `commitment_cid` comes from that live `mishpat_commitments` lookup
+///     (entry-hash cid, resolving row);
+/// (3) it is recorded BEFORE the verb acts (emit-then-act), so the rate
+///     ceiling is fail-closed — a use that cannot be accounted is refused,
+///     never executed unaccounted.
+/// CONSUMPTION STAYS SCOPED: rate accounting + audit. Economic-consequence
+/// consumption (reciprocity, payout, standing) remains HELD pending
+/// cross-signed attestation, exactly as the note above requires.
+///
+/// `dht_anchor_hash` is `None` (local projection; the notarized-intent DHT
+/// path for operator attestations is downstream work); `state = "recorded"`.
+#[allow(clippy::too_many_arguments)]
+pub fn record_operator_verb_event(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    capability: &str,
+    provider: &str,
+    receiver: &str,
+    commitment_cid: &str,
+    has_point_in_time: &str,
+) -> Result<EconomicEvent, StorageError> {
+    let new_event = NewEconomicEvent {
+        id,
+        h_app_id: &ctx.h_app_id,
+        action: capability,
+        provider,
+        receiver,
+        resource_conforms_to: None,
+        resource_inventoried_as: None,
+        resource_classified_as_json: None,
+        resource_quantity_value: None,
+        resource_quantity_unit: None,
+        effort_quantity_value: None,
+        effort_quantity_unit: None,
+        has_point_in_time,
+        has_duration: None,
+        input_of: None,
+        output_of: None,
+        lamad_event_type: None,
+        content_id: None,
+        contributor_presence_id: None,
+        path_id: None,
+        triggered_by: None,
+        state: "recorded",
+        note: None,
+        metadata_json: None,
+        dht_anchor_hash: None,
+        at_location: None,
+        verified_at: None,
+        scope_collab_cid: None,
+        // The bounds reference lives in the COLUMN — the rate window and the
+        // REA facings read `economic_events.bounded_by`, never metadata_json.
+        bounded_by: Some(commitment_cid),
+        substrate_signal: None,
+    };
+
+    diesel::insert_into(economic_events::table)
+        .values(&new_event)
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("operator-verb event insert failed: {e}")))?;
+
+    get_economic_event(conn, ctx, id)?
+        .ok_or_else(|| StorageError::Internal("Failed to retrieve operator-verb event".into()))
+}
+
 /// Bulk record events (for seeding/import) - scoped by app
 pub fn bulk_record_events(
     conn: &mut SqliteConnection,
