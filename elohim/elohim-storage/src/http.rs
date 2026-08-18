@@ -1988,13 +1988,7 @@ impl HttpServer {
             }
             Err(e) => {
                 error!(error = %e, "Request error");
-                let mut response = Self::escaped_error_response(&e);
-                let headers = response.headers_mut();
-                headers.insert(
-                    "Access-Control-Allow-Origin",
-                    hyper::header::HeaderValue::from_static("*"),
-                );
-                Ok(response.map(Either::Left))
+                Ok(Self::escaped_error_response(&e).map(Either::Left))
             }
         }
     }
@@ -2009,14 +2003,29 @@ impl HttpServer {
     /// as a bare `500 Error: ...`, indistinguishable from a conductor that tried
     /// and broke, which made the gate's own `is_admission_shed` contract
     /// unusable by anything outside this process.
+    /// Both arms carry the cross-origin headers themselves (`with_cors_headers`
+    /// parity): dropping `Cross-Origin-Resource-Policy` here would make a COEP
+    /// embedder block the body, degrading a legible 503-with-Retry-After into
+    /// an opaque network failure client-side.
     fn escaped_error_response(e: &StorageError) -> Response<Full<Bytes>> {
-        if crate::conductor_admission::is_admission_shed(e) {
-            return crate::services::response::admission_shed_backpressure();
-        }
-        Response::builder()
-            .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(Full::new(Bytes::from(format!("Error: {}", e))))
-            .unwrap()
+        let mut response = if crate::conductor_admission::is_admission_shed(e) {
+            crate::services::response::admission_shed_backpressure()
+        } else {
+            Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(Full::new(Bytes::from(format!("Error: {}", e))))
+                .unwrap()
+        };
+        let headers = response.headers_mut();
+        headers.insert(
+            "Access-Control-Allow-Origin",
+            hyper::header::HeaderValue::from_static("*"),
+        );
+        headers.insert(
+            "Cross-Origin-Resource-Policy",
+            hyper::header::HeaderValue::from_static("cross-origin"),
+        );
+        response
     }
 
     /// Health check endpoint with tiered detail via `?detail=` query parameter.
@@ -16762,5 +16771,26 @@ mod admission_egress_tests {
     fn an_escaped_ordinary_error_still_reaches_the_wire_as_500() {
         let resp = HttpServer::escaped_error_response(&StorageError::Internal("boom".into()));
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    /// Both escaped arms must keep `with_cors_headers` parity: without
+    /// `Cross-Origin-Resource-Policy: cross-origin` a COEP embedder blocks the
+    /// body, so the legible 503-with-Retry-After (or the plain 500) degrades
+    /// into an opaque network failure client-side.
+    #[test]
+    fn escaped_errors_carry_cross_origin_headers_on_both_arms() {
+        for resp in [
+            HttpServer::escaped_error_response(&shed()),
+            HttpServer::escaped_error_response(&StorageError::Internal("boom".into())),
+        ] {
+            assert_eq!(
+                resp.headers().get("Access-Control-Allow-Origin").unwrap(),
+                "*"
+            );
+            assert_eq!(
+                resp.headers().get("Cross-Origin-Resource-Policy").unwrap(),
+                "cross-origin"
+            );
+        }
     }
 }

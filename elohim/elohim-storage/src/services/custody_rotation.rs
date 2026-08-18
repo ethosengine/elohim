@@ -231,22 +231,26 @@ fn current_blob_for(
     Ok(picked.filter(|h| !h.trim().is_empty()))
 }
 
-/// Does a commitment row with this id already exist in the scope?
-fn commitment_id_exists(
+/// The `state` of the commitment row with this id, if the row exists.
+///
+/// State matters, not bare existence: authoring is create-then-activate, and a
+/// crash between the two leaves a `created` row the custody fold cannot see.
+/// Treating that row as an authored successor would retire the predecessor
+/// while the replacement promise never takes effect — a terminal strand.
+fn successor_state(
     conn: &mut SqliteConnection,
     h_app_id: &str,
     id: &str,
-) -> Result<bool, StorageError> {
+) -> Result<Option<String>, StorageError> {
     use crate::db::diesel_schema::rea_commitments::dsl as rc;
 
-    let found: Option<String> = rc::rea_commitments
+    rc::rea_commitments
         .filter(rc::h_app_id.eq(h_app_id))
         .filter(rc::id.eq(id))
-        .select(rc::id)
+        .select(rc::state)
         .first::<String>(conn)
         .optional()
-        .map_err(|e| StorageError::Database(format!("custody rotation: successor lookup: {e}")))?;
-    Ok(found.is_some())
+        .map_err(|e| StorageError::Database(format!("custody rotation: successor lookup: {e}")))
 }
 
 /// Detect the active self-provided `custody-blob` pledges whose named bytes are
@@ -264,12 +268,16 @@ fn commitment_id_exists(
 /// 4. that current blob appears in NONE of the pledge's `resource_classified_as`
 ///    entries (else `NotDivergent` — the promise is already current);
 /// 5. when the deterministic successor id for `(provider, receiver, current
-///    blob)` already exists, the candidate is still emitted with
+///    blob)` already exists **active**, the candidate is still emitted with
 ///    `author_needed: false` (and `SuccessorExists` counted): a prior pass
 ///    authored the successor but failed to supersede the predecessor, and that
 ///    residual must converge rather than park forever (C3). Re-running mints
 ///    nothing either way (C6b) — the healthy fully-rotated state never reaches
-///    this arm because a superseded predecessor is not `active`.
+///    this arm because a superseded predecessor is not `active`. A successor
+///    row stuck in `created` (activate failed mid-authoring) keeps
+///    `author_needed: true`: the idempotent author finishes the activation
+///    rather than minting a duplicate, and the predecessor is never retired
+///    behind a successor the custody fold cannot see.
 pub fn select_rotation_candidates(
     conn: &mut SqliteConnection,
     h_app_id: &str,
@@ -327,13 +335,19 @@ pub fn select_rotation_candidates(
             &commitment.receiver,
             &current_blob,
         );
-        let author_needed = if commitment_id_exists(conn, h_app_id, &successor_id)? {
-            // Successor already notarized (a prior pass's supersession failed):
-            // still a candidate, but only the supersession remains to converge.
-            crate::metrics::inc_custody_rotation_skipped(CustodyRotationSkip::SuccessorExists);
-            false
-        } else {
-            true
+        let author_needed = match successor_state(conn, h_app_id, &successor_id)?.as_deref() {
+            Some("active") => {
+                // Successor authored AND activated (a prior pass's supersession
+                // failed): still a candidate, but only the supersession remains
+                // to converge.
+                crate::metrics::inc_custody_rotation_skipped(CustodyRotationSkip::SuccessorExists);
+                false
+            }
+            // A `created`-stuck row (activate failed mid-authoring) is NOT an
+            // authored successor — route it back through the author, whose
+            // create-if-absent-then-activate contract finishes the half-done
+            // authoring instead of minting a duplicate.
+            Some(_) | None => true,
         };
 
         candidates.push(RotationCandidate {
@@ -522,27 +536,36 @@ impl RotationAuthor for ConductorRotationAuthor {
         let hc = self.hc.clone();
         let successor_id = candidate.successor_id.clone();
 
+        // Idempotent by state, so a crash between create and activate converges
+        // on the next tick instead of stranding a `created` row forever (the
+        // detector routes such rows back here with `author_needed: true`).
+        let existing = successor_state(conn, &ctx.h_app_id, &successor_id)?;
+
         tokio::task::block_in_place(|| {
             handle.block_on(async move {
-                // custody-blob is a CONDUCTOR_SOFT_ACTION: with a bridge present
-                // this routes to create_via_conductor →
-                // conductor_writes::call_create_rea_commitment (NOTARIZED), and
-                // eagerly projects the row with its dht_anchor_hash.
-                ReaCommitmentService::create(conn, ctx, input, None, Some(&hc)).await?;
-                let activate = UpdateReaCommitmentState {
-                    state: "active".to_string(),
-                    finished: None,
-                    metadata_json: None,
-                };
-                ReaCommitmentService::update_state(
-                    conn,
-                    ctx,
-                    &successor_id,
-                    &activate,
-                    None,
-                    Some(&hc),
-                )
-                .await?;
+                if existing.is_none() {
+                    // custody-blob is a CONDUCTOR_SOFT_ACTION: with a bridge
+                    // present this routes to create_via_conductor →
+                    // conductor_writes::call_create_rea_commitment (NOTARIZED),
+                    // and eagerly projects the row with its dht_anchor_hash.
+                    ReaCommitmentService::create(conn, ctx, input, None, Some(&hc)).await?;
+                }
+                if existing.as_deref() != Some("active") {
+                    let activate = UpdateReaCommitmentState {
+                        state: "active".to_string(),
+                        finished: None,
+                        metadata_json: None,
+                    };
+                    ReaCommitmentService::update_state(
+                        conn,
+                        ctx,
+                        &successor_id,
+                        &activate,
+                        None,
+                        Some(&hc),
+                    )
+                    .await?;
+                }
                 Ok::<(), StorageError>(())
             })
         })
@@ -616,16 +639,33 @@ mod tests {
                 return Err(StorageError::Internal("author refused".into()));
             }
             self.authored.lock().unwrap().push(candidate.clone());
-            insert_commitment(
-                conn,
-                &candidate.successor_id,
-                &candidate.provider,
-                &candidate.receiver,
-                &candidate.current_blob_hash,
-                "active",
-                Some(&successor_metadata(candidate)),
-                &ctx.h_app_id,
-            );
+            // Mirror the conductor author's idempotent contract: create only if
+            // absent, then activate whatever state the row is in.
+            if successor_state(conn, &ctx.h_app_id, &candidate.successor_id)
+                .expect("successor lookup")
+                .is_none()
+            {
+                insert_commitment(
+                    conn,
+                    &candidate.successor_id,
+                    &candidate.provider,
+                    &candidate.receiver,
+                    &candidate.current_blob_hash,
+                    "active",
+                    Some(&successor_metadata(candidate)),
+                    &ctx.h_app_id,
+                );
+            } else {
+                use crate::db::diesel_schema::rea_commitments::dsl as rc;
+                diesel::update(
+                    rc::rea_commitments
+                        .filter(rc::h_app_id.eq(&ctx.h_app_id))
+                        .filter(rc::id.eq(&candidate.successor_id)),
+                )
+                .set(rc::state.eq("active"))
+                .execute(conn)
+                .expect("activate successor");
+            }
             Ok(())
         }
     }
@@ -969,6 +1009,76 @@ mod tests {
         assert!(!found[0].author_needed, "authoring already happened");
         assert_eq!(found[0].successor_id, successor_id);
         assert_eq!(skip_count(CustodyRotationSkip::SuccessorExists), before + 1);
+    }
+
+    /// A successor stuck in `created` (create succeeded, activate failed) is NOT
+    /// an authored successor: the custody fold reads only `state = 'active'`
+    /// rows, so treating the bare row as done would retire the predecessor while
+    /// the promise it replaces never takes effect — a terminal strand.
+    #[test]
+    fn stuck_created_successor_still_needs_authoring() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        insert_content(&mut conn, "c1", Some(NEW_BLOB), None);
+        seed_stale_pledge(&mut conn, "custody-blob-stale", "c1");
+        let successor_id = crate::services::rea_commitment_service::deterministic_custody_id(
+            SELF, STEWARD, NEW_BLOB,
+        );
+        insert_commitment(
+            &mut conn,
+            &successor_id,
+            SELF,
+            STEWARD,
+            NEW_BLOB,
+            "created",
+            None,
+            APP,
+        );
+
+        let _w = counter_window();
+        let found = select_rotation_candidates(&mut conn, APP, &selves()).expect("detect");
+        assert_eq!(found.len(), 1);
+        assert!(
+            found[0].author_needed,
+            "a created-but-never-activated successor must route back through the author"
+        );
+    }
+
+    /// The pass-level guarantee for the same residue: the stuck successor is
+    /// activated (not re-created) BEFORE the predecessor retires, so no tick
+    /// ordering can leave the node with zero effective custody pledges.
+    #[test]
+    fn stuck_created_successor_is_activated_not_stranded() {
+        let _w = counter_window();
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        insert_content(&mut conn, "c1", Some(NEW_BLOB), None);
+        seed_stale_pledge(&mut conn, "custody-blob-stale", "c1");
+        let successor_id = crate::services::rea_commitment_service::deterministic_custody_id(
+            SELF, STEWARD, NEW_BLOB,
+        );
+        insert_commitment(
+            &mut conn,
+            &successor_id,
+            SELF,
+            STEWARD,
+            NEW_BLOB,
+            "created",
+            None,
+            APP,
+        );
+
+        let author = RecordingAuthor::default();
+        let outcome = run_rotation_pass(&mut conn, &ctx(), &selves(), &holding_new_blob(), &author)
+            .expect("pass");
+
+        assert_eq!(outcome.rotated, 1);
+        assert_eq!(
+            state_of(&mut conn, &successor_id),
+            "active",
+            "the stuck successor must be activated, not left 'created'"
+        );
+        assert_eq!(state_of(&mut conn, "custody-blob-stale"), "superseded");
     }
 
     /// The C3 liveness leg: author-succeeded-supersede-failed residue converges

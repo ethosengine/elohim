@@ -344,26 +344,40 @@ impl WarmShellStore {
     ///
     /// Every step is local (hot map, then archive) — no upstream read, ever.
     pub async fn lookup(&self, slug: &str, file_path: &str) -> (WarmClass, Option<WarmShell>) {
+        let (class, warm, _declared) = self.lookup_with_declared(slug, file_path).await;
+        (class, warm)
+    }
+
+    /// [`Self::lookup`], also returning the declared head it classified
+    /// against. A caller that goes on to fetch-and-stock must key the stock by
+    /// THIS head, not re-resolve after the fetch: a projection advance during
+    /// the fetch would relabel old-era bytes as the new head and serve them
+    /// `AtHead` with no staleness marker.
+    pub async fn lookup_with_declared(
+        &self,
+        slug: &str,
+        file_path: &str,
+    ) -> (WarmClass, Option<WarmShell>, Option<String>) {
         let Some(archive) = self.archive.as_ref() else {
             // Inert store: nothing warm, so the caller takes today's path.
-            return (WarmClass::Cold, None);
+            return (WarmClass::Cold, None, None);
         };
         let declared = archive.declared_blob_hash(slug).await;
 
-        if let Some(declared) = declared.as_deref() {
+        if let Some(head) = declared.as_deref() {
             if let Some(hot) = self.hot_get(slug, file_path) {
-                if hot.blob_hash == declared {
-                    return (WarmClass::AtHead, Some(hot));
+                if hot.blob_hash == head {
+                    return (WarmClass::AtHead, Some(hot), declared);
                 }
             }
-            if let Some(a) = archive.load(slug, file_path, declared).await {
+            if let Some(a) = archive.load(slug, file_path, head).await {
                 let shell = WarmShell {
                     blob_hash: a.blob_hash,
                     content_type: a.content_type,
                     bytes: a.bytes,
                 };
                 self.hot_put(slug, file_path, shell.clone());
-                return (WarmClass::AtHead, Some(shell));
+                return (WarmClass::AtHead, Some(shell), declared);
             }
         }
 
@@ -385,9 +399,9 @@ impl WarmShellStore {
             // No declared head to compare against and bytes in hand: treat it as
             // the head we know of, so a projection that never names a hash still
             // serves fetch-free.
-            Some(shell) if declared.is_none() => (WarmClass::AtHead, Some(shell)),
-            Some(shell) => (WarmClass::Behind, Some(shell)),
-            None => (WarmClass::Cold, None),
+            Some(shell) if declared.is_none() => (WarmClass::AtHead, Some(shell), None),
+            Some(shell) => (WarmClass::Behind, Some(shell), declared),
+            None => (WarmClass::Cold, None, declared),
         }
     }
 
@@ -436,7 +450,7 @@ where
     F: FnOnce(FetchBudget) -> Fut,
     Fut: std::future::Future<Output = Option<FetchedShell>>,
 {
-    let (class, warm) = store.lookup(slug, entry_file).await;
+    let (class, warm, declared) = store.lookup_with_declared(slug, entry_file).await;
     match decide_shell_serve(class, upstream_available) {
         ShellPlan::ServeWarm => match warm {
             Some(shell) => ShellOutcome::Warm(shell),
@@ -445,7 +459,7 @@ where
             None => ShellOutcome::Unavailable,
         },
         ShellPlan::UpgradeThenWarm => match fetch(FetchBudget::Upgrade).await {
-            Some(fresh) => stock_and_return(store, slug, entry_file, fresh).await,
+            Some(fresh) => stock_and_return(store, slug, entry_file, declared, fresh).await,
             // The upgrade could not land — keep serving the one-behind shell.
             // Strictly better than today, which shed to a bundle fallback that
             // then paid the SAME doomed fetch again.
@@ -455,29 +469,28 @@ where
             },
         },
         ShellPlan::Fetch => match fetch(FetchBudget::Full).await {
-            Some(fresh) => stock_and_return(store, slug, entry_file, fresh).await,
+            Some(fresh) => stock_and_return(store, slug, entry_file, declared, fresh).await,
             None => ShellOutcome::Unavailable,
         },
         ShellPlan::Shed => ShellOutcome::Unavailable,
     }
 }
 
-/// Stock a freshly-read shell under the head the local projection declares (or
-/// the archive's last-known head), then hand it back as `Fresh`.
+/// Stock a freshly-read shell under the head the local projection declared when
+/// the fetch was decided, then hand it back as `Fresh`.
 async fn stock_and_return(
     store: &WarmShellStore,
     slug: &str,
     entry_file: &str,
+    declared: Option<String>,
     fresh: FetchedShell,
 ) -> ShellOutcome {
     // The upstream `/apps/{slug}/{entry}` surface returns no head marker, so the
-    // stocking key is the head the local projection declares. With no declared
-    // head there is no content-addressed key to stock under — serve the bytes,
-    // skip the archive write rather than invent an address.
-    let declared = match store.archive.as_ref() {
-        Some(archive) => archive.declared_blob_hash(slug).await,
-        None => None,
-    };
+    // stocking key is the head the local projection declared AT LOOKUP TIME —
+    // never re-resolved here, or a projection advance during the fetch would
+    // relabel old-era bytes as the new head. With no declared head there is no
+    // content-addressed key to stock under — serve the bytes, skip the archive
+    // write rather than invent an address.
     let shell = WarmShell {
         blob_hash: declared.clone().unwrap_or_default(),
         content_type: fresh.content_type.clone(),
@@ -649,6 +662,44 @@ mod tests {
             0,
             "a warm shell must never ride an upstream fetch on the / hot path"
         );
+    }
+
+    /// The stocking key is the head as declared when the fetch was DECIDED, not
+    /// re-read after it lands: a projection advance during the (up to 10s)
+    /// upstream fetch must not relabel old-era bytes as the new head, or they
+    /// would serve as `AtHead` with no staleness marker — violating the
+    /// module's possibly-one-behind-is-marked-as-such contract.
+    #[tokio::test]
+    async fn a_projection_advance_mid_fetch_does_not_relabel_old_bytes_as_the_new_head() {
+        let archive = Arc::new(FakeArchive::default());
+        archive.declare("sha256-h1");
+        let store = WarmShellStore::new(Some(archive.clone()));
+
+        let racing = archive.clone();
+        let outcome = resolve_shell(&store, "landing", "index.html", true, move |_budget| {
+            Box::pin(async move {
+                // The declared head advances while the fetch is in flight.
+                racing.declare("sha256-h2");
+                Some(FetchedShell {
+                    bytes: b"<html>h1-era</html>".to_vec(),
+                    content_type: "text/html".to_string(),
+                })
+            }) as BoxedFetch
+        })
+        .await;
+
+        match outcome {
+            ShellOutcome::Fresh(shell) => assert_eq!(
+                shell.blob_hash, "sha256-h1",
+                "bytes fetched under h1 must not be stocked as h2"
+            ),
+            other => panic!("expected a fresh shell, got {other:?}"),
+        }
+
+        // The h1-era copy is honestly one-behind now, never AtHead under h2.
+        let (class, warm) = store.lookup("landing", "index.html").await;
+        assert_eq!(class, WarmClass::Behind);
+        assert_eq!(warm.unwrap().blob_hash, "sha256-h1");
     }
 
     // ── (2) hot path, upstream unavailable, warm cache ───────────────────────

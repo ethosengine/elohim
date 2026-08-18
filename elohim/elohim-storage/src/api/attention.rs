@@ -259,9 +259,11 @@ async fn handle_post_tending(
                 // AttentionTending is private (Visibility::Private) and never
                 // written to storage — there is no projection table to fall back
                 // to. Return 503 so the client can retry later rather than
-                // silently dropping the tending record.
-                return Err(StorageError::Conductor(
-                    "create_attention_tending: conductor unavailable".to_string(),
+                // silently dropping the tending record. An admission shed rides
+                // through unchanged so the egress can classify it.
+                return Err(crate::conductor_admission::zome_unavailable_error(
+                    "create_attention_tending",
+                    e,
                 ));
             }
         }

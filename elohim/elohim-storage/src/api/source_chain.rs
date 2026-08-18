@@ -162,15 +162,13 @@ pub async fn handle(
 
 /// Map a zome-call failure onto this handler's error.
 ///
-/// A conductor-admission shed passes through UNCHANGED. It carries the marker
-/// `conductor_admission::is_admission_shed` keys on, and collapsing it into the
-/// generic "unavailable" message destroys the only signal saying the conductor
-/// never saw the call — which is how a shed reached the wire as a bare 500.
+/// Delegates to [`crate::conductor_admission::zome_unavailable_error`]: a
+/// conductor-admission shed passes through UNCHANGED, because collapsing it
+/// into the generic "unavailable" message destroys the only signal saying the
+/// conductor never saw the call — which is how a shed reached the wire as a
+/// bare 500.
 fn zome_error(op: &str, e: StorageError) -> StorageError {
-    if crate::conductor_admission::is_admission_shed(&e) {
-        return e;
-    }
-    StorageError::Conductor(format!("{op}: conductor unavailable"))
+    crate::conductor_admission::zome_unavailable_error(op, e)
 }
 
 // ---------------------------------------------------------------------------

@@ -415,6 +415,24 @@ pub fn is_admission_shed(err: &StorageError) -> bool {
     matches!(err, StorageError::Timeout(msg) if msg.contains(ADMISSION_SHED_MARKER))
 }
 
+/// Map a zome-call failure onto a handler's "unavailable" error WITHOUT
+/// laundering a shed.
+///
+/// A conductor-admission shed passes through UNCHANGED: it carries the marker
+/// [`is_admission_shed`] keys on, and collapsing it into the generic
+/// "unavailable" message destroys the only signal saying the conductor never
+/// saw the call — which is how a shed reached the wire as a bare 500 (measured
+/// live 2026-08-18). Every handler that wraps zome-call errors must route them
+/// through here (or preserve the marker itself); classification happens at the
+/// egress, so a single `map_err` rewrite anywhere on the path is enough to
+/// break it.
+pub fn zome_unavailable_error(op: &str, e: StorageError) -> StorageError {
+    if is_admission_shed(&e) {
+        return e;
+    }
+    StorageError::Conductor(format!("{op}: conductor unavailable"))
+}
+
 /// Held capacity. Releases on drop, recording **W** (hold time) as it goes.
 #[derive(Debug)]
 pub struct AdmissionPermit {
