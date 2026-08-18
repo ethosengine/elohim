@@ -1700,3 +1700,149 @@ decisionPoints:
       - path: elohim/elohim-storage/src/services/head_batch_resolver.rs
         testName: the_fallback_rule_has_exactly_two_triggers
         kind: unit
+
+  - name: perform_reconcile_verb
+    kind: verdict-fn
+    sourceLocation:
+      file: src/api/operator_verbs.rs
+      modulePath: api::operator_verbs::perform_reconcile_verb
+      line: 141
+    summary: >
+      Commitment-gated operator verb (habit operator-runtime-surface, slice 1): the peer
+      authorizes the caller itself via the shared authorize_operation gate (active
+      delegates-compute grant, scope operator-reconcile, 7-check bounds), then kicks the
+      existing projection-reconcile loop and answers with an attestation naming the
+      commitment CID it acted under. Accepted / Refused(reason) / LoopUnavailable.
+    concernIds:
+      - id: C2
+        status: answered
+        justification: >
+          revoked_grant_stops_working_immediately proves revocation is monotonic — a revoked
+          grant never re-admits the verb.
+      - id: C4
+        status: answered
+        justification: >
+          authorized_but_loop_unavailable_is_an_honest_503 proves an authorized verb on a
+          loopless peer answers LoopUnavailable (503), never a silent 200 that did nothing.
+      - id: C6a
+        status: answered
+        justification: >
+          kick_is_bounded_and_idempotent proves the capacity-1 kick channel coalesces an
+          authorized flood into at most one queued extra sweep of the single-flight loop.
+      - id: C6b
+        status: answered
+        justification: >
+          kick_is_bounded_and_idempotent — kicking while a kick is queued is an
+          AlreadyPending accept, not an error and not a second sweep.
+      - id: C8
+        status: answered
+        justification: >
+          every verdict logs performer + reason (deny) or performer + commitment CID +
+          outcome (accept); the 200 body IS the attestation naming the grant.
+      - id: C12
+        status: answered
+        justification: >
+          this surface is the C12 instance: authorization is an active delegates-compute
+          commitment (bounded, revocable, audited), never an admin key; no verified
+          performer is an immediate refusal (fail-closed).
+    contractTests:
+      - path: elohim/elohim-storage/tests/operator_verbs.rs
+        testName: holder_is_accepted_and_attestation_names_the_commitment
+        kind: integration
+      - path: elohim/elohim-storage/tests/operator_verbs.rs
+        testName: caller_without_a_grant_is_refused_and_no_kick_fires
+        kind: integration
+      - path: elohim/elohim-storage/tests/operator_verbs.rs
+        testName: revoked_grant_stops_working_immediately
+        kind: integration
+      - path: elohim/elohim-storage/tests/operator_verbs.rs
+        testName: authorized_but_loop_unavailable_is_an_honest_503
+        kind: integration
+      - path: elohim/elohim-storage/src/api/operator_verbs.rs
+        testName: kick_is_bounded_and_idempotent
+        kind: unit
+
+  - name: select_rotation_candidates
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/custody_rotation.rs
+      modulePath: services::custody_rotation::select_rotation_candidates
+      line: 260
+    summary: >
+      Which of this node's ACTIVE `custody-blob` pledges have drifted off the bytes their
+      content now points at, and therefore need a successor pledge authored. A pledge is a
+      candidate iff its metadata resolves a contentId, that content row's blob column FOR THE
+      PLEDGE'S ARTIFACT ROLE (blob_hash vs server_blob_hash) is non-empty, that current blob
+      appears in NONE of the pledge's resource_classified_as entries, and the deterministic
+      successor id for (provider, receiver, current blob) is not already present. Reads and
+      decides only — the acting half (possession gate, notarized author, supersession) is
+      run_rotation_pass. Closes the last unwired station in the ch07 custody chain: the
+      manifest re-stamps, self-held evidence records, and the fold classifies, but nothing
+      authored a successor when a redeploy rotated the blob underneath the promise.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          A pledge whose metadata_json is absent, unparseable, or carries no contentId is
+          SKIPPED and counted (no_content_id) — never matched to a content row by inference.
+          Missing content row and NULL/empty blob column are their own distinct answer
+          (content_blob_absent), not folded into "nothing to do". Pinned by
+          pledge_without_a_resolvable_content_id_is_skipped_and_counted and
+          pledge_for_missing_content_or_empty_blob_is_skipped_and_counted.
+      - id: C6a
+        status: answered
+        justification: >
+          One bounded pass over this node's own active custody pledges — chunked eq_any, no
+          retry ladder, no conductor call inside the predicate. A failed author or supersede
+          is counted and left for the next level-triggered tick, never retried in-loop.
+      - id: C6b
+        status: answered
+        justification: >
+          The successor id is deterministic over (provider, receiver, current blob), so a
+          replayed pass against settled state mints nothing: an existing successor drops the
+          row as successor_exists, and the predecessor's supersession mark is itself
+          idempotent (mark_superseded returns success on an already-superseded row). Pinned
+          by existing_successor_makes_detection_an_idempotent_no_op and the second-pass leg
+          of rotation_pass_authors_the_successor_and_supersedes_first_write_wins.
+      - id: C8
+        status: answered
+        justification: >
+          Every examined pledge lands in exactly one counted outcome — the typed
+          metrics::CustodyRotationSkip vocabulary beside the
+          elohim_custody_rotation_authored_total success series, so a rotation rate is
+          readable rather than inferred. All seven label combinations are pre-touched at
+          registration; label strings are pinned by rotation_skip_labels_are_stable.
+      - id: C10
+        status: answered
+        justification: >
+          A custody pledge is a contract over specific bytes, and this is where that contract
+          evolves: the successor is a NEW notarized commitment and the predecessor is retired
+          through the documented supersession ceremony (db::rea_commitments::mark_superseded,
+          "at most one non-superseded successor per predecessor; first-write-wins") — the old
+          promise is never silently mutated in place or defaulted onto new bytes. The
+          successor's metadata carries the `supersedes` pointer so the chain stays walkable.
+      - id: C12
+        status: answered
+        justification: >
+          Only pledges whose provider is in the caller's self_agent_cids are ever rotated —
+          this node re-states its OWN promises and never rewrites a peer's. Pinned by
+          non_self_provider_and_non_active_rows_are_invisible.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/custody_rotation.rs
+        testName: divergent_active_pledge_is_a_rotation_candidate
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_rotation.rs
+        testName: pledge_without_a_resolvable_content_id_is_skipped_and_counted
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_rotation.rs
+        testName: existing_successor_makes_detection_an_idempotent_no_op
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_rotation.rs
+        testName: ssr_server_pledge_tracks_the_server_blob_column
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_rotation.rs
+        testName: rotation_pass_authors_the_successor_and_supersedes_first_write_wins
+        kind: unit
+      - path: elohim/elohim-storage/src/services/custody_rotation.rs
+        testName: rotation_makes_the_custody_fold_report_stocked
+        kind: unit

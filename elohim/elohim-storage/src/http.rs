@@ -282,6 +282,11 @@ pub struct HttpServer {
     /// RESTART the conductor (the only way to apply target_arc_factor — spec §2).
     /// None = no embedded conductor → actuation unavailable.
     conductor_manager: Option<Arc<tokio::sync::Mutex<crate::conductor::ConductorManager>>>,
+    /// Operator-runtime-surface slice 1: capacity-1 kick channel into the
+    /// projection-reconcile loop, wired at startup via [`Self::with_reconcile_kick`].
+    /// `POST /api/v1/operator/reconcile` (commitment-gated) try_sends here; the
+    /// loop treats a kick as an immediate extra wake. None = verb answers 503.
+    reconcile_kick: Option<tokio::sync::mpsc::Sender<()>>,
     /// Embedded conductor ADMIN websocket — wired at startup (embedded mode
     /// only) so `GET /db/p2p/conductor-diagnostics` can read the conductor's
     /// peer store (`agent_info`) and transport/fetch state (`dump_network_stats`
@@ -640,6 +645,7 @@ impl HttpServer {
             write_through_state: None,
             hc_registry: None,
             conductor_manager: None,
+            reconcile_kick: None,
             admin_websocket: None,
             fan_out_ctx: None,
             network_stakes_resolver: None,
@@ -794,6 +800,15 @@ impl HttpServer {
         resolver: Arc<crate::trust::ManifestStakesResolver>,
     ) -> Self {
         self.network_stakes_resolver = Some(resolver);
+        self
+    }
+
+    /// Wire the projection-reconcile kick channel (operator-runtime-surface
+    /// slice 1). The sender feeds the capacity-1 channel whose receiver lives
+    /// in the reconcile loop's `tokio::select!`; absent = the operator verb
+    /// answers 503 (honest: this peer runs no reconcile loop).
+    pub fn with_reconcile_kick(mut self, kick: tokio::sync::mpsc::Sender<()>) -> Self {
+        self.reconcile_kick = Some(kick);
         self
     }
 
@@ -1416,6 +1431,27 @@ impl HttpServer {
                 self.handle_seed_shard_manifest(req).await
             }
 
+            // Operator-runtime-surface slice 1: commitment-gated reconcile verb.
+            // The peer authorizes for ITSELF (delegates-compute grant with
+            // scope="operator-reconcile" via the shared authorize_operation gate),
+            // kicks the existing projection-reconcile loop, and answers with an
+            // attestation naming the commitment CID it acted under. Manifest-
+            // declared (doorway-proxied) — see api/operator_verbs.rs for why
+            // that is safe, unlike the off-manifest authorize-operation oracle.
+            (Method::POST, "/api/v1/operator/reconcile") => {
+                if let Some(pool) = self.db_pool.as_ref() {
+                    crate::api::operator_verbs::handle_reconcile(
+                        req,
+                        pool,
+                        self.reconcile_kick.as_ref(),
+                        &self.self_cid,
+                    )
+                    .await
+                } else {
+                    Ok(response::service_unavailable("db pool not available"))
+                }
+            }
+
             // Dev-seed endpoint for `delegates-compute` mishpat commitments
             // (Che op-gate Slice 1, §14). Flag-gated (ALLOW_SEED_DELEGATES_COMPUTE=1);
             // writes directly into mishpat_commitments with a synthesized dev anchor.
@@ -1952,15 +1988,35 @@ impl HttpServer {
             }
             Err(e) => {
                 error!(error = %e, "Request error");
-                Ok(Self::with_cors_headers(Response::builder())
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(Either::Left(Full::new(Bytes::from(format!(
-                        "Error: {}",
-                        e
-                    )))))
-                    .unwrap())
+                let mut response = Self::escaped_error_response(&e);
+                let headers = response.headers_mut();
+                headers.insert(
+                    "Access-Control-Allow-Origin",
+                    hyper::header::HeaderValue::from_static("*"),
+                );
+                Ok(response.map(Either::Left))
             }
         }
+    }
+
+    /// Map an error that ESCAPED a handler onto the wire.
+    ///
+    /// Everything is a plain 500 here by design: a handler that did not choose
+    /// its own status does not get one invented for it at the last seam. The ONE
+    /// exception is a conductor-admission shed — nothing was dispatched, the
+    /// conductor never saw the call, so it is backpressure and must carry
+    /// Retry-After. Before this classification existed the shed reached the wire
+    /// as a bare `500 Error: ...`, indistinguishable from a conductor that tried
+    /// and broke, which made the gate's own `is_admission_shed` contract
+    /// unusable by anything outside this process.
+    fn escaped_error_response(e: &StorageError) -> Response<Full<Bytes>> {
+        if crate::conductor_admission::is_admission_shed(e) {
+            return crate::services::response::admission_shed_backpressure();
+        }
+        Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body(Full::new(Bytes::from(format!("Error: {}", e))))
+            .unwrap()
     }
 
     /// Health check endpoint with tiered detail via `?detail=` query parameter.
@@ -13196,6 +13252,17 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/operator — commitment-gated operator runtime verbs
+        // (habit operator-runtime-surface). Fail-closed: the peer itself
+        // authorizes each verb against an active delegates-compute grant.
+        // =====================================================================
+        .route(
+            Route::post("/api/v1/operator/reconcile")
+                .handler("operator_reconcile")
+                .auth_required()
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/flow-planning — Resource flow planning
         // =====================================================================
         .route(
@@ -16654,5 +16721,46 @@ mod c3_serve_head_preference_tests {
             None,
             "declared head blob absent locally → degrade to own row, do NOT fan out"
         );
+    }
+}
+
+#[cfg(test)]
+mod admission_egress_tests {
+    use super::*;
+    use crate::conductor_admission::ADMISSION_SHED_MARKER;
+
+    /// The shape `ConductorAdmission::shed_error` produces.
+    fn shed() -> StorageError {
+        StorageError::Timeout(format!(
+            "{ADMISSION_SHED_MARKER}: no conductor permit for imagodei within 100ms \
+             (class=interactive, capacity=4, in_flight=4) — nothing was dispatched"
+        ))
+    }
+
+    /// The last seam before the wire. Every error that escapes a handler lands
+    /// here, and until 2026-08-18 it collapsed ALL of them to a plain-text 500 —
+    /// so a conductor-admission shed (the conductor never saw the call) was
+    /// indistinguishable from a conductor that tried and broke. Measured live
+    /// against a local island conductor at capacity=1: 4,538 sheds counted at
+    /// the gate, 4,538 bare 500s on the wire, zero Retry-After.
+    #[test]
+    fn an_escaped_admission_shed_reaches_the_wire_as_backpressure() {
+        let resp = HttpServer::escaped_error_response(&shed());
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            resp.headers().get(hyper::header::RETRY_AFTER).unwrap(),
+            crate::conductor_admission::SHED_RETRY_AFTER_SECS
+                .to_string()
+                .as_str(),
+            "a shed must tell the caller when to come back"
+        );
+    }
+
+    /// Everything else keeps the existing sink behaviour — this seam gains one
+    /// classification, not a new status-code policy for the whole surface.
+    #[test]
+    fn an_escaped_ordinary_error_still_reaches_the_wire_as_500() {
+        let resp = HttpServer::escaped_error_response(&StorageError::Internal("boom".into()));
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
 }

@@ -45,6 +45,7 @@ pub mod mishpat_recognition;
 pub mod network_posture;
 pub mod node_shape;
 pub mod observations;
+pub mod operator_verbs; // operator-runtime-surface slice 1 — POST /api/v1/operator/reconcile (manifest-declared)
 pub mod peer_capacity;
 pub mod peer_statuses;
 pub mod peer_topology;

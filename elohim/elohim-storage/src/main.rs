@@ -727,6 +727,16 @@ async fn async_main(
         );
     }
 
+    // Custody-commitment rotation (re-states a promise this node already made
+    // over bytes it already holds — reconciliation, NOT the salvage consent
+    // floor's conscription). Default ON; env DISABLES it: 0/false/off/no.
+    if let Ok(v) = std::env::var("CUSTODY_ROTATION_ENABLED") {
+        config.custody_rotation_enabled = !matches!(
+            v.trim().to_ascii_lowercase().as_str(),
+            "0" | "false" | "off" | "no"
+        );
+    }
+
     // Iroh parallel-stack toggle (see plan
     // genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md).
     // Default `Libp2p` — existing deployments unaffected. `iroh` selects
@@ -2178,6 +2188,125 @@ async fn async_main(
                     }
                 }
 
+                // ── Custody-commitment rotation tick ──────────────────────────
+                //
+                // A redeploy mints new bundle bytes, so the content row points at
+                // a new blob — but the `custody-blob` pledges this node PROVIDES
+                // keep naming the OLD one. Every other station already handles
+                // the rotation (the manifest re-stamps, self-held evidence
+                // records the new shard, the fold looks for an ACTIVE pledge
+                // naming the new blob); nothing authored the successor. This tick
+                // does: author over bytes we verifiably hold, then supersede the
+                // stale predecessor.
+                //
+                // NOT gated behind `salvage_capacity_enabled`. Rotation re-states
+                // a promise this node ALREADY made, over bytes it ALREADY holds —
+                // reconciliation, not conscription — which is the same line
+                // `manifest_backfill_enabled` draws. Safe no-op when disabled,
+                // when nothing has drifted, when no agent_cid self-provider is
+                // resolvable, or when the current bytes are absent locally.
+                match (
+                    config.custody_rotation_enabled,
+                    registry.lamad_client(),
+                    db_pool.clone(),
+                ) {
+                    (true, Some(rotation_hc), Some(rotation_pool)) => {
+                        let rotation_blob_store = blob_store.clone();
+                        let rotation_author = std::sync::Arc::new(
+                            elohim_storage::services::custody_rotation::ConductorRotationAuthor::new(
+                                rotation_hc.clone(),
+                            ),
+                        );
+                        let mut rotation_shutdown = shutdown_tx.subscribe();
+                        tokio::spawn(async move {
+                            use tokio::time::{interval, Duration, MissedTickBehavior};
+                            let ctx = elohim_storage::db::AppContext::default_lamad();
+                            let mut ticker = interval(Duration::from_secs(
+                                elohim_storage::services::custody_rotation::ROTATION_TICK_SECONDS,
+                            ));
+                            ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                            loop {
+                                tokio::select! {
+                                    _ = ticker.tick() => {
+                                        let mut conn = match rotation_pool.get() {
+                                            Ok(c) => c,
+                                            Err(e) => {
+                                                tracing::warn!(error = %e, "custody rotation tick: db conn failed (retry next tick)");
+                                                continue;
+                                            }
+                                        };
+                                        // Same per-tick identity contract the salvage author
+                                        // applies: the provider we WRITE must be a truthful
+                                        // agent_cid, never a transport id — a junk provider
+                                        // could never join the custody fold's holder key.
+                                        // Re-resolved each tick so a session that logs in
+                                        // after boot is picked up.
+                                        let Some(self_agent_cid) =
+                                            elohim_storage::services::salvage_commitment_author::resolve_self_agent_cid(
+                                                &mut conn,
+                                                &rotation_hc,
+                                            )
+                                        else {
+                                            tracing::debug!(
+                                                target: "custody_rotation",
+                                                "custody rotation tick: no agent_cid self-provider resolvable — skipping this tick"
+                                            );
+                                            continue;
+                                        };
+                                        let pantry = match elohim_storage::reconcile::custody::BlobStoreSnapshot::from_store(
+                                            &rotation_blob_store,
+                                        ) {
+                                            Ok(p) => p,
+                                            Err(e) => {
+                                                tracing::warn!(error = %e, "custody rotation tick: pantry snapshot failed (retry next tick)");
+                                                continue;
+                                            }
+                                        };
+                                        match elohim_storage::services::custody_rotation::run_rotation_pass(
+                                            &mut conn,
+                                            &ctx,
+                                            std::slice::from_ref(&self_agent_cid),
+                                            &pantry,
+                                            rotation_author.as_ref(),
+                                        ) {
+                                            Ok(outcome) if outcome.rotated > 0 || outcome.author_failed > 0 || outcome.supersede_failed > 0 => {
+                                                tracing::info!(
+                                                    target: "custody_rotation",
+                                                    examined = outcome.examined,
+                                                    rotated = outcome.rotated,
+                                                    bytes_absent = outcome.bytes_absent,
+                                                    author_failed = outcome.author_failed,
+                                                    supersede_failed = outcome.supersede_failed,
+                                                    "custody rotation pass completed"
+                                                );
+                                            }
+                                            Ok(_) => {}
+                                            Err(e) => {
+                                                tracing::warn!(error = %e, "custody rotation tick: pass failed (retry next tick)");
+                                            }
+                                        }
+                                    }
+                                    _ = rotation_shutdown.recv() => {
+                                        tracing::debug!("custody rotation tick: shutdown signal received, exiting");
+                                        break;
+                                    }
+                                }
+                            }
+                        });
+                        info!(
+                            recheck_seconds =
+                                elohim_storage::services::custody_rotation::ROTATION_TICK_SECONDS,
+                            "custody rotation tick started (shutdown-aware)"
+                        );
+                    }
+                    (false, _, _) => {
+                        info!("custody rotation tick disabled (custody_rotation_enabled=false)");
+                    }
+                    _ => {
+                        info!("custody rotation tick disabled: requires lamad HcClient + db pool");
+                    }
+                }
+
                 // ── Re-anchor backfill (Workstream D — cold-seed recovery) ────
                 //
                 // Heal content rows the cold-conductor seed left provenance-only
@@ -3208,12 +3337,21 @@ async fn async_main(
         Arc::new(state)
     };
 
+    // Operator-runtime-surface slice 1: capacity-1 kick channel from the
+    // commitment-gated `POST /api/v1/operator/reconcile` verb into the
+    // projection-reconcile loop. Capacity 1 = an authorized flood coalesces
+    // into at most one queued extra sweep. The receiver is consumed by the
+    // reconcile loop below; in the arms where that loop never spawns the
+    // receiver drops and the verb honestly answers 503 (kick channel closed).
+    let (reconcile_kick_tx, reconcile_kick_rx) = tokio::sync::mpsc::channel::<()>(1);
+
     let mut http_server = HttpServer::new(blob_store.clone(), http_addr)
         .with_progress_hub(Arc::clone(&progress_hub))
         .with_elohim_capability(elohim_capability)
         .with_render_capability(render_capability)
         .with_extensions(extensions)
         .with_write_through_state(write_through_state.clone())
+        .with_reconcile_kick(reconcile_kick_tx)
         // T17: race-fetch parameters (timeout, parallelism, self-CID).
         .with_fetch_config(&config);
 
@@ -4331,6 +4469,10 @@ async fn async_main(
         match (reconcile_secs, p2p_handle, db_pool.clone()) {
             (0, _, _) => {
                 info!("projection-reconcile: disabled (PROJECTION_RECONCILE_SECS=0)");
+                // Close the operator-verb kick channel so
+                // POST /api/v1/operator/reconcile answers 503 honestly
+                // (loop unavailable) instead of queueing a kick nobody drains.
+                drop(reconcile_kick_rx);
             }
             (secs, Some(handle), Some(pool)) => {
                 use std::sync::atomic::AtomicBool;
@@ -4429,114 +4571,131 @@ async fn async_main(
                     // retried. Re-admission (new peer evidence, or a cooldown)
                     // keeps exhaustion from becoming a black hole.
                     let mut miss_ledger = MissLedger::new();
+                    // Operator kick (operator-runtime-surface slice 1): a queued
+                    // kick from the commitment-gated POST /api/v1/operator/reconcile
+                    // wakes the loop immediately; the sweep body below is identical
+                    // for tick- and kick-wakes. If the sender side disappears the
+                    // arm disarms and the ticker cadence continues alone.
+                    let mut kick_rx = reconcile_kick_rx;
+                    let mut kick_open = true;
                     loop {
                         tokio::select! {
-                            _ = ticker.tick() => {
-                                // Discovery is conductor-free and bounded (peer
-                                // asks capped by PEER_TIMEOUT) — runs EVERY tick.
-                                let plan = run_discovery(
-                                    &handle,
-                                    &pool,
-                                    &mut inventory_window,
-                                    &mut miss_ledger,
-                                )
-                                .await;
-
-                                let bridge_up = hc_cell.get().is_some();
-                                let in_flight = heal_inflight.load(Ordering::Acquire);
-                                match heal_decision(bridge_up, in_flight) {
-                                    HealAction::Spawn => {
-                                        // Claim the single-flight slot (CAS is the
-                                        // authoritative guard; the load above only
-                                        // shapes the log branch).
-                                        if heal_inflight
-                                            .compare_exchange(
-                                                false,
-                                                true,
-                                                Ordering::AcqRel,
-                                                Ordering::Acquire,
-                                            )
-                                            .is_ok()
-                                        {
-                                            let hc = hc_cell
-                                                .get()
-                                                .expect("bridge_up implies Some")
-                                                .clone();
-                                            let heal_pool = pool.clone();
-                                            let heal_state = state.clone();
-                                            let heal_provide = provide_for_reconcile.clone();
-                                            // The heal leg's adopt-before-author
-                                            // pre-flight fetches head Records from
-                                            // the peers that advertised a
-                                            // declaration, so it needs the same
-                                            // handle discovery just used.
-                                            let heal_p2p = handle.clone();
-                                            // Q7: the declared-stakes resolver,
-                                            // per-spawn clone of the ONE boot
-                                            // instance (see
-                                            // `reconcile_stakes_resolver`).
-                                            let heal_stakes = reconcile_stakes.clone();
-                                            let flag = heal_inflight.clone();
-                                            tokio::spawn(async move {
-                                                // RAII release: the guard's Drop
-                                                // clears the single-flight flag on
-                                                // normal exit, panic-unwind, AND
-                                                // task cancellation. A manual store
-                                                // after the `.await` would leak the
-                                                // flag (stick `true` for the process
-                                                // lifetime) if run_heal panicked at
-                                                // any await — silently freezing every
-                                                // future heal tick fleet-wide.
-                                                let _guard = HealFlag(flag);
-                                                // Q7: build the borrowed trust
-                                                // seam for THIS sweep. No
-                                                // resolver (no DB at boot) ⇒
-                                                // inert ⇒ today's behavior; a
-                                                // resolver ⇒ the declared
-                                                // pricer, which is still
-                                                // FullChain at every stage but
-                                                // an explicit Simulacra
-                                                // declaration.
-                                                let trust = match heal_stakes.as_ref() {
-                                                    Some(r) => {
-                                                        elohim_storage::trust::TrustGradient::declared(
-                                                            r.as_ref(),
-                                                        )
-                                                    }
-                                                    None => {
-                                                        elohim_storage::trust::TrustGradient::inert()
-                                                    }
-                                                };
-                                                run_heal(
-                                                    plan,
-                                                    &hc,
-                                                    &heal_pool,
-                                                    &heal_state,
-                                                    &heal_provide,
-                                                    &heal_p2p,
-                                                    &trust,
-                                                )
-                                                .await;
-                                            });
-                                        }
-                                    }
-                                    HealAction::SkipInFlight => {
-                                        tracing::info!(
-                                            "projection-reconcile: heal leg still in flight — \
-                                             discovery ran, heal skipped this tick"
-                                        );
-                                    }
-                                    HealAction::SkipNoBridge => {
-                                        tracing::info!(
-                                            "projection-reconcile: lamad bridge not up — \
-                                             discovery ran, heal deferred"
-                                        );
+                            _ = ticker.tick() => {}
+                            kick = kick_rx.recv(), if kick_open => {
+                                match kick {
+                                    Some(()) => tracing::info!(
+                                        "projection-reconcile: operator kick — running immediate sweep"
+                                    ),
+                                    None => {
+                                        kick_open = false;
+                                        continue;
                                     }
                                 }
                             }
                             _ = reconcile_shutdown.recv() => {
                                 tracing::debug!("projection-reconcile: shutdown signal received, exiting");
                                 break;
+                            }
+                        }
+                        {
+                            // Discovery is conductor-free and bounded (peer
+                            // asks capped by PEER_TIMEOUT) — runs EVERY wake.
+                            let plan = run_discovery(
+                                &handle,
+                                &pool,
+                                &mut inventory_window,
+                                &mut miss_ledger,
+                            )
+                            .await;
+
+                            let bridge_up = hc_cell.get().is_some();
+                            let in_flight = heal_inflight.load(Ordering::Acquire);
+                            match heal_decision(bridge_up, in_flight) {
+                                HealAction::Spawn => {
+                                    // Claim the single-flight slot (CAS is the
+                                    // authoritative guard; the load above only
+                                    // shapes the log branch).
+                                    if heal_inflight
+                                        .compare_exchange(
+                                            false,
+                                            true,
+                                            Ordering::AcqRel,
+                                            Ordering::Acquire,
+                                        )
+                                        .is_ok()
+                                    {
+                                        let hc =
+                                            hc_cell.get().expect("bridge_up implies Some").clone();
+                                        let heal_pool = pool.clone();
+                                        let heal_state = state.clone();
+                                        let heal_provide = provide_for_reconcile.clone();
+                                        // The heal leg's adopt-before-author
+                                        // pre-flight fetches head Records from
+                                        // the peers that advertised a
+                                        // declaration, so it needs the same
+                                        // handle discovery just used.
+                                        let heal_p2p = handle.clone();
+                                        // Q7: the declared-stakes resolver,
+                                        // per-spawn clone of the ONE boot
+                                        // instance (see
+                                        // `reconcile_stakes_resolver`).
+                                        let heal_stakes = reconcile_stakes.clone();
+                                        let flag = heal_inflight.clone();
+                                        tokio::spawn(async move {
+                                            // RAII release: the guard's Drop
+                                            // clears the single-flight flag on
+                                            // normal exit, panic-unwind, AND
+                                            // task cancellation. A manual store
+                                            // after the `.await` would leak the
+                                            // flag (stick `true` for the process
+                                            // lifetime) if run_heal panicked at
+                                            // any await — silently freezing every
+                                            // future heal tick fleet-wide.
+                                            let _guard = HealFlag(flag);
+                                            // Q7: build the borrowed trust
+                                            // seam for THIS sweep. No
+                                            // resolver (no DB at boot) ⇒
+                                            // inert ⇒ today's behavior; a
+                                            // resolver ⇒ the declared
+                                            // pricer, which is still
+                                            // FullChain at every stage but
+                                            // an explicit Simulacra
+                                            // declaration.
+                                            let trust = match heal_stakes.as_ref() {
+                                                Some(r) => {
+                                                    elohim_storage::trust::TrustGradient::declared(
+                                                        r.as_ref(),
+                                                    )
+                                                }
+                                                None => {
+                                                    elohim_storage::trust::TrustGradient::inert()
+                                                }
+                                            };
+                                            run_heal(
+                                                plan,
+                                                &hc,
+                                                &heal_pool,
+                                                &heal_state,
+                                                &heal_provide,
+                                                &heal_p2p,
+                                                &trust,
+                                            )
+                                            .await;
+                                        });
+                                    }
+                                }
+                                HealAction::SkipInFlight => {
+                                    tracing::info!(
+                                        "projection-reconcile: heal leg still in flight — \
+                                             discovery ran, heal skipped this tick"
+                                    );
+                                }
+                                HealAction::SkipNoBridge => {
+                                    tracing::info!(
+                                        "projection-reconcile: lamad bridge not up — \
+                                             discovery ran, heal deferred"
+                                    );
+                                }
                             }
                         }
                     }
@@ -4549,6 +4708,9 @@ async fn async_main(
             }
             _ => {
                 info!("projection-reconcile: disabled (requires libp2p P2P handle + db pool)");
+                // Close the operator-verb kick channel so
+                // POST /api/v1/operator/reconcile answers 503 honestly.
+                drop(reconcile_kick_rx);
             }
         }
     }

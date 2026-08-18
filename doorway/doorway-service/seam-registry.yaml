@@ -488,3 +488,156 @@ decisionPoints:
       - path: doorway/doorway-service/src/routes/storage_proxy.rs
         testName: proxy_outcome_classifies_failures
         kind: unit
+
+  - name: decide_shell_serve
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/render/warm_shell.rs
+      modulePath: render::warm_shell::decide_shell_serve
+      line: 205
+    summary: >
+      The warm-boot shell cache's hot-path decision (Task 3.4): given how the cached shell
+      relates to the locally-declared head (AtHead / Behind / Cold) and whether the storage
+      upstream can answer at all, choose ServeWarm (no upstream read), UpgradeThenWarm (bounded
+      re-read, fall back to what we hold), Fetch (cold but answerable), or Shed (cold and
+      unanswerable — the existing 503 catching-up contract, immediately). The load-bearing arm
+      is (AtHead, _) -> ServeWarm: a warm shell NEVER pays a per-request upstream fetch, which
+      is what stops `/` riding a doomed 10s stall through a post-deploy catch-up window.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          "we hold nothing and cannot ask" (Shed) is classified distinctly from "we hold
+          something one-behind" (ServeWarm/UpgradeThenWarm) and from "we hold nothing but can
+          ask" (Fetch) — an unreachable upstream never reads as an absent shell, and a
+          one-behind shell never reads as a confirmed head.
+      - id: C6a
+        status: answered
+        justification: >
+          Each fetching arm declares its budget through FetchBudget — Upgrade gets
+          SHELL_UPGRADE_TIMEOUT_SECS because it already holds a serviceable answer, Full gets
+          EPR_DISPATCH_TIMEOUT_SECS because nothing else can be served. Pinned by
+          an_upgrade_fetch_gets_the_tight_budget_a_cold_fetch_gets_the_full_one.
+      - id: C8
+        status: partial
+        justification: >
+          Every arm is typed and logged (tracing at the two http.rs serve sites, plus the
+          x-elohim-bundle wire marker), but no labeled counter increments per arm yet — a
+          warm-serve rate is not currently countable in Prometheus.
+    contractTests:
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: shell_serve_decision_matrix_is_cache_first
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: upstream_unavailable_with_a_cold_cache_sheds_immediately
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: an_upgrade_fetch_gets_the_tight_budget_a_cold_fetch_gets_the_full_one
+        kind: unit
+
+  - name: ShellOutcome
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/render/warm_shell.rs
+      modulePath: render::warm_shell::ShellOutcome
+      line: 240
+    summary: >
+      Warm(WarmShell) / Fresh(WarmShell) / Unavailable — the terminal answer of resolve_shell,
+      consumed by http.rs to choose between a composed SSR serve, a warm bundle serve, and the
+      existing catching-up shed.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          Warm (served without asking) and Fresh (served after the upstream answered) are
+          distinct answers, and Unavailable is neither — the caller can never mistake a
+          cache-served shell for a confirmed head.
+      - id: C11
+        status: partial
+        justification: >
+          The breaker-open (backpressure) path degrades by a DECLARED policy — serve the last
+          reconciled bundle, or shed immediately — but the degradation is not yet counted;
+          only the pre-existing breaker/admission counters observe it.
+    contractTests:
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: boot_hydration_makes_the_shell_servable_with_zero_upstream_fetches
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: once_the_upstream_answers_the_shell_upgrades_to_the_declared_head
+        kind: unit
+      - path: doorway/doorway-service/src/render/warm_shell.rs
+        testName: a_failed_upgrade_falls_back_to_the_one_behind_shell_never_a_shed
+        kind: unit
+
+  - name: ShellProvenance
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/render/warm_shell.rs
+      modulePath: render::warm_shell::ShellProvenance
+      line: 155
+    summary: >
+      LastReconciled / DeclaredHead — WHY a served shell carries (or does not carry) the
+      x-elohim-bundle staleness marker. LastReconciled means the doorway served its own
+      projection of the last reconciled bundle with no upstream read this request; DeclaredHead
+      means the upstream confirmed it, so no marker is emitted and the marker DROPS the moment
+      the upstream answers again.
+    concernIds:
+      - id: C7
+        status: answered
+        justification: >
+          What the response advertises equals what it serves: a possibly-one-behind bundle
+          declares itself as such on the wire rather than passing as the declared head.
+          Pinned by warm_shell_serve_is_marked_and_a_confirmed_head_drops_the_marker.
+      - id: C8
+        status: partial
+        justification: >
+          The reason is typed and observable per-response on the wire, but is not aggregated
+          into a labeled counter.
+    contractTests:
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: warm_shell_serve_is_marked_and_a_confirmed_head_drops_the_marker
+        kind: unit
+
+  - name: op_gate_capability
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/server/http.rs
+      modulePath: server::http::op_gate_capability
+      line: 1210
+    summary: >
+      Which delegates-compute capability (commitment scope) gates a request, pure over
+      (method, path): POST /db/content{,/bulk} -> orchestrate-node; POST
+      /api/v1/operator/reconcile -> operator-reconcile (operator-runtime-surface slice 1);
+      else None. Paired with effective_op_gate_mode (operator verbs force Enforce — a
+      born-gated route class neither DELEGATES_COMPUTE_OP_GATE nor dev_mode softens) and
+      the dispatch-site fail-closed deny for unknown /api/v1/operator/* verbs.
+    concernIds:
+      - id: C12
+        status: answered
+        justification: >
+          operator_paths_force_enforce_regardless_of_configured_mode +
+          operator_verb_denied_verdict_is_fail_closed prove the operator verb class is
+          authorization-gated in every configuration, with deny on refused verdict AND on
+          infra failure.
+      - id: C4
+        status: answered
+        justification: >
+          unknown_operator_paths_are_recognized_for_fail_closed_handling pins the
+          recognizer the dispatch site uses to refuse an operator path whose verb has no
+          registered capability — unknown is a refusal, never a silent ungated forward.
+    contractTests:
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: operator_reconcile_maps_to_its_own_capability
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: operator_paths_force_enforce_regardless_of_configured_mode
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: operator_verb_denied_verdict_is_fail_closed
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: operator_verb_allowed_verdict_forwards
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: unknown_operator_paths_are_recognized_for_fail_closed_handling
+        kind: unit
