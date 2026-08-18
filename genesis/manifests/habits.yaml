@@ -664,6 +664,14 @@ habits:
     checks:
       - "a2o @concern:doorway-failover (genesis/a2o/features/dataplane/doorway-failover.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
     evidence: >
+      DELTA 2026-08-18c (batch closed on dev — pre-push review pass, 57688ae4a):
+      both cures below were hardened before landing, red-first — warm_shell keys
+      the stocking on the head declared when the fetch was DECIDED (a projection
+      advance mid-fetch can no longer relabel old-era bytes AtHead), and
+      custody_rotation's successor check is state-aware with an idempotent author
+      (a create-succeeded/activate-failed row now converges instead of stranding
+      the pledge into invisibility). Gates green; a2o scenarios remain the flip
+      authority, unchanged.
       DELTA 2026-08-18 (ch07+failover session): Task 3.4 warm-boot shell cache
       LANDED desk-proven (doorway gate green: 943 lib/bin tests, clippy, fmt) —
       / is cache-first (ServeWarm / UpgradeThenWarm-2s / Fetch / instant-Shed
@@ -857,13 +865,6 @@ habits:
       operator-reseed verbs on the arc-actuate precedent, and the peer-local
       log seam (/debug/stream is written but unrouted — the adam-invisibility
       log axis).
-    refs:
-      - "task #10 (operator directive 2026-07-02)"
-      - "elohim/elohim-storage/src/api/operator_verbs.rs (verb handler + kick) · doorway src/server/http.rs op_gate_capability/effective_op_gate_mode (per-verb gate) · seam-registry rows in both crates"
-      - "storage POST /admin/arc-policy/actuate — the pre-existing commitment-gated peer-local mutation precedent (sets-authority-arc; conductor restart) this verb family generalizes"
-      - "memory: project_rea_compute_commitment_primitive (delegates-compute displaces X-API-Key)"
-      - "task #7 (adam has zero Loki streams — the symmetry gap, live)"
-    evidence: >
       DELTA 2026-08-16: the dev-loop substrate for this habit's verbs now
       exists — app/elohim-app/scripts/hc-mesh.sh brings up the alpha-shaped
       3-peer mesh in one Che container (3 hc-0.6 sandbox conductors on a LOCAL
@@ -872,15 +873,20 @@ habits:
       doorway), and the facade runner substrate-verify.ts scores 5/7 green
       against it — the same floor as CI's Dataplane Validation, with the two
       reds in CI's own env-state classes. Runtime verbs built on .dataplane()
-      can now be proven at the desk before any fleet deploy. Status stays
-      unwired: the first_move red (commitment-gated verb scenario) is not
-      written.
+      can now be proven at the desk before any fleet deploy. Status was unwired
+      at the time of writing: the first_move red was not yet written.
       DELTA 2026-08-16 (overnight): the mesh proved full convergence at desk
       scale (3,439 rows × 3 peers → converged=1, known_divergent=0, ~90min,
       adopt-before-author minting live) and cornered the >16MB chunked-blob
       durability/serving bug the fleet masks (backlog
       chunked-blob-over-16mb-not-durable-mesh-repro, HIGH — pins saga
       ch03/04/05/09/10 on any bundle over the threshold).
+    refs:
+      - "task #10 (operator directive 2026-07-02)"
+      - "elohim/elohim-storage/src/api/operator_verbs.rs (verb handler + kick) · doorway src/server/http.rs op_gate_capability/effective_op_gate_mode (per-verb gate) · seam-registry rows in both crates"
+      - "storage POST /admin/arc-policy/actuate — the pre-existing commitment-gated peer-local mutation precedent (sets-authority-arc; conductor restart) this verb family generalizes"
+      - "memory: project_rea_compute_commitment_primitive (delegates-compute displaces X-API-Key)"
+      - "task #7 (adam has zero Loki streams — the symmetry gap, live)"
 
   - id: dev-system-equilibrium
     invariant: >
@@ -1140,6 +1146,13 @@ habits:
       - "LIVE-FLEET (the one leg still unproven, and the one the habit's invariant is finally about): elohim_conductor_admission_in_flight present on an alpha pod's /metrics with elohim_conductor_admission_hold_ms populated. Local proof does not carry it — alpha adds the doorway as a SECOND ungated client of the same pool, real gossip/validation load the gate cannot see, and a cgroup CPU ceiling. Until a deploy carries this, the sizing verdict below is a local one."
       - "cargo test --lib admission_egress (elohim/elohim-storage) + cargo test --lib source_chain::tests — a shed reaches the WIRE as backpressure (503 + Retry-After + X-Available-Permits + {status:catching-up}), and no handler launders ADMISSION_SHED_MARKER on the way there"
     evidence: >
+      DELTA 2026-08-18b (batch closed on dev — pre-push review pass, 57688ae4a):
+      the last api-layer launderer of ADMISSION_SHED_MARKER is closed. The wrap
+      is now canonical in conductor_admission::zome_unavailable_error (source_chain
+      delegates to it) and attention.rs rides it, so the check clause "no handler
+      launders ADMISSION_SHED_MARKER on the way there" is true across the api
+      layer rather than at the two seams cured below. Red-first test, gates green.
+      STATUS STAYS RED: the LIVE-FLEET leg is untouched by this.
       DELTA 2026-08-18 (LIVE-LOCAL leg GREEN; the sizing question is ANSWERED,
       and its documented decision rule was falsified). Measured against a real
       conductor in the devspace — island peer (bootstrap/signal pointed at a
