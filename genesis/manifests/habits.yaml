@@ -239,12 +239,28 @@ habits:
       Converged state can be notarized: green tier is reachable for any content
       (HEAD-DAG declare_content_head, reach re-certified at republish, author
       signatures). Authority answers come from the notary, never from LWW order.
-    status: red
+    status: green
     active: true
     checks:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
       - "sweettest rea_commitment_replication (elohim/holochain/tests/sweettest — unignored 837b772c9; isolated late-join conductors, bounded 60s peer-B retrieval; RED but MIS-ATTRIBUTED per DELTA 2026-08-09 — it measures one-time cold-cell Wasm warm-up, not REA retrieval; do not read it as a fetch-seam probe until it warms peer B)"
     evidence: >
+      DELTA 2026-08-18 (GREEN — edge #1362 SUCCESS): notary-authority 3p/0f
+      on the deployed fleet — notarized-tier serve, cross-peer canonical-head
+      convergence, and the earned-authority refusal all passed for the first
+      time. What flipped it was never the identity plane: the conductor's
+      post-outage DHT storm was starving storage reads in the shared cgroup
+      (cured: conductor spawns nice-10, 3146ebdc5) and the probes had no
+      shed-awareness (cured: bounded catching-up ride, review-hardened
+      3b1d13322). Same run: saga 10/11 green (ch02/03/05/10 recovered; only
+      ch07 custody-witnessed red — elohim_custody_class_count{class=stocked}
+      =0 on A, a real custody gap, the next frontier), quiesce
+      sustained-PASS 362s. Declared-stakes grants live on matthew+jessica
+      (genesis seeded stakes:genesis-lamad simulacra; adam failed the PUT —
+      retries on the next seed run). Watch: doorway-failover regressed
+      4p->1p/3f alongside B-caughtUp flapping; A-converged gauge still reads
+      0.0 through a run whose convergence SCENARIO passes — gauge probe
+      suspect, not the dataplane.
       DELTA 2026-08-17d (ch02 red root-caused to CPU-starved storage, shed cured
       at the substrate, local-proven): ch02 household-forms leaves the A-side
       identity cluster too — the rows were CORRECT live (all three
