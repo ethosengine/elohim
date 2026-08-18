@@ -46,7 +46,9 @@ use super::{get_conn, parse_body};
 /// Exposed for direct test coverage of the flag-gate logic.
 pub fn is_seed_allowed() -> bool {
     super::seed_network_stakes::gate_value_allows(
-        std::env::var("ALLOW_SEED_DELEGATES_COMPUTE").ok().as_deref(),
+        std::env::var("ALLOW_SEED_DELEGATES_COMPUTE")
+            .ok()
+            .as_deref(),
     )
 }
 
