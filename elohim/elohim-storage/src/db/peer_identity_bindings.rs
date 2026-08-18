@@ -135,6 +135,16 @@ pub fn delete_all_for_peer(
 /// This is the input to view-federation (Phase 4 view services + F-T21
 /// `Federator::query`): one outbound view-federation request per row.
 ///
+/// ## This is the ROUTING cut — it serves self-asserted bindings
+///
+/// Rows here may carry `proof_status = 'unverified'`, and today essentially all
+/// of them do. That is safe for *selection* — which peer to dial, which device
+/// to display — because content addressing bounds the worst case: a spoofed
+/// binding costs a wasted dial, and the bytes still verify by hash. It is NOT
+/// safe for deciding **whom to credit**. An economic join must call
+/// [`list_attributable_for_agent`] instead, which applies the cross-signature
+/// cut (habit `identity-cross-signed`).
+///
 /// Returns an empty `Vec` if the agent has no active bindings.
 pub fn list_active_for_agent(
     conn: &mut SqliteConnection,
@@ -152,6 +162,180 @@ pub fn list_active_for_agent(
         .map_err(|e| {
             StorageError::Database(format!("peer_identity_bindings list_active_for_agent: {e}"))
         })
+}
+
+// ============================================================================
+// The attribution cut (habit `identity-cross-signed`, C2-S5)
+// ============================================================================
+
+/// How this deployment treats bindings that are NOT cross-signed when an
+/// economic attribution join asks for them.
+///
+/// The two postures exist because the cut and the minting path land in that
+/// order: verification is buildable today, but nothing on the fleet emits a real
+/// proof yet (C2-S2). Flipping straight to `Enforce` before minting exists would
+/// empty every attribution surface on every peer at once — a self-inflicted
+/// outage in the name of a property no peer can yet satisfy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AttributionPosture {
+    /// Serve unverified bindings to attribution joins, but COUNT them
+    /// (`elohim_attribution_unverified_bindings_total`). Default. Behaviour is
+    /// byte-identical to before this slice; the counter is the measure that says
+    /// how much attribution is riding self-asserted identity right now.
+    Observe,
+    /// Refuse them. Only `proof_status = 'cross_signed'` rows reach an
+    /// attribution join; everything else is dropped, and the surface reads
+    /// honestly empty rather than confidently wrong.
+    Enforce,
+}
+
+/// Read the deployment's attribution posture from
+/// `ELOHIM_ATTRIBUTION_CROSS_SIGNED` (`enforce` | `observe`).
+///
+/// Defaults to [`AttributionPosture::Observe`] — see the enum doc for why, and
+/// `genesis/manifests/habits.yaml` (`identity-cross-signed`) for the flip
+/// condition. Any unrecognised value reads as `observe`: an operator typo must
+/// not silently blank the economic surfaces.
+pub fn attribution_posture() -> AttributionPosture {
+    match std::env::var("ELOHIM_ATTRIBUTION_CROSS_SIGNED")
+        .unwrap_or_default()
+        .trim()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "enforce" | "1" | "true" => AttributionPosture::Enforce,
+        _ => AttributionPosture::Observe,
+    }
+}
+
+/// A binding set that has passed the attribution cut.
+///
+/// The type is the point. Economic joins take `&AttributableBindings`, never
+/// `&[PeerIdentityBindingRow]`, so "did anyone check these?" is answered by the
+/// signature of the function rather than by remembering to add a `WHERE`. The
+/// only constructor is [`list_attributable_for_agent`], which applies the cut.
+///
+/// It deliberately does NOT deref to the raw row slice: a caller that wants the
+/// routing set (dial selection, device display) should say so by calling
+/// [`list_active_for_agent`], which is honest about serving self-asserted rows.
+#[derive(Debug, Clone)]
+pub struct AttributableBindings {
+    rows: Vec<PeerIdentityBindingRow>,
+    posture: AttributionPosture,
+    /// How many active bindings were self-asserted at read time — the ones
+    /// `Enforce` drops and `Observe` lets through under protest.
+    unverified_seen: usize,
+}
+
+impl AttributableBindings {
+    /// The empty set — no binding may be credited.
+    ///
+    /// Safe to construct anywhere precisely because it can only ever *withhold*
+    /// credit. Use it for the "this caller resolved no agent" branch.
+    pub fn none() -> Self {
+        Self {
+            rows: Vec::new(),
+            posture: attribution_posture(),
+            unverified_seen: 0,
+        }
+    }
+
+    /// Test-only: build a populated set without going through the cut, so unit
+    /// tests can exercise the *arithmetic* of an attribution fold independently
+    /// of the cut that feeds it. Not available outside the crate's own tests —
+    /// production code has exactly one way in, [`list_attributable_for_agent`].
+    #[cfg(test)]
+    pub(crate) fn from_rows_for_test(rows: Vec<PeerIdentityBindingRow>) -> Self {
+        Self {
+            rows,
+            posture: AttributionPosture::Observe,
+            unverified_seen: 0,
+        }
+    }
+
+    /// The peer ids an economic join may credit.
+    pub fn peer_ids(&self) -> Vec<&str> {
+        self.rows.iter().map(|r| r.peer_id.as_str()).collect()
+    }
+
+    /// The admitted rows.
+    pub fn rows(&self) -> &[PeerIdentityBindingRow] {
+        &self.rows
+    }
+
+    /// No binding may be credited.
+    pub fn is_empty(&self) -> bool {
+        self.rows.is_empty()
+    }
+
+    /// Posture this set was cut under.
+    pub fn posture(&self) -> AttributionPosture {
+        self.posture
+    }
+
+    /// Active-but-self-asserted bindings observed while building this set.
+    /// Non-zero under `Observe` means attribution is riding unverified identity
+    /// right now; non-zero under `Enforce` means it was refused.
+    pub fn unverified_seen(&self) -> usize {
+        self.unverified_seen
+    }
+}
+
+/// List the bindings for `agent_cid` that may back an **economic attribution**
+/// join — crediting bytes, custody, or reciprocity to an identity.
+///
+/// This is the cut named by `elohim-storage/CLAUDE.md`: a binding may decide
+/// *where to dial*, never *whom to credit*. Selection is safe on an unverified
+/// binding because content addressing bounds the worst case (a spoofed dial
+/// costs a wasted round trip, and the bytes still verify by hash); attribution
+/// is not, because the error lands durably in a projection that assigns value
+/// to the wrong agent.
+///
+/// Under [`AttributionPosture::Observe`] (default) the set is the same one
+/// [`list_active_for_agent`] returns, with the self-asserted rows counted;
+/// under `Enforce` only cross-signed rows survive.
+pub fn list_attributable_for_agent(
+    conn: &mut SqliteConnection,
+    agent_cid: &str,
+    now_iso: &str,
+) -> Result<AttributableBindings, StorageError> {
+    list_attributable_for_agent_with_posture(conn, agent_cid, now_iso, attribution_posture())
+}
+
+/// [`list_attributable_for_agent`] with the posture supplied rather than read
+/// from the environment.
+///
+/// Exists so the cut's behaviour under `Enforce` is provable at the desk without
+/// mutating process-global environment state from a parallel test — the posture
+/// is an argument, so both branches are exercised deterministically.
+pub fn list_attributable_for_agent_with_posture(
+    conn: &mut SqliteConnection,
+    agent_cid: &str,
+    now_iso: &str,
+    posture: AttributionPosture,
+) -> Result<AttributableBindings, StorageError> {
+    let active = list_active_for_agent(conn, agent_cid, now_iso)?;
+    let unverified_seen = active.iter().filter(|r| !r.is_cross_signed()).count();
+
+    if unverified_seen > 0 {
+        crate::metrics::ATTRIBUTION_UNVERIFIED_BINDINGS
+            .with_label_values(&[match posture {
+                AttributionPosture::Observe => "observe",
+                AttributionPosture::Enforce => "enforce",
+            }])
+            .inc_by(unverified_seen as u64);
+    }
+
+    let rows = match posture {
+        AttributionPosture::Observe => active,
+        AttributionPosture::Enforce => active.into_iter().filter(|r| r.is_cross_signed()).collect(),
+    };
+
+    Ok(AttributableBindings {
+        rows,
+        posture,
+        unverified_seen,
+    })
 }
 
 // ============================================================================
@@ -197,6 +381,8 @@ mod tests {
             source: source.to_string(),
             device_archetype: "node".to_string(),
             superseded_by: None,
+            signature: String::new(),
+            proof_status: crate::p2p::binding_proof_wire::BindingProofStatus::unverified(),
         }
     }
 
@@ -319,6 +505,8 @@ mod tests {
                 source: "dht".into(),
                 device_archetype: "desktop".into(),
                 superseded_by: Some("uhCkk-prev".into()),
+                signature: String::new(),
+                proof_status: crate::p2p::binding_proof_wire::BindingProofStatus::unverified(),
             },
         )
         .expect("dht upsert");
@@ -336,6 +524,8 @@ mod tests {
                 source: "gossip".into(),
                 device_archetype: "node".into(),
                 superseded_by: None, // gossip wire never carries supersession
+                signature: String::new(),
+                proof_status: crate::p2p::binding_proof_wire::BindingProofStatus::unverified(),
             },
         )
         .expect("gossip preserving upsert");
@@ -377,6 +567,8 @@ mod tests {
                 source: "gossip".into(),
                 device_archetype: "node".into(),
                 superseded_by: None,
+                signature: String::new(),
+                proof_status: crate::p2p::binding_proof_wire::BindingProofStatus::unverified(),
             },
         )
         .expect("first-observer upsert");
@@ -410,6 +602,8 @@ mod tests {
             source: "dht".to_string(),
             device_archetype: "node".to_string(),
             superseded_by: None,
+            signature: String::new(),
+            proof_status: crate::p2p::binding_proof_wire::BindingProofStatus::unverified(),
         };
         upsert(&mut conn, &older).expect("upsert older");
 
@@ -424,6 +618,8 @@ mod tests {
             source: "dht".to_string(),
             device_archetype: "node".to_string(),
             superseded_by: Some("uhCkk-supersedes-this".to_string()),
+            signature: String::new(),
+            proof_status: crate::p2p::binding_proof_wire::BindingProofStatus::unverified(),
         };
         upsert(&mut conn, &newer_superseded).expect("upsert newer-superseded");
 

@@ -115,6 +115,8 @@ fn seed_binding(conn: &mut SqliteConnection, peer_id: &str, agent_cid: &str) {
             source: "dht".to_string(),
             device_archetype: "desktop".to_string(),
             superseded_by: None,
+            signature: String::new(),
+            proof_status: elohim_storage::p2p::binding_proof_wire::BindingProofStatus::unverified(),
         })
         .execute(conn)
         .expect("seed binding");
@@ -512,6 +514,8 @@ fn seed_binding_with_archetype(
             source: "dht".to_string(),
             device_archetype: archetype.to_string(),
             superseded_by: None,
+            signature: String::new(),
+            proof_status: elohim_storage::p2p::binding_proof_wire::BindingProofStatus::unverified(),
         })
         .execute(conn)
         .expect("seed binding with archetype");

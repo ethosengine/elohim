@@ -17,6 +17,7 @@ use diesel::sql_types::{Float, Nullable};
 use thiserror::Error;
 
 use crate::db::models::PeerIdentityBindingRow;
+use crate::db::peer_identity_bindings::AttributableBindings;
 use crate::db::DbPool;
 use crate::services::federator::{FederationResult, Federator};
 use crate::services::reciprocity_view::aggregate_stewarded_bytes_by_peer;
@@ -55,12 +56,23 @@ pub async fn aggregate_my_cluster_view(
 ) -> Result<MyClusterView, ClusterViewError> {
     let now_iso = Utc::now().to_rfc3339();
 
-    // 1) Resolve bindings.
-    let bindings: Vec<PeerIdentityBindingRow> = {
+    // 1) Resolve bindings — BOTH cuts, because this view mixes two classes of
+    // claim. `bindings` is the routing/display set (which devices to fan out to
+    // and name); `attributable` is the subset that may carry economic credit
+    // (custody commitments, stewarded bytes). See
+    // `db::peer_identity_bindings::list_attributable_for_agent`.
+    let (bindings, attributable) = {
         let mut conn = pool
             .get()
             .map_err(|e| ClusterViewError::Pool(e.to_string()))?;
-        crate::db::peer_identity_bindings::list_active_for_agent(&mut conn, agent_cid, &now_iso)?
+        let routing: Vec<PeerIdentityBindingRow> =
+            crate::db::peer_identity_bindings::list_active_for_agent(
+                &mut conn, agent_cid, &now_iso,
+            )?;
+        let attributable = crate::db::peer_identity_bindings::list_attributable_for_agent(
+            &mut conn, agent_cid, &now_iso,
+        )?;
+        (routing, attributable)
     };
 
     if bindings.is_empty() {
@@ -99,7 +111,14 @@ pub async fn aggregate_my_cluster_view(
     // 3a) Aggregate stewarded bytes per peer (custody-blob REA commitments where
     // this agent's peers are the provider). Failures are permissive — a
     // stewardship-lookup error must not blank the entire cluster view.
-    let my_peer_ids: Vec<String> = bindings.iter().map(|b| b.peer_id.clone()).collect();
+    // Attributable cut: `stewarded` credits custody commitments to a peer, so a
+    // self-asserted binding must not be able to hang someone else's custody off
+    // this agent's device card.
+    let my_peer_ids: Vec<String> = attributable
+        .peer_ids()
+        .into_iter()
+        .map(str::to_string)
+        .collect();
     let stewarded_map = aggregate_stewarded_bytes_by_peer(pool, &my_peer_ids)
         .await
         .unwrap_or_else(|e| {
@@ -122,7 +141,7 @@ pub async fn aggregate_my_cluster_view(
         let mut conn = pool
             .get()
             .map_err(|e| ClusterViewError::Pool(e.to_string()))?;
-        compose_totals(&mut conn, &devices, &bindings)
+        compose_totals(&mut conn, &devices, &attributable)
     };
 
     let any_live = devices
@@ -234,15 +253,23 @@ fn parse_archetype(s: &str) -> DeviceArchetype {
 
 /// Compose `DeviceTotals` from live device summaries + a SUM over `rea_commitments`
 /// (provider-side custody-blob commitments by this agent's peers).
+///
+/// The two inputs are on DIFFERENT sides of the attribution cut, deliberately:
+/// - `devices` are display rows built from the routing binding set — showing a
+///   device the agent claims is a claim about presentation, self-correcting on
+///   the next read;
+/// - `attributable` gates `external_committed_bytes`, which credits *custody
+///   commitments* to peer ids. That is an economic assignment, so it may only
+///   join through bindings that passed [`list_attributable_for_agent`].
 fn compose_totals(
     conn: &mut diesel::SqliteConnection,
     devices: &[DeviceSummary],
-    bindings: &[PeerIdentityBindingRow],
+    attributable: &AttributableBindings,
 ) -> DeviceTotals {
     let storage_used_bytes: u64 = devices.iter().filter_map(|d| d.storage_used_bytes).sum();
     let storage_total_bytes: u64 = devices.iter().filter_map(|d| d.storage_total_bytes).sum();
 
-    let my_peer_ids: Vec<&str> = bindings.iter().map(|b| b.peer_id.as_str()).collect();
+    let my_peer_ids: Vec<&str> = attributable.peer_ids();
     let external_committed_bytes = if my_peer_ids.is_empty() {
         0
     } else {
@@ -393,6 +420,8 @@ mod tests {
             source: "dht".into(),
             device_archetype: "node".into(),
             superseded_by: None,
+            signature: String::new(),
+            proof_status: crate::p2p::binding_proof_wire::PROOF_STATUS_UNVERIFIED.to_string(),
         }
     }
 
@@ -441,7 +470,11 @@ mod tests {
             device(None, None), // a device that reported no storage — skipped, not zeroed
             device(Some(50), Some(500)),
         ];
-        let totals = compose_totals(&mut conn, &devices, &[]);
+        let totals = compose_totals(
+            &mut conn,
+            &devices,
+            &AttributableBindings::from_rows_for_test(vec![]),
+        );
         assert_eq!(totals.storage_used_bytes, 150);
         assert_eq!(totals.storage_total_bytes, 1_500);
     }
@@ -451,7 +484,11 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
         seed_commitment_row(&mut conn, "d8-c0", "peer-unbound", "custody-blob", 4_096.0);
-        let totals = compose_totals(&mut conn, &[], &[]);
+        let totals = compose_totals(
+            &mut conn,
+            &[],
+            &AttributableBindings::from_rows_for_test(vec![]),
+        );
         assert_eq!(totals.external_committed_bytes, 0);
     }
 
@@ -465,7 +502,11 @@ mod tests {
         seed_commitment_row(&mut conn, "d8-c2", "peer-mine", "provide", 500.0);
         // Custody-blob but someone else's peer.
         seed_commitment_row(&mut conn, "d8-c3", "peer-theirs", "custody-blob", 700.0);
-        let totals = compose_totals(&mut conn, &[], &[binding("peer-mine")]);
+        let totals = compose_totals(
+            &mut conn,
+            &[],
+            &AttributableBindings::from_rows_for_test(vec![binding("peer-mine")]),
+        );
         assert_eq!(totals.external_committed_bytes, 1_000);
     }
 
@@ -475,7 +516,11 @@ mod tests {
         let mut conn = pool.get().unwrap();
         seed_commitment_row(&mut conn, "d8-c4", "peer-a", "custody-blob", 1_000.0);
         seed_commitment_row(&mut conn, "d8-c5", "peer-b", "custody-blob", 250.0);
-        let totals = compose_totals(&mut conn, &[], &[binding("peer-a"), binding("peer-b")]);
+        let totals = compose_totals(
+            &mut conn,
+            &[],
+            &AttributableBindings::from_rows_for_test(vec![binding("peer-a"), binding("peer-b")]),
+        );
         assert_eq!(totals.external_committed_bytes, 1_250);
     }
 
@@ -486,7 +531,11 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
         seed_commitment_row(&mut conn, "d8-c6", "peer-neg", "custody-blob", -512.0);
-        let totals = compose_totals(&mut conn, &[], &[binding("peer-neg")]);
+        let totals = compose_totals(
+            &mut conn,
+            &[],
+            &AttributableBindings::from_rows_for_test(vec![binding("peer-neg")]),
+        );
         assert_eq!(totals.external_committed_bytes, 0);
     }
 

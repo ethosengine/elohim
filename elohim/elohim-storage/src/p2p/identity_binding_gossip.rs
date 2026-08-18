@@ -151,6 +151,21 @@ pub fn binding_row_from_gossip(
         source: "gossip".to_string(),
         device_archetype: payload.device_archetype.clone(),
         superseded_by: None,
+        signature: payload.signature.clone(),
+        // The classification chokepoint (C2-S4). The transport kind is assigned
+        // by US, from the namespace this id came out of — `peer_id` on this
+        // table is a libp2p PeerId — never from the payload's own claim, which
+        // an attacker controls. A sentinel, an empty field, or a proof minted
+        // for a different binding all land `unverified` here; only two
+        // verifying Ed25519 halves over these very fields produce cross_signed.
+        proof_status: crate::p2p::binding_proof_wire::classify_binding_signature(
+            &payload.agent_cid,
+            &payload.peer_id,
+            crate::p2p::binding_cross_signature::TRANSPORT_KIND_LIBP2P,
+            &payload.valid_from,
+            payload.valid_until.as_deref(),
+            &payload.signature,
+        ),
     }
 }
 

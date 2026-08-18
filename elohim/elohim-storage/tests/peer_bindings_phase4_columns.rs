@@ -30,6 +30,8 @@ fn binding(
         source: "dht".to_string(),
         device_archetype: device_archetype.to_string(),
         superseded_by: superseded_by.map(|s| s.to_string()),
+        signature: String::new(),
+        proof_status: elohim_storage::p2p::binding_proof_wire::BindingProofStatus::unverified(),
     }
 }
 

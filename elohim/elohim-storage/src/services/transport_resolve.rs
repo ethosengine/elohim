@@ -124,6 +124,8 @@ mod tests {
                 source: "handshake".to_string(),
                 device_archetype: "unknown".to_string(),
                 superseded_by: None,
+                signature: String::new(),
+                proof_status: crate::p2p::binding_proof_wire::BindingProofStatus::unverified(),
             },
         )
         .expect("seed binding");

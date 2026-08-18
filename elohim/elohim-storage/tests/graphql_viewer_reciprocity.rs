@@ -40,6 +40,8 @@ fn seed_binding(
         source: "dht".to_string(),
         device_archetype: archetype.to_string(),
         superseded_by: None,
+        signature: String::new(),
+        proof_status: elohim_storage::p2p::binding_proof_wire::BindingProofStatus::unverified(),
     };
     peer_identity_bindings::upsert(&mut conn, &row).expect("upsert binding");
 }

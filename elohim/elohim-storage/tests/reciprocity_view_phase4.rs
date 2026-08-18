@@ -48,6 +48,8 @@ fn insert_binding(
             source: "dht".to_string(),
             device_archetype: archetype.to_string(),
             superseded_by: None,
+            signature: String::new(),
+            proof_status: elohim_storage::p2p::binding_proof_wire::BindingProofStatus::unverified(),
         })
         .execute(conn)
         .expect("insert binding");
@@ -109,7 +111,7 @@ async fn reciprocity_view_resolves_display_name_and_online() {
 
     let bindings = {
         let mut conn = pool.get().expect("conn");
-        peer_identity_bindings::list_active_for_agent(
+        peer_identity_bindings::list_attributable_for_agent(
             &mut conn,
             "agent-matthew-rv4",
             &chrono::Utc::now().to_rfc3339(),
@@ -152,7 +154,7 @@ async fn reciprocity_capacity_returns_total_minus_committed() {
 
     let bindings = {
         let mut conn = pool.get().expect("conn");
-        peer_identity_bindings::list_active_for_agent(
+        peer_identity_bindings::list_attributable_for_agent(
             &mut conn,
             "agent-matthew-cap",
             &chrono::Utc::now().to_rfc3339(),

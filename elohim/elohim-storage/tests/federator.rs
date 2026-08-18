@@ -28,6 +28,8 @@ fn make_binding(peer_id: &str, agent_cid: &str) -> PeerIdentityBindingRow {
         source: "dht".to_string(),
         device_archetype: "node".to_string(),
         superseded_by: None,
+        signature: String::new(),
+        proof_status: elohim_storage::p2p::binding_proof_wire::PROOF_STATUS_UNVERIFIED.to_string(),
     }
 }
 

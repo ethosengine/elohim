@@ -170,6 +170,8 @@ mod tests {
                 source: source.to_string(),
                 device_archetype: "node".to_string(),
                 superseded_by: None,
+                signature: String::new(),
+                proof_status: crate::p2p::binding_proof_wire::BindingProofStatus::unverified(),
             })
             .execute(&mut conn)
             .expect("insert binding");
@@ -194,6 +196,8 @@ mod tests {
                 source: "dht".to_string(),
                 device_archetype: "node".to_string(),
                 superseded_by: None,
+                signature: String::new(),
+                proof_status: crate::p2p::binding_proof_wire::BindingProofStatus::unverified(),
             })
             .execute(&mut conn)
             .expect("insert expiring binding");

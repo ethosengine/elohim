@@ -51,6 +51,8 @@ fn insert_binding(
             source: "dht".to_string(),
             device_archetype: archetype.to_string(),
             superseded_by: None,
+            signature: String::new(),
+            proof_status: elohim_storage::p2p::binding_proof_wire::BindingProofStatus::unverified(),
         })
         .execute(conn)
         .expect("insert binding");

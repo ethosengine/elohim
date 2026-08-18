@@ -102,6 +102,25 @@ path that signs its own `(agent_cid, peer_id)`), and (c) the rotation/lineage
 interaction (`superseded_by`) so a recovered key inherits standing without re-proving
 from zero. The resolver spec §3.5 / §6 carry the lineage constraints to honor.
 
+## Status 2026-08-18 — the cut this item asks for is BUILT; the proof it gates on is not
+
+The last bullet of "Done-when" below ("until then: attribution paths either do not join
+through the binding, or are gated behind the proof") is now **implemented rather than
+merely observed**: `db::peer_identity_bindings::list_attributable_for_agent` is the gated
+door, `AttributableBindings` makes the gate a type rather than a discipline, and the
+attribution consumers named in this doc (`reciprocity_view`, `cluster_view`) take it. See
+`agent-peer-binding-signing.md` § "Landed 2026-08-18" for the full slice.
+
+Two honest qualifications, because this item is easy to read as closed and is not:
+
+1. The gate ships in **`observe` posture by default** — it counts what rides through
+   (`elohim_attribution_unverified_bindings_total`) but does not yet refuse, because no peer
+   can mint a proof (C2-S2). Enforcing before minting would blank every economic surface
+   without making anything safer.
+2. The *first three* Done-when bullets — a real cross-signed proof replacing the sentinel,
+   integrity-side `validate_create` verifying it, and attribution being allowed to trust the
+   binding — remain open. Verification today is **receiver-local**, not notarized.
+
 ## Done-when
 
 - A **cross-signed `AgentPeerBinding` proof** replaces the `STAGE1_SIGNATURE_SENTINEL`:

@@ -950,7 +950,8 @@ impl Viewer {
             .get()
             .map_err(|e| async_graphql::Error::new(format!("pool error: {}", e)))?;
         let now_iso = chrono::Utc::now().to_rfc3339();
-        let bindings = crate::db::peer_identity_bindings::list_active_for_agent(
+        // Attribution cut — same rule as the REST reciprocity handler.
+        let bindings = crate::db::peer_identity_bindings::list_attributable_for_agent(
             &mut conn,
             &self.agent_cid,
             &now_iso,

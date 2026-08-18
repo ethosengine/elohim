@@ -377,6 +377,19 @@ pub fn binding_row_from_handshake_request(
         // Non-authoritative writer; `upsert_preserving_supersession` keeps
         // any prior DHT-set supersession.
         superseded_by: None,
+        signature: b.signature.clone(),
+        // Classified against `peer_id_str` — the PeerId the TRANSPORT verified,
+        // not the payload's self-reported `b.peer_id`. That is strictly the
+        // stronger check: a proof minted for some other endpoint cannot ride a
+        // connection from this one.
+        proof_status: crate::p2p::binding_proof_wire::classify_binding_signature(
+            &b.agent_cid,
+            peer_id_str,
+            crate::p2p::binding_cross_signature::TRANSPORT_KIND_LIBP2P,
+            &b.valid_from,
+            b.valid_until.as_deref(),
+            &b.signature,
+        ),
     }
 }
 

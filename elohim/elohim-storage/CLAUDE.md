@@ -172,7 +172,20 @@ A node/agent has three distinct identity namespaces. They are NOT interchangeabl
 - **`src/node_transport.rs`** — the self-identity seam: resolves the node's own `self_cid` (which namespace it returns depends on transport mode — libp2p returns the peer id string; iroh returns the iroh NodeId). Mismatches between `self_cid` and seeder-written `provider` values are the primary fragmentation source.
 - **`src/p2p/identity_handshake.rs`** — `synthesise_dht_anchor_hash(peer_id, agent_cid)` (line 336) is a fallback anchor when no DHT-truth row exists yet; it is not a substitute resolver.
 
-Pick `agent_cid` as the canonical join key. **Most identities you will join ARE already `agent_cid`** — `shard_locations.peer_id` and (seeder-written) `rea_commitments.provider` both hold `uhCAk`; the live cause of an empty join is usually a NULL `humans.agent_pub_key`, fixed by **populating it**, not by a resolver. ⚠ A general transport-id→`agent_cid` resolver is specced (`genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md`) but is **NOT built and is blocked**: no edge node emits a real `AgentPeerBinding` (projected rows are split-brained placeholders), and the binding is **self-asserted/unsigned today** (`STAGE1_SIGNATURE_SENTINEL`; agent and libp2p keys are uncrossed) — do NOT consume bindings for economic attribution until a cross-signed control proof lands (open security item).
+Pick `agent_cid` as the canonical join key. **Most identities you will join ARE already `agent_cid`** — `shard_locations.peer_id` and (seeder-written) `rea_commitments.provider` both hold `uhCAk`; the live cause of an empty join is usually a NULL `humans.agent_pub_key`, fixed by **populating it**, not by a resolver. ⚠ A general transport-id→`agent_cid` resolver is specced (`genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md`) but is **NOT built and is blocked**: no edge node emits a real `AgentPeerBinding` (projected rows are split-brained placeholders), and the binding is **self-asserted today** (`STAGE1_SIGNATURE_SENTINEL`; agent and libp2p keys are uncrossed).
+
+### The attribution cut — a binding may decide where to DIAL, never whom to CREDIT
+
+Because bindings are self-asserted, a gossiped spoof `(agent_cid = attacker, transport_id = victim)` passes every check the DHT applies. *Selection* survives that — content addressing bounds the worst case, so a spoofed dial costs a wasted round trip and the bytes still verify by hash. *Attribution* does not: the error lands durably in a projection that assigns value to the wrong agent. So the cut is enforced **by type**, not by remembering a `WHERE`:
+
+| Reading bindings for… | Call | Serves self-asserted rows? |
+|---|---|---|
+| routing, dial selection, device display | `list_active_for_agent` | yes, honestly |
+| economic attribution (custody credit, reciprocity ledger, stewarded bytes) | `list_attributable_for_agent` → `AttributableBindings` | only under posture `observe`; refused under `enforce` |
+
+`proof_status` is written **only** by `p2p::binding_proof_wire::classify_binding_signature` — the sole constructor of the `cross_signed` value (`BindingProofStatus`'s inner enum is private and is the insert model's field type, so a writer that tries to hand-assign it gets a compile error). Read it via `PeerIdentityBindingRow::is_cross_signed`, never by string-comparing the column, and never with a `!= 'unverified'` gate.
+
+Posture: `ELOHIM_ATTRIBUTION_CROSS_SIGNED=enforce|observe`, **default observe** — because no peer can mint a proof yet (C2-S2), so enforcing today would blank every economic surface without making anything safer. `elohim_attribution_unverified_bindings_total` counts what rides through. Habit: `identity-cross-signed`; decomposition and red-team review: `genesis/data/timeline/backlog/agent-peer-binding-signing.md`. **Still open in this class:** durable *placement* is not yet on the cut — `services/transport_resolve.rs`'s source-2 fallback can redirect shard PUSH bytes to a spoofed peer while `shard_locations` keeps recording the victim.
 
 ---
 

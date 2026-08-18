@@ -3,7 +3,6 @@
 //! Uses the shared `elohim_storage::test_util::test_pool` in-memory SQLite
 //! pattern. All tests are async (tokio) because the aggregator is async.
 
-use diesel::prelude::*;
 use diesel::RunQueryDsl;
 use elohim_storage::db::diesel_schema::{economic_events, peer_identity_bindings, rea_commitments};
 use elohim_storage::db::models::{NewEconomicEvent, NewPeerIdentityBindingRow, NewReaCommitment};
@@ -116,21 +115,27 @@ fn seed_binding_with_agent(
             source: "dht".to_string(),
             device_archetype: archetype.to_string(),
             superseded_by: None,
+            signature: String::new(),
+            proof_status: elohim_storage::p2p::binding_proof_wire::BindingProofStatus::unverified(),
         })
         .execute(&mut conn)
         .expect("seed binding");
 }
 
+/// Load this agent's bindings through the ATTRIBUTION cut — the same door the
+/// reciprocity handler uses. Under the default `observe` posture this returns
+/// the active set unchanged, so these ledger tests measure the fold, not the
+/// cut; `binding_attribution_cut.rs` measures the cut itself.
 fn load_bindings(
     pool: &elohim_storage::db::DbPool,
     agent_cid: &str,
-) -> Vec<elohim_storage::db::models::PeerIdentityBindingRow> {
+) -> elohim_storage::db::peer_identity_bindings::AttributableBindings {
     let mut conn = pool.get().unwrap();
-    use elohim_storage::db::diesel_schema::peer_identity_bindings::dsl as pib;
-    pib::peer_identity_bindings
-        .filter(pib::agent_cid.eq(agent_cid))
-        .load::<elohim_storage::db::models::PeerIdentityBindingRow>(&mut conn)
-        .unwrap()
+    let now_iso = "1970-01-01T00:00:00Z";
+    elohim_storage::db::peer_identity_bindings::list_attributable_for_agent(
+        &mut conn, agent_cid, now_iso,
+    )
+    .unwrap()
 }
 
 // ============================================================================
@@ -141,7 +146,7 @@ fn load_bindings(
 #[tokio::test]
 async fn reciprocity_empty_when_no_bindings() {
     let pool = test_pool();
-    let bindings = vec![];
+    let bindings = elohim_storage::db::peer_identity_bindings::AttributableBindings::none();
 
     let view = aggregate_reciprocity_view(
         &pool,

@@ -164,6 +164,54 @@ but source-chain-monotonic and DHT-validated, un-backdatable below a real supers
 
 ---
 
+## Landed 2026-08-18 — C2-S4 + the attribution half of C2-S5 (desk-proven, deploy-inert)
+
+Habit `identity-cross-signed` moved `unwired -> red` on this work. What is now in the tree:
+
+- **The projection retains the proof.** `peer_identity_bindings` gained `signature` +
+  `proof_status` (migration `2026-08-18-104500_peer_identity_binding_proof_status`,
+  `DEFAULT 'unverified' NOT NULL`, partial index on the cross-signed cut). Before this the
+  signature was *dropped at projection time* — no consumer could have verified a binding
+  even if it wanted to, which is why "verify on consume" had nowhere to stand.
+- **`p2p::binding_proof_wire`** — the envelope codec (`elohim:apb:1:<b64url(msgpack)>`) over
+  the landed C2-S1 algebra, total and panic-free on attacker-controlled input, plus
+  `classify_binding_signature`, the single writer chokepoint. The red-team's "type-level, not
+  a remembered `WHERE`" requirement is met literally: `BindingProofStatus`'s inner enum is
+  private and is the insert model's field type, so `cross_signed` is unconstructible outside
+  the verifier — a careless writer gets a compile error, not an attributable row.
+  Row-level policy included: bounded validity window (open-ended and >90d classify
+  `unverified`), and transport-kind assigned by the verifier from the id's own namespace
+  rather than from the payload's claim.
+- **All four writers classify at write** — gossip receive, handshake (against the
+  TRANSPORT-verified PeerId, not the payload's self-report), and DHT arrival. The
+  DHT-arrival signal now *carries the entry's signature through* instead of discarding it,
+  and the gossip re-publish forwards it rather than substituting a sentinel, so a real proof
+  will propagate the moment C2-S2 mints one.
+- **The consumer cut** — `AttributableBindings`, taken by type by the economic joins
+  (reciprocity ledger REST + GraphQL, `external_committed_bytes`, the per-device `stewarded`
+  triptych) while routing/display keeps `list_active_for_agent` and its honest self-asserted
+  rows.
+- **Posture** — `ELOHIM_ATTRIBUTION_CROSS_SIGNED=enforce|observe`, default **observe** +
+  the counter `elohim_attribution_unverified_bindings_total`. Deliberate: no peer can mint a
+  proof until C2-S2, so enforcing now would blank every economic surface without making
+  anything safer. The counter is the measure that says how much attribution rides
+  self-asserted identity today; draining it to zero under `posture="enforce"` is the habit's
+  flip-to-green.
+- **Proof**: `tests/binding_attribution_refuses_sentinel.rs` (the standing red — was 2
+  failed / 0 passed against honest stubs, and is no longer `#[ignore]`d, which was a CI
+  no-op) + `tests/binding_attribution_cut.rs` (7 tests: sentinel projects unverified,
+  cross-signed projects cross_signed, `Enforce` admits only the proven peer and counts the
+  refusal, `Observe` is behaviour-preserving, a legacy-shaped row defaults to unverified, a
+  poisoned signature neither panics nor attributes, a lifted proof does not attach).
+
+**Still NOT done, and not implied by the above**: C2-S2 (minting), C2-S3 (notarized-timestamp
+freshness anchoring — the pincer stands), C2-S6 lineage currency, C2-S7 integrity fold
+(verification here is receiver-local, NOT notarized), and the durable-placement half of C2-S5
+— see the shard-push-redirect finding immediately below, which needs C2-S2 first because
+gating it today would stop shard distribution outright.
+
+---
+
 ## Confirmed review finding (2026-07-23) — fallback-dial redirects shard PUSH bytes
 
 A subsequent code review named a concrete consequence of the unsigned binding that this doc's

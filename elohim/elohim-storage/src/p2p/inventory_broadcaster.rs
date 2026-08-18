@@ -589,6 +589,8 @@ mod tests {
                 source: "handshake".to_string(),
                 device_archetype: "node".to_string(),
                 superseded_by: None,
+                signature: String::new(),
+                proof_status: crate::p2p::binding_proof_wire::BindingProofStatus::unverified(),
             };
             diesel::insert_into(peer_identity_bindings::table)
                 .values(&row)
@@ -693,6 +695,8 @@ mod tests {
                 source: "handshake".to_string(),
                 device_archetype: "node".to_string(),
                 superseded_by: None,
+                signature: String::new(),
+                proof_status: crate::p2p::binding_proof_wire::BindingProofStatus::unverified(),
             };
             diesel::insert_into(peer_identity_bindings::table)
                 .values(&row)

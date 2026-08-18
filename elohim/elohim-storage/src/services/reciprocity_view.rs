@@ -18,7 +18,7 @@ use diesel::prelude::*;
 use diesel::sql_types::{Double, Float, Nullable};
 use thiserror::Error;
 
-use crate::db::models::PeerIdentityBindingRow;
+use crate::db::peer_identity_bindings::AttributableBindings;
 use crate::db::DbPool;
 use crate::views::{ReciprocityRow, ReciprocityView};
 
@@ -48,14 +48,14 @@ pub enum ReciprocityViewError {
 pub async fn aggregate_reciprocity_view(
     pool: &DbPool,
     agent_cid: &str,
-    bindings: &[PeerIdentityBindingRow],
+    bindings: &AttributableBindings,
     connected_peers: &HashSet<String>,
 ) -> Result<ReciprocityView, ReciprocityViewError> {
     let mut conn = pool
         .get()
         .map_err(|e| ReciprocityViewError::Pool(e.to_string()))?;
 
-    let my_peers: Vec<&str> = bindings.iter().map(|b| b.peer_id.as_str()).collect();
+    let my_peers: Vec<&str> = bindings.peer_ids();
 
     if my_peers.is_empty() {
         return Ok(ReciprocityView {

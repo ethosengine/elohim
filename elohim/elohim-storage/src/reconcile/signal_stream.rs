@@ -164,6 +164,18 @@ pub struct AgentPeerBindingSignal {
     pub superseded_by: Option<String>,
     /// Timestamp at which the signal was emitted from the conductor.
     pub emitted_at: DateTime<Utc>,
+    /// The binding entry's `signature` field, carried through from the DHT
+    /// entry (the DNA holds it as `Vec<u8>`; this is its UTF-8 reading).
+    ///
+    /// It was previously decoded and DISCARDED by the translator — so the
+    /// authoritative DHT-arrival path projected a binding while throwing away
+    /// the only field that could ever prove it. Carrying it makes the projection
+    /// classifiable (`p2p::binding_proof_wire`) and lets the gossip re-publish
+    /// forward the real proof instead of substituting a sentinel.
+    ///
+    /// Empty when the entry carried no signature or non-UTF-8 bytes; both read
+    /// as self-asserted, which is the honest classification.
+    pub signature: String,
 }
 
 /// Payload for `DnaSignal::PortalHostCreated`.
@@ -633,6 +645,7 @@ mod tests {
             binding_action_hash: "uhCkk-binding-action-hash".to_string(),
             superseded_by: None,
             emitted_at: Utc::now(),
+            signature: String::new(),
         })
     }
 

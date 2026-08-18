@@ -89,8 +89,12 @@ async fn handle_reciprocity_self(
     // Legacy local relational path.
     let _ = graph_engine;
     let now_iso = chrono::Utc::now().to_rfc3339();
-    let bindings = peer_identity_bindings::list_active_for_agent(&mut conn, &agent_cid, &now_iso)
-        .map_err(|e| StorageError::Internal(format!("bindings lookup failed: {}", e)))?;
+    // Attribution cut: a reciprocity ledger says who owes whom bytes. It may
+    // only join through bindings that passed the cross-signature check (habit
+    // `identity-cross-signed`); the routing set is not admissible here.
+    let bindings =
+        peer_identity_bindings::list_attributable_for_agent(&mut conn, &agent_cid, &now_iso)
+            .map_err(|e| StorageError::Internal(format!("bindings lookup failed: {}", e)))?;
 
     // HTTP callers have no live P2P swarm — pass empty snapshot.
     // Per Phase 4 T10 design: online will be Some(false) for all rows,

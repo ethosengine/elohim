@@ -59,6 +59,8 @@ fn insert_binding(conn: &mut diesel::SqliteConnection, agent_cid: &str, peer_id:
             source: "dht".to_string(),
             device_archetype: "desktop".to_string(),
             superseded_by: None,
+            signature: String::new(),
+            proof_status: elohim_storage::p2p::binding_proof_wire::BindingProofStatus::unverified(),
         })
         .execute(conn)
         .expect("insert binding");

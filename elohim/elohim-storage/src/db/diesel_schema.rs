@@ -1285,6 +1285,12 @@ diesel::table! {
         source           -> Text,
         device_archetype -> Text,
         superseded_by    -> Nullable<Text>,
+        // The cross-signature proof as it arrived, and THIS node's fail-closed
+        // classification of it. Only `p2p::binding_proof_wire` can produce the
+        // 'cross_signed' value; every other writer lands 'unverified'.
+        // Read gates positive-match `= 'cross_signed'` — never `!= 'unverified'`.
+        signature        -> Text,
+        proof_status     -> Text,
     }
 }
 

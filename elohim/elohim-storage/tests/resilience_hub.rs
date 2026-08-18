@@ -62,6 +62,8 @@ fn insert_binding(conn: &mut elohim_storage::db::PooledConn, peer_id: &str, agen
         source: "dht".to_string(),
         device_archetype: "node".to_string(),
         superseded_by: None,
+        signature: String::new(),
+        proof_status: elohim_storage::p2p::binding_proof_wire::BindingProofStatus::unverified(),
     };
     diesel::replace_into(peer_identity_bindings::table)
         .values(&row)

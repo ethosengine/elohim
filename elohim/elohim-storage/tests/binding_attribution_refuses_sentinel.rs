@@ -1,6 +1,6 @@
-//! STANDING RED — spine node `identity-cross-signed`.
+//! Regression guard — habit `identity-cross-signed`.
 //!
-//! # What is broken
+//! # What was broken
 //!
 //! An `AgentPeerBinding` asserts a `(agent_cid, transport_id)` pair — "agent X
 //! owns transport endpoint Y". Today that assertion is **self-asserted**:
@@ -18,13 +18,18 @@
 //! plainly: do NOT consume bindings for economic attribution until a cross-signed
 //! control proof lands.
 //!
-//! # Why this file is the red
+//! # Why this file exists
 //!
-//! The signature ALGEBRA already exists and is sound — `p2p::binding_cross_signature`
-//! (slice C2-S1) is landed, pure, and red-team reviewed. It is `pub mod`-declared
-//! and referenced **nowhere else in `src/`**. What is missing is the admissibility
-//! DECISION that stands between a binding and an attribution join. There is no such
-//! predicate anywhere today; the check is `!signature.is_empty()`.
+//! It was the STANDING RED for this habit: the signature ALGEBRA existed and was
+//! sound — `p2p::binding_cross_signature` (slice C2-S1), pure and red-team
+//! reviewed — but was `pub mod`-declared and referenced **nowhere else in
+//! `src/`**. What was missing was the admissibility DECISION between a binding
+//! and an attribution join; the only check was `!signature.is_empty()`.
+//!
+//! C2-S4 supplied it (`p2p::binding_proof_wire`), so these two assertions now
+//! PASS and stand as the regression guard. They deliberately do not run
+//! `#[ignore]`d any more: an ignored test is a CI no-op, and this property is
+//! exactly the kind that decays silently.
 //!
 //! Both halves are asserted deliberately. A red that only refused sentinels could
 //! be "cured" by refusing everything, which would be equally useless — the positive
@@ -83,7 +88,6 @@ fn cross_signed_proof(core: &BindingCore) -> CrossSignatureProof {
 }
 
 #[test]
-#[ignore = "STANDING RED — spine node identity-cross-signed; run with --ignored"]
 fn a_sentinel_binding_is_inadmissible_for_economic_attribution() {
     // There is no admissibility predicate in the tree at all — that absence IS
     // the finding. The signature field a live binding carries today is this
@@ -101,7 +105,6 @@ fn a_sentinel_binding_is_inadmissible_for_economic_attribution() {
 }
 
 #[test]
-#[ignore = "STANDING RED — spine node identity-cross-signed; run with --ignored"]
 fn a_genuinely_cross_signed_binding_is_admissible() {
     // The half that keeps the red honest: a cure may not simply refuse
     // everything. Uses the landed C2-S1 algebra, so this can only pass against

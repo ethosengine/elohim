@@ -497,6 +497,8 @@ fn handle_incoming_handshake(
         source: "handshake".to_string(),
         device_archetype: "node".to_string(),
         superseded_by: None,
+        signature: String::new(),
+        proof_status: elohim_storage::p2p::binding_proof_wire::BindingProofStatus::unverified(),
     };
 
     match pool.get() {

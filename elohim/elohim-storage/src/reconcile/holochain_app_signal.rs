@@ -262,6 +262,11 @@ fn translate_imagodei(signal: ImagodeiSignal) -> Option<DnaSignal> {
                 binding_action_hash: action_hash,
                 superseded_by,
                 emitted_at,
+                // The entry's signature bytes, carried through instead of
+                // discarded. Lossy UTF-8 on purpose: this is attacker-reachable
+                // input on the DHT, and non-UTF-8 bytes must classify as
+                // self-asserted rather than panic a projection sweep.
+                signature: String::from_utf8_lossy(&binding.signature).into_owned(),
             }))
         }
 

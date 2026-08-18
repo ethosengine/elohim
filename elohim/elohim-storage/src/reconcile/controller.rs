@@ -600,6 +600,25 @@ impl<S: DnaSignalStream> ReconcileController<S> {
                         source: "dht".to_string(),
                         device_archetype: signal.device_archetype.as_str().to_string(),
                         superseded_by: signal.superseded_by.clone(),
+                        signature: signal.signature.clone(),
+                        // Classification chokepoint (C2-S4). This is the
+                        // AUTHORITATIVE arrival path, and until a peer actually
+                        // mints a cross-signature (C2-S2) every entry lands
+                        // `unverified` — which is the correct reading of a
+                        // signature field carrying `STAGE1_SIGNATURE_SENTINEL`.
+                        // Transport kind is assigned here, from the namespace
+                        // `peer_id` belongs to, never from the entry's claim.
+                        proof_status: crate::p2p::binding_proof_wire::classify_binding_signature(
+                            &signal.agent_cid,
+                            &signal.peer_id,
+                            crate::p2p::binding_cross_signature::TRANSPORT_KIND_LIBP2P,
+                            &signal.valid_from.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                            signal
+                                .valid_until
+                                .map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string())
+                                .as_deref(),
+                            &signal.signature,
+                        ),
                     };
                     match crate::db::peer_identity_bindings::upsert(&mut conn, &row) {
                         Ok(()) => debug!(
@@ -643,9 +662,17 @@ impl<S: DnaSignalStream> ReconcileController<S> {
             device_archetype: signal.device_archetype.as_str().to_string(),
             binding_action_hash: signal.binding_action_hash.clone(),
             emitted_at: signal.emitted_at.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
-            // Stage 1: structural-only sentinel. Stage 2 replaces with real Ed25519
-            // signature over canonical payload bytes (see identity_binding_gossip.rs).
-            signature: crate::p2p::identity_binding_gossip::STAGE1_SIGNATURE_SENTINEL.to_string(),
+            // Forward whatever the DHT entry actually carried, so a real
+            // cross-signature propagates to peers instead of being replaced by a
+            // placeholder at the one hop that had the proof in hand. The
+            // sentinel remains the fallback for an entry with no signature —
+            // the gossip payload's structural check requires non-empty, and
+            // "self-asserted" is the honest thing for that byte to say.
+            signature: if signal.signature.is_empty() {
+                crate::p2p::identity_binding_gossip::STAGE1_SIGNATURE_SENTINEL.to_string()
+            } else {
+                signal.signature.clone()
+            },
         };
 
         match &self.swarm_tx {
@@ -1281,6 +1308,7 @@ mod tests {
             binding_action_hash: "uhCkk-binding-action-hash".to_string(),
             superseded_by: None,
             emitted_at: Utc::now(),
+            signature: String::new(),
         }
     }
 
@@ -1651,6 +1679,7 @@ mod tests {
             binding_action_hash: "uhCkk-dht-binding-hash".into(),
             superseded_by: Some("uhCkk-prev-binding".to_string()),
             emitted_at: Utc::now(),
+            signature: String::new(),
         };
 
         let stream = InMemoryDnaSignalStream::with_signals(vec![DnaSignal::AgentPeerBinding(
@@ -1838,6 +1867,8 @@ mod tests {
                     source: "dht".to_string(),
                     device_archetype: "node".to_string(),
                     superseded_by: None,
+                    signature: String::new(),
+                    proof_status: crate::p2p::binding_proof_wire::BindingProofStatus::unverified(),
                 },
             )
             .expect("upsert binding");

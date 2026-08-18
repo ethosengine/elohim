@@ -201,6 +201,8 @@ fn seed_binding_for_a4(pool: &elohim_storage::db::DbPool) {
         source: "dht".to_string(),
         device_archetype: "desktop".to_string(),
         superseded_by: None,
+        signature: String::new(),
+        proof_status: elohim_storage::p2p::binding_proof_wire::BindingProofStatus::unverified(),
     };
     peer_identity_bindings::upsert(&mut conn, &row).expect("upsert binding");
 }

@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use super::lossy_text::LossyTextOpt;
+use crate::p2p::binding_proof_wire::BindingProofStatus;
 
 use super::diesel_schema::{
     access_grants, acquisition_pins, agreements, appeals, apps, challenges,
@@ -3097,9 +3098,42 @@ pub struct PeerIdentityBindingRow {
     /// Action hash of the AgentPeerBinding DHT entry that supersedes this row, if any.
     /// NULL means this is the current binding for (agent_cid, peer_id).
     pub superseded_by: Option<String>,
+    /// The binding's signature field exactly as it arrived. Today this is
+    /// overwhelmingly `STAGE1_SIGNATURE_SENTINEL` — a self-asserted placeholder.
+    /// Retained (it used to be dropped at projection time) so `proof_status` is
+    /// re-derivable on rebuild rather than becoming a second source of truth.
+    pub signature: String,
+    /// This node's classification of `signature`: `'unverified'` or
+    /// `'cross_signed'`. Written only via
+    /// [`crate::p2p::binding_proof_wire::classify_binding_signature`].
+    /// Use [`PeerIdentityBindingRow::is_cross_signed`] to read it — a bare
+    /// string comparison invites the `!= 'unverified'` gate, which admits every
+    /// future status nobody has reasoned about yet.
+    pub proof_status: String,
+}
+
+impl PeerIdentityBindingRow {
+    /// Did this node verify a real cross-signature for this binding?
+    ///
+    /// The ONLY sanctioned read of `proof_status`, and a positive match by
+    /// construction. `false` means self-asserted: the row may steer an
+    /// ephemeral, self-correcting decision (which peer to dial for
+    /// content-addressed bytes that verify by hash), and may NOT back an
+    /// economic attribution or a durable placement.
+    pub fn is_cross_signed(&self) -> bool {
+        self.proof_status == crate::p2p::binding_proof_wire::PROOF_STATUS_CROSS_SIGNED
+    }
 }
 
 /// Insert model for peer identity bindings (INSERT/REPLACE on primary key).
+///
+/// `proof_status` is typed, not a string, and that is the C2-S4 guarantee: a
+/// writer can name [`BindingProofStatus::unverified`] (the honest default when
+/// no proof arrived) but has no way to *write* the verified value — it exists
+/// only as the return of
+/// [`classify_binding_signature`](crate::p2p::binding_proof_wire::classify_binding_signature),
+/// which cannot produce it without two verifying Ed25519 halves. A writer that
+/// forgets the rule gets a compile error rather than an attributable row.
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = peer_identity_bindings)]
 pub struct NewPeerIdentityBindingRow {
@@ -3112,6 +3146,12 @@ pub struct NewPeerIdentityBindingRow {
     pub source: String,
     pub device_archetype: String,
     pub superseded_by: Option<String>,
+    /// The binding's signature field exactly as it arrived (empty when the
+    /// source carries none). Persisted so the classification below stays
+    /// re-derivable rather than becoming a second truth.
+    pub signature: String,
+    /// This node's classification of `signature`. See the struct doc.
+    pub proof_status: BindingProofStatus,
 }
 
 // Recovery Protocol Phase 2 — M4 Revocation + Recovery Projection

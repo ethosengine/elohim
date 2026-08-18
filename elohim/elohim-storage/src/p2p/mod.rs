@@ -33,6 +33,7 @@ pub mod adapters;
 pub mod attention_tending;
 pub mod behaviour;
 pub mod binding_cross_signature;
+pub mod binding_proof_wire;
 pub mod blob_fetch;
 pub mod blob_protocol;
 pub mod blob_swarm;
@@ -981,42 +982,16 @@ pub struct PeerListView {
     pub total: usize,
 }
 
+// The attribution-admissibility decision for `AgentPeerBinding` (habit
+// `identity-cross-signed`) lives with the codec that can actually verify it —
+// `binding_proof_wire`. Re-exported here because that is where callers and the
+// standing red (`tests/binding_attribution_refuses_sentinel.rs`) already reach
+// for it.
+pub use binding_proof_wire::{
+    binding_admissible_for_attribution, binding_admissible_for_attribution_proof,
+};
+
 /// Commands sent from HTTP handlers to the P2P event loop.
-/// May a binding carrying `signature` back an economic attribution join?
-///
-/// **This is an honest reproduction of today's rule, not a stub.** The only gate
-/// a binding passes today is `imagodei_integrity::validate_create`'s non-empty
-/// check — so a `STAGE1_SIGNATURE_SENTINEL`, which is non-empty, is admitted.
-/// That is the standing security defect, and encoding it here makes it
-/// assertable (`tests/binding_attribution_refuses_sentinel.rs`) instead of
-/// merely described in prose.
-///
-/// Spine node `identity-cross-signed`. The cure verifies the cross-signature via
-/// [`binding_cross_signature`] rather than inspecting the string — see
-/// [`binding_admissible_for_attribution_proof`].
-///
-/// `dev_mode` is threaded now because the eventual cure needs it (a dev fleet
-/// must still function before every peer emits real proofs); today it changes
-/// nothing, which is itself the honest report.
-pub fn binding_admissible_for_attribution(signature: &str, _dev_mode: bool) -> bool {
-    !signature.is_empty()
-}
-
-/// May a binding backed by a verified cross-signature proof be admitted?
-///
-/// **Today: always `false`** — an honest reproduction, because nothing in `src/`
-/// consumes [`binding_cross_signature`] at all. The algebra is landed (slice
-/// C2-S1) and unwired, so no proof, however valid, reaches an attribution
-/// decision. Returning `false` reports that faithfully; the cure verifies the
-/// proof and admits it.
-pub fn binding_admissible_for_attribution_proof(
-    _core: &binding_cross_signature::BindingCore,
-    _proof: &binding_cross_signature::CrossSignatureProof,
-    _dev_mode: bool,
-) -> bool {
-    false
-}
-
 pub enum P2PCommand {
     /// Publish an EPR Head to Kademlia DHT.
     ///
