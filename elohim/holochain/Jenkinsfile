@@ -917,6 +917,7 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         "s|ALLOW_DNA_REINSTALL_PLACEHOLDER|${nonProdGate}|g",
         "s|ALLOW_SEED_SHARD_MANIFEST_PLACEHOLDER|${nonProdGate}|g",
         "s|ALLOW_SEED_NETWORK_STAKES_PLACEHOLDER|${nonProdGate}|g",
+        "s|ALLOW_SEED_DELEGATES_COMPUTE_PLACEHOLDER|${nonProdGate}|g",
         "s|ADOPT_BEFORE_AUTHOR_PLACEHOLDER|${nonProdGate}|g",
         "s|RESOURCE_PREFIX_PLACEHOLDER|${humanConfig.resourcePrefix}|g",
         "s|INSTANCE_PLACEHOLDER|${humanConfig.instance}|g",

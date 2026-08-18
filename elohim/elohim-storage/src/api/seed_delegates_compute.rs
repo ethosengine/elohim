@@ -38,11 +38,16 @@ use super::{get_conn, parse_body};
 // Flag gate
 // ---------------------------------------------------------------------------
 
-/// Returns `true` when `ALLOW_SEED_DELEGATES_COMPUTE=1` is set in the environment.
+/// Returns `true` when `ALLOW_SEED_DELEGATES_COMPUTE` is `1`/`true` in the
+/// environment — the shared seed-lever vocabulary (`gate_value_allows`), so the
+/// deploy template's `true`/`false` stamping enables this lever exactly like
+/// its shard-manifest / network-stakes siblings.
 ///
 /// Exposed for direct test coverage of the flag-gate logic.
 pub fn is_seed_allowed() -> bool {
-    std::env::var("ALLOW_SEED_DELEGATES_COMPUTE").as_deref() == Ok("1")
+    super::seed_network_stakes::gate_value_allows(
+        std::env::var("ALLOW_SEED_DELEGATES_COMPUTE").ok().as_deref(),
+    )
 }
 
 // ---------------------------------------------------------------------------

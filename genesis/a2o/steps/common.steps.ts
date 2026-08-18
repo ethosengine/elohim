@@ -265,6 +265,15 @@ Before(function (this: E2EWorld, scenario) {
 Before(function (this: E2EWorld, scenario) {
   const tags = scenario.pickle.tags.map(t => t.name);
   if (tags.includes('@wip')) {
+    // A2O_RUN_WIP=1: deliberately execute @wip scenarios for a LOCAL red
+    // measurement (e.g. habit evidence). CI counting is unaffected — the edge
+    // Dataplane Validation tag filter (`not @wip`) excludes them upstream of
+    // this gate; dropping @wip for CI remains an operator decision.
+    if (process.env.A2O_RUN_WIP === '1') {
+      // eslint-disable-next-line no-console
+      console.log(`  ▶️  RUNNING @wip (A2O_RUN_WIP=1): "${scenario.pickle.name}"`);
+      return undefined;
+    }
     // eslint-disable-next-line no-console
     console.log(
       `  ⏭️  HELD (@wip): "${scenario.pickle.name}" — steps not yet wired; skipped, not failed.`

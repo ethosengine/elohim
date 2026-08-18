@@ -711,16 +711,51 @@ habits:
       reconciliation as commitment-gated protocol verbs — with peer-local
       telemetry served by the peer itself. The dev surface and the operator
       OS-settings surface are the same surface.
-    status: unwired
-    active: false
-    first_move: >
-      Write the red: a2o scenario — an operator holding a delegates-compute
-      commitment requests a restart/backfill on a peer via the doorway; the peer
-      executes and attests; a caller WITHOUT the commitment is refused. (Kills
-      the kubectl-only class: restart-doorway-epr.sh; also the adam-invisibility
-      class — peers unobservable except through our cluster's Loki.)
+    status: red
+    active: true
+    checks:
+      - "a2o @concern:operator-runtime-surface (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — @wip-tagged, so EXCLUDED from the edge Dataplane Validation rollup until the operator drops @wip; measure locally with A2O_RUN_WIP=1 npx cucumber-js --tags '@concern:operator-runtime-surface')"
+      - "cargo test --test operator_verbs (elohim/elohim-storage — storage-side verb halves: holder accepted + attestation names the grant cid; no-grant refused; revoked refused; no verified performer refused; loopless peer honest 503)"
+    evidence: >
+      DELTA 2026-08-18 (unwired -> RED, slice-1 cure landed desk-proven; first
+      local measure recorded): the red is now RUNNABLE — step definitions wired
+      for all 4 scenarios (steps/dataplane/operator-commitment-gated-verbs.steps.ts;
+      A2O_RUN_WIP=1 override added to the common.steps @wip hold for local
+      measurement, CI counting untouched) and the live run measured 3 failed /
+      1 pending against alpha: scenarios 1-3 fail at persona login (fixture
+      humans have no API-mode credentials on the deployed doorway — the
+      verified-performer path IS part of the contract), telemetry scenario
+      honesty-pends. Cure chain landed the same day, desk-proven: storage
+      POST /api/v1/operator/reconcile (manifest-declared, doorway-proxied)
+      authorizes the caller ON THE PEER via the wired authorize_operation gate
+      (delegates-compute grant, scope=operator-reconcile, 7-check bounds),
+      kicks the EXISTING projection-reconcile loop through a capacity-1
+      coalescing channel (no second reconcile implementation; disabled-loop
+      arms drop the receiver so the verb 503s honestly), and answers with an
+      attestation naming the commitment cid (5/5 integration tests green,
+      tests/operator_verbs.rs; kick boundedness unit-pinned). Doorway op-gate
+      generalized: per-verb capability strings (op_gate_capability), operator
+      paths force Enforce regardless of DELEGATES_COMPUTE_OP_GATE/dev_mode,
+      unknown operator verbs deny fail-closed, verified performer rides a
+      strip-then-inject internal header (22 op-gate kernel tests green). Grant
+      writer wired to the fleet: ALLOW_SEED_DELEGATES_COMPUTE stamped per-env
+      in the edgenode template (true alpha/staging, false prod) and the lever
+      now accepts the template's true/false vocabulary (gate_value_allows,
+      shared with its stakes sibling — it previously read only "1", so the
+      stamp would have been silently inert). Flip-to-green condition: fixture
+      personas can authenticate API-mode against alpha (harness auth gap),
+      grants seeded via the lever, then the 4 scenarios pass locally; the
+      @wip drop (joining the CI byConcern rollup) stays an operator decision
+      per the feature file's own note. Slice 2 (named, not started): emit the
+      REA economic event per executed verb (bounded_by = grant cid), which
+      also lights the currently-inert rate check; then operator-restart /
+      operator-reseed verbs on the arc-actuate precedent, and the peer-local
+      log seam (/debug/stream is written but unrouted — the adam-invisibility
+      log axis).
     refs:
       - "task #10 (operator directive 2026-07-02)"
+      - "elohim/elohim-storage/src/api/operator_verbs.rs (verb handler + kick) · doorway src/server/http.rs op_gate_capability/effective_op_gate_mode (per-verb gate) · seam-registry rows in both crates"
+      - "storage POST /admin/arc-policy/actuate — the pre-existing commitment-gated peer-local mutation precedent (sets-authority-arc; conductor restart) this verb family generalizes"
       - "memory: project_rea_compute_commitment_primitive (delegates-compute displaces X-API-Key)"
       - "task #7 (adam has zero Loki streams — the symmetry gap, live)"
     evidence: >

@@ -80,7 +80,11 @@ pub fn is_seed_allowed() -> bool {
 
 /// Pure half of the gate: which env-var spellings count as opt-in.
 /// Kept env-free so tests never mutate process globals.
-fn gate_value_allows(value: Option<&str>) -> bool {
+/// Shared seed-lever gate vocabulary (`1` or case-insensitive `true`) — the
+/// deploy template stamps `true`/`false` from `nonProdGate`, hand-set envs use
+/// `1`. Public so sibling seed levers (delegates-compute) accept the SAME
+/// vocabulary instead of silently reading `true` as off.
+pub fn gate_value_allows(value: Option<&str>) -> bool {
     matches!(value, Some(v) if v == "1" || v.eq_ignore_ascii_case("true"))
 }
 

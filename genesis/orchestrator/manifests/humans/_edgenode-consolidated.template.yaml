@@ -410,6 +410,15 @@ spec:
             # alpha/staging, false for prod.
             - name: ALLOW_SEED_NETWORK_STAKES
               value: "ALLOW_SEED_NETWORK_STAKES_PLACEHOLDER"
+            # Gate for the delegates-compute grant seed lever
+            # (POST /admin/seed/delegates-compute, seed_delegates_compute.rs) —
+            # the fixture writer for commitment-gated operator verbs (habit
+            # operator-runtime-surface: a2o @concern:operator-runtime-surface
+            # seeds/revokes an operator-reconcile grant through it). Off (403)
+            # by default; same per-env rendering as its seed-lever siblings:
+            # true for alpha/staging (preproduction fixtures), false for prod.
+            - name: ALLOW_SEED_DELEGATES_COMPUTE
+              value: "ALLOW_SEED_DELEGATES_COMPUTE_PLACEHOLDER"
             # Corpus-key -> h_app_id bridge for the stakes resolver
             # (trust/manifest_resolver.rs leg 3): a grant is scoped by corpus
             # id (genesis-lamad) but the adoption hot path resolves by
