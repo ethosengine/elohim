@@ -130,8 +130,27 @@ pub fn too_many_requests_with_retry(
         .unwrap()
 }
 
+/// The wire shape of a conductor-admission shed: the same catching-up 503 that
+/// storage's own request-admission ceiling emits.
+///
+/// ONE home for both pools. A shed says the conductor never saw the call, so the
+/// honest answer is "come back", not "it broke" — and a caller that must guess
+/// which of the two gates refused it cannot write a single retry rule.
+pub fn admission_shed_backpressure() -> Response<Full<Bytes>> {
+    let gate = crate::conductor_admission::admission();
+    let available = gate.capacity().saturating_sub(gate.in_flight()) as usize;
+    too_many_requests_with_retry(crate::conductor_admission::SHED_RETRY_AFTER_SECS, available)
+}
+
 /// Convert a StorageError to an appropriate HTTP response
 pub fn error_response(error: StorageError) -> Response<Full<Bytes>> {
+    // Classified FIRST, and by MARKER rather than variant: a shed rides
+    // `Timeout`, whose mapping below (504) would tell the caller the conductor
+    // took too long — the exact opposite of what happened, which is that the
+    // conductor was never asked.
+    if crate::conductor_admission::is_admission_shed(&error) {
+        return admission_shed_backpressure();
+    }
     let (status, message) = match &error {
         StorageError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
         StorageError::AlreadyExists(msg) => (StatusCode::CONFLICT, msg.clone()),
@@ -266,5 +285,59 @@ mod tests {
             resp.headers().get(header::CONTENT_TYPE).unwrap(),
             "application/json"
         );
+    }
+
+    /// A conductor-admission shed is BACKPRESSURE, not a failure verdict: the
+    /// conductor never saw the call, so the caller must be told to come back —
+    /// not told the work was attempted and broke. Measured live 2026-08-18
+    /// against a local island conductor: the shed reached the wire as a plain
+    /// `500 Error: Conductor error: ... conductor unavailable`, with no
+    /// Retry-After and no way for any client to classify it.
+    #[test]
+    fn an_admission_shed_answers_backpressure_not_a_failure_verdict() {
+        let resp = error_response(shed_err());
+        assert_eq!(
+            resp.status(),
+            StatusCode::SERVICE_UNAVAILABLE,
+            "a shed must not read as a failure verdict"
+        );
+        assert_eq!(
+            resp.headers().get(header::RETRY_AFTER).unwrap(),
+            "2",
+            "a shed must tell the caller when to come back"
+        );
+    }
+
+    /// The shed body must be the SAME catching-up shape storage's own
+    /// request-admission ceiling already emits, so one client retry rule covers
+    /// both pools — a caller neither can nor should tell which one shed it.
+    #[test]
+    fn an_admission_shed_uses_the_same_catching_up_body_as_the_request_ceiling() {
+        let resp = error_response(shed_err());
+        assert_eq!(
+            resp.headers().get(header::CONTENT_TYPE).unwrap(),
+            "application/json"
+        );
+        assert!(
+            resp.headers().get("X-Available-Permits").is_some(),
+            "a shed must report the gate occupancy it refused against"
+        );
+    }
+
+    /// Non-shed timeouts keep their existing mapping — the classification must
+    /// key on the shed marker, never on the `Timeout` variant as a whole.
+    #[test]
+    fn a_plain_timeout_is_not_reclassified_as_backpressure() {
+        let resp = error_response(StorageError::Timeout("upstream read timed out".into()));
+        assert_eq!(resp.status(), StatusCode::GATEWAY_TIMEOUT);
+    }
+
+    /// The shed shape `ConductorAdmission::shed_error` actually produces.
+    fn shed_err() -> StorageError {
+        StorageError::Timeout(format!(
+            "{}: no conductor permit for imagodei within 100ms \
+             (class=interactive, capacity=4, in_flight=4) — nothing was dispatched",
+            crate::conductor_admission::ADMISSION_SHED_MARKER
+        ))
     }
 }

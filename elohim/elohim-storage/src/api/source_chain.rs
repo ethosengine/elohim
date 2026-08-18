@@ -160,6 +160,19 @@ pub async fn handle(
     }
 }
 
+/// Map a zome-call failure onto this handler's error.
+///
+/// A conductor-admission shed passes through UNCHANGED. It carries the marker
+/// `conductor_admission::is_admission_shed` keys on, and collapsing it into the
+/// generic "unavailable" message destroys the only signal saying the conductor
+/// never saw the call — which is how a shed reached the wire as a bare 500.
+fn zome_error(op: &str, e: StorageError) -> StorageError {
+    if crate::conductor_admission::is_admission_shed(&e) {
+        return e;
+    }
+    StorageError::Conductor(format!("{op}: conductor unavailable"))
+}
+
 // ---------------------------------------------------------------------------
 // GET /api/v1/source-chain/{agentId}/entries
 // ---------------------------------------------------------------------------
@@ -199,9 +212,7 @@ async fn handle_get_entries(
                 error = %e,
                 "imagodei zome unreachable for query_my_source_chain"
             );
-            Err(StorageError::Conductor(
-                "query_my_source_chain: conductor unavailable".to_string(),
-            ))
+            Err(zome_error("query_my_source_chain", e))
         }
     }
 }
@@ -246,9 +257,46 @@ async fn handle_get_links(
                 error = %e,
                 "imagodei zome unreachable for query_my_source_chain_links"
             );
-            Err(StorageError::Conductor(
-                "query_my_source_chain_links: conductor unavailable".to_string(),
-            ))
+            Err(zome_error("query_my_source_chain_links", e))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::conductor_admission::{is_admission_shed, ADMISSION_SHED_MARKER};
+
+    /// The shape `ConductorAdmission::shed_error` produces.
+    fn shed() -> StorageError {
+        StorageError::Timeout(format!(
+            "{ADMISSION_SHED_MARKER}: no conductor permit for imagodei within 100ms \
+             (class=interactive, capacity=4, in_flight=4) — nothing was dispatched"
+        ))
+    }
+
+    /// A shed must survive the handler unchanged. Collapsing it into a generic
+    /// "conductor unavailable" destroys the ADMISSION_SHED_MARKER, and with it
+    /// every downstream `is_admission_shed` classification — which is how a
+    /// shed reached the wire as a bare 500 (measured live 2026-08-18).
+    #[test]
+    fn a_shed_survives_the_handlers_error_wrap() {
+        let mapped = zome_error("query_my_source_chain", shed());
+        assert!(
+            is_admission_shed(&mapped),
+            "the handler laundered the shed marker: {mapped}"
+        );
+    }
+
+    /// A genuine conductor failure still collapses to the readable message —
+    /// the classification keys on the marker, not on every error.
+    #[test]
+    fn a_real_conductor_failure_still_reads_as_unavailable() {
+        let mapped = zome_error(
+            "query_my_source_chain",
+            StorageError::Conductor("Zome call failed: ZomeNotFound".into()),
+        );
+        assert!(!is_admission_shed(&mapped));
+        assert!(mapped.to_string().contains("conductor unavailable"));
     }
 }

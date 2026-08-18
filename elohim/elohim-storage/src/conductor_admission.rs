@@ -83,11 +83,48 @@
 //! and the conductor spends permits on its own gossip/validation/publish work
 //! that this gate cannot see. So the gate is an ADMISSION approximation, not an
 //! accounting of the pool — it bounds our contribution to the pool's load, which
-//! is the only half we own. If `in_flight` then sits pinned at capacity with
-//! real demand queued behind it, THAT is the evidence-backed case for raising
-//! `db_max_readers` in the conductor fork — a measured reason rather than a
-//! guessed one. Both knobs are env-overridable so a live node can be retuned
-//! without a rebuild.
+//! is the only half we own. Both knobs are env-overridable so a live node can be
+//! retuned without a rebuild.
+//!
+//! ## The sizing test — and the half of it this doc originally got wrong
+//!
+//! This module used to say: if `in_flight` sits pinned at capacity with real
+//! demand queued behind it, THAT is the evidence-backed case for raising
+//! `db_max_readers`. Measured against a live conductor (2026-08-18, local island
+//! peer, `app/elohim-app/scripts/hc-admission-probe.py`), that inference is
+//! **necessary but not sufficient**, and acting on it alone makes things worse.
+//!
+//! Occupancy pinned at capacity only says the GATE is the binding constraint. It
+//! cannot distinguish "the pool has headroom we are refusing to use" from "the
+//! pool is already past its knee". The sufficient test is a second run at a
+//! larger [`ENV_PERMITS`], asking whether ARRIVAL RATE rises:
+//!
+//! ```text
+//!   capacity 17 -> 34, same offered load:  lambda 924/s -> 897/s   (flat)
+//!                                          W      18.2ms -> 37.6ms (x2.06)
+//! ```
+//!
+//! Throughput did not move; hold-time scaled with the permits. That is a
+//! saturated downstream absorbing concurrency as queueing — the pool was
+//! OVERSUBSCRIBED at 17, not undersized, and doubling it bought only latency.
+//! So: `in_flight == capacity` is where the investigation starts, and
+//! `d(lambda)/d(capacity) > 0` is what has to hold before anyone raises
+//! `db_max_readers` in the conductor fork. Little's Law itself held throughout
+//! (|L - lambda*W| under 1% across 15 runs spanning capacities 4..34), which is
+//! what makes the comparison trustworthy in the first place.
+//!
+//! ## A shed has to be legible OUTSIDE this process too
+//!
+//! [`is_admission_shed`] is what lets a caller route a shed as backpressure
+//! rather than as a verdict, and the reconcile arms use it. At the HTTP egress
+//! that classification was missing until 2026-08-18: handlers collapsed the shed
+//! into a generic "conductor unavailable" (destroying [`ADMISSION_SHED_MARKER`]),
+//! and the last error seam then answered a bare `500`. A person on the other end
+//! could not tell "the conductor never saw this" from "the conductor broke". The
+//! shed now leaves as the catching-up `503` + `Retry-After` that storage's own
+//! request-admission ceiling already emits — see
+//! [`crate::services::response::admission_shed_backpressure`], which is the one
+//! home for that wire shape.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
@@ -125,6 +162,13 @@ pub const DEFAULT_INTERACTIVE_WAIT: Duration = Duration::from_secs(5);
 /// alternative — return the ids to `pending` and retry next sweep — whereas an
 /// HTTP caller has only an error. Under contention the arms yield to people.
 pub const DEFAULT_BACKGROUND_WAIT: Duration = Duration::from_secs(1);
+
+/// Seconds a shed caller is told to wait before re-offering the call.
+///
+/// Matches storage's own request-admission ceiling (`STORAGE_SHED_RETRY_AFTER_SECS`)
+/// on purpose: a caller neither can nor should tell WHICH pool shed it, so one
+/// client retry rule has to cover both.
+pub const SHED_RETRY_AFTER_SECS: u64 = 2;
 
 /// Substring stamped into every shed error, so the class survives the trip
 /// through [`StorageError`]'s `String` payloads and can be recognised by
