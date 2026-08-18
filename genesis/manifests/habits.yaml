@@ -808,6 +808,17 @@ habits:
       - "a2o @concern:operator-runtime-surface (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — @wip DROPPED 2026-08-18 by operator decision: COUNTS in the edge Dataplane Validation byConcern rollup; also runnable locally with npx cucumber-js --tags '@concern:operator-runtime-surface')"
       - "cargo test --test operator_verbs (elohim/elohim-storage — 9 tests: holder accepted + attestation names grant cid AND recorded event id; no-grant refused; revoked refused; no verified performer refused; loopless peer honest 503 with no phantom rate charge; accepted use recorded bounded_by the grant; refusals record nothing; rate_per_hour ceiling refuses the over-limit use)"
     evidence: >
+      DELTA 2026-08-18c (login-realm RCA, desk-proven): the "persona API-mode
+      auth gap" was FALSIFIED — the login 401s came from the scenarios
+      addressing peer elohim.host (doorway alpha-B: separate unseeded identity
+      realm, own user DB + JWT secret); scenarios re-addressed to alpha-A (the
+      seeded realm) and the desk run now logs both personas in, with scenario
+      2 (no-grant refusal) PASSING LIVE against alpha — /api/v1/operator/
+      reconcile answered an explicit 401/403, the first live evidence of the
+      deployed op-gate. Scenarios 1/3/4 desk-blocked only by in-cluster
+      storage-URL unreachability from the dev container (CI's runner is
+      in-cluster); measured by the 2026-08-18 [build:edge] [edge:validate-only]
+      push.
       DELTA 2026-08-18b (operator decisions executed: @wip dropped + slice 2
       landed desk-proven): the concern now COUNTS in CI — @wip removed from the
       feature (operator authorization this turn; the born-red 3f/1pending joins

@@ -15,12 +15,22 @@ Feature: Operator verbs are commitment-gated protocol acts, not cluster surgery
   for. And because operating your own peer includes SEEING it, the last
   scenario asserts the peer serves its own runtime telemetry directly.
 
-  In the scenarios: "matthew" is a steward who holds (or held) such a grant
-  over peer "elohim.host"; "james" holds none. The Background registers the
-  same doorway pair as the sibling dataplane suites (shared step fixtures);
-  peer "alpha-A" anchors that pair even though these scenarios address
-  "elohim.host". "Refused" means an explicit authorization refusal (401/403) —
-  a missing route or a crash is a failure of the scenario, never a pass.
+  In the scenarios: "matthew" is a steward — the human who answers for a
+  peer's runtime and may hold bounded operator authority over it; he holds
+  (or held) such a grant over peer "alpha-A", while "james" holds none.
+  "The doorway" is the web gateway through which external callers reach a
+  peer. A commitment's "cid" is the content-derived identifier the grant is
+  known by on the network — the attestation names it so anyone can check
+  WHICH grant the peer acted under. The Background registers the same
+  doorway pair as the sibling dataplane suites (shared step fixtures).
+  The scenarios address peer "alpha-A" because that is the doorway realm the
+  fixture personas are seeded into: "elohim.host" (doorway alpha-B) is a
+  SEPARATE identity realm — its own user DB and JWT secret, never seeded —
+  so a scenario addressing it dies at login (401) before the verb is ever
+  reached, measuring nothing. Re-addressing elohim.host stays open until
+  identity spans doorway realms or B is deliberately seeded. "Refused" means
+  an explicit authorization refusal (401/403) — a missing route or a crash
+  is a failure of the scenario, never a pass.
 
   RED-FIRST. These scenarios ARE the schedulable red for habit
   `operator-runtime-surface`. They assert what "operating a peer" must come to
@@ -33,10 +43,10 @@ Feature: Operator verbs are commitment-gated protocol acts, not cluster surgery
   (steps/dataplane/operator-commitment-gated-verbs.steps.ts) and the slice-1
   cure (storage POST /api/v1/operator/reconcile + doorway per-verb op-gate +
   ALLOW_SEED_DELEGATES_COMPUTE grant lever) is on dev. They go green when the
-  deployed fleet carries that cure AND fixture personas can authenticate to
-  the doorway API outside a browser session — today they cannot (the "persona
-  API-mode auth gap"), so the holder scenarios fail at login before reaching
-  the verb.
+  deployed fleet carries that cure. (An earlier "persona API-mode auth gap"
+  note here was falsified 2026-08-18 — the login 401s were the realm mismatch
+  described above, cured by re-addressing the scenarios to peer "alpha-A";
+  full RCA in the steps file's Auth note.)
   Run locally: pnpm exec cucumber-js --tags '@concern:operator-runtime-surface'
 
   WHAT THE CODE ALREADY TAUGHT US (do not lose this — it reshapes the work):
@@ -68,9 +78,10 @@ Feature: Operator verbs are commitment-gated protocol acts, not cluster surgery
   scope reconciler ignores it; these run whenever the alpha endpoints are reachable.
 
   Background:
-    # alpha-A is registered because these Given-peer fixtures are shared with the
-    # sibling dataplane suites (one doorway pair, byte-identical Background); the
-    # scenarios below address elohim.host only.
+    # Both peers are registered because these Given-peer fixtures are shared with
+    # the sibling dataplane suites (one doorway pair, byte-identical Background);
+    # the scenarios below address alpha-A only (the seeded identity realm — see
+    # the realm note in the preamble).
     Given peer "alpha-A" at "alpha-A"
     And peer "elohim.host" at "elohim.host"
 
@@ -81,19 +92,19 @@ Feature: Operator verbs are commitment-gated protocol acts, not cluster surgery
     # external callers reach a peer). The attestation is OBSERVABLE: the 200 response
     # body names the commitment cid the peer acted under plus the id of the recorded
     # economic event (the durable audit row the grant's rate ceiling counts).
-    Given "matthew" holds an active "delegates-compute" commitment over peer "elohim.host"
-    When "matthew" requests a reconcile on peer "elohim.host" through the doorway
+    Given "matthew" holds an active "delegates-compute" commitment over peer "alpha-A"
+    When "matthew" requests a reconcile on peer "alpha-A" through the doorway
     Then the request is accepted
-    And peer "elohim.host" performs the reconcile
-    And peer "elohim.host" attests the commitment cid it acted under
+    And peer "alpha-A" performs the reconcile
+    And peer "alpha-A" attests the commitment cid it acted under
 
   Scenario: a caller without a commitment is refused
     # Fail-closed. Today both admin verbs answer on the operator-seat class without ever
     # consulting authorize_operation, so this is the scenario that is honestly red.
-    Given "james" holds no "delegates-compute" commitment over peer "elohim.host"
-    When "james" requests a reconcile on peer "elohim.host" through the doorway
+    Given "james" holds no "delegates-compute" commitment over peer "alpha-A"
+    When "james" requests a reconcile on peer "alpha-A" through the doorway
     Then the request is refused
-    And peer "elohim.host" performs no reconcile
+    And peer "alpha-A" performs no reconcile
 
   Scenario: a revoked commitment stops working immediately
     # Revocability is the whole point of preferring a commitment over a key: a key must be
@@ -101,9 +112,9 @@ Feature: Operator verbs are commitment-gated protocol acts, not cluster surgery
     # gone. This scenario deliberately starts from the post-revocation state — the
     # grant-then-revoke transition is the fixture; the assertion is that the SAME holder
     # who succeeded in the first scenario is refused the moment the grant is revoked.
-    Given "matthew" held a "delegates-compute" commitment over peer "elohim.host"
+    Given "matthew" held a "delegates-compute" commitment over peer "alpha-A"
     And that commitment has been revoked
-    When "matthew" requests a reconcile on peer "elohim.host" through the doorway
+    When "matthew" requests a reconcile on peer "alpha-A" through the doorway
     Then the request is refused
 
   Scenario: a peer serves its own runtime telemetry
@@ -113,6 +124,6 @@ Feature: Operator verbs are commitment-gated protocol acts, not cluster surgery
     # the probe hits the peer's OWN public hostname and the peer's own HTTP surface
     # answers with its sync/reconcile/peer state; the negative step pins that no
     # Grafana/Loki/Prometheus hop is part of that answer path.
-    When peer "elohim.host" is asked for its runtime status directly
-    Then peer "elohim.host" reports its own sync, reconcile and peer counts
+    When peer "alpha-A" is asked for its runtime status directly
+    Then peer "alpha-A" reports its own sync, reconcile and peer counts
     And the answer does not traverse the operator's observability cluster

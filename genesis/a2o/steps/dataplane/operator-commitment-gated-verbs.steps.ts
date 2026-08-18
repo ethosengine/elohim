@@ -13,7 +13,7 @@
  *
  * Four scenarios live here:
  *   1. A commitment holder ("matthew") drives a reconcile on peer
- *      "elohim.host" and gets a 200 attestation naming the commitment it
+ *      "alpha-A" and gets a 200 attestation naming the commitment it
  *      acted under.
  *   2. A caller with no grant ("james") is refused (401/403).
  *   3. A revoked commitment stops working immediately (401/403).
@@ -67,7 +67,7 @@
  *   - "performs the reconcile" / "attests the commitment cid" only assert
  *     once a real 200 attestation exists.
  *
- * ## Auth gap note
+ * ## Auth note (the "API-mode auth gap" was falsified 2026-08-18)
  *
  * There is no existing "log this fixture human in and hand me a bearer token
  * for arbitrary API-mode use" helper outside the Playwright/BrowserDevice
@@ -77,6 +77,15 @@
  * a raw authenticated `undici` POST — the same "call the private post via the
  * client's token" shape used in `operator-onboarding.steps.ts`'s
  * `adminDelete()`, just without depending on a BrowserDevice.
+ *
+ * That raw login WORKS — the historical "Invalid credentials" failures were
+ * not an API-mode gap but a doorway-realm mismatch: the scenarios originally
+ * addressed peer "elohim.host" (doorway alpha-B), a separate identity realm
+ * (own user DB, own JWT secret) the seeder never populates, so login 401'd
+ * before any verb was reached. The scenarios now address peer "alpha-A", the
+ * realm the fixture personas are seeded into (seed-humans.ts targets
+ * doorway-alpha only). An A-issued JWT is NOT valid at doorway-B (different
+ * JWT secrets), so login and the gated verb must target the same doorway.
  */
 
 import { strict as assert } from 'node:assert';
