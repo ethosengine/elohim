@@ -1138,7 +1138,10 @@ fn build_chrome_context_json<B>(path: &str, req: &Request<B>) -> String {
     .to_json()
 }
 
-fn resolve_agent_cid_from_request<B>(state: &AppState, req: &Request<B>) -> Option<String> {
+fn resolve_verified_claims_from_request<B>(
+    state: &AppState,
+    req: &Request<B>,
+) -> Option<crate::auth::Claims> {
     let auth_header = req
         .headers()
         .get(hyper::header::AUTHORIZATION)
@@ -1156,7 +1159,33 @@ fn resolve_agent_cid_from_request<B>(state: &AppState, req: &Request<B>) -> Opti
     if !result.valid {
         return None;
     }
-    result.claims.map(|c| c.human_id)
+    result.claims
+}
+
+fn resolve_agent_cid_from_request<B>(state: &AppState, req: &Request<B>) -> Option<String> {
+    resolve_verified_claims_from_request(state, req).map(|c| c.human_id)
+}
+
+/// Performer identity for the delegates-compute op-gate.
+///
+/// A `delegates-compute` grant names its `recipient` in the Holochain agent-key
+/// namespace (`uhCAk…` — what `/auth/login` returns as `agentPubKey`, and what
+/// the grant levers seed as `recipient`). The gate must therefore authorize the
+/// verified JWT's `agent_pub_key`, NOT `claims.human_id` (the doorway-local
+/// user UUID) — authorizing the UUID made every granted holder 403 with
+/// "no active delegates-compute grant for (performer, capability)".
+/// Tokens with an empty `agent_pub_key` (legacy/visitor shapes) fall back to
+/// `human_id` so the gate still has a stable performer to correctly find no
+/// grant for. Same trust class as `resolve_agent_cid_from_request` (C8: from
+/// the verified JWT, never a client header).
+fn resolve_op_gate_performer_from_request<B>(state: &AppState, req: &Request<B>) -> Option<String> {
+    resolve_verified_claims_from_request(state, req).map(|c| {
+        if c.agent_pub_key.is_empty() {
+            c.human_id
+        } else {
+            c.agent_pub_key
+        }
+    })
 }
 
 /// Extract the raw Bearer token string from an `Authorization: Bearer <token>` header.
@@ -3020,6 +3049,7 @@ mod epr_dispatch_breaker_tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)] // the const relation IS the pinned invariant
     fn dispatch_timeout_is_tightened_well_under_the_old_30s_wall() {
         // The regression this fix closes: a per-request .timeout() override
         // silently widened past the 10s browser-facing budget, back up to a
@@ -3524,6 +3554,7 @@ async fn ssr_fallback_response(
                 let agent_cid_owned = resolve_agent_cid_from_request(state, &req);
                 let ctx = routes::ForwardCtx {
                     agent_cid: agent_cid_owned.as_deref(),
+                    ..Default::default()
                 };
                 routes::forward_to_storage(
                     req,
@@ -5350,6 +5381,7 @@ async fn handle_request(
                     let agent_cid_owned = resolve_agent_cid_from_request(&state, &req);
                     let ctx = routes::ForwardCtx {
                         agent_cid: agent_cid_owned.as_deref(),
+                        ..Default::default()
                     };
                     // Blob paths get cache-aware forwarding; all other registry
                     // routes use the generic forwarder unchanged.
@@ -5396,13 +5428,17 @@ async fn handle_request(
                             capability
                         };
                         if let Some(capability) = gated_capability {
-                            // performer = doorway-verified human_id (never the client
-                            // X-Agent-Cid header, which is trivially spoofable — C8).
+                            // performer = doorway-verified agent_pub_key (grant-recipient
+                            // namespace; see resolve_op_gate_performer_from_request — and
+                            // never the client X-Agent-Cid header, which is trivially
+                            // spoofable — C8).
                             // The authorize call runs ONLY when a performer exists; the
                             // no-credential case branches by mode (D2: observe is a
                             // non-blocking shadow stage — log the would-deny but never
                             // block; only enforce fails closed).
-                            match agent_cid_owned.as_ref() {
+                            let op_gate_performer =
+                                resolve_op_gate_performer_from_request(&state, &req);
+                            match op_gate_performer.as_ref() {
                                 Some(performer) => {
                                     let performer = performer.clone();
                                     // Forward the user's own Bearer (D6: storage logs requester identity).
@@ -5496,37 +5532,31 @@ async fn handle_request(
                     // ── end op-gate ───────────────────────────────────────────
 
                     // Strip the internal-hop performer header from every inbound
-                    // request (a client-supplied value must never reach storage),
-                    // then inject the doorway-verified performer for an allowed
-                    // operator verb — storage's verb handlers re-authorize for
-                    // themselves against this performer.
+                    // request (a client-supplied value must never reach storage).
+                    // The doorway-verified performer for an allowed operator verb
+                    // rides ForwardCtx instead — forward_to_storage rebuilds the
+                    // outbound request from an allowlist, so a header injected on
+                    // the inbound hyper request would be silently dropped there
+                    // (that drop is exactly how the operator verb answered
+                    // `no-verified-performer` end-to-end, 2026-08-19).
                     let mut req = req;
-                    {
-                        let headers = req.headers_mut();
-                        headers.remove(X_ELOHIM_VERIFIED_PERFORMER);
-                        if let Some(vp) = verified_performer_for_forward.as_deref() {
-                            match hyper::header::HeaderValue::from_str(vp) {
-                                Ok(value) => {
-                                    headers.insert(
-                                        hyper::header::HeaderName::from_static(
-                                            X_ELOHIM_VERIFIED_PERFORMER,
-                                        ),
-                                        value,
-                                    );
-                                }
-                                Err(_) => {
-                                    // A performer that can't ride a header can't be
-                                    // authorized downstream — refuse rather than
-                                    // forward an unattributed operator mutation.
-                                    warn!(
-                                        path = %p,
-                                        "op-gate: performer not header-safe; denying"
-                                    );
-                                    return Ok(to_boxed(make_op_gate_forbidden()));
-                                }
-                            }
+                    req.headers_mut().remove(X_ELOHIM_VERIFIED_PERFORMER);
+                    if let Some(vp) = verified_performer_for_forward.as_deref() {
+                        if hyper::header::HeaderValue::from_str(vp).is_err() {
+                            // A performer that can't ride a header can't be
+                            // authorized downstream — refuse rather than forward
+                            // an unattributed operator mutation.
+                            warn!(
+                                path = %p,
+                                "op-gate: performer not header-safe; denying"
+                            );
+                            return Ok(to_boxed(make_op_gate_forbidden()));
                         }
                     }
+                    let ctx = routes::ForwardCtx {
+                        verified_performer: verified_performer_for_forward.as_deref(),
+                        ..ctx
+                    };
 
                     return Ok(to_boxed(
                         routes::forward_to_storage(
@@ -7815,5 +7845,110 @@ mod op_gate_tests {
         assert!(is_operator_verb_path("/api/v1/operator/anything-future"));
         assert!(!is_operator_verb_path("/api/v1/operators"));
         assert!(!is_operator_verb_path("/db/content"));
+    }
+}
+
+#[cfg(test)]
+mod op_gate_performer_tests {
+    //! The op-gate performer must be the identity a `delegates-compute` grant
+    //! names as `recipient`: the verified JWT's `agent_pub_key` (`uhCAk…`),
+    //! never the doorway-local `human_id` UUID. Pinned red 2026-08-19 by the
+    //! operator-runtime-surface positive path: the grant lever seeds
+    //! `recipient = login.agentPubKey` while the gate authorized
+    //! `performer = claims.human_id`, so a granted holder was 403'd
+    //! ("no active delegates-compute grant for (performer, capability)").
+
+    use super::{resolve_agent_cid_from_request, resolve_op_gate_performer_from_request, AppState};
+    use crate::auth::{JwtValidator, TokenInput};
+    use crate::config::Args;
+    use clap::Parser;
+    use http_body_util::Empty;
+    use hyper::body::Bytes;
+    use hyper::Request;
+
+    const TEST_SECRET: &str = "test-secret-that-is-at-least-32-characters-long";
+
+    fn test_state() -> AppState {
+        let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        args.dev_mode = false;
+        args.jwt_secret = Some(TEST_SECRET.to_string());
+        AppState::new(args)
+    }
+
+    fn bearer_jwt(human_id: &str, agent_pub_key: &str) -> String {
+        let validator = JwtValidator::new(TEST_SECRET.into(), 3600).unwrap();
+        validator
+            .generate_token(TokenInput {
+                human_id: human_id.into(),
+                agent_pub_key: agent_pub_key.into(),
+                identifier: "steward@example.com".into(),
+                permission_level: crate::auth::PermissionLevel::Authenticated,
+                session_id: None,
+                doorway_id: None,
+                doorway_url: None,
+                conductor_id: None,
+                installed_app_id: None,
+                is_steward: false,
+                has_local_conductor: false,
+            })
+            .unwrap()
+    }
+
+    fn req_with_bearer(token: Option<&str>) -> Request<Empty<Bytes>> {
+        let mut builder = Request::builder()
+            .method("POST")
+            .uri("/api/v1/operator/reconcile");
+        if let Some(t) = token {
+            builder = builder.header(hyper::header::AUTHORIZATION, format!("Bearer {t}"));
+        }
+        builder.body(Empty::<Bytes>::new()).unwrap()
+    }
+
+    #[test]
+    fn op_gate_performer_is_the_agent_pub_key_not_the_human_id() {
+        let state = test_state();
+        let token = bearer_jwt("ba3a0a01-doorway-user-uuid", "uhCAkTestAgentKey");
+        let req = req_with_bearer(Some(&token));
+        assert_eq!(
+            resolve_op_gate_performer_from_request(&state, &req).as_deref(),
+            Some("uhCAkTestAgentKey"),
+            "the performer authorized against a delegates-compute grant must be \
+             the grant-recipient namespace (agent_pub_key), not the doorway UUID"
+        );
+    }
+
+    #[test]
+    fn op_gate_performer_falls_back_to_human_id_when_agent_key_absent() {
+        // Legacy/visitor-shaped tokens carry an empty agent_pub_key; the gate
+        // still needs a stable performer to (correctly) find no grant for.
+        let state = test_state();
+        let token = bearer_jwt("ba3a0a01-doorway-user-uuid", "");
+        let req = req_with_bearer(Some(&token));
+        assert_eq!(
+            resolve_op_gate_performer_from_request(&state, &req).as_deref(),
+            Some("ba3a0a01-doorway-user-uuid"),
+        );
+    }
+
+    #[test]
+    fn op_gate_performer_is_none_without_a_credential() {
+        let state = test_state();
+        let req = req_with_bearer(None);
+        assert_eq!(resolve_op_gate_performer_from_request(&state, &req), None);
+    }
+
+    #[test]
+    fn agent_cid_resolver_semantics_are_unchanged() {
+        // The shared resolver keeps returning human_id — its three existing
+        // call sites (ForwardCtx X-Agent-Cid views, membrane keying) are out
+        // of scope for the op-gate cure; see the backlog capture in
+        // genesis/data/timeline/backlog/ for the namespace mismatch it carries.
+        let state = test_state();
+        let token = bearer_jwt("ba3a0a01-doorway-user-uuid", "uhCAkTestAgentKey");
+        let req = req_with_bearer(Some(&token));
+        assert_eq!(
+            resolve_agent_cid_from_request(&state, &req).as_deref(),
+            Some("ba3a0a01-doorway-user-uuid"),
+        );
     }
 }

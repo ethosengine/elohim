@@ -117,6 +117,29 @@ pub fn perform_seed(
         }
     }
 
+    // Dev-seed supersession: a new dev-seed grant replaces prior ACTIVE
+    // dev-seeded grants for the same (recipient, scope) — hard-scoped to rows
+    // carrying the `_provenance:"dev-seed"` bounds marker, so DHT-projected
+    // (notarized) grants are never touched. Without this, scenario sequences
+    // (grant → grant → revoke) leave an older active grant shadowing the
+    // revocation, and cross-run accumulation makes revocation unobservable.
+    let superseded = db::mishpat_commitments::revoke_active_dev_seeded_for(
+        conn,
+        input.recipient,
+        input.scope,
+        input.cid,
+        &chrono::Utc::now().to_rfc3339(),
+    )
+    .map_err(|e| StorageError::Internal(format!("supersede prior dev-seed grants: {e}")))?;
+    if superseded > 0 {
+        tracing::info!(
+            recipient = %input.recipient,
+            scope = %input.scope,
+            superseded,
+            "dev-seed: superseded prior active dev-seeded delegates-compute grant(s)"
+        );
+    }
+
     let anchor =
         crate::p2p::identity_handshake::synthesise_dht_anchor_hash(input.recipient, input.cid);
 

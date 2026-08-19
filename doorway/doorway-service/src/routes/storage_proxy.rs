@@ -117,6 +117,15 @@ pub struct ForwardCtx<'a> {
     /// (no bearer / invalid bearer / Session Visitor), no header is set and storage
     /// falls back to its `local_sessions`-based resolution or treats as visitor.
     pub agent_cid: Option<&'a str>,
+    /// Doorway-verified performer for an ALLOWED operator verb (op-gate
+    /// Allow on `/api/v1/operator/*`). When `Some`, the forwarder emits
+    /// `x-elohim-verified-performer: <value>` on the internal hop — storage's
+    /// verb handlers re-authorize against it and refuse fail-closed
+    /// (`no-verified-performer`) without it. Must be set from the verified
+    /// JWT only (same C8 trust class as the op-gate performer), never from a
+    /// client header: the dispatch arm strips inbound copies before this
+    /// context is built.
+    pub verified_performer: Option<&'a str>,
 }
 
 /// Maximum blob size (in bytes) written to the local pantry via the registry path.
@@ -234,6 +243,14 @@ where
     // the wire shape.
     if let Some(cid) = ctx.agent_cid {
         builder = builder.header("X-Agent-Cid", cid);
+    }
+
+    // Inject the doorway-verified performer for allowed operator verbs (see
+    // ForwardCtx docs). The forwarder rebuilds the outbound request from an
+    // allowlist, so this must ride ctx — a header injected on the inbound
+    // hyper request would be silently dropped here.
+    if let Some(vp) = ctx.verified_performer {
+        builder = builder.header("x-elohim-verified-performer", vp);
     }
 
     if matches!(method, Method::POST | Method::PUT | Method::PATCH) {
@@ -1414,6 +1431,7 @@ mod tests {
         let req = make_get_request("http://doorway/api/v1/cluster");
         let ctx = ForwardCtx {
             agent_cid: Some("matthew"),
+            ..Default::default()
         };
         let resp = forward_to_storage(
             req,
@@ -1458,6 +1476,123 @@ mod tests {
         assert_eq!(
             captured_value, None,
             "X-Agent-Cid must NOT be set when ctx.agent_cid is None"
+        );
+    }
+
+    // ========================================================================
+    // x-elohim-verified-performer header injection (operator verbs)
+    // ========================================================================
+
+    /// Spawn a mock storage that captures the most recent
+    /// `x-elohim-verified-performer` header observed on inbound requests.
+    async fn spawn_performer_capturing_mock_storage() -> (
+        SocketAddr,
+        Arc<tokio::sync::Mutex<Option<String>>>,
+        tokio::task::JoinHandle<()>,
+    ) {
+        use std::sync::Arc as StdArc;
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let captured: StdArc<tokio::sync::Mutex<Option<String>>> =
+            StdArc::new(tokio::sync::Mutex::new(None));
+        let captured_clone = StdArc::clone(&captured);
+
+        let handle = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let io = TokioIo::new(stream);
+                let captured_per_conn = StdArc::clone(&captured_clone);
+                tokio::spawn(async move {
+                    let _ = http1::Builder::new()
+                        .serve_connection(
+                            io,
+                            service_fn(move |req: Request<hyper::body::Incoming>| {
+                                let captured_per_req = StdArc::clone(&captured_per_conn);
+                                async move {
+                                    let vp = req
+                                        .headers()
+                                        .get("x-elohim-verified-performer")
+                                        .and_then(|v| v.to_str().ok())
+                                        .map(String::from);
+                                    *captured_per_req.lock().await = vp;
+                                    let resp: Result<Response<Full<Bytes>>, Infallible> =
+                                        Ok(Response::builder()
+                                            .status(200u16)
+                                            .header("Content-Type", "application/json")
+                                            .body(Full::new(Bytes::from("{}")))
+                                            .unwrap());
+                                    resp
+                                }
+                            }),
+                        )
+                        .await;
+                });
+            }
+        });
+
+        (addr, captured, handle)
+    }
+
+    /// The forwarder must carry the doorway-verified performer to storage:
+    /// storage's operator-verb handlers re-authorize against this header
+    /// (`operator_verbs::VERIFIED_PERFORMER_HEADER`) and refuse the verb with
+    /// `no-verified-performer` when it is absent. The forwarder rebuilds the
+    /// outbound request from an allowlist, so the header must be an explicit
+    /// ForwardCtx field — injecting it on the hyper request upstream is lost.
+    #[tokio::test]
+    async fn forward_to_storage_injects_verified_performer_when_present() {
+        let (addr, captured, _handle) = spawn_performer_capturing_mock_storage().await;
+        let storage_url = format!("http://{addr}");
+
+        let req = make_get_request("http://doorway/api/v1/operator/reconcile");
+        let ctx = ForwardCtx {
+            verified_performer: Some("uhCAkOperatorAgentKey"),
+            ..Default::default()
+        };
+        let resp = forward_to_storage(
+            req,
+            &storage_url,
+            "/api/v1/operator/reconcile",
+            &reqwest::Client::new(),
+            &UpstreamBreakers::default(),
+            ctx,
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let captured_value = captured.lock().await.clone();
+        assert_eq!(
+            captured_value,
+            Some("uhCAkOperatorAgentKey".to_string()),
+            "x-elohim-verified-performer must reach storage when ctx carries it"
+        );
+    }
+
+    /// Without a verified performer in ctx, no performer header is emitted —
+    /// storage then (correctly) refuses the operator verb fail-closed.
+    #[tokio::test]
+    async fn forward_to_storage_omits_verified_performer_when_absent() {
+        let (addr, captured, _handle) = spawn_performer_capturing_mock_storage().await;
+        let storage_url = format!("http://{addr}");
+
+        let req = make_get_request("http://doorway/api/v1/operator/reconcile");
+        let resp = forward_to_storage(
+            req,
+            &storage_url,
+            "/api/v1/operator/reconcile",
+            &reqwest::Client::new(),
+            &UpstreamBreakers::default(),
+            ForwardCtx::default(),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let captured_value = captured.lock().await.clone();
+        assert_eq!(
+            captured_value, None,
+            "x-elohim-verified-performer must NOT be set when ctx carries none"
         );
     }
 }

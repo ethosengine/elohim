@@ -282,3 +282,155 @@ fn seed_delegates_compute_absent_from_build_manifest() {
          it must never be doorway-proxied; got manifest excerpt"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Test 5: dev-seed supersession — a new dev-seed grant revokes prior ACTIVE
+// dev-seeded grants for the same (recipient, scope)
+// ---------------------------------------------------------------------------
+
+/// Dev-seed hygiene: scenario sequences (grant → use → grant → revoke → use)
+/// require that "the holder's grant" is singular per (recipient, scope) at any
+/// moment. Without supersession, a revoked fresh grant is shadowed by an
+/// earlier still-active dev-seeded grant (find_active_delegates_compute picks
+/// newest-first among ACTIVE rows), so "a revoked commitment stops working
+/// immediately" can never be observed on an accumulated dev DB. Supersession
+/// is scoped HARD to rows whose bounds carry `_provenance:"dev-seed"` — a
+/// DHT-projected (notarized) grant must never be touched by the dev lever.
+#[test]
+fn seed_delegates_compute_supersedes_prior_active_dev_seeded_grant() {
+    let _g = SEED_FLAG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::env::set_var("ALLOW_SEED_DELEGATES_COMPUTE", "1");
+
+    let pool = test_pool();
+    let mut conn = pool.get().expect("pool connection");
+
+    let seed = |conn: &mut _, cid: &str, recipient: &str, scope: &str, bounds: &str| {
+        perform_seed(
+            conn,
+            &SeedDelegatesInput {
+                cid,
+                scope,
+                provider: PROVIDER,
+                recipient,
+                bounds_json: bounds,
+                valid_from: VALID_FROM,
+                valid_until: VALID_UNTIL,
+            },
+        )
+        .expect("perform_seed must succeed")
+    };
+
+    // Grant A then grant B for the SAME (recipient, scope).
+    seed(
+        &mut conn,
+        "commitment:supersede-a",
+        RECIPIENT,
+        SCOPE,
+        BOUNDS_JSON,
+    );
+    // Unrelated rows that must survive B's seeding untouched:
+    seed(
+        &mut conn,
+        "commitment:supersede-other-scope",
+        RECIPIENT,
+        "operator-reconcile",
+        BOUNDS_JSON,
+    );
+    seed(
+        &mut conn,
+        "commitment:supersede-other-recipient",
+        "agent:someone-else",
+        SCOPE,
+        BOUNDS_JSON,
+    );
+    let b = seed(
+        &mut conn,
+        "commitment:supersede-b",
+        RECIPIENT,
+        SCOPE,
+        BOUNDS_JSON,
+    );
+
+    // B is active; A got superseded (revoked_at set).
+    assert!(b.revoked_at.is_none(), "the new grant must be active");
+    let a = mishpat_commitments::get_by_cid(&mut conn, "commitment:supersede-a")
+        .expect("get_by_cid")
+        .expect("row a exists");
+    assert!(
+        a.revoked_at.is_some(),
+        "prior active dev-seeded grant for the same (recipient, scope) must be superseded"
+    );
+
+    // Same recipient, different scope — untouched.
+    let other_scope =
+        mishpat_commitments::get_by_cid(&mut conn, "commitment:supersede-other-scope")
+            .expect("get_by_cid")
+            .expect("row exists");
+    assert!(
+        other_scope.revoked_at.is_none(),
+        "different scope must not be superseded"
+    );
+
+    // Same scope, different recipient — untouched.
+    let other_recipient =
+        mishpat_commitments::get_by_cid(&mut conn, "commitment:supersede-other-recipient")
+            .expect("get_by_cid")
+            .expect("row exists");
+    assert!(
+        other_recipient.revoked_at.is_none(),
+        "different recipient must not be superseded"
+    );
+}
+
+/// A grant whose bounds do NOT carry `_provenance:"dev-seed"` (i.e. a
+/// DHT-projected/notarized row) must never be revoked by dev-seed supersession.
+#[test]
+fn seed_delegates_compute_supersession_never_touches_non_dev_seeded_rows() {
+    let _g = SEED_FLAG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::env::set_var("ALLOW_SEED_DELEGATES_COMPUTE", "1");
+
+    let pool = test_pool();
+    let mut conn = pool.get().expect("pool connection");
+
+    // A notarized-shaped row (no dev-seed marker) for the same (recipient, scope),
+    // written through the shared projection upsert like the DHT signal path does.
+    mishpat_commitments::upsert_with_anchor(
+        &mut conn,
+        elohim_storage::db::models::NewMishpatCommitment {
+            cid: "commitment:notarized-grant".into(),
+            action: "delegates-compute".into(),
+            scope: SCOPE.into(),
+            provider: PROVIDER.into(),
+            recipient: RECIPIENT.into(),
+            bounds_json: r#"{"rate_per_hour":30,"reach_ceiling":"commons"}"#.into(),
+            valid_from: VALID_FROM.into(),
+            valid_until: VALID_UNTIL.into(),
+            revoked_at: None,
+            dht_anchor_hash: Some("uhCkk-test-anchor".into()),
+            state: "active".into(),
+        },
+    )
+    .expect("upsert notarized row");
+
+    perform_seed(
+        &mut conn,
+        &SeedDelegatesInput {
+            cid: "commitment:dev-seeded-after-notarized",
+            scope: SCOPE,
+            provider: PROVIDER,
+            recipient: RECIPIENT,
+            bounds_json: BOUNDS_JSON,
+            valid_from: VALID_FROM,
+            valid_until: VALID_UNTIL,
+        },
+    )
+    .expect("perform_seed must succeed");
+
+    let notarized = mishpat_commitments::get_by_cid(&mut conn, "commitment:notarized-grant")
+        .expect("get_by_cid")
+        .expect("row exists");
+    assert!(
+        notarized.revoked_at.is_none(),
+        "a non-dev-seeded (notarized) grant must NEVER be revoked by the dev lever"
+    );
+}

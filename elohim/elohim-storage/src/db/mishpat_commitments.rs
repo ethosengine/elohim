@@ -145,6 +145,38 @@ pub fn set_revoked_at(conn: &mut SqliteConnection, cid: &str, ts: &str) -> Query
         .execute(conn)
 }
 
+/// Dev-seed supersession: revoke every ACTIVE **dev-seeded** `delegates-compute`
+/// grant for `(recipient, scope)` except `except_cid`.
+///
+/// Called by the dev-seed lever (`api::seed_delegates_compute::perform_seed`)
+/// so that "the holder's grant" is singular per (recipient, scope) at any
+/// moment on a dev/Che DB — without this, a freshly-revoked grant is shadowed
+/// by an earlier still-active dev-seeded one and revocation is unobservable.
+/// Scoped HARD to rows whose `bounds_json` carries `"_provenance":"dev-seed"`:
+/// a DHT-projected (notarized) grant is never touched by the dev lever.
+/// Returns the number of superseded rows.
+pub fn revoke_active_dev_seeded_for(
+    conn: &mut SqliteConnection,
+    recipient_cid: &str,
+    capability: &str,
+    except_cid: &str,
+    ts: &str,
+) -> QueryResult<usize> {
+    let now = current_timestamp();
+    diesel::update(
+        mc::mishpat_commitments
+            .filter(mc::action.eq("delegates-compute"))
+            .filter(mc::recipient.eq(recipient_cid))
+            .filter(mc::scope.eq(capability))
+            .filter(mc::state.eq("active"))
+            .filter(mc::revoked_at.is_null())
+            .filter(mc::cid.ne(except_cid))
+            .filter(mc::bounds_json.like("%\"_provenance\":\"dev-seed\"%")),
+    )
+    .set((mc::revoked_at.eq(ts), mc::updated_at.eq(&now)))
+    .execute(conn)
+}
+
 /// Graduate a Mishpat commitment proposed → active (the projection reflecting
 /// "this commitment now has a notarized provide event" — the event is truth,
 /// this column is projection; spec §6.5). Idempotent + guarded: only flips a
