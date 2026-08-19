@@ -3998,6 +3998,11 @@ mod tests {
         // 1860 divergent of which 1855 are adjudicated (heal forbidden to move)
         // — the split the `..._divergent_refused` series exists to publish.
         set_projection_reconcile_gauges("content", 1956, 4158, 0, 1860, 1855);
+        // The anchored-but-scoped population. Primed here so the render
+        // assertion below can prove the series actually REACHES /metrics — it is
+        // the confirm/falsify instrument for the 2026-08-19 classifier cure, and
+        // an instrument that never renders cannot settle anything.
+        set_projection_reconcile_reach_scoped("content", 1562);
         record_reconcile_sweep(
             &GapCounts {
                 pending: 0,
@@ -4203,6 +4208,12 @@ mod tests {
         assert!(
             text.contains("elohim_projection_reconcile_local_total"),
             "reconcile local-total gauge missing:\n{text}"
+        );
+        assert!(
+            text.contains("elohim_projection_reconcile_reach_scoped{stream=\"content\"} 1562"),
+            "reach-scoped gauge missing — without it the anchored-but-scoped population \
+             is invisible again and the classifier cure cannot be confirmed OR falsified \
+             on the fleet:\n{text}"
         );
         assert!(
             text.contains("elohim_shard_redistribute_bytes_missing_total"),
