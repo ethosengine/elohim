@@ -33,6 +33,7 @@ pub mod adapters;
 pub mod attention_tending;
 pub mod behaviour;
 pub mod binding_cross_signature;
+pub mod binding_mint;
 pub mod binding_proof_wire;
 pub mod blob_fetch;
 pub mod blob_protocol;

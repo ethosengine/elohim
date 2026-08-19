@@ -33,15 +33,39 @@ use elohim_storage::p2p::binding_cross_signature::{
     TRANSPORT_DOMAIN, TRANSPORT_KIND_LIBP2P,
 };
 use elohim_storage::p2p::binding_proof_wire::{
-    classify_binding_signature, encode_proof, BindingProofStatus,
+    agent_cid_from_agent_pubkey, classify_binding_signature, encode_proof,
+    libp2p_peer_id_from_ed25519_pubkey, BindingProofStatus,
 };
 use elohim_storage::p2p::identity_binding_gossip::{
     binding_row_from_gossip, IdentityBindingGossip, STAGE1_SIGNATURE_SENTINEL,
 };
 
-const AGENT: &str = "uhCAkAttributionCutAgent";
-const HONEST_PEER: &str = "12D3KooWHonestPeer";
-const SPOOF_PEER: &str = "12D3KooWSpoofPeer";
+// C2-S2 raised the bar on these fixtures: an id is only usable in a proof if it
+// DERIVES from the key that signs for it. `AGENT` is the `uhCAk…` HoloHash the
+// agent key names; `HONEST_PEER` is the libp2p PeerId the transport key derives.
+// `SPOOF_PEER` deliberately derives from NEITHER — it is the attacker's claim.
+fn transport_sk() -> SigningKey {
+    SigningKey::from_bytes(&[3u8; 32])
+}
+fn agent_sk() -> SigningKey {
+    SigningKey::from_bytes(&[4u8; 32])
+}
+fn agent() -> String {
+    agent_cid_from_agent_pubkey(&agent_sk().verifying_key().to_bytes())
+}
+fn honest_peer() -> String {
+    libp2p_peer_id_from_ed25519_pubkey(&transport_sk().verifying_key().to_bytes())
+        .expect("fixture transport key derives a PeerId")
+}
+fn spoof_peer() -> String {
+    libp2p_peer_id_from_ed25519_pubkey(
+        &SigningKey::from_bytes(&[5u8; 32])
+            .verifying_key()
+            .to_bytes(),
+    )
+    .expect("derive")
+}
+
 const FROM: &str = "2026-08-01T00:00:00Z";
 const UNTIL: &str = "2026-08-31T00:00:00Z";
 const NOW: &str = "2026-08-10T00:00:00Z";
@@ -60,12 +84,12 @@ fn test_pool() -> DbPool {
     pool
 }
 
-/// A genuine cross-signature for `(AGENT, peer_id)`: the transport key attests
+/// A genuine cross-signature for `(agent(), peer_id)`: the transport key attests
 /// the agent, the agent key attests the transport, each over its own
 /// domain-separated preimage.
 fn cross_signed_signature(peer_id: &str) -> String {
     let core = BindingCore {
-        agent_cid: AGENT.to_string(),
+        agent_cid: agent(),
         transport_id: peer_id.to_string(),
         transport_kind: TRANSPORT_KIND_LIBP2P,
         valid_from: FROM.to_string(),
@@ -97,7 +121,7 @@ fn cross_signed_signature(peer_id: &str) -> String {
 fn project_gossiped_binding(pool: &DbPool, peer_id: &str, signature: &str) {
     let payload = IdentityBindingGossip {
         peer_id: peer_id.to_string(),
-        agent_cid: AGENT.to_string(),
+        agent_cid: agent(),
         valid_from: FROM.to_string(),
         valid_until: Some(UNTIL.to_string()),
         device_archetype: "node".to_string(),
@@ -113,10 +137,10 @@ fn project_gossiped_binding(pool: &DbPool, peer_id: &str, signature: &str) {
 #[test]
 fn a_sentinel_binding_projects_as_unverified() {
     let pool = test_pool();
-    project_gossiped_binding(&pool, SPOOF_PEER, STAGE1_SIGNATURE_SENTINEL);
+    project_gossiped_binding(&pool, &spoof_peer(), STAGE1_SIGNATURE_SENTINEL);
 
     let mut conn = pool.get().expect("conn");
-    let rows = list_active_for_agent(&mut conn, AGENT, NOW).expect("list");
+    let rows = list_active_for_agent(&mut conn, &agent(), NOW).expect("list");
     assert_eq!(rows.len(), 1);
     assert!(
         !rows[0].is_cross_signed(),
@@ -138,17 +162,18 @@ fn a_sentinel_binding_projects_as_unverified() {
 fn a_row_written_without_the_proof_columns_defaults_to_unverified() {
     let pool = test_pool();
     let mut conn = pool.get().expect("conn");
-    diesel::sql_query(
+    diesel::sql_query(format!(
         "INSERT INTO peer_identity_bindings \
          (peer_id, agent_cid, dht_anchor_hash, valid_from, valid_until, observed_at, source, \
           device_archetype, superseded_by) \
-         VALUES ('12D3KooWLegacyRow', 'uhCAkAttributionCutAgent', 'uhCkk-legacy', \
+         VALUES ('12D3KooWLegacyRow', '{}', 'uhCkk-legacy', \
           '2026-08-01T00:00:00Z', NULL, '2026-08-10T00:00:00Z', 'dht', 'node', NULL)",
-    )
+        agent()
+    ))
     .execute(&mut conn)
     .expect("legacy-shaped insert must still be accepted");
 
-    let rows = list_active_for_agent(&mut conn, AGENT, NOW).expect("list");
+    let rows = list_active_for_agent(&mut conn, &agent(), NOW).expect("list");
     assert_eq!(rows.len(), 1);
     assert!(
         !rows[0].is_cross_signed(),
@@ -158,7 +183,7 @@ fn a_row_written_without_the_proof_columns_defaults_to_unverified() {
 
     let cut = list_attributable_for_agent_with_posture(
         &mut conn,
-        AGENT,
+        &agent(),
         NOW,
         AttributionPosture::Enforce,
     )
@@ -169,10 +194,14 @@ fn a_row_written_without_the_proof_columns_defaults_to_unverified() {
 #[test]
 fn a_cross_signed_binding_projects_as_cross_signed() {
     let pool = test_pool();
-    project_gossiped_binding(&pool, HONEST_PEER, &cross_signed_signature(HONEST_PEER));
+    project_gossiped_binding(
+        &pool,
+        &honest_peer(),
+        &cross_signed_signature(&honest_peer()),
+    );
 
     let mut conn = pool.get().expect("conn");
-    let rows = list_active_for_agent(&mut conn, AGENT, NOW).expect("list");
+    let rows = list_active_for_agent(&mut conn, &agent(), NOW).expect("list");
     assert_eq!(rows.len(), 1);
     assert!(
         rows[0].is_cross_signed(),
@@ -184,13 +213,17 @@ fn a_cross_signed_binding_projects_as_cross_signed() {
 #[test]
 fn enforce_admits_only_the_cross_signed_binding_and_counts_the_refusal() {
     let pool = test_pool();
-    project_gossiped_binding(&pool, HONEST_PEER, &cross_signed_signature(HONEST_PEER));
-    project_gossiped_binding(&pool, SPOOF_PEER, STAGE1_SIGNATURE_SENTINEL);
+    project_gossiped_binding(
+        &pool,
+        &honest_peer(),
+        &cross_signed_signature(&honest_peer()),
+    );
+    project_gossiped_binding(&pool, &spoof_peer(), STAGE1_SIGNATURE_SENTINEL);
 
     let mut conn = pool.get().expect("conn");
     let cut = list_attributable_for_agent_with_posture(
         &mut conn,
-        AGENT,
+        &agent(),
         NOW,
         AttributionPosture::Enforce,
     )
@@ -198,7 +231,7 @@ fn enforce_admits_only_the_cross_signed_binding_and_counts_the_refusal() {
 
     assert_eq!(
         cut.peer_ids(),
-        vec![HONEST_PEER],
+        vec![honest_peer().as_str()],
         "an economic join may credit only the peer whose binding was proven; \
          the spoof claiming this agent's identity is refused"
     );
@@ -221,8 +254,8 @@ fn the_genesis_seeder_fixture_signature_classifies_unverified() {
     let seeder_signature = String::from_utf8_lossy(&[0u8]).into_owned();
     assert_eq!(
         classify_binding_signature(
-            AGENT,
-            SPOOF_PEER,
+            &agent(),
+            &spoof_peer(),
             TRANSPORT_KIND_LIBP2P,
             FROM,
             Some(UNTIL),
@@ -232,10 +265,10 @@ fn the_genesis_seeder_fixture_signature_classifies_unverified() {
     );
 
     let pool = test_pool();
-    project_gossiped_binding(&pool, SPOOF_PEER, &seeder_signature);
+    project_gossiped_binding(&pool, &spoof_peer(), &seeder_signature);
     let mut conn = pool.get().expect("conn");
     assert_eq!(
-        list_active_for_agent(&mut conn, AGENT, NOW)
+        list_active_for_agent(&mut conn, &agent(), NOW)
             .expect("list")
             .len(),
         1,
@@ -246,14 +279,18 @@ fn the_genesis_seeder_fixture_signature_classifies_unverified() {
 #[test]
 fn observe_is_behaviour_preserving_and_still_counts() {
     let pool = test_pool();
-    project_gossiped_binding(&pool, HONEST_PEER, &cross_signed_signature(HONEST_PEER));
-    project_gossiped_binding(&pool, SPOOF_PEER, STAGE1_SIGNATURE_SENTINEL);
+    project_gossiped_binding(
+        &pool,
+        &honest_peer(),
+        &cross_signed_signature(&honest_peer()),
+    );
+    project_gossiped_binding(&pool, &spoof_peer(), STAGE1_SIGNATURE_SENTINEL);
 
     let mut conn = pool.get().expect("conn");
-    let routing = list_active_for_agent(&mut conn, AGENT, NOW).expect("list");
+    let routing = list_active_for_agent(&mut conn, &agent(), NOW).expect("list");
     let cut = list_attributable_for_agent_with_posture(
         &mut conn,
-        AGENT,
+        &agent(),
         NOW,
         AttributionPosture::Observe,
     )
@@ -280,7 +317,11 @@ fn observe_is_behaviour_preserving_and_still_counts() {
 #[test]
 fn a_poisoned_signature_neither_panics_nor_attributes() {
     let pool = test_pool();
-    project_gossiped_binding(&pool, HONEST_PEER, &cross_signed_signature(HONEST_PEER));
+    project_gossiped_binding(
+        &pool,
+        &honest_peer(),
+        &cross_signed_signature(&honest_peer()),
+    );
     for (i, poison) in [
         "elohim:apb:1:!!!!",
         "elohim:apb:1:AAAAAAAA",
@@ -296,7 +337,7 @@ fn a_poisoned_signature_neither_panics_nor_attributes() {
     let mut conn = pool.get().expect("conn");
     let cut = list_attributable_for_agent_with_posture(
         &mut conn,
-        AGENT,
+        &agent(),
         NOW,
         AttributionPosture::Enforce,
     )
@@ -304,7 +345,7 @@ fn a_poisoned_signature_neither_panics_nor_attributes() {
 
     assert_eq!(
         cut.peer_ids(),
-        vec![HONEST_PEER],
+        vec![honest_peer().as_str()],
         "hostile signature bodies are classified unverified and cut, while the \
          legitimate row is unaffected — one bad row does not empty the set"
     );
@@ -315,10 +356,10 @@ fn a_poisoned_signature_neither_panics_nor_attributes() {
 /// one binding onto another agent/transport pair does not verify.
 #[test]
 fn a_lifted_proof_does_not_attach_to_another_binding() {
-    let lifted = cross_signed_signature(HONEST_PEER);
+    let lifted = cross_signed_signature(&honest_peer());
     let status = classify_binding_signature(
-        AGENT,
-        SPOOF_PEER, // same agent, different transport id
+        &agent(),
+        &spoof_peer(), // same agent, different transport id
         TRANSPORT_KIND_LIBP2P,
         FROM,
         Some(UNTIL),
@@ -331,11 +372,11 @@ fn a_lifted_proof_does_not_attach_to_another_binding() {
     );
 
     let pool = test_pool();
-    project_gossiped_binding(&pool, SPOOF_PEER, &lifted);
+    project_gossiped_binding(&pool, &spoof_peer(), &lifted);
     let mut conn = pool.get().expect("conn");
     let cut = list_attributable_for_agent_with_posture(
         &mut conn,
-        AGENT,
+        &agent(),
         NOW,
         AttributionPosture::Enforce,
     )

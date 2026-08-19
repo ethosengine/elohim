@@ -39,14 +39,23 @@
 //! Spec: `genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md`
 //!
 //! Not yet in scope here (later C2 slices, deliberately NOT conflated with
-//! admissibility): transport-id derivation (S2), notarized-timestamp freshness
-//! (S3), wire encoding (S4), lineage currency (S6). Verifying two signatures is
-//! necessary, never sufficient.
+//! admissibility): notarized-timestamp freshness (S3), lineage currency (S6).
+//! Verifying two signatures is necessary, never sufficient.
+//!
+//! C2-S2 raised the fixture's own bar: the ids below are now DERIVED from the
+//! signing keys (`transport_id` from the transport key, `agent_cid` from the
+//! agent key), and a third assertion pins that the same fixture survives the
+//! projection chokepoint — not just the pure algebra. A fixture naming
+//! arbitrary ids can no longer stand in for a real binding.
 
 use ed25519_dalek::{Signer, SigningKey};
 use elohim_storage::p2p::binding_cross_signature::{
     canonical_bytes, BindingCore, CrossSignatureProof, AGENT_DOMAIN, SCHEME_VERSION,
     TRANSPORT_DOMAIN, TRANSPORT_KIND_LIBP2P,
+};
+use elohim_storage::p2p::binding_proof_wire::{
+    agent_cid_from_agent_pubkey, classify_binding_signature, encode_proof,
+    libp2p_peer_id_from_ed25519_pubkey,
 };
 use elohim_storage::p2p::identity_binding_gossip::STAGE1_SIGNATURE_SENTINEL;
 
@@ -56,11 +65,17 @@ fn signing_key(seed: u8) -> SigningKey {
 
 fn sample_core() -> BindingCore {
     BindingCore {
-        agent_cid: "uhCAkTESTAGENTCID".to_string(),
-        transport_id: "12D3KooWTESTTRANSPORT".to_string(),
+        // C2-S2: both ids DERIVE from the keys that sign for them.
+        agent_cid: agent_cid_from_agent_pubkey(&signing_key(2).verifying_key().to_bytes()),
+        transport_id: libp2p_peer_id_from_ed25519_pubkey(
+            &signing_key(1).verifying_key().to_bytes(),
+        )
+        .expect("fixture transport key derives a PeerId"),
         transport_kind: TRANSPORT_KIND_LIBP2P,
         valid_from: "2026-07-25T00:00:00Z".to_string(),
-        valid_until: None,
+        // Bounded: the chokepoint refuses open-ended credentials, so a fixture
+        // that means to be admissible end-to-end must expire.
+        valid_until: Some("2026-08-14T00:00:00Z".to_string()),
         nonce: "dGVzdC1ub25jZQ==".to_string(),
         issued_at: "2026-07-25T00:00:00Z".to_string(),
     }
@@ -124,5 +139,49 @@ fn a_genuinely_cross_signed_binding_is_admissible() {
         admissible,
         "a binding whose transport key and agent key each signed over the other \
          must be admitted — refusing everything is not a cure"
+    );
+}
+
+/// C2-S2: admissibility in the pure algebra must survive the PROJECTION
+/// chokepoint too — the layer that additionally requires each id to derive from
+/// the key that signed for it. A proof that only the algebra accepts is not a
+/// binding any writer may mark `cross_signed`.
+#[test]
+fn a_derived_cross_signed_binding_survives_the_projection_chokepoint() {
+    let core = sample_core();
+    let signature = encode_proof(&cross_signed_proof(&core));
+
+    assert!(
+        classify_binding_signature(
+            &core.agent_cid,
+            &core.transport_id,
+            core.transport_kind,
+            &core.valid_from,
+            core.valid_until.as_deref(),
+            &signature,
+        )
+        .is_cross_signed(),
+        "the chokepoint must admit a proof whose ids derive from its keys — \
+         otherwise no peer could ever mint one and the habit can never flip"
+    );
+
+    // ...and must refuse the SAME proof presented against an endpoint the
+    // transport key does not derive. This is the hole C2-S1's module doc
+    // assigned to S2: the algebra alone cannot tell these two apart.
+    let foreign = libp2p_peer_id_from_ed25519_pubkey(&signing_key(9).verifying_key().to_bytes())
+        .expect("derive");
+    let mut lifted = core.clone();
+    lifted.transport_id = foreign.clone();
+    assert!(
+        !classify_binding_signature(
+            &core.agent_cid,
+            &foreign,
+            core.transport_kind,
+            &core.valid_from,
+            core.valid_until.as_deref(),
+            &encode_proof(&cross_signed_proof(&lifted)),
+        )
+        .is_cross_signed(),
+        "a key that is not this endpoint's key must not certify this endpoint"
     );
 }

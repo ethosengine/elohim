@@ -5,11 +5,11 @@
 //! from `/api/v1/signal/emit` (Task C.2) to sign EPR Envelope canonical bytes.
 //!
 //! Scenarios:
-//!   1. `sign_succeeds_for_self` — a single agent signs arbitrary bytes under
-//!      their own agent_cid (Stage 1 carve-out path: no Agent EPR registered);
-//!      output carries a 64-byte signature and 32-byte pubkey matching the
-//!      caller's `agent_initial_pubkey`. Validates the lair signing path and
-//!      the wire-shape contract.
+//!   1. `sign_succeeds_for_self` — an agent registers its own Agent EPR, then
+//!      signs arbitrary bytes under that `agent_cid`; output carries a 64-byte
+//!      signature and 32-byte pubkey matching the caller's
+//!      `agent_initial_pubkey`. Validates the lair signing path and the
+//!      wire-shape contract.
 //!   2. `sign_signature_verifies` — same as (1) plus we verify the returned
 //!      signature against the returned pubkey using ed25519-dalek. This is the
 //!      load-bearing correctness check: if the bytes signed in lair are not
@@ -19,6 +19,10 @@
 //!      `agent_cid` (where A has registered an Agent EPR). The pre-commit
 //!      signer-match gate fires → zome call errors. Mirrors the gate test
 //!      pattern in `imagodei_peer_binding.rs`.
+//!   4. `sign_rejects_unregistered_agent_cid` — the C2-S2 carve-out closure. An
+//!      `agent_cid` with no Agent EPR used to be PERMITTED (the gate simply did
+//!      not run), which is precisely the case an attacker would arrange. It must
+//!      now be refused.
 //!
 //! NOTE on `#[ignore]`: these tests pack a real imagodei DNA. They are
 //! `#[ignore]` until the Jenkins pipeline's pack-then-test stage runs them
@@ -74,15 +78,42 @@ struct CreateAgentInput {
     pub activity_pub_type: Option<String>,
 }
 
+/// Register an Agent EPR whose `holochain_agent_key` is the CALLING conductor's
+/// agent — the precondition `sign_for_agent`'s gate now requires.
+async fn register_agent_epr(
+    conductor: &mut SweetConductor,
+    cell: &holochain::sweettest::SweetCell,
+    id: &str,
+    display_name: &str,
+) {
+    let input = CreateAgentInput {
+        id: id.to_string(),
+        agent_type: "human".to_string(),
+        display_name: display_name.to_string(),
+        bio: None,
+        avatar: None,
+        affinities: vec![],
+        visibility: "community".to_string(),
+        location: None,
+        did: None,
+        activity_pub_type: None,
+    };
+    let _: serde_json::Value = conductor
+        .call(&cell.zome("imagodei"), "create_agent", input)
+        .await;
+}
+
 // ---------------------------------------------------------------------------
-// Scenario 1: happy path under Stage 1 self-sovereign carve-out
+// Scenario 1: happy path — caller signs under its OWN registered Agent EPR
 // ---------------------------------------------------------------------------
 
-/// Single agent signs arbitrary bytes under a placeholder agent_cid for which
-/// no Agent EPR is registered. The Stage 1 carve-out (see
-/// `project_bootstrap_to_elohim_security_gradient`) permits this — lair signs
-/// because it holds the caller's key. The signature is 64 bytes, the pubkey
-/// is 32 bytes.
+/// A single agent registers its own Agent EPR and signs arbitrary bytes under
+/// that `agent_cid`. The signer-match gate resolves the EPR and finds the
+/// caller's own key, so lair signs. The signature is 64 bytes, the pubkey is 32
+/// bytes.
+///
+/// Registering the EPR is not incidental setup: since C2-S2 closed the no-EPR
+/// carve-out, an unregistered `agent_cid` is REFUSED (scenario 4).
 #[ignore = "requires packed DNA — run via Jenkins pack-then-test or `cargo test -- --ignored`"]
 #[tokio::test(flavor = "multi_thread")]
 async fn sign_succeeds_for_self() -> Result<()> {
@@ -93,8 +124,11 @@ async fn sign_succeeds_for_self() -> Result<()> {
         .await?;
     let cell = app.cells().first().expect("cell installed").clone();
 
+    let agent_cid = "agent-sign-succeeds-for-self".to_string();
+    register_agent_epr(&mut conductor, &cell, &agent_cid, "Self signer").await;
+
     let input = SignForAgentInput {
-        agent_cid: "bafy-stage1-carve-out-placeholder".to_string(),
+        agent_cid,
         canonical_bytes: b"test bytes for signing".to_vec(),
     };
 
@@ -139,9 +173,12 @@ async fn sign_signature_verifies() -> Result<()> {
         .await?;
     let cell = app.cells().first().expect("cell installed").clone();
 
+    let agent_cid = "agent-sign-signature-verifies".to_string();
+    register_agent_epr(&mut conductor, &cell, &agent_cid, "Verifying signer").await;
+
     let canonical_bytes = b"epr envelope canonical cbor stand-in".to_vec();
     let input = SignForAgentInput {
-        agent_cid: "bafy-stage1-carve-out-placeholder".to_string(),
+        agent_cid,
         canonical_bytes: canonical_bytes.clone(),
     };
 
@@ -181,9 +218,8 @@ async fn sign_signature_verifies() -> Result<()> {
 ///
 /// Mirrors `imagodei_peer_binding.rs::binding_rejects_wrong_signer`.
 ///
-/// Using a placeholder CID (no registered EPR) would hit the Stage 1
-/// carve-out and falsely pass — that's why scenario (1) uses a placeholder
-/// while this scenario registers a real EPR.
+/// Distinct from scenario 4: there the EPR is ABSENT (refused because nothing
+/// binds the identity to a key); here it is PRESENT and names a different key.
 #[ignore = "requires packed DNA — run via Jenkins pack-then-test or `cargo test -- --ignored`"]
 #[tokio::test(flavor = "multi_thread")]
 async fn sign_rejects_wrong_signer() -> Result<()> {
@@ -249,5 +285,46 @@ async fn sign_rejects_wrong_signer() -> Result<()> {
     );
 
     let _ = (a2, cell1); // keep unused-binding lint happy
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 4: the closed carve-out — an unregistered agent_cid is refused
+// ---------------------------------------------------------------------------
+
+/// C2-S2 closed the Stage-1 no-EPR carve-out. Before, an `agent_cid` that
+/// resolved no Agent EPR skipped the signer-match gate entirely and lair signed
+/// anyway — so the ONE case with no check was the one an attacker controls
+/// (name an identity nobody registered). The refusal is the property under test.
+///
+/// This is the sweettest that would have gone green against the old code, which
+/// is exactly why it is here: it pins the closure, not the general gate.
+#[ignore = "requires packed DNA — run via Jenkins pack-then-test or `cargo test -- --ignored`"]
+#[tokio::test(flavor = "multi_thread")]
+async fn sign_rejects_unregistered_agent_cid() -> Result<()> {
+    let (mut conductor, agent) = single_agent_conductor().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
+    let app = conductor
+        .setup_app_for_agent("imagodei-app", agent.clone(), &[dna])
+        .await?;
+    let cell = app.cells().first().expect("cell installed").clone();
+
+    // Deliberately NOT registered — no `create_agent` call for this id.
+    let input = SignForAgentInput {
+        agent_cid: "agent-that-was-never-registered".to_string(),
+        canonical_bytes: b"bytes nobody should sign for".to_vec(),
+    };
+
+    let result: holochain::conductor::api::error::ConductorApiResult<SignForAgentOutput> =
+        conductor
+            .call_fallible(&cell.zome("imagodei"), "sign_for_agent", input)
+            .await;
+
+    assert!(
+        result.is_err(),
+        "an agent_cid with no Agent EPR must be REFUSED — permitting it means the \
+         signer-match gate is silently absent for exactly the identities an attacker \
+         gets to choose"
+    );
     Ok(())
 }

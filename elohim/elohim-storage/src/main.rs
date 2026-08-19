@@ -2635,6 +2635,14 @@ async fn async_main(
 
         info!(peer_id = %identity.peer_id(), "P2P identity loaded");
 
+        // C2-S2 binding mint — capture the two identity halves BEFORE `identity`
+        // moves into `P2PNode::new`. `agent_cid` here is the SAME value the
+        // libp2p identity handshake claims for this node (`agent_pubkey()`), and
+        // reusing it is load-bearing: minting under a parallel notion of self is
+        // exactly how the `peer_identity_bindings.agent_cid` namespaces fragment.
+        let mint_transport_keypair = identity.keypair().clone();
+        let mint_agent_cid = identity.agent_pubkey().to_string();
+
         // Collect bootstrap nodes from CLI args
         let mut bootstrap_nodes = args.bootstrap_nodes.clone();
 
@@ -2855,6 +2863,57 @@ async fn async_main(
                 target: "elohim_storage::agent_info",
                 "step-zero substrate agent_info gossip disabled (feature flag off)"
             );
+        }
+
+        // C2-S2: mint this node's OWN cross-signed AgentPeerBinding.
+        //
+        // Runs here because both preconditions are now met: the swarm identity is
+        // loaded (transport half signs locally) and the conductor registry is
+        // connected (agent half is signed by imagodei's `sign_for_agent`). The
+        // task is idempotent — it no-ops when the projection already holds a
+        // current cross-signed row — and every failure path emits NOTHING, so a
+        // node that cannot mint keeps its honest self-asserted binding rather
+        // than publishing something unverifiable.
+        //
+        // `ELOHIM_BINDING_MINT=off` is the fleet kill switch; the env is read
+        // exactly ONCE, here, and threaded as a bool.
+        {
+            let mint_enabled = elohim_storage::p2p::binding_mint::mint_enabled_from_env();
+            let mint_hc = hc_registry_for_http
+                .as_ref()
+                .and_then(|r| r.imagodei.clone());
+            match (mint_enabled, mint_hc, db_pool.clone()) {
+                (true, Some(hc), Some(pool)) => {
+                    // The zome accepts only these four archetypes; anything else
+                    // is a hard Guest error, so normalise rather than fail.
+                    let archetype = match config.device_archetype.as_deref() {
+                        Some(a @ ("node" | "desktop" | "mobile" | "steward")) => a.to_string(),
+                        _ => "node".to_string(),
+                    };
+                    info!(
+                        agent_cid = %mint_agent_cid,
+                        device_archetype = %archetype,
+                        "binding mint: scheduling own cross-signed AgentPeerBinding"
+                    );
+                    elohim_storage::p2p::binding_mint::spawn_binding_mint_task(
+                        hc,
+                        pool,
+                        mint_agent_cid.clone(),
+                        mint_transport_keypair.clone(),
+                        archetype,
+                    );
+                }
+                (false, _, _) => info!(
+                    "binding mint: disabled by {}",
+                    elohim_storage::p2p::binding_mint::MINT_ENABLED_ENV
+                ),
+                (true, None, _) => info!(
+                    "binding mint: no imagodei conductor bridge — binding stays self-asserted"
+                ),
+                (true, _, None) => {
+                    info!("binding mint: no DB pool — cannot check idempotency, skipping")
+                }
+            }
         }
 
         Some(p2p_node)

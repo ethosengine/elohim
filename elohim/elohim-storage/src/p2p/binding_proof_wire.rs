@@ -269,6 +269,110 @@ impl std::fmt::Display for BindingProofStatus {
     }
 }
 
+// =============================================================================
+// Identity derivation (C2-S2) — a signature is only a proof if the KEY that
+// signed is the key the claimed identity NAMES.
+// =============================================================================
+
+/// HoloHash prefix bytes for `AgentPubKey` (`uhCAk…`). A HoloHash is 39 bytes:
+/// 3 prefix + 32 core + 4 DHT-location.
+const HOLO_HASH_AGENT_PREFIX: [u8; 3] = [0x84, 0x20, 0x24];
+/// Total raw byte length of any HoloHash.
+const HOLO_HASH_LEN: usize = 39;
+
+/// Recover the raw 32-byte Ed25519 public key an `agent_cid` names, when
+/// `agent_cid` is a HoloHash `AgentPubKey` (`uhCAk…`).
+///
+/// Returns `None` for every other namespace — a genesis-seeder human slug
+/// (`"matthew"`, see `genesis/seeder/src/seed-agent-bindings.ts`), an Agent-EPR
+/// CIDv1, an empty field, attacker-chosen bytes. That is deliberately
+/// fail-closed: binding a key to *those* identities needs the head/lineage
+/// resolver (C2-S6), and until it exists a proof over them cannot be
+/// distinguished from a proof by an unrelated key.
+///
+/// The DHT-location suffix is NOT checked: it is derived from the core and
+/// carries no authority. Encoding convention mirrors
+/// [`crate::signals::HoloHashB64`], which is where this crate already
+/// hand-holds the holochain base64 form — `holo_hash` is a transitive
+/// dependency with two versions resolved in the lockfile and is deliberately
+/// not taken as a direct dep here (see `Cargo.toml`'s holo_hash pin note).
+///
+/// Total and panic-free over attacker-controlled input.
+pub fn agent_pubkey_from_agent_cid(agent_cid: &str) -> Option<[u8; 32]> {
+    let body = agent_cid.strip_prefix('u')?;
+    // Bound the work before decoding: a HoloHash is exactly 39 bytes, so its
+    // base64url-no-pad form is exactly 52 characters. A 100k-character field
+    // never reaches the decoder.
+    if body.len() != 52 {
+        return None;
+    }
+    let bytes = URL_SAFE_NO_PAD.decode(body).ok()?;
+    if bytes.len() != HOLO_HASH_LEN || bytes[0..3] != HOLO_HASH_AGENT_PREFIX {
+        return None;
+    }
+    <[u8; 32]>::try_from(&bytes[3..35]).ok()
+}
+
+/// The inverse of [`agent_pubkey_from_agent_cid`] — the `uhCAk…` string naming
+/// this Ed25519 key.
+///
+/// The 4-byte DHT-location suffix is emitted as zeros: this crate does not
+/// compute holochain's location fold, and the verifier deliberately does not
+/// read it. Use this to construct fixtures and to cross-check a conductor-
+/// supplied `agent_cid`; the minting path takes the node's real `agent_cid`
+/// from the identity seam rather than re-deriving one here.
+pub fn agent_cid_from_agent_pubkey(pubkey: &[u8; 32]) -> String {
+    let mut raw = Vec::with_capacity(HOLO_HASH_LEN);
+    raw.extend_from_slice(&HOLO_HASH_AGENT_PREFIX);
+    raw.extend_from_slice(pubkey);
+    raw.extend_from_slice(&[0u8; 4]);
+    format!("u{}", URL_SAFE_NO_PAD.encode(raw))
+}
+
+/// The libp2p `PeerId` an Ed25519 public key derives to, in the canonical
+/// base58btc form this codebase stores (`PeerId::to_base58()`, which is also
+/// `Display`) — see `p2p/mod.rs`'s handshake self-claim and the
+/// `peer_identity_bindings.peer_id` column.
+///
+/// `None` only when libp2p refuses the bytes outright. Note that libp2p does
+/// NOT decompress the point here, so garbage bytes generally yield *a* PeerId
+/// rather than `None` — which is safe, because the derived id then fails to
+/// equal the claimed one, and `verify_binding_signatures` rejects a
+/// non-canonical key independently. This check NARROWS the algebra; it never
+/// replaces it. Panic-free.
+pub fn libp2p_peer_id_from_ed25519_pubkey(pubkey: &[u8; 32]) -> Option<String> {
+    let ed = libp2p::identity::ed25519::PublicKey::try_from_bytes(pubkey).ok()?;
+    let public = libp2p::identity::PublicKey::from(ed);
+    Some(libp2p::PeerId::from(public).to_base58())
+}
+
+/// Does `transport_id` actually derive from `transport_pubkey` under
+/// `transport_kind`?
+///
+/// This is the check `binding_cross_signature`'s module doc assigns to C2-S2.
+/// Without it, a proof signed by a key **unrelated to the claimed endpoint**
+/// verified: both halves are self-consistent, so the algebra alone cannot tell
+/// "this endpoint's key attested the agent" from "some key attested the agent
+/// while naming someone else's endpoint".
+///
+/// Only [`TRANSPORT_KIND_LIBP2P`](crate::p2p::binding_cross_signature::TRANSPORT_KIND_LIBP2P)
+/// is derivable today, because libp2p is the only namespace any writer
+/// classifies from (all four call sites assign it explicitly). An iroh-kind row
+/// is refused rather than admitted on an unchecked derivation — there is no
+/// iroh classification site to make it correct, and fail-closed is the rule
+/// here. Adding one means adding its derivation to this function first.
+pub fn transport_id_derives_from(
+    transport_kind: u8,
+    transport_id: &str,
+    transport_pubkey: &[u8; 32],
+) -> bool {
+    use crate::p2p::binding_cross_signature::TRANSPORT_KIND_LIBP2P;
+    if transport_kind != TRANSPORT_KIND_LIBP2P {
+        return false;
+    }
+    libp2p_peer_id_from_ed25519_pubkey(transport_pubkey).as_deref() == Some(transport_id)
+}
+
 /// Is a `(valid_from, valid_until)` pair an acceptable, bounded credential window?
 ///
 /// Open-ended bindings are refused outright (see [`MAX_VALIDITY_DAYS`]). Both
@@ -295,10 +399,21 @@ fn window_is_bounded(valid_from: &str, valid_until: Option<&str>) -> bool {
 /// - the envelope's scheme version is the supported one;
 /// - the transport kind the *verifier* assigns (from which table/namespace the
 ///   id came, never from the payload's claim) matches the proof;
+/// - `transport_id` DERIVES from `proof.transport_pubkey`
+///   ([`transport_id_derives_from`]) — the signing key must BE this endpoint;
+/// - `agent_cid` names `proof.agent_pubkey`
+///   ([`agent_pubkey_from_agent_cid`]) — the signing key must BE this agent;
 /// - both Ed25519 halves verify (`verify_strict`) over their domain-separated
 ///   preimages, assembled from these row fields and the proof's own
 ///   nonce/`issued_at`;
 /// - the validity window is present and bounded.
+///
+/// The two derivation clauses are what make the signatures a *binding* rather
+/// than two self-consistent attestations by arbitrary keys. They are why an
+/// `agent_cid` outside the HoloHash `AgentPubKey` namespace (a seeder human
+/// slug, an Agent-EPR CIDv1) classifies `unverified` today: binding a key to
+/// those identities is C2-S6 resolver work, and fail-closed is the answer
+/// until it lands.
 ///
 /// Every other input — sentinel, empty, garbage, a valid signature over a
 /// *different* core, an open-ended window — returns `unverified`. There is no
@@ -320,6 +435,15 @@ pub fn classify_binding_signature(
         return BindingProofStatus::unverified();
     }
     if !window_is_bounded(valid_from, valid_until) {
+        return BindingProofStatus::unverified();
+    }
+    // Identity derivation (C2-S2) — cheap structural checks BEFORE the two
+    // Ed25519 verifies, so a hostile row costs a base58 encode rather than two
+    // curve operations.
+    if !transport_id_derives_from(transport_kind, transport_id, &proof.transport_pubkey) {
+        return BindingProofStatus::unverified();
+    }
+    if agent_pubkey_from_agent_cid(agent_cid) != Some(proof.agent_pubkey) {
         return BindingProofStatus::unverified();
     }
     let core = BindingCore {
@@ -385,15 +509,31 @@ mod tests {
     use crate::p2p::identity_binding_gossip::STAGE1_SIGNATURE_SENTINEL;
     use ed25519_dalek::{Signer, SigningKey};
 
-    const AGENT: &str = "uhCAkTESTAGENT";
-    const TRANSPORT: &str = "12D3KooWTESTTRANSPORT";
+    /// The two keys every fixture in this module signs with. The ids below are
+    /// DERIVED from them (C2-S2): a fixture that names an arbitrary transport id
+    /// or agent cid can no longer classify `cross_signed`, which is the point.
+    fn transport_sk() -> SigningKey {
+        SigningKey::from_bytes(&[7u8; 32])
+    }
+    fn agent_sk() -> SigningKey {
+        SigningKey::from_bytes(&[9u8; 32])
+    }
+
+    fn transport_id() -> String {
+        libp2p_peer_id_from_ed25519_pubkey(&transport_sk().verifying_key().to_bytes())
+            .expect("fixture transport key derives a PeerId")
+    }
+    fn agent_cid() -> String {
+        agent_cid_from_agent_pubkey(&agent_sk().verifying_key().to_bytes())
+    }
+
     const FROM: &str = "2026-08-01T00:00:00Z";
     const UNTIL: &str = "2026-08-31T00:00:00Z";
 
     fn core() -> BindingCore {
         BindingCore {
-            agent_cid: AGENT.to_string(),
-            transport_id: TRANSPORT.to_string(),
+            agent_cid: agent_cid(),
+            transport_id: transport_id(),
             transport_kind: TRANSPORT_KIND_LIBP2P,
             valid_from: FROM.to_string(),
             valid_until: Some(UNTIL.to_string()),
@@ -403,8 +543,8 @@ mod tests {
     }
 
     fn proof_for(core: &BindingCore) -> CrossSignatureProof {
-        let transport_sk = SigningKey::from_bytes(&[7u8; 32]);
-        let agent_sk = SigningKey::from_bytes(&[9u8; 32]);
+        let transport_sk = transport_sk();
+        let agent_sk = agent_sk();
         CrossSignatureProof {
             scheme_version: SCHEME_VERSION,
             transport_kind: core.transport_kind,
@@ -423,13 +563,162 @@ mod tests {
 
     fn classify(signature: &str) -> BindingProofStatus {
         classify_binding_signature(
-            AGENT,
-            TRANSPORT,
+            &agent_cid(),
+            &transport_id(),
             TRANSPORT_KIND_LIBP2P,
             FROM,
             Some(UNTIL),
             signature,
         )
+    }
+
+    // ── C2-S2: identity derivation ──────────────────────────────────────────
+
+    /// The transport half's public key must DERIVE to the claimed libp2p
+    /// `PeerId`. Without this, a valid signature by a key unrelated to the
+    /// claimed endpoint passed the algebra (C2-S1's own module doc names this
+    /// as the hole S2 closes).
+    #[test]
+    fn a_transport_pubkey_that_does_not_derive_the_peer_id_classifies_unverified() {
+        let mut wrong = core();
+        // A well-formed PeerId — just not the one this transport key derives.
+        wrong.transport_id = libp2p_peer_id_from_ed25519_pubkey(
+            &SigningKey::from_bytes(&[42u8; 32])
+                .verifying_key()
+                .to_bytes(),
+        )
+        .expect("derive");
+        let signature = encode_proof(&proof_for(&wrong));
+        let status = classify_binding_signature(
+            &agent_cid(),
+            &wrong.transport_id,
+            TRANSPORT_KIND_LIBP2P,
+            FROM,
+            Some(UNTIL),
+            &signature,
+        );
+        assert!(
+            !status.is_cross_signed(),
+            "a signature by a key that is not this endpoint's key must not certify it"
+        );
+    }
+
+    #[test]
+    fn a_transport_pubkey_that_derives_the_peer_id_classifies_cross_signed() {
+        assert!(classify(&encode_proof(&proof_for(&core()))).is_cross_signed());
+    }
+
+    /// The agent half's public key must be the one `agent_cid` names. The
+    /// degenerate-R1 check: `agent_cid` is a HoloHash `AgentPubKey`, so its
+    /// 32-byte core IS the ed25519 key, no resolver needed.
+    #[test]
+    fn an_agent_pubkey_that_is_not_the_agent_cid_classifies_unverified() {
+        let mut wrong = core();
+        wrong.agent_cid = agent_cid_from_agent_pubkey(
+            &SigningKey::from_bytes(&[43u8; 32])
+                .verifying_key()
+                .to_bytes(),
+        );
+        let signature = encode_proof(&proof_for(&wrong));
+        let status = classify_binding_signature(
+            &wrong.agent_cid,
+            &transport_id(),
+            TRANSPORT_KIND_LIBP2P,
+            FROM,
+            Some(UNTIL),
+            &signature,
+        );
+        assert!(
+            !status.is_cross_signed(),
+            "a key that is not the one agent_cid names must not vouch as that agent"
+        );
+    }
+
+    /// An `agent_cid` in a namespace we cannot bind to a key (the genesis
+    /// seeder's human slug, an EPR CIDv1) is fail-closed until C2-S6's
+    /// resolver — never silently admitted on signature algebra alone.
+    #[test]
+    fn an_unresolvable_agent_cid_namespace_classifies_unverified() {
+        for foreign in [
+            "matthew",
+            "bafyreiexampleagentepridentity",
+            "",
+            "uhCAkTESTAGENT",
+        ] {
+            let mut wrong = core();
+            wrong.agent_cid = foreign.to_string();
+            let signature = encode_proof(&proof_for(&wrong));
+            let status = classify_binding_signature(
+                foreign,
+                &transport_id(),
+                TRANSPORT_KIND_LIBP2P,
+                FROM,
+                Some(UNTIL),
+                &signature,
+            );
+            assert!(
+                !status.is_cross_signed(),
+                "agent_cid '{foreign}' cannot be bound to a key without C2-S6"
+            );
+        }
+    }
+
+    /// No iroh classification site exists today, so an iroh-kind row is
+    /// fail-closed rather than accepted on an unchecked derivation.
+    #[test]
+    fn a_non_libp2p_transport_kind_classifies_unverified() {
+        let mut iroh = core();
+        iroh.transport_kind = TRANSPORT_KIND_IROH;
+        let signature = encode_proof(&proof_for(&iroh));
+        let status = classify_binding_signature(
+            &agent_cid(),
+            &iroh.transport_id,
+            TRANSPORT_KIND_IROH,
+            FROM,
+            Some(UNTIL),
+            &signature,
+        );
+        assert!(!status.is_cross_signed());
+    }
+
+    #[test]
+    fn derivation_helpers_are_panic_free_on_hostile_input() {
+        for hostile in [
+            "",
+            "u",
+            "uhCAk",
+            "uhCAk!!!!",
+            "\u{1F4A3}",
+            &"u".repeat(100_000),
+            "uhCEk_wrong_prefix_kind_here_padding_padding_padding_x",
+        ] {
+            let _ = agent_pubkey_from_agent_cid(hostile);
+            let _ = transport_id_derives_from(TRANSPORT_KIND_LIBP2P, hostile, &[0u8; 32]);
+            let _ = transport_id_derives_from(0xFF, hostile, &[0xFFu8; 32]);
+        }
+        // A non-canonical ed25519 point must not panic the derivation. libp2p
+        // does NOT decompress the point here, so it yields *a* PeerId rather
+        // than `None` — which is safe: that PeerId will not equal the claimed
+        // `transport_id` unless the attacker also controls the claim, and
+        // `verify_binding_signatures` rejects the non-canonical key regardless.
+        // The derivation check is a NARROWING of the algebra, never a
+        // replacement for it.
+        let garbage = libp2p_peer_id_from_ed25519_pubkey(&[0xFFu8; 32]);
+        assert!(
+            garbage.as_deref() != Some(&transport_id()[..]),
+            "a garbage key must never derive the honest endpoint's id"
+        );
+    }
+
+    #[test]
+    fn agent_cid_roundtrips_through_the_holo_hash_encoding() {
+        let pk = agent_sk().verifying_key().to_bytes();
+        let cid = agent_cid_from_agent_pubkey(&pk);
+        assert!(
+            cid.starts_with("uhCAk"),
+            "AgentPubKey multibase form: {cid}"
+        );
+        assert_eq!(agent_pubkey_from_agent_cid(&cid), Some(pk));
     }
 
     // ── envelope codec ──────────────────────────────────────────────────────
@@ -557,8 +846,8 @@ mod tests {
         open.valid_until = None;
         let signature = encode_proof(&proof_for(&open));
         let status = classify_binding_signature(
-            AGENT,
-            TRANSPORT,
+            &agent_cid(),
+            &transport_id(),
             TRANSPORT_KIND_LIBP2P,
             FROM,
             None,
@@ -577,8 +866,8 @@ mod tests {
         long.valid_until = Some(far.to_string());
         let signature = encode_proof(&proof_for(&long));
         let status = classify_binding_signature(
-            AGENT,
-            TRANSPORT,
+            &agent_cid(),
+            &transport_id(),
             TRANSPORT_KIND_LIBP2P,
             FROM,
             Some(far),

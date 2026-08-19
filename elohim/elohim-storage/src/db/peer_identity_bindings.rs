@@ -164,6 +164,43 @@ pub fn list_active_for_agent(
         })
 }
 
+/// Does this node already hold a CURRENT cross-signed binding for
+/// `(agent_cid, peer_id)`?
+///
+/// The minting path's idempotency gate (C2-S2): a node mints its own binding
+/// once and then leaves it alone until it nears expiry. "Current" means all of:
+/// not superseded, `valid_until` beyond `min_valid_until_iso` (the caller passes
+/// `now + re-mint lead time`, so a binding is renewed BEFORE it lapses rather
+/// than after), and `proof_status = 'cross_signed'` read through
+/// [`PeerIdentityBindingRow::is_cross_signed`] — never a string comparison, and
+/// never a `!= 'unverified'` gate.
+///
+/// A row that exists but is only self-asserted answers `false`, which is the
+/// point: the sentinel row a peer already gossiped about us must not suppress
+/// the mint that replaces it.
+pub fn has_current_cross_signed(
+    conn: &mut SqliteConnection,
+    agent_cid: &str,
+    peer_id: &str,
+    min_valid_until_iso: &str,
+) -> Result<bool, StorageError> {
+    use peer_identity_bindings::dsl;
+
+    let rows = dsl::peer_identity_bindings
+        .filter(dsl::agent_cid.eq(agent_cid))
+        .filter(dsl::peer_id.eq(peer_id))
+        .filter(dsl::superseded_by.is_null())
+        .filter(dsl::valid_until.gt(min_valid_until_iso))
+        .load::<PeerIdentityBindingRow>(conn)
+        .map_err(|e| {
+            StorageError::Database(format!(
+                "peer_identity_bindings has_current_cross_signed: {e}"
+            ))
+        })?;
+
+    Ok(rows.iter().any(|r| r.is_cross_signed()))
+}
+
 // ============================================================================
 // The attribution cut (habit `identity-cross-signed`, C2-S5)
 // ============================================================================
