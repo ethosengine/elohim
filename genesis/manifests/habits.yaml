@@ -802,12 +802,34 @@ habits:
       reconciliation as commitment-gated protocol verbs — with peer-local
       telemetry served by the peer itself. The dev surface and the operator
       OS-settings surface are the same surface.
-    status: red
+    status: green
     active: true
     checks:
       - "a2o @concern:operator-runtime-surface (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — @wip DROPPED 2026-08-18 by operator decision: COUNTS in the edge Dataplane Validation byConcern rollup; also runnable locally with npx cucumber-js --tags '@concern:operator-runtime-surface')"
       - "cargo test --test operator_verbs (elohim/elohim-storage — 9 tests: holder accepted + attestation names grant cid AND recorded event id; no-grant refused; revoked refused; no verified performer refused; loopless peer honest 503 with no phantom rate charge; accepted use recorded bounded_by the grant; refusals record nothing; rate_per_hour ceiling refuses the over-limit use)"
     evidence: >
+      DELTA 2026-08-19b (GREEN — edge #1366 deploy run, in-pipeline quiesce
+      gate A-QUIESCED then validation): operator-runtime-surface passed=4
+      failed=0 pending=0 — the positive path now returns 200 with the
+      attestation naming the exact grant cid. Cure = three stacked defects,
+      each proven locally on the isolated stack before push (commit 1b8c80f9c):
+      (1) doorway op-gate authorized performer=claims.human_id while grants
+      name recipient=claims.agent_pub_key — new op-gate performer resolver
+      prefers the verified JWT's agent_pub_key; (2) forward_to_storage rebuilds
+      outbound requests from a header allowlist, silently dropping the injected
+      x-elohim-verified-performer — now an explicit ForwardCtx field; (3) the
+      dev-seed lever now supersedes prior ACTIVE dev-seeded grants for the same
+      (recipient, scope), making revocation observable on an accumulated DB
+      (never touches non-dev-seeded rows). Local proof arc: register →
+      no-grant 403 → grant-to-agentPubKey 200 attestation (commitmentCid,
+      attestationEventId) → revoke 403; a2o locally 3/4 (james refusal red
+      LOCALLY ONLY — dev_mode hands every hosted register the shared
+      uhCAk-dev-mode-agent-key; live alpha logins verified DISTINCT keys, and
+      james 403'd in edge #1366). Confirmation caveat: three follow-up
+      validate-only runs (#1367-#1369, same evening) all DID-NOT-MEASURE on
+      chronic A-side quiesce oscillation (measurement-availability debt filed:
+      genesis/data/timeline/backlog/quiesce-gate-measurement-availability.md);
+      the green stands on #1366's quiesce-gated measurement + the local proof.
       DELTA 2026-08-19 (FIRST LIVE MEASUREMENT — edge #1364 validate-only,
       quiesce gate A-QUIESCED sustained 363s, zero fleet churn): the 4
       scenarios entered the byConcern rollup as operator-runtime-surface
