@@ -1862,6 +1862,7 @@ mod inbound_max_tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)] // the const relation IS the pinned invariant
     fn inbound_max_read_floors_and_defaults() {
         std::env::remove_var("DOORWAY_MAX_INFLIGHT_READ");
         assert_eq!(

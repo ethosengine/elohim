@@ -442,6 +442,110 @@ pub fn readiness_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
         .unwrap()
 }
 
+/// Handle version endpoint (/version)
+///
+/// Returns build information for deployment verification.
+/// The orchestrator uses this to verify deployments match expected commits.
+pub fn version_info() -> Response<Full<Bytes>> {
+    let info = elohim_compute::BuildInfo::new("elohim-doorway");
+    let body = serde_json::to_string(&info)
+        .unwrap_or_else(|_| r#"{"version":"unknown","commit":"unknown"}"#.to_string());
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "application/json")
+        .body(Full::new(Bytes::from(body)))
+        .unwrap()
+}
+
+/// Handle startup progress endpoint (/health/startup)
+///
+/// Returns JSON showing startup progress for the bootstrap page to poll.
+/// Reports identity, storage, projection, and root-app readiness.
+pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let args = &state.args;
+
+    // identity.did — derive from doorway_id
+    let did = if let Some(ref id) = args.doorway_id {
+        if id.contains('.') {
+            format!("did:web:{id}")
+        } else {
+            let domain = id.replace('-', ".");
+            format!("did:web:{domain}")
+        }
+    } else {
+        format!("did:web:{}", args.node_id)
+    };
+
+    // storage
+    let storage_ready = args.storage_url.is_some();
+
+    // projection counts from hot cache
+    let (content, humans, relationships) = state
+        .projection
+        .as_ref()
+        .map(|p| p.count_by_type())
+        .unwrap_or((0, 0, 0));
+    let projection_ready = content + humans + relationships > 0;
+
+    // root projection — whichever EPR commitment declares urlPath="/" is the root.
+    // ROOT_APP_SLUG is gone; the router consults live projection data from storage.
+    let root_projection = state.epr_router.dispatch("/").map(|p| {
+        serde_json::json!({
+            "eprId": p.epr_id,
+            "urlPath": p.url_path,
+            "ready": true,
+        })
+    });
+
+    let warmup = if let Some(ref ws) = state.warmup_state {
+        serde_json::json!({
+            "inProgress": ws.in_progress.load(std::sync::atomic::Ordering::Relaxed),
+            "attempts": ws.attempts.load(std::sync::atomic::Ordering::Relaxed),
+            "maxAttempts": ws.max_attempts.load(std::sync::atomic::Ordering::Relaxed),
+            "completed": ws.completed.load(std::sync::atomic::Ordering::Relaxed),
+            "lastError": ws.last_error.lock().unwrap().clone(),
+            "budgetSecs": crate::projection::warm_stream::WARMUP_TOTAL_BUDGET_SECS,
+            "upstreams": ws.health.snapshot(),
+        })
+    } else {
+        serde_json::json!(null)
+    };
+
+    // Served SSR bundle-head attestations (Track-4 T4-1). Each entry:
+    // {slug, serverBlobHash, materializedAt (rfc3339), status (current|stale|
+    // refreshing|failed)} plus declaredServerBlobHash when a reconcile check has
+    // observed it. Empty on a non-SSR doorway. A parallel CI/probe consumes this
+    // exact camelCase shape — see render::registry::BundleHead::to_json.
+    let served_bundle_heads = state.renderer_registry.heads_json();
+
+    let body = serde_json::json!({
+        "identity": {
+            "ready": true,
+            "did": did,
+        },
+        "storage": {
+            "ready": storage_ready,
+        },
+        "projection": {
+            "ready": projection_ready,
+            "content": content,
+            "humans": humans,
+            "relationships": relationships,
+        },
+        "rootProjection": root_projection,
+        "warmup": warmup,
+        "servedBundleHeads": served_bundle_heads,
+    })
+    .to_string();
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "application/json")
+        .body(Full::new(Bytes::from(body)))
+        .unwrap()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -581,108 +685,4 @@ mod tests {
         assert_eq!(json["p2p"]["stale"], serde_json::json!(true));
         assert!(json["p2p"].get("observedAgeMs").is_none());
     }
-}
-
-/// Handle startup progress endpoint (/health/startup)
-///
-/// Returns JSON showing startup progress for the bootstrap page to poll.
-/// Reports identity, storage, projection, and root-app readiness.
-pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
-    let args = &state.args;
-
-    // identity.did — derive from doorway_id
-    let did = if let Some(ref id) = args.doorway_id {
-        if id.contains('.') {
-            format!("did:web:{id}")
-        } else {
-            let domain = id.replace('-', ".");
-            format!("did:web:{domain}")
-        }
-    } else {
-        format!("did:web:{}", args.node_id)
-    };
-
-    // storage
-    let storage_ready = args.storage_url.is_some();
-
-    // projection counts from hot cache
-    let (content, humans, relationships) = state
-        .projection
-        .as_ref()
-        .map(|p| p.count_by_type())
-        .unwrap_or((0, 0, 0));
-    let projection_ready = content + humans + relationships > 0;
-
-    // root projection — whichever EPR commitment declares urlPath="/" is the root.
-    // ROOT_APP_SLUG is gone; the router consults live projection data from storage.
-    let root_projection = state.epr_router.dispatch("/").map(|p| {
-        serde_json::json!({
-            "eprId": p.epr_id,
-            "urlPath": p.url_path,
-            "ready": true,
-        })
-    });
-
-    let warmup = if let Some(ref ws) = state.warmup_state {
-        serde_json::json!({
-            "inProgress": ws.in_progress.load(std::sync::atomic::Ordering::Relaxed),
-            "attempts": ws.attempts.load(std::sync::atomic::Ordering::Relaxed),
-            "maxAttempts": ws.max_attempts.load(std::sync::atomic::Ordering::Relaxed),
-            "completed": ws.completed.load(std::sync::atomic::Ordering::Relaxed),
-            "lastError": ws.last_error.lock().unwrap().clone(),
-            "budgetSecs": crate::projection::warm_stream::WARMUP_TOTAL_BUDGET_SECS,
-            "upstreams": ws.health.snapshot(),
-        })
-    } else {
-        serde_json::json!(null)
-    };
-
-    // Served SSR bundle-head attestations (Track-4 T4-1). Each entry:
-    // {slug, serverBlobHash, materializedAt (rfc3339), status (current|stale|
-    // refreshing|failed)} plus declaredServerBlobHash when a reconcile check has
-    // observed it. Empty on a non-SSR doorway. A parallel CI/probe consumes this
-    // exact camelCase shape — see render::registry::BundleHead::to_json.
-    let served_bundle_heads = state.renderer_registry.heads_json();
-
-    let body = serde_json::json!({
-        "identity": {
-            "ready": true,
-            "did": did,
-        },
-        "storage": {
-            "ready": storage_ready,
-        },
-        "projection": {
-            "ready": projection_ready,
-            "content": content,
-            "humans": humans,
-            "relationships": relationships,
-        },
-        "rootProjection": root_projection,
-        "warmup": warmup,
-        "servedBundleHeads": served_bundle_heads,
-    })
-    .to_string();
-
-    Response::builder()
-        .status(StatusCode::OK)
-        .header("Content-Type", "application/json")
-        .body(Full::new(Bytes::from(body)))
-        .unwrap()
-}
-
-/// Handle version endpoint (/version)
-///
-/// Returns build information for deployment verification.
-/// The orchestrator uses this to verify deployments match expected commits.
-pub fn version_info() -> Response<Full<Bytes>> {
-    let info = elohim_compute::BuildInfo::new("elohim-doorway");
-    let body = serde_json::to_string(&info)
-        .unwrap_or_else(|_| r#"{"version":"unknown","commit":"unknown"}"#.to_string());
-
-    Response::builder()
-        .status(StatusCode::OK)
-        .header("Content-Type", "application/json")
-        .body(Full::new(Bytes::from(body)))
-        .unwrap()
 }

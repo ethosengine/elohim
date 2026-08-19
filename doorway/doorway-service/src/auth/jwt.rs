@@ -970,8 +970,10 @@ mod tests {
                 iat: now,
                 exp: now + 3600,
             };
-            let mut header = Header::default(); // alg = HS256
-            header.kid = Some("sibling".into());
+            let header = Header {
+                kid: Some("sibling".into()),
+                ..Default::default() // alg = HS256
+            };
             let token = encode(
                 &header,
                 &claims,
