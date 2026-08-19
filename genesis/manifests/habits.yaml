@@ -808,6 +808,22 @@ habits:
       - "a2o @concern:operator-runtime-surface (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — @wip DROPPED 2026-08-18 by operator decision: COUNTS in the edge Dataplane Validation byConcern rollup; also runnable locally with npx cucumber-js --tags '@concern:operator-runtime-surface')"
       - "cargo test --test operator_verbs (elohim/elohim-storage — 9 tests: holder accepted + attestation names grant cid AND recorded event id; no-grant refused; revoked refused; no verified performer refused; loopless peer honest 503 with no phantom rate charge; accepted use recorded bounded_by the grant; refusals record nothing; rate_per_hour ceiling refuses the over-limit use)"
     evidence: >
+      DELTA 2026-08-19 (FIRST LIVE MEASUREMENT — edge #1364 validate-only,
+      quiesce gate A-QUIESCED sustained 363s, zero fleet churn): the 4
+      scenarios entered the byConcern rollup as operator-runtime-surface
+      passed=3 failed=1. PASSING LIVE: no-grant refusal (james, explicit 403),
+      revoked-grant refusal (matthew, 403), peer-serves-own-telemetry. The one
+      red is the positive path (holder gets 200+attestation): Loki
+      2026-08-19T01:44:37Z doorway-alpha logs "op-gate ENFORCE deny …
+      performer=ba3a0a01-… reason=no active delegates-compute grant for
+      (performer, capability)" — the seed lever grants recipient=agentPubKey
+      (uhCAk…) but the op-gate derives performer=claims.human_id (matthew's
+      doorway UUID; http.rs:1014 defers human_id→agent_cid resolution). The
+      remaining red is the identity-plane join owned by identity-cross-signed,
+      not a scenario defect; op-gate ENFORCE is confirmed live on operator
+      paths. Also proven by the same run: grant lever reachable in-cluster
+      (Given seeded 2xx), saga rollup refreshed 6/11→8/11 (ch02 recovered,
+      ch07 banked; ch04/ch06/ch10 red).
       DELTA 2026-08-18c (login-realm RCA, desk-proven): the "persona API-mode
       auth gap" was FALSIFIED — the login 401s came from the scenarios
       addressing peer elohim.host (doorway alpha-B: separate unseeded identity
