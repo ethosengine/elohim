@@ -527,3 +527,128 @@ busted the elohim.host ghost anchor. Remaining threads, each owned:
 - **Flip condition (notary-authority habit):** one edge run whose quiesce
   gate completes recording 3/3 — structurally gated on the trio drain,
   which is gated on the burn thread above.
+
+## RCA #2 (2026-08-19) — the residual plateau is a CLASSIFIER conflation, not unanchored rows
+
+The 2026-08-01 RCA above cured the adopt-before-author timeout class and the
+cycle's amplitude changed, but the gap plateau itself never drained. Traced
+again 2026-08-19 (code + live Prometheus + doorway probes). The residual is a
+different, simpler defect.
+
+### Correction to H3 (this supersedes the "seed-pod unanchored backfill" bullet)
+
+H3 read the ~2000-row shortfall as `dht_anchor_hash IS NULL` rows on
+matthew/jessica. **That is falsified.** The instrument H3 leaned on —
+`/db/stats` — returns only `contentCount` and `uniqueTags` (verified live
+2026-08-19); it establishes row-count PARITY (which correctly killed the
+H2 corpus-split hypothesis) but cannot see anchor state at all. The "~2000 NULL"
+was a subtraction — `contentCount` minus the anchored+distribution-safe count —
+and that subtraction silently assumes the only reason a row is missing from the
+advertised inventory is a missing anchor.
+
+The direct measure disagrees. `/p2p/status` `provideLoop.reanchorPending` IS
+`count_unanchored_content` (`h_app_id='lamad' AND dht_anchor_hash IS NULL`), and
+`witness_bootstrap` runs unconditionally at the tail of every `run_heal` tick
+(no early return ahead of it), so the value is fresh. Live on matthew:
+
+    reanchorPending: 1        # exactly ONE genuinely un-anchored lamad row
+    contentCount:    4495
+    local_total{content}: 2466
+    gaps{content}:   2585     # = anchor-gap class + divergent (both push to gap_ids)
+    divergent:       1023
+
+Also note RC-4 was falsified narrowly and correctly: `apply_content_patch_fields`
+has no reach branch on UPDATE, so *reconcile* is not narrowing reach. That does
+not speak to rows that were SEEDED at a scoped reach — a different claim, and the
+one that survives.
+
+### Root cause
+
+`classify_content_gap` (`p2p/projection_reconcile.rs`) answered its two questions
+with mismatched predicates:
+
+- `present` ← `content_ids_present` — `h_app_id` only. Reach-agnostic, anchor-agnostic.
+- `local_anchors` ← `list_content_anchor_inventory` — `dht_anchor_hash IS NOT NULL`
+  **AND** `reach IN ('community','public','commons')`.
+
+So `present && !local_anchors.contains(id)` was read as "un-anchored" when it
+actually means "not advertisable". A row that is present AND anchored but held at
+a scoped reach satisfies the first and fails the second → classified `AnchorGap`
+forever, because it can leave that set by neither available route:
+
+- heal stamps ANCHORS and never widens reach, so healing cannot resolve it; and
+- `local_total` counts distribution-safe rows only, so it cannot age out.
+
+Consequences measured on alpha:
+
+- `local_total{content}` on matthew: 2445 → 2466 over **7 days** (+21).
+- `healed{content}` fleet-wide over 24h: jessica 2, james 4, all others **0**.
+- matthew heal outcomes over 6h: healed 0, `unattempted` 5228 (all
+  `budget_exhausted`), `call_failed` 2596, `missing` 327, `refused_declared` 149,
+  `refreshed` 82. ~1.6 ids resolved per 12s batch call.
+- The conductor throughput symptom is DOWNSTREAM, not parallel: ~1562 impossible
+  ids are enqueued every sweep, which is what exhausts the batch budget and
+  drives the 34% `call_failed` rate. Fixing conductor throughput alone would only
+  let it fail faster.
+- The permanent gap floor is why `divergent_actionable`/`caughtUp` never settle,
+  which is why the fleet-quiesce gate could not hold its 330s window
+  (edge #1367-#1369 DID-NOT-MEASURE) — see
+  `quiesce-gate-measurement-availability.md`.
+
+Reach is EARNED and per-node, orthogonal to head and replication. A peer holding
+a row at a wider reach than we do is not a convergence defect; counting it as one
+was the bug.
+
+### Cure (landed, desk-proven)
+
+- `content_diesel::anchored_content_ids_any_reach` — a reach-AGNOSTIC anchored-id
+  set, LOCAL-ONLY (the advertised inventory keeps its distribution-safe filter,
+  which is a requirement, not an optimization).
+- `ContentGap::ReachScoped` — present + anchored + scoped reach. Counted,
+  never enqueued; the id is marked resolved in the `MissLedger`.
+- `elohim_projection_reconcile_reach_scoped{stream}` — the population is now
+  named on its own gauge instead of hiding inside `gaps`.
+
+Pinned red-first by `p2p::projection_reconcile::tests::
+an_anchored_row_at_scoped_reach_is_not_an_anchor_gap` (which also pins that a
+genuinely NULL-anchor row is STILL `AnchorGap`, so scenario-2 heal is not
+silenced) and by `db::content_diesel::tests::
+the_anchored_id_set_is_reach_agnostic_while_the_advertised_inventory_is_not`,
+which pins the three SQL predicates against a real SQLite projection.
+
+### The falsifier (what to check on the next deploy)
+
+The inference chain — `gaps=2585` ∧ `reanchorPending=1` ⇒ the population is
+anchored-but-scoped — is tight but was NOT confirmed by a row-level read (the
+doorway serves only distribution-safe rows; pod access is operator-owned). The
+new gauge settles it:
+
+- **Confirmed** if `reach_scoped{content}` on matthew lands ≈1500-2000 while
+  `gaps{content}` collapses toward `divergent` (~1000) — and `caughtUp` becomes
+  reachable.
+- **Falsified** if `reach_scoped` is ~0 and `gaps` stays ~2585. Then the
+  population is something else and this cure is merely a latent-bug fix, not the
+  stall's cause.
+
+A `SELECT reach, count(*) FROM content WHERE dht_anchor_hash IS NOT NULL GROUP BY
+reach` on matthew would settle it outright, operator-side.
+
+### Still open after this cure
+
+- **If the scoped rows SHOULD be distribution-safe**, this is a seed-data defect
+  and the cure above only makes it visible (correctly) rather than fixing it.
+  The gauge is the place that will say so.
+- **The one genuine NULL-anchor row** is skipped every sweep
+  (`reanchorCompleted: 0` cumulative, `reanchorFailed: 0` ⇒ it is hitting the
+  non-canonical-reach or non-canonical-content-type guard in
+  `reanchor_backfill`). It holds `reanchorCaughtUp: false` permanently, and it
+  alone pins `head_corpus_digest_readiness` in Amber — which keeps the T5
+  corpus-digest shortcut dormant fleet-wide even though
+  `ELOHIM_HEAD_CORPUS_DIGEST=true` is set on every human. One poison row
+  disabling a fleet-wide lever is its own finding.
+- **The corpus digest is whole-corpus and binary** — one differing row out of
+  4489 forces full enumeration, so it only pays out when there is nothing to do.
+  Bucketed/range digests are the peer-scale lever that is currently unbuilt
+  (7 peers vs 4489 EPRs; discovery is O(corpus x peers) per sweep with a
+  3-sweep/15-min rotating-window latency floor before a divergence is even
+  visible).

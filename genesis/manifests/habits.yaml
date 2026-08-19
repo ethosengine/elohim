@@ -78,6 +78,27 @@ habits:
       - "a2o @concern:content-sync, @concern:blob-replication, @concern:peer-mesh, @concern:epr-projection-fallback, @concern:reconcile-inventory (edge Dataplane Validation stage)"
       - "cargo test --test sync_libp2p_convergence (elohim/elohim-storage)"
     evidence: >
+      DELTA 2026-08-19 (residual gap-plateau root-caused and cured; desk-proven,
+      fleet-UNCONFIRMED — status deliberately NOT flipped): the content arm's
+      classify_content_gap answered "is it anchored?" against the
+      distribution-safe-FILTERED map while answering "is it present?"
+      reach-agnostically, so a present+anchored row held at a scoped reach read as
+      AnchorGap forever — unhealable by construction (heal stamps anchors, never
+      widens reach) and uncountable in local_total (distribution-safe only). Live
+      shape: matthew gaps{content}=2585 against reanchorPending=1 (ONE genuinely
+      NULL-anchor row), local_total frozen 2445->2466 over 7 days,
+      healed{content}=0 fleet-wide over 24h, and a permanent gap floor that kept
+      divergent_actionable from settling (the quiesce gate's DID-NOT-MEASURE runs
+      #1367-#1369). Cure: ContentGap::ReachScoped + reach-agnostic
+      anchored_content_ids_any_reach + elohim_projection_reconcile_reach_scoped,
+      red-first pinned by two tests (classifier + the three SQL predicates). This
+      habit's own checks stayed GREEN throughout a 7-day fleet non-convergence —
+      that coverage gap is the honest finding beside the cure. Flip evidence is
+      the new gauge: reach_scoped ~1500-2000 with gaps collapsing toward divergent
+      CONFIRMS; reach_scoped ~0 with gaps ~2585 FALSIFIES. Supersedes the H3
+      "~2000 unanchored rows" reading in
+      backlog/content-gap-limit-cycle-blocks-convergence.md (RCA #2 there).
+
       DELTA 2026-08-17b (W4.1 definitive local quiesce measure, uncontended,
       io_baseline 528MB/s): seed-to-sustained-PASS 94s for 3,432 rows =
       2,190 rows/min — 57x the 38 rows/min baseline, 6.4x past the >=344

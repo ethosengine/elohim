@@ -2074,6 +2074,36 @@ pub fn list_unanchored_content_ids(
         .map_err(|e| StorageError::Internal(format!("list_unanchored_content_ids failed: {}", e)))
 }
 
+/// Ids of locally-present content rows that carry a DHT anchor — REACH-AGNOSTIC.
+///
+/// The deliberately UNFILTERED twin of [`list_content_anchor_inventory`]'s id
+/// set, and LOCAL-ONLY: this never becomes a cross-peer surface (the advertised
+/// inventory keeps its [`DISTRIBUTION_SAFE_REACH`] filter, which is a
+/// requirement, not an optimization).
+///
+/// It exists so the cross-peer gap classifier can ask its two questions
+/// SEPARATELY — "is this row anchored at all?" (this query) and "may it cross a
+/// peer boundary?" (the reach filter). Collapsing them is what froze alpha:
+/// probing presence reach-agnostically while probing anchoredness through the
+/// distribution-safe map classifies every anchored-but-scoped row as an
+/// un-anchored gap. That gap is unhealable by construction — heal stamps
+/// anchors and never widens reach — so the population is permanent and
+/// self-renewing. See `projection_reconcile::ContentGap::ReachScoped`.
+pub fn anchored_content_ids_any_reach(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+) -> Result<std::collections::HashSet<String>, StorageError> {
+    let ids: Vec<String> = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::dht_anchor_hash.is_not_null())
+        .select(content::id)
+        .load(conn)
+        .map_err(|e| {
+            StorageError::Internal(format!("anchored_content_ids_any_reach failed: {e}"))
+        })?;
+    Ok(ids.into_iter().collect())
+}
+
 /// Count content rows that were never DHT-authored (`dht_anchor_hash IS NULL`),
 /// scoped by app context. The re-anchor backfill uses this to report the
 /// remaining `pending` count on `/p2p/status` after a bounded sweep.
@@ -2736,6 +2766,76 @@ mod tests {
             "a changed anchor on an eligible row MUST change the digest — this is the \
              signal the in_sync shortcut relies on to catch divergence"
         );
+    }
+
+    /// The SQL half of the alpha-freeze cure: the three predicates the cross-peer
+    /// gap classifier consumes must disagree in exactly the diagnosed way, so a
+    /// row that is present AND anchored but scoped is never mistakable for an
+    /// un-anchored one.
+    ///
+    /// Live shape this pins (matthew, 2026-08-19): `gaps{content}=2585` against
+    /// `reanchorPending=1`. Reading "not in the distribution-safe map" as
+    /// "un-anchored" turned ~2584 scoped rows into a permanent gap population.
+    #[test]
+    fn the_anchored_id_set_is_reach_agnostic_while_the_advertised_inventory_is_not() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::default_lamad();
+        let mk = |id: &str, reach: &str, anchor: Option<&str>| CreateContentInput {
+            id: id.to_string(),
+            title: id.to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: reach.to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+            dht_anchor_hash: anchor.map(str::to_string),
+        };
+        // scoped + ANCHORED — the class that froze the fleet.
+        create_content(&mut conn, &ctx, mk("c:scoped", "trusted", Some("anc-s"))).unwrap();
+        // distribution-safe + anchored — advertisable.
+        create_content(&mut conn, &ctx, mk("c:safe", "public", Some("anc-p"))).unwrap();
+        // distribution-safe + UN-anchored — the genuine anchor gap (scenario 2).
+        create_content(&mut conn, &ctx, mk("c:null", "public", None)).unwrap();
+
+        let ids: Vec<String> = ["c:scoped", "c:safe", "c:null"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+
+        let present = content_ids_present(&mut conn, &ctx, &ids).unwrap();
+        assert!(
+            present.contains("c:scoped"),
+            "presence is reach-agnostic — the scoped row IS held locally"
+        );
+
+        let (advertised, _total) =
+            list_content_anchor_inventory(&mut conn, &ctx, 0, i64::MAX).unwrap();
+        let advertised: std::collections::HashSet<String> =
+            advertised.into_iter().map(|r| r.id).collect();
+        assert!(
+            !advertised.contains("c:scoped"),
+            "the advertised inventory MUST stay distribution-safe filtered — this is a \
+             requirement, not an optimization"
+        );
+
+        let anchored = anchored_content_ids_any_reach(&mut conn, &ctx).unwrap();
+        assert!(
+            anchored.contains("c:scoped"),
+            "the scoped row is ANCHORED; only a reach-agnostic set can say so, and without \
+             it the classifier reads the row as un-anchored forever"
+        );
+        assert!(
+            !anchored.contains("c:null"),
+            "a genuinely un-anchored row must stay OUT of the anchored set, or the fix \
+             would silence the real scenario-2 heal"
+        );
+        assert!(advertised.contains("c:safe") && anchored.contains("c:safe"));
     }
 
     #[test]

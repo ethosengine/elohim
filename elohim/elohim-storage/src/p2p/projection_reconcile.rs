@@ -3171,10 +3171,44 @@ enum ContentGap {
     /// the content reconcile NEVER fabricates a row (`stamp_declared_head` is
     /// existing-row-only by construction).
     AbsentLocal,
-    /// Present but un-anchored (`dht_anchor_hash` NULL — not in the local
-    /// anchored set). Heal: the own conductor stamps the notary anchor. This is
-    /// scenario 2 — the bulk-seeded row that never saw its `ContentCommitted`.
+    /// Present but un-anchored (`dht_anchor_hash` NULL). Heal: the own conductor
+    /// stamps the notary anchor. This is scenario 2 — the bulk-seeded row that
+    /// never saw its `ContentCommitted`.
+    ///
+    /// The predicate is ANCHOR-ONLY and reach-agnostic. It deliberately does NOT
+    /// mean "absent from the distribution-safe advertised set" — see
+    /// [`ContentGap::ReachScoped`] for why collapsing those two froze a fleet.
     AnchorGap,
+    /// Present AND anchored, but held at a reach outside
+    /// `DISTRIBUTION_SAFE_REACH` — so it is absent from this node's advertised
+    /// inventory while a peer advertises the same id. NOT a gap, and never
+    /// enqueued for heal.
+    ///
+    /// ## Why this class exists (the freeze it ends)
+    ///
+    /// `classify_content_gap` used to answer "is it anchored?" by probing the
+    /// distribution-safe-FILTERED map (`list_content_anchor_inventory`) while
+    /// answering "is it present?" reach-agnostically (`content_ids_present`).
+    /// An anchored row held at a scoped reach satisfies the first and fails the
+    /// second, so it classified as `AnchorGap` — "un-anchored" — forever:
+    ///
+    /// - heal stamps ANCHORS and never widens reach, so the row cannot leave the
+    ///   set by being healed;
+    /// - `local_total` counts distribution-safe rows only, so it cannot leave by
+    ///   being counted either.
+    ///
+    /// Measured on alpha 2026-08-19: matthew reported `gaps{content}=2585`
+    /// against `reanchorPending=1` — exactly ONE genuinely NULL-anchor row, so
+    /// ~2584 of the "anchor gaps" were this class. `local_total` sat at 2466 for
+    /// 7 days (2445→2466), `healed{content}` was 0 over 24h fleet-wide, and the
+    /// permanent gap floor kept `divergent_actionable` from ever settling — which
+    /// is what made the fleet-quiesce gate unmeasurable (edge #1367-#1369).
+    ///
+    /// Reach is EARNED and per-node (orthogonal to head and replication), so a
+    /// peer holding a row at a wider reach than we do is not a convergence
+    /// defect. Counting it as one was the bug. This class is counted and
+    /// reported so the population stays visible, never actioned.
+    ReachScoped,
     /// Present + anchored, but the local anchor disagrees with a NON-EMPTY peer
     /// anchor. Verify-gap: the own conductor decides who is right (we re-stamp
     /// OUR conductor's head; we never adopt the peer's value). Counts as a
@@ -3187,18 +3221,30 @@ enum ContentGap {
 /// Pure diff for ONE advertised content id (the notary invariant, Leg 4).
 ///
 /// `present` is reach-agnostic local presence (`content_ids_present`);
-/// `local_anchors` is the local anchored + distribution-safe set
-/// (`list_content_anchor_inventory`); `peer_anchor` is the anchor a peer
-/// advertised for the id (`None`/empty ⇒ the peer is itself un-anchored, which
-/// is never divergence evidence).
+/// `anchored_any_reach` is the reach-agnostic anchored id set
+/// (`anchored_content_ids_any_reach`); `local_anchors` is the local anchored +
+/// distribution-safe set (`list_content_anchor_inventory`); `peer_anchor` is the
+/// anchor a peer advertised for the id (`None`/empty ⇒ the peer is itself
+/// un-anchored, which is never divergence evidence).
+///
+/// The two anchor sets are BOTH required and are not interchangeable: the first
+/// answers "is it anchored?", the second answers "is it advertisable?". Probing
+/// only the second makes an anchored-but-scoped row read as un-anchored — the
+/// conflation documented on [`ContentGap::ReachScoped`].
 fn classify_content_gap(
     id: &str,
     present: &std::collections::HashSet<String>,
+    anchored_any_reach: &std::collections::HashSet<String>,
     local_anchors: &std::collections::HashMap<String, String>,
     peer_anchor: Option<&str>,
 ) -> ContentGap {
     if !present.contains(id) {
         return ContentGap::AbsentLocal;
+    }
+    // Two SEPARATE questions. "Not in `local_anchors`" means "not advertisable",
+    // which is only an anchor gap when the row is also genuinely un-anchored.
+    if !local_anchors.contains_key(id) && anchored_any_reach.contains(id) {
+        return ContentGap::ReachScoped;
     }
     match local_anchors.get(id) {
         None => ContentGap::AnchorGap,
@@ -3241,8 +3287,9 @@ async fn discover_content(
     // safe rows (the same set this node advertises). Absent / un-anchored rows
     // are resolved via presence below. Offset 0 / i64::MAX: the LOCAL diff needs
     // the WHOLE local set (the rotating window only bounds the PEER ask).
-    let (local_anchors, requester_head_corpus_digest): (
+    let (local_anchors, anchored_any_reach, requester_head_corpus_digest): (
         std::collections::HashMap<String, String>,
+        std::collections::HashSet<String>,
         Option<String>,
     ) = {
         let mut conn = match pool.get() {
@@ -3264,6 +3311,19 @@ async fn discover_content(
                 .collect(),
             Err(e) => {
                 tracing::warn!(error = %e, "projection-reconcile[content]: local inventory failed; skipping sweep");
+                return ContentDiscovery::empty(0);
+            }
+        };
+        // Reach-AGNOSTIC anchored ids. Separate from `local_anchors` on purpose:
+        // that map is distribution-safe filtered (it is what we ADVERTISE), and
+        // using it to answer "is this row anchored?" mislabels every
+        // anchored-but-scoped row as an un-anchored gap it can never leave.
+        let anchored_any_reach = match crate::db::content_diesel::anchored_content_ids_any_reach(
+            &mut conn, &app_ctx,
+        ) {
+            Ok(set) => set,
+            Err(e) => {
+                tracing::warn!(error = %e, "projection-reconcile[content]: anchored-id set failed; skipping sweep");
                 return ContentDiscovery::empty(0);
             }
         };
@@ -3304,7 +3364,11 @@ async fn discover_content(
         } else {
             None
         };
-        (local_anchors, requester_head_corpus_digest)
+        (
+            local_anchors,
+            anchored_any_reach,
+            requester_head_corpus_digest,
+        )
     };
     let local_anchored = local_anchors.len();
 
@@ -3506,15 +3570,23 @@ async fn discover_content(
     let mut gap_ids: Vec<String> = Vec::new();
     let mut divergent_ids: Vec<String> = Vec::new();
     let mut divergent_anchor = 0usize;
+    // Anchored rows this node holds at a scoped reach while a peer advertises
+    // them. Counted for visibility, never enqueued — see `ContentGap::ReachScoped`.
+    let mut reach_scoped = 0usize;
     let mut resolved_ids: Vec<&String> = Vec::new();
     for id in &advertised_ids {
         match classify_content_gap(
             id,
             &present,
+            &anchored_any_reach,
             &local_anchors,
             advertised_anchor.get(id).map(String::as_str),
         ) {
             ContentGap::AbsentLocal | ContentGap::InSync => resolved_ids.push(id),
+            ContentGap::ReachScoped => {
+                reach_scoped += 1;
+                resolved_ids.push(id);
+            }
             ContentGap::AnchorGap => gap_ids.push(id.clone()),
             ContentGap::Divergent => {
                 divergent_anchor += 1;
@@ -3559,6 +3631,22 @@ async fn discover_content(
                  counting all divergence as unadjudicated this sweep"
             ),
         }
+    }
+
+    // Publish the anchored-but-scoped-reach population. Measured-gated like the
+    // window gauges: with no peer answering, 0 would be an unmeasured zero rather
+    // than an observation.
+    if peers_asked > 0 {
+        crate::metrics::set_projection_reconcile_reach_scoped("content", reach_scoped as u64);
+    }
+    if reach_scoped > 0 {
+        tracing::info!(
+            target: "elohim_storage::projection_reconcile",
+            reach_scoped,
+            gaps = gap_ids.len(),
+            "projection-reconcile[content]: peers advertise ids this node holds at a scoped \
+             reach — counted, not enqueued (reach is earned per-node, not a divergence)"
+        );
     }
 
     // (4c) Cross-sweep retry budget (see [`MissLedger`]): drop gap ids whose
@@ -8060,12 +8148,73 @@ mod tests {
         assert_eq!(decide_outcome(&transient, None), RowOutcome::Failed);
     }
 
+    /// REGRESSION (alpha freeze, 2026-08-19): an anchored row held at a SCOPED
+    /// reach must never classify as an un-anchored gap.
+    ///
+    /// The classifier answered "is it anchored?" against the distribution-safe
+    /// FILTERED map, so a row that is present and anchored but scoped
+    /// (`private`/`trusted`/`familiar`/…) satisfied `present` and missed
+    /// `local_anchors` — reading as `AnchorGap`. Heal stamps anchors and never
+    /// widens reach, and `local_total` counts distribution-safe rows only, so
+    /// the row could leave the gap set by NEITHER route: a permanent,
+    /// self-renewing gap population re-enqueued every sweep.
+    ///
+    /// Live shape this pins: matthew `gaps{content}=2585` against
+    /// `reanchorPending=1` (one genuinely NULL-anchor row), `local_total` frozen
+    /// at 2466 for 7 days, `healed{content}=0` fleet-wide over 24h, and a
+    /// `divergent_actionable` floor that made the fleet-quiesce gate
+    /// unmeasurable.
+    #[test]
+    fn an_anchored_row_at_scoped_reach_is_not_an_anchor_gap() {
+        use std::collections::{HashMap, HashSet};
+
+        // `s` is present AND anchored, but its reach is outside
+        // DISTRIBUTION_SAFE_REACH — so it is absent from the advertised
+        // (distribution-safe) map while a peer advertises the same id.
+        let present: HashSet<String> = ["s"].iter().map(|x| x.to_string()).collect();
+        let anchored_any_reach: HashSet<String> = ["s"].iter().map(|x| x.to_string()).collect();
+        let local_anchors: HashMap<String, String> = HashMap::new();
+
+        assert_eq!(
+            classify_content_gap(
+                "s",
+                &present,
+                &anchored_any_reach,
+                &local_anchors,
+                Some("anchor-P")
+            ),
+            ContentGap::ReachScoped,
+            "an anchored row held at a scoped reach is a reach fact, not an anchor gap — \
+             enqueueing it for heal creates a population that can never converge"
+        );
+
+        // And the genuine un-anchored case must still be an anchor gap: the fix
+        // must not silence scenario 2 (the bulk-seeded row that never saw its
+        // ContentCommitted).
+        let present2: HashSet<String> = ["u"].iter().map(|x| x.to_string()).collect();
+        let none_anchored: HashSet<String> = HashSet::new();
+        assert_eq!(
+            classify_content_gap(
+                "u",
+                &present2,
+                &none_anchored,
+                &local_anchors,
+                Some("anchor-P")
+            ),
+            ContentGap::AnchorGap,
+            "a row with no DHT anchor at all is still the healable anchor-gap class"
+        );
+    }
+
     #[test]
     fn content_gap_classification_absent_null_divergent() {
         use std::collections::{HashMap, HashSet};
 
         // present: b (un-anchored), c (anchored=X), d (anchored=X). a is absent.
         let present: HashSet<String> = ["b", "c", "d"].iter().map(|s| s.to_string()).collect();
+        // reach-agnostic anchored set: c and d are anchored; b is not.
+        let anchored_any_reach: HashSet<String> =
+            ["c", "d"].iter().map(|s| s.to_string()).collect();
         // local anchored set (list_content_anchor_inventory): only c and d.
         let mut local_anchors: HashMap<String, String> = HashMap::new();
         local_anchors.insert("c".into(), "anchor-X".into());
@@ -8073,33 +8222,57 @@ mod tests {
 
         // (a) advertised but absent locally → SKIP.
         assert_eq!(
-            classify_content_gap("a", &present, &local_anchors, Some("anchor-Z")),
+            classify_content_gap(
+                "a",
+                &present,
+                &anchored_any_reach,
+                &local_anchors,
+                Some("anchor-Z")
+            ),
             ContentGap::AbsentLocal
         );
         // (b) present but un-anchored (not in local_anchors) → anchor-gap.
         assert_eq!(
-            classify_content_gap("b", &present, &local_anchors, Some("anchor-Y")),
+            classify_content_gap(
+                "b",
+                &present,
+                &anchored_any_reach,
+                &local_anchors,
+                Some("anchor-Y")
+            ),
             ContentGap::AnchorGap
         );
         // (c) present + anchored, peer anchor disagrees → divergent.
         assert_eq!(
-            classify_content_gap("c", &present, &local_anchors, Some("anchor-Y")),
+            classify_content_gap(
+                "c",
+                &present,
+                &anchored_any_reach,
+                &local_anchors,
+                Some("anchor-Y")
+            ),
             ContentGap::Divergent
         );
         // (d) present + anchored, peer anchor agrees → in sync.
         assert_eq!(
-            classify_content_gap("d", &present, &local_anchors, Some("anchor-X")),
+            classify_content_gap(
+                "d",
+                &present,
+                &anchored_any_reach,
+                &local_anchors,
+                Some("anchor-X")
+            ),
             ContentGap::InSync
         );
         // (c) present + anchored, peer advertised EMPTY anchor → NOT divergence
         // (an un-anchored peer is not evidence our anchor is wrong).
         assert_eq!(
-            classify_content_gap("c", &present, &local_anchors, Some("")),
+            classify_content_gap("c", &present, &anchored_any_reach, &local_anchors, Some("")),
             ContentGap::InSync
         );
         // (c) present + anchored, peer advertised NO anchor → in sync.
         assert_eq!(
-            classify_content_gap("c", &present, &local_anchors, None),
+            classify_content_gap("c", &present, &anchored_any_reach, &local_anchors, None),
             ContentGap::InSync
         );
     }

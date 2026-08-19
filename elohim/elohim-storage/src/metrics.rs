@@ -829,6 +829,25 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Last-sweep count of locally-ANCHORED rows held at a reach outside
+    /// `DISTRIBUTION_SAFE_REACH` while a peer advertises the same id
+    /// (`ContentGap::ReachScoped`). label: stream = "content".
+    ///
+    /// Reach is earned and per-node, so this is a NORMAL steady-state population,
+    /// not a defect — it is published because it used to be invisible: these rows
+    /// were classified as un-anchored gaps and re-enqueued for a heal that could
+    /// never resolve them (alpha, 2026-08-19: ~2584 of matthew's 2585 "gaps").
+    /// A number here that tracks the old `gaps` value is the cure landing, not a
+    /// regression.
+    pub static ref PROJECTION_RECONCILE_REACH_SCOPED: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_projection_reconcile_reach_scoped",
+            "Last-sweep anchored-but-scoped-reach rows a peer advertises, by stream.",
+        ),
+        &["stream"],
+    )
+    .unwrap();
+
     /// Last-sweep LOCAL projection row count per reconcile stream (the convergence
     /// target). label: stream = "rea" | "content". `rea` climbing off 0 is the
     /// direct cure signal for the starved-heal incident (rea_local_total stuck at 0
@@ -2043,6 +2062,7 @@ pub fn register_all() {
         }
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_GAPS.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_LOCAL_TOTAL.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_REACH_SCOPED.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_EXHAUSTED.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_DIVERGENT.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_DIVERGENT_REFUSED.clone()));
@@ -3404,6 +3424,18 @@ pub fn inc_projection_heal_outcome_by(stream: &str, outcome: &str, count: usize)
 /// `divergent` is the TOTAL; `divergent_refused` is its adjudicated share (see
 /// [`PROJECTION_RECONCILE_DIVERGENT_REFUSED`]) — `divergent_refused <= divergent`
 /// always, and the difference is what gates convergence.
+/// Publish the anchored-but-scoped-reach population for `stream`.
+///
+/// Separate from [`set_projection_reconcile_gauges`] because it is computed at
+/// classification time inside the content arm (like the window gauges), and
+/// because it is NOT a convergence input — it is a normal population that must
+/// stay visible, never a gap.
+pub fn set_projection_reconcile_reach_scoped(stream: &str, reach_scoped: u64) {
+    PROJECTION_RECONCILE_REACH_SCOPED
+        .with_label_values(&[stream])
+        .set(reach_scoped as i64);
+}
+
 pub fn set_projection_reconcile_gauges(
     stream: &str,
     gaps: u64,
