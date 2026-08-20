@@ -554,19 +554,25 @@ export function householdProjectionSatisfied(
   if (typeof cid !== 'string' || !cid.startsWith('collective:')) {
     return false;
   }
-  const present = new Set(
-    participants.map(p => {
-      if (typeof p === 'string') {
-        return p;
-      }
-      if (p && typeof p === 'object') {
-        const o = p as Record<string, unknown>;
-        return (o['humanId'] ?? o['id'] ?? o['participant'] ?? '') as string;
-      }
-      return '';
-    }),
-  );
+  const present = new Set(participants.map(participantId));
   return expectedMemberIds.every(id => present.has(id));
+}
+
+/**
+ * The member id one projected participant row names. Rows may be plain id
+ * strings (the `Vec<String>` view shape) or objects carrying
+ * `humanId`/`id`/`participant`. Shared by the settle predicate and its
+ * gap description so the two can never disagree about who is present.
+ */
+function participantId(p: unknown): string {
+  if (typeof p === 'string') {
+    return p;
+  }
+  if (p && typeof p === 'object') {
+    const o = p as Record<string, unknown>;
+    return (o['humanId'] ?? o['id'] ?? o['participant'] ?? '') as string;
+  }
+  return '';
 }
 
 /**
@@ -614,14 +620,51 @@ export async function waitForHouseholdProjected(
       return true;
     }
     if (Date.now() >= deadline) {
+      // Name WHICH leg is short. The old single line ("collective_cid/
+      // participants may lag") could not distinguish an unstamped cid from a
+      // short participant list from an absent row, so the downstream a2o red had
+      // to re-derive it from scratch (genesis #1489). These are different
+      // defects: an unstamped cid means the CollectiveCommitted signal landed on
+      // another peer's storage and reconcile has not gap-filled it here; a
+      // missing member means their conductor never affirmed.
       console.warn(
-        `[!] household projection did not settle within ${timeoutMs}ms — collective_cid/` +
-          `participants may lag (non-fatal; projection_reconcile continues after exit)`,
+        `[!] household projection did not settle within ${timeoutMs}ms — ` +
+          `${describeProjectionGap(collective, participants, expectedMemberIds)} ` +
+          `(non-fatal; projection_reconcile continues after exit)`,
       );
       return false;
     }
     await new Promise(r => setTimeout(r, intervalMs));
   }
+}
+
+/**
+ * Human-readable statement of exactly which settle leg is unmet, for the
+ * timeout warning above. Pure over the same inputs as
+ * [`householdProjectionSatisfied`], and reuses its participant-id reader, so it
+ * cannot describe a state that predicate would have accepted.
+ */
+export function describeProjectionGap(
+  collective: Record<string, unknown> | null,
+  participants: unknown[],
+  expectedMemberIds: string[],
+): string {
+  if (!collective) {
+    return 'the collective row is absent from this storage peer';
+  }
+  const gaps: string[] = [];
+  const cid = collective['collectiveCid'] ?? collective['collective_cid'];
+  if (typeof cid !== 'string' || !cid.startsWith('collective:')) {
+    gaps.push(`collective_cid unstamped (got ${JSON.stringify(cid ?? null)})`);
+  }
+  const present = participants.map(participantId).filter(Boolean);
+  const missing = expectedMemberIds.filter(id => !present.includes(id));
+  if (missing.length > 0) {
+    gaps.push(
+      `participants missing ${missing.join(', ')} (present: ${present.join(', ') || 'none'})`,
+    );
+  }
+  return gaps.length > 0 ? gaps.join('; ') : 'no gap detected on the final poll (race with settle)';
 }
 
 // =============================================================================

@@ -12,7 +12,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { householdProjectionSatisfied } from './seed-household-formation.js';
+import { describeProjectionGap, householdProjectionSatisfied } from './seed-household-formation.js';
 
 const TRIAD = ['human-matthew-manager', 'human-jessica-spouse', 'human-james-son'];
 
@@ -44,5 +44,45 @@ describe('householdProjectionSatisfied', () => {
 
   it('ignores a present-but-empty collective_cid (not a real stamp)', () => {
     expect(householdProjectionSatisfied({ collectiveCid: '' }, TRIAD, TRIAD)).toBe(false);
+  });
+});
+
+describe('describeProjectionGap', () => {
+  const STAMPED = { collectiveCid: 'collective:uhCkkAAA' };
+
+  it('names an absent collective row', () => {
+    expect(describeProjectionGap(null, [], TRIAD)).toContain('absent');
+  });
+
+  it('names the unstamped cid, and what it saw instead', () => {
+    const gap = describeProjectionGap({ slug: 'family-dowell' }, TRIAD, TRIAD);
+    expect(gap).toContain('collective_cid unstamped');
+    expect(gap).toContain('null');
+  });
+
+  it('names EVERY missing member, not just the first', () => {
+    const gap = describeProjectionGap(STAMPED, ['human-james-son'], TRIAD);
+    expect(gap).toContain('human-matthew-manager');
+    expect(gap).toContain('human-jessica-spouse');
+    expect(gap).toContain('present: human-james-son');
+  });
+
+  it('reports both legs when both are short', () => {
+    const gap = describeProjectionGap({}, [], TRIAD);
+    expect(gap).toContain('collective_cid unstamped');
+    expect(gap).toContain('participants missing');
+  });
+
+  it('reads object participant rows the same way the predicate does', () => {
+    const rows = TRIAD.map(id => ({ humanId: id }));
+    expect(describeProjectionGap(STAMPED, rows, TRIAD)).toBe(
+      'no gap detected on the final poll (race with settle)',
+    );
+  });
+
+  it('never claims a gap the settle predicate would have accepted', () => {
+    // The two must agree: satisfied ⇒ no gap named.
+    expect(householdProjectionSatisfied(STAMPED, TRIAD, TRIAD)).toBe(true);
+    expect(describeProjectionGap(STAMPED, TRIAD, TRIAD)).not.toContain('missing');
   });
 });
