@@ -122,6 +122,14 @@ impl ShardService {
                 ));
             }
         }
+        // ConvergenceAtom::InventoryServe — the local read cost of answering ONE
+        // peer's ListContent page. Started before the pool checkout deliberately:
+        // waiting for a connection IS the cost when the read pool is saturated,
+        // and a timer starting after checkout would report a fast query while the
+        // peer waited seconds to be served. Measured 2026-08-20 on matthew:
+        // "Database read connection is saturated. Util 1387.50%" — the wait was
+        // the whole story and no timer existed to say so.
+        let serve_started = std::time::Instant::now();
         let pool = match self.db_pool.as_ref() {
             Some(p) => p,
             None => return ShardResponse::Error("No database pool".to_string()),
@@ -167,9 +175,19 @@ impl ShardService {
                     })
                     .collect();
                 let has_more = (offset as u64 + inventory.len() as u64) < total;
+                // Covers BOTH queries — list_content AND count_content. The pair
+                // is the real cost: count_content is a full count over the whole
+                // corpus (4495 rows on alpha) run on EVERY page, so a 5-page walk
+                // pays five full counts. Timing only the list would have hidden
+                // half of it.
+                crate::metrics::observe_atom_duration(
+                    crate::metrics::ConvergenceAtom::InventoryServe,
+                    serve_started.elapsed(),
+                );
                 info!(
                     count = inventory.len(),
                     total = total,
+                    elapsed_ms = serve_started.elapsed().as_secs_f64() * 1_000.0,
                     "Serving content inventory"
                 );
                 ShardResponse::ContentList {
@@ -178,7 +196,17 @@ impl ShardService {
                     has_more,
                 }
             }
-            Err(e) => ShardResponse::Error(format!("Content query failed: {}", e)),
+            Err(e) => {
+                // Errors are recorded too: a query that FAILS after waiting on a
+                // saturated pool still consumed the wait, and omitting it would
+                // make the distribution improve exactly as the pool degrades
+                // (coordinated omission).
+                crate::metrics::observe_atom_duration(
+                    crate::metrics::ConvergenceAtom::InventoryServe,
+                    serve_started.elapsed(),
+                );
+                ShardResponse::Error(format!("Content query failed: {}", e))
+            }
         }
     }
 

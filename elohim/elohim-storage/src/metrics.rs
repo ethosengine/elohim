@@ -2213,6 +2213,20 @@ pub enum ConvergenceAtom {
     ManifestPersist,
     /// One `digest_of_entry_lines` fold — pure, expected sub-millisecond.
     DigestFold,
+    /// One inventory page SERVED to a peer (`shard_service::handle_list_content`)
+    /// — the local `holochain_sqlite` read cost of answering a `ListContent`.
+    ///
+    /// Added 2026-08-20 because this was the single highest-rate loop in the
+    /// system with NO timer on it. Measured that day on matthew:
+    /// `Serving content inventory count=1000 total=4495` firing MULTIPLE TIMES
+    /// PER SECOND while `holochain_sqlite::db::access` reported
+    /// "Database read connection is saturated. Util 1387.50%" — read starvation
+    /// that opened the doorway breaker and surfaced as `503 catching-up`.
+    /// Finding that required Loki archaeology precisely because this atom did
+    /// not exist. Note the handler runs TWO queries per page — `list_content`
+    /// AND `count_content`, both `MinTrust::Invisible` — so the cost is not
+    /// one scan but two.
+    InventoryServe,
 }
 
 impl seam_contracts::ReasonLabel for ConvergenceAtom {
@@ -2225,6 +2239,7 @@ impl seam_contracts::ReasonLabel for ConvergenceAtom {
         ConvergenceAtom::ShardFetch,
         ConvergenceAtom::ManifestPersist,
         ConvergenceAtom::DigestFold,
+        ConvergenceAtom::InventoryServe,
     ];
 
     fn label(&self) -> &'static str {
@@ -2237,6 +2252,7 @@ impl seam_contracts::ReasonLabel for ConvergenceAtom {
             ConvergenceAtom::ShardFetch => "shard_fetch",
             ConvergenceAtom::ManifestPersist => "manifest_persist",
             ConvergenceAtom::DigestFold => "digest_fold",
+            ConvergenceAtom::InventoryServe => "inventory_serve",
         }
     }
 }
@@ -4335,8 +4351,12 @@ mod tests {
                 atom.label()
             );
         }
-        // Exactly 8 — the plan names the atom roster closed, not open-ended.
-        assert_eq!(ConvergenceAtom::ALL.len(), 8);
+        // Exactly 9 — the roster stays CLOSED, not open-ended. Was 8 until
+        // 2026-08-20, when `inventory_serve` was added: the highest-rate loop in
+        // the system had no atom, so a read-pool saturation at 1387% util had to
+        // be found by log archaeology instead of read off this histogram.
+        // Bumping this number is the deliberate act that admits a 9th atom.
+        assert_eq!(ConvergenceAtom::ALL.len(), 9);
     }
 
     /// Both recording paths land in the SAME series: a `Duration` measured at
