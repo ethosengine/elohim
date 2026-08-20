@@ -23,6 +23,17 @@ Feature: EPR Cross-Peer Content Resolution
 
   # --- Foundational P2P resolution (verified landed; @wip lifted by Wave 0 audit) ---
 
+  # Runs against TWO DISTINCT peers with asymmetric custody. "staging" is now
+  # doorway-B — elohim.host, adam-backed, its own storage and its own projection
+  # DB — a federation peer of doorway-A rather than an alias of it
+  # (genesis/scripts/ci/e2e-verify-api.sh points E2E_DOORWAY_STAGING at
+  # E2E_DOORWAY_BETA, which genesis/Jenkinsfile householdMeshEnv() resolves).
+  # @requires:shem because doorway-B's backing storage is adam, who is pinned to
+  # the remote pool: no shem, no second peer. Where a fleet declares no second
+  # doorway the two names collapse, and the step definitions detect that by
+  # comparing the resolved URLs (distinctPeers in
+  # genesis/a2o/steps/federation-epr.steps.ts) and HOLD as pending naming the
+  # collapse — a tautology is never allowed to pass as a crossing.
   @requires:shem
   Scenario: Content stewarded by another peer resolves with full body
     # Pete stewards a curriculum module on peer "alpha". When peer
@@ -59,6 +70,15 @@ Feature: EPR Cross-Peer Content Resolution
     Given peer "alpha" creates content "new-concept" via POST /db/content
     Then the DHT contains an EPR Head for "new-concept"
 
+  # The precondition is an actual cross-peer resolve — storage's P2P fallback in
+  # GET /db/content/{id} (elohim/elohim-storage/src/http.rs, the resolve_and_fetch arm that
+  # stamps metadata {"resolved_via":"p2p"}) only runs when the row is absent locally AND a
+  # remote peer holds it. That is now reachable: staging is doorway-B, a genuinely separate
+  # peer (see the first scenario). Because the stamp is written ONLY on that arm, reading it
+  # back is proof the read crossed peers rather than being served from a local row.
+  # @requires:shem for the same reason as above — doorway-B is adam-backed, and adam is
+  # pinned to the remote pool.
+  @requires:shem
   Scenario: P2P-resolved content is tagged for diagnostics
     # When content arrives via cross-peer resolution rather than local
     # storage, the local record carries that provenance. Operators can
@@ -69,26 +89,24 @@ Feature: EPR Cross-Peer Content Resolution
   # --- Reach-gated access (the ones the audit confirmed have substrate but step defs may be wip) ---
 
   # ============================================================================
-  # Federation @wip status (post-2026-05-16 walk)
+  # Federation @wip status
   #
   # Per 2026-05-16-epr-wip-disposition.md (HEAD 487fd5b0b):
-  # - 0 of 8 @wip scenarios were lifted in this sprint
-  # - 7 routed to doorway-full-facilitator sprint (rows 5–11) — gate is the
-  #   federation-epr.steps.ts file, which does not yet exist anywhere in
-  #   genesis/a2o/steps/
+  # - 0 of 8 @wip scenarios were lifted in that sprint
+  # - 7 routed to the doorway-full-facilitator sprint (rows 5-11) — the gate was
+  #   the federation-epr.steps.ts step-def file
   # - 1 routed to iroh-phase-12-followon (row 12) — additionally gated on
   #   end-to-end caller-identity through the EPR-atom codec
   #
-  # Substrate is confirmed live for all reach / policy / attestation gating
-  # at elohim/elohim-storage/src/epr_service.rs:86–189 (handle_resolve).
-  # The gap is the BDD glue layer, NOT the protocol gating.
+  # RESOLVED 2026-08-20: genesis/a2o/steps/federation-epr.steps.ts now exists and
+  # binds these steps, including the five "verified landed" scenarios above this
+  # block (lines 26-61) that were previously running undefined-silently. The
+  # cross-peer steps HOLD and name the collapse when both peers resolve to one
+  # host, rather than asserting a tautology against a single node.
   #
-  # Backlog (must-route, not optional): the 5 "verified landed" scenarios
-  # above this block (lines 26–61) are running undefined-silently — they
-  # have no step-defs in genesis/a2o/steps/ either. Route them to the
-  # doorway-full-facilitator sprint as a side effect of authoring
-  # federation-epr.steps.ts (the same step-def file that satisfies rows 5–11
-  # will cover the 5 above-block scenarios as well).
+  # Substrate is confirmed live for all reach / policy / attestation gating at
+  # elohim/elohim-storage/src/epr_service.rs:86-189 (handle_resolve). The gap was
+  # the BDD glue layer, NOT the protocol gating.
   #
   # Per-scenario gate conditions are inline above each @wip below.
   # ============================================================================
