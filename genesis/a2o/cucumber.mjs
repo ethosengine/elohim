@@ -15,14 +15,27 @@
  * that returns the profile map (see cucumber-js from_file.js).
  */
 
+// Where the base profile writes its machine- and human-readable reports.
+//
+// These are env-overridable because cucumber-js MERGES the config's `format`
+// list with the CLI's `--format` flags rather than replacing it: a stage that
+// names its own `--format json:reports/cucumber-report-<stage>.json` still gets
+// a SECOND, byte-identical copy at the generic path below. The genesis
+// pipeline archives `cucumber-report*.json` as a glob, so that second copy was
+// ingested by the CucumberReport plugin as a third, phantom run — the browser
+// stage's failures counted twice in the "Found N failed steps" headline
+// (verified byte-identical in builds #1340/#1342; see
+// genesis/data/timeline/backlog/ci-cucumber-report-plugin-double-counts-browser-json.md).
+//
+// A stage that owns its own report sets these so exactly one JSON is written
+// per run. Unset (local dev, `just test`, ad-hoc runs) the paths are unchanged.
+const jsonReportPath = process.env.CUCUMBER_JSON_REPORT || 'reports/cucumber-report.json';
+const htmlReportPath = process.env.CUCUMBER_HTML_REPORT || 'reports/cucumber-report.html';
+
 const base = {
   requireModule: ['tsx'],
   require: ['steps/**/*.ts'],
-  format: [
-    'progress-bar',
-    ['html', 'reports/cucumber-report.html'],
-    ['json', 'reports/cucumber-report.json'],
-  ],
+  format: ['progress-bar', ['html', htmlReportPath], ['json', jsonReportPath]],
   formatOptions: { snippetInterface: 'async-await' },
 };
 

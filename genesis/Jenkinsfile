@@ -292,6 +292,131 @@ def remoteOnlyHumanRecords() {
     }
 }
 
+/**
+ * Live household-mesh fixture wiring for the a2o E2E stage.
+ *
+ * genesis/a2o/src/framework/fixtures/household-mesh.ts is the single authority
+ * for the multi-doorway / multi-peer legs of the federation + resilience
+ * features, and nothing ever fed it: every scenario naming a second doorway or
+ * a named storage peer died reporting an environment-variable NAME. Topology
+ * knowledge lives here (as it does for RESOLVED_DOORWAY_HOST /
+ * INTERNAL_STORAGE_URL), so this resolves it and hands it to the E2E stage via
+ * withEnv. The negative half (this harness has no process control over remote
+ * pods; this fleet has no third doorway) is declared in
+ * genesis/scripts/ci/e2e-verify-*.sh.
+ *
+ * Doorways: the alpha namespace deploys TWO from one pipeline —
+ * manifests/doorway/alpha.yaml (DOORWAY_ID alpha-elohim-host, at
+ * doorway-alpha.elohim.host, matthew-backed) and manifests/doorway/alpha-b.yaml
+ * (DOORWAY_ID apex-elohim-host, at elohim.host, adam-backed, its own MongoDB
+ * projection DB). a2o calls the front door "apex" and the generic second
+ * doorway "beta"; on this fleet both names resolve to doorway-B — which is a
+ * real federation peer of doorway-A (different pod, different backing storage,
+ * different projection DB), but is ONE doorway wearing two a2o names, so apex
+ * and beta are never a peer PAIR. Other envs deploy a single doorway, so
+ * nothing is declared for them and the fixture says so in its own words.
+ *
+ * Storage: mirrors resolveHumanAssignments() + computeStorageUrls() in
+ * elohim/holochain/Jenkinsfile via humansDeployedTo() below — `suspended` is not
+ * the whole filter there, the resolved `env` is the other half. Returns []
+ * entries only for values that exist; an empty withEnv value would read as
+ * "declared, but blank" to the fixture.
+ */
+/**
+ * The humans a namespace ACTUALLY runs — the mirror of the authoritative filter
+ * in elohim/holochain/Jenkinsfile: resolveHumanAssignments() drops `suspended`
+ * humans AND assigns each survivor an `env`, then computeStorageUrls() keeps
+ * only `it.env == targetEnv`. This helper once filtered on `!suspended` alone,
+ * which agreed with that only by luck.
+ *
+ * Genesis cannot observe the edge pipeline's DEPLOY_STRATEGY, so it applies the
+ * only sound approximation: hold back every human that ANY shipped strategy can
+ * place outside `targetEnv`. Under 'distributed' that is pete -> staging and
+ * frank -> prod (elohim/holochain/Jenkinsfile `fullDistribution`); under
+ * 'alpha-concentration' (the default) nothing moves. Holding them back can only
+ * under-report the pool; including them could fabricate a URL — an
+ * `elohim-pete-alpha` that no StatefulSet backs — and a fabricated peer is
+ * measured by the pool-degrade scenarios as fleet fact.
+ *
+ * Fails LOUDLY rather than falling back to a guess. The three-name fallback this
+ * replaced ran while the registry held seven non-suspended humans: a readJSON
+ * throw silently halved the doorway's storage pool, and every scenario counting
+ * peers would have reported the halving as the topology.
+ */
+def humansDeployedTo(String targetEnv) {
+    def path = 'genesis/orchestrator/data/deployments.json'
+    if (!fileExists(path)) {
+        error("householdMeshEnv: ${path} not found — cannot resolve the '${targetEnv}' storage pool. " +
+              'Refusing to guess: a fabricated pool is reported by the fixture as measured topology.')
+    }
+    def humans
+    try {
+        humans = (readJSON(file: path).humans ?: []).findAll { !it.suspended && it.name }
+    } catch (Exception e) {
+        error("householdMeshEnv: ${path} parse failed (${e.message}) — cannot resolve the " +
+              "'${targetEnv}' storage pool. Refusing to guess.")
+    }
+
+    // Mirrors `fullDistribution` in elohim/holochain/Jenkinsfile
+    // resolveHumanAssignments(): the only humans any shipped strategy places
+    // outside alpha.
+    def neverIn = ['alpha': ['pete', 'frank']]
+    def held = (neverIn[targetEnv] ?: []).findAll { name -> humans.any { it.name == name } }
+    if (held) {
+        echo "householdMeshEnv: holding ${held.join(', ')} out of the '${targetEnv}' pool — " +
+             'the edge pipeline places them elsewhere under DEPLOY_STRATEGY=distributed, ' +
+             'and genesis cannot observe which strategy deployed this fleet.'
+    }
+    def names = humans.collect { it.name }.findAll { !held.contains(it) }
+    if (names.isEmpty()) {
+        error("householdMeshEnv: no non-suspended human resolves to env '${targetEnv}' in ${path} — " +
+              'the fixture would otherwise declare an empty storage pool as this fleet\'s topology.')
+    }
+    return names
+}
+
+def householdMeshEnv(String doorwayHost) {
+    // Only the alpha namespace deploys a second doorway and the named peers.
+    // Declaring nothing elsewhere is deliberate: the fixture then reports the
+    // absent topology in its own words instead of inventing a URL.
+    if (!doorwayHost?.contains('alpha.elohim.host')) {
+        echo "householdMeshEnv: no second-doorway/household topology for '${doorwayHost}' — household-mesh scenarios will say so"
+        return []
+    }
+
+    // ONE second doorway exists on this fleet, and a2o has two names for it.
+    // doorway-B is manifests/doorway/alpha-b.yaml — DOORWAY_ID apex-elohim-host,
+    // at elohim.host, adam-backed, its own MongoDB projection DB. a2o calls the
+    // front door "apex" and the generic second doorway "beta"; on THIS fleet
+    // both resolve to doorway-B. That is declared here as one value used twice,
+    // not two independently-chosen URLs that happen to match, so nobody reads
+    // apex-vs-beta as a peer pair. Any scenario needing two DISTINCT second
+    // doorways must not use this pair — a cross-doorway assertion between apex
+    // and beta is a tautology on this fleet, and the URL-equality check in
+    // genesis/a2o/steps/federation-epr.steps.ts (distinctPeers) refuses it for
+    // exactly that reason. A third doorway is declared ABSENT, with the reason,
+    // in genesis/scripts/ci/e2e-verify-*.sh.
+    def doorwayB = 'https://elohim.host'
+    echo "householdMeshEnv: apex and beta both resolve to doorway-B (${doorwayB}) — " +
+         'this fleet deploys exactly two doorways, so they are one peer under two names.'
+
+    def entries = [
+        "E2E_DOORWAY_APEX=${doorwayB}",
+        "E2E_DOORWAY_BETA=${doorwayB}",
+        'E2E_APEX_PRIMARY_STORAGE_URL=http://elohim-adam-alpha.elohim-alpha.svc.cluster.local:8090',
+    ]
+
+    def names = humansDeployedTo('alpha')
+    for (String peer : ['matthew', 'jessica', 'james']) {
+        if (names.contains(peer)) {
+            entries << "E2E_STORAGE_${peer.toUpperCase()}=http://elohim-${peer}-alpha.elohim-alpha.svc.cluster.local:8090"
+        }
+    }
+    def pool = names.collect { "http://elohim-${it}-alpha.elohim-alpha.svc.cluster.local:8090" }
+    entries << "E2E_DOORWAY_POOL_STORAGE_URLS=${pool.join(',')}"
+    return entries
+}
+
 /** humanIds marked `suspended` in deployments.json — the AUTHORITATIVE
  * is-this-human-exercise-able flag (e.g. suspendedBy:scope-reconcile:shem). A
  * suspended human is never a seed/verify target: holding it from the peer set
@@ -1854,6 +1979,10 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         // Same dev admin key as the doorway pod's Secret (see helper).
                         def e2eAdminKey = resolveE2eAdminKey()
 
+                        // Live household-mesh fixture legs (second doorway,
+                        // named storage peers, the doorway's storage pool).
+                        def meshEnv = householdMeshEnv(doorwayHost)
+
                         // Install E2E driver dependencies
                         dir('genesis/a2o') {
                             sh 'pnpm install --frozen-lockfile 2>/dev/null || pnpm install'
@@ -1862,7 +1991,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         // Always run API-level tests (@e2e tag, fast, no browser)
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             dir('genesis/a2o') {
-                                withEnv(["E2E_ADMIN_BOOTSTRAP_KEY=${e2eAdminKey}"]) {
+                                withEnv(["E2E_ADMIN_BOOTSTRAP_KEY=${e2eAdminKey}"] + meshEnv) {
                                 sh "bash '${env.WORKSPACE}/genesis/scripts/ci/e2e-verify-api.sh' '${doorwayHost}' '${env.INTERNAL_STORAGE_URL}' '${env.ELOHIM_REMOTE_COMPUTE_STATUS ?: 'unknown'}'"
                                 }
                             }
@@ -1876,7 +2005,9 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             container('playwright') {
                                 dir('genesis/a2o') {
+                                    withEnv(meshEnv) {
                                     sh "bash '${env.WORKSPACE}/genesis/scripts/ci/e2e-verify-browser.sh' '${doorwayHost}' '${env.INTERNAL_STORAGE_URL}' '${env.ELOHIM_REMOTE_COMPUTE_STATUS ?: 'unknown'}'"
+                                    }
                                 }
                             }
                         }
@@ -1920,14 +2051,25 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         )
 
                         // Publish cucumber reports through the Jenkins plugin so the
-                        // build sidebar gets the "Cucumber Reports" link. Glob covers
-                        // both the API report (cucumber-report.json) and the browser
-                        // report (cucumber-report-browser.json) when present.
-                        if (fileExists('genesis/a2o/reports/cucumber-report.json') ||
+                        // build sidebar gets the "Cucumber Reports" link.
+                        //
+                        // The glob consumes EXACTLY the two per-stage snapshots and
+                        // never the generic reports/cucumber-report.json. cucumber.mjs's
+                        // base config writes that generic file on EVERY run, so after the
+                        // browser stage it is a SECOND copy of a stage's report — and the
+                        // old 'cucumber-report*.json' glob matched all three files, so the
+                        // plugin counted one stage twice and reported a failed-step total
+                        // that no stage produced (genesis #1489: 45 + 36 + 36 published as
+                        // 119). 'cucumber-report-*.json' requires the hyphen, so it matches
+                        // cucumber-report-api.json + cucumber-report-browser.json and
+                        // excludes cucumber-report.json by construction.
+                        // Snapshots: e2e-verify-api.sh (api) and e2e-verify-browser.sh
+                        // (browser, which also clears the generic leftover).
+                        if (fileExists('genesis/a2o/reports/cucumber-report-api.json') ||
                             fileExists('genesis/a2o/reports/cucumber-report-browser.json')) {
                             cucumber([
                                 reportTitle: 'A2O E2E Reports',
-                                fileIncludePattern: 'cucumber-report*.json',
+                                fileIncludePattern: 'cucumber-report-*.json',
                                 jsonReportDirectory: 'genesis/a2o/reports',
                                 buildStatus: 'UNSTABLE',
                                 sortingMethod: 'ALPHABETICAL',
