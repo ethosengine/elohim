@@ -77,7 +77,23 @@ habits:
       - "a2o @concern:federation-deploy (genesis/a2o/features/dataplane/federation-deploy.feature)"
       - "a2o @concern:content-sync, @concern:blob-replication, @concern:peer-mesh, @concern:epr-projection-fallback, @concern:reconcile-inventory (edge Dataplane Validation stage)"
       - "cargo test --test sync_libp2p_convergence (elohim/elohim-storage)"
+      - ".claude/scripts/latency-scoreboard.py --local (and --deployed) — bounded convergence, not merely eventual: a CONJUNCTION of speed AND this habit's trust invariant, never speed alone. A fast stale head is worse than a slow correct one, so this check can only ever narrow the habit, never carry it."
     evidence: >
+      DELTA 2026-08-20b (latency instrument born; NO status change — the
+      instrument is not the outcome): doorway had exactly ONE histogram and it
+      timed session LIFETIME, so lane C had no request-duration series at all
+      and its SLO was anchored to a multiplication rather than an observation.
+      doorway_hop_duration_ms now records four Chain-R hops (serve, proxy,
+      proxy_blob, resolve) at a tier the PEER derives from its own capacity —
+      a 1-2 core peer declines, unknown capacity resolves DOWN. Measured the
+      same day, and the reason this is worth a check: five stage0b runs came in
+      cleanly BIMODAL at 7 vs 9 poll ticks (a 1.0s step between identical runs)
+      and a median would have reported 4.5s and hidden it — so the scoreboard
+      reports modality, never a bare p50. Still UNMEASURED on this habit: no
+      deployed number exists yet (needs one edge deploy carrying the instrument
+      plus the PodMonitor selector fix that finally scrapes doorway B, which had
+      NO target at all). Not a flip; a rung.
+
       DELTA 2026-08-20 (the 2026-08-19 cure below is FLEET-CONFIRMED on edge
       #1370, and it did NOT produce convergence — both halves matter): reach_scoped
       landed 1849 on matthew / 1715 on jessica / 124 on adam / 1 on the four

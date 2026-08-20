@@ -565,10 +565,27 @@ where
         None => builder,
     };
 
+    // R3b — the blob round trip on the pantry MISS path. Separate from `proxy`
+    // because a hit short-circuits above with no network hop existing to time:
+    // folding hits and misses into one series would report a cache-effectiveness
+    // change as a latency change, which is lane C's whole concern mislabelled.
+    let blob_started = std::time::Instant::now();
     match builder.send().await {
         Ok(upstream) => {
             let status = upstream.status();
             let status_u16 = status.as_u16();
+            crate::metrics::observe_hop(
+                crate::metrics::DoorwayHop::ProxyBlob,
+                "asset",
+                if status.is_success() {
+                    "miss"
+                } else if matches!(status_u16, 429 | 503) {
+                    "shed"
+                } else {
+                    "err"
+                },
+                blob_started.elapsed(),
+            );
 
             // HONOR upstream backpressure (429/503) — surface catching-up to the
             // client (preserve upstream Retry-After, else cooldown).
