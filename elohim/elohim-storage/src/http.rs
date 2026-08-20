@@ -11939,35 +11939,89 @@ impl HttpServer {
     ///
     /// The `epr:` prefix is stripped at the boundary so the queried id matches
     /// the bare `head_ref` stored by handle_create_pin (which strips it on POST).
+    ///
+    /// ## 404 means "not pinned here", not "not measured yet"
+    ///
+    /// A tracker is born in the acquisition reconcile cycle, not in `POST
+    /// /api/v1/pins`. So between accepting a pin (201) and the next reconcile
+    /// tick there is a window in which the node holds an ACTIVE pin for the EPR
+    /// and has no `GapTracker` for it. Answering 404 there says "this node knows
+    /// nothing about that EPR", which is false — and it is the window every
+    /// caller hits, because the natural next request after pinning is "how is my
+    /// pin doing?" (acquisition-pins.feature:40; the PinProgressComponent asks
+    /// the same question).
+    ///
+    /// So the two absences are told apart:
+    ///   * no active pin for this EPR on this node → 404 (genuinely not found)
+    ///   * active pin, no tracker yet → 200 with the tri-state nulls
+    ///     (`total: null`, `caughtUp: null`) already specified for
+    ///     "cannot compute — keep waiting" (spec §4.3). Never a false-complete:
+    ///     null caughtUp is not caught up.
+    ///
+    /// Without a wired `AcquisitionState` at all (no p2p) there is no pull
+    /// subsystem to be unmeasured — that stays 404 (airplane-mode contract,
+    /// `epr_pull_pinned_but_no_p2p_is_404`).
     async fn handle_epr_pull(&self, epr_id: &str) -> Result<Response<Full<Bytes>>, StorageError> {
         // Canonicalize to the bare content id (epr: stripped) — pins store
         // head_ref bare, so the lookup key must be bare too.
         let epr_id = epr_id.strip_prefix("epr:").unwrap_or(epr_id);
 
         // pin_id → head_ref from the local table (own-node, airplane-mode).
+        // head_ref is normalized to the bare id on the way in for the same
+        // reason the query is: legacy rows written before handle_create_pin
+        // stripped the prefix still carry `epr:`, and a stored-vs-queried
+        // prefix mismatch would silently drop them out of the group.
         let mut conn = self.get_diesel_conn()?;
         let pins = db::acquisition_pins::list_all_pins(&mut conn)
             .map_err(|e| StorageError::Database(e.to_string()))?;
-        let pin_heads: std::collections::HashMap<i32, String> =
-            pins.into_iter().map(|p| (p.id, p.head_ref)).collect();
         drop(conn);
+        let bare = |head_ref: &str| -> String {
+            head_ref
+                .strip_prefix("epr:")
+                .unwrap_or(head_ref)
+                .to_string()
+        };
+        // Is this EPR pinned here at all? Only an `active` pin counts — a
+        // removed/retired pin is no longer a promise this node is keeping.
+        let pinned_here = pins
+            .iter()
+            .any(|p| p.status == "active" && bare(&p.head_ref) == epr_id);
+        let pin_heads: std::collections::HashMap<i32, String> = pins
+            .into_iter()
+            .map(|p| (p.id, bare(&p.head_ref)))
+            .collect();
 
         #[cfg(feature = "p2p")]
-        let view = {
+        let (acquisition_wired, view) = {
             if let Some(ref handle) = self.p2p_handle {
-                handle.acquisition_per_epr(epr_id, &pin_heads).await
+                (true, handle.acquisition_per_epr(epr_id, &pin_heads).await)
             } else {
-                None
+                (false, None)
             }
         };
         #[cfg(not(feature = "p2p"))]
-        let view: Option<elohim_views::acquisition::EprPullStatusView> = {
+        let (acquisition_wired, view): (
+            bool,
+            Option<elohim_views::acquisition::EprPullStatusView>,
+        ) = {
             let _ = &pin_heads; // unused without p2p
-            None
+            (false, None)
         };
 
         match view {
             Some(v) => Ok(response::ok(&v)),
+            // Pinned, acquisition running, no tracker yet: report the honest
+            // unmeasured rollup rather than denying the pin exists.
+            None if acquisition_wired && pinned_here => Ok(response::ok(
+                &elohim_views::acquisition::EprPullStatusView {
+                    epr_id: epr_id.to_string(),
+                    total: None,
+                    fetched: 0,
+                    pending: 0,
+                    failed: 0,
+                    caught_up: None,
+                },
+            )),
             None => Ok(response::not_found(&format!(
                 "no active pull state for EPR '{}'",
                 epr_id
@@ -12243,6 +12297,107 @@ fn pin_to_view(p: db::models::AcquisitionPin) -> elohim_views::acquisition::PinV
         status: p.status,
         created_at: p.created_at,
         updated_at: p.updated_at,
+    }
+}
+
+/// The window between accepting a pin and the first reconcile tick.
+///
+/// `tests/acquisition_pins_http.rs` covers the no-p2p (airplane-mode) side of
+/// GET /api/v1/pins/{eprId}/pull, where 404 is the whole contract. These cover
+/// the side that needs a wired `AcquisitionState`: with acquisition running, an
+/// active pin whose tracker has not been born yet must report an honest
+/// unmeasured rollup, and only a genuinely unpinned EPR may 404.
+/// @concern: acquisition-pins.feature:40
+#[cfg(all(test, feature = "p2p"))]
+mod epr_pull_unmeasured_window_tests {
+    use super::HttpServer;
+    use std::sync::Arc;
+
+    async fn server_with_acquisition() -> HttpServer {
+        let blob_store = Arc::new(
+            crate::blob_store::BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap())
+            .with_db_pool(crate::test_util::test_pool())
+            .with_p2p_handle(crate::p2p::P2PHandle::for_testing())
+    }
+
+    #[tokio::test]
+    async fn freshly_pinned_epr_reports_an_unmeasured_rollup_not_404() {
+        let server = server_with_acquisition().await;
+        let create = server
+            .test_handle_create_pin_raw(r#"{"headRef":"epr:strawberry-guide","provide":true}"#)
+            .await;
+        assert_eq!(create.status, 201, "seed pin must be accepted");
+
+        // No reconcile tick has run, so AcquisitionState holds no tracker.
+        let resp = server.test_handle_epr_pull("strawberry-guide").await;
+        assert_eq!(
+            resp.status,
+            200,
+            "a pin this node accepted must not read back as 'not found'; body: {:?}",
+            String::from_utf8_lossy(&resp.body)
+        );
+
+        let val: serde_json::Value = serde_json::from_slice(&resp.body).expect("valid JSON body");
+        assert_eq!(val["eprId"], "strawberry-guide");
+        assert!(
+            val["total"].is_null(),
+            "unmeasured total is the tri-state null, not 0; got {}",
+            val["total"]
+        );
+        assert!(
+            val["caughtUp"].is_null(),
+            "unmeasured must never read as caught up; got {}",
+            val["caughtUp"]
+        );
+        for field in ["fetched", "pending", "failed"] {
+            assert_eq!(val[field], 0, "{field} must be 0 before any measurement");
+        }
+    }
+
+    #[tokio::test]
+    async fn epr_prefixed_query_finds_the_same_pin() {
+        let server = server_with_acquisition().await;
+        server
+            .test_handle_create_pin_raw(r#"{"headRef":"epr:strawberry-guide"}"#)
+            .await;
+        let resp = server.test_handle_epr_pull("epr:strawberry-guide").await;
+        assert_eq!(resp.status, 200, "the epr: prefix must normalize away");
+    }
+
+    #[tokio::test]
+    async fn an_unpinned_epr_is_still_404() {
+        let server = server_with_acquisition().await;
+        let resp = server.test_handle_epr_pull("never-pinned-here").await;
+        assert_eq!(
+            resp.status,
+            404,
+            "404 stays the answer for an EPR this node holds no pin for; body: {:?}",
+            String::from_utf8_lossy(&resp.body)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_removed_pin_does_not_keep_reporting_a_rollup() {
+        let server = server_with_acquisition().await;
+        let create = server
+            .test_handle_create_pin_raw(r#"{"headRef":"epr:transient"}"#)
+            .await;
+        let val: serde_json::Value = serde_json::from_slice(&create.body).expect("valid JSON");
+        let id = val["id"].as_i64().expect("pin id");
+
+        server.test_handle_remove_pin(&id.to_string()).await;
+
+        let resp = server.test_handle_epr_pull("transient").await;
+        assert_eq!(
+            resp.status,
+            404,
+            "an un-pinned EPR is no longer a promise this node keeps; body: {:?}",
+            String::from_utf8_lossy(&resp.body)
+        );
     }
 }
 

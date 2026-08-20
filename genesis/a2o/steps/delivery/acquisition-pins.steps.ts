@@ -185,14 +185,35 @@ Then(
   String.raw`GET \/api\/v1\/pins\/{word}\/pull reports a pull rollup`,
   async function (this: E2EWorld, eprId: string) {
     const { status, body } = await storageGetJson(`/api/v1/pins/${eprId}/pull`);
-    assert.equal(status, 200, `GET pull rollup returned ${status}`);
+    // A 404 here means "this node holds no pin for that EPR" — which would
+    // contradict the 201 the previous step just got. It must NOT mean "the pin
+    // exists but acquisition has not measured it yet"; that answer is a 200
+    // carrying the tri-state nulls (total/caughtUp null = keep waiting).
+    assert.equal(
+      status,
+      200,
+      `GET pull rollup returned ${status}` +
+        (status === 404
+          ? ` — the node denied holding a pin it accepted one step ago; body: ${JSON.stringify(body).slice(0, 200)}`
+          : '')
+    );
     const rollup = body as Record<string, unknown>;
-    // The rollup is grouped by head_ref; the shape must carry the counters the
-    // PinProgressComponent renders (fetched/pending/failed) and a caughtUp flag.
-    for (const field of ['fetched', 'pending', 'failed', 'caughtUp']) {
+    // The rollup is grouped by head_ref; the shape must carry the whole wire
+    // contract (epr-pull-status.schema.json): the id it answers for, the
+    // counters PinProgressComponent renders, and the tri-state total/caughtUp.
+    for (const field of ['eprId', 'total', 'fetched', 'pending', 'failed', 'caughtUp']) {
       assert.ok(
         field in rollup,
         `pull rollup missing "${field}"; got ${JSON.stringify(rollup).slice(0, 200)}`
+      );
+    }
+    // Never a false-complete: an unmeasured rollup reports caughtUp null, and a
+    // measured one reports a boolean — but never `true` with a null total.
+    if (rollup['total'] === null) {
+      assert.equal(
+        rollup['caughtUp'],
+        null,
+        `an unmeasured rollup must not claim caught-up; got ${JSON.stringify(rollup).slice(0, 200)}`
       );
     }
   }
