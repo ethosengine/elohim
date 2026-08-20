@@ -817,8 +817,32 @@ habits:
     checks:
       - "cargo test --test binding_attribution_refuses_sentinel (elohim/elohim-storage — the admissibility decision: a sentinel is inadmissible AND a real cross-signature is admitted; no longer #[ignore]d, so it counts in the gate)"
       - "cargo test --test binding_attribution_cut (elohim/elohim-storage — the same decision end-to-end through the projection: sentinel projects unverified, cross-signed projects cross_signed, Enforce admits only the proven peer and COUNTS the refusal, Observe is behaviour-preserving, a poisoned signature neither panics nor attributes, a lifted proof does not attach)"
-      - "live: elohim_attribution_unverified_bindings_total{posture=\"enforce\"} == 0 on the alpha fleet — the flip-to-green measure. Today the series reads posture=\"observe\" with a non-zero count, which is the honest statement that attribution IS riding self-asserted identity right now."
+      - "live: elohim_attribution_bindings_examined_total{posture=\"enforce\"} > 0 AND elohim_attribution_unverified_bindings_total{posture=\"enforce\"} == 0 on the alpha fleet — the flip-to-green measure, stated as a CONJUNCTION because the numerator alone cannot carry it. A bare zero is ambiguous between 'every binding examined was cross-signed' (the green) and 'no attribution join reached a binding' (silence), and MEASURED 2026-08-20 the live series is the second: max_over_time(...[7d]) == 0 across all 56 pod instances, and no posture=\"enforce\" series exists at all. Flipping the posture against the numerator alone would turn this habit green having verified nothing."
     evidence: >
+      DELTA 2026-08-20c (STAYS RED; the flip measure was unfalsifiable and now
+      is not — a measure fix, never a status change). The live check read
+      `unverified{enforce} == 0` alone, which is satisfied by two opposite fleet
+      states: every binding examined was cross-signed, or no attribution join
+      reached a binding. MEASURED: max_over_time(unverified[7d]) == 0 across all
+      56 alpha pod instances, and no posture="enforce" series exists — so the
+      zero is silence. That matters because the gate was corrected 2026-08-20 to
+      key on the live count rather than on a minter existing, and the live count
+      IS zero: by the letter of the old check, someone could have flipped
+      ELOHIM_ATTRIBUTION_CROSS_SIGNED=enforce today and turned this habit green
+      having verified nothing. Note the reading also contradicts the two
+      structural reasons the count was expected NON-zero (minting is
+      libp2p-only while alpha runs dual since 2026-08-05; the minted proof
+      reaches 2 of 3 writers) — an expectation of non-zero and 7 days of zero
+      cannot both hold, and the denominator is what settles it. Landed:
+      elohim_attribution_joins_total and
+      elohim_attribution_bindings_examined_total (both posture-labelled, both
+      incremented UNCONDITIONALLY — a counter that fires only on the interesting
+      path is how the numerator got here), AttributableBindings::examined()
+      counted BEFORE the posture filter so Enforce cannot shrink its own
+      denominator, and 2 tests pinning the three-way read. 13 passed / 0 failed
+      across both attribution targets. NOT proven: whether the joins are absent
+      or the bindings are — that needs one deploy carrying the counters, and it
+      is the next rung, not this one.
       DELTA 2026-08-18 (unwired -> RED; C2-S4 + the attribution half of C2-S5
       landed, desk-proven, DEPLOY-INERT by default). The red was already
       written but was #[ignore]d — a CI no-op — and measured 2 failed / 0

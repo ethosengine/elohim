@@ -262,6 +262,12 @@ pub struct AttributableBindings {
     /// How many active bindings were self-asserted at read time — the ones
     /// `Enforce` drops and `Observe` lets through under protest.
     unverified_seen: usize,
+    /// How many active bindings this join looked at, admitted or refused — the
+    /// DENOMINATOR under `unverified_seen`. Without it a zero numerator is
+    /// ambiguous between "every binding was proven" and "nobody looked", and the
+    /// habit's flip-to-green measure cannot tell a clean fleet from a dead code
+    /// path. Counted BEFORE the posture filter, so `Enforce` cannot shrink it.
+    examined: usize,
 }
 
 impl AttributableBindings {
@@ -274,6 +280,7 @@ impl AttributableBindings {
             rows: Vec::new(),
             posture: attribution_posture(),
             unverified_seen: 0,
+            examined: 0,
         }
     }
 
@@ -284,6 +291,7 @@ impl AttributableBindings {
     #[cfg(test)]
     pub(crate) fn from_rows_for_test(rows: Vec<PeerIdentityBindingRow>) -> Self {
         Self {
+            examined: rows.len(),
             rows,
             posture: AttributionPosture::Observe,
             unverified_seen: 0,
@@ -315,6 +323,16 @@ impl AttributableBindings {
     /// right now; non-zero under `Enforce` means it was refused.
     pub fn unverified_seen(&self) -> usize {
         self.unverified_seen
+    }
+
+    /// How many active bindings this join examined — the denominator that makes
+    /// [`Self::unverified_seen`] readable.
+    ///
+    /// `unverified_seen() == 0 && examined() == 0` is SILENCE, not safety: the
+    /// join reached no binding, so it proved nothing about identity. Only
+    /// `unverified_seen() == 0 && examined() > 0` is the habit's green.
+    pub fn examined(&self) -> usize {
+        self.examined
     }
 }
 
@@ -353,13 +371,33 @@ pub fn list_attributable_for_agent_with_posture(
 ) -> Result<AttributableBindings, StorageError> {
     let active = list_active_for_agent(conn, agent_cid, now_iso)?;
     let unverified_seen = active.iter().filter(|r| !r.is_cross_signed()).count();
+    let examined = active.len();
+
+    let posture_label = match posture {
+        AttributionPosture::Observe => "observe",
+        AttributionPosture::Enforce => "enforce",
+    };
+
+    // The denominator, emitted UNCONDITIONALLY — including the join that reaches
+    // no binding at all. `unverified_seen` fires only on the interesting path,
+    // which is exactly why its zero could not be read: a flat zero is equally
+    // consistent with "every binding examined was cross-signed" and "no join
+    // reached a binding", and on alpha it has read zero across all 56 pod
+    // instances for 7 days while the analysis in
+    // `.claude/memory/project_attribution_cut_binding_proof_status.md` predicts
+    // a NON-zero count (minting is libp2p-only; alpha runs dual). Both cannot
+    // hold. Only the conjunction `examined > 0 && unverified == 0` is the
+    // habit's green; `examined == 0` is silence, and must never read as safety.
+    crate::metrics::ATTRIBUTION_JOINS
+        .with_label_values(&[posture_label])
+        .inc();
+    crate::metrics::ATTRIBUTION_BINDINGS_EXAMINED
+        .with_label_values(&[posture_label])
+        .inc_by(examined as u64);
 
     if unverified_seen > 0 {
         crate::metrics::ATTRIBUTION_UNVERIFIED_BINDINGS
-            .with_label_values(&[match posture {
-                AttributionPosture::Observe => "observe",
-                AttributionPosture::Enforce => "enforce",
-            }])
+            .with_label_values(&[posture_label])
             .inc_by(unverified_seen as u64);
     }
 
@@ -372,6 +410,7 @@ pub fn list_attributable_for_agent_with_posture(
         rows,
         posture,
         unverified_seen,
+        examined,
     })
 }
 

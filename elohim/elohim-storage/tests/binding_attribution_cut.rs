@@ -386,3 +386,108 @@ fn a_lifted_proof_does_not_attach_to_another_binding() {
         "the lift must be refused at the projection, not only in the pure algebra"
     );
 }
+
+// ---------------------------------------------------------------------------
+// The denominator (C2-S5). A count without one cannot carry the habit.
+// ---------------------------------------------------------------------------
+
+/// The habit's flip-to-green measure is `unverified == 0 under enforce`. TWO
+/// completely different fleet states satisfy that predicate:
+///
+///   A. no attribution join examined a single binding — nobody looked
+///   B. every binding an attribution join examined was cross-signed — the green
+///
+/// `unverified_seen()` alone cannot tell them apart. MEASURED 2026-08-20:
+/// `max_over_time(elohim_attribution_unverified_bindings_total[7d]) == 0` across
+/// all 56 alpha pod instances, with no `posture="enforce"` series at all — while
+/// the standing analysis predicts a NON-zero count, because minting is
+/// libp2p-only and alpha has run dual since 2026-08-05, so an iroh-kind row
+/// classifies `unverified` permanently. A prediction of non-zero and 7 days of
+/// zero cannot both be right, and the numerator alone cannot say which gave.
+/// Flipping the posture to `enforce` on that reading would satisfy the habit's
+/// stated measure having verified nothing — a false green on the one habit that
+/// exists to stop attribution riding self-asserted identity.
+///
+/// `ATTRIBUTION_UNVERIFIED_BINDINGS`' own doc names the hazard exactly — "not
+/// merely that nobody looked" — so the requirement was always understood; the
+/// instrument just could not express it. This is the denominator that can.
+#[test]
+fn a_zero_unverified_count_is_ambiguous_until_the_cut_reports_what_it_examined() {
+    // State A — nobody looked: this agent has no bindings at all.
+    let empty = test_pool();
+    let mut conn = empty.get().expect("conn");
+    let nobody_looked = list_attributable_for_agent_with_posture(
+        &mut conn,
+        &agent(),
+        NOW,
+        AttributionPosture::Enforce,
+    )
+    .expect("cut");
+
+    // State B — the genuine green: the only binding examined was cross-signed.
+    let proven = test_pool();
+    project_gossiped_binding(
+        &proven,
+        &honest_peer(),
+        &cross_signed_signature(&honest_peer()),
+    );
+    let mut conn = proven.get().expect("conn");
+    let all_proven = list_attributable_for_agent_with_posture(
+        &mut conn,
+        &agent(),
+        NOW,
+        AttributionPosture::Enforce,
+    )
+    .expect("cut");
+
+    // The measure as it stands today: identical, and therefore useless.
+    assert_eq!(nobody_looked.unverified_seen(), 0);
+    assert_eq!(all_proven.unverified_seen(), 0);
+
+    // The denominator is the whole difference between a green and a blind spot.
+    assert_eq!(
+        nobody_looked.examined(),
+        0,
+        "a join that examined nothing must SAY it examined nothing — this is the \
+         reading the live fleet has today, and it must never be mistaken for proof"
+    );
+    assert_eq!(
+        all_proven.examined(),
+        1,
+        "a join that examined a binding and found it cross-signed is the habit's \
+         actual green; only `examined > 0` distinguishes it from silence"
+    );
+}
+
+/// The habit's live check reads PROMETHEUS, not this struct — so the denominator
+/// has to reach the exposition surface or the fix is desk-only. Asserts presence
+/// rather than absolute values: these are process-global counters and the other
+/// tests in this binary increment them concurrently.
+#[test]
+fn the_examined_denominator_reaches_the_metrics_surface() {
+    // Mirrors production startup (`main.rs` calls this once before serving);
+    // Once-guarded, so the other tests in this binary calling it is harmless.
+    elohim_storage::metrics::register_all();
+
+    let pool = test_pool();
+    project_gossiped_binding(&pool, &spoof_peer(), STAGE1_SIGNATURE_SENTINEL);
+    let mut conn = pool.get().expect("conn");
+    let _ = list_attributable_for_agent_with_posture(
+        &mut conn,
+        &agent(),
+        NOW,
+        AttributionPosture::Observe,
+    )
+    .expect("cut");
+
+    let exposition = elohim_storage::metrics::gather_text();
+    assert!(
+        exposition.contains("elohim_attribution_bindings_examined_total"),
+        "the denominator must be scrapeable — habits.yaml reads the fleet, not the struct"
+    );
+    assert!(
+        exposition.contains("elohim_attribution_joins_total"),
+        "join count separates 'looked and found no bindings' from 'never looked at all'; \
+         without it an empty bindings table and a dead code path read the same"
+    );
+}

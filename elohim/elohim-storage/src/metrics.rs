@@ -243,6 +243,54 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Attribution joins performed, and bindings they examined — the DENOMINATOR
+    /// under `ATTRIBUTION_UNVERIFIED_BINDINGS` (habit `identity-cross-signed`).
+    ///
+    /// The unverified counter alone cannot carry the habit, because a zero is
+    /// ambiguous between two opposite fleet states: every binding examined was
+    /// cross-signed (the green), or no attribution join examined a binding at all
+    /// (silence). Its own doc names that hazard — "not merely that nobody looked"
+    /// — but nothing in the exposition could express it, so the flip-to-green
+    /// measure was unfalsifiable. MEASURED 2026-08-20: the numerator has read
+    /// zero across all 56 alpha pod instances for 7 days, with no
+    /// `posture="enforce"` series at all — while the standing analysis predicts
+    /// a NON-zero count (minting is libp2p-only; alpha has run dual since
+    /// 2026-08-05, and an iroh-kind row classifies unverified permanently).
+    /// A prediction of non-zero and 7 days of zero cannot both be right, and
+    /// the numerator alone cannot say which gave. Flipping the posture on it
+    /// would satisfy the habit having verified nothing.
+    ///
+    /// Read all three together. The three states are distinguishable only as a
+    /// conjunction:
+    ///
+    ///   joins == 0                          → nobody looked; the zero is silence
+    ///   joins > 0, examined == 0            → looked, reached no binding
+    ///   examined > 0, unverified == 0       → the habit's actual green
+    ///
+    /// Both are incremented UNCONDITIONALLY, including when a join finds nothing
+    /// — a counter that only fires on the interesting path is how the numerator
+    /// got into this state.
+    pub static ref ATTRIBUTION_JOINS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_attribution_joins_total",
+            "Economic attribution joins that consulted the peer-identity binding cut.",
+        ),
+        &["posture"],
+    )
+    .unwrap();
+
+    /// Bindings examined by an attribution join, admitted or refused. Counted
+    /// before the posture filter, so `Enforce` cannot shrink the denominator it
+    /// is being judged against. See [`ATTRIBUTION_JOINS`].
+    pub static ref ATTRIBUTION_BINDINGS_EXAMINED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_attribution_bindings_examined_total",
+            "Peer identity bindings examined by an economic attribution join (denominator).",
+        ),
+        &["posture"],
+    )
+    .unwrap();
+
     // ── View-federation outcome attribution (the notary-authority spine) ──
 
     /// Outbound view-federation request outcomes at the resolution site. Before
@@ -1810,6 +1858,8 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(NODE_CORPUS_DOCS.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_NAMESPACE_VIOLATIONS.clone()));
         let _ = REGISTRY.register(Box::new(ATTRIBUTION_UNVERIFIED_BINDINGS.clone()));
+        let _ = REGISTRY.register(Box::new(ATTRIBUTION_JOINS.clone()));
+        let _ = REGISTRY.register(Box::new(ATTRIBUTION_BINDINGS_EXAMINED.clone()));
         // Pre-touch the posture this deployment actually runs, so "no
         // self-asserted binding reached an attribution join" reads as a measured
         // 0 rather than an absent series. Only the live posture is pre-touched:
