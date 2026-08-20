@@ -1017,6 +1017,28 @@ pub(crate) fn extract_agent_cid(
     Ok(None)
 }
 
+/// Resolve the requester from the EXPLICIT `X-Agent-Cid` header ONLY — step 1
+/// of `extract_agent_cid`'s cascade, without step 2's ambient session fallback.
+///
+/// **Use this for every REACH authorization decision.** `extract_agent_cid`
+/// falls back to the active `local_sessions` row, which is a single-tenant
+/// desktop convenience and NOT a statement about who sent this request. On a
+/// hosted pod `genesis_self_heal` mints an active session for the node's own
+/// human (`services::genesis_self_heal`, "session arm"), and the doorway omits
+/// `X-Agent-Cid` when it has no verified caller (`storage_proxy`'s
+/// `forward_to_storage_omits_x_agent_cid_when_absent`). Composed, those two
+/// facts mean an ANONYMOUS request would resolve as the node's own human and
+/// be served that human's authorized reach — the same class of exposure the
+/// header-presence bug produced, reached through the identity door instead.
+///
+/// A caller that asserts no identity gets no identity: deny-by-default.
+pub(crate) fn extract_agent_cid_explicit<B>(req: &Request<B>) -> Option<String> {
+    req.headers()
+        .get("X-Agent-Cid")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+}
+
 // ---------------------------------------------------------------------------
 // Unit tests
 // ---------------------------------------------------------------------------
@@ -1055,6 +1077,49 @@ mod tests {
         // Body contents are asserted via the body-builder pure function.
         let body = browser_write_path_pending_body();
         assert_eq!(body["code"], "BROWSER_WRITE_PATH_PENDING");
+    }
+
+    /// The reach gates resolve identity with `extract_agent_cid_explicit`,
+    /// which reads the doorway-injected header and NOTHING else.
+    ///
+    /// Regression, 2026-08-20: the gates first shipped using the cascade form,
+    /// whose step 2 falls back to the active `local_sessions` row. A hosted pod
+    /// always has one (genesis self-heal mints it for the node's own human) and
+    /// the doorway sends no `X-Agent-Cid` for an unverified caller — so an
+    /// anonymous listing request resolved as the node's human and was served
+    /// that human's reach. A caller asserting no identity must resolve to
+    /// nobody; the ambient session belongs to the node, not to this request.
+    #[test]
+    fn explicit_agent_cid_ignores_everything_but_the_header() {
+        let with_header = Request::builder()
+            .uri("/db/content")
+            .header("X-Agent-Cid", "matthew")
+            .body(())
+            .unwrap();
+        assert_eq!(
+            extract_agent_cid_explicit(&with_header).as_deref(),
+            Some("matthew")
+        );
+
+        let anonymous = Request::builder().uri("/db/content").body(()).unwrap();
+        assert_eq!(
+            extract_agent_cid_explicit(&anonymous),
+            None,
+            "anonymous request must resolve to no identity even where an active \
+             local session exists"
+        );
+
+        // A bearer token is not an identity: it was the original bypass.
+        let bearer_only = Request::builder()
+            .uri("/db/content")
+            .header("Authorization", "Bearer bogus")
+            .body(())
+            .unwrap();
+        assert_eq!(
+            extract_agent_cid_explicit(&bearer_only),
+            None,
+            "an unvalidated bearer header must not resolve an identity"
+        );
     }
 
     /// IMAGODEI_BRIDGE_OFFLINE response has the correct status and code.

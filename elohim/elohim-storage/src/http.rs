@@ -5286,9 +5286,13 @@ impl HttpServer {
                         //
                         // The single-item route already did this correctly; this is the
                         // same resolve-then-authorize path applied per row.
-                        let requester = crate::api::account::extract_agent_cid(&req, &mut conn)
-                            .ok()
-                            .flatten()
+                        // EXPLICIT header only — never the ambient local-session
+                        // fallback. A hosted pod mints an active session for its
+                        // own human and the doorway omits `X-Agent-Cid` for an
+                        // unverified caller, so the cascade form would resolve an
+                        // ANONYMOUS request as the node's human and serve that
+                        // human's reach. See `extract_agent_cid_explicit`.
+                        let requester = crate::api::account::extract_agent_cid_explicit(&req)
                             .and_then(|idv| {
                                 crate::db::humans::get_human_by_id(&mut conn, &idv)
                                     .ok()
@@ -6565,11 +6569,11 @@ impl HttpServer {
                     if !is_public {
                         // Header PRESENCE is not authentication — see the /db/content
                         // listing note. Require the caller to RESOLVE to an identity
-                        // (doorway-injected `X-Agent-Cid`, or a local session); a bare
-                        // `Authorization:` header no longer opens restricted tiers.
-                        let resolved = crate::api::account::extract_agent_cid(&req, &mut conn)
-                            .ok()
-                            .flatten()
+                        // via the doorway-injected `X-Agent-Cid`; a bare
+                        // `Authorization:` header no longer opens restricted tiers,
+                        // and neither does the ambient local session (which would
+                        // resolve an anonymous request as the node's own human).
+                        let resolved = crate::api::account::extract_agent_cid_explicit(&req)
                             .is_some();
                         if !resolved {
                             return Ok(Response::builder()
@@ -6597,9 +6601,8 @@ impl HttpServer {
                     if crate::epr_service::reach_level_index(&view.reach)
                         > crate::epr_service::reach_level_index("community")
                     {
-                        let identity = crate::api::account::extract_agent_cid(&req, &mut conn)
-                            .ok()
-                            .flatten();
+                        // Explicit header only — see `extract_agent_cid_explicit`.
+                        let identity = crate::api::account::extract_agent_cid_explicit(&req);
                         let requester = match identity {
                             Some(idv) => {
                                 match crate::db::humans::get_human_by_id(&mut conn, &idv)
@@ -6672,15 +6675,13 @@ impl HttpServer {
                     if let (Some(ref enforcement), Some(ref agent)) =
                         (&self.policy_enforcement, &agent_id)
                     {
-                        let reach_level_num = match view.reach.as_str() {
-                            "commons" | "public" => 0u8,
-                            "community" => 1,
-                            "familiar" => 2,
-                            "trusted" => 3,
-                            "intimate" => 4,
-                            "self" | "private" => 5,
-                            _ => 0,
-                        };
+                        // Shared mapping, not a hand-rolled copy: this duplicate
+                        // still carried the pre-2026-08-20 `_ => 0` fail-open, so
+                        // an unrecognized tier read as commons for device-policy
+                        // purposes. `can_serve` blocks on
+                        // `content_reach > max_reach`, so the shared fail-closed
+                        // u8::MAX is the safe direction here.
+                        let reach_level_num = crate::epr_service::reach_level_index(&view.reach);
                         let content_meta = ContentMetadata {
                             hash: content_id.to_string(),
                             categories: Vec::new(),

@@ -374,10 +374,20 @@ impl EprService {
         // Fast path: check cached peer trust context (ambient authorization)
         if let Some(ctx) = self.peer_trust_cache.try_get_by_agent(agent_pubkey) {
             let reach_idx = reach_level_index(reach);
-            let ceiling_idx = reach_level_index(&ctx.reach_ceiling);
-            // For community and below, ambient ceiling is sufficient — no content-specific check needed
-            if ceiling_idx >= reach_idx && reach_idx <= reach_level_index("community") {
-                return Ok(());
+            // `ctx.reach_ceiling` is a PRIVILEGE (higher = more allowed) and it
+            // arrives verbatim off the wire from the peer's `TrustResponse`,
+            // cached without validation. Read it with the `Option` form and
+            // refuse an unrecognized tier: `reach_level_index`'s fail-closed
+            // u8::MAX would satisfy `ceiling_idx >= reach_idx` for EVERY tier,
+            // so a typo'd or forked reach vocabulary from a peer would buy
+            // ambient access to community content without the participation
+            // check. An unrecognized ceiling grants nothing and falls through
+            // to the content-specific path below.
+            if let Some(ceiling_idx) = recognized_reach_level_index(&ctx.reach_ceiling) {
+                // For community and below, ambient ceiling is sufficient — no content-specific check needed
+                if ceiling_idx >= reach_idx && reach_idx <= reach_level_index("community") {
+                    return Ok(());
+                }
             }
             // For familiar+ tiers, fall through — need content-specific steward match
         }
@@ -825,28 +835,50 @@ pub fn trust_memo_reads_param(config_flag_enabled: bool, gradient_carries_store:
     config_flag_enabled && gradient_carries_store
 }
 
-/// Map a reach-level string to its ordered index. `commons`/`public` is the
-/// loosest (0); `self`/`private` is the strictest (5). Unknown strings map
-/// to 0 (commons) so unrecognized reach defaults to the most permissive
-/// tier — matching the original behavior in `p2p::mod::reach_level_index`.
-pub fn reach_level_index(reach: &str) -> u8 {
+/// Map a reach-level string to its ordered index, or `None` when the tier is
+/// not recognized. `commons`/`public` is the loosest (0); `self`/`private` is
+/// the strictest (5).
+///
+/// Callers that read the index as a **privilege ceiling** (higher = MORE is
+/// allowed) must use this and refuse `None`. For them `reach_level_index`'s
+/// fail-closed `u8::MAX` sentinel would read as "maximally privileged" —
+/// the fail-safe direction inverts with the direction of the comparison, so
+/// one sentinel cannot serve both readings.
+pub fn recognized_reach_level_index(reach: &str) -> Option<u8> {
     match reach {
-        "commons" | "public" => 0,
-        "community" => 1,
-        "familiar" => 2,
-        "trusted" => 3,
-        "intimate" => 4,
-        "self" | "private" => 5,
+        "commons" | "public" => Some(0),
+        "community" => Some(1),
+        "familiar" => Some(2),
+        "trusted" => Some(3),
+        "intimate" => Some(4),
+        "self" | "private" => Some(5),
+        _ => None,
+    }
+}
+
+/// Map a reach-level string to its ordered index, reading it as a **content
+/// restriction** (higher = MORE restricted). `commons`/`public` is the
+/// loosest (0); `self`/`private` is the strictest (5); an unrecognized tier
+/// fails closed to `u8::MAX`.
+pub fn reach_level_index(reach: &str) -> u8 {
+    match recognized_reach_level_index(reach) {
+        Some(idx) => idx,
         // An UNRECOGNIZED tier is the most restricted thing we know, never the
         // least. Reading it as 0 (commons) meant a typo'd or newly-added reach
         // sorted as public: callers gate on `index > community` to decide
         // whether to CALL the authorizer, so `authorize_reach_for_human`'s own
         // `_ => Err("Unknown reach level")` was unreachable and the row served.
-        // Fail-closed here keeps that deny reachable. Every consumer was checked
-        // for this value (2026-08-20): the policy ceiling treats it as maximally
-        // restricted, the ambient-ceiling fast path falls through to the
-        // content-specific check, and the HTTP gate routes it into the
-        // authorizer that refuses it.
+        // Fail-closed here keeps that deny reachable.
+        //
+        // This sentinel is only safe where the index is read as a RESTRICTION.
+        // Consumers checked 2026-08-20, corrected 2026-08-20 after review:
+        // `policy_cache::can_serve` blocks on `content_reach > max_reach`, so
+        // u8::MAX is maximally restricted there (safe); the HTTP gates route it
+        // into the authorizer that refuses it (safe); but
+        // `check_reach_authorization`'s ambient fast path reads a PEER-SUPPLIED
+        // ceiling in the opposite direction, where u8::MAX would have meant
+        // maximally privileged. That call site takes
+        // `recognized_reach_level_index` and refuses `None` instead.
         _ => u8::MAX,
     }
 }
@@ -996,6 +1028,56 @@ mod tests {
     // authorizer's `_ => Err` instead of being served as commons.
     assert_eq!(reach_level_index("garbage"), u8::MAX);
     assert!(reach_level_index("garbage") > reach_level_index("community"));
+    }
+
+    /// The same string is read two ways, and the two readings must fail safe
+    /// in OPPOSITE directions.
+    ///
+    /// Regression, 2026-08-20: `check_reach_authorization`'s ambient fast path
+    /// reads `ctx.reach_ceiling` as a PRIVILEGE (higher = more allowed), and
+    /// that string arrives verbatim off the wire from a peer's `TrustResponse`
+    /// and is cached unvalidated. Fail-closing `reach_level_index` to u8::MAX
+    /// made an unrecognized ceiling outrank every tier, so a peer with a typo'd
+    /// or forked vocabulary satisfied `ceiling_idx >= reach_idx` for community
+    /// content and skipped the participation check. Ceiling readers take the
+    /// Option form and refuse `None`.
+    #[test]
+    fn unrecognized_reach_grants_no_ceiling_privilege() {
+        const TIERS: [&str; 8] = [
+            "commons",
+            "public",
+            "community",
+            "familiar",
+            "trusted",
+            "intimate",
+            "self",
+            "private",
+        ];
+
+        // Recognized tiers agree across both readings.
+        for tier in TIERS {
+            assert_eq!(
+                recognized_reach_level_index(tier),
+                Some(reach_level_index(tier)),
+                "{tier} must read the same as a restriction and as a ceiling"
+            );
+        }
+
+        // An unrecognized tier is maximally RESTRICTED...
+        assert_eq!(reach_level_index("garbage"), u8::MAX);
+        for tier in TIERS {
+            assert!(
+                reach_level_index("garbage") >= reach_level_index(tier),
+                "sentinel outranks {tier}, so it must never be read as a ceiling"
+            );
+        }
+
+        // ...and confers NO privilege, which is what the fast path consults.
+        assert_eq!(
+            recognized_reach_level_index("garbage"),
+            None,
+            "an unrecognized peer-supplied ceiling must grant nothing"
+        );
     }
 
     // ---- T7: process-lifetime memo store plumbing ----
