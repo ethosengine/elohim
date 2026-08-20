@@ -17,9 +17,22 @@ has had:
   * time-to-quiesce — gate start to A-QUIESCED (or to the deadline)
   * sustained — the winning window's length vs the required sustain
   * best-window — the LONGEST window achieved on a run that did NOT measure.
-    On edge #1371 that was 303s against a 330s requirement: a 27-second miss,
-    invisible in a pass/fail verdict, and the difference between "the fleet is
-    broken" and "the gate is 8% too strict".
+    Invisible in a pass/fail verdict, and the difference between "the fleet is
+    broken" and "the fleet was one poll short".
+
+    THE WINDOW IS QUANTIZED, and the series is what shows it. Sustain is the
+    separation between two PASSing observations, and observations happen only
+    every QUIESCE_POLL_SECS (60), so the only reachable separations are ~60s
+    multiples. Measured across builds 1366-1374: 242, 303, 362, 363, 423 — every
+    one an integer poll count plus a couple of seconds of poll-execution drift.
+
+    That makes QUIESCE_SUSTAIN_SECS=330 unreachable as written: nothing can land
+    between 300s and 360s, so the threshold means "360s" exactly, and any value
+    in (300, 360] would behave identically. #1371's 303s is therefore not a
+    27-second miss to be tuned away — it is a ONE-POLL miss. Reading it as "8%
+    too strict" invites shaving 8% off the threshold, which changes nothing:
+    the next reachable value down is 300s, a full poll cheaper, and it would
+    admit the 5-interval runs the 300s sweep cadence is meant to exclude.
   * reset ledger — how many times the sustain window opened and reset, and WHICH
     leg reset it. This is the gate's composition residual: a run blocked by
     A-content-503 is a doorway availability story; one blocked by A-not-quiesced
@@ -43,10 +56,11 @@ import json
 import re
 import sys
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
-JENKINS = "https://jenkins.ethosengine.com/job/elohim-edge/job/dev"
+JOB = "elohim-edge"  # matches ci-harvest.py's QUIESCE_JOB — same series, same label
+JENKINS = f"https://jenkins.ethosengine.com/job/{JOB}/job/dev"
 SERIES = Path(__file__).resolve().parents[2] / ".claude" / "data" / "quiesce-timeline.jsonl"
 
 # fleet-quiesce[2026-08-20T16:35:30Z]: PASS A-caughtUp=True ... — sustained 363s, ...
@@ -56,6 +70,19 @@ LINE = re.compile(
 SUSTAINED = re.compile(r"sustained (?P<s>\d+)s")
 ELAPSED = re.compile(r"elapsed (?P<s>\d+)s")
 REASONS = re.compile(r"—\s*(?:resetting sustain window\s*)?\((?P<r>[^)]*)\)")
+ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+# Jenkins' own last word. Line-anchored — see result_from_console().
+FINISHED = re.compile(r"^Finished:\s*(?P<r>[A-Z_]+)\s*$", re.M)
+
+# The three outcomes, rendered. Kept beside the parser that mints them so a new
+# outcome cannot be added without a label — an unlabelled outcome renders "?"
+# and silently reads as "nothing happened".
+OUTCOME_LABEL = {
+    "measured": "MEASURED",
+    "no_measure": "no-measure",
+    "interrupted": "INTERRUPTED",
+    "unknown": "?",
+}
 
 
 def fetch(build: int) -> str | None:
@@ -72,6 +99,23 @@ def parse_ts(s: str) -> datetime:
     return datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ")
 
 
+def age_phrase(stamp: str) -> str | None:
+    """How stale an observation is, in words. Returns None if unparseable —
+    an unreadable stamp must not print a confident-looking age."""
+    try:
+        delta = datetime.now(timezone.utc) - parse_ts(stamp).replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
+    mins = int(delta.total_seconds() // 60)
+    if mins < 0:
+        return None  # clock skew between writer and reader; say nothing
+    if mins < 60:
+        return f"{mins}m ago"
+    if mins < 60 * 48:
+        return f"{mins // 60}h ago"
+    return f"{mins // 1440}d ago"
+
+
 def parse_quiesce(build: int, text: str, build_result: str | None = None) -> dict | None:
     """THE shared parser. One console body -> one honest record, or None.
 
@@ -84,8 +128,9 @@ def parse_quiesce(build: int, text: str, build_result: str | None = None) -> dic
 
       measured      the gate reached A-QUIESCED; time_to_verdict_s is real
       no_measure    the gate ran its deadline and gave up; best_window_s says how
-                    close (on #1371: 303s of a required 330s — an 8% miss that a
-                    pass/fail verdict cannot show)
+                    close — in POLLS, not seconds (see the quantization note in
+                    the module docstring: #1371's 303s vs 330s is one poll short,
+                    not 27 seconds short)
       interrupted   ABORTED/superseded MID-GATE. NOT a quiesce verdict. #1373
                     produced 2 polls over 70s before abort-previous killed it;
                     recorded naively that reads as "the fleet settled in 70s".
@@ -146,90 +191,63 @@ def parse_quiesce(build: int, text: str, build_result: str | None = None) -> dic
     }
 
 
-ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+def result_from_console(text: str) -> str | None:
+    """The build's own verdict, taken from the console we already fetched.
 
+    `/api/json` is OIDC-protected on this instance (it 403s to an anonymous
+    reader); `consoleText` is not, and Jenkins writes its final verdict there as
+    the last line. So the result costs no extra request and no credential.
 
-def analyse(build: int, text: str) -> dict | None:
-    polls = []
-    for line in text.splitlines():
-        m = LINE.search(line)
-        if m:
-            polls.append((parse_ts(m.group("ts")), m.group("verdict"), m.group("body"), line))
-    if not polls:
-        return None
+    ANCHORED TO LINE START on purpose. `elohim-storage` has tests named
+    `lookup_excludes_superseded_binding` and `rejects_superseded_approval`; a
+    loose search for "superseded"/"aborted" anywhere in the body classifies a
+    green build as interrupted because its unit tests have honest names.
 
-    measured = "A-QUIESCED" in text
-    no_measure = "DID NOT MEASURE" in text
-    start, end = polls[0][0], polls[-1][0]
-
-    # Reset ledger + best window. A window opens on the first PASS after a FAIL
-    # and closes when a FAIL resets it; its length is the elapsed the gate itself
-    # reports, which is authoritative over anything we'd recompute from stamps.
-    resets, best, cur = [], 0, 0
-    for ts, verdict, body, raw in polls:
-        if verdict == "PASS":
-            e = ELAPSED.search(body)
-            s = SUSTAINED.search(body)
-            if s:
-                cur = int(s.group("s"))
-            elif e:
-                cur = int(e.group("s"))
-            else:
-                cur = 0
-            best = max(best, cur)
-        else:
-            if cur > 0:
-                # a window was open and this FAIL ended it
-                r = REASONS.search(body)
-                resets.append({"at": ts.isoformat() + "Z", "after_s": cur,
-                               "reason": (r.group("r").strip() if r else "unknown")})
-            cur = 0
-
-    # Which legs blocked, counted across every failing poll. This is the number
-    # that says whether a run was a doorway story or a notary story.
-    legs: dict[str, int] = {}
-    for _, verdict, body, _ in polls:
-        if verdict != "FAIL":
-            continue
-        r = REASONS.search(body)
-        if not r:
-            continue
-        for leg in r.group("r").split():
-            key = re.sub(r"\(.*", "", leg)
-            legs[key] = legs.get(key, 0) + 1
-
-    return {
-        "build": build,
-        "measured": measured,
-        "no_measure": no_measure,
-        "polls": len(polls),
-        "gate_start": start.isoformat() + "Z",
-        "gate_end": end.isoformat() + "Z",
-        "time_to_verdict_s": int((end - start).total_seconds()),
-        "best_window_s": best,
-        "resets": len(resets),
-        "reset_detail": resets,
-        "blocking_legs": dict(sorted(legs.items(), key=lambda kv: -kv[1])),
-    }
+    None means no verdict line — the build is still running, or the fetch was
+    truncated. `parse_quiesce` then reports outcome "unknown" rather than
+    guessing, which is the right answer for a gate that has not finished.
+    """
+    found = FINISHED.findall(text)
+    return found[-1] if found else None
 
 
 def render(rs: list[dict]):
-    hdr = (f"{'build':>7}{'verdict':>14}{'polls':>7}{'to-verdict':>12}"
+    """Render records in `parse_quiesce`'s shape — the ONLY shape written.
+
+    Reads `outcome`, never a `measured`/`no_measure` boolean pair: this renderer
+    and `ci-harvest.py` consume one file, so a second record shape here means
+    whichever writer ran last decides whether the reader crashes.
+    """
+    hdr = (f"{'build':>7}{'outcome':>14}{'polls':>7}{'to-verdict':>12}"
            f"{'best-window':>13}{'resets':>8}  blocking legs (count)")
     print(hdr)
     print("-" * (len(hdr) + 18))
     for r in rs:
-        v = "MEASURED" if r["measured"] else ("no-measure" if r["no_measure"] else "?")
+        v = OUTCOME_LABEL.get(r.get("outcome"), "?")
         legs = ", ".join(f"{k}×{n}" for k, n in list(r["blocking_legs"].items())[:3]) or "—"
+        span = r.get("time_to_verdict_s")
+        span_s = f"{span:>11}s" if span is not None else f"{'—':>12}"
         print(f"{r['build']:>7}{v:>14}{r['polls']:>7}"
-              f"{r['time_to_verdict_s']:>11}s{r['best_window_s']:>12}s{r['resets']:>8}  {legs}")
+              f"{span_s}{r['best_window_s']:>12}s{r['resets']:>8}  {legs}")
 
-    measured = [r for r in rs if r["measured"]]
-    missed = [r for r in rs if not r["measured"]]
+    measured = [r for r in rs if r.get("outcome") == "measured"]
+    missed = [r for r in rs if r.get("outcome") == "no_measure"]
+    untrusted = [r for r in rs if not r.get("verdict_trustworthy", True)]
+
+    times = [r["time_to_verdict_s"] for r in measured if r.get("time_to_verdict_s") is not None]
     print(f"\nmeasured {len(measured)}/{len(rs)} runs"
-          + (f" — time-to-quiesce: "
-             f"min {min(r['time_to_verdict_s'] for r in measured)}s / "
-             f"max {max(r['time_to_verdict_s'] for r in measured)}s" if measured else ""))
+          + (f" — time-to-quiesce: min {min(times)}s / max {max(times)}s" if times else ""))
+
+    # Interrupted runs are excluded from EVERY statistic above and below. A build
+    # killed mid-gate by abort-previous has a real elapsed and real poll count,
+    # and both are meaningless as quiesce measurements: #1373 died 2 polls in and
+    # would otherwise report "the fleet settled in 70s" — faster than any run
+    # that actually settled, and pure artefact of when the axe fell.
+    if untrusted:
+        print(f"  excluded {len(untrusted)} interrupted run(s) from the stats: "
+              + ", ".join(f"#{r['build']}" for r in untrusted)
+              + " — killed mid-gate, so their timings measure the abort, not the fleet.")
+
     if missed:
         near = [r for r in missed if r["best_window_s"] > 0]
         if near:
@@ -247,6 +265,15 @@ def render(rs: list[dict]):
             print("  (a doorway-content leg is an AVAILABILITY story; A-not-quiesced/caughtUp is a")
             print("   NOTARY-plane story. Same verdict, opposite cures — never read the verdict alone.)")
 
+    # Decay stamp. A recorded PASS is evidence about a moment; the fleet kept
+    # moving after it. Print the age so nobody reads the newest row as "now".
+    stamps = [r.get("observed_at") for r in rs if r.get("observed_at")]
+    if stamps:
+        newest = max(stamps)
+        print(f"\nnewest observation {newest}"
+              + (f" ({age_phrase(newest)})" if age_phrase(newest) else "")
+              + " — point-in-time, not live status.")
+
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
@@ -262,13 +289,12 @@ def main() -> int:
             print("no series recorded yet — run with --record", file=sys.stderr)
             return 1
         rows = [json.loads(l) for l in SERIES.read_text().splitlines() if l.strip()]
-        seen, uniq = set(), []
-        for r in sorted(rows, key=lambda r: r["build"]):
-            if r["build"] in seen:
-                continue
-            seen.add(r["build"])
-            uniq.append(r)
-        render(uniq)
+        # Newest append per build wins. A re-harvest exists to CORRECT an earlier
+        # record — a build read while still running, or one re-read after its
+        # result landed — so keeping the first occurrence would pin the series to
+        # the least-informed reading of every build.
+        latest = {r["build"]: r for r in rows}  # dict insertion order = file order
+        render([latest[b] for b in sorted(latest)])
         return 0
 
     builds = []
@@ -285,11 +311,15 @@ def main() -> int:
         text = fetch(b)
         if text is None:
             continue
-        r = analyse(b, text)
+        # Same parser, same record shape, same interrupted-classification as the
+        # ci-harvest leg — this CLI is a second CALLER, never a second parser.
+        r = parse_quiesce(b, text, build_result=result_from_console(text))
         if r is None:
             print(f"  build {b}: no fleet-quiesce lines "
                   "(stage skipped, or the build never reached it)", file=sys.stderr)
             continue
+        r["job"] = JOB
+        r["harvested_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         results.append(r)
 
     if not results:
