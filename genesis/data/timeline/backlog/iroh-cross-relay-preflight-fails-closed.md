@@ -7,7 +7,7 @@ title: "kitsune2_transport_iroh fails closed on cross-relay peers — the per-do
 slug: "iroh-cross-relay-preflight-fails-closed"
 written: "2026-08-09"
 author: "convergence final-seam shift"
-status: "wip"
+status: "active.alpha"
 priority: "high"
 tags: [iroh, relay, kitsune2, transport, wave2, alpha, partition, conductor-fork]
 
@@ -92,7 +92,41 @@ error was literally true — matching the 100%-failure counts recorded in
 Same message, different cause. Expect the rate to have dropped from 100% of
 initiations to roughly the cross-doorway fraction, not to zero.
 
-# The fix (committed to the conductor fork, NOT pushed)
+# STATUS 2026-08-20 — this doc is HISTORY below this line, not status
+
+Both open items in this doc were resolved on 2026-08-09; the doc then went
+untouched and misled a reviewer on 2026-08-20 into filing the ship sequence as
+blocked. Read the rest as the record of how the fix was found, not as work
+remaining.
+
+- **The fork IS pushed.** `git ls-remote origin elohim-0.6.3` on
+  `ethosengine/holochain` → `e4a1c9bb2eee9dacab12ea8ce89b2a08344dd4a7`
+  (pushed 2026-08-20, clean fast-forward from the prior pin `6d0814266`).
+  The heading below still says "NOT pushed"; it is wrong.
+- **The D9 rollback-anchor ruling was MADE**, as a variant of option (b): a NEW
+  anchor tag with the old one preserved. `1e2ed7d86` (2026-08-09, dev) points
+  `scripts/ci/push-storage-iroh.sh:54` at
+  `elohim-edgenode-iroh:hc-elohim-0.6.3-relay-fallback-iroh` (operator-built,
+  Harbor-verified, from this fork SHA) and states verbatim: "Old anchor
+  hc-elohim-0.6.3-iroh untouched = the D9 rollback." The "Operator ruling
+  needed" section below is closed.
+- **The fix has been live on alpha since 2026-08-09**, so it carries eleven days
+  of production evidence — stronger than the unrun `stage0b`.
+
+Reviewed 2026-08-20 against a byte-diff of the pristine crates.io
+`kitsune2_transport_iroh-0.4.1` tarball: 19 of 21 vendored files are
+byte-identical, the behavioural change is **34 lines**, and the same-relay path
+(today's common case) is provably untouched — zero diff above `src/lib.rs:794`.
+Verdict: ship with follow-ups. The open follow-up worth keeping: `stage0b`
+(`crates/holochain/tests/iroh_stage0.rs:257`) is the only executed proof of the
+cross-relay claim and is wired into no runner — it needs an explicit runner or
+an env guard before a full-workspace test run hangs on two live relay hosts.
+
+Do NOT read this doc as evidence about the 2026-08-20 doorway availability
+problem: that is the T4 doorway→storage breaker plane, not T2 conductor iroh
+transport. See backlog/alpha-a-projector-chronic-catchup-flap.
+
+# The fix (committed to the conductor fork, NOT pushed — SUPERSEDED, see above)
 
 `elohim/holochain-conductor` @ `e4a1c9bb2` on branch `elohim-0.6.3`.
 
@@ -161,7 +195,7 @@ No monorepo Dockerfile or manifest edit is required for step 3 —
 `storage-iroh/Dockerfile:50` already defaults `CONDUCTOR_SOURCE` to
 `elohim-edgenode-iroh:hc-elohim-0.6.3-iroh`, and step 2 moves that tag in place.
 
-## Operator ruling needed — the rollback anchor (design doc D9)
+## Operator ruling needed — the rollback anchor (design doc D9) — CLOSED 2026-08-09 by `1e2ed7d86`, see the STATUS block at the top
 
 Step 2 **overwrites** `elohim-edgenode-iroh:hc-elohim-0.6.3-iroh`, which D9
 names a rollback anchor that stays live for the wave. Two ways to keep the
