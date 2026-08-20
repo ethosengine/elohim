@@ -2227,6 +2227,22 @@ pub enum ConvergenceAtom {
     /// AND `count_content`, both `MinTrust::Invisible` — so the cost is not
     /// one scan but two.
     InventoryServe,
+    /// One `ListContent` page ROUND TRIP as seen by the requester — send to
+    /// matching `ContentList` (or to transport failure), `p2p::mod`'s
+    /// replication cycle.
+    ///
+    /// The requester half of the pair whose responder half is [`Self::InventoryServe`].
+    /// Together they give this hop's composition residual:
+    /// `inventory_request - remote inventory_serve = wire + queue`. Neither
+    /// alone can separate "the peer is slow to answer" from "the link is slow",
+    /// and that ambiguity is exactly what let a local read-pool saturation read
+    /// as a network problem on 2026-08-20.
+    ///
+    /// Timed per PAGE, not per chain — a 5-page walk is five round trips, and
+    /// attributing the chain's total to its last page would misreport both.
+    /// Failed round trips are recorded at full elapsed (see the transport-failure
+    /// arm) so a timeout storm cannot hide by omitting its own samples.
+    InventoryRequest,
 }
 
 impl seam_contracts::ReasonLabel for ConvergenceAtom {
@@ -2240,6 +2256,7 @@ impl seam_contracts::ReasonLabel for ConvergenceAtom {
         ConvergenceAtom::ManifestPersist,
         ConvergenceAtom::DigestFold,
         ConvergenceAtom::InventoryServe,
+        ConvergenceAtom::InventoryRequest,
     ];
 
     fn label(&self) -> &'static str {
@@ -2253,6 +2270,7 @@ impl seam_contracts::ReasonLabel for ConvergenceAtom {
             ConvergenceAtom::ManifestPersist => "manifest_persist",
             ConvergenceAtom::DigestFold => "digest_fold",
             ConvergenceAtom::InventoryServe => "inventory_serve",
+            ConvergenceAtom::InventoryRequest => "inventory_request",
         }
     }
 }
@@ -4351,12 +4369,12 @@ mod tests {
                 atom.label()
             );
         }
-        // Exactly 9 — the roster stays CLOSED, not open-ended. Was 8 until
+        // Exactly 10 — the roster stays CLOSED, not open-ended. Was 8 until
         // 2026-08-20, when `inventory_serve` was added: the highest-rate loop in
         // the system had no atom, so a read-pool saturation at 1387% util had to
         // be found by log archaeology instead of read off this histogram.
         // Bumping this number is the deliberate act that admits a 9th atom.
-        assert_eq!(ConvergenceAtom::ALL.len(), 9);
+        assert_eq!(ConvergenceAtom::ALL.len(), 10);
     }
 
     /// Both recording paths land in the SAME series: a `Duration` measured at

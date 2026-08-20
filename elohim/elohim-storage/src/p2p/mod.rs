@@ -160,9 +160,26 @@ const SYNC_LIST_PAGE_LIMIT: u32 = sync_round::SYNC_LIST_PAGE_LIMIT;
 /// response AND on `OutboundFailure`, bounding the map by in-flight chains; the
 /// removed `(peer, _)` is what tells the [`replication_schedule::ReplicationScheduler`]
 /// which peer's chain just completed or failed.
+/// In-flight ListContent pages: `request_id -> (peer, offset, sent_at)`.
+///
+/// `sent_at` was added 2026-08-20 to time the REQUESTER half of the inventory
+/// round trip. This map already spans exactly the interval we need — inserted at
+/// send, removed on the matching `ContentList` response — so the instant rides
+/// the cursor rather than needing a second parallel map that could drift out of
+/// sync with it.
+///
+/// Paired with `ConvergenceAtom::InventoryServe` (the responder's local read
+/// cost), this yields the composition residual for the hop:
+/// `round_trip - remote_serve = wire + queue`. Neither number alone can
+/// distinguish "the peer is slow to answer" from "the link is slow" — which is
+/// the exact ambiguity that made a 1387% read-pool saturation look like a
+/// network problem for a day.
 type ListContentCursorMap = Arc<
     tokio::sync::Mutex<
-        std::collections::HashMap<request_response::OutboundRequestId, (PeerId, u32)>,
+        std::collections::HashMap<
+            request_response::OutboundRequestId,
+            (PeerId, u32, std::time::Instant),
+        >,
     >,
 >;
 
@@ -4822,6 +4839,18 @@ impl P2PNode {
                                             .lock()
                                             .await
                                             .remove(&request_id);
+                                        // Close the requester half of the round
+                                        // trip. Only a cursor-bearing response is
+                                        // timed: an ad-hoc list (no cursor) is not
+                                        // part of the replication cycle and would
+                                        // pollute the series with a different
+                                        // population.
+                                        if let Some((_, _, sent_at)) = page_cursor.as_ref() {
+                                            crate::metrics::observe_atom_duration(
+                                                crate::metrics::ConvergenceAtom::InventoryRequest,
+                                                sent_at.elapsed(),
+                                            );
+                                        }
                                         let page_len = items.len();
                                         let remote_ids: Vec<String> =
                                             items.into_iter().map(|i| i.id).collect();
@@ -4858,7 +4887,7 @@ impl P2PNode {
                                         // cadence. A response with no tracked cursor is a
                                         // pre-fix / raced list — handled as before, no
                                         // scheduler transition.
-                                        if let Some((cursor_peer, offset)) = page_cursor {
+                                        if let Some((cursor_peer, offset, _sent_at)) = page_cursor {
                                             match crate::p2p::sync_protocol::next_doc_list_offset(
                                                 offset, page_len, has_more,
                                             ) {
@@ -4877,9 +4906,17 @@ impl P2PNode {
                                                     // Keep the chain in-flight; record the
                                                     // next page's cursor. No mark_started —
                                                     // the peer is already in flight.
+                                                    // Fresh instant per PAGE, not per chain: each
+                                                    // page is its own round trip, and carrying the
+                                                    // chain's start forward would report page 5 as
+                                                    // costing the sum of pages 1-5.
                                                     self.list_content_cursors.lock().await.insert(
                                                         next_id,
-                                                        (cursor_peer, next_offset),
+                                                        (
+                                                            cursor_peer,
+                                                            next_offset,
+                                                            std::time::Instant::now(),
+                                                        ),
                                                     );
                                                     debug!(
                                                         peer = %cursor_peer,
@@ -5162,11 +5199,23 @@ impl P2PNode {
                 // This is the arm that breaks the timeout storm — a Timeout here
                 // no longer lets the next tick re-fire the same request; the peer
                 // is deferred until its (now longer) backoff elapses.
-                if let Some((cursor_peer, offset)) =
+                if let Some((cursor_peer, offset, sent_at)) =
                     self.list_content_cursors.lock().await.remove(&request_id)
                 {
+                    // Record the FAILED round trip at its full elapsed value. A
+                    // request that burned the whole 30s timeout is the most
+                    // expensive one the replication cycle makes; dropping it
+                    // would make inventory_request p95 improve exactly as the
+                    // link degrades — coordinated omission, and the timeout
+                    // storm this arm exists to break would be invisible in the
+                    // very histogram meant to show it.
+                    crate::metrics::observe_atom_duration(
+                        crate::metrics::ConvergenceAtom::InventoryRequest,
+                        sent_at.elapsed(),
+                    );
                     debug!(
                         peer = %cursor_peer, offset = offset, error = ?error,
+                        elapsed_ms = sent_at.elapsed().as_secs_f64() * 1_000.0,
                         "ListContent chain failed at transport level — backing off peer"
                     );
                     self.replication_scheduler.mark_failure(cursor_peer).await;
@@ -8025,7 +8074,7 @@ impl P2PNode {
             self.list_content_cursors
                 .lock()
                 .await
-                .insert(request_id, (*peer, 0));
+                .insert(request_id, (*peer, 0, std::time::Instant::now()));
             self.replication_scheduler.mark_started(*peer).await;
 
             debug!(peer = %peer, request_id = ?request_id, "Sent ListContent for replication discovery");
