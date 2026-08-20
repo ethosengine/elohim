@@ -11,9 +11,10 @@ import { strict as assert } from 'node:assert';
 
 import { Given, When, Then } from '@cucumber/cucumber';
 
+import { BrowserDevice } from '../src/framework/devices/browser-device.js';
 import { E2EWorld } from '../src/framework/world.js';
 
-import type { AllocationView } from '../src/framework/api/doorway-client.js';
+import type { AllocationView, DoorwayClient } from '../src/framework/api/doorway-client.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -39,9 +40,41 @@ function presenceIdFor(displayName: string): string {
   return id;
 }
 
-function getClient(world: E2EWorld) {
-  // Use the first doorway's client (set up in Background)
+/**
+ * The client these steps read content with.
+ *
+ * MUST prefer a logged-in human's client over the doorway's anonymous one.
+ * Stewardship is a claim about the SEEDED CORPUS, and that corpus is
+ * `reach: community` — an anonymous reader cannot see it. Measured against the
+ * live alpha doorway (2026-08-20), `GET /db/content?tags=<t>&limit=10000`:
+ *
+ *   tag              anonymous   as a logged-in member
+ *   value-scanner            5                    1870
+ *   fct                      1                     221
+ *   public-observer          4                     445
+ *
+ * and `GET /db/content/manifesto` answers
+ * `403 {"error":"Authentication required","requiredReach":"community"}` with no
+ * session. The five/one/four items an anonymous reader DOES see carry no
+ * `metadata.category`, so the seeder gave them the matthew-only fallback — which
+ * is what produced the misleading "affinity seeding looks broken" failure. The
+ * allocator was healthy the whole time (3322 of 4495 alpha content items are
+ * multi-steward); the READER had no membership.
+ *
+ * Membership, not admin, is what lifts the gate: the AUTHENTICATED fixture
+ * humans (Jessica, Susan) see the same 1870/221 as the ADMIN one (Matthew).
+ *
+ * Falls back to the anonymous doorway client so a scenario without a logged-in
+ * human still runs (and fails legibly) instead of throwing here.
+ */
+function getClient(world: E2EWorld): DoorwayClient {
   const doorway = world.getDoorway('alpha');
+  for (const human of world.humans.values()) {
+    const device = human.devices[0];
+    if (device instanceof BrowserDevice && device.isAuthenticated) {
+      return device.client;
+    }
+  }
   return doorway.client;
 }
 
@@ -55,6 +88,86 @@ function getStoredAllocations(world: E2EWorld): AllocationView[] {
 interface AllocationCandidate {
   contentId: string;
   allocations: AllocationView[];
+}
+
+/** One-line `steward@ratio + steward@ratio` rendering of an allocation set. */
+function allocationShape(allocations: AllocationView[]): string {
+  if (allocations.length === 0) return 'no allocations';
+  const parts = allocations.map(a => `${a.stewardPresenceId}@${a.allocationRatio.toFixed(2)}`);
+  return parts.join(' + ');
+}
+
+/** `metadata.category` off a content list item — the key the seeder allocates from. */
+function contentCategory(item: Record<string, unknown>): string | undefined {
+  const metadata = item.metadata as Record<string, unknown> | undefined | null;
+  const category = metadata?.category;
+  return typeof category === 'string' ? category : undefined;
+}
+
+/**
+ * Explain a missing steward against the item that was actually anchored.
+ *
+ * "Eve not found in allocations" says nothing about WHICH item was anchored or
+ * what `anchorToSteward` had to choose from, so it reads as "the seeder forgot
+ * Eve" when the real condition can be that the reachable universe held no
+ * public-observer-category item at all.
+ */
+function notFoundDiagnosis(
+  world: E2EWorld,
+  displayName: string,
+  presenceId: string,
+  allocations: AllocationView[]
+): string {
+  const rawCandidates = world.contentIds.get('allocationCandidates');
+  const scanned = rawCandidates ? (JSON.parse(rawCandidates) as AllocationCandidate[]).length : 0;
+  const shape = allocationShape(allocations);
+  return (
+    `${displayName} (${presenceId}) not found in the allocations for ` +
+    `"${world.contentIds.get('lastQueryContentId')}" ` +
+    `(category queried: "${world.contentIds.get('lastQueryCategory')}"): ${shape}. ` +
+    `${scanned} item(s) were scanned and none of them carried ${presenceId} either. ` +
+    `${allocatorHealthNote(world)}.`
+  );
+}
+
+/**
+ * Explain WHY no multi-steward item was found, instead of blaming the allocator.
+ *
+ * The message this replaced ("affinity seeding looks broken (every scanned item
+ * is fallback or empty)") sent readers to the seeder when the real condition on
+ * alpha was a five-item reachable universe: the corpus is `reach: community` and
+ * the client had no session. Every genuinely useful distinction is in the numbers
+ * — how big the reachable universe was, how many of those carry the allocator's
+ * category key, and what each scanned item's allocation actually looks like — so
+ * state them rather than guessing at a cause.
+ */
+function noMultiStewardDiagnosis(
+  world: E2EWorld,
+  category: string,
+  universeSize: number,
+  candidates: AllocationCandidate[]
+): string {
+  const shapes = candidates
+    .map(c => `      ${c.contentId}: ${allocationShape(c.allocations)}`)
+    .join('\n');
+
+  const readerHint =
+    universeSize <= 10
+      ? `Only ${universeSize} "${category}" item(s) were reachable. On a healthy fleet this ` +
+        `tag covers hundreds. Suspect the READER before the allocator: the seeded corpus is ` +
+        `reach:community, so an unauthenticated client sees only the commons/public slice ` +
+        `(measured on alpha: value-scanner 5 anonymous vs 1870 as a logged-in member). ` +
+        `Check that a human is logged in in this scenario's Background, and that GET ` +
+        `/db/content/manifesto does not answer 403 requiredReach:community for this session.`
+      : `${universeSize} "${category}" item(s) were reachable but none of the ${candidates.length} ` +
+        `scanned carried more than one steward — this one really does point at the allocator.`;
+
+  return (
+    `No multi-steward allocation among the ${candidates.length} scanned "${category}" items.\n` +
+    `    ${allocatorHealthNote(world)}.\n` +
+    `    ${readerHint}\n` +
+    `    Scanned items and their allocations:\n${shapes}`
+  );
 }
 
 /**
@@ -89,25 +202,50 @@ function anchorToSteward(world: E2EWorld, presenceId: string): AllocationView[] 
 // Background
 // ---------------------------------------------------------------------------
 
+/**
+ * Record how healthy the ALLOCATOR is, independent of what this reader can see.
+ *
+ * `/db/allocations` is not reach-gated, so these numbers are the same for an
+ * anonymous and an authenticated reader. That asymmetry is the whole point: it
+ * lets a later failure say "the allocator produced N multi-steward items; this
+ * reader could only reach K content items" instead of blaming the seeder for a
+ * visibility problem.
+ */
+async function recordAllocatorHealth(world: E2EWorld): Promise<void> {
+  const client = getClient(world);
+  const allocations = await client.listAllocations();
+  assert.ok(allocations.length > 0, 'No stewardship allocations found — has the seeder been run?');
+
+  const perContent = new Map<string, number>();
+  for (const a of allocations) {
+    perContent.set(a.contentId, (perContent.get(a.contentId) ?? 0) + 1);
+  }
+  const multiSteward = [...perContent.values()].filter(n => n > 1).length;
+
+  world.contentIds.set('totalAllocationCount', String(allocations.length));
+  world.contentIds.set('allocatedContentCount', String(perContent.size));
+  world.contentIds.set('multiStewardContentCount', String(multiSteward));
+}
+
+/** One line describing the allocator's health, for use inside a failure message. */
+function allocatorHealthNote(world: E2EWorld): string {
+  const rows = world.contentIds.get('totalAllocationCount');
+  const items = world.contentIds.get('allocatedContentCount');
+  const multi = world.contentIds.get('multiStewardContentCount');
+  if (!rows || !items) return 'allocator health unknown (Background did not run)';
+  return `allocator holds ${rows} allocation rows across ${items} content items, ${multi} of them multi-steward`;
+}
+
 Given(
   'content has been seeded with affinity-based stewardship allocations',
   async function (this: E2EWorld) {
-    const client = getClient(this);
-    const allocations = await client.listAllocations();
-    assert.ok(
-      allocations.length > 0,
-      'No stewardship allocations found — has the seeder been run?'
-    );
-    this.contentIds.set('totalAllocationCount', String(allocations.length));
+    await recordAllocatorHealth(this);
   }
 );
 
 // Alternate wording used in the philosophy scenario
 Given('content has been seeded with affinity-based allocations', async function (this: E2EWorld) {
-  const client = getClient(this);
-  const allocations = await client.listAllocations();
-  assert.ok(allocations.length > 0, 'No stewardship allocations found — has the seeder been run?');
-  this.contentIds.set('totalAllocationCount', String(allocations.length));
+  await recordAllocatorHealth(this);
 });
 
 // ---------------------------------------------------------------------------
@@ -122,7 +260,30 @@ When(
     // Find content with this category tag, then get allocations for each
     const allContent = await client.searchContent([category]);
 
-    assert.ok(allContent.length > 0, `No content found with tag "${category}"`);
+    assert.ok(
+      allContent.length > 0,
+      `No content found with tag "${category}" — ${allocatorHealthNote(this)}. ` +
+        `An empty content universe is a READER problem (reach/visibility or seeding), ` +
+        `not an allocation problem.`
+    );
+
+    // Order the scan by the key the ALLOCATOR uses, not by the key the query
+    // uses. The seeder allocates from `metadata.category`
+    // (seed-stewardship.ts CATEGORY_STEWARD_MAP); this step can only select by
+    // TAG, and the two namespaces are not the same set. On alpha the tag `fct`
+    // covers 221 items of which only 15 carry `metadata.category === "fct"` —
+    // the rest are scripture / fct-media / fct-narrative, each with a DIFFERENT
+    // curated affinity shape. Scanning tag-order therefore anchors the
+    // class-level claim ("faith content is stewarded by pastoral affinity, Pete
+    // ~0.50") onto an item from a neighbouring category whose ratio is 0.60.
+    // Putting the category-matched items first makes the representative item
+    // actually representative of the category under assertion; the tag-only
+    // remainder stays in the scan as a fallback so a fleet that has not
+    // persisted `metadata` still finds a candidate.
+    const categoryFirst = [
+      ...allContent.filter(c => contentCategory(c) === category),
+      ...allContent.filter(c => contentCategory(c) !== category),
+    ];
 
     // Pick a REPRESENTATIVE item — one the affinity engine actually
     // multi-steward-allocated — instead of whatever sits at index 0
@@ -131,11 +292,11 @@ When(
     // metadata.category), so asserting on index 0 flaked with the seed
     // window (genesis #1104/#1105). Keep every scanned item as a candidate
     // so named-steward assertions can anchor class-level.
-    const scanWindow = Math.min(allContent.length, 30);
+    const scanWindow = Math.min(categoryFirst.length, 30);
     const candidates: AllocationCandidate[] = [];
     let picked: AllocationCandidate | undefined;
     for (let i = 0; i < scanWindow; i++) {
-      const contentId = allContent[i].id as string;
+      const contentId = categoryFirst[i].id as string;
       const allocations = await client.getAllocationsForContent(contentId);
       candidates.push({ contentId, allocations });
       if (!picked && allocations.length > 1) {
@@ -143,11 +304,7 @@ When(
       }
       if (picked && candidates.length >= 8) break;
     }
-    assert.ok(
-      picked,
-      `No multi-steward allocation among the first ${scanWindow} "${category}" items — ` +
-        `affinity seeding looks broken (every scanned item is fallback or empty)`
-    );
+    assert.ok(picked, noMultiStewardDiagnosis(this, category, allContent.length, candidates));
 
     this.contentIds.set('lastAllocations', JSON.stringify(picked.allocations));
     this.contentIds.set('allocationCandidates', JSON.stringify(candidates));
@@ -263,13 +420,14 @@ Then(
     const allocations = anchorToSteward(this, presenceId);
 
     const steward = allocations.find(a => a.stewardPresenceId === presenceId);
-    assert.ok(steward, `${displayName} not found in allocations`);
+    assert.ok(steward, notFoundDiagnosis(this, displayName, presenceId, allocations));
 
     const maxRatio = Math.max(...allocations.map(a => a.allocationRatio));
     assert.strictEqual(
       steward.allocationRatio,
       maxRatio,
-      `Expected ${displayName} to have highest ratio (${maxRatio}), got ${steward.allocationRatio}`
+      `Expected ${displayName} to have highest ratio (${maxRatio}), got ${steward.allocationRatio}` +
+        ` on ${this.contentIds.get('lastQueryContentId')}`
     );
 
     this.contentIds.set('lastMentionedSteward', presenceId);

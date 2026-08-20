@@ -6,6 +6,20 @@ Feature: Content Stewardship Allocation
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
+    # Jessica reads as a member of the commons. She is here because the
+    # stewarded corpus is reach:community — a passer-by with no membership can
+    # read the commons slice, but not the body of seeded content these scenarios
+    # make claims about. The same query returns 5 value-scanner items to an
+    # anonymous reader and 1870 to Jessica, so without her these scenarios judge
+    # the affinity graph from a handful of items that were never in it.
+    #
+    # Jessica specifically, for two reasons. She is AUTHENTICATED and not an
+    # admin, so membership — not privilege — is what lifts the reach gate, and a
+    # future regression that let reach leak to admins only would still fail here.
+    # And she is a household persona, so this feature does not become pending
+    # whenever the remote pool is down; stewardship allocation has nothing to do
+    # with remote compute and should not inherit its outages.
+    And human "Jessica" is logged in on doorway "alpha"
     And content has been seeded with affinity-based stewardship allocations
 
   # ============================================================================

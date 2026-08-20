@@ -428,7 +428,7 @@ export class DoorwayClient {
     const all: AllocationView[] = [];
     for (let offset = 0; ; offset += pageSize) {
       const page = await this.get<AllocationView[]>(
-        `/db/allocations?active_only=true&limit=${pageSize}&offset=${offset}`
+        `/db/allocations?activeOnly=true&limit=${pageSize}&offset=${offset}`
       );
       all.push(...page);
       if (page.length < pageSize) break;

@@ -69,6 +69,57 @@ interface BulkAllocationResult {
   errors: string[];
 }
 
+/**
+ * The subset of a stored allocation row this seeder reconciles against.
+ *
+ * Read back from `GET /db/allocations` so the run can tell a MISSING
+ * (content, steward) pair from a pair that exists with a STALE ratio. The
+ * governance columns are carried so the reconciler can refuse to touch a row
+ * the governance plane owns (disputed / ratified / non-active) — a seeder must
+ * never stomp a negotiated allocation.
+ */
+export interface StoredAllocation {
+  id: string;
+  contentId: string;
+  stewardPresenceId: string;
+  allocationRatio: number;
+  allocationMethod: string;
+  contributionType: string;
+  governanceState?: string | null;
+  disputeId?: string | null;
+  elohimRatifiedAt?: string | null;
+  note?: string | null;
+}
+
+/** A ratio/method/type repair for one already-existing allocation row. */
+export interface AllocationRepair {
+  allocationId: string;
+  contentId: string;
+  stewardPresenceId: string;
+  fromRatio: number;
+  toRatio: number;
+  allocationMethod: string;
+  contributionType: ContributionType;
+  note: string;
+}
+
+/** What the reconciler decided for ONE content item. */
+export interface ContentAllocationPlan {
+  creates: CreateAllocationInput[];
+  repairs: AllocationRepair[];
+  /** Rows whose ratio drifted but which the governance plane owns — reported, never written. */
+  governedSkips: StoredAllocation[];
+}
+
+/**
+ * Ratio drift below this is float noise, not a real difference.
+ *
+ * Storage stores `allocation_ratio` as an f32, so a 2/3 written by this seeder
+ * reads back as 0.6666666865348816. Anything at or under this epsilon is the
+ * same number; anything above is a genuinely different allocation.
+ */
+export const RATIO_EPSILON = 1e-4;
+
 interface StewardRatio {
   presenceId: string;
   ratio: number;
@@ -116,6 +167,9 @@ export interface ResolvedStewardship {
 function allocationKey(contentId: string, stewardPresenceId: string): string {
   return `${contentId}::${stewardPresenceId}`;
 }
+
+/** Shared empty set so the per-content miss path allocates nothing. */
+const EMPTY_STEWARD_SET: ReadonlySet<string> = new Set<string>();
 
 // =============================================================================
 // Category-to-Steward Affinity Mapping
@@ -363,7 +417,7 @@ class StewardshipClient extends DoorwayClient {
   }
 
   /**
-   * Returns the set of EXISTING (content, steward) allocations, keyed by the
+   * Returns the EXISTING (content, steward) allocations, keyed by the
    * `${contentId}::${stewardPresenceId}` composite. Per-steward granularity
    * (not content-granular) is required because a content item can be
    * partially allocated — some of its category-expected stewards present,
@@ -371,9 +425,14 @@ class StewardshipClient extends DoorwayClient {
    * (content,steward) pair as `failed` (uniqueness violation surfaces as Err;
    * http.rs handle_bulk_create_allocations), so re-POSTing existing pairs both
    * pollutes the failure count and wastes round-trips. The caller diffs
-   * against this set to POST only the genuinely-missing pairs.
+   * against this map to POST only the genuinely-missing pairs.
+   *
+   * The VALUE (not just the key) is carried because membership is not the only
+   * thing that can drift: a pair that exists can hold a stale RATIO. See
+   * `planContentAllocations` — the map is what lets the run tell "missing" from
+   * "present but wrong".
    */
-  async getContentWithAllocations(): Promise<Set<string>> {
+  async getContentWithAllocations(): Promise<Map<string, StoredAllocation>> {
     // PAGINATED — a single `limit=10000` read SILENTLY TRUNCATES once the
     // (persistent-PVC) allocations table exceeds the page size. A truncated
     // existing-set makes the caller's idempotency diff INCOMPLETE: genuinely-
@@ -386,19 +445,19 @@ class StewardshipClient extends DoorwayClient {
     // matthew-only). Page through `limit`/`offset` (DB layer wires both —
     // db/stewardship_allocations.rs AllocationQuery) until a short/empty page.
     const PAGE_SIZE = 10000;
-    const keys = new Set<string>();
+    const existing = new Map<string, StoredAllocation>();
     let offset = 0;
 
     for (;;) {
       const response = await this.fetch(
-        `/db/allocations?active_only=true&limit=${PAGE_SIZE}&offset=${offset}`,
+        `/db/allocations?activeOnly=true&limit=${PAGE_SIZE}&offset=${offset}`,
         { method: 'GET' }
       );
 
       if (!response.ok) {
         if (response.status === 404) {
           console.log('   Allocations endpoint not available, assuming no existing allocations');
-          return new Set();
+          return new Map();
         }
         throw new Error(`Failed to get allocations: ${response.status}`);
       }
@@ -406,10 +465,10 @@ class StewardshipClient extends DoorwayClient {
       const allocBody = (await response.json()) as unknown;
       const page = (
         Array.isArray(allocBody) ? allocBody : ((allocBody as { items?: unknown[] }).items ?? [])
-      ) as Array<{ contentId: string; stewardPresenceId: string }>;
+      ) as StoredAllocation[];
 
       for (const a of page) {
-        keys.add(`${a.contentId}::${a.stewardPresenceId}`);
+        existing.set(`${a.contentId}::${a.stewardPresenceId}`, a);
       }
 
       // A short page (fewer rows than requested) is the last page. An exactly-
@@ -420,7 +479,50 @@ class StewardshipClient extends DoorwayClient {
       offset += PAGE_SIZE;
     }
 
-    return keys;
+    return existing;
+  }
+
+  /**
+   * Repair ONE existing allocation row's ratio (plus the method /
+   * contributionType / note that must travel with it).
+   *
+   * ## Why `/api/v1/stewardship/allocations/{id}` and not `/db/allocations/{id}`
+   *
+   * Storage implements PUT on BOTH paths (they share
+   * `handle_allocation_by_id` → `stewardship_allocations::update_allocation`),
+   * but the doorway's route registry only declares GET and DELETE for
+   * `/db/allocations/{id}`. A PUT there is not a route the doorway knows, so it
+   * falls through to the 404 catch-all:
+   *
+   *   PUT http://localhost:8888/db/allocations/{id}
+   *     -> 404 {"error":"Not Found","hint":"Use WebSocket connection to /admin or /app/:port"}
+   *   PUT http://localhost:8888/api/v1/stewardship/allocations/{id}
+   *     -> 200 (row updated)
+   *
+   * This seeder always runs THROUGH a doorway (genesis/scripts/ci/seed-stewardship.sh
+   * passes RESOLVED_DOORWAY_HOST), so the `/api/v1/stewardship` path is the only
+   * one that reaches the handler. Do not "simplify" it back to `/db`.
+   */
+  async repairAllocation(repair: AllocationRepair): Promise<void> {
+    const response = await this.fetch(`/api/v1/stewardship/allocations/${repair.allocationId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Schema-Version': '1' },
+      body: JSON.stringify({
+        schemaVersion: 1,
+        allocationRatio: repair.toRatio,
+        allocationMethod: repair.allocationMethod,
+        contributionType: repair.contributionType,
+        note: repair.note,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(
+        `Failed to repair allocation ${repair.allocationId} ` +
+          `(${repair.contentId} / ${repair.stewardPresenceId}): ${response.status} ${error}`
+      );
+    }
   }
 
   async presenceExists(presenceId: string): Promise<boolean> {
@@ -698,6 +800,175 @@ export function allocationNote(
   }
 }
 
+/**
+ * True when the governance plane owns this row and the seeder must not write it.
+ *
+ * An allocation that has been disputed, ratified by an Elohim council, or moved
+ * out of `active` is a governance artifact — its ratio is a negotiated outcome,
+ * not a derived one. The seeder reports such drift and leaves the row alone.
+ */
+function isGovernanceOwned(stored: StoredAllocation): boolean {
+  if (stored.disputeId) return true;
+  if (stored.elohimRatifiedAt) return true;
+  const state = stored.governanceState ?? 'active';
+  return state !== 'active';
+}
+
+/**
+ * Decide what must change for ONE content item so its stored allocations match
+ * the resolved steward set.
+ *
+ * ## Why this exists: insert-only idempotency leaves ratios permanently stale
+ *
+ * The seeder's idempotency diff is (content, steward)-granular: it POSTs the
+ * pairs that don't exist yet and skips the ones that do. That is correct for
+ * MEMBERSHIP and silently wrong for RATIOS. When a content item's resolved
+ * steward set changes shape — which is exactly what happened when the authored
+ * `stewardedBy` path started displacing the bootstrap default — the NEW steward
+ * is inserted at its normalized ratio while the pre-existing steward keeps the
+ * ratio it was seeded with. `unit-appeals-process` is the canonical case:
+ *
+ *     matthew-dowell @ 1.00   (seeded 2026-06-04, provenance `default`)
+ *   + pete-pastor    @ 0.333  (seeded 2026-07-31, provenance `authored`)
+ *   = 1.333
+ *
+ * where the resolver says matthew 0.667 / pete 0.333. Fifty content items on
+ * alpha carry exactly this shape (sums 1.333 / 1.579 / 1.636 / 1.70), which is
+ * what the a2o `@integrity` scenario reports as
+ * "Allocation ratios for unit-appeals-process sum to 1.333, expected ~1.0".
+ * A ratio that does not sum to 1.0 corrupts every downstream share, so the
+ * seeder must RECONCILE existing rows, not only insert missing ones.
+ *
+ * Repairs carry the method/contributionType/note along with the ratio: a row
+ * whose ratio comes from the authored declaration but whose note still reads
+ * "Bootstrap steward assignment - uncategorized content" is a lie about its own
+ * provenance.
+ *
+ * Stewards stored but ABSENT from the resolved set are deliberately left
+ * alone — retiring a steward is a supersede decision (it can carry accumulated
+ * recognition), not a seeding one. They are counted by the caller so the drift
+ * stays visible.
+ */
+export function planContentAllocations(
+  contentId: string,
+  resolved: ResolvedStewardship,
+  category: string | undefined,
+  storedBySteward: Map<string, StoredAllocation>
+): ContentAllocationPlan {
+  const note = allocationNote(resolved.provenance, category);
+  const plan: ContentAllocationPlan = { creates: [], repairs: [], governedSkips: [] };
+
+  for (const steward of resolved.stewards) {
+    const contributionType: ContributionType = steward.contributionType ?? 'curator';
+    const stored = storedBySteward.get(steward.presenceId);
+
+    if (!stored) {
+      plan.creates.push({
+        contentId,
+        stewardPresenceId: steward.presenceId,
+        allocationRatio: steward.ratio,
+        // Storage validates these against fixed enums (db/models.rs):
+        //   allocation_methods = manual|computed|negotiated  → 'computed' (ratios ARE
+        //     affinity-computed by this seeder); 'affinity' is rejected.
+        //   contribution_types = original_creator|editor|translator|curator|maintainer|
+        //     inherited → 'curator' (a steward curates); 'steward' is rejected.
+        allocationMethod: 'computed',
+        contributionType,
+        note,
+      });
+      continue;
+    }
+
+    // A row this seeder did not author is not this seeder's to reconcile.
+    // `allocation_methods` is manual|computed|negotiated (db/models.rs), `manual`
+    // is BOTH the column default (migrations/2026-01-08-000000_initial/up.sql)
+    // and what the app writes for every UI-created split
+    // (app/lamad/src/app/services/stewardship-allocation.service.ts). Only
+    // `computed` rows are this seeder's own output.
+    //
+    // Counting a non-computed method as "shape drift" and repairing it to
+    // `computed` is precisely the stomp the StoredAllocation contract above
+    // forbids — and genesis runs this unattended against the live fleet, so a
+    // negotiated split would be silently overwritten with the affinity ratio
+    // and the seeder's note. isGovernanceOwned() cannot catch it: a manual row
+    // that is active and undisputed is invisible to all three of its checks.
+    if (stored.allocationMethod !== 'computed') {
+      plan.governedSkips.push(stored);
+      continue;
+    }
+
+    const ratioDrifted = Math.abs(stored.allocationRatio - steward.ratio) > RATIO_EPSILON;
+    const shapeDrifted = stored.contributionType !== contributionType;
+    if (!ratioDrifted && !shapeDrifted) continue;
+
+    if (isGovernanceOwned(stored)) {
+      plan.governedSkips.push(stored);
+      continue;
+    }
+
+    plan.repairs.push({
+      allocationId: stored.id,
+      contentId,
+      stewardPresenceId: steward.presenceId,
+      fromRatio: stored.allocationRatio,
+      toRatio: steward.ratio,
+      allocationMethod: 'computed',
+      contributionType,
+      note,
+    });
+  }
+
+  return plan;
+}
+
+/**
+ * Invert the flat `${contentId}::${stewardPresenceId}` allocation map into
+ * content -> stored steward ids.
+ *
+ * ## Why this exists
+ *
+ * The reconciler needs, per content item, the stewards ALREADY stored against
+ * it (to count the ones no longer in any resolved set). Asking that question of
+ * the flat map by prefix — `for (const key of existing.keys()) if
+ * (key.startsWith(`${contentId}::`))` — is O(content x allocations): on alpha
+ * that is ~10k content ids x ~10k allocations = 10^8 iterations, each one
+ * re-allocating the `${contentId}::` template literal, to produce a single
+ * number that is only ever logged. This builds the answer once, in one pass.
+ *
+ * The steward id is read from the VALUE's `stewardPresenceId`, not parsed back
+ * out of the key. The two are identical by construction — the key is built as
+ * `${a.contentId}::${a.stewardPresenceId}` in
+ * `StewardshipClient.getContentWithAllocations` — and reading the field cannot
+ * mis-split an id that happens to contain the `::` separator.
+ */
+export function indexStoredStewardsByContent(
+  existingAllocations: ReadonlyMap<string, StoredAllocation>
+): Map<string, Set<string>> {
+  const byContent = new Map<string, Set<string>>();
+  for (const stored of existingAllocations.values()) {
+    let stewards = byContent.get(stored.contentId);
+    if (!stewards) {
+      stewards = new Set<string>();
+      byContent.set(stored.contentId, stewards);
+    }
+    stewards.add(stored.stewardPresenceId);
+  }
+  return byContent;
+}
+
+/**
+ * The run's one report of stored-but-unresolved stewards, or null when there
+ * are none. Extracted so the exact wording is pinned by a test alongside the
+ * counter it reports — the count and the sentence are one claim.
+ */
+export function unresolvedStoredStewardsNotice(count: number): string | null {
+  if (count <= 0) return null;
+  return (
+    `   Stored stewards no longer in any resolved set: ${count} ` +
+    `(retirement is a supersede decision — not written here)`
+  );
+}
+
 // =============================================================================
 // Presence Loader
 // =============================================================================
@@ -880,7 +1151,7 @@ async function main() {
   // Step 5: Get existing (content, steward) allocation pairs. Idempotency is
   // per-steward, not per-content: a content item may be partially allocated.
   console.log('Checking existing allocations...');
-  let existingAllocations: Set<string>;
+  let existingAllocations: Map<string, StoredAllocation>;
   try {
     existingAllocations = await client.getContentWithAllocations();
     console.log(`   Found ${existingAllocations.size} existing (content, steward) allocations`);
@@ -902,57 +1173,72 @@ async function main() {
   }
   console.log();
 
-  // Step 7: Build the MISSING (content, steward) allocation pairs.
+  // Step 7: Reconcile every content item against its resolved steward set.
   //
-  // Per-steward idempotency: a content item is re-visited whenever ANY of its
-  // category-expected stewards lacks an allocation (partial allocation), and we
-  // POST only the pairs that don't already exist. The storage bulk handler
-  // counts an already-existing pair as `failed` (uniqueness Err →
-  // http.rs:5793-5796), so resending existing pairs would inflate the failure
-  // count and waste round-trips — we diff against `existingAllocations` instead.
+  // TWO kinds of drift, not one:
+  //
+  //   MEMBERSHIP — a resolved steward with no row yet. POST it. (Per-steward
+  //     idempotency: a content item is re-visited whenever ANY of its expected
+  //     stewards lacks an allocation. The storage bulk handler counts an
+  //     already-existing pair as `failed` (uniqueness Err → http.rs:5793-5796),
+  //     so we diff against `existingAllocations` and send only the missing.)
+  //
+  //   RATIO — a row that exists but holds a stale share. PUT it. Insert-only
+  //     idempotency cannot see this class at all: when the authored
+  //     `stewardedBy` path started displacing the bootstrap default, the new
+  //     steward was inserted at its normalized ratio while the pre-existing
+  //     matthew-dowell row kept the 1.0 it was seeded with — 50 content items
+  //     on alpha whose ratios sum to 1.333 / 1.579 / 1.636 / 1.70 instead of
+  //     1.0. See `planContentAllocations` for the full account.
+  //
+  // Both are computed per content item by `planContentAllocations`, which also
+  // refuses to touch a row the governance plane owns.
   const allocations: CreateAllocationInput[] = [];
+  const repairs: AllocationRepair[] = [];
+  const governedSkips: StoredAllocation[] = [];
   // Content items that gained at least one new (content, steward) pair — drives
   // the Step 9 affinity seeding (mirrors the per-steward diff, see below).
   const contentNeedingAllocations: string[] = [];
+  const contentNeedingRepair = new Set<string>();
+  // Stewards stored against a content item but absent from its resolved set.
+  // Retiring one is a supersede decision, not a seeding one — counted, never written.
+  let unresolvedStoredStewards = 0;
 
   // Provenance per content id — reused by the Step 9 affinity seeding.
   const provenanceByContent = new Map<string, StewardshipProvenance>();
 
+  // content -> stewards already stored against it. Built ONCE (one pass over
+  // the allocations) instead of re-scanned per content item inside the loop
+  // below; see `indexStoredStewardsByContent` for the cost that removes.
+  const storedStewardsByContent = indexStoredStewardsByContent(existingAllocations);
+
   for (const contentId of allContentIds) {
     const facts = contentIndex.get(contentId);
     const category = facts?.category;
-    const { stewards, provenance } = stewardshipFor(contentId);
-    provenanceByContent.set(contentId, provenance);
+    const resolved = stewardshipFor(contentId);
+    provenanceByContent.set(contentId, resolved.provenance);
 
-    const missingStewards = stewards.filter(
-      (steward) => !existingAllocations.has(allocationKey(contentId, steward.presenceId))
-    );
-    if (missingStewards.length === 0) {
-      continue; // Fully allocated for every expected steward — skip.
+    const storedBySteward = new Map<string, StoredAllocation>();
+    for (const steward of resolved.stewards) {
+      const stored = existingAllocations.get(allocationKey(contentId, steward.presenceId));
+      if (stored) storedBySteward.set(steward.presenceId, stored);
     }
-    contentNeedingAllocations.push(contentId);
 
-    for (const steward of missingStewards) {
-      allocations.push({
-        contentId: contentId,
-        stewardPresenceId: steward.presenceId,
-        allocationRatio: steward.ratio,
-        // Storage validates these against fixed enums (db/models.rs):
-        //   allocation_methods = manual|computed|negotiated  → 'computed' (ratios ARE
-        //     affinity-computed by this seeder); 'affinity' is rejected.
-        //   contribution_types = original_creator|editor|translator|curator|maintainer|
-        //     inherited → 'curator' (a steward curates); 'steward' is rejected.
-        // The AUTHORED path carries the declared role through
-        // contributionTypeForRole (author → original_creator, steward →
-        // maintainer); category/default paths keep 'curator', which the
-        // a2o @affinity and @fallback scenarios assert on.
-        // BACKLOG: enrich the storage enums with domain-accurate `affinity`/`steward`
-        // (manifesto vocabulary) so the wire values match the story — storage change,
-        // edge-rebuild window. See sprint-result backlog.
-        allocationMethod: 'computed',
-        contributionType: steward.contributionType ?? 'curator',
-        note: allocationNote(provenance, category),
-      });
+    const plan = planContentAllocations(contentId, resolved, category, storedBySteward);
+
+    if (plan.creates.length > 0) {
+      contentNeedingAllocations.push(contentId);
+      allocations.push(...plan.creates);
+    }
+    if (plan.repairs.length > 0) {
+      contentNeedingRepair.add(contentId);
+      repairs.push(...plan.repairs);
+    }
+    governedSkips.push(...plan.governedSkips);
+
+    const resolvedIds = new Set(resolved.stewards.map((s) => s.presenceId));
+    for (const stewardId of storedStewardsByContent.get(contentId) ?? EMPTY_STEWARD_SET) {
+      if (!resolvedIds.has(stewardId)) unresolvedStoredStewards++;
     }
   }
 
@@ -960,18 +1246,38 @@ async function main() {
     `Building allocations for ${contentNeedingAllocations.length} content items ` +
       `(${allContentIds.length} total; ${allContentIds.length - contentNeedingAllocations.length} fully allocated)...`
   );
+  console.log(
+    `   Ratio drift to repair: ${repairs.length} rows across ${contentNeedingRepair.size} content items`
+  );
+  if (governedSkips.length > 0) {
+    console.log(
+      `   Rows left untouched (human-authored method, or disputed/ratified/non-active): ${governedSkips.length}`
+    );
+    for (const s of governedSkips.slice(0, 10)) {
+      console.log(
+        `     ${s.contentId} / ${s.stewardPresenceId}: state=${s.governanceState ?? 'active'}` +
+          `${s.disputeId ? ` dispute=${s.disputeId}` : ''}`
+      );
+    }
+  }
+  const unresolvedNotice = unresolvedStoredStewardsNotice(unresolvedStoredStewards);
+  if (unresolvedNotice) {
+    console.log(unresolvedNotice);
+  }
 
-  if (allocations.length === 0) {
-    console.log('   All content already has every expected steward allocated, nothing to do');
+  if (allocations.length === 0 && repairs.length === 0) {
+    console.log('   All content already has every expected steward at its resolved ratio');
     console.log();
     console.log('Done!');
     return;
   }
 
-  console.log(`   Generated ${allocations.length} missing allocation records`);
-  console.log(
-    `   Average new stewards per item: ${(allocations.length / contentNeedingAllocations.length).toFixed(1)}`
-  );
+  if (allocations.length > 0) {
+    console.log(`   Generated ${allocations.length} missing allocation records`);
+    console.log(
+      `   Average new stewards per item: ${(allocations.length / contentNeedingAllocations.length).toFixed(1)}`
+    );
+  }
   console.log();
 
   // Step 8: Bulk create allocations (in batches to avoid overwhelming the API)
@@ -1006,11 +1312,50 @@ async function main() {
     }
   }
 
+  // Step 8b: Repair the stale ratios on rows that already exist.
+  //
+  // One PUT per row (there is no bulk update endpoint), paced the same way the
+  // creates are so SQLite is not hammered. A repair failure is reported and
+  // counted, never fatal: a partially-repaired table is strictly closer to
+  // correct than an unrepaired one, and the next run re-plans from live state.
+  let totalRepaired = 0;
+  let totalRepairFailed = 0;
+
+  if (repairs.length > 0) {
+    console.log();
+    console.log(`Repairing ${repairs.length} drifted allocation ratios...`);
+    for (let i = 0; i < repairs.length; i++) {
+      const repair = repairs[i];
+      try {
+        await client.repairAllocation(repair);
+        totalRepaired++;
+        if (totalRepaired <= 10) {
+          console.log(
+            `   ${repair.contentId} / ${repair.stewardPresenceId}: ` +
+              `${repair.fromRatio.toFixed(4)} -> ${repair.toRatio.toFixed(4)}`
+          );
+        }
+      } catch (error) {
+        totalRepairFailed++;
+        allErrors.push(String(error));
+      }
+      // Same pacing as the create batches — one PUT per row can still lock SQLite.
+      if ((i + 1) % BATCH_SIZE === 0 && i + 1 < repairs.length) {
+        await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY_MS));
+      }
+    }
+    if (totalRepaired > 10) {
+      console.log(`   ... and ${totalRepaired - 10} more repaired`);
+    }
+  }
+
   console.log();
   console.log('='.repeat(60));
   console.log('Stewardship allocation complete!');
   console.log(`   Created: ${totalCreated}`);
   console.log(`   Failed: ${totalFailed}`);
+  console.log(`   Ratios repaired: ${totalRepaired}`);
+  console.log(`   Ratio repairs failed: ${totalRepairFailed}`);
   if (allErrors.length > 0) {
     console.log('   Errors:');
     allErrors.slice(0, 10).forEach((e) => console.log(`     - ${e}`));
