@@ -485,13 +485,14 @@ function encodeDocId(id: string): string {
  */
 export async function getRaw(
   url: string,
-  opts: { timeoutMs?: number } = {}
+  opts: { timeoutMs?: number; headers?: Record<string, string> } = {}
 ): Promise<{ status: number; text: string }> {
   const timeoutMs = opts.timeoutMs ?? 15_000;
   const { statusCode, body } = await request(url, {
     method: 'GET',
     bodyTimeout: timeoutMs,
     headersTimeout: timeoutMs,
+    ...(opts.headers ? { headers: opts.headers } : {}),
   });
   const text = await body.text();
   return { status: statusCode, text };

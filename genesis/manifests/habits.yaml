@@ -748,20 +748,35 @@ habits:
 
   - id: reach-enforced-everywhere
     invariant: >
-      One reach vocabulary; receiver-side pre-authorization at EVERY egress plane
-      (DHT, CRDT sync, shard, HTTP, doorway). Scoped tiers flow only to
-      authorized receivers — enforcement, not exclusion.
-    status: unwired
+      Receiver-side pre-authorization at EVERY egress plane (DHT, CRDT sync,
+      shard, HTTP, doorway): a credential the substrate cannot verify grants
+      nothing beyond no credential at all. Scoped tiers flow only to authorized
+      receivers — enforcement, not exclusion. Authorization is unconditional at
+      every posture; a declared dev stage may cheapen the DEPTH at which identity
+      and relationships are verified, never WHETHER the decision is made, and
+      never in the open direction.
+    status: red
     active: false
+    checks:
+      - "a2o @concern:reach-enforced-http (genesis/a2o/features/dataplane/reach-enforced-http.feature — runs in the edge Dataplane Validation stage; 3 scenarios asserting an unverifiable bearer token, a self-asserted X-Agent-Cid, and a self-asserted X-Agent-Id each return exactly the anonymous listing). Names NO reach tier: it asserts a RELATION, so it holds under any vocabulary and does not wait on the drift."
     first_move: >
-      Write the reds: one scenario per egress plane asserting a scoped-tier row
-      does NOT reach an unauthorized peer/client. Start with the CRDT sync plane
-      (today: broadcast-only fail-closed gate = exclusion, not enforcement —
-      reach_is_distribution_safe in sync/projector.rs) and the HTTP path
-      (backlog: http-reach-enforcement-gap).
+      HTTP egress is wired and cured (2026-08-20). Wire the remaining four planes
+      the same way — one check per plane asserting a scoped-tier row does NOT
+      reach an unauthorized peer/client. Next: the CRDT sync plane (today
+      broadcast-only fail-closed = exclusion, not enforcement —
+      reach_is_distribution_safe in sync/projector.rs), then shard/blob, where
+      the responder does no reach check at all BY DESIGN (custody is deliberately
+      reach-blind; the boundary is serving, so the check belongs on the serve
+      path, not on custody).
+    evidence:
+      - "2026-08-20: flipped unwired -> RED on measured violation, which is stronger evidence than an absent check. Live on doorway-alpha, verified twice: anonymous GET /db/content?limit=1000&offset=1000 returned 90 rows (all commons); the identical request carrying the literal header 'Authorization: Bearer bogus' returned 1000 — familiar 906, commons 90, private 3, intimate 1 — every row with its contentBody. Cause: http.rs:5272 decided reach from header PRESENCE, never validation."
+      - "2026-08-20: HTTP-plane cure committed (41f7780aa) — the listing now resolves the requester and authorizes per row via epr_service::authorize_reach_for_human_with_own_trust, deny-by-default when unresolvable; the same header-presence check on the single-item route's Layer 1 is cured too; and reach_level_index's `_ => 0` fail-open (an UNRECOGNIZED tier read as the most permissive, making the authorizer's own `_ => Err` unreachable) now fails closed to u8::MAX. Stays RED until the scenario runs green against a deploy carrying the fix — a flip needs a build number, not a commit."
+      - "2026-08-20 scope, held honestly: the doorway strips client-supplied identity headers (probed: X-Agent-Cid/X-Agent-Id return the anonymous result), so the cure closes the bypass for doorway-fronted traffic. It does NOT make identity unforgeable — extract_agent_cid returns the header verbatim — so a caller reaching elohim-storage directly in-cluster can still assert an identity and receive that identity's authorized reach. That residual is identity-cross-signed's, not this habit's."
+    notes:
+      - "The invariant's original first clause ('One reach vocabulary') was moved out of the checkable statement 2026-08-20 and is tracked in refs below. It is a RECONCILIATION goal, not an enforcement property, and elohim-storage/CLAUDE.md forbids canonizing a single vocabulary while the drift is open — so a check honoring it could not be written without violating a standing rule. That clause is why this habit sat unwired. The wired check asserts a relation instead and names no tier."
     refs:
       - "genesis/data/timeline/backlog/http-reach-enforcement-gap.md"
-      - "memory: project_reach_enum_drift_reconciliation (3 vocabularies — unify first)"
+      - "memory: project_reach_enum_drift_reconciliation (3 vocabularies — unify, but not as a precondition for enforcement)"
 
   - id: identity-cross-signed
     invariant: >
