@@ -1,4 +1,8 @@
-@e2e @content @delivery @requires:doorway @requires:seeded-content @requires:shem
+# NOT @requires:shem: every scenario here is single-doorway (one doorway's projection
+# cache in front of one storage). shem is the remote multi-tenant canvas; carrying that
+# tag is what moved this feature in and out of held/ with the shem flip (41c565f3e)
+# rather than with anything it actually depends on.
+@e2e @content @delivery @requires:doorway @requires:seeded-content
 Feature: Web2 Absorption — Doorway Projection Cache
   As a learner visiting via browser
   I want HTML5 apps to load without 502 errors

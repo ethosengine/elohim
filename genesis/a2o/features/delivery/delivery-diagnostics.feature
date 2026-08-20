@@ -18,7 +18,14 @@ Feature: Delivery Diagnostics — Observability and Controlled Degradation
 
   # --- The Original Failure (regression anchor) ---
 
-  @regression
+  # @wip: three of this scenario's four assertions are implemented (the load fan-out, the
+  # all-proxied check, the 300+ request count). The fourth — "some requests fail or storage
+  # resource usage spikes dangerously" — cannot be an automated gate: it asserts that a
+  # DELIBERATE 300+ concurrent burst against SHARED deployed storage succeeds in hurting it.
+  # That is non-deterministic by construction (it passes only when the fleet is fragile) and
+  # it is an intentional overload of infrastructure other peers are using. The Gherkin stays
+  # verbatim as the regression narrative; the tag says the last assertion is unimplemented.
+  @wip @regression
   Scenario: Without projection cache, browser load overwhelms storage
     Given the doorway projection cache is disabled
     When 10 browsers simultaneously load "evolution-of-trust"
@@ -30,7 +37,18 @@ Feature: Delivery Diagnostics — Observability and Controlled Degradation
     # the projection cache is no longer load-bearing and the architecture
     # should be revisited.
 
-  @regression
+  # @wip: the load profile this scenario asks for is, by the doorway's OWN policy, an
+  # attack. 10 browsers x the 40-file evolution-of-trust bundle is ~400 requests inside one
+  # 60s window from one client IP, and /apps/{slug}/{file} is NOT static-asset-exempt from
+  # the membrane (doorway/doorway-service/src/server/membrane.rs is_static_asset): it
+  # challenges (429) at 600 req/60s and BANS the source for 900s at 1200. Reproduced here
+  # against the local doorway on 2026-08-20 — the burst 429'd, and the 429s bled into the
+  # NEXT scenarios' background steps. In CI the whole API suite shares one source IP, so
+  # arming this would risk a 15-minute self-ban poisoning every scenario after it.
+  # The step definitions ARE implemented (steps/delivery.steps.ts) and honest — run them
+  # deliberately against a dedicated doorway with --tags '@delivery and @wip'. What is
+  # missing is an isolated load target, not the code.
+  @wip @regression
   Scenario: With projection cache enabled, same load is absorbed
     Given the doorway projection cache is enabled and warm for "evolution-of-trust"
     When 10 browsers simultaneously load "evolution-of-trust"
