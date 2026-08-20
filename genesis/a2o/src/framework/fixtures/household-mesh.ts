@@ -15,6 +15,13 @@ export interface DoorwayFixture {
   primaryStorageUrl?: string;
   poolStorageUrls?: string[];
   logPath?: string;
+  /**
+   * Declared NOT to exist on this substrate, with the reason a reader needs.
+   * A scenario that names a doorway this fleet does not deploy then fails with
+   * the topology fact ("this fleet deploys two doorways") instead of an
+   * environment-variable name, which tells the reader nothing.
+   */
+  absentReason?: string;
 }
 
 export interface StoragePeerFixture {
@@ -27,6 +34,15 @@ export interface HouseholdMeshFixture {
   commonsEprId?: string;
   convergenceWindowMs?: number;
   connectedPeersFloor?: number;
+  /**
+   * Can this harness control the mesh PROCESSES (SIGSTOP a peer, tail a
+   * doorway's log file)? True on a local stack (`just mesh start` — real PIDs
+   * on this host, real log files on this disk). False against a deployed
+   * fleet, where every peer and doorway is a remote pod: there is no PID to
+   * signal and no file to read. Scenarios that need it are local-stack-only.
+   */
+  processControl?: boolean;
+  processControlReason?: string;
   doorways?: Record<string, DoorwayFixture>;
   storagePeers?: Record<string, StoragePeerFixture>;
 }
@@ -86,7 +102,7 @@ function applyDoorwayEnvironment(
   doorways: Record<string, DoorwayFixture>,
   env: FixtureEnvironment
 ): void {
-  for (const id of ['alpha', 'beta', 'apex']) {
+  for (const id of ['alpha', 'beta', 'apex', 'gamma']) {
     const envUrl = env[`E2E_DOORWAY_${id.toUpperCase()}`];
     doorways[id] = {
       ...doorways[id],
@@ -180,15 +196,65 @@ export function loadHouseholdMeshFixture(
   return mergeHouseholdMeshEnvironment(source, env);
 }
 
+/**
+ * Resolve a doorway URL from the fixture, or `undefined` when the fixture
+ * simply says nothing about it.
+ *
+ * Throws — deliberately — when the fixture DECLARES the doorway absent. A
+ * declaration is knowledge; silently returning `undefined` for it discards that
+ * knowledge and the caller reports a missing environment variable instead of
+ * the substrate fact.
+ *
+ * Because it can throw, this is a RESOLVE-OR-EXPLAIN accessor, not a cheap
+ * lookup: it must be the LAST thing a caller consults. Reached before the
+ * caller's own candidates, a declared absence shadows a URL that was right
+ * there. Use `resolveDoorwayUrl()` rather than hand-rolling that order.
+ */
 export function fixtureDoorwayUrl(fixture: HouseholdMeshFixture, id: string): string | undefined {
-  return fixture.doorways?.[id]?.url;
+  const doorway = fixture.doorways?.[id];
+  if (doorway?.url) return doorway.url;
+  if (doorway?.absentReason) {
+    throw new Error(`household fixture declares doorway "${id}" absent: ${doorway.absentReason}`);
+  }
+  return undefined;
+}
+
+/**
+ * Resolve a doorway URL from the caller's own candidates FIRST, and only then
+ * ask the fixture.
+ *
+ * The fixture is loaded lazily, inside the fallthrough, so neither a declared
+ * absence nor an unreadable manifest can shadow a URL the caller already had —
+ * a literal `doorway "alpha" at "http://localhost:8888"` resolves to that
+ * literal even on a substrate whose manifest declares alpha absent. When
+ * nothing resolves, the fixture still gets the last word, so an honest absence
+ * is still reported as the topology fact rather than a variable name.
+ */
+export function resolveDoorwayUrl(
+  id: string,
+  candidates: readonly (string | undefined)[],
+  loadFixture: () => HouseholdMeshFixture = loadHouseholdMeshFixture
+): string | undefined {
+  for (const candidate of candidates) {
+    if (candidate) return candidate;
+  }
+  return fixtureDoorwayUrl(loadFixture(), id);
+}
+
+function knownDoorwayIds(fixture: HouseholdMeshFixture): string {
+  const ids = Object.entries(fixture.doorways ?? {})
+    .filter(([, doorway]) => Boolean(doorway?.url))
+    .map(([id]) => id);
+  return ids.length ? ids.join(', ') : 'none';
 }
 
 export function requireFixtureDoorwayUrl(fixture: HouseholdMeshFixture, id: string): string {
   const value = fixtureDoorwayUrl(fixture, id);
   if (!value) {
     throw new Error(
-      `live household fixture missing doorway "${id}": set E2E_DOORWAY_${id.toUpperCase()} ` +
+      `live household fixture missing doorway "${id}" ` +
+        `(doorways this run resolved: ${knownDoorwayIds(fixture)}): ` +
+        `set E2E_DOORWAY_${id.toUpperCase()} ` +
         'or doorways.' +
         `${id}.url in E2E_HOUSEHOLD_FIXTURE_PATH`
     );
@@ -224,6 +290,23 @@ export function requireFixturePoolStorageUrls(
   return [...new Set(values.map(withoutTrailingSlashes))];
 }
 
+/**
+ * Why this harness cannot reach into the mesh's processes. Named so a scenario
+ * that needs process control reports the substrate fact, not a variable name.
+ */
+function processControlNote(fixture: HouseholdMeshFixture): string {
+  if (fixture.processControl === false) {
+    return (
+      fixture.processControlReason ??
+      'this run declared no process control over the mesh (processControl: false)'
+    );
+  }
+  return (
+    'process control needs the peer or doorway running as a local process on this host ' +
+    '(`just mesh start`, plus pid/pidFile/logPath in E2E_HOUSEHOLD_FIXTURE_PATH)'
+  );
+}
+
 export function requireFixtureDoorwayLogPath(
   fixture: HouseholdMeshFixture,
   doorwayId: string
@@ -231,8 +314,10 @@ export function requireFixtureDoorwayLogPath(
   const value = fixture.doorways?.[doorwayId]?.logPath;
   if (!value) {
     throw new Error(
-      `live household fixture missing log path for doorway "${doorwayId}": set ` +
-        'E2E_DOORWAY_LOG_PATH or the manifest logPath'
+      `cannot read doorway "${doorwayId}" logs: no log file for it. ` +
+        `${processControlNote(fixture)}. A deployed doorway logs to its pod's stdout, so no file ` +
+        'exists to tail — that scenario is local-stack-only and belongs behind @local. ' +
+        'On a local stack set E2E_DOORWAY_LOG_PATH or the manifest logPath.'
     );
   }
   return value;
@@ -246,7 +331,8 @@ export function requireFixtureStoragePeer(
   if (!peer?.url) {
     throw new Error(
       `live household fixture missing storage peer "${name}": set ` +
-        `E2E_STORAGE_${name.toUpperCase()} or storagePeers.${name}.url in the manifest`
+        `E2E_STORAGE_${name.toUpperCase()} or storagePeers.${name}.url in the manifest ` +
+        '(CI wires these from genesis/orchestrator/data/deployments.json)'
     );
   }
   return { ...peer, url: withoutTrailingSlashes(peer.url) };
@@ -265,8 +351,11 @@ export function requireFixturePeerPid(fixture: HouseholdMeshFixture, name: strin
   const pid = peer?.pid ?? optionalInteger(fromFile);
   if (!pid || pid <= 1 || pid === process.pid) {
     throw new Error(
-      `live household fixture missing a safe PID for "${name}": set ` +
-        `E2E_STORAGE_${name.toUpperCase()}_PID, its _PID_FILE, or pid/pidFile in the manifest`
+      `cannot pause or resume household peer "${name}": no safe PID for it. ` +
+        `${processControlNote(fixture)}. Against a deployed fleet the peer is a remote pod, so ` +
+        'there is nothing here to signal — that scenario is local-stack-only and belongs behind ' +
+        `@local. On a local stack set E2E_STORAGE_${name.toUpperCase()}_PID, its _PID_FILE, or ` +
+        'pid/pidFile in the manifest.'
     );
   }
   return pid;

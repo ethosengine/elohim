@@ -1,7 +1,10 @@
 {
+  "$comment": "Local-stack shape: `just mesh start` gives real PIDs on this host and a real doorway log file on this disk, so processControl is true and the pause/resume + log-tailing scenarios are runnable. CI writes the deployed-fleet counterpart (processControl false) from genesis/scripts/ci/e2e-verify-*.sh.",
   "commonsEprId": "manifesto",
   "convergenceWindowMs": 60000,
   "connectedPeersFloor": 2,
+  "processControl": true,
+  "processControlReason": "local household stack — peers and doorway run as processes on this host",
   "doorways": {
     "alpha": {
       "url": "http://localhost:8888",
@@ -15,6 +18,9 @@
     "apex": {
       "url": "http://localhost:8890",
       "primaryStorageUrl": "http://localhost:8090"
+    },
+    "gamma": {
+      "absentReason": "the local stack brings up three doorways (alpha, beta, apex); a scenario naming a fourth should say which topology it needs"
     }
   },
   "storagePeers": {
