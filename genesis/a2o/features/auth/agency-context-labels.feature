@@ -20,7 +20,10 @@ Feature: Agency badge distinguishes hosted-steward from hosted-visitor
     When Matthew logs in at elohim-app via the doorway OAuth flow
     And elohim-app loads the agency badge
     Then the agency stage badge reads "Hosted Steward"
-    And the tagline reads "A steward, currently signed in through a doorway"
+    # The tagline is asserted verbatim against AGENCY_STAGES['hosted-steward'].tagline
+    # in app/elohim-app/src/app/imagodei/models/agency.model.ts — the shipped wording,
+    # which names recovery explicitly rather than only "signed in through a doorway".
+    And the tagline reads "A steward in recovery — doorway temporarily hosts your conductor"
 
   @elohim-visually-validated @requires:shem
   Scenario: Susan sees the Hosted Visitor badge after OAuth login through doorway
@@ -37,7 +40,14 @@ Feature: Agency badge distinguishes hosted-steward from hosted-visitor
     When the hosting account loads with isSteward=true
     Then the agency stage badge updates to "Hosted Steward"
 
-  Scenario: getNextStage from hosted-steward points to app-steward
+  # A recovery mode is ranked between the stages it sits between, so the badge can
+  # say where the human is — but it is NOT a rung, so nothing offers "upgrade from
+  # recovery". The resolution of hosted-steward is restoring your own device, not
+  # graduating further. Both halves are asserted against the shipped AGENCY_STAGES
+  # and getNextStage() in app/elohim-app/src/app/imagodei/models/agency.model.ts.
+  Scenario: hosted-steward is ranked between hosted and app-steward without joining the ladder
     When I read the AGENCY_STAGES progression
-    Then the stage after "hosted-steward" is "app-steward"
+    Then "hosted-steward" is flagged as a recovery mode, not a progression step
+    And the stage after "hosted" is "app-steward"
+    And getNextStage from "hosted-steward" is null — a recovery mode has no next rung
     And the order ranking is visitor < hosted < hosted-steward < app-steward < node-steward

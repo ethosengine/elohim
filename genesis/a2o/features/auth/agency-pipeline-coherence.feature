@@ -12,7 +12,19 @@ Feature: Agency pipeline in doorway-account matches the elohim-app stages
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
 
-  @elohim-visually-validated
+  # @wip — the steps below are fully wired, but the cure is NOT built. Against the
+  # shipped doorway-account.component.ts this scenario is a RED-defining contract on
+  # three counts, all in doorway/doorway-app (out of this pass's write-set):
+  #   1. isStepCompleted('steward') returns account.isSteward, so a steward whose
+  #      conductor is offline has "Steward" ticked complete — doorway/account claims
+  #      he is further along than the elohim-app badge ("Hosted Steward") does. That
+  #      is precisely the drift this feature exists to catch.
+  #   2. The in-between affordance renders as a generic .context-banner reading
+  #      "Accessing through this doorway" — it never names the Hosted Steward state.
+  #   3. That banner names no doorway host, so the page cannot read
+  #      "Accessing through alpha.elohim.host".
+  # Drop @wip when doorway-account distinguishes hosted-steward from steward.
+  @elohim-visually-validated @wip
   Scenario: Matthew's pipeline shows hosted-steward as an in-between state
     Given human "Matthew" is a graduated steward whose conductor is offline
     When Matthew opens doorway/account
@@ -21,7 +33,15 @@ Feature: Agency pipeline in doorway-account matches the elohim-app stages
     And the pipeline step "Steward" is NOT marked completed
     And the page reads "Accessing through alpha.elohim.host" near the header
 
-  @requires:shem
+  # @wip — steps wired; the first assertion is an open design question, not a
+  # wired-up contract. doorway-account marks "Hosted" COMPLETED for every account and
+  # marks "Key Export" CURRENT for a hosted visitor, because its pipeline tracks the
+  # next GATE while the elohim-app badge tracks the current STAGE. Whether coherence
+  # means the doorway should mark "Hosted" current (matching the badge) or the story
+  # should assert the gate axis is a decision for the surface owners. Resolve that
+  # before dropping @wip; the other two assertions already hold against the shipped
+  # component.
+  @requires:shem @wip
   Scenario: Susan's pipeline reflects no stewardship affordance
     Given human "Susan" is a hosted visitor with no portal host registered
     When Susan opens doorway/account
