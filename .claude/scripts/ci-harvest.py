@@ -110,6 +110,41 @@ HABITS_PATH = os.path.join(PROJECT, "genesis", "manifests", "habits.yaml")
 _NO_MEASURE_BANNER = "=== Dataplane Validation: DID NOT MEASURE ==="
 _NO_MEASURE_IDENT = "dataplane-validation-did-not-measure"
 
+# ── Quiesce leg ──────────────────────────────────────────────────────────────
+# The fleet-quiesce gate prints, once per poll, everything needed to understand
+# why the fleet did or did not settle — then discards it into a console log that
+# ages out. It gates ALL saga evidence and passed 2 of the last 8 builds, yet its
+# time-to-pass, blocking leg and reset causes were recorded nowhere.
+#
+# The PARSER lives in genesis/scripts/quiesce-timeline.py, deliberately NOT under
+# .claude/: it is tooling for reading our own simulacra, so any agent (Codex,
+# Gemini, a human at a terminal) can reach for it, and the gate's log format has
+# exactly ONE reader to update. This module only supplies the fetch, the
+# idempotence and the append.
+QUIESCE_JOB = "elohim-edge"
+QUIESCE_TAIL = 420_000  # must clear the ~230KB of validation log that follows the gate
+QUIESCE_PATH = os.path.join(PROJECT, ".claude", "data", "quiesce-timeline.jsonl")
+
+_quiesce_parse = None  # resolved lazily; a missing shared tool must not break harvest
+
+
+def _load_quiesce_parser():
+    """Import parse_quiesce from the shared genesis tool (hyphenated filename)."""
+    global _quiesce_parse
+    if _quiesce_parse is not None:
+        return _quiesce_parse
+    try:
+        import importlib.util
+
+        path = os.path.join(PROJECT, "genesis", "scripts", "quiesce-timeline.py")
+        spec = importlib.util.spec_from_file_location("quiesce_timeline", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        _quiesce_parse = mod.parse_quiesce
+    except Exception:
+        _quiesce_parse = False  # sentinel: tried and unavailable
+    return _quiesce_parse
+
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 
@@ -119,18 +154,76 @@ def get_json(path):
         return json.loads(resp.read().decode("utf-8", "replace"))
 
 
-def get_console_tail(job, build):
-    """Tail of the console via progressiveText (X-Text-Size two-step)."""
+def get_console_tail(job, build, nbytes=None):
+    """Tail of the console via progressiveText (X-Text-Size two-step).
+
+    `nbytes` overrides CONSOLE_TAIL. The quiesce leg needs a much larger window:
+    the fleet-quiesce block sits ~230KB before the end of an edge log (the whole
+    Dataplane Validation suite runs after it), so the default 60KB tail cannot
+    see it at all.
+    """
+    n = nbytes or CONSOLE_TAIL
     base = f"/job/{job}/job/{BRANCH}/{build}/logText/progressiveText"
     probe = urllib.request.Request(JENKINS + base + "?start=2000000000")
     with urllib.request.urlopen(probe, timeout=HTTP_TIMEOUT) as resp:
         size = int(resp.headers.get("X-Text-Size", "0"))
     if size <= 0:
         return ""
-    start = max(0, size - CONSOLE_TAIL)
+    start = max(0, size - n)
     req = urllib.request.Request(JENKINS + base + f"?start={start}")
-    with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
-        return resp.read(CONSOLE_TAIL + 4096).decode("utf-8", "replace")
+    with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT * 4) as resp:
+        return resp.read(n + 4096).decode("utf-8", "replace")
+
+
+def load_quiesce_seen():
+    """Build numbers already recorded — the leg is idempotent across harvests."""
+    seen = set()
+    try:
+        with open(QUIESCE_PATH, "r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    seen.add(json.loads(line)["build"])
+                except (json.JSONDecodeError, KeyError):
+                    continue
+    except OSError:
+        pass
+    return seen
+
+
+def append_quiesce(rec):
+    try:
+        os.makedirs(os.path.dirname(QUIESCE_PATH), exist_ok=True)
+        with open(QUIESCE_PATH, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec) + "\n")
+    except OSError:
+        pass  # never fail a harvest over a telemetry append
+
+
+def harvest_quiesce(build, result, seen_builds):
+    """Fetch one edge build's console and delegate parsing to the shared tool.
+
+    Returns None when there is nothing honest to say — instrument outage, gate
+    never ran, or already recorded. Never a zero: ABSENT is not the same as
+    "the fleet settled instantly".
+    """
+    if build in seen_builds:
+        return None
+    parse = _load_quiesce_parser()
+    if not parse:
+        return None
+    try:
+        text = get_console_tail(QUIESCE_JOB, build, nbytes=QUIESCE_TAIL)
+    except Exception:
+        return None  # instrument outage: record nothing rather than a false zero
+    rec = parse(build, text, build_result=result)
+    if rec is None:
+        return None
+    rec["job"] = QUIESCE_JOB
+    rec["harvested_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return rec
 
 
 def normalize(line):
@@ -387,6 +480,18 @@ def harvest_job(job, cursor, taxonomy):
         and (last_cursor is None or newest["number"] > last_cursor)
     ):
         out["urgent"] = {"build": newest["number"], "result": newest["result"]}
+
+    # Quiesce leg — edge only. Runs on EVERY fresh build regardless of result,
+    # because the interesting cases are exactly the ones a success-only or
+    # in-stage recorder cannot see: a build ABORTED mid-gate (superseded), and a
+    # run that burned its full deadline without measuring. Both are data.
+    if job == QUIESCE_JOB:
+        seen = load_quiesce_seen()
+        for b in fresh:
+            rec = harvest_quiesce(b["number"], b["result"], seen)
+            if rec is not None:
+                append_quiesce(rec)
+                seen.add(b["number"])
 
     for b in fresh:
         out["builds_seen"].append(b["number"])

@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 """quiesce-timeline.py — turn the fleet-quiesce gate's own log lines into a series.
 
+AGENT-AGNOSTIC BY PLACEMENT. This lives in `genesis/scripts/` — not under
+`.claude/` — because it is tooling for reading OUR OWN SIMULACRA, and any agent
+(Claude, Codex, Gemini, a human at a terminal) should be able to reach for it.
+Sibling of `genesis/scripts/jenkins-sync.sh`, which fetches the CI artifact this
+one derives from the same builds. `.claude/scripts/ci-harvest.py` imports
+`parse_quiesce` from here rather than carrying its own copy — one parser, one
+place to fix when the gate's log format moves.
+
 The gate at scripts/ci/fleet-quiesce-gate.sh already prints, once per poll, every
 number needed to understand why the fleet did or did not quiesce. That output then
 dies in a Jenkins console log. This reads it back and derives the numbers nobody
@@ -62,6 +70,83 @@ def fetch(build: int) -> str | None:
 
 def parse_ts(s: str) -> datetime:
     return datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ")
+
+
+def parse_quiesce(build: int, text: str, build_result: str | None = None) -> dict | None:
+    """THE shared parser. One console body -> one honest record, or None.
+
+    Importable: `.claude/scripts/ci-harvest.py` calls this so the gate's log
+    format has exactly one reader to update. Any other agent's tooling should
+    call it too rather than re-deriving the regexes.
+
+    `build_result` distinguishes the three outcomes. Collapsing them is how a
+    coin-flip gets read as a green:
+
+      measured      the gate reached A-QUIESCED; time_to_verdict_s is real
+      no_measure    the gate ran its deadline and gave up; best_window_s says how
+                    close (on #1371: 303s of a required 330s — an 8% miss that a
+                    pass/fail verdict cannot show)
+      interrupted   ABORTED/superseded MID-GATE. NOT a quiesce verdict. #1373
+                    produced 2 polls over 70s before abort-previous killed it;
+                    recorded naively that reads as "the fleet settled in 70s".
+
+    READING CAVEAT carried in every record via `observed_at`: a quiesce result is
+    POINT-IN-TIME AND DECAYS. "The build is green" does not mean "the p2p
+    dataplanes are settled now" — the gate passed at an instant, validation then
+    ran for many minutes, and the fleet kept moving. Weigh `observed_at` against
+    now before treating a recorded PASS as current state. Evidence about a
+    moment, never a live status.
+    """
+    polls = []
+    for line in text.splitlines():
+        m = LINE.search(ANSI.sub("", line))
+        if m:
+            polls.append((m.group("ts"), m.group("verdict"), m.group("body")))
+    if not polls:
+        return None  # gate never ran (stage skipped, or the build died before it)
+
+    interrupted = build_result == "ABORTED"
+    measured = (not interrupted) and ("A-QUIESCED" in text)
+    no_measure = (not interrupted) and ("DID NOT MEASURE" in text)
+
+    best, cur, resets = 0, 0, 0
+    legs: dict[str, int] = {}
+    for _ts, verdict, body in polls:
+        if verdict == "PASS":
+            m = SUSTAINED.search(body) or ELAPSED.search(body)
+            cur = int(m.group("s")) if m else 0
+            best = max(best, cur)
+        else:
+            if cur > 0:
+                resets += 1
+            cur = 0
+            r = REASONS.search(body)
+            if r:
+                for leg in r.group("r").split():
+                    key = re.sub(r"\(.*", "", leg)
+                    legs[key] = legs.get(key, 0) + 1
+
+    try:
+        span = int((parse_ts(polls[-1][0]) - parse_ts(polls[0][0])).total_seconds())
+    except Exception:
+        span = None
+
+    return {
+        "build": build,
+        "outcome": "interrupted" if interrupted else
+                   ("measured" if measured else ("no_measure" if no_measure else "unknown")),
+        "build_result": build_result,
+        "observed_at": polls[-1][0],
+        "polls": len(polls),
+        "time_to_verdict_s": span,
+        "best_window_s": best,
+        "resets": resets,
+        "blocking_legs": dict(sorted(legs.items(), key=lambda kv: -kv[1])),
+        "verdict_trustworthy": not interrupted,
+    }
+
+
+ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 
 def analyse(build: int, text: str) -> dict | None:
