@@ -42,7 +42,7 @@
  *                         (all fields serialised with #[serde(rename_all = "camelCase")])
  */
 
-import { request } from 'undici';
+import { Agent, request } from 'undici';
 
 // ---------------------------------------------------------------------------
 // Peer resolution
@@ -477,25 +477,127 @@ function encodeDocId(id: string): string {
 // ---------------------------------------------------------------------------
 
 /**
+ * undici's own default TCP-connect bound. `bodyTimeout`/`headersTimeout` do NOT
+ * cover connect — they only start once a socket exists — so this is the number
+ * that actually governs an unroutable address.
+ *
+ * MEASURED (2026-08-20, this container):
+ *   getRaw('http://10.255.255.1:8080/health', { timeoutMs: 4000 })
+ *     -> threw "Connect Timeout Error (attempted address: 10.255.255.1:8080,
+ *        timeout: 10000ms)" after 10492 ms.
+ *
+ * A caller asking for 4s waited 10.5s. That is how a "bounded" reach probe
+ * outran the very cucumber step deadline it exists to beat. Nothing below may
+ * ever RAISE the connect bound above this default — only lower it — because a
+ * step doing two sequential 15s-default GETs to a dead host must keep failing
+ * at ~10.5s each, not at 15s each.
+ */
+const UNDICI_DEFAULT_CONNECT_TIMEOUT_MS = 10_000;
+
+/**
+ * Connect bounds are quantized to whole seconds (rounded DOWN, floor 1s, cap
+ * the undici default) so one dispatcher is reused across calls instead of a
+ * fresh connection pool per distinct millisecond value —
+ * `getRawRidingCatchUp` computes its per-fetch bound from the remaining ride
+ * budget, so the raw values are arbitrary. Rounding DOWN can only tighten the
+ * connect phase, never loosen it past what the caller asked for.
+ */
+function connectBoundFor(timeoutMs: number): number {
+  const capped = Math.min(timeoutMs, UNDICI_DEFAULT_CONNECT_TIMEOUT_MS);
+  return Math.max(1_000, Math.floor(capped / 1_000) * 1_000);
+}
+
+/** One dispatcher per distinct connect bound (at most 10 entries — see connectBoundFor). */
+const dispatchersByConnectBound = new Map<number, Agent>();
+
+function boundedDispatcher(timeoutMs: number): Agent {
+  const connectTimeout = connectBoundFor(timeoutMs);
+  const existing = dispatchersByConnectBound.get(connectTimeout);
+  if (existing) return existing;
+  const agent = new Agent({ connect: { timeout: connectTimeout } });
+  dispatchersByConnectBound.set(connectTimeout, agent);
+  return agent;
+}
+
+/**
+ * Thrown when a bounded request produced no answer inside its own bound.
+ *
+ * The dispatcher above abandons the socket at the connect bound, but undici's
+ * connect timer is coarse (a 4000ms connect bound was observed firing at
+ * 4496ms), and DNS/TLS/redirect stalls are not covered by any of the three
+ * per-phase timeouts. This error is the hard wall-clock backstop that makes
+ * `timeoutMs` mean what it says end to end.
+ */
+export class RequestBoundExceeded extends Error {
+  constructor(method: string, url: string, timeoutMs: number) {
+    super(
+      `${method} ${url} — no response within its ${timeoutMs}ms bound ` +
+        `(connect, headers and body are all bounded)`
+    );
+    this.name = 'RequestBoundExceeded';
+  }
+}
+
+/**
+ * Settle `work` within `timeoutMs` or reject with `onExceeded()`.
+ *
+ * The abandoned request still settles later (undici's own connect timer fires
+ * after ours); `work.catch` keeps that rejection handled so a request this
+ * function walked away from can never crash the runner as an unhandled
+ * rejection. When it instead resolves late, the body read inside `work` still
+ * runs, so the socket is released rather than leaked.
+ */
+async function withRequestBound<T>(
+  work: Promise<T>,
+  timeoutMs: number,
+  onExceeded: () => Error
+): Promise<T> {
+  work.catch(() => undefined);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const bound = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(onExceeded()), timeoutMs);
+  });
+  try {
+    return await Promise.race([work, bound]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Raw GET — returns status + response body text. Never throws on non-2xx (a
  * non-2xx status is still a real answer); DOES throw on connect error/timeout
  * (there is no status to report). `opts.timeoutMs` overrides the default 15s
  * remote-peer allowance — callers doing bounded, no-retry classification
  * (classifyDoorwayState) pass a tighter budget.
+ *
+ * `timeoutMs` is a TOTAL wall-clock bound covering connect, headers AND body.
+ * Callers size step budgets off it (steps/common.steps.ts sizes the whole
+ * browser-failure diagnosis off `REACH_PROBE_TIMEOUT_MS`), so a bound that
+ * silently only covered two of the three phases was worse than no bound at
+ * all — it made an unreachable host look budgeted while it burned 10.5s.
  */
 export async function getRaw(
   url: string,
   opts: { timeoutMs?: number; headers?: Record<string, string> } = {}
 ): Promise<{ status: number; text: string }> {
   const timeoutMs = opts.timeoutMs ?? 15_000;
-  const { statusCode, body } = await request(url, {
-    method: 'GET',
-    bodyTimeout: timeoutMs,
-    headersTimeout: timeoutMs,
-    ...(opts.headers ? { headers: opts.headers } : {}),
-  });
-  const text = await body.text();
-  return { status: statusCode, text };
+  const attempt = (async () => {
+    const { statusCode, body } = await request(url, {
+      method: 'GET',
+      dispatcher: boundedDispatcher(timeoutMs),
+      bodyTimeout: timeoutMs,
+      headersTimeout: timeoutMs,
+      ...(opts.headers ? { headers: opts.headers } : {}),
+    });
+    const text = await body.text();
+    return { status: statusCode, text };
+  })();
+  return withRequestBound(
+    attempt,
+    timeoutMs,
+    () => new RequestBoundExceeded('GET', url, timeoutMs)
+  );
 }
 
 /**
@@ -853,17 +955,63 @@ export const CATCHUP_RIDE_STEP_TIMEOUT_MS =
   CATCHUP_RIDE_TIMEOUT_MS + CATCHUP_RIDE_MAX_INTERVAL_MS + 30_000;
 
 /**
+ * Which plane a `catching-up` shed actually came from, when the doorway says.
+ *
+ * Doorway funnels TWO different conditions into one `{"status":"catching-up"}`
+ * body: its upstream breaker being open (storage was never called — a real
+ * outage) and its own admission gate being at ceiling (genuine backpressure
+ * that clears itself). Until 2026-08-20 the JSON did not say which, so every
+ * machine consumer read an outage as churn — that single ambiguity is why saga
+ * ch04/ch06/ch10 reds were repeatedly triaged to the wrong plane. Doorway now
+ * carries `cause` ("upstream" | "admission"), plus `circuit` on the upstream
+ * branch (routes/catching_up.rs).
+ *
+ * Returns null against an older doorway that predates the field — callers must
+ * degrade to the pre-2026-08-20 wording rather than assert a plane they cannot
+ * actually see.
+ */
+export function shedCause(text: string): { cause: string; circuit?: string } | null {
+  try {
+    const body = JSON.parse(text) as Record<string, unknown>;
+    const cause = body['cause'];
+    if (typeof cause !== 'string' || cause.length === 0) return null;
+    const circuit = body['circuit'];
+    return { cause, ...(typeof circuit === 'string' ? { circuit } : {}) };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The one shared phrasing for "this read rode the shed" — appended to
  * failure messages. Names the runbook class ONLY when the FINAL answer is
  * still the catching-up shed; a genuine 404/500 after a transient shed says
  * so without misrouting triage to the admission runbook.
+ *
+ * When the doorway names its cause, this routes the red to the RIGHT plane:
+ * an upstream-breaker shed is an availability failure on the doorway→storage
+ * hop and has nothing to do with the projector catching up, so pointing triage
+ * at the admission runbook would be the misroute this repo keeps paying for.
  */
 export function describeCatchUpRide(res: RiddenRawResponse): string {
   if (res.rodeCatchUpMs === undefined) return '';
   const secs = Math.round(res.rodeCatchUpMs / 1000);
-  return res.status === 503 && isCatchingUpBody(res.text)
-    ? ` (still catching-up after riding the admission shed for ${secs}s — runbook "Content view sheds 503 catching-up")`
-    : ` (after a transient catching-up shed of ${secs}s)`;
+  if (!(res.status === 503 && isCatchingUpBody(res.text))) {
+    return ` (after a transient catching-up shed of ${secs}s)`;
+  }
+  const named = shedCause(res.text);
+  if (named?.cause === 'upstream') {
+    const circuit = named.circuit ? `circuit=${named.circuit}` : 'circuit unreported';
+    return (
+      ` (still shedding after ${secs}s — cause=UPSTREAM (${circuit}): the doorway's breaker to its` +
+      ` storage peer is not serving, so this is a doorway→storage availability failure, NOT the` +
+      ` projector catching up — runbook "substrate-trust-contract", not the admission runbook)`
+    );
+  }
+  if (named?.cause === 'admission') {
+    return ` (still catching-up after riding the admission shed for ${secs}s — cause=ADMISSION — runbook "Content view sheds 503 catching-up")`;
+  }
+  return ` (still catching-up after riding the shed for ${secs}s — cause unreported by this doorway (pre-2026-08-20 build); could be upstream-breaker OR admission)`;
 }
 
 /**
@@ -908,10 +1056,17 @@ export async function probeDeclaredHead(
   peerUrl: string,
   contentId: string
 ): Promise<DeclaredHeadResult> {
-  const { status, text } = await getRaw(`${peerUrl}/db/content/${encodeDocId(contentId)}/head`);
+  // Rides the bounded shed, exactly like its sibling probeContent above.
+  // These two read the SAME surface one path segment apart, and until
+  // 2026-08-20 only one of them rode: probeContent absorbed a shed while
+  // probeDeclaredHead threw on the first 503. That asymmetry inside one file
+  // is what made saga ch06's "elohim.host's declared head converges with
+  // alpha-A's" red on a doorway that was serving again seconds later.
+  const res = await getRawRidingCatchUp(`${peerUrl}/db/content/${encodeDocId(contentId)}/head`);
+  const { status, text } = res;
   if (status !== 200) {
     throw new Error(
-      `GET ${peerUrl}/db/content/${contentId}/head: HTTP ${status} (body: ${text.slice(0, 120)})`
+      `GET ${peerUrl}/db/content/${contentId}/head: HTTP ${status} (body: ${text.slice(0, 120)})${describeCatchUpRide(res)}`
     );
   }
   let body: Record<string, unknown>;

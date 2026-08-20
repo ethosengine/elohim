@@ -35,6 +35,7 @@ import {
   probeDeclaredHead,
   resolvePeerUrl,
   CLASSIFY_TIMEOUT_MS,
+  CATCHUP_RIDE_STEP_TIMEOUT_MS,
   type DoorwayState,
 } from '../../src/framework/dataplane/surfaces.js';
 import { E2EWorld } from '../../src/framework/world.js';
@@ -48,7 +49,16 @@ import { E2EWorld } from '../../src/framework/world.js';
  */
 const SINGLE_CLASSIFY_TIMEOUT_MS = 3 * CLASSIFY_TIMEOUT_MS + 15_000;
 const PAIR_CLASSIFY_TIMEOUT_MS = 3 * CLASSIFY_TIMEOUT_MS + 15_000;
-const PAIR_CLASSIFY_AND_HEAD_TIMEOUT_MS = 3 * CLASSIFY_TIMEOUT_MS + 30_000;
+/**
+ * Re-derived 2026-08-20: `probeDeclaredHead` now RIDES the bounded catching-up
+ * shed (surfaces.ts) instead of failing on the first 503, so the head fetch is
+ * no longer one bounded `getRaw` — it can take up to CATCHUP_RIDE_TIMEOUT_MS.
+ * The old `+ 30_000` headroom was sized against the pre-ride behaviour and
+ * would kill this step on cucumber's generic timeout mid-ride, discarding the
+ * `describeCatchUpRide` diagnosis the ride exists to produce. Classification
+ * and the head fetch are sequential phases here, so the two caps add.
+ */
+const PAIR_CLASSIFY_AND_HEAD_TIMEOUT_MS = 3 * CLASSIFY_TIMEOUT_MS + CATCHUP_RIDE_STEP_TIMEOUT_MS;
 
 // ---------------------------------------------------------------------------
 // 1. Honest classification — shed is not death

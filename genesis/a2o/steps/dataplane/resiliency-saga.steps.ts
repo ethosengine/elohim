@@ -604,6 +604,8 @@ interface RawCapture {
   status: number;
   text: string;
   url: string;
+  /** Ride annotation (empty when no shed was ridden) — see describeCatchUpRide. */
+  ride: string;
 }
 const rawCapture = new WeakMap<E2EWorld, RawCapture>();
 
@@ -624,17 +626,26 @@ const rawCapture = new WeakMap<E2EWorld, RawCapture>();
  * mask a genuinely-down doorway — a real outage still fails the assertions
  * below honestly.
  *
+ * TWO different windows, two different absorbers (2026-08-20). The /health
+ * poll above absorbs the pod RESTART window, and it cannot do more than that:
+ * /health is deliberately `admission_exempt` (doorway/src/server/http.rs — "so
+ * /health stays answerable while shedding"), so it answers 200 throughout
+ * exactly the shed this chapter trips on. Waiting on it and then issuing a
+ * bare GET is waiting on the one signal guaranteed to be blind to the
+ * condition — measured that day on doorway-alpha: /health 200 while `/`
+ * returned 503. So the GET itself now rides the bounded shed. Neither absorber
+ * subsumes the other: the ride cannot help with a refused connection, and the
+ * readiness poll cannot see a shed.
+ *
  * Example:
  *   When I query "/" on peer "elohim.host" expecting raw text
  */
 When(
   'I query {string} on peer {string} expecting raw text',
-  // DOORWAY_READY_POLL_TIMEOUT_MS (90s) exceeds cucumber's 30s default step
-  // timeout (steps/common.steps.ts's setDefaultTimeout) — without an explicit
-  // override cucumber would kill the step mid-wait, before the poll's own
-  // deadline governor (or the raw GET that follows it) ever runs. +15s margin
-  // matches this file's other bounded-poll steps' convention.
-  { timeout: DOORWAY_READY_POLL_TIMEOUT_MS + 15_000 },
+  // Sized for BOTH bounded waits back to back: the readiness poll (90s) and
+  // then the shed ride (CATCHUP_RIDE_STEP_TIMEOUT_MS). Cucumber's 30s default
+  // (steps/common.steps.ts setDefaultTimeout) would kill the step mid-wait.
+  { timeout: DOORWAY_READY_POLL_TIMEOUT_MS + CATCHUP_RIDE_STEP_TIMEOUT_MS },
   async function (this: E2EWorld, path: string, peerName: string) {
     const doorway = this.getDoorway(peerName);
     const ready = await waitForDoorwayReady(doorway.url);
@@ -647,15 +658,24 @@ When(
       );
     }
     const url = `${doorway.url}${path}`;
-    const { status, text } = await getRaw(url);
-    rawCapture.set(this, { status, text, url });
+    const res = await getRawRidingCatchUp(url);
+    rawCapture.set(this, {
+      status: res.status,
+      text: res.text,
+      url,
+      ride: describeCatchUpRide(res),
+    });
   }
 );
 
 Then('the raw response status is {int}', function (this: E2EWorld, expected: number) {
   const c = rawCapture.get(this);
   assert.ok(c, 'No raw response captured — run "When I query ... expecting raw text" first');
-  assert.strictEqual(c.status, expected, `${c.url}: status ${c.status}, expected ${expected}`);
+  assert.strictEqual(
+    c.status,
+    expected,
+    `${c.url}: status ${c.status}, expected ${expected}${c.ride}`
+  );
 });
 
 Then('the raw response body contains {string}', function (this: E2EWorld, needle: string) {
@@ -686,16 +706,23 @@ Then('the raw response body contains {string}', function (this: E2EWorld, needle
  */
 Then(
   'peers {string} and {string} report the same non-zero stewardingCollectives for {string}',
+  // Both peers are read concurrently, so ONE ride's ceiling covers the step.
+  { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS },
   async function (this: E2EWorld, peerA: string, peerB: string, contentId: string) {
     const readStewardingCollectives = async (peerName: string): Promise<number> => {
       const doorway = this.getDoorway(peerName);
-      const { status, text } = await getRaw(
+      // Rides the bounded shed (ch03/ch05 house pattern). This read used a
+      // bare getRaw until 2026-08-20 and so failed on the first 503 from a
+      // doorway that was serving again seconds later — measured that day as a
+      // recurring ~2min shed window on BOTH alpha doorways.
+      const res = await getRawRidingCatchUp(
         `${doorway.url}/api/v1/resilience/${encodeURIComponent(contentId)}/household`
       );
+      const { status, text } = res;
       assert.strictEqual(
         status,
         200,
-        `GET /api/v1/resilience/${contentId}/household on ${peerName}: HTTP ${status} (body: ${text.slice(0, 120)})`
+        `GET /api/v1/resilience/${contentId}/household on ${peerName}: HTTP ${status} (body: ${text.slice(0, 120)})${describeCatchUpRide(res)}`
       );
       let body: Record<string, unknown>;
       try {
@@ -713,8 +740,15 @@ Then(
       return value;
     };
 
-    const a = await readStewardingCollectives(peerA);
-    const b = await readStewardingCollectives(peerB);
+    // Concurrent, not sequential: this scenario compares two peers' answers, and
+    // two reads taken up to a full ride apart would be comparing different
+    // instants — a weaker claim, and one that can go red purely because the
+    // fleet moved between them. Concurrency also keeps the step's ceiling at ONE
+    // ride instead of two.
+    const [a, b] = await Promise.all([
+      readStewardingCollectives(peerA),
+      readStewardingCollectives(peerB),
+    ]);
     assert.ok(
       a > 0,
       `stewardingCollectives on ${peerA} is ${a} — expected > 0 (the resilience card must not read zero)`
@@ -743,16 +777,23 @@ Then(
  */
 Then(
   'peers {string} and {string} hold the same DHT anchor for content {string}',
+  // Both peers are read concurrently, so ONE ride's ceiling covers the step.
+  { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS },
   async function (this: E2EWorld, peerA: string, peerB: string, contentId: string) {
     const readAnchor = async (peerName: string): Promise<string> => {
       const doorway = this.getDoorway(peerName);
-      const { status, text } = await getRaw(
+      // Rides the bounded shed — same reason as the ch10 comparator above.
+      // This read hits the SAME surface probeContent already rode; reading it
+      // here with a bare getRaw meant the anchor-equality finish line went red
+      // on transient unavailability rather than on actual divergence.
+      const res = await getRawRidingCatchUp(
         `${doorway.url}/db/content/${encodeURIComponent(contentId)}`
       );
+      const { status, text } = res;
       assert.strictEqual(
         status,
         200,
-        `GET /db/content/${contentId} on ${peerName}: HTTP ${status} (body: ${text.slice(0, 120)})`
+        `GET /db/content/${contentId} on ${peerName}: HTTP ${status} (body: ${text.slice(0, 120)})${describeCatchUpRide(res)}`
       );
       let body: Record<string, unknown>;
       try {
@@ -768,8 +809,9 @@ Then(
       return anchor;
     };
 
-    const a = await readAnchor(peerA);
-    const b = await readAnchor(peerB);
+    // Concurrent for the same reason as ch10: an anchor comparison across two
+    // peers is only meaningful if both are read at the same instant.
+    const [a, b] = await Promise.all([readAnchor(peerA), readAnchor(peerB)]);
     assert.strictEqual(
       a,
       b,
@@ -804,6 +846,10 @@ Then(
  */
 Then(
   'peer {string} resolves the declared head for content {string} equal to peer {string}',
+  // probeDeclaredHead rides the bounded shed (surfaces.ts), so this step can
+  // wait far past cucumber's 31s default. Both peers are read concurrently
+  // below, so ONE ride's ceiling covers the step.
+  { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS },
   async function (this: E2EWorld, adopter: string, contentId: string, declarer: string) {
     // Delegates the fetch to the shared probeDeclaredHead() (surfaces.ts) —
     // same helper the failover concern's "every serving doorway ... resolves
@@ -821,14 +867,18 @@ Then(
       }
     };
 
-    const declared = await readHead(declarer);
+    // Concurrent, not sequential: two rides back to back could take twice the
+    // ride cap, and a cross-peer head comparison is only meaningful if both
+    // sides are read at the same instant. The assertion ORDER below is
+    // unchanged — the declarer is still checked first, because "nothing was
+    // declared" and "declared but not adopted" are different findings.
+    const [declared, adopted] = await Promise.all([readHead(declarer), readHead(adopter)]);
     assert.ok(
       declared.declared,
       `${declarer} reports declared=false for ${contentId} — there is no canonical declaration for ${adopter} to adopt yet, ` +
         `so this station cannot distinguish adoption from anchor convergence`
     );
 
-    const adopted = await readHead(adopter);
     assert.ok(
       adopted.declared,
       `${adopter} reports declared=false for ${contentId} — it holds only an anchor fallback, ` +

@@ -3,8 +3,11 @@ import { describe, it } from 'node:test';
 
 import {
   agentKeyMatchesDiagnosticAgent,
+  describeCatchUpRide,
+  getRaw,
   getRawRidingCatchUp,
   parsePrometheusMetrics,
+  shedCause,
   CATCHUP_RIDE_MAX_INTERVAL_MS,
   CATCHUP_RIDE_TIMEOUT_MS,
 } from '../surfaces.js';
@@ -207,5 +210,112 @@ void describe('getRawRidingCatchUp', () => {
     // Bounded: deadline / clamped interval, +1 for the initial probe.
     assert.equal(calls, Math.ceil(CATCHUP_RIDE_TIMEOUT_MS / CATCHUP_RIDE_MAX_INTERVAL_MS) + 1);
     assert.ok((res.rodeCatchUpMs ?? 0) >= CATCHUP_RIDE_TIMEOUT_MS);
+  });
+});
+
+void describe('shedCause / describeCatchUpRide — routing a shed to the right plane', () => {
+  const rode = (text: string) => ({ status: 503, text, rodeCatchUpMs: 42_000 });
+
+  void it('reads the upstream cause the doorway now names', () => {
+    const named = shedCause('{"status":"catching-up","cause":"upstream","circuit":"open"}');
+    assert.deepEqual(named, { cause: 'upstream', circuit: 'open' });
+  });
+
+  void it('reads the admission cause', () => {
+    assert.deepEqual(shedCause('{"status":"catching-up","cause":"admission"}'), {
+      cause: 'admission',
+    });
+  });
+
+  void it('returns null for a pre-2026-08-20 doorway that names no cause', () => {
+    assert.equal(shedCause('{"status":"catching-up","retryAfter":30}'), null);
+    assert.equal(shedCause('not json at all'), null);
+  });
+
+  void it('routes an upstream shed AWAY from the admission runbook', () => {
+    const msg = describeCatchUpRide(
+      rode('{"status":"catching-up","cause":"upstream","circuit":"open"}')
+    );
+    assert.ok(msg.includes('cause=UPSTREAM'), msg);
+    assert.ok(msg.includes('circuit=open'), msg);
+    assert.ok(msg.includes('availability failure'), msg);
+    // The misroute this whole change exists to stop: triage must be pointed at
+    // the substrate-trust-contract runbook, NOT at the admission runbook. The
+    // discriminator is the admission runbook's own identifying phrase — the
+    // message may (and does) name the admission runbook in order to rule it out.
+    assert.ok(msg.includes('substrate-trust-contract'), msg);
+    assert.ok(!msg.includes('Content view sheds 503 catching-up'), msg);
+  });
+
+  void it('routes a genuine admission shed TO the admission runbook', () => {
+    const msg = describeCatchUpRide(rode('{"status":"catching-up","cause":"admission"}'));
+    assert.ok(msg.includes('cause=ADMISSION'), msg);
+    assert.ok(msg.includes('Content view sheds 503 catching-up'), msg);
+  });
+
+  void it('says plainly that an old doorway did not report a cause', () => {
+    const msg = describeCatchUpRide(rode('{"status":"catching-up","retryAfter":30}'));
+    assert.ok(msg.includes('cause unreported'), msg);
+    // Must not assert a plane it cannot see.
+    assert.ok(!msg.includes('cause=UPSTREAM'), msg);
+    assert.ok(!msg.includes('cause=ADMISSION'), msg);
+  });
+
+  void it('stays silent when no shed was ridden at all', () => {
+    assert.equal(describeCatchUpRide({ status: 200, text: '{}' }), '');
+  });
+
+  void it('reports a transient shed that ended in a non-shed answer', () => {
+    const msg = describeCatchUpRide({ status: 404, text: 'gone', rodeCatchUpMs: 5_000 });
+    assert.ok(msg.includes('transient catching-up shed'), msg);
+  });
+});
+
+void describe('getRaw — timeoutMs is a TOTAL bound, connect included', () => {
+  /*
+   * REGRESSION GUARD (build elohim-genesis/dev #1489 sweep, 2026-08-20).
+   *
+   * `bodyTimeout`/`headersTimeout` only start once a socket exists; neither
+   * bounds the TCP connect, which undici defaults to 10s. So a caller asking
+   * for a 4s bound waited 10.5s — MEASURED here before the fix:
+   *
+   *   getRaw('http://10.255.255.1:8080/health', { timeoutMs: 4000 })
+   *     -> threw "Connect Timeout Error (attempted address: 10.255.255.1:8080,
+   *        timeout: 10000ms)" after 10492 ms
+   *
+   * That is not a cosmetic overrun: steps/common.steps.ts sizes a browser
+   * step's whole failure diagnosis off REACH_PROBE_TIMEOUT_MS, so a probe that
+   * silently ran 2.6x its declared bound pushed the step past
+   * CUCUMBER_STEP_DEADLINE_MS and cucumber killed it with the bare
+   * "function timed out" line that browserStep exists to abolish.
+   *
+   * 10.255.255.1 is in RFC-1918 space with no route out of this container, so
+   * the connect hangs rather than being refused. Where a network DOES answer
+   * or refuse it fast, the assertion still holds (it only ever tightens) —
+   * the test asserts the CEILING, never that a failure occurred.
+   */
+  // Deliberately plain http: the point is a TCP connect that never completes.
+  // TLS would add a second unbounded phase and tell us nothing about the bound
+  // under test.
+  // eslint-disable-next-line sonarjs/no-clear-text-protocols
+  const UNROUTABLE = 'http://10.255.255.1:8080/health';
+  const BOUND_MS = 1_500;
+  /* Loose enough not to flake on a slow runner; far below undici's 10s
+   * connect default, so the pre-fix behaviour could never pass it. */
+  const CEILING_MS = 5_000;
+
+  void it("settles an unroutable address within its own bound, not undici's connect default", async () => {
+    const started = Date.now();
+    try {
+      await getRaw(UNROUTABLE, { timeoutMs: BOUND_MS });
+    } catch {
+      // Either outcome is fine; the contract under test is WHEN it settles.
+    }
+    const elapsed = Date.now() - started;
+    assert.ok(
+      elapsed < CEILING_MS,
+      `getRaw ignored its ${BOUND_MS}ms bound: settled after ${elapsed}ms ` +
+        `(the pre-fix connect-unbounded shape took ~10500ms)`
+    );
   });
 });
