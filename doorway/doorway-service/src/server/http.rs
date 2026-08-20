@@ -4235,6 +4235,91 @@ async fn serve_ssr_route(
     .await
 }
 
+/// Percent-decode one path segment captured by a prefix/suffix route arm.
+///
+/// `Uri::path()` hands back the RAW (still percent-encoded) path, so a segment
+/// carrying reserved characters arrives escaped. A Holochain agent pub key is
+/// standard base64 — it contains `/` and `=`, which any correct client escapes
+/// to `%2F` / `%3D` before putting it in a path segment. Handing that escaped
+/// text to a registry keyed by the real base64 string never matches, so the
+/// lookup 404s on a key the node is actually hosting
+/// (conductor-visibility.feature:28).
+///
+/// Undecodable input (a stray `%` that is not a valid escape) is passed through
+/// verbatim rather than dropped: the handler then reports "not found" for the
+/// literal thing that was asked for, which is the honest answer.
+fn decode_path_segment(raw: &str) -> String {
+    urlencoding::decode(raw)
+        .map(|decoded| decoded.into_owned())
+        .unwrap_or_else(|_| raw.to_string())
+}
+
+#[cfg(test)]
+mod path_segment_decoding_tests {
+    use super::decode_path_segment;
+
+    #[test]
+    fn standard_base64_agent_key_survives_percent_encoding() {
+        // The exact key that 404'd in elohim-genesis/dev #1489: standard
+        // base64 (two `/`, trailing `=`), escaped by encodeURIComponent.
+        let encoded = "W%2FeFHpTC1DwhYW3flMJ%2F6pdlxGqPd7D5mhqwu89OCjs%3D";
+        assert_eq!(
+            decode_path_segment(encoded),
+            "W/eFHpTC1DwhYW3flMJ/6pdlxGqPd7D5mhqwu89OCjs=",
+            "the registry is keyed by the real base64 string, not its escaped form"
+        );
+    }
+
+    #[test]
+    fn url_safe_key_is_unchanged() {
+        // base64url-no-pad (the Holochain display form) has nothing to escape —
+        // decoding must be a no-op, not a corruption.
+        let key = "uhCAkW-eFHpTC1DwhYW3flMJ_6pdlxGqPd7D5mhqwu89OCjs";
+        assert_eq!(decode_path_segment(key), key);
+    }
+
+    #[test]
+    fn undecodable_segment_passes_through_verbatim() {
+        // A lone `%` is not a valid escape; report on what was asked for.
+        assert_eq!(decode_path_segment("100%broken"), "100%broken");
+    }
+
+    /// The defect end-to-end at its real seam: the escaped segment misses a key
+    /// the registry is genuinely holding, and the decoded one finds it.
+    /// `main.rs` startup discovery registers every hosted agent under the
+    /// STANDARD base64 encoding, which is exactly the form that has to be
+    /// escaped to survive a URL path segment.
+    #[tokio::test]
+    async fn escaped_key_misses_the_registry_and_the_decoded_key_hits() {
+        use crate::conductor::{ConductorInfo, ConductorRegistry};
+
+        let registry = ConductorRegistry::new(None).await;
+        registry.register_conductor(ConductorInfo {
+            conductor_id: "conductor-0".to_string(),
+            conductor_url: "ws://cond-0:4445".to_string(),
+            admin_url: "ws://cond-0:4444".to_string(),
+            capacity_used: 0,
+            capacity_max: 50,
+        });
+
+        let standard_b64 = "W/eFHpTC1DwhYW3flMJ/6pdlxGqPd7D5mhqwu89OCjs=";
+        registry
+            .register_agent(standard_b64, "conductor-0", "elohim")
+            .await
+            .unwrap();
+
+        let escaped = "W%2FeFHpTC1DwhYW3flMJ%2F6pdlxGqPd7D5mhqwu89OCjs%3D";
+        assert!(
+            registry.get_conductor_for_agent(escaped).is_none(),
+            "the escaped form is not a registry key — this is the 404 the route used to return"
+        );
+        let entry = registry
+            .get_conductor_for_agent(&decode_path_segment(escaped))
+            .expect("decoding the path segment must find the hosted agent");
+        assert_eq!(entry.conductor_id, "conductor-0");
+    }
+}
+
 /// Route incoming HTTP requests
 async fn handle_request(
     state: Arc<AppState>,
@@ -4858,13 +4943,19 @@ async fn handle_request(
             ));
         }
 
-        // Agent conductor lookup
+        // Agent conductor lookup.
+        // The key is percent-DECODED before the registry lookup: agent pub keys
+        // are standard base64, so `/` and `=` arrive as `%2F` / `%3D` and the
+        // registry (keyed by the real base64 string — see main.rs agent
+        // discovery, which registers both the STANDARD and URL_SAFE_NO_PAD
+        // encodings) would otherwise miss a key it is genuinely hosting.
         (Method::GET, p) if p.starts_with("/admin/agents/") && p.ends_with("/conductor") => {
-            let agent_key = p
-                .strip_prefix("/admin/agents/")
-                .and_then(|s| s.strip_suffix("/conductor"))
-                .unwrap_or("");
-            to_boxed(routes::handle_agent_conductor(&req, Arc::clone(&state), agent_key).await)
+            let agent_key = decode_path_segment(
+                p.strip_prefix("/admin/agents/")
+                    .and_then(|s| s.strip_suffix("/conductor"))
+                    .unwrap_or(""),
+            );
+            to_boxed(routes::handle_agent_conductor(&req, Arc::clone(&state), &agent_key).await)
         }
 
         // List all nodes with detailed resource and social metrics

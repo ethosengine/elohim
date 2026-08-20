@@ -127,6 +127,8 @@ Then('the agents list should be an array', function () {
 // ---------------------------------------------------------------------------
 
 let lastAgentConductorResponse: AgentConductorResponse | undefined;
+/** The key the lookup asked about, in its real (unescaped) form. */
+let lastLookedUpAgentPubKey: string | undefined;
 
 When(
   '{word} looks up which conductor hosts {word}',
@@ -138,6 +140,12 @@ When(
     const target = this.getHuman(targetName);
     assert.ok(target.agentPubKey, `${targetName} has no agentPubKey`);
 
+    // An agent pub key is base64: standard-alphabet keys carry `/` and `=`, so
+    // they MUST be escaped to survive a single path segment. The doorway is
+    // required to percent-decode the segment before it consults the conductor
+    // registry — the registry is keyed by the real key, never by its escaped
+    // form. See the echo assertion below.
+    lastLookedUpAgentPubKey = target.agentPubKey;
     lastAgentConductorResponse = await adminGet<AgentConductorResponse>(
       device,
       `/admin/agents/${encodeURIComponent(target.agentPubKey)}/conductor`
@@ -147,6 +155,16 @@ When(
 
 Then('the agent conductor lookup should return a conductor ID', function () {
   assert.ok(lastAgentConductorResponse, 'No agent conductor response available');
+  // The answer must be about the agent that was asked about. An echoed
+  // percent-escaped key ("W%2FeFH…%3D") is the fingerprint of a doorway that
+  // never decoded the path segment — it looked up, and would answer for, a key
+  // that no conductor hosts.
+  assert.equal(
+    lastAgentConductorResponse.agentPubKey,
+    lastLookedUpAgentPubKey,
+    `lookup answered for a different key than the one asked about — ` +
+      `asked "${lastLookedUpAgentPubKey}", got "${lastAgentConductorResponse.agentPubKey}"`
+  );
   assert.ok(lastAgentConductorResponse.conductorId, 'Missing conductorId in agent lookup response');
 });
 
