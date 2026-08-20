@@ -837,7 +837,17 @@ pub fn reach_level_index(reach: &str) -> u8 {
         "trusted" => 3,
         "intimate" => 4,
         "self" | "private" => 5,
-        _ => 0,
+        // An UNRECOGNIZED tier is the most restricted thing we know, never the
+        // least. Reading it as 0 (commons) meant a typo'd or newly-added reach
+        // sorted as public: callers gate on `index > community` to decide
+        // whether to CALL the authorizer, so `authorize_reach_for_human`'s own
+        // `_ => Err("Unknown reach level")` was unreachable and the row served.
+        // Fail-closed here keeps that deny reachable. Every consumer was checked
+        // for this value (2026-08-20): the policy ceiling treats it as maximally
+        // restricted, the ambient-ceiling fast path falls through to the
+        // content-specific check, and the HTTP gate routes it into the
+        // authorizer that refuses it.
+        _ => u8::MAX,
     }
 }
 
@@ -981,7 +991,11 @@ mod tests {
         assert_eq!(reach_level_index("intimate"), 4);
         assert_eq!(reach_level_index("self"), 5);
         assert_eq!(reach_level_index("private"), 5);
-        assert_eq!(reach_level_index("garbage"), 0);
+        // Re-aimed 2026-08-20: this line used to ASSERT the fail-open (== 0).
+    // An unknown tier must sort as the MOST restricted, so it reaches the
+    // authorizer's `_ => Err` instead of being served as commons.
+    assert_eq!(reach_level_index("garbage"), u8::MAX);
+    assert!(reach_level_index("garbage") > reach_level_index("community"));
     }
 
     // ---- T7: process-lifetime memo store plumbing ----

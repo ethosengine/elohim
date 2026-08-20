@@ -72,9 +72,11 @@ pub struct PricingInput {
     pub stage: NetworkStage,
     pub floor: FloorClass,
     /// TYPED reach — never `&str`. The `&str` path
-    /// (`epr_service::reach_level_index`) maps an unknown string to the
-    /// MOST permissive tier; a pricer must never inherit that fail-open
-    /// behavior, so it only ever sees the closed, DNA-notarized enum.
+    /// (`epr_service::reach_level_index`) is a lossy projection of this enum;
+    /// a pricer must never inherit a string parse, so it only ever sees the
+    /// closed, DNA-notarized enum. (That path mapped an unknown string to the
+    /// MOST permissive tier until 2026-08-20; it now fails closed to
+    /// `u8::MAX`, but the argument for keeping this field typed is unchanged.)
     pub reach: Reach,
     /// The derived standing view — `Unknown` everywhere until T19 lands the
     /// `standing_projector` writer (plan §2.1, evidence correction #1).

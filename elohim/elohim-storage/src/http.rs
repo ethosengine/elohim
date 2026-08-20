@@ -5268,16 +5268,85 @@ impl HttpServer {
                     db::content_diesel::MinTrust::Amber,
                 ) {
                     Ok(items) => {
-                        // Reach-based filtering: unauthenticated requests only see commons/public
-                        let has_auth = req.headers().get(header::AUTHORIZATION).is_some()
-                            || req.headers().get("X-Agent-Id").is_some();
+                        // REACH ENFORCEMENT (2026-08-20). Authorization here is
+                        // UNCONDITIONAL at every posture. What a declared dev stage may
+                        // cheapen is the DEPTH at which a requester's identity and
+                        // relationships are verified — never WHETHER the decision is made,
+                        // and never in the open direction.
+                        //
+                        // What this replaced was not a lenient policy, it was the absence
+                        // of one: `has_auth = headers.get(AUTHORIZATION).is_some()` treated
+                        // header PRESENCE as authorization, so any caller sending
+                        // `Authorization: Bearer <anything>` received every restricted row
+                        // WITH its content body. Measured live on doorway-alpha
+                        // 2026-08-20: anonymous → 90 rows (all commons); the identical
+                        // request with the literal token `bogus` → 1000 rows
+                        // (familiar 906, private 3, intimate 1). `X-Agent-Id` is
+                        // self-asserted, so no token was needed at all.
+                        //
+                        // The single-item route already did this correctly; this is the
+                        // same resolve-then-authorize path applied per row.
+                        let requester = crate::api::account::extract_agent_cid(&req, &mut conn)
+                            .ok()
+                            .flatten()
+                            .and_then(|idv| {
+                                crate::db::humans::get_human_by_id(&mut conn, &idv)
+                                    .ok()
+                                    .flatten()
+                                    .or_else(|| {
+                                        crate::db::humans::get_human_by_agent_key(&mut conn, &idv)
+                                            .ok()
+                                            .flatten()
+                                    })
+                            });
+                        let community_idx = crate::epr_service::reach_level_index("community");
+                        let reach_gate = crate::epr_service::EprService::new(
+                            None,
+                            None,
+                            None,
+                            crate::p2p::trust_cache::PeerTrustCache::new(),
+                        )
+                        .with_memo_store(self.memo_store.clone());
+                        let mut refused: usize = 0;
                         let views: Vec<ContentView> = items
                             .into_iter()
                             .map(Into::into)
                             .filter(|v: &ContentView| {
-                                has_auth || v.reach == "commons" || v.reach == "public"
+                                let idx = crate::epr_service::reach_level_index(&v.reach);
+                                // commons/public: no identity needed.
+                                if idx == 0 {
+                                    return true;
+                                }
+                                // Every restricted tier needs a RESOLVED requester.
+                                // Deny-by-default when the caller cannot be resolved —
+                                // this is the fail-closed half header-presence skipped.
+                                let Some(ref human) = requester else {
+                                    refused += 1;
+                                    return false;
+                                };
+                                // community: a resolved identity IS the gate (mirrors the
+                                // single-item route, which authorizes only above community).
+                                if idx <= community_idx {
+                                    return true;
+                                }
+                                match reach_gate.authorize_reach_for_human_with_own_trust(
+                                    &mut conn, &app_ctx, &v.reach, human, &v.id,
+                                ) {
+                                    Ok(()) => true,
+                                    Err(_) => {
+                                        refused += 1;
+                                        false
+                                    }
+                                }
                             })
                             .collect();
+                        if refused > 0 {
+                            tracing::debug!(
+                                refused,
+                                resolved_requester = requester.is_some(),
+                                "reach enforcement filtered rows from /db/content listing"
+                            );
+                        }
                         let body = serde_json::json!({
                             "items": views,
                             "count": views.len(),
@@ -6494,9 +6563,15 @@ impl HttpServer {
                 if let Ok(Some(ref view)) = result {
                     let is_public = view.reach == "commons" || view.reach == "public";
                     if !is_public {
-                        let has_auth = req.headers().get(header::AUTHORIZATION).is_some()
-                            || req.headers().get("X-Agent-Id").is_some();
-                        if !has_auth {
+                        // Header PRESENCE is not authentication — see the /db/content
+                        // listing note. Require the caller to RESOLVE to an identity
+                        // (doorway-injected `X-Agent-Cid`, or a local session); a bare
+                        // `Authorization:` header no longer opens restricted tiers.
+                        let resolved = crate::api::account::extract_agent_cid(&req, &mut conn)
+                            .ok()
+                            .flatten()
+                            .is_some();
+                        if !resolved {
                             return Ok(Response::builder()
                                 .status(StatusCode::FORBIDDEN)
                                 .header(header::CONTENT_TYPE, "application/json")
