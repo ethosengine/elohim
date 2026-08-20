@@ -861,26 +861,23 @@ pub fn recognized_reach_level_index(reach: &str) -> Option<u8> {
 /// loosest (0); `self`/`private` is the strictest (5); an unrecognized tier
 /// fails closed to `u8::MAX`.
 pub fn reach_level_index(reach: &str) -> u8 {
-    match recognized_reach_level_index(reach) {
-        Some(idx) => idx,
-        // An UNRECOGNIZED tier is the most restricted thing we know, never the
-        // least. Reading it as 0 (commons) meant a typo'd or newly-added reach
-        // sorted as public: callers gate on `index > community` to decide
-        // whether to CALL the authorizer, so `authorize_reach_for_human`'s own
-        // `_ => Err("Unknown reach level")` was unreachable and the row served.
-        // Fail-closed here keeps that deny reachable.
-        //
-        // This sentinel is only safe where the index is read as a RESTRICTION.
-        // Consumers checked 2026-08-20, corrected 2026-08-20 after review:
-        // `policy_cache::can_serve` blocks on `content_reach > max_reach`, so
-        // u8::MAX is maximally restricted there (safe); the HTTP gates route it
-        // into the authorizer that refuses it (safe); but
-        // `check_reach_authorization`'s ambient fast path reads a PEER-SUPPLIED
-        // ceiling in the opposite direction, where u8::MAX would have meant
-        // maximally privileged. That call site takes
-        // `recognized_reach_level_index` and refuses `None` instead.
-        _ => u8::MAX,
-    }
+    // An UNRECOGNIZED tier is the most restricted thing we know, never the
+    // least. Reading it as 0 (commons) meant a typo'd or newly-added reach
+    // sorted as public: callers gate on `index > community` to decide whether
+    // to CALL the authorizer, so `authorize_reach_for_human`'s own
+    // `_ => Err("Unknown reach level")` was unreachable and the row served.
+    // Fail-closed here keeps that deny reachable.
+    //
+    // This sentinel is only safe where the index is read as a RESTRICTION.
+    // Consumers checked 2026-08-20, corrected 2026-08-20 after review:
+    // `policy_cache::can_serve` blocks on `content_reach > max_reach`, so
+    // u8::MAX is maximally restricted there (safe); the HTTP gates route it
+    // into the authorizer that refuses it (safe); but
+    // `check_reach_authorization`'s ambient fast path reads a PEER-SUPPLIED
+    // ceiling in the opposite direction, where u8::MAX would have meant
+    // maximally privileged. That call site takes `recognized_reach_level_index`
+    // and refuses `None` instead.
+    recognized_reach_level_index(reach).unwrap_or(u8::MAX)
 }
 
 /// Query the **direct (1-hop)** prerequisite content ids for `content_id` from
