@@ -33,6 +33,8 @@ WARN_PATTERNS = [
     r'docker-compose.*\.yml$',
     r'Dockerfile$',
     r'/manifests/.*\.ya?ml$',  # Kubernetes manifests
+    r'(^|/)\.npmrc$',          # registry _authToken lives here
+    r'(^|/)\.cargo/(config|credentials)(\.toml)?$',  # cargo registry token
     r'package-lock\.json$',    # Usually auto-generated
     r'Cargo\.lock$',           # Usually auto-generated
     r'flake\.lock$',           # Nix lock file
@@ -54,16 +56,29 @@ ASSIGNMENT = re.compile(
     r'''(?imx)
     ["']?(?P<name>
       password|passwd|pwd|api[_-]?key|secret(?:[_-]?key)?|access[_-]?token|
-      refresh[_-]?token|auth[_-]?token|client[_-]?secret|private[_-]?key
-    )["']?\s*(?:=|:)\s*
-    (?P<quote>["']?)(?P<value>[^\s,"'\]}#;]+)(?P=quote)
+      refresh[_-]?token|auth[_-]?token|client[_-]?secret|private[_-]?key|token
+    )(?:[_-][a-z0-9]+)*["']?\s*(?:=|:)\s*
+    (?P<quote>["']?)(?:(?:Bearer|Basic|Token)\s+)?(?P<value>[^\s,"'\]}#;]+)(?P=quote)
     ''',
 )
+# An unquoted capture is syntactically ambiguous: it is equally likely to be a bare code
+# expression (`self.args.jwt_secret.as_ref()?`, `process.env.API_KEY`, a type name) as it is
+# to be a real credential. .env / YAML / shell all write live credentials unquoted, so the
+# unquoted branch cannot simply be dropped — it is narrowed instead. Generated credential
+# material is drawn from base64/base64url/hex alphabets and effectively always carries a
+# digit; code expressions carry call/index/path punctuation and usually no digit.
+# Admits generated credential alphabets AND hand-typed password punctuation, while still
+# excluding the call/index/generic/path punctuation that makes a value a code expression:
+# ( ) [ ] < > : ; \ | ? and whitespace never appear here.
+CREDENTIAL_CHARSET = re.compile(r"^[A-Za-z0-9+/=_.~!@$%^&*-]+$")
 PLACEHOLDER_WORDS = {
     "", "changeme", "change-me", "dummy", "example", "fake", "fixture", "placeholder",
     "redacted", "replace-me", "secret", "test", "todo", "unset", "your-key-here",
 }
-PLACEHOLDER_FRAGMENTS = ("example", "dummy", "fake", "fixture", "placeholder", "redact", "test-")
+PLACEHOLDER_FRAGMENTS = (
+    "example", "dummy", "fake", "fixture", "placeholder", "redact", "test-",
+    "change-me", "change_me", "changeme", "replace-me", "replace_with", "your-",
+)
 
 
 def matches_pattern(file_path: str, patterns: list) -> tuple[bool, str]:
@@ -91,6 +106,67 @@ def _looks_like_live_value(value: str) -> bool:
     return classes >= 2 and len(set(value)) >= 8
 
 
+def _has_generated_entropy(value: str) -> bool:
+    """Word-slugs are not credentials, however long they are.
+
+    `register-confirm-password` (a data-testid), `optional-bearer-token` (doc prose) and
+    `correct-horse-battery-staple` (a unit fixture) all clear the length and character-class
+    bars while being ordinary hyphenated English. Generated credential material carries a
+    digit or mixes case; hyphenated identifiers carry neither.
+    """
+    return any(c.isdigit() for c in value) or (
+        any(c.islower() for c in value) and any(c.isupper() for c in value)
+    )
+
+
+def _segment_is_credential_ish(segment: str) -> bool:
+    """One dot-separated segment that looks generated rather than like an identifier.
+
+    A digit is necessary but not sufficient — it must also either mix in uppercase (a JWT
+    segment) or be long enough that no one typed it as a name (a hex token body). This is
+    what separates `NpmToken.9f3a1c7e...` (a real registry token) from `process.env.KEY`.
+    """
+    if not any(c.isdigit() for c in segment):
+        return False
+    return any(c.isupper() for c in segment) or len(segment) >= 16
+
+
+def _unquoted_looks_like_credential(value: str) -> bool:
+    """Extra shape evidence demanded of an UNQUOTED value before it may interrupt.
+
+    Quoted values are unambiguous string literals and skip this. Unquoted ones must look
+    like generated credential material rather than code: credential alphabet only (no call,
+    index, generic, or path-separator punctuation), at least one digit, and — for dotted
+    values — at least one generated-looking segment, so `self.args.jwt_secret` and
+    `process.env.DOORWAY_API_KEY` stay silent while `eyJhbGciOi....` and `NpmToken.9f3a...`
+    do not.
+
+    Known trade: an all-alphabetic unquoted passphrase (`DB_PASSWORD=correctHorseBattery`)
+    stays advisory-only, because dropping the digit requirement re-admits every bare type
+    name and env-var path in the tree. Quoted passphrases are still caught.
+    """
+    if not CREDENTIAL_CHARSET.match(value):
+        return False
+    if not any(char.isdigit() for char in value):
+        return False
+    # '=' is base64 PADDING, so it is terminal. An interior '=' means the capture ran into
+    # a query string (`token=transfer-1&tab=usage`), not a credential.
+    if "=" in value.rstrip("="):
+        return False
+    if "." in value:
+        return any(_segment_is_credential_ish(seg) for seg in value.split("."))
+    return True
+
+
+def _assignment_is_secret(match: "re.Match") -> bool:
+    value = match.group("value")
+    if not _looks_like_live_value(value):
+        return False
+    if not _has_generated_entropy(value):
+        return False
+    return bool(match.group("quote")) or _unquoted_looks_like_credential(value)
+
+
 def check_content_for_secrets(content: str) -> list[str]:
     """Return redaction-safe IDs for high-confidence secret material only."""
     found = []
@@ -99,7 +175,7 @@ def check_content_for_secrets(content: str) -> list[str]:
     for detector_id, pattern in LIVE_TOKEN_PATTERNS.items():
         if pattern.search(content):
             found.append(detector_id)
-    if any(_looks_like_live_value(match.group("value")) for match in ASSIGNMENT.finditer(content)):
+    if any(_assignment_is_secret(match) for match in ASSIGNMENT.finditer(content)):
         found.append("high-entropy-secret-assignment")
     return found
 

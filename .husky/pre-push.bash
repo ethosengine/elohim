@@ -153,6 +153,54 @@ if echo "$CHANGED" | grep -qE "^\.epr-meta/elohim/|^\.claude/skills/|^\.claude/a
   fi
 fi
 
+# ── Claude hook boundary tests ─────────────────────────────
+#
+# .claude/hooks/** are PreToolUse gates that decide when the pilot gets interrupted —
+# sensitive-file-protection.py owns the confidentiality boundary. Its committed test
+# suite already pinned that boundary in both directions, but nothing executed it, so a
+# 2026-08-19 "cure" for a Rust-expression false positive silently disabled secret
+# detection for every UNQUOTED assignment (.env / YAML / shell — where live credentials
+# actually get pasted) and shipped with its own regression test red. A verification that
+# no lane runs is not a verification.
+#
+# MUST run on the raw (pre-.ci-ignore-filter) $CHANGED and before that filter's early
+# exit, for the same reason as the projection check above: .ci-ignore drops the broad
+# `.claude/` prefix, and a hooks-only push would otherwise exit at "All changes are
+# .ci-ignore'd" before this ever ran.
+#
+# Pure python (~ms), no cargo — PVC-EXEMPT BY OMISSION: never in HEAVY_GATES, never
+# deferrable. Fail-open if python3 is absent (degraded shell), same posture as above.
+if echo "$CHANGED" | grep -qE "^\.claude/hooks/"; then
+  if command -v python3 >/dev/null 2>&1; then
+    hook_tests_ran=0
+    for hook_test in .claude/hooks/tests/test_*.py; do
+      [ -f "$hook_test" ] || continue
+      hook_tests_ran=1
+      echo "[pre-push] Running Claude hook boundary tests: $hook_test"
+      if ! python3 "$hook_test"; then
+        echo ""
+        echo "!!============================================================!!"
+        echo "!! CLAUDE HOOK BOUNDARY TEST FAILED: $hook_test"
+        echo "!! A PreToolUse hook changed its interruption boundary. If the new"
+        echo "!! behavior is intended, update the assertion IN THE SAME COMMIT so the"
+        echo "!! boundary stays declared; do not push a red boundary test."
+        echo "!!============================================================!!"
+        echo ""
+        exit 1
+      fi
+    done
+    # A glob that matches nothing must not print a success line — a renamed or deleted
+    # suite would otherwise read as "gate passed" forever, which is the same
+    # verification-that-never-runs failure this gate exists to close.
+    if [ "$hook_tests_ran" -eq 0 ]; then
+      echo "[pre-push] ERROR: .claude/hooks changed but no boundary tests were found."
+      echo "  Expected at least one .claude/hooks/tests/test_*.py"
+      exit 1
+    fi
+    echo "[pre-push] Claude hook boundary tests ✓"
+  fi
+fi
+
 # ── .ci-ignore filter ─────────────────────────────────────────────
 #
 # Drop files that are listed in repo-root .ci-ignore (CLAUDE.md, .claude/,
