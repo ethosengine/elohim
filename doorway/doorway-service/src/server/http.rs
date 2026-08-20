@@ -1951,7 +1951,51 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
                                 return resp;
                             }
 
+                            // R1 — the Chain-R PARENT hop: whole inbound request,
+                            // entry to response. Timed HERE, at the single call
+                            // site, rather than inside `handle_request`, because
+                            // that function has many early returns and each one
+                            // would need its own timer — a shape that goes stale
+                            // the first time someone adds a return.
+                            //
+                            // `route_class` is a CLOSED set (service | epr | ws |
+                            // asset), never the raw path: a path label would make
+                            // this series unbounded in cardinality and turn the
+                            // instrument into the outage it exists to prevent.
+                            let hop_started = std::time::Instant::now();
+                            let hop_route_class =
+                                crate::metrics::classify_route(req.method(), req.uri().path());
                             let response = handle_request(state, addr, req).await?;
+                            let hop_elapsed = hop_started.elapsed();
+                            let hop_outcome = if response.status().is_success() {
+                                "ok"
+                            } else if response.status().as_u16() == 503 {
+                                // Distinguished because a shed is the dominant
+                                // slow path on this fleet and must not be averaged
+                                // into healthy serves.
+                                "shed"
+                            } else {
+                                "err"
+                            };
+                            crate::metrics::observe_hop(
+                                crate::metrics::DoorwayHop::Serve,
+                                hop_route_class,
+                                hop_outcome,
+                                hop_elapsed,
+                            );
+                            // Self-reported elapsed, so a downstream prober can
+                            // compute (client RTT - serve) without differencing
+                            // two clocks. Container clocks here skew by hours;
+                            // a timestamp-differenced residual is poison by
+                            // construction. Joins the existing `x-ssr-*` header
+                            // convention.
+                            let mut response = response;
+                            if let Ok(v) = hyper::header::HeaderValue::from_str(&format!(
+                                "{:.3}",
+                                hop_elapsed.as_secs_f64() * 1_000.0
+                            )) {
+                                response.headers_mut().insert("x-elohim-hop-serve-ms", v);
+                            }
                             Ok(crate::cors::apply_cors_headers(
                                 &cors_config,
                                 request_origin.as_deref(),

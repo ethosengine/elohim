@@ -29,8 +29,8 @@ use std::time::Instant;
 
 use lazy_static::lazy_static;
 use prometheus::{
-    Encoder, Histogram, HistogramOpts, IntCounter, IntCounterVec, IntGauge, Opts, Registry,
-    TextEncoder,
+    Encoder, Histogram, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGauge, Opts,
+    Registry, TextEncoder,
 };
 
 // ── Reconnect-reason label values (M2). The close *cause*, a non-overlapping
@@ -116,6 +116,39 @@ lazy_static! {
             "Conductor WS session lifetime in seconds.",
         )
         .buckets(vec![0.05, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0, 300.0]),
+    )
+    .unwrap();
+
+    // ── R-CHAIN HOP TIMING — the read journey's per-hop cost ─────────────────
+    //
+    // The fast lane (Chain R) of the latency valueflow chain: browser-initiated,
+    // synchronous, budgeted in MILLISECONDS. Deliberately a separate metric
+    // family from anything on the converge journey (Chain W, which lives in
+    // elohim-storage and is ALLOWED to lag) — no alarm on this series may ever
+    // reference a Chain-W series, which is how "never gate the fast lane on the
+    // slow lane" is enforced structurally rather than by convention.
+    //
+    // Before this existed, doorway had exactly ONE histogram and it timed
+    // session *lifetime*; there was no request-duration series at all, so lane
+    // C's SLO was anchored to a single multiplication rather than an
+    // observation. The composition residual `serve - (the branch that ran)` is
+    // the point: a fat parent over flat children says the doorway's own
+    // overhead is the cure, not any downstream coupling.
+    //
+    // Buckets are millisecond-resolution at the low end because the rule is
+    // instrument resolution <= 1/10 of the hop's budget. A 200ms hit budget
+    // needs <=20ms resolution; the 500ms-poll-vs-4.5s-phenomenon failure
+    // (11% quantization) is what that rule exists to prevent.
+    // Design: genesis/docs/superpowers/specs/2026-08-20-latency-valueflow-chain-design.md
+    pub static ref HOP_DURATION_MS: HistogramVec = HistogramVec::new(
+        HistogramOpts::new(
+            "doorway_hop_duration_ms",
+            "Wall-clock cost of one Chain-R (read journey) hop, by hop/class/outcome.",
+        )
+        .buckets(vec![
+            1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 400.0, 800.0, 1_600.0, 5_000.0,
+        ]),
+        &["hop", "route_class", "outcome"],
     )
     .unwrap();
 
@@ -225,6 +258,222 @@ lazy_static! {
 /// two never disagree. Set once in `server::run`.
 static HEARTBEAT: OnceLock<(Instant, Arc<AtomicU64>)> = OnceLock::new();
 
+// ── Chain-R hop vocabulary + the observer-cost tier ──────────────────────────
+
+/// How much of the Chain-R hop chain this process records — a VERBOSITY LADDER,
+/// deliberately the same ontology as log levels, not a private vocabulary.
+/// `Off < Basic < Full` orders exactly like `error < info < debug`: each rung
+/// is a superset of the one below, a consumer states the minimum rung it needs,
+/// and turning the dial up is always safe for correctness and never free for
+/// cost. `Ord` is derived because that subset relation is the whole contract.
+///
+/// The instrument must never become the load it measures — the same
+/// observer-dominates trap already measured one level down, where a 500ms poll
+/// accounted for essentially all of a 4.5s "propagation" figure. But a plain
+/// dev-only switch would be WORSE than no tiering: the two-tier design requires
+/// local and deployed to emit into the SAME series so the local-vs-deployed
+/// delta means something, and a metric that is off in production has no
+/// deployed number to compare against. Hence a ladder, not a boolean.
+///
+/// The rung is chosen by the PEER, from its own capacity ([`derive_hop_tier`]),
+/// with `DOORWAY_HOP_METRICS = off | basic | full` as the operator override.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum HopTier {
+    /// Emergency stop. Nothing recorded — the delta goes dark; use only to rule
+    /// the instrument out as a suspect during an incident.
+    Off,
+    /// DEFAULT, safe for production. Parent hops only (`serve`, `proxy`) — a
+    /// handful of series, one observation per request. Keeps the deployed side
+    /// of every top-level delta alive at negligible cost.
+    Basic,
+    /// Diagnostic. Adds the child hops, which is what makes the composition
+    /// residual computable — `serve - (branch that ran)` needs the children.
+    /// More observations per request; flip it on to diagnose, not to live on.
+    Full,
+}
+
+/// The tier this peer has resolved for itself. Set ONCE at boot by the code
+/// that holds this peer's self-knowledge (`server::run`, which can see the
+/// compute budget), exactly like [`HEARTBEAT`] above.
+static HOP_TIER: OnceLock<HopTier> = OnceLock::new();
+
+/// Derive a safe tier from what this peer knows about ITSELF.
+///
+/// A peer must carry enough self-knowledge to decide what it can safely
+/// sustain — that is the same question as "what reactive streaming can I
+/// support", asked about the instrument instead of the dataplane. A smartwatch
+/// must not be *told* it can afford `Full`; it must decline it.
+///
+/// Follows the house pattern for self-derived capacity
+/// (`elohim-storage`'s `conductor_admission::default_capacity` — env is the
+/// OVERRIDE, the default is derived from a self-probe minus a reserve) and the
+/// operator-as-pod min-of-three already used for renders
+/// (`render::capability`: `min(probe_cpu_count, ceiling_max_cores,
+/// allocation_cpu_cores)`, where 0 means UNKNOWN and is ignored in the min).
+///
+/// `effective_cores == 0` means the peer genuinely does not know its own
+/// capacity. That is honest absence, and it resolves DOWN to `Basic`, never up:
+/// a peer that cannot vouch for its headroom does not get to spend it.
+pub fn derive_hop_tier(effective_cores: u32) -> HopTier {
+    match effective_cores {
+        // Unknown capacity — the honest-absence case. Keep the parent numbers
+        // (so the deployed side of every delta survives) and nothing more.
+        0 => HopTier::Basic,
+        // Constrained peers: a watch, a phone, a shared 1-2 core pod. The
+        // instrument must not compete with the work.
+        1..=2 => HopTier::Off,
+        // Ordinary household node.
+        3..=7 => HopTier::Basic,
+        // A rack with headroom can afford the child hops, which is what makes
+        // the composition residual computable on THIS peer.
+        _ => HopTier::Full,
+    }
+}
+
+/// Called once at boot with this peer's own derived tier. Later calls are
+/// ignored (`OnceLock`), so a mid-flight change cannot split a histogram
+/// between two tiers and make its `_count` mean two different things.
+pub fn set_hop_tier(tier: HopTier) {
+    let _ = HOP_TIER.set(tier);
+}
+
+/// Resolution order: explicit operator override, then this peer's own derived
+/// tier, then the safe default. One relaxed load per observation (~1ns) — a
+/// runtime ladder rather than a cargo feature, so a live doorway can be turned
+/// up for one deploy without a rebuild.
+fn hop_tier() -> HopTier {
+    // 1. Operator override always wins — including the emergency `off`.
+    if let Ok(raw) = std::env::var("DOORWAY_HOP_METRICS") {
+        match raw.to_ascii_lowercase().as_str() {
+            "off" | "0" | "false" => return HopTier::Off,
+            "basic" | "1" | "true" => return HopTier::Basic,
+            "full" | "all" => return HopTier::Full,
+            // A typo must not silently blind the lane, and must not silently
+            // grant more than the peer chose for itself: fall through to the
+            // peer's own derivation.
+            _ => {}
+        }
+    }
+    // 2. What this peer decided it can afford.
+    // 3. Safe default when boot never set one (tests, early startup).
+    *HOP_TIER.get().unwrap_or(&HopTier::Basic)
+}
+
+/// One atomic hop on Chain R — the read journey. Closed vocabulary: a hop that
+/// is not in [`DoorwayHop::ALL`] cannot be recorded, and the completeness test
+/// below fails if a variant is added without being pre-touched.
+///
+/// Each hop declares the minimum [`HopTier`] at which it records. Parents are
+/// `Basic` so production always retains the top-level number; children are
+/// `Full` because they exist to decompose a parent, which is a diagnostic act.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DoorwayHop {
+    /// R1 — whole inbound request, `handle_request` entry to response written.
+    /// The PARENT of every other hop here.
+    Serve,
+    /// R2 — `DoorwayResolver::resolve` (tiered projection/conductor/external).
+    Resolve,
+    /// R3 — one upstream storage HTTP round trip via the storage proxy.
+    Proxy,
+    /// R3b — one blob-path round trip; distinct from `Proxy` because the pantry
+    /// hit short-circuits before any network hop exists to time.
+    ProxyBlob,
+}
+
+impl DoorwayHop {
+    /// Minimum tier at which this hop records.
+    fn min_tier(&self) -> HopTier {
+        match self {
+            // Parents: the number production must never lose.
+            DoorwayHop::Serve | DoorwayHop::Proxy => HopTier::Basic,
+            // Children: only needed to decompose a parent.
+            DoorwayHop::Resolve | DoorwayHop::ProxyBlob => HopTier::Full,
+        }
+    }
+}
+
+impl seam_contracts::ReasonLabel for DoorwayHop {
+    const ALL: &'static [Self] = &[
+        DoorwayHop::Serve,
+        DoorwayHop::Resolve,
+        DoorwayHop::Proxy,
+        DoorwayHop::ProxyBlob,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            DoorwayHop::Serve => "serve",
+            DoorwayHop::Resolve => "resolve",
+            DoorwayHop::Proxy => "proxy",
+            DoorwayHop::ProxyBlob => "proxy_blob",
+        }
+    }
+}
+
+/// Record one Chain-R hop. The ONLY function that touches [`HOP_DURATION_MS`],
+/// so no call site imports `prometheus` or invents a label.
+///
+/// `route_class` and `outcome` must come from small CLOSED sets — never a raw
+/// path, content id, or peer id, which would make this series unbounded in
+/// cardinality and turn the instrument into the outage.
+pub fn observe_hop(
+    hop: DoorwayHop,
+    route_class: &'static str,
+    outcome: &'static str,
+    elapsed: std::time::Duration,
+) {
+    use seam_contracts::ReasonLabel as _;
+    if hop_tier() < hop.min_tier() {
+        return;
+    }
+    HOP_DURATION_MS
+        .with_label_values(&[hop.label(), route_class, outcome])
+        .observe(elapsed.as_secs_f64() * 1_000.0);
+}
+
+/// Bucket a request into a CLOSED route class for the `route_class` label.
+///
+/// Label-only: this classifies a measurement, it decides nothing about serving,
+/// and nothing may branch on it. That is deliberate — the moment a serving
+/// decision reads this, it becomes a seam decision point and owes the
+/// seam-registry contract. Keep it a label.
+///
+/// Closed by construction: four values, no path text, no ids. An unbounded
+/// `route_class` (raw paths, content ids) would multiply every hop series by
+/// the size of the URL space and make the instrument the outage.
+pub fn classify_route(method: &hyper::Method, path: &str) -> &'static str {
+    if method == hyper::Method::OPTIONS {
+        return "preflight";
+    }
+    // Matches the dispatch's own vocabulary (`is_service_path`): health, admin,
+    // api/v1/*, db/*, apps/* reach explicit arms; everything else falls to the
+    // EPR router / SPA bundle.
+    if path.starts_with("/db/")
+        || path.starts_with("/api/")
+        || path.starts_with("/admin")
+        || path.starts_with("/health")
+        || path.starts_with("/metrics")
+    {
+        "service"
+    } else if path.starts_with("/blob/") || path.starts_with("/chrome/") {
+        "asset"
+    } else {
+        "epr"
+    }
+}
+
+/// The active tier, for the scrape body — a reader must be able to tell
+/// "this hop is genuinely fast" from "this hop was not being recorded".
+/// An unlabelled absence is exactly the ambiguity this whole chain exists to
+/// remove, so the tier travels WITH the numbers.
+pub fn hop_tier_label() -> &'static str {
+    match hop_tier() {
+        HopTier::Off => "off",
+        HopTier::Basic => "basic",
+        HopTier::Full => "full",
+    }
+}
+
 /// Register every doorway collector into [`REGISTRY`]. Idempotent (guarded by a
 /// `Once`), so calling it more than once at boot is safe. Call exactly once
 /// early in doorway startup; `/metrics` reads the registry thereafter.
@@ -273,6 +522,21 @@ pub fn register_all() {
                 .inc_by(0);
         }
         let _ = REGISTRY.register(Box::new(MEMBRANE_BANS_ACTIVE.clone()));
+        let _ = REGISTRY.register(Box::new(HOP_DURATION_MS.clone()));
+        // Pre-touch every hop so a doorway that never took one (e.g. no blob
+        // request in the window) reads as a MEASURED zero rather than an absent
+        // series. A composition residual subtracts children from a parent; an
+        // ABSENT child silently inflates the residual and would be read as
+        // doorway overhead that does not exist. Same discipline as storage's
+        // ConvergenceAtom pre-touch (elohim/elohim-storage/src/metrics.rs).
+        {
+            use seam_contracts::ReasonLabel as _;
+            for hop in DoorwayHop::ALL {
+                HOP_DURATION_MS
+                    .with_label_values(&[hop.label(), "unknown", "ok"])
+                    .observe(0.0);
+            }
+        }
     });
 }
 
@@ -399,6 +663,80 @@ mod tests {
     // every test in this binary shares one process-global REGISTRY and parallel
     // tests mutate it, so absolutes are flaky. (Storage's metrics.rs asserts
     // presence for the same reason.)
+
+    /// A peer that cannot vouch for its own headroom must resolve DOWN, never
+    /// up. `effective_cores == 0` is honest absence (the `render::capability`
+    /// convention: 0 means unknown and is ignored in the min), and it must not
+    /// be read as "unconstrained".
+    #[test]
+    fn unknown_capacity_resolves_down_not_up() {
+        assert_eq!(derive_hop_tier(0), HopTier::Basic);
+        assert!(derive_hop_tier(0) < HopTier::Full);
+    }
+
+    /// The constrained peer declines. This is the whole point of deriving the
+    /// tier from the peer instead of configuring it: a watch or a 1-2 core pod
+    /// must not spend its headroom on the instrument.
+    #[test]
+    fn constrained_peer_declines_instrumentation() {
+        assert_eq!(derive_hop_tier(1), HopTier::Off);
+        assert_eq!(derive_hop_tier(2), HopTier::Off);
+    }
+
+    /// Monotone in capacity: more cores never yields a cheaper tier. Without
+    /// this a capability probe returning a larger number could silently reduce
+    /// what a peer records, which would be indistinguishable from the peer
+    /// getting quieter for a real reason.
+    #[test]
+    fn tier_is_monotone_in_capacity() {
+        let mut prev = derive_hop_tier(1);
+        for cores in 1u32..64 {
+            let t = derive_hop_tier(cores);
+            assert!(
+                t >= prev,
+                "tier regressed at {cores} cores: {prev:?} -> {t:?}"
+            );
+            prev = t;
+        }
+        assert_eq!(derive_hop_tier(32), HopTier::Full);
+    }
+
+    /// The ladder orders like log levels — each rung a superset of the one
+    /// below. `observe_hop` gates on `hop_tier() < hop.min_tier()`, so that
+    /// ordering IS the contract.
+    #[test]
+    fn tier_ladder_orders_like_log_levels() {
+        assert!(HopTier::Off < HopTier::Basic);
+        assert!(HopTier::Basic < HopTier::Full);
+        // Parent hops survive at Basic; children need Full.
+        assert!(HopTier::Basic >= DoorwayHop::Serve.min_tier());
+        assert!(HopTier::Basic >= DoorwayHop::Proxy.min_tier());
+        assert!(HopTier::Basic < DoorwayHop::Resolve.min_tier());
+        assert!(HopTier::Full >= DoorwayHop::Resolve.min_tier());
+    }
+
+    /// Every hop is pre-touched at boot, so a hop nobody took reads as a
+    /// MEASURED zero rather than an absent series. Iterating `ALL` (not a
+    /// literal list) means a 5th hop cannot be added without being pre-touched.
+    #[test]
+    fn all_hops_are_pretouched_at_boot() {
+        use seam_contracts::ReasonLabel as _;
+        register_all();
+        let text = gather_text();
+        assert!(
+            text.contains("doorway_hop_duration_ms_bucket"),
+            "Chain-R hop histogram missing:\n{text}"
+        );
+        for hop in DoorwayHop::ALL {
+            assert!(
+                text.contains(&format!("hop=\"{}\"", hop.label())),
+                "hop {:?} not pre-touched — an absent child silently inflates the \
+                 composition residual and reads as doorway overhead that does not exist",
+                hop.label()
+            );
+        }
+        assert_eq!(DoorwayHop::ALL.len(), 4);
+    }
 
     #[test]
     fn register_all_idempotent_and_gathers_all_metrics() {

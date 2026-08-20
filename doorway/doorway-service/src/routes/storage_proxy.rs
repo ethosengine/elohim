@@ -324,10 +324,31 @@ where
         }
     };
 
+    // R3 — one doorway→storage round trip. This is the hop whose absence made
+    // the 2026-08-20 investigation guesswork: the breaker recorded pass/fail
+    // (`record_trial` below) but never HOW LONG, so "storage is slow" and
+    // "storage is down" were the same observation. Timed on BOTH arms — a
+    // timeout that burns the full STORAGE_PROXY_REQUEST_TIMEOUT_SECS is the
+    // most expensive request the doorway ever makes and must not be missing
+    // from the distribution (that is coordinated omission: the stall
+    // under-represents itself and the cascade reads as "fewer, faster").
+    let proxy_started = std::time::Instant::now();
     match builder.send().await {
         Ok(response) => {
             let status = response.status();
             let status_u16 = status.as_u16();
+            crate::metrics::observe_hop(
+                crate::metrics::DoorwayHop::Proxy,
+                "service",
+                if status.is_success() {
+                    "ok"
+                } else if matches!(status_u16, 429 | 503) {
+                    "shed"
+                } else {
+                    "err"
+                },
+                proxy_started.elapsed(),
+            );
 
             // HONOR upstream backpressure: a 429/503 from storage becomes a
             // catching-up to the browser, preserving the upstream Retry-After
@@ -394,6 +415,16 @@ where
             }
         }
         Err(e) => {
+            // The connect/timeout arm. Recorded at its FULL elapsed value, not
+            // dropped: a request that burned the whole request timeout is the
+            // single most expensive thing this doorway does, and omitting it
+            // would make the p95 improve precisely as the fleet degrades.
+            crate::metrics::observe_hop(
+                crate::metrics::DoorwayHop::Proxy,
+                "service",
+                "timeout",
+                proxy_started.elapsed(),
+            );
             warn!(error = %e, path = %path, storage_url = %storage_url,
                 "storage forward failed (connect/timeout) — recording breaker failure");
             record_trial(&trial, false);

@@ -212,7 +212,42 @@ impl DoorwayResolver {
 
         // Try sources in order, passing identity for access control
         let result = self.try_resolve(content_type, id, &parsed, requester).await;
-        let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
+        let elapsed = start.elapsed();
+        let duration_ms = elapsed.as_secs_f64() * 1000.0;
+
+        // R2 — the tiered resolve, a CHILD of the `serve` hop. Labelled by the
+        // tier that actually answered, because a projection hit and a conductor
+        // round trip are different phenomena and averaging them is what made
+        // the pre-existing `avg_resolution_ms` unreadable: a lifetime rolling
+        // mean over both tiers, never reset, exported nowhere, and read by
+        // exactly one unit test. It measured something real and answered
+        // nothing. This histogram replaces it as the live signal — the mean is
+        // left in place only because `ResolutionStats` is a public shape.
+        //
+        // `Full` tier only (see DoorwayHop::min_tier): children exist to
+        // decompose a parent, which is a diagnostic act, so a constrained peer
+        // keeps `serve` and drops this.
+        let (tier_label, outcome) = match &result {
+            Ok((_, _, tier, cached)) => (
+                // Matched on the enum, not a string: SourceTier is already a
+                // closed set, so the compiler enforces the label vocabulary and
+                // a 5th tier cannot appear as an unlabelled series.
+                match tier {
+                    elohim_cache_core::SourceTier::Local => "local",
+                    elohim_cache_core::SourceTier::Projection => "projection",
+                    elohim_cache_core::SourceTier::Authoritative => "conductor",
+                    elohim_cache_core::SourceTier::External => "external",
+                },
+                if *cached { "cached" } else { "ok" },
+            ),
+            Err(_) => ("unknown", "err"),
+        };
+        crate::metrics::observe_hop(
+            crate::metrics::DoorwayHop::Resolve,
+            tier_label,
+            outcome,
+            elapsed,
+        );
 
         // Update stats
         self.update_stats(&result, duration_ms);

@@ -823,6 +823,26 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         "inbound admission ceiling set"
     );
 
+    // What this peer knows about ITSELF decides how much of the Chain-R hop
+    // chain it can afford to record. A peer must not be TOLD it can afford
+    // full instrumentation — a watch or a shared 1-2 core pod has to decline,
+    // and only the peer can know that. `available_parallelism` is the probe
+    // this process can actually make about its own host; 0 (unknowable) is
+    // honest absence and `derive_hop_tier` resolves it DOWN, never up.
+    //
+    // Same shape as elohim-storage's `conductor_admission::default_capacity`:
+    // env is the OVERRIDE (`DOORWAY_HOP_METRICS`), the default is derived.
+    let hop_cores = std::thread::available_parallelism()
+        .map(|n| n.get() as u32)
+        .unwrap_or(0);
+    let hop_tier = doorway::metrics::derive_hop_tier(hop_cores);
+    doorway::metrics::set_hop_tier(hop_tier);
+    info!(
+        cores = hop_cores,
+        tier = doorway::metrics::hop_tier_label(),
+        "chain-R hop metrics tier derived from this peer's own capacity"
+    );
+
     // Create discovery readiness channel before Arc::new(state)
     let (discovery_tx, discovery_rx) = tokio::sync::watch::channel(false);
     state.discovery_ready = discovery_rx;
