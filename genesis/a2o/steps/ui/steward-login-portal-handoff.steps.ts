@@ -711,9 +711,31 @@ Then(
 
 /**
  * The browser completes the OAuth dance at the doorway normally (hosted
- * visitor — scenario 4, @requires:shem). Same fall-through shape: the browser
- * stays at the doorway origin. Defined for binding cleanliness; held at runtime
- * by the substrate gate.
+ * visitor — scenario 4, @requires:shem). Same fall-through shape as the
+ * portal-unreachable step above: doorway completes auth itself, with no
+ * hand-off to a peer-native portal.
+ *
+ * ORIGIN CORRECTION (2026-08-20). This step used to assert
+ * `page.url().origin === new URL(doorwayUrl).origin` and failed in CI with
+ * "Expected … the doorway origin "https://doorway-alpha.elohim.host" but the
+ * browser is at: https://alpha.elohim.host/threshold/login". That expectation
+ * was STALE, not a regression in the product: the doorway threshold/login IdP
+ * surface is served on BOTH the doorway origin AND the app origin (doorway
+ * forwards /threshold/* to doorway-app in routes/threshold.rs, and the app
+ * ingress mirrors it), while `PlaywrightDevice`'s base is the APP url
+ * (`doorwayToAppUrl`). So the old assertion measured the device's base URL, not
+ * the product's behaviour, and could never pass for this app-initiated flow.
+ * Its sibling step ("…as relying-party-and-identity-provider") had already been
+ * corrected the same way; this brings scenario 4 into line.
+ *
+ * What replaces it keeps a real assertion rather than dropping one:
+ *   1. NO portal hand-off was attempted — the page.route interceptor armed on
+ *      the portal origin in the When step must never have fired. This is the
+ *      genuine "no portalHostUrl ⇒ doorway is the IdP" invariant and the exact
+ *      inverse of "the browser is redirected to {portal}".
+ *   2. The browser finished on a DOORWAY-SERVED origin — either the doorway
+ *      origin or the app origin it forwards /threshold/* from — and in
+ *      particular not on the portal host.
  *
  * Example:
  *   And the browser completes the OAuth dance at the doorway normally
@@ -724,15 +746,27 @@ Then(
     const device = firstPlaywrightDevice(this);
     if (!device) return 'pending';
 
-    await device.page.waitForLoadState('networkidle');
+    await device.page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => undefined);
+
+    // 1) No portal hand-off was attempted for a human with no portal host.
+    const attempted = this.contentIds.get(REDIRECT_ATTEMPT_KEY);
+    assert.ok(
+      !attempted,
+      `Expected NO portal hand-off for a hosted visitor with no registered portal host — ` +
+        `doorway completes the OAuth dance itself — but the SPA attempted a client-driven ` +
+        `navigation to: ${attempted}`
+    );
+
+    // 2) The browser finished on an origin the doorway serves the IdP surface
+    //    on (doorway origin OR the app origin it forwards /threshold/* from).
     const doorway = requireDoorwayUrl(this);
+    const doorwayOrigin = new URL(doorway).origin;
+    const appOrigin = new URL(doorwayToAppUrl(doorway)).origin;
     const current = new URL(device.page.url());
-    const expectedOrigin = new URL(doorway).origin;
-    assert.strictEqual(
-      current.origin,
-      expectedOrigin,
-      `Expected a hosted visitor's OAuth dance to finish at the doorway origin ` +
-        `"${expectedOrigin}" but the browser is at: ${current.href}`
+    assert.ok(
+      current.origin === doorwayOrigin || current.origin === appOrigin,
+      `Expected a hosted visitor's OAuth dance to finish on a doorway-served origin ` +
+        `("${doorwayOrigin}" or "${appOrigin}") but the browser is at: ${current.href}`
     );
     return undefined;
   }

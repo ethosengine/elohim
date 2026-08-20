@@ -14,10 +14,7 @@ import { Given } from '@cucumber/cucumber';
 
 import { BrowserDevice } from '../src/framework/devices/browser-device.js';
 import { PlaywrightDevice } from '../src/framework/devices/playwright-device.js';
-import {
-  fixtureDoorwayUrl,
-  loadHouseholdMeshFixture,
-} from '../src/framework/fixtures/household-mesh.js';
+import { resolveDoorwayUrl } from '../src/framework/fixtures/household-mesh.js';
 import { Human } from '../src/framework/human.js';
 import { doorwayToAppUrl } from '../src/framework/utils/url.js';
 import { E2EWorld } from '../src/framework/world.js';
@@ -98,9 +95,13 @@ Given(
   'doorway {string} at {string}',
   function (this: E2EWorld, doorwayId: string, urlOrEnv: string) {
     const isEnvironmentReference = urlOrEnv.startsWith('E2E_');
-    const fixtureUrl = fixtureDoorwayUrl(loadHouseholdMeshFixture(), doorwayId);
-    const url =
-      process.env[urlOrEnv] ?? fixtureUrl ?? (isEnvironmentReference ? undefined : urlOrEnv);
+    // Order matters: what the run was GIVEN wins, and the fixture is consulted
+    // only when nothing else resolved. Consulting it first let a fixture that
+    // DECLARES a doorway absent throw over a literal URL that would have worked.
+    const url = resolveDoorwayUrl(doorwayId, [
+      process.env[urlOrEnv],
+      isEnvironmentReference ? undefined : urlOrEnv,
+    ]);
     assert.ok(url, `Cannot resolve doorway URL from: ${urlOrEnv}`);
     this.addDoorway(doorwayId, url);
   }

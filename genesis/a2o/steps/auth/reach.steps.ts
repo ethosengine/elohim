@@ -54,6 +54,55 @@ When(
 );
 
 // ---------------------------------------------------------------------------
+// Then — anonymous read is served
+// ---------------------------------------------------------------------------
+
+/**
+ * Assert the anonymous GET was served (HTTP 200) — the same strict equality the
+ * shared `Then the response status is {int}` step applies, but it NAMES what
+ * refused the read.
+ *
+ * This exists because the bare `403 !== 200` this scenario used to fail with
+ * says nothing about WHICH plane refused, and the three planes are independent:
+ *
+ *   - reach        — the audience an EPR has earned. A 403 carries
+ *                    `requiredReach`, which is the row's stored reach; if it is
+ *                    not commons/public, the authored grade did not reach this
+ *                    peer's row and the defect is in grading/reconciliation.
+ *   - content head — which version is canonical. Never expressed as a 403.
+ *   - replication  — how many peers hold the bytes. A 503 `catching-up` is THIS
+ *                    plane shedding, and is not a reach decision at all.
+ *
+ * Conflating them is the documented failure mode, so the message keeps them apart.
+ */
+Then('the content is served to the anonymous reader', function (this: E2EWorld) {
+  const resp = responseStore.get(this);
+  assert.ok(resp, NO_RESPONSE);
+  if (resp.status === 200) {
+    return;
+  }
+  const raw = resp.body.toString('utf-8').slice(0, 400);
+  let detail = `body: ${raw}`;
+  try {
+    const body = JSON.parse(raw) as Record<string, unknown>;
+    if (resp.status === 403) {
+      detail =
+        `the REACH plane refused it: requiredReach=${JSON.stringify(body['requiredReach'])} ` +
+        `error=${JSON.stringify(body['error'])}. Commons/public content needs no identity, so ` +
+        `a requiredReach above commons means this peer's row does not carry the authored ` +
+        `commons grade — an earned-reach grading/reconcile gap, not an auth gap.`;
+    } else if (resp.status === 503) {
+      detail =
+        `the AVAILABILITY plane is shedding (${raw}) — this peer is catching up and never ` +
+        `reached a reach decision. Not a reach defect.`;
+    }
+  } catch {
+    // Non-JSON body — the raw prefix above is the best available detail.
+  }
+  assert.strictEqual(resp.status, 200, `anonymous read was not served: ${detail}`);
+});
+
+// ---------------------------------------------------------------------------
 // Then — 403 reach body assertions
 // ---------------------------------------------------------------------------
 
