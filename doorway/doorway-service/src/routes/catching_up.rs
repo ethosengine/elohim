@@ -114,7 +114,36 @@ pub fn shed_response(
                 .expect("infallible 503 html response");
         }
     }
-    let body = serde_json::json!({ "status": "catching-up", "retryAfter": retry_after_secs });
+    // The same `cause` the HTML page renders, carried for programmatic clients.
+    //
+    // The 2026-07-19 design deliberately left the JSON opaque ("for an API client
+    // that is correct backpressure") and fixed only the human's dead end. The
+    // 2026-08-20 investigation is the counter-evidence: a breaker-open shed (the
+    // upstream was NEVER called) and a genuine admission shed are indistinguishable
+    // on the wire, so every machine consumer reads an outage as benign churn. That
+    // one ambiguity is why saga ch04/ch06/ch10 reds were repeatedly diagnosed as
+    // post-deploy churn, and why the fleet-quiesce gate cannot tell "still settling"
+    // from "upstream is down" (measured: doorway_upstream_breaker_open_total 66->69
+    // in six minutes while admission shedTotal stayed 0 on BOTH doorways).
+    //
+    // Additive only: `status` and `retryAfter` keep their exact legacy meaning and
+    // values, so any client reading those two is unaffected. What is new is that a
+    // reader who WANTS to tell the two apart now can.
+    let (cause_kind, error_streak, circuit) = match &cause {
+        ShedCause::Upstream {
+            circuit,
+            error_streak,
+            ..
+        } => ("upstream", *error_streak, circuit.as_str()),
+        ShedCause::Admission => ("admission", 0, "n/a"),
+    };
+    let body = serde_json::json!({
+        "status": "catching-up",
+        "retryAfter": retry_after_secs,
+        "cause": cause_kind,
+        "circuit": circuit,
+        "errorStreak": error_streak,
+    });
     Response::builder()
         .status(StatusCode::SERVICE_UNAVAILABLE)
         .header("Content-Type", "application/json")
@@ -183,7 +212,7 @@ mod tests {
     }
 
     #[test]
-    fn json_variant_body_shape_unchanged() {
+    fn json_variant_keeps_status_and_retry_after() {
         let resp = shed_response(false, 30, ShedCause::Admission);
         assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(
@@ -198,6 +227,46 @@ mod tests {
                 .unwrap(),
             "application/json"
         );
+    }
+
+    /// The discriminator the whole 2026-08-20 investigation turned on: a
+    /// breaker-open shed (upstream never called) and a genuine admission shed
+    /// must not be the same bytes. `status`/`retryAfter` keep their legacy
+    /// meaning; `cause` is what lets a probe or a CI gate tell an outage from
+    /// churn instead of waiting out a fleet that is never coming back.
+    #[tokio::test]
+    async fn json_variant_names_its_cause() {
+        use http_body_util::BodyExt;
+
+        let read = |resp: Response<Full<Bytes>>| async move {
+            let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+            serde_json::from_slice::<serde_json::Value>(&bytes).unwrap()
+        };
+
+        let admission = read(shed_response(false, 2, ShedCause::Admission)).await;
+        assert_eq!(admission["status"], "catching-up");
+        assert_eq!(admission["retryAfter"], 2);
+        assert_eq!(admission["cause"], "admission");
+
+        let upstream = read(shed_response(
+            false,
+            30,
+            ShedCause::Upstream {
+                endpoint: "http://storage:8090".into(),
+                circuit: "open".into(),
+                error_streak: 4,
+            },
+        ))
+        .await;
+        assert_eq!(upstream["status"], "catching-up");
+        assert_eq!(upstream["retryAfter"], 30);
+        assert_eq!(upstream["cause"], "upstream");
+        assert_eq!(upstream["circuit"], "open");
+        assert_eq!(upstream["errorStreak"], 4);
+
+        // The endpoint is deliberately NOT serialized: the HTML page does not
+        // show it either, and it is an internal cluster address.
+        assert!(upstream.get("endpoint").is_none());
     }
 
     #[tokio::test]
