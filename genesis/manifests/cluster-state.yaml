@@ -28,10 +28,19 @@ resources:
 
   alpha-cluster-6peer:
     role: 6-peer alpha soak cluster (adam+matthew bootstrap pair)   # project_alpha_topology_bootstrap_pair
-    available: degraded
-    note: 10/13 peers CrashLooping (158-168 restarts, failedSince build #1024). Whether this is a CODE
-          regression or env-down is UNRESOLVED — needs operator/investigation before it earns a regression
-          cascade. Soak gates #7/#11 are BLOCKED-BY-ENV until a stable 6-peer cluster exists.
+    available: true
+    note: restored 2026-08-20 — 7 of 7 elohim-node peers report up=1 (matthew, jessica, adam, james,
+          gertrude, susan, eve) with ZERO container restarts, and elohim_projection_reconcile_sweeps_total
+          advances steadily on every one. Evidence-backed flip, mirrors the probe. The prior note's premise
+          is FALSIFIED, not merely aged: it read "10/13 peers CrashLooping (158-168 restarts, failedSince
+          build #1024) — UNRESOLVED", and that declaration then went untouched from 2026-07-16 while the
+          fleet recovered, silently capping saga ch06 at pending-env (@requires:alpha-cluster-6peer ->
+          runtime skip -> counted as pending -> all_green requires pending==0). Same drift class the shem
+          entry above warns about, in the opposite direction.
+          SEPARATE and still open — do NOT read this flip as "alpha is healthy": the doorway->storage
+          circuit breaker flaps (A 69.3% availability, dips to 574s, measured n=150 on 2026-08-20). That
+          is the T4 doorway-projection plane, not the peer cluster this capability names; peer count and
+          peer stability are met. See backlog/alpha-a-projector-chronic-catchup-flap.
 
   harbor-registry:
     role: CI image registry (harbor.ethosengine.com)
