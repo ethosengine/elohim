@@ -44,8 +44,20 @@ spec:
     matchNames:
       - elohim-alpha
   selector:
-    matchLabels:
-      app: elohim-doorway # NOT elohim-edgenode
+    # BOTH doorways, not just A. matchLabels is an exact match, so `app: elohim-doorway`
+    # silently excluded doorway B, whose pods label themselves `app: elohim-doorway-b`
+    # (genesis/orchestrator/manifests/doorway/alpha-b.yaml:85,90). MEASURED 2026-08-20:
+    # `up{pod=~"elohim-doorway-alpha-b-.*"}` returned EMPTY — B had no scrape target at
+    # all, so every breaker/shed/backpressure series existed for A only. That is half of
+    # the doorway-projection lane dark, and it made a B-side diagnosis curl-only during
+    # the 2026-08-20 availability investigation (backlog/alpha-a-projector-chronic-catchup-flap).
+    # Still NOT elohim-edgenode — that is the storage pod, scraped by its own PodMonitor.
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - elohim-doorway
+          - elohim-doorway-b
   podMetricsEndpoints:
     - port: gateway-ws # containerPort 8080 — the MAIN listener (/metrics lives here, NOT health-wd/8079)
       path: /metrics
