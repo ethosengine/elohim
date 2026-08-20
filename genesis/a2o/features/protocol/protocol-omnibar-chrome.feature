@@ -34,6 +34,16 @@ Feature: The doorway travels the protocol trust surface onto every page it serve
   # Household floor: "/" and the pillar mounts are served by the alpha doorway
   # over matthew's storage projection — one node, no cross-node discovery — so no
   # @requires:shem (mirrors landing-discovery.feature).
+  #
+  # Reading a red here (2026-08-20): this contract can only be judged on a page
+  # the doorway actually SERVED. A doorway that is shedding never reaches the
+  # EPR router at all — it answers 503 either as the upstream/admission shed
+  # (`{"status":"catching-up"}`) or as the degraded root page (empty EPR
+  # projection) — so a 503 is the fleet being unavailable, not the trust surface
+  # falling off. The serving-precondition step names which of the two happened,
+  # in its own failure text, so that distinction never has to be re-derived by
+  # hand: both scenarios failed this way in elohim-genesis #1489 and were
+  # mis-filed as a code regression on the strength of a bare `503 !== 200`.
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
@@ -42,7 +52,7 @@ Feature: The doorway travels the protocol trust surface onto every page it serve
     # The very first page a stranger meets — served through the EPR router, the
     # path the first splice missed — must arrive already wearing the omnibar.
     When I GET "/" from the doorway
-    Then the doorway response status is 200
+    Then the doorway serves that page — status 200, not a shed page
     And the doorway response Content-Type contains "text/html"
     And the served page carries exactly one "elohim-omni-context" omnibar context island
     And the served page references the "/chrome/omni-element." omnibar element loader
@@ -52,7 +62,7 @@ Feature: The doorway travels the protocol trust surface onto every page it serve
     # EPR router again — so the trust surface must travel there unchanged. The
     # visitor never crosses a page where the protocol chrome quietly falls off.
     When I GET "/lamad" from the doorway
-    Then the doorway response status is 200
+    Then the doorway serves that page — status 200, not a shed page
     And the doorway response Content-Type contains "text/html"
     And the served page carries exactly one "elohim-omni-context" omnibar context island
     And the served page references the "/chrome/omni-element." omnibar element loader

@@ -33,6 +33,21 @@ Feature: The omnibar links out to the claims that back the EPR it wraps
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
 
+  # Fleet-independent by construction: `/chrome/*` is an in-binary static
+  # handler that touches neither storage nor the conductor, so this scenario
+  # answers even while the fleet sheds content reads. (Measured 2026-08-20 on a
+  # shedding alpha: `GET /health` 200 and `GET /chrome/omni-element.js` 404 from
+  # the same doorway — the 404 was the missing route, not the outage.)
+  #
+  # The address asked for is the STABLE alias `elohim-chrome-asset` publishes
+  # (`STABLE_ELEMENT_PATH`) precisely FOR references that cannot embed a content
+  # hash — which is what a scenario is. Both runtimes that link the chrome crate
+  # now serve it: the storage sidecar (`handle_chrome_asset` in
+  # elohim/elohim-storage/src/http.rs) and the doorway
+  # (doorway/doorway-service/src/routes/chrome.rs), each with
+  # `Cache-Control: public, max-age=0, must-revalidate` + an `ETag` of the
+  # content address — revalidate, never immutable, because the alias' bytes move
+  # with the element.
   Scenario: The doorway serves the element that carries the claims resolution
     # The claims leg lives entirely inside the runtime-served element, so the
     # element asset being reachable is the precondition for every scenario
