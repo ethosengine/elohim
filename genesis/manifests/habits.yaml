@@ -78,6 +78,16 @@ habits:
       - "a2o @concern:content-sync, @concern:blob-replication, @concern:peer-mesh, @concern:epr-projection-fallback, @concern:reconcile-inventory (edge Dataplane Validation stage)"
       - "cargo test --test sync_libp2p_convergence (elohim/elohim-storage)"
     evidence: >
+      DELTA 2026-08-20 (the 2026-08-19 cure below is FLEET-CONFIRMED on edge
+      #1370, and it did NOT produce convergence — both halves matter): reach_scoped
+      landed 1849 on matthew / 1715 on jessica / 124 on adam / 1 on the four
+      healthy pods, selecting exactly the nodes with depressed local_total, and
+      the anchor-gap class went to ZERO (matthew gaps == divergent == 991;
+      exhausted 318 -> 0). But healed is still 0 and caughtUp still false: what
+      remains is genuine divergence (the SPIN class), which has no discharge path
+      today. The queue is honest for the first time; convergence is a separate,
+      now-unmasked blocker. Habit stays GREEN on its own checks — which is itself
+      the finding: those checks passed through the whole 7-day freeze.
       DELTA 2026-08-19 (residual gap-plateau root-caused and cured; desk-proven,
       fleet-UNCONFIRMED — status deliberately NOT flipped): the content arm's
       classify_content_gap answered "is it anchored?" against the

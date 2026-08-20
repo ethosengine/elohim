@@ -96,6 +96,52 @@ elohim_projection_reconcile_local_total{stream="content"}
 The change is safe either way: it can only reclassify rows that are **provably
 anchored**, so the downside is "no improvement", never a regression.
 
+### OUTCOME (2026-08-20, edge #1370 rolled) — CONFIRMED, but only half the prediction
+
+`reach_scoped{stream=content}`, after the window had rotated a few sweeps:
+
+| pod | reach_scoped | local_total | gaps | divergent |
+|---|---|---|---|---|
+| **matthew** | **1849** | 2466 | **991** | **991** |
+| **jessica** | **1715** | 2601 | — | — |
+| adam | 124 | 4364 | 2925 | 2926 |
+| james | 1 | 4489 | 1859 | 1867 |
+| susan / gertrude / eve | 1 | 4481-4489 | — | — |
+
+**The diagnosis is confirmed, and selectively on the right pods.** The two nodes
+with depressed `local_total` are the two carrying large scoped populations; the
+four healthy nodes carry exactly one row each. Coincidence does not select
+matthew and jessica.
+
+**The anchor-gap class is now zero.** On matthew `gaps == divergent == 991`
+exactly (james 1859/1867, adam 2925/2926). Before the cure, `gaps` ran 1901-2909
+against `divergent` 554-1610 — the excess was the mislabeled population.
+`exhausted` on matthew fell 318 → 0: the `MissLedger` is no longer being poisoned
+by ids that could never resolve.
+
+**Two corrections to what §3 originally predicted:**
+
+1. **The band was wrong.** I predicted `reach_scoped` 1500-2000 and the first
+   reading was 921 — because `reach_scoped` counts only ids a peer ADVERTISED
+   THIS SWEEP, so under the rotating 2000-row window it is a per-sweep partial
+   view that climbs toward the true population (921 → 1849 over a few sweeps,
+   converging on `contentCount − local_total` ≈ 2029). **Size this population
+   with `contentCount − local_total`, never with this gauge.**
+2. **"`caughtUp` becomes reachable" has NOT happened, and the cure alone will not
+   deliver it.** `healed` is still 0 in the 20 minutes after restart;
+   `caughtUp` is still false because `pending = 991 > 0`. The cure removed the
+   impossible work and made the population honest — it did not converge anything.
+   Everything still pending is now **genuine divergence**, i.e. the SPIN class
+   (`spin-divergent-undeclared-rows-block-a-convergence.md`), which by that
+   entry's own analysis has no discharge path today: `ContestPeer` is
+   declared-only and ghost-decay is Absent-only.
+
+**Net:** the content arm's work queue is now honest for the first time. The gap
+plateau is gone; what remains is a cleanly-isolated divergence population and a
+`local_total` that will NOT rise unless G2 resolves as a defect. G6/SPIN is now
+the sole remaining content-arm blocker to convergence, and it is no longer hidden
+behind manufactured work.
+
 The single decisive query nobody has run (operator-side; needs pod access):
 
 ```sql
@@ -110,8 +156,8 @@ shot and makes everything below cheaper.
 
 ## 4. The gap inventory — every distinct thing still needing RCA
 
-### G1 — classifier conflation · **CURED, fleet-unconfirmed**
-See §2/§3. Owner: whoever reads the falsifier.
+### G1 — classifier conflation · **CURED and FLEET-CONFIRMED (2026-08-20, edge #1370)**
+See §2/§3-OUTCOME. Closed. Note it did NOT produce convergence — see G6.
 
 ### G2 — why are matthew and jessica the only two short? · **UNKNOWN, highest value**
 
@@ -224,7 +270,7 @@ queue-wait vs wasm body); what the 183 `call_failed`s actually are (WS error?
 decode? conductor restart?); whether AIMD is pinned at the floor and why.
 Re-measure **after** G1 lands — the population change may move all of these.
 
-### G6 — `healed=0` vs `healedTotal` climbing · **RESOLVED as an instrument trap, but the SPIN population is real**
+### G6 — SPIN divergence · **NOW THE FRONTIER** (was masked by G1)
 
 `/p2p/status` `healedTotal` accumulates the GapTracker's `completed`, which
 counts rows brought to a *settled* state — `refreshed` and `refused_declared`
