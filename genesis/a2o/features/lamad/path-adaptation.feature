@@ -100,14 +100,26 @@ Feature: Adaptive Path Progression
   # Layer 4: Discovery-Informed Recommendations
   # ═══════════════════════════════════════════════════════════════════════════
 
-  @discovery @recommendation
+  # @wip — like every other scenario in this file, Layer 4 has no step definitions.
+  # It also cannot be honestly driven yet: the banner insight is produced by
+  # ElohimPresenceService.onDiscoveryCompleted(), which invokes an elohim agent with
+  # the 'path-recommendation' capability through NativeBackend →
+  # POST /api/v1/elohim/invoke → the Agent SDK sidecar. Without that sidecar the
+  # invocation is declined and no insight moment is ever added, so a passing step
+  # here would be asserting nothing. Drop @wip together with the step definitions
+  # (they belong in steps/ui/elohim-presence.steps.ts, next to completeAssessment()
+  # and the ELOHIM_PRESENCE selectors) once the agent backend is reachable in E2E.
+  @discovery @recommendation @wip
   Scenario: Elohim recommends a path after discovery completion
     Given Matthew has completed the "Values Hierarchy" discovery assessment
     When the elohim presence processes the discovery completion
     Then a banner insight should appear with a path recommendation
     And the "View Recommended Path" action should be available
 
-  @discovery @navigation
+  # @wip — same gap as the scenario above: the "View Recommended Path" action only
+  # exists on an insight moment the agent backend produces, so there is nothing to
+  # click until that backend is reachable.
+  @discovery @navigation @wip
   Scenario: Clicking "View Recommended Path" navigates to the path
     Given Matthew sees an elohim insight with a "View Recommended Path" action
     And the recommended path is "know-thyself"

@@ -35,7 +35,15 @@ import { StorageClient, ConductorClient } from './storage-client.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const SIMULATION_DIR = resolve(__dirname, '../../../../elohim-node/simulation');
+// The simulation harness moved with the crate: commit d35d1d5e3 ("refactor:
+// restructure steward/ into device/ and node/ shells") renamed
+// elohim-node/simulation -> steward/node/simulation (git records it R100 —
+// byte-identical). This constant kept pointing at the pre-rename path, so every
+// execSync below resolved to a file that does not exist. Nothing caught it
+// because the only callers (steps/compute-allocation.steps.ts, and the stopTestnet
+// hook in steps/common.steps.ts) are gated behind @testnet/@local profiles that CI
+// never runs. Keep this in step with the crate's home, not with its old name.
+const SIMULATION_DIR = resolve(__dirname, '../../../../steward/node/simulation');
 const SPAWN_SCRIPT = `${SIMULATION_DIR}/spawn-persona-testnet.sh`;
 const BUDGET_SCRIPT = `${SIMULATION_DIR}/compute-budget.sh`;
 const DEFAULT_TESTNET_DIR = '/tmp/elohim-persona-testnet';

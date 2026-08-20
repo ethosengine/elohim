@@ -1,4 +1,12 @@
-@e2e @auth @recovery-cross-stack @iroh @phase11-gate5 @requires:shem
+# NOT @requires:shem: the substrate this needs is the 5-node in-process cross-stack
+# harness MultiStackFixture (elohim/elohim-storage/src/p2p_iroh/multi_stack_fixture.rs)
+# on ONE box — not the remote multi-tenant canvas. shem being up or down says nothing
+# about whether these can run; carrying the tag is what promoted this feature into the
+# deployed API suite when shem flipped back on (41c565f3e).
+# Every step below is DEFINED and deliberately `pending`: the fixture has no HTTP admin
+# surface for cucumber to drive yet (plan 2026-05-10-iroh-recovery-e2e.md Plans 1+4).
+# Pending, not undefined — the debt stays visible in the run report.
+@e2e @auth @recovery-cross-stack @iroh @phase11-gate5
 Feature: Recovery completes across mixed iroh/libp2p share-holder transports
 
   Cutover gate #5 (spec 2026-05-08-iroh-libp2p-complementarity.md line 514).

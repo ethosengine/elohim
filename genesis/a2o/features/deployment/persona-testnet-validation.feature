@@ -1,4 +1,41 @@
-@e2e @deployment @p2p @persona-testnet @requires:shem
+# SUBSTRATE: this feature is a ONE-BOX harness, not a deployed-fleet target.
+# Every scenario inherits a Background demanding 20 concurrent `elohim-node`
+# processes driven by steward/node/simulation/spawn-persona-testnet.sh.
+#
+# Two INDEPENDENT blockers keep it out of CI. Both were measured on 2026-08-20;
+# neither is the stale `elohim-node/simulation` path that an earlier revision of
+# this header blamed. That path bug was real but unrelated, and is now fixed
+# (testnet-manager.ts points at steward/node/simulation; the crate was renamed in
+# d35d1d5e3). Fixing it does not make one scenario here runnable:
+#
+#   1. NO BINARY, NO RUNNER (-> @local). `steward/node` has no build-manifest.json,
+#      so no pipeline ever builds the `elohim-node` bin, and no Jenkinsfile or
+#      scripts/ci/*.sh invokes the `testnet` cucumber profile. Both e2e gates run
+#      cucumber against a deployed doorway URL and spawn no local processes.
+#      Verified: the spawn script now runs and stops at "Cannot find elohim-node
+#      binary" (exit 1) rather than "No such file or directory" (exit 127).
+#   2. NO STEP DEFINITIONS (-> @wip). `cucumber-js --dry-run --tags @persona-testnet`
+#      reports 18 scenarios / 128 steps, 128 undefined. Not one step is implemented.
+#
+# The two tags guard DIFFERENT runners and neither is redundant:
+#   @local -> excluded from the deployed API and browser gates, which filter
+#             'not @local and not @wip' (genesis/scripts/ci/e2e-verify-*.sh).
+#   @wip   -> excluded from `pnpm test:testnet`, this feature's only real home
+#             (--profile testnet --tags '@testnet and @e2e and not @wip'), which
+#             does NOT filter @local. Drop @wip and the testnet profile picks up
+#             128 undefined steps.
+# Removing either tag reds a gate without adding one line of coverage; the work
+# that earns them back is writing the step definitions and giving `elohim-node` a
+# build, in that order.
+#
+# NOT @requires:shem: shem is the remote multi-tenant canvas and is available
+# today; carrying that tag is what silently promoted this feature into the
+# deployed API suite when shem flipped back on (commit 41c565f3e).
+#
+# Known-good foothold for whoever implements this: gen-persona-configs.sh --out DIR
+# runs binary-free and emits all 20 persona TOMLs, so the config-generation
+# assertions are reachable before any Rust build exists.
+@e2e @deployment @p2p @persona-testnet @testnet @local @wip
 Feature: Persona Testnet — 20 Humans on One Box
   As the Elohim Protocol,
   I want to simulate 20 real humans from genesis stories on a single machine

@@ -88,8 +88,12 @@ Given(
 // Scenario-level Given steps
 // ---------------------------------------------------------------------------
 
+// The share-holder roster arrives as a bare JSON array literal — `["Ben", "Cara", "Faye"]`
+// — NOT as a quoted string, so the `{string}` cucumber parameter can never match it (that
+// mismatch is why these five scenarios ran as UNDEFINED rather than pending). Regex step
+// definitions capture the literal bracket form.
 Given(
-  "Abby's required_witness_count is satisfied by share-holders {string}",
+  /^Abby's required_witness_count is satisfied by share-holders (\[.*\])$/,
   function (this: E2EWorld, _shareHolderListJson: string) {
     // Pending plan-1: record which share-holders are active for this scenario.
     // _shareHolderListJson e.g. '["Ben", "Cara", "Faye"]' — parse and store in world state.
@@ -122,7 +126,7 @@ When('Abby invokes create_recovery_request from a fresh agent key', function (th
 });
 
 When(
-  'each share-holder in {string} receives the recovery.invitation gossip',
+  /^each share-holder in (\[.*\]) receives the recovery\.invitation gossip$/,
   function (this: E2EWorld, _shareHolderListJson: string) {
     // Pending plan-1: poll each share-holder's GET /api/v1/account/pending-recovery
     // (account.rs:386) until non-empty or 10s timeout.
@@ -133,7 +137,7 @@ When(
 );
 
 When(
-  'share-holders {string} each receive the recovery.invitation gossip',
+  /^share-holders (\[.*\]) each receive the recovery\.invitation gossip$/,
   function (this: E2EWorld, _shareHolderListJson: string) {
     // Same polling logic as above — alias for the offline-scenario wording.
     return 'pending';
@@ -141,7 +145,7 @@ When(
 );
 
 When(
-  'each share-holder in {string} submits submit_intimate_witness',
+  /^each share-holder in (\[.*\]) submits submit_intimate_witness$/,
   function (this: E2EWorld, _shareHolderListJson: string) {
     // Pending plan-1: POST per share-holder to submit witness.
     // Coordinator: submit_intimate_witness (imagodei/zomes/imagodei/src/lib.rs:2709).
@@ -151,7 +155,7 @@ When(
 );
 
 When(
-  'share-holders {string} each submit submit_intimate_witness',
+  /^share-holders (\[.*\]) each submit submit_intimate_witness$/,
   function (this: E2EWorld, _shareHolderListJson: string) {
     // Alias for the offline-scenario wording.
     return 'pending';
@@ -199,7 +203,9 @@ Then('the rotation succeeds', function (this: E2EWorld) {
   return 'pending';
 });
 
-Then('the rotation succeeds (k-of-n threshold met without Cara)', function (this: E2EWorld) {
+// Parentheses are cucumber-expression OPTIONAL-group syntax, so the plain-string form of
+// this phrase matched neither the literal step nor anything else. Regex keeps them literal.
+Then(/^the rotation succeeds \(k-of-n threshold met without Cara\)$/, function (this: E2EWorld) {
   // Same assertion as 'the rotation succeeds' — alias for the offline scenario wording.
   return 'pending';
 });

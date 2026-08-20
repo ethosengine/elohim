@@ -9,7 +9,20 @@ Feature: Shard Tracking for Content Auto-Recovery
     And doorway "beta" at "E2E_DOORWAY_BETA"
     And doorway "gamma" at "E2E_DOORWAY_GAMMA"
 
-  @requires:shem
+  # @wip — this scenario's five steps have no definitions, and neither of the two
+  # things it needs is step-wiring work:
+  #   1. A THIRD doorway. The Background asks for "gamma" via E2E_DOORWAY_GAMMA, and
+  #      this fleet deploys two doorways (alpha, beta) — CI sets neither BETA nor
+  #      GAMMA (genesis/scripts/ci/e2e-verify-api.sh exports ALPHA and STAGING only),
+  #      so the Background dies on "beta" before the scenario body is reached. Its two
+  #      siblings below are already @wip for the same reason.
+  #   2. The cure itself: publishing does not yet Reed-Solomon-encode content, and no
+  #      node-registry ShardAssignment is written or queryable across doorways.
+  # Left untagged it read as coverage while contributing nothing — an undefined step
+  # scores zero in the gate but appears in the feature as if it were exercised.
+  # Drop @wip when a third doorway is deployed AND publish registers ShardAssignments
+  # in the node-registry that a second doorway can read back.
+  @wip @requires:shem
   Scenario: Publishing content creates traceable shard assignments across the network
     Given human "Terrance" is logged in on doorway "alpha" with device "phone"
     When "Terrance" creates a new pathway titled "My Life Story"

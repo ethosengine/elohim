@@ -218,6 +218,20 @@ habits:
     checks:
       - "a2o @concern:blob-durability — 8 scenarios across genesis/a2o/features/resilience/ (governed-distribution, salvage-placement, chaos-peer-churn, grandma-photos-survive-node-loss, app-blob-heal-on-read, observable-distribution, resilience-dimensions, household-diversity-dataplane)"
     evidence: >
+      2026-08-20 MEASURE DELTA (scope, not a status flip): the #1489 red-triage
+      pass retagged observable-distribution.feature. "Content-viewer resilience
+      tooltip is live" gained @wip — openContentViewerStub() in
+      steps/resilience.steps.ts returns 'pending' unconditionally, so both Then
+      assertions were unreachable and the scenario measured nothing. Under
+      scripts/ci/run-dataplane-validation.sh:135 (--tags '@dataplane and not
+      @wip and not @browser-only') this file now contributes 2 scenarios where
+      it contributed 3. The same pass moved that file's @local from feature
+      level onto the two ingest-then-place scenarios that actually write into
+      the mesh they measure, returning the rest of the file to both CI gates.
+      The checks clause names files, not a scenario count, so it stands
+      unchanged; status stays green on the 2026-07-03 evidence below. Recorded
+      because a habit-bound measure moved, and a measure that moves silently is
+      how a green stops meaning anything.
       GREEN 2026-07-03 (edge #1148, dev@9ade36dee): blob-durability passed=3
       failed=0 pending=7 — ZERO failures with the operator-approved
       @browser-only exclusion live (c387260cb); every pending is an
