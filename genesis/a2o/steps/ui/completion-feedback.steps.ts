@@ -19,6 +19,7 @@ import {
   SOPHIA,
 } from '../../src/framework/pages/selectors.js';
 import { E2EWorld } from '../../src/framework/world.js';
+import { browserStep } from '../common.steps.js';
 
 function getDevice(world: E2EWorld): PlaywrightDevice {
   for (const [, human] of world.humans) {
@@ -491,6 +492,8 @@ When('I answer all quiz questions incorrectly', async function (this: E2EWorld) 
 // Reflection Assessment Navigation & Answering
 // ---------------------------------------------------------------------------
 
+const REFLECTION_ASSESSMENT_PATH = '/resource/assessment-personal-values';
+
 /**
  * Navigate to a discovery/reflection assessment via the content-viewer route.
  * Uses the "Personal Values Reflection" seed content (assessment-personal-values)
@@ -498,14 +501,27 @@ When('I answer all quiz questions incorrectly', async function (this: E2EWorld) 
  * Psyche API interpretation returns null, causing the completion summary to show
  * the generic "Assessment Complete" headline — which is the reflection scenario
  * expectation.
+ *
+ * Wrapped in browserStep so an unreachable route is named, with its live HTTP
+ * status, instead of surfacing as a bare 30s cucumber timeout.
  */
 When('I navigate to a reflection assessment', async function (this: E2EWorld) {
   const device = requirePlaywright(this);
   if (!device) return 'pending';
 
-  await device.navigate('/resource/assessment-personal-values');
-  await device.page.waitForLoadState('networkidle');
-  await device.page.locator(SOPHIA_QUESTION_TAG).waitFor({ state: 'attached', timeout: 15_000 });
+  await browserStep(
+    device,
+    `open the reflection assessment "${REFLECTION_ASSESSMENT_PATH}"`,
+    REFLECTION_ASSESSMENT_PATH,
+    async () => {
+      await device.navigate(REFLECTION_ASSESSMENT_PATH);
+      await device.page.waitForLoadState('networkidle');
+      await device.page
+        .locator(SOPHIA_QUESTION_TAG)
+        .waitFor({ state: 'attached', timeout: 15_000 });
+    }
+  );
+  return undefined;
 });
 
 /**

@@ -35,6 +35,7 @@ import { Given, When, Then } from '@cucumber/cucumber';
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
 import { Human } from '../../src/framework/human.js';
 import { E2EWorld } from '../../src/framework/world.js';
+import { browserStep } from '../common.steps.js';
 
 // ---------------------------------------------------------------------------
 // Selectors — mirror omni-element.js's own markup, not a testid registry.
@@ -118,8 +119,12 @@ async function ensureNativeOmniVisitor(world: E2EWorld): Promise<PlaywrightDevic
 Given('I open the doorway landing page in the browser', async function (this: E2EWorld) {
   const device = await ensureNativeOmniVisitor(this);
   if (!device) return NO_PW_DEVICE_PENDING;
-  await device.navigate('/');
-  await device.page.locator(OMNI).waitFor({ state: 'attached', timeout: 15_000 });
+  // browserStep so "the doorway shed 503" and "the chrome element never
+  // mounted on a served page" read differently in the report.
+  await browserStep(device, 'open the doorway landing page "/"', '/', async () => {
+    await device.navigate('/');
+    await device.page.locator(OMNI).waitFor({ state: 'attached', timeout: 15_000 });
+  });
   return undefined;
 });
 

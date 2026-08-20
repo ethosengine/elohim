@@ -11,6 +11,7 @@ import { Given, When, Then } from '@cucumber/cucumber';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
 import { E2EWorld } from '../../src/framework/world.js';
+import { browserStep } from '../common.steps.js';
 
 /**
  * Get the first PlaywrightDevice from a human, or throw.
@@ -34,24 +35,33 @@ function getPlaywrightDevice(world: E2EWorld, humanName?: string): PlaywrightDev
   );
 }
 
+/**
+ * Navigate the first Playwright device, wrapped so a failure names the URL,
+ * its direct HTTP status and the doorway's /health instead of dying as a bare
+ * "function timed out" (build #1489 lost 3 staging-validation scenarios here).
+ */
+async function goTo(world: E2EWorld, path: string): Promise<void> {
+  const device = getPlaywrightDevice(world);
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  await browserStep(device, `navigate to "${normalizedPath}"`, normalizedPath, async () => {
+    await device.navigate(normalizedPath);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Background / Setup
 // ---------------------------------------------------------------------------
 
 Given('I navigate to the staging site', async function (this: E2EWorld) {
-  const device = getPlaywrightDevice(this);
-  await device.navigate('/');
+  await goTo(this, '/');
 });
 
 Given('I am on the home page', async function (this: E2EWorld) {
-  const device = getPlaywrightDevice(this);
-  await device.navigate('/');
+  await goTo(this, '/');
 });
 
 Given('I am on the {string} page', async function (this: E2EWorld, path: string) {
-  const device = getPlaywrightDevice(this);
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  await device.navigate(normalizedPath);
+  await goTo(this, path);
 });
 
 // ---------------------------------------------------------------------------
@@ -64,9 +74,7 @@ When('the page loads', async function (this: E2EWorld) {
 });
 
 When('I navigate to {string}', async function (this: E2EWorld, path: string) {
-  const device = getPlaywrightDevice(this);
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  await device.navigate(normalizedPath);
+  await goTo(this, path);
 });
 
 When('I click on {string}', async function (this: E2EWorld, text: string) {

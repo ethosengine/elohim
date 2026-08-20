@@ -49,6 +49,7 @@ import {
 } from '../../src/framework/pages/selectors.js';
 import { doorwayToAppUrl } from '../../src/framework/utils/url.js';
 import { E2EWorld } from '../../src/framework/world.js';
+import { browserStep } from '../common.steps.js';
 import { AppResponse, fetchApp, responseStore } from '../delivery.steps.js';
 
 // ---------------------------------------------------------------------------
@@ -99,6 +100,19 @@ async function ensureVisitor(world: E2EWorld): Promise<PlaywrightDevice | null> 
   human.addDevice(device);
   world.onCleanup(async () => device.close());
   return device;
+}
+
+/**
+ * Open a shared deep link, wrapped so an unreachable link NAMES itself.
+ *
+ * A cold deep link is exactly the case where "function timed out" is useless:
+ * the reader cannot tell a 404'd route from a shedding doorway from a served
+ * page whose bundle never settled. 8 scenarios of build #1489 died that way.
+ */
+async function openDeepLink(device: PlaywrightDevice, deepLink: string): Promise<void> {
+  await browserStep(device, `open the deep link "${deepLink}"`, deepLink, async () => {
+    await device.navigate(deepLink);
+  });
 }
 
 /** Wait for a root container testid to become visible; return true/false. */
@@ -153,7 +167,8 @@ Given(
     if (!device) {
       return PENDING;
     }
-    await device.navigate(deepLink);
+    await openDeepLink(device, deepLink);
+    return undefined;
   }
 );
 
@@ -293,7 +308,8 @@ Given('a learner opens the deep link {string}', async function (this: E2EWorld, 
   if (!device) {
     return PENDING;
   }
-  await device.navigate(deepLink);
+  await openDeepLink(device, deepLink);
+  return undefined;
 });
 
 /**

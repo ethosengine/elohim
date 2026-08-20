@@ -13,6 +13,7 @@ import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.
 import { ASSESSMENT, SOPHIA, LIKERT, DISCOVERY } from '../../src/framework/pages/selectors.js';
 import { isExpectedNetworkFailure } from '../../src/framework/utils/console-filters.js';
 import { E2EWorld } from '../../src/framework/world.js';
+import { browserStep } from '../common.steps.js';
 
 function getDevice(world: E2EWorld): PlaywrightDevice {
   for (const [, human] of world.humans) {
@@ -35,12 +36,16 @@ function requirePlaywright(world: E2EWorld): PlaywrightDevice | null {
 When('I navigate to the {string} path', async function (this: E2EWorld, pathName: string) {
   const device = requirePlaywright(this);
   if (!device) return 'pending';
-  await device.navigate('/lamad');
-  await device.page.waitForLoadState('networkidle');
-  const pathLink = device.page.getByText(pathName, { exact: false }).first();
-  await pathLink.waitFor({ state: 'visible', timeout: 10_000 });
-  await pathLink.click();
-  await device.page.waitForLoadState('networkidle');
+  // /lamad is the URL under test — name it (and its live status) on failure.
+  await browserStep(device, `open /lamad and enter the "${pathName}" path`, '/lamad', async () => {
+    await device.navigate('/lamad');
+    await device.page.waitForLoadState('networkidle');
+    const pathLink = device.page.getByText(pathName, { exact: false }).first();
+    await pathLink.waitFor({ state: 'visible', timeout: 10_000 });
+    await pathLink.click();
+    await device.page.waitForLoadState('networkidle');
+  });
+  return undefined;
 });
 
 When(

@@ -27,6 +27,7 @@ import { Then, When } from '@cucumber/cucumber';
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
 import { Human } from '../../src/framework/human.js';
 import { E2EWorld } from '../../src/framework/world.js';
+import { browserStep } from '../common.steps.js';
 
 const LANDING_VISITOR = '_landing-visitor';
 const VISIBLE_TIMEOUT = 10_000;
@@ -88,7 +89,11 @@ function activeDevice(world: E2EWorld): PlaywrightDevice {
 
 When('I open the landing page in a browser', async function (this: E2EWorld) {
   const device = await ensureLandingVisitor(this);
-  await device.navigate('/');
+  // browserStep so an unreachable/shedding doorway is NAMED in the failure —
+  // this step is where 8 scenarios of build #1489 died as a bare timeout.
+  await browserStep(device, 'open the landing page "/"', '/', async () => {
+    await device.navigate('/');
+  });
 });
 
 Then(

@@ -33,6 +33,7 @@ import {
 } from '../../src/framework/pages/selectors.js';
 import { isSpaRoutingNoise } from '../../src/framework/utils/console-filters.js';
 import { E2EWorld } from '../../src/framework/world.js';
+import { browserStep } from '../common.steps.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -48,12 +49,17 @@ function requirePwDevice(world: E2EWorld, humanName: string): PlaywrightDevice {
 }
 
 async function navigateToShefaPath(device: PlaywrightDevice, path: string): Promise<void> {
-  // PlaywrightDevice was constructed with the elohim-app URL as `appUrl`; it
-  // exposes `navigate(path)` which prepends that base.
-  await device.navigate(path);
-  // Topology pages fetch from federated/aggregated endpoints; networkidle
-  // gives them a chance to settle the loading skeleton.
-  await device.page.waitForLoadState('networkidle');
+  // browserStep wraps the whole open so a failure names the shefa URL, its
+  // direct HTTP status and the doorway's /health — the three /shefa/* opens
+  // were three of build #1489's bare "function timed out" scenarios.
+  await browserStep(device, `open "${path}"`, path, async () => {
+    // PlaywrightDevice was constructed with the elohim-app URL as `appUrl`; it
+    // exposes `navigate(path)` which prepends that base.
+    await device.navigate(path);
+    // Topology pages fetch from federated/aggregated endpoints; networkidle
+    // gives them a chance to settle the loading skeleton.
+    await device.page.waitForLoadState('networkidle');
+  });
 }
 
 // ---------------------------------------------------------------------------

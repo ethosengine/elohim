@@ -12,6 +12,7 @@ import { Given, When, Then } from '@cucumber/cucumber';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
 import { E2EWorld } from '../../src/framework/world.js';
+import { browserStep } from '../common.steps.js';
 
 function getDevice(world: E2EWorld): PlaywrightDevice {
   for (const [, human] of world.humans) {
@@ -42,8 +43,14 @@ Given('I am a new traveler {string}', async function (this: E2EWorld, _name: str
 Given('the {string} path exists', async function (this: E2EWorld, pathName: string) {
   const device = requirePlaywright(this);
   if (!device) return 'pending';
-  const pathElement = device.page.getByText(pathName, { exact: false }).first();
-  await pathElement.waitFor({ state: 'visible', timeout: 10_000 });
+  // The wait itself is unchanged (10s, as before). browserStep only makes its
+  // failure legible: "waiting for getByText(...)" alone never said whether the
+  // page under it was a 503 shed, a 404, or a served document that hung.
+  await browserStep(device, `find the "${pathName}" path on the current page`, null, async () => {
+    const pathElement = device.page.getByText(pathName, { exact: false }).first();
+    await pathElement.waitFor({ state: 'visible', timeout: 10_000 });
+  });
+  return undefined;
 });
 
 // ---------------------------------------------------------------------------
