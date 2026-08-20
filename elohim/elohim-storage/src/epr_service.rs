@@ -1024,10 +1024,10 @@ mod tests {
         assert_eq!(reach_level_index("self"), 5);
         assert_eq!(reach_level_index("private"), 5);
         // Re-aimed 2026-08-20: this line used to ASSERT the fail-open (== 0).
-    // An unknown tier must sort as the MOST restricted, so it reaches the
-    // authorizer's `_ => Err` instead of being served as commons.
-    assert_eq!(reach_level_index("garbage"), u8::MAX);
-    assert!(reach_level_index("garbage") > reach_level_index("community"));
+        // An unknown tier must sort as the MOST restricted, so it reaches the
+        // authorizer's `_ => Err` instead of being served as commons.
+        assert_eq!(reach_level_index("garbage"), u8::MAX);
+        assert!(reach_level_index("garbage") > reach_level_index("community"));
     }
 
     /// The same string is read two ways, and the two readings must fail safe

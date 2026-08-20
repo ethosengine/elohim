@@ -6573,8 +6573,8 @@ impl HttpServer {
                         // `Authorization:` header no longer opens restricted tiers,
                         // and neither does the ambient local session (which would
                         // resolve an anonymous request as the node's own human).
-                        let resolved = crate::api::account::extract_agent_cid_explicit(&req)
-                            .is_some();
+                        let resolved =
+                            crate::api::account::extract_agent_cid_explicit(&req).is_some();
                         if !resolved {
                             return Ok(Response::builder()
                                 .status(StatusCode::FORBIDDEN)
