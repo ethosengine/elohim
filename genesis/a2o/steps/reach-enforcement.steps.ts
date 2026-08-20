@@ -26,6 +26,8 @@
  */
 
 import { strict as assert } from 'node:assert';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { Given, When, Then } from '@cucumber/cucumber';
 
@@ -175,6 +177,62 @@ When(
     const name = headerSpec.slice(0, idx).trim();
     const value = headerSpec.slice(idx + 1).trim();
     await captureListing(this, peerName, 'presented', { [name]: value });
+  }
+);
+
+/**
+ * THE ABSOLUTE. The relation below ("no more than anonymous") is necessary but
+ * NOT sufficient: a defect that elevates BOTH postures equally satisfies it
+ * while leaking. That is not hypothetical — a requester-resolution path that
+ * falls back to an ambient process-wide session would serve the node's own
+ * human to a caller presenting nothing at all, and every relative assertion in
+ * this file would stay green through it.
+ *
+ * So one assertion must be absolute: what an anonymous caller receives, on its
+ * own, bounded. The floor is DERIVED from the protocol enum
+ * (sdk/schemas/v1/enums/reach.schema.json, ordered most-restrictive to
+ * most-open) rather than hardcoded, so it tracks the vocabulary instead of
+ * pinning a tier list this suite has no authority to canonize. Only the name of
+ * the floor itself is given — the one anchor the codebase already treats as
+ * stable, testing `reach == "commons" || reach == "public"` in several places.
+ */
+function openReachSet(floor: string): Set<string> {
+  const schemaPath = fileURLToPath(
+    new URL('../../../elohim/sdk/schemas/v1/enums/reach.schema.json', import.meta.url)
+  );
+  const schema = JSON.parse(readFileSync(schemaPath, 'utf8')) as { enum?: string[] };
+  const ordered = schema.enum ?? [];
+  const floorIdx = ordered.indexOf(floor);
+  assert.ok(
+    floorIdx >= 0,
+    `Reach floor "${floor}" is not in the protocol enum — the vocabulary moved and this ` +
+      `assertion needs re-anchoring, not silently weakening.`
+  );
+  return new Set(ordered.slice(floorIdx));
+}
+
+Then(
+  'the anonymous listing contains only rows at or above {string} reach',
+  function (this: E2EWorld, floor: string) {
+    const anon = requireListing(this, 'anonymous');
+    const open = openReachSet(floor);
+    const restricted = anon.ids.filter(id => !open.has(anon.reachById.get(id) ?? '(absent)'));
+    if (restricted.length > 0) {
+      const byReach = new Map<string, number>();
+      for (const id of restricted) {
+        const r = anon.reachById.get(id) ?? '(absent)';
+        byReach.set(r, (byReach.get(r) ?? 0) + 1);
+      }
+      assert.fail(
+        `REACH BYPASS (absolute): an anonymous caller presenting NO credential received ` +
+          `${restricted.length} row(s) below the "${floor}" floor — ` +
+          `${[...byReach.entries()].map(pair => pair.join('=')).join(', ')}. ` +
+          `Sample: ${restricted.slice(0, 3).join(', ')}. ` +
+          `A requester-resolution path is granting identity to a caller that asserted none ` +
+          `(check whether reach decisions resolve identity from an ambient session rather ` +
+          `than from the request).`
+      );
+    }
   }
 );
 

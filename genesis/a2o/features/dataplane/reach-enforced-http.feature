@@ -52,6 +52,10 @@ Feature: Reach is enforced at the HTTP egress, not inferred from a header
     When I list content on peer "alpha-A" anonymously
     And I list content on peer "alpha-A" presenting header "Authorization: Bearer not-a-real-token"
     Then both listings answered 200
+    # The ABSOLUTE, and it must come first: the two assertions below are
+    # relative, so a defect that elevates BOTH postures equally passes them
+    # while leaking. Anonymous must be bounded on its own terms.
+    And the anonymous listing contains only rows at or above "public" reach
     And the presented credential returned no rows beyond the anonymous listing
     And the presented credential returned no fuller content than the anonymous listing
 
@@ -66,6 +70,7 @@ Feature: Reach is enforced at the HTTP egress, not inferred from a header
     When I list content on peer "alpha-A" anonymously
     And I list content on peer "alpha-A" presenting header "X-Agent-Cid: matthew"
     Then both listings answered 200
+    And the anonymous listing contains only rows at or above "public" reach
     And the presented credential returned no rows beyond the anonymous listing
     And the presented credential returned no fuller content than the anonymous listing
 
@@ -76,5 +81,6 @@ Feature: Reach is enforced at the HTTP egress, not inferred from a header
     When I list content on peer "alpha-A" anonymously
     And I list content on peer "alpha-A" presenting header "X-Agent-Id: matthew"
     Then both listings answered 200
+    And the anonymous listing contains only rows at or above "public" reach
     And the presented credential returned no rows beyond the anonymous listing
     And the presented credential returned no fuller content than the anonymous listing

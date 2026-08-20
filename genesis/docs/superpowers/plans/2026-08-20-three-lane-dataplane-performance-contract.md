@@ -244,6 +244,41 @@ next lever is the conductor error class.
 the *gate* faster; it does not make peers agree. Say that in any habit delta, so
 a faster gate never reads as agreement.
 
+## 8a. Named risk from the reach cure — fail-closed has a cost
+
+Closing `reach_level_index`'s fail-open was correct, and it carries a consequence
+that must not be discovered later by a confused author.
+
+`content.reach` has **no write-time validation**, and the reach vocabulary is in
+declared multi-vocabulary drift. Before the cure, a row carrying a non-canonical
+reach string read as the most permissive tier — wrongly public. After it, that
+row reads as maximally restricted: **invisible to everyone, including its own
+owner**, with no backfill path and no error at the point of authorship. The cure
+converted a confidentiality failure into an availability one. That is the right
+direction — a leak is worse than an outage, and an outage is visible — but it is
+a trade, not a free win.
+
+Two follow-ups this implies, neither landed:
+
+1. **Validate `reach` at write time** against the protocol enum, so a
+   non-canonical value is refused at authorship rather than silently swallowing
+   the row. Today the only feedback is content that stops appearing.
+2. **A sweep for already-written non-canonical values**, which are now dark.
+   UNKNOWN how many exist; nothing counts them today, which is itself the
+   finding — the same missing-instrument shape as §4.
+
+Related, and the reason this is a *named* risk rather than a footnote: a second
+fail-open in the same function was found by review after the cure landed.
+`reach_level_index` is read in two directions — as a RESTRICTION on content, and
+as a PRIVILEGE via `ctx.reach_ceiling` in the ambient trust fast path, where the
+ceiling arrives verbatim off the wire from a peer and is cached unvalidated. A
+value that fails closed in the first direction fails **open** in the second:
+`u8::MAX` satisfies `ceiling_idx >= reach_idx` for every tier, so a peer with a
+typo'd or forked vocabulary would buy ambient community access with the
+participation check skipped. The lesson generalizes past this function: **a
+sentinel is only fail-closed with respect to a direction**, and any ordinal read
+in both directions needs an `Option`-returning form rather than a magic value.
+
 ## 9. Open decisions for the architect
 
 1. **Ciphertext CID vs convergent encryption.** If the address is the CID of the
