@@ -31,6 +31,10 @@ Feature: Web2 Absorption — Doorway Projection Cache
     And the projection cache contains entries for "evolution-of-trust"
     And each cache entry records the blob_hash from storage
 
+  # Still @wip, and for a reason worth naming: no surface exposes a cache ENTRY. The doorway
+  # publishes GET /admin/cache/stats (counts only), so "each entry carries an agreement_id"
+  # is unobservable from outside the process — the claim has no witness, in a test or for an
+  # operator. Sheds @wip when a cache-entry read surface exists.
   @wip @act:i
   Scenario: Cache entries include EPR agreement reference
     Given the projection cache for "evolution-of-trust" is empty
@@ -47,11 +51,16 @@ Feature: Web2 Absorption — Doorway Projection Cache
     Then all app files are served from the projection cache
     And zero requests reach elohim-storage
 
-  @wip @act:i
+  # A "browser" here is the whole bundle, not one file: 30 browsers fan ~1200 requests at
+  # one doorway from a single source IP, past the membrane's 900-second ban threshold. That
+  # is an act which changes the mesh for every other run on it, so the first step holds the
+  # scenario unless the operator has said go.
+  @requires:owned-substrate @act:i
   Scenario: Storage remains stable under concurrent browser load
-    Given the projection cache for "evolution-of-trust" is warm
-    When 30 browsers simultaneously request "evolution-of-trust"
-    Then all requests complete successfully
+    Given this run owns the doorway's request budget
+    And the projection cache for "evolution-of-trust" is warm
+    When 30 browsers simultaneously load "evolution-of-trust"
+    Then all browsers receive complete responses
     And elohim-storage memory usage stays within container limits
 
   # --- Request Coalescing ---
@@ -65,7 +74,10 @@ Feature: Web2 Absorption — Doorway Projection Cache
 
   # --- Cache Invalidation ---
 
-  @wip @act:i
+  # WRITES: re-seeding moves a real content head. Held behind A2O_ALLOW_DESTRUCTIVE=1.
+  # The literal "sha256-old" reads as "whatever hash is cached right now" — the contract is
+  # that the cached hash is SUPERSEDED, never that it equals a particular string.
+  @requires:owned-substrate @act:i
   Scenario: Re-seeded content invalidates stale cache entries
     Given the projection cache for "evolution-of-trust" is warm with blob_hash "sha256-old"
     When "evolution-of-trust" is re-seeded with a new ZIP blob

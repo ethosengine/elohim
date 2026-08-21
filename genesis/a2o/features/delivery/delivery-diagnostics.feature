@@ -81,7 +81,7 @@ Feature: Delivery Diagnostics — Observability and Controlled Degradation
 
   # --- Controlled Layer Disable ---
 
-  @wip
+  @act:i
   Scenario: Operator can disable the projection cache at runtime
     Given the projection cache is enabled
     When Matthew disables the projection cache via operator API
@@ -101,7 +101,7 @@ Feature: Delivery Diagnostics — Observability and Controlled Degradation
 
   # --- Peer Capability Introspection ---
 
-  @wip
+  @act:i
   Scenario: Operator can query a peer's delivery capabilities
     Given elohim-storage is running with ExtractionCache
     When Matthew queries delivery capabilities for the storage peer
@@ -109,7 +109,7 @@ Feature: Delivery Diagnostics — Observability and Controlled Degradation
     And the response shows cache_tier
     And the response lists ready_content hashes
 
-  @wip
+  @act:i
   Scenario: Operator can see all peers and their delivery capabilities
     Given doorway "alpha" is connected to 3 peers
     When Matthew requests the delivery capability summary
