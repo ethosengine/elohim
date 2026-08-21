@@ -39,6 +39,10 @@
 #   MESH_PEERS      Peer names, comma-separated (default: matthew,jessica,james)
 #   MESH_DIR        Data root (default: /tmp/elohim-local-mesh)
 #   DOORWAY_PORT    Doorway HTTP port (default: 8888)
+#   DOORWAY_A_HEALTH_PORT / DOORWAY_B_HEALTH_PORT  health-watchdog listener ports (default 8079 / 8089;
+#                   alpha runs 8079 — spawn_health_listener serves /health,/ready,/health/serving from
+#                   its own OS-thread runtime; unset ⇒ liveness rides the MAIN listener and the watchdog
+#                   a2o scenarios are unconstructible)
 #   STORAGE_BIN     elohim-storage binary (default: pool release slot)
 #   DOORWAY_BIN     doorway binary (default: pool debug slot)
 #   MONGOD_BIN      mongod binary (default: first of $PATH mongod, ~/bin/mongod);
@@ -907,6 +911,7 @@ EOF
     # unstaged slug degrades to CSR with x-ssr-skipped. The landing browser
     # bundle carries only index.csr.html, so WITHOUT SSR the / mount 404s.
     DOORWAY_ID="${DOORWAY_ID:-alpha-elohim-host}" \
+    DOORWAY_HEALTH_PORT="${DOORWAY_A_HEALTH_PORT:-8079}" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-a" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
     API_KEY_ADMIN="${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}" \
@@ -932,6 +937,7 @@ EOF
   DOORWAY_B_PORT="${DOORWAY_B_PORT:-8889}"
   if ! curl -s -m 2 "http://localhost:$DOORWAY_B_PORT/health" >/dev/null; then
     DOORWAY_ID="${DOORWAY_B_ID:-apex-elohim-host}" \
+    DOORWAY_HEALTH_PORT="${DOORWAY_B_HEALTH_PORT:-8089}" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-b" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
     API_KEY_ADMIN="${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}" \
