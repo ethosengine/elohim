@@ -103,7 +103,17 @@ function applyDoorwayEnvironment(
   env: FixtureEnvironment
 ): void {
   for (const id of ['alpha', 'beta', 'apex', 'gamma']) {
-    const envUrl = env[`E2E_DOORWAY_${id.toUpperCase()}`];
+    // The second doorway has two live names for the same substrate fact:
+    // E2E_DOORWAY_BETA is the a2o Background convention (this loop's own
+    // alpha/beta/apex/gamma id naming, `Given doorway "beta" at
+    // "E2E_DOORWAY_BETA"`); E2E_DOORWAY_B is the CI vocabulary
+    // (scripts/ci/run-dataplane-validation.sh passes it to the quiesce gate,
+    // and src/framework/dataplane/surfaces.ts's resolvePeerUrl('elohim.host')
+    // already honors it). A run that sets only one must still resolve "beta"
+    // — BETA wins when both are set, since the mode-aware step's direct
+    // env-var lookup reads it before ever consulting this fixture.
+    const betaAlias = id === 'beta' ? env['E2E_DOORWAY_B'] : undefined;
+    const envUrl = env[`E2E_DOORWAY_${id.toUpperCase()}`] ?? betaAlias;
     doorways[id] = {
       ...doorways[id],
       ...(envUrl ? { url: withoutTrailingSlashes(envUrl) } : {}),

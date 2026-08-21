@@ -103,11 +103,43 @@ When(
   }
 );
 
-/** Normalise inScopeOf to an array regardless of wire shape.
- *  Storage may return an array OR a pipe-delimited string (e.g. "doorway:x|epr:y"). */
+/**
+ * One inScopeOf array entry may itself be a JSON-encoded array string rather
+ * than a bare scope value. This is the live wire shape today for commitments
+ * created from a plain-string `inScopeOf` body (the seeder's
+ * `JSON.stringify(spec.scopes)` convention, `genesis/seeder/src/
+ * seed-operator-bindings.ts`): elohim-storage's `normalize_create_input`
+ * (`elohim/elohim-storage/src/api/rea_commitments.rs`, "pre-wrap plain-string
+ * array fields") wraps that already-JSON-array-encoded string in ANOTHER
+ * single-element array instead of parsing it first, so the value that
+ * round-trips is `["[\"host:...\",\"epr_root:...\"]"]` — a JSON array whose
+ * only element is itself a JSON array literal. Try to parse each entry as
+ * JSON before treating it as a scalar scope value so this step reads the
+ * real scope list regardless of which encoding shape the wire carries.
+ */
+function normaliseScopeOfEntry(entry: unknown): string[] {
+  if (typeof entry !== 'string') return [];
+  const trimmed = entry.trim();
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((v): v is string => typeof v === 'string');
+      }
+    } catch {
+      // Not actually JSON — fall through and treat it as a scalar/pipe value.
+    }
+  }
+  return trimmed.includes('|') ? trimmed.split('|') : [trimmed];
+}
+
+/** Normalise inScopeOf to a flat array of scope strings regardless of wire shape.
+ *  Storage may return a native array, a pipe-delimited string (e.g. "doorway:x|epr:y"),
+ *  or (see normaliseScopeOfEntry) an array whose entries are themselves
+ *  JSON-encoded arrays. */
 function normaliseScopeOf(raw: unknown): string[] {
-  if (Array.isArray(raw)) return raw as string[];
-  if (typeof raw === 'string') return raw.split('|');
+  if (Array.isArray(raw)) return raw.flatMap(normaliseScopeOfEntry);
+  if (typeof raw === 'string') return normaliseScopeOfEntry(raw);
   return [];
 }
 

@@ -65,8 +65,14 @@ export function resolvePeerUrl(peerName: string): string {
       // E2E_DOORWAY_B is already CI vocabulary (run-dataplane-validation.sh
       // passes it to the quiesce gate); wiring it here lets a local mesh
       // stand in a second doorway instead of every B-leg probing the LIVE
-      // production doorway from the desk. Default unchanged.
-      return process.env['E2E_DOORWAY_B'] ?? 'https://elohim.host';
+      // production doorway from the desk. E2E_DOORWAY_BETA is the a2o
+      // Background convention (household-mesh.ts's alpha/beta/apex/gamma id
+      // naming, `Given doorway "beta" at "E2E_DOORWAY_BETA"`) — accept it as
+      // an alias so a run that set only one env name still resolves here too.
+      // Default unchanged.
+      return (
+        process.env['E2E_DOORWAY_B'] ?? process.env['E2E_DOORWAY_BETA'] ?? 'https://elohim.host'
+      );
     case 'shem': {
       const url = process.env['E2E_SHEM_HOST'];
       if (!url) throw new Error('E2E_SHEM_HOST not set — cannot resolve shem peer');
@@ -265,7 +271,12 @@ export interface P2PStatusSurface {
 /** Subset of the content DB response — the blobHash field the step library checks */
 export interface ContentItemSurface {
   id: string;
-  /** Present and non-null when the content has an associated blob (sha256-… format) */
+  /**
+   * Present and non-null when the content has an associated blob. Format
+   * depends on ingest vintage: freshly-ingested content carries a CIDv1
+   * (`bafkrei…`, raw codec + sha2-256); legacy rows may still carry the
+   * pre-migration `sha256-<64hex>` shape.
+   */
   blobHash?: string | null;
   /**
    * The DECLARED server (SSR) bundle hash — elohim-storage/src/ssr.rs

@@ -76,6 +76,23 @@ void describe('household mesh fixture', () => {
     assert.equal(fixture.commonsEprId, 'bafy-runtime');
   });
 
+  void it('resolves "beta" from the E2E_DOORWAY_B CI alias when BETA is unset', () => {
+    const fixture = mergeHouseholdMeshEnvironment(manifest, {
+      E2E_DOORWAY_B: 'https://ci-b.example/',
+    });
+
+    assert.equal(requireFixtureDoorwayUrl(fixture, 'beta'), 'https://ci-b.example');
+  });
+
+  void it('prefers E2E_DOORWAY_BETA over E2E_DOORWAY_B when both are set', () => {
+    const fixture = mergeHouseholdMeshEnvironment(manifest, {
+      E2E_DOORWAY_BETA: 'https://runtime-beta.example/',
+      E2E_DOORWAY_B: 'https://ci-b.example/',
+    });
+
+    assert.equal(requireFixtureDoorwayUrl(fixture, 'beta'), 'https://runtime-beta.example');
+  });
+
   void it('preserves the conventional per-peer environment fallback for the storage pool', () => {
     const fixture = mergeHouseholdMeshEnvironment(
       {},

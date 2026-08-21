@@ -659,12 +659,24 @@ function normalizeInventoryParity(wire: InventoryParityWire): InventoryParity {
   return normalized;
 }
 
+/**
+ * The CID-first migration moved blobHash off the legacy `sha256-<64hex>`
+ * shape to CIDv1 (base32 lower, `bafkrei…` = raw codec + sha2-256) for
+ * freshly-ingested content — manifesto is one such row. See
+ * elohim/elohim-storage/src/blob_store.rs (`Cid::new_v1(RAW_CODEC, ...)`).
+ */
+const CID_V1_RAW_SHA256 = /^bafkrei[a-z2-7]+$/;
+
 async function loadManifesto(world: E2EWorld, state: PeerLossState): Promise<void> {
   const doorwayUrl = registeredDoorwayUrl(world, 'alpha');
   const content = await jsonGet<Record<string, unknown>>(doorwayUrl, '/db/content/manifesto');
   const hash = content['blobHash'];
   assert.equal(typeof hash, 'string', 'manifesto projection has no blobHash');
-  assert.match(hash as string, /^sha256-[a-f0-9]{64}$/);
+  assert.match(
+    hash as string,
+    CID_V1_RAW_SHA256,
+    `manifesto blobHash "${hash}" does not look like a CID content address (expected bafkrei…)`
+  );
   state.manifestoHash = hash as string;
 }
 

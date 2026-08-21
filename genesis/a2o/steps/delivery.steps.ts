@@ -47,10 +47,16 @@ export async function fetchApp(baseUrl: string, path: string): Promise<AppRespon
 export const responseStore = new WeakMap<E2EWorld, AppResponse>();
 
 /** Sentinel value used in feature files when the real hash isn't known yet. */
-const PLACEHOLDER_HASH = 'sha256-abc123';
+const PLACEHOLDER_HASH = 'bafkreiplaceholder';
 
-/** Pattern that a real sha256 content-address must match. */
-const CONTENT_ADDRESS_PATTERN = /^sha256-[a-f0-9]{64}$/;
+/**
+ * Pattern that a real content address must match. The doorway serves CIDv1
+ * (base32 lower, `bafkrei…` = raw codec + sha2-256) as X-Content-Address —
+ * the CID-first migration moved the header off the legacy `sha256-<64hex>`
+ * shape. See doorway/doorway-service/src/routes/blob.rs `parse_content_address`
+ * and elohim/elohim-storage/src/blob_store.rs (`Cid::new_v1(RAW_CODEC, ...)`).
+ */
+const CONTENT_ADDRESS_PATTERN = /^bafkrei[a-z2-7]+$/;
 
 /** World-local storage key for the captured X-Content-Address value. */
 const CAPTURED_CONTENT_ADDRESS_KEY = 'capturedContentAddress';
@@ -145,7 +151,7 @@ When('I request {string}', async function (this: E2EWorld, path: string) {
       assert.match(
         captured,
         CONTENT_ADDRESS_PATTERN,
-        `Captured "${captured}" does not look like a sha256 content address`
+        `Captured "${captured}" does not look like a CID content address (expected bafkrei…)`
       );
     }
     capturedContentAddress = captured;
@@ -193,7 +199,7 @@ Then(
       assert.match(
         actual,
         CONTENT_ADDRESS_PATTERN,
-        `Header "${headerName}" value "${actual}" does not look like a sha256 content address`
+        `Header "${headerName}" value "${actual}" does not look like a CID content address (expected bafkrei…)`
       );
       this.contentIds.set(CAPTURED_CONTENT_ADDRESS_KEY, actual);
       capturedContentAddress = actual;
