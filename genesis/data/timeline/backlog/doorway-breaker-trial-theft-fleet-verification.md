@@ -181,3 +181,16 @@ failures. Two bounded follow-ups: (1) a `elohim_http_request_duration_ms` histog
 minimum window (N failures within T seconds) so a one-second stall cannot open it. Measure on the mesh with
 `just test mesh` under load before changing either.
 
+## CORRECTION 2026-08-21 20:30 — the "storage stall" is the DOORWAY stalling on its first SSR render
+
+The continuous mesh watch (15 s cadence, direct-vs-doorway latency) resolved the 19:38 and 20:22 windows:
+every request THROUGH doorway A took exactly 12.00 s (the proxy timeout) while storage answered DIRECT in
+1.6 ms; `/admin/self-healing` unreachable; doorway.log throughput per 10 s 169 → 23 → 15 → 3 → 2 → 1 right
+after `SSR render trace` at 20:22:22 (first render of the lamad SPA after restart; `GET /apps/lamad/index.html`
+entered at 20:22:1x). The breaker then opened on the doorway's OWN timeouts (`storage forward failed
+(connect/timeout)` ×3 at 20:22:56), `/health` went degraded, saga ch01 red. Storage was never the stall —
+the request-duration histogram (in flight) will show that directly; the doorway's SSR render executes on
+the runtime that serves proxy/health/admin and parks it (~60 s cold). Cure direction: dedicated bounded
+render pool + per-render budget that sheds to the bundle path, `doorway_ssr_render_duration_ms`, pre-warm
+the first render off the request path. Doorway agent dispatched with this as item 5.
+
