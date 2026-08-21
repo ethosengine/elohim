@@ -291,6 +291,18 @@ impl ContentService {
             .ok_or_else(|| StorageError::NotFound(format!("Content not found: {}", id)))?
         };
 
+        // Refuse a reach change the substrate cannot carry, BEFORE any write —
+        // a partial apply followed by a refusal would diverge SQL from the DHT.
+        // See `reach_patch_refusal` for why the anchored path cannot honor it.
+        if let Some(refusal) = reach_patch_refusal(
+            id,
+            existing.content.dht_anchor_hash.as_deref(),
+            &existing.content.reach,
+            view.reach.as_deref(),
+        ) {
+            return Err(refusal);
+        }
+
         // Merge metadata (same logic as the legacy `update` method above).
         let merged_metadata_json =
             if let Some(patch_meta) = &view.metadata {
@@ -376,12 +388,13 @@ impl ContentService {
             // Standard update: only patched fields cross the wire.
             // LIMITATION (reach floor, G1): `reach` is NOT threaded through this standard
             // update path — the zome's update_content (content_store) does not accept a
-            // reach patch field. A reach correction on content with a LIVE dht_anchor_hash
-            // therefore routes here but does not change the notarized reach. It IS applied
-            // on the null-anchor and stale-anchor branches above, which re-publish via
-            // create_content (carrying reach). The heal of bulk-seeded (never-anchored)
-            // content works for that reason; updating reach on a live-anchored entry needs
-            // a zome change (future slice). See reach-floor-foundation-plan.md Task 6.
+            // reach patch field. It IS applied on the null-anchor and stale-anchor branches,
+            // which re-publish via create_content (carrying reach), which is why the heal of
+            // bulk-seeded (never-anchored) content works. Changing reach on a live-anchored
+            // entry needs a zome change (reach-floor-foundation-plan.md Task 6) — until then
+            // `reach_patch_refusal` (called above, before any write) REFUSES such a patch
+            // with a 400 rather than letting it reach here and answer 200 having changed
+            // nothing. So no reach-carrying patch can arrive on this arm.
             let patch = lamad_types::UpdateContentInput {
                 id: id.to_string(),
                 blob_cid: new_blob_cid.clone(),
@@ -700,6 +713,52 @@ impl ContentService {
     }
 }
 
+/// Decide whether a reach-carrying PATCH must be REFUSED rather than answered
+/// with a success it cannot honor.
+///
+/// `reach` is a DNA-notarized, DHT-witnessed field. Two write paths exist, and
+/// only one of them can carry it:
+///
+/// - **NULL / stale `dht_anchor_hash`** → `update_via_conductor` re-publishes
+///   the whole entry through `create_content`, which DOES carry `reach`. The
+///   patch genuinely applies; nothing to refuse.
+/// - **Live `dht_anchor_hash`** → the standard update path calls the
+///   content_store zome's `update_content`, whose input struct has NO reach
+///   field (`lamad_types::UpdateContentInput`). The conductor round-trip then
+///   returns the entry with its ORIGINAL reach, and the projection re-stamps
+///   that unchanged value. The write reported 200, bumped `updated_at`, and
+///   changed nothing — the worse half of a silent no-op.
+///
+/// Making reach patchable on an anchored entry needs a zome change
+/// (reach-floor-foundation-plan.md Task 6), which is a DNA-hash-moving
+/// integrity concern and not this layer's to invent. Until it lands, the honest
+/// answer is a refusal.
+///
+/// A re-send of the SAME reach is not a change and is never refused — the
+/// deploy PATCH sends `{blobHash, reach}` together on every deploy and must
+/// keep working.
+fn reach_patch_refusal(
+    id: &str,
+    dht_anchor_hash: Option<&str>,
+    current_reach: &str,
+    requested_reach: Option<&str>,
+) -> Option<StorageError> {
+    let requested = requested_reach?;
+    if requested == current_reach {
+        return None;
+    }
+    dht_anchor_hash?;
+    Some(StorageError::InvalidInput(format!(
+        "reach is not patchable on a DHT-anchored content entry \
+         (id={id}, notarized reach={current_reach}, requested={requested}). \
+         The content_store zome's update_content carries no reach field, so this \
+         write would report success and change nothing. Author the reach when the \
+         entry is created (POST /db/content) or re-author the entry; patching a \
+         notarized reach in place needs a zome change \
+         (reach-floor-foundation-plan.md Task 6)."
+    )))
+}
+
 /// Content statistics
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ContentStats {
@@ -729,5 +788,65 @@ mod tests {
         ) {
             // If this compiles, the method exists
         }
+    }
+
+    // ---------------------------------------------------------------------
+    // Reach-patch refusal (the silent-no-op fix)
+    //
+    // A reach-carrying PATCH on a DHT-ANCHORED row used to answer 200 while
+    // changing nothing: the standard-update branch cannot carry `reach` (the
+    // content_store zome's `update_content` has no reach field), and the
+    // post-write projection then re-stamped the entry's UNCHANGED reach. The
+    // guard is real and deliberate — so it must be loud, not silent.
+    // ---------------------------------------------------------------------
+
+    const ANCHOR: &str = "uhCkk87JiPmogR2U93nUTJLa9kolkN5GhYwqSKen9lMZLm3JdxGwY";
+
+    #[test]
+    fn reach_change_on_anchored_row_is_refused_not_silently_dropped() {
+        let refusal = reach_patch_refusal(
+            "community-garden-club",
+            Some(ANCHOR),
+            "public",
+            Some("community"),
+        )
+        .expect("a reach change the substrate cannot carry must be refused");
+        let msg = refusal.to_string();
+        assert!(msg.contains("reach"), "message must name the field: {msg}");
+        assert!(
+            msg.contains("community-garden-club"),
+            "message must name the row: {msg}"
+        );
+        assert!(
+            matches!(refusal, StorageError::InvalidInput(_)),
+            "InvalidInput so the route answers 400, never a success"
+        );
+    }
+
+    #[test]
+    fn refused_reach_patch_maps_to_400() {
+        let refusal = reach_patch_refusal("c1", Some(ANCHOR), "public", Some("community")).unwrap();
+        let resp = crate::services::response::error_response(refusal);
+        assert_eq!(resp.status(), hyper::StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn idempotent_reach_resend_is_not_refused() {
+        // The deploy PATCH sends {blobHash, reach} together and re-sends the
+        // SAME reach on every deploy. Refusing that would 400 every deploy.
+        assert!(reach_patch_refusal("c1", Some(ANCHOR), "public", Some("public")).is_none());
+    }
+
+    #[test]
+    fn unanchored_row_accepts_a_reach_change() {
+        // A NULL anchor takes the bootstrap branch, which re-publishes the whole
+        // entry via `create_content` — that call DOES carry reach, so the patch
+        // genuinely applies and must not be refused.
+        assert!(reach_patch_refusal("c1", None, "public", Some("community")).is_none());
+    }
+
+    #[test]
+    fn patch_without_reach_is_never_refused() {
+        assert!(reach_patch_refusal("c1", Some(ANCHOR), "public", None).is_none());
     }
 }
