@@ -27,6 +27,7 @@ just --list
 just gate                     # changed projects, including worktree edits
 just gate elohim-storage      # explicit manifest project or owning path
 just test app                 # focused test family
+just test mesh [scope]        # Act I a2o lane against the local mesh (scope = feature path or tag expr; scoped runs stay scoped)
 just dev start                # isolated conductor + storage + doorway
 just mesh status              # local multi-peer mesh
 just mesh prologue            # Act I Prologue: cast + seed + stage + fixture manifest (run after `just mesh start`)

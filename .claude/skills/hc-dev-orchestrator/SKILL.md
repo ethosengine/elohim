@@ -160,6 +160,19 @@ measure. Scenario: `genesis/a2o/features/resilience/conductor-validation-spin.fe
 a shell whose command line contains those strings (an env assignment, a `pgrep -af …` argument) is
 SIGTERM'd too (exit 144). Run `just mesh stop` alone in its own command.
 
+## Running the Act I lane
+
+```bash
+just test mesh                                   # whole Act I lane (@e2e, not @wip/@browser) under cluster-state.act1-household.yaml
+just test mesh features/dataplane/doorway-failover.feature
+just test mesh '@act:i and @dataplane'
+```
+
+`just test mesh` sources `hc-mesh.sh`'s `mesh_seed_env` and exports the Prologue's a2o env block; a
+scope argument makes it write a paths-less config so the run is actually scoped (cucumber merges a
+profile's `paths` with positionals otherwise). `@act:<i|ii|iii|host>` resolves to the act's baseline caps;
+an undeclared `@requires:` cap warns loudly once per run. Spec: `genesis/a2o/LAYERS.md`.
+
 ## Build and gate
 
 ```bash
