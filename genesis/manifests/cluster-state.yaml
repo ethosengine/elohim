@@ -16,6 +16,14 @@ resources:
     role: Matthew / Jessica / James household — local P2P          # project_shem_is_p2p_live_canvas
     available: true
     provides_node_types: [operations, edge, performance]
+  owned-substrate:
+    role: the lane OWNS its substrate — scenarios may kill peers, restart conductors/doorways, delete blobs, re-key agents (processControl: true)
+    available: false
+    note: >
+      FALSE on every shared fleet (alpha is shared; a kill is an outage for everyone). TRUE only in the
+      Act I household-mesh contract (cluster-state.act1-household.yaml). Declared here 2026-08-21 because an
+      undeclared cap fails OPEN in substrate-scope.ts — without this line `@requires:owned-substrate` gated
+      nothing on the default lane and the un-parked destructive scenarios would have run against alpha.
 
   shem:
     role: multi-tenant live P2P canvas — the cross-node proving ground   # project_shem_is_p2p_live_canvas
