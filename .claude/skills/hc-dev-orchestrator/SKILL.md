@@ -214,6 +214,7 @@ just status saga
 |---|---:|---|
 | Angular | 4200 | page request |
 | Doorway | 8888 | `/health`, `/status`, `/db/stats` |
+| Doorway health watchdog | 8079 (A) / 8089 (B) | `/health`, `/ready`, `/health/serving` on their own OS-thread runtime (`DOORWAY_A_HEALTH_PORT`/`DOORWAY_B_HEALTH_PORT`; alpha runs 8079) |
 | Conductor app | 4445 | WebSocket |
 | Conductor admin | dynamic | `elohim/holochain/local-dev/.hc_ports` |
 | Storage | 8090 | `/health`, `/db/stats` |
