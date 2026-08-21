@@ -1,4 +1,5 @@
-@delivery @omnibar @provenance @e2e @act:i
+# HELD (2026-08-21): 11/11 scenarios have no bound step definitions — story-first placeholder; un-@wip when steps land.
+@delivery @omnibar @provenance @e2e @act:i @wip
 Feature: Full-Browser Content Delivery with Protocol Omnibar
   As a visitor to the Elohim Protocol
   I want content delivered as full pages with an unobtrusive provenance bar
