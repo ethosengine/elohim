@@ -23,13 +23,24 @@ Feature: Acquisition pins — the device pin and the pull queue (slice 1)
     Then the pin response status is 501
     And the pin response body mentions "slice-3"
 
-  @requires:household-nodes @wip
+  # WRITES: pinning on peer B enqueues a real acquisition and moves real bytes.
+  # Every mutating step answers 'skipped' unless A2O_ALLOW_DESTRUCTIVE=1.
+  @requires:household-nodes @requires:owned-substrate
   Scenario: A pin completes only when verified bytes land on disk
     Given two connected storage peers where only peer A holds "epr:strawberry-guide"
     When peer B pins "epr:strawberry-guide"
     And the pull queue drains
     Then peer B's pull status shows fetched 1 of total 1
     And the content row exists in peer B's local projection
+    # BORN RED, measured 2026-08-21 on the household mesh: peer B's rollup answered
+    # {total:1, fetched:1, caughtUp:true} while GET /db/content/strawberry-guide on that
+    # same peer was still 404; the row appeared ~20s later. So "caught up" is being
+    # published from the fetch ledger alone, ahead of the projection it is supposed to
+    # be reporting on — inventory-arrival wearing byte-arrival's clothes (R-A). It
+    # matters to a person, not just a test: a device that pins a guide, sees the pin go
+    # green, and opens it gets "not found" for something it was just told it holds.
+    # The last assertion is deliberately taken at the moment of the claim and reports
+    # the measured lag when the row lands late, so the gap can never pass as a slow success.
 
   # --- Provide loop (slice 2b, rung 4): pin-as-peer + per-EPR pull rollup ---
   # The provide pin (provide:true) makes a caught-up commons pin a serveable
@@ -47,7 +58,7 @@ Feature: Acquisition pins — the device pin and the pull queue (slice 1)
     Then the pin response status is 400
     And the pin response body mentions "peer"
 
-  @requires:household-nodes @wip
+  @requires:household-nodes @requires:owned-substrate
   Scenario: A peer that pins-as-peer serves the bytes to a second node
     Given two connected storage peers where only peer A holds "epr:strawberry-guide"
     When peer A pins "epr:strawberry-guide" as a peer
@@ -112,7 +123,9 @@ Feature: Acquisition pins — the device pin and the pull queue (slice 1)
     # Review after: new ShardResponse variants, changes to
     # MAX_ACQUISITION_INFLIGHT, or any new caller of DispatchBudget.
 
-  @wip @regression
+  # RESTARTS a storage peer: the only way to observe a process before its first
+  # reconcile. Held behind A2O_ALLOW_DESTRUCTIVE=1, answering 'skipped'.
+  @requires:owned-substrate @regression
   Scenario: Pull status distinguishes an unmeasured boot from an observed empty pin set
     Given a storage peer has restarted and no acquisition reconcile has completed
     When I GET /p2p/status
