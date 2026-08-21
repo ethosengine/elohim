@@ -377,6 +377,56 @@ decisionPoints:
         testName: test_should_serve_private_content_to_owner
         kind: unit
 
+  - name: is_diagnostic_probe
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/catching_up.rs
+      modulePath: routes::catching_up::is_diagnostic_probe
+      line: 162
+    summary: >
+      Exact-path match for the two read-only diagnostic probes the substrate-trust-contract
+      runbook names as the authority (/p2p/status, /db/p2p/conductor-diagnostics). Used by
+      storage_proxy::forward_to_storage to make these a PURE PASS-THROUGH: the breaker is
+      neither consulted (is_open) nor fed (record), read_class returns None so no freshness
+      hook fires, and an upstream 429/503 is relayed with its own status and body rather than
+      being re-minted as the doorway's catching-up envelope. The platform must not blind its
+      own probes during exactly the incident they exist to explain.
+    concernIds:
+      - id: C11
+        status: answered
+        justification: >
+          Every doorway-side self-protection path is bounded to NOT apply to these two paths.
+          diagnostic_probe_paths (catching_up.rs) pins the exact-path match;
+          read_class_is_none_for_diagnostic_probes + a_diagnostic_probe_carries_no_freshness_at_all
+          pin the freshness bypass; diagnostic_probe_relays_upstream_503_verbatim
+          (storage_proxy.rs) pins that a REAL upstream answer survives the honor-backpressure
+          branch intact, and non_diagnostic_read_still_honors_upstream_503 pins that the
+          carve-out is scoped to these paths rather than relaxing backpressure generally.
+      - id: C2
+        status: n-a
+        justification: >
+          The probes carry no authority decision. Their payloads are either already public via
+          the shared bootstrap table (agent infos) or node-local operational state the node
+          itself owns (its own connection list) — elohim-storage's handle_conductor_diagnostics
+          states that trust model. This predicate only decides whether the doorway is allowed
+          to substitute its own answer for storage's, never who may read.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/catching_up.rs
+        testName: diagnostic_probe_paths
+        kind: unit
+      - path: doorway/doorway-service/src/routes/catching_up.rs
+        testName: read_class_is_none_for_diagnostic_probes
+        kind: unit
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: a_diagnostic_probe_carries_no_freshness_at_all
+        kind: unit
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: diagnostic_probe_relays_upstream_503_verbatim
+        kind: unit
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: non_diagnostic_read_still_honors_upstream_503
+        kind: unit
+
   - name: is_head_declare_write
     kind: pure-decision-predicate
     sourceLocation:

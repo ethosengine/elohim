@@ -518,7 +518,25 @@ where
             // HONOR upstream backpressure: a 429/503 from storage becomes a
             // catching-up to the browser, preserving the upstream Retry-After
             // (else the breaker cooldown) so the client does not hammer.
-            if matches!(status_u16, 429 | 503) {
+            //
+            // EXCEPT for a diagnostic probe (`diag_probe`). `is_diagnostic_probe`
+            // promises a PURE PASS-THROUGH, and honoring backpressure here broke
+            // that promise in the one case it was written for: storage ANSWERED,
+            // and its answer was the diagnosis. Measured on the 2026-08-21 local
+            // mesh — `GET /db/p2p/conductor-diagnostics` returned the doorway's
+            // `{"status":"catching-up","cause":"upstream","circuit":"closed",
+            // "errorStreak":0}` while storage had said `503 {"error":"conductor
+            // diagnostics unavailable: no embedded conductor admin connection"}`.
+            // Nothing was catching up and no breaker had tripped; the envelope
+            // was simply a lie, and the substrate-trust-contract runbook's
+            // primary probe had no way to see past it. The breaker branch above
+            // already carved these two paths out (`trial` is None); this branch
+            // is the same carve-out for the case where the upstream replied.
+            //
+            // There is no backpressure cost to relaying: the round trip is
+            // already spent, so passing storage's own status and body through
+            // issues no further work to the upstream that asked us to back off.
+            if matches!(status_u16, 429 | 503) && !diag_probe {
                 // Breaker-neutral: honored backpressure proves the upstream is
                 // ALIVE (see ProxyOutcome::classify — busy is not broken). The
                 // client still gets the catching-up response below; the
@@ -1358,6 +1376,96 @@ mod tests {
             0,
             "the shed must never reach storage for a non-head-declare route"
         );
+    }
+
+    /// REGRESSION (code-red, 2026-08-21 local mesh). `GET /db/p2p/conductor-
+    /// diagnostics` through doorway A answered the doorway's own opaque
+    /// `{"status":"catching-up","cause":"upstream","circuit":"closed",
+    /// "errorStreak":0}` — while storage had in fact answered `503
+    /// {"error":"conductor diagnostics unavailable: no embedded conductor
+    /// admin connection"}`. Nothing was catching up and no breaker had
+    /// tripped: the one line that explained the incident was dropped on the
+    /// floor by the honor-upstream-backpressure branch, and the runbook's
+    /// primary probe had no way to see past the envelope.
+    ///
+    /// `is_diagnostic_probe` promises a PURE PASS-THROUGH — "the platform must
+    /// not blind its own probes during exactly the incident they exist to
+    /// explain". The breaker branch honored that promise; this branch did not,
+    /// so the carve-out only covered the case where storage never answered and
+    /// silently lost the case where storage answered with the diagnosis.
+    #[tokio::test]
+    async fn diagnostic_probe_relays_upstream_503_verbatim() {
+        let upstream_body = br#"{"error":"conductor diagnostics unavailable: no embedded conductor admin connection"}"#.to_vec();
+        let (addr, _handle) =
+            spawn_mock_storage(503, upstream_body.clone(), "application/json").await;
+        let storage_url = format!("http://{addr}");
+        let breakers = UpstreamBreakers::new(5, 30);
+
+        let path = "/db/p2p/conductor-diagnostics";
+        let resp = forward_to_storage(
+            make_get_request(&format!("http://doorway{path}")),
+            &storage_url,
+            path,
+            &reqwest::Client::new(),
+            &breakers,
+            ForwardCtx::default(),
+        )
+        .await;
+
+        assert_eq!(
+            resp.status(),
+            StatusCode::SERVICE_UNAVAILABLE,
+            "storage's own status is relayed, never re-minted by the doorway"
+        );
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(
+            body.as_ref(),
+            upstream_body.as_slice(),
+            "the probe must read storage's real cause, never the doorway's \
+             opaque catching-up envelope"
+        );
+        assert!(
+            breakers.snapshot().is_empty(),
+            "a diagnostic probe neither consults nor feeds the breaker — \
+             relaying the answer must not have started recording one"
+        );
+    }
+
+    /// Sibling scoping test for the carve-out above: an ordinary read against
+    /// the same 503-answering upstream still gets the catching-up shed. The
+    /// bypass is scoped to the two named probes, not a blanket "relay every
+    /// upstream 503" — honoring backpressure for normal traffic is what keeps
+    /// a busy storage from being hammered.
+    #[tokio::test]
+    async fn non_diagnostic_read_still_honors_upstream_503() {
+        let (addr, _handle) = spawn_mock_storage(
+            503,
+            br#"{"error":"write pool exhausted"}"#.to_vec(),
+            "application/json",
+        )
+        .await;
+        let storage_url = format!("http://{addr}");
+        let breakers = UpstreamBreakers::new(5, 30);
+
+        let path = "/db/content/some-id";
+        let resp = forward_to_storage(
+            make_get_request(&format!("http://doorway{path}")),
+            &storage_url,
+            path,
+            &reqwest::Client::new(),
+            &breakers,
+            ForwardCtx::default(),
+        )
+        .await;
+
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            json["status"], "catching-up",
+            "ordinary reads keep the existing shed contract"
+        );
+        assert_eq!(json["cause"], "upstream");
     }
 
     fn make_cache() -> Arc<ContentCache> {
