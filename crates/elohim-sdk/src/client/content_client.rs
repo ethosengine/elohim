@@ -157,7 +157,7 @@ impl ContentClient {
             storage,
             write_buffer: WriteBuffer::new(buffer_config),
             reach_enforcer: ReachEnforcer::authenticated(),
-            http_client: reqwest::Client::new(),
+            http_client: super::schema_conformant_http_client(),
         }
     }
 

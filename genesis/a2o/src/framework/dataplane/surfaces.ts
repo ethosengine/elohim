@@ -657,6 +657,18 @@ export async function getRaw(
 }
 
 /**
+ * Schema-negotiation header sent on every bodied dataplane POST.
+ *
+ * elohim-storage's `validate_schema_version_header` treats an absent
+ * `X-Schema-Version` on a guarded `/db/**\/bulk` write as a DEPRECATED client
+ * contract: it warns, then falls back to `default_schema_version()`. Declaring
+ * it on the shared helper (rather than per call site) keeps every a2o dataplane
+ * POST conformant by construction. `1` tracks `SUPPORTED_SCHEMA_VERSIONS`
+ * (elohim/elohim-views/src/shared.rs).
+ */
+const SCHEMA_VERSION_HEADER = { 'x-schema-version': '1' } as const;
+
+/**
  * Raw POST — returns status + response body text. Never throws on non-2xx.
  * Unauthenticated by default (no auth header): a caller that presents no
  * identity is, definitionally, a non-author — the exact "any peer on the wire"
@@ -670,7 +682,7 @@ export async function postRaw(
   const hasBody = jsonBody !== undefined;
   const { statusCode, body } = await request(url, {
     method: 'POST',
-    headers: hasBody ? { 'content-type': 'application/json' } : {},
+    headers: hasBody ? { 'content-type': 'application/json', ...SCHEMA_VERSION_HEADER } : {},
     body: hasBody ? JSON.stringify(jsonBody) : undefined,
     bodyTimeout: 15_000,
     headersTimeout: 15_000,

@@ -66,7 +66,7 @@ impl ProjectionWarmer {
         Self {
             doorway_url: doorway_url.into(),
             api_key: None,
-            http_client: reqwest::Client::new(),
+            http_client: super::schema_conformant_http_client(),
         }
     }
 
@@ -75,7 +75,7 @@ impl ProjectionWarmer {
         Self {
             doorway_url: doorway_url.into(),
             api_key: Some(api_key.into()),
-            http_client: reqwest::Client::new(),
+            http_client: super::schema_conformant_http_client(),
         }
     }
 

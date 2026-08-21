@@ -3,15 +3,16 @@ id: "backlog-deprecation-storage-bulk-x-schema-version-header"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "elohim-storage bulk writes tolerate a missing X-Schema-Version header (deprecated client contract) — in-repo clients now conformant, server tolerance and the SDK projection flush remain"
+title: "elohim-storage bulk writes tolerate a missing X-Schema-Version header (deprecated client contract) — every in-repo client is now conformant; the terminal server-tolerance decision is an open operator wire-contract call"
 slug: "deprecation-storage-bulk-x-schema-version-header"
 written: "2026-08-07"
+updated: "2026-08-21"
 author: "deprecation-triage"
-status: "wip"
+status: "backlog"
 priority: "low"
-deprecation_status: in-progress
+deprecation_status: blocked
 severity: low
-fingerprints: ["3d8af5658223", "f47f0600b001", "cdb5ca58ee6c", "d7af212f42f2", "fef5d7190486", "ea88a05cc69f", "388edb6e4ce8", "b4f2961e0593"]
+fingerprints: ["3d8af5658223", "f47f0600b001", "cdb5ca58ee6c", "d7af212f42f2", "fef5d7190486", "ea88a05cc69f", "388edb6e4ce8", "b4f2961e0593", "61d2d6c7bc10", "4b6912d97c00", "f7398a2d0c88", "0ab7ff6b4673", "757534fab7b6", "2942cdb50eba", "a997ee70af19", "27ddce001d3a"]
 relatedNodeIds: []
 tags: [deprecation, elohim-storage, schema-negotiation, http-contract, bulk-endpoints]
 cites:
@@ -20,6 +21,8 @@ cites:
   - elohim/elohim-storage/src/services/response.rs
   - crates/elohim-storage-client/src/client.rs
   - crates/elohim-sdk/src/client/content_client.rs
+  - crates/elohim-sdk/src/client/mod.rs
+  - genesis/a2o/src/framework/dataplane/surfaces.ts
   - app/elohim-app/src/app/elohim/services/storage-client.service.ts
   - app/elohim-library/projects/elohim-service/src/client/elohim-client.ts
   - genesis/seeder/src/doorway-client.ts
@@ -84,11 +87,18 @@ observed from the primary seed path.
 | `genesis/a2o/scripts/publish-results.ts` | content bulk |
 | `crates/elohim-storage-client/src/client.rs` | `bulk_create_content` — fixed as a reqwest **client default header** so future guarded routes on this client are conformant by construction |
 
-**Still non-conformant (the remaining trajectory):**
+**Fixed in the 2026-08-21 pass** — the two remaining holes, one of which was
+the actual live emitter:
 
-| File | Route | Why not fixed here |
+| File | Route | Note |
 |---|---|---|
-| `crates/elohim-sdk/src/client/content_client.rs:395,428` | `/db/{app_id}/{content_type}/bulk` in `flush_to_projection` + `flush_to_storage` | The file was under concurrent edit by another agent during this run and was declared out of scope for the dispatch. Both call sites build a bare `self.http_client.post(&url).json(&items)` with no schema header. |
+| `crates/elohim-sdk/src/client/content_client.rs` | `/db/{app_id}/{content_type}/bulk` in `flush_to_projection` + `flush_to_storage` | Fixed as a **client default header** via the new `schema_conformant_http_client()` in `crates/elohim-sdk/src/client/mod.rs`, not per call site — the pattern `crates/elohim-storage-client` already used. `elohim-views` was already a direct SDK dependency, so the value reads from `default_schema_version()` and cannot drift. `ProjectionWarmer`'s two constructors take the same client. |
+| `genesis/a2o/src/framework/dataplane/surfaces.ts` | `postRaw()` → `/db/content/bulk` from `steps/mesh/sync-control.steps.ts:709` | **This was the live emitter.** Fixed on the shared `postRaw` helper, so every bodied a2o dataplane POST is conformant by construction. `postRawInvalidJson` in `sync-control.steps.ts` was updated in step to preserve its documented "mirrors postRaw's shape exactly, minus the stringify" invariant. |
+
+No in-repo caller of the six guarded routes is non-conformant as of this pass
+(`grep -rn '/bulk'` sweep over `crates/ elohim/ doorway/ steward/` for Rust and
+`app/ genesis/` for TS — every remaining hit is a server-side route definition
+or a doc comment).
 
 ## Migration path
 
@@ -97,75 +107,97 @@ No upstream guide — the contract is ours. Two steps:
 1. **Every client sends `X-Schema-Version: 1`.** Value read from the shared
    contract where the language allows it (`elohim_views::shared::default_schema_version()`
    in Rust) rather than a literal, so a future `SUPPORTED_SCHEMA_VERSIONS` bump
-   cannot silently desync a client. This step is what makes the runtime warning
-   stop firing.
+   cannot silently desync a client. **This step is COMPLETE as of 2026-08-21.**
 2. **Decide the terminal state for the server tolerance** — either promote the
    absent-header case from `warn` + default to a 400, or delete the deprecation
    language and accept omission as permanently supported. This is a wire-contract
    decision affecting any external/third-party client of a doorway, not just the
-   monorepo, and it is the reason this entry stays open after step 1.
+   monorepo. **This is the only remaining work, and it is not a background-agent
+   call.**
 
 ## Current decision
 
-**Step 1 landed for every in-repo client except the SDK projection flush; step 2
-is undecided and needs an operator call.**
+**BLOCKED on an operator wire-contract decision. Step 1 is complete and
+runtime-verified; do not re-dispatch triage for this warning.**
 
-The six non-conformant in-repo call sites now send the header, verified green
-(see Verification). The runtime warning can now only be emitted by
-`crates/elohim-sdk`'s `content_client` flush or by an out-of-repo client.
+Every in-repo client of the six guarded bulk routes now sends the header. The
+warning can now only be emitted by an out-of-repo client, or by a stale binary
+or stale checkout predating this pass — if it reappears from an in-repo path,
+that is a genuine regression and the ledger will correctly re-fire.
 
-Next actions, in order:
+The one remaining action is step 2, and it needs a human call because it changes
+a public wire contract. Recommendation carried forward from the 2026-08-07 pass,
+unchanged and now stronger: **keep the tolerance, drop the "deprecated"
+language**, and let `X-Supported-Schema-Versions` carry the negotiation. A hard
+400 buys nothing while `SUPPORTED_SCHEMA_VERSIONS == [1]` — there is no second
+version to disambiguate — and it converts a silent-and-correct default into an
+outage for any external client. Revisit if and when version 2 ships. Executing
+that decision deletes the `warn!` line, which also ends this concern's
+contribution to the sentinel self-capture load described below, and closes
+this entry.
 
-1. Add `X-Schema-Version` to `crates/elohim-sdk/src/client/content_client.rs`
-   `flush_to_projection` and `flush_to_storage` — small and mechanical, blocked
-   on the concurrent edit clearing. Prefer wiring it as a default header on the
-   SDK's shared `http_client` (the pattern used in `crates/elohim-storage-client`)
-   rather than per call site.
-2. Then decide step 2. Recommendation: **keep tolerance, drop the "deprecated"
-   language**, and let `X-Supported-Schema-Versions` carry the negotiation. A
-   hard 400 buys nothing while `SUPPORTED_SCHEMA_VERSIONS == [1]` — there is no
-   second version to disambiguate — and it turns a silent-and-correct default
-   into an outage for any external client. Revisit if and when version 2 ships.
-   Executing that decision deletes the `warn!` line, which also removes this
-   concern's contribution to the sentinel self-capture load described below.
+**A correction this pass had to make.** The 2026-08-07 entry claimed step 1's
+banner-gone proof "structurally" — every in-repo caller was believed to take the
+present-header branch. That claim was wrong: `genesis/a2o`'s `postRaw` helper was
+never in the 2026-08-07 inventory, and it emitted the warning against the live
+local mesh twice on 2026-08-21 (`matthew.log` 20:22:04 and 20:26:13). A
+structural argument over an inventory is only as good as the inventory. This
+pass replaces it with a runtime A/B (below) rather than a second structural
+claim.
 
-**Note on the ledger fingerprints.** All eight canonicalized fingerprints are
-captures of the SAME source line, re-hashed each time `http.rs` grew and the
-`warn!` moved (line 260 → 267 → 277 → 317) or each time a different `grep`
-prefix was used. None is a distinct runtime observation — every one is a
-grep-output self-capture. That multiplication is Class 3 of
+**Note on the ledger fingerprints.** Sixteen fingerprints canonicalize here, and
+only two are distinct runtime observations (the `matthew.log` pair above,
+captured as `61d2d6c7bc10` / `4b6912d97c00`). The other fourteen are grep- and
+diff-output self-captures of the same source line, re-hashed each time `http.rs`
+grew and the `warn!` moved (line 260 → 267 → 277 → 317 → 430), each time a
+different `grep` prefix was used, or — during this very triage run — each time
+the agent's own scoping commands and doc-comment diffs printed the warning text
+back to a hooked shell. That multiplication is Class 3 of
 `deprecation-sentinel-redundant-capture-surfaces.md`, where this warning is
-already the worked example (`f47f0600b001` ← five rows at three statuses). It
-stays owned there; this entry owns the underlying HTTP contract only. Fingerprint
-`3d8af5658223` previously cited a backlog file
+already the worked example. It stays owned there; this entry owns the underlying
+HTTP contract only. Fingerprint `3d8af5658223` previously cited a backlog file
 (`deprecation-elohim-storage-schema-version-header-warn.md`) that was never
 committed — this entry replaces that dangling citation.
 
 ## Verification
 
-Gates run 2026-08-07 against the client changes. All green.
+**Runtime A/B against the live local mesh (2026-08-21), matthew storage at
+`http://localhost:8090`** — the banner-gone proof the previous pass could not
+produce. Warning occurrences counted in `/tmp/elohim-local-mesh/logs/matthew.log`:
+
+| Probe | Request | HTTP | Warning delta |
+|---|---|---|---|
+| A — old `postRaw` shape | `POST /db/content/bulk` with `content-type` only | 200 | **+1** (reproduces the ledger warning on demand) |
+| B — new `postRaw` shape | same POST plus `x-schema-version: 1` | 200 | **0** (banner gone) |
+
+Probe A reproduces the exact captured warning and probe B extinguishes it, with
+both requests accepted — so the header is both necessary and sufficient, and the
+fix cannot be a false negative from the request simply failing earlier.
+
+**Gates run 2026-08-21 on the trees changed in this pass. All green.**
 
 | Tree | Command | Result |
 |---|---|---|
-| `crates/elohim-storage-client` | `RUSTFLAGS="" cargo build` | `Finished dev profile`, exit 0 |
-| `crates/elohim-storage-client` | `RUSTFLAGS="" cargo test` | `3 passed; 0 failed` (doc-tests), exit 0 |
-| `crates/elohim-storage-client` | `cargo clippy --all-targets -- -D warnings` | `Finished dev profile`, no errors |
-| `crates/elohim-storage-client` | `cargo fmt --check` | clean |
-| `genesis/seeder` | `pnpm run typecheck` | exit 0 |
-| `genesis/seeder` | `pnpm test` | `31 passed \| 1 skipped (32)` files, `444 passed \| 9 skipped (453)` tests |
-| `genesis/a2o` | `pnpm run typecheck` | exit 0 |
-| `genesis/a2o` | `pnpm run lint` | `34 problems (0 errors, 34 warnings)` |
-| `app/elohim-library/projects/elohim-service` | `pnpm test` | `32 passed (32)` files, `798 passed (798)` tests |
-| `app/elohim-app` | `pnpm exec vitest run --config vite.config.ts src/app/elohim/services/storage-client.service.spec.ts` | `30 passed (30)` |
-| `app/elohim-library` | `pnpm exec eslint projects/elohim-service/src/client/elohim-client.ts` | `0 errors, 4 warnings` (pre-existing) |
+| `crates/elohim-sdk` | `RUSTFLAGS="" cargo build --all-features` | `Finished dev profile`, exit 0 |
+| `crates/elohim-sdk` | `RUSTFLAGS="" cargo test --all-features` | `8 passed; 0 failed` (lib) · `1 passed; 0 failed` (integration) · doc-tests exit 0 |
+| `crates/elohim-sdk` | `cargo clippy --all-features --all-targets -- -D warnings` | `Finished dev profile`, exit 0 |
+| `crates/elohim-sdk` | `cargo fmt --check` | clean, exit 0 |
+| `genesis/a2o` | `pnpm exec eslint` (both changed files) | exit 0, no findings |
+| `genesis/a2o` | `pnpm exec prettier --check` (both changed files) | "All matched files use Prettier code style!" |
+| `genesis/a2o` | `pnpm run typecheck` | 1 error, **pre-existing and not from this pass** — see below |
 
-`pnpm exec eslint` on `storage-client.service.ts` reports two `import/order`
-errors at lines 24–25. These are pre-existing debt on the branch: `git diff -U0`
-on that file shows hunks at `+34`, `+275`, `+291` only — the import block is
-untouched.
+The new lib test is
+`client::tests::schema_conformant_client_sends_schema_version_header_on_bulk_post`,
+which binds a loopback listener, issues a bulk POST through
+`schema_conformant_http_client()`, and asserts the header appears in the raw
+request bytes — an on-the-wire assertion rather than a construction-only one, so
+the SDK side is regression-guarded independently of a running mesh.
 
-The banner-gone proof for step 1 is structural rather than observational: the
-warning is emitted only on the absent-header branch, and every in-repo caller of
-the six guarded handlers now takes the present-header branch (inventory above,
-`grep -rn "/bulk"` sweep). It is not claimed as fully closed precisely because
-`crates/elohim-sdk`'s flush still takes the deprecated branch.
+The single `pnpm run typecheck` error is
+`steps/delivery/acquisition-pins.steps.ts(504,13): error TS2339: Property
+'status' does not exist on type 'ResponseData<null>'`. It belongs to another
+session's concurrent in-flight work on that file (`git diff HEAD` shows 433
+insertions there, and line 504 falls inside the `@@ -266,6 +493,26 @@` added
+hunk). It is untouched by and unrelated to this pass, and was deliberately not
+fixed here to avoid colliding with that session. This pass's two a2o files carry
+zero typecheck, lint, or format findings.

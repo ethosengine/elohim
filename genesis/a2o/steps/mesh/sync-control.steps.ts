@@ -242,7 +242,7 @@ async function postRawInvalidJson(
 ): Promise<{ status: number; text: string }> {
   const { statusCode, body } = await undiciRequest(url, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'x-schema-version': '1' },
     body: rawBody,
     bodyTimeout: 15_000,
     headersTimeout: 15_000,
