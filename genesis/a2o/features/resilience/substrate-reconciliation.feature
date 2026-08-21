@@ -12,10 +12,32 @@ Feature: Delivery reconciles to the available compute when a peer goes offline
   returns, a re-run restabilizes to the full set of people, with no one
   editing any config.
 
-  This is the test-bench guard for that contract. It reads the substrate
-  signal this run was given (ELOHIM_REMOTE_COMPUTE_STATUS) and asserts the invariant
-  that holds whether the remote peer is up or down: the household is always
-  reachable, and only remote-only people are ever scaled out.
+  Every scenario reads the substrate signal this run was given
+  (ELOHIM_REMOTE_COMPUTE_STATUS) and asserts the invariant that holds whether the
+  remote peer is up or down: the household is always reachable, and only
+  remote-only people are ever scaled out.
+
+  "Reachable" means the system can actually serve that person on this run — their
+  machine is answering — so the first three scenarios are the availability half of
+  the promise and the fourth is what a person at home experiences while it holds.
+
+  Restabilization is proved by the SAME assertion, read the other way round:
+  "reachable exactly when the remote peer is available" is bidirectional, so a run
+  taken after the peer returns finds Gertrude reachable again with nobody having
+  edited anything. There is no separate return scenario because there is no
+  separate mechanism — the signal is read fresh every run.
+
+  A second, different reconciliation follows the first: when a peer comes back, the
+  DATA it missed while dark has to converge too. That is the last scenario, and it
+  is a contract about rows rather than about reachability. A COMMITMENT is a record
+  of something a peer promised to hold; a PROJECTION is a peer's own local copy of
+  the shared record; a CONDUCTOR is the local authority that notarized it. The rule
+  it guards: a peer missing a row heals it from its OWN conductor — never by
+  copying another peer's bytes — so what converges is what this peer itself can
+  vouch for.
+
+  # `@act:host` scenarios assert only on repo configuration and need no substrate at
+  # all; `@act:i` scenarios need the household mesh. See genesis/a2o/LAYERS.md.
 
   Background:
     Given the substrate signal has been read for this run
@@ -36,16 +58,15 @@ Feature: Delivery reconciles to the available compute when a peer goes offline
     Then no household person has been scaled out this run
     And every person scaled out this run is a remote-only person
 
-  # Read-only, and deliberately not staged: "offline" is the substrate condition this run
-  # was handed (ELOHIM_REMOTE_COMPUTE_STATUS), not something the scenario causes. On a run
-  # where the remote pool IS up there is no outage to read through, so it holds.
+  # The Given READS the outage; it does not cause one. On a run where the remote pool is
+  # up there is no outage to read through, so the scenario holds rather than pretending.
   @e2e @act:i
   Scenario: A household learner keeps reading while the remote peer is offline
-    Given the remote peer is offline
+    Given this run's substrate signal says the remote peer is offline
     And human "Matthew" is logged in on doorway "alpha" with device
-    When Matthew opens a learning path that lives on the household
-    Then the content is delivered from the household
-    And the run is marked reduced-scope, naming the people it could not reach
+    When Matthew opens a learning path whose content is stored on the household
+    Then the content is delivered from a household machine
+    And the run is marked reduced-scope, naming the people it could not serve
 
   # P1 reconciliation stream: edge-triggered ReaProjectionSignals are the only
   # thing that lands an REA commitment into a peer's local projection. A peer

@@ -73,7 +73,7 @@ async function getJson(url: string): Promise<{ status: number; body: unknown }> 
  * simulation of one. When the remote pool IS up, there is no outage to read
  * through, so the scenario holds instead of pretending.
  */
-Given('the remote peer is offline', function (this: E2EWorld) {
+Given("this run's substrate signal says the remote peer is offline", function (this: E2EWorld) {
   if (isRemoteComputeAvailable()) {
     // eslint-disable-next-line no-console
     console.log(
@@ -96,7 +96,7 @@ interface HouseholdReadCapture {
 const householdReadStore = new WeakMap<E2EWorld, HouseholdReadCapture>();
 
 When(
-  'Matthew opens a learning path that lives on the household',
+  'Matthew opens a learning path whose content is stored on the household',
   { timeout: 60_000 },
   async function (this: E2EWorld) {
     const base = doorwayUrl(this);
@@ -112,7 +112,7 @@ When(
   }
 );
 
-Then('the content is delivered from the household', async function (this: E2EWorld) {
+Then('the content is delivered from a household machine', async function (this: E2EWorld) {
   const capture = householdReadStore.get(this);
   assert.ok(capture, 'no household read captured — the "Matthew opens a learning path" When must run first');
   assert.equal(
@@ -146,7 +146,7 @@ Then('the content is delivered from the household', async function (this: E2EWor
 });
 
 Then(
-  'the run is marked reduced-scope, naming the people it could not reach',
+  'the run is marked reduced-scope, naming the people it could not serve',
   function (this: E2EWorld) {
     assert.equal(
       isRemoteComputeAvailable(),
