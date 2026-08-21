@@ -1,4 +1,4 @@
-@e2e @federation @resilience
+@e2e @federation @resilience @act:i
 Feature: Doorway EPR router degrades through the storage pool
   As a household member visiting elohim.host
   I want the doorway to serve the landing and lamad apps even when its

@@ -1,4 +1,4 @@
-@e2e @federation @resilience
+@e2e @federation @resilience @act:i
 Feature: Peer-loss failover — reads keep serving while a household peer is down
   As a household member reading content during a device outage
   I want reads to be served by the surviving household peers, and the

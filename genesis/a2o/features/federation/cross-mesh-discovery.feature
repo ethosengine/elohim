@@ -1,4 +1,4 @@
-@step-zero @cross-mesh @phase-1-federation @requires:shem @requires:alpha-cluster-6peer
+@e2e @step-zero @cross-mesh @phase-1-federation @requires:shem @requires:alpha-cluster-6peer @act:iii
 Feature: Cross-mesh DHT discovery survives the doorway-A / doorway-B partition
 
   The federation-wiring-audit Phase 1 split the alpha cluster's signaling

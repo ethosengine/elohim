@@ -1,4 +1,4 @@
-@wip @e2e @delivery @federation @requires:doorway
+@wip @e2e @delivery @federation @requires:doorway @act:i
 # @wip until the ~11 step-defs are implemented (see the doc-comment below + `npx tsx scripts/generate-step-skeletons.ts`).
 # Graduate (drop @wip) AFTER the membrane deploys to alpha — the flood/header/Prometheus step-defs need a LIVE
 # membrane to author + verify reliably. Until then, verification is manual: `scripts/membrane-probe.sh` +

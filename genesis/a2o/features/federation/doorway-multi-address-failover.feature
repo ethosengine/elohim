@@ -1,4 +1,4 @@
-@e2e @federation @resilience
+@e2e @federation @resilience @act:i
 Feature: Doorway multi-address failover — the browser keeps working when the primary doorway address goes dark
   As a household member using the elohim app from a browser
   I want my session to keep serving content through a configured fallback

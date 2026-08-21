@@ -1,4 +1,4 @@
-@e2e @federation @epr
+@e2e @federation @epr @act:i
 Feature: EPR Cross-Peer Content Resolution
   As a learner navigating a path
   I want content stewarded by another peer to resolve transparently
@@ -34,7 +34,6 @@ Feature: EPR Cross-Peer Content Resolution
   # comparing the resolved URLs (distinctPeers in
   # genesis/a2o/steps/federation-epr.steps.ts) and HOLD as pending naming the
   # collapse — a tautology is never allowed to pass as a crossing.
-  @requires:shem
   Scenario: Content stewarded by another peer resolves with full body
     # Pete stewards a curriculum module on peer "alpha". When peer
     # "staging" needs it for a learner, the protocol resolves Pete's
@@ -78,7 +77,6 @@ Feature: EPR Cross-Peer Content Resolution
   # back is proof the read crossed peers rather than being served from a local row.
   # @requires:shem for the same reason as above — doorway-B is adam-backed, and adam is
   # pinned to the remote pool.
-  @requires:shem
   Scenario: P2P-resolved content is tagged for diagnostics
     # When content arrives via cross-peer resolution rather than local
     # storage, the local record carries that provenance. Operators can
@@ -115,7 +113,7 @@ Feature: EPR Cross-Peer Content Resolution
   # Backlog destination: doorway-full-facilitator sprint
   # Citation: 2026-05-16-epr-wip-disposition.md row 5
   # Gate condition: lifts when federation-epr.steps.ts ships with `peer "X" has content "Y" with reach "<level>"`, `human "Z" is a consented member of collective "W"`, and `human "Z" requests content "Y" from peer "X"` step verbs. The community-reach gate itself is enforced at elohim/elohim-storage/src/epr_service.rs:86–189 — substrate is ready; only the BDD glue is missing.
-  @wip @requires:shem
+  @wip
   Scenario: Community-reach guide accessible only to consented collective members
     # Matthew's collective ("local-church") authored a governance guide
     # at community reach. Matthew is a consented member — the guide
@@ -135,7 +133,7 @@ Feature: EPR Cross-Peer Content Resolution
   # Backlog destination: doorway-full-facilitator sprint
   # Citation: 2026-05-16-epr-wip-disposition.md row 6
   # Gate condition: lifts when federation-epr.steps.ts ships with `human "X" is a steward of "Y"`, `human "Z" has a "<reach-level>" relationship with human "X"` step verbs and the relationship fixture builder. Trusted-reach gate enforcement is live at epr_service.rs:86–189; substrate is ready.
-  @wip @requires:shem
+  @wip
   Scenario: Trusted-reach content requires standing relationship with steward
     # Some content is stewarded for a circle of trust — not for everyone
     # in a collective, but for those the steward has explicitly extended
@@ -153,7 +151,7 @@ Feature: EPR Cross-Peer Content Resolution
   # Backlog destination: doorway-full-facilitator sprint
   # Citation: 2026-05-16-epr-wip-disposition.md row 7
   # Gate condition: lifts when federation-epr.steps.ts ships with `content "X" requires prerequisite mastery of "Y"`, `human "Z" has mastery of "Y"`, and `human "Z" requests the body of content "X"` step verbs and the mastery-attestation fixture builder. The attestation gate is enforced at epr_service.rs:133–177; substrate is ready.
-  @wip @requires:shem
+  @wip
   Scenario: Attestation-gated content requires prerequisite mastery
     # Calculus 201 only opens for learners who have demonstrated mastery
     # of Calculus 101. The attestation is on the DHT (notarized);
@@ -173,7 +171,7 @@ Feature: EPR Cross-Peer Content Resolution
   # Backlog destination: doorway-full-facilitator sprint
   # Citation: 2026-05-16-epr-wip-disposition.md row 8
   # Gate condition: lifts when federation-epr.steps.ts ships with `peer "X" has content "Y" stewarded by "A" at N% and "B" at M%`, `peer "X" resolves "Y" via P2P from peer "Z"`, and `recognition events are created for steward "A" and steward "B"` step verbs. Recognition emission on P2P delivery is the substrate behaviour the test will assert; verify against epr_service path.
-  @wip @requires:shem
+  @wip
   Scenario: Recognition distributes proportionally to stewards on P2P delivery
     # Stewardship is real work and the protocol counts it. When peer
     # "staging" fetches Pete and Terrance's co-stewarded content, both
@@ -189,7 +187,7 @@ Feature: EPR Cross-Peer Content Resolution
   # Backlog destination: doorway-full-facilitator sprint
   # Citation: 2026-05-16-epr-wip-disposition.md row 9
   # Gate condition: lifts when federation-epr.steps.ts ships with `human "X" has a device policy with reach_level_max of N` and the device-policy fixture builder. The policy-ceiling check is enforced at epr_service.rs:109–131; substrate is ready.
-  @wip @requires:shem
+  @wip
   Scenario: Policy ceiling blocks content above the device's reach level max
     # Terrance's device — a stewarded-child device — has a policy ceiling
     # on reach level. Even when Terrance holds the structural standing to
@@ -207,7 +205,7 @@ Feature: EPR Cross-Peer Content Resolution
   # Backlog destination: doorway-full-facilitator sprint
   # Citation: 2026-05-16-epr-wip-disposition.md row 10
   # Gate condition: lifts when federation-epr.steps.ts ships with `Pete views his recognition feed on peer "X"`, `he sees a recognition event for "Y" delivered to peer "Z"`, and the cross-peer fetch event tracking helper. Substrate emits recognition events on delivery; the BDD layer needs to surface them.
-  @wip @requires:shem
+  @wip
   Scenario: Steward sees recognition land for content delivered cross-peer
     # Pete is on his own peer when Jessica's peer fetches his guide for
     # a learner. Pete's recognition view should reflect the new event —
@@ -223,7 +221,7 @@ Feature: EPR Cross-Peer Content Resolution
   # Backlog destination: doorway-full-facilitator sprint
   # Citation: 2026-05-16-epr-wip-disposition.md row 11
   # Gate condition: lifts when federation-epr.steps.ts ships with `peer "X" has content "Y" with multiple stewards`, `peer "X" disconnects mid-fetch before delivering the body`, and `the resolver attempts a different peer that holds the CID` step verbs, plus the disconnect simulator helper. The multi-steward failover behaviour belongs to doorway/storage; verify against the existing P2P fetch retry logic before authoring.
-  @wip @requires:shem
+  @wip
   Scenario: Cross-peer fetch surfaces transient peer-offline as a soft state
     # Mid-fetch, the source peer goes offline. The renderer should not
     # blank the page or show a stack trace; it shows a "fetching from
@@ -240,7 +238,7 @@ Feature: EPR Cross-Peer Content Resolution
   # Backlog destination: iroh-phase-12-followon
   # Citation: 2026-05-16-epr-wip-disposition.md row 12
   # Gate condition: lifts when (a) iroh Phase 12 caller-identity is fully wired through the EPR-atom request-response codec end-to-end, and (b) federation-epr.steps.ts ships with `Matthew has an active AgentPeerBinding on peer "X"`, `peer "X" fetches "Y" via the EPR-atom protocol`, and `peer "Z" resolves the requesting peer to agent "A" via PeerIdentityMap` step verbs. The reach-gate accepting Matthew-as-steward is already substrate-live; the gap is the libp2p caller-identity threading + the BDD glue around it.
-  @wip @requires:shem
+  @wip
   Scenario: Identity binding allows cross-peer fetches to attribute reach correctly
     # Matthew's content with reach "trusted" is requested from peer
     # "shem-pete" — but the requester is Matthew himself on his desktop.

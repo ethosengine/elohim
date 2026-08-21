@@ -1,4 +1,4 @@
-@wip @federation @serve-routing
+@wip @federation @serve-routing @act:iii
 Feature: Serve-routing prefers the lower-latency capable peer cross-WAN
   As a learner anywhere in the mesh
   I want blob fetches to be routed to the peer with the lowest measured round-trip time
