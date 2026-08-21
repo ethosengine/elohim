@@ -86,3 +86,37 @@ wipe that peer so its actions become unfetchable, and assert sys-validation's re
 Flat-at-quota CPU regardless of limit → storage activity counters near zero → log-rate spectroscopy
 (lines/s by message) → a stuck counter (`missing dependencies` never reaching 0) with a fixed period
 (10 s) and a saturation gauge (`Util 4000%`). A spin-loop is a constant amplitude with a constant period.
+
+## Cure 1 implemented in the conductor fork (2026-08-21)
+
+Branch `fix/sys-validation-unfetchable-deps-backoff` in `elohim/holochain-conductor`
+(commits `b9c7458ae`, `c9a6c4439`; submodule pointer deliberately NOT bumped — that is the
+integrator's move, and it dispatches a conductor image build).
+
+- Per-dependency exponential backoff in `sys_validation_workflow`, with two independent schedules:
+  local re-checks cap at 60s (so a dependency arriving by gossip is still noticed within a minute),
+  network fetches cap at 1h. Both start due immediately, so a merely-late dependency is unaffected.
+  After 12 failed network fetches a dependency is reported unfetchable and moves to a slow sweep —
+  never dropped, never validated-as-good.
+- The local dependency lookup fan-out was an unbounded `join_all`; it is now bounded to 10 in
+  flight. That, not the network fetch, was the source of the `Util 4037%` read-pool saturation.
+- The saturation log line is throttled to once per 30s per database with a suppressed count, and
+  the true rate is now the `hc.db.connections.read_saturation` counter.
+- New metrics: `hc.conductor.sys_validation.missing_dependencies`,
+  `hc.conductor.sys_validation.unfetchable_dependencies`, `hc.db.connections.read_saturation`.
+
+**What this does NOT do — still open:**
+
+1. It stops the spin; it does not drain the missing set. Cure direction 3 (identify the fossil set
+   via `DumpFullState`, and migrate or reinstall the affected DNA rows with lineage) is still the
+   honest cure for the *data*. The new unfetchable-dependency metric is the measure for it: a
+   non-zero, non-falling value names the fossil count directly.
+2. Every pass still re-writes `AwaitingSysDeps` for each waiting op (`put_validation_limbo`), so N
+   ops means N no-op UPDATEs every retry interval. Bounded and much smaller than the read storm,
+   but real; skipping the write when the stage is unchanged is a separate small change.
+3. Cure direction 2 (a `RUST_LOG` directive dropping `holochain_sqlite::db::access` /
+   `holochain_cascade` below INFO) is now redundant for the saturation line but is still the
+   zero-deploy relief for the `NoPeersForLocation` line until the fork image ships.
+4. Not reproduced on the local mesh. The `@requires:owned-substrate` chaos scenario named above
+   (author on one peer, re-key that peer, assert retry budget and log rate) is still unwritten and
+   is what would make this Act I-provable.
