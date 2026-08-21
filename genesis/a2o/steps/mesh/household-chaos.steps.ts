@@ -42,7 +42,7 @@
  */
 
 import { strict as assert } from 'node:assert';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { copyFile, mkdir, readdir, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
@@ -268,9 +268,37 @@ function holdDestructive(description: string): 'skipped' | undefined {
  * the process table (a `pkill -f elohim-storage` also matches the runner's own
  * shell and self-kills the run).
  */
+/**
+ * The live pid of the elohim-storage listening on `port`, by EXACT argv match.
+ *
+ * The manifest's pids are written once by the prologue, and a peer restarted
+ * since then (a re-key drill, a supervisor bounce) has a new one — which is
+ * ordinary, not a fault, and should not stop a drill. Re-derivation is done by
+ * walking the process table and matching argv exactly: never a `pkill -f` /
+ * `pgrep -f` pattern, which also matches the runner's own shell and self-kills
+ * the run. More than one match is refused rather than guessed.
+ */
+function discoverPeerPid(port: string): number | undefined {
+  const listing = execFileSync('/usr/bin/ps', ['-eo', 'pid=,args='], { encoding: 'utf8' });
+  const matches: number[] = [];
+  for (const line of listing.split('\n')) {
+    const trimmed = line.trim();
+    const split = trimmed.indexOf(' ');
+    if (split < 0) continue;
+    const candidate = Number(trimmed.slice(0, split));
+    const argv = trimmed.slice(split + 1).split(/\s+/);
+    if (!argv.some(arg => arg.includes('elohim-storage'))) continue;
+    if (!argv.some((arg, index) => arg === '--http-port' && argv[index + 1] === port)) continue;
+    if (candidate > 1 && candidate !== process.pid && candidate !== process.ppid) {
+      matches.push(candidate);
+    }
+  }
+  return matches.length === 1 ? matches[0] : undefined;
+}
+
 async function verifiedPeerPid(name: HouseholdPeerName): Promise<number> {
   const manifest = fixture();
-  const pid = requireFixturePeerPid(manifest, name);
+  let pid = requireFixturePeerPid(manifest, name);
   assert.ok(pid !== process.pid, 'refusing to signal the test runner itself');
   const port = new URL(requireFixtureStoragePeer(manifest, name).url).port;
   assert.ok(port, `household peer "${name}" has no port in its manifest URL`);
@@ -278,11 +306,25 @@ async function verifiedPeerPid(name: HouseholdPeerName): Promise<number> {
   let cmdline: string;
   try {
     cmdline = await readFile(`/proc/${pid}/cmdline`, 'utf8');
-  } catch (error) {
-    assert.fail(
-      `household fixture names pid ${pid} for peer "${name}", but /proc/${pid} is unreadable ` +
-        `(${String(error)}) — the manifest is stale; re-run \`just mesh prologue\``
+  } catch {
+    // Stale manifest pid — the peer was restarted since the prologue wrote it.
+    // Re-derive from the process table rather than red on a bookkeeping fact,
+    // and say out loud that it happened so a genuinely absent peer still reads
+    // as absent rather than as a lookup that quietly found something.
+    const rediscovered = discoverPeerPid(port);
+    assert.ok(
+      rediscovered,
+      `household fixture names pid ${pid} for peer "${name}", /proc/${pid} is gone, and no single ` +
+        `elohim-storage on port ${port} could be found to replace it — the manifest is stale AND ` +
+        'the peer is not running; re-run `just mesh prologue`'
     );
+    // eslint-disable-next-line no-console
+    console.log(
+      `  ℹ️  stale manifest pid for "${name}" (${pid} is gone) — re-derived ${rediscovered} by ` +
+        `exact argv match on --http-port ${port}. Re-run \`just mesh prologue\` to refresh it.`
+    );
+    pid = rediscovered;
+    cmdline = await readFile(`/proc/${pid}/cmdline`, 'utf8');
   }
   const argv = cmdline.split('\0').filter(Boolean);
   assert.ok(
@@ -879,10 +921,22 @@ async function assertUnderCustody(
     `${doorwayUrl(world)}/api/v1/resilience/${encodeURIComponent(contentId)}/household`
   );
   assert.equal(status, 200, `GET /api/v1/resilience/${contentId}/household → ${status}`);
-  const footprint = normalizeHouseholdFootprint(
-    JSON.parse(text) as Record<string, unknown>,
-    contentId
-  );
+  let footprint;
+  try {
+    footprint = normalizeHouseholdFootprint(JSON.parse(text) as Record<string, unknown>, contentId);
+  } catch (error) {
+    // A chaos drill kills peers to see whether custody SURVIVES. If nothing
+    // holds this content under custody to begin with, there is no promise to
+    // break and the drill would be measuring an empty set. That is a seeding
+    // fact about this mesh, not a resilience defect, and the two must not look
+    // alike in triage.
+    throw new Error(
+      `"${contentId}" has no custody footprint on this mesh, so there is no promise for a peer ` +
+        'death to break — the drill would be killing peers to watch nothing. Seed custody for it ' +
+        '(the household seed must place commitment-backed copies), or point the scenario at ' +
+        `content this household actually stewards. Underlying: ${String(error)}`
+    );
+  }
   assert.ok(
     footprint.commitmentBacked > 0,
     `"${contentId}" has no commitment-backed collectives — nothing credits its custody`
