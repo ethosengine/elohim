@@ -641,3 +641,109 @@ decisionPoints:
       - path: doorway/doorway-service/src/server/http.rs
         testName: unknown_operator_paths_are_recognized_for_fail_closed_handling
         kind: unit
+
+  - name: UpstreamBreakers::would_shed
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/upstream_health.rs
+      modulePath: routes::upstream_health::UpstreamBreakers::would_shed
+      line: 151
+    summary: >
+      Non-mutating availability read for a PLANNING caller ("should I even try this upstream?"):
+      true when the endpoint's circuit is anything other than Closed. Deliberately conservative —
+      an Open circuit past its cooldown still reads as shedding, because advancing the state
+      machine is the GATE's job (begin()), never the planner's.
+    concernIds:
+      - id: C3
+        status: answered
+        justification: >
+          This is the liveness cure, and the defect it closes was a liveness violation in the
+          strict sense: no legal move existed from the reachable HalfOpen state. The sibling
+          gate `is_open` CONSUMES the one half-open trial, and two `/`-path planners called it
+          with no BreakerTrial guard, so no outcome was ever recorded and the circuit re-latched
+          on every stale re-admit (2026-08-20, both doorways). would_shed_never_consumes_the_
+          half_open_trial proves a planner may ask a hundred times and the guarded caller behind
+          it still receives the trial; would_shed_does_not_advance_across_the_cooldown_boundary
+          proves the same across the cooldown edge with an injected tick. The raw gate is now
+          #[cfg(test)], so a production caller cannot re-enter this state a fourth time
+          (fixed 2026-07-21 f5e22baa2, reintroduced 2026-08-18 f0b908660, re-fixed 2026-08-21).
+      - id: C7
+        status: answered
+        justification: >
+          snapshot() previously reported a HalfOpen circuit as skipped:false while it was in fact
+          shedding every caller but the trial holder — an advertise/serve asymmetry that read as
+          reassuring on /admin/self-healing during the incident. snapshot_reports_half_open_as_
+          skipping pins the corrected mapping, which makes `skipped` definitionally equal to
+          would_shed (state != Closed) — what the surface advertises is now what it serves.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/upstream_health.rs
+        testName: would_shed_never_consumes_the_half_open_trial
+        kind: unit
+      - path: doorway/doorway-service/src/routes/upstream_health.rs
+        testName: would_shed_does_not_advance_across_the_cooldown_boundary
+        kind: unit
+      - path: doorway/doorway-service/src/routes/upstream_health.rs
+        testName: would_shed_is_true_while_a_trial_is_outstanding
+        kind: unit
+      - path: doorway/doorway-service/src/routes/upstream_health.rs
+        testName: would_shed_is_false_for_an_unknown_or_healthy_endpoint
+        kind: unit
+      - path: doorway/doorway-service/src/routes/upstream_health.rs
+        testName: snapshot_reports_half_open_as_skipping
+        kind: unit
+
+  - name: ServingHealth
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/routes/health.rs
+      modulePath: routes::health::ServingHealth
+      line: 200
+    summary: >
+      The answer to "can this doorway actually SERVE?", read from the live breaker map via the
+      non-mutating snapshot(). Two declared regimes, not one: `shedding` (a circuit is open — the
+      cheap, fast refusal) and `degrading` (a non-zero error streak — the EXPENSIVE regime, where
+      the circuit is still Closed and each request rides the full upstream budget). Carried in
+      /health's body and as the status code of /health/serving.
+    concernIds:
+      - id: C7
+        status: answered
+        justification: >
+          The advertise/serve asymmetry this closes was total: `healthy` was a hardcoded `true`
+          and `status` read "online" whenever the conductor was connected — which DEV_MODE forces
+          — so elohim.host advertised health continuously while serving 503 on every content
+          route for hours (2026-08-20). health_stops_reporting_green_while_the_serving_path_sheds
+          pins the demotion; serving_probe_carries_the_status_code_health_cannot pins the 503.
+      - id: C11
+        status: answered
+        justification: >
+          The two-regime split IS the declared, counted degradation policy. A shedding-only
+          signal is honest exactly when the failure is cheap (~5ms shed) and blind exactly when
+          it is expensive: the blind window is UPSTREAM_CIRCUIT_FAIL_THRESHOLD - 1 = 2 failures,
+          during which `/` rides EPR_DISPATCH_TIMEOUT_SECS twice (measured 20.751s live,
+          2026-08-21 11:59Z, with doorway-alpha sitting at errorStreak:2/circuit:closed).
+          health_is_demoted_in_the_slow_regime_before_the_circuit_ever_opens pins that window.
+      - id: C3
+        status: partial
+        justification: >
+          health_keeps_returning_200_while_shedding pins the liveness rail — /health on :8080 is
+          simultaneously the startup, readiness AND liveness probe, so its STATUS CODE must never
+          flip or a degraded upstream CrashLoops the pod and readiness pulls a doorway that can
+          still serve warm shells. PARTIAL because the split is enforced by a test plus manifest
+          comments, not structurally: nothing prevents a future manifest from pointing a
+          livenessProbe at /health/serving.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/health.rs
+        testName: health_stops_reporting_green_while_the_serving_path_sheds
+        kind: unit
+      - path: doorway/doorway-service/src/routes/health.rs
+        testName: health_is_demoted_in_the_slow_regime_before_the_circuit_ever_opens
+        kind: unit
+      - path: doorway/doorway-service/src/routes/health.rs
+        testName: health_keeps_returning_200_while_shedding
+        kind: unit
+      - path: doorway/doorway-service/src/routes/health.rs
+        testName: serving_probe_carries_the_status_code_health_cannot
+        kind: unit
+      - path: doorway/doorway-service/src/routes/health.rs
+        testName: health_is_green_when_nothing_is_shedding
+        kind: unit
