@@ -1,4 +1,4 @@
-@e2e @protocol @landing-dogfood
+@e2e @protocol @landing-dogfood @act:i
 Feature: Elohim Protocol landing page is dogfooded as protocol content
   As Matthew, who stewards the Elohim Protocol public surface and operates
   the alpha doorway as the same agent
@@ -35,6 +35,8 @@ Feature: Elohim Protocol landing page is dogfooded as protocol content
   # standalone landing SPA may now carry NO protocol affordance — a product decision
   # the dogfood scenario correctly surfaced. Backlog:
   # genesis/data/timeline/backlog/landing-protocol-affordance-gap.md
+  # HELD (2026-08-21): the badge component was deliberately deleted in 980ea505d; this
+  # scenario asserts a surface that no longer exists (backlog landing-protocol-affordance-gap).
   @wip
   Scenario: The protocol-signal badge renders on the landing page
     When I open the landing page in a browser

@@ -1,4 +1,4 @@
-@e2e @protocol @protocol-omni
+@e2e @protocol @protocol-omni @act:i
 Feature: ProtocolOmniComponent makes protocol context legible at the top of the viewport
   As a visitor of any kind (anonymous cold hit or walked-from-protocol peer)
   I want a protocol chrome that announces the EPR I am viewing and lets me

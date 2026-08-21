@@ -1,4 +1,4 @@
-@e2e @protocol @regression @requires:doorway
+@e2e @protocol @regression @requires:doorway @act:i
 Feature: The doorway travels the protocol trust surface onto every page it serves
   As a person browsing the Elohim Protocol through a doorway — arriving at the
   front door, then wandering on into a pillar
