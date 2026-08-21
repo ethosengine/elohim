@@ -920,6 +920,7 @@ EOF
     SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
     nohup "$DOORWAY_BIN" --dev-mode --listen "0.0.0.0:$DOORWAY_PORT" \
       --conductor-url "ws://localhost:$(admin_port 0)" \
+      --app-port-min "$(app_port 0)" \
       --storage-url "$primary" ${extras:+--storage-urls "$extras"} \
       --bootstrap-enabled --signal-enabled > "$LOGDIR/doorway.log" 2>&1 &
     for _ in $(seq 1 20); do
@@ -946,6 +947,7 @@ EOF
     SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
     nohup "$DOORWAY_BIN" --dev-mode --listen "0.0.0.0:$DOORWAY_B_PORT" \
       --conductor-url "ws://localhost:$(admin_port 1)" \
+      --app-port-min "$(app_port 1)" \
       --storage-url "http://127.0.0.1:$(http_port 1)" \
       --storage-urls "http://127.0.0.1:$(http_port 0),http://127.0.0.1:$(http_port 2)" \
       > "$LOGDIR/doorway-b.log" 2>&1 &
