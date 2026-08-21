@@ -45,7 +45,8 @@
     "local:seed": "tsx scripts/local-stack.ts --seed",
     "build:sprint-report": "tsx scripts/build-sprint-report.ts",
     "substrate-verify": "tsx scripts/substrate-verify.ts",
-    "substrate-verify:selftest": "tsx scripts/substrate-verify.selftest.ts"
+    "substrate-verify:selftest": "tsx scripts/substrate-verify.selftest.ts",
+    "census": "tsx scripts/surface-census.ts"
   },
   "dependencies": {
     "@cucumber/cucumber": "^11.2.0",
