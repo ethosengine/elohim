@@ -1,4 +1,4 @@
-@epr-decomposition @b23 @epr-link @hypercard @browser @requires:doorway
+@e2e @epr-decomposition @b23 @epr-link @hypercard @browser @requires:doorway @act:i
 Feature: EPR-links flip cards in place, preserving context
   Inside a mounted pillar bundle, clicking an EPR-link to another EPR
   resolves content inline (HyperCard flip) rather than triggering a

@@ -1,4 +1,4 @@
-@browser @elohim-core @chrome-preferences
+@browser @elohim-core @chrome-preferences @act:i
 Feature: Chrome preferences follow the person across EPR-app boundaries
   Theme and language controls live in the protocol chrome (omnibar, navigator)
   and persist device-wide through one shared contract, so crossing a bundle
