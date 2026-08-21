@@ -3,7 +3,7 @@ id: "backlog-doorway-warm-shell-local-archive-mesh-provable"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "Warm-shell archive is Mongo-only, so the 18a65fd0d wiring cure is fleet-only evidence — add a SQLite/directory ShellArchive so the local mesh can prove it"
+title: "Warm-shell archive is Mongo-only, so the 18a65fd0d wiring cure is fleet-only evidence — run a real mongod in the local mesh so the production wiring path is desk-provable"
 slug: "doorway-warm-shell-local-archive-mesh-provable"
 written: "2026-08-21"
 author: "claude (local-pair validation session, /btw fork analysis)"
@@ -14,12 +14,13 @@ nodes: [elohim-doorway-alpha, elohim-doorway-alpha-b]
 relatedNodeIds:
   - "memory:project_local_pair_failover_validation_rail"
   - "memory:project_freshness_graded_by_declared_stakes"
-tags: [doorway, warm-shell, local-mesh, dataplane, doorway-failover, desk-proven-is-not-wired]
+tags: [doorway, warm-shell, local-mesh, mongodb, dataplane, doorway-failover, desk-proven-is-not-wired, che-devworkspaces]
 cites:
   - doorway/doorway-service/src/render/warm_shell.rs
   - doorway/doorway-service/src/cache/app_file_cache.rs
   - doorway/doorway-service/src/server/http.rs
   - app/elohim-app/scripts/hc-mesh.sh
+  - doorway/doorway-service/src/config.rs
   - genesis/data/timeline/backlog/doorway-breaker-trial-theft-fleet-verification.md
   - genesis/data/timeline/backlog/doorway-boot-self-heal-family-mesh-repro.md
 ---
@@ -44,22 +45,35 @@ stand-in but is still a separate server, absent from this container, with an unv
 `AppFileCacheService` and a test-only `FakeArchive`. Archive entries are content-addressed
 (`{slug}:{file_path}:{blob_hash}`); the Mongo features used are an upsert and a `last_accessed` touch.
 
-## Task (well-specified, disjoint — any agent may claim)
+## Decision 2026-08-21 (operator, via /btw thread): real `mongod` in the mesh, NOT a SQLite shim
 
-1. Add a `SqliteShellArchive` (or a plain directory store under `$MESH_DIR`) implementing `ShellArchive`;
-   select it when Mongo is unconfigured (`--dev-mode` mesh), keep Mongo authoritative when configured.
-2. Route it through the SAME `bind_warm_shell_to_archive()` path as Mongo — the invariant under test is
-   "every archive-installing path rebuilds the store"; do not add a second wiring path.
-3. Keep the inert-store tests (`an_inert_store_hydrates_nothing`); the degrade path is a contract.
-4. Mesh proof: `hydrated: N>0` in the boot log; `/` cache-first; a2o scenario on the local pair asserting
-   `x-elohim-bundle: last-reconciled` (and `x-elohim-freshness: amber` once the freshness verdict lands)
-   through a storage outage (`fuser -k 8090/tcp` drill per the memory rail).
-5. Sequence AFTER the freshness-verdict work lands (it edits `AppState` construction in
-   `server/http.rs` — same write-set).
+A second `ShellArchive` impl plus a selector would prove only a convenience path; the in-process wiring
+invariant is already pinned by `binding_the_archive_lights_the_warm_shell_and_the_invariant_holds`. What
+the desk cannot yet prove is the PRODUCTION path — Mongo-backed `app_file_cache` → `init_projection` →
+archive — and only a real `mongod` proves that.
 
-## Parity leg (separate, image change)
+What it costs, from the code:
 
-A real `mongod` as one more loopback process in `hc-mesh.sh` is the only thing that proves the exact
-production path; needs a devfile/image change and must live under `commands:` (exec on demand), never
-postStart. Mongo's absence is also why the SSR "boot-once" gap in
-`doorway-boot-self-heal-family-mesh-repro.md` cannot be fully reproduced locally.
+- **Doorway side: nothing.** `MONGODB_URI` defaults to `mongodb://localhost:27017`, `MONGODB_DB` to
+  `doorway` (`config.rs:97,101`); with nothing listening it logs "MongoDB connection failed (dev mode,
+  continuing without)" and goes inert. The moment a `mongod` is on 27017 both mesh doorways wire the
+  archive through the same `init_projection` path production uses.
+- **Mesh side: one leg** in `hc-mesh.sh` before the doorways start —
+  `mongod --dbpath $MESH_DIR/mongo --bind_ip 127.0.0.1 --port 27017 --fork --logpath $MESH_DIR/logs/mongod.log`
+  — plus stop/status lines. Give doorway B its own database (`MONGODB_DB=doorway-b`): a shared archive
+  between A and B would hide exactly the per-doorway boot-order class this exists to reproduce.
+- **Image side: the real cost.** No `mongod`/`mongosh`/`ferretdb` binary exists in this container. Added in
+  the che-devworkspaces submodule (`containers/` for the image; `devfile.yaml` under `commands:` — exec on
+  demand, never postStart). Watch-out: the dev image is UBI10 lineage and MongoDB's RPMs target RHEL 8/9 —
+  confirm a mongod build installs on UBI10 before committing; if it does not, FerretDB (single static Go
+  binary, Mongo wire protocol) is the fallback — it proves the driver path, not `mongod` itself.
+
+Mesh proof once landed: `hydrated: N>0` in both doorway boot logs; `/` cache-first; a2o scenario on the
+local pair asserting `x-elohim-bundle: last-reconciled` (and `x-elohim-freshness: amber` once the
+freshness verdict lands) through a storage outage (`fuser -k 8090/tcp` drill per the memory rail). With
+Mongo in the mesh the SSR "boot-once" gap in `doorway-boot-self-heal-family-mesh-repro.md` also becomes
+fully reproducible locally — the same absence was blocking it.
+
+Sequence: the mesh-script leg is disjoint from the freshness work; the image change lives in the
+submodule (pushes straight to che-devworkspaces main, inert-by-default; force the image with `[build:conductor]`
+is NOT the right tag — it is the devspace image, not the conductor image).
