@@ -52,6 +52,11 @@
 #                   pulls API_KEY_ADMIN from a real secret. Printed in the
 #                   `status` probe-env line and exported by `mesh_seed_env`.
 #
+#   HOLOCHAIN_BIN   Absolute path to a conductor binary to run INSTEAD of the
+#                   `holochain` on PATH (see the block above stop_all). Unset =
+#                   stock. Used for conductor-fork A/B runs; a binary swap alone
+#                   cannot move a DNA hash, but verify via /health.
+#
 #   MESH_RUST_LOG   Conductor log level. Default is targeted, not blanket:
 #                   warn + INFO on exactly the three modules that diagnose a
 #                   sys-validation spin (read-pool saturation, cascade
@@ -250,6 +255,34 @@ mesh_seed_env() { # ONE source of truth for the seed-chain-facing env block.
   export STORAGE_API_KEY_ADMIN="$API_KEY_ADMIN"
 }
 
+# ---------------------------------------------------------------------------
+# HOLOCHAIN_BIN — which conductor binary the sandboxes run.
+#
+# Empty (default) = whatever `holochain` is on PATH, i.e. the stock build. Set
+# it to an absolute path to run a fork instead, for an A/B where the ONLY thing
+# that changes is the conductor:
+#
+#   HOLOCHAIN_BIN=/path/to/fork/holochain ./hc-mesh.sh conductors-restart
+#
+# `hc sandbox` takes the binary via HC_HOLOCHAIN_PATH (equivalently -H), which
+# is the mechanism this uses; the binary's directory is also prepended to PATH
+# so anything else the run step shells out to resolves consistently.
+#
+# A binary swap alone CANNOT move a DNA hash: the hash covers integrity zomes +
+# modifiers, both of which live in the already-installed sandboxes that
+# `conductors-restart` reuses. Verify rather than assume — compare
+# `dhtParticipation.dnaHashes` from any storage peer's /health before and after.
+# ---------------------------------------------------------------------------
+HOLOCHAIN_BIN="${HOLOCHAIN_BIN:-}"
+
+# Emit the env prefix for a `hc sandbox` invocation. Empty when HOLOCHAIN_BIN is
+# unset, so the default path is byte-identical to what it was before this knob.
+holochain_bin_env() {
+  [ -n "$HOLOCHAIN_BIN" ] || return 0
+  [ -x "$HOLOCHAIN_BIN" ] || { echo "HOLOCHAIN_BIN is not executable: $HOLOCHAIN_BIN" >&2; exit 1; }
+  printf 'HC_HOLOCHAIN_PATH=%s PATH=%s:%s ' "$HOLOCHAIN_BIN" "$(dirname "$HOLOCHAIN_BIN")" "$PATH"
+}
+
 stop_all() {
   # Kill by exact binary identity, NEVER by a pattern that could match the
   # caller's own command line (self-kill class, hit twice on 2026-08-16).
@@ -384,7 +417,12 @@ restart_conductors() {
   # setsid, not just nohup: nohup only ignores SIGHUP and does nothing about a
   # SIGKILL to the process GROUP, which is how a calling shell reaps background
   # children when it exits.
-  RUST_LOG="$MESH_RUST_LOG" \
+  if [ -n "$HOLOCHAIN_BIN" ]; then
+    echo "  HOLOCHAIN_BIN=$HOLOCHAIN_BIN ($("$HOLOCHAIN_BIN" --version 2>&1 | head -1))"
+  else
+    echo "  holochain: $(command -v holochain) ($(holochain --version 2>&1 | head -1)) [stock, PATH]"
+  fi
+  RUST_LOG="$MESH_RUST_LOG" $(holochain_bin_env) \
   setsid nohup sh -c "echo test | hc sandbox --piped -f $fports run -a" >> .sandbox_run_log 2>&1 &
   disown 2>/dev/null || true
 
@@ -677,7 +715,7 @@ PYEOF
     done
     echo "dev-tier gossip config patched into ${#PEERS[@]} conductor-config.yaml (k2Gossip initiate=1000ms)"
 
-    RUST_LOG="$MESH_RUST_LOG" \
+    RUST_LOG="$MESH_RUST_LOG" $(holochain_bin_env) \
     nohup sh -c "echo test | hc sandbox --piped -f $fports run -a -p=$rports" > .sandbox_run_log 2>&1 &
     echo -n "waiting for ${#PEERS[@]} conductors to boot"
     for _ in $(seq 1 90); do
