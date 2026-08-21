@@ -78,3 +78,38 @@ for the landing, which needs known peers — re-measure after the re-cast before
 - Cast order fixed in the Prologue (35a2a58b6): identities BEFORE hosted registrations; proven on the next
   regeneration (a conductor that already embodies a UUID cannot be un-embodied).
 
+## Addendum 2026-08-21 (late) — the mesh must run the FORK conductor, and `hc` must match it
+
+- **Parity is the point, and we did not have it.** Alpha runs the conductor **fork**; the local mesh has
+  been running whatever stock `holochain` is on PATH (0.6.0, `/opt/holochain/bin/holochain`). The proving
+  ground was not running the fleet's conductor — so a local QUIET said nothing about alpha, and any
+  reproduction attempt was exercising a different program. `hc-mesh.sh` now **defaults `HOLOCHAIN_BIN` to
+  a fork build when one is present** (searched via `MESH_FORK_BIN_DIRS`, default
+  `$MESH_DIR/fork-bin:$REPO_ROOT/.fork-bin:/opt/elohim/fork-bin`), and `status` prints the conductor and
+  CLI it resolved — saying **`[STOCK — alpha runs the fork, so this mesh is NOT at parity]`** when it
+  falls back. Parity should be visible in the probe-env line, not remembered.
+- **`hc` must match the conductor's schema line, and the auto-detect requires BOTH binaries.** The `hc`
+  CLI **rewrites** `conductor-config.yaml` in its own version's schema — that is how `-f` pins admin
+  ports — so a stock 0.6.0 `hc` in front of a 0.6.3 conductor is fatal: it puts back the key the
+  conductor rejects. Measured, in order: 0.6.3 refuses `network.base64_auth_material` ("unknown field …
+  expected one of `base64_auth_material_bootstrap`, `base64_auth_material_relay`, …"), and once that null
+  key is dropped it then fails on **`missing field relay_url`**, which 0.6.0 never writes. The two
+  schemas may admit no common config. A fork-bin directory holding `holochain` but no `hc` is therefore
+  **skipped with a warning**, never half-adopted.
+- **Deploy implication, beyond the mesh.** The conductor data dir is a persistent PVC. Rolling a
+  0.6.3-line conductor onto any fleet whose config was written by 0.6.0 hits exactly this parse failure,
+  before boot, with the reason only in the conductor log.
+- **`MESH_CONDUCTOR_LAUNCH=direct`** launches each conductor itself — the same argv `hc` would use,
+  passphrase piped, ports read from each config where they are already pinned. It removes the CLI from
+  the equation entirely and gives each conductor **its own log file**
+  (`.sandbox_run_log.<peer>`), which is the only way the spin detector can attribute log rate per
+  conductor rather than reading one multiplexed prefix-less stream.
+- **`MESH_RUST_LOG`**: conductors default to ERROR when `RUST_LOG` is unset, and every line that
+  diagnoses a sys-validation spin is INFO. Measured before the fix: **86 ERROR, 0 INFO** across the whole
+  run log. The default is targeted (warn + INFO on `holochain_sqlite::db::access`,
+  `holochain::core::workflow::sys_validation_workflow`, `holochain_cascade`; `kitsune2_gossip` pinned
+  back to warn) because a blanket `info` buries the shared log.
+- **A conductor restart kills every storage peer's zome path** (stale app-interface token; the peer never
+  re-mints it) — `/health` stays 200 and writes still return 201 while nothing can be anchored. So
+  `conductors-restart` is only half an operation: follow it with `storage-restart`, and confirm with
+  `zome-probe`. Backlog: `storage-stale-app-interface-token-after-conductor-restart.md`.

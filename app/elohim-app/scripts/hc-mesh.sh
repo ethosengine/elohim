@@ -281,6 +281,42 @@ mesh_seed_env() { # ONE source of truth for the seed-chain-facing env block.
 # `conductors-restart` reuses. Verify rather than assume — compare
 # `dhtParticipation.dnaHashes` from any storage peer's /health before and after.
 # ---------------------------------------------------------------------------
+# Default: the fork build, when one is present.
+#
+# PARITY IS THE POINT. Alpha runs the conductor FORK; for months the local mesh
+# ran whatever stock `holochain` happened to be on PATH, which means the proving
+# ground was not running the fleet's conductor. A local QUIET then says nothing
+# about alpha, and a local reproduction attempt is testing a different program.
+# So if a fork build is present, it is used unless HOLOCHAIN_BIN says otherwise.
+#
+# MESH_FORK_BIN_DIRS is searched in order for a directory containing BOTH
+# `holochain` and `hc` — both, because the CLI writes conductor-config.yaml in
+# ITS schema and a mismatched pair simply will not boot (0.6.0 hc + 0.6.3
+# conductor: "unknown field base64_auth_material", then "missing field
+# relay_url"). A directory with only one of them is skipped, loudly, rather than
+# half-adopted.
+MESH_FORK_BIN_DIRS="${MESH_FORK_BIN_DIRS:-$MESH_DIR/fork-bin:$REPO_ROOT/.fork-bin:/opt/elohim/fork-bin}"
+
+detect_fork_bin() { # -> prints the fork dir, or nothing
+  local d
+  IFS=':' read -ra _dirs <<< "$MESH_FORK_BIN_DIRS"
+  for d in "${_dirs[@]}"; do
+    [ -n "$d" ] || continue
+    if [ -x "$d/holochain" ] && [ -x "$d/hc" ]; then echo "$d"; return 0; fi
+    if [ -x "$d/holochain" ] && [ ! -x "$d/hc" ]; then
+      echo "WARN: $d has holochain but no matching hc — skipping (the CLI must match the conductor's config schema)" >&2
+    fi
+  done
+  return 1
+}
+
+FORK_BIN_DIR="$(detect_fork_bin || true)"
+if [ -z "${HOLOCHAIN_BIN:-}" ] && [ -n "$FORK_BIN_DIR" ]; then
+  HOLOCHAIN_BIN="$FORK_BIN_DIR/holochain"
+  # The matching CLI has to win PATH too, or `hc sandbox` rewrites the config in
+  # the stock schema and the fork conductor refuses the file it just wrote.
+  export PATH="$FORK_BIN_DIR:$PATH"
+fi
 HOLOCHAIN_BIN="${HOLOCHAIN_BIN:-}"
 
 # Export the conductor-binary selection into the CURRENT shell. Call it inside a
@@ -326,6 +362,14 @@ status_all() {
   printf "mongod   :%s " "$MONGO_PORT"
   if (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null; then echo "UP (archive-backed doorways)"; else echo "down (doorways run archive-less: inert warm shell)"; fi
   echo
+  local _hc_desc
+  if [ -n "$HOLOCHAIN_BIN" ]; then
+    _hc_desc="$HOLOCHAIN_BIN ($("$HOLOCHAIN_BIN" --version 2>&1 | head -1))$([ -n "$FORK_BIN_DIR" ] && printf ' [FORK, auto-detected]' || printf ' [explicit HOLOCHAIN_BIN]')"
+  else
+    _hc_desc="$(command -v holochain) ($(holochain --version 2>&1 | head -1)) [STOCK — alpha runs the fork, so this mesh is NOT at parity]"
+  fi
+  echo "conductor:  $_hc_desc"
+  echo "hc CLI:     $(command -v hc) ($(hc --version 2>&1 | head -1))"
   echo "probe env:  PEER_STORAGE_URLS=\"$(peer_csv)\" CONDUCTOR_URLS=\"$(conductor_csv)\" INTERNAL_DOORWAY_URL=\"localhost:$DOORWAY_PORT\" E2E_DOORWAY_B=\"http://localhost:${DOORWAY_B_PORT:-8889}\" API_KEY_ADMIN=\"${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}\""
 }
 

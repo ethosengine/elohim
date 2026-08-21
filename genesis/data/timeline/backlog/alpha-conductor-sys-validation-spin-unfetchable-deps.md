@@ -58,14 +58,63 @@ reference actions no living chain holds). Cost scales with the missing set; the 
 lines/s × 7 pods) is a second CPU/I-O sink and is plausibly what has been OOM-killing Loki all day
 (35 kills in `dmesg`, all Loki's pod).
 
-## Local mesh: does NOT reproduce
+## Mesh reproduction — two attempts, neither reproduced, and why (2026-08-21)
 
-Three conductors at 0.16–0.21 cores average (50 s window), storage 0.06 cores under a 120-request read
-burst; **zero** `read connection is saturated` lines in `.sandbox_run_log` (3,145 lines in 204 min ≈
-0.26 lines/s vs ~980/s on alpha). The local corpus was authored on the mesh, so no dependency is missing.
-To make this Act I-provable, stage the class deliberately: author content on one peer, then re-key or
-wipe that peer so its actions become unfetchable, and assert sys-validation's retry budget and log rate
-(a `@requires:owned-substrate` chaos scenario).
+Baseline, before any staging: three conductors at **0.10 cores** each, `.sandbox_run_log` at
+**0.02 lines/s total**, zero `read connection is saturated`, zero sys-validation lines. Alpha, for
+contrast, runs ~980 lines/s per pod with missing-dependency counts of 1508–2849 that never drain.
+Instruments: `app/elohim-app/scripts/hc-mesh-spin-detector.sh` (the measure) and
+`hc-mesh-chaos-rekey.sh` (the staging). Summaries under `/tmp/elohim-local-mesh/spin/`.
+
+**v1 — author on one peer, let the others fetch it, then re-key that peer.** 5 nodes authored on
+james's storage, each re-authored onto **james's own conductor** by `reanchor_backfill`
+(`dhtAnchorHash uhCkk…`, `trust: notarized`, 5/5 in 45 s); matthew and jessica each came to hold 4/5;
+james re-keyed in 13 s (`uhCAkOZ2b…` → `uhCAkuV2p0…`), storage DB kept on purpose. **Verdict QUIET.**
+CPU never left baseline; the re-keyed peer spiked to 0.67 cores, fell to 0.29, and settled at 0.08
+within four cycles — a peer re-syncing, decreasing, not a spin.
+
+*Why it could not reproduce:* the neighbours had already **fetched and validated** james's ops before
+the re-key. Validated ops are integrated, so nothing is pending and there is no dependency to chase.
+Re-keying does not retroactively un-validate work already done. Alpha's condition is the opposite —
+the reinstall left ops **in the validation queue** whose dependencies were never fetched and now never
+can be.
+
+**v2 — deny the neighbours the chain's head.** Both neighbour conductors frozen with `SIGSTOP`
+(trap-guaranteed thaw), james authored a base node plus **24 dependent revisions** onto his source
+chain, 8 s thaw, then re-key (`uhCAkuV2p0…` → `uhCAkMgQJn…`). After the thaw the neighbours had
+received **nothing**: `Content not found: chain-v2-stock060` on both, while james held it at rev 24,
+notarized. The 8 s window did not deliver a partial tail; it delivered no tail. **Not measured** — with
+the neighbours holding nothing that references james, a measure would have scored the staging, not the
+conductor.
+
+## Staging v3 — the design (not yet run)
+
+Two changes, and one assertion that must pass before any measurement is believed.
+
+1. **Widen the delivery window, and drive it by observation rather than by a timer.** 8 s was chosen
+   arbitrarily and produced nothing. Either widen to tens of seconds, or — better — invert the control:
+   author the chain, then **wait until the neighbours' conductors have actually received ops** from it,
+   and only THEN re-key. The re-key is the instant the dependencies become unproducible, so it must
+   come after partial delivery, not race it.
+2. **Read the conductor, not the projection.** v2's "did they get it?" check queried
+   `/db/content/<id>` — a *storage projection*, synced on its own reconcile cadence and not what
+   sys-validation holds. The op store and validation queue are conductor state. Read them via the admin
+   interface (`dump_state` / `DumpFullState`, or `hc sandbox call dump-conductor-state`), or off the
+   **per-conductor log**, which is now genuinely attributable: `MESH_CONDUCTOR_LAUNCH=direct` gives each
+   conductor its own `.sandbox_run_log.<peer>` instead of one multiplexed prefix-less stream, and
+   `MESH_RUST_LOG` puts the three diagnostic modules at INFO so the lines exist at all.
+
+**The staging-worked assertion (gate the measure on this):**
+
+> A neighbour conductor holds **≥1 op whose dependency is absent from every peer.**
+
+Until that holds, a QUIET verdict measures the staging and says nothing about the conductor. This is
+the same discipline the detector already enforces on its log leg: a measure that cannot see must say
+so rather than report a confident zero. Verify the assertion first; only then start the detector.
+
+*Prerequisite, learned the hard way:* the mesh must be running the **fork conductor line**, and the
+`hc` CLI must match the conductor's config schema — a 0.6.0 `hc` rewrites `conductor-config.yaml` in
+its own schema and a 0.6.3 conductor then refuses to boot. See the Prologue addendum.
 
 ## Cure directions (decide, then prove on the mesh first)
 
