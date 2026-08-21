@@ -71,6 +71,20 @@ each proven separately:
    **reintroduced 2026-08-18 (`f0b908660`, warm-boot shell cache)** — the in-tree comment at the
    second site asserted "`is_open` only READS the circuit", sitting directly on the bug it named.
 
+**The amplifier — found after the first pass, and larger than any single link above.** The
+warm-boot shell cache that was supposed to make `/` cache-first has been **dead code on every
+deployed doorway since it landed**. `main.rs` builds AppState via `with_pool` (343) or
+`with_services` (345); both set `warm_shell: WarmShellStore::inert()` because no archive exists at
+construction, and the only constructor that ever built a live store (`with_projection`) has zero
+production callers. The archive arrives later in `init_projection`, which installed
+`app_file_cache` and never rebuilt the store. An inert store's `lookup_with_declared` returns
+`Cold` *before* it consults the hot map, so `stock()` writes are unreadable and `hydrate()` returns
+0 unconditionally — the boot log's `hydrated: 0` reads as a cold archive rather than a disabled
+one. Hence `decide_shell_serve(Cold, true) = Fetch` and `/` paid a full 10 s fetch per request plus
+a second through the `ProjectedEpr` fallback: the measured 20.751 s. Cured by a named
+`bind_warm_shell_to_archive()`; the suite's nine existing tests all built stores *with* an archive,
+so nothing tested the shape production used.
+
 Cured in-tree 2026-08-21: the flight now re-enters instead of falling through (bounded by
 `MAX_EXTRACTION_COALESCE_ROUNDS`) and only the flight's owner creates the guard; `evict_app` deletes
 the prefix unconditionally; both planners use a new non-mutating `would_shed()` and the raw gate is
@@ -100,6 +114,17 @@ governs every proxied route, so a slow *app-bundle* read sheds *content* reads t
 Splitting the key (or weighting by route class) would have contained this incident to `/apps`. The
 counter-argument is real: a genuinely dead peer should shed everything, and per-route keys multiply
 the state a half-open trial has to cover. Decide deliberately; do not drift into it.
+
+**2b. The unexplained ignition, and the one thing this investigation did NOT close.** `/p2p/status`
+is served by a `tokio::watch` borrow — zero I/O, no DB, no conductor — yet three independent
+verifiers measured it at **12.018–12.071 s against BOTH matthew and adam** at different times. A
+handler doing one lock-read cannot take 12 s unless the storage HTTP runtime could not *schedule*
+it for 12 s. That runtime is `worker_threads(2)` (`elohim-storage/src/main.rs:270-275`), shared via
+`server_rt.block_on(async_main)` with the libp2p swarm loop and everything it spawns, inside a
+cgroup measured at 90–100 % of quota. A bump is the obvious lever and is **deliberately not taken
+here**: this project's own conductor-admission work established that pinned occupancy is necessary
+but not sufficient, and that oversubscription made throughput *worse* (`d(lambda)/d(capacity) <= 0`).
+Measure before tuning — that is the whole point of `conductor-capacity-represented`.
 
 **3. The instrument that would have settled this in minutes is dark by construction.**
 `doorway_hop_duration_ms{hop,outcome,route_class}` reads `_count 1, _sum 0` on both doorways after

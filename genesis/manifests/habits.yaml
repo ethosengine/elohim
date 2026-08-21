@@ -725,6 +725,35 @@ habits:
     checks:
       - "a2o @concern:doorway-failover (genesis/a2o/features/dataplane/doorway-failover.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
     evidence: >
+      DELTA 2026-08-21b (CORRECTION to this habit's own 2026-08-18 evidence,
+      and the amplifier of the 503 above): the entry below claims "Task 3.4
+      warm-boot shell cache LANDED desk-proven ... / is cache-first ... both
+      local doorways shed in 1-4ms (was 10-20s class)". The local proof was
+      real; the DEPLOYED claim was false, for the whole of that cure's life.
+      main.rs builds AppState through with_pool (343) or with_services (345),
+      and BOTH set warm_shell: WarmShellStore::inert() because no archive
+      exists at construction; the only constructor that ever built a live
+      store, with_projection, has ZERO production callers. The archive arrives
+      later in init_projection, which installed app_file_cache and never
+      rebuilt the store. An inert store's lookup_with_declared returns Cold
+      BEFORE it consults the hot map, so stock() writes are unreadable,
+      hydrate() returns 0 unconditionally (the boot log's "hydrated: 0" reads
+      as a cold archive, not a disabled one), decide_shell_serve(Cold, true) =
+      Fetch, and `/` paid a full EPR_DISPATCH_TIMEOUT_SECS fetch on EVERY
+      request plus a second one through the ProjectedEpr fallback. That is the
+      20.751s `/` measured on 2026-08-21, and those paired 10s failures are
+      what opened the breaker in the delta below. The suite had NINE tests for
+      this feature and every one built a store WITH an archive — nothing tested
+      the shape production actually used. Cured: init_projection now calls a
+      named bind_warm_shell_to_archive() (named, because the invariant is that
+      every archive-installing path must rebuild the store), with rails
+      stocking_an_inert_store_still_serves_nothing,
+      an_inert_store_hydrates_nothing, and
+      binding_the_archive_lights_the_warm_shell_and_the_invariant_holds.
+      `just gate doorway` exit 0. THE GENERAL LESSON, which is why this
+      correction is written here rather than only in the commit: a local proof
+      of a CACHE says nothing about whether production CONSTRUCTS that cache.
+      "desk-proven" is not "wired".
       DELTA 2026-08-21 (STAYS RED — cause NAMED and four cures landed
       host-green; the a2o @concern:doorway-failover scenario is still the flip
       authority and has NOT run): the apex 503 was never the projector and
