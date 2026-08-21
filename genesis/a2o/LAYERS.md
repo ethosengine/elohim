@@ -172,3 +172,24 @@ today's 194-eligible is step debt, `@wip` debt, and one unstaged SPA bundle — 
   env-red classes.
 - `genesis/manifests/cluster-state.act1-household.yaml`, `cluster-state.act2-neighbourhood.yaml` — the
   lane contracts.
+
+## Wire vs implement vs design — how a red or a `@wip` is classified
+
+Three mechanical facts, read in order (made runnable by `pnpm census` → `layering/surface-census.md`):
+
+1. **Does the surface the scenario asserts on exist?** Route answers non-404, metric appears in `/metrics`,
+   field appears in the response, CLI verb exists. *Exists* → the gap is wiring or a defect, never design.
+   *Absent* → **IMPLEMENT** — *bounded* when it is a missing metric/field/registration, *design* when it is
+   a missing capability (`POST /p2p/sync-mode` → 404 with no syncMode concept anywhere is a feature, not a wire).
+2. **Is the precondition constructible on the substrate we own?** Unseeded/unset → **FIXTURE** (Prologue,
+   seed, cast — still wiring, different file). Impossible in the topology (three peers cannot discriminate
+   two losses; a path that only runs with an embedded conductor) → **STRUCTURAL**: re-aim the story or
+   change the topology — a design decision, never a step.
+3. **Do the steps bind?** (scoped dry-run: bound / partial / none). Unbound + surface exists + constructible
+   → **WIRE**, the cheapest class. Unbound + surface absent → a story ahead of its code — design.
+
+The residual — bound, constructible, surface exists, still red — is either a **DEFECT** (reach PATCH that
+silently applied nothing) or a **STALE** assertion (sha256 where the wire now carries a CID). Only this
+cell needs a human read; the blind-reader verdict and "does a spec doc cite the behaviour" decide which.
+Never weaken an assertion to move a scenario out of this cell.
+
