@@ -1,8 +1,12 @@
 # Runner profiles for the three acts
 
 What to add to `cucumber.mjs`, what the mesh stage must export, and how the CI stages narrow per act.
-**This document specifies; it does not edit.** `cucumber.mjs`, the Jenkinsfiles and `cluster-state.yaml`
-are untouched by this pass.
+
+**Status (2026-08-21): §1's `mesh` profile and the act gate it depends on have LANDED.** `cucumber.mjs`
+carries a `mesh` profile with its own tag filter, `substrate-scope.ts` resolves `@act:<i|ii|iii|host>`
+to that act's baseline caps, and `just test mesh [<path-or-tags>]` wires the env block below — see
+`../LAYERS.md` §"How the gate resolves it" and §"Running the mesh lane". The Jenkinsfiles (§5) and
+`cluster-state.yaml` remain untouched: everything below §2 still SPECIFIES rather than describes.
 
 Vocabulary: `@act:i` / `@act:ii` / `@act:iii` / `@act:host` (see `../LAYERS.md`). The act tag carries the
 act's baseline caps; `@requires:` appears only for a cap outside that baseline.

@@ -12,11 +12,13 @@
  *
  * Requires E2E_DEVICE_MODE=playwright. In HTTP mode, browser-only assertions return 'pending'.
  *
- * ENV CAVEAT (Sprint 1): the seeding Givens are documented intent — a direct
- * "seed content with contributor presences" API does not yet exist in the test fixture
- * layer (ContributorPresence is recognition-derived, not directly creatable). A full green
- * run requires a healthy stack pre-loaded with the expected seed data. The structural
- * contract (testids, page object, step wiring) is complete and verified via dry-run.
+ * SEEDING ASYMMETRY: a ContributorPresence is recognition-derived — it exists
+ * because an economic event named someone — so there is no "create a
+ * contributor presence" call to make, and the WITH-contributors Given still
+ * documents intent and defers (its scenario stays @wip until the recognition
+ * fixture exists). The WITHOUT-contributors Given has no such problem: on a
+ * substrate this suite owns it simply authors a node nobody has been
+ * recognized on, and verifies that before the UI is asked anything.
  */
 
 import { strict as assert } from 'node:assert';
@@ -64,13 +66,52 @@ Given(
 );
 
 /**
- * Seed intent: content with no contributor presences (verifies absent-section behavior).
+ * Seed a content node that nobody has been recognized on yet.
+ *
+ * This one IS seedable, and the asymmetry is the point: a contributor presence
+ * is recognition-DERIVED (it appears because an economic event named someone),
+ * so it cannot be conjured — but a node with NO recognition on it is just a
+ * node, and on a substrate this suite owns (`processControl: true`, Act I) we
+ * may author one. So this step really establishes its precondition instead of
+ * asserting it: it creates the node if it is absent, and either way it proves
+ * the node carries no contributor presences before the scenario asks the UI
+ * whether the section is hidden. Without that proof, a green "section absent"
+ * could equally mean "the section never renders at all".
  */
 Given(
   'content {string} has been seeded with no contributor presences',
-  function (this: E2EWorld, _contentId: string) {
-    // Same caveat as above — returns pending until fixture seeding is wired.
-    return 'pending';
+  async function (this: E2EWorld, contentId: string) {
+    const device = requirePlaywright(this);
+    if (!device) return 'pending';
+
+    let item: Record<string, unknown> | null = null;
+    try {
+      item = await device.client.getContent(contentId);
+    } catch {
+      item = null;
+    }
+
+    if (!item) {
+      await device.client.createContent({
+        id: contentId,
+        contentType: 'article',
+        title: 'Content without contributors',
+        description: 'a2o fixture: a node no one has been recognized on yet',
+        contentBody: 'Nobody has been recognized on this node. The viewer should say nothing.',
+        contentFormat: 'markdown',
+        tags: ['e2e', 'a2o-fixture', 'no-contributors'],
+      });
+      item = await device.client.getContent(contentId);
+    }
+
+    const presences = item['contributorPresences'];
+    assert.ok(
+      presences === undefined ||
+        presences === null ||
+        (Array.isArray(presences) && presences.length === 0),
+      `content "${contentId}" was supposed to have no contributor presences, but carries ` +
+        `${JSON.stringify(presences)} — the absent-section assertion below would be vacuous`
+    );
   }
 );
 

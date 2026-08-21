@@ -376,6 +376,11 @@ echo "export E2E_DOORWAY_POOL_STORAGE_URLS=\"$POOL_CSV\""
 echo "export E2E_HOUSEHOLD_FIXTURE_PATH=\"$FIXTURE_PATH\""
 echo "export ELOHIM_CLUSTER_STATE_PATH_OVERRIDE=\"$REPO_ROOT/genesis/manifests/cluster-state.act1-household.yaml\""
 echo "export ELOHIM_REMOTE_COMPUTE_STATUS=\"unavailable\""
+# One JSON report per run: cucumber MERGES the config's format list with any --format flag, so a
+# stage that names its own report otherwise gets a second byte-identical copy at the generic path
+# (genesis/a2o/cucumber.mjs, jsonReportPath note). Same value `just test mesh` exports.
+mkdir -p "$MESH_DIR/reports"
+echo "export CUCUMBER_JSON_REPORT=\"$MESH_DIR/reports/mesh.json\""
 
 # ---------------------------------------------------------------------------
 # Summary.

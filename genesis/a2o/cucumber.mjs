@@ -5,6 +5,7 @@
  *   default  — all features (requires tags to scope execution)
  *   alpha    — doorway-alpha environment
  *   local    — local dev stack
+ *   mesh     — Act I, the household mesh this run owns (`just test mesh`)
  *   browser  — Playwright browser tests (E2E_DEVICE_MODE=playwright)
  *   genesis  — includes aspirational BDD scenarios from genesis docs
  *
@@ -48,6 +49,32 @@ export default function () {
     // write event that re-churns the mesh being measured (2026-08-16 Q10
     // finding). Measure saga with `--profile saga`, never bare CLI paths.
     saga: { ...base, paths: ['features/dataplane/resiliency-saga/**/*.feature'] },
+    // Act I — THE HOUSEHOLD. Runs against a mesh this run OWNS (`just mesh start` + `just mesh
+    // prologue`, or the CI mesh stage). `paths` is the whole tree on purpose: an act is declared by
+    // TAG, not by directory — Act I scenarios live in features/dataplane, features/auth,
+    // features/lamad and features/qahal alike.
+    //
+    // SCOPING: cucumber MERGES a profile's `paths` with CLI positionals rather than replacing them,
+    // so `cucumber-js --profile mesh features/x.feature` runs the WHOLE tree plus that file. To
+    // scope, run with a generated config that has this profile MINUS `paths` — that is exactly what
+    // `just test mesh <path-or-tags>` does (see genesis/a2o/LAYERS.md § Running the mesh lane).
+    //
+    // The env this profile expects is emitted by `app/elohim-app/scripts/hc-mesh-prologue.sh`
+    // (`just mesh prologue`), whose "a2o env" block exports:
+    //   E2E_DOORWAY_ALPHA / E2E_DOORWAY_B / E2E_DOORWAY_BETA
+    //   E2E_STORAGE_URL / E2E_STORAGE_B / E2E_STORAGE_<PEER>   (MATTHEW, JESSICA, JAMES)
+    //   E2E_DOORWAY_POOL_STORAGE_URLS
+    //   E2E_HOUSEHOLD_FIXTURE_PATH=/tmp/elohim-local-mesh/household-fixture.json  (processControl)
+    //   ELOHIM_CLUSTER_STATE_PATH_OVERRIDE=genesis/manifests/cluster-state.act1-household.yaml
+    //   ELOHIM_REMOTE_COMPUTE_STATUS=unavailable
+    // plus CUCUMBER_JSON_REPORT=/tmp/elohim-local-mesh/reports/mesh.json so exactly one JSON report
+    // is written per run (see the jsonReportPath note above).
+    mesh: {
+      ...base,
+      paths: ['features/**/*.feature'],
+      worldParameters: { env: 'mesh' },
+      tags: '@e2e and not @wip and not @browser and not @browser-only',
+    },
     alpha: { ...base, paths: ['features/**/*.feature'], worldParameters: { env: 'alpha' } },
     local: { ...base, paths: ['features/**/*.feature'], worldParameters: { env: 'local' } },
     browser: {

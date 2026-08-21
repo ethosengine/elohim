@@ -1,4 +1,4 @@
-@e2e @content @browser-only @requires:doorway @requires:seeded-content @requires:seeded-contributors
+@e2e @content @browser-only @requires:doorway @requires:seeded-content @requires:seeded-contributors @act:i
 Feature: Contributor presences on a content artifact
   When a learner opens a piece of content, they can see who inspired or contributed to it.
   Recognition arrives before registration: a contributor presence is established the moment
@@ -21,7 +21,7 @@ Feature: Contributor presences on a content artifact
     And there is a contributor card for "Donella Meadows"
     And there is a contributor card for "Peter Senge"
 
-  @wip
+  @requires:owned-substrate
   Scenario: Content without contributors shows no contributors section
     Given content "no-contributors-node" has been seeded with no contributor presences
     When the learner opens the content "no-contributors-node"
