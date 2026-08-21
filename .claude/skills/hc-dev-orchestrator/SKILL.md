@@ -65,6 +65,60 @@ starts or stops peers. The underlying maintained interfaces are
 `hc-mesh.sh start|stop|status|probe` and `hc-mesh-quiesce.sh`; do not copy
 their pacing environment into new npm aliases.
 
+### Act I Prologue cast (`hc-mesh-prologue.sh`)
+
+`hc-mesh.sh` brings the mesh's PROCESSES up; it does not cast the household.
+Once `just mesh start` reports both doorways healthy, run the Prologue to
+seed the Act I substrate a2o's `@act:i` scenarios need — named conductor
+identities, the landing + lamad-spa bundles (browser AND the landing's SSR
+server bundle), the full CI-order seed chain, and the household fixture
+manifest `genesis/a2o/src/framework/fixtures/household-mesh.ts` resolves
+against:
+
+```bash
+just mesh start                # bring the mesh up first — the Prologue never starts/stops it
+./app/elohim-app/scripts/hc-mesh.sh prologue   # (or: bash hc-mesh-prologue.sh directly)
+```
+
+`just mesh prologue` needs one addition to the `mesh` recipe's action
+whitelist in the root `justfile` (`start|stop|status|probe|prologue)` on the
+`case` line, plus the same addition to its usage message) — not yet wired;
+until then invoke `hc-mesh.sh prologue` directly.
+
+**The cast fix — named `CONDUCTOR_URLS`.** An unnamed loopback conductor URL
+(`ws://localhost:4445,ws://localhost:4455,...`) resolves by first-reachable-
+wins in `seed-conductor-identities.ts`, which can cast the wrong human onto
+the wrong conductor (observed 2026-08-21: Adam cast onto james's conductor,
+zeroing household participants downstream). `hc-mesh.sh`'s `conductor_csv()`
+produces the named form instead — `matthew=ws://localhost:4445,jessica=ws://
+localhost:4455,james=ws://localhost:4465` — and `mesh_seed_env()` (source
+`hc-mesh.sh`, then call it) exports it as `CONDUCTOR_URLS` alongside
+`HOLOCHAIN_ADMIN_URL` / `STORAGE_URL` / `DOORWAY_URL` / `PEER_STORAGE_URLS` /
+`SEEDER_TARGET_PEERS` / `API_KEY_ADMIN` — one source of truth for both the
+Prologue script and an operator's shell. `just mesh status` prints the same
+named form on its `probe env:` line.
+
+Backlog record: `genesis/data/timeline/backlog/mesh-prologue-cast-and-env-gaps.md`.
+
+### Re-measuring a2o against the mesh — scoping trap
+
+`cucumber-js -p local <files>` runs the WHOLE suite: a profile's `paths` in
+`cucumber.mjs` MERGE with CLI positionals rather than being replaced by them,
+so pointing the `local` profile at one feature directory still loads every
+path the profile itself declares. To re-measure a narrow set of scenarios
+after a fix, either:
+
+```bash
+# an EMPTY .mjs config file, path relative to the REPO ROOT, so no profile paths merge in
+pnpm exec cucumber-js --config path/to/empty.mjs features/dataplane/one.feature
+
+# or: keep the profile's env/worldParameters, narrow by scenario NAME instead of path
+pnpm exec cucumber-js -p local --name '^exact scenario title$'
+```
+
+Never assume a directory argument alone narrows the run under a named
+profile — it is additive, not a filter.
+
 The mesh runs a declared dev-tier pacing profile (a preproduction-stakes
 declaration, never a prod default) exported to the storage peers by
 `hc-mesh.sh` — each knob overridable via its `MESH_*` twin:
@@ -171,6 +225,7 @@ pnpm exec ng serve --proxy-config proxy.conf.mjs --disable-host-check
 | `app/elohim-app/scripts/hc-start.sh` | single-peer stack |
 | `app/elohim-app/scripts/hc-mesh.sh` | local multi-peer mesh |
 | `app/elohim-app/scripts/hc-mesh-quiesce.sh` | bounded quiesce measure |
+| `app/elohim-app/scripts/hc-mesh-prologue.sh` | Act I Prologue cast (seeds an already-running mesh) |
 | `genesis/orchestrator/gate-runner.mjs` | manifest gate selection/execution |
 | `genesis/agentic/bin/pool-lib.sh` | cargo-pool family and slot authority |
 | `elohim/holochain/local-dev/.hc_ports` | local conductor ports |

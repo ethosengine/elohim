@@ -17,7 +17,16 @@
 # set as CI's Dataplane Validation).
 #
 # USAGE:
-#   ./hc-mesh.sh [start|stop|status|probe]
+#   ./hc-mesh.sh [start|stop|status|probe|prologue]
+#
+#   `prologue` execs hc-mesh-prologue.sh — the Act I Prologue cast (named
+#   CONDUCTOR_URLS seeding, SSR/landing/lamad-spa bundle staging, the full
+#   substrate seed chain, and the household fixture manifest for a2o). It
+#   never starts/stops/restarts mesh components; it seeds an ALREADY-running
+#   mesh. This script can also be SOURCED (never executes start/stop/etc when
+#   sourced — see the dispatch guard at the bottom) to reuse its env-shape
+#   helpers (`conductor_csv`, `peer_csv`, `mesh_seed_env`) from another script
+#   or an operator's shell.
 #
 # ENVIRONMENT:
 #   MESH_PEERS      Peer names, comma-separated (default: matthew,jessica,james)
@@ -30,6 +39,11 @@
 #                   warm-shell store, memory-only projection) exactly as before
 #   MONGO_PORT      loopback mongod port for the doorways' projection archive
 #                   (default: 27017 — the doorway's own MONGODB_URI default)
+#   MESH_API_KEY_ADMIN  Admin bootstrap key shared by both doorways AND the
+#                   seed chain (default: mesh-admin-dev-key). A mesh-only
+#                   preproduction credential — never a prod default; prod
+#                   pulls API_KEY_ADMIN from a real secret. Printed in the
+#                   `status` probe-env line and exported by `mesh_seed_env`.
 #
 #   Dev-tier pacing profile (see the block below the port-scheme helpers —
 #   minutes-quiesce plan W3): MESH_RECONCILE_SECS, MESH_CONTEST_BACKOFF,
@@ -115,6 +129,14 @@ p2p_port()   { echo $((9701 + $1)); }
 #                                          reached only by this positive declaration
 #                                          (trust::manifest_resolver::ManifestStakesResolver,
 #                                          T10 runtime half, §3 W2 task Q6).
+#
+# Two more storage-peer levers below (not part of the pacing profile — always
+# on, unconditionally, for every peer): ALLOW_SEED_NETWORK_STAKES=1 and
+# ALLOW_SEED_DELEGATES_COMPUTE=1 (elohim-storage/src/api/seed_network_stakes.rs
+# / seed-delegates-compute route). Both gate a seed-only HTTP lever behind a
+# 403 by default; the Act I Prologue's stage-manifest leg and
+# seed-delegates-compute.ts honest-fail without them. Mesh-only preproduction
+# levers, same as ELOHIM_NETWORK_STAKES=simulacra above — never a prod default.
 # ---------------------------------------------------------------------------
 PROJECTION_RECONCILE_SECS="${MESH_RECONCILE_SECS:-30}"
 CONTEST_BACKOFF_SECONDS="${MESH_CONTEST_BACKOFF:-120}"
@@ -155,6 +177,43 @@ peer_csv() { # name=host:port CSV for substrate-verify / PEER_STORAGE_URLS
   echo "$out"
 }
 
+conductor_csv() { # name=ws://localhost:PORT CSV for named CONDUCTOR_URLS —
+  # the cast fix (backlog mesh-prologue-cast-and-env-gaps.md): an unnamed
+  # loopback conductor URL resolves by first-reachable-wins, which cast
+  # Adam onto james's conductor on 2026-08-21. Named entries let
+  # seed-conductor-identities.ts / seed-agent-bindings.ts /
+  # seed-household-formation.ts bind each human to ITS OWN conductor.
+  local out="" i=0
+  for name in "${PEERS[@]}"; do
+    out+="${out:+,}$name=ws://localhost:$(app_port $i)"; i=$((i+1))
+  done
+  echo "$out"
+}
+
+peer_url_csv() { # http://localhost:PORT CSV, no names — SEEDER_TARGET_PEERS shape
+  local out="" i=0
+  for _ in "${PEERS[@]}"; do
+    out+="${out:+,}http://localhost:$(http_port $i)"; i=$((i+1))
+  done
+  echo "$out"
+}
+
+mesh_seed_env() { # ONE source of truth for the seed-chain-facing env block.
+  # Exports (not echoes) so both hc-mesh-prologue.sh and an operator's shell
+  # (`source hc-mesh.sh && mesh_seed_env`) populate identically — the named
+  # CONDUCTOR_URLS cast fix plus the admin credential the seed chain needs to
+  # clear /admin/* 403s (see the doorway launch comments below).
+  export CONDUCTOR_URLS="$(conductor_csv)"
+  export HOLOCHAIN_ADMIN_URL="ws://localhost:$(admin_port 0)"
+  export STORAGE_URL="http://localhost:$(http_port 0)"
+  export DOORWAY_URL="http://localhost:$DOORWAY_PORT"
+  export PEER_STORAGE_URLS="$(peer_csv)"
+  export SEEDER_TARGET_PEERS="$(peer_url_csv)"
+  export API_KEY_ADMIN="${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}"
+  export DOORWAY_API_KEY="$API_KEY_ADMIN"
+  export STORAGE_API_KEY_ADMIN="$API_KEY_ADMIN"
+}
+
 stop_all() {
   # Kill by exact binary identity, NEVER by a pattern that could match the
   # caller's own command line (self-kill class, hit twice on 2026-08-16).
@@ -183,7 +242,7 @@ status_all() {
   printf "mongod   :%s " "$MONGO_PORT"
   if (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null; then echo "UP (archive-backed doorways)"; else echo "down (doorways run archive-less: inert warm shell)"; fi
   echo
-  echo "probe env:  PEER_STORAGE_URLS=\"$(peer_csv)\" INTERNAL_DOORWAY_URL=\"localhost:$DOORWAY_PORT\" E2E_DOORWAY_B=\"http://localhost:${DOORWAY_B_PORT:-8889}\""
+  echo "probe env:  PEER_STORAGE_URLS=\"$(peer_csv)\" CONDUCTOR_URLS=\"$(conductor_csv)\" INTERNAL_DOORWAY_URL=\"localhost:$DOORWAY_PORT\" E2E_DOORWAY_B=\"http://localhost:${DOORWAY_B_PORT:-8889}\" API_KEY_ADMIN=\"${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}\""
 }
 
 probe_all() {
@@ -285,6 +344,7 @@ EOF
     DOORWAY_ID="${DOORWAY_ID:-alpha-elohim-host}" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-a" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
+    API_KEY_ADMIN="${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}" \
     SSR_BUNDLE_PATH="${SSR_BUNDLE_PATH:-$REPO_ROOT/app/elohim-app/dist/elohim-app/server/main.server.mjs}" \
     SSR_BUNDLE_SLUG="${SSR_BUNDLE_SLUG:-elohim-host-landing}" \
     SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
@@ -309,6 +369,7 @@ EOF
     DOORWAY_ID="${DOORWAY_B_ID:-apex-elohim-host}" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-b" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
+    API_KEY_ADMIN="${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}" \
     SSR_BUNDLE_PATH="${SSR_BUNDLE_PATH:-$REPO_ROOT/app/elohim-app/dist/elohim-app/server/main.server.mjs}" \
     SSR_BUNDLE_SLUG="${SSR_BUNDLE_SLUG:-elohim-host-landing}" \
     SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
@@ -439,6 +500,8 @@ PYEOF
       ELOHIM_ADOPT_BEFORE_AUTHOR="$ELOHIM_ADOPT_BEFORE_AUTHOR" \
       ADOPT_CONTEST_FANOUT="$ADOPT_CONTEST_FANOUT" \
       ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
+      ALLOW_SEED_NETWORK_STAKES=1 \
+      ALLOW_SEED_DELEGATES_COMPUTE=1 \
       nohup "$STORAGE_BIN" --http-port "$(http_port $i)" > "$LOGDIR/$name.log" 2>&1 &
       echo "storage $name: http=$(http_port $i) p2p=$(p2p_port $i) agent=${agent:0:16}..."
     else
@@ -461,10 +524,17 @@ PYEOF
   echo "next: ./hc-mesh.sh probe   # run the CI Dataplane Validation probes here"
 }
 
-case "${1:-start}" in
-  start)  start_all ;;
-  stop)   stop_all ;;
-  status) status_all ;;
-  probe)  probe_all ;;
-  *) echo "usage: hc-mesh.sh [start|stop|status|probe]"; exit 2 ;;
-esac
+# Dispatch guard: only run the action switch when this file is EXECUTED, not
+# when it is SOURCED. hc-mesh-prologue.sh (and an operator's shell) source
+# this script to reuse conductor_csv/peer_csv/mesh_seed_env without risking an
+# accidental start/stop of a live mesh (a storage agent may be using it).
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+  case "${1:-start}" in
+    start)    start_all ;;
+    stop)     stop_all ;;
+    status)   status_all ;;
+    probe)    probe_all ;;
+    prologue) shift; exec bash "$SCRIPT_DIR/hc-mesh-prologue.sh" "$@" ;;
+    *) echo "usage: hc-mesh.sh [start|stop|status|probe|prologue]"; exit 2 ;;
+  esac
+fi
