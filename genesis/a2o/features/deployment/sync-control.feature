@@ -24,7 +24,7 @@ Feature: User-controlled sync — mobile, wifi, and the operator's data plan
 
   # --- Failure Regression: silent cellular sync ---
 
-  @wip @regression
+  @regression @act:i @requires:owned-substrate
   Scenario: Without sync mode control, mobile device burns cellular data
     Given device "2019 Android Phone" from the device portfolio
     # 3GB RAM, carrier-grade NAT, 4G cellular as the only network
@@ -39,7 +39,7 @@ Feature: User-controlled sync — mobile, wifi, and the operator's data plan
 
   # --- Capability Proof: the three modes ---
 
-  @wip
+  @act:i @requires:owned-substrate
   Scenario: Operator pauses sync explicitly
     Given the peer's sync mode is "sync"
     When the operator sets sync mode to "paused"
@@ -48,7 +48,7 @@ Feature: User-controlled sync — mobile, wifi, and the operator's data plan
     And the P2P status reports syncMode "paused"
     # The pause is sticky — it survives restart and network changes.
 
-  @wip
+  @act:i @requires:owned-substrate
   Scenario: Operator resumes sync after pause
     Given the peer's sync mode is "paused"
     And there are 200 pending DHT updates from connected peers
@@ -57,7 +57,7 @@ Feature: User-controlled sync — mobile, wifi, and the operator's data plan
     And the 200 pending updates are absorbed
     # Pause does not lose work — it defers it.
 
-  @wip
+  @act:i @requires:owned-substrate
   Scenario: Wifi-only mode pauses sync when cellular is the active network
     Given device "2019 Android Phone" with sync mode "wifi-only"
     And the device is currently on cellular
@@ -66,7 +66,7 @@ Feature: User-controlled sync — mobile, wifi, and the operator's data plan
     # Detection: device emits networkClass on heartbeat;
     # peer sync loop treats wifi-only + cellular as effective-paused.
 
-  @wip
+  @act:i @requires:owned-substrate
   Scenario: Wifi-only mode resumes sync when device joins wifi
     Given device "2019 Android Phone" with sync mode "wifi-only"
     And the device is currently on cellular with sync paused
@@ -78,7 +78,7 @@ Feature: User-controlled sync — mobile, wifi, and the operator's data plan
 
   # --- Capability Proof: archetype-tunable defaults ---
 
-  @wip
+  @wip @act:host
   Scenario Outline: Each archetype has a sensible default sync mode
     Given device "<device>" from the device portfolio
     Then the device's default sync mode should be "<default>"
@@ -97,7 +97,7 @@ Feature: User-controlled sync — mobile, wifi, and the operator's data plan
 
   # --- Observability: the operator can see what's happening ---
 
-  @wip
+  @wip @act:i
   Scenario: Sync state is visible in the operator dashboard
     Given the operator opens their device's sync settings
     Then the current sync mode is shown
@@ -105,7 +105,7 @@ Feature: User-controlled sync — mobile, wifi, and the operator's data plan
     And if mode is "wifi-only", the current network class is shown
     # Without visibility, "is my peer participating?" requires a CLI.
 
-  @wip
+  @act:i @requires:owned-substrate
   Scenario: Sync mode transitions are logged for auditability
     Given the peer's sync mode has changed 4 times in the last 24 hours
     When the operator queries the sync mode history

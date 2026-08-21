@@ -1,4 +1,4 @@
-@e2e @deployment @p2p @epic:elohim-p2p-infrastructure
+@e2e @deployment @p2p @epic:elohim-p2p-infrastructure @act:i
 Feature: P2P Peer Validation
   As a deployment pipeline
   I want to validate that P2P peers are connected and syncing
@@ -34,7 +34,7 @@ Feature: P2P Peer Validation
   #   operator documentation, container sizing recommendations
   # Review after: delta-sync protocol replaces full-state inventory exchange
 
-  @wip @regression
+  @regression @requires:owned-substrate
   Scenario: Storage pauses P2P sync during account import
     Given elohim-storage on doorway "alpha" has 3 connected peers
     When a seeder POSTs an account package for "Matthew" with 200 content items
@@ -43,7 +43,7 @@ Feature: P2P Peer Validation
     And after the import response returns, sync_paused should be false
     # Guard: without backpressure, concurrent sync + import causes OOM on 256MB nodes.
 
-  @wip
+  @requires:owned-substrate
   Scenario: Storage pauses P2P sync during bulk content creation
     Given elohim-storage on doorway "alpha" has 3 connected peers
     When a seeder POSTs a bulk content batch of 100 items
@@ -51,7 +51,7 @@ Feature: P2P Peer Validation
     And after the bulk response returns, sync_paused should be false
     # Threshold: batches under 50 items do not trigger the pause.
 
-  @wip
+  @requires:owned-substrate
   Scenario: Sync resumes even if bulk write fails
     Given elohim-storage on doorway "alpha" has 3 connected peers
     And P2P sync is active
@@ -59,7 +59,7 @@ Feature: P2P Peer Validation
     Then sync_paused should be false after the error response
     # RAII guard: SyncPauseGuard resumes sync on drop, including error paths.
 
-  @wip @regression
+  @regression @requires:owned-substrate
   Scenario: Sync auto-suppressed while drain backlog is large
     Given elohim-storage on doorway "alpha" has 5 connected peers
     And 3424 content items have been bulk-seeded
@@ -72,7 +72,7 @@ Feature: P2P Peer Validation
     # Operational parameters: 4Gi limit, 5 peers, 3424 items, 500/cycle drain
     # The drain is the priority after a seed — sync can wait.
 
-  @wip
+  @requires:owned-substrate
   Scenario: P2P status endpoint exposes sync_paused state
     Given the doorway health endpoint is accessible
     When I check the P2P status
