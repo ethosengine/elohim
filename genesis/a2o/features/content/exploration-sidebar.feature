@@ -1,4 +1,4 @@
-@e2e @lamad @epr-decomposition @native-content-graph @regression @requires:doorway @requires:seeded-content
+@e2e @lamad @epr-decomposition @native-content-graph @regression @requires:doorway @requires:seeded-content @act:i
 Feature: Shared exploration sidebar surfaces authored and discovered neighbors
   A learner reading a doctrinal page sees, beside the content, the SAME "Explore"
   sidebar whether they opened it standalone at its universal EPR address or met it

@@ -1,4 +1,4 @@
-@e2e @content @epr @protocol @requires:doorway
+@e2e @content @epr @protocol @requires:doorway @act:i
 Feature: The omnibar links out to the claims that back the EPR it wraps
   As a person reading any page a doorway serves me
   I want the protocol chrome to show me what BACKS this content — the story it

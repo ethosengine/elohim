@@ -1,4 +1,4 @@
-@e2e @content @landing @discovery @requires:doorway
+@e2e @content @landing @discovery @requires:doorway @act:i
 Feature: The elohim.host doorstep invites a visitor into the protocol
   As a first-time visitor arriving cold at elohim.host — someone who has
   never heard the word "Lamad" and owes the protocol nothing

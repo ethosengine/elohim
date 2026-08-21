@@ -14,6 +14,7 @@ Feature: Content Lifecycle
 
   # --- Create ---
 
+  @act:i
   Scenario: Create content
     When Matthew creates content titled "Governance Basics" with tags "governance,family-systems"
     Then the content should be created successfully
@@ -21,6 +22,7 @@ Feature: Content Lifecycle
 
   # --- Read ---
 
+  @act:i
   Scenario: Read own content
     Given Matthew has created content titled "My Article" with tags "test"
     When Matthew reads the content by id
@@ -28,6 +30,7 @@ Feature: Content Lifecycle
 
   # --- Discover ---
 
+  @act:i
   Scenario: Discover content by tag
     Given Matthew has created content titled "Tagged Content" with tags "e2e-discovery,governance"
     When Matthew searches for content with tag "e2e-discovery"
@@ -35,14 +38,14 @@ Feature: Content Lifecycle
 
   # --- Cross-human discovery (same doorway) ---
 
-  @requires:shem
+  @requires:shem @act:iii
   Scenario: Susan discovers Matthew's content
     Given Matthew has created content titled "Family Governance" with tags "e2e-shared,family-systems"
     And human "Susan" is logged in on doorway "alpha"
     When Susan searches for content with tag "e2e-shared"
     Then the search results should include "Family Governance"
 
-  @requires:shem
+  @requires:shem @act:iii
   Scenario: Terrance discovers Matthew's content
     Given Matthew has created content titled "Learning Science" with tags "e2e-learning,education"
     And human "Terrance" is logged in on doorway "alpha"

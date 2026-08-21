@@ -1,3 +1,4 @@
+@act:i @e2e
 Feature: SSR capability is advertised, honored, and accountable
   As a substrate operator
   I want each doorway to declare its SSR capability honestly

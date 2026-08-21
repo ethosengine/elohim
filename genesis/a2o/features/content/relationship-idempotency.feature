@@ -1,4 +1,4 @@
-@e2e @content @relationships @idempotency
+@e2e @content @relationships @idempotency @act:i
 Feature: Relationship import converges under bidirectional authorship
 
   Executable contract for the account-import idempotency guarantee. The
@@ -6,6 +6,7 @@ Feature: Relationship import converges under bidirectional authorship
   test at elohim/elohim-storage/tests/account_import_idempotency.rs — these
   scenarios are @wip pending an a2o-level live-storage fixture.
 
+  # HELD (2026-08-21): The behaviour is already proved by elohim-storage/tests/account_import_idempotency.rs; redundant once the a2o fixture is built.
   @wip
   Scenario: A spouse relationship authored by both parties is created once
     Given Adam's account package declares spouse relationship with Eve

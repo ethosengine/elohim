@@ -1,4 +1,4 @@
-@e2e @content @epr @epr-content-facing @requires:doorway @requires:seeded-content
+@e2e @content @epr @epr-content-facing @requires:doorway @requires:seeded-content @act:i
 Feature: EPR content-perspective facing — the /raw neighborhood inspector
   As a developer (and as the content's own first-person perspective)
   I want an atom's raw leg-neighborhood — its coupling legs, how many atoms it

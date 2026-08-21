@@ -1,4 +1,4 @@
-@e2e @lamad @epr-decomposition @native-content-graph @content-graph-resolver @requires:doorway @requires:seeded-content
+@e2e @lamad @epr-decomposition @native-content-graph @content-graph-resolver @requires:doorway @requires:seeded-content @act:i
 Feature: Native content-graph resolver — discovered constraints
   # Harvested 2026-06-08 from the native-content-graph-seam slice (story-harvest).
   # These lock CONSTRAINTS surfaced DURING implementation that the happy-path a2o

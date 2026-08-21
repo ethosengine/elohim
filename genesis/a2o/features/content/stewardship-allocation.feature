@@ -1,4 +1,4 @@
-@e2e @content @stewardship
+@e2e @content @stewardship @act:i
 Feature: Content Stewardship Allocation
   As a content ecosystem,
   stewardship should be distributed by affinity

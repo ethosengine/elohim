@@ -26,7 +26,7 @@
 #     targets PLUS claim CIDs, per EprNavContextView)
 #   - `derivedFrom` discloses which relationship kinds contributed — the
 #     substrate saying out loud how it knows what it is showing
-@e2e @content @epr @stewardship @requires:doorway @requires:seeded-content
+@e2e @content @epr @stewardship @requires:doorway @requires:seeded-content @act:i
 Feature: The landing surface carries real backing claims
   As a visitor arriving at the protocol's own front door
   I want the page's stewardship, custody and governance context to be

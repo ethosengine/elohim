@@ -4,7 +4,7 @@
 # and elohim/epr/src/verdict.rs (Decision spine). These scenarios capture the laws as regression
 # stories for when the standing surface reaches the app.
 
-@concern:epistemic-standing @slice:ontology-keel-1
+@concern:epistemic-standing @slice:ontology-keel-1 @act:host @e2e
 Feature: A claim earns its standing through witnessed review — and the system knows what is not its to decide
 
   As a learner encountering a claim in the commons
