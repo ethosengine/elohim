@@ -1,4 +1,4 @@
-@e2e @federation @peer-advertisement @requires:doorway
+@e2e @federation @peer-advertisement @requires:doorway @act:i
 Feature: Peer Advertisement — The Network's Self-Awareness Heartbeat
   As a node operator
   I want every peer to broadcast what it is, what it can do, and what state it is in
@@ -20,7 +20,7 @@ Feature: Peer Advertisement — The Network's Self-Awareness Heartbeat
 
   # --- Peer Profile Identity ---------------------------------------------------
 
-  @wip @requires:shem
+  @wip
   Scenario: Laptop peer advertises intermittent profile
     Given human "Terrance" has a Tauri node "terrance-laptop" configured as laptop
     And "terrance-laptop" has capabilities: storage=true, always_on=false, max_storage=10GB, cache_budget=200MB
@@ -66,7 +66,7 @@ Feature: Peer Advertisement — The Network's Self-Awareness Heartbeat
     And each announcement has an incrementing timestamp
     And the announcements are published to "/elohim/compute/capacity/1.0.0"
 
-  @wip @requires:shem
+  @wip
   Scenario: Receiving peer builds neighbor table from announcements
     Given "terrance-laptop" is connected to "matthew-home" via gossipsub
     When "matthew-home" broadcasts a CapacityAnnouncement
@@ -74,7 +74,7 @@ Feature: Peer Advertisement — The Network's Self-Awareness Heartbeat
     And "terrance-laptop" records the announcement in its neighbor capacity table
     And the table entry is keyed by node_id with last_seen timestamp
 
-  @wip @requires:shem
+  @wip
   Scenario: Stale announcements are evicted from neighbor table
     Given "terrance-laptop" has a neighbor table entry for "matthew-home"
     And the entry was last updated 120 seconds ago
@@ -102,7 +102,7 @@ Feature: Peer Advertisement — The Network's Self-Awareness Heartbeat
     And the announcement shows ready=false
     And peers stop routing compute requests to "matthew-home"
 
-  @wip @requires:shem
+  @wip
   Scenario: Peer coming online announces immediately
     Given "terrance-laptop" was previously offline (lid closed)
     When Terrance opens the laptop and "terrance-laptop" reconnects to the network
@@ -110,7 +110,7 @@ Feature: Peer Advertisement — The Network's Self-Awareness Heartbeat
     And the announcement reflects current state (cache may be cold)
     And the regular 30-second heartbeat resumes
 
-  @wip @requires:shem
+  @wip
   Scenario: Peer going offline is detected by absence of heartbeats
     Given "terrance-laptop" is connected and broadcasting
     And "matthew-home" has a fresh neighbor table entry for "terrance-laptop"
@@ -119,7 +119,7 @@ Feature: Peer Advertisement — The Network's Self-Awareness Heartbeat
     And after 90 seconds, "matthew-home" marks "terrance-laptop" as stale
     And after the connection timeout, the entry is evicted
 
-  @wip @requires:shem
+  @wip
   Scenario: Cache warming updates readiness in announcement
     Given "matthew-home" has an empty ExtractionCache
     And "matthew-home" is broadcasting with ready_content empty
@@ -127,7 +127,7 @@ Feature: Peer Advertisement — The Network's Self-Awareness Heartbeat
     Then the next CapacityAnnouncement includes "evolution-of-trust" in capabilities
     And peers recognize "matthew-home" can now serve that content
 
-  @wip @requires:shem
+  @wip
   Scenario: Cache eviction removes content from announcement
     Given "matthew-home" has "evolution-of-trust" warm in its ExtractionCache
     And "matthew-home" is advertising "evolution-of-trust" in capabilities
@@ -137,7 +137,7 @@ Feature: Peer Advertisement — The Network's Self-Awareness Heartbeat
 
   # --- Peer Diversity on the Same Network --------------------------------------
 
-  @wip @requires:multi-node @requires:shem
+  @wip @requires:multi-node
   Scenario: Network shows diverse peer profiles simultaneously
     Given the following peers are connected via gossipsub:
       | peer             | profile      | always_on | storage  | cache    | serve        |
@@ -150,7 +150,7 @@ Feature: Peer Advertisement — The Network's Self-Awareness Heartbeat
     And the profiles are distinguishable by capability sets
     And no peer is assumed to have the same profile as another
 
-  @wip @requires:multi-node @requires:shem
+  @wip @requires:multi-node
   Scenario: Heterogeneous network handles mixed availability
     Given "terrance-laptop" goes offline (intermittent)
     And "matthew-home" remains online (always-on)
@@ -162,7 +162,7 @@ Feature: Peer Advertisement — The Network's Self-Awareness Heartbeat
 
   # --- Heartbeat Survival Across Slow Conductor Boots ---------------------------
 
-  @wip @regression
+  @regression @requires:owned-substrate
   Scenario: Peer vitals light up even when the conductor enables cells slowly
     Given human "Matthew" has a storage peer whose conductor takes longer than the bounded boot ramp to enable cells
     When the peer's infrastructure bridge misses every boot-ramp connect attempt with CellDisabled
