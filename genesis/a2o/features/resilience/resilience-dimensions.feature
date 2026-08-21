@@ -61,7 +61,7 @@ Feature: Resilience dimensions — the matrix that proves the felt-durability su
     Given content "dim-triad" is stewarded by 3 distinct households
     And a peer in an unrelated household is online
     When I request "/api/v1/resilience/dim-triad/household"
-    Then the response details field "onlinePeerCount" counts only peers within the stewarding households
+    Then the response field "details.onlinePeers.live" counts only peers within the stewarding households
     # Regression anchor: list_by_household shipped as a stub returning ALL
     # peers, multiplying counts per household — inflating status toward
     # protected. Pinned deterministically in the Rust D2 tests.

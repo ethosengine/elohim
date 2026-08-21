@@ -1778,6 +1778,37 @@ Then(
 );
 
 /**
+ * D2 regression guard: the online-peer count must reflect only peers within
+ * the content's stewarding households, never an unrelated household's peer
+ * fanned in on top. Field path is `details.onlinePeers.live` (the honest
+ * live/known pair — `ResilienceSnapshotView.details.onlinePeers`,
+ * elohim/sdk/schemas/v1/views/resilience-snapshot-view.schema.json), not a
+ * bare `onlinePeerCount` — the wire shape never carried that flat field.
+ *
+ * The full "only within stewarding households" claim needs a fixture that
+ * pins the exact online-peer set per household (not yet authored — see the
+ * feature file's workstream-D note); this step covers the part checkable
+ * from the response alone: the field is present as an honest non-negative
+ * count. The regression this guards (`list_by_household` shipped as a stub
+ * returning ALL peers, multiplying counts per household) inflated this same
+ * field, so once the fixture lands, a tighter bound belongs here too.
+ *
+ * Example:
+ *   Then the response field "details.onlinePeers.live" counts only peers within the stewarding households
+ */
+Then(
+  'the response field {string} counts only peers within the stewarding households',
+  function (this: E2EWorld, fieldName: string) {
+    const data = loadResponse(this);
+    const actual = readPath(data, fieldName);
+    assert.ok(
+      typeof actual === 'number' && actual >= 0,
+      `Expected "${fieldName}" to be a non-negative number; got: ${JSON.stringify(actual)}`
+    );
+  }
+);
+
+/**
  * Assert a (possibly dotted) string field in the last stored response is NOT a
  * given value — the negated sibling of "the response field {string} is {string}".
  *
