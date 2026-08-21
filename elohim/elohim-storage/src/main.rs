@@ -1361,7 +1361,7 @@ async fn async_main(
                 // Acquire the bridge INSIDE the task via connect_role_forever
                 // instead — a late connection is exactly as good as a boot one.
                 {
-                    let infra_boot = registry.infrastructure.clone();
+                    let infra_boot = registry.infrastructure_client();
                     let late_inputs = elohim_storage::hc_client_registry::HcRegistryInputs {
                         admin_url: admin_url.clone(),
                         app_url: args.app_url.clone(),
@@ -2443,6 +2443,34 @@ async fn async_main(
                     });
                 }
 
+                // Keep every role's bridge alive for the life of the process.
+                //
+                // Everything above this line handles a bridge that never came
+                // up. NOTHING above it handles a bridge that came up and then
+                // DIED — which is what a conductor-only restart does to all
+                // three roles at once: the app-authentication token is
+                // invalidated, both websockets close, `holochain_client` does
+                // not reconnect, and every zome call answers `Websocket closed:
+                // No connection` for the rest of the process's life while
+                // `/health` keeps answering 200 and `POST /db/content` keeps
+                // accepting writes that can never be anchored (reproduced on a
+                // throwaway conductor 2026-08-21; dead ≥95s and counting).
+                //
+                // The supervisor probes each live role and, on death, clears the
+                // handle (routes answer an honest, retryable 503) and re-runs
+                // the SAME `connect_role_forever` the boot path uses — which
+                // re-attaches the app interface, re-authorizes per-cell signing
+                // credentials and mints a FRESH auth token. Recovery is a
+                // re-mint, not a socket reconnect; there is no other way back.
+                std::sync::Arc::clone(&registry).spawn_bridge_supervisor(
+                    elohim_storage::hc_client_registry::HcRegistryInputs {
+                        admin_url: admin_url.clone(),
+                        app_url: args.app_url.clone(),
+                        app_id: args.app_id.clone(),
+                    },
+                    shutdown_tx.clone(),
+                );
+
                 // Stash the registry in shared state for HTTP handlers.
                 hc_registry_for_http = Some(registry);
             }
@@ -2881,7 +2909,7 @@ async fn async_main(
             let mint_enabled = elohim_storage::p2p::binding_mint::mint_enabled_from_env();
             let mint_hc = hc_registry_for_http
                 .as_ref()
-                .and_then(|r| r.imagodei.clone());
+                .and_then(|r| r.imagodei_client());
             match (mint_enabled, mint_hc, db_pool.clone()) {
                 (true, Some(hc), Some(pool)) => {
                     // The zome accepts only these four archetypes; anything else
@@ -3981,7 +4009,7 @@ async fn async_main(
         db_pool.as_ref(),
         hc_registry_for_http
             .as_ref()
-            .and_then(|r| r.imagodei.clone()),
+            .and_then(|r| r.imagodei_client()),
     ) {
         let pool_clone = pool.clone();
         tokio::spawn(async move {

@@ -169,17 +169,13 @@ fn schema_accepts(schema_path: &str, instance: &Value) -> bool {
 fn hc_client_registry_has_imagodei_field() {
     // Construct with both slots empty — simulates the 503-path state.
     // If `imagodei` is renamed or removed, this fails at compile time.
-    let registry = HcClientRegistry {
-        infrastructure: None,
-        imagodei: None,
-        lamad: std::sync::RwLock::new(None),
-    };
+    let registry = HcClientRegistry::empty();
     assert!(
-        registry.imagodei.is_none(),
+        registry.imagodei_client().is_none(),
         "HcClientRegistry.imagodei must exist and accept None"
     );
     assert!(
-        registry.infrastructure.is_none(),
+        registry.infrastructure_client().is_none(),
         "HcClientRegistry.infrastructure must exist and accept None"
     );
 }
@@ -188,13 +184,9 @@ fn hc_client_registry_has_imagodei_field() {
 fn hc_client_registry_both_slots_absent_is_valid_state() {
     // A registry built with no connected roles is legitimate — storage serves
     // on HTTP but conductor-gated routes (qahal writes) return 503.
-    let registry = std::sync::Arc::new(HcClientRegistry {
-        infrastructure: None,
-        imagodei: None,
-        lamad: std::sync::RwLock::new(None),
-    });
-    assert!(registry.infrastructure.is_none());
-    assert!(registry.imagodei.is_none());
+    let registry = std::sync::Arc::new(HcClientRegistry::empty());
+    assert!(registry.infrastructure_client().is_none());
+    assert!(registry.imagodei_client().is_none());
 }
 
 // =============================================================================

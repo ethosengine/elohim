@@ -291,7 +291,7 @@ fn require_qahal_service(
         Some(r) => r,
         None => return Err(response_503_imagodei_bridge_offline()),
     };
-    let hc = match registry.imagodei.clone() {
+    let hc = match registry.imagodei_client() {
         Some(h) => h,
         None => return Err(response_503_imagodei_bridge_offline()),
     };

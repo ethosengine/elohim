@@ -31,7 +31,23 @@ use holochain_client::{
 };
 
 use crate::conductor_admission::AdmissionClass;
+use crate::conductor_bridge_health::bridge_health;
 use crate::error::StorageError;
+
+/// Map a `holochain_client` zome-call failure onto a [`StorageError`] AND fold
+/// it into the process-wide zome-path observer.
+///
+/// Every zome-call site funnels through here so the observation cannot be
+/// forgotten at one of them: a bridge that dies on the mishpat cell is exactly
+/// as dead as one that dies on lamad, and `/health` must say so either way.
+/// Classification (transport-dead vs the conductor answering "no" vs an
+/// admission shed that never left this process) lives in
+/// [`crate::conductor_bridge_health::classify_zome_error`], NOT here.
+fn zome_call_failed(e: impl std::fmt::Display) -> StorageError {
+    let msg = format!("Zome call failed: {}", e);
+    bridge_health().observe_zome_error(&msg);
+    StorageError::Conductor(msg)
+}
 
 /// What the admission gate observed about one zome call.
 ///
@@ -380,7 +396,8 @@ impl HcClient {
                 ExternIO::from(payload),
             )
             .await
-            .map_err(|e| StorageError::Conductor(format!("Zome call failed: {}", e)))?;
+            .map_err(zome_call_failed)?;
+        bridge_health().record_success();
         Ok(result.into_vec())
     }
 
@@ -420,7 +437,8 @@ impl HcClient {
                 ExternIO::from(payload),
             )
             .await
-            .map_err(|e| StorageError::Conductor(format!("Zome call failed: {}", e)))?;
+            .map_err(zome_call_failed)?;
+        bridge_health().record_success();
         Ok(result.into_vec())
     }
 
@@ -484,7 +502,8 @@ impl HcClient {
                 ExternIO::from(payload),
             )
             .await
-            .map_err(|e| StorageError::Conductor(format!("Zome call failed: {}", e)))?;
+            .map_err(zome_call_failed)?;
+        bridge_health().record_success();
 
         let timing = ZomeCallTiming {
             admission_wait: permit.wait(),
@@ -951,12 +970,23 @@ impl HcClient {
 
     /// Quick health check - just verify conductor is responsive
     pub async fn ping(&self) -> Result<(), StorageError> {
-        // Use list_apps as a simple ping
-        self.admin_ws
-            .list_apps(None)
-            .await
-            .map_err(|e| StorageError::Connection(format!("Conductor ping failed: {}", e)))?;
-        Ok(())
+        // Use list_apps as a simple ping.
+        //
+        // Folded into the zome-path observer because on a node with NO zome
+        // traffic this is the only evidence there is — and a node with no
+        // traffic is exactly the reported shape: the bridge died at a conductor
+        // restart and nothing asked it a question until a person did, 90s later.
+        match self.admin_ws.list_apps(None).await {
+            Ok(_) => {
+                bridge_health().record_success();
+                Ok(())
+            }
+            Err(e) => {
+                let msg = format!("Conductor ping failed: {}", e);
+                bridge_health().observe_zome_error(&msg);
+                Err(StorageError::Connection(msg))
+            }
+        }
     }
 }
 

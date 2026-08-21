@@ -45,18 +45,44 @@ pub fn should_warn_still_down(attempt: u32) -> bool {
     attempt == 1 || attempt.is_multiple_of(5)
 }
 
-/// Role-keyed registry of HcClient connections. Fields hold `None` when
-/// the role failed to connect at startup; downstream code returns 503
-/// (`IMAGODEI_BRIDGE_OFFLINE` etc.) if the role is unavailable.
+/// How often the bridge supervisor asks a LIVE role whether it is still alive.
+///
+/// 20s is deliberately shorter than the heartbeat's 60s tick: the heartbeat
+/// only WARNS, so before this supervisor existed the shortest honest window
+/// between a conductor restart and any recovery was infinity. 20s bounds the
+/// dead window at roughly one probe plus one reconnect (~2s), which the
+/// throwaway reproduction measured end-to-end.
+pub const BRIDGE_PROBE_INTERVAL: Duration = Duration::from_secs(20);
+
+/// Role-keyed registry of HcClient connections. Every slot holds `None` when
+/// the role is not currently connected — at startup, or after the supervisor
+/// observed its bridge die — and downstream code returns 503 if the role is
+/// unavailable.
+///
+/// ALL THREE SLOTS ARE INTERIOR-MUTABLE, and that is the whole point. A
+/// conductor restart invalidates the app-authentication token and closes both
+/// websockets of every role at once; `holochain_client` does not reconnect and
+/// the token cannot be reused, so recovery means building a WHOLE NEW
+/// [`HcClient`] (re-attach app interface → re-authorize per-cell signing
+/// credentials → re-mint the auth token → reconnect the app websocket) and
+/// swapping it in behind the handles the HTTP layer already holds. Before this,
+/// only `lamad` could be swapped, so `infrastructure` (heartbeat, peer status)
+/// and `imagodei` (identity, qahal) stayed permanently dead after any
+/// conductor-only restart.
 pub struct HcClientRegistry {
-    pub infrastructure: Option<Arc<HcClient>>,
-    pub imagodei: Option<Arc<HcClient>>,
+    pub infrastructure: RwLock<Option<Arc<HcClient>>>,
+    pub imagodei: RwLock<Option<Arc<HcClient>>>,
     /// `lamad` role — hosts the `content_store` zome (REA commitments,
     /// content rows, attestations). Required for the conductor-first HTTP
     /// write path landing per 2026-05-26-substrate-rea-replication-fix.md
     /// (closes Gap C/D — REA + content row replication on alpha).
     pub lamad: RwLock<Option<Arc<HcClient>>>,
 }
+
+/// The roles the supervisor keeps alive. Ordered coldest-first, matching the
+/// boot ramp: `infrastructure` is the role most likely to be `None`-stamped on
+/// a slow conductor boot.
+pub const SUPERVISED_ROLES: [&str; 3] = ["infrastructure", "imagodei", "lamad"];
 
 /// Connection inputs. Mirrors the relevant CLI args without depending on
 /// the Args struct directly (cleaner test surface).
@@ -76,10 +102,54 @@ impl HcClientRegistry {
         let imagodei = Self::connect_role(inputs, "imagodei").await;
         let lamad = Self::connect_role(inputs, "lamad").await;
         Self {
-            infrastructure,
-            imagodei,
+            infrastructure: RwLock::new(infrastructure),
+            imagodei: RwLock::new(imagodei),
             lamad: RwLock::new(lamad),
         }
+    }
+
+    /// A registry with every role unconnected — the shape a node has before any
+    /// bridge lands, and the shape tests construct.
+    pub fn empty() -> Self {
+        Self {
+            infrastructure: RwLock::new(None),
+            imagodei: RwLock::new(None),
+            lamad: RwLock::new(None),
+        }
+    }
+
+    fn slot(&self, role: &str) -> Option<&RwLock<Option<Arc<HcClient>>>> {
+        match role {
+            "infrastructure" => Some(&self.infrastructure),
+            "imagodei" => Some(&self.imagodei),
+            "lamad" => Some(&self.lamad),
+            _ => None,
+        }
+    }
+
+    /// Snapshot the current handle for `role`, or `None` for an unknown role.
+    pub fn client(&self, role: &str) -> Option<Arc<HcClient>> {
+        self.slot(role)?
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+    }
+
+    /// Store (or clear) the handle for `role`. Unknown roles are ignored.
+    pub fn set_client(&self, role: &str, hc: Option<Arc<HcClient>>) {
+        if let Some(slot) = self.slot(role) {
+            *slot.write().unwrap_or_else(|e| e.into_inner()) = hc;
+        }
+    }
+
+    /// Snapshot the current `infrastructure` handle.
+    pub fn infrastructure_client(&self) -> Option<Arc<HcClient>> {
+        self.client("infrastructure")
+    }
+
+    /// Snapshot the current `imagodei` handle.
+    pub fn imagodei_client(&self) -> Option<Arc<HcClient>> {
+        self.client("imagodei")
     }
 
     /// Snapshot the current `lamad` handle. Interior-mutable: the boot-time
@@ -87,12 +157,12 @@ impl HcClientRegistry {
     /// bounded boot ramp gave up, so the HTTP re-notarize path picks it up
     /// instead of reading a frozen boot-time `None`.
     pub fn lamad_client(&self) -> Option<Arc<HcClient>> {
-        self.lamad.read().unwrap_or_else(|e| e.into_inner()).clone()
+        self.client("lamad")
     }
 
     /// Store a (re)connected `lamad` handle (called by the late-connect updater).
     pub fn set_lamad(&self, hc: Option<Arc<HcClient>>) {
-        *self.lamad.write().unwrap_or_else(|e| e.into_inner()) = hc;
+        self.set_client("lamad", hc);
     }
 
     async fn connect_role(inputs: &HcRegistryInputs, role: &str) -> Option<Arc<HcClient>> {
@@ -221,6 +291,95 @@ impl HcClientRegistry {
             }
         }
     }
+
+    /// Keep every role's bridge ALIVE for the life of the process.
+    ///
+    /// WHY THIS EXISTS. `connect_role_forever` retries only while the connect
+    /// FAILS; it returns the instant one succeeds, and nothing then watches the
+    /// connection it handed back. `HcClient` holds an `AdminWebsocket` plus an
+    /// `AppWebsocket` built from a ONE-SHOT `issue_app_auth_token`;
+    /// `holochain_client` 0.8 has no reconnect, and a conductor restart both
+    /// closes the sockets and invalidates the token (the conductor's token store
+    /// is in-memory — a reconnect with the old token is refused
+    /// `Authentication failed with reason: Invalid token`). So a conductor-only
+    /// restart under a running storage left every zome call answering
+    /// `Websocket closed: No connection` FOREVER, while `/health` answered 200
+    /// and `POST /db/content` kept accepting writes it could never anchor.
+    ///
+    /// Recovery is not a socket-level reconnect — it is a full re-mint, which is
+    /// exactly what `HcClient::connect` already does end to end: attach the app
+    /// interface, re-authorize per-cell signing credentials for every cell the
+    /// happ provisions, issue a FRESH app-authentication token, and reconnect
+    /// the app websocket. So the supervisor's whole job is to notice death and
+    /// re-arm the existing forever-loop.
+    ///
+    /// Order matters on the way down: the handle is cleared BEFORE reconnecting,
+    /// so routes answer `503 bridge unavailable` (honest backpressure a caller
+    /// can retry) rather than `502 Websocket closed` (a broken node) during the
+    /// gap.
+    pub fn spawn_bridge_supervisor(
+        self: Arc<Self>,
+        inputs: HcRegistryInputs,
+        shutdown: tokio::sync::broadcast::Sender<()>,
+    ) {
+        for role in SUPERVISED_ROLES {
+            let registry = Arc::clone(&self);
+            let inputs = inputs.clone();
+            let mut shutdown_rx = shutdown.subscribe();
+            let reconnect_shutdown = shutdown.clone();
+            tokio::spawn(async move {
+                loop {
+                    tokio::select! {
+                        _ = tokio::time::sleep(BRIDGE_PROBE_INTERVAL) => {}
+                        _ = shutdown_rx.recv() => {
+                            info!(role, "bridge supervisor exiting (shutdown)");
+                            return;
+                        }
+                    }
+
+                    // A role with no handle is either still in its boot ramp or
+                    // already being re-armed by this same loop's previous pass;
+                    // either way `connect_role_forever` below owns it.
+                    let Some(hc) = registry.client(role) else {
+                        continue;
+                    };
+
+                    // `ping` folds its own result into the zome-path observer,
+                    // so a node with zero zome traffic still reports honestly.
+                    if hc.ping().await.is_ok() {
+                        continue;
+                    }
+
+                    warn!(
+                        role,
+                        "conductor bridge is DEAD (ping failed) — clearing the handle and \
+                         re-minting the app auth token; zome routes answer 503 until it lands"
+                    );
+                    // Drop the dead handle FIRST. Anything holding an Arc clone
+                    // keeps failing until it re-reads, but nothing NEW picks up
+                    // a corpse, and `/health` stops advertising its DNA hashes.
+                    registry.set_client(role, None);
+                    drop(hc);
+                    crate::conductor_bridge_health::bridge_health().record_reconnect();
+
+                    if let Some(fresh) =
+                        Self::connect_role_forever(&inputs, role, reconnect_shutdown.subscribe())
+                            .await
+                    {
+                        registry.set_client(role, Some(fresh));
+                        info!(
+                            role,
+                            "conductor bridge RE-MINTED after a conductor restart — fresh app \
+                             auth token, signing credentials re-authorized, zome path live"
+                        );
+                    } else {
+                        // Only `None` on shutdown.
+                        return;
+                    }
+                }
+            });
+        }
+    }
 }
 
 #[cfg(test)]
@@ -261,5 +420,55 @@ mod backoff_policy_tests {
         assert!(should_warn_still_down(5));
         assert!(!should_warn_still_down(6));
         assert!(should_warn_still_down(10));
+    }
+}
+
+#[cfg(test)]
+mod supervised_slot_tests {
+    use super::*;
+
+    #[test]
+    fn every_supervised_role_has_a_swappable_slot() {
+        // The defect this guards: `infrastructure` and `imagodei` used to be
+        // plain `Option` fields, so the supervisor could clear and re-mint only
+        // `lamad`. A conductor restart kills all three bridges at once — a role
+        // the supervisor cannot swap is a role that stays dead forever.
+        let reg = HcClientRegistry::empty();
+        for role in SUPERVISED_ROLES {
+            assert!(
+                reg.slot(role).is_some(),
+                "supervised role '{role}' has no swappable slot"
+            );
+        }
+    }
+
+    #[test]
+    fn every_slot_starts_empty_and_reads_back_none() {
+        let reg = HcClientRegistry::empty();
+        assert!(reg.infrastructure_client().is_none());
+        assert!(reg.imagodei_client().is_none());
+        assert!(reg.lamad_client().is_none());
+        // An unknown role is a miss, never a panic.
+        assert!(reg.client("qahal").is_none());
+    }
+
+    #[test]
+    fn clearing_a_slot_is_the_503_gap_the_supervisor_opens() {
+        // The supervisor clears BEFORE reconnecting so routes answer 503
+        // (retryable backpressure) instead of 502 (a broken node). Clearing an
+        // already-empty slot, and clearing an unknown role, must both be no-ops.
+        let reg = HcClientRegistry::empty();
+        reg.set_client("infrastructure", None);
+        reg.set_client("nonexistent-role", None);
+        assert!(reg.infrastructure_client().is_none());
+    }
+
+    #[test]
+    fn probe_interval_is_shorter_than_the_heartbeat_tick() {
+        // The heartbeat (60s) only WARNS. The supervisor must probe strictly
+        // more often than that, or the dead window is bounded by the thing that
+        // never fixes anything.
+        assert!(BRIDGE_PROBE_INTERVAL < Duration::from_secs(60));
+        assert!(BRIDGE_PROBE_INTERVAL >= Duration::from_secs(5));
     }
 }

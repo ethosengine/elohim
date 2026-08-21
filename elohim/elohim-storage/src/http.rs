@@ -180,6 +180,26 @@ fn is_head_declare_write(method: &Method, path: &str) -> bool {
     *method == Method::POST && path.starts_with("/db/content/") && path.ends_with("/head")
 }
 
+/// Paths that never draw an admission permit.
+///
+/// `/health` and `/version` because they are the container's own probes — a
+/// shed there reads as a dead pod. `/health/serving` for the same reason and a
+/// sharper one: it is the probe that answers "is the conductor bridge alive?",
+/// so shedding it under load would replace a truthful red with an
+/// indistinguishable 503 (backpressure), destroying the one signal it exists to
+/// carry. `/debug/pprof/profile` is exempt for the opposite reason — it BLOCKS
+/// for up to 60s and carries its own stricter single-flight guard.
+///
+/// Extracted as a free function so the exemption test asserts the REAL
+/// predicate rather than a hand-copied mirror that drifts the moment a probe is
+/// added (which is exactly what happened when `/health/serving` landed).
+pub(crate) fn admission_exempt_path(path: &str) -> bool {
+    matches!(
+        path,
+        "/health" | "/health/serving" | "/version" | "/debug/pprof/profile"
+    )
+}
+
 #[cfg(test)]
 mod head_declare_write_admission_carveout_tests {
     use super::*;
@@ -1160,10 +1180,7 @@ impl HttpServer {
         // answers 429 otherwise — so exempting it here removes a permit leak
         // without removing backpressure. Inert unless ELOHIM_PPROF_ENABLED.
         let admission_exempt = method == Method::OPTIONS
-            || matches!(
-                path.as_str(),
-                "/health" | "/version" | "/debug/pprof/profile"
-            )
+            || admission_exempt_path(path.as_str())
             || is_head_declare_write(&method, &path);
         let _admit = if admission_exempt {
             None
@@ -1209,6 +1226,14 @@ impl HttpServer {
                 let query = req.uri().query().unwrap_or("");
                 self.handle_health(query).await
             }
+
+            // Can this peer actually WRITE TRUTH right now? The status-code-
+            // bearing companion to `/health` (which must stay 200 — it is the
+            // container's liveness probe). 503 + Retry-After when the zome path
+            // has been observed dead, so an alert, an a2o scenario, a doorway
+            // or an operator has ONE thing to watch that goes red when the
+            // conductor bridge dies under a running storage process.
+            (Method::GET, "/health/serving") => Ok(self.handle_health_serving()),
 
             // Build/version info
             (Method::GET, "/version") => {
@@ -2104,9 +2129,29 @@ impl HttpServer {
             });
             body["bytes"] = serde_json::json!(stats.total_bytes);
             body["importEnabled"] = serde_json::json!(self.import_api.is_some());
-            body["conductor"] = serde_json::json!({
-                "mode": if self.embedded_conductor { "embedded" } else { "external" },
-            });
+            // The conductor block now carries the ZOME PATH as this node has
+            // actually observed it, not just which kind of conductor it points
+            // at. `mode` survives a conductor restart untouched (so does every
+            // `dnaHashes` entry below — those read a CACHED CellId), which is
+            // how a node with a permanently dead bridge kept advertising itself
+            // healthy while every write landed NULL-anchored. `zomePath` is the
+            // one field here that can only be true by having crossed the wire.
+            //
+            // The BODY stays 200 on purpose. `/health` is simultaneously the
+            // startup, readiness AND liveness probe for the storage container
+            // (genesis/orchestrator/manifests/edgenode/*.yaml), so demoting its
+            // status when the bridge dies would CrashLoop a pod that can still
+            // serve every projection read, blob and EPR it holds. The
+            // status-code-bearing signal lives at `/health/serving` — the same
+            // split doorway made for the same reason.
+            body["conductor"] = crate::conductor_bridge_health::health_block(
+                if self.embedded_conductor {
+                    "embedded"
+                } else {
+                    "external"
+                },
+                &crate::conductor_bridge_health::bridge_health().snapshot(),
+            );
 
             // Backing-aware DHT-participation identity (Tier C — peer-discovery
             // fractal-federation spec, 2026-07-09 §6). This node self-reports the
@@ -2123,13 +2168,13 @@ impl HttpServer {
             // backing; read `dnaHashes` together with it for the full identity.
             let mut dna_hashes = serde_json::Map::new();
             if let Some(reg) = self.hc_registry.as_ref() {
-                if let Some(hc) = reg.infrastructure.as_ref() {
+                if let Some(hc) = reg.infrastructure_client() {
                     dna_hashes.insert(
                         "infrastructure".to_string(),
                         serde_json::json!(hc.cell_id().dna_hash().to_string()),
                     );
                 }
-                if let Some(hc) = reg.imagodei.as_ref() {
+                if let Some(hc) = reg.imagodei_client() {
                     dna_hashes.insert(
                         "imagodei".to_string(),
                         serde_json::json!(hc.cell_id().dna_hash().to_string()),
@@ -2169,6 +2214,55 @@ impl HttpServer {
             .header(header::CONTENT_TYPE, "application/json")
             .body(Full::new(Bytes::from(body.to_string())))
             .unwrap())
+    }
+
+    /// How long a caller should wait before re-probing a peer whose conductor
+    /// bridge is being re-minted. One supervisor probe interval is the honest
+    /// answer: that is the longest the gap can last once the re-mint lands.
+    const SERVING_RETRY_AFTER_SECS: u64 = 20;
+
+    /// GET /health/serving — can this peer write truth right now?
+    ///
+    /// 200 when the zome path is `live` or `unknown`; **503 + Retry-After** when
+    /// it has been observed `dead`. Body is the same `conductor` block `/health`
+    /// carries, built by the same function, so the code a probe reads and the
+    /// JSON a person reads cannot disagree about the same node.
+    ///
+    /// Deliberately NOT wired as any Kubernetes probe. `/health` is
+    /// simultaneously the startup, readiness and liveness probe for the storage
+    /// container, so a serving-aware status code THERE would CrashLoop a peer
+    /// that can still serve every blob and projection it holds — and, via
+    /// readiness, pull it out of the Service at the exact moment the supervisor
+    /// is repairing it. Splitting the signal from the probe is the point: the
+    /// gap this closes is that on a conductor-only restart NOTHING returned a
+    /// bad status code while every anchored write silently landed NULL-anchored.
+    ///
+    /// `unknown` answers 200 on purpose — a node that has not yet attempted a
+    /// zome call has no evidence, and a probe that reds on absence of evidence
+    /// trains its readers to ignore it.
+    fn handle_health_serving(&self) -> Response<Full<Bytes>> {
+        let snap = crate::conductor_bridge_health::bridge_health().snapshot();
+        let body = serde_json::json!({
+            "servingOk": snap.serving_ok(),
+            "conductor": crate::conductor_bridge_health::health_block(
+                if self.embedded_conductor { "embedded" } else { "external" },
+                &snap,
+            ),
+        });
+        let mut builder = Response::builder()
+            .header(header::CONTENT_TYPE, "application/json")
+            .header("Access-Control-Allow-Origin", "*")
+            .status(if snap.serving_ok() {
+                StatusCode::OK
+            } else {
+                StatusCode::SERVICE_UNAVAILABLE
+            });
+        if !snap.serving_ok() {
+            builder = builder.header("Retry-After", Self::SERVING_RETRY_AFTER_SECS.to_string());
+        }
+        builder
+            .body(Full::new(Bytes::from(body.to_string())))
+            .unwrap()
     }
 
     /// GET /manifest - Declare the route surface for doorway dynamic discovery
@@ -16895,14 +16989,69 @@ mod admission_tests {
         use hyper::Method;
         let sem = Semaphore::new(0);
         let exempt = |method: &Method, path: &str| {
-            matches!(method, &Method::OPTIONS) || matches!(path, "/health" | "/version")
+            matches!(method, &Method::OPTIONS) || super::admission_exempt_path(path)
         };
-        for p in ["/health", "/version"] {
+        // `/health/serving` MUST be here: it is the probe that reports a dead
+        // conductor bridge, and a shed would answer 503 for the wrong reason.
+        for p in ["/health", "/health/serving", "/version"] {
             assert!(exempt(&Method::GET, p), "{p} exempt");
         }
         // gated path sheds
         assert!(!exempt(&Method::GET, "/db/content/x"));
         assert!(sem.try_acquire().is_err(), "0 permits => gated path sheds");
+    }
+
+    /// The serving probe's decision, asserted against the real snapshot policy.
+    ///
+    /// The handler itself needs a whole `HttpServer` to call, so what is worth
+    /// pinning here is the contract between the observed zome path and the
+    /// status code: dead ⇒ 503 (+ Retry-After), live/unknown ⇒ 200. If that
+    /// mapping ever inverts, a conductor-only restart goes silent again.
+    #[test]
+    fn serving_probe_reds_exactly_when_the_zome_path_is_dead() {
+        use crate::conductor_bridge_health::{BridgeHealth, ZomePathStatus};
+
+        let fresh = BridgeHealth::new();
+        assert_eq!(fresh.snapshot().status, ZomePathStatus::Unknown);
+        assert!(
+            fresh.snapshot().serving_ok(),
+            "no evidence must not red the probe"
+        );
+
+        let live = BridgeHealth::new();
+        live.record_success();
+        assert!(live.snapshot().serving_ok(), "a live path serves");
+
+        let dead = BridgeHealth::new();
+        dead.record_success();
+        dead.record_failure();
+        assert!(
+            !dead.snapshot().serving_ok(),
+            "an observed-dead zome path MUST fail the serving probe — this is \
+             the whole signal a conductor-only restart used to lack"
+        );
+    }
+
+    /// `/health` keeps its 200 while carrying the honest verdict in the BODY.
+    ///
+    /// Load-bearing: `/health` is the storage container's startup, readiness
+    /// AND liveness probe, so a status demotion here CrashLoops a peer that can
+    /// still serve every blob and projection it holds.
+    #[test]
+    fn health_body_carries_the_verdict_that_the_serving_probe_puts_in_its_status() {
+        use crate::conductor_bridge_health::{bridge_health, health_block, BridgeHealth};
+
+        let dead = BridgeHealth::new();
+        dead.record_failure();
+        let block = health_block("external", &dead.snapshot());
+        assert_eq!(block["zomePath"], "dead");
+        assert_eq!(block["mode"], "external");
+
+        // And the process-wide observer the handlers actually read is the same
+        // type, so the two surfaces cannot diverge in shape.
+        let live_block = health_block("embedded", &bridge_health().snapshot());
+        assert!(live_block.get("zomePath").is_some());
+        assert!(live_block.get("lastZomeCallAgeSecs").is_some());
     }
 
     #[test]

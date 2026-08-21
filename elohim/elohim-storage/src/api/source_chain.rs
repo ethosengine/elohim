@@ -179,7 +179,7 @@ async fn handle_get_entries(
     agent_id: &str,
     hc_registry: Option<&Arc<HcClientRegistry>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    let Some(hc) = hc_registry.and_then(|r| r.imagodei.clone()) else {
+    let Some(hc) = hc_registry.and_then(|r| r.imagodei_client()) else {
         tracing::debug!(
             agent_id,
             "no imagodei conductor configured — returning empty source-chain entries"
@@ -223,7 +223,7 @@ async fn handle_get_links(
     agent_id: &str,
     hc_registry: Option<&Arc<HcClientRegistry>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    let Some(hc) = hc_registry.and_then(|r| r.imagodei.clone()) else {
+    let Some(hc) = hc_registry.and_then(|r| r.imagodei_client()) else {
         tracing::debug!(
             agent_id,
             "no imagodei conductor configured — returning empty source-chain links"

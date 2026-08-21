@@ -722,7 +722,7 @@ async fn handle_self_revocation(
         Some(r) => r,
         None => return Ok(response_503_imagodei_bridge_offline()),
     };
-    let hc = match registry.imagodei.as_ref() {
+    let hc = match registry.imagodei_client() {
         Some(h) => h,
         None => return Ok(response_503_imagodei_bridge_offline()),
     };
@@ -746,7 +746,7 @@ async fn handle_self_revocation(
     };
 
     match forward_to_imagodei::<_, CreateSelfRevocationZomeOutput>(
-        hc,
+        &hc,
         "create_self_revocation",
         &zome_input,
     )
@@ -787,7 +787,7 @@ async fn handle_revocation_vote(
         Some(r) => r,
         None => return Ok(response_503_imagodei_bridge_offline()),
     };
-    let hc = match registry.imagodei.as_ref() {
+    let hc = match registry.imagodei_client() {
         Some(h) => h,
         None => return Ok(response_503_imagodei_bridge_offline()),
     };
@@ -808,7 +808,7 @@ async fn handle_revocation_vote(
     };
 
     match forward_to_imagodei::<_, SubmitRevocationVoteZomeOutput>(
-        hc,
+        &hc,
         "submit_revocation_vote",
         &zome_input,
     )
@@ -850,7 +850,7 @@ async fn handle_add_portal_host(
         Some(r) => r,
         None => return Ok(response_503_imagodei_bridge_offline()),
     };
-    let hc = match registry.imagodei.as_ref() {
+    let hc = match registry.imagodei_client() {
         Some(h) => h,
         None => return Ok(response_503_imagodei_bridge_offline()),
     };
@@ -870,7 +870,7 @@ async fn handle_add_portal_host(
     };
 
     match forward_to_imagodei::<_, holochain_types::prelude::ActionHash>(
-        hc,
+        &hc,
         "add_portal_host",
         &zome_input,
     )
@@ -910,7 +910,7 @@ async fn handle_remove_portal_host(
         Some(r) => r,
         None => return Ok(response_503_imagodei_bridge_offline()),
     };
-    let hc = match registry.imagodei.as_ref() {
+    let hc = match registry.imagodei_client() {
         Some(h) => h,
         None => return Ok(response_503_imagodei_bridge_offline()),
     };
@@ -929,7 +929,7 @@ async fn handle_remove_portal_host(
         .map_err(|e| StorageError::InvalidInput(format!("url_b64 is not valid UTF-8: {e}")))?;
 
     // Zome returns `()` on success.
-    match forward_to_imagodei::<_, ()>(hc, "remove_portal_host", &host_url).await {
+    match forward_to_imagodei::<_, ()>(&hc, "remove_portal_host", &host_url).await {
         Ok(()) => {
             let view = crate::views::RemovePortalHostOutputView { deleted: true };
             Ok(response::ok(&view))
