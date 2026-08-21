@@ -1,4 +1,7 @@
-@e2e @browser @ssr @delivery @observability @requires:doorway @wip @act:i
+# HTTP-only by construction: every assertion below reads a raw response the serving peer
+# produced, so the story drives no browser — it is the compose contract as a crawler,
+# onebox or text browser meets it.
+@e2e @ssr @delivery @observability @requires:doorway @act:i
 Feature: SSR compose serves the projected app's own markup — or names why it stepped aside
   As a visitor without a JS engine (a crawler, a link-preview onebox, a reader on a text browser)
   I want a projected route to carry server-rendered markup only when it is THAT app's markup
@@ -50,10 +53,14 @@ Feature: SSR compose serves the projected app's own markup — or names why it s
     When the raw HTTP response for "/" is captured
     Then the raw HTTP response status is 200
     And the raw HTTP response header "x-ssr-rendered" is "1"
-    And the raw HTTP response body contains server-rendered markup with hydration attributes
-    And the raw HTTP response body contains the client bundle script tags
+    And the raw HTTP response body contains Angular hydration markers
+    And the raw HTTP response body carries a client bundle script
 
-  @requires:ssr-bundle
+  # Still @wip: the proof needs a SECOND server bundle staged — the one for the route's own
+  # projected app. A peer whose Prologue staged only the landing server bundle has nothing to
+  # observe here, so the Given holds the scenario rather than failing it. Sheds @wip when
+  # multi-bundle renderer selection stages a lamad-spa server bundle.
+  @requires:ssr-bundle @wip
   Scenario: A projected app with its own server bundle composes its own selector
     # Selector-agnosticism proof: when a lamad server bundle is loaded for lamad-spa, the
     # compose primitive splices <lamad-root> exactly as it splices <app-root> — no code
