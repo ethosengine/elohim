@@ -307,11 +307,66 @@ pub fn spawn_discovery_task(
     })
 }
 
+// ── Discovery retry (boot-order self-heal) ───────────────────────────────────
+//
+// Doorway and conductor restart independently (pod restarts, deploys, the local
+// hc-mesh, which starts doorways at step 1 and conductors at step 2). Discovery
+// used to be a ONE-SHOT: sleep 2s, call `discover()` once, and — if the
+// conductor was not listening yet — log "readiness NOT signaled" and EXIT. The
+// role map (`zome_configs`) then stayed empty for the life of the process, so
+// every `get_zome_config_by_role` answered `No zome config found for role
+// 'imagodei'. Available: []` and every hosted registration failed HTTP 500
+// AGENT_KEY_ERROR until an operator restarted the doorway. This mirrors the
+// storage-side shape fixed in 77dd6b7b6: retry only WHILE the connect fails,
+// and return the instant one succeeds, is exactly half a self-heal.
+
+/// First retry delay after a failed discovery attempt.
+pub(crate) const DISCOVERY_RETRY_BASE: Duration = Duration::from_secs(1);
+
+/// Ceiling for the retry ladder. Bounded so a conductor that is down for hours
+/// costs one admin dial every 30s instead of a hot loop — and never silent: a
+/// doorway with an empty role map cannot serve zome calls at all, so the retry
+/// keeps saying so.
+pub(crate) const DISCOVERY_RETRY_MAX: Duration = Duration::from_secs(30);
+
+/// What to do after one discovery attempt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiscoveryVerdict {
+    /// The role map is populated — signal readiness and STOP retrying.
+    Ready,
+    /// Nothing usable was discovered — back off and try again.
+    Retry,
+}
+
+/// Judge one discovery attempt. Pure, so the stop condition is testable without
+/// a conductor.
+///
+/// `Ready` requires cells AND no errors: a partial discovery leaves a role map
+/// that answers some roles and not others, which is the same AGENT_KEY_ERROR
+/// with a harder-to-read cause. The retry is cheap; a half-map is not.
+pub fn discovery_verdict(result: &DiscoveryResult) -> DiscoveryVerdict {
+    if result.cells_discovered > 0 && result.errors.is_empty() {
+        DiscoveryVerdict::Ready
+    } else {
+        DiscoveryVerdict::Retry
+    }
+}
+
+/// Next delay on the bounded-exponential ladder.
+pub fn next_discovery_delay(prev: Duration) -> Duration {
+    (prev * 2).min(DISCOVERY_RETRY_MAX)
+}
+
 /// Spawn discovery as a background task with completion signal.
 ///
 /// The `ready_tx` channel is set to `true` when discovery completes successfully
 /// (all cells discovered and stored in zome_configs). Routes can wait on the
 /// corresponding receiver before attempting conductor operations.
+///
+/// Retries on a bounded-exponential ladder until the role map is non-empty, so
+/// a doorway that booted before its conductor heals itself instead of serving
+/// AGENT_KEY_ERROR until an operator restarts it. Once discovery succeeds the
+/// loop RETURNS — the self-heal must not become its own flap.
 pub fn spawn_discovery_task_with_signal(
     config: DiscoveryConfig,
     zome_configs: Arc<DashMap<String, ZomeCallConfig>>,
@@ -322,24 +377,55 @@ pub fn spawn_discovery_task_with_signal(
         // Wait a bit for conductor to be ready
         tokio::time::sleep(Duration::from_secs(2)).await;
 
-        let service = DiscoveryService::new(config, zome_configs, import_config_store);
-        let result = service.discover().await;
+        let service = DiscoveryService::new(config, zome_configs.clone(), import_config_store);
+        let started = std::time::Instant::now();
+        let mut delay = DISCOVERY_RETRY_BASE;
+        let mut attempt: u32 = 0;
 
-        if result.cells_discovered > 0 && result.errors.is_empty() {
-            let _ = ready_tx.send(true);
-            info!(
-                "Discovery ready signal sent ({} cells)",
-                result.cells_discovered
-            );
-        } else {
+        loop {
+            attempt += 1;
+            let result = service.discover().await;
+
+            if discovery_verdict(&result) == DiscoveryVerdict::Ready {
+                let _ = ready_tx.send(true);
+                info!(
+                    attempt,
+                    cells = result.cells_discovered,
+                    elapsed_secs = started.elapsed().as_secs(),
+                    "Discovery ready signal sent — role map populated, retry loop stopping"
+                );
+                return result;
+            }
+
+            // Another path (a second discovery task, a test) populated the map
+            // while we were dialing: the condition this loop exists to satisfy
+            // is met, so stop rather than spin.
+            if !zome_configs.is_empty() {
+                let _ = ready_tx.send(true);
+                info!(
+                    attempt,
+                    roles = zome_configs.len(),
+                    "Role map populated by another path — discovery retry loop stopping"
+                );
+                return result;
+            }
+
+            // NEVER SILENT: an empty role map means every zome call fails
+            // AGENT_KEY_ERROR, so each attempt says so at WARN with the cause
+            // and when it will try again.
             warn!(
-                "Discovery completed with issues: {} cells, {} errors — readiness NOT signaled",
-                result.cells_discovered,
-                result.errors.len()
+                attempt,
+                cells = result.cells_discovered,
+                errors = result.errors.len(),
+                first_error = result.errors.first().map(String::as_str).unwrap_or(""),
+                retry_in_secs = delay.as_secs(),
+                "Discovery found no usable cells — role map still EMPTY (every zome call \
+                 will fail AGENT_KEY_ERROR until it fills); retrying"
             );
-        }
 
-        result
+            tokio::time::sleep(delay).await;
+            delay = next_discovery_delay(delay);
+        }
     })
 }
 
@@ -373,5 +459,75 @@ mod tests {
         let config = DiscoveryConfig::default();
         assert_eq!(config.installed_app_id, "elohim");
         assert_eq!(config.zome_name, "content_store");
+    }
+
+    fn result(cells: usize, errors: &[&str]) -> DiscoveryResult {
+        DiscoveryResult {
+            cells_discovered: cells,
+            import_configs_found: 0,
+            routes_found: 0,
+            errors: errors.iter().map(|e| (*e).to_string()).collect(),
+        }
+    }
+
+    /// THE REGRESSION THIS CLOSES (local mesh, 2026-08-21). `hc-mesh.sh
+    /// start_all` starts doorways at step 1 and conductors at step 2, so the
+    /// single discovery attempt (boot + 2s) found no admin interface and
+    /// returned `Admin connection failed`. The old code logged
+    /// "readiness NOT signaled" and the task EXITED — the role map stayed empty
+    /// for the life of the process and every hosted registration answered HTTP
+    /// 500 AGENT_KEY_ERROR until an operator restarted the doorway.
+    ///
+    /// A failed attempt must be a RETRY, never a terminal state.
+    #[test]
+    fn a_conductorless_attempt_retries_rather_than_giving_up() {
+        assert_eq!(
+            discovery_verdict(&result(0, &["Admin connection failed: connection refused"])),
+            DiscoveryVerdict::Retry,
+            "the boot-order case — doorway up before conductor"
+        );
+        assert_eq!(
+            discovery_verdict(&result(0, &[])),
+            DiscoveryVerdict::Retry,
+            "a clean run that found nothing is still an empty role map"
+        );
+    }
+
+    /// The stop condition: once the role map is populated the loop RETURNS.
+    /// A self-heal that keeps running after it has healed is just a new flap.
+    #[test]
+    fn a_populated_role_map_stops_the_retry_loop() {
+        assert_eq!(discovery_verdict(&result(3, &[])), DiscoveryVerdict::Ready);
+    }
+
+    /// A PARTIAL discovery is a retry, not a success. Signalling ready on a
+    /// half-filled map produces the same AGENT_KEY_ERROR for whichever role is
+    /// missing, with a much harder-to-read cause than an empty map.
+    #[test]
+    fn a_partial_discovery_is_not_ready() {
+        assert_eq!(
+            discovery_verdict(&result(2, &["DNA uhC0k-x: import config failed"])),
+            DiscoveryVerdict::Retry
+        );
+    }
+
+    /// Bounded: a conductor that is down for hours costs one admin dial every
+    /// 30s, not a hot loop and not an unbounded wait.
+    #[test]
+    fn the_retry_ladder_is_bounded() {
+        let mut d = DISCOVERY_RETRY_BASE;
+        let mut steps = 0;
+        while d < DISCOVERY_RETRY_MAX && steps < 100 {
+            let next = next_discovery_delay(d);
+            assert!(next > d, "the ladder must climb");
+            d = next;
+            steps += 1;
+        }
+        assert_eq!(d, DISCOVERY_RETRY_MAX, "the ladder reaches its ceiling");
+        assert_eq!(
+            next_discovery_delay(DISCOVERY_RETRY_MAX),
+            DISCOVERY_RETRY_MAX,
+            "and never climbs past it"
+        );
     }
 }

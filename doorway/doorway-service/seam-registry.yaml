@@ -377,6 +377,62 @@ decisionPoints:
         testName: test_should_serve_private_content_to_owner
         kind: unit
 
+  - name: discovery_verdict
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/discovery.rs
+      modulePath: services::discovery::discovery_verdict
+      line: 347
+    summary: >
+      Judges one conductor-discovery attempt as Ready (role map populated — signal readiness
+      and STOP retrying) or Retry (back off and try again). The stop condition for the
+      boot-order self-heal loop in spawn_discovery_task_with_signal, which retries on a
+      bounded-exponential ladder (1s..30s) until the role map is non-empty. Replaces a
+      ONE-SHOT attempt that, when the conductor was not yet listening, logged
+      "readiness NOT signaled" and EXITED — leaving zome_configs empty for the life of the
+      process so every hosted registration failed HTTP 500 AGENT_KEY_ERROR until an operator
+      restarted the doorway (reproduced on the local mesh 2026-08-21; same shape as the
+      storage-side conductor-bridge fix 77dd6b7b6).
+    concernIds:
+      - id: C11
+        status: answered
+        justification: >
+          The retry is bounded and self-terminating in both directions: the ladder caps at
+          DISCOVERY_RETRY_MAX (the_retry_ladder_is_bounded), and Ready stops the loop so the
+          self-heal cannot become its own flap (a_populated_role_map_stops_the_retry_loop).
+          A partial discovery is deliberately Retry rather than Ready
+          (a_partial_discovery_is_not_ready) — a half-filled role map reproduces the same
+          AGENT_KEY_ERROR with a harder-to-read cause.
+      - id: C2
+        status: n-a
+        justification: >
+          Discovery reads the conductor's own cell list over the admin interface and maps
+          role names to agent keys. It adjudicates no authority and admits no caller; the
+          agent keys it records are the conductor's, used to ADDRESS zome calls, never to
+          decide who may make one.
+    contractTests:
+      - path: doorway/doorway-service/src/services/discovery.rs
+        testName: a_conductorless_attempt_retries_rather_than_giving_up
+        kind: unit
+      - path: doorway/doorway-service/src/services/discovery.rs
+        testName: a_populated_role_map_stops_the_retry_loop
+        kind: unit
+      - path: doorway/doorway-service/src/services/discovery.rs
+        testName: a_partial_discovery_is_not_ready
+        kind: unit
+      - path: doorway/doorway-service/src/services/discovery.rs
+        testName: the_retry_ladder_is_bounded
+        kind: unit
+      - path: doorway/doorway-service/src/routes/health.rs
+        testName: health_does_not_claim_a_conductor_it_cannot_call
+        kind: unit
+      - path: doorway/doorway-service/src/routes/health.rs
+        testName: serving_probe_503s_while_the_role_map_is_empty
+        kind: unit
+      - path: doorway/doorway-service/src/routes/health.rs
+        testName: a_read_replica_is_never_judged_conductor_blind
+        kind: unit
+
   - name: is_diagnostic_probe
     kind: pure-decision-predicate
     sourceLocation:

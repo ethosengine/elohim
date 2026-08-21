@@ -239,6 +239,17 @@ pub struct ConductorHealth {
     pub pools_healthy: usize,
     /// Total per-conductor pools (one per conductor in CONDUCTOR_URLS)
     pub pools_total: usize,
+    /// How many roles the discovery service has actually mapped
+    /// (`zome_configs.len()`).
+    ///
+    /// The load-bearing number behind `connected`. A socket to the conductor is
+    /// not a usable conductor: with an empty role map every zome call answers
+    /// `No zome config found for role 'imagodei'. Available: []` and every
+    /// hosted registration fails HTTP 500 AGENT_KEY_ERROR. Named in camelCase
+    /// on purpose — it is a NEW field, and the honest name is worth more than
+    /// consistency with the snake_case fields already on the wire.
+    #[serde(rename = "rolesDiscovered")]
+    pub roles_discovered: usize,
 }
 
 /// One upstream's breaker as the serving path sees it.
@@ -306,6 +317,20 @@ pub struct ServingHealth {
     /// what this advertises cannot drift from what the proxy decides.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub freshness: Option<crate::routes::freshness::FreshnessStatus>,
+    /// How many roles the conductor discovery service has mapped.
+    ///
+    /// `Some(0)` is the CONDUCTOR-BLIND regime: the doorway holds a socket it
+    /// cannot use, so every zome call answers `No zome config found for role
+    /// 'imagodei'. Available: []` and every hosted registration fails HTTP 500
+    /// AGENT_KEY_ERROR. That is a serving failure by any honest definition, and
+    /// on 2026-08-21 nothing carried a bad status code while it was true.
+    ///
+    /// `Option` for the same reason `freshness` is: the breaker-only
+    /// [`ServingHealth::observe`] form has no `AppState` to count roles from.
+    /// The 503 predicate in `serving_check` reads THIS field, so what the body
+    /// shows and what the status code means cannot drift apart.
+    #[serde(rename = "rolesDiscovered", skip_serializing_if = "Option::is_none")]
+    pub roles_discovered: Option<usize>,
 }
 
 impl ServingHealth {
@@ -327,6 +352,10 @@ impl ServingHealth {
             degrading: upstreams.iter().any(|u| u.error_streak > 0),
             upstreams,
             freshness: None,
+            // Breaker-only form: no AppState, so no role count. `None` is a
+            // real third answer ("not observed here"), never a silent zero —
+            // a zero would 503 every caller of the breaker-only form.
+            roles_discovered: None,
         }
     }
 
@@ -341,6 +370,16 @@ impl ServingHealth {
             state.stage_provenance,
             &state.freshness_pantry,
         ));
+        // Only a doorway that RUNS discovery can be judged conductor-blind.
+        // `main` spawns the discovery task under exactly this flag, so a read
+        // replica (`--projection-writer=false`, serving from shared MongoDB and
+        // deliberately never dialing a conductor) reports `None` — "not observed
+        // here" — and is never 503'd for an empty map it was never meant to fill.
+        health.roles_discovered = if state.args.projection_writer {
+            Some(state.zome_configs.len())
+        } else {
+            None
+        };
         health
     }
 }
@@ -383,14 +422,27 @@ fn build_health_response(state: &AppState) -> HealthResponse {
         .map(|r| (r.pools().healthy_count(), r.pools().total_count()))
         .unwrap_or((0, 0));
 
-    // In dev mode, conductor connection is optional
-    // Doorway can operate as pure HTTP bridge to elohim-storage
+    // How many roles discovery actually mapped. This is what makes a conductor
+    // USABLE — see `ConductorHealth::roles_discovered`.
+    let roles_discovered = state.zome_configs.len();
+
+    // In dev mode, conductor connection is optional: the doorway can operate as
+    // a pure HTTP bridge to elohim-storage. What dev mode may NOT do is claim a
+    // conductor connection it cannot use. Reported on 2026-08-21 from the local
+    // mesh: `conductor.connected: true` with `connected_workers: 0` and an empty
+    // role map, while every hosted registration answered HTTP 500
+    // AGENT_KEY_ERROR. `connected: true` was a hardcoded dev-mode constant, so
+    // the one field the seeder is told to check before seeding could not report
+    // the one condition that makes seeding fail.
+    //
+    // The role map is the honest gate on BOTH sides: a live worker with no roles
+    // serves nothing, so it is not "connected" in any sense a caller can use.
+    // (`readiness_check` keeps its dev-mode "always ready" contract explicitly
+    // rather than inheriting it from this flag — see there.)
     let conductor_connected = if args.dev_mode {
-        // Dev mode: always report healthy for conductor
-        // (actual status still shown in connected_workers/total_workers)
-        true
+        roles_discovered > 0
     } else {
-        actual_conductor_connected
+        actual_conductor_connected && roles_discovered > 0
     };
 
     // Check if projection/cache is enabled
@@ -495,6 +547,7 @@ fn build_health_response(state: &AppState) -> HealthResponse {
             pool_size,
             pools_healthy,
             pools_total,
+            roles_discovered,
         },
         projection: ProjectionRole {
             writer: args.projection_writer,
@@ -545,9 +598,16 @@ pub fn serving_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
     let body = serde_json::to_string(&serving)
         .unwrap_or_else(|_| r#"{"shedding":true,"degrading":true,"upstreams":[]}"#.to_string());
 
-    // 503 on EITHER regime: an open circuit (cannot serve) or a non-zero error
-    // streak (serving, but riding upstream timeouts — the 20s-page regime).
-    let failing = serving.shedding || serving.degrading;
+    // 503 on ANY regime that stops this doorway answering: an open circuit
+    // (cannot serve), a non-zero error streak (serving, but riding upstream
+    // timeouts — the 20s-page regime), or a CONDUCTOR-BLIND doorway (empty role
+    // map, so every zome call and every hosted registration fails). The third
+    // was added 2026-08-21: a doorway that booted before its conductor answered
+    // /health with conductor.connected=true and /health/serving with 200 while
+    // every registration returned HTTP 500 AGENT_KEY_ERROR — the same
+    // nothing-carries-a-bad-status-code hole this endpoint exists to close.
+    let conductor_blind = serving.roles_discovered == Some(0);
+    let failing = serving.shedding || serving.degrading || conductor_blind;
     let mut builder = Response::builder()
         .header("Content-Type", "application/json")
         .status(if failing {
@@ -580,6 +640,15 @@ pub fn readiness_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
     let is_ready = if !state.args.projection_writer {
         // Read replicas are ready if they have a projection store (MongoDB)
         state.projection.is_some() || state.args.dev_mode
+    } else if state.args.dev_mode {
+        // Dev mode stays ALWAYS READY, unchanged. This used to be inherited from
+        // `conductor.connected` being a hardcoded dev-mode `true`; now that the
+        // flag reports the honest role-map state, the readiness contract has to
+        // say so itself instead of riding a lie that happened to be convenient.
+        // A dev doorway is a legitimate pure HTTP bridge to elohim-storage, so
+        // an empty role map must not pull it out of a load balancer — it must
+        // only stop it CLAIMING a conductor it cannot call.
+        true
     } else {
         response.conductor.connected
     };
@@ -715,6 +784,139 @@ mod tests {
         AppState::new(args)
     }
 
+    /// A dev-mode state — the shape every local-mesh and Che doorway runs in,
+    /// and the one whose `conductor.connected` was hardcoded `true`.
+    fn dev_state() -> AppState {
+        let args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0", "--dev-mode"]);
+        AppState::new(args)
+    }
+
+    /// Populate the role map the way `DiscoveryService::discover` does.
+    fn discover_role(state: &AppState, role: &str) {
+        state.zome_configs.insert(
+            format!("uhC0k-{role}"),
+            crate::worker::ZomeCallConfig {
+                dna_hash: format!("uhC0k-{role}"),
+                agent_pub_key: "uhCAk-test".to_string(),
+                zome_name: "content_store".to_string(),
+                app_id: "elohim".to_string(),
+                role_name: role.to_string(),
+            },
+        );
+    }
+
+    /// THE REGRESSION THIS CLOSES (local mesh, 2026-08-21). The doorways were
+    /// started before the conductors. Afterwards `/health` reported
+    /// `conductor.connected: true` with `connected_workers: 0` and an EMPTY
+    /// role map, while every hosted registration answered HTTP 500
+    /// `{"error":"Failed to get agent identity","code":"AGENT_KEY_ERROR"}`
+    /// because `get_zome_config_by_role` had nothing to find
+    /// (`No zome config found for role 'imagodei'. Available: []`).
+    ///
+    /// `connected` is the ONE field this struct's own docs tell the seeder to
+    /// check before seeding, and in dev mode it was a hardcoded constant — so
+    /// it could not report the single condition that makes seeding fail.
+    #[test]
+    fn health_does_not_claim_a_conductor_it_cannot_call() {
+        let state = dev_state();
+        assert_eq!(state.zome_configs.len(), 0, "role map starts empty");
+
+        let r = build_health_response(&state);
+        assert_eq!(
+            r.conductor.roles_discovered, 0,
+            "the honest count rides the wire"
+        );
+        assert!(
+            !r.conductor.connected,
+            "an empty role map means every zome call fails — dev mode may skip \
+             the conductor, but it may not CLAIM one it cannot call"
+        );
+    }
+
+    /// The other half of the contract: once discovery fills the role map, the
+    /// claim comes back. Without this the fix above would just be a new lie in
+    /// the opposite direction.
+    #[test]
+    fn a_discovered_role_map_restores_the_connected_claim() {
+        let state = dev_state();
+        discover_role(&state, "imagodei");
+
+        let r = build_health_response(&state);
+        assert_eq!(r.conductor.roles_discovered, 1);
+        assert!(
+            r.conductor.connected,
+            "a doorway that can resolve roles reports a usable conductor"
+        );
+    }
+
+    /// `/health/serving` is the status-code-bearing probe — the endpoint that
+    /// exists because on 2026-08-20 NOTHING returned a bad status code while
+    /// the doorway could not serve. A conductor-blind doorway is that same
+    /// hole: 200 while every registration 500s.
+    #[test]
+    fn serving_probe_503s_while_the_role_map_is_empty() {
+        let state = Arc::new(dev_state());
+        let resp = serving_check(Arc::clone(&state));
+        assert_eq!(
+            resp.status(),
+            StatusCode::SERVICE_UNAVAILABLE,
+            "conductor-blind is a serving failure and must carry the status code"
+        );
+        assert!(
+            resp.headers().contains_key("Retry-After"),
+            "a caller told 503 must be told when to come back"
+        );
+    }
+
+    /// Scoping sibling: the 503 above is caused by the EMPTY role map, not by
+    /// the probe having become unconditionally red.
+    #[test]
+    fn serving_probe_200s_once_roles_are_discovered() {
+        let state = dev_state();
+        discover_role(&state, "imagodei");
+        let resp = serving_check(Arc::new(state));
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    /// A read replica (`--projection-writer=false`) never dials a conductor —
+    /// `main` spawns the discovery task only for writers. Judging it
+    /// conductor-blind would 503 a doorway that is serving perfectly from the
+    /// shared projection store, so the gate reports "not observed here" instead
+    /// of a silent zero.
+    #[test]
+    fn a_read_replica_is_never_judged_conductor_blind() {
+        let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0", "--dev-mode"]);
+        args.projection_writer = false;
+        let state = Arc::new(AppState::new(args));
+        assert_eq!(
+            state.zome_configs.len(),
+            0,
+            "a replica never fills a role map"
+        );
+
+        let serving = ServingHealth::observe_with_freshness(&state);
+        assert_eq!(
+            serving.roles_discovered, None,
+            "not observed, never a zero that would 503"
+        );
+        assert_eq!(serving_check(Arc::clone(&state)).status(), StatusCode::OK);
+    }
+
+    /// The honest `connected` flag must NOT quietly pull a dev doorway out of a
+    /// load balancer. A dev doorway is a legitimate pure HTTP bridge to
+    /// elohim-storage; readiness kept its "always ready" contract explicitly
+    /// when `connected` stopped being a hardcoded `true`.
+    #[test]
+    fn dev_mode_readiness_survives_the_honest_connected_flag() {
+        let state = Arc::new(dev_state());
+        let resp = readiness_check(Arc::clone(&state));
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "dev readiness is unchanged by the conductor-honesty fix"
+        );
+    }
+
     /// Drive `state`'s breaker for `ep` into a shedding (Open) state.
     fn open_the_breaker(state: &AppState, ep: &str) {
         for _ in 0..crate::routes::upstream_health::UPSTREAM_CIRCUIT_FAIL_THRESHOLD {
@@ -812,6 +1014,9 @@ mod tests {
     #[test]
     fn serving_probe_carries_the_status_code_health_cannot() {
         let state = Arc::new(test_state());
+        // This test is about the BREAKER regimes; give it a discovered role so
+        // the conductor-blind gate (added 2026-08-21) is not what it measures.
+        discover_role(&state, "imagodei");
         let r = serving_check(Arc::clone(&state));
         assert_eq!(r.status(), StatusCode::OK, "nothing shedding yet");
 
