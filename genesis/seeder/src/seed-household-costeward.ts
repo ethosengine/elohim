@@ -279,6 +279,13 @@ export function activationDecision(
 // Live-mesh probes
 // =============================================================================
 
+/** Every peer storage base URL declared in PEER_STORAGE_URLS. */
+function peerStorageUrlsFromEnv(): string[] {
+  return parseNamedCsv(process.env.PEER_STORAGE_URLS ?? '').map(entry =>
+    (entry.value.includes('://') ? entry.value : `http://${entry.value}`).replace(/\/+$/, ''),
+  );
+}
+
 /** Storage base URL for a human, honoring PEER_STORAGE_URLS. */
 function storageBase(humanId: string): string {
   return storageUrlForHuman(humanId).replace(/\/+$/, '');
@@ -465,8 +472,27 @@ export async function ensureDistributionMeasured(opts: {
   const humans = humansResponse.ok
     ? (((await humansResponse.json()) as { items?: unknown[] }).items ?? [])
     : [];
+  // Live keys override the cached ones. Without this the lever would name the
+  // PREVIOUS conductor generation's agent keys — a manifest that joins nothing,
+  // which is the same measured zero it was called to cure (see the IDENTITY
+  // RULE in the module docs).
+  const liveKeys = new Map<string, string>();
+  for (const url of peerStorageUrlsFromEnv()) {
+    try {
+      const response = await fetchImpl(`${url}/auth/me`, { signal: AbortSignal.timeout(5000) });
+      if (!response.ok) continue;
+      const body = (await response.json()) as { humanId?: unknown; agentPubKey?: unknown };
+      if (typeof body.humanId === 'string' && typeof body.agentPubKey === 'string') {
+        liveKeys.set(body.humanId, body.agentPubKey);
+      }
+    } catch {
+      // An unreachable peer contributes no override — the cached key stands,
+      // and a stale one shows up as a still-zero steward count, reported.
+    }
+  }
   const stewards = stewardAgentKeysByHousehold(
     humans as { id?: string; agentPubKey?: string | null; householdId?: string | null }[],
+    liveKeys,
   );
   const blobHash = String(row['blobHash'] ?? '');
   const lever = await driveSeedShardManifestLever(
@@ -625,9 +651,7 @@ if (isMain) {
   // answers differ, which is the exact disagreement that chapter exists to
   // catch. Reading through storage directly (not the doorway) also keeps the
   // follow-up measurement out of the doorway's 30s route cache.
-  const peerStorage = parseNamedCsv(process.env.PEER_STORAGE_URLS ?? '').map(entry =>
-    entry.value.includes('://') ? entry.value : `http://${entry.value}`,
-  );
+  const peerStorage = peerStorageUrlsFromEnv();
   const storageTargets =
     peerStorage.length > 0
       ? peerStorage
