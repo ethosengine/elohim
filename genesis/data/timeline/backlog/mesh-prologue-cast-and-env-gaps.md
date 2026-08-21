@@ -163,3 +163,18 @@ prologue`. Fork binaries for tonight: scratchpad `fork-bin/` (fix) and `base-bin
 rebuild from the submodule (`cargo build --release -p holochain --bin holochain` and `-p holochain_cli --bin
 hc`, crates/dev slot, ~6 min incremental) when the scratchpad is gone. Then the base-vs-fix A/B on staging v3.
 
+### Parity attempt 2 (2026-08-21 19:14) — `just mesh start` on the fork: what actually happened
+
+- `HOLOCHAIN_BIN` takes a BINARY path; a directory (`…/fork-bin`) is rejected by `[ -x ]` and the start
+  fell through to the auto-detected fork binary, while `hc` stayed STOCK (`hc CLI: /opt/holochain/bin/hc
+  0.6.0` in the probe env) — `generate` wrote 0.6.0-schema configs and the stock `hc sandbox run`
+  panicked at `crates/hc_sandbox/src/run.rs:176:37` on all three conductors (storage + doorways came up,
+  zome path dead). The Prologue ran against dead conductors.
+- Tomorrow's one-liner: make `hc-mesh.sh` put the FORK `hc` on PATH for `generate` AND `run` whenever a
+  fork conductor is selected (both halves must be the same schema line), accept `HOLOCHAIN_BIN` as either
+  a binary or a dir containing `holochain` + `hc`, and refuse to start when the two disagree (print both
+  versions). Then: `just mesh stop` alone → `HOLOCHAIN_BIN=<fork-bin/holochain> just mesh start` →
+  `just mesh prologue` → saga + inventory on the fork.
+- Fallback used tonight: `HOLOCHAIN_BIN=/opt/holochain/bin/holochain` forces stock (the auto-detect would
+  otherwise pick the fork again).
+
