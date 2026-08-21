@@ -280,6 +280,18 @@ impl WarmShellStore {
         Self::new(None)
     }
 
+    /// True when this store has a persistent archive behind it.
+    ///
+    /// An inert store is not a slower cache — it is a **disabled** one:
+    /// [`Self::lookup_with_declared`] returns `Cold` before it consults the hot
+    /// map at all, so [`Self::stock`] writes that can never be read. Wiring
+    /// (`AppState::init_projection`) asserts on this, because for the whole of
+    /// Task 3.4's deployed life every production doorway held an inert store
+    /// and nobody could tell from the outside.
+    pub fn is_archive_backed(&self) -> bool {
+        self.archive.is_some()
+    }
+
     fn key(slug: &str, file_path: &str) -> String {
         format!("{slug}:{file_path}")
     }
@@ -511,6 +523,56 @@ async fn stock_and_return(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    /// THE RAIL THAT WAS MISSING. An inert store is a DISABLED cache, not a
+    /// cold one — and nothing in the suite said so, which is how Task 3.4
+    /// shipped, passed nine tests, was written up as "`/` is cache-first", and
+    /// then did nothing at all on every deployed doorway for its entire life.
+    /// The tests all built stores WITH an archive; production built them
+    /// without one and no test looked.
+    #[tokio::test]
+    async fn stocking_an_inert_store_still_serves_nothing() {
+        let store = WarmShellStore::inert();
+        assert!(!store.is_archive_backed());
+
+        store
+            .stock(
+                "app",
+                "index.html",
+                "sha256-abc",
+                "text/html",
+                b"hi".to_vec(),
+            )
+            .await;
+
+        let (class, warm) = store.lookup("app", "index.html").await;
+        assert_eq!(
+            class,
+            WarmClass::Cold,
+            "an inert store reports Cold even for bytes it just accepted — \
+             lookup_with_declared short-circuits BEFORE the hot map"
+        );
+        assert!(warm.is_none());
+        assert_eq!(
+            decide_shell_serve(class, true),
+            ShellPlan::Fetch,
+            "so `/` pays a full upstream fetch on EVERY request — the 20s apex"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_inert_store_hydrates_nothing() {
+        let store = WarmShellStore::inert();
+        let targets = vec![("app".to_string(), "index.html".to_string())];
+        assert_eq!(
+            store.hydrate(&targets).await,
+            0,
+            "hydrate short-circuits on a None archive — the boot-time log line \
+             read `hydrated: 0` every time and looked like a cold archive"
+        );
+    }
+
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};

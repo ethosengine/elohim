@@ -996,7 +996,51 @@ impl AppState {
         info!("App file projection cache initialized");
         self.app_file_cache = Some(Arc::new(svc));
 
+        // Rebuild the warm-boot shell store on the archive we just installed.
+        //
+        // WHY THIS LINE EXISTS. Every production AppState comes from
+        // `with_pool` or `with_services` (main.rs:343/345), and BOTH construct
+        // `warm_shell` as `WarmShellStore::inert()` because no archive exists
+        // at construction time. Only `with_projection` ever built a live one —
+        // and it has no production callers. So on every deployed doorway the
+        // Task 3.4 warm-boot shell cache was dead code: an inert store's
+        // `lookup_with_declared` returns `Cold` BEFORE it ever consults the hot
+        // map, so `decide_shell_serve(Cold, available) = Fetch` and `/` paid a
+        // full `EPR_DISPATCH_TIMEOUT_SECS` upstream fetch on EVERY request —
+        // then a second one through the `SsrFallback::ProjectedEpr` arm. That
+        // is the 20.751s `/` measured on elohim.host on 2026-08-21 while its
+        // own `/db/content` answered in 0.114s, and those paired 10s failures
+        // are what opened the endpoint-keyed breaker that then shed every route
+        // on the peer.
+        //
+        // The archive arrives HERE, after construction, which is exactly why
+        // the store must be rebuilt here. `main.rs` hydrates it further down
+        // (after the EPR router knows its mounts); until now that hydrate call
+        // returned 0 unconditionally, because `hydrate` short-circuits on a
+        // `None` archive.
+        self.bind_warm_shell_to_archive();
+
         Ok(())
+    }
+
+    /// Rebuild `warm_shell` on whatever archive `app_file_cache` currently
+    /// holds. **Every path that installs an archive must call this**, which is
+    /// why it is a named method and not an inline assignment.
+    ///
+    /// The invariant: `app_file_cache.is_some()` implies
+    /// `warm_shell.is_archive_backed()`. Violating it does not fail loudly — it
+    /// silently disables the warm-boot shell cache, which is exactly what
+    /// happened for the whole of Task 3.4's deployed life.
+    pub fn bind_warm_shell_to_archive(&mut self) {
+        self.warm_shell = Arc::new(crate::render::warm_shell::WarmShellStore::new(
+            self.app_file_cache
+                .clone()
+                .map(|c| c as Arc<dyn crate::render::warm_shell::ShellArchive>),
+        ));
+        info!(
+            archive_backed = self.warm_shell.is_archive_backed(),
+            "warm-boot shell cache bound to the app-file archive"
+        );
     }
 }
 
@@ -7530,6 +7574,38 @@ mod epr_claims_dispatch_tests {
 #[cfg(test)]
 mod admission_tests {
     use super::*;
+
+    #[test]
+    fn binding_the_archive_lights_the_warm_shell_and_the_invariant_holds() {
+        // THE WIRING RAIL. `with_pool`/`with_services` — the only constructors
+        // main.rs uses — build `warm_shell` as inert(), because no archive
+        // exists yet. The archive arrives later, in `init_projection`. For the
+        // whole of Task 3.4's deployed life nothing rebuilt the store at that
+        // point, so every production doorway ran a DISABLED shell cache while
+        // its boot log cheerfully reported `hydrated: 0` and `/` paid two
+        // sequential EPR_DISPATCH_TIMEOUT_SECS fetches per navigation.
+        let args = <crate::config::Args as clap::Parser>::parse_from([
+            "doorway",
+            "--listen",
+            "127.0.0.1:0",
+        ]);
+        let mut state = AppState::new(args);
+
+        // Construction-time shape: no archive, inert store — consistent.
+        assert!(state.app_file_cache.is_none());
+        assert!(!state.warm_shell.is_archive_backed());
+
+        // Binding with no archive is a no-op, never a panic.
+        state.bind_warm_shell_to_archive();
+        assert!(!state.warm_shell.is_archive_backed());
+
+        // THE INVARIANT: an archive present implies an archive-backed store.
+        assert_eq!(
+            state.app_file_cache.is_some(),
+            state.warm_shell.is_archive_backed(),
+            "app_file_cache.is_some() must imply warm_shell.is_archive_backed()"
+        );
+    }
 
     #[test]
     fn liveness_paths_are_exempt() {
