@@ -725,6 +725,9 @@ habits:
     checks:
       - "a2o @concern:doorway-failover (genesis/a2o/features/dataplane/doorway-failover.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
     evidence: >
+      DELTA 2026-08-21c (freshness verdict + amber pantry landed host-green,
+      commits 5da4c3b0e + ccf0138a9): status stays red — the a2o scenario is
+      the flip authority.
       DELTA 2026-08-21b (CORRECTION to this habit's own 2026-08-18 evidence,
       and the amplifier of the 503 above): the entry below claims "Task 3.4
       warm-boot shell cache LANDED desk-proven ... / is cache-first ... both
