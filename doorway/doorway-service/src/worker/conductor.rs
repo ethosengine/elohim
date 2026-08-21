@@ -312,7 +312,11 @@ async fn connection_loop(
             return;
         };
 
-        // Wait before reconnecting
+        // Wait before reconnecting. The rung is recorded as well as logged: the
+        // ladder used to be visible ONLY in this line, so a doorway pinned at
+        // the 30s ceiling was indistinguishable in a scrape from one that never
+        // reconnects at all.
+        crate::metrics::inc_reconnect_ladder_step(reconnect_delay);
         warn!("Reconnecting to conductor in {:?}...", reconnect_delay);
         tokio::time::sleep(reconnect_delay).await;
     }
@@ -353,9 +357,12 @@ async fn run_session(
         }
         SessionEnd::ConnectionClosed { reason, close_code } => {
             crate::metrics::inc_reconnect(reason);
-            if let Some(code) = close_code {
-                crate::metrics::inc_close_code(*code);
-            }
+            // ALWAYS recorded, including the codeless case. The `if let Some`
+            // that used to guard this meant a conductor tearing the socket down
+            // without a close code incremented nothing — and a label-bearing
+            // collector with no observed label emits no series, so the metric
+            // was ABSENT from /metrics rather than zero.
+            crate::metrics::inc_close_code(*close_code);
         }
     }
 
@@ -775,6 +782,30 @@ mod tests {
         assert_eq!(
             d, BASE_RECONNECT_DELAY,
             "stable session must reset the backoff to base"
+        );
+    }
+
+    /// The metrics module projects the ladder into a closed label vocabulary so
+    /// every rung can be pre-touched. That projection is a COPY of the rungs
+    /// this module generates, so it can drift; this walks the real backoff and
+    /// asserts the two agree. Without it, a change to BASE/MAX here would
+    /// silently push every reconnect into the `other` bucket.
+    #[test]
+    fn reconnect_ladder_rungs_match_the_backoff() {
+        let mut backoff = ReconnectBackoff::new();
+        let mut walked = Vec::new();
+        // Climb far enough to saturate at the cap.
+        for _ in 0..32 {
+            let d = backoff.next_after_connect_failure();
+            let ms = d.as_millis() as u64;
+            if !walked.contains(&ms) {
+                walked.push(ms);
+            }
+        }
+        assert_eq!(
+            walked,
+            crate::metrics::RECONNECT_LADDER_RUNGS_MS.to_vec(),
+            "the metrics ladder projection drifted from the real backoff — every              reconnect would fall into the `other` bucket"
         );
     }
 

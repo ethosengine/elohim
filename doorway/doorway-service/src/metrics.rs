@@ -103,6 +103,27 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Which rung of the conductor reconnect backoff ladder was just waited on.
+    ///
+    /// The ladder (100ms doubling, capped at 30s) was previously visible ONLY as
+    /// a `warn!` log line — so "is this peer climbing or has it settled?" could
+    /// not be asked of a scrape, and a doorway pinned at the 30s ceiling looked
+    /// identical to a healthy one that never reconnects. A pile at the low rungs
+    /// is ordinary churn; a pile at 30000 is a conductor that has been refusing
+    /// for at least ten consecutive attempts.
+    ///
+    /// A counter, not a gauge of the current delay: the pool runs several
+    /// workers, and a gauge would be last-writer-wins across them — reporting one
+    /// worker's rung as if it were the pool's.
+    pub static ref CONDUCTOR_RECONNECT_LADDER_STEP: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "doorway_conductor_reconnect_ladder_step",
+            "Conductor reconnect backoff waits, by ladder rung (delay in ms).",
+        ),
+        &["step"],
+    )
+    .unwrap();
+
     // ── M3: session duration — the auth-reject vs idle-reap discriminator ─────
 
     /// Conductor WS session lifetime in seconds. Buckets straddle sub-second
@@ -566,6 +587,28 @@ pub fn register_all() {
                 .inc_by(0);
         }
         let _ = REGISTRY.register(Box::new(CONDUCTOR_CLOSE_CODE_TOTAL.clone()));
+        // Pre-touch the ONE close-code label reachable without a coded close.
+        // The numeric axis stays unbounded and un-pre-touched (see above), but
+        // leaving the collector with NO series at all is what made
+        // `doorway_conductor_close_code_total` absent from live /metrics while
+        // readers took it for zero: a conductor that tears the socket down
+        // WITHOUT a code (Close(None), or no close frame at all) is the common
+        // case, and it incremented nothing.
+        CONDUCTOR_CLOSE_CODE_TOTAL
+            .with_label_values(&[CLOSE_CODE_NONE])
+            .inc_by(0);
+        let _ = REGISTRY.register(Box::new(CONDUCTOR_RECONNECT_LADDER_STEP.clone()));
+        // The ladder IS a closed vocabulary (BASE doubling to the MAX cap), so
+        // unlike the close-code axis every rung can be pre-touched — a doorway
+        // that has never reconnected reads as a measured zero on each rung.
+        for rung in RECONNECT_LADDER_RUNGS_MS {
+            CONDUCTOR_RECONNECT_LADDER_STEP
+                .with_label_values(&[&rung.to_string()])
+                .inc_by(0);
+        }
+        CONDUCTOR_RECONNECT_LADDER_STEP
+            .with_label_values(&[LADDER_STEP_OTHER])
+            .inc_by(0);
         let _ = REGISTRY.register(Box::new(CONDUCTOR_SESSION_DURATION_SECONDS.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_SESSIONS.clone()));
         let _ = REGISTRY.register(Box::new(RESOLVE_TOTAL.clone()));
@@ -659,10 +702,55 @@ pub fn inc_reconnect(reason: &str) {
     CONDUCTOR_RECONNECT_TOTAL.with_label_values(&[reason]).inc();
 }
 
-/// M2: a conductor Close frame carried a numeric close code.
-pub fn inc_close_code(code: u16) {
+/// Label for a conductor close that carried NO numeric code — a bare
+/// `Close(None)`, or a socket that dropped without a close frame at all.
+pub const CLOSE_CODE_NONE: &str = "none";
+
+/// M2: a conductor session's close, classified by the code the Close frame
+/// carried — or [`CLOSE_CODE_NONE`] when it carried none.
+///
+/// Takes an `Option` on purpose. The previous `u16` signature meant every
+/// call site guarded with `if let Some(code)`, so a codeless close incremented
+/// NOTHING — and since a label-bearing collector emits no series until a label
+/// is observed, `doorway_conductor_close_code_total` never appeared in
+/// `/metrics` at all. It read as "metric missing" where a reader assumed
+/// "zero closes", which is the opposite of what was happening. A close with no
+/// code is still a close, and it is the common one.
+pub fn inc_close_code(code: Option<u16>) {
+    let label = match code {
+        Some(c) => c.to_string(),
+        None => CLOSE_CODE_NONE.to_string(),
+    };
     CONDUCTOR_CLOSE_CODE_TOTAL
-        .with_label_values(&[&code.to_string()])
+        .with_label_values(&[&label])
+        .inc();
+}
+
+/// The reconnect backoff ladder's rungs, in milliseconds: `BASE_RECONNECT_DELAY`
+/// (100ms) doubling to the `MAX_RECONNECT_DELAY` (30s) cap. A closed vocabulary,
+/// which is what makes the ladder metric pre-touchable.
+///
+/// Kept in sync with `worker::conductor::ReconnectBackoff` by
+/// `reconnect_ladder_rungs_match_the_backoff` in that module — the ladder is
+/// defined there; this is its label projection.
+pub const RECONNECT_LADDER_RUNGS_MS: [u64; 10] =
+    [100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 30000];
+
+/// Label for a reconnect delay that is not one of the declared rungs — never
+/// expected, and named rather than silently bucketed into a real rung so a
+/// ladder change that outruns this projection is visible instead of disguised.
+pub const LADDER_STEP_OTHER: &str = "other";
+
+/// Record one wait on the conductor reconnect backoff ladder.
+pub fn inc_reconnect_ladder_step(delay: std::time::Duration) {
+    let millis = delay.as_millis() as u64;
+    let label = if RECONNECT_LADDER_RUNGS_MS.contains(&millis) {
+        millis.to_string()
+    } else {
+        LADDER_STEP_OTHER.to_string()
+    };
+    CONDUCTOR_RECONNECT_LADDER_STEP
+        .with_label_values(&[&label])
         .inc();
 }
 
@@ -870,6 +958,85 @@ mod tests {
         assert_eq!(DoorwayHop::ALL.len(), 4);
     }
 
+    /// The rail that was missing. `register_all_idempotent_and_gathers_all_
+    /// metrics` below asserts `doorway_conductor_close_code_total` renders — but
+    /// it TOUCHES the collector first, manufacturing the very series it then
+    /// checks for. That is why the metric passed here for months while being
+    /// absent from live `/metrics`: production only touched it inside an
+    /// `if let Some(code)`, and a conductor that closes without a code (or drops
+    /// the socket outright) never satisfied it.
+    ///
+    /// This asserts presence from `register_all()` ALONE — no touch — which is
+    /// the only version of the claim a scrape can corroborate.
+    #[test]
+    fn close_code_and_ladder_render_without_being_touched_first() {
+        register_all();
+        let text = gather_text();
+
+        assert!(
+            text.contains("doorway_conductor_close_code_total{code=\"none\"}"),
+            "the codeless close series must exist from boot — a conductor that \
+             tears the socket down without a code is the COMMON case, and it is \
+             what left this metric absent from live /metrics"
+        );
+        // Every ladder rung, unprompted: a doorway that has never reconnected
+        // must read as a measured zero on each rung, not as a missing metric.
+        for rung in RECONNECT_LADDER_RUNGS_MS {
+            assert!(
+                text.contains(&format!(
+                    "doorway_conductor_reconnect_ladder_step{{step=\"{rung}\"}}"
+                )),
+                "ladder rung {rung}ms must render from boot"
+            );
+        }
+    }
+
+    #[test]
+    fn a_codeless_close_is_counted() {
+        register_all();
+        let before = CONDUCTOR_CLOSE_CODE_TOTAL
+            .with_label_values(&[CLOSE_CODE_NONE])
+            .get();
+        inc_close_code(None);
+        assert_eq!(
+            CONDUCTOR_CLOSE_CODE_TOTAL
+                .with_label_values(&[CLOSE_CODE_NONE])
+                .get(),
+            before + 1,
+            "a close with no code is still a close"
+        );
+    }
+
+    #[test]
+    fn ladder_steps_land_on_their_rung_and_strays_are_named() {
+        register_all();
+        let rung = std::time::Duration::from_millis(RECONNECT_LADDER_RUNGS_MS[3]);
+        let before = CONDUCTOR_RECONNECT_LADDER_STEP
+            .with_label_values(&[&RECONNECT_LADDER_RUNGS_MS[3].to_string()])
+            .get();
+        inc_reconnect_ladder_step(rung);
+        assert_eq!(
+            CONDUCTOR_RECONNECT_LADDER_STEP
+                .with_label_values(&[&RECONNECT_LADDER_RUNGS_MS[3].to_string()])
+                .get(),
+            before + 1
+        );
+
+        // A delay that is not a declared rung is NAMED, never folded into a
+        // real rung — a ladder change that outruns the projection must be
+        // visible rather than disguised as ordinary traffic.
+        let stray_before = CONDUCTOR_RECONNECT_LADDER_STEP
+            .with_label_values(&[LADDER_STEP_OTHER])
+            .get();
+        inc_reconnect_ladder_step(std::time::Duration::from_millis(777));
+        assert_eq!(
+            CONDUCTOR_RECONNECT_LADDER_STEP
+                .with_label_values(&[LADDER_STEP_OTHER])
+                .get(),
+            stray_before + 1
+        );
+    }
+
     #[test]
     fn register_all_idempotent_and_gathers_all_metrics() {
         register_all();
@@ -877,7 +1044,7 @@ mod tests {
 
         // Touch each label-bearing collector so its series renders.
         inc_reconnect(REASON_CLOSE_FRAME);
-        inc_close_code(1000);
+        inc_close_code(Some(1000));
         observe_session_duration(0.2);
         inc_resolve("projection");
         inc_blob_pantry("hit");

@@ -638,9 +638,9 @@ impl SignalSubscriber {
                             // report the close + code (handoff §M2 / RCA §4.3).
                             let code = frame.as_ref().map(|f| u16::from(f.code));
                             crate::metrics::inc_reconnect(crate::metrics::REASON_CLOSE_FRAME);
-                            if let Some(code) = code {
-                                crate::metrics::inc_close_code(code);
-                            }
+                            // Recorded even when the frame carried no code —
+                            // see metrics::inc_close_code.
+                            crate::metrics::inc_close_code(code);
                             info!(close_code = ?code, "Conductor closed connection");
                             return Ok(());
                         }
