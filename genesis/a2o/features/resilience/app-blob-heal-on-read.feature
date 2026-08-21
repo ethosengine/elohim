@@ -1,4 +1,4 @@
-@e2e @resilience @local @wip @concern:blob-durability @dataplane
+@e2e @resilience @local @concern:blob-durability @dataplane @act:i
 Feature: App ZIP blobs heal on read via peer race-fetch
   As a household member visiting a projected EPR app
   I want a serving peer that lost the app's ZIP bytes to fetch them from
@@ -19,7 +19,7 @@ Feature: App ZIP blobs heal on read via peer race-fetch
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
     And elohim-storage is reachable at "E2E_STORAGE_URL"
 
-  @wip
+  @requires:owned-substrate
   Scenario: First request to an app with locally-missing bytes heals and serves
     Given content "heal-target" is an "html5-app" with its ZIP blob held by at least one peer
     And the serving peer's local blob store is missing the ZIP for "heal-target"

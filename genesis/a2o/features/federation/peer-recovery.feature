@@ -1,4 +1,4 @@
-@e2e @federation @resilience @wip
+@e2e @federation @resilience @act:i
 Feature: Peer recovery — a wiped device recovers its stewarded content from the mesh
   As a household member whose device lost its local store
   I want my device to reconverge from the household mesh on its own —
@@ -18,7 +18,7 @@ Feature: Peer recovery — a wiped device recovers its stewarded content from th
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
 
-  @wip
+  @requires:owned-substrate
   Scenario: A wiped device recovers its stewarded content from the mesh
     Given human "Jessica" has a storage peer in the household mesh
     And a custody-blob commitment names Jessica's peer as provider for the manifesto blob
@@ -28,7 +28,7 @@ Feature: Peer recovery — a wiped device recovers its stewarded content from th
     And the custody sweep on Jessica's peer reports a kick for the manifesto blob
     And a "serve-blob" economic event records which household peer aided the recovery
 
-  @wip
+  @requires:owned-substrate
   Scenario: Recovery does not depend on gossip inventory health
     Given Jessica's peer was restarted and its gossip inventory is empty
     And a custody-blob commitment names Jessica's peer as provider for the manifesto blob
@@ -37,7 +37,7 @@ Feature: Peer recovery — a wiped device recovers its stewarded content from th
     Then the sweep falls back to racing the connected household peers
     And the sweep outcome reports the kick as an inventory-blind fallback
 
-  @wip
+  @requires:owned-substrate
   Scenario: A wiped peer's commitment projection reconciles from its own conductor
     Given Jessica's peer projection holds no custody-blob commitment rows
     And another household peer's projection holds the custody-blob commitment rows
