@@ -14,7 +14,11 @@ interface DogfoodWorld {
   fetchedNode?: Record<string, unknown>;
   doorwayResponse?: Response;
   commitments?: Record<string, unknown>[];
-  scopedCommitment?: Record<string, unknown>;
+  /**
+   * The commitments still consistent with EVERY clause asserted so far — the
+   * witness set for "at least one commitment ... that commitment ...".
+   */
+  scopedCommitments?: Record<string, unknown>[];
   doorways?: Map<string, { url: string }>;
 }
 
@@ -143,37 +147,84 @@ function normaliseScopeOf(raw: unknown): string[] {
   return [];
 }
 
+/**
+ * "At least one commitment ... and THAT commitment ..." names ONE witness that
+ * satisfies every clause — so each clause narrows the surviving candidates
+ * rather than freezing the first row that happened to match the first clause.
+ *
+ * Freezing was wrong in practice, not just in principle: this provider's
+ * commitment list carries more than one row scoped to the hosting pair, and the
+ * first of them is not the hosting agreement. Pinning to it made the two
+ * metadata clauses read `undefined` and the scenario reported a metadata gap
+ * that the real hosting-agreement row did not have.
+ *
+ * The narrowing keeps the story falsifiable: a clause no candidate satisfies
+ * empties the set and fails, naming the clause and what the candidates carried.
+ */
+function narrowCommitments(
+  world: DogfoodWorld,
+  clause: string,
+  predicate: (c: Record<string, unknown>) => boolean,
+  describe: (c: Record<string, unknown>) => string
+): void {
+  const before = world.scopedCommitments ?? world.commitments ?? [];
+  assert.ok(
+    before.length > 0,
+    `No commitments left to test "${clause}" — an earlier clause matched nothing`
+  );
+  const after = before.filter(predicate);
+  assert.ok(
+    after.length > 0,
+    `No commitment satisfied "${clause}". Candidates carried: ` + before.map(describe).join(' | ')
+  );
+  world.scopedCommitments = after;
+}
+
 Then(
   'at least one commitment has inScopeOf containing {string}',
   function (this: DogfoodWorld, expected: string) {
-    const match = (this.commitments ?? []).find(c =>
-      normaliseScopeOf(c.inScopeOf).includes(expected)
+    this.scopedCommitments = undefined;
+    narrowCommitments(
+      this,
+      `inScopeOf containing "${expected}"`,
+      c => normaliseScopeOf(c.inScopeOf).includes(expected),
+      c => JSON.stringify(normaliseScopeOf(c.inScopeOf))
     );
-    assert.ok(match, `No commitment had inScopeOf containing "${expected}"`);
-    this.scopedCommitment = match;
   }
 );
 
 Then(
   'that commitment has inScopeOf containing {string}',
   function (this: DogfoodWorld, expected: string) {
-    const scope = normaliseScopeOf(this.scopedCommitment?.inScopeOf);
-    assert.ok(scope.includes(expected), `scope was ${JSON.stringify(scope)}`);
+    narrowCommitments(
+      this,
+      `inScopeOf containing "${expected}"`,
+      c => normaliseScopeOf(c.inScopeOf).includes(expected),
+      c => JSON.stringify(normaliseScopeOf(c.inScopeOf))
+    );
   }
 );
 
 Then(
   "that commitment's metadata signalKind is {string}",
   function (this: DogfoodWorld, expected: string) {
-    const meta = (this.scopedCommitment?.metadata ?? {}) as Record<string, unknown>;
-    assert.equal(meta.signalKind, expected);
+    narrowCommitments(
+      this,
+      `metadata signalKind "${expected}"`,
+      c => ((c.metadata ?? {}) as Record<string, unknown>).signalKind === expected,
+      c => JSON.stringify(c.metadata ?? null)
+    );
   }
 );
 
 Then(
   "that commitment's metadata triggerKind is {string}",
   function (this: DogfoodWorld, expected: string) {
-    const meta = (this.scopedCommitment?.metadata ?? {}) as Record<string, unknown>;
-    assert.equal(meta.triggerKind, expected);
+    narrowCommitments(
+      this,
+      `metadata triggerKind "${expected}"`,
+      c => ((c.metadata ?? {}) as Record<string, unknown>).triggerKind === expected,
+      c => JSON.stringify(c.metadata ?? null)
+    );
   }
 );
