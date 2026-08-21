@@ -7,7 +7,7 @@ title: "elohim-storage never re-mints its conductor app-interface auth token aft
 slug: "storage-stale-app-interface-token-after-conductor-restart"
 written: "2026-08-21"
 author: "claude (found while restarting the mesh conductors to make the sys-validation spin observable)"
-status: "refined"
+status: "wip"
 priority: "high"
 jobs: [elohim-edge]
 nodes: [elohim-matthew-alpha, elohim-jessica-alpha, elohim-james-alpha]
@@ -114,3 +114,23 @@ not.
 ./hc-mesh.sh zome-probe            # all peers: ZOME CALLS ARE DEAD, /health still 200
 ./hc-mesh.sh storage-restart       # the only way back today
 ```
+
+## Update 2026-08-21 (late) — decisions 1 and 2 closed by `77dd6b7b6`
+
+`fix(storage): a restarted conductor left the zome path dead forever, and /health said 200` — root cause
+was supervision, not tokens per se: `connect_role_forever` returned on first success and nothing watched the
+bridge afterwards; the late-connect re-arm was gated on `lamad_client().is_none()` (false once it had ever
+worked) and covered only lamad. Now: `conductor_bridge_health.rs` (evidence-based zome-path observer: a
+domain error proves LIVE, only a transport failure proves DEAD, an admission shed proves nothing),
+`spawn_bridge_supervisor` probing every role every 20 s and re-arming the full re-mint, `/health` carries
+`conductor.zomePath` (liveness stays 200), `/health/serving` returns 503 + Retry-After when dead. Throwaway
+reproduction: dead forever before; recovered at T+29 s and T+21 s across two cycles after. 21 tests; storage
+gate green.
+
+**Decision 3 — refuse or flag writes that cannot be anchored — deliberately still open:** it is a policy
+call against the offline-first invariant (shedding a write loses it on an offline-capable peer). Seam noted
+by the fixing agent: NULL-anchored rows written during a dead window heal on the next `witness_bootstrap`
+tick only where P2P is enabled; on a P2P-disabled peer they wait for restart — an unasserted precondition
+between the supervisor and the healer. Also: the doorway's `ServingHealth` does not read storage's
+`/health/serving`, so a doorway can report serving while its upstream cannot anchor (small doorway change).
+
