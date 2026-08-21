@@ -68,6 +68,14 @@ Feature: A household peer can be re-keyed without grinding the rest of the house
   #     draws the line between those two worlds — five lines a second by
   #     default, which is two hundred times the resting mesh's ENTIRE log rate.
   #
+  # ONE THING THE INSTRUMENT CANNOT DO, and says so. Every line it counts is
+  # logged by the conductor at INFO, so a conductor started without RUST_LOG
+  # emits ERROR only and those lines become unobservable rather than absent.
+  # Measured on this mesh 2026-08-21: 86 ERROR lines, 0 INFO. The detector
+  # reports that as a BLIND log leg instead of a confident zero, and the
+  # saturation assertion below refuses to pass on it — a story that goes green
+  # because nobody was looking is worse than one that fails.
+  #
   # The verdict is SPIN only when BOTH legs hold: a backlog that is not
   # shrinking AND saturation over the threshold. Either alone is not the bug —
   # a draining backlog is a peer doing its job, and a busy read pool during a

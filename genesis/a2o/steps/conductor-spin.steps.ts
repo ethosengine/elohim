@@ -63,6 +63,8 @@ interface LogStreamReading {
   missingDeps: number | null;
   fetched: number | null;
   missingSeries: string;
+  infoLines?: number;
+  logLegBlind?: boolean;
   verdict: string;
 }
 
@@ -316,6 +318,18 @@ Then('no conductor accumulates a missing-dependency backlog that stops shrinking
 Then("the conductors' read-pool saturation rate stays under the spin threshold", () => {
   const r = reading();
   for (const [name, stream] of Object.entries(r.logStreams)) {
+    // A blind leg cannot clear this bar. Every line the detector counts here is
+    // logged at INFO, so a conductor running at ERROR reports a confident
+    // 0.00/s that means "not observed", not "not happening". Passing on that
+    // would make this scenario green for the one reason that proves nothing.
+    assert.ok(
+      stream.logLegBlind !== true,
+      `${name}: the conductor is logging at ERROR only, so read-pool saturation ` +
+        `cannot be observed and this assertion cannot be honestly satisfied. Restart ` +
+        `the mesh conductors with RUST_LOG=info (or at least ` +
+        `holochain_sqlite::db::access=info,holochain_cascade=info,` +
+        `holochain::core::workflow::sys_validation_workflow=info) and measure again.`
+    );
     assert.ok(
       stream.saturatedPerSec <= r.satThreshold,
       `${name} logged ${stream.saturatedPerSec} read-pool-saturation lines/s, over the ` +
