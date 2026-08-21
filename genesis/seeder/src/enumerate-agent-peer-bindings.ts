@@ -12,7 +12,11 @@
  * so this is an inventory of currently-active bindings, not a full history.
  *
  * Required environment:
- *   CONDUCTOR_URLS  comma-separated app WebSocket URLs
+ *   CONDUCTOR_URLS  comma-separated app WebSocket URLs. Two entry forms,
+ *                   freely mixed (see seed-conductor-identities.ts /
+ *                   peer-id.ts::parseNamedCsv): bare `ws://host:port`, or
+ *                   named `name=ws://host:port` (the local `just mesh` form,
+ *                   all-loopback with no `elohim-<name>-<env>` hostname).
  * Optional environment:
  *   INSTALLED_APP_ID  app id prefix (default: elohim)
  *   REPORT_PATH       local JSON destination; absent means stdout only
@@ -32,7 +36,11 @@ import {
   type AgentPeerBindingView,
   type AnchorBindings,
 } from './agent-peer-binding-provenance.js';
-import { conductorUrlForHuman } from './seed-conductor-identities.js';
+import {
+  conductorUrlForHuman,
+  parseConductorUrls,
+  type ConductorUrlEntry,
+} from './seed-conductor-identities.js';
 
 interface Human {
   id: string;
@@ -115,8 +123,33 @@ async function activeBindings(
   }) as Promise<AgentPeerBindingView[]>;
 }
 
-function expectedHumanId(url: string, humanIds: string[]): string | null {
-  return humanIds.find(id => conductorUrlForHuman(id, [{ name: null, url }]) === url) ?? null;
+/**
+ * Which household member's conductor a given URL is expected to be, per the
+ * SAME name-affine resolution seed-conductor-identities.ts uses (named
+ * `name=url` entries first, then the `elohim-<name>-<env>` hostname
+ * convention). Takes the FULL parsed CONDUCTOR_URLS entry list (not a
+ * single-entry stand-in) so a named entry — the local `just mesh` form —
+ * resolves correctly; a singleton `{name: null, url}` can only ever match
+ * hostname-affinity.
+ */
+export function expectedHumanId(
+  url: string,
+  humanIds: string[],
+  entries: ConductorUrlEntry[],
+): string | null {
+  return humanIds.find(id => conductorUrlForHuman(id, entries) === url) ?? null;
+}
+
+/**
+ * Resolve CONDUCTOR_URLS to plain URLs for this script. Reuses the shared
+ * name-affine parser (peer-id.ts::parseNamedCsv via
+ * seed-conductor-identities.ts::parseConductorUrls) — a raw `.split(',')`
+ * treats a `name=url` entry (the local `just mesh` convention) as one
+ * opaque string, which `new URL()` in toAdminUrl then rejects as an Invalid
+ * URL. Exported for unit tests.
+ */
+export function parseEnumerateConductorUrls(raw: string): ConductorUrlEntry[] {
+  return parseConductorUrls(raw);
 }
 
 function readTargetHumanIds(): string[] {
@@ -131,13 +164,11 @@ function readTargetHumanIds(): string[] {
 }
 
 export async function main(): Promise<void> {
-  const urls = (process.env.CONDUCTOR_URLS ?? '')
-    .split(',')
-    .map(url => url.trim())
-    .filter(Boolean);
-  if (!urls.length) {
+  const entries = parseEnumerateConductorUrls(process.env.CONDUCTOR_URLS ?? '');
+  if (!entries.length) {
     throw new Error('CONDUCTOR_URLS is required (comma-separated app WebSocket URLs)');
   }
+  const urls = entries.map(e => e.url);
 
   const appIdPrefix = process.env.INSTALLED_APP_ID ?? 'elohim';
   const humanIds = readTargetHumanIds();
@@ -156,7 +187,7 @@ export async function main(): Promise<void> {
       snapshots.push({
         conductorUrl,
         anchorAgentPubKey: encodeHashToBase64(session.agentPubKey),
-        expectedHumanId: expectedHumanId(conductorUrl, humanIds),
+        expectedHumanId: expectedHumanId(conductorUrl, humanIds, entries),
         bindings,
       });
     } catch (error) {

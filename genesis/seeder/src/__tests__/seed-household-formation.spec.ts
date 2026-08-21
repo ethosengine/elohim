@@ -2,11 +2,40 @@ import { createHash } from 'node:crypto';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   buildHouseholdCharter, buildCeremonyCustodyInput, HOUSEHOLD_MEMBERS,
-  resolveExistingCollectiveCid, electFounder,
+  resolveExistingCollectiveCid, electFounder, parseHouseholdConductorUrls,
 } from '../seed-household-formation.js';
 import {
   clearPeerIdCache, deterministicPeerId, resolvePeerId, storageUrlForHuman,
 } from '../peer-id.js';
+
+describe('parseHouseholdConductorUrls', () => {
+  it('resolves named CONDUCTOR_URLS entries (local just-mesh form) to bare URLs', () => {
+    // genesis #1 regression: seed-household-formation.ts used to `.split(',')`
+    // the raw env var, so a named entry like `matthew=ws://localhost:4445`
+    // was handed whole to `new URL()` downstream and FATALed with
+    // "Invalid URL" on the local hc-mesh (whose CONDUCTOR_URLS is
+    // name-affine, not hostname-affine).
+    const urls = parseHouseholdConductorUrls(
+      'matthew=ws://localhost:4445,jessica=ws://localhost:4455,james=ws://localhost:4465',
+    );
+    expect(urls).toEqual([
+      'ws://localhost:4445',
+      'ws://localhost:4455',
+      'ws://localhost:4465',
+    ]);
+  });
+
+  it('passes bare hostname-affine URLs through unchanged', () => {
+    const urls = parseHouseholdConductorUrls(
+      'ws://elohim-adam-alpha:4445,ws://elohim-eve-alpha:4445',
+    );
+    expect(urls).toEqual(['ws://elohim-adam-alpha:4445', 'ws://elohim-eve-alpha:4445']);
+  });
+
+  it('empty string resolves to an empty list', () => {
+    expect(parseHouseholdConductorUrls('')).toEqual([]);
+  });
+});
 
 describe('buildHouseholdCharter', () => {
   it('declares household kind, rubric, and the family-dowell slug alias', () => {

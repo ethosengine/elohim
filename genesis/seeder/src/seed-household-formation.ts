@@ -51,6 +51,7 @@ import {
 } from '@holochain/client';
 import { deterministicPeerId, resolvePeerId, type Archetype } from './peer-id.js';
 import type { CustodyPeerIds } from './seed-commitments.js';
+import { parseConductorUrls } from './seed-conductor-identities.js';
 
 // =============================================================================
 // Canonical household triad
@@ -671,6 +672,22 @@ export function describeProjectionGap(
 // Main
 // =============================================================================
 
+/**
+ * Resolve CONDUCTOR_URLS to plain URLs for this script. Reuses the shared
+ * name-affine parser (peer-id.ts::parseNamedCsv via
+ * seed-conductor-identities.ts::parseConductorUrls) — a raw `.split(',')`
+ * chokes on `name=url` entries (`matthew=ws://localhost:4445` parses as an
+ * "Invalid URL" when handed whole to `new URL()` downstream in
+ * toAdminUrl/connectToConductor: genesis #1 — the local `just mesh
+ * prologue` fresh-mesh run FATALs household formation on exactly this).
+ * This script only needs the bare URLs — session binding happens live via
+ * get_my_human, not by name — so named entries are stripped to their
+ * `.value` here. Exported for unit tests (main() itself is not exported).
+ */
+export function parseHouseholdConductorUrls(raw: string): string[] {
+  return parseConductorUrls(raw).map(e => e.url);
+}
+
 // Module-level sessions reference so the fatal catch can best-effort close.
 let activeSessions: Map<string, MemberSession> = new Map();
 
@@ -682,10 +699,7 @@ async function main(): Promise<void> {
   const blobHash = process.env.CONTENT_BLOB_HASH ?? '';
   const blobSizeBytes = parseInt(process.env.CONTENT_BLOB_SIZE_BYTES ?? '0', 10);
 
-  const conductorUrls = conductorUrlsRaw
-    .split(',')
-    .map(u => u.trim())
-    .filter(Boolean);
+  const conductorUrls = parseHouseholdConductorUrls(conductorUrlsRaw);
 
   console.log('=== Seed Household Formation (ceremony, rung 3) ===\n');
   console.log(`App ID prefix: ${appIdPrefix}`);

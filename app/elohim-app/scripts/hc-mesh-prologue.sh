@@ -208,17 +208,35 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 5. Substrate chain, CI order (genesis/Jenkinsfile: Seed Humans -> Presences
-#    -> Collectives -> Accounts -> Conductor Identities -> Provide Rows ->
-#    Agent Peer Bindings -> Household Formation -> Stewardship -> EPR Atoms
-#    -> [blob authored above] -> Custody Commitments -> operator bindings/
-#    projections [already run in step 2-3]), plus seed-nodes and
-#    seed-delegates-compute — both mesh-local levers, not wired into CI (see
-#    their own file-header comments), included here because the a2o Act I
-#    lane needs stewarded nodes and a bounded delegates-compute grant that
-#    only exist on THIS mesh if something seeds them.
+# 5. Substrate chain. Conductor Identities now runs BEFORE Seed Humans — the
+#    reverse of genesis/Jenkinsfile's CI order (Seed Humans -> Presences ->
+#    Collectives -> Accounts -> Conductor Identities -> Provide Rows -> Agent
+#    Peer Bindings -> Household Formation -> Stewardship -> EPR Atoms ->
+#    [blob authored above] -> Custody Commitments -> operator bindings/
+#    projections [already run in step 2-3]). On this mesh doorway A's hosted
+#    pool IS matthew's own conductor (4445): Seed Humans' hosted
+#    `/auth/register` call for matthew (agencyPhase=doorway) passes no
+#    human_id, so doorway mints a random UUID Human on that SAME conductor
+#    (auth_routes.rs "minting a random UUID" warning) — if that runs first,
+#    it embodies the conductor before Seed Conductor Identities gets a
+#    chance to, and the founder cast reports `[C] Conflict` instead of
+#    `[+]`/`[=]`. seed-conductor-identities.ts reads its human roster
+#    directly from data/humans/humans.json (never from doorway or from Seed
+#    Humans' output), so casting it first has no dependency to break; running
+#    it first means each household conductor embodies its OWN canonical
+#    `human-<name>` id before any hosted registration can mint a UUID onto
+#    it. Seed Humans' own registration for matthew then hits the "Agent
+#    already has a Human profile" recovery branch (auth_routes.rs) and
+#    reports `exists` against the correct id instead of conflicting.
+#    seed-nodes and seed-delegates-compute are both mesh-local levers, not
+#    wired into CI (see their own file-header comments), included here
+#    because the a2o Act I lane needs stewarded nodes and a bounded
+#    delegates-compute grant that only exist on THIS mesh if something seeds
+#    them.
 # ---------------------------------------------------------------------------
-banner "5. substrate chain (CI order)"
+banner "5. substrate chain (Conductor Identities cast BEFORE Seed Humans — see comment above)"
+run_seed_leg "seed-conductor-identities" hard \
+  'CONDUCTOR_URLS="$CONDUCTOR_URLS" npx tsx src/seed-conductor-identities.ts'
 run_seed_leg "seed-humans" hard \
   'DOORWAY_URL="$DOORWAY_A_URL" npx tsx src/seed-humans.ts'
 run_seed_leg "seed-presences" soft \
@@ -227,8 +245,6 @@ run_seed_leg "seed-collectives" soft \
   'DOORWAY_URL="$DOORWAY_A_URL" npx tsx src/seed-collectives.ts'
 run_seed_leg "seed-accounts" soft \
   'DOORWAY_URL="$DOORWAY_A_URL" SEEDER_TARGET_PEERS="$SEEDER_TARGET_PEERS" npx tsx src/seed-accounts.ts'
-run_seed_leg "seed-conductor-identities" hard \
-  'CONDUCTOR_URLS="$CONDUCTOR_URLS" npx tsx src/seed-conductor-identities.ts'
 run_seed_leg "seed-provide-rows" soft \
   'DOORWAY_URL="$DOORWAY_A_URL" PEER_STORAGE_URLS="$PEER_STORAGE_URLS" npx tsx src/seed-provide-rows.ts'
 run_seed_leg "seed-agent-bindings" soft \
