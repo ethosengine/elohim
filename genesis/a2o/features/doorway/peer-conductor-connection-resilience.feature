@@ -1,4 +1,4 @@
-@e2e @doorway @resilience @regression @requires:doorway @wip
+@e2e @doorway @resilience @regression @requires:doorway
 Feature: Doorway peer-conductor connections back off and do not leak
   As a household member whose doorway fronts a pool of peer conductors
   I want the doorway to retreat politely when a conductor session is unstable
@@ -27,6 +27,7 @@ Feature: Doorway peer-conductor connections back off and do not leak
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
 
+  @act:i
   Scenario: Auth-rejected peer conductor is retried with exponential backoff
     Given a peer conductor in the pool accepts WebSocket connections but rejects the authenticate handshake
     When the doorway's worker attempts to connect 5 times
@@ -34,24 +35,28 @@ Feature: Doorway peer-conductor connections back off and do not leak
     And the doorway marks the conductor pool unhealthy while disconnected
     And the doorway's other pool conductors continue serving requests
 
+  @act:i
   Scenario: Unstable sessions do not reset the backoff clock
     Given a peer conductor that accepts connections but drops every session within 2 seconds
     When the doorway reconnects through 5 flap cycles
     Then the reconnect delay keeps growing across cycles instead of resetting to the floor
     And the backoff resets only after a session stays healthy for the minimum stable window
 
+  @act:i
   Scenario: Reconnect cycles do not leak connection tasks
     Given the doorway is connected to a peer conductor with an active signal subscriber
     When the conductor session drops and reconnects 10 times
     Then the doorway holds exactly one live connection task per conductor worker
     And the doorway's task count stays flat across the cycles
 
+  @act:i @requires:owned-substrate
   Scenario: Conductor restart heals the worker pool without a doorway restart
     Given a peer conductor that restarts and invalidates previously issued app auth tokens
     When the doorway's pool workers reconnect with the stale token
     Then the doorway re-mints an app auth token from the conductor admin interface
     And zome calls through that conductor pool succeed within the recovery window
 
+  @act:i
   Scenario: Reconnect churn is visible to operators
     Given a peer conductor that drops its signal subscriber session repeatedly
     When the operator reads the doorway status endpoint
@@ -61,7 +66,7 @@ Feature: Doorway peer-conductor connections back off and do not leak
     # reconnect_attempts: 0 for every peer — the diagnostic had to come from
     # conductor-side log floods instead of the doorway's own health surface.
 
-  @requires:shem
+  @requires:shem @act:iii
   Scenario: Conductor fleet survives a doorway reconnect storm
     Given a doorway fronting the full multi-tenant conductor fleet
     And every conductor session is severed at the same moment
@@ -100,7 +105,7 @@ Feature: Doorway peer-conductor connections back off and do not leak
   # Constraints pinned here (the invariant: an unresponsive conductor degrades to
   # a bounded error and the gateway STAYS RESPONSIVE):
 
-  @regression
+  @regression @act:i
   Scenario: A conductor that never answers yields a bounded error, not a hang
     # The load-bearing invariant. A zome/admin call to an unreachable or
     # silent conductor must resolve to an Err within the hard deadline — never
@@ -111,7 +116,7 @@ Feature: Doorway peer-conductor connections back off and do not leak
     And the doorway clears that conductor connection so the next call reconnects
     And the doorway keeps serving other requests throughout
 
-  @regression
+  @regression @act:i
   Scenario: The gateway stays responsive while one request path is wedged
     # Even if a single handler blocks, the runtime must schedule other work —
     # explicit (not CPU-derived) tokio worker threads break the single-blocked-
@@ -124,7 +129,7 @@ Feature: Doorway peer-conductor connections back off and do not leak
     # (2026-06-15: liveness moved to the dedicated watchdog port; readiness and
     #  startup stay on the main listener — see the 2026-06-15 section below.)
 
-  @regression @requires:ssr-bundle
+  @regression @requires:ssr-bundle @act:i
   Scenario: A saturated SSR render queue sheds to the CSR shell instead of queuing
     # The single sequential isolate must not let a stuck render back-pressure
     # onto the runtime. When the render queue is saturated the request is shed
@@ -190,7 +195,7 @@ Feature: Doorway peer-conductor connections back off and do not leak
   #       shares the main runtime" and the assertion that liveness answers on the
   #       MAIN listener.
 
-  @regression
+  @regression @act:i
   Scenario: A conductor DNS flap does not park the doorway's worker pool
     # I1, the load-bearing root cure. Hostname resolution for a conductor connect
     # must never run as a blocking syscall on a tokio worker — a failing lookup
@@ -202,7 +207,7 @@ Feature: Doorway peer-conductor connections back off and do not leak
     And the doorway's worker pool stays available to schedule other tasks
     And the doorway keeps serving requests throughout the flap
 
-  @regression
+  @regression @act:i @requires:owned-substrate
   Scenario: Liveness survives a full main-runtime stall yet still restarts a real wedge
     # I2. Liveness is served from a runtime isolated from the main worker pool, so
     # a fully-stalled main pool can't silence it — but its verdict is gated on a
@@ -214,7 +219,7 @@ Feature: Doorway peer-conductor connections back off and do not leak
     And it reports unhealthy because the main-runtime heartbeat has gone stale
     And the pod is restarted instead of hanging unnoticed
 
-  @regression
+  @regression @act:i
   Scenario: A momentary worker-pool park does not false-kill the pod
     # The honesty counterpart to I2: a transient park the runtime recovers from
     # (under the staleness threshold) must NOT trip a liveness kill — that
