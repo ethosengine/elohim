@@ -354,7 +354,7 @@ Then('the suspension should succeed', function (this: E2EWorld) {
 
 When(
   "{word} updates {word}'s storage quota to {int} MB",
-  async function (this: E2EWorld, adminName: string, targetName: string, _limitMb: number) {
+  async function (this: E2EWorld, adminName: string, targetName: string, limitMb: number) {
     const admin = this.getHuman(adminName);
     const device = admin.devices[0] as BrowserDevice;
 
@@ -363,9 +363,15 @@ When(
     const userEntry = await findUserEntry(device, target);
     assert.ok(userEntry, notFoundMessage(targetName, target));
 
-    // Quota update placeholder — re-activates the user as a proxy until
-    // a dedicated adminUpdateQuota endpoint is added to DoorwayClient
-    const result = await device.client.adminSetUserStatus(userEntry.id, true);
+    // The doorway has carried PUT /admin/users/{id}/quota all along
+    // (admin_users.rs handle_update_quota). This step used to re-ACTIVATE the
+    // user as a stand-in and call that a quota update, so the limit the
+    // scenario named was never sent and the readback below could only ever
+    // report `undefined`. Send the real mutation, in the megabytes the handler
+    // expects (it does the *1024*1024 itself).
+    const result = await device.client.adminUpdateQuota(userEntry.id, {
+      storageLimitMb: limitMb,
+    });
     this.contentIds.set('lastMutationSuccess', result.success ? 'true' : 'false');
   }
 );
@@ -381,9 +387,11 @@ Then(
     assert.ok(lastUserDetails.quota, 'User details missing quota');
     const expectedBytes = expectedMb * 1024 * 1024;
     assert.strictEqual(
-      lastUserDetails.quota.storageLimit,
+      lastUserDetails.quota.storageLimitBytes,
       expectedBytes,
-      `Expected quota ${expectedBytes} but got ${lastUserDetails.quota.storageLimit}`
+      `Expected quota ${expectedBytes} bytes (${expectedMb} MB) but got ` +
+        `${lastUserDetails.quota.storageLimitBytes} bytes ` +
+        `(${lastUserDetails.quota.storageLimitMb} MB)`
     );
   }
 );

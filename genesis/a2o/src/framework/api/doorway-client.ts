@@ -266,6 +266,16 @@ export interface AdminUsersResponse {
   totalPages: number;
 }
 
+/**
+ * `GET /admin/users/{id}` — the doorway's own field names.
+ *
+ * Both blocks carry each limit TWICE, in bytes and in MB (`admin_users.rs`
+ * handle_get_user). The earlier `storageLimit` / `dailyBandwidthLimit` spellings
+ * here matched neither, so `quota.storageLimit` read `undefined` while the
+ * enclosing `quota` object was present — a quota assertion could only fail, and
+ * only ever said "got undefined". Measured live 2026-08-21:
+ *   quota: { storageLimitBytes: 104857600, storageLimitMb: 100.0, ... }
+ */
 export interface AdminUserDetailsResponse {
   id: string;
   identifier: string;
@@ -273,14 +283,29 @@ export interface AdminUserDetailsResponse {
   isActive: boolean;
   usage?: {
     storageBytes: number;
+    storageMb: number;
     projectionQueries: number;
     bandwidthBytes: number;
+    bandwidthMb: number;
   };
   quota?: {
-    storageLimit: number;
+    storageLimitBytes: number;
+    storageLimitMb: number;
+    storagePercentUsed: number;
     dailyQueryLimit: number;
-    dailyBandwidthLimit: number;
+    dailyBandwidthLimitBytes: number;
+    dailyBandwidthLimitMb: number;
+    enforceHardLimit: boolean;
+    isOverQuota: boolean;
   };
+}
+
+/** Body of `PUT /admin/users/{id}/quota` (`admin_users.rs UpdateQuotaRequest`). */
+export interface AdminUpdateQuotaRequest {
+  storageLimitMb?: number;
+  dailyQueryLimit?: number;
+  dailyBandwidthLimitMb?: number;
+  enforceHardLimit?: boolean;
 }
 
 export interface AdminListUsersParams {
@@ -604,6 +629,22 @@ export class DoorwayClient {
 
   async adminDeleteUser(userId: string): Promise<AdminMutationResponse> {
     return this.delete<AdminMutationResponse>(`/admin/users/${encodeURIComponent(userId)}`, {});
+  }
+
+  /**
+   * `PUT /admin/users/{id}/quota` — set a hosted user's limits.
+   *
+   * The doorway takes MEGABYTES and multiplies them into bytes itself, so send
+   * `storageLimitMb: 500`, not the byte count.
+   */
+  async adminUpdateQuota(
+    userId: string,
+    quota: AdminUpdateQuotaRequest
+  ): Promise<AdminMutationResponse> {
+    return this.put<AdminMutationResponse>(
+      `/admin/users/${encodeURIComponent(userId)}/quota`,
+      quota
+    );
   }
 
   async adminForceLogout(userId: string): Promise<AdminMutationResponse> {
