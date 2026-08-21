@@ -1,4 +1,4 @@
-@e2e @content @delivery @requires:doorway
+@e2e @content @delivery @requires:doorway @act:i
 Feature: SPA Bundle Delivery — Root App from Blob Storage
   As a doorway operator
   I want my SPA served from the content system
@@ -53,7 +53,7 @@ Feature: SPA Bundle Delivery — Root App from Blob Storage
     And the response body is the SPA index.html
     And Angular's router handles the /content/manifesto route on the client
 
-  @wip @regression @substrate-rea-replication-fix @requires:alpha-cluster-6peer
+  @regression @substrate-rea-replication-fix @requires:owned-substrate
   Scenario: /lamad serves the SPA shell once project-epr commitments propagate via DHT
     # Regression seatbelt for genesis/docs/superpowers/plans/
     # 2026-05-26-substrate-rea-replication-fix.md (Gap D from the 2026-05-26
@@ -74,7 +74,7 @@ Feature: SPA Bundle Delivery — Root App from Blob Storage
     And the response body is the SPA index.html
     And Angular's router handles the /lamad route on the client
 
-  @wip @regression @substrate-rea-replication-fix @requires:alpha-cluster-6peer
+  @regression @substrate-rea-replication-fix @requires:owned-substrate
   Scenario: /lamad survives a doorway pod restart regardless of which storage peer the new pod reads
     # The morning of 2026-05-26 surfaced this exact regression after CI
     # pivoted from rollout-restart to pods-API deletion (build #1042):
@@ -105,7 +105,7 @@ Feature: SPA Bundle Delivery — Root App from Blob Storage
     Then the response is the operator dashboard
     And the SPA catch-all does not intercept the /threshold route
 
-  @wip @requires:shem
+  @wip
   Scenario: /apps/ still serves html5-apps and is not intercepted by the root app
     Given the SPA bundle for "lamad-spa" is extracted and cached
     And content "evolution-of-trust" has been seeded as html5-app
@@ -139,7 +139,7 @@ Feature: SPA Bundle Delivery — Root App from Blob Storage
       | projection | ready or pending    |
       | rootApp    | ready or pending    |
 
-  @wip @browser-only @requires:shem
+  @wip @browser-only
   Scenario: Bootstrap page auto-navigates when rootApp becomes ready
     Given the bootstrap page is displayed
     And /health/startup is returning rootApp: pending
@@ -147,7 +147,7 @@ Feature: SPA Bundle Delivery — Root App from Blob Storage
     Then the bootstrap page navigates to / automatically
     And Terrance sees the SPA without manually refreshing
 
-  @wip @browser-only @requires:shem
+  @wip @browser-only
   Scenario: Bootstrap page falls back to reload timer when /health/startup is unreachable
     # If health endpoint is down (doorway restarting), the page should not hang.
     # A reload timer ensures the user eventually gets the app.

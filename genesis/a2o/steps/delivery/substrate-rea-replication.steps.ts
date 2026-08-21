@@ -23,11 +23,18 @@
  */
 
 import { strict as assert } from 'node:assert';
+import { execFileSync, spawn } from 'node:child_process';
+import { openSync, readFileSync, realpathSync } from 'node:fs';
 
 import { Given, When, Then } from '@cucumber/cucumber';
 
 import { request } from 'undici';
 
+import {
+  loadHouseholdMeshFixture,
+  requireFixtureDoorwayUrl,
+  requireFixturePoolStorageUrls,
+} from '../../src/framework/fixtures/household-mesh.js';
 import { E2EWorld } from '../../src/framework/world.js';
 import { fetchApp, responseStore } from '../delivery.steps.js';
 
@@ -206,8 +213,13 @@ Then(
 );
 
 // ---------------------------------------------------------------------------
-// Pod-restart scenario — kubectl-dependent, scaffolded as pending
+// Pod-restart scenario — real, on a mesh that owns its processes
 // ---------------------------------------------------------------------------
+
+/** How long a restarted doorway gets to answer /health before the step reds. */
+const DOORWAY_RESTART_HEALTH_BUDGET_MS = 90_000;
+/** Kill + boot + health wait, with margin — cucumber's 30s default kills this. */
+const DOORWAY_RESTART_STEP_TIMEOUT_MS = 150_000;
 
 /**
  * Documentary precondition: a prior probe confirmed /lamad serves the SPA
@@ -227,29 +239,209 @@ Given(
 );
 
 /**
- * Pod-restart steps require kubectl access against the alpha cluster.
- * a2o runs from CI with read-only HTTP probes; kubectl is operator-driven.
- * These return 'pending' so cucumber records the contract without
- * generating a false pass or false fail.
+ * Restarting the doorway, for real, because this mesh owns its processes.
+ *
+ * These steps used to `return 'pending'` with the note "kubectl access is
+ * operator-driven" — true of the deployed fleet, where a doorway is a remote
+ * pod with no PID on this host. The household mesh is the other case: the
+ * doorway is a process on this machine, and the fixture manifest says so
+ * (`processControl: true`). So the scenario stops being a contract nobody can
+ * run and becomes an ordinary drill.
+ *
+ * The restart is a re-exec of the SAME process: argv, environment and cwd are
+ * read back out of /proc before the kill and replayed after it, so the new
+ * doorway is the one the mesh was configured with rather than one this test
+ * invented. The pid is discovered by an EXACT argv match on the listen port —
+ * never a `pkill -f` pattern, which would match this runner's own shell and
+ * kill the run (the self-kill trap, 2026-08-16).
+ *
+ * DESTRUCTIVE: takes doorway "alpha" down for the length of one boot. Hold it
+ * behind an explicit operator go on a shared mesh.
  */
-When("doorway {string}'s pod is restarted", function (this: E2EWorld, _doorwayId: string) {
-  return 'pending';
-});
 
+interface RestartRecord {
+  pid: number;
+  port: string;
+  /** Corrective actions a step had to take to get the doorway serving again. */
+  interventions: string[];
+}
+
+const restarts = new WeakMap<E2EWorld, RestartRecord>();
+
+/** Read a NUL-separated /proc file into its parts. */
+function readNulList(path: string): string[] {
+  return readFileSync(path, 'utf8').split('\0').filter(Boolean);
+}
+
+/**
+ * The one pid listening on `port`, found by exact argv match.
+ *
+ * Refuses on zero matches AND on more than one: a drill that guesses which of
+ * two candidates to kill is a drill that eventually kills the wrong thing.
+ */
+function doorwayPidForPort(port: string): number {
+  // Absolute path: the pid this returns is about to be signalled, so the
+  // binary that produced it must not be resolvable through a writable PATH.
+  const listing = execFileSync('/usr/bin/ps', ['-eo', 'pid=,args='], { encoding: 'utf8' });
+  const matches: number[] = [];
+  for (const line of listing.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const split = trimmed.indexOf(' ');
+    if (split < 0) continue;
+    const pid = Number(trimmed.slice(0, split));
+    const args = trimmed.slice(split + 1);
+    const argv = args.split(/\s+/);
+    const isDoorway = argv[0]?.endsWith('/doorway') || argv[0] === 'doorway';
+    if (!isDoorway) continue;
+    const listenIdx = argv.indexOf('--listen');
+    if (listenIdx < 0) continue;
+    const listen = argv[listenIdx + 1] ?? '';
+    if (listen.endsWith(`:${port}`)) matches.push(pid);
+  }
+  assert.ok(
+    matches.length > 0,
+    `no doorway process is listening on port ${port} — nothing to restart. ` +
+      'This scenario needs the doorway running as a local process (`just mesh start`); ' +
+      'against a deployed fleet it is a remote pod and there is no PID here to signal.'
+  );
+  assert.equal(
+    matches.length,
+    1,
+    `${matches.length} doorway processes claim port ${port} (pids ${matches.join(', ')}) — ` +
+      'refusing to guess which one the mesh means'
+  );
+  const pid = matches[0];
+  assert.ok(
+    pid > 1 && pid !== process.pid && pid !== process.ppid,
+    `refusing to signal pid ${pid}: it is this test run or its parent`
+  );
+  return pid;
+}
+
+async function waitForDoorwayHealthy(base: string, budgetMs: number): Promise<void> {
+  const deadline = Date.now() + budgetMs;
+  let last = 'never answered';
+  while (Date.now() < deadline) {
+    try {
+      const resp = await fetchApp(base, '/health');
+      if (resp.status === 200) return;
+      last = `status ${resp.status}`;
+    } catch (error) {
+      last = String(error);
+    }
+    await new Promise<void>(resolve => setTimeout(resolve, 1_000));
+  }
+  assert.fail(`doorway at ${base} did not come back within ${budgetMs}ms (${last})`);
+}
+
+When(
+  "doorway {string}'s pod is restarted",
+  { timeout: DOORWAY_RESTART_STEP_TIMEOUT_MS },
+  async function (this: E2EWorld, doorwayId: string) {
+    const fixture = loadHouseholdMeshFixture();
+    const base = requireFixtureDoorwayUrl(fixture, doorwayId);
+    const port = new URL(base).port || '80';
+    const pid = doorwayPidForPort(port);
+
+    // Capture what the process WAS before killing it, so the replacement is
+    // the same doorway and not a differently-configured one.
+    const argv = readNulList(`/proc/${pid}/cmdline`);
+    const env: Record<string, string> = {};
+    for (const entry of readNulList(`/proc/${pid}/environ`)) {
+      const eq = entry.indexOf('=');
+      if (eq > 0) env[entry.slice(0, eq)] = entry.slice(eq + 1);
+    }
+    const cwd = realpathSync(`/proc/${pid}/cwd`);
+    const [command, ...args] = argv;
+    assert.ok(command, `could not read argv for doorway pid ${pid}`);
+
+    process.kill(pid, 'SIGTERM');
+    const graceDeadline = Date.now() + 20_000;
+    while (Date.now() < graceDeadline) {
+      try {
+        process.kill(pid, 0);
+      } catch {
+        break;
+      }
+      await new Promise<void>(resolve => setTimeout(resolve, 250));
+    }
+    try {
+      process.kill(pid, 0);
+      process.kill(pid, 'SIGKILL');
+    } catch {
+      // already gone — the graceful stop worked
+    }
+
+    const logPath = fixture.doorways?.[doorwayId]?.logPath;
+    const out = logPath ? openSync(logPath, 'a') : 'ignore';
+    const child = spawn(command, args, {
+      cwd,
+      env,
+      detached: true,
+      stdio: ['ignore', out, out],
+    });
+    child.unref();
+
+    await waitForDoorwayHealthy(base, DOORWAY_RESTART_HEALTH_BUDGET_MS);
+    restarts.set(this, { pid: child.pid ?? 0, port, interventions: [] });
+  }
+);
+
+/**
+ * The scenario's premise: the replacement doorway may read a DIFFERENT storage
+ * peer than the one that died, and that must not matter. This step proves the
+ * premise is live rather than assuming it — if the doorway had exactly one
+ * storage peer to choose from, the next assertion would pass for a reason that
+ * has nothing to do with substrate-correct writes.
+ */
 When(
   "the new pod's storage peer is selected non-deterministically from the alpha cluster",
   function (this: E2EWorld) {
-    return 'pending';
+    const fixture = loadHouseholdMeshFixture();
+    const pool = requireFixturePoolStorageUrls(fixture, 'alpha');
+    assert.ok(
+      pool.length > 1,
+      `the doorway has only ${pool.length} storage peer to read from, so "whichever peer the ` +
+        'new pod picks" is not a choice — this scenario cannot fail for its own reason here'
+    );
   }
 );
 
 Then(
   /^a subsequent request for (\/\S+) returns the SPA index\.html with status (\d+)$/,
-  function (this: E2EWorld, _path: string, _status: string) {
-    return 'pending';
+  { timeout: DOORWAY_RESTART_STEP_TIMEOUT_MS },
+  async function (this: E2EWorld, path: string, status: string) {
+    const record = restarts.get(this);
+    assert.ok(record, 'no doorway restart was recorded — this Then must follow the restart When');
+    const fixture = loadHouseholdMeshFixture();
+    const base = requireFixtureDoorwayUrl(fixture, 'alpha');
+    const resp = await fetchApp(base, path);
+    assert.equal(
+      resp.status,
+      Number(status),
+      `${path} returned ${resp.status} after the restart: ${resp.body.toString('utf-8').slice(0, 200)}`
+    );
+    const ct = resp.headers['content-type'] ?? '';
+    assert.ok(ct.includes('text/html'), `${path} served as "${ct}" after the restart`);
+    responseStore.set(this, resp);
   }
 );
 
+/**
+ * "No operator intervention" is a claim about what the RUN had to do, so it is
+ * asserted against the run's own record: the restart brought the doorway back
+ * and the SPA served again without any step reaching for a corrective lever
+ * (an admin refresh, a re-seed, a second restart). Any step that ever needs
+ * one must push its name onto `interventions`, and this assertion turns red —
+ * which is the only way the claim stays falsifiable as the file grows.
+ */
 Then('no operator intervention is required', function (this: E2EWorld) {
-  return 'pending';
+  const record = restarts.get(this);
+  assert.ok(record, 'no doorway restart was recorded — this Then must follow the restart When');
+  assert.deepEqual(
+    record.interventions,
+    [],
+    `the doorway only served again after: ${record.interventions.join(', ')}`
+  );
 });
