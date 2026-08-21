@@ -13,11 +13,12 @@ import { Given } from '@cucumber/cucumber';
 
 import { BrowserDevice } from '../src/framework/devices/browser-device.js';
 import { PlaywrightDevice } from '../src/framework/devices/playwright-device.js';
+import { resolveDoorwayUrl } from '../src/framework/fixtures/household-mesh.js';
 import { getFixture, isHumanDeployed } from '../src/framework/fixtures/humans.js';
 import { Human } from '../src/framework/human.js';
 import { DoorwayDashboardPage } from '../src/framework/pages/index.js';
 import { doorwayToAppUrl } from '../src/framework/utils/url.js';
-import { E2EWorld } from '../src/framework/world.js';
+import { DoorwayEntry, E2EWorld } from '../src/framework/world.js';
 
 /**
  * Login a pre-seeded fixture human via HTTP (BrowserDevice).
@@ -35,7 +36,7 @@ Given(
       return 'pending';
     }
     const fixture = getFixture(humanName);
-    const doorway = this.getDoorway(doorwayId);
+    const doorway = resolveDoorwayFor(this, doorwayId);
 
     const human = new Human(humanName, fixture.credentials);
     const device = new BrowserDevice(`${humanName}-browser`, doorway.url);
@@ -55,6 +56,29 @@ Given(
 );
 
 /**
+ * The doorway this scenario named, even when its Background registered PEERS.
+ *
+ * A dataplane feature's Background often registers `peer "alpha-A"` rather than
+ * `doorway "alpha"` — they are the same deployment seen from two sides, which
+ * is exactly what content-sync's own comment says. A human still logs in at the
+ * DOORWAY, so this step used to die with `Unknown doorway: "alpha"` on a
+ * scenario whose substrate was sitting right there in the household manifest.
+ *
+ * Order matters and matches the `doorway {string} at {string}` step: what the
+ * run was GIVEN wins, and the manifest is consulted only when nothing else
+ * resolved — a manifest that DECLARES a doorway absent must not shadow one the
+ * scenario already registered. When nothing resolves at all, the original
+ * "Unknown doorway, known: …" error stands, so a typo still reads as a typo.
+ */
+function resolveDoorwayFor(world: E2EWorld, doorwayId: string): DoorwayEntry {
+  const registered = world.doorways.get(doorwayId);
+  if (registered) return registered;
+  const url = resolveDoorwayUrl(doorwayId, []);
+  if (!url) return world.getDoorway(doorwayId);
+  return world.addDoorway(doorwayId, url);
+}
+
+/**
  * Login a pre-seeded fixture human with a mode-aware device (HTTP or Playwright).
  *
  * Example:
@@ -67,7 +91,7 @@ Given(
       return 'pending';
     }
     const fixture = getFixture(humanName);
-    const doorway = this.getDoorway(doorwayId);
+    const doorway = resolveDoorwayFor(this, doorwayId);
 
     const human = new Human(humanName, fixture.credentials);
 
@@ -120,7 +144,7 @@ Given(
       return 'pending';
     }
     const fixture = getFixture(humanName);
-    const doorway = this.getDoorway(doorwayId);
+    const doorway = resolveDoorwayFor(this, doorwayId);
 
     const human = new Human(humanName, fixture.credentials);
 

@@ -54,7 +54,7 @@
 # Design:  genesis/docs/superpowers/specs/2026-07-01-crdt-authoritative-content-state-dht-notary-decouple-design.md
 # Plan:    genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md (C1-C5)
 # Spine:   genesis/manifests/habits.yaml — node `notary-authority`
-@e2e @dataplane @concern:notary-authority
+@e2e @dataplane @concern:notary-authority @act:i
 Feature: Notary authority — the federation converges on ONE earned canonical head
   Converged content state (the value) lives on the CRDT plane; the DHT notary witnesses
   authority, provenance, and HEAD-of-DAG selection over it. Many peers may legitimately author
@@ -135,7 +135,7 @@ Feature: Notary authority — the federation converges on ONE earned canonical h
   # aborting the run. Steward-declared binding is the near-term promotion mechanism; the long-term
   # trajectory is self-electing supersession-lineage (v2 declares it supersedes v1 → DAG tip),
   # so any peer holding both elects v2 deterministically. See the design + C3 backlog.
-  @wip @requires:multi-node
+  @requires:multi-node @requires:owned-substrate
   Scenario: An archetype EPR upgrade elects the new head everywhere and does not regress (RED — durable upgrade)
     Given EPR "elohim-host-landing" resolves the same canonical head across peers "alpha-A" and "elohim.host"
     When the steward promotes a new version of "elohim-host-landing" to canonical

@@ -30,12 +30,14 @@ Feature: Content-sync plane convergence
     Given peer "alpha-A" at "alpha-A"
     And peer "elohim.host" at "elohim.host"
 
+  @act:i
   Scenario: The sync plane has produced at least one document on alpha-A
     # Confirms the content-projection producer is running and the sync table is non-empty.
     # A total >= 1 means at least one content node has been authored and projected into
     # an Automerge document — the minimum evidence that the sync plane is live.
     Then /sync/v1/elohim/docs list on peer "alpha-A" has at least 1 document
 
+  @act:i
   Scenario: A content node named by alpha-A has committed changes there
     # Diagnostic rung between "the table is non-empty" and "it reached the other peer":
     # this exercises the PER-DOCUMENT heads surface, so a failure here indicts the
@@ -44,6 +46,7 @@ Feature: Content-sync plane convergence
     When a content sync doc is selected from peer "alpha-A"
     Then the selected sync doc is present on peer "alpha-A"
 
+  @act:i
   Scenario: The same content doc has converged onto elohim.host
     # The claim the plane exists to keep: elohim.host holds the document alpha-A named,
     # at the SAME point in its change history — equal head sets, not merely two non-empty
@@ -52,7 +55,7 @@ Feature: Content-sync plane convergence
     When a content sync doc is selected from peer "alpha-A"
     Then the selected sync doc has converged onto peer "elohim.host"
 
-  @wip
+  @act:i @requires:owned-substrate
   Scenario: Author a content node and confirm it converges on a second peer within 30 s
     # Blocked: POST /db/content in API mode requires an explicit operator write grant.
     # See a2o/CLAUDE.md "Authorized writes on shared alpha". Until the dataplane runner
@@ -71,7 +74,7 @@ Feature: Content-sync plane convergence
     And /sync doc matching the created content id is present on peer "alpha-A" within 5 s
     And /sync doc matching the created content id is present on peer "elohim.host" within 30 s
 
-  @wip @requires:shem
+  @wip @requires:shem @act:iii
   Scenario: Cross-tenant content doc converges via shem relay within 60 s
     # "shem" is the remote multi-tenant cluster — peers belonging to households OTHER than
     # the one alpha-A serves. Its P2P network is a separate island, so a document only

@@ -110,7 +110,7 @@
 #     silence, named at the top of this file as the human harm, is unchanged
 #     by this cure. Closing that gap (a person-facing notification of a
 #     retired or re-admitted pin) is not attempted here.
-@e2e @dataplane @concern:saga-11-pull-queue-retires
+@e2e @dataplane @concern:saga-11-pull-queue-retires @act:i
 Feature: Chapter 11 — the pull queue can finish
   A want no peer can satisfy must not hold the pull queue open forever — left
   unfixed, this node would silently stop co-stewarding content the household
@@ -185,7 +185,7 @@ Feature: Chapter 11 — the pull queue can finish
   #     match the header's worked example (line ~96), not a literal restatement
   #     of alpha's 6-member total (which, from any one alpha member's own view,
   #     is 5 connected peers, not 6); the two counts are deliberately decoupled.
-  @wip @requires:household-nodes
+  @requires:household-nodes @requires:owned-substrate
   Scenario: an unsatisfiable pin retires once the peer-sized retry budget exhausts
     Given jessica's node, a fixture peer with no other outstanding pins
     And an acquisition fabric of 6 connected peers

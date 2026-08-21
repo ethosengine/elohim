@@ -1,4 +1,4 @@
-@e2e @delivery @happ-delivery
+@e2e @delivery @happ-delivery @act:i
 Feature: hApp coordinator delivery — a shipped zome fix reaches running conductors
   As a steward whose conductor holds years of household state
   I want fixes the community ships to reach my running conductor
@@ -21,7 +21,7 @@ Feature: hApp coordinator delivery — a shipped zome fix reaches running conduc
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
 
-  @wip @regression
+  @regression @requires:owned-substrate
   Scenario: Without coordinator drift detection, a coordinator-only fix never deploys
     Given a conductor with the elohim hApp installed from an earlier bundle
     And a new bundle whose infrastructure coordinator zome changed but whose integrity zomes did not
@@ -32,7 +32,7 @@ Feature: hApp coordinator delivery — a shipped zome fix reaches running conduc
     # DNA-hash-granular staleness check is structurally blind to
     # coordinator-only changes. uhCok… in errors is a WASM hash; uhC0k… a DNA hash.
 
-  @wip
+  @requires:owned-substrate
   Scenario: Coordinator drift is healed by hot-swap without re-keying the agent
     Given a conductor with the elohim hApp installed and an agent key holding DHT state
     And a new bundle whose infrastructure coordinator wasm hash differs from the installed cell's
@@ -45,7 +45,7 @@ Feature: hApp coordinator delivery — a shipped zome fix reaches running conduc
     # Informs: prod can enable coordinator hot-swap WITHOUT enabling re-key
     # reinstalls — they are different upgrade classes.
 
-  @wip
+  @requires:owned-substrate
   Scenario: An operator can see which drift class the installer decided on
     Given a conductor that just completed its hApp lifecycle check
     When the operator reads the node's startup log

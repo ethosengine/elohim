@@ -19,6 +19,14 @@
  * steps are implemented here as @wip stubs returning 'pending'. The load-
  * bearing regression for two-node byte-arrival semantics is the Rust test
  * elohim/elohim-storage/tests/acquisition_pull_e2e.rs — not a cucumber run.
+ *
+ * Two steps in the "Acquisition constraint regressions" section below (the
+ * fabric-size Given and the distinct-peers-probed Then) are real, not
+ * pending — they are reused verbatim by
+ * resiliency-saga/11-pull-queue-retires.feature's household-mesh scenario
+ * (steps/mesh/delivery-notary.steps.ts), which runs against a real 3-peer
+ * mesh rather than the injectable-failure fixture the sibling stubs in this
+ * section still need.
  */
 
 import { strict as assert } from 'node:assert';
@@ -26,6 +34,8 @@ import { strict as assert } from 'node:assert';
 import { Given, When, Then } from '@cucumber/cucumber';
 
 import { request } from 'undici';
+
+import { probeP2PStatus } from '../../src/framework/dataplane/surfaces.js';
 
 import type { E2EWorld } from '../../src/framework/world.js';
 
@@ -282,15 +292,56 @@ Then('peer B fetched the bytes from peer A', function () {
 //     p2p/mod.rs. Parameters: MAX_ACQUISITION_INFLIGHT=25; 25 leaked slots wedge
 //     acquisition permanently and silently.
 //
-// These cucumber steps stay pending until a household-scale acquisition fixture
-// (a 6-peer fabric with injectable failure responses) exists — the same
-// scaffolded-pending posture as the two-node scenarios above.
+// Most of these cucumber steps stay pending until a household-scale
+// acquisition fixture (a fabric with INJECTABLE per-peer failure responses)
+// exists — the same scaffolded-pending posture as the two-node scenarios
+// above. Two of them (the fabric-size Given and the distinct-peers-probed
+// Then) no longer need that fixture: they are also reused, unchanged in
+// wording, by resiliency-saga/11-pull-queue-retires.feature's "an
+// unsatisfiable pin retires once the peer-sized retry budget exhausts"
+// scenario, which runs against a REAL 3-peer household mesh
+// (E2E_HOUSEHOLD_FIXTURE_PATH) — see steps/mesh/delivery-notary.steps.ts.
+// That mesh cannot supply the chapter's worked-example fabric size (6 peers;
+// this mesh has 3, so 2 connected peers from any one member's own view) —
+// both steps below assert against the mesh's ACTUAL /p2p/status reading
+// rather than fake the literal number, so a mismatch reds honestly and names
+// the discrepancy instead of hiding it behind a stub.
 // ---------------------------------------------------------------------------
 
-Given('an acquisition fabric of {int} connected peers', function (_peerCount: number) {
-  // Pending: needs a multi-peer household stack with an injectable peer set.
-  return 'pending';
-});
+/** Baseline captured by "an acquisition fabric of {int} connected peers". */
+interface AcquisitionFabricState {
+  connectedPeers: number;
+}
+const acquisitionFabricState = new WeakMap<E2EWorld, AcquisitionFabricState>();
+
+Given(
+  'an acquisition fabric of {int} connected peers',
+  async function (this: E2EWorld, expectedPeerCount: number) {
+    // Real probe: GET /p2p/status on the own-node storage URL this file
+    // already speaks to (storageUrl() — E2E_STORAGE_URL, matthew's port on
+    // the household mesh). On a healthy 3-peer mesh every member reports the
+    // same connectedPeers count (the other two), so which member answers
+    // this probe does not change the number — this scenario's own subject
+    // (jessica) is reachable the same way via E2E_STORAGE_JESSICA.
+    const { body } = await probeP2PStatus(storageUrl());
+    const connectedPeers = body.connectedPeers;
+    assert.ok(
+      typeof connectedPeers === 'number',
+      `GET /p2p/status on ${storageUrl()}: connectedPeers is not a number ` +
+        `(${JSON.stringify(connectedPeers)})`
+    );
+    acquisitionFabricState.set(this, { connectedPeers });
+    assert.strictEqual(
+      connectedPeers,
+      expectedPeerCount,
+      `this mesh's real acquisition fabric has ${connectedPeers} connected peer(s) at ` +
+        `${storageUrl()} — the chapter's worked example names a ${expectedPeerCount}-peer alpha ` +
+        `fabric; this is a household mesh with 3 total members (2 connected from any one member's ` +
+        `own view). The retry budget the "probed on N distinct peers" step below actually checks ` +
+        `is max(3, connectedPeers), so this mismatch alone does not prevent that step from passing.`
+    );
+  }
+);
 
 Given('{string} sits at a stable position in the acquisition batch', function (_headRef: string) {
   // Pending: the stable batch position comes from list_active_pins' DB order —
@@ -303,9 +354,34 @@ When('its acquisition retries until the retry budget is exhausted', function () 
   return 'pending';
 });
 
-Then('the item was probed on {int} distinct peers', function (_distinctPeers: number) {
-  return 'pending';
-});
+Then(
+  'the item was probed on {int} distinct peers',
+  function (this: E2EWorld, expectedDistinctPeers: number) {
+    // No HTTP surface exposes a per-item dispatch-history trace (which
+    // peers a SPECIFIC pin's retries actually reached), so this cannot
+    // directly observe "probed on N distinct peers" as a literal fact. What
+    // IS real and falsifiable: the retry-budget FORMULA the dispatch
+    // rotation uses (max(3, connected peers) — see this file's acquisition
+    // constraint-regression header above), computed from the fabric size
+    // the Given step above actually measured.
+    const fabric = acquisitionFabricState.get(this);
+    assert.ok(
+      fabric,
+      'no acquisition-fabric baseline — the "an acquisition fabric of ... connected peers" Given ' +
+        'must run first'
+    );
+    const retryBudget = Math.max(3, fabric.connectedPeers);
+    assert.strictEqual(
+      retryBudget,
+      expectedDistinctPeers,
+      `this mesh's live peer-sized retry budget is max(3, ${fabric.connectedPeers} connected ` +
+        `peers) = ${retryBudget} — the chapter's worked example names ${expectedDistinctPeers} ` +
+        `distinct peers (a 6-peer alpha fabric). No per-item dispatch-history surface exists to ` +
+        `directly observe how many peers this specific pin was actually probed on, so this checks ` +
+        `the BUDGET the dispatch rotation would use, not a directly-observed trace.`
+    );
+  }
+);
 
 When(
   '{int} acquisition dispatches are answered with an error-class shard response',
