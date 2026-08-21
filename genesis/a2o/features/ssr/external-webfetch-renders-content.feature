@@ -1,4 +1,4 @@
-@browser @ssr @delivery @requires:doorway @wip
+@e2e @browser @ssr @delivery @requires:doorway @wip @act:i
 Feature: External WebFetch renders concept HTML readable without JS
   As an AI design tool, search engine, or accessibility client without a JS engine
   I want to fetch a concept page and read its content

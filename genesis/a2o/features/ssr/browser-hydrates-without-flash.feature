@@ -1,4 +1,4 @@
-@browser @ssr @delivery @requires:doorway @wip
+@e2e @browser @ssr @delivery @requires:doorway @wip @act:i
 Feature: Browser hydrates SSR'd content without a re-render flash
   As an Elohim Protocol learner browsing on a slow connection
   I want server-rendered content to upgrade to interactive without flickering

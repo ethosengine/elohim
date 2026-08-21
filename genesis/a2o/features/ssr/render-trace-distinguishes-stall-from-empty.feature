@@ -1,4 +1,4 @@
-@browser @ssr @delivery @observability @requires:doorway @wip
+@e2e @browser @ssr @delivery @observability @requires:doorway @wip @act:i
 Feature: SSR render trace distinguishes a stalled fetch from a legitimately-empty render
   As a peer operator (and a learner on a slow substrate)
   I want a render whose upstream data never arrives to be distinguishable from a render that

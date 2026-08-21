@@ -1,4 +1,4 @@
-@browser @ssr @delivery @observability @requires:doorway @wip
+@e2e @browser @ssr @delivery @observability @requires:doorway @wip @act:i
 Feature: SSR compose serves the projected app's own markup — or names why it stepped aside
   As a visitor without a JS engine (a crawler, a link-preview onebox, a reader on a text browser)
   I want a projected route to carry server-rendered markup only when it is THAT app's markup

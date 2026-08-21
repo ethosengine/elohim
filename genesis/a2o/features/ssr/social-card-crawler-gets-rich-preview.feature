@@ -1,4 +1,4 @@
-@browser @ssr @delivery @requires:doorway @wip
+@e2e @browser @ssr @delivery @requires:doorway @wip @act:i
 Feature: Social card crawlers receive rich link previews
   As a social-card crawler (Twitter, Slack, Mastodon, Discord)
   I want to fetch a learning path URL and extract OpenGraph metadata
