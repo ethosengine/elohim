@@ -126,7 +126,7 @@ http_port()  { echo $((8090 + $1)); }
 PEER_ADMIN="$(admin_port "$PEER_INDEX")"
 PEER_APP="$(app_port "$PEER_INDEX")"
 PEER_HTTP="$(http_port "$PEER_INDEX")"
-PEER_SANDBOX="$LOCAL_DEV_DIR/$PEER"
+PEER_SANDBOX="$LOCAL_DEV_DIR/${PEER:?peer name must not be empty}"
 PEER_RUN_LOG="$LOCAL_DEV_DIR/.sandbox_run_log.$PEER"
 SHARED_RUN_LOG="$LOCAL_DEV_DIR/.sandbox_run_log"
 
@@ -354,13 +354,13 @@ phase_rekey() {
   if [ "$REKEY_METHOD" = "reinstall" ]; then
     [ -d "$PEER_SANDBOX" ] || fail "$PEER's sandbox is missing at $PEER_SANDBOX — use --method regenerate"
     say "deleting $PEER's chain + keystore (databases/, ks/), KEEPING wasm-cache"
-    rm -rf "$PEER_SANDBOX/databases" "$PEER_SANDBOX/ks"
+    rm -rf "${PEER_SANDBOX:?}/databases" "${PEER_SANDBOX:?}/ks"
   else
     say "deleting $PEER's whole sandbox: $PEER_SANDBOX (chain + keystore + DHT db + wasm-cache)"
     local attempt=1 gen_rc=1
     while [ "$attempt" -le 3 ]; do
       say "hc sandbox generate for $PEER (attempt $attempt/3; a cold wasm install races a 60s admin timeout)"
-      rm -rf "$PEER_SANDBOX"
+      rm -rf "${PEER_SANDBOX:?}"
       ( cd "$LOCAL_DEV_DIR" && timeout 300 sh -c "echo test | hc sandbox --piped -f $PEER_ADMIN generate -n 1 --app-id elohim --in-process-lair --root \"\$PWD\" -d $PEER \"$HAPP_PATH\" network --bootstrap http://localhost:$DOORWAY_PORT/bootstrap webrtc ws://signal.localhost:$DOORWAY_PORT" ) > "$WORK_DIR/$TAG.generate.$attempt.log" 2>&1
       gen_rc=$?
       [ "$gen_rc" -eq 0 ] && break
