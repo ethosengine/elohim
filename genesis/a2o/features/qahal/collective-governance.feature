@@ -1,3 +1,4 @@
+@act:i @e2e
 Feature: Collective governance
   As a member of a small group
   I want to propose and vote on group decisions

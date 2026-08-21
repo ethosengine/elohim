@@ -1,4 +1,4 @@
-@e2e @qahal @lens-market @requires:household-nodes @wip
+@e2e @qahal @lens-market @requires:household-nodes @wip @act:i
 Feature: Plural Mishpat lenses over a shared resource
   As a community holding a shared concept under governance
   I want several schools of thought to offer their own reading of it, side by side

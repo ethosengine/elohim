@@ -1,4 +1,4 @@
-@e2e @qahal @household-formation @requires:household-nodes
+@e2e @qahal @household-formation @requires:household-nodes @act:i
 Feature: Household formation — recognition of the given
   A family — each member with a device, hub or not — forms a household and
   immediately sees the protocol working among themselves. The ceremony is the
