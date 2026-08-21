@@ -22,6 +22,7 @@ import { fileURLToPath } from 'url';
 
 import { CONTENT_FORMATS } from './validation-constants.js';
 import { ALL_STEP_TYPES, REACH_OPENNESS, isReach } from './generated/schema-enums.js';
+import { earnedReach } from './reach-resolver.js';
 import type { ContentFormat, ContentType, Reach } from './generated/schema-enums.js';
 import type { CreateContentInput } from './generated/create-content-input.js';
 import type { ConceptMetadata, PathMetadata } from './generated/metadata-types.js';
@@ -500,34 +501,10 @@ function loadContentFiles(): ConceptJson[] {
 // stewardship, and relationship graphs.
 // ============================================================================
 
-/**
- * Assert a string is a canonical reach value (from the generated ordinal).
- * HARD-FAILS on non-canonical input — no silent coalesce. Legacy keys
- * (invited, local, neighborhood, municipal) are NOT canonical and throw here.
- */
-// NOTE: genesis/data/lamad/paths/love-map-adam-eve.json currently has reach="invited" (non-canonical) — seed hard-fails until reconciled in slice 3 / Task 9. See reach-floor-foundation-plan.md.
-function assertReach(v: string, ctx: string): Reach {
-  if (!isReach(v)) {
-    throw new Error(
-      `non-canonical reach "${v}" in ${ctx} — must be one of ${Object.keys(REACH_OPENNESS).join(', ')}`
-    );
-  }
-  return v;
-}
-
-/**
- * Resolve effective reach under an inverted burden: default `private`, rise
- * only via an authored value or an archetype advisory (account-package
- * relationship assignment). The most-open candidate across
- * {private, advisory, authored} wins, compared by the generated REACH_OPENNESS
- * ordinal. Any non-canonical candidate HARD-FAILS via assertReach.
- */
-export function earnedReach(input: { authored?: string; advisory?: string }): Reach {
-  const candidates: Reach[] = ['private'];
-  if (input.advisory) candidates.push(assertReach(input.advisory, 'archetype advisory'));
-  if (input.authored) candidates.push(assertReach(input.authored, 'authored reach'));
-  return candidates.reduce((a, b) => (REACH_OPENNESS[a] >= REACH_OPENNESS[b] ? a : b));
-}
+// `assertReach` / `earnedReach` moved to ./reach-resolver.ts so the doorway
+// seed path (seed.ts) resolves reach through the SAME unit. Re-exported here
+// because src/__tests__/reach-resolver.test.ts imports it from this module.
+export { earnedReach };
 
 /**
  * Load account packages and build a map of content ID → maximum reach level.

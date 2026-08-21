@@ -38,10 +38,11 @@ import DoorwayClient, { readSeederCredentials } from './doorway-client.js';
 import StorageClient from './storage-client.js'; // Used for computing blob hash (thumbnails, HTML5 apps)
 import BlobManager from './blob-manager.js';
 import { validateBatch, logValidationErrors, isStrictValidation } from './validators.js';
-import type { ContentFormat, ContentType, Reach } from './generated/schema-enums.js';
+import type { ContentFormat, ContentType } from './generated/schema-enums.js';
 import type { CreateContentInput } from './generated/create-content-input.js';
 import { SeedingVerification, type ExpectedCounts } from './verification.js';
 import { applyPathThumbnail } from './path-thumbnail.js';
+import { seedReach } from './reach-resolver.js';
 import {
   seedOperatorBindings,
   seedHostingAgreements,
@@ -618,6 +619,9 @@ interface ConceptJson {
   thumbnailUrl?: string;      // Preview image for visual cards
   // HTML5 app blob reference (pre-computed hash in JSON)
   blobHash?: string;          // SHA256 hash (without sha256- prefix)
+  // Authored reach grade — the audience this row has EARNED. Absent on most of
+  // the corpus; `seedReach` decides what an ungraded row keeps.
+  reach?: string;
 }
 
 interface PathJson {
@@ -833,7 +837,9 @@ function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContent
     contentBody: useSparsePattern ? `sha256-${blobEntry.hash}` : contentString,
     contentFormat: normalizeContentFormat(concept.contentFormat, concept.contentType),
     tags: concept.tags || [],
-    reach: 'public',
+    // Was a literal 'public' — it discarded the authored grade on every one of
+    // the 88 graded corpus rows (49 commons, 38 community, 2 intimate).
+    reach: seedReach(concept),
     metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
     // Content manifest fields for sparse DHT
     blobCid: blobEntry?.cid ?? undefined,
@@ -1851,7 +1857,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
           pathType,
           ...pathData.metadata, // preserve any extra metadata
         },
-        reach: (pathData.visibility as Reach | undefined) ?? 'public',
+        reach: seedReach(pathData),
         tags: pathData.tags || [],
       };
     }

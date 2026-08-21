@@ -17,9 +17,10 @@ Feature: Commons and public reach content is accessible to anonymous visitors
   @regression
   Scenario: Anonymous reader can read the manifesto (earned commons reach)
     # The manifesto is THE public protocol document. Its authored reach is
-    # "commons". Account-packages assign it "community" (rank 5) but the
-    # seeder's raise-only logic must honour the authored "commons" (rank 7)
-    # as the floor. Any regression here returns HTTP 403.
+    # "commons". Account-packages assign it "community" (rank 6) but the
+    # seeder's raise-only logic must honour the authored "commons" (rank 8) as
+    # the floor — a higher rank is a broader audience, so the account-package
+    # assignment can only ever raise. Any regression here returns HTTP 403.
     #
     # Measured red, genesis #1489 (2026-08-20): 403. The seeder computes the
     # authored floor correctly — the row on the fleet is stale. Content rows are
@@ -52,8 +53,13 @@ Feature: Commons and public reach content is accessible to anonymous visitors
   Scenario: Anonymous reader is rejected for community-reach content (403 with requiredReach)
     # Community reach requires a session. The 403 body must declare the required
     # reach so the client can present the correct onboarding prompt.
-    # autonomous-entity-epic is community-reach (live-verified 403); rea-foundations
-    # is public (200) and would not exercise the negative gate.
-    When an anonymous client GETs content "autonomous-entity-epic"
+    #
+    # The fixture must be a row whose community grade the SEED guarantees, so
+    # that every seeded peer reproduces the gate: "community-garden-club" is
+    # authored "reach": "community" in genesis/data/lamad/content/. A fixture
+    # picked instead from an observed 403 tests whatever grade that one fleet
+    # happens to be carrying — which is how the previous fixture, an epic
+    # authored "commons", stood here as the community case.
+    When an anonymous client GETs content "community-garden-club"
     Then the response status is 403
     And the 403 body requiredReach is "community"

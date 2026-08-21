@@ -2,6 +2,7 @@
   "id": "bdd-smoke-tests",
   "did": "did:elohim:path:bdd-smoke-tests",
   "contentType": "path",
+  "reach": "private",
   "title": "BDD Smoke Tests",
   "description": "Ordered sequence of product test features for smoke testing the Elohim platform. Used by the BDD pipeline to validate deployments.",
   "difficulty": "beginner",
