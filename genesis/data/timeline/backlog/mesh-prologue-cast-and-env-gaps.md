@@ -149,3 +149,17 @@ The mesh CAN show this class now; it could not this morning. Matthew's showed th
 counterpart, `declare_canonical_head: target action ... is not retrievable` — a dead-key anchor being
 re-declared and failing, which is the defect filed as
 `rekeyed-peer-serves-dead-key-anchors-as-notarized.md` seen from the conductor side.
+
+## Parity path (2026-08-21, late) — generate with the fork's `hc`, do not migrate 0.6.0 sandboxes
+
+The mesh has been running STOCK holochain 0.6.0 (`/opt/holochain`) while alpha runs the fork's 0.6.3 line —
+the proving ground was not running the fleet's conductor. Migrating the existing 0.6.0 sandboxes to the fork
+failed twice on schema (`network.base64_auth_material` removed, `relay_url` required; `app_ports: []` after a
+fork launch because 0.6.0's persistent app interfaces do not carry over; direct launch rejects both
+`relay_url` absent and `relay_url: null`). The clean path: on a QUIET box (the 60 s admin timeout vs cold
+wasm compile), `just mesh stop` alone, then `HOLOCHAIN_BIN=<fork-bin with holochain+hc> just mesh start` so
+`hc sandbox generate` writes 0.6.3-schema configs and attaches app interfaces itself, then `just mesh
+prologue`. Fork binaries for tonight: scratchpad `fork-bin/` (fix) and `base-bin/` (fork base e4a1c9bb2) —
+rebuild from the submodule (`cargo build --release -p holochain --bin holochain` and `-p holochain_cli --bin
+hc`, crates/dev slot, ~6 min incremental) when the scratchpad is gone. Then the base-vs-fix A/B on staging v3.
+
