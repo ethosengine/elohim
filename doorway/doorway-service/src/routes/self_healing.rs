@@ -37,6 +37,11 @@ pub struct SelfHealingView {
     pub admission: Option<AdmissionView>,
     /// Per-upstream circuit/health state. LANDED (UpstreamBreakers::snapshot()).
     pub upstreams: Vec<UpstreamView>,
+    /// The OPEN CONDITION every entry in `upstreams` is judged by: N failures
+    /// within T seconds, then a cooldown. Derived from `UpstreamBreakers::
+    /// policy()` rather than restated, so this surface cannot advertise a
+    /// window the gate does not use (C7).
+    pub upstream_policy: UpstreamPolicyView,
     pub projector: ProjectorView,
     pub peers: Vec<PeerView>,
     pub render: RenderView,
@@ -60,9 +65,23 @@ pub struct UpstreamView {
     pub endpoint: String,
     /// "closed" | "half-open" | "open"
     pub circuit: String,
+    /// Consecutive recorded failures, unbounded in time.
     pub error_streak: u32,
+    /// Failures still inside the open-window — the number actually measured
+    /// against `upstreamPolicy.failThreshold`. A streak far above this means
+    /// the failures are spread out, i.e. slow-and-recovering, not down.
+    pub recent_failures: u32,
     pub last_good: Option<String>,
     pub skipped: bool,
+}
+
+/// The live open condition, rendered beside the upstreams it judges.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpstreamPolicyView {
+    pub fail_threshold: u32,
+    pub fail_window_seconds: u64,
+    pub cooldown_seconds: u64,
 }
 
 /// Projector lag + reconcile caught-up state (LANDED).
@@ -129,6 +148,8 @@ pub struct SelfHealingInputs {
     pub admission: (usize, usize, u64),
     /// Per-upstream breaker snapshots for the UpstreamView (LANDED).
     pub upstreams: Vec<crate::routes::upstream_health::BreakerSnapshot>,
+    /// The breakers' live open-condition policy (LANDED).
+    pub upstream_policy: crate::routes::upstream_health::BreakerPolicy,
 }
 
 /// PURE: compose the read model from injected snapshots. No I/O, no AppState.
@@ -169,10 +190,16 @@ pub fn compose_self_healing(inputs: SelfHealingInputs) -> SelfHealingView {
             endpoint: b.endpoint,
             circuit: b.circuit.to_string(),
             error_streak: b.error_streak,
+            recent_failures: b.recent_failures,
             last_good: None, // the breaker does not track a last-good timestamp yet
             skipped: b.skipped,
         })
         .collect();
+    let upstream_policy = UpstreamPolicyView {
+        fail_threshold: inputs.upstream_policy.fail_threshold,
+        fail_window_seconds: inputs.upstream_policy.fail_window_secs,
+        cooldown_seconds: inputs.upstream_policy.cooldown_secs,
+    };
 
     SelfHealingView {
         // FOLLOW-ON: auto-config sibling sets this from AppState.auto_preset.
@@ -183,6 +210,7 @@ pub fn compose_self_healing(inputs: SelfHealingInputs) -> SelfHealingView {
             shed_total,
         }),
         upstreams,
+        upstream_policy,
         projector: ProjectorView {
             lag_seconds: inputs.projector_lag_seconds,
             caught_up: inputs.p2p_caught_up,
@@ -277,6 +305,7 @@ pub async fn handle_self_healing(state: Arc<crate::server::AppState>) -> Respons
     // Upstreams (LANDED): read-only breaker snapshot — never admits a half-open
     // trial as a side effect of being observed.
     let upstreams = state.upstream_breakers.snapshot();
+    let upstream_policy = state.upstream_breakers.policy();
 
     let projector_lag_seconds = fetch_projector_status(&state).await;
 
@@ -290,6 +319,7 @@ pub async fn handle_self_healing(state: Arc<crate::server::AppState>) -> Respons
         conductor,
         admission,
         upstreams,
+        upstream_policy,
     });
 
     match serde_json::to_string_pretty(&view) {
@@ -337,8 +367,14 @@ mod tests {
                 endpoint: "http://storage:8090".to_string(),
                 circuit: "open",
                 error_streak: 4,
+                recent_failures: 3,
                 skipped: true,
             }],
+            upstream_policy: crate::routes::upstream_health::BreakerPolicy {
+                fail_threshold: 3,
+                fail_window_secs: 20,
+                cooldown_secs: 30,
+            },
         }
     }
 
@@ -354,6 +390,11 @@ mod tests {
             conductor: (true, 1, 1),
             admission: (128, 100, 0),
             upstreams: vec![],
+            upstream_policy: crate::routes::upstream_health::BreakerPolicy {
+                fail_threshold: 3,
+                fail_window_secs: 20,
+                cooldown_secs: 30,
+            },
         });
         let json = serde_json::to_value(&view).unwrap();
         // autoPreset stays reserved (null); admission + upstreams now LANDED.
@@ -366,6 +407,20 @@ mod tests {
         assert_eq!(json["admission"]["available"], serde_json::json!(100));
         assert_eq!(json["admission"]["shedTotal"], serde_json::json!(0));
         assert_eq!(json["upstreams"], serde_json::json!([]));
+        // The OPEN CONDITION is rendered beside the upstreams it judges — an
+        // operator reading "shedding" can see what shedding took.
+        assert_eq!(
+            json["upstreamPolicy"]["failThreshold"],
+            serde_json::json!(3)
+        );
+        assert_eq!(
+            json["upstreamPolicy"]["failWindowSeconds"],
+            serde_json::json!(20)
+        );
+        assert_eq!(
+            json["upstreamPolicy"]["cooldownSeconds"],
+            serde_json::json!(30)
+        );
         // LANDED scalars present and camelCase.
         assert_eq!(json["projector"]["caughtUp"], serde_json::json!(true));
         assert_eq!(json["projector"]["divergentAnchor"], serde_json::json!(0));
@@ -387,7 +442,11 @@ mod tests {
         assert_eq!(view.upstreams[0].endpoint, "http://storage:8090");
         assert_eq!(view.upstreams[0].circuit, "open");
         assert_eq!(view.upstreams[0].error_streak, 4);
+        assert_eq!(view.upstreams[0].recent_failures, 3);
         assert!(view.upstreams[0].skipped);
+        assert_eq!(view.upstream_policy.fail_threshold, 3);
+        assert_eq!(view.upstream_policy.fail_window_seconds, 20);
+        assert_eq!(view.upstream_policy.cooldown_seconds, 30);
         assert_eq!(view.upstreams[0].last_good, None);
         // LANDED projector
         assert_eq!(view.projector.lag_seconds, Some(7));

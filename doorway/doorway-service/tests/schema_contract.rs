@@ -19,7 +19,7 @@ use doorway::routes::auth_routes::{
 use doorway::routes::health::P2PHealth;
 use doorway::routes::self_healing::{
     AdmissionView, ConductorView, PeerView, ProjectorView, RenderView, SelfHealingView,
-    UpstreamView, WarmupView,
+    UpstreamPolicyView, UpstreamView, WarmupView,
 };
 use serde_json::Value;
 use std::collections::HashMap;
@@ -533,6 +533,13 @@ fn stability_status_view_pending_matches_schema() {
         auto_preset: None,
         admission: None,
         upstreams: Vec::new(),
+        // The open condition is NEVER pending: a doorway always knows what it
+        // would take to open a circuit, even before any upstream is observed.
+        upstream_policy: UpstreamPolicyView {
+            fail_threshold: 3,
+            fail_window_seconds: 20,
+            cooldown_seconds: 30,
+        },
         projector: ProjectorView {
             lag_seconds: None,
             caught_up: None,
@@ -576,9 +583,15 @@ fn stability_status_view_populated_matches_schema() {
             endpoint: "https://upstream.example".to_string(),
             circuit: "open".to_string(),
             error_streak: 5,
+            recent_failures: 3,
             last_good: Some("2026-06-13T00:00:00Z".to_string()),
             skipped: true,
         }],
+        upstream_policy: UpstreamPolicyView {
+            fail_threshold: 3,
+            fail_window_seconds: 20,
+            cooldown_seconds: 30,
+        },
         projector: ProjectorView {
             lag_seconds: Some(7),
             caught_up: Some(false),

@@ -6,15 +6,37 @@
 //! (`started.elapsed().as_secs()`) so `cooldown_ticks` == cooldown seconds.
 
 use std::cell::Cell;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Mutex;
 use std::time::Instant;
 
 use elohim_compute::{CircuitBreaker, CircuitState};
 use tracing::warn;
 
-/// Consecutive failed upstream outcomes before a circuit opens.
+/// Failed upstream outcomes *within [`UPSTREAM_CIRCUIT_FAIL_WINDOW_SECS`]*
+/// before a circuit opens.
+///
+/// This is a WINDOW threshold, not a streak threshold. See
+/// [`UPSTREAM_CIRCUIT_FAIL_WINDOW_SECS`] for why.
 pub const UPSTREAM_CIRCUIT_FAIL_THRESHOLD: u32 = 3;
+/// How recent failures must be to count toward opening a circuit.
+///
+/// WHY A WINDOW AND NOT A STREAK. The shared `CircuitBreaker` opens on N
+/// *consecutive* failures with no time bound, so a streak accumulated across
+/// minutes — or across a single upstream stall — is indistinguishable from a
+/// burst. Measured on the local mesh 2026-08-21 19:38: one ~60s conductor stall
+/// on matthew produced five connect/timeout failures inside a minute, opened the
+/// circuit, and kept shedding for minutes afterwards; storage answered the very
+/// same path in 1.6 ms a minute later, `/health` read `degraded`, and saga ch01
+/// went red against a peer that was already healthy. A stall is ONE fault, and a
+/// breaker that treats its fan-out as N independent faults over-sheds by exactly
+/// that fan-out.
+///
+/// A window makes the open condition falsifiable in time: `THRESHOLD` failures
+/// must land inside `WINDOW` seconds of each other. Failures spread wider than
+/// the window age out of the tally and never open the circuit on their own — the
+/// upstream is slow-and-recovering, not down. Same threshold, bounded evidence.
+pub const UPSTREAM_CIRCUIT_FAIL_WINDOW_SECS: u64 = 20;
 /// Seconds a circuit stays open before a half-open trial.
 pub const UPSTREAM_CIRCUIT_COOLDOWN_SECS: u64 = 30;
 /// Belt-and-braces self-heal: how many cooldowns a *consumed* half-open trial
@@ -31,10 +53,88 @@ pub const STALE_HALFOPEN_COOLDOWN_MULTIPLIER: u64 = 4;
 /// needs (the shared `CircuitBreaker` does not track *when* a trial was
 /// admitted, only when the circuit opened).
 struct Entry {
+    /// The state machine. Constructed with an inner threshold of ONE so it opens
+    /// on the single failure [`Entry::fail`] forwards once the *window* verdict
+    /// says so — the window, not the inner breaker, owns the open condition.
     cb: CircuitBreaker,
     /// Tick at which the currently-outstanding half-open trial was admitted.
     /// `Some` only while state is `HalfOpen`; cleared whenever an outcome lands.
     halfopen_since: Option<u64>,
+    /// Ticks of the failures still inside the window, oldest first. Pruned on
+    /// every failure; cleared by a success or by opening the circuit.
+    failure_ticks: VecDeque<u64>,
+    /// Consecutive recorded failures, unbounded in time. Reported by
+    /// [`UpstreamBreakers::snapshot`]; tracked HERE rather than read off the
+    /// inner breaker because the inner breaker now only ever sees the one
+    /// forwarded failure, so its own streak counter would read 1 forever.
+    error_streak: u32,
+}
+
+impl Entry {
+    fn new(cooldown_ticks: u64) -> Self {
+        Self {
+            // Threshold 1: the window decides WHEN to open, this decides HOW.
+            cb: CircuitBreaker::new(1, cooldown_ticks),
+            halfopen_since: None,
+            failure_ticks: VecDeque::new(),
+            error_streak: 0,
+        }
+    }
+
+    /// One failed outcome at `tick`. Opens the circuit only when `threshold`
+    /// failures fall inside `window_ticks` of each other.
+    fn fail(&mut self, tick: u64, window_ticks: u64, threshold: u32) {
+        self.error_streak = self.error_streak.saturating_add(1);
+        self.halfopen_since = None;
+        match self.cb.state() {
+            // A failed half-open TRIAL re-opens immediately and unconditionally:
+            // the trial is itself the probe, so one failure is complete evidence
+            // and no window applies. (This is also the path `abandon_trial`
+            // takes for a cancelled trial.)
+            CircuitState::HalfOpen => {
+                self.cb.record_outcome(false, tick);
+                self.failure_ticks.clear();
+            }
+            // Already shedding — an outcome recorded by a call admitted before
+            // the circuit opened. Count the streak, but never refresh
+            // `opened_at`: a late straggler must not extend the cooldown.
+            CircuitState::Open => {}
+            CircuitState::Closed => {
+                self.failure_ticks.push_back(tick);
+                while let Some(&oldest) = self.failure_ticks.front() {
+                    if tick.saturating_sub(oldest) > window_ticks {
+                        self.failure_ticks.pop_front();
+                    } else {
+                        break;
+                    }
+                }
+                if self.failure_ticks.len() as u32 >= threshold {
+                    // Inner threshold is 1, so this single forwarded failure
+                    // opens the circuit with `opened_at = tick`.
+                    self.cb.record_outcome(false, tick);
+                    self.failure_ticks.clear();
+                }
+            }
+        }
+    }
+
+    /// One successful outcome at `tick`: closes the circuit and empties the
+    /// window — recovery is not partial credit.
+    fn succeed(&mut self, tick: u64) {
+        self.error_streak = 0;
+        self.halfopen_since = None;
+        self.failure_ticks.clear();
+        self.cb.record_outcome(true, tick);
+    }
+
+    /// How many failures are still inside the window as of `tick` (read-only —
+    /// does not prune). Observability for `/admin/self-healing`.
+    fn failures_in_window(&self, tick: u64, window_ticks: u64) -> u32 {
+        self.failure_ticks
+            .iter()
+            .filter(|&&t| tick.saturating_sub(t) <= window_ticks)
+            .count() as u32
+    }
 }
 
 /// What the gate decided for one call.
@@ -55,15 +155,43 @@ pub struct UpstreamBreakers {
     started: Instant,
     fail_threshold: u32,
     cooldown_ticks: u64,
+    /// Seconds within which `fail_threshold` failures must land to open a
+    /// circuit. See [`UPSTREAM_CIRCUIT_FAIL_WINDOW_SECS`].
+    fail_window_ticks: u64,
 }
 
 impl UpstreamBreakers {
+    /// Threshold + cooldown with the default failure window
+    /// ([`UPSTREAM_CIRCUIT_FAIL_WINDOW_SECS`]).
     pub fn new(fail_threshold: u32, cooldown_secs: u64) -> Self {
+        Self::with_window(
+            fail_threshold,
+            cooldown_secs,
+            UPSTREAM_CIRCUIT_FAIL_WINDOW_SECS,
+        )
+    }
+
+    /// Full policy: `fail_threshold` failures within `window_secs` open the
+    /// circuit, which then sheds for `cooldown_secs` before one half-open trial.
+    pub fn with_window(fail_threshold: u32, cooldown_secs: u64, window_secs: u64) -> Self {
         Self {
             breakers: Mutex::new(HashMap::new()),
             started: Instant::now(),
-            fail_threshold,
+            fail_threshold: fail_threshold.max(1),
             cooldown_ticks: cooldown_secs,
+            fail_window_ticks: window_secs,
+        }
+    }
+
+    /// The live open-condition policy, for `/admin/self-healing` and
+    /// `/status.json`. Read from the SAME fields `record_at` decides with, so an
+    /// operator reading the window can never be reading a different number from
+    /// the one that opened the circuit (C7).
+    pub fn policy(&self) -> BreakerPolicy {
+        BreakerPolicy {
+            fail_threshold: self.fail_threshold,
+            fail_window_secs: self.fail_window_ticks,
+            cooldown_secs: self.cooldown_ticks,
         }
     }
 
@@ -84,14 +212,12 @@ impl UpstreamBreakers {
     /// (admitting exactly one trial) and re-admits a trial when an outstanding
     /// one has gone stale.
     fn admit(&self, endpoint: &str, tick: u64) -> Admission {
-        let fail_threshold = self.fail_threshold;
         let cooldown_ticks = self.cooldown_ticks;
         let stale_ticks = self.stale_halfopen_ticks();
         let mut map = self.breakers.lock().unwrap();
-        let entry = map.entry(endpoint.to_string()).or_insert_with(|| Entry {
-            cb: CircuitBreaker::new(fail_threshold, cooldown_ticks),
-            halfopen_since: None,
-        });
+        let entry = map
+            .entry(endpoint.to_string())
+            .or_insert_with(|| Entry::new(cooldown_ticks));
 
         if entry.cb.state() == CircuitState::HalfOpen {
             // A trial is already outstanding. Normally: shed until its outcome
@@ -205,13 +331,16 @@ impl UpstreamBreakers {
     fn record_at(&self, endpoint: &str, ok: bool, tick: u64) {
         let fail_threshold = self.fail_threshold;
         let cooldown_ticks = self.cooldown_ticks;
+        let window_ticks = self.fail_window_ticks;
         let mut map = self.breakers.lock().unwrap();
-        let entry = map.entry(endpoint.to_string()).or_insert_with(|| Entry {
-            cb: CircuitBreaker::new(fail_threshold, cooldown_ticks),
-            halfopen_since: None,
-        });
-        entry.cb.record_outcome(ok, tick);
-        entry.halfopen_since = None;
+        let entry = map
+            .entry(endpoint.to_string())
+            .or_insert_with(|| Entry::new(cooldown_ticks));
+        if ok {
+            entry.succeed(tick);
+        } else {
+            entry.fail(tick, window_ticks, fail_threshold);
+        }
     }
 
     /// A consumed half-open trial ended with NO outcome — the request future was
@@ -229,9 +358,11 @@ impl UpstreamBreakers {
         let mut map = self.breakers.lock().unwrap();
         if let Some(entry) = map.get_mut(endpoint) {
             if entry.cb.state() == CircuitState::HalfOpen {
-                // HalfOpen + failure → Open with opened_at = now.
-                entry.cb.record_outcome(false, tick);
-                entry.halfopen_since = None;
+                // HalfOpen + failure → Open with opened_at = now. Routed through
+                // `fail` so the abandoned trial is counted on the same streak
+                // ledger every other outcome uses (the HalfOpen arm there is
+                // unconditional — no window applies to a failed trial).
+                entry.fail(tick, self.fail_window_ticks, self.fail_threshold);
             }
         }
     }
@@ -241,6 +372,8 @@ impl UpstreamBreakers {
     /// NOT `should_skip()`, so it never admits a half-open trial as a side
     /// effect of being observed.
     pub fn snapshot(&self) -> Vec<BreakerSnapshot> {
+        let tick = self.tick();
+        let window_ticks = self.fail_window_ticks;
         let map = self.breakers.lock().unwrap();
         map.iter()
             .map(|(endpoint, entry)| {
@@ -258,7 +391,8 @@ impl UpstreamBreakers {
                 BreakerSnapshot {
                     endpoint: endpoint.clone(),
                     circuit,
-                    error_streak: cb.error_streak(),
+                    error_streak: entry.error_streak,
+                    recent_failures: entry.failures_in_window(tick, window_ticks),
                     skipped,
                 }
             })
@@ -325,9 +459,24 @@ pub struct BreakerSnapshot {
     pub endpoint: String,
     /// "closed" | "half-open" | "open"
     pub circuit: &'static str,
+    /// Consecutive recorded failures, unbounded in time (reset by any success).
     pub error_streak: u32,
+    /// Failures still inside the open-window as of this observation. THIS is
+    /// the number measured against `BreakerPolicy::fail_threshold`; the streak
+    /// above is the older, time-blind count kept for continuity.
+    pub recent_failures: u32,
     /// True when the circuit is OPEN (currently shedding, no trial admitted).
     pub skipped: bool,
+}
+
+/// The live open-condition policy: N failures within T seconds open a circuit,
+/// which then sheds for `cooldown_secs`. Rendered on `/admin/self-healing` and
+/// `/status.json` so the number an operator reads is the number the gate used.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BreakerPolicy {
+    pub fail_threshold: u32,
+    pub fail_window_secs: u64,
+    pub cooldown_secs: u64,
 }
 
 impl Default for UpstreamBreakers {
@@ -679,6 +828,201 @@ mod tests {
         );
         // Re-armed: the clock restarts from the re-admission.
         assert_eq!(b.admit(ep, 200), Admission::Shed);
+    }
+
+    // ---------------------------------------------------------------------
+    // The open condition is a WINDOW, not a streak (2026-08-21 mesh evidence:
+    // one ~60s stall on matthew fanned out into five failures inside a minute,
+    // opened the circuit, and shed for minutes while storage answered the same
+    // path in 1.6ms). Tick-injected via `record_at` so these are deterministic.
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn two_failures_outside_the_window_do_not_open() {
+        // Threshold 2 makes the WINDOW the only thing under test: two failures
+        // is enough by count, and they still must not open, because 30s apart is
+        // wider than the 20s window. A slow-and-recovering upstream is not a
+        // down one.
+        let b = UpstreamBreakers::with_window(2, 30, 20);
+        let ep = "http://slow-but-alive:8090";
+        b.record_at(ep, false, 0);
+        b.record_at(ep, false, 30);
+        assert_eq!(
+            circuit_of(&b, ep),
+            "closed",
+            "the tick-0 failure aged out of the 20s window before tick 30"
+        );
+        assert_eq!(
+            b.admit(ep, 30),
+            Admission::Closed,
+            "a closed circuit admits normally — no shed"
+        );
+        // The streak still counts them (that is the DEGRADING signal, a
+        // separate honesty axis), but only the in-window tally opens.
+        let snap = b.snapshot().into_iter().find(|s| s.endpoint == ep).unwrap();
+        assert_eq!(
+            snap.error_streak, 2,
+            "both failures are still on the streak"
+        );
+    }
+
+    #[test]
+    fn three_failures_inside_the_window_open() {
+        let b = UpstreamBreakers::with_window(3, 30, 20);
+        let ep = "http://really-down:8090";
+        b.record_at(ep, false, 0);
+        b.record_at(ep, false, 10);
+        assert_eq!(circuit_of(&b, ep), "closed", "2 of 3 inside the window");
+        b.record_at(ep, false, 19);
+        assert_eq!(
+            circuit_of(&b, ep),
+            "open",
+            "3 failures within 20s is a burst — open"
+        );
+        assert_eq!(b.admit(ep, 20), Admission::Shed, "and it sheds");
+    }
+
+    #[test]
+    fn failures_straddling_the_window_edge_never_accumulate() {
+        // The regression shape itself: a steady trickle of failures, each one
+        // further apart than the window, must NEVER open the circuit no matter
+        // how many arrive. Under the old consecutive-streak rule this opened on
+        // the third and shed for a cooldown, repeatedly.
+        let b = UpstreamBreakers::with_window(3, 30, 20);
+        let ep = "http://trickle:8090";
+        for i in 0..20u64 {
+            b.record_at(ep, false, i * 21);
+            assert_eq!(
+                circuit_of(&b, ep),
+                "closed",
+                "failure #{i} at tick {} is alone in its window",
+                i * 21
+            );
+        }
+    }
+
+    #[test]
+    fn a_success_empties_the_window() {
+        // Recovery is not partial credit: two in-window failures plus a success
+        // must not leave the circuit one failure from opening.
+        let b = UpstreamBreakers::with_window(3, 30, 20);
+        let ep = "http://recovers:8090";
+        b.record_at(ep, false, 0);
+        b.record_at(ep, false, 1);
+        b.record_at(ep, true, 2);
+        b.record_at(ep, false, 3);
+        b.record_at(ep, false, 4);
+        assert_eq!(
+            circuit_of(&b, ep),
+            "closed",
+            "the success cleared the window; two fresh failures are not three"
+        );
+        b.record_at(ep, false, 5);
+        assert_eq!(circuit_of(&b, ep), "open", "the third fresh failure opens");
+    }
+
+    #[test]
+    fn window_open_then_half_open_trial_recovers() {
+        // Full half-open recovery under the window rule: burst opens, cooldown
+        // admits exactly one trial, a successful trial closes and re-arms the
+        // window from empty.
+        let b = UpstreamBreakers::with_window(3, 30, 20);
+        let ep = "http://recovers-via-trial:8090";
+        b.record_at(ep, false, 0);
+        b.record_at(ep, false, 5);
+        b.record_at(ep, false, 10);
+        assert_eq!(circuit_of(&b, ep), "open");
+
+        assert_eq!(b.admit(ep, 20), Admission::Shed, "inside the 30s cooldown");
+        assert_eq!(
+            b.admit(ep, 40),
+            Admission::Trial,
+            "cooldown elapsed: exactly one trial"
+        );
+        assert_eq!(
+            b.admit(ep, 41),
+            Admission::Shed,
+            "everyone else still sheds"
+        );
+
+        b.record_at(ep, true, 42); // the trial succeeded
+        assert_eq!(circuit_of(&b, ep), "closed");
+        // ...and the window is empty, so a single failure does not re-open.
+        b.record_at(ep, false, 43);
+        assert_eq!(
+            circuit_of(&b, ep),
+            "closed",
+            "one failure after recovery is not a burst"
+        );
+    }
+
+    #[test]
+    fn a_failed_half_open_trial_reopens_without_waiting_for_a_window() {
+        // The trial IS the probe: one failed trial is complete evidence, so the
+        // window must not require THRESHOLD more failures before re-opening.
+        let b = UpstreamBreakers::with_window(3, 30, 20);
+        let ep = "http://trial-fails:8090";
+        b.record_at(ep, false, 0);
+        b.record_at(ep, false, 1);
+        b.record_at(ep, false, 2);
+        assert_eq!(b.admit(ep, 40), Admission::Trial);
+        b.record_at(ep, false, 41);
+        assert_eq!(
+            circuit_of(&b, ep),
+            "open",
+            "a single failed trial re-opens immediately"
+        );
+        assert_eq!(b.admit(ep, 50), Admission::Shed, "with a fresh cooldown");
+    }
+
+    #[test]
+    fn policy_reports_the_numbers_the_gate_actually_used() {
+        // C7: what /admin/self-healing and /status.json render must be read off
+        // the same fields record_at decides with — no restated constants.
+        let b = UpstreamBreakers::with_window(4, 45, 15);
+        let p = b.policy();
+        assert_eq!(p.fail_threshold, 4);
+        assert_eq!(p.fail_window_secs, 15);
+        assert_eq!(p.cooldown_secs, 45);
+
+        let ep = "http://policy:8090";
+        // Exactly `fail_threshold` failures inside exactly `fail_window_secs`.
+        for i in 0..p.fail_threshold as u64 {
+            b.record_at(ep, false, i * 5);
+        }
+        assert_eq!(
+            circuit_of(&b, ep),
+            "open",
+            "threshold failures spanning {}s (window {}s) opened it",
+            (p.fail_threshold as u64 - 1) * 5,
+            p.fail_window_secs
+        );
+
+        let d = UpstreamBreakers::default();
+        assert_eq!(d.policy().fail_threshold, UPSTREAM_CIRCUIT_FAIL_THRESHOLD);
+        assert_eq!(
+            d.policy().fail_window_secs,
+            UPSTREAM_CIRCUIT_FAIL_WINDOW_SECS
+        );
+        assert_eq!(d.policy().cooldown_secs, UPSTREAM_CIRCUIT_COOLDOWN_SECS);
+    }
+
+    #[test]
+    fn snapshot_recent_failures_counts_only_the_window() {
+        let b = UpstreamBreakers::with_window(5, 30, 20);
+        let ep = "http://window-count:8090";
+        b.record(ep, false);
+        b.record(ep, false);
+        let snap = b.snapshot().into_iter().find(|s| s.endpoint == ep).unwrap();
+        assert_eq!(snap.error_streak, 2);
+        assert_eq!(
+            snap.recent_failures, 2,
+            "both failures landed in the same wall-clock second"
+        );
+        b.record(ep, true);
+        let snap = b.snapshot().into_iter().find(|s| s.endpoint == ep).unwrap();
+        assert_eq!(snap.recent_failures, 0, "a success empties the window");
+        assert_eq!(snap.error_streak, 0);
     }
 
     #[test]

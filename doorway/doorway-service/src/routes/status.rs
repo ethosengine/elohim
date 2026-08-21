@@ -266,6 +266,13 @@ pub struct StatusResponse {
     pub upstreams: Vec<UpstreamStatus>,
     /// Inbound admission gate state (ceiling, headroom, shed count).
     pub admission: AdmissionStatus,
+    /// The live circuit-breaker OPEN CONDITION: N failures within T seconds,
+    /// then shed for a cooldown. Read off `UpstreamBreakers::policy()` — the
+    /// same fields the gate decides with — so an operator reading the window
+    /// here cannot be reading a different number from the one that opened a
+    /// circuit (C7, the same derive-don't-restate rule `freshness` follows).
+    #[serde(rename = "upstreamPolicy")]
+    pub upstream_policy: UpstreamPolicyStatus,
     /// The live freshness policy this doorway serves under: the declared stage,
     /// where that declaration came from, the per-class requirement, and the
     /// last-good pantry's occupancy.
@@ -284,9 +291,29 @@ pub struct UpstreamStatus {
     pub endpoint: String,
     /// "closed" | "half-open" | "open"
     pub circuit: String,
+    /// Consecutive recorded failures, unbounded in time.
     #[serde(rename = "errorStreak")]
     pub error_streak: u32,
+    /// Failures still inside the open-window — the number actually measured
+    /// against `upstreamPolicy.failThreshold`.
+    #[serde(rename = "recentFailures")]
+    pub recent_failures: u32,
     pub skipped: bool,
+}
+
+/// The open condition every `UpstreamStatus` above is judged by.
+#[derive(Debug, Serialize)]
+pub struct UpstreamPolicyStatus {
+    /// Failures required to open a circuit.
+    #[serde(rename = "failThreshold")]
+    pub fail_threshold: u32,
+    /// Seconds those failures must land within. A failure older than this ages
+    /// out and never opens a circuit on its own.
+    #[serde(rename = "failWindowSeconds")]
+    pub fail_window_secs: u64,
+    /// Seconds an open circuit sheds before admitting one half-open trial.
+    #[serde(rename = "cooldownSeconds")]
+    pub cooldown_secs: u64,
 }
 
 /// Inbound admission gate state for `/status.json`.
@@ -716,9 +743,16 @@ async fn build_status_data(state: &Arc<AppState>) -> StatusResponse {
             endpoint: b.endpoint,
             circuit: b.circuit.to_string(),
             error_streak: b.error_streak,
+            recent_failures: b.recent_failures,
             skipped: b.skipped,
         })
         .collect();
+    let breaker_policy = state.upstream_breakers.policy();
+    let upstream_policy = UpstreamPolicyStatus {
+        fail_threshold: breaker_policy.fail_threshold,
+        fail_window_secs: breaker_policy.fail_window_secs,
+        cooldown_secs: breaker_policy.cooldown_secs,
+    };
     let admission = AdmissionStatus {
         max_inflight: crate::metrics::inbound_max() as usize,
         available: state.inbound_semaphore.available_permits(),
@@ -750,6 +784,7 @@ async fn build_status_data(state: &Arc<AppState>) -> StatusResponse {
         federated_peers,
         upstreams,
         admission,
+        upstream_policy,
         freshness: crate::routes::freshness::status_block(
             state.network_stage,
             state.stage_provenance,
@@ -1320,12 +1355,18 @@ mod tests {
                 endpoint: "http://localhost:8090".to_string(),
                 circuit: "closed".to_string(),
                 error_streak: 0,
+                recent_failures: 0,
                 skipped: false,
             }],
             admission: AdmissionStatus {
                 max_inflight: 256,
                 available: 256,
                 shed_total: 0,
+            },
+            upstream_policy: UpstreamPolicyStatus {
+                fail_threshold: crate::routes::upstream_health::UPSTREAM_CIRCUIT_FAIL_THRESHOLD,
+                fail_window_secs: crate::routes::upstream_health::UPSTREAM_CIRCUIT_FAIL_WINDOW_SECS,
+                cooldown_secs: crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
             },
             freshness: crate::routes::freshness::status_block(
                 seam_contracts::freshness::NetworkStage::Bootstrap,
