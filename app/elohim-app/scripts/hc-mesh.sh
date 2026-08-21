@@ -284,6 +284,7 @@ EOF
     # bundle carries only index.csr.html, so WITHOUT SSR the / mount 404s.
     DOORWAY_ID="${DOORWAY_ID:-alpha-elohim-host}" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-a" \
+    ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
     SSR_BUNDLE_PATH="${SSR_BUNDLE_PATH:-$REPO_ROOT/app/elohim-app/dist/elohim-app/server/main.server.mjs}" \
     SSR_BUNDLE_SLUG="${SSR_BUNDLE_SLUG:-elohim-host-landing}" \
     SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
@@ -307,6 +308,7 @@ EOF
   if ! curl -s -m 2 "http://localhost:$DOORWAY_B_PORT/health" >/dev/null; then
     DOORWAY_ID="${DOORWAY_B_ID:-apex-elohim-host}" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-b" \
+    ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
     SSR_BUNDLE_PATH="${SSR_BUNDLE_PATH:-$REPO_ROOT/app/elohim-app/dist/elohim-app/server/main.server.mjs}" \
     SSR_BUNDLE_SLUG="${SSR_BUNDLE_SLUG:-elohim-host-landing}" \
     SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
