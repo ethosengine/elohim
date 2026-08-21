@@ -6,7 +6,7 @@
 # Proof signal: GET /health conductor.connected=true, plus the peer's own healthy
 # verdict (healthy:true, status:"online").
 # Status today: GREEN — stable, already-verified baseline infrastructure.
-@e2e @dataplane @concern:saga-01-device-awakens
+@e2e @dataplane @concern:saga-01-device-awakens @act:i
 Feature: Chapter 1 — the device awakens
   Before matthew can upload anything or host anyone, his device's conductor must be
   up and the doorway process in front of it must report itself healthy. This chapter

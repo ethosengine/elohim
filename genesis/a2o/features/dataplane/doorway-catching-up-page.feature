@@ -13,7 +13,7 @@
 # including the diagnostic ones — served only the bare shed JSON. The
 # diagnostics scenario pins the self-blinding fix: probe routes bypass the
 # breaker, or an incident hides its own evidence.
-@e2e @dataplane @concern:doorway-catching-up-page
+@e2e @dataplane @concern:doorway-catching-up-page @act:i
 Feature: Doorway catching-up page — staged, honest shed progress for people
 
   Background:

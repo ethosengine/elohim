@@ -2,7 +2,7 @@
 # scripts/ci/verify-projected-head.sh. CI proves this once per deploy, against
 # the bundle it just authored; this feature proves it stands independently of
 # any particular deploy, against whatever head is currently declared.
-@e2e @dataplane @concern:served-projected-head @requires:multi-node
+@e2e @dataplane @concern:served-projected-head @requires:multi-node @act:i
 Feature: Served-vs-declared projected head propagation
   federation-deploy.feature and blob-replication.feature pin that a routed mount
   answers 200 and that a content row's blobHash is non-null on every federation

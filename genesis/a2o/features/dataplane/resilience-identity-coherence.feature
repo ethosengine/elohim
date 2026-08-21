@@ -11,7 +11,7 @@
 # Transport-Identity Coherence" and
 # genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md
 # §3.4 "stopgap".
-@e2e @dataplane @concern:identity-coherence @regression
+@e2e @dataplane @concern:identity-coherence @regression @act:i
 Feature: Membership projection stamps the member's agent key — household resilience joins light
   Before this guard, on_membership_projected stamped humans.household_id from a DHT
   MembershipProjected signal but dropped the agent_pub_key already carried in the

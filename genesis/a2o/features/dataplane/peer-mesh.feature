@@ -1,4 +1,4 @@
-@e2e @dataplane @concern:peer-mesh @requires:multi-node
+@e2e @dataplane @concern:peer-mesh @requires:multi-node @act:i
 Feature: Peer mesh connectivity
   The alpha deployment forms a connected P2P mesh: peers announce themselves via the DHT,
   establish direct libp2p connections, and the storage projector reconciles anchor divergence

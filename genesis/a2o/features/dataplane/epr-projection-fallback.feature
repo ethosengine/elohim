@@ -1,6 +1,6 @@
 # RED-FIRST: fails until dataplane-peer-fallback-and-blob-replication lands;
 # this IS the acceptance gate.
-@e2e @dataplane @concern:epr-projection-fallback @requires:multi-node
+@e2e @dataplane @concern:epr-projection-fallback @requires:multi-node @act:i
 Feature: EPR projection fallback — root resolution on federation peer
   On elohim.host (the alpha-b federation peer), resolving "/" returns HTTP 404 with
   body {"error": "App not found: elohim-host-landing"} because the EPR content record

@@ -29,10 +29,11 @@
 #   declared head on BOTH alpha-A and elohim.host (reused verbatim from
 #   served-projected-head.feature's Track-4 T4-2 step).
 #
-# Status today: GREEN locally. The cross-node scenario needs the full alpha fabric
-# to be meaningful (comparing two independently-operated federation doorways), so it
-# is tagged @requires:alpha-cluster-6peer.
-@e2e @dataplane @concern:saga-06-heads-converge
+# Status today: GREEN locally. The cross-node scenario compares alpha-A against
+# elohim.host, the doorway-pair's own federation partner — both are inside the Act I
+# baseline (multi-node, doorway-pair), so it needs no @requires:alpha-cluster-6peer;
+# a household-owned mesh already has the two doorways this comparison needs.
+@e2e @dataplane @concern:saga-06-heads-converge @act:i
 Feature: Chapter 6 — blobs sync to one head
   A visitor reaching elohim-host-landing (the household's public landing page) through
   a different doorway than matthew's must see the SAME page matthew published, not a
@@ -226,7 +227,6 @@ Feature: Chapter 6 — blobs sync to one head
   Scenario: the sweep-abandoned counter is registered and queryable
     Then metric "elohim_content_witness_sweep_abandoned_total" on peer "alpha-A" >= 0
 
-  @requires:alpha-cluster-6peer
   Scenario: alpha-A and elohim.host serve the same converged head for elohim-host-landing
     Given peer "elohim.host" at "elohim.host"
     Then the served head for EPR "elohim-host-landing" matches the declared head on peer "alpha-A"

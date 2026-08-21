@@ -13,7 +13,7 @@
 # land PENDING (step definitions in steps/contributor-presence.steps.ts return
 # 'pending'), never failed. They un-pend when the seeder bootstrap (Stage 1) and
 # the verified-vs-witnessed holder fold (Stage 2) land.
-@e2e @dataplane @concern:contributor-presence @wip
+@e2e @dataplane @concern:contributor-presence @wip @act:i
 Feature: Fixture residents hold their households as witnessed presences, not bare humans
   A substrate resident without a conductor is a person not yet in the network —
   a ContributorPresence, not a humans row claiming an agent it does not have.

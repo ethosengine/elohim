@@ -18,7 +18,7 @@
 # Status today: live infrastructure — the free-bytes assertion is expected to
 # already hold; the stewarded-bytes assertion is deliberately weak until chapter 2's
 # identity-fill cure lands.
-@e2e @dataplane @concern:saga-08-capacity-reported
+@e2e @dataplane @concern:saga-08-capacity-reported @act:i
 Feature: Chapter 8 — capacity is reported
   A mesh's resilience is only as legible as the capacity its custodians report.
   This chapter proves the cluster-aggregate free and stewarded capacity gauges are
@@ -30,5 +30,8 @@ Feature: Chapter 8 — capacity is reported
   Scenario: The cluster reports non-zero free custodian capacity
     Then metric "elohim_custodian_free_bytes" on peer "alpha-A" > 0
 
+  # HELD (2026-08-21): >=0 on an unsigned gauge is unfalsifiable; the chapter header
+  # admits it is a placeholder until identity-fill lands.
+  @wip
   Scenario: The cluster reports a non-negative stewarded-bytes aggregate
     Then metric "elohim_custodian_stewarded_bytes" on peer "alpha-A" >= 0

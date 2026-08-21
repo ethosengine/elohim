@@ -25,7 +25,7 @@
 # doorway surfaces serve again) and go red if receive-side idempotency ever regresses.
 # @requires:alpha-cluster-6peer — needs the live multi-peer alpha mesh (the storm only
 # manifests under real cross-peer gossip fan-in).
-@e2e @dataplane @concern:inventory-convergence @requires:alpha-cluster-6peer
+@e2e @dataplane @concern:inventory-convergence @requires:alpha-cluster-6peer @act:ii
 Feature: Inventory-gossip apply plane converges under WAN-adversarial gossip
   A peer that sinks the full arc must drain inbound inventory idempotently: redundant
   re-delivered or re-emitted snapshots of an unchanged blob set carry no new information

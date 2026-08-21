@@ -29,7 +29,7 @@
 # Status today: RED on the numeric compare — upstream chapters this one depends on
 # (5 co-steward-agreement, 9 projectors-carry) are themselves born red, so the card
 # cannot yet tell a converged truth. The rendered scenario stays @wip.
-@e2e @dataplane @concern:saga-10-card-tells-truth
+@e2e @dataplane @concern:saga-10-card-tells-truth @act:i
 Feature: Chapter 10 — the resilience card tells the truth
   Two doorways, one truth: the resilience card for elohim-host-landing must report
   the SAME non-zero stewarding picture whether a human views it via alpha or via

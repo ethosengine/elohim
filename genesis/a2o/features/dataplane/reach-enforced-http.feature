@@ -18,7 +18,7 @@
 # so the property asserted is a RELATION that holds under every vocabulary:
 # a credential the substrate cannot verify grants nothing beyond no credential
 # at all. That is drift-proof, and it is precisely what the bypass violated.
-@e2e @dataplane @concern:reach-enforced-http
+@e2e @dataplane @concern:reach-enforced-http @act:i
 Feature: Reach is enforced at the HTTP egress, not inferred from a header
   "Reach" is the audience an EPR has earned — who may receive it. It is
   independent of which version is canonical and of how many peers hold the

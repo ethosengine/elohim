@@ -20,7 +20,7 @@
 # `rea_commitments`, where the replication fold reads `commons_bytes`. This
 # chapter therefore restores the byte-budget assertion that was previously
 # documented as unreachable. Do not weaken either assertion to make it pass.
-@e2e @dataplane @concern:saga-09-projectors-carry
+@e2e @dataplane @concern:saga-09-projectors-carry @act:i
 Feature: Chapter 9 — projector caches carry the head
   A resilience projector is only trustworthy if its cached view carries the same
   replication truth the live mesh has already converged on. This chapter proves the

@@ -1,6 +1,6 @@
 # RED-FIRST: fails until blobHash-pointer propagation lands; asserts uniform all-peer EPR
 # resolution to kill the per-host stageSpaBlob crutch.
-@e2e @dataplane @concern:federation-deploy @requires:multi-node
+@e2e @dataplane @concern:federation-deploy @requires:multi-node @act:i
 Feature: Federation deploy uniformity — landing EPR resolves on all federation doorways
   The landing EPR (elohim-host-landing) must resolve correctly on EVERY federation doorway,
   not just the deploy-time author peer. Two conditions must hold on each doorway: the root path

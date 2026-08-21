@@ -20,7 +20,7 @@
 # Status today: BORN RED — no such commitment has been notarized and projected on
 # alpha yet; this chapter is the loop's work queue entry for wiring the co-steward
 # agreement flow end to end. Do not weaken this assertion to make it pass.
-@e2e @dataplane @concern:saga-05-co-steward-agreement
+@e2e @dataplane @concern:saga-05-co-steward-agreement @act:i
 Feature: Chapter 5 — adam co-stewards via a rea-agreement
   matthew's content needs more than one steward to survive a single device loss.
   adam's co-stewardship is a Mishpat-notarized Commitment, projected into

@@ -1,4 +1,4 @@
-@e2e @dataplane @concern:relay-capacity @requires:multi-node
+@e2e @dataplane @concern:relay-capacity @requires:multi-node @act:ii
 Feature: TURN relay capacity bounds doorway-operator serviceable scale
   # HARVESTED 2026-07-28 (story-harvest, two-premises TURN shakeout).
   #

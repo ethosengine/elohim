@@ -55,7 +55,7 @@
 # scenario's gauge assertion. Residual (separate node, not this finish line):
 # location rows under superseded shard hashes keep class="unknown" high (1543
 # on alpha-A at RCA) until peer-announced orphan hygiene exists.
-@e2e @dataplane @concern:saga-07-custody-witnessed
+@e2e @dataplane @concern:saga-07-custody-witnessed @act:i
 Feature: Chapter 7 — custody is witnessed
   A household entrusts its content — a family's writings, a learner's record —
   to peers who PROMISE to hold the bytes. Until some peer OBSERVES that holding

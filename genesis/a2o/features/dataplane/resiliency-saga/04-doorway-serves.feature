@@ -18,7 +18,7 @@
 # src/framework/dataplane/surfaces.ts.
 #
 # Status: see the chapter table in README.md (this directory) — the README, not this header, is the authority (headers here went stale mid-2026-07).
-@e2e @dataplane @concern:saga-04-doorway-serves
+@e2e @dataplane @concern:saga-04-doorway-serves @act:i
 Feature: Chapter 4 — the doorway serves
   Hosting a doorway means a human's browser gets a real page back. This chapter
   proves the root path answers 200 with the actual SPA shell rendered — the visible,

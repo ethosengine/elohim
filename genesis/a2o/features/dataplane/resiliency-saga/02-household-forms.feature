@@ -34,7 +34,7 @@
 # chapter whose finish-line state is supplied by the other legs. When the
 # migration lands, discovery on matthew goes non-zero and the per-member buckets
 # become meaningful again.
-@e2e @dataplane @concern:saga-02-household-forms
+@e2e @dataplane @concern:saga-02-household-forms @act:i
 Feature: Chapter 2 — the household forms
   matthew's household (jessica, james) must be discoverable and legible before any
   co-stewardship agreement can be witnessed: identity-fill finds their household

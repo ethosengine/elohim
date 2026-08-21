@@ -1,6 +1,6 @@
 # RED-FIRST: fails until dataplane-peer-fallback-and-blob-replication lands;
 # this IS the acceptance gate.
-@e2e @dataplane @concern:blob-replication @requires:multi-node
+@e2e @dataplane @concern:blob-replication @requires:multi-node @act:i
 Feature: Blob replication — EPR blobHash metadata propagation to federation peer
   The landing EPR (elohim-host-landing) has a non-null blobHash on alpha-A (the
   deploy-time author peer): the SPA bundle was zipped, uploaded, and the EPR content

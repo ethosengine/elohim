@@ -15,7 +15,7 @@
 # catching-up admission shed (503 + {"status":"catching-up"}, retryAfter
 # honored, 90s cap). A peer still shedding after the bound fails honestly with
 # the shed body in the message.
-@e2e @dataplane @concern:saga-03-eprfs-upload
+@e2e @dataplane @concern:saga-03-eprfs-upload @act:i
 Feature: Chapter 3 — matthew's deploy-time upload of elohim-host-landing materialized in his eprfs
   matthew is the author persona of peer "alpha-A" (his node in the alpha
   deployment; the Background binds every probe to it). His eprfs — the peer's

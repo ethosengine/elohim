@@ -39,7 +39,7 @@
 # Born red 2026-08-21: the three freshness scenarios. No deploy carries the
 # graded-freshness cure yet, so today these reads shed instead of declaring a
 # colour, and no doorway emits a freshness header at all.
-@e2e @dataplane @concern:doorway-failover
+@e2e @dataplane @concern:doorway-failover @act:i
 Feature: Doorway failover — two doorways, one name, one truth
   A person reaching for elohim.host should never inherit a single doorway's bad
   hour. The doorway pair must be honestly classifiable, someone must always be

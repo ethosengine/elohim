@@ -1,4 +1,4 @@
-@e2e @dataplane @concern:operator-runtime-surface @requires:multi-node
+@e2e @dataplane @concern:operator-runtime-surface @requires:multi-node @act:i
 Feature: Operator verbs are commitment-gated protocol acts, not cluster surgery
   THE STORY. Today "operating a peer" means holding OUR cluster's credentials:
   restart scripts call kubectl, admin routes answer whoever reaches them, and a
@@ -117,6 +117,9 @@ Feature: Operator verbs are commitment-gated protocol acts, not cluster surgery
     When "matthew" requests a reconcile on peer "alpha-A" through the doorway
     Then the request is refused
 
+  # HELD (2026-08-21): the negative leg is a regex over the storage base URL string — it can
+  # only fail if someone configures E2E_STORAGE_* at Grafana. Near-unfalsifiable as written.
+  @wip
   Scenario: a peer serves its own runtime telemetry
     # The symmetry gap: today this peer is legible only through the operator's
     # observability cluster, which makes "operating your own node" false for anyone
