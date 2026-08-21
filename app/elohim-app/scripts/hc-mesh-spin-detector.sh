@@ -25,6 +25,18 @@
 #     decreasing across >= 3 cycles AND saturated lines/s is over threshold;
 #     QUIET otherwise.
 #
+#   - per-conductor THREAD COUNT, and the hottest threads by name. `perf` is not
+#     installable in this container (no perf/kernel-tools package in any
+#     configured repo, checked 2026-08-21), so this is the profiler substitute:
+#     /proc/<pid>/task/<tid>/{stat,comm} gives per-thread CPU and thread names,
+#     which is enough to say WHICH worker is burning the core even though it
+#     cannot say which function inside it.
+#   - each storage peer's own convergence state, read-only, from GET /p2p/status:
+#     connected peers, whether projection-reconcile reports itself caught up and
+#     converged, and its divergent-anchor count. A conductor spinning while its
+#     storage peer insists it is caught up is a different (and worse) finding
+#     than one spinning while its peer openly reports divergence.
+#
 # A one-line JSON summary is printed last (and optionally written to a file)
 # so an a2o step can assert on the verdict without parsing the human report.
 #
@@ -53,6 +65,12 @@
 #                       ~0.26 lines/s TOTAL, alpha is 600-950/s of THIS class)
 #     --cpu-threshold C cores per conductor above which CPU is flagged hot in
 #                       the report (default 0.8; informational, not the verdict)
+#     --storage N=URL   a storage peer to probe read-only for convergence state;
+#                       repeatable. Default: derived from the discovered
+#                       conductor names on the standard mesh port scheme
+#                       (matthew :8090, jessica :8091, james :8092).
+#     --no-storage      skip the storage probes entirely
+#     --top-threads N   report the N hottest THREADS per conductor (default 3)
 #     --json-out PATH   also write the one-line JSON summary here
 #     --quiet           suppress per-cycle rows; print the summary + verdict only
 #
@@ -72,7 +90,10 @@ SAT_THRESHOLD="${SPIN_SAT_THRESHOLD:-5.0}"
 CPU_THRESHOLD="${SPIN_CPU_THRESHOLD:-0.8}"
 JSON_OUT=""
 QUIET=0
+PROBE_STORAGE=1
+TOP_THREADS="${SPIN_TOP_THREADS:-3}"
 declare -a LOG_NAMES=() LOG_PATHS=() PID_NAMES=() PID_VALUES=()
+declare -a STORAGE_NAMES=() STORAGE_URLS=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -84,6 +105,9 @@ while [ $# -gt 0 ]; do
     --sat-threshold) SAT_THRESHOLD="$2"; shift 2 ;;
     --cpu-threshold) CPU_THRESHOLD="$2"; shift 2 ;;
     --json-out)      JSON_OUT="$2"; shift 2 ;;
+    --storage)       STORAGE_NAMES+=("${2%%=*}"); STORAGE_URLS+=("${2#*=}"); shift 2 ;;
+    --no-storage)    PROBE_STORAGE=0; shift ;;
+    --top-threads)   TOP_THREADS="$2"; shift 2 ;;
     --quiet)         QUIET=1; shift ;;
     -h|--help)       sed -n '2,60p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $1 (try --help)" >&2; exit 2 ;;
@@ -112,6 +136,39 @@ fi
 if [ ${#LOG_NAMES[@]} -eq 0 ]; then
   LOG_NAMES+=("mesh"); LOG_PATHS+=("$LOCAL_DEV_DIR/.sandbox_run_log")
 fi
+
+# Storage peers default to the mesh's standard port scheme, derived from the
+# conductor names we just discovered — so the common case needs no flags, and an
+# unusual topology stays expressible with --storage.
+if [ "$PROBE_STORAGE" -eq 1 ] && [ ${#STORAGE_NAMES[@]} -eq 0 ]; then
+  IFS=',' read -ra _MESH_PEERS <<< "${MESH_PEERS:-matthew,jessica,james}"
+  for i in "${!_MESH_PEERS[@]}"; do
+    for pn in "${PID_NAMES[@]}"; do
+      if [ "$pn" = "${_MESH_PEERS[$i]}" ]; then
+        STORAGE_NAMES+=("$pn"); STORAGE_URLS+=("http://localhost:$((8090 + i))")
+      fi
+    done
+  done
+fi
+
+# Read-only convergence probe. Never writes, never retries hard, and treats an
+# unreachable peer as a REPORTED fact rather than a failure — a peer that cannot
+# answer during a spin measurement is itself a finding.
+storage_probe() { # <url> -> "connectedPeers caughtUp converged divergentAnchor pullCaughtUp"
+  curl -s -m 5 "$1/p2p/status" 2>/dev/null | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print("- - - - -"); raise SystemExit(0)
+pr = d.get("projectionReconcile") or {}
+pull = d.get("pull") or {}
+def s(v):
+    return "-" if v is None else str(v).lower()
+print(s(d.get("connectedPeers")), s(pr.get("caughtUp")), s(pr.get("converged")),
+      s(pr.get("divergentAnchor")), s(pull.get("caughtUp")))
+' 2>/dev/null || echo "- - - - -"
+}
 
 if [ ${#PID_NAMES[@]} -eq 0 ]; then
   echo "no conductor processes found (looked for: holochain --config-path ...). Is the mesh up?" >&2
@@ -159,6 +216,26 @@ classify() { # <path> <from_offset> <to_offset>
     }'
 }
 
+thread_count() { ls "/proc/$1/task" 2>/dev/null | wc -l; }
+
+# Per-thread CPU accounting — the stand-in for a profiler we cannot install.
+# Emits "<tid> <ticks> <comm>" per line for every thread of <pid>. The comm goes
+# LAST because thread names contain spaces: holochain names eight of its threads
+# "RTC worker", which with comm in the middle shifts the tick count into the
+# name field, and `set -u` then evaluates "worker" as an unbound variable inside
+# the arithmetic. Trailing-field-absorbs-the-rest is the only safe layout.
+thread_ticks() { # <pid>
+  local d
+  for d in /proc/"$1"/task/*; do
+    [ -d "$d" ] || continue
+    local tid comm stat
+    tid="${d##*/}"
+    comm="$(cat "$d/comm" 2>/dev/null)" || continue
+    stat="$(cat "$d/stat" 2>/dev/null)" || continue
+    echo "$tid $(echo "$stat" | awk '{ rest = substr($0, index($0, ")") + 2); n = split(rest, f, " "); print f[12] + f[13] }') ${comm:-unknown}"
+  done
+}
+
 cpu_ticks() { # <pid> -> utime+stime, or "" when the process is gone
   local stat
   stat="$(cat "/proc/$1/stat" 2>/dev/null)" || return 1
@@ -169,13 +246,26 @@ cpu_ticks() { # <pid> -> utime+stime, or "" when the process is gone
 # --- baseline snapshot -------------------------------------------------------
 declare -A PREV_TICKS PREV_OFF
 declare -A CPU_SUM CPU_MAX CPU_LAST
+declare -A THREADS_LAST THREADS_MAX
+declare -A PREV_TT SUM_TT TT_COMM
+declare -A STORE_BEFORE STORE_AFTER
 declare -A TOT_SUM SAT_SUM NOP_SUM SYS_SUM
 declare -A MISS_SERIES MISS_LAST FETCH_LAST DNA_LAST
 
 for i in "${!PID_NAMES[@]}"; do
-  t="$(cpu_ticks "${PID_VALUES[$i]}")" || t=""
-  PREV_TICKS["${PID_NAMES[$i]}"]="${t:-0}"
-  CPU_SUM["${PID_NAMES[$i]}"]=0; CPU_MAX["${PID_NAMES[$i]}"]=0
+  n="${PID_NAMES[$i]}"; pid="${PID_VALUES[$i]}"
+  t="$(cpu_ticks "$pid")" || t=""
+  PREV_TICKS["$n"]="${t:-0}"
+  CPU_SUM["$n"]=0; CPU_MAX["$n"]=0
+  THREADS_LAST["$n"]="$(thread_count "$pid")"; THREADS_MAX["$n"]="${THREADS_LAST[$n]}"
+  while read -r tid ticks comm; do
+    [ -n "$tid" ] || continue
+    PREV_TT["$n|$tid"]="$ticks"; SUM_TT["$n|$tid"]=0; TT_COMM["$n|$tid"]="$comm"
+  done < <(thread_ticks "$pid")
+done
+
+for i in "${!STORAGE_NAMES[@]}"; do
+  STORE_BEFORE["${STORAGE_NAMES[$i]}"]="$(storage_probe "${STORAGE_URLS[$i]}")"
 done
 for i in "${!LOG_NAMES[@]}"; do
   n="${LOG_NAMES[$i]}"
@@ -189,6 +279,9 @@ echo "hc-mesh-spin-detector: ${CYCLES} cycles x ${WINDOW}s = $((CYCLES * WINDOW)
 echo "  conductors: $(for i in "${!PID_NAMES[@]}"; do printf '%s(%s) ' "${PID_NAMES[$i]}" "${PID_VALUES[$i]}"; done)"
 echo "  log streams: $(for i in "${!LOG_NAMES[@]}"; do printf '%s=%s ' "${LOG_NAMES[$i]}" "${LOG_PATHS[$i]}"; done)"
 echo "  thresholds: saturated > ${SAT_THRESHOLD} lines/s (verdict), cpu > ${CPU_THRESHOLD} cores (flag)"
+if [ ${#STORAGE_NAMES[@]} -gt 0 ]; then
+  echo "  storage peers (read-only /p2p/status): $(for i in "${!STORAGE_NAMES[@]}"; do printf '%s=%s ' "${STORAGE_NAMES[$i]}" "${STORAGE_URLS[$i]}"; done)"
+fi
 echo
 
 for cycle in $(seq 1 "$CYCLES"); do
@@ -205,6 +298,15 @@ for cycle in $(seq 1 "$CYCLES"); do
       cores="$(awk -v d="$((t - ${PREV_TICKS[$n]}))" -v hz="$CLK_TCK" -v w="$WINDOW" 'BEGIN{printf "%.2f", d/hz/w}')"
       PREV_TICKS["$n"]="$t"
       CPU_LAST["$n"]="$cores"
+      tc="$(thread_count "$p")"
+      THREADS_LAST["$n"]="$tc"
+      [ "$tc" -gt "${THREADS_MAX[$n]:-0}" ] && THREADS_MAX["$n"]="$tc"
+      while read -r tid ticks comm; do
+        [ -n "$tid" ] || continue
+        prev="${PREV_TT[$n|$tid]:-$ticks}"
+        SUM_TT["$n|$tid"]=$(( ${SUM_TT[$n|$tid]:-0} + ticks - prev ))
+        PREV_TT["$n|$tid"]="$ticks"; TT_COMM["$n|$tid"]="$comm"
+      done < <(thread_ticks "$p")
       CPU_SUM["$n"]="$(awk -v a="${CPU_SUM[$n]}" -v b="$cores" 'BEGIN{printf "%.4f", a+b}')"
       awk -v a="${CPU_MAX[$n]}" -v b="$cores" 'BEGIN{exit !(b>a)}' && CPU_MAX["$n"]="$cores"
     fi
@@ -241,6 +343,10 @@ for cycle in $(seq 1 "$CYCLES"); do
 
   [ "$QUIET" -eq 1 ] || printf 'cycle %d/%d  cpu(cores): %s\n           logs: %s\n' \
     "$cycle" "$CYCLES" "$cpu_row" "$log_row"
+done
+
+for i in "${!STORAGE_NAMES[@]}"; do
+  STORE_AFTER["${STORAGE_NAMES[$i]}"]="$(storage_probe "${STORAGE_URLS[$i]}")"
 done
 
 # --- verdict -----------------------------------------------------------------
@@ -288,7 +394,19 @@ for i in "${!PID_NAMES[@]}"; do
   else
     avg="$(awk -v s="${CPU_SUM[$n]}" -v c="$CYCLES" 'BEGIN{printf "%.2f", s/c}')"
     hot=""; awk -v a="$avg" -v t="$CPU_THRESHOLD" 'BEGIN{exit !(a>t)}' && hot="  <-- hot"
-    printf '  cpu  %-10s avg %s cores, max %s cores%s\n' "$n" "$avg" "${CPU_MAX[$n]}" "$hot"
+    printf '  cpu  %-10s avg %s cores, max %s cores, %s threads (max %s)%s\n' \
+      "$n" "$avg" "${CPU_MAX[$n]}" "${THREADS_LAST[$n]:-?}" "${THREADS_MAX[$n]:-?}" "$hot"
+    # Hottest threads — which worker is burning it, since perf is unavailable here.
+    top="$(for key in "${!SUM_TT[@]}"; do
+             [ "${key%%|*}" = "$n" ] || continue
+             echo "${SUM_TT[$key]} ${key##*|} ${TT_COMM[$key]}"
+           done | sort -rn | head -"$TOP_THREADS")"
+    while read -r ticks tid comm; do
+      [ -n "${ticks:-}" ] || continue
+      [ "$ticks" -gt 0 ] || continue
+      printf '       %-10s thread %-7s %-18s %s cores\n' "" "$tid" "$comm" \
+        "$(awk -v d="$ticks" -v hz="$CLK_TCK" -v s="$((CYCLES * WINDOW))" 'BEGIN{printf "%.2f", d/hz/s}')"
+    done <<< "$top"
   fi
 done
 for i in "${!LOG_NAMES[@]}"; do
@@ -303,6 +421,15 @@ for i in "${!LOG_NAMES[@]}"; do
     "$([ -n "${DNA_LAST[$n]}" ] && printf ' | per-dna: %s' "${DNA_LAST[$n]}")"
   printf '       %-10s trend [%s] -> %s (%s)\n' "$n" "${MISS_SERIES[$n]}" "${STREAM_VERDICT[$n]}" "${STREAM_REASON[$n]}"
 done
+if [ ${#STORAGE_NAMES[@]} -gt 0 ]; then
+  for i in "${!STORAGE_NAMES[@]}"; do
+    n="${STORAGE_NAMES[$i]}"
+    read -r b_peers b_caught b_conv b_div b_pull <<< "${STORE_BEFORE[$n]:-- - - - -}"
+    read -r a_peers a_caught a_conv a_div a_pull <<< "${STORE_AFTER[$n]:-- - - - -}"
+    printf '  peer %-10s connected %s->%s | reconcile caughtUp %s->%s converged %s->%s | divergentAnchor %s->%s | pull caughtUp %s->%s\n' \
+      "$n" "$b_peers" "$a_peers" "$b_caught" "$a_caught" "$b_conv" "$a_conv" "$b_div" "$a_div" "$b_pull" "$a_pull"
+  done
+fi
 echo
 echo "VERDICT: $VERDICT"
 
@@ -316,7 +443,19 @@ for i in "${!PID_NAMES[@]}"; do
     json+="$sep\"$n\":{\"pid\":${PID_VALUES[$i]},\"state\":\"gone\"}"
   else
     avg="$(awk -v s="${CPU_SUM[$n]}" -v c="$CYCLES" 'BEGIN{printf "%.2f", s/c}')"
-    json+="$sep\"$n\":{\"pid\":${PID_VALUES[$i]},\"avgCores\":$avg,\"maxCores\":${CPU_MAX[$n]}}"
+    json+="$sep\"$n\":{\"pid\":${PID_VALUES[$i]},\"avgCores\":$avg,\"maxCores\":${CPU_MAX[$n]}"
+    json+=",\"threads\":${THREADS_LAST[$n]:-0},\"maxThreads\":${THREADS_MAX[$n]:-0},\"topThreads\":["
+    tsep=""
+    while read -r ticks tid comm; do
+      [ -n "${ticks:-}" ] || continue
+      [ "$ticks" -gt 0 ] || continue
+      json+="$tsep{\"tid\":$tid,\"comm\":\"$comm\",\"cores\":$(awk -v d="$ticks" -v hz="$CLK_TCK" -v s="$((CYCLES * WINDOW))" 'BEGIN{printf "%.2f", d/hz/s}')}"
+      tsep=","
+    done <<< "$(for key in "${!SUM_TT[@]}"; do
+                  [ "${key%%|*}" = "$n" ] || continue
+                  echo "${SUM_TT[$key]} ${key##*|} ${TT_COMM[$key]}"
+                done | sort -rn | head -"$TOP_THREADS")"
+    json+="]}"
   fi
   sep=","
 done
@@ -332,6 +471,26 @@ for i in "${!LOG_NAMES[@]}"; do
   json+=",\"sysValPerSec\":$(awk -v c="${SYS_SUM[$n]}" -v s="$total_s" 'BEGIN{printf "%.2f", c/s}')"
   json+=",\"missingDeps\":$miss,\"fetched\":$fetch"
   json+=",\"missingSeries\":\"${MISS_SERIES[$n]}\",\"verdict\":\"${STREAM_VERDICT[$n]}\"}"
+  sep=","
+done
+json+="}"
+json+=",\"storagePeers\":{"
+sep=""
+for i in "${!STORAGE_NAMES[@]}"; do
+  n="${STORAGE_NAMES[$i]}"
+  jstore() { # <probe-tuple> -> JSON object; "-" becomes null, never a fake value
+    read -r peers caught conv div pull <<< "$1"
+    local o="{"
+    o+="\"connectedPeers\":$([ "$peers" = "-" ] && echo null || echo "$peers")"
+    o+=",\"reconcileCaughtUp\":$([ "$caught" = "-" ] && echo null || echo "$caught")"
+    o+=",\"reconcileConverged\":$([ "$conv" = "-" ] && echo null || echo "$conv")"
+    o+=",\"divergentAnchor\":$([ "$div" = "-" ] && echo null || echo "$div")"
+    o+=",\"pullCaughtUp\":$([ "$pull" = "-" ] && echo null || echo "$pull")"
+    echo "$o}"
+  }
+  json+="$sep\"$n\":{\"url\":\"${STORAGE_URLS[$i]}\""
+  json+=",\"before\":$(jstore "${STORE_BEFORE[$n]:-- - - - -}")"
+  json+=",\"after\":$(jstore "${STORE_AFTER[$n]:-- - - - -}")}"
   sep=","
 done
 json+="}}"

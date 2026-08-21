@@ -66,13 +66,36 @@ interface LogStreamReading {
   verdict: string;
 }
 
+interface StoragePeerReading {
+  connectedPeers: number | null;
+  reconcileCaughtUp: boolean | null;
+  reconcileConverged: boolean | null;
+  divergentAnchor: number | null;
+  pullCaughtUp: boolean | null;
+}
+
 interface DetectorReading {
   verdict: string;
   cycles: number;
   windowSecs: number;
   satThreshold: number;
-  conductors: Record<string, { pid: number; avgCores?: number; maxCores?: number; state?: string }>;
+  conductors: Record<
+    string,
+    {
+      pid: number;
+      avgCores?: number;
+      maxCores?: number;
+      state?: string;
+      threads?: number;
+      maxThreads?: number;
+      topThreads?: { tid: number; comm: string; cores: number }[];
+    }
+  >;
   logStreams: Record<string, LogStreamReading>;
+  storagePeers?: Record<
+    string,
+    { url: string; before: StoragePeerReading; after: StoragePeerReading }
+  >;
 }
 
 interface SpinState {
@@ -109,10 +132,12 @@ function requireProcessControl(): void {
 
 /** Storage base URL for a household peer, from the fixture's declared pool. */
 function peerStorageUrl(peer: string): string {
-  const index = ['matthew', 'jessica', 'james'].indexOf(peer);
+  // Scenarios name household members the way people do ("Matthew"); the mesh
+  // names their peers in lowercase. One lowercase here keeps both honest.
+  const index = ['matthew', 'jessica', 'james'].indexOf(peer.toLowerCase());
   assert.ok(index >= 0, `unknown household peer "${peer}"`);
   const fixture = loadHouseholdMeshFixture();
-  const fromFixture = fixture.storagePeers?.[peer]?.url;
+  const fromFixture = fixture.storagePeers?.[peer.toLowerCase()]?.url;
   return fromFixture ?? `http://localhost:${8090 + index}`;
 }
 
@@ -237,6 +262,10 @@ When(
       args.push('--log', `${TARGET_PEER}=${peerLog}`);
       args.push('--log', `mesh=${REPO_ROOT}/elohim/holochain/local-dev/.sandbox_run_log`);
     }
+    // Same predictable home the chaos script's measure phase writes to, so an
+    // operator comparing runs and this step read the identical artifact.
+    const phase = state.rekeyed ? 'after-rekey' : 'baseline';
+    args.push('--json-out', `${MESH_DIR}/spin/${RUN_TAG}-${phase}.json`);
     const { out } = runScript(DETECTOR, args, minutes * MINUTE_MS + DETECTOR_SLACK_MS);
     state.detector = parseDetectorJson(out);
   }
@@ -312,7 +341,7 @@ Given('James has authored content on his own peer', { timeout: 9 * MINUTE_MS }, 
 });
 
 Given(
-  "that content is anchored on James's own conductor, signed onto his chain",
+  "that content is anchored on James's own conductor, signed onto his source chain",
   { timeout: 5 * MINUTE_MS },
   async () => {
     for (const id of authoredIds()) {
@@ -443,7 +472,7 @@ Then(
   }
 );
 
-Then("James's peer does not answer with silence while its conductor grinds", () => {
+Then("James's peer answers every request instead of shedding it or holding it open", () => {
   const answers = state.answers ?? [];
   for (const a of answers) {
     assert.notEqual(

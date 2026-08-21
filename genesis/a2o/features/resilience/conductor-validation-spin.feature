@@ -41,7 +41,7 @@ Feature: A household peer can be re-keyed without grinding the rest of the house
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
-    And the household mesh is running with peers "matthew", "jessica" and "james"
+    And the household mesh is running with peers "Matthew", "Jessica" and "James"
     # The doorway is the household's front door, and every scenario in this
     # suite establishes one. This story then works behind it, peer to peer,
     # because the grind it measures happens between the conductors themselves.
@@ -88,7 +88,7 @@ Feature: A household peer can be re-keyed without grinding the rest of the house
 
   Scenario: A re-keyed household peer leaves the others at rest, not grinding
     Given James has authored content on his own peer
-    And that content is anchored on James's own conductor, signed onto his chain
+    And that content is anchored on James's own conductor, signed onto his source chain
     And Matthew's and Jessica's peers hold that content under James's anchor
     And the content James already stored stays on his disk through the re-key
     When James's peer is re-keyed, taking a new conductor identity
@@ -96,6 +96,11 @@ Feature: A household peer can be re-keyed without grinding the rest of the house
     Then the spin detector's verdict is "QUIET"
     And no conductor accumulates a missing-dependency backlog that stops shrinking
     And the conductors' read-pool saturation rate stays under the spin threshold
+    # A SOURCE CHAIN is the running, signed record of everything one conductor
+    # has ever done, and each entry is signed with that conductor's key. A
+    # re-key starts a new one and abandons the old, which is why the old
+    # signatures become unproducible for everybody at once.
+    #
     # Authoring and anchoring are two steps, and the second is the one that
     # matters here: authoring writes the content to James's own machine, while
     # anchoring signs it onto his conductor's chain and publishes it, which is
@@ -119,7 +124,7 @@ Feature: A household peer can be re-keyed without grinding the rest of the house
     Given James's peer has been re-keyed after authoring content
     When Matthew asks James's peer for that content
     Then James's peer either re-adopts that content under his new key or reports it as unfetchable
-    And James's peer does not answer with silence while its conductor grinds
+    And James's peer answers every request instead of shedding it or holding it open
     # Losing a key is allowed. Two answers are honest: "I have this again, under
     # my new name" or "I cannot prove this any more". The third answer — an open
     # request, held forever, behind a conductor burning a core to re-ask a

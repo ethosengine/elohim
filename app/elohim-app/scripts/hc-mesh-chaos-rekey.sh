@@ -69,6 +69,7 @@ API_KEY="${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}"
 MESH_PEERS="${MESH_PEERS:-matthew,jessica,james}"
 DETECTOR="$SCRIPT_DIR/hc-mesh-spin-detector.sh"
 WORK_DIR="${CHAOS_WORK_DIR:-$MESH_DIR/chaos-rekey}"
+SPIN_JSON_DIR="${SPIN_JSON_DIR:-$MESH_DIR/spin}"
 
 PEER="james"
 COUNT=5
@@ -427,9 +428,15 @@ phase_measure() {
   [ -x "$DETECTOR" ] || fail "spin detector not found/executable at $DETECTOR"
   local logs=(--log "mesh=$SHARED_RUN_LOG")
   [ -f "$PEER_RUN_LOG" ] && logs+=(--log "$PEER=$PEER_RUN_LOG")
+  # One predictable home for the machine-readable summary, so an a2o step (or an
+  # operator comparing two runs) can find it without knowing this script's
+  # internal work-dir layout: $MESH_DIR/spin/<tag>-<phase>.json
+  mkdir -p "$SPIN_JSON_DIR"
   "$DETECTOR" "${logs[@]}" --minutes "$MEASURE_MINUTES" \
-    --json-out "$WORK_DIR/$TAG.after.json" | tee "$WORK_DIR/$TAG.after.txt"
+    --json-out "$SPIN_JSON_DIR/$TAG-measure.json" | tee "$WORK_DIR/$TAG.after.txt"
   local rc=${PIPESTATUS[0]}
+  cp -f "$SPIN_JSON_DIR/$TAG-measure.json" "$WORK_DIR/$TAG.after.json" 2>/dev/null
+  say "spin summary: $SPIN_JSON_DIR/$TAG-measure.json"
 
   head_ "post-re-key content honesty on $PEER (:$PEER_HTTP)"
   # Alpha's honest alternative to a spin: the peer either RE-ADOPTS its old
