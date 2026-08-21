@@ -495,6 +495,24 @@ impl ContentService {
             content_diesel::update_content(&mut conn, &self.ctx, server_patch)?;
         }
 
+        // Mirror the COMMITTED reach into SQL when the re-publish carried a
+        // reach change the projection would otherwise drop. See
+        // `reach_mirror_after_renotarize` for why the projection drops it and
+        // why this stays on the request-borne path only.
+        if let Some(committed_reach) = reach_mirror_after_renotarize(
+            view.reach.as_deref(),
+            &output.content.reach,
+            &existing.content.reach,
+        ) {
+            let mut conn = self.conn()?;
+            let reach_patch = content_diesel::UpdateContentInput {
+                id: id.to_string(),
+                reach: Some(committed_reach),
+                ..Default::default()
+            };
+            content_diesel::update_content(&mut conn, &self.ctx, reach_patch)?;
+        }
+
         let updated = {
             let mut conn = self.conn()?;
             content_diesel::get_content_with_tags(
@@ -713,6 +731,34 @@ impl ContentService {
     }
 }
 
+/// The reach value a request-borne re-notarization must mirror into SQL, or
+/// `None` when there is nothing to mirror.
+///
+/// `ContentProjectionPatch` CARRIES `reach`, but `apply_content_patch_fields`
+/// writes it only on the defensive-INSERT branch — on the UPDATE branch (every
+/// existing row) it is silently dropped. So a reach change that legitimately
+/// reached the DHT through the bootstrap/stale-anchor re-publish left the local
+/// row on its OLD grade: a projection DIVERGING from the entry it had just
+/// notarized, which is worse than the silent no-op `reach_patch_refusal`
+/// covers.
+///
+/// Mirror the COMMITTED reach (what the conductor returned), never the
+/// requested one — SQL must say what the DHT says, not what the caller hoped.
+///
+/// Deliberately narrow to this request-borne path. Teaching the SHARED
+/// signal-projection path to re-project reach for every anchored row would
+/// re-grade the whole corpus off DHT entries in one deploy — a corpus-wide
+/// product decision, not a defect fix (see
+/// `genesis/data/timeline/backlog/2026-08-21-seed-doorway-unauthored-reach-default.md`).
+fn reach_mirror_after_renotarize(
+    requested_reach: Option<&str>,
+    committed_reach: &str,
+    row_reach: &str,
+) -> Option<String> {
+    requested_reach?;
+    (committed_reach != row_reach).then(|| committed_reach.to_string())
+}
+
 /// Decide whether a reach-carrying PATCH must be REFUSED rather than answered
 /// with a success it cannot honor.
 ///
@@ -843,6 +889,41 @@ mod tests {
         // entry via `create_content` — that call DOES carry reach, so the patch
         // genuinely applies and must not be refused.
         assert!(reach_patch_refusal("c1", None, "public", Some("community")).is_none());
+    }
+
+    #[test]
+    fn reach_mirror_writes_the_committed_grade_when_the_republish_carried_one() {
+        // Unanchored row: the bootstrap re-publish DID carry reach to the DHT,
+        // but the projection drops it on the UPDATE branch — so the mirror must
+        // write the COMMITTED value, not the requested one and not nothing.
+        assert_eq!(
+            reach_mirror_after_renotarize(Some("community"), "community", "public"),
+            Some("community".to_string())
+        );
+    }
+
+    #[test]
+    fn reach_mirror_is_silent_when_nothing_asked_or_nothing_moved() {
+        // No reach in the patch → never touch the column.
+        assert_eq!(
+            reach_mirror_after_renotarize(None, "public", "public"),
+            None
+        );
+        // The conductor committed the grade the row already had → no write.
+        assert_eq!(
+            reach_mirror_after_renotarize(Some("public"), "public", "public"),
+            None
+        );
+    }
+
+    #[test]
+    fn reach_mirror_trusts_the_conductor_over_the_request() {
+        // The caller asked for `intimate`; the committed entry says `community`.
+        // SQL must say what the DHT says.
+        assert_eq!(
+            reach_mirror_after_renotarize(Some("intimate"), "community", "public"),
+            Some("community".to_string())
+        );
     }
 
     #[test]
