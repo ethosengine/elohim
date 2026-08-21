@@ -52,6 +52,14 @@
 #                   pulls API_KEY_ADMIN from a real secret. Printed in the
 #                   `status` probe-env line and exported by `mesh_seed_env`.
 #
+#   MESH_CONDUCTOR_LAUNCH
+#                   `hc` (default) launches via `hc sandbox run`; `direct` runs
+#                   each conductor binary itself. Use `direct` with HOLOCHAIN_BIN
+#                   whenever the conductor's config schema differs from the `hc`
+#                   CLI's — the CLI rewrites the config in its own schema and a
+#                   mismatched conductor then refuses to boot. `direct` also
+#                   gives each conductor its own log file.
+#
 #   HOLOCHAIN_BIN   Absolute path to a conductor binary to run INSTEAD of the
 #                   `holochain` on PATH (see the block above stop_all). Unset =
 #                   stock. Used for conductor-fork A/B runs; a binary swap alone
@@ -275,12 +283,19 @@ mesh_seed_env() { # ONE source of truth for the seed-chain-facing env block.
 # ---------------------------------------------------------------------------
 HOLOCHAIN_BIN="${HOLOCHAIN_BIN:-}"
 
-# Emit the env prefix for a `hc sandbox` invocation. Empty when HOLOCHAIN_BIN is
-# unset, so the default path is byte-identical to what it was before this knob.
-holochain_bin_env() {
+# Export the conductor-binary selection into the CURRENT shell. Call it inside a
+# subshell right before launching `hc sandbox`.
+#
+# It is a function that exports rather than one that prints an env prefix,
+# because `VAR=x $(prefix_fn) prog` does NOT do what it looks like: the command
+# substitution expands into the COMMAND WORD position and bash tries to execute
+# "HC_HOLOCHAIN_PATH=..." as a program. That failed silently into the conductor
+# log ("No such file or directory") while every conductor stayed down.
+holochain_bin_export() {
   [ -n "$HOLOCHAIN_BIN" ] || return 0
   [ -x "$HOLOCHAIN_BIN" ] || { echo "HOLOCHAIN_BIN is not executable: $HOLOCHAIN_BIN" >&2; exit 1; }
-  printf 'HC_HOLOCHAIN_PATH=%s PATH=%s:%s ' "$HOLOCHAIN_BIN" "$(dirname "$HOLOCHAIN_BIN")" "$PATH"
+  export HC_HOLOCHAIN_PATH="$HOLOCHAIN_BIN"
+  export PATH="$(dirname "$HOLOCHAIN_BIN"):$PATH"
 }
 
 stop_all() {
@@ -553,6 +568,47 @@ restart_conductors() {
   # agent tool-call or a CI step and having them vanish the moment that step
   # returns is the failure this prevents (observed 2026-08-21: conductors up at
   # 17:16:51, gone by 17:20, no crash in the log because there was none).
+  # CONFIG-SCHEMA COMPAT (0.6.0 -> 0.6.3). A conductor-config.yaml written by
+  # hc 0.6.0 carries `network.base64_auth_material`, which 0.6.3 REMOVED in
+  # favour of base64_auth_material_bootstrap / _relay. A 0.6.3 conductor refuses
+  # to parse it outright:
+  #
+  #   network: unknown field `base64_auth_material`, expected one of
+  #   `base64_auth_material_bootstrap`, `base64_auth_material_relay`, ...
+  #
+  # so swapping the binary against existing sandboxes fails before boot, with
+  # every conductor down and the reason buried in the run log. On this mesh the
+  # field is null, i.e. it carries no information, so dropping it makes the same
+  # file readable by BOTH versions — which is also what an A/B wants: one config,
+  # two binaries, no other difference. A NON-null value is a real credential and
+  # is left alone, loudly, because migrating it is a decision this script must
+  # not make silently.
+  #
+  # This is not only a local-mesh concern: rolling a 0.6.3-line conductor onto
+  # any fleet whose conductor data dir was written by 0.6.0 hits exactly this,
+  # and the conductor PVC is persistent.
+  local cfg
+  for name in "${PEERS[@]}"; do
+    cfg="$LOCAL_DEV_DIR/$name/conductor-config.yaml"
+    [ -f "$cfg" ] || continue
+    python3 - "$cfg" "$name" <<'CFGEOF'
+import sys, yaml
+path, name = sys.argv[1], sys.argv[2]
+with open(path) as f:
+    cfg = yaml.safe_load(f) or {}
+net = cfg.get("network") or {}
+if "base64_auth_material" in net:
+    if net["base64_auth_material"] is None:
+        del net["base64_auth_material"]
+        cfg["network"] = net
+        with open(path, "w") as f:
+            yaml.safe_dump(cfg, f, default_flow_style=False, sort_keys=False)
+        print(f"  {name}: dropped null network.base64_auth_material (0.6.3 rejects the key)")
+    else:
+        print(f"  {name}: WARN network.base64_auth_material is SET — a 0.6.3 conductor will refuse this config; migrate it deliberately", file=sys.stderr)
+CFGEOF
+  done
+
   # NO -p ON A RESTART. `hc sandbox run --help` says it outright: "Interfaces
   # are persistent. If you add an interface it will be there next time you run
   # the conductor." The app interfaces were attached by the original generate
@@ -574,9 +630,40 @@ restart_conductors() {
   else
     echo "  holochain: $(command -v holochain) ($(holochain --version 2>&1 | head -1)) [stock, PATH]"
   fi
-  RUST_LOG="$MESH_RUST_LOG" $(holochain_bin_env) \
-  setsid nohup sh -c "echo test | hc sandbox --piped -f $fports run -a" >> .sandbox_run_log 2>&1 &
-  disown 2>/dev/null || true
+  # LAUNCH MODE. `hc sandbox run` is the normal path, but it cannot be used for a
+  # conductor A/B across a config-schema change: the `hc` CLI REWRITES each
+  # conductor-config.yaml (that is how -f pins admin ports) in ITS OWN version's
+  # schema. With hc 0.6.0 on PATH and a 0.6.3 conductor binary, hc puts
+  # `base64_auth_material` back immediately after the compat shim above removes
+  # it, and the 0.6.3 conductor then refuses to parse the file. The CLI and the
+  # conductor must agree on the schema, and only the conductor was rebuilt.
+  #
+  # `direct` launches each conductor itself — exactly the argv hc would have used
+  # — with the passphrase piped the same way. No CLI, no rewrite, and as a bonus
+  # each conductor gets its OWN log file, so the spin detector can attribute log
+  # rates per conductor instead of reading one multiplexed prefix-less stream.
+  #
+  # Ports come from each conductor-config.yaml, which already carries the pinned
+  # admin port, so nothing needs -f.
+  if [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "direct" ]; then
+    local hc_bin="${HOLOCHAIN_BIN:-$(command -v holochain)}"
+    [ -x "$hc_bin" ] || { echo "no conductor binary: $hc_bin" >&2; return 1; }
+    echo "  launch mode: direct (per-conductor logs, no hc CLI rewrite)"
+    for name in "${PEERS[@]}"; do
+      (
+        export RUST_LOG="$MESH_RUST_LOG"
+        cd "$LOCAL_DEV_DIR" || exit 1
+        setsid nohup sh -c "echo test | '$hc_bin' --piped --structured=Log --config-path '$LOCAL_DEV_DIR/$name/conductor-config.yaml'" \
+          >> "$LOCAL_DEV_DIR/.sandbox_run_log.$name" 2>&1 &
+      )
+    done
+  else
+    (
+      export RUST_LOG="$MESH_RUST_LOG"
+      holochain_bin_export
+      setsid nohup sh -c "echo test | hc sandbox --piped -f $fports run -a" >> .sandbox_run_log 2>&1 &
+    )
+  fi
 
   echo -n "waiting for ${#PEERS[@]} conductors to boot"
   for _ in $(seq 1 60); do
@@ -867,8 +954,11 @@ PYEOF
     done
     echo "dev-tier gossip config patched into ${#PEERS[@]} conductor-config.yaml (k2Gossip initiate=1000ms)"
 
-    RUST_LOG="$MESH_RUST_LOG" $(holochain_bin_env) \
-    nohup sh -c "echo test | hc sandbox --piped -f $fports run -a -p=$rports" > .sandbox_run_log 2>&1 &
+    (
+      export RUST_LOG="$MESH_RUST_LOG"
+      holochain_bin_export
+      setsid nohup sh -c "echo test | hc sandbox --piped -f $fports run -a -p=$rports" > .sandbox_run_log 2>&1 &
+    )
     echo -n "waiting for ${#PEERS[@]} conductors to boot"
     for _ in $(seq 1 90); do
       [ "$(ss -tln | grep -cE "127.0.0.1:($(echo "$fports" | tr ',' '|')) ")" -ge ${#PEERS[@]} ] && break
