@@ -362,14 +362,33 @@ status_all() {
   printf "mongod   :%s " "$MONGO_PORT"
   if (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null; then echo "UP (archive-backed doorways)"; else echo "down (doorways run archive-less: inert warm shell)"; fi
   echo
+  # What is ACTUALLY RUNNING comes first, read from /proc — not what the next
+  # launch would choose. Those differ whenever someone overrides HOLOCHAIN_BIN
+  # for one restart, and a status line that reports the intention instead of the
+  # fact is exactly the kind of confident-wrong measure this mesh keeps teaching
+  # us to distrust.
+  local _running_bin _running_desc
+  _running_bin="$(for pid in $(ps -eo pid=,args= | awk -v me="$$" '$1 != me && index($0, "--config-path") && index($0, "/local-dev/") { print $1 }'); do
+      readlink "/proc/$pid/exe" 2>/dev/null | sed 's/ (deleted)$//'; done | sort -u | head -1)"
+  if [ -n "$_running_bin" ]; then
+    _running_desc="$_running_bin ($("$_running_bin" --version 2>&1 | head -1))"
+    case "$_running_bin" in
+      *fork-bin*) _running_desc="$_running_desc [FORK]" ;;
+      *) _running_desc="$_running_desc [STOCK — alpha runs the fork, so this mesh is NOT at parity]" ;;
+    esac
+  else
+    _running_desc="(no conductor running)"
+  fi
+  echo "conductor RUNNING: $_running_desc"
+
   local _hc_desc
   if [ -n "$HOLOCHAIN_BIN" ]; then
     _hc_desc="$HOLOCHAIN_BIN ($("$HOLOCHAIN_BIN" --version 2>&1 | head -1))$([ -n "$FORK_BIN_DIR" ] && printf ' [FORK, auto-detected]' || printf ' [explicit HOLOCHAIN_BIN]')"
   else
     _hc_desc="$(command -v holochain) ($(holochain --version 2>&1 | head -1)) [STOCK — alpha runs the fork, so this mesh is NOT at parity]"
   fi
-  echo "conductor:  $_hc_desc"
-  echo "hc CLI:     $(command -v hc) ($(hc --version 2>&1 | head -1))"
+  echo "conductor NEXT LAUNCH: $_hc_desc"
+  echo "hc CLI:            $(command -v hc) ($(hc --version 2>&1 | head -1))"
   echo "probe env:  PEER_STORAGE_URLS=\"$(peer_csv)\" CONDUCTOR_URLS=\"$(conductor_csv)\" INTERNAL_DOORWAY_URL=\"localhost:$DOORWAY_PORT\" E2E_DOORWAY_B=\"http://localhost:${DOORWAY_B_PORT:-8889}\" API_KEY_ADMIN=\"${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}\""
 }
 
