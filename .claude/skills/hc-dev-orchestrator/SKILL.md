@@ -73,7 +73,12 @@ seed the Act I substrate a2o's `@act:i` scenarios need — named conductor
 identities, the landing + lamad-spa bundles (browser AND the landing's SSR
 server bundle), the full CI-order seed chain (identities cast BEFORE `seed-humans` on the mesh — doorway A's hosted pool is matthew's conductor, so hosted registrations must not claim it first), and the household fixture
 manifest `genesis/a2o/src/framework/fixtures/household-mesh.ts` resolves
-against:
+against, and Act I's own cast — the drill fixtures two resilience features
+name (`heal-target`, `chaos-ladder`) with their household custody promises,
+and the co-steward agreement (`seed-household-costeward.ts`) the saga's last
+chapters count. On alpha that agreement is authored at run time by chapter 5
+with adam as co-steward; the household mesh has no such author, so the
+Prologue casts jessica co-stewarding the landing EPR instead:
 
 ```bash
 just mesh start                # bring the mesh up first — the Prologue never starts/stops it
