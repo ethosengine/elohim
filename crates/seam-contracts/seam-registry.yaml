@@ -144,3 +144,223 @@ decisionPoints:
       content-addressed hash) and is the reason the Arbitrated harness — not the type — is what
       catches a constant or colliding tiebreak. `real_predicate_is_arbitration_conformant`
       carries the worst case deliberately.
+
+  - name: verdict
+    kind: verdict-fn
+    sourceLocation:
+      file: src/freshness.rs
+      modulePath: seam_contracts::freshness::verdict
+      line: 328
+    summary: >
+      Grades ONE read's freshness requirement by its declared stakes and answers whether the
+      available colour satisfies it: `requirement(class, stage)` x `Available` -> Serve |
+      ServeAmber | ServeAmberWarn | Shed, with Authority and CounterEvidence as never-
+      stage-priced FLOOR rows.
+    concernIds:
+      - id: C13
+        status: answered
+        justification: >
+          This IS C13's guarantee form for the serving path. The pre-cure contract was UNIFORM —
+          a doorway shed every data read the moment its upstream circuit opened, so a content
+          read and a session mint were priced identically (elohim.host, 2026-08-20: hours of 503
+          on every /db/content/* while nothing needed a live witness to be answered honestly).
+          The graduation is real and bounded on both ends: matrix_table_matches_the_operator_
+          confirmed_defaults pins the per-class-per-stage prices as independently stated
+          literals, and floor_classes_never_yield_amber_over_the_full_product walks the entire
+          ReadClass x NetworkStage x Available product (16 x 11 = 176 points, count asserted,
+          amber ages sampled at every boundary including zero and ten years) proving no stage
+          can cheapen a floor row. That is the same shape as elohim-storage's
+          `every_in_crate_pricer_forces_full_chain_across_the_entire_product_space`: a floor is
+          only a floor if no point in the product space escapes it.
+      - id: C4
+        status: answered
+        justification: >
+          Amber is the honest name for "I hold real, content-addressed bytes but no current
+          witness," and the verdict type keeps it categorically apart from green — a caller can
+          never be handed stale bytes labelled fresh. `Available::None` sheds for every class and
+          every stage (nothing_available_sheds_for_every_class_and_stage, full 4x4 asserted): the
+          predicate has no arm that invents an answer it does not have.
+      - id: C8
+        status: answered
+        justification: >
+          FreshnessVerdict implements ReasonLabel with a pinned four-label vocabulary
+          (freshness_verdict_is_reason_label_conformant asserts conformant + discriminating +
+          stable against the literal set), so `{class,stage,verdict}` is a countable triple and a
+          rename is a decision rather than a silent dashboard break. ReadClass::label() and
+          NetworkStage::label() supply the other two label axes and are metric-safe-charset
+          asserted (read_class_labels_are_the_wire_vocabulary).
+      - id: C10
+        status: answered
+        justification: >
+          NetworkStage here is a declared MIRROR of the authority in
+          elohim/elohim-storage/src/trust/stage.rs — this crate is a leaf (zero first-party deps,
+          enforced by no_heavy_deps_in_dep_tree) so it cannot import the authority. The honesty
+          is mechanized, not asserted in a comment: network_stage_variant_names_match_storage_
+          trust_stage READS the authority's source text, parses its variant list, and compares —
+          so a variant added or renamed on the authority side fails HERE. FromStr is exact-
+          lowercase with no aliasing and no case folding, and the label/parse round trip is
+          pinned, so "what the resolver accepts" and "what the metric emits" cannot drift apart.
+      - id: C0
+        status: n-a
+        justification: >
+          Plane location is the CALLER's decision. This is a plain-data function over four small
+          enums; it names no plane, reads no store, and is linked identically by a doorway (web2
+          projection), a storage peer, or a WASM zome. The Cat-C placement question for the
+          doorway's last-good pantry is answered in the CONSUMING crate's rows, where the store
+          actually lives.
+      - id: C1
+        status: n-a
+        justification: >
+          There is no election here and no author identity in any input: the arguments are a read
+          class, a stage, and an availability colour. Nothing in the signature can express "I am
+          the one who should win," so the predicate adds no self-election channel.
+      - id: C2
+        status: n-a
+        justification: >
+          No claim is arbitrated and nothing is ordered. Freshness is a per-request grading, not a
+          contest between competing declarations, so monotonic-authority has no subject here. The
+          stage's own Ord IS semantic and independently pinned
+          (network_stage_ordering_matches_declared_semantics) but it orders permissiveness, not
+          authority over a move.
+      - id: C3
+        status: answered
+        justification: >
+          The function is total over its input product: every (class, stage, available) triple
+          has exactly one verdict and no arm can wedge, loop, or return "undecided" — there is no
+          reachable state without a legal move because there is no state at all. Proven by
+          construction rather than by narrative: the two total-row tests
+          (nothing_available_sheds_for_every_class_and_stage,
+          a_live_green_answer_serves_for_every_class_and_stage) each assert the full 4x4, and the
+          floor property walks all 176 points.
+      - id: C5
+        status: partial
+        justification: >
+          `Available::Amber { age }` is EVIDENCE the caller presents, and this predicate re-
+          derives nothing about it — it cannot check that the bytes hash to their claimed
+          content address or that the age is honestly computed. That re-derivation is a real
+          obligation and it lives at the consuming stock/draw seam (doorway mints a CIDv1 over the
+          body it stocks and serves it as `x-elohim-served-head`, so a consumer CAN re-derive).
+          `partial`, not `answered`: the contract crate carries the grading, the consumer carries
+          the re-derivation, and only the pair closes C5.
+      - id: C6a
+        status: n-a
+        justification: >
+          The predicate schedules no work and owns no budget: two matches and a Duration compare,
+          allocation-free. The bounded-work question belongs to the pantry that produces
+          `Available::Amber` (per-entry and total byte caps) and is bound in the consuming crate's
+          pantry row, not here — binding it here would be a second claim on someone else's budget.
+      - id: C6b
+        status: answered
+        justification: >
+          Pure and total: the same inputs yield the same verdict every time, and evaluating it a
+          hundred times mints nothing and changes nothing. Idempotence is structural (no &mut, no
+          interior mutability, no clock) rather than tested for, which is the stronger form.
+      - id: C7
+        status: partial
+        justification: >
+          This function is the thing an advertise surface must AGREE with, not the surface itself
+          — it has nothing of its own to advertise. `requirement()` is public precisely so a
+          status endpoint can render the live policy from the same function that decides, instead
+          of restating it (the phantom-legend failure mode). `partial` because the symmetry can
+          only be proven where the surface exists: doorway's freshness_status_block_matches_the_
+          predicate is the test that closes it, and it is cited on the consuming crate's row.
+      - id: C9
+        status: n-a
+        justification: >
+          No identity, key, or lineage appears in any input or output. A read's freshness is
+          independent of who is asking; the authorization question is a different gate (C12) that
+          runs before this one.
+      - id: C11
+        status: partial
+        justification: >
+          The predicate is compatible with honoring externally-imposed backpressure — serving
+          amber costs the upstream nothing, so an upstream 429/503 can be honored AND answered —
+          but it neither receives nor enforces a backpressure signal itself; nothing in its
+          signature names an upstream. The obligation ("amber served during backpressure must
+          never touch storage") is enforceable only at the call site and is bound on the
+          consuming crate's forwarder row.
+      - id: C12
+        status: n-a
+        justification: >
+          Freshness is orthogonal to authorization. This function never sees a bearer, a reach
+          level, or a consent record, and MUST NOT be read as an access decision — a
+          ServeAmber verdict says "these bytes are fresh enough," never "this caller may have
+          them." The consent gate (reach + Authorization) runs separately and is bound where it
+          lives; conflating them is exactly the mistake the two-axes discipline in the module doc
+          exists to prevent.
+      - id: C14
+        status: answered
+        justification: >
+          The outcome set closes: Shed is the named, countable residual arm rather than a dropped
+          or defaulted case, and it is reached by construction from every unsatisfiable
+          combination (GreenOnly x amber, any requirement x None, expired amber). There is no
+          fall-through, no Option, and no panic path — an unclassifiable outcome is not
+          expressible, so nothing can go unwitnessed.
+    contractTests:
+      - path: crates/seam-contracts/src/freshness.rs
+        testName: floor_classes_never_yield_amber_over_the_full_product
+        kind: unit
+        mirrorRisk: false
+      - path: crates/seam-contracts/src/freshness.rs
+        testName: matrix_table_matches_the_operator_confirmed_defaults
+        kind: unit
+        mirrorRisk: false
+      - path: crates/seam-contracts/src/freshness.rs
+        testName: floor_classes_still_serve_a_live_green_answer
+        kind: unit
+      - path: crates/seam-contracts/src/freshness.rs
+        testName: amber_strictly_past_max_age_sheds
+        kind: unit
+      - path: crates/seam-contracts/src/freshness.rs
+        testName: nothing_available_sheds_for_every_class_and_stage
+        kind: unit
+      - path: crates/seam-contracts/src/freshness.rs
+        testName: a_live_green_answer_serves_for_every_class_and_stage
+        kind: unit
+      - path: crates/seam-contracts/src/freshness.rs
+        testName: is_floor_agrees_with_the_matrix
+        kind: unit
+      - path: crates/seam-contracts/src/freshness.rs
+        testName: network_stage_variant_names_match_storage_trust_stage
+        kind: unit
+        mirrorRisk: false
+      - path: crates/seam-contracts/src/freshness.rs
+        testName: network_stage_parses_exact_lowercase_only
+        kind: unit
+      - path: crates/seam-contracts/src/freshness.rs
+        testName: network_stage_default_is_bootstrap_not_simulacra
+        kind: unit
+      - path: crates/seam-contracts/src/freshness.rs
+        testName: network_stage_label_round_trips_through_from_str
+        kind: unit
+      - path: crates/seam-contracts/src/freshness.rs
+        testName: network_stage_ordering_matches_declared_semantics
+        kind: unit
+      - path: crates/seam-contracts/src/freshness.rs
+        testName: freshness_verdict_is_reason_label_conformant
+        kind: unit
+      - path: crates/seam-contracts/src/freshness.rs
+        testName: read_class_labels_are_the_wire_vocabulary
+        kind: unit
+    notes: >
+      BIRTH-RULE JUSTIFICATION (this crate's .epr-meta seam-birth-rule, which fires on a new
+      `pub enum` here). Five new public types land together — NetworkStage, ReadClass, Available,
+      Requirement, FreshnessVerdict — and they belong in the LEAF rather than in doorway because
+      the predicate has two intended consumers on opposite sides of the dependency graph: the
+      doorway (which cannot depend on elohim-epr or elohim-storage) and, at the declared next
+      rung, storage's own projector-lag `catching-up` shed. One matrix, two callers, no
+      re-derivation.
+
+      DECLARED NEXT RUNGS, not built here (C13's own successor-criterion obligation): (1) storage
+      consuming this same predicate for its projector-lag shed, so "behind because of conductor
+      lag" and "behind because the upstream is unreachable" are priced by one table; (2) an
+      EPR-envelope-derived ReadClass (kind x reach x coupling), which is what will first make
+      `ReadClass::CounterEvidence` reachable — no route path can recognize counter-evidence, so
+      that variant is deliberately unreachable-but-named today; (3) per-publisher stricter
+      freshness as an A2 claim.
+
+      RESIDUE, stated honestly: the amber boundary is INCLUSIVE (`age == max_age` still serves,
+      strictly past it sheds), and both `max_age` values are compile-time constants rather than
+      operator-tunable policy. Making them a standing-policy manifest read is a real change with a
+      real home (the ManifestStakesResolver that already owns the stage leg) and is not smuggled
+      in as a default here.
