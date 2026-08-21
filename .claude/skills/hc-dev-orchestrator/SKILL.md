@@ -71,7 +71,7 @@ their pacing environment into new npm aliases.
 Once `just mesh start` reports both doorways healthy, run the Prologue to
 seed the Act I substrate a2o's `@act:i` scenarios need — named conductor
 identities, the landing + lamad-spa bundles (browser AND the landing's SSR
-server bundle), the full CI-order seed chain, and the household fixture
+server bundle), the full CI-order seed chain (identities cast BEFORE `seed-humans` on the mesh — doorway A's hosted pool is matthew's conductor, so hosted registrations must not claim it first), and the household fixture
 manifest `genesis/a2o/src/framework/fixtures/household-mesh.ts` resolves
 against:
 
