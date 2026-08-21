@@ -186,13 +186,14 @@ done
 #   total sat nopeers sysval other missing fetched dna_pairs...
 classify() { # <path> <from_offset> <to_offset>
   local path="$1" from="$2" to="$3" len=$((3 > 2 ? $3 - $2 : 0))
-  if [ "$len" -le 0 ]; then echo "0 0 0 0 0 - - "; return; fi
+  if [ "$len" -le 0 ]; then echo "0 0 0 0 0 - - 0 "; return; fi
   tail -c "+$((from + 1))" "$path" 2>/dev/null | head -c "$len" | awk '
-    BEGIN { total=0; sat=0; nop=0; sys=0; oth=0; miss="-"; fetch="-" }
+    BEGIN { total=0; sat=0; nop=0; sys=0; oth=0; info=0; miss="-"; fetch="-" }
     {
       line=$0
       gsub(/\033\[[0-9;]*m/, "", line)
       total++
+      if (line ~ /\yTRACE\y|\yDEBUG\y|\yINFO\y/) { info++ }
       if (line ~ /read connection is saturated/) { sat++ }
       else if (line ~ /No peers to fetch record|NoPeersForLocation/) { nop++ }
       else if (line ~ /Sys validation sleeping/) {
@@ -210,7 +211,7 @@ classify() { # <path> <from_offset> <to_offset>
       else { oth++ }
     }
     END {
-      printf "%d %d %d %d %d %s %s", total, sat, nop, sys, oth, miss, fetch
+      printf "%d %d %d %d %d %s %s %d", total, sat, nop, sys, oth, miss, fetch, info
       for (d in per) printf " %s=%s", d, per[d]
       printf "\n"
     }'
@@ -249,7 +250,7 @@ declare -A CPU_SUM CPU_MAX CPU_LAST
 declare -A THREADS_LAST THREADS_MAX
 declare -A PREV_TT SUM_TT TT_COMM
 declare -A STORE_BEFORE STORE_AFTER
-declare -A TOT_SUM SAT_SUM NOP_SUM SYS_SUM
+declare -A TOT_SUM SAT_SUM NOP_SUM SYS_SUM INFO_SUM
 declare -A MISS_SERIES MISS_LAST FETCH_LAST DNA_LAST
 
 for i in "${!PID_NAMES[@]}"; do
@@ -270,7 +271,7 @@ done
 for i in "${!LOG_NAMES[@]}"; do
   n="${LOG_NAMES[$i]}"
   PREV_OFF["$n"]="$(stat -c %s "${LOG_PATHS[$i]}" 2>/dev/null || echo 0)"
-  TOT_SUM["$n"]=0; SAT_SUM["$n"]=0; NOP_SUM["$n"]=0; SYS_SUM["$n"]=0
+  TOT_SUM["$n"]=0; SAT_SUM["$n"]=0; NOP_SUM["$n"]=0; SYS_SUM["$n"]=0; INFO_SUM["$n"]=0
   MISS_SERIES["$n"]=""; MISS_LAST["$n"]="-"; FETCH_LAST["$n"]="-"; DNA_LAST["$n"]=""
 done
 
@@ -320,7 +321,8 @@ for cycle in $(seq 1 "$CYCLES"); do
     from="${PREV_OFF[$n]}"
     # truncation/rotation: never read a negative span, restart from 0
     [ "$now_off" -lt "$from" ] && from=0
-    read -r total sat nop sys oth miss fetch dnas <<< "$(classify "$path" "$from" "$now_off")"
+    read -r total sat nop sys oth miss fetch info dnas <<< "$(classify "$path" "$from" "$now_off")"
+    INFO_SUM["$n"]=$(( ${INFO_SUM[$n]:-0} + info ))
     PREV_OFF["$n"]="$now_off"
     TOT_SUM["$n"]=$(( ${TOT_SUM[$n]} + total ))
     SAT_SUM["$n"]=$(( ${SAT_SUM[$n]} + sat ))
@@ -355,7 +357,8 @@ done
 #       (a draining backlog is work; a flat or growing one is a spin)
 #   (b) saturated lines/s over threshold (the read pool is being hammered)
 VERDICT="QUIET"
-declare -A STREAM_VERDICT STREAM_REASON
+BLIND_STREAMS=""
+declare -A STREAM_VERDICT STREAM_REASON LOG_LEG_BLIND
 for i in "${!LOG_NAMES[@]}"; do
   n="${LOG_NAMES[$i]}"
   total_s=$((CYCLES * WINDOW))
@@ -376,9 +379,25 @@ for i in "${!LOG_NAMES[@]}"; do
   fi
   sat_ok=0
   awk -v r="$sat_rate" -v t="$SAT_THRESHOLD" 'BEGIN{exit !(r>t)}' && sat_ok=1
+  # BLIND-LEG GUARD. Every line this detector classifies — the saturation line,
+  # NoPeersForLocation, and sys-validation's own counter — is logged by the
+  # conductor at INFO. A conductor started without RUST_LOG defaults to ERROR
+  # only, so those lines are not merely absent, they are UNOBSERVABLE, and the
+  # log leg reports a confident 0.00/s that means nothing. Reporting that as
+  # QUIET would be a measure asserting a green it never took. If a stream
+  # produced lines but NONE of them were INFO-or-lower, say so instead.
+  if [ "${INFO_SUM[$n]:-0}" -eq 0 ]; then
+    LOG_LEG_BLIND["$n"]=1
+  else
+    LOG_LEG_BLIND["$n"]=0
+  fi
   if [ "$miss_ok" -eq 1 ] && [ "$sat_ok" -eq 1 ]; then
     STREAM_VERDICT["$n"]="SPIN"; VERDICT="SPIN"
     STREAM_REASON["$n"]="$reason; saturated ${sat_rate}/s > ${SAT_THRESHOLD}/s"
+  elif [ "${LOG_LEG_BLIND[$n]}" -eq 1 ]; then
+    STREAM_VERDICT["$n"]="QUIET-LOG-BLIND"
+    STREAM_REASON["$n"]="no INFO-or-lower lines in this stream — the conductor is logging at ERROR only (RUST_LOG unset), so the saturation/missing-dependency legs CANNOT be observed here. CPU is still measured and trustworthy."
+    BLIND_STREAMS+="${BLIND_STREAMS:+,}$n"
   else
     STREAM_VERDICT["$n"]="QUIET"
     STREAM_REASON["$n"]="$reason; saturated ${sat_rate}/s vs threshold ${SAT_THRESHOLD}/s"
@@ -431,11 +450,21 @@ if [ ${#STORAGE_NAMES[@]} -gt 0 ]; then
   done
 fi
 echo
+if [ -n "$BLIND_STREAMS" ]; then
+  echo "  !! LOG LEG BLIND on: $BLIND_STREAMS"
+  echo "     Those conductors emit ERROR only, and every line this detector"
+  echo "     classifies is INFO. Their 0.00/s rates are 'not observed', NOT"
+  echo "     'not happening'. Restart them with RUST_LOG=info (or at least"
+  echo "     RUST_LOG=holochain_sqlite::db::access=info,holochain_cascade=info,"
+  echo "     holochain::core::workflow::sys_validation_workflow=info) to see"
+  echo "     the spin at all. CPU below is unaffected and still trustworthy."
+fi
 echo "VERDICT: $VERDICT"
 
 # --- one-line JSON (a2o asserts on this) -------------------------------------
 json="{\"tool\":\"hc-mesh-spin-detector\",\"startedAt\":\"$START_ISO\",\"cycles\":$CYCLES,\"windowSecs\":$WINDOW"
-json+=",\"satThreshold\":$SAT_THRESHOLD,\"verdict\":\"$VERDICT\",\"conductors\":{"
+json+=",\"satThreshold\":$SAT_THRESHOLD,\"verdict\":\"$VERDICT\""
+json+=",\"logLegBlindStreams\":\"$BLIND_STREAMS\",\"conductors\":{"
 sep=""
 for i in "${!PID_NAMES[@]}"; do
   n="${PID_NAMES[$i]}"
@@ -470,7 +499,9 @@ for i in "${!LOG_NAMES[@]}"; do
   json+=",\"noPeersPerSec\":$(awk -v c="${NOP_SUM[$n]}" -v s="$total_s" 'BEGIN{printf "%.2f", c/s}')"
   json+=",\"sysValPerSec\":$(awk -v c="${SYS_SUM[$n]}" -v s="$total_s" 'BEGIN{printf "%.2f", c/s}')"
   json+=",\"missingDeps\":$miss,\"fetched\":$fetch"
-  json+=",\"missingSeries\":\"${MISS_SERIES[$n]}\",\"verdict\":\"${STREAM_VERDICT[$n]}\"}"
+  json+=",\"missingSeries\":\"${MISS_SERIES[$n]}\",\"infoLines\":${INFO_SUM[$n]:-0}"
+  json+=",\"logLegBlind\":$([ "${LOG_LEG_BLIND[$n]:-0}" -eq 1 ] && echo true || echo false)"
+  json+=",\"verdict\":\"${STREAM_VERDICT[$n]}\"}"
   sep=","
 done
 json+="}"
