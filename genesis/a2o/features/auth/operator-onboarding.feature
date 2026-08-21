@@ -1,11 +1,12 @@
-@e2e @auth @operator-onboarding @requires:doorway
+@e2e @auth @operator-onboarding @requires:doorway @act:i
 Feature: Operator Onboarding
   As Matthew, the first steward bootstrapping the alpha doorway
   I want to register as admin using the bootstrap key,
   configure federation peers, and see the agency pipeline funnel
   So that I can bring the doorway online and start serving humans
 
-  The bootstrap key is the genesis moment — the first admin claims the
+  A doorway is the hosted gateway humans reach the protocol through. The
+  bootstrap key is the genesis moment — the first admin claims the
   doorway by proving they hold the deployment secret. After that,
   Matthew configures which other doorways to federate with and monitors
   the pipeline: how many humans are registered, hosted, graduating, steward.
@@ -46,10 +47,9 @@ Feature: Operator Onboarding
 
   # --- Agency pipeline funnel ---
 
-  @requires:shem
   Scenario: Matthew views the agency pipeline
     Given human "Matthew" is logged in on doorway "alpha"
-    And human "Susan" is logged in on doorway "alpha"
+    And human "James" is logged in on doorway "alpha"
     When Matthew queries the agency pipeline
     Then the pipeline should show at least 2 registered users
     And the pipeline response should include all funnel stages

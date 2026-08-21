@@ -1,4 +1,4 @@
-@recovery-m4 @emergency-contact-quorum
+@recovery-m4 @emergency-contact-quorum @e2e
 Feature: Emergency Contacts Kill a Captured Key by Quorum
 
   When a person's only key is captured by an attacker, that person cannot
@@ -25,6 +25,7 @@ Feature: Emergency Contacts Kill a Captured Key by Quorum
   # Happy path — quorum reached, key killed
   # ─────────────────────────────────────────────────────────
 
+  @act:iii
   Scenario: Jessica initiates a revocation request for Matthew's captured key
     Given an attacker has captured "K1" and is acting as Matthew
     When Jessica opens the emergency panel in her app
@@ -35,6 +36,7 @@ Feature: Emergency Contacts Kill a Captured Key by Quorum
     And the revocation shows "0 of 3 votes received"
     And Matthew's emergency contacts receive a notification about the pending revocation
 
+  @act:iii
   Scenario: Three emergency contacts approve and the key is revoked
     Given a pending revocation request for Matthew's key "K1" with required votes 3
     When Jessica, David, and Sarah each approve the revocation request
@@ -44,6 +46,7 @@ Feature: Emergency Contacts Kill a Captured Key by Quorum
     And Matthew's emergency contacts see: "Matthew's compromised key has been revoked"
     And Matthew can subsequently start a full recovery (M3) to obtain a new key
 
+  @act:iii
   Scenario: Matthew's profile and history remain accessible after revocation
     Given Matthew's key "K1" has been revoked by emergency contact quorum
     When anyone looks up Matthew's profile
@@ -54,7 +57,7 @@ Feature: Emergency Contacts Kill a Captured Key by Quorum
   # Threshold not met — revocation stays pending
   # ─────────────────────────────────────────────────────────
 
-  @requires:shem
+  @requires:shem @act:iii
   Scenario: Only two contacts respond — revocation stays pending
     Given a pending revocation request for Matthew's key "K1" with required votes 3
     When only Jessica and David approve the revocation request
@@ -64,6 +67,7 @@ Feature: Emergency Contacts Kill a Captured Key by Quorum
     And Matthew's key "K1" is still accepted by the network
     And the pending revocation remains open for additional contacts to vote
 
+  @act:iii
   Scenario: A vote can be submitted later to reach threshold
     Given a pending revocation with 2 of 3 votes received
     When Sarah approves the revocation request
@@ -74,6 +78,7 @@ Feature: Emergency Contacts Kill a Captured Key by Quorum
   # Anti-rotation gate — P2: revocation blocks key rotation
   # ─────────────────────────────────────────────────────────
 
+  @act:iii
   Scenario: An attacker cannot rotate the captured key while a revocation is pending
     Given a pending revocation request for Matthew's key "K1"
     And an attacker holds "K1" and attempts to rotate it to a new key "K_attacker"
@@ -82,6 +87,7 @@ Feature: Emergency Contacts Kill a Captured Key by Quorum
     And "K_attacker" is not recognized as Matthew's current key
     And Matthew's emergency contacts' revocation vote can still proceed normally
 
+  @act:iii
   Scenario: An attacker cannot rotate an already-revoked key
     Given Matthew's key "K1" has been revoked by emergency contact quorum
     When the attacker attempts to commit a key rotation from "K1" to "K_attacker"
@@ -92,12 +98,14 @@ Feature: Emergency Contacts Kill a Captured Key by Quorum
   # Eligibility gate — only designated emergency contacts can vote
   # ─────────────────────────────────────────────────────────
 
+  @act:i
   Scenario: A person who is not Matthew's emergency contact cannot initiate a revocation
     Given a person named "Stranger" who has no emergency-contact relationship with Matthew
     When Stranger attempts to file a revocation request for Matthew's key "K1"
     Then the request is rejected with an "not an active emergency contact" error
     And no revocation record is created for Matthew's key
 
+  @act:iii
   Scenario: A contact who already voted cannot vote again
     Given a pending revocation request for Matthew's key "K1"
     And Jessica has already submitted an approved vote

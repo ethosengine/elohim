@@ -1,4 +1,4 @@
-@e2e @auth @user-management @requires:doorway
+@e2e @auth @user-management @requires:doorway @act:i
 Feature: Hosted User Management
   As Matthew, the genesis steward and admin of the alpha doorway
   I want to manage hosted visitors with accounts
@@ -12,19 +12,17 @@ Feature: Hosted User Management
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
     And human "Matthew" is logged in on doorway "alpha"
 
-  @requires:shem
   Scenario: Matthew lists hosted users
-    Given human "Susan" is logged in on doorway "alpha"
+    Given human "James" is logged in on doorway "alpha"
     When Matthew queries the admin users list
     Then the users list should contain at least 2 entries
     And the users list should include Matthew's entry
-    And the users list should include Susan's entry
+    And the users list should include James's entry
 
-  @requires:shem
   Scenario: Matthew views user details
-    Given human "Susan" is logged in on doorway "alpha"
-    When Matthew views user details for Susan
-    Then the user details should include Susan's identifier
+    Given human "James" is logged in on doorway "alpha"
+    When Matthew views user details for James
+    Then the user details should include James's identifier
     And the user details should include usage stats
     And the user details should include quota limits
 
@@ -35,16 +33,14 @@ Feature: Hosted User Management
     When Troublemaker checks their identity
     Then the identity check should fail with unauthorized
 
-  @requires:shem
   Scenario: Matthew updates a user's quota
-    Given human "Susan" is logged in on doorway "alpha"
-    When Matthew updates Susan's storage quota to 500 MB
+    Given human "James" is logged in on doorway "alpha"
+    When Matthew updates James's storage quota to 500 MB
     Then the quota update should succeed
-    When Matthew views user details for Susan
-    Then Susan's storage quota should be 500 MB
+    When Matthew views user details for James
+    Then James's storage quota should be 500 MB
 
-  @requires:shem
   Scenario: Non-admin cannot access user management
-    Given human "Susan" is logged in on doorway "alpha"
-    When Susan attempts to access the admin users endpoint
+    Given human "James" is logged in on doorway "alpha"
+    When James attempts to access the admin users endpoint
     Then the request should be forbidden

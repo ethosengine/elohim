@@ -1,4 +1,4 @@
-@recovery-m5 @account-pillar @portal-host
+@recovery-m5 @account-pillar @portal-host @act:i @e2e
 Feature: Adding and listing portal hosts
   As a steward
   I want to declare which URLs may render my auth portal

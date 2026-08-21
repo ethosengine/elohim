@@ -1,4 +1,4 @@
-@e2e @auth @visitor @reach @requires:doorway @wip
+@e2e @auth @visitor @reach @requires:doorway @wip @act:i
 Feature: Visitor Boundaries
   As Traveler, an anonymous visitor to the network,
   I want to browse commons content without registering

@@ -1,4 +1,4 @@
-@e2e @auth @browser-only @requires:doorway @auth-portal-convergence
+@e2e @auth @browser-only @requires:doorway @auth-portal-convergence @act:i
 Feature: Doorway login is gateway-scoped, not generic email
   As an operator landing at doorway-alpha.elohim.host
   I want the login form to express the doorway's actual scope

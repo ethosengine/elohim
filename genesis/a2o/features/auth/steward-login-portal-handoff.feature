@@ -1,4 +1,4 @@
-@e2e @auth @browser-only @requires:doorway @recovery-m5 @auth-portal-convergence
+@e2e @auth @browser-only @requires:doorway @recovery-m5 @auth-portal-convergence @act:i
 Feature: Doorway hands the login session off to the steward's portal host
   As Matthew, a graduated steward whose peer-native portal is registered
   I want doorway to recognize me as a steward and hand authentication to my portal host
@@ -6,7 +6,7 @@ Feature: Doorway hands the login session off to the steward's portal host
 
   Doorway's role for a graduated steward is OAuth-relying-party: it presents
   the form, but it does not adjudicate the credential. When the credential
-  check succeeds and the AuthResponse carries a reachable portalHostUrl,
+  check succeeds and the auth response carries a reachable portalHostUrl,
   doorway redirects to the peer-native portal, which completes the OAuth
   code dance back at the original client_id.
 
@@ -88,10 +88,9 @@ Feature: Doorway hands the login session off to the steward's portal host
     And the /auth/login response does NOT include "portalHostUrl"
     And the browser completes the OAuth dance at the doorway as relying-party-and-identity-provider
 
-  @requires:shem
   Scenario: Hosted visitor receives no portalHostUrl
-    Given human "Susan" is a hosted visitor with no portal host registered
-    When Susan submits credentials at the threshold-login page
+    Given human "James" is a hosted visitor with no portal host registered
+    When James submits credentials at the threshold-login page
     Then the /auth/login response includes "isSteward": false
     And the /auth/login response does NOT include "portalHostUrl"
     And the browser completes the OAuth dance at the doorway normally

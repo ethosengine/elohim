@@ -14,7 +14,7 @@ Feature: Recovery succeeds with or without Shamir share custody
     Given Matthew has three emergency contacts: Jessica, Adam, and Abby
     And Matthew's required intimate-quorum threshold is 2
 
-  @wip @requires:shem
+  @wip @requires:shem @act:iii
   Scenario: Recovery succeeds without Shamir custody (Path A only)
     Given Matthew has NOT committed a governance-action:shamir-custody-setup
     When Matthew initiates a recovery request
@@ -24,7 +24,7 @@ Feature: Recovery succeeds with or without Shamir share custody
     And no Shamir share request is dialled to any custodian
     And no attestation:shamir-reconstructed exists for Matthew
 
-  @wip @requires:shem
+  @wip @requires:shem @act:iii
   Scenario: Recovery succeeds with Shamir custody (Path A + Path B)
     Given Matthew has committed a governance-action:shamir-custody-setup naming Jessica, Adam, and Abby as custodians with threshold (m=2, n=3)
     And Jessica and Adam are online
@@ -36,7 +36,7 @@ Feature: Recovery succeeds with or without Shamir share custody
     And the ShareAssembler reconstructs Matthew's seed
     And an attestation:shamir-reconstructed exists for Matthew
 
-  @wip @requires:shem
+  @wip @requires:shem @act:iii
   Scenario: Recovery still succeeds when Shamir custodians are offline
     Given Matthew has committed a governance-action:shamir-custody-setup naming Jessica, Adam, and Abby as custodians with threshold (m=2, n=3)
     But Jessica, Adam, and Abby are all offline at recovery time
@@ -47,7 +47,7 @@ Feature: Recovery succeeds with or without Shamir share custody
     And no attestation:shamir-reconstructed exists for Matthew
     And Matthew is not informed of the Shamir attempt at all
 
-  @wip
+  @wip @act:i
   Scenario: Recovery never asks Matthew to choose Path A or Path B
     When Matthew initiates a recovery request
     Then the recovery UI does not present a Shamir-vs-social toggle

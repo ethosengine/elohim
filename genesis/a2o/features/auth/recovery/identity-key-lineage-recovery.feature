@@ -1,4 +1,4 @@
-@wip @auth @recovery @identity-lineage @requires:household-nodes
+@wip @auth @recovery @identity-lineage @requires:household-nodes @act:i @e2e
 Feature: A recovered identity keeps its contribution, standing, and claims through the chain-root
 
   As a person who has lost the key to my identity

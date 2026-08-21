@@ -13,6 +13,7 @@ Feature: Authentication Lifecycle
 
   # --- Registration (new human arrives) ---
 
+  @act:i
   Scenario: Register a new human on a doorway
     When a new human "Newcomer" registers on doorway "alpha"
     Then the auth response should include a token
@@ -21,28 +22,32 @@ Feature: Authentication Lifecycle
 
   # --- Login (existing humans return) ---
 
+  @act:i
   Scenario: Matthew logs in as admin
     Given human "Matthew" is logged in on doorway "alpha"
     Then Matthew should have a valid token
     And Matthew's identifier should be "matthew.dowell@alpha.elohim.host"
 
-  @requires:shem
+  @requires:shem @act:iii
   Scenario: Susan logs in as a family member
     Given human "Susan" is logged in on doorway "alpha"
     Then Susan should have a valid token
     And Susan's identifier should be "susan@test.elohim.host"
 
+  @act:i
   Scenario: Login with wrong password fails
     When human "Matthew" attempts login on doorway "alpha" with password "wrong-password"
     Then the login should fail
 
   # --- Session verification ---
 
+  @act:i
   Scenario: Verify doorway health after login
     Given human "Matthew" is logged in on doorway "alpha"
     When Matthew checks doorway health
     Then the doorway should be healthy
 
+  @act:i
   Scenario: Verify identity with /auth/me
     Given human "Matthew" is logged in on doorway "alpha"
     When Matthew checks their identity
@@ -50,6 +55,7 @@ Feature: Authentication Lifecycle
 
   # --- Full account lifecycle ---
 
+  @act:i
   Scenario: Register, login, logout, login again
     When a new human "Lifecycle" registers on doorway "alpha"
     Then the auth response should include a token
@@ -66,6 +72,7 @@ Feature: Authentication Lifecycle
 
   # --- Identity plumbing (Sprint 7 — JWT carries Holochain identity) ---
 
+  @act:i
   Scenario: Registration creates a valid Holochain identity
     When a new human "IdentityTest" registers on doorway "alpha"
     Then the auth response should include a token
@@ -73,6 +80,7 @@ Feature: Authentication Lifecycle
     And the auth response should include an agentPubKey
     And the agentPubKey should not be empty
 
+  @act:i
   Scenario: API requests carry requester identity from JWT
     Given human "Matthew" is logged in on doorway "alpha"
     When Matthew checks their identity
@@ -81,7 +89,7 @@ Feature: Authentication Lifecycle
 
   # --- Concurrent sessions (the family is online) ---
 
-  @requires:shem
+  @requires:shem @act:iii
   Scenario: Multiple humans logged in simultaneously
     Given human "Matthew" is logged in on doorway "alpha"
     And human "Susan" is logged in on doorway "alpha"

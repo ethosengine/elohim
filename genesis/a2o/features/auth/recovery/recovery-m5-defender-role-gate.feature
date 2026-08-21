@@ -1,4 +1,4 @@
-@recovery-m5 @defender-stub
+@recovery-m5 @defender-stub @act:i @e2e
 Feature: submit_specialist_revocation gated by local defender role marker
   As an elohim-agent acting on a human's behalf
   I want submit_specialist_revocation to verify my defender role

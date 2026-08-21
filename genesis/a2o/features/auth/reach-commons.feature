@@ -1,4 +1,4 @@
-@e2e @reach
+@e2e @reach @act:i
 Feature: Commons and public reach content is accessible to anonymous visitors
   Content that holds an authored commons reach grade must be readable by any
   anonymous client — no session, no token, no relationship required. This is

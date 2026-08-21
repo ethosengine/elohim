@@ -1,4 +1,4 @@
-@e2e @auth @browser-only @requires:doorway @agency-context
+@e2e @auth @browser-only @requires:doorway @agency-context @act:i
 Feature: Agency badge distinguishes hosted-steward from hosted-visitor
   As a returning user opening elohim-app
   I want the agency badge to tell me how the system actually understands me
@@ -9,7 +9,10 @@ Feature: Agency badge distinguishes hosted-steward from hosted-visitor
   the human that the system has forgotten who they are. The stage
   "hosted-steward" exists precisely for the in-between case: a steward
   whose peer-native infrastructure is authoritative but who is presently
-  signed in through a doorway.
+  signed in through a doorway — recovering because their own device or
+  conductor is temporarily unreachable, not because they lost standing.
+  Recovery resolves by restoring the steward's own device; it is never a
+  rung to graduate past.
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
@@ -25,10 +28,10 @@ Feature: Agency badge distinguishes hosted-steward from hosted-visitor
     # which names recovery explicitly rather than only "signed in through a doorway".
     And the tagline reads "A steward in recovery — doorway temporarily hosts your conductor"
 
-  @elohim-visually-validated @requires:shem
-  Scenario: Susan sees the Hosted Visitor badge after OAuth login through doorway
-    Given human "Susan" is a hosted visitor with no portal host registered
-    When Susan logs in at elohim-app via the doorway OAuth flow
+  @elohim-visually-validated
+  Scenario: James sees the Hosted Visitor badge after OAuth login through doorway
+    Given human "James" is a hosted visitor with no portal host registered
+    When James logs in at elohim-app via the doorway OAuth flow
     And elohim-app loads the agency badge
     Then the agency stage badge reads "Hosted Visitor"
     And the tagline reads "A doorway holds your keys"

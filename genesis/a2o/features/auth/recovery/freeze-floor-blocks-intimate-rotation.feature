@@ -1,4 +1,4 @@
-@stage1-structural @recovery-m3 @requires:shem
+@stage1-structural @recovery-m3 @requires:shem @act:iii @e2e
 Feature: Freeze-Floor Gate Blocks Intimate-Layer Rotation
 
   When an elohim defender (or, pre-M5, a manually committed IdentityFreeze)

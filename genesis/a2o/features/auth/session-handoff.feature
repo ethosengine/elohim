@@ -1,4 +1,4 @@
-@e2e @auth @session-handoff @requires:doorway
+@e2e @auth @session-handoff @requires:doorway @act:i
 Feature: Cross-App Session Handoff
   As Matthew, the genesis steward operating the doorway
   I want my session to persist when I navigate from elohim-app to doorway-app

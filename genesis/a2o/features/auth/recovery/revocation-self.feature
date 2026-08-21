@@ -1,4 +1,4 @@
-@recovery-m4 @self-revocation
+@recovery-m4 @self-revocation @e2e
 Feature: Self-Revocation of a Stolen Device Key
 
   A person who still controls at least one trusted device can immediately
@@ -15,6 +15,7 @@ Feature: Self-Revocation of a Stolen Device Key
     And each device holds a separate agent key: "K_laptop" and "K_phone"
     And both keys are linked to Matthew's human identity in the network
 
+  @act:i
   Scenario: Matthew kills his stolen phone's key from his laptop
     Given Matthew's phone is stolen
     When Matthew opens the security panel on his laptop
@@ -27,12 +28,14 @@ Feature: Self-Revocation of a Stolen Device Key
     And any future action signed by "K_phone" is rejected by the network
     And Matthew sees a confirmation: "Your phone's key has been revoked"
 
+  @act:i
   Scenario: The revoked key cannot sign new actions after revocation
     Given Matthew has already revoked "K_phone" from his laptop
     When something attempts to act as Matthew using "K_phone"
     Then the network rejects the action with a revocation error
     And no entry is written to the DHT on behalf of that action
 
+  @act:i
   Scenario: Matthew's other devices and relationships are unaffected
     Given Matthew has revoked "K_phone"
     When Matthew's emergency contacts check his profile
@@ -40,6 +43,7 @@ Feature: Self-Revocation of a Stolen Device Key
     And Matthew's attestations and learning history are intact
     And Matthew can still act normally from his laptop using "K_laptop"
 
+  @act:i
   Scenario: Matthew cannot accidentally revoke his only remaining trusted key
     Given Matthew has only one registered device: "laptop" with key "K_laptop"
     When Matthew attempts to revoke "K_laptop" using "K_laptop" itself
@@ -47,7 +51,7 @@ Feature: Self-Revocation of a Stolen Device Key
     And Matthew sees a message explaining that he cannot revoke his only trusted key
     And "K_laptop" remains valid
 
-  @wip
+  @wip @act:iii
   Scenario: Matthew can initiate full recovery after revoking his only key
     Given Matthew has revoked all of his keys
     And Matthew is effectively locked out of his identity

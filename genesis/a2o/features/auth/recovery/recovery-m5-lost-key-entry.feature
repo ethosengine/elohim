@@ -1,4 +1,4 @@
-@recovery-m5 @account-pillar @recovery-entry
+@recovery-m5 @account-pillar @recovery-entry @act:i @e2e
 Feature: Lost-key entry point routes to the right flow
   As a steward who cannot sign in
   I want a single entry point for "I lost my key"

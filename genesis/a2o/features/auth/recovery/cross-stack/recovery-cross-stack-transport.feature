@@ -6,7 +6,7 @@
 # Every step below is DEFINED and deliberately `pending`: the fixture has no HTTP admin
 # surface for cucumber to drive yet (plan 2026-05-10-iroh-recovery-e2e.md Plans 1+4).
 # Pending, not undefined — the debt stays visible in the run report.
-@e2e @auth @recovery-cross-stack @iroh @phase11-gate5
+@e2e @auth @recovery-cross-stack @iroh @phase11-gate5 @act:host
 Feature: Recovery completes across mixed iroh/libp2p share-holder transports
 
   Cutover gate #5 (spec 2026-05-08-iroh-libp2p-complementarity.md line 514).

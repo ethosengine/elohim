@@ -1,13 +1,15 @@
-@e2e @auth @browser-only @requires:doorway @agency-pipeline
+@e2e @auth @browser-only @requires:doorway @agency-pipeline @act:i
 Feature: Agency pipeline in doorway-account matches the elohim-app stages
   As a hosted human looking at the agency pipeline on doorway/account
   I want the pipeline to express the same lifecycle the agency badge in elohim-app shows
   So that the two surfaces don't tell me different stories about where I am
 
-  doorway/account renders an "Agency Pipeline" with steps {hosted, key_export,
-  install_app, steward}. elohim-app's agency badge renders stages {visitor,
-  hosted, hosted-steward, app-steward, node-steward}. The two MUST be coherent
-  for a returning user — neither claims I am further along than the other does.
+  "Agency" tracks how far a person has progressed from depending entirely on a
+  hosting doorway toward running their own node. doorway/account renders an
+  "Agency Pipeline" with steps {hosted, key_export, install_app, steward}.
+  elohim-app's agency badge renders stages {visitor, hosted, hosted-steward,
+  app-steward, node-steward}. The two MUST be coherent for a returning user —
+  neither claims I am further along than the other does.
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
@@ -41,10 +43,10 @@ Feature: Agency pipeline in doorway-account matches the elohim-app stages
   # should assert the gate axis is a decision for the surface owners. Resolve that
   # before dropping @wip; the other two assertions already hold against the shipped
   # component.
-  @requires:shem @wip
-  Scenario: Susan's pipeline reflects no stewardship affordance
-    Given human "Susan" is a hosted visitor with no portal host registered
-    When Susan opens doorway/account
+  @wip
+  Scenario: James's pipeline reflects no stewardship affordance
+    Given human "James" is a hosted visitor with no portal host registered
+    When James opens doorway/account
     Then the agency pipeline step "Hosted" is marked current
     And the pipeline does NOT show a "Hosted Steward" affordance
     And the Graduate-to-Steward CTA is visible with key_export listed as the next gate

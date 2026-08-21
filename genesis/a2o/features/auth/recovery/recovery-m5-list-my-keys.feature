@@ -1,4 +1,4 @@
-@recovery-m5 @account-pillar
+@recovery-m5 @account-pillar @act:i @e2e
 Feature: Listing my keys in the account-management surface
   As a steward
   I want to see my active key and revocation history

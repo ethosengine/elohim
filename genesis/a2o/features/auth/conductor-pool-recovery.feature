@@ -1,4 +1,4 @@
-@e2e @auth @hosted-human @chaperone @requires:doorway @wip
+@e2e @auth @hosted-human @chaperone @requires:doorway @wip @act:i
 Feature: Conductor Pool Recovery for Hosted Users
   As a hosted human whose doorway pool composition changed across deploys
   I want chaperone connection to self-heal
@@ -18,15 +18,14 @@ Feature: Conductor Pool Recovery for Hosted Users
   # chaperone now treats stale Path-2 mappings as a re-provision trigger
   # and recovers via the existing idempotent provisioner.
 
-  @requires:shem
   Scenario: Hosted human reconnects after the conductor pool composition changed
-    Given human "Susan" is logged in on doorway "alpha"
-    And Susan's agent→conductor mapping references a conductor no longer in the pool
-    When Susan's browser POSTs to /hc/connect
+    Given human "James" is logged in on doorway "alpha"
+    And James's agent→conductor mapping references a conductor no longer in the pool
+    When James's browser POSTs to /hc/connect
     Then the response status should be 200
     And the response body should include "appToken"
     And the response body should include "appPort"
-    And Susan's registry mapping should now reference a current conductor
+    And James's registry mapping should now reference a current conductor
 
   Scenario: Doorway exposes orphan-mapping count for operators
     When Matthew queries the admin conductors endpoint on doorway "alpha"

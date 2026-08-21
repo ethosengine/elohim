@@ -1,4 +1,4 @@
-@recovery-m5 @auth-portal-convergence
+@recovery-m5 @auth-portal-convergence @act:i @e2e
 Feature: Doorway redirects steward humans to their portal host
   As a steward who has graduated from hosted to peer-native
   I want doorway/account to point me at my own steward

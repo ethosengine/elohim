@@ -39,7 +39,7 @@ Feature: Gertrude claims her presence — a convened, witnessed, negotiated sett
     Given peer "alpha-A" at "alpha-A"
     And "Gertrude" exists as a commons-stewarded contributor presence with a steward-authored witnessed ascription
 
-  @requires:shem
+  @requires:shem @act:iii
   Scenario: Gertrude joins the network with her own conductor and files a claim intent
     # The +1 conductor on shem (in resource budget). Filing the claim is an REA
     # Intent — it opens the negotiation; nothing transfers here.
@@ -48,6 +48,7 @@ Feature: Gertrude claims her presence — a convened, witnessed, negotiated sett
     Then her contributor presence on peer "alpha-A" is in state "claiming"
     And a claim intent event is recorded for her presence
 
+  @act:i
   Scenario: The claim convening is convened and witnessed
     # Ceremony-stub: assert convened, witnessed, events recorded — NEVER what
     # the convening decided. The tending stewards and the commons pool are
@@ -57,7 +58,7 @@ Feature: Gertrude claims her presence — a convened, witnessed, negotiated sett
     And the claim convening is recorded as witnessed by her tending stewards
     And the claim convening produced recorded events
 
-  @requires:shem
+  @requires:shem @act:iii
   Scenario: The deterministic floor executes the settlement mechanically
     # Never judgment at the floor: identity binding via the membership stamp,
     # state transition to claimed, and claimed_root anchored to her identity
@@ -68,6 +69,7 @@ Feature: Gertrude claims her presence — a convened, witnessed, negotiated sett
     And her identity binding is stamped through the membership stamp
     And her presence claimed_root is anchored at her identity chain-root
 
+  @act:i
   Scenario: The negotiated backfill is recorded as append-only events
     # Ceremony-stub: the backfill NEGOTIATION is ceiling work (judgment); what
     # this scenario pins is only that its outcome landed as REA events —
@@ -76,7 +78,7 @@ Feature: Gertrude claims her presence — a convened, witnessed, negotiated sett
     Then the negotiated backfill for her presence is recorded as append-only events
     And no backfill event asserts a valuation semantic
 
-  @requires:shem
+  @requires:shem @act:iii
   Scenario: The household card flips Gertrude from witnessed to verified
     # The observable the whole arc exists for: with her own key bound, the
     # household-resilience holder relation counts her verified — and stops
@@ -85,6 +87,7 @@ Feature: Gertrude claims her presence — a convened, witnessed, negotiated sett
     Then the household holder relation on peer "alpha-A" counts "Gertrude" as a verified holder
     And the household holder relation on peer "alpha-A" no longer counts "Gertrude" as a witnessed holder
 
+  @act:i
   Scenario: A settlement is appealable through correcting events
     # Appealability is structural: corrections are NEW events appended to the
     # flow — the original settlement events are never mutated or deleted. The

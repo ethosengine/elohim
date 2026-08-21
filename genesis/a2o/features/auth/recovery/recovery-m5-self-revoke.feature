@@ -1,4 +1,4 @@
-@recovery-m5 @account-pillar @revocation
+@recovery-m5 @account-pillar @revocation @act:i @e2e
 Feature: Self-revocation through the account-management surface
   As a steward concerned my key may be compromised
   I want to revoke my current key

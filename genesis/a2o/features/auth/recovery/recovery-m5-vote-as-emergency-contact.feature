@@ -1,4 +1,4 @@
-@recovery-m5 @account-pillar @recovery-vote
+@recovery-m5 @account-pillar @recovery-vote @act:i @e2e
 Feature: Voting on recovery as an emergency contact
   As an emergency contact
   I want to approve or reject pending recovery requests
