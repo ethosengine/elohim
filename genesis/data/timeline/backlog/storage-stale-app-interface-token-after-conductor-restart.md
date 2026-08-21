@@ -153,3 +153,70 @@ Next morning's order: `just mesh stop` alone → fresh `just mesh start` (stock)
 reproduce with `conductors-restart` → then decide where the keepalive belongs. Until then, do not use
 `conductors-restart` on a mesh you intend to measure.
 
+
+## Root-caused 2026-08-21 (late) — the flap is a FOURTH, unsupervised bridge, not an idle reap
+
+Reproduced end to end on a throwaway conductor (stock 0.6.0, dead bootstrap/signal `:9999`,
+admin 4744 / app 4745, throwaway storage `:8099`, live mesh untouched). Three runs, 3 min each:
+
+| run | conductor launch | storage | zomePath over 3 min | bridgeReconnects |
+|---|---|---|---|---|
+| **A** | `hc sandbox run -a -p=4745` | fresh | `live` for 180 s, no failure | **0** |
+| **B1** | **direct** (`holochain --piped --structured=Log --config-path …`), storage NOT restarted | carried over | **FLAPS** `live↔dead`, `lastZomeFailureAgeSecs` resetting to 0 every ~60 s | 3, then **flat** |
+| **B2** | same direct conductor | fresh | `live` for 180 s, no failure | **0** |
+
+**The launch path is exonerated.** Across A and B the conductor's `argv` is identical but for
+the absolute-vs-PATH binary path; the process `environ` differs only in `PWD`, `OLDPWD`, the
+PATH prefix and `_` (same `RUST_LOG`); and `conductor-config.yaml` is **byte-identical** through
+generate → run A → run B (`hc sandbox run` rewrote it to the same bytes). B2 is the clincher: the
+*same* direct-launched conductor is stable for 3 min once the storage peer is fresh. The variable
+is **"a conductor restarted under a running storage"**, not "direct vs `hc`" — the earlier
+correlation was an artifact of `conductors-restart` being the only action that produces that state.
+
+**What actually flaps.** `spawn_bridge_supervisor` covers `SUPERVISED_ROLES =
+[infrastructure, imagodei, lamad]`. All three re-minted correctly (`bridgeReconnects` 3, then flat,
+`conductor bridge RE-MINTED …` ×3) and their sockets stayed alive — the supervisor's 20 s ping
+succeeds and pushes `zomePath` back to `live`. But the **PeerStatus heartbeat task holds its own
+`HcClient`** (`heartbeat.rs`), created at storage boot, in **no** supervised role slot, and it is
+never re-minted. Every 60 s it logs, forever:
+
+```
+23:03:09 WARN conductor ping failed: Connection error: Conductor ping failed: Websocket error: Websocket closed: No connection
+23:03:10 WARN heartbeat tick failed: record_peer_status zome call failed: … Websocket closed: No connection
+23:04:09 WARN conductor ping failed: … (23:05:09, 23:06:09, …)
+```
+
+Both of those fold into `bridge_health()`, which is a **process-global** observer, not per-role. So
+one dead client among four makes the whole `/health conductor.zomePath` flip `dead` at each 60 s
+heartbeat tick and back to `live` at the next 20 s supervisor ping — the reported
+`lastZomeFailureAgeSecs 0–14` with `bridgeReconnects` NOT climbing. **Two defects, both storage-side,
+neither in the conductor:**
+
+1. **The heartbeat's `HcClient` is outside the supervisor.** Either register the heartbeat's client
+   as a supervised slot, or have the heartbeat borrow `registry.client("infrastructure")` per tick
+   instead of holding a private handle for the life of the process. (It already logs its own
+   failure — the supervisor is the only thing that can cure it.)
+2. **`bridge_health()` is global where the bridges are per-role.** One dead role among N cannot be
+   reported as a single boolean without flapping. `/health` should carry per-role zome-path state
+   and derive the summary from it (any-dead → degraded, honestly named), so a flapping field stops
+   meaning "the conductor is closing our sockets".
+
+**Corollary found in the same run — no peer-policy file means NO bridge supervision at all.**
+`spawn_bridge_supervisor` is nested inside the PeerStatus-heartbeat block, which is skipped whole on
+`PeerStatus heartbeat disabled: policy config load failed`. A throwaway storage started without
+`ELOHIM_STORAGE_PEER_POLICY_PATH` reproduced the ORIGINAL 77dd6b7b6 defect exactly: after a conductor
+restart, `zomePath: dead`, `consecutiveFailures: 1`, `bridgeReconnects: 0`, still dead 80 s later with
+no recovery attempt. The self-heal that exists to survive a conductor restart is gated on an unrelated
+config file. Hoist `spawn_bridge_supervisor` out of that block — it depends on nothing in it.
+
+**Not the conductor.** The fork's `holochain_websocket` already pings the client every 5 s
+(`WebsocketReceiver::new`, `crates/holochain_websocket/src/lib.rs`), and the app-interface auth path
+drops a connection only on a 10 s auth timeout or a rejected token
+(`conductor/interface/websocket.rs:264`). No conductor change was made and none is indicated by this
+evidence. The doorway's separate 18-reconnects-in-40 s measurement is NOT explained by this and stays
+open — check `doorway-boot-self-heal-family-mesh-repro.md` **open sibling 5** first (doorway B derives
+its app port from the global `--app-port-min` and therefore authenticates against conductor 0's app
+interface with conductor 1's token) before reaching for a keepalive.
+
+**`conductors-restart` remains half an operation**, for the reason above rather than the one first
+suspected: follow it with `storage-restart`, and confirm with `zome-probe`.
