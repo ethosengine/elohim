@@ -4,6 +4,9 @@ Feature: submit_specialist_revocation gated by local defender role marker
   I want submit_specialist_revocation to verify my defender role
   So that the structural quorum gate from M4 retains its meaning
 
+  Background:
+    Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
+
   # ─────────────────────────────────────────────────────────
   # Stubbed Ok(false) in M5 — rejection path works naturally
   # ─────────────────────────────────────────────────────────

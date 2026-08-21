@@ -5,7 +5,8 @@ Feature: Doorway redirects steward humans to their portal host
   So that I manage my account from peer-native infrastructure
 
   Background:
-    Given I am authenticated at a doorway as a graduated steward
+    Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
+    And I am authenticated at a doorway as a graduated steward
     And my AccountView includes a portal host at "https://matthew.steward.example/account"
     And the portal host responds to /healthz with 200
 
