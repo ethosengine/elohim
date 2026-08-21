@@ -1,6 +1,7 @@
 """Tests for env_scope (the gap-granular substrate-scope resolver).
 Run: python3 .claude/scripts/_lib/__tests__/env_scope_test.py (exit 0 = pass)."""
 import sys
+import tempfile
 from pathlib import Path
 
 here = Path(__file__).resolve()
@@ -56,5 +57,46 @@ testable_gap = es.resolved_requires_env(es.requires_tags("write the loopback fix
 crossnode_gap = es.resolved_requires_env(es.requires_tags("run e2e @requires:shem"), doc_default)
 check("iroh transport gap stays pickable", es.gap_blocked(testable_gap, AVAIL, KNOWN) is False)
 check("cross-node gap is held", es.gap_blocked(crossnode_gap, AVAIL, KNOWN) is True)
+
+# ── feature_act: the a2o `@act:<id>` tag scan (mirrors substrate-scope.ts's actFromTags/ACT_TAG) ──
+check("feature_act reads @act:i", es.feature_act(
+    "@e2e @resilience @act:i @requires:owned-substrate @concern:x\nFeature: X\n") == "i")
+check("feature_act reads @act:host", es.feature_act("@act:host @e2e\nFeature: X\n") == "host")
+check("feature_act reads @act:iii", es.feature_act("@act:iii\nFeature: X\n") == "iii")
+check("feature_act None when no act tag", es.feature_act("@e2e @requires:doorway\nFeature: X\n") is None)
+check("feature_act ignores tags AFTER Feature: (scenario-level, not feature-level)",
+      es.feature_act("@e2e\nFeature: X\n\n  @act:i\n  Scenario: Y\n") is None)
+check("feature_act ignores gherkin comments (prose mentioning the tag is not a tag)",
+      es.feature_act("# see @act:i for context\n@e2e\nFeature: X\n") is None)
+check("feature_act on empty/None text -> None", es.feature_act("") is None and es.feature_act(None) is None)
+
+# ── act_baseline_caps: the act's OWN lane-contract file, additive-only (mirrors actBaselineCaps()) ──
+_mdir = Path(tempfile.mkdtemp())
+(_mdir / "cluster-state.act1-household.yaml").write_text(
+    "resources:\n"
+    "  household-nodes:\n    available: true\n"
+    "  owned-substrate:\n    available: true\n"
+    "  harbor-registry:\n    available: false\n"
+)
+(_mdir / "cluster-state.act2-neighbourhood.yaml").write_text(
+    "resources:\n"
+    "  household-nodes:\n    available: true\n"
+    "  owned-substrate:\n    available: false\n"
+)
+(_mdir / "cluster-state.yaml").write_text(
+    "resources:\n"
+    "  household-nodes:\n    available: true\n"
+    "  shem:\n    available: true\n"
+)
+check("act_baseline_caps('i') = act1's available:true set",
+      es.act_baseline_caps("i", _mdir) == {"household-nodes", "owned-substrate"})
+check("act_baseline_caps('ii') reads act2 and DROPS owned-substrate (false there)",
+      es.act_baseline_caps("ii", _mdir) == {"household-nodes"})
+check("act_baseline_caps('iii') reads the live file and adds shem by definition",
+      es.act_baseline_caps("iii", _mdir) == {"household-nodes", "shem"})
+check("act_baseline_caps('host') -> empty (no substrate at all)",
+      es.act_baseline_caps("host", _mdir) == set())
+check("act_baseline_caps fails open (empty) when the act file is unreadable",
+      es.act_baseline_caps("i", _mdir / "nope") == set())
 
 print(f"\n  {_p} assertions passed ✅")

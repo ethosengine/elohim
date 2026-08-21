@@ -130,4 +130,38 @@ check("verdict: no cache, doc-level blocked -> held", sr._scope_verdict(nc, av, 
 live = mkdoc("live.md", "requires_env: [household-nodes]")  # doc-level req satisfied
 check("verdict: no cache, doc-level satisfied -> live", sr._scope_verdict(live, av, kn, {})[0] == "live")
 
+# ── _effective_avail: .feature @act: rescue ──
+# Live cluster-state.yaml withholds owned-substrate from the shared/default lane ON PURPOSE
+# (cluster-state.yaml's own note); a .feature tagged @act:i @requires:owned-substrate is exercised
+# only via Act I's own lane (the mesh stage), which grants it — the planning layer must not hold it.
+_orig_manifests = sr.MANIFESTS_DIR
+mdir = Path(tempfile.mkdtemp())
+(mdir / "cluster-state.act1-household.yaml").write_text("resources:\n  owned-substrate:\n    available: true\n")
+sr.MANIFESTS_DIR = mdir
+
+feat = D / "conductor-validation-spin.feature"
+feat.write_text("@e2e @resilience @act:i @requires:owned-substrate @concern:x\nFeature: X\n  Scenario: Y\n")
+avail_live = set()  # owned-substrate NOT available on the live/default lane
+
+eff = sr._effective_avail(feat, avail_live)
+check("_effective_avail rescues owned-substrate for @act:i", "owned-substrate" in eff)
+check("_effective_avail is additive-only (never drops what was already there)", avail_live <= eff)
+
+md_doc = mkdoc("noact.md", "requires_env: [owned-substrate]")
+check("_effective_avail leaves .md docs untouched (no act concept in frontmatter)",
+      sr._effective_avail(md_doc, avail_live) == avail_live)
+
+feat_noact = D / "no-act-tag.feature"
+feat_noact.write_text("@e2e @requires:owned-substrate\nFeature: Y\n")
+check("_effective_avail leaves an act-less .feature untouched",
+      sr._effective_avail(feat_noact, avail_live) == avail_live)
+
+known = {"owned-substrate"}
+v, caps = sr._scope_verdict(feat, sr._effective_avail(feat, avail_live), known, {})
+check("_scope_verdict: @act:i rescues owned-substrate -> live, no blocking caps", v == "live" and caps == [])
+v2, caps2 = sr._scope_verdict(feat, avail_live, known, {})  # without the rescue, for contrast
+check("_scope_verdict: without the act rescue, the same doc would have been held",
+      v2 == "held" and caps2 == ["owned-substrate"])
+sr.MANIFESTS_DIR = _orig_manifests
+
 print(f"\n  {_p} assertions passed ✅")

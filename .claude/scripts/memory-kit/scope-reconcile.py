@@ -32,6 +32,7 @@ from _lib import cluster_state as _cs  # noqa: E402
 
 ROOT = _paths.repo_root_from_file(__file__)
 CLUSTER_STATE = ROOT / "genesis" / "manifests" / "cluster-state.yaml"
+MANIFESTS_DIR = CLUSTER_STATE.parent
 GAP_DIR = ROOT / ".claude" / "memory-kit" / "gap-items"
 # The deployments arm — humans declare nodeTypes (requirement side); cluster-state resources declare
 # provides_node_types (availability side); `suspended` is DERIVED, never hand-written. Derived flags carry
@@ -168,6 +169,28 @@ def _gap_index() -> dict:
     return idx
 
 
+def _effective_avail(doc: Path, avail: set) -> set:
+    """The `available` set to gate <doc>'s requires_env against. `.md` docs are unaffected (frontmatter
+    `requires_env` has no act concept — .md doc semantics stay exactly the live cluster-state.yaml set).
+    A `.feature` file declaring `@act:<id>` (env_scope.feature_act) gets that act's OWN baseline caps
+    (env_scope.act_baseline_caps) UNIONED in — additive only, never removes a live-available cap.
+
+    Why: a `.feature` tagged `@act:i @requires:owned-substrate` is exercised ONLY via the mesh stage's
+    Act I lane (ELOHIM_CLUSTER_STATE_PATH_OVERRIDE -> cluster-state.act1-household.yaml), where
+    owned-substrate is available — never against the default/live lane, which withholds it from the
+    shared/default run ON PURPOSE (cluster-state.yaml's own note: "without this line @requires:owned-
+    substrate gated nothing on the default lane and the un-parked destructive scenarios would have run
+    against alpha"). Gating scope-reconcile's held/live decision on that deliberate default-lane
+    withholding is a false HELD — the feature's own act baseline is the honest scope predicate, matching
+    substrate-scope.ts's actBaselineCaps() (genesis/a2o/src/framework/fixtures/substrate-scope.ts)."""
+    if doc.suffix != ".feature":
+        return avail
+    act = _es.feature_act(doc.read_text(encoding="utf-8", errors="replace"))
+    if not act:
+        return avail
+    return avail | _es.act_baseline_caps(act, MANIFESTS_DIR)
+
+
 def _scope_verdict(doc: Path, avail: set, known: set, gidx: dict) -> tuple:
     """(verdict, blocking_caps): 'held' = every gap blocked (uniformly out of scope), 'live' = has at least one
     satisfiable gap (mixed/testable → belongs on the plate), 'ambiguous' = no scope info at all.
@@ -214,7 +237,7 @@ def compute_drift() -> tuple:
                     # precondition (doorway, seeded-content), not hardware-vocab drift.
                 if unk:
                     vocab.append((d, unk))
-                verdict, caps = _scope_verdict(d, avail, known, gidx)
+                verdict, caps = _scope_verdict(d, _effective_avail(d, avail), known, gidx)
                 if verdict == "held":
                     to_held.append((d, held / d.relative_to(live), caps))
         if held.is_dir():
@@ -226,7 +249,7 @@ def compute_drift() -> tuple:
                     unk = []
                 if unk:
                     vocab.append((d, unk))
-                verdict, caps = _scope_verdict(d, avail, known, gidx)
+                verdict, caps = _scope_verdict(d, _effective_avail(d, avail), known, gidx)
                 if verdict == "live":
                     to_live.append((d, live / d.relative_to(held), caps))
                 elif verdict == "ambiguous":
