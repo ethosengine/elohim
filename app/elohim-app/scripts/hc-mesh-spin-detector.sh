@@ -37,6 +37,12 @@
 #     storage peer insists it is caught up is a different (and worse) finding
 #     than one spinning while its peer openly reports divergence.
 #
+#   - a LEVEL CENSUS per stream (how many ERROR/WARN/INFO/DEBUG/TRACE lines were
+#     actually seen), printed always. Every line this tool classifies is logged
+#     at INFO, so a stream with zero INFO/DEBUG/TRACE cannot observe the spin at
+#     all and is reported BLIND rather than quiet. The census is the evidence
+#     that a zero rate was a zero and not a blindfold.
+#
 # A one-line JSON summary is printed last (and optionally written to a file)
 # so an a2o step can assert on the verdict without parsing the human report.
 #
@@ -186,14 +192,15 @@ done
 #   total sat nopeers sysval other missing fetched dna_pairs...
 classify() { # <path> <from_offset> <to_offset>
   local path="$1" from="$2" to="$3" len=$((3 > 2 ? $3 - $2 : 0))
-  if [ "$len" -le 0 ]; then echo "0 0 0 0 0 - - 0 "; return; fi
+  if [ "$len" -le 0 ]; then echo "0 0 0 0 0 - - 0 0 0 0 0 "; return; fi
   tail -c "+$((from + 1))" "$path" 2>/dev/null | head -c "$len" | awk '
-    BEGIN { total=0; sat=0; nop=0; sys=0; oth=0; info=0; miss="-"; fetch="-" }
+    BEGIN { total=0; sat=0; nop=0; sys=0; oth=0; miss="-"; fetch="-"
+            lv["ERROR"]=0; lv["WARN"]=0; lv["INFO"]=0; lv["DEBUG"]=0; lv["TRACE"]=0 }
     {
       line=$0
       gsub(/\033\[[0-9;]*m/, "", line)
       total++
-      if (line ~ /\yTRACE\y|\yDEBUG\y|\yINFO\y/) { info++ }
+      if (match(line, /\y(TRACE|DEBUG|INFO|WARN|ERROR)\y/)) lv[substr(line, RSTART, RLENGTH)]++
       if (line ~ /read connection is saturated/) { sat++ }
       else if (line ~ /No peers to fetch record|NoPeersForLocation/) { nop++ }
       else if (line ~ /Sys validation sleeping/) {
@@ -211,10 +218,50 @@ classify() { # <path> <from_offset> <to_offset>
       else { oth++ }
     }
     END {
-      printf "%d %d %d %d %d %s %s %d", total, sat, nop, sys, oth, miss, fetch, info
+      printf "%d %d %d %d %d %s %s %d %d %d %d %d", total, sat, nop, sys, oth, miss, fetch, \
+        lv["ERROR"], lv["WARN"], lv["INFO"], lv["DEBUG"], lv["TRACE"]
       for (d in per) printf " %s=%s", d, per[d]
       printf "\n"
     }'
+}
+
+# --- can this conductor SEE the spin at all? --------------------------------
+# The first blindness test counted observed INFO lines, which is wrong in one
+# important direction: with a TARGETED RUST_LOG (the mesh default), a HEALTHY
+# conductor emits zero INFO from these modules precisely because nothing is
+# wrong. "No INFO lines" then means either "cannot see" or "nothing to see",
+# and those must never be conflated. So ask the conductor's own environment
+# instead of its output: RUST_LOG says what it is ALLOWED to say.
+SPIN_TARGETS="holochain_sqlite::db::access holochain::core::workflow::sys_validation_workflow holochain_cascade"
+
+conductor_sight() { # <pid> -> "full" | "partial:<missing,...>" | "none" | "unset"
+  local rl
+  rl="$(tr '\0' '\n' < "/proc/$1/environ" 2>/dev/null | sed -n 's/^RUST_LOG=//p' | head -1)"
+  [ -n "$rl" ] || { echo unset; return; }
+  RL="$rl" TARGETS="$SPIN_TARGETS" python3 -c '
+import os
+rl = os.environ["RL"]
+targets = os.environ["TARGETS"].split()
+VERBOSE = {"info", "debug", "trace"}
+glob = False
+mods = []
+for d in rl.split(","):
+    d = d.strip()
+    if not d:
+        continue
+    if "=" in d:
+        mod, _, lvl = d.rpartition("=")
+        if lvl.strip().lower() in VERBOSE:
+            mods.append(mod.strip())
+    elif d.lower() in VERBOSE:
+        glob = True
+if glob:
+    print("full"); raise SystemExit(0)
+# tracing matches by module-path prefix: holochain_cascade=info covers
+# holochain_cascade::authority, so a target is covered by any enabled ancestor.
+missing = [t for t in targets if not any(t == m or t.startswith(m + "::") for m in mods)]
+print("full" if not missing else ("none" if len(missing) == len(targets) else "partial:" + ",".join(missing)))
+' 2>/dev/null || echo unset
 }
 
 thread_count() { ls "/proc/$1/task" 2>/dev/null | wc -l; }
@@ -247,10 +294,11 @@ cpu_ticks() { # <pid> -> utime+stime, or "" when the process is gone
 # --- baseline snapshot -------------------------------------------------------
 declare -A PREV_TICKS PREV_OFF
 declare -A CPU_SUM CPU_MAX CPU_LAST
-declare -A THREADS_LAST THREADS_MAX
+declare -A THREADS_LAST THREADS_MAX SIGHT
 declare -A PREV_TT SUM_TT TT_COMM
 declare -A STORE_BEFORE STORE_AFTER
-declare -A TOT_SUM SAT_SUM NOP_SUM SYS_SUM INFO_SUM
+declare -A TOT_SUM SAT_SUM NOP_SUM SYS_SUM
+declare -A ERR_SUM WARN_SUM INFO_SUM DEBUG_SUM TRACE_SUM
 declare -A MISS_SERIES MISS_LAST FETCH_LAST DNA_LAST
 
 for i in "${!PID_NAMES[@]}"; do
@@ -259,6 +307,7 @@ for i in "${!PID_NAMES[@]}"; do
   PREV_TICKS["$n"]="${t:-0}"
   CPU_SUM["$n"]=0; CPU_MAX["$n"]=0
   THREADS_LAST["$n"]="$(thread_count "$pid")"; THREADS_MAX["$n"]="${THREADS_LAST[$n]}"
+  SIGHT["$n"]="$(conductor_sight "$pid")"
   while read -r tid ticks comm; do
     [ -n "$tid" ] || continue
     PREV_TT["$n|$tid"]="$ticks"; SUM_TT["$n|$tid"]=0; TT_COMM["$n|$tid"]="$comm"
@@ -271,7 +320,8 @@ done
 for i in "${!LOG_NAMES[@]}"; do
   n="${LOG_NAMES[$i]}"
   PREV_OFF["$n"]="$(stat -c %s "${LOG_PATHS[$i]}" 2>/dev/null || echo 0)"
-  TOT_SUM["$n"]=0; SAT_SUM["$n"]=0; NOP_SUM["$n"]=0; SYS_SUM["$n"]=0; INFO_SUM["$n"]=0
+  TOT_SUM["$n"]=0; SAT_SUM["$n"]=0; NOP_SUM["$n"]=0; SYS_SUM["$n"]=0
+  ERR_SUM["$n"]=0; WARN_SUM["$n"]=0; INFO_SUM["$n"]=0; DEBUG_SUM["$n"]=0; TRACE_SUM["$n"]=0
   MISS_SERIES["$n"]=""; MISS_LAST["$n"]="-"; FETCH_LAST["$n"]="-"; DNA_LAST["$n"]=""
 done
 
@@ -321,8 +371,11 @@ for cycle in $(seq 1 "$CYCLES"); do
     from="${PREV_OFF[$n]}"
     # truncation/rotation: never read a negative span, restart from 0
     [ "$now_off" -lt "$from" ] && from=0
-    read -r total sat nop sys oth miss fetch info dnas <<< "$(classify "$path" "$from" "$now_off")"
-    INFO_SUM["$n"]=$(( ${INFO_SUM[$n]:-0} + info ))
+    read -r total sat nop sys oth miss fetch n_err n_warn n_info n_debug n_trace dnas \
+      <<< "$(classify "$path" "$from" "$now_off")"
+    ERR_SUM["$n"]=$(( ${ERR_SUM[$n]:-0} + n_err ));   WARN_SUM["$n"]=$(( ${WARN_SUM[$n]:-0} + n_warn ))
+    INFO_SUM["$n"]=$(( ${INFO_SUM[$n]:-0} + n_info )); DEBUG_SUM["$n"]=$(( ${DEBUG_SUM[$n]:-0} + n_debug ))
+    TRACE_SUM["$n"]=$(( ${TRACE_SUM[$n]:-0} + n_trace ))
     PREV_OFF["$n"]="$now_off"
     TOT_SUM["$n"]=$(( ${TOT_SUM[$n]} + total ))
     SAT_SUM["$n"]=$(( ${SAT_SUM[$n]} + sat ))
@@ -386,17 +439,19 @@ for i in "${!LOG_NAMES[@]}"; do
   # log leg reports a confident 0.00/s that means nothing. Reporting that as
   # QUIET would be a measure asserting a green it never took. If a stream
   # produced lines but NONE of them were INFO-or-lower, say so instead.
-  if [ "${INFO_SUM[$n]:-0}" -eq 0 ]; then
-    LOG_LEG_BLIND["$n"]=1
-  else
-    LOG_LEG_BLIND["$n"]=0
-  fi
+  # Blind iff NO conductor is configured to emit these lines. One sighted
+  # conductor makes a zero rate a real observation.
+  any_sighted=0
+  for cn in "${PID_NAMES[@]}"; do
+    case "${SIGHT[$cn]:-unset}" in full|partial:*) any_sighted=1 ;; esac
+  done
+  LOG_LEG_BLIND["$n"]=$([ "$any_sighted" -eq 1 ] && echo 0 || echo 1)
   if [ "$miss_ok" -eq 1 ] && [ "$sat_ok" -eq 1 ]; then
     STREAM_VERDICT["$n"]="SPIN"; VERDICT="SPIN"
     STREAM_REASON["$n"]="$reason; saturated ${sat_rate}/s > ${SAT_THRESHOLD}/s"
   elif [ "${LOG_LEG_BLIND[$n]}" -eq 1 ]; then
     STREAM_VERDICT["$n"]="QUIET-LOG-BLIND"
-    STREAM_REASON["$n"]="no INFO-or-lower lines in this stream — the conductor is logging at ERROR only (RUST_LOG unset), so the saturation/missing-dependency legs CANNOT be observed here. CPU is still measured and trustworthy."
+    STREAM_REASON["$n"]="no conductor feeding this stream has RUST_LOG enabling the spin modules at info — the saturation/missing-dependency legs CANNOT be observed here, so a zero rate means NOT OBSERVED, not NOT HAPPENING. CPU is still measured and trustworthy."
     BLIND_STREAMS+="${BLIND_STREAMS:+,}$n"
   else
     STREAM_VERDICT["$n"]="QUIET"
@@ -413,8 +468,8 @@ for i in "${!PID_NAMES[@]}"; do
   else
     avg="$(awk -v s="${CPU_SUM[$n]}" -v c="$CYCLES" 'BEGIN{printf "%.2f", s/c}')"
     hot=""; awk -v a="$avg" -v t="$CPU_THRESHOLD" 'BEGIN{exit !(a>t)}' && hot="  <-- hot"
-    printf '  cpu  %-10s avg %s cores, max %s cores, %s threads (max %s)%s\n' \
-      "$n" "$avg" "${CPU_MAX[$n]}" "${THREADS_LAST[$n]:-?}" "${THREADS_MAX[$n]:-?}" "$hot"
+    printf '  cpu  %-10s avg %s cores, max %s cores, %s threads (max %s), spin-log sight: %s%s\n' \
+      "$n" "$avg" "${CPU_MAX[$n]}" "${THREADS_LAST[$n]:-?}" "${THREADS_MAX[$n]:-?}" "${SIGHT[$n]:-unset}" "$hot"
     # Hottest threads — which worker is burning it, since perf is unavailable here.
     top="$(for key in "${!SUM_TT[@]}"; do
              [ "${key%%|*}" = "$n" ] || continue
@@ -438,6 +493,12 @@ for i in "${!LOG_NAMES[@]}"; do
     "$(awk -v c="${SYS_SUM[$n]}" -v s="$total_s" 'BEGIN{printf "%.2f", c/s}')" \
     "${MISS_LAST[$n]}" "${FETCH_LAST[$n]}" \
     "$([ -n "${DNA_LAST[$n]}" ] && printf ' | per-dna: %s' "${DNA_LAST[$n]}")"
+  # The level census is printed ALWAYS, not only when blind: it is the evidence
+  # that the numbers above could have been non-zero. A reader should never have
+  # to take "saturated 0.00/s" on trust.
+  printf '       %-10s levels seen: ERROR=%s WARN=%s INFO=%s DEBUG=%s TRACE=%s%s\n' "$n" \
+    "${ERR_SUM[$n]:-0}" "${WARN_SUM[$n]:-0}" "${INFO_SUM[$n]:-0}" "${DEBUG_SUM[$n]:-0}" "${TRACE_SUM[$n]:-0}" \
+    "$([ "${LOG_LEG_BLIND[$n]:-0}" -eq 1 ] && printf '  <-- no INFO/DEBUG/TRACE: this stream is BLIND to the spin lines')"
   printf '       %-10s trend [%s] -> %s (%s)\n' "$n" "${MISS_SERIES[$n]}" "${STREAM_VERDICT[$n]}" "${STREAM_REASON[$n]}"
 done
 if [ ${#STORAGE_NAMES[@]} -gt 0 ]; then
@@ -451,7 +512,7 @@ if [ ${#STORAGE_NAMES[@]} -gt 0 ]; then
 fi
 echo
 if [ -n "$BLIND_STREAMS" ]; then
-  echo "  !! LOG LEG BLIND on: $BLIND_STREAMS"
+  echo "  !! LOG LEG BLIND on: $BLIND_STREAMS (no conductor has RUST_LOG enabling the spin modules)"
   echo "     Those conductors emit ERROR only, and every line this detector"
   echo "     classifies is INFO. Their 0.00/s rates are 'not observed', NOT"
   echo "     'not happening'. Restart them with RUST_LOG=info (or at least"
@@ -473,7 +534,8 @@ for i in "${!PID_NAMES[@]}"; do
   else
     avg="$(awk -v s="${CPU_SUM[$n]}" -v c="$CYCLES" 'BEGIN{printf "%.2f", s/c}')"
     json+="$sep\"$n\":{\"pid\":${PID_VALUES[$i]},\"avgCores\":$avg,\"maxCores\":${CPU_MAX[$n]}"
-    json+=",\"threads\":${THREADS_LAST[$n]:-0},\"maxThreads\":${THREADS_MAX[$n]:-0},\"topThreads\":["
+    json+=",\"threads\":${THREADS_LAST[$n]:-0},\"maxThreads\":${THREADS_MAX[$n]:-0}"
+    json+=",\"spinLogSight\":\"${SIGHT[$n]:-unset}\",\"topThreads\":["
     tsep=""
     while read -r ticks tid comm; do
       [ -n "${ticks:-}" ] || continue
@@ -499,7 +561,8 @@ for i in "${!LOG_NAMES[@]}"; do
   json+=",\"noPeersPerSec\":$(awk -v c="${NOP_SUM[$n]}" -v s="$total_s" 'BEGIN{printf "%.2f", c/s}')"
   json+=",\"sysValPerSec\":$(awk -v c="${SYS_SUM[$n]}" -v s="$total_s" 'BEGIN{printf "%.2f", c/s}')"
   json+=",\"missingDeps\":$miss,\"fetched\":$fetch"
-  json+=",\"missingSeries\":\"${MISS_SERIES[$n]}\",\"infoLines\":${INFO_SUM[$n]:-0}"
+  json+=",\"missingSeries\":\"${MISS_SERIES[$n]}\""
+  json+=",\"levelCensus\":{\"error\":${ERR_SUM[$n]:-0},\"warn\":${WARN_SUM[$n]:-0},\"info\":${INFO_SUM[$n]:-0},\"debug\":${DEBUG_SUM[$n]:-0},\"trace\":${TRACE_SUM[$n]:-0}}"
   json+=",\"logLegBlind\":$([ "${LOG_LEG_BLIND[$n]:-0}" -eq 1 ] && echo true || echo false)"
   json+=",\"verdict\":\"${STREAM_VERDICT[$n]}\"}"
   sep=","

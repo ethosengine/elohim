@@ -17,7 +17,14 @@
 # set as CI's Dataplane Validation).
 #
 # USAGE:
-#   ./hc-mesh.sh [start|stop|status|probe|prologue]
+#   ./hc-mesh.sh [start|stop|status|probe|prologue|conductors-restart]
+#
+#   `conductors-restart` restarts the N conductors IN PLACE against their
+#   EXISTING sandboxes — no generate, so agent keys, chains and DHT databases
+#   survive. Use it to pick up a new MESH_RUST_LOG (or after a conductor hang);
+#   never to reset the mesh, and note that `start` on free ports would instead
+#   REGENERATE the sandboxes and re-key every peer. Storage peers are left
+#   alone and must reconnect to their conductors themselves.
 #
 #   `prologue` execs hc-mesh-prologue.sh — the Act I Prologue cast (named
 #   CONDUCTOR_URLS seeding, SSR/landing/lamad-spa bundle staging, the full
@@ -44,6 +51,14 @@
 #                   preproduction credential — never a prod default; prod
 #                   pulls API_KEY_ADMIN from a real secret. Printed in the
 #                   `status` probe-env line and exported by `mesh_seed_env`.
+#
+#   MESH_RUST_LOG   Conductor log level. Default is targeted, not blanket:
+#                   warn + INFO on exactly the three modules that diagnose a
+#                   sys-validation spin (read-pool saturation, cascade
+#                   NoPeersForLocation, sys-validation's missing-dependency
+#                   counter). RUST_LOG unset means holochain logs ERROR only,
+#                   which makes those lines unobservable rather than absent —
+#                   see the block below the pacing profile.
 #
 #   Dev-tier pacing profile (see the block below the port-scheme helpers —
 #   minutes-quiesce plan W3): MESH_RECONCILE_SECS, MESH_CONTEST_BACKOFF,
@@ -157,6 +172,27 @@ ADOPT_CONTEST_FANOUT="${MESH_ADOPT_FANOUT:-1}"
 # (never a default — see the comment block above).
 ELOHIM_NETWORK_STAKES="${MESH_NETWORK_STAKES:-simulacra}"
 
+# ---------------------------------------------------------------------------
+# Conductor log level (MESH_RUST_LOG). Holochain defaults to ERROR when RUST_LOG
+# is unset, and the three lines that diagnose a sys-validation spin are all
+# INFO: the DHT read-pool saturation line (holochain_sqlite::db::access), the
+# cascade's NoPeersForLocation (holochain_cascade), and sys-validation's own
+# "N fetched of M missing dependencies" counter. Without this, those lines are
+# not merely absent from .sandbox_run_log — they are UNOBSERVABLE, and any tool
+# reading that file reports a confident zero that means nothing. Measured
+# 2026-08-21 on this mesh before the fix: 86 ERROR lines, 0 INFO.
+#
+# Deliberately TARGETED rather than a blanket `info`: a blanket level buries the
+# shared run log (all N conductors multiplex into one prefix-less file) under
+# gossip chatter and makes it useless to read by eye. Everything else stays at
+# warn; kitsune2_gossip is pinned to warn explicitly because it is the loudest
+# module at info and says nothing about this class.
+#
+# Diagnosing something else? Override the whole string:
+#   MESH_RUST_LOG="warn,holochain_p2p=debug" ./hc-mesh.sh conductors-restart
+# ---------------------------------------------------------------------------
+MESH_RUST_LOG="${MESH_RUST_LOG:-warn,holochain_sqlite::db::access=info,holochain::core::workflow::sys_validation_workflow=info,holochain_cascade=info,kitsune2_gossip=warn}"
+
 # Alpha identity model (edgenode template): each storage node self-heals its
 # own human's agent_pub_key from its conductor cell key, NULL-only. Without
 # this env the saga ch02 finish line (non-null agentPubKey) can never light.
@@ -259,6 +295,125 @@ probe_all() {
     pnpm exec tsx scripts/substrate-verify.ts "$cmd" || failures=$((failures+1))
   done
   echo "probe complete: $failures subcommand(s) with failures (reports: $MESH_DIR/reports)"
+}
+
+restart_conductors() {
+  # Restart the conductors IN PLACE, against the sandboxes that already exist.
+  #
+  # Why this is a separate action and not "stop && start": `start` regenerates
+  # sandboxes when the admin ports are free (rm -rf + `hc sandbox generate`),
+  # which mints NEW agent keys for every peer and throws away their chains. That
+  # is a re-key of the whole household, not a restart. It is also load-sensitive
+  # — the cold wasm install inside generate races the conductor's 60s admin
+  # request timeout, measured 65s and failing at load average 79 on 2026-08-21.
+  #
+  # This action changes exactly one thing: the process, and whatever env it is
+  # launched with (MESH_RUST_LOG). Keys, chains, DHT databases, wasm caches and
+  # conductor-config.yaml are all untouched. Reach for it when you need the
+  # conductors running under different logging or after a hang — never to
+  # "reset" the mesh.
+  #
+  # Storage peers are NOT touched. Each one holds a websocket to its conductor's
+  # admin+app interfaces; watch for its "Connected ... to app interface" line
+  # after this returns, and check /health. If a peer does not reconnect on its
+  # own, restart THAT peer deliberately — this action will not do it for you,
+  # because a storage restart is a different blast radius.
+  cd "$LOCAL_DEV_DIR" || exit 2
+
+  local fports="" aports="" i=0
+  for _ in "${PEERS[@]}"; do
+    fports+="${fports:+,}$(admin_port $i)"; aports+="${aports:+,}$(app_port $i)"; i=$((i+1))
+  done
+
+  # Exact pids only. Every lookup below matches an argv substring unique to the
+  # target process AND excludes this shell — `pkill -f holochain` would match
+  # the caller's own command line, which is how shells have been SIGTERM'd here
+  # before. Nothing in this function's own argv contains these patterns.
+  local pids=() pid
+  for name in "${PEERS[@]}"; do
+    pid="$(ps -eo pid=,args= | awk -v me="$$" -v pat="$LOCAL_DEV_DIR/$name/conductor-config.yaml" \
+      '$1 != me && index($0, "--config-path") && index($0, pat) { print $1; exit }')"
+    [ -n "$pid" ] && { pids+=("$pid"); echo "  conductor $name: pid $pid"; } \
+                  || echo "  conductor $name: not running"
+  done
+  # The `hc sandbox ... run` supervisor and the sh -c that launched it: they
+  # respawn nothing, but leaving them behind orphans the next run's port pins.
+  while read -r pid; do
+    [ -n "$pid" ] && { pids+=("$pid"); echo "  hc sandbox run supervisor: pid $pid"; }
+  done < <(ps -eo pid=,args= | awk -v me="$$" \
+    '$1 != me && index($0, "hc sandbox") && index($0, " run ") { print $1 }')
+
+  if [ ${#pids[@]} -eq 0 ]; then
+    echo "no conductors running — use ./hc-mesh.sh start"
+  else
+    echo "stopping ${#pids[@]} process(es) by exact pid"
+    kill "${pids[@]}" 2>/dev/null
+    for _ in $(seq 1 20); do
+      local alive=0
+      for pid in "${pids[@]}"; do kill -0 "$pid" 2>/dev/null && alive=$((alive+1)); done
+      [ "$alive" -eq 0 ] && break
+      sleep 1
+    done
+    for pid in "${pids[@]}"; do kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null; done
+    sleep 1
+  fi
+
+  # Append rather than truncate: the previous run's log is evidence, and the
+  # spin detector tracks byte offsets and handles growth cleanly.
+  echo "restarting ${#PEERS[@]} conductors from EXISTING sandboxes (no generate, keys kept)"
+  echo "  RUST_LOG=$MESH_RUST_LOG"
+  # setsid, not just nohup. nohup only ignores SIGHUP; it does nothing about a
+  # SIGKILL delivered to the whole process GROUP, which is how a calling shell's
+  # cleanup reaps its background children. Restarting the conductors from an
+  # agent tool-call or a CI step and having them vanish the moment that step
+  # returns is the failure this prevents (observed 2026-08-21: conductors up at
+  # 17:16:51, gone by 17:20, no crash in the log because there was none).
+  # NO -p ON A RESTART. `hc sandbox run --help` says it outright: "Interfaces
+  # are persistent. If you add an interface it will be there next time you run
+  # the conductor." The app interfaces were attached by the original generate
+  # and are still in each conductor-config.yaml, so re-attaching them makes
+  # `hc sandbox run` fail its post-boot connect step and EXIT 0 — silently,
+  # with every conductor already reporting "Conductor ready" — which then tears
+  # the conductors down with it. Measured 2026-08-21: with -p, all three booted
+  # and the supervisor exited within a second, no error in the log, and the
+  # "Conductor launched #!N" lines a healthy run prints were simply absent;
+  # without -p, the same command stays up and the app ports come back by
+  # themselves. `start` may pass -p because it has just generated the sandboxes
+  # and no interface exists yet; a restart must not.
+  #
+  # setsid, not just nohup: nohup only ignores SIGHUP and does nothing about a
+  # SIGKILL to the process GROUP, which is how a calling shell reaps background
+  # children when it exits.
+  RUST_LOG="$MESH_RUST_LOG" \
+  setsid nohup sh -c "echo test | hc sandbox --piped -f $fports run -a" >> .sandbox_run_log 2>&1 &
+  disown 2>/dev/null || true
+
+  echo -n "waiting for ${#PEERS[@]} conductors to boot"
+  for _ in $(seq 1 60); do
+    [ "$(ss -tln | grep -cE "127.0.0.1:($(echo "$fports" | tr ',' '|')) ")" -ge ${#PEERS[@]} ] && break
+    printf "."; sleep 3
+  done
+  echo
+  if [ "$(ss -tln | grep -cE "127.0.0.1:($(echo "$fports" | tr ',' '|')) ")" -lt ${#PEERS[@]} ]; then
+    echo "NOT all conductors came back — see $LOCAL_DEV_DIR/.sandbox_run_log" >&2
+    return 1
+  fi
+  echo "conductors up on $fports"
+  # The app interfaces are persistent, so they should return WITHOUT -p. If they
+  # do not, the storage peers have nothing to talk to and the mesh looks alive
+  # while being useless — worth saying out loud rather than leaving to discovery.
+  local app_up
+  app_up="$(ss -tln | grep -cE "127.0.0.1:($(echo "$aports" | tr ',' '|')) ")"
+  echo "app interfaces up on $aports: $app_up/${#PEERS[@]}"
+  [ "$app_up" -lt "${#PEERS[@]}" ] && echo "  WARN: an app interface did not return — storage peers cannot make zome calls" >&2
+  echo
+  echo "storage peers (NOT restarted — check they reconnect on their own):"
+  local j=0
+  for name in "${PEERS[@]}"; do
+    printf "  %-8s :%s " "$name" "$(http_port $j)"
+    curl -s -m 3 "http://localhost:$(http_port $j)/health" >/dev/null && echo "UP" || echo "DOWN <-- needs a deliberate restart"
+    j=$((j+1))
+  done
 }
 
 start_all() {
@@ -462,6 +617,7 @@ PYEOF
     done
     echo "dev-tier gossip config patched into ${#PEERS[@]} conductor-config.yaml (k2Gossip initiate=1000ms)"
 
+    RUST_LOG="$MESH_RUST_LOG" \
     nohup sh -c "echo test | hc sandbox --piped -f $fports run -a -p=$rports" > .sandbox_run_log 2>&1 &
     echo -n "waiting for ${#PEERS[@]} conductors to boot"
     for _ in $(seq 1 90); do
@@ -534,7 +690,8 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     stop)     stop_all ;;
     status)   status_all ;;
     probe)    probe_all ;;
+    conductors-restart) restart_conductors ;;
     prologue) shift; exec bash "$SCRIPT_DIR/hc-mesh-prologue.sh" "$@" ;;
-    *) echo "usage: hc-mesh.sh [start|stop|status|probe|prologue]"; exit 2 ;;
+    *) echo "usage: hc-mesh.sh [start|stop|status|probe|prologue|conductors-restart]"; exit 2 ;;
   esac
 fi
