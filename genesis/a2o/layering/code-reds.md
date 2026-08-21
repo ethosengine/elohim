@@ -133,6 +133,27 @@ All 25 are Act I reds: they were produced by a household mesh with no fleet, no 
 stack. That is the layering argument in one measurement — **a household run is a real proving ground, and
 the suite has been paying fleet prices to learn less.**
 
+## What Act I cannot witness
+
+A held scenario is not always step debt. Some assertions are unwitnessable on a household mesh *by
+construction*, and saying so is a layering fact worth as much as a red.
+
+| assertion | why Act I cannot witness it | act that can |
+|---|---|---|
+| a content item stewarded by **2 distinct collectives** (`observable-distribution.feature`, "Resilience snapshot reports the diversity shortfall") | the household IS one collective — matthew, jessica and james share one fate, which is the whole reason copies inside it barely count. A single-collective mesh can never produce a 2-collective placement. | **Act II** (neighbourhood: adam's household federates, so a second collective exists) |
+| a content item meeting the **floor of 3+ distinct collectives** (same feature, "coverageShortfall is a present 0 when the floor is met") | same reason, one further out: the standard tier's floor is 3, and Act I can supply exactly 1. | **Act II** |
+
+Measured 2026-08-21: a search across 40 content items on the Act I mesh found **none** with a
+`stewardingCollectives` count other than the household's own. Both scenarios are therefore tagged
+`@act:ii` — the runtime gate holds them on an Act I lane and names the act in its skip line, and
+`scope-reconcile` resolves them against the neighbourhood contract rather than reading them as
+household work that never got done.
+
+The general rule this instances: **diversity floors are an Act II property.** Any assertion whose subject
+is "how many distinct collectives / households / fates hold this" needs more than one household to be
+true or false at all, and belongs to the act that has them. Act I can prove that placement, gap
+detection and the shortfall ARITHMETIC work; it cannot prove a shortfall against a floor it cannot reach.
+
 ## Disposition (2026-08-21, same day — all on branch `fix/doorway-breaker-trial-theft-and-apps-extraction-herd`)
 
 | # | verdict | commit | note |

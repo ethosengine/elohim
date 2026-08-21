@@ -352,11 +352,19 @@ Feature: Observable + contract-aware auto-distribute
   #
   # A count alone cannot tell an operator "one collective short"; that is the whole reason the
   # snapshot aggregates in a way that preserves the deficit rather than collapsing to a total.
+  #
+  # BOTH SCENARIOS ARE @act:ii, and not because their steps are missing. A household is ONE
+  # collective — matthew, jessica and james share one fate — so an Act I mesh cannot place a
+  # content item across 2, let alone meet a floor of 3. Measured 2026-08-21: a search across 40
+  # content items on the household mesh found none with any other collective count. Diversity
+  # floors are an Act II property; the neighbourhood, where adam's household federates, is the
+  # smallest stage on which these can be true or false at all. See layering/code-reds.md
+  # § What Act I cannot witness.
 
   # Read-only: the step looks for a content item this mesh has ACTUALLY placed across the
   # named number of collectives rather than staging one — a manufactured item would prove
   # only that the arithmetic runs. Holds, naming the gap, when no such item exists here.
-  @regression @act:i
+  @regression @act:ii
   Scenario: Resilience snapshot reports the diversity shortfall, not just a count
     Given a "standard"-tier content item with 2 distinct stewarding collectives (floor is 3)
     When the operator requests "/api/v1/resilience/{cid}/household"
@@ -366,7 +374,7 @@ Feature: Observable + contract-aware auto-distribute
     # The visible payoff of replacing rows.len() with descent-preserving aggregation —
     # the count alone could not say "1 collective short of the floor."
 
-  @act:i
+  @act:ii
   Scenario: coverageShortfall is a present 0 when the floor is met (absent != zero)
     Given a "standard"-tier content item with 3+ distinct stewarding collectives (floor is 3)
     When the operator requests "/api/v1/resilience/{cid}/household"

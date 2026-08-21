@@ -264,22 +264,48 @@ Given(
   }
 );
 
+/**
+ * Shared operator-read vocabulary, not a shortfall-only step: this phrasing is
+ * already used by features/resilience/operational-weave.feature against
+ * /api/v1/weave, so the definition stays general. `{cid}` in the template is
+ * substituted from whichever content item an earlier Given selected — and is
+ * required ONLY when the template actually contains it, so a path with no
+ * placeholder needs no prior selection.
+ */
+const operatorResponseStore = new WeakMap<E2EWorld, Record<string, unknown>>();
+
 When('the operator requests {string}', async function (this: E2EWorld, template: string) {
-  const state = shortfallStore.get(this);
-  assert.ok(state, 'no content item selected — the tier Given must run first');
-  const path = template.replace('{cid}', state.contentId);
+  let path = template;
+  if (template.includes('{cid}')) {
+    const state = shortfallStore.get(this);
+    assert.ok(
+      state,
+      'the path names {cid} but no content item has been selected — a Given that picks one ' +
+        'must run first'
+    );
+    path = template.replace('{cid}', state.contentId);
+  }
   const { status, body } = await getJson(`${storageUrl()}${path}`);
   assert.equal(status, 200, `GET ${path} returned ${status}`);
-  state.response = body as Record<string, unknown>;
+  const parsed = body as Record<string, unknown>;
+  operatorResponseStore.set(this, parsed);
+  const state = shortfallStore.get(this);
+  if (state) state.response = parsed;
 });
 
+/** The last operator read, whichever Given selected it. */
+function operatorResponse(world: E2EWorld): Record<string, unknown> {
+  const body = operatorResponseStore.get(world);
+  assert.ok(body, 'no operator read captured — the "operator requests" When must run first');
+  return body;
+}
+
 Then('{string} equals {int}', function (this: E2EWorld, field: string, expected: number) {
-  const state = shortfallStore.get(this);
-  assert.ok(state?.response, 'no snapshot captured — the "operator requests" When must run first');
+  const body = operatorResponse(this);
   assert.equal(
-    state.response[field],
+    body[field],
     expected,
-    `expected "${field}" to be ${expected}; snapshot was ${JSON.stringify(state.response)}`
+    `expected "${field}" to be ${expected}; response was ${JSON.stringify(body)}`
   );
 });
 
