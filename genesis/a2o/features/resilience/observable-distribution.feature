@@ -340,7 +340,10 @@ Feature: Observable + contract-aware auto-distribute
   # (constituents-preserving), exposing the deficit — so a consumer sees not just
   # "how many stewards" but "how many distinct-collective slots short of the floor."
 
-  @wip @regression @act:i
+  # Read-only: the step looks for a content item this mesh has ACTUALLY placed across the
+  # named number of collectives rather than staging one — a manufactured item would prove
+  # only that the arithmetic runs. Holds, naming the gap, when no such item exists here.
+  @regression @act:i
   Scenario: Resilience snapshot reports the diversity shortfall, not just a count
     Given a "standard"-tier content item with 2 distinct stewarding collectives (floor is 3)
     When the operator requests "/api/v1/resilience/{cid}/household"
@@ -350,7 +353,7 @@ Feature: Observable + contract-aware auto-distribute
     # The visible payoff of replacing rows.len() with descent-preserving aggregation —
     # the count alone could not say "1 collective short of the floor."
 
-  @wip @act:i
+  @act:i
   Scenario: coverageShortfall is a present 0 when the floor is met (absent != zero)
     Given a "standard"-tier content item with 3+ distinct stewarding collectives (floor is 3)
     When the operator requests "/api/v1/resilience/{cid}/household"

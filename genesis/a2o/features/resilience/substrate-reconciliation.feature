@@ -36,7 +36,10 @@ Feature: Delivery reconciles to the available compute when a peer goes offline
     Then no household person has been scaled out this run
     And every person scaled out this run is a remote-only person
 
-  @wip @act:i
+  # Read-only, and deliberately not staged: "offline" is the substrate condition this run
+  # was handed (ELOHIM_REMOTE_COMPUTE_STATUS), not something the scenario causes. On a run
+  # where the remote pool IS up there is no outage to read through, so it holds.
+  @e2e @act:i
   Scenario: A household learner keeps reading while the remote peer is offline
     Given the remote peer is offline
     And human "Matthew" is logged in on doorway "alpha" with device

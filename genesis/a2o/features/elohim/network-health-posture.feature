@@ -251,7 +251,9 @@ Feature: Network Health Posture — Aggregate Awareness and Attestation-Gated In
     Then the diagnostics surface loads (the gate is discoverability, not access)
     And Matthew can pin it to navigation so it persists across reloads
 
-  @wip
+  # This scenario asserts a gap, on purpose: it passes while the deanonymization surface is
+  # open, and its FIRST step holds the scenario the day admin routes start refusing strangers
+  # — at which point the story should be rewritten as the enforcement it then describes.
   Scenario: Self-healing read model exposes peer identities without attestation today
     Given doorway "alpha" serves "GET /admin/self-healing"
     And no ingress rule restricts "/admin/*" to operator networks
