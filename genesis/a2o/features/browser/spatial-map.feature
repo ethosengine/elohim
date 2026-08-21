@@ -1,4 +1,4 @@
-@browser @spatial @hosted-human @requires:doorway
+@browser @spatial @hosted-human @requires:doorway @act:i @e2e
 Feature: Spatial Map Renders
   The /map route mounts SpatialMapComponent and MapLibre paints OSM tiles.
   This is the minimum proof of the geospatial Cybersyn stack — without it,

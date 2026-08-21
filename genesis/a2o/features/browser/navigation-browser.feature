@@ -1,4 +1,4 @@
-@browser @navigation @hosted-human @requires:doorway
+@browser @navigation @hosted-human @requires:doorway @act:i @e2e
 Feature: Browser Navigation Health
   Verify that key pages load without errors in a real browser.
 

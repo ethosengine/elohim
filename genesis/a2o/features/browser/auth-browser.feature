@@ -1,4 +1,4 @@
-@browser @auth @hosted-human @requires:doorway
+@browser @auth @hosted-human @requires:doorway @act:i @e2e
 Feature: Browser Authentication
   As a hosted human using a real browser
   I want to login through the UI and verify the app loads correctly

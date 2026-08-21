@@ -1,4 +1,4 @@
-@browser @doorway-dashboard @requires:doorway
+@browser @doorway-dashboard @requires:doorway @act:i @e2e
 Feature: Doorway Dashboard Health
   As Matthew, the genesis steward operating the alpha doorway
   I want the dashboard to load without console errors
