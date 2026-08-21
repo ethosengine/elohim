@@ -134,3 +134,22 @@ tick only where P2P is enabled; on a P2P-disabled peer they wait for restart —
 between the supervisor and the healer. Also: the doorway's `ServingHealth` does not read storage's
 `/health/serving`, so a doorway can report serving while its upstream cannot anchor (small doorway change).
 
+## Sibling observed 2026-08-21 20:05 — the app-websocket LIFETIME class (open)
+
+After `hc-mesh.sh conductors-restart` (stock 0.6.0, direct launch), the storage bridges on matthew and
+jessica FLAP: `/health` `conductor.zomePath` alternates live→dead→live every few seconds
+(`lastZomeFailureAgeSecs` 0–14, `bridgeReconnects` 3 and climbing; storage log: `conductor ping failed …
+Websocket closed: No connection`, `heartbeat tick failed: record_peer_status zome call failed`,
+`projection-reconcile: rea heal OPENED the unresponsive-conductor circuit`). James's bridge stayed
+`unknown` (never a first zome call). The supervisor (77dd6b7b6) re-mints correctly — this is not the
+stale-token defect; it is the conductor closing app websockets after seconds. The doorway agent measured
+the same thing on its workers (`da63fd7a0` report, root-caused not fixed): sessions 2.4 s / 7.5 s, below
+`STABLE_SESSION_THRESHOLD` (10 s), `Conductor closed connection: None` (stream end, no close frame), the
+doorway sends nothing between zome calls — leading hypothesis a conductor-side idle reap; 18 reconnects / 40 s.
+Before the restart (the 19:25 `hc sandbox run` boot) the storage bridges were stably live for an hour, so
+compare the two launch paths' conductor configs first (app interface `allowed_origins`, interface
+persistence, the `-p` difference the chaos agent found), then the fork's `holochain_websocket` keepalive.
+Next morning's order: `just mesh stop` alone → fresh `just mesh start` (stock) → confirm stable bridges →
+reproduce with `conductors-restart` → then decide where the keepalive belongs. Until then, do not use
+`conductors-restart` on a mesh you intend to measure.
+
