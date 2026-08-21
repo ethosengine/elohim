@@ -109,7 +109,7 @@
 
 import { createHash } from 'node:crypto';
 import { CommitmentClient, seedCapacityPledge } from './seed-commitments.js';
-import { storageUrlForHuman } from './peer-id.js';
+import { parseNamedCsv, storageUrlForHuman } from './peer-id.js';
 
 // =============================================================================
 // Configuration
@@ -619,27 +619,43 @@ if (isMain) {
 
   // --- Leg 1 -----------------------------------------------------------------
   console.log('\n-- leg 1: distribution ladder (ch10 enabler) --');
-  let distribution: DistributionLegResult;
-  try {
-    distribution = await ensureDistributionMeasured({
-      doorwayUrl: doorwayA,
-      // The re-declare must hit STORAGE directly: /db/content/bulk is a storage
-      // route, and the doorway's read-through cache would answer the follow-up
-      // card read from the pre-distribution snapshot otherwise.
-      storageUrl: process.env.STORAGE_URL || storageBase('human-matthew-manager'),
-      contentId,
-      apiKey,
-    });
-  } catch (error) {
-    distribution = {
-      rung: 'blocked',
-      stewardingCollectives: 0,
-      detail: `distribution probe failed: ${error instanceof Error ? error.message : String(error)}`,
-    };
+  // Run the ladder on EVERY peer's storage, not just the authoring one.
+  // ch10 compares the card across two doorways, and each doorway reads its OWN
+  // primary storage — a manifest recorded on only one of them makes the two
+  // answers differ, which is the exact disagreement that chapter exists to
+  // catch. Reading through storage directly (not the doorway) also keeps the
+  // follow-up measurement out of the doorway's 30s route cache.
+  const peerStorage = parseNamedCsv(process.env.PEER_STORAGE_URLS ?? '').map(entry =>
+    entry.value.includes('://') ? entry.value : `http://${entry.value}`,
+  );
+  const storageTargets =
+    peerStorage.length > 0
+      ? peerStorage
+      : [process.env.STORAGE_URL || storageBase('human-matthew-manager')];
+
+  const distributionResults: DistributionLegResult[] = [];
+  for (const storageUrl of storageTargets) {
+    let result: DistributionLegResult;
+    try {
+      result = await ensureDistributionMeasured({
+        doorwayUrl: storageUrl,
+        storageUrl,
+        contentId,
+        apiKey,
+      });
+    } catch (error) {
+      result = {
+        rung: 'blocked',
+        stewardingCollectives: 0,
+        detail: `probe failed: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+    distributionResults.push(result);
+    const mark = result.rung === 'blocked' ? 'X' : '+';
+    console.log(`  [${mark}] ${storageUrl} ${result.rung} (stewards=${result.stewardingCollectives})`);
+    if (result.rung === 'blocked') console.log(`      ${result.detail}`);
   }
-  console.log(`  [${distribution.rung === 'blocked' ? 'X' : '+'}] ${distribution.rung}: ${distribution.detail}`);
-  console.log(`      stewardingCollectives=${distribution.stewardingCollectives}`);
-  if (distribution.rung === 'blocked') partial += 1;
+  if (distributionResults.some(result => result.rung === 'blocked')) partial += 1;
 
   // --- Leg 2 -----------------------------------------------------------------
   console.log('\n-- leg 2: co-steward replicates-commons agreement (ch09 count) --');
@@ -672,16 +688,32 @@ if (isMain) {
       coStewardHumanId,
       bytes,
     });
-    const legResult = await seedCoStewardCommitment(clientA, body);
-    const mark = legResult.status === 'failed' ? 'X' : '+';
-    console.log(`  [${mark}] ${legResult.commitmentId}: ${legResult.status} — ${legResult.detail}`);
-    if (legResult.status === 'failed') partial += 1;
+    // Authored through BOTH doorways: the commitment projection is per-node,
+    // and ch10 reads the card from each doorway's own storage. A pledge that
+    // exists on only one side is precisely the asymmetry that makes two
+    // doorways tell two truths.
+    for (const [label, client] of [
+      ['A', clientA],
+      ['B', clientB],
+    ] as const) {
+      const legResult = await seedCoStewardCommitment(client, body);
+      const mark = legResult.status === 'failed' ? 'X' : '+';
+      console.log(
+        `  [${mark}] doorway ${label} ${legResult.commitmentId}: ${legResult.status} — ${legResult.detail}`,
+      );
+      if (legResult.status === 'failed') partial += 1;
+    }
   }
 
   // --- Leg 3 -----------------------------------------------------------------
   console.log("\n-- leg 3: co-steward commons capacity pledge (ch09 bytes) --");
   // Fail-soft by construction (see seedCapacityPledge): a storage build that
   // predates the ratios endpoint is a valid deployment state, not an error.
+  // Both nodes pledge: the provider is injected server-side from the receiving
+  // node's OWN conductor cell, so a pledge posted to A names matthew and one
+  // posted to B names jessica — two households' byte budgets, and a
+  // totalPledgedBytes that is non-zero on either doorway's card.
+  await seedCapacityPledge(clientA);
   await seedCapacityPledge(clientB);
 
   // --- Measure ---------------------------------------------------------------
