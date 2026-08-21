@@ -7,7 +7,7 @@ title: "Warm-shell archive is Mongo-only, so the 18a65fd0d wiring cure is fleet-
 slug: "doorway-warm-shell-local-archive-mesh-provable"
 written: "2026-08-21"
 author: "claude (local-pair validation session, /btw fork analysis)"
-status: "backlog"
+status: "wip"
 priority: "medium"
 jobs: [elohim-edge]
 nodes: [elohim-doorway-alpha, elohim-doorway-alpha-b]
@@ -44,6 +44,13 @@ stand-in but is still a separate server, absent from this container, with an unv
 (`declared_blob_hash`, `load`, `load_latest`, `store`). Impls today: the Mongo-backed
 `AppFileCacheService` and a test-only `FakeArchive`. Archive entries are content-addressed
 (`{slug}:{file_path}:{blob_hash}`); the Mongo features used are an upsert and a `last_accessed` touch.
+
+## Landed 2026-08-21 (same day)
+
+- che-devworkspaces `9409696`: `containers/udi-plus/Dockerfile` installs `mongod` 8.0.12 (pinned rhel93 tarball, sha256-gated); runs on the UBI10 lineage (glibc 2.39, OpenSSL 3.5). Until the image rebuilds the binary lives at `/home/user/bin/mongod` (ephemeral, same class as the gh CLI).
+- elohim `cb0e182b4`: `just mesh start` brings up a loopback `mongod` (:27017, dbpath `$MESH_DIR/mongo`) before the doorways; A/B get `doorway-a`/`doorway-b`; `mesh stop`/`status` cover it; no binary ⇒ previous behaviour, said aloud.
+- elohim `1f81a3cc1`: doorways receive the mesh's `ELOHIM_NETWORK_STAKES=simulacra`.
+- Desk proof: both doorways boot `archive_backed=true`, `hydrated=1`; with matthew's storage killed, `/` → 200 in 0.9 ms with `x-elohim-bundle: last-reconciled`. Remaining: the image rebuild (so a fresh workspace has `mongod` without the ephemeral binary) and the a2o scenario asserting the marker through an outage on the local pair.
 
 ## Decision 2026-08-21 (operator, via /btw thread): real `mongod` in the mesh, NOT a SQLite shim
 
