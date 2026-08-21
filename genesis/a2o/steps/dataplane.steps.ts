@@ -12,6 +12,9 @@
  *   Then peer {string} /health p2p.caughtUp is true
  *   Then peer {string} /health peerCount >= {int}
  *   Then /sync doc {string} is present on peer {string}
+ *   When a content sync doc is selected from peer {string}
+ *   Then the selected sync doc is present on peer {string}
+ *   Then the selected sync doc has converged onto peer {string}
  *   Then blob {string} is byte-present on peer {string}
  *   Then EPR {string} blobHash is non-null on peer {string}
  *   Then the served head for EPR {string} matches the declared head on peer {string}
@@ -73,6 +76,27 @@ import { E2EWorld } from '../src/framework/world.js';
 
 /** Map of registered peer name → resolved base URL for this scenario */
 const peerUrls = new WeakMap<E2EWorld, Map<string, string>>();
+
+/**
+ * The document chosen by "a content sync doc is selected from peer {string}":
+ * its docId AND the head set the selecting peer reported at selection time.
+ * The head set is what makes the follow-on cross-peer step a CONVERGENCE
+ * assertion (same state) rather than a co-presence one (both non-empty).
+ */
+/**
+ * How long a selected document may still be in flight to a second peer before
+ * unequal heads count as divergence rather than gossip latency. Both mesh
+ * peers reported the identical head within ~2 s of an authored node's POST
+ * (2026-08-21), so this is generous headroom, not a measured requirement.
+ */
+const SYNC_CONVERGENCE_TIMEOUT_MS = 30_000;
+
+interface SelectedSyncDoc {
+  peerName: string;
+  docId: string;
+  heads: string[];
+}
+const selectedSyncDoc = new WeakMap<E2EWorld, SelectedSyncDoc>();
 
 /** Last generic surface query: surface path + parsed JSON body */
 interface SurfaceCapture {
@@ -318,6 +342,130 @@ Then(
     assert.ok(
       Array.isArray(body.heads) && body.heads.length > 0,
       `/sync doc "${docId}" on ${peerName}: heads is empty or missing — document not yet synced`
+    );
+  }
+);
+
+/**
+ * Select a content sync document from the peer's OWN live document list and
+ * remember it for the rest of the scenario.
+ *
+ * This exists because pinning a literal docId makes the assertion readable on
+ * exactly one substrate. `node:e2e-45cef93f-…` was a real alpha-fleet corpus
+ * node; on a household mesh (or any freshly-seeded stack) that document has
+ * never existed, so the heads probe answered `heads: []` and the scenario
+ * reported "document not yet synced" — a producer failure it had no evidence
+ * for. Selecting from `/sync/v1/elohim/docs` keeps the assertion's meaning (a
+ * REAL document, named by the peer itself, has committed changes) on every
+ * substrate.
+ *
+ * The list surface does not promise an order, so we take the first entry that
+ * ALREADY carries heads. That keeps the follow-on cross-peer assertion about
+ * CONVERGENCE rather than about the producer racing us on a doc it has not
+ * finished writing.
+ */
+When(
+  /^a content sync doc is selected from peer "([^"]+)"$/,
+  async function (this: E2EWorld, peerName: string) {
+    const url = getPeerUrl(this, peerName);
+    const { body } = await probeSyncDocs(url, 'elohim');
+    const documents = Array.isArray(body?.documents) ? body.documents : [];
+    const withHeads = documents.find(d => Array.isArray(d.heads) && d.heads.length > 0);
+    assert.ok(
+      withHeads,
+      `/sync/v1/elohim/docs on ${peerName}: no document carries heads ` +
+        `(${documents.length} listed, total=${body?.total}) — the content-projection ` +
+        `producer has not written a single Automerge document on this peer`
+    );
+    selectedSyncDoc.set(this, {
+      peerName,
+      docId: withHeads.docId,
+      heads: [...withHeads.heads],
+    });
+  }
+);
+
+/** Read back the document chosen by "a content sync doc is selected from peer". */
+function requireSelectedSyncDoc(world: E2EWorld): SelectedSyncDoc {
+  const selected = selectedSyncDoc.get(world);
+  assert.ok(
+    selected,
+    'No sync doc selected — run `When a content sync doc is selected from peer "<peer>"` first'
+  );
+  return selected;
+}
+
+/**
+ * Order-independent comparison of two Automerge head sets.
+ *
+ * Set-based rather than sort-based: the heads array carries no ordering
+ * guarantee across peers, and comparing as sets says exactly that.
+ */
+function sameHeadSet(a: string[], b: string[]): boolean {
+  const setA = new Set(a);
+  const setB = new Set(b);
+  if (setA.size !== setB.size) return false;
+  for (const head of setA) {
+    if (!setB.has(head)) return false;
+  }
+  return true;
+}
+
+/**
+ * Assert the selected sync document is present with non-empty heads on a peer.
+ *
+ * Presence only — the document exists here and has at least one committed
+ * change. Use the "has converged onto peer" step for the cross-peer claim;
+ * two peers each holding a non-empty-but-DIFFERENT head set is divergence,
+ * and this step cannot tell the difference.
+ */
+Then(
+  /^the selected sync doc is present on peer "([^"]+)"$/,
+  async function (this: E2EWorld, peerName: string) {
+    const { docId } = requireSelectedSyncDoc(this);
+    const url = getPeerUrl(this, peerName);
+    const { body } = await probeSyncDocHeads(url, 'elohim', docId);
+    assert.ok(
+      Array.isArray(body.heads) && body.heads.length > 0,
+      `selected /sync doc "${docId}" on ${peerName}: heads is empty or missing — document not yet synced`
+    );
+  }
+);
+
+/**
+ * Assert the selected sync document has converged onto a second peer — the
+ * SAME docId carrying the SAME head set the selecting peer reported.
+ *
+ * Equal heads is what "converged" means for an Automerge document: both
+ * replicas are at the same point in the change graph. A non-empty heads array
+ * on each peer proves only co-presence — peer A at head X and peer B at head Z
+ * is a DIVERGED document that a presence check happily passes.
+ *
+ * Convergence is eventual, so this polls: a document still in flight across
+ * the libp2p gossip engine legitimately reads a stale head for a few seconds.
+ */
+Then(
+  /^the selected sync doc has converged onto peer "([^"]+)"$/,
+  async function (this: E2EWorld, peerName: string) {
+    const selected = requireSelectedSyncDoc(this);
+    const url = getPeerUrl(this, peerName);
+
+    let lastSeen: string[] = [];
+    const converged = await pollForGauge<true>(
+      async () => {
+        const { body } = await probeSyncDocHeads(url, 'elohim', selected.docId);
+        lastSeen = Array.isArray(body.heads) ? body.heads : [];
+        return sameHeadSet(lastSeen, selected.heads) ? true : undefined;
+      },
+      { intervalMs: 2000, timeoutMs: SYNC_CONVERGENCE_TIMEOUT_MS }
+    );
+
+    assert.ok(
+      converged,
+      `selected /sync doc "${selected.docId}" has NOT converged onto ${peerName} ` +
+        `within ${SYNC_CONVERGENCE_TIMEOUT_MS / 1000}s: ${selected.peerName} heads ` +
+        `[${selected.heads.join(', ')}] vs ${peerName} heads ` +
+        `[${lastSeen.join(', ')}]${lastSeen.length === 0 ? ' (document absent here)' : ''}`
     );
   }
 );

@@ -10,7 +10,11 @@ import { randomUUID } from 'node:crypto';
 
 import { Given, When, Then } from '@cucumber/cucumber';
 
-import { waitForContent, waitForContentByTags } from '../src/framework/assertions/content-sync.js';
+import {
+  PROVENANCE_VISIBILITY_BUDGET,
+  waitForContent,
+  waitForContentByTags,
+} from '../src/framework/assertions/content-sync.js';
 import { BrowserDevice } from '../src/framework/devices/browser-device.js';
 import { E2EWorld } from '../src/framework/world.js';
 
@@ -118,12 +122,9 @@ When('{word} reads the content by id', async function (this: E2EWorld, humanName
   // provenance-publish drain loop marks the row (≈DRAIN_INTERVAL_SECS=15s on
   // storage). A read-by-id immediately after create races that drain and 404s,
   // so poll until the content is visible — mirroring the waitForContentByTags
-  // pattern the sibling tag-search step already uses.
-  const content = await waitForContent(device.client, id, {
-    maxAttempts: 5,
-    initialDelayMs: 1000,
-    timeoutMs: 15_000,
-  });
+  // pattern the sibling tag-search step already uses. The budget must span the
+  // whole drain window, not half of it: see PROVENANCE_VISIBILITY_BUDGET.
+  const content = await waitForContent(device.client, id, PROVENANCE_VISIBILITY_BUDGET);
   this.contentIds.set('lastReadContent', JSON.stringify(content));
 });
 
@@ -148,11 +149,14 @@ When(
     const runTag = this.contentIds.get('lastContentRunTag');
     assert.ok(runTag, 'No run tag — was content created in this scenario?');
 
-    const results = await waitForContentByTags(device.client, [tag, runTag], {
-      maxAttempts: 5,
-      initialDelayMs: 1000,
-      timeoutMs: 15_000,
-    });
+    // Same provenance-publish window as the read-by-id step above: a tag
+    // search is a gated list read, so it cannot see the row until the drain
+    // loop has stamped `p2p_published_at`.
+    const results = await waitForContentByTags(
+      device.client,
+      [tag, runTag],
+      PROVENANCE_VISIBILITY_BUDGET
+    );
 
     this.contentIds.set('lastSearchResults', JSON.stringify(results));
   }
