@@ -48,7 +48,14 @@
 #   --count N            content nodes to author on that peer (default 5)
 #   --tag TAG            run tag; content ids are chaos-rekey-<TAG>-NN
 #                        (default: the UTC timestamp). Reuse it to resume a run.
-#   --phase P            run one phase instead of all four
+#   --phase P            run one phase instead of all four. `stage-v2` runs the
+#                        deep-chain staging + rekey + measure, which is the
+#                        variant that actually leaves the neighbours holding
+#                        unfetchable dependencies (v1 does not — see the
+#                        phase_author_chain comment for why).
+#   --chain-len N        revisions in the v2 dependent chain (default 24)
+#   --gossip-window S    seconds the neighbours run before the re-key, so gossip
+#                        moves the chain's tail and not its head (default 8)
 #   --measure-minutes M  detector run length after the re-key (default 3)
 #   --method M           reinstall (default) re-keys by wiping only the
 #                        conductor's chain + keystore and re-installing the happ
@@ -85,6 +92,8 @@ ANCHOR_TIMEOUT=180
 WITNESS_TIMEOUT=240
 KEEP_STORAGE_DB=1
 REKEY_METHOD="${REKEY_METHOD:-reinstall}"
+CHAIN_LEN="${CHAIN_LEN:-24}"
+GOSSIP_WINDOW="${GOSSIP_WINDOW:-8}"
 TAG=""
 
 while [ $# -gt 0 ]; do
@@ -93,6 +102,8 @@ while [ $# -gt 0 ]; do
     --count)            COUNT="$2"; shift 2 ;;
     --tag)              TAG="$2"; shift 2 ;;
     --phase)            PHASE="$2"; shift 2 ;;
+    --chain-len)        CHAIN_LEN="$2"; shift 2 ;;
+    --gossip-window)    GOSSIP_WINDOW="$2"; shift 2 ;;
     --measure-minutes)  MEASURE_MINUTES="$2"; shift 2 ;;
     --anchor-timeout)   ANCHOR_TIMEOUT="$2"; shift 2 ;;
     --witness-timeout)  WITNESS_TIMEOUT="$2"; shift 2 ;;
@@ -175,6 +186,23 @@ print('' if v is None else v)
 # ===========================================================================
 # PHASE 1 — author on the target peer's own chain
 # ===========================================================================
+# /proc/<pid>/exe resolves to "<path> (deleted)" when the binary has been
+# REPLACED under a running process — which happens constantly here, because the
+# storage binary is rebuilt into a shared cargo pool slot while the mesh runs.
+# Handing that literal string to exec gives FileNotFoundError on a path that
+# looks perfectly real in the error message. Strip the suffix, and fall back to
+# the configured binary if the stripped path is gone too (the old inode is still
+# executable via /proc/<pid>/exe, but only while that process lives).
+resolve_exe() { # <pid> [fallback]
+  local raw stripped
+  raw="$(readlink "/proc/$1/exe" 2>/dev/null)"
+  stripped="${raw% (deleted)}"
+  if [ -x "$stripped" ]; then echo "$stripped"; return 0; fi
+  if [ -n "${2:-}" ] && [ -x "$2" ]; then echo "$2"; return 0; fi
+  echo "$stripped"
+  return 1
+}
+
 phase_author() {
   head_ "phase 1/4: author $COUNT content nodes on $PEER (:$PEER_HTTP)"
   port_listening "$PEER_HTTP" || fail "$PEER storage is not listening on :$PEER_HTTP — is the mesh up?"
@@ -218,6 +246,101 @@ phase_author() {
       "$(storage_get "http://localhost:$PEER_HTTP/db/content/$id" | json_field dhtAnchorHash)"
   done < "$IDS_FILE"
   [ "$anchored" -gt 0 ] || fail "nothing anchored on $PEER within ${ANCHOR_TIMEOUT}s — the staging precondition is unmet (check $MESH_DIR/logs/$PEER.log for reanchor_backfill)"
+}
+
+# ===========================================================================
+# PHASE 1b (staging v2) — leave the neighbours holding a chain they cannot complete
+# ===========================================================================
+# Why v1 did not reproduce the class. Matthew and jessica had already FETCHED
+# AND VALIDATED james's ops before the re-key. Validated ops are integrated;
+# nothing is pending; re-keying james does not retroactively un-validate work
+# already done, so there is no dependency for anyone to chase. Alpha's condition
+# is the opposite: the reinstall left ops sitting in the validation queue whose
+# dependencies were never fetched and now never can be.
+#
+# So build that condition on purpose. Stop the neighbours, have james author a
+# DEEP chain of dependent actions (each update's action references the previous
+# one on his source chain), let the neighbours run only briefly so gossip
+# delivers the TAIL of that chain and not its head, then re-key james so the
+# head can never be produced by anyone. The neighbours are then holding ops whose
+# dependencies are genuinely unfetchable — which is the whole point.
+#
+# SIGSTOP is the instrument because it freezes a conductor without disturbing a
+# single byte of its state: no restart, no re-key, no lost tokens. The trap
+# below guarantees SIGCONT even if this phase dies partway — a household left
+# with two frozen conductors is a much worse outcome than a failed experiment.
+phase_author_chain() {
+  head_ "phase 1b/4: stage v2 — a chain whose head the neighbours never receive"
+  local chain_len="${CHAIN_LEN:-24}" gossip_window="${GOSSIP_WINDOW:-8}"
+  port_listening "$PEER_HTTP" || fail "$PEER storage is not listening on :$PEER_HTTP"
+
+  local others=() opids=() i=0
+  for name in "${PEERS[@]}"; do
+    if [ "$name" != "$PEER" ]; then
+      local cp; cp="$(conductor_pid "$name")"
+      [ -n "$cp" ] || fail "no conductor process for $name — cannot freeze it"
+      others+=("$name"); opids+=("$cp")
+    fi
+    i=$((i + 1))
+  done
+  say "neighbours to freeze: $(for k in "${!others[@]}"; do printf '%s(%s) ' "${others[$k]}" "${opids[$k]}"; done)"
+
+  # Guaranteed thaw. Never leave a frozen conductor behind, whatever happens.
+  thaw() {
+    local p
+    for p in "${opids[@]}"; do kill -CONT "$p" 2>/dev/null; done
+  }
+  trap 'echo "[chaos-rekey] thawing neighbours (trap)"; thaw' EXIT INT TERM
+
+  for p in "${opids[@]}"; do kill -STOP "$p" 2>/dev/null || fail "could not SIGSTOP $p"; done
+  say "neighbours FROZEN (SIGSTOP) — they will receive nothing james authors from here"
+
+  local base="chain-$TAG"
+  local code
+  code="$(curl -s -m 30 -o /dev/null -w '%{http_code}' -X POST "http://localhost:$PEER_HTTP/db/content" \
+    -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" \
+    -d "{\"id\":\"$base\",\"title\":\"Chain head ($TAG)\",\"contentType\":\"concept\",\"contentFormat\":\"markdown\",\"contentBody\":\"# $base\\n\\nrevision 0\",\"reach\":\"commons\",\"createdBy\":\"$(human_id "$PEER")\",\"tags\":[\"chaos-rekey\",\"chain\",\"$TAG\"]}")"
+  [ "$code" = "201" ] || [ "$code" = "200" ] || fail "could not create the chain base on $PEER (HTTP $code)"
+  echo "$base" > "$IDS_FILE"
+  say "chain base $base created (HTTP $code)"
+
+  # Let the base anchor onto james's chain before extending it, or the updates
+  # have nothing to depend on.
+  local dl=$((SECONDS + ANCHOR_TIMEOUT)) anchored=""
+  while [ "$SECONDS" -lt "$dl" ]; do
+    anchored="$(storage_get "http://localhost:$PEER_HTTP/db/content/$base" | json_field dhtAnchorHash)"
+    [ -n "$anchored" ] && break
+    sleep 5
+  done
+  [ -n "$anchored" ] || { thaw; fail "chain base never anchored on $PEER — its zome path may be dead (see: a conductor restart invalidates each storage peer's app-interface token)"; }
+  say "chain base anchored: ${anchored:0:24}…"
+
+  local ok=0 n
+  for n in $(seq 1 "$chain_len"); do
+    code="$(curl -s -m 30 -o /dev/null -w '%{http_code}' -X PATCH "http://localhost:$PEER_HTTP/db/content/$base" \
+      -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" \
+      -d "{\"contentBody\":\"# $base\\n\\nrevision $n of $chain_len — each revision is one more action on $PEER's source chain\",\"title\":\"Chain head ($TAG) rev $n\"}")"
+    [ "$code" = "200" ] && ok=$((ok + 1)) || say "  WARN: revision $n returned HTTP $code"
+  done
+  say "authored $ok/$chain_len dependent revisions onto $PEER's source chain"
+  [ "$ok" -gt 0 ] || { thaw; fail "no revisions authored — nothing staged"; }
+
+  # Brief thaw: enough for gossip to move the TAIL, not the whole chain.
+  say "thawing neighbours for ${gossip_window}s so gossip delivers only the tail"
+  thaw
+  sleep "$gossip_window"
+  trap - EXIT INT TERM
+
+  local j=0
+  for name in "${PEERS[@]}"; do
+    if [ "$name" != "$PEER" ]; then
+      printf '  %-8s sees %s: %s\n' "$name" "$base" \
+        "$(storage_get "http://localhost:$(http_port $j)/db/content/$base" | json_field dhtAnchorHash | cut -c1-24)"
+    fi
+    j=$((j + 1))
+  done
+  { echo "CHAIN_BASE=$base"; echo "CHAIN_LEN=$ok"; echo "GOSSIP_WINDOW=$gossip_window"; } >> "$STATE"
+  say "staging v2 complete — now re-key $PEER so the head of this chain becomes unproducible"
 }
 
 # ===========================================================================
@@ -280,7 +403,9 @@ phase_rekey() {
   local envfile="$WORK_DIR/$TAG.$PEER.environ" cwd
   cp "/proc/$spid/environ" "$envfile" || fail "could not read /proc/$spid/environ"
   cwd="$(readlink "/proc/$spid/cwd")"
-  local storage_bin; storage_bin="$(readlink "/proc/$spid/exe")"
+  local storage_bin
+  storage_bin="$(resolve_exe "$spid")" \
+    || fail "$PEER's storage binary is gone (was '$storage_bin') — it was rebuilt under the running process; rebuild it before re-keying"
   say "captured storage env ($(tr -cd '\0' < "$envfile" | wc -c) vars), cwd=$cwd, bin=$storage_bin"
 
   # Sibling liveness BEFORE, so we can prove what our kill did and undo it.
@@ -510,11 +635,13 @@ say "artifacts: $WORK_DIR/$TAG.*"
 RC=0
 case "$PHASE" in
   author)  phase_author ;;
+  author-chain) phase_author_chain ;;
+  stage-v2) phase_author_chain; phase_rekey; phase_measure; RC=$? ;;
   witness) phase_witness ;;
   rekey)   phase_rekey ;;
   measure) phase_measure; RC=$? ;;
   all)     phase_author; phase_witness; phase_rekey; phase_measure; RC=$? ;;
-  *) fail "unknown phase '$PHASE' (author|witness|rekey|measure|all)" ;;
+  *) fail "unknown phase '$PHASE' (author|author-chain|witness|rekey|measure|all|stage-v2)" ;;
 esac
 
 head_ "run complete (tag=$TAG)"
@@ -523,7 +650,7 @@ head_ "run complete (tag=$TAG)"
 # phase reporting "did not reproduce" would be a measure that never ran claiming
 # a green — the exact lossy-measure shape the CI museum warns about.
 case "$PHASE" in
-  all|measure)
+  all|measure|stage-v2)
     if [ "$RC" -eq 1 ]; then
       echo "OUTCOME: the class REPRODUCED — the detector's verdict is SPIN."
     else

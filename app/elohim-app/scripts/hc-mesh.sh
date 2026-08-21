@@ -330,6 +330,158 @@ probe_all() {
   echo "probe complete: $failures subcommand(s) with failures (reports: $MESH_DIR/reports)"
 }
 
+# /proc/<pid>/exe resolves to "<path> (deleted)" when the binary has been
+# REPLACED under a running process — which happens constantly here, because the
+# storage binary is rebuilt into a shared cargo pool slot while the mesh runs.
+# Handing that literal string to exec gives FileNotFoundError on a path that
+# looks perfectly real in the error message. Strip the suffix, and fall back to
+# the configured binary if the stripped path is gone too (the old inode is still
+# executable via /proc/<pid>/exe, but only while that process lives).
+resolve_exe() { # <pid> [fallback]
+  local raw stripped
+  raw="$(readlink "/proc/$1/exe" 2>/dev/null)"
+  stripped="${raw% (deleted)}"
+  if [ -x "$stripped" ]; then echo "$stripped"; return 0; fi
+  if [ -n "${2:-}" ] && [ -x "$2" ]; then echo "$2"; return 0; fi
+  echo "$stripped"
+  return 1
+}
+
+restart_storage() {
+  # Restart storage peers in place, each with the EXACT environment it is already
+  # running with — recovered from /proc/<pid>/environ, never rebuilt from this
+  # script. Rebuilding would drift the moment start_all's env block changes, and
+  # would clobber AGENT_PUBKEY for any peer re-keyed since boot (after a chaos
+  # re-key, james runs on a key this script has no way to know).
+  #
+  # Why this exists: a conductor restart invalidates the app-interface auth token
+  # each peer minted at ITS startup, and the peer does not re-mint it. It keeps
+  # answering /health with 200 and keeps accepting writes while every zome call
+  # fails and nothing can be anchored. Restarting the peer is the only way back.
+  # Backlog: storage-stale-app-interface-token-after-conductor-restart.
+  #
+  # Optional arguments: peer names (default: all).
+  local targets=("$@")
+  [ ${#targets[@]} -eq 0 ] && targets=("${PEERS[@]}")
+  local workdir="${MESH_DIR}/storage-restart"
+  mkdir -p "$workdir"
+
+  local name port pid envfile cwd bin key k
+  for name in "${targets[@]}"; do
+    port=""; k=0
+    for n2 in "${PEERS[@]}"; do [ "$n2" = "$name" ] && port="$(http_port $k)"; k=$((k+1)); done
+    [ -n "$port" ] || { echo "  $name: not a mesh peer ($MESH_PEERS)" >&2; continue; }
+    envfile="$workdir/$name.environ"
+
+    # Exact pid: the storage binary's argv carries --http-port <port>, which no
+    # other process has, and which never appears in this script's own argv.
+    pid="$(ps -eo pid=,args= | awk -v me="$$" -v pat="--http-port $port" \
+      '$1 != me && index($0, "elohim-storage") && index($0, pat) { print $1; exit }')"
+
+    # Capture the live environment when we can. A pid that exists but whose
+    # /proc is unreadable (a process already exiting) is treated exactly like no
+    # pid at all — fall through to the last good capture rather than give up,
+    # which is the difference between a recoverable peer and a dead one.
+    if [ -n "$pid" ] && cp "/proc/$pid/environ" "$envfile" 2>/dev/null; then
+      cwd="$(readlink "/proc/$pid/cwd")"
+      if ! bin="$(resolve_exe "$pid" "$STORAGE_BIN")"; then
+        echo "  $name: binary is gone (was '$bin'); rebuild it or set STORAGE_BIN" >&2
+        continue
+      fi
+      key="$(tr '\0' '\n' < "$envfile" | sed -n 's/^AGENT_PUBKEY=//p' | head -1)"
+      echo "  $name :$port pid=$pid agent=${key:0:20}… bin=$bin (env captured live)"
+      kill "$pid" 2>/dev/null
+      local t=15
+      while [ "$t" -gt 0 ] && kill -0 "$pid" 2>/dev/null; do sleep 1; t=$((t-1)); done
+      kill -0 "$pid" 2>/dev/null && { kill -9 "$pid" 2>/dev/null; sleep 2; }
+    elif [ -s "$envfile" ]; then
+      cwd="$LOCAL_DEV_DIR"
+      bin="$STORAGE_BIN"
+      [ -x "$bin" ] || { echo "  $name: STORAGE_BIN is not executable: $bin" >&2; continue; }
+      key="$(tr '\0' '\n' < "$envfile" | sed -n 's/^AGENT_PUBKEY=//p' | head -1)"
+      echo "  $name :$port not readable/not running — restoring the capture from $(date -r "$envfile" -u +%H:%M:%SZ), agent=${key:0:20}…"
+      [ -n "$pid" ] && { kill -9 "$pid" 2>/dev/null; sleep 1; }
+    else
+      echo "  $name :$port not running and no captured environment — use ./hc-mesh.sh start"
+      continue
+    fi
+
+    # setsid: nohup ignores SIGHUP but not a SIGKILL to the process group, which
+    # is how a calling shell reaps its background children when it exits.
+    setsid nohup python3 -c '
+import os, sys
+envfile, binpath, port, cwd = sys.argv[1:5]
+with open(envfile, "rb") as f:
+    raw = f.read().decode("utf-8", "replace")
+env = dict(p.split("=", 1) for p in raw.split("\0") if "=" in p)
+os.chdir(cwd)
+os.execve(binpath, [binpath, "--http-port", port], env)
+' "$envfile" "$bin" "$port" "$cwd" >> "$LOGDIR/$name.log" 2>&1 &
+    disown 2>/dev/null || true
+  done
+
+  echo -n "waiting for storage peers to serve"
+  local dl=$((SECONDS + 180))
+  while [ "$SECONDS" -lt "$dl" ]; do
+    local up=0 k2=0
+    for n2 in "${PEERS[@]}"; do
+      curl -s -m 2 "http://localhost:$(http_port $k2)/health" >/dev/null && up=$((up+1)); k2=$((k2+1))
+    done
+    [ "$up" -ge ${#PEERS[@]} ] && break
+    printf "."; sleep 3
+  done
+  echo
+  # /health is not the question. "Serving" and "able to anchor" are different
+  # claims and only one of them matters.
+  probe_zome_paths
+}
+
+# Report, per peer, whether its ZOME path is alive — i.e. whether it can still
+# reach its conductor. Shared by conductors-restart and storage-restart.
+probe_zome_paths() {
+  echo "storage peers (zome path, not just /health):"
+  local j=0 name port body probe_id needs_restart=""
+  for name in "${PEERS[@]}"; do
+    port="$(http_port $j)"
+    printf "  %-8s :%s " "$name" "$port"
+    if ! curl -s -m 3 "http://localhost:$port/health" >/dev/null; then
+      echo "DOWN (not serving at all)"
+    else
+      probe_id="$(curl -s -m 8 "http://localhost:$port/db/content?limit=25" 2>/dev/null \
+        | python3 -c '
+import json, sys
+try:
+    items = json.load(sys.stdin).get("items", [])
+except Exception:
+    items = []
+print(next((i["id"] for i in items if i.get("dhtAnchorHash")), ""))
+' 2>/dev/null)"
+      if [ -z "$probe_id" ]; then
+        echo "serving, but no ANCHORED content to probe the zome path with (inconclusive)"
+      else
+        body="$(curl -s -m 15 -H "Authorization: Bearer ${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}" \
+          "http://localhost:$port/db/content/$probe_id/head-record" 2>/dev/null)"
+        case "$body" in
+          *"Zome call failed"*|*"Websocket closed"*|*"No connection"*)
+            echo "serving, but ZOME CALLS ARE DEAD (stale app-interface token) <-- restart this peer"
+            needs_restart+="${needs_restart:+ }$name" ;;
+          "") echo "serving, zome probe timed out <-- check this peer"
+            needs_restart+="${needs_restart:+ }$name" ;;
+          *) echo "UP (zome path alive)" ;;
+        esac
+      fi
+    fi
+    j=$((j+1))
+  done
+  if [ -n "$needs_restart" ]; then
+    echo
+    echo "  Stale conductor token — restart deliberately: ./hc-mesh.sh storage-restart $needs_restart"
+    echo "  Until then these peers accept writes that can never be anchored."
+    return 1
+  fi
+  return 0
+}
+
 restart_conductors() {
   # Restart the conductors IN PLACE, against the sandboxes that already exist.
   #
@@ -789,7 +941,9 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     status)   status_all ;;
     probe)    probe_all ;;
     conductors-restart) restart_conductors ;;
+    storage-restart) shift; restart_storage "$@" ;;
+    zome-probe) probe_zome_paths ;;
     prologue) shift; exec bash "$SCRIPT_DIR/hc-mesh-prologue.sh" "$@" ;;
-    *) echo "usage: hc-mesh.sh [start|stop|status|probe|prologue|conductors-restart]"; exit 2 ;;
+    *) echo "usage: hc-mesh.sh [start|stop|status|probe|prologue|conductors-restart|storage-restart [peer...]|zome-probe]"; exit 2 ;;
   esac
 fi
