@@ -564,6 +564,66 @@ async function withRequestBound<T>(
   }
 }
 
+/** A raw GET answer including its response headers. See `getRawWithHeaders`. */
+export interface RawHttpResponse {
+  status: number;
+  text: string;
+  /**
+   * Lower-cased header names; a repeated header is joined with ', '. Typed
+   * with `| undefined` because the interesting question a caller asks of this
+   * map is usually "did the peer send this header AT ALL" — an absent header
+   * must read as `undefined`, not as a silently-typed `string`.
+   */
+  headers: Record<string, string | undefined>;
+}
+
+/**
+ * Normalise undici's `IncomingHttpHeaders` into a plain lower-cased string map.
+ * Undici already lower-cases the names it yields; the explicit lower-casing
+ * here makes that a guarantee of THIS module rather than of the client, so a
+ * caller may always look a header up by its canonical lower-case name.
+ */
+function normaliseResponseHeaders(
+  headers: Record<string, string | string[] | undefined>
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    if (value === undefined) continue;
+    out[name.toLowerCase()] = Array.isArray(value) ? value.join(', ') : value;
+  }
+  return out;
+}
+
+/**
+ * Raw GET returning status + body text + RESPONSE HEADERS, under the same
+ * total wall-clock bound as `getRaw` (which delegates here and drops the
+ * headers). Callers that assert on a header the doorway sets — the freshness
+ * trust signal (`x-elohim-freshness*`), the bundle marker — need the header
+ * map; everyone else keeps the narrower two-field shape.
+ */
+export async function getRawWithHeaders(
+  url: string,
+  opts: { timeoutMs?: number; headers?: Record<string, string> } = {}
+): Promise<RawHttpResponse> {
+  const timeoutMs = opts.timeoutMs ?? 15_000;
+  const attempt = (async () => {
+    const { statusCode, headers, body } = await request(url, {
+      method: 'GET',
+      dispatcher: boundedDispatcher(timeoutMs),
+      bodyTimeout: timeoutMs,
+      headersTimeout: timeoutMs,
+      ...(opts.headers ? { headers: opts.headers } : {}),
+    });
+    const text = await body.text();
+    return { status: statusCode, text, headers: normaliseResponseHeaders(headers) };
+  })();
+  return withRequestBound(
+    attempt,
+    timeoutMs,
+    () => new RequestBoundExceeded('GET', url, timeoutMs)
+  );
+}
+
 /**
  * Raw GET — returns status + response body text. Never throws on non-2xx (a
  * non-2xx status is still a real answer); DOES throw on connect error/timeout
@@ -581,23 +641,8 @@ export async function getRaw(
   url: string,
   opts: { timeoutMs?: number; headers?: Record<string, string> } = {}
 ): Promise<{ status: number; text: string }> {
-  const timeoutMs = opts.timeoutMs ?? 15_000;
-  const attempt = (async () => {
-    const { statusCode, body } = await request(url, {
-      method: 'GET',
-      dispatcher: boundedDispatcher(timeoutMs),
-      bodyTimeout: timeoutMs,
-      headersTimeout: timeoutMs,
-      ...(opts.headers ? { headers: opts.headers } : {}),
-    });
-    const text = await body.text();
-    return { status: statusCode, text };
-  })();
-  return withRequestBound(
-    attempt,
-    timeoutMs,
-    () => new RequestBoundExceeded('GET', url, timeoutMs)
-  );
+  const { status, text } = await getRawWithHeaders(url, opts);
+  return { status, text };
 }
 
 /**
