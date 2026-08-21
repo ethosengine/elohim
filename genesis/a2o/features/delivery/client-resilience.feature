@@ -4,10 +4,16 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
   I want HTML5 apps to work offline after first load
   So that my learning is not interrupted by network conditions
 
-  The Service Worker makes every browser and Tauri instance a self-sufficient
+  The Service Worker (SW) makes every browser and Tauri instance a self-sufficient
   peer. Once content is loaded, it stays cached locally. Capability negotiation
-  lets the client choose the best delivery strategy: fetch individual files from
-  a peer with warm extraction, or fetch the ZIP and extract locally.
+  lets the client software select the best delivery strategy: fetch individual
+  files from a peer with warm extraction, or fetch the ZIP and extract locally.
+
+  Two local cache rings compose, innermost first: the elohim-cache-core WASM
+  cache (IndexedDB, sub-5ms) is consulted before the SW CacheStorage; the SW
+  is consulted before the network (doorway → elohim-storage). A miss at one
+  ring falls through to the next; a hit at an inner ring never touches an
+  outer one.
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
@@ -105,7 +111,7 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
     Then the SW evicts all cached files for "evolution-of-trust"
     And the next request triggers a fresh fetch
 
-  # --- elohim-cache-core (WASM) Layer ---
+  # --- elohim-cache-core (WASM) Layer — the innermost cache ring (see preamble) ---
 
   @wip @browser-only
   Scenario: WASM cache provides sub-millisecond content lookups
