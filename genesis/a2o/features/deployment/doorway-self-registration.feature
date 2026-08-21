@@ -1,4 +1,4 @@
-@e2e @deployment @node-registration @requires:doorway
+@e2e @deployment @node-registration @requires:doorway @act:i
 Feature: Doorway Self-Registration
   As Matthew, the genesis steward operating the alpha doorway
   I want my doorway to register itself as a node in the orchestrator

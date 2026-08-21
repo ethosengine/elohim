@@ -1,4 +1,4 @@
-@e2e @deployment @conductor-visibility @requires:doorway
+@e2e @deployment @conductor-visibility @requires:doorway @act:i
 Feature: Conductor Pool Visibility
   As Matthew, the genesis steward operating the alpha doorway
   I want to see the conductor pool — which conductors are running,
@@ -24,14 +24,12 @@ Feature: Conductor Pool Visibility
     Then the conductor agents response should include the conductor ID
     And the agents list should be an array
 
-  @requires:shem
   Scenario: Matthew checks which conductor hosts a user
     Given human "Susan" is logged in on doorway "alpha"
     When Matthew looks up which conductor hosts Susan
     Then the agent conductor lookup should return a conductor ID
     And the lookup should include the conductor URL
 
-  @requires:shem
   Scenario: Non-admin cannot access conductor pool
     Given human "Susan" is logged in on doorway "alpha"
     When Susan attempts to access the conductor pool

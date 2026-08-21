@@ -1,4 +1,4 @@
-@e2e @deployment @substrate-floor @resource-tunable @wip
+@e2e @deployment @substrate-floor @resource-tunable @wip @act:host
 Feature: Node resource limits are tunable, bounded, and documented
   As an operator watching runaway-resource issues recur across the stack
   I want every node resource limit to be a named, per-node tunable with a safe

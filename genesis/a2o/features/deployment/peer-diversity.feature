@@ -1,4 +1,4 @@
-@e2e @deployment @p2p @peer-diversity @requires:seeded-content
+@e2e @deployment @p2p @peer-diversity @requires:seeded-content @act:host
 Feature: Peer Diversity — Operations Adapt to Device Constraints
   As the Elohim Protocol
   I want every operation to be aware of the device it runs on

@@ -1,4 +1,4 @@
-@e2e @deployment @regression @conductor-admin
+@e2e @deployment @regression @conductor-admin @act:i
 Feature: Conductor admin WebSocket is reachable through elohim-storage
   As a protocol operator
   I want every human's conductor admin interface reachable from doorway

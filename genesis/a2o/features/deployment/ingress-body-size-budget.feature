@@ -17,7 +17,7 @@ Feature: Ingress body-size budget — diversity of peers, diversity of payloads
 
   # --- Failure Regression: the recent alpha 413 incident ---
 
-  @wip @regression
+  @wip @regression @act:ii
   Scenario: Without seeder chunking, default 1 MB ingress rejects bulk content
     Given the doorway ingress sits on the nginx-ingress 1 MB default
     And the seeder loads 3424 content items totalling ~3.5 MB
@@ -30,7 +30,7 @@ Feature: Ingress body-size budget — diversity of peers, diversity of payloads
     # Constraint: with default ingress, seeder ALWAYS fails — no operator with a
     # default-config doorway can seed without first tuning the ingress.
 
-  @wip @regression
+  @wip @regression @act:ii
   Scenario: Without seeder chunking, default 1 MB ingress rejects HTML5 ZIPs
     Given the doorway ingress sits on the nginx-ingress 1 MB default
     And the seeder is asked to upload "evolution-of-trust" (6.75 MB ZIP)
@@ -42,7 +42,7 @@ Feature: Ingress body-size budget — diversity of peers, diversity of payloads
 
   # --- Capability Proof: chunking + budget negotiation ---
 
-  @wip
+  @wip @act:ii
   Scenario: With chunked bulk POST, seeder succeeds against thin-client ingress
     Given the doorway ingress is configured with proxy-body-size "1m"
     And the seeder loads 3424 content items
@@ -53,7 +53,7 @@ Feature: Ingress body-size budget — diversity of peers, diversity of payloads
     # Operational parameters: chunk_size <= 0.8 MB (20% headroom under 1 MB)
     # Informs: seeder configuration default for thin-client deployments
 
-  @wip
+  @wip @act:ii
   Scenario: Seeder discovers ingress budget before posting
     Given the doorway exposes its configured ingress body-size budget
     When the seeder asks the doorway for its payload budget
@@ -64,7 +64,7 @@ Feature: Ingress body-size budget — diversity of peers, diversity of payloads
 
   # --- Capability Proof: archetype-tunable budgets ---
 
-  @wip
+  @wip @act:host
   Scenario Outline: Different peer archetypes declare different body-size budgets
     Given a doorway is deployed on a "<archetype>" peer
     Then its configured proxy-body-size budget is "<budget>"

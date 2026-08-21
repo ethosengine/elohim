@@ -35,7 +35,7 @@
 # Known-good foothold for whoever implements this: gen-persona-configs.sh --out DIR
 # runs binary-free and emits all 20 persona TOMLs, so the config-generation
 # assertions are reachable before any Rust build exists.
-@e2e @deployment @p2p @persona-testnet @testnet @local @wip
+@e2e @deployment @p2p @persona-testnet @testnet @local @wip @act:i
 Feature: Persona Testnet — 20 Humans on One Box
   As the Elohim Protocol,
   I want to simulate 20 real humans from genesis stories on a single machine

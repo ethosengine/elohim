@@ -1,4 +1,4 @@
-@e2e @deployment @hub-topology @wip
+@e2e @deployment @hub-topology @wip @act:host
 Feature: Hub Topology — Substrate Aggregation as Realm-Specific Implementations
   As the Elohim Protocol
   I want hub-and-spoke topology modeled as a narrow abstract Hub interface

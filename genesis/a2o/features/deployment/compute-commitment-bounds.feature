@@ -26,6 +26,8 @@ Feature: Compute commitments are bounded and breach without contagion
 
   # --- Decoupling: compute breach does not contaminate attribution ---
 
+  @wip @act:ii
+  # HELD (2026-08-21): Asserts a one-time historical incident (shem decommission); can never go green again now the fleet is re-provisioned.
   Scenario: Catastrophic compute loss does not silence authored work
     Given adam's source chain on shem is unrecoverable
     And matthew's storage holds adam's previously-replicated authored content
@@ -35,6 +37,8 @@ Feature: Compute commitments are bounded and breach without contagion
     And the love-map between adam and eve remains queryable
     And no flow that recognizes adam's prior contribution is gated on adam's compute being online
 
+  @wip @act:ii
+  # HELD (2026-08-21): One-time historical incident; unfalsifiable going forward.
   Scenario: Catastrophic compute loss is recorded as compute-class breach only
     When the operator marks adam, pete, frank as suspended in deployments.json
     Then their compute-allocation commitments enter breach state
@@ -49,6 +53,8 @@ Feature: Compute commitments are bounded and breach without contagion
       | adam's stewardship standing                         | frozen     |
       | pete's recognition by his faith community           | continues  |
 
+  @wip @act:ii
+  # HELD (2026-08-21): One-time historical incident; unfalsifiable going forward.
   Scenario: Standing agreements with the lost executor breach with clear cause
     Given adam had a standing agreement to validate alpha-collective trust commits hourly
     When the next scheduled execution time arrives after shem's loss
@@ -59,6 +65,7 @@ Feature: Compute commitments are bounded and breach without contagion
 
   # --- Substrate floor: deterministic, elohim-free ---
 
+  @act:i
   Scenario: Substrate negotiates a compute request without elohim
     Given matthew's elohim is not running
     And matthew's household has 800 cpu_m headroom and 2 GiB memory headroom
@@ -69,6 +76,7 @@ Feature: Compute commitments are bounded and breach without contagion
     And the commitment's negotiated_by.kind is "substrate-floor"
     And no elohim discernment is required for the verdict to be valid
 
+  @act:i
   Scenario: Substrate denies a compute request that exceeds bounds
     Given matthew's household has 200 cpu_m headroom
     When a peer requests 500 cpu_m
@@ -78,6 +86,7 @@ Feature: Compute commitments are bounded and breach without contagion
     And the peer receives a structured response a human can act on
     # Operator parameter: bounds derived from compute-capacity.json headroom
 
+  @act:i
   Scenario: Standing agreement fires deterministically without elohim
     Given matthew authored a standing agreement to gossip-relay imagodei-trust signals
     And the standing agreement is recorded with trigger_kind "standing"
@@ -88,6 +97,7 @@ Feature: Compute commitments are bounded and breach without contagion
 
   # --- Elohim ceiling: enriches, never gates ---
 
+  @act:i
   Scenario: Elohim adds discernment without invalidating substrate verdict
     Given the substrate has Granted a peer's compute request
     And matthew's elohim is now lit and has discernment context
@@ -101,6 +111,7 @@ Feature: Compute commitments are bounded and breach without contagion
     And no elohim signal can retroactively un-grant a substrate-granted commitment
     # Elohim CAN refuse future requests by authoring policy; cannot reverse history
 
+  @act:i
   Scenario: Elohim accepts what substrate would have denied via exception
     Given the substrate would deny a compute request for capacity reasons
     When matthew's elohim authors an exception commitment with explicit rationale
@@ -113,6 +124,7 @@ Feature: Compute commitments are bounded and breach without contagion
 
   # --- Three trigger kinds ---
 
+  @act:i
   Scenario Outline: Substrate handles all three trigger kinds without elohim
     Given a compute-allocation commitment exists with trigger_kind <kind>
     When the firing condition for <kind> is met
@@ -127,7 +139,7 @@ Feature: Compute commitments are bounded and breach without contagion
 
   # --- Recovery and re-entry ---
 
-  @requires:shem
+  @requires:shem @act:iii
   Scenario: Replacement hardware allows breached commitments to either resume or formally retire
     Given adam's compute commitments are in breach state with cause "catastrophic-loss"
     When replacement remote-labeled hardware comes online
@@ -138,6 +150,8 @@ Feature: Compute commitments are bounded and breach without contagion
       | formally retired  | retirement event recorded; commitment state final     |
     And no commitment is silently abandoned
 
+  @wip @act:ii
+  # HELD (2026-08-21): One-time historical incident; unfalsifiable going forward.
   Scenario: Stewardship through catastrophic loss preserves dignity
     Given adam's compute is in breach state
     When the protocol surfaces adam's status to other peers

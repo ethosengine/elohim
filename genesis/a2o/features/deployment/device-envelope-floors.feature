@@ -76,7 +76,7 @@ Feature: Device-envelope CPU floors keep small peers reaching for the mesh, loud
     And at least one other household node is running and reachable through the fleet's discovery path (the bootstrap service peers use to find each other)
     And gossip-initiation logs, at debug level, and cgroup CPU-throttle counters (nr_periods / nr_throttled) are sampled as deltas over each scenario's observation window
 
-  @regression @requires:shem
+  @regression @requires:shem @act:iii
   Scenario: A CFS-throttled peer goes silently dark on gossip while liveness surfaces stay green by design
     Given Susan's deployment record carries an explicit "1000m" CPU override, below the 2026-08 evidence bracket's "2000m" working value
     When her node is restarted at that limit and a "5 minute" observation window elapses from conductor startup
@@ -95,7 +95,7 @@ Feature: Device-envelope CPU floors keep small peers reaching for the mesh, loud
     # MOVED (discovery got cheaper, or the runtime learned to degrade
     # loudly) — revisit the floor before deleting this anchor.
 
-  @requires:shem
+  @requires:shem @act:iii
   Scenario: At the evidence bracket's 2000m working value, Susan's node attempts gossip and discovers a peer
     Given Susan's deployment record carries an explicit "2000m" CPU override — the evidence bracket's working value, pinned independently of the currently declared floor
     When her node is restarted at that limit and a "5 minute" observation window elapses from conductor startup
@@ -107,7 +107,7 @@ Feature: Device-envelope CPU floors keep small peers reaching for the mesh, loud
     # peers (her named backup partners) and whether content flows are the
     # downstream stations named in the preamble — not claimed here.
 
-  @requires:shem
+  @requires:shem @act:iii
   Scenario: A deployed archetype inherits its floor from the budget contract
     Given Susan's deployment record declares the "device-recycled-laptop" archetype with no resource override
     And the fleet renders per-node manifests from the shared edgenode template, which stamps each archetype's declared resource limits
@@ -124,7 +124,7 @@ Feature: Device-envelope CPU floors keep small peers reaching for the mesh, loud
     # household silently below its archetype's promise — is delivered one
     # node at a time by this contract plus the report below.
 
-  @requires:shem
+  @act:ii
   Scenario: An operator can distinguish Ready from gossip-initiating
     Given each node exports its gossip-initiation attempt count as a runtime metric, computed over a "5 minute" window since its last restart
     And Susan's node, deployed at "1000m", has exported an attempt count of "0" for its window

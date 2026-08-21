@@ -1,4 +1,4 @@
-@e2e @deployment @modeling @human-device-mapping
+@e2e @deployment @modeling @human-device-mapping @act:host
 Feature: Human × Device × Deployment mapping is internally consistent
   As a protocol operator deploying personas to K8s
   I want every deployment record to name a real human and a real device archetype
@@ -87,6 +87,8 @@ Feature: Human × Device × Deployment mapping is internally consistent
 
   # --- Completeness ---
 
+  @wip
+  # HELD (2026-08-21): Duplicates the pre-push validate:deployments gate one-for-one; a red here and a red there are the same red.
   Scenario: The six protocol humans are all represented in the deployment registry
     Given the deployment registry from "genesis/orchestrator/data/deployments.json"
     Then the registry contains a record for each name:

@@ -7,6 +7,7 @@ Feature: Staging Site Validation
   Background:
     Given doorway "alpha" is healthy at env "E2E_DOORWAY_ALPHA"
 
+  @act:i
   Scenario: Staging site loads successfully
     Given human "Validator" is on doorway "alpha" with device
     And I navigate to the staging site
@@ -14,6 +15,7 @@ Feature: Staging Site Validation
     Then the site should be accessible
     And the page should display the main content
 
+  @act:i
   Scenario: Essential page elements are present
     Given human "Validator" is on doorway "alpha" with device
     And I navigate to the staging site
@@ -22,6 +24,7 @@ Feature: Staging Site Validation
     And the hero section should be displayed
     And the footer should be present
 
+  @act:ii
   Scenario: Git hash validation
     Given human "Validator" is on doorway "alpha" with device
     And I navigate to the staging site

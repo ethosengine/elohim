@@ -6,6 +6,7 @@ Feature: Seeder respects the deployment registry
   deployment registry remains the single source of truth for what
   exists on the cluster right now.
 
+  @act:host
   Scenario: Seeder imports only deployed humans
     Given the deployment registry lists humans "adam, matthew, frank"
     And account packages exist for "adam, matthew, frank, charlie, eve"
@@ -14,6 +15,7 @@ Feature: Seeder respects the deployment registry
     And the seeder marks "charlie, eve" as staged
     And the seeder exits with status 0
 
+  @act:host
   Scenario: Registry entry without a package is a warning
     Given the deployment registry lists human "ghost-human"
     And no account package exists for "ghost-human"
@@ -21,7 +23,7 @@ Feature: Seeder respects the deployment registry
     Then the seeder emits warning "registry references ghost-human, no package found"
     And the seeder exits with status 0
 
-  @wip
+  @wip @act:i
   Scenario: Seeder is idempotent across reruns
     # Requires a live doorway + storage fixture; dry-run alone cannot
     # exercise the rerun path. Covered indirectly by the Rust integration
@@ -31,6 +33,7 @@ Feature: Seeder respects the deployment registry
     Then all deployed humans report outcome "imported"
     And no package reports outcome "failed"
 
+  @act:host
   Scenario: --deployed-humans flag overrides the registry file
     Given the deployment registry lists humans "adam, matthew"
     When the seeder runs with "--deployed-humans=human-adam-firstman"
