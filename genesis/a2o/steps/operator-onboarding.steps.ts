@@ -11,6 +11,7 @@ import { randomUUID } from 'node:crypto';
 
 import { When, Then } from '@cucumber/cucumber';
 
+import { adminBootstrapKey } from '../src/framework/api/admin-bootstrap.js';
 import { BrowserDevice } from '../src/framework/devices/browser-device.js';
 import { Human } from '../src/framework/human.js';
 import { E2EWorld } from '../src/framework/world.js';
@@ -94,8 +95,13 @@ When(
     const device = new BrowserDevice(`${humanName}-browser`, doorway.url);
     human.addDevice(device);
 
-    // Register with the bootstrap key from environment
-    const bootstrapKey = process.env.E2E_ADMIN_BOOTSTRAP_KEY ?? 'test-admin-key';
+    // Register with the bootstrap key from environment. The doorway rejects a
+    // mismatch OUTRIGHT (ADMIN_KEY_REJECTED) rather than silently issuing an
+    // Authenticated token, so the key the suite sends and the key the doorway
+    // was started with must be the same string. `API_KEY_ADMIN` is the name the
+    // doorway, the seeder and `just mesh status` all use for it, so honouring it
+    // here is what lets a mesh run work without an a2o-specific variable.
+    const bootstrapKey = adminBootstrapKey() ?? 'test-admin-key';
     const auth = await device.register({
       identifier: creds.identifier,
       password: creds.password,

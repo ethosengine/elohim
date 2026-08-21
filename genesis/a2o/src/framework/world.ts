@@ -7,6 +7,7 @@
 
 import { World, type IWorldOptions } from '@cucumber/cucumber';
 
+import { ensureFixtureAdmin } from './api/admin-bootstrap.js';
 import { DoorwayClient } from './api/doorway-client.js';
 import { fixtureCredentials } from './fixtures/humans.js';
 import { Human } from './human.js';
@@ -103,6 +104,9 @@ export class E2EWorld extends World {
     if (cached) return cached;
 
     const creds = fixtureCredentials('Matthew');
+    // Matthew is only ADMIN if this deployment was seeded with the admin key.
+    // Env-gated no-op otherwise. See api/admin-bootstrap.ts.
+    await ensureFixtureAdmin(doorwayUrl, creds.identifier);
     const client = new DoorwayClient(doorwayUrl);
     const auth = await client.login({
       identifier: creds.identifier,

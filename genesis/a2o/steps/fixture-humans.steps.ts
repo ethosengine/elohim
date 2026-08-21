@@ -11,6 +11,7 @@
 
 import { Given } from '@cucumber/cucumber';
 
+import { ensureFixtureAdmin } from '../src/framework/api/admin-bootstrap.js';
 import { BrowserDevice } from '../src/framework/devices/browser-device.js';
 import { PlaywrightDevice } from '../src/framework/devices/playwright-device.js';
 import { resolveDoorwayUrl } from '../src/framework/fixtures/household-mesh.js';
@@ -41,6 +42,12 @@ Given(
     const human = new Human(humanName, fixture.credentials);
     const device = new BrowserDevice(`${humanName}-browser`, doorway.url);
     human.addDevice(device);
+
+    // A steward is only an admin if the deployment was SEEDED with the admin
+    // key; a mesh seeded without it holds a valid Matthew at AUTHENTICATED and
+    // every admin scenario reds with a 403 that looks like product. Env-gated
+    // no-op when this run holds no admin key. See api/admin-bootstrap.ts.
+    if (fixture.isAdmin) await ensureFixtureAdmin(doorway.url, fixture.credentials.identifier);
 
     const auth = await device.login({
       identifier: fixture.credentials.identifier,
