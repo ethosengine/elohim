@@ -810,14 +810,60 @@ Before(async function (this: E2EWorld, scenario) {
 });
 
 /**
+ * Where else to look when a doorway env var is unset.
+ *
+ * `E2E_DOORWAY_STAGING` names the SECOND doorway in a cross-doorway scenario. It
+ * is the deployed fleet's spelling for it; a local mesh spells the same peer
+ * `E2E_DOORWAY_BETA` / `E2E_DOORWAY_B` (doorway-B, its own storage peer and its
+ * own projection DB — a federation peer of doorway-A, not an alias of it). A run
+ * that declares a real second doorway under either of those names can prove a
+ * cross-doorway claim, so refusing it purely over the variable's NAME would hold
+ * a provable scenario for a spelling.
+ *
+ * This is a name fallback only. Whether the resolved host is genuinely a SECOND
+ * doorway is a separate question, answered below.
+ */
+const DOORWAY_ENV_FALLBACKS: Record<string, string[]> = {
+  E2E_DOORWAY_STAGING: ['E2E_DOORWAY_BETA', 'E2E_DOORWAY_B'],
+  E2E_DOORWAY_BETA: ['E2E_DOORWAY_B', 'E2E_DOORWAY_STAGING'],
+};
+
+function resolveDoorwayEnv(envVar: string): { url?: string; from: string } {
+  const direct = process.env[envVar];
+  if (direct) return { url: direct, from: envVar };
+  for (const alt of DOORWAY_ENV_FALLBACKS[envVar] ?? []) {
+    const url = process.env[alt];
+    if (url) return { url, from: alt };
+  }
+  return { from: envVar };
+}
+
+/**
  * Background step: verify a doorway is healthy.
  * The URL comes from an environment variable.
+ *
+ * A cross-doorway feature registers two doorways here. Some harnesses point
+ * several doorway names at ONE host, and a cross-doorway claim proved against a
+ * single host is not proved at all — it is a tautology wearing a federation
+ * costume. When the URL resolved for this doorway is already registered under a
+ * DIFFERENT name, the scenario HOLDS ('pending') and names the collapse rather
+ * than passing. Same guard, same reason, as `distinctPeers` in
+ * `steps/federation-epr.steps.ts`; it must never be bypassed to buy a green.
  */
 Given(
   'doorway {string} is healthy at env {string}',
   async function (this: E2EWorld, doorwayId: string, envVar: string) {
-    const url = process.env[envVar];
+    const { url, from } = resolveDoorwayEnv(envVar);
     assert.ok(url, `Environment variable ${envVar} is not set`);
+
+    for (const [otherId, other] of this.doorways) {
+      if (otherId !== doorwayId && other.url === url) {
+        return 'pending';
+      }
+    }
+    if (from !== envVar) {
+      this.contentIds.set(`doorway:${doorwayId}:resolvedFrom`, from);
+    }
 
     const entry = this.addDoorway(doorwayId, url);
 
