@@ -1,4 +1,4 @@
-@e2e @trust @trust-legibility @concern:trust-legibility @dataplane
+@e2e @trust @trust-legibility @concern:trust-legibility @dataplane @act:i
 Feature: Interim trust-earning states declare why trust is not yet earned
   As a person looking at a surface that is withholding something
   I want the surface itself to tell me why trust has not been earned yet,
