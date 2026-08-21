@@ -1,0 +1,149 @@
+# Act I — THE HOUSEHOLD. The lane contract for the local/CI mesh (`just mesh`, `run-mesh-quiesce-stage.sh`).
+#
+# This is a LANE CONTRACT, not a health report. `available: false` here means "Act I does not provide
+# this", never "it is broken". The alpha fleet's health lives in cluster-state.yaml (the durable home
+# for the deployed substrate); this file is what a run that OWNS its substrate can promise.
+#
+# Cast:  matthew, jessica, james (the household triad — deployments.json nodeTypes operations/edge/performance)
+# Stage: peers :8090/:8091/:8092 · doorway A :8888 (alpha-elohim-host, matthew-primary) ·
+#        doorway B :8889 (apex-elohim-host, jessica-primary, pool matthew+james) · mongod archive per doorway
+# Proves: device awakens -> household forms -> first in-family co-steward agreement. NetworkStage Simulacra -> Bootstrap.
+#
+# HOW IT IS READ: a run points substrate-scope.ts at this file with
+#   ELOHIM_CLUSTER_STATE_PATH_OVERRIDE=genesis/manifests/cluster-state.act1-household.yaml
+# The default (dev loops, alpha) keeps reading cluster-state.yaml, so nothing about today's gating changes
+# until a lane opts in. See genesis/a2o/LAYERS.md and genesis/a2o/layering/profiles.md.
+#
+# INERT-CAP RULE: substrate-scope.ts IGNORES any `@requires:<cap>` whose cap is not declared in the
+# cluster-state file it is reading (fail-open, treated as a fixture precondition). A cap only gates once
+# it is declared HERE. That is why every cap the tag-plan uses is declared in this file, including the
+# ones that are true — an undeclared cap is a no-op, not a gate.
+
+schema_version: 1
+updated: 2026-08-21
+
+resources:
+  household-nodes:
+    role: matthew / jessica / james — three storage peers on one host, one P2P mesh
+    available: true
+    note: The act's whole cast. A 3-node mesh is a real multi-node cluster; `shem` is never needed to
+          discriminate cross-node behaviour among them (genesis/a2o/CLAUDE.md, "shem != multi-node").
+
+  doorway:
+    role: at least one doorway projecting the peer pool over HTTP
+    available: true
+    note: Doorway A at :8888 (alpha-elohim-host), matthew-primary.
+
+  doorway-pair:
+    role: TWO distinct doorway ids backed by DIFFERENT primary peers
+    available: true
+    note: A(:8888, matthew-primary) + B(:8889, apex-elohim-host, jessica-primary, pool matthew+james).
+          This is what makes cross-doorway scenarios falsifiable — on the deployed fleet an undeclared
+          second doorway collapses onto E2E_DOORWAY_ALPHA and those scenarios pass as a tautology.
+
+  multi-node:
+    role: two or more live peers to gossip, converge and fail over between
+    available: true
+
+  mongo-archive:
+    role: the doorway's mongod archive (per-doorway request/projection archive)
+    available: true
+    note: One mongod per doorway in the mesh bring-up.
+
+  seeded-content:
+    role: a seeded content corpus to read, resolve and converge on
+    available: true
+    note: Full seed, 3,447 rows. NOT DHT-anchored — see dht-anchored-content.
+
+  seeded-humans:
+    role: fixture humans that can log in and carry sessions
+    available: true
+
+  owned-substrate:
+    role: this run OWNS the mesh — it may write, delete, re-seed, restart, kill and tail processes
+    available: true
+    note: The single cap that separates Act I from every shared-substrate lane, and the reason ~35
+          permanently-@wip resilience scenarios become buildable here. Its fixture-side expression is
+          `processControl: true` in E2E_HOUSEHOLD_FIXTURE_PATH, which is what
+          requireFixturePeerPid/requireFixtureDoorwayLogPath fail closed on. On shared alpha this is
+          false by policy (genesis/a2o/CLAUDE.md, "Authorized writes on shared alpha"), not by outage.
+
+  epr-cli:
+    role: the `epr` CLI against a scratch git root — no substrate at all
+    available: true
+
+  ssr-bundle:
+    role: the app bundles the doorway serves (landing AND the lamad SPA at /lamad)
+    available: false
+    note: RED, and the highest-leverage red in this file — flipping it unholds 186 Act I scenarios.
+          The mesh stage stages only the landing blob; `app/lamad/dist/lamad/browser` already exists on
+          disk. This is a STAGE change (genesis/a2o/layering/profiles.md, "mesh stage obligations"),
+          not a substrate acquisition. Measured 2026-08-21: `GET /lamad` -> 404 {"error":"App not
+          found: lamad-spa"}. Do not flip this to true before the stage actually stages it.
+
+  dht-anchored-content:
+    role: seeded content carries a DHT anchor, so provenance-gated reads resolve
+    available: false
+    note: Local bulk seed never DHT-anchors, so the provenance gate 404s reads of freshly-authored rows
+          by design (memory: project_local_stack_dht_anchor_gap). Act II provides this; Act I does not.
+          Zero Act I scenarios require it today — declared so a scenario that DOES need it holds honestly.
+
+  per-human-conductor:
+    role: every fixture human has its own conductor identity/agent key
+    available: false
+    note: The mesh seeds 2 of 7 conductor identities; five humans have no local conductor. This is the
+          upstream of the "household_id present, agent_pub_key NULL" reds in code-reds.md.
+
+  bench-suite:
+    role: a transport/throughput benchmark harness with meaningful numbers
+    available: false
+    note: Loopback RTT is ~0, so a bench on this act measures the loopback, not the transport. Holds 5
+          scenarios honestly rather than letting them pass vacuously.
+
+  apex-dns:
+    role: real apex DNS names (elohim.host and friends) resolving to the doorways
+    available: false
+    note: The mesh's second doorway is apex-FLAVOURED (id `apex`) but is reached at localhost:8889.
+
+  tls:
+    role: TLS-terminated doorways
+    available: false
+
+  deploy-churn:
+    role: a real deploy/restart cycle with its ~20min conductor catch-up window
+    available: false
+    note: Act I restarts processes on demand (see owned-substrate); it does not reproduce a fleet
+          deploy's churn window. Scenarios about the shed contract during a deploy belong to Act II.
+
+  observability:
+    role: Grafana / Loki / Prometheus SERVERS to query
+    available: false
+    note: Deliberately narrow. A scenario reading a service's OWN /metrics text endpoint (elohim-storage
+          or doorway) does NOT need this cap and is Act I — that is most metric-bearing saga chapters.
+          Only a scenario that queries a Grafana/Loki/Prometheus server needs it.
+
+  jenkins:
+    role: a Jenkins build context — build numbers, archived artifacts, upstream causes
+    available: false
+    note: False on purpose even though the CI mesh stage runs inside Jenkins: Act I's contract must hold
+          on a laptop, and a household of one device is exactly what this act proves.
+
+  harbor-registry:
+    role: CI image registry (harbor.ethosengine.com)
+    available: false
+    note: Act I assembles binaries the pipeline already built, or builds them locally; it pulls no images.
+
+  alpha-cluster-6peer:
+    role: the deployed alpha soak cluster
+    available: false
+    note: Act II's stage, not this one.
+
+  shem:
+    role: the multi-tenant live P2P canvas — Act III's stage
+    available: false
+    note: False as a LANE statement. shem's real availability is declared in cluster-state.yaml (true as
+          of 2026-08-20); Act I simply does not run the commons.
+
+# Cap vocabulary must stay in sync across cluster-state.yaml, cluster-state.act1-household.yaml and
+# cluster-state.act2-neighbourhood.yaml. A cap declared in one and missing from another silently demotes
+# to a fixture precondition in the file that lacks it (substrate-scope.ts fails open on unknown caps).

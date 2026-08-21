@@ -1,0 +1,132 @@
+# Act II — THE NEIGHBOURHOOD. The lane contract for the deployed alpha fleet (Dataplane Validation).
+#
+# This is a LANE CONTRACT, not a health report. `available: false` here means "Act II does not provide
+# this", never "it is broken". The alpha fleet's actual health lives in cluster-state.yaml — that file
+# stays the durable declaration a probe reconciles; this one says which acts the alpha lane may run.
+#
+# Cast:  the household triad plus adam (and the community peers the fleet actually deploys) — adam's
+#        household federates; doorway B becomes adam's.
+# Stage: alpha peers on real hosts, apex DNS, TLS, deploy churn, observability stack, Jenkins.
+# Proves: cross-household agreement notarized -> Coordinated.
+#
+# HOW IT IS READ: the Dataplane Validation stage points substrate-scope.ts at this file with
+#   ELOHIM_CLUSTER_STATE_PATH_OVERRIDE=genesis/manifests/cluster-state.act2-neighbourhood.yaml
+# Default runs still read cluster-state.yaml. See genesis/a2o/LAYERS.md and layering/profiles.md.
+#
+# INERT-CAP RULE: substrate-scope.ts IGNORES any `@requires:<cap>` not declared in the file it reads
+# (fail-open). A cap gates only once declared here — so every cap the tag-plan uses is declared, true
+# ones included.
+
+schema_version: 1
+updated: 2026-08-21
+
+resources:
+  household-nodes:
+    role: matthew / jessica / james, deployed as fleet peers
+    available: true
+
+  doorway:
+    role: doorway-alpha.elohim.host
+    available: true
+
+  doorway-pair:
+    role: two distinct doorways over different primary peers
+    available: true
+    note: doorway-alpha (matthew-primary) + elohim.host (adam-primary). Set BOTH E2E_DOORWAY_B and
+          E2E_DOORWAY_BETA — the fixtures resolve the second doorway under two names, and a lane that
+          sets only one silently probes the live production doorway for the other.
+
+  multi-node:
+    role: many live peers across real hosts
+    available: true
+
+  mongo-archive:
+    role: the doorway's mongod archive
+    available: true
+
+  seeded-content:
+    role: the deployed content corpus
+    available: true
+
+  seeded-humans:
+    role: fixture humans with hosted accounts on the fleet
+    available: true
+
+  ssr-bundle:
+    role: landing + lamad SPA bundles served by the doorways
+    available: true
+
+  dht-anchored-content:
+    role: content carries DHT anchors, so provenance-gated reads resolve
+    available: true
+
+  per-human-conductor:
+    role: every deployed human has its own conductor pod and agent key
+    available: true
+    note: Governed by deployments.json `suspended` — a suspended human is not exercisable regardless of
+          this cap (isHumanDeployed() returns 'pending').
+
+  apex-dns:
+    role: real apex DNS names resolving to the doorways
+    available: true
+
+  tls:
+    role: TLS-terminated doorways
+    available: true
+
+  deploy-churn:
+    role: a real deploy/restart cycle and its conductor catch-up window
+    available: true
+    note: The thing Act I structurally cannot reproduce, and the reason saga chapters 4 and 6 decompose
+          into steady-state-serving vs deploy-window-shed. Measure with [build:edge] [edge:validate-only]
+          so measurement does not restart the fleet it is measuring.
+
+  observability:
+    role: Grafana / Loki / Prometheus SERVERS to query
+    available: true
+    note: Only for scenarios that query the SERVERS. A scenario reading a service's own /metrics text
+          endpoint needs no cap and belongs to Act I.
+
+  jenkins:
+    role: a Jenkins build context — build numbers, archived artifacts, upstream causes
+    available: true
+
+  harbor-registry:
+    role: CI image registry (harbor.ethosengine.com)
+    available: true
+
+  alpha-cluster-6peer:
+    role: the deployed alpha soak cluster (adam+matthew bootstrap pair)
+    available: true
+    note: Mirrors cluster-state.yaml's evidence-backed 2026-08-20 flip. If that entry flips to false, flip
+          this one with it — two homes, one truth.
+
+  owned-substrate:
+    role: this run OWNS the substrate — may write, delete, re-seed, restart, kill, tail processes
+    available: false
+    note: FALSE BY POLICY, not by outage. Alpha is shared deployed state owned by real peers; agent writes
+          happen only under an explicit operator permission grant (genesis/a2o/CLAUDE.md, "Authorized
+          writes on shared alpha"), and every peer/doorway is a remote pod with no PID to signal and no
+          file to tail (household-mesh fixtures declare processControl:false here). This is the cap that
+          honestly holds the kill-a-peer / tail-the-log family in this lane instead of leaving it @wip.
+
+  epr-cli:
+    role: the `epr` CLI against a scratch git root
+    available: true
+
+  bench-suite:
+    role: a transport/throughput benchmark harness
+    available: false
+    note: No bench harness is wired into the edge pipeline. Declared so the 5 bench scenarios hold with a
+          reason rather than passing vacuously.
+
+  shem:
+    role: the multi-tenant live P2P canvas — Act III's stage
+    available: false
+    note: False as a LANE statement, not a health claim: shem's real availability is declared in
+          cluster-state.yaml (true as of 2026-08-20). Act II is the neighbourhood; the commons is Act III.
+          Flip this only if the operator decides the alpha lane should also run Act III.
+
+# Cap vocabulary must stay in sync across cluster-state.yaml, cluster-state.act1-household.yaml and this
+# file. A cap declared in one and missing from another silently demotes to a fixture precondition in the
+# file that lacks it (substrate-scope.ts fails open on unknown caps).
