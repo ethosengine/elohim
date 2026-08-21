@@ -41,7 +41,7 @@
 # Habit: dev-system-equilibrium (genesis/manifests/habits.yaml) — the equilibrium
 #        scenarios below are the story form of that habit's runnable check.
 
-@e2e @devflow @wip @requires:epr-cli
+@e2e @devflow @wip @requires:epr-cli @act:host
 Feature: The run plane — what a long run remembers, and whether the work is draining
   As an agentic developer working one objective across many sessions, where the
   conversation between sessions is summarised away and cannot be relied on

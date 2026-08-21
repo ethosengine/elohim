@@ -1,4 +1,4 @@
-@e2e @devflow @concern:agent-identity-claim-and-acceptance
+@e2e @devflow @concern:agent-identity-claim-and-acceptance @act:host @requires:epr-cli
 Feature: An agent claims who it is, in flight, and the record survives the claim being wrong
   As an agent working inside a session (or a human dispatching one)
   I want to register an honor-system identity claim for the run and have every

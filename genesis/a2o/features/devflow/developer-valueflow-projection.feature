@@ -1,4 +1,4 @@
-@e2e @devflow @concern:epr-rea-valueflow-fabric
+@e2e @devflow @concern:epr-rea-valueflow-fabric @act:host @requires:epr-cli
 Feature: The developer valueflow, projected from the repository itself
   As a developer (human or agentic) changing an artifact anywhere in the pipeline
   I want the repo's own manifesto → epic → spec → plan → scenario → code → gate →
