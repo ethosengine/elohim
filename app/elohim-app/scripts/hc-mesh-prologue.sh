@@ -135,12 +135,35 @@ say "CONDUCTOR_URLS=$CONDUCTOR_URLS"
 #    the authoring doorway for everything else in this script; via B too
 #    because jessica (doorway B's primary) has NO row on A's storage backend
 #    otherwise — jessica's own scenarios need her doorway to have seeded her.
+#
+# THREE ids, because each one is a precondition something downstream asserts
+# and none of them is created by any other leg:
+#
+#   elohim-host-landing  the apex EPR — the projection root, and the subject of
+#                        the resilience saga's last chapters.
+#   lamad-spa            the /lamad bundle's content row. Leg 4 stages that
+#                        bundle's bytes with a PATCH against this row, so
+#                        without it `stage-lamad-spa-browser-A` 404s three
+#                        times, `/lamad` stays 404 on BOTH doorways, and every
+#                        lamad + SSR scenario env-reds on a precondition rather
+#                        than on anything it meant to test.
+#   evolution-of-trust   the html5-app the delivery features reach at
+#                        `/apps/evolution-of-trust/index.html` (content
+#                        addressing, web2 absorption, delivery diagnostics,
+#                        cache invalidation). seed.ts uploads its ZIP from
+#                        genesis/docs/content/fct/evolution-of-trust.zip and
+#                        declares the row in the same pass.
+#
+# Order matters and is load-bearing: these rows must exist BEFORE
+# seed-projections (2-3) and BEFORE the stage legs (4), which patch bytes onto
+# rows this leg creates. seed.ts is idempotent — an already-seeded id is a skip.
 # ---------------------------------------------------------------------------
+BASE_CORPUS_IDS="elohim-host-landing,lamad-spa,evolution-of-trust"
 banner "1. seed.ts (base corpus) via A and B"
 run_seed_leg "seed-base-corpus-via-A" hard \
-  'DOORWAY_URL="$DOORWAY_A_URL" npx tsx src/seed.ts --ids=elohim-host-landing'
+  'DOORWAY_URL="$DOORWAY_A_URL" npx tsx src/seed.ts --ids="$BASE_CORPUS_IDS"'
 run_seed_leg "seed-base-corpus-via-B" hard \
-  'DOORWAY_URL="$DOORWAY_B_URL" npx tsx src/seed.ts --ids=elohim-host-landing'
+  'DOORWAY_URL="$DOORWAY_B_URL" npx tsx src/seed.ts --ids="$BASE_CORPUS_IDS"'
 
 # ---------------------------------------------------------------------------
 # 2-3. Operator bindings + projections — explicit, ahead of the substrate
