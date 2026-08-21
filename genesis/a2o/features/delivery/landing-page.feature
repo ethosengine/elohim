@@ -1,4 +1,4 @@
-@e2e @delivery @landing-page @requires:doorway
+@e2e @delivery @landing-page @requires:doorway @act:i
 Feature: The deployed elohim.host landing page serves its load-bearing surface
   As an operator verifying a landing-page release
   I want confirmation that the deployed doorway actually serves the

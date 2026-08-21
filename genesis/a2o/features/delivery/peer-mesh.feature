@@ -1,4 +1,4 @@
-@e2e @content @delivery @federation @requires:doorway @requires:seeded-content
+@e2e @content @delivery @federation @requires:doorway @requires:seeded-content @act:i
 Feature: Peer Mesh — P2P App Delivery
   As a learner in a household
   I want my device to fetch content from the nearest peer
@@ -16,6 +16,7 @@ Feature: Peer Mesh — P2P App Delivery
   # --- LAN Peer Discovery ---
 
   @wip @tauri-only @requires:multi-node
+  # HELD (2026-08-21): No declared act runs two Tauri desktop nodes; no runner today.
   Scenario: Tauri node serves app files to household peer over LAN
     Given human "Matthew" has loaded "evolution-of-trust" on Tauri node "matthew-laptop"
     And Matthew's ExtractionCache has "evolution-of-trust" warm
@@ -26,6 +27,7 @@ Feature: Peer Mesh — P2P App Delivery
     And the requests never leave the local network
 
   @wip @tauri-only @requires:multi-node
+  # HELD (2026-08-21): No declared act runs two Tauri desktop nodes; no runner today.
   Scenario: LAN delivery uses direct HTTP between Tauri nodes
     Given Tauri nodes "matthew-laptop" and "jessica-laptop" are on the same LAN
     And "matthew-laptop" advertises serves_extracted: true for "evolution-of-trust"
@@ -35,14 +37,14 @@ Feature: Peer Mesh — P2P App Delivery
 
   # --- Multi-Peer Resolution ---
 
-  @wip @browser-only @requires:shem
+  @wip @browser-only
   Scenario: Client resolves multiple delivery peers via EPR
     Given "evolution-of-trust" has knownLocations including doorway and 2 peers
     When Terrance's SW needs to fetch "evolution-of-trust"
     Then the SW queries EPR for knownLocations
     And receives a scored list of peers with delivery capabilities
 
-  @wip @browser-only @requires:shem
+  @wip @browser-only
   Scenario: Peer scoring prefers LAN over doorway over remote
     Given the following peers are available for "evolution-of-trust":
       | peer             | network  | capability        | cache_tier  |
@@ -58,7 +60,7 @@ Feature: Peer Mesh — P2P App Delivery
 
   # --- Fallback Chain ---
 
-  @wip @browser-only @requires:shem
+  @wip @browser-only
   Scenario: Fallback chain degrades gracefully
     Given the SW has scored peers for "evolution-of-trust"
     And the best peer (LAN, extracted) goes offline
@@ -67,7 +69,7 @@ Feature: Peer Mesh — P2P App Delivery
     And the SW falls back to doorway projection cache
     And the app loads successfully from doorway
 
-  @wip @browser-only @requires:shem
+  @wip @browser-only
   Scenario: When all extraction peers fail, client extracts ZIP
     Given all peers that serve extracted files are unavailable
     And one peer with serves_compressed: true is reachable
@@ -76,7 +78,7 @@ Feature: Peer Mesh — P2P App Delivery
     And the SW extracts files locally
     And the app loads with a slightly longer initial delay
 
-  @wip @browser-only @requires:shem
+  @wip @browser-only
   Scenario: Doorway is not required when peers are available
     Given doorway "alpha" is offline
     And human "Matthew" on Tauri node "matthew-laptop" is reachable via relay

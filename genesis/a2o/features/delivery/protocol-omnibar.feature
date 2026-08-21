@@ -1,4 +1,4 @@
-@delivery @omnibar @provenance
+@delivery @omnibar @provenance @e2e @act:i
 Feature: Full-Browser Content Delivery with Protocol Omnibar
   As a visitor to the Elohim Protocol
   I want content delivered as full pages with an unobtrusive provenance bar

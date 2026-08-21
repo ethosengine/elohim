@@ -1,4 +1,4 @@
-@e2e @delivery @requires:doorway @requires:seeded-content
+@e2e @delivery @requires:doorway @requires:seeded-content @act:i
 Feature: Content-addressed delivery
   As a learner visiting an HTML5 app
   I want content served by both slug and content address

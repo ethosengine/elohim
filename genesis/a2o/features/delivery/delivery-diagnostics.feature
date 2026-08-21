@@ -1,4 +1,4 @@
-@e2e @content @delivery @requires:doorway @requires:seeded-content
+@e2e @content @delivery @requires:doorway @requires:seeded-content @act:i
 Feature: Delivery Diagnostics — Observability and Controlled Degradation
   As a doorway operator
   I want to understand which layer is serving content and deliberately disable layers
@@ -26,6 +26,7 @@ Feature: Delivery Diagnostics — Observability and Controlled Degradation
   # it is an intentional overload of infrastructure other peers are using. The Gherkin stays
   # verbatim as the regression narrative; the tag says the last assertion is unimplemented.
   @wip @regression
+  # HELD (2026-08-21): Final assertion ("some requests fail or storage spikes dangerously") passes only when the fleet is fragile — unfalsifiable as a gate.
   Scenario: Without projection cache, browser load overwhelms storage
     Given the doorway projection cache is disabled
     When 10 browsers simultaneously load "evolution-of-trust"
@@ -49,6 +50,7 @@ Feature: Delivery Diagnostics — Observability and Controlled Degradation
   # deliberately against a dedicated doorway with --tags '@delivery and @wip'. What is
   # missing is an isolated load target, not the code.
   @wip @regression
+  # HELD (2026-08-21): Paired with the above; same unfalsifiable control.
   Scenario: With projection cache enabled, same load is absorbed
     Given the doorway projection cache is enabled and warm for "evolution-of-trust"
     When 10 browsers simultaneously load "evolution-of-trust"
@@ -165,7 +167,7 @@ Feature: Delivery Diagnostics — Observability and Controlled Degradation
 
   # --- Cold-Cache Performance (Phase 1 Validation) ---
 
-  @wip @browser-only @regression @requires:shem
+  @wip @browser-only @regression
   Scenario: Cold-cache HTML5 app loads via SW ZIP delivery without crashing storage
     # The original OOM failure happened when projection cache was cold and every
     # browser file request hit storage directly. SW ZIP delivery is the fix:

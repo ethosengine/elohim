@@ -1,4 +1,4 @@
-@e2e @delivery @transport @perf @requires:bench-suite
+@e2e @delivery @transport @perf @requires:bench-suite @act:i
 Feature: Transport perf parity — what the dual-stack promise feels like
 
   The protocol promises that *whoever you are, whatever device you're on,

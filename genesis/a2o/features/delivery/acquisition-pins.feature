@@ -1,4 +1,4 @@
-@e2e @delivery @requires:doorway
+@e2e @delivery @requires:doorway @act:i
 Feature: Acquisition pins — the device pin and the pull queue (slice 1)
   The device pin is the airplane-mode floor (spec §1.1): declarable with no
   hub, no conductor, no peers. The pull queue satisfies pins by byte-arrival,
