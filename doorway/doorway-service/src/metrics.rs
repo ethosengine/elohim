@@ -250,6 +250,33 @@ lazy_static! {
         "Number of sources currently under a membrane ban.",
     )
     .unwrap();
+
+    /// Freshness verdicts by (read class, declared stage, verdict).
+    ///
+    /// The C8 leg of "freshness graded by declared stakes": before this, a
+    /// shed was a shed — `doorway_upstream_breaker_open_total` counted the
+    /// refusals but nothing said which STAKES forced them, so "we are shedding
+    /// authority reads because the circuit is open" and "we are shedding
+    /// content reads we could have answered amber" were the same number.
+    /// Labels come from the predicate's own vocabulary (`ReadClass::label`,
+    /// `NetworkStage::label`, `FreshnessVerdict::label`), which is
+    /// ReasonLabel-conformance-tested, so the legend cannot drift from the code.
+    pub static ref FRESHNESS_VERDICT_TOTAL: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "doorway_freshness_verdict_total",
+            "Freshness verdicts by read class, declared network stage, and verdict.",
+        ),
+        &["class", "stage", "verdict"],
+    )
+    .unwrap();
+
+    /// Bytes currently stocked in the last-good freshness pantry — the live
+    /// reading of the bounded budget (C6a) the pantry declares.
+    pub static ref FRESHNESS_PANTRY_BYTES: IntGauge = IntGauge::new(
+        "doorway_freshness_pantry_bytes",
+        "Bytes currently stocked in the last-good freshness pantry.",
+    )
+    .unwrap();
 }
 
 /// Boot-set handle the watchdog stamps: (`start`, `heartbeat`). `gather_text`
@@ -522,6 +549,8 @@ pub fn register_all() {
                 .inc_by(0);
         }
         let _ = REGISTRY.register(Box::new(MEMBRANE_BANS_ACTIVE.clone()));
+        let _ = REGISTRY.register(Box::new(FRESHNESS_VERDICT_TOTAL.clone()));
+        let _ = REGISTRY.register(Box::new(FRESHNESS_PANTRY_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(HOP_DURATION_MS.clone()));
         // Pre-touch every hop so a doorway that never took one (e.g. no blob
         // request in the window) reads as a MEASURED zero rather than an absent
@@ -653,6 +682,20 @@ pub fn inc_membrane_verdict(verdict: &str) {
 /// Membrane: update the active-ban gauge (called from `EdgeGuardStore::maybe_sweep`).
 pub fn set_membrane_bans_active(count: i64) {
     MEMBRANE_BANS_ACTIVE.set(count);
+}
+
+/// Freshness: count one verdict. Labels are the predicate's own vocabulary —
+/// pass `ReadClass::label()`, `NetworkStage::label()`, and
+/// `FreshnessVerdict::label()`, never hand-written strings.
+pub fn inc_freshness_verdict(class: &str, stage: &str, verdict: &str) {
+    FRESHNESS_VERDICT_TOTAL
+        .with_label_values(&[class, stage, verdict])
+        .inc();
+}
+
+/// Freshness: publish the last-good pantry's current byte occupancy.
+pub fn set_freshness_pantry_bytes(bytes: u64) {
+    FRESHNESS_PANTRY_BYTES.set(bytes as i64);
 }
 
 #[cfg(test)]

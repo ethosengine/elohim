@@ -346,6 +346,31 @@ pub struct AppState {
     /// (default 1 for single-ingress topology). Used to pick the rightmost-
     /// untrusted IP from X-Forwarded-For.
     pub trusted_proxy_hops: usize,
+
+    // ── Freshness graded by declared stakes ──────────────────────────────────
+    /// The network's DECLARED operating stage (`ELOHIM_NETWORK_STAKES`), read
+    /// ONCE at boot — never on a request path, and never inferred from a
+    /// request. Absent or unparseable resolves fail-closed to
+    /// `NetworkStage::Bootstrap`; the cheapest stage (`Simulacra`) is reachable
+    /// only by an exact, positive declaration.
+    ///
+    /// This is the OPERATOR-CONFIG leg only. elohim-storage additionally
+    /// resolves a stage from a standing-policy manifest; the doorway has no
+    /// manifest registry and therefore cannot, which is declared as a C10
+    /// `partial` on the `catching_up::read_class` registry row rather than
+    /// papered over.
+    pub network_stage: seam_contracts::freshness::NetworkStage,
+
+    /// Where `network_stage` came from — advertised verbatim on `/status.json`
+    /// and `/health/serving` so a reader can tell a declared stage from an
+    /// applied default.
+    pub stage_provenance: crate::routes::freshness::StageProvenance,
+
+    /// The bounded last-good DATA pantry the storage proxy answers AMBER from
+    /// when the upstream cannot be reached. Cat C / Ephemeral: every entry is
+    /// reconstructable by re-fetching the same path, so a restart that empties
+    /// it costs one round trip per path and nothing else.
+    pub freshness_pantry: Arc<crate::routes::freshness::FreshnessPantry>,
 }
 
 /// Retry-After (seconds) advertised when doorway sheds an inbound request at
@@ -365,6 +390,25 @@ pub const DEFAULT_MAX_INFLIGHT_READ: usize = 512;
 /// Build the ONE pooled client the storage proxy uses for forward_to_storage /
 /// forward_blob_to_storage. Replaces the per-request `reqwest::Client::new()`
 /// (untimed) so a hung upstream cannot block a worker indefinitely.
+/// Resolve the declared network stage ONCE per process.
+///
+/// `AppState` is constructed once in production but many times across the test
+/// binary, and an env read per construction is the flake class this crate has
+/// already paid for (`BLOB_PANTRY_MAX_BYTES`, parallel tests, `set_var` leaking
+/// between them). A `OnceLock` makes the read happen exactly once no matter how
+/// many states are built, which is also the honest semantics: a node's declared
+/// stakes are a boot-time property, not a per-object one.
+fn network_stage_at_boot() -> (
+    seam_contracts::freshness::NetworkStage,
+    crate::routes::freshness::StageProvenance,
+) {
+    static RESOLVED: std::sync::OnceLock<(
+        seam_contracts::freshness::NetworkStage,
+        crate::routes::freshness::StageProvenance,
+    )> = std::sync::OnceLock::new();
+    *RESOLVED.get_or_init(crate::routes::freshness::resolve_stage_from_env)
+}
+
 fn init_storage_proxy_client() -> Arc<reqwest::Client> {
     Arc::new(
         reqwest::Client::builder()
@@ -575,6 +619,9 @@ impl AppState {
                 crate::server::membrane::edge_guard_config().window_secs,
             )),
             trusted_proxy_hops: crate::server::membrane::trusted_proxy_hops_from_env(),
+            network_stage: network_stage_at_boot().0,
+            stage_provenance: network_stage_at_boot().1,
+            freshness_pantry: Arc::new(crate::routes::freshness::FreshnessPantry::from_env()),
         }
     }
 
@@ -689,6 +736,9 @@ impl AppState {
                 crate::server::membrane::edge_guard_config().window_secs,
             )),
             trusted_proxy_hops: crate::server::membrane::trusted_proxy_hops_from_env(),
+            network_stage: network_stage_at_boot().0,
+            stage_provenance: network_stage_at_boot().1,
+            freshness_pantry: Arc::new(crate::routes::freshness::FreshnessPantry::from_env()),
         }
     }
 
@@ -818,6 +868,9 @@ impl AppState {
                 crate::server::membrane::edge_guard_config().window_secs,
             )),
             trusted_proxy_hops: crate::server::membrane::trusted_proxy_hops_from_env(),
+            network_stage: network_stage_at_boot().0,
+            stage_provenance: network_stage_at_boot().1,
+            freshness_pantry: Arc::new(crate::routes::freshness::FreshnessPantry::from_env()),
         }
     }
 
@@ -962,6 +1015,9 @@ impl AppState {
                 crate::server::membrane::edge_guard_config().window_secs,
             )),
             trusted_proxy_hops: crate::server::membrane::trusted_proxy_hops_from_env(),
+            network_stage: network_stage_at_boot().0,
+            stage_provenance: network_stage_at_boot().1,
+            freshness_pantry: Arc::new(crate::routes::freshness::FreshnessPantry::from_env()),
         })
     }
 
@@ -3520,6 +3576,17 @@ fn with_bundle_provenance_header(
             "x-elohim-bundle",
             hyper::header::HeaderValue::from_static(value),
         );
+        // The same fact in the freshness vocabulary, ALONGSIDE the existing
+        // marker (never replacing it — `x-elohim-bundle` is its own contract
+        // and a2o reads it). A warm shell IS amber by the definition the
+        // storage proxy uses: true, locally-held bytes that no upstream
+        // witnessed on this request. Saying so in one vocabulary across both
+        // paths is what lets a client reason about staleness without knowing
+        // which internal path answered it.
+        resp.headers_mut().insert(
+            crate::routes::storage_proxy::X_ELOHIM_FRESHNESS,
+            hyper::header::HeaderValue::from_static("amber"),
+        );
     }
     resp
 }
@@ -3648,6 +3715,8 @@ async fn ssr_fallback_response(
                 let agent_cid_owned = resolve_agent_cid_from_request(state, &req);
                 let ctx = routes::ForwardCtx {
                     agent_cid: agent_cid_owned.as_deref(),
+                    pantry: Some(state.freshness_pantry.as_ref()),
+                    stage: Some(state.network_stage),
                     ..Default::default()
                 };
                 routes::forward_to_storage(
@@ -5583,6 +5652,8 @@ async fn handle_request(
                     let agent_cid_owned = resolve_agent_cid_from_request(&state, &req);
                     let ctx = routes::ForwardCtx {
                         agent_cid: agent_cid_owned.as_deref(),
+                        pantry: Some(state.freshness_pantry.as_ref()),
+                        stage: Some(state.network_stage),
                         ..Default::default()
                     };
                     // Blob paths get cache-aware forwarding; all other registry
@@ -6865,12 +6936,27 @@ mod ssr_session_tests {
             "last-reconciled",
             "a cache-served shell must declare its staleness class"
         );
+        // The freshness vocabulary rides ALONGSIDE, not instead of.
+        assert_eq!(
+            warm.headers()
+                .get(crate::routes::storage_proxy::X_ELOHIM_FRESHNESS)
+                .unwrap(),
+            "amber",
+            "a warm shell is amber in the same vocabulary the storage proxy uses"
+        );
         assert_eq!(warm.status(), 200);
 
         let fresh = with_bundle_provenance_header(body(), ShellProvenance::DeclaredHead);
         assert!(
             fresh.headers().get("x-elohim-bundle").is_none(),
             "a shell confirmed against the upstream carries no staleness marker"
+        );
+        assert!(
+            fresh
+                .headers()
+                .get(crate::routes::storage_proxy::X_ELOHIM_FRESHNESS)
+                .is_none(),
+            "an upstream-confirmed shell claims no freshness colour of its own"
         );
     }
 

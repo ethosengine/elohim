@@ -747,3 +747,390 @@ decisionPoints:
       - path: doorway/doorway-service/src/routes/health.rs
         testName: health_is_green_when_nothing_is_shedding
         kind: unit
+
+  - name: read_class
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/catching_up.rs
+      modulePath: routes::catching_up::read_class
+      line: 299
+    summary: >
+      Classifies a proxied request's DECLARED STAKES over (method, path) — Knowledge |
+      ValueCoupled | Authority, or `None` for the diagnostic probes that bypass the breaker
+      entirely — which is the input `seam_contracts::freshness::verdict` prices a shed-or-serve
+      decision against.
+    concernIds:
+      - id: C13
+        status: answered
+        justification: >
+          This is the doorway's half of the graduated contract: before it, "may this read be
+          answered from bytes no live witness confirms" had one answer for every route (no), so a
+          content read and a session mint were shed identically. read_class_recognizes_knowledge_
+          reads and read_class_recognizes_value_reads pin the graduation; read_class_floors_the_
+          head_plane and read_class_floors_identity_and_governance_reads pin its ceiling.
+      - id: C12
+        status: answered
+        justification: >
+          Every write is Authority-class (read_class_floors_every_write, across POST/PUT/PATCH/
+          DELETE/OPTIONS) and Authority can never be answered amber, so no mutation and no
+          identity/session/governance read is ever satisfied from the pantry. The classification
+          is deliberately NOT an authorization decision and must not be read as one — a
+          Knowledge verdict says "stale-but-true is acceptable here," never "this caller may see
+          it." The consent gate is `should_stock` (below) plus storage's own auth.
+      - id: C4
+        status: answered
+        justification: >
+          `None` is a real third answer, not a default: a diagnostic probe is not a freshness
+          decision at all and keeps its full breaker bypass. read_class_is_none_for_diagnostic_
+          probes pins that, and read_class_cannot_yet_produce_counter_evidence states in a test
+          what this route-derived cut CANNOT see, rather than letting the unreachable variant
+          read as covered.
+      - id: C10
+        status: partial
+        justification: >
+          Two named, counted gaps. (1) The class is ROUTE-derived; the declared next rung is an
+          EPR-envelope-derived class (kind x reach x coupling), which is also what will first
+          make `ReadClass::CounterEvidence` reachable — no URL path can carry that signal, so the
+          variant is deliberately unreachable-but-named today. (2) The route registry's declared
+          `auth_required` metadata is NOT threaded here: `read_class_with_auth_required` exists
+          and is tested (auth_required_overlay_only_tightens) but no call site passes it,
+          because the only routes to it are a second `RouteRegistry::match_request` per proxied
+          request or a new field on the registered `Disposition::StorageProxy`. The overlay can
+          only ever reclassify Authority-to-Authority today (every auth_required route is already
+          matched by an authority segment or by the non-GET rule), so the gap is real but inert.
+          Also: the doorway resolves its NetworkStage from operator config only — elohim-storage's
+          manifest leg has no analogue here, and is not faked.
+      - id: C3
+        status: answered
+        justification: >
+          Total over its inputs: every (method, path) pair returns exactly one of four answers,
+          with an explicit fail-closed default rather than a fall-through — an unrecognized GET
+          is Authority (read_class_is_authority_for_unknown_paths), which is byte-for-byte the
+          prior behaviour for it, so the liveness-preserving choice and the no-change choice are
+          the same choice.
+      - id: C8
+        status: answered
+        justification: >
+          The class it returns is one of the three labels on
+          `doorway_freshness_verdict_total{class,stage,verdict}` and on the
+          `x-elohim-freshness-class` response header, so every classification is countable AND
+          externally observable. the_class_header_rides_every_proxied_read_status
+          (storage_proxy.rs) proves the header survives 200/404/502, not just the happy path.
+      - id: C0
+        status: answered
+        justification: >
+          Plane location is exactly what this row decides, and it decides it conservatively: the
+          head plane (`/head`, `/head-record`, `/canonical-head`) is Authority even as a GET,
+          because which version is canonical is a notary answer and a stale one is a wrong one.
+          read_class_floors_the_head_plane pins all three paths.
+      - id: C6a
+        status: n-a
+        justification: >
+          Schedules no work and owns no budget — a handful of `split('/')` scans over one path
+          per request, allocation-free. The bounded budget belongs to the pantry row below.
+      - id: C6b
+        status: answered
+        justification: >
+          Pure and total; the same (method, path) always yields the same class, and calling it
+          repeatedly mints nothing. Structural (no &mut, no clock, no I/O) rather than tested for.
+      - id: C7
+        status: answered
+        justification: >
+          Every class this function can RETURN is advertised by the `/status.json` freshness
+          block, and every class the block advertises is one this function can return — pinned
+          from the surface side by advertised_policy_covers_every_classifiable_read, which
+          drives THIS function and asserts the result is in `ADVERTISED_CLASSES`. That is why
+          CounterEvidence is absent from the advertised policy: advertising a rule this surface
+          can never apply is the same asymmetry pointed the other way.
+      - id: C1
+        status: n-a
+        justification: >
+          No election and no author identity: the inputs are a method and a path. Nothing here
+          can express "I should win," and the classification is identical for every caller.
+      - id: C2
+        status: n-a
+        justification: >
+          Nothing is ordered or arbitrated. A read's stakes are a per-request property, not a
+          contest between competing claims.
+      - id: C5
+        status: n-a
+        justification: >
+          No evidence is transferred or accepted here — the function reads the request line the
+          doorway itself received, which is not a claim from a peer. The evidence question lives
+          on the amber ANSWER (re-derivable `served_head`), not on its classification.
+      - id: C9
+        status: n-a
+        justification: >
+          No identity, key, or lineage is consulted. The class of a read is the same whoever
+          asks; identity-bearing ROUTES are floored by path, which is a different mechanism from
+          reasoning about an identity.
+      - id: C11
+        status: n-a
+        justification: >
+          Receives no backpressure signal and enforces none; it names no upstream. Backpressure
+          is honored at the call site (`forward_to_storage`'s 429/503 arm) and is bound there.
+      - id: C14
+        status: answered
+        justification: >
+          The outcome set closes with a witnessed arm on both axes: `None` names the
+          not-a-freshness-decision case explicitly rather than defaulting it, and the
+          unrecognized-path case resolves to Authority rather than falling through. There is no
+          panic path and no silent drop.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/catching_up.rs
+        testName: read_class_floors_every_write
+        kind: unit
+      - path: doorway/doorway-service/src/routes/catching_up.rs
+        testName: read_class_floors_the_head_plane
+        kind: unit
+      - path: doorway/doorway-service/src/routes/catching_up.rs
+        testName: read_class_floors_identity_and_governance_reads
+        kind: unit
+      - path: doorway/doorway-service/src/routes/catching_up.rs
+        testName: read_class_recognizes_value_reads
+        kind: unit
+      - path: doorway/doorway-service/src/routes/catching_up.rs
+        testName: read_class_recognizes_knowledge_reads
+        kind: unit
+      - path: doorway/doorway-service/src/routes/catching_up.rs
+        testName: read_class_never_substring_matches_a_content_slug
+        kind: unit
+        mirrorRisk: false
+      - path: doorway/doorway-service/src/routes/catching_up.rs
+        testName: read_class_is_authority_for_unknown_paths
+        kind: unit
+      - path: doorway/doorway-service/src/routes/catching_up.rs
+        testName: read_class_is_none_for_diagnostic_probes
+        kind: unit
+      - path: doorway/doorway-service/src/routes/catching_up.rs
+        testName: read_class_cannot_yet_produce_counter_evidence
+        kind: unit
+      - path: doorway/doorway-service/src/routes/catching_up.rs
+        testName: auth_required_overlay_only_tightens
+        kind: unit
+      - path: doorway/doorway-service/src/routes/freshness.rs
+        testName: advertised_policy_covers_every_classifiable_read
+        kind: unit
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: an_authority_read_sheds_rather_than_answering_amber
+        kind: unit
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: the_class_header_rides_every_proxied_read_status
+        kind: unit
+    notes: >
+      THE SUBSTRING TRAP, and why segment matching is not a style choice. The obvious
+      implementation is `path.contains("/admin")`, and it classifies
+      `/db/content/administration-basics` as Authority — shedding a content read during exactly
+      the window this feature exists to keep serving. `read_class_never_substring_matches_a_
+      content_slug` drives six real-shaped slugs (administration-basics, heading-styles,
+      authority-and-consent, voter-guide, session-planning, identity-formation) through the
+      predicate and requires Knowledge for all six. That test is the reason
+      `AUTHORITY_SEGMENTS` is matched with whole-segment equality.
+
+      The `/head-record` and `/canonical-head` READ surfaces are floored here even though
+      `is_head_declare_write` (the breaker carve-out above) deliberately EXCLUDES them. Those
+      are two different questions about the same paths: the carve-out asks "must this reach
+      storage so storage's authority refusal can run" (only the write must), and this asks "may
+      this be answered without a live witness" (none of the three may).
+
+  - name: should_stock
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/freshness.rs
+      modulePath: routes::freshness::should_stock
+      line: 210
+    summary: >
+      Decides whether one upstream response may be kept as last-good in the bearer-blind
+      freshness pantry: GET, 200, non-floor class, NO Authorization header, response reach
+      absent/public/commons, non-empty, within the per-entry ceiling. Every gate is a refusal;
+      there is no permissive branch.
+    concernIds:
+      - id: C12
+        status: answered
+        justification: >
+          This IS the consent gate, and it is the row where a wrong `true` is a disclosure rather
+          than a slow page. The pantry is keyed by path+query with NO requester component, so
+          anything stocked can be replayed to any caller during a shed — which makes two refusals
+          load-bearing: a response fetched under an `Authorization` header is never stocked
+          (stock_predicate_refuses_authorized_responses, and end-to-end through the real
+          forwarder in an_authorized_response_is_never_stocked), and a response whose body
+          declares a reach narrower than commons is never stocked
+          (stock_predicate_refuses_reach_gated_bodies + a_reach_gated_body_is_never_stocked). The
+          reach gate is fail-closed on an UNRECOGNIZED token, so a future reach vocabulary cannot
+          silently widen what this pantry will replay — the list tests `some-future-reach`
+          explicitly.
+      - id: C6a
+        status: answered
+        justification: >
+          The bounded budget, declared as data and proven as a ceiling. Per-entry 1 MiB, total
+          64 MiB, plus an independent 8192-entry guard so a flood of tiny bodies cannot grow the
+          map either; total_byte_budget_is_never_exceeded stocks 20 bodies into a 250-byte pantry
+          and asserts the running total after EVERY insert, and an_oversize_body_is_refused_
+          without_evicting_the_pantry proves an over-ceiling body is refused outright rather than
+          evicting the pantry to make room for itself. Both ceilings are read from the
+          environment ONCE at construction, not per call — a deliberate departure from the
+          sibling `blob_pantry_max_bytes()`, whose read-per-call shape plus a test `set_var` is
+          this crate's documented parallel-test flake class.
+      - id: C4
+        status: answered
+        justification: >
+          Refusing to stock is how the pantry stays honest about what it holds: a body it may not
+          replay is simply never held, so there is no state in which the doorway has bytes it
+          cannot account for. The empty-body refusal is part of this — a zero-length 200 is not an
+          answer worth replaying as one.
+      - id: C6b
+        status: answered
+        justification: >
+          Pure and total over its arguments; the same response always yields the same decision,
+          and `FreshnessPantry::stock` is itself idempotent on a repeated key —
+          restocking_a_key_replaces_rather_than_double_counts proves a replace reclaims the old
+          body's bytes rather than double-counting them, which is exactly the leak that would
+          have made the declared ceiling a fiction.
+      - id: C11
+        status: answered
+        justification: >
+          The pantry is what makes honoring backpressure compatible with answering. Drawing from
+          it issues NO work to the upstream that just returned 429/503, so amber during
+          backpressure honors the signal rather than evading it —
+          honored_backpressure_is_answered_from_the_pantry_without_touching_storage asserts both
+          the amber answer and that the breaker stays CLOSED (a busy upstream is a live one).
+      - id: C5
+        status: answered
+        justification: >
+          Every stocked entry carries `served_head`, a CIDv1 (raw codec 0x55, sha2-256) minted
+          over the exact body bytes and emitted as `x-elohim-served-head`, so a consumer
+          RE-DERIVES the address rather than trusting the doorway's claim about it. This is the
+          leg the contract crate's own C5 binding is `partial` on, closed here:
+          a_knowledge_read_is_served_amber_while_the_circuit_is_open asserts the advertised
+          address equals `mint_served_head` of the bytes actually served.
+      - id: C8
+        status: answered
+        justification: >
+          The pantry's occupancy is published as `doorway_freshness_pantry_bytes` on every stock
+          and rendered in the `/status.json` freshness block, so the declared budget and its live
+          consumption are both observable — a bounded budget nobody can read is a claim, not a
+          bound.
+      - id: C7
+        status: answered
+        justification: >
+          What the pantry reports is what it holds: status_block_reports_the_live_pantry_
+          occupancy drives a real stock and asserts entries/bytes/maxBytes move with it, so
+          the advertised occupancy is read from the same counters `stock` maintains rather than
+          estimated beside them.
+      - id: C0
+        status: answered
+        justification: >
+          Cat C / Ephemeral, decided at the gate and stated in the module doc: no DHT entry type,
+          no table, no coordinator fn, no route. Every entry is reconstructable by re-fetching
+          the same path, so a restart costs one round trip per path and nothing is anyone's
+          source of truth. It passes the swap test — a sibling doorway stocks its OWN last-good
+          bytes and the two never need to agree, because each only ever reports what IT witnessed.
+      - id: C13
+        status: answered
+        justification: >
+          The stock decision is itself graduated by the same declared stakes the serve decision
+          is: a floor class is never stocked (stock_predicate_refuses_floor_classes), so the
+          bounded budget is never spent on bytes that could not lawfully be served from it.
+      - id: C1
+        status: n-a
+        justification: >
+          No election, and no author identity in any input — the arguments are a method, a
+          status, a class, two booleans-worth of request/response properties, and two lengths.
+      - id: C2
+        status: n-a
+        justification: >
+          Nothing is ordered or arbitrated. A later stock for the same key simply replaces the
+          earlier one, which is a cache semantics question (bounded above), not an authority
+          contest — the pantry never claims its entry is canonical.
+      - id: C3
+        status: n-a
+        justification: >
+          Not a state machine: a total pure predicate with no reachable non-terminal state and
+          nothing to wedge. The liveness question for the FEATURE lives on `verdict` and on
+          `read_class`, both of which carry their own C3 bindings.
+      - id: C9
+        status: n-a
+        justification: >
+          No identity, key, or lineage is consulted or stored. The pantry is deliberately
+          identity-BLIND, which is precisely why the Authorization and reach refusals above have
+          to be absolute — the store has no way to scope an entry to a person, so it must only
+          ever hold bytes that need no scoping.
+      - id: C10
+        status: partial
+        justification: >
+          The reach vocabulary this gate matches against (`public`, `commons`) is a literal list
+          here, not a generated projection of the canonical Reach enum
+          (elohim/sdk/schemas/v1) — a fourth reach drift, in the class
+          project_reach_enum_drift_reconciliation names. It fails CLOSED (an unrecognized token is
+          refused and pinned by test), so drift costs stocking opportunities rather than
+          disclosure, and that is the only reason this is `partial` rather than `unbound`.
+          Reconciling it against the generated enum is the named follow-on.
+      - id: C14
+        status: answered
+        justification: >
+          The outcome is a boolean with no error arm and no panic path, and every `false` is
+          reached by a NAMED refusal in source order rather than by fall-through — so "why was
+          this not stocked" is answerable by reading the first gate that matched, and there is no
+          unclassified residual to witness.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/freshness.rs
+        testName: stock_predicate_refuses_authorized_responses
+        kind: unit
+      - path: doorway/doorway-service/src/routes/freshness.rs
+        testName: stock_predicate_refuses_reach_gated_bodies
+        kind: unit
+        mirrorRisk: false
+      - path: doorway/doorway-service/src/routes/freshness.rs
+        testName: stock_predicate_refuses_floor_classes
+        kind: unit
+      - path: doorway/doorway-service/src/routes/freshness.rs
+        testName: stock_predicate_refuses_non_get_non_200_and_oversize
+        kind: unit
+      - path: doorway/doorway-service/src/routes/freshness.rs
+        testName: stock_predicate_accepts_the_public_knowledge_case
+        kind: unit
+      - path: doorway/doorway-service/src/routes/freshness.rs
+        testName: total_byte_budget_is_never_exceeded
+        kind: unit
+        mirrorRisk: false
+      - path: doorway/doorway-service/src/routes/freshness.rs
+        testName: an_oversize_body_is_refused_without_evicting_the_pantry
+        kind: unit
+      - path: doorway/doorway-service/src/routes/freshness.rs
+        testName: restocking_a_key_replaces_rather_than_double_counts
+        kind: unit
+      - path: doorway/doorway-service/src/routes/freshness.rs
+        testName: stocked_bytes_are_drawable_and_addressed
+        kind: unit
+      - path: doorway/doorway-service/src/routes/freshness.rs
+        testName: status_block_reports_the_live_pantry_occupancy
+        kind: unit
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: an_authorized_response_is_never_stocked
+        kind: unit
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: a_reach_gated_body_is_never_stocked
+        kind: unit
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: a_live_answer_is_tagged_green_and_stocked_as_last_good
+        kind: unit
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: honored_backpressure_is_answered_from_the_pantry_without_touching_storage
+        kind: unit
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: a_knowledge_read_is_served_amber_while_the_circuit_is_open
+        kind: unit
+    notes: >
+      WHY THE REACH GATE IS READ FROM THE RESPONSE, NOT THE REQUEST. The doorway cannot know a
+      path's reach before it asks; storage answers with it. So the gate runs on the collected
+      body, reusing `cache::reach_aware_serving::extract_reach_from_response` — the same reader
+      the registered `should_serve_response` predicate uses, so the two cannot disagree about
+      what a body's reach IS. The parse is guarded on a JSON content type and the per-entry
+      ceiling, so a large binary body is never handed to serde on the hot path.
+
+      RESIDUE, stated honestly: a non-JSON body yields `reach = None`, which the gate treats as
+      permissive, inheriting `should_serve_response`'s own backward-compatible rule. That is
+      sound for the bodies the pantry actually holds today (JSON projections and static app
+      assets, neither reach-marked) but it is an inherited assumption, not a proof — a future
+      binary format that carries reach out-of-band would need the marker threaded from the
+      response HEADERS rather than the body. Named here rather than discovered later.

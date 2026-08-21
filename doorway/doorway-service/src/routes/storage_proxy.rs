@@ -37,7 +37,11 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, warn};
 
+use seam_contracts::freshness::{verdict, Available, FreshnessVerdict, NetworkStage, ReadClass};
+use seam_contracts::ReasonLabel as _;
+
 use crate::cache::ContentCache;
+use crate::routes::freshness::{FreshnessPantry, PantryEntry};
 use crate::routes::UpstreamBreakers;
 
 /// Connect timeout for the pooled storage-proxy client (fail fast on a dead peer).
@@ -126,6 +130,16 @@ pub struct ForwardCtx<'a> {
     /// client header: the dispatch arm strips inbound copies before this
     /// context is built.
     pub verified_performer: Option<&'a str>,
+    /// The last-good DATA pantry this doorway may answer AMBER from when the
+    /// upstream cannot be reached. `None` (the `Default`) is exactly the prior
+    /// behaviour: no amber is ever served and every failure path sheds, so any
+    /// call site that has not been wired is unchanged rather than degraded.
+    pub pantry: Option<&'a FreshnessPantry>,
+    /// The network's DECLARED operating stage, resolved once at AppState
+    /// construction. `None` means "not wired", and resolves to the same
+    /// fail-closed `NetworkStage::default()` (Bootstrap) a missing declaration
+    /// does — the stage is never inferred from a request.
+    pub stage: Option<NetworkStage>,
 }
 
 /// Maximum blob size (in bytes) written to the local pantry via the registry path.
@@ -147,6 +161,135 @@ fn blob_pantry_max_bytes() -> u64 {
 /// Blob TTL for the local pantry: mirrors the 1-hour default used by
 /// [`handle_blob_request_with_storage_proxy`](super::blob::handle_blob_request_with_storage_proxy).
 const BLOB_PANTRY_TTL: Duration = Duration::from_secs(3_600); // 1 hour
+
+// ── Freshness wire contract ─────────────────────────────────────────────────
+//
+// The trust signal. Before this, a doorway answer carried no statement about
+// whether a live witness stood behind it: a 200 was a 200 whether it came from
+// the current DHT-witnessed projection or from nowhere at all, and the only
+// alternative to a live answer was a 503. These headers make "behind" a thing a
+// client can SEE and decide about, rather than a thing it can only be refused
+// over.
+
+/// `green` (a live upstream answer) or `amber` (true last-good bytes, no
+/// current witness). Present on every proxied read response.
+pub const X_ELOHIM_FRESHNESS: &str = "x-elohim-freshness";
+/// The read's declared stakes: `knowledge` | `value` | `authority`.
+pub const X_ELOHIM_FRESHNESS_CLASS: &str = "x-elohim-freshness-class";
+/// On a shed: the colour that WOULD have satisfied this read, given what the
+/// doorway has on hand.
+pub const X_ELOHIM_FRESHNESS_REQUIRED: &str = "x-elohim-freshness-required";
+/// `1` on an amber answer whose class is priced `AmberWarn` at the declared
+/// stage — served, but the consumer is told it acted on unwitnessed bytes.
+pub const X_ELOHIM_FRESHNESS_WARN: &str = "x-elohim-freshness-warn";
+/// RFC3339 moment the amber bytes were stocked.
+pub const X_ELOHIM_STOCKED_AT: &str = "x-elohim-stocked-at";
+/// CIDv1 (raw, sha2-256) of the amber body — re-derivable by the consumer, so
+/// amber is checkable rather than merely claimed.
+pub const X_ELOHIM_SERVED_HEAD: &str = "x-elohim-served-head";
+
+/// Stamp a live upstream answer as green. Additive: nothing existing is
+/// removed or rewritten.
+fn tag_green(mut resp: Response<Full<Bytes>>, class: ReadClass) -> Response<Full<Bytes>> {
+    let h = resp.headers_mut();
+    h.insert(
+        X_ELOHIM_FRESHNESS,
+        hyper::header::HeaderValue::from_static("green"),
+    );
+    if let Ok(v) = hyper::header::HeaderValue::from_str(class.label()) {
+        h.insert(X_ELOHIM_FRESHNESS_CLASS, v);
+    }
+    resp
+}
+
+/// Stamp a shed with what it would have taken to answer. The 503 body, status
+/// and `Retry-After` are untouched — the existing catching-up contract is a
+/// contract, and this only adds the reason the refusal was necessary.
+fn tag_shed(mut resp: Response<Full<Bytes>>, class: ReadClass) -> Response<Full<Bytes>> {
+    let h = resp.headers_mut();
+    h.insert(
+        X_ELOHIM_FRESHNESS_REQUIRED,
+        hyper::header::HeaderValue::from_static("green"),
+    );
+    if let Ok(v) = hyper::header::HeaderValue::from_str(class.label()) {
+        h.insert(X_ELOHIM_FRESHNESS_CLASS, v);
+    }
+    resp
+}
+
+/// Build the amber answer: the stocked bytes, their content type, and the
+/// provenance a consumer needs to judge them.
+///
+/// `Cache-Control: no-store` is not optional — amber must never be re-cached
+/// downstream as if it were fresh. A CDN that stored one of these would turn a
+/// doorway's honest "one hour behind" into an intermediary's silent lie.
+fn amber_response(entry: &PantryEntry, class: ReadClass, warn: bool) -> Response<Full<Bytes>> {
+    let mut builder = Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", entry.content_type.as_str())
+        .header("Cross-Origin-Resource-Policy", "cross-origin")
+        .header(X_ELOHIM_FRESHNESS, "amber")
+        .header(X_ELOHIM_FRESHNESS_CLASS, class.label())
+        .header(X_ELOHIM_STOCKED_AT, entry.stocked_at_rfc3339.as_str())
+        .header(X_ELOHIM_SERVED_HEAD, entry.served_head.as_str())
+        .header(hyper::header::CACHE_CONTROL, "no-store");
+    if warn {
+        builder = builder.header(X_ELOHIM_FRESHNESS_WARN, "1");
+    }
+    builder
+        .body(Full::new(entry.body.clone()))
+        .expect("infallible amber response")
+}
+
+/// Ask the predicate whether the last-good pantry can answer this read, and
+/// COUNT the verdict either way (C8 — a shed and a save are the same
+/// measurement, taken at the same point).
+///
+/// Called at most once per request: the three call sites (circuit open, send
+/// error/timeout, honored upstream backpressure) are mutually exclusive
+/// terminal paths, so the counter is a per-request tally, not a per-attempt one.
+fn freshness_answer(
+    ctx: &ForwardCtx<'_>,
+    class: ReadClass,
+    key: &str,
+) -> Option<Response<Full<Bytes>>> {
+    let stage = ctx.stage.unwrap_or_default();
+    let entry = ctx.pantry.and_then(|p| p.draw(key));
+    let available = match &entry {
+        Some(e) => Available::Amber { age: e.age() },
+        None => Available::None,
+    };
+    let v = verdict(class, stage, available);
+    crate::metrics::inc_freshness_verdict(class.label(), stage.label(), v.label());
+
+    match (v, entry) {
+        (FreshnessVerdict::ServeAmber, Some(e)) => {
+            debug!(
+                key = %key,
+                class = class.label(),
+                stage = stage.label(),
+                age_secs = e.age().as_secs(),
+                "serving last-good bytes as AMBER — upstream unavailable"
+            );
+            Some(amber_response(&e, class, false))
+        }
+        (FreshnessVerdict::ServeAmberWarn, Some(e)) => {
+            warn!(
+                key = %key,
+                class = class.label(),
+                stage = stage.label(),
+                age_secs = e.age().as_secs(),
+                "serving last-good bytes as AMBER (WARNED) — a value-coupled read \
+                 answered without a live witness at the declared stage"
+            );
+            Some(amber_response(&e, class, true))
+        }
+        // Shed: either the class floors amber, nothing is stocked, or what is
+        // stocked has aged past its window. The caller falls through to the
+        // existing catching-up contract unchanged.
+        _ => None,
+    }
+}
 
 /// Forward an incoming request to the elohim-storage endpoint.
 ///
@@ -200,6 +343,14 @@ where
     // chance to run so a non-author is refused 401/403 rather than masked
     // behind a blind circuit-open 503 while the peer is catching up.
     let is_head_declare = crate::routes::catching_up::is_head_declare_write(&method, path);
+    // Freshness (declared stakes). `None` is the diagnostic-probe case — those
+    // bypass the breaker entirely and are not a freshness decision at all, so
+    // every freshness branch below is a no-op for them and their carve-out is
+    // byte-for-byte unchanged.
+    let read_class = crate::routes::catching_up::read_class(&method, path);
+    let is_read = matches!(method, Method::GET | Method::HEAD);
+    let has_authorization = req.headers().contains_key("authorization");
+    let pantry_key = crate::routes::freshness::pantry_key(path, query);
 
     let mut builder = match method {
         Method::GET => client.get(&full_url),
@@ -306,6 +457,16 @@ where
                 None
             }
             None => {
+                // HOOK 1 (circuit open). The upstream is not being called
+                // either way, so answering from the last-good pantry costs it
+                // nothing — and for a knowledge read, true bytes from an hour
+                // ago are a better answer than a 503.
+                if let Some(class) = read_class {
+                    if let Some(amber) = freshness_answer(&ctx, class, &pantry_key) {
+                        crate::metrics::inc_breaker_open();
+                        return amber;
+                    }
+                }
                 warn!(
                     target: "upstream_shed",
                     counter = "doorway_upstream_breaker_open_total",
@@ -314,12 +475,16 @@ where
                     "upstream circuit OPEN — shedding without calling storage (503 + Retry-After)"
                 );
                 crate::metrics::inc_breaker_open();
-                return catching_up_proxy_response(
+                let shed = catching_up_proxy_response(
                     wants_html,
                     crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
                     storage_url,
                     breakers,
                 );
+                return match read_class {
+                    Some(class) => tag_shed(shed, class),
+                    None => shed,
+                };
             }
         }
     };
@@ -375,7 +540,22 @@ where
                     "honoring upstream backpressure — surfacing catching-up to client"
                 );
                 crate::metrics::inc_backpressure_honored();
-                return catching_up_proxy_response(wants_html, retry_after, storage_url, breakers);
+                // HOOK 3 (honored upstream backpressure). Amber is allowed
+                // here precisely BECAUSE it honours the backpressure: drawing
+                // from the local pantry issues no further work to the upstream
+                // that just asked us to back off (C11). The trial is already
+                // recorded `true` above — a busy upstream is a live one.
+                if let Some(class) = read_class {
+                    if let Some(amber) = freshness_answer(&ctx, class, &pantry_key) {
+                        return amber;
+                    }
+                }
+                let shed =
+                    catching_up_proxy_response(wants_html, retry_after, storage_url, breakers);
+                return match read_class {
+                    Some(class) => tag_shed(shed, class),
+                    None => shed,
+                };
             }
 
             let content_type = response
@@ -395,22 +575,91 @@ where
                         &trial,
                         ProxyOutcome::classify(status_u16) != ProxyOutcome::Failure,
                     );
-                    Response::builder()
+
+                    // Stock the last-good answer. Every gate lives in the pure
+                    // `should_stock` predicate (GET, 200, non-floor class, no
+                    // Authorization, reach absent/public/commons, within the
+                    // per-entry ceiling) so the consent rule is testable
+                    // without a socket. The reach parse is guarded on a JSON
+                    // content type and the size ceiling, so a large binary body
+                    // is never handed to serde on the hot path.
+                    if let (Some(pantry), Some(class)) = (ctx.pantry, read_class) {
+                        let within_ceiling = body.len() as u64 <= pantry.per_entry_max();
+                        let reach = if within_ceiling && content_type.contains("json") {
+                            crate::cache::reach_aware_serving::extract_reach_from_response(&body)
+                        } else {
+                            None
+                        };
+                        // A non-JSON body carries no reach marker we can read;
+                        // `should_stock` still refuses anything authorized or
+                        // floor-classed, and the reach gate is `None`-permissive
+                        // by the same backward-compatible rule
+                        // `should_serve_response` already uses.
+                        if crate::routes::freshness::should_stock(
+                            &method,
+                            status_u16,
+                            class,
+                            has_authorization,
+                            reach.as_deref(),
+                            body.len(),
+                            pantry.per_entry_max(),
+                        ) {
+                            pantry.stock(
+                                pantry_key.clone(),
+                                PantryEntry {
+                                    body: Bytes::from(body.to_vec()),
+                                    content_type: content_type.clone(),
+                                    stocked_at: std::time::Instant::now(),
+                                    stocked_at_rfc3339: chrono::Utc::now()
+                                        .to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+                                    served_head: crate::routes::freshness::mint_served_head(&body),
+                                },
+                            );
+                            crate::metrics::set_freshness_pantry_bytes(pantry.bytes());
+                        }
+                    }
+
+                    let live = Response::builder()
                         .status(StatusCode::from_u16(status_u16).unwrap_or(StatusCode::OK))
                         .header("Content-Type", content_type)
                         .header("Cross-Origin-Resource-Policy", "cross-origin")
                         .body(Full::new(Bytes::from(body.to_vec())))
-                        .unwrap()
+                        .unwrap();
+                    // A live answer is green by definition — an upstream
+                    // witness stood behind it. Counted for every read so the
+                    // amber/shed numerators have their denominator (the
+                    // measure the top-red flip discipline asks for).
+                    match read_class {
+                        Some(class) if is_read => {
+                            let stage = ctx.stage.unwrap_or_default();
+                            crate::metrics::inc_freshness_verdict(
+                                class.label(),
+                                stage.label(),
+                                FreshnessVerdict::Serve.label(),
+                            );
+                            tag_green(live, class)
+                        }
+                        _ => live,
+                    }
                 }
                 Err(e) => {
                     warn!(error = %e, "Failed to read storage response body");
                     record_trial(&trial, false);
-                    catching_up_proxy_response(
+                    // No freshness DECISION is made here (this arm is not one
+                    // of the three hook points — the upstream did answer, we
+                    // just could not read it), but the shed still names the
+                    // read's class, so the class header is present at every
+                    // status a proxied read can terminate at.
+                    let shed = catching_up_proxy_response(
                         wants_html,
                         crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
                         storage_url,
                         breakers,
-                    )
+                    );
+                    match read_class {
+                        Some(class) => tag_shed(shed, class),
+                        None => shed,
+                    }
                 }
             }
         }
@@ -428,12 +677,25 @@ where
             warn!(error = %e, path = %path, storage_url = %storage_url,
                 "storage forward failed (connect/timeout) — recording breaker failure");
             record_trial(&trial, false);
-            catching_up_proxy_response(
+            // HOOK 2 (connect error / timeout). The upstream never answered;
+            // the breaker failure is already recorded above, so serving amber
+            // here changes no self-protection state — it only changes whether
+            // the person on the other end gets true bytes or a dead end.
+            if let Some(class) = read_class {
+                if let Some(amber) = freshness_answer(&ctx, class, &pantry_key) {
+                    return amber;
+                }
+            }
+            let shed = catching_up_proxy_response(
                 wants_html,
                 crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS,
                 storage_url,
                 breakers,
-            )
+            );
+            match read_class {
+                Some(class) => tag_shed(shed, class),
+                None => shed,
+            }
         }
     }
 }
@@ -1646,6 +1908,502 @@ mod tests {
         assert_eq!(
             captured_value, None,
             "x-elohim-verified-performer must NOT be set when ctx carries none"
+        );
+    }
+
+    // ========================================================================
+    // Freshness graded by declared stakes — the wire contract
+    //
+    // Every test below drives the REAL `forward_to_storage` against a real
+    // in-process upstream, so what they assert is the bytes a client receives,
+    // not a helper's return value.
+    // ========================================================================
+
+    use crate::routes::freshness::{FreshnessPantry, StageProvenance};
+    use seam_contracts::freshness::NetworkStage;
+
+    /// A commons-reach JSON body — the shape the pantry is allowed to stock.
+    const COMMONS_BODY: &[u8] = br#"{"id":"elohim-host-landing","reach":"commons"}"#;
+
+    async fn read_body(resp: Response<Full<Bytes>>) -> Vec<u8> {
+        use http_body_util::BodyExt;
+        resp.into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec()
+    }
+
+    fn header<'a>(resp: &'a Response<Full<Bytes>>, name: &str) -> Option<&'a str> {
+        resp.headers().get(name).and_then(|v| v.to_str().ok())
+    }
+
+    /// A live answer is GREEN, carries its class, and is stocked as last-good.
+    #[tokio::test]
+    async fn a_live_answer_is_tagged_green_and_stocked_as_last_good() {
+        let (addr, _h) = spawn_mock_storage(200, COMMONS_BODY.to_vec(), "application/json").await;
+        let storage_url = format!("http://{addr}");
+        let client = reqwest::Client::new();
+        let breakers = UpstreamBreakers::default();
+        let pantry = FreshnessPantry::default();
+        let ctx = ForwardCtx {
+            pantry: Some(&pantry),
+            stage: Some(NetworkStage::Bootstrap),
+            ..Default::default()
+        };
+
+        let path = "/db/content/elohim-host-landing";
+        let resp = forward_to_storage(
+            make_get_request(path),
+            &storage_url,
+            path,
+            &client,
+            &breakers,
+            ctx,
+        )
+        .await;
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(header(&resp, X_ELOHIM_FRESHNESS), Some("green"));
+        assert_eq!(header(&resp, X_ELOHIM_FRESHNESS_CLASS), Some("knowledge"));
+        assert_eq!(
+            header(&resp, X_ELOHIM_STOCKED_AT),
+            None,
+            "a green answer has no stocked-at — it was witnessed just now"
+        );
+        assert_eq!(pantry.entries(), 1, "the live answer must be stocked");
+        assert_eq!(pantry.bytes(), COMMONS_BODY.len() as u64);
+    }
+
+    /// THE cure. With the circuit OPEN — the exact state that answered 503 on
+    /// every content read for hours on 2026-08-20 — a knowledge read is now
+    /// answered from true last-good bytes, tagged amber, with a re-derivable
+    /// address and `no-store` so no intermediary can launder it into "fresh".
+    #[tokio::test]
+    async fn a_knowledge_read_is_served_amber_while_the_circuit_is_open() {
+        let (addr, _h) = spawn_mock_storage(200, COMMONS_BODY.to_vec(), "application/json").await;
+        let storage_url = format!("http://{addr}");
+        let client = reqwest::Client::new();
+        // Long cooldown: the circuit stays fully OPEN for the whole test.
+        let breakers = UpstreamBreakers::new(1, 3_600);
+        let pantry = FreshnessPantry::default();
+        let path = "/db/content/elohim-host-landing";
+        let ctx = ForwardCtx {
+            pantry: Some(&pantry),
+            stage: Some(NetworkStage::Bootstrap),
+            ..Default::default()
+        };
+
+        // Warm the pantry from a live answer.
+        let _ = forward_to_storage(
+            make_get_request(path),
+            &storage_url,
+            path,
+            &client,
+            &breakers,
+            ctx,
+        )
+        .await;
+        assert_eq!(pantry.entries(), 1);
+
+        // Now the upstream goes away.
+        breakers.record(&storage_url, false);
+        assert_eq!(breakers.snapshot()[0].circuit, "open");
+
+        let resp = forward_to_storage(
+            make_get_request(path),
+            &storage_url,
+            path,
+            &client,
+            &breakers,
+            ctx,
+        )
+        .await;
+
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "a knowledge read must be ANSWERED, not shed, while true bytes are held"
+        );
+        assert_eq!(header(&resp, X_ELOHIM_FRESHNESS), Some("amber"));
+        assert_eq!(header(&resp, X_ELOHIM_FRESHNESS_CLASS), Some("knowledge"));
+        assert_eq!(
+            header(&resp, X_ELOHIM_FRESHNESS_WARN),
+            None,
+            "knowledge amber is unremarked — the warn header is AmberWarn only"
+        );
+        // The address is a CIDv1 base32-lower, raw codec + sha2-256 — the
+        // consumer can re-derive it from the body it just received.
+        let head = header(&resp, X_ELOHIM_SERVED_HEAD).expect("amber must name its address");
+        assert!(
+            head.starts_with("bafkrei")
+                && head
+                    .chars()
+                    .skip(1)
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()),
+            "served_head must be a lower-case base32 CIDv1, got {head}"
+        );
+        assert_eq!(
+            head,
+            crate::routes::freshness::mint_served_head(COMMONS_BODY),
+            "the advertised address must be the address of the bytes served"
+        );
+        // Parseable RFC3339 with no sub-second ambiguity.
+        let stocked = header(&resp, X_ELOHIM_STOCKED_AT).expect("amber must name when");
+        assert!(
+            chrono::DateTime::parse_from_rfc3339(stocked).is_ok(),
+            "stocked-at must be RFC3339, got {stocked}"
+        );
+        assert!(
+            header(&resp, "cache-control")
+                .unwrap_or_default()
+                .contains("no-store"),
+            "amber must never be re-cached downstream as fresh"
+        );
+        assert_eq!(
+            read_body(resp).await,
+            COMMONS_BODY,
+            "the bytes must be the true bytes"
+        );
+    }
+
+    /// The FLOOR, on the wire. An authority read holds the same stocked bytes
+    /// available and is still refused — and the refusal says what it would have
+    /// taken. `/head-record` is the probe because it is a GET whose PATH looks
+    /// exactly like a content read.
+    #[tokio::test]
+    async fn an_authority_read_sheds_rather_than_answering_amber() {
+        let (addr, _h) = spawn_mock_storage(200, COMMONS_BODY.to_vec(), "application/json").await;
+        let storage_url = format!("http://{addr}");
+        let client = reqwest::Client::new();
+        let breakers = UpstreamBreakers::new(1, 3_600);
+        let pantry = FreshnessPantry::default();
+        let ctx = ForwardCtx {
+            pantry: Some(&pantry),
+            stage: Some(NetworkStage::Bootstrap),
+            ..Default::default()
+        };
+
+        for path in [
+            "/db/content/elohim-host-landing/head-record",
+            "/db/content/elohim-host-landing/canonical-head",
+        ] {
+            // Even if bytes WERE stocked for this key, the floor refuses them.
+            pantry.stock(
+                path.to_string(),
+                crate::routes::freshness::PantryEntry {
+                    body: Bytes::from_static(COMMONS_BODY),
+                    content_type: "application/json".to_string(),
+                    stocked_at: std::time::Instant::now(),
+                    stocked_at_rfc3339: "2026-08-21T00:00:00Z".to_string(),
+                    served_head: crate::routes::freshness::mint_served_head(COMMONS_BODY),
+                },
+            );
+            breakers.record(&storage_url, false);
+
+            let resp = forward_to_storage(
+                make_get_request(path),
+                &storage_url,
+                path,
+                &client,
+                &breakers,
+                ctx,
+            )
+            .await;
+
+            assert_eq!(
+                resp.status(),
+                StatusCode::SERVICE_UNAVAILABLE,
+                "{path} is authority-class and must never be answered amber"
+            );
+            assert_eq!(header(&resp, X_ELOHIM_FRESHNESS_CLASS), Some("authority"));
+            assert_eq!(header(&resp, X_ELOHIM_FRESHNESS_REQUIRED), Some("green"));
+            assert_eq!(
+                header(&resp, X_ELOHIM_FRESHNESS),
+                None,
+                "a shed serves no colour at all — Shed is an outcome, not a freshness level"
+            );
+        }
+    }
+
+    /// A value-coupled read at a coordinated stage is served, but WARNED — the
+    /// one genuinely stage-priced row, observable from outside.
+    #[tokio::test]
+    async fn a_value_coupled_amber_is_warned_at_the_enforced_stage() {
+        let storage_url = "http://127.0.0.1:1".to_string(); // never answers
+        let client = reqwest::Client::builder()
+            .connect_timeout(Duration::from_millis(200))
+            .build()
+            .unwrap();
+        let breakers = UpstreamBreakers::default();
+        let pantry = FreshnessPantry::default();
+        let path = "/db/reciprocity";
+        pantry.stock(
+            path.to_string(),
+            crate::routes::freshness::PantryEntry {
+                body: Bytes::from_static(COMMONS_BODY),
+                content_type: "application/json".to_string(),
+                stocked_at: std::time::Instant::now(),
+                stocked_at_rfc3339: "2026-08-21T00:00:00Z".to_string(),
+                served_head: crate::routes::freshness::mint_served_head(COMMONS_BODY),
+            },
+        );
+
+        // HOOK 2: the connect-error arm.
+        let resp = forward_to_storage(
+            make_get_request(path),
+            &storage_url,
+            path,
+            &client,
+            &breakers,
+            ForwardCtx {
+                pantry: Some(&pantry),
+                stage: Some(NetworkStage::Enforced),
+                ..Default::default()
+            },
+        )
+        .await;
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(header(&resp, X_ELOHIM_FRESHNESS), Some("amber"));
+        assert_eq!(header(&resp, X_ELOHIM_FRESHNESS_CLASS), Some("value"));
+        assert_eq!(
+            header(&resp, X_ELOHIM_FRESHNESS_WARN),
+            Some("1"),
+            "a value-coupled read answered without a live witness must be warned"
+        );
+    }
+
+    /// The consent invariant, end to end: a response fetched under an
+    /// `Authorization` header is never stocked, so it can never be replayed to
+    /// an unauthenticated caller during a shed.
+    #[tokio::test]
+    async fn an_authorized_response_is_never_stocked() {
+        let (addr, _h) = spawn_mock_storage(200, COMMONS_BODY.to_vec(), "application/json").await;
+        let storage_url = format!("http://{addr}");
+        let client = reqwest::Client::new();
+        let breakers = UpstreamBreakers::default();
+        let pantry = FreshnessPantry::default();
+        let path = "/db/content/private-ish";
+
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri(path)
+            .header("authorization", "Bearer someone-elses-token")
+            .body(Empty::<Bytes>::new())
+            .unwrap();
+
+        let resp = forward_to_storage(
+            req,
+            &storage_url,
+            path,
+            &client,
+            &breakers,
+            ForwardCtx {
+                pantry: Some(&pantry),
+                stage: Some(NetworkStage::Bootstrap),
+                ..Default::default()
+            },
+        )
+        .await;
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            pantry.entries(),
+            0,
+            "a bearer-shaped answer must never enter a bearer-blind pantry"
+        );
+    }
+
+    /// A reach-gated body is never stocked either — the same C12 rule, read
+    /// from the response instead of the request.
+    #[tokio::test]
+    async fn a_reach_gated_body_is_never_stocked() {
+        let body = br#"{"id":"will","reach":"private"}"#.to_vec();
+        let (addr, _h) = spawn_mock_storage(200, body, "application/json").await;
+        let storage_url = format!("http://{addr}");
+        let client = reqwest::Client::new();
+        let breakers = UpstreamBreakers::default();
+        let pantry = FreshnessPantry::default();
+        let path = "/db/content/will";
+
+        let resp = forward_to_storage(
+            make_get_request(path),
+            &storage_url,
+            path,
+            &client,
+            &breakers,
+            ForwardCtx {
+                pantry: Some(&pantry),
+                stage: Some(NetworkStage::Bootstrap),
+                ..Default::default()
+            },
+        )
+        .await;
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(pantry.entries(), 0, "reach:private must never be stocked");
+    }
+
+    /// The class header rides EVERY proxied read status, not just 200 — a
+    /// client that only ever sees 404s must still be able to read the class.
+    #[tokio::test]
+    async fn the_class_header_rides_every_proxied_read_status() {
+        for status in [200u16, 404, 502] {
+            let (addr, _h) =
+                spawn_mock_storage(status, COMMONS_BODY.to_vec(), "application/json").await;
+            let storage_url = format!("http://{addr}");
+            let client = reqwest::Client::new();
+            let breakers = UpstreamBreakers::default();
+            let pantry = FreshnessPantry::default();
+            let path = "/db/content/elohim-host-landing";
+
+            let resp = forward_to_storage(
+                make_get_request(path),
+                &storage_url,
+                path,
+                &client,
+                &breakers,
+                ForwardCtx {
+                    pantry: Some(&pantry),
+                    stage: Some(NetworkStage::Bootstrap),
+                    ..Default::default()
+                },
+            )
+            .await;
+
+            assert_eq!(resp.status().as_u16(), status);
+            assert_eq!(
+                header(&resp, X_ELOHIM_FRESHNESS_CLASS),
+                Some("knowledge"),
+                "status {status} lost its class header"
+            );
+            assert_eq!(header(&resp, X_ELOHIM_FRESHNESS), Some("green"));
+        }
+    }
+
+    /// Honored upstream backpressure (429/503) is answered amber — and doing so
+    /// HONORS the backpressure, because drawing from the local pantry sends the
+    /// upstream nothing (C11).
+    #[tokio::test]
+    async fn honored_backpressure_is_answered_from_the_pantry_without_touching_storage() {
+        let (addr, _h) = spawn_mock_storage(503, b"{}".to_vec(), "application/json").await;
+        let storage_url = format!("http://{addr}");
+        let client = reqwest::Client::new();
+        let breakers = UpstreamBreakers::default();
+        let pantry = FreshnessPantry::default();
+        let path = "/db/content/elohim-host-landing";
+        pantry.stock(
+            path.to_string(),
+            crate::routes::freshness::PantryEntry {
+                body: Bytes::from_static(COMMONS_BODY),
+                content_type: "application/json".to_string(),
+                stocked_at: std::time::Instant::now(),
+                stocked_at_rfc3339: "2026-08-21T00:00:00Z".to_string(),
+                served_head: crate::routes::freshness::mint_served_head(COMMONS_BODY),
+            },
+        );
+
+        let resp = forward_to_storage(
+            make_get_request(path),
+            &storage_url,
+            path,
+            &client,
+            &breakers,
+            ForwardCtx {
+                pantry: Some(&pantry),
+                stage: Some(NetworkStage::Bootstrap),
+                ..Default::default()
+            },
+        )
+        .await;
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(header(&resp, X_ELOHIM_FRESHNESS), Some("amber"));
+        // The breaker stays CLOSED: a busy upstream is a live one, and amber
+        // did not change that classification.
+        assert_eq!(breakers.snapshot()[0].circuit, "closed");
+    }
+
+    /// An unwired call site (`ForwardCtx::default()`) is byte-for-byte the
+    /// prior behaviour: no pantry, no amber, and the shed exactly as before.
+    #[tokio::test]
+    async fn an_unwired_call_site_keeps_the_prior_shed_behaviour() {
+        let storage_url = "http://127.0.0.1:1".to_string();
+        let client = reqwest::Client::builder()
+            .connect_timeout(Duration::from_millis(200))
+            .build()
+            .unwrap();
+        let breakers = UpstreamBreakers::default();
+        let path = "/db/content/elohim-host-landing";
+
+        let resp = forward_to_storage(
+            make_get_request(path),
+            &storage_url,
+            path,
+            &client,
+            &breakers,
+            ForwardCtx::default(),
+        )
+        .await;
+
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            header(&resp, X_ELOHIM_FRESHNESS),
+            None,
+            "no colour is claimed when no pantry is wired"
+        );
+        // The class is still named — that costs nothing and helps a reader.
+        assert_eq!(header(&resp, X_ELOHIM_FRESHNESS_CLASS), Some("knowledge"));
+        assert_eq!(header(&resp, X_ELOHIM_FRESHNESS_REQUIRED), Some("green"));
+    }
+
+    /// The diagnostic-probe carve-out is untouched: no freshness decision, no
+    /// freshness headers, no pantry interaction at all.
+    #[tokio::test]
+    async fn a_diagnostic_probe_carries_no_freshness_at_all() {
+        let (addr, _h) = spawn_mock_storage(200, COMMONS_BODY.to_vec(), "application/json").await;
+        let storage_url = format!("http://{addr}");
+        let client = reqwest::Client::new();
+        let breakers = UpstreamBreakers::default();
+        let pantry = FreshnessPantry::default();
+        let path = "/p2p/status";
+
+        let resp = forward_to_storage(
+            make_get_request(path),
+            &storage_url,
+            path,
+            &client,
+            &breakers,
+            ForwardCtx {
+                pantry: Some(&pantry),
+                stage: Some(NetworkStage::Bootstrap),
+                ..Default::default()
+            },
+        )
+        .await;
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(header(&resp, X_ELOHIM_FRESHNESS), None);
+        assert_eq!(header(&resp, X_ELOHIM_FRESHNESS_CLASS), None);
+        assert_eq!(
+            pantry.entries(),
+            0,
+            "a probe is not a freshness decision and stocks nothing"
+        );
+    }
+
+    /// The stage the forwarder uses when none is wired is the fail-closed
+    /// default, not the cheapest — pinned so a future refactor cannot silently
+    /// widen amber by defaulting to Simulacra.
+    #[test]
+    fn an_unwired_stage_resolves_fail_closed() {
+        let ctx = ForwardCtx::default();
+        assert_eq!(ctx.stage.unwrap_or_default(), NetworkStage::Bootstrap);
+        assert_eq!(
+            crate::routes::freshness::resolve_stage(None),
+            (NetworkStage::Bootstrap, StageProvenance::BootstrapDefault)
         );
     }
 }

@@ -18,6 +18,8 @@ use hyper::body::Bytes;
 use hyper::header::HeaderMap;
 use hyper::{Method, Response, StatusCode};
 
+use seam_contracts::freshness::ReadClass;
+
 use super::upstream_health::UpstreamBreakers;
 
 /// Why a request was shed — drives the page's headline and copy honestly.
@@ -182,6 +184,171 @@ pub fn is_diagnostic_probe(path: &str) -> bool {
 /// behind the normal catching-up shed unchanged, same as storage's exclusion.
 pub fn is_head_declare_write(method: &Method, path: &str) -> bool {
     *method == Method::POST && path.starts_with("/db/content/") && path.ends_with("/head")
+}
+
+// ── Freshness: the read's declared stakes ────────────────────────────────────
+
+/// Path segments that mark a read as [`ReadClass::Authority`] — a FLOOR class
+/// that is answered live or not at all.
+///
+/// Matched by exact SEGMENT equality, never by substring: `path.contains("/admin")`
+/// would classify `/db/content/administration-basics` as Authority and shed a
+/// content read during exactly the window this feature exists to keep serving.
+const AUTHORITY_SEGMENTS: &[&str] = &[
+    // Identity and session — answering these from unwitnessed bytes is how a
+    // revoked session reads as live.
+    "auth",
+    "authorize",
+    "oauth",
+    "session",
+    "sessions",
+    "identity",
+    "did",
+    "recovery",
+    "recover",
+    "keys",
+    "jwks",
+    // Governance and the standing that flows from it.
+    "governance",
+    "vote",
+    "votes",
+    "proposal",
+    "proposals",
+    "consent",
+    "attestation",
+    "attestations",
+    "revocation",
+    "revocations",
+    "standing",
+    // Head authority: which version IS canonical is never answered from stale
+    // bytes (that is the head-plane's whole point).
+    "head",
+    "head-record",
+    "canonical-head",
+    // Operator surface.
+    "admin",
+    "operator",
+];
+
+/// Path segments that mark a read as [`ReadClass::ValueCoupled`] — a read a
+/// person may act ECONOMICALLY on.
+const VALUE_COUPLED_SEGMENTS: &[&str] = &[
+    "reciprocity",
+    "stewardship",
+    "stewarded",
+    "shefa",
+    "banking",
+    "balance",
+    "balances",
+    "commitments",
+    "rea_commitments",
+    "economic",
+    "economic_events",
+    "economic-events",
+    "distribution",
+    "cluster",
+];
+
+/// Path prefixes that mark a read as [`ReadClass::Knowledge`] — the corpus,
+/// where stale-but-true beats absent.
+const KNOWLEDGE_PREFIXES: &[&str] = &[
+    "/db/content",
+    "/db/paths",
+    "/db/learning",
+    "/blob/",
+    "/apps/",
+    "/api/v1/content",
+    "/api/v1/paths",
+    "/db/",
+];
+
+/// True when `path` has `seg` as a whole path segment.
+fn has_segment(path: &str, seg: &str) -> bool {
+    path.split('/').any(|s| s == seg)
+}
+
+/// Classify a proxied request's declared stakes.
+///
+/// `None` means "not a freshness decision at all": the read-only diagnostic
+/// probes, which bypass the breaker entirely and must keep doing so — the
+/// platform must not blind its own probes during exactly the incident they
+/// exist to explain.
+///
+/// ROUTE-DERIVED, first cut. The declared next rung is an EPR-envelope-derived
+/// class (kind x reach x coupling), which is also what will first make
+/// [`ReadClass::CounterEvidence`] reachable: no URL path can tell you a read
+/// carries counter-evidence, so this function never returns that variant and
+/// says so rather than guessing.
+///
+/// FAIL-CLOSED at every ambiguity:
+/// - any method other than GET/HEAD is [`ReadClass::Authority`] (a write is
+///   never answered from a pantry);
+/// - an UNRECOGNIZED GET path is [`ReadClass::Authority`], not Knowledge —
+///   an unknown route's stakes are unknown, and `GreenOnly` is exactly today's
+///   behaviour for it, so the fail-closed default is also the no-change default;
+/// - the Authority segment list is checked BEFORE the value and knowledge
+///   lists, so a `/db/content/.../head` read can never fall through to
+///   Knowledge on the strength of its prefix.
+///
+/// **Contract tests:** `read_class_floors_every_write`,
+/// `read_class_floors_the_head_plane`, `read_class_is_authority_for_unknown_paths`,
+/// `read_class_recognizes_knowledge_reads`, `read_class_recognizes_value_reads`,
+/// `read_class_never_substring_matches_a_content_slug`,
+/// `read_class_is_none_for_diagnostic_probes`.
+pub fn read_class(method: &Method, path: &str) -> Option<ReadClass> {
+    // Diagnostic probes are not a freshness decision — they bypass the breaker
+    // entirely (same GET-only condition `forward_to_storage` applies).
+    if *method == Method::GET && is_diagnostic_probe(path) {
+        return None;
+    }
+
+    // Every non-read is authority-class, head-declare included.
+    if !matches!(*method, Method::GET | Method::HEAD) {
+        return Some(ReadClass::Authority);
+    }
+
+    if AUTHORITY_SEGMENTS.iter().any(|seg| has_segment(path, seg)) {
+        return Some(ReadClass::Authority);
+    }
+    if VALUE_COUPLED_SEGMENTS
+        .iter()
+        .any(|seg| has_segment(path, seg))
+    {
+        return Some(ReadClass::ValueCoupled);
+    }
+    if KNOWLEDGE_PREFIXES.iter().any(|p| path.starts_with(p)) {
+        return Some(ReadClass::Knowledge);
+    }
+
+    // Unknown GET: fail closed toward GreenOnly.
+    Some(ReadClass::Authority)
+}
+
+/// [`read_class`] with the route registry's declared `auth_required` as an
+/// overlay: a route the manifest says needs auth is Authority-class no matter
+/// what its path looks like.
+///
+/// DECLARED GAP, not an oversight: the dispatch site does not currently thread
+/// `auth_required` here, because the only ways to reach it from
+/// `forward_to_storage` are a second `RouteRegistry::match_request` on the
+/// request path (a lock + pattern match per proxied request) or a new field on
+/// `Disposition::StorageProxy` (a registered decision point). Neither is worth
+/// taking in this pass: every route the manifest marks `auth_required` is
+/// already matched by [`AUTHORITY_SEGMENTS`] or by the non-GET rule, and the
+/// unknown-path default is Authority anyway — so wiring it can only ever
+/// RECLASSIFY a path from Authority to Authority. Registered as the C10
+/// `partial` on this decision point so the gap is counted rather than assumed
+/// closed.
+pub fn read_class_with_auth_required(
+    method: &Method,
+    path: &str,
+    auth_required: bool,
+) -> Option<ReadClass> {
+    let class = read_class(method, path)?;
+    if auth_required {
+        return Some(ReadClass::Authority);
+    }
+    Some(class)
 }
 
 #[cfg(test)]
@@ -365,6 +532,195 @@ mod tests {
     #[test]
     fn head_declare_write_excludes_unrelated_write_route() {
         assert!(!is_head_declare_write(&Method::POST, "/db/content/bulk"));
+    }
+
+    /// Every write is authority-class, so no mutation can ever be "answered"
+    /// from a pantry.
+    #[test]
+    fn read_class_floors_every_write() {
+        for m in [
+            Method::POST,
+            Method::PUT,
+            Method::PATCH,
+            Method::DELETE,
+            Method::OPTIONS,
+        ] {
+            assert_eq!(
+                read_class(&m, "/db/content/some-id"),
+                Some(ReadClass::Authority),
+                "{m} on a content path must still be authority-class"
+            );
+        }
+        // The notary head-declare write specifically.
+        assert_eq!(
+            read_class(&Method::POST, "/db/content/some-id/head"),
+            Some(ReadClass::Authority)
+        );
+    }
+
+    /// Head authority is never answered from stale bytes — including the READ
+    /// surfaces, whose whole job is to say which version is canonical.
+    #[test]
+    fn read_class_floors_the_head_plane() {
+        for p in [
+            "/db/content/some-id/head",
+            "/db/content/some-id/head-record",
+            "/db/content/some-id/canonical-head",
+        ] {
+            assert_eq!(
+                read_class(&Method::GET, p),
+                Some(ReadClass::Authority),
+                "{p} must be authority-class even as a GET"
+            );
+        }
+    }
+
+    #[test]
+    fn read_class_floors_identity_and_governance_reads() {
+        for p in [
+            "/auth/portal",
+            "/api/v1/session",
+            "/db/identity/humans",
+            "/db/governance/proposals",
+            "/db/attestations",
+            "/admin/steward-peers",
+            "/api/v1/operator/reconcile",
+            "/.well-known/did.json",
+        ] {
+            assert_eq!(
+                read_class(&Method::GET, p),
+                Some(ReadClass::Authority),
+                "{p} must be authority-class"
+            );
+        }
+    }
+
+    #[test]
+    fn read_class_recognizes_value_reads() {
+        for p in [
+            "/db/reciprocity",
+            "/db/stewardship/summary",
+            "/api/v1/shefa/balance",
+            "/db/economic_events",
+            "/db/rea_commitments",
+        ] {
+            assert_eq!(
+                read_class(&Method::GET, p),
+                Some(ReadClass::ValueCoupled),
+                "{p} must be value-coupled"
+            );
+        }
+    }
+
+    #[test]
+    fn read_class_recognizes_knowledge_reads() {
+        for p in [
+            "/db/content/elohim-host-landing",
+            "/db/content",
+            "/blob/bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku",
+            "/apps/lamad/main.js",
+            "/api/v1/content/abc",
+            "/api/v1/paths/intro",
+            "/db/something-unlisted",
+        ] {
+            assert_eq!(
+                read_class(&Method::GET, p),
+                Some(ReadClass::Knowledge),
+                "{p} must be knowledge-class"
+            );
+        }
+        // HEAD reads classify exactly like GET.
+        assert_eq!(
+            read_class(&Method::HEAD, "/db/content/abc"),
+            Some(ReadClass::Knowledge)
+        );
+    }
+
+    /// The substring trap, pinned. A content slug that merely CONTAINS an
+    /// authority token must stay knowledge-class — otherwise this feature
+    /// sheds the very reads it exists to keep serving.
+    #[test]
+    fn read_class_never_substring_matches_a_content_slug() {
+        for p in [
+            "/db/content/administration-basics",
+            "/db/content/heading-styles",
+            "/db/content/authority-and-consent",
+            "/db/content/voter-guide",
+            "/db/content/session-planning",
+            "/db/content/identity-formation",
+        ] {
+            assert_eq!(
+                read_class(&Method::GET, p),
+                Some(ReadClass::Knowledge),
+                "{p} is a content slug, not an authority route"
+            );
+        }
+    }
+
+    /// Unknown paths fail closed to Authority — which is byte-for-byte today's
+    /// behaviour for them (shed when the circuit is open).
+    #[test]
+    fn read_class_is_authority_for_unknown_paths() {
+        for p in ["/", "/whatever", "/api/v2/brand-new", "/xyz/abc"] {
+            assert_eq!(
+                read_class(&Method::GET, p),
+                Some(ReadClass::Authority),
+                "{p} is unrecognized and must fail closed"
+            );
+        }
+    }
+
+    /// Diagnostic probes are not a freshness decision at all — they keep their
+    /// existing full bypass.
+    #[test]
+    fn read_class_is_none_for_diagnostic_probes() {
+        assert_eq!(read_class(&Method::GET, "/p2p/status"), None);
+        assert_eq!(
+            read_class(&Method::GET, "/db/p2p/conductor-diagnostics"),
+            None
+        );
+        // A POST to a probe path is still a write, and still floored.
+        assert_eq!(
+            read_class(&Method::POST, "/p2p/status"),
+            Some(ReadClass::Authority)
+        );
+    }
+
+    /// `read_class` never returns CounterEvidence: no path can carry that
+    /// signal. Stated as a test so the day an envelope-derived class lands, the
+    /// change is visible rather than silent.
+    #[test]
+    fn read_class_cannot_yet_produce_counter_evidence() {
+        for p in [
+            "/db/content/x",
+            "/db/reciprocity",
+            "/auth/portal",
+            "/db/content/counter-evidence",
+            "/unknown",
+        ] {
+            assert_ne!(
+                read_class(&Method::GET, p),
+                Some(ReadClass::CounterEvidence)
+            );
+        }
+    }
+
+    /// The registry-metadata overlay can only ever tighten the class.
+    #[test]
+    fn auth_required_overlay_only_tightens() {
+        assert_eq!(
+            read_class_with_auth_required(&Method::GET, "/db/content/x", false),
+            Some(ReadClass::Knowledge)
+        );
+        assert_eq!(
+            read_class_with_auth_required(&Method::GET, "/db/content/x", true),
+            Some(ReadClass::Authority)
+        );
+        // A probe stays a probe: the overlay never resurrects a bypassed path.
+        assert_eq!(
+            read_class_with_auth_required(&Method::GET, "/p2p/status", true),
+            None
+        );
     }
 
     #[test]

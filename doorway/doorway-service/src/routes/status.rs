@@ -266,6 +266,15 @@ pub struct StatusResponse {
     pub upstreams: Vec<UpstreamStatus>,
     /// Inbound admission gate state (ceiling, headroom, shed count).
     pub admission: AdmissionStatus,
+    /// The live freshness policy this doorway serves under: the declared stage,
+    /// where that declaration came from, the per-class requirement, and the
+    /// last-good pantry's occupancy.
+    ///
+    /// C7: the policy rows are DERIVED from
+    /// `seam_contracts::freshness::requirement` — the same function the storage
+    /// proxy decides with — so this surface cannot advertise a policy the
+    /// doorway does not actually serve.
+    pub freshness: crate::routes::freshness::FreshnessStatus,
 }
 
 /// One upstream's breaker state for `/status.json` (feeds the catching-up
@@ -741,6 +750,11 @@ async fn build_status_data(state: &Arc<AppState>) -> StatusResponse {
         federated_peers,
         upstreams,
         admission,
+        freshness: crate::routes::freshness::status_block(
+            state.network_stage,
+            state.stage_provenance,
+            &state.freshness_pantry,
+        ),
     }
 }
 
@@ -1313,6 +1327,11 @@ mod tests {
                 available: 256,
                 shed_total: 0,
             },
+            freshness: crate::routes::freshness::status_block(
+                seam_contracts::freshness::NetworkStage::Bootstrap,
+                crate::routes::freshness::StageProvenance::BootstrapDefault,
+                &crate::routes::freshness::FreshnessPantry::default(),
+            ),
             compute: elohim_compute::ComputeReport {
                 service_id: "doorway".to_string(),
                 build: elohim_compute::BuildInfo {
@@ -1364,5 +1383,28 @@ mod tests {
         assert!(json.contains("humansServed"));
         assert!(json.contains("contentAvailable"));
         assert!(json.contains("federatedPeers"));
+        // Freshness contract: the advertised block and the exact tokens an a2o
+        // scenario (and any client deciding whether to trust an amber answer)
+        // matches on. Locked here for the same reason as the keys above.
+        let v: serde_json::Value = serde_json::from_str(&json).expect("status.json must parse");
+        let freshness = &v["freshness"];
+        assert!(
+            ["simulacra", "bootstrap", "coordinated", "enforced"]
+                .contains(&freshness["stage"].as_str().unwrap()),
+            "freshness.stage must be a declared lower-case stage token"
+        );
+        assert!(freshness["stageProvenance"].is_string());
+        assert!(freshness["pantry"]["bytes"].is_u64());
+        let policy = freshness["policy"].as_array().expect("policy is an array");
+        assert_eq!(policy.len(), 3, "one row per route-derivable read class");
+        for row in policy {
+            assert!(["knowledge", "value", "authority"].contains(&row["class"].as_str().unwrap()));
+            assert!(["amber-ok", "amber-warn", "green-only"]
+                .contains(&row["requirement"].as_str().unwrap()));
+            let max_age = row
+                .get("maxAgeSecs")
+                .expect("maxAgeSecs is always present, number or null");
+            assert!(max_age.is_u64() || max_age.is_null());
+        }
     }
 }

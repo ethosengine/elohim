@@ -295,6 +295,17 @@ pub struct ServingHealth {
     pub degrading: bool,
     /// Per-upstream breaker state.
     pub upstreams: Vec<ServingUpstream>,
+    /// The live freshness policy this doorway is serving under — declared
+    /// stage, its provenance, the per-class requirement, and the last-good
+    /// pantry's occupancy against its declared ceiling.
+    ///
+    /// `Option` because `ServingHealth::observe` (the breaker-only form) has no
+    /// AppState to read a stage or a pantry from; `observe_with_freshness` is
+    /// the form the routes use. C7: the rows are DERIVED from
+    /// `seam_contracts::freshness::requirement`, not restated beside it, so
+    /// what this advertises cannot drift from what the proxy decides.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub freshness: Option<crate::routes::freshness::FreshnessStatus>,
 }
 
 impl ServingHealth {
@@ -315,7 +326,22 @@ impl ServingHealth {
             shedding: upstreams.iter().any(|u| u.shedding),
             degrading: upstreams.iter().any(|u| u.error_streak > 0),
             upstreams,
+            freshness: None,
         }
+    }
+
+    /// [`Self::observe`] plus the live freshness block — the form every route
+    /// uses. Split from `observe` so the breaker-only reading stays available
+    /// to callers that hold no AppState (and so the existing breaker tests keep
+    /// their exact subject).
+    pub fn observe_with_freshness(state: &AppState) -> Self {
+        let mut health = Self::observe(&state.upstream_breakers);
+        health.freshness = Some(crate::routes::freshness::status_block(
+            state.network_stage,
+            state.stage_provenance,
+            &state.freshness_pantry,
+        ));
+        health
     }
 }
 
@@ -515,7 +541,7 @@ pub fn health_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
 /// is that on 2026-08-20 NOTHING returned a bad status code while elohim.host
 /// 503'd every content read for hours.
 pub fn serving_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
-    let serving = ServingHealth::observe(&state.upstream_breakers);
+    let serving = ServingHealth::observe_with_freshness(&state);
     let body = serde_json::to_string(&serving)
         .unwrap_or_else(|_| r#"{"shedding":true,"degrading":true,"upstreams":[]}"#.to_string());
 
