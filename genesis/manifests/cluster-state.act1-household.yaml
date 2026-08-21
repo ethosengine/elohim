@@ -74,8 +74,13 @@ resources:
 
   ssr-bundle:
     role: the app bundles the doorway serves (landing AND the lamad SPA at /lamad)
-    available: false
-    note: RED, and the highest-leverage red in this file — flipping it unholds 186 Act I scenarios.
+    available: true
+    note: >
+      Flipped 2026-08-21 with evidence — both bundles staged per host the way CI does it
+      (stage-spa-blob.sh upload+PATCH via A, DECLARE_ONLY propagation of A's head to B);
+      /lamad 200 on both doorways, jessica adopted matthew's lamad-spa head in <10 s. Gossip
+      alone left it un-adopted >8 min behind a 3,400-head seed — staging is a Prologue step,
+      not a substrate acquisition. Unholds 186 Act I scenarios.
           The mesh stage stages only the landing blob; `app/lamad/dist/lamad/browser` already exists on
           disk. This is a STAGE change (genesis/a2o/layering/profiles.md, "mesh stage obligations"),
           not a substrate acquisition. Measured 2026-08-21: `GET /lamad` -> 404 {"error":"App not
