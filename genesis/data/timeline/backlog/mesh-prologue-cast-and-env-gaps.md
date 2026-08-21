@@ -178,3 +178,13 @@ hc`, crates/dev slot, ~6 min incremental) when the scratchpad is gone. Then the 
 - Fallback used tonight: `HOLOCHAIN_BIN=/opt/holochain/bin/holochain` forces stock (the auto-detect would
   otherwise pick the fork again).
 
+
+## 2026-08-21 23:00 — conductor generate `CannotOpen` once after a container restart
+
+`just mesh start` (stock 0.6.0, `--root local-dev`, `-n 3`) panicked on the first conductor with
+`SqliteError(CannotOpen) … local-dev/matthew/databases/conductor/conductor` — `databases/db.key` was
+written, `databases/conductor/` never created. Reproduction attempts all SUCCEEDED (same command rooted
+under `/tmp`; `-n 1` under `local-dev`; `-n 1` under a fresh non-setgid `/projects` dir), and the
+verbatim `-n 3` relaunch four minutes later generated all three. Treated as transient; the one concurrent
+variable was another session running throwaway sandboxes with the same `hc` at the time. If it recurs,
+capture `strace -f -e mkdirat,openat` around the generate before theorising about the mount.
