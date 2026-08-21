@@ -64,10 +64,21 @@
 #                   mismatched conductor then refuses to boot. `direct` also
 #                   gives each conductor its own log file.
 #
-#   HOLOCHAIN_BIN   Absolute path to a conductor binary to run INSTEAD of the
-#                   `holochain` on PATH (see the block above stop_all). Unset =
-#                   stock. Used for conductor-fork A/B runs; a binary swap alone
-#                   cannot move a DNA hash, but verify via /health.
+#   HOLOCHAIN_BIN   A conductor BINARY, or a DIRECTORY holding `holochain` +
+#                   `hc`, to use INSTEAD of what is on PATH (see the block above
+#                   stop_all). Unset = the auto-detected fork build, else stock.
+#                   The matching `hc` goes on PATH for BOTH `generate` and
+#                   `run`, and the start REFUSES a mismatched pair (both
+#                   versions printed; MESH_ALLOW_TOOLCHAIN_SKEW=1 to override).
+#                   Used for conductor-fork A/B runs; a binary swap alone cannot
+#                   move a DNA hash, but verify via /health.
+#
+#   MESH_FORK_RELAY_URL
+#                   Relay URL for the fork's `network … quic <RELAY_URL>`
+#                   generate grammar (stock 0.6.0 takes `webrtc <SIGNAL_URL>`
+#                   instead; the grammar is read from the CLI, not guessed).
+#                   Defaults to the doorway — a placeholder that must parse as a
+#                   URL, since loopback peers never need a relay.
 #
 #   MESH_RUST_LOG   Conductor log level. Default is targeted, not blanket:
 #                   warn + INFO on exactly the three modules that diagnose a
@@ -299,6 +310,13 @@ mesh_seed_env() { # ONE source of truth for the seed-chain-facing env block.
 # conductor: "unknown field base64_auth_material", then "missing field
 # relay_url"). A directory with only one of them is skipped, loudly, rather than
 # half-adopted.
+# NOTE the cargo-pool slot where a local fork build lands
+# (/projects/.cargo-target-pool/family/dev/crates/dev/release) is deliberately
+# NOT in this list. Auto-detect must mean "someone put a conductor here on
+# purpose", and a build-output directory appears merely because someone ran
+# cargo — swapping the mesh's conductor on that evidence is the silent switch
+# this file already paid for once. Point HOLOCHAIN_BIN at it explicitly:
+#   HOLOCHAIN_BIN=/projects/.cargo-target-pool/family/dev/crates/dev/release just mesh start
 MESH_FORK_BIN_DIRS="${MESH_FORK_BIN_DIRS:-$MESH_DIR/fork-bin:$REPO_ROOT/.fork-bin:/opt/elohim/fork-bin}"
 
 detect_fork_bin() { # -> prints the fork dir, or nothing
@@ -314,14 +332,44 @@ detect_fork_bin() { # -> prints the fork dir, or nothing
   return 1
 }
 
+# ---------------------------------------------------------------------------
+# HOLOCHAIN_BIN accepts a BINARY or a DIRECTORY holding `holochain` + `hc`.
+#
+# A directory used to be rejected by the `[ -x ]` guard, and the start SILENTLY
+# fell through to the auto-detected fork conductor while `hc` stayed stock
+# (2026-08-21 19:14, parity attempt 2): `generate` then wrote 0.6.0-schema
+# configs and the stock `hc sandbox run` panicked at hc_sandbox/src/run.rs:176
+# on all three conductors, storage and doorways came up, and the Prologue ran
+# against dead conductors. A directory is the shape a person naturally has (a
+# build output dir), so accept it — and take the matching `hc` with it.
+# ---------------------------------------------------------------------------
+if [ -n "${HOLOCHAIN_BIN:-}" ] && [ -d "$HOLOCHAIN_BIN" ]; then
+  if [ -x "$HOLOCHAIN_BIN/holochain" ] && [ -x "$HOLOCHAIN_BIN/hc" ]; then
+    HC_BIN_DIR="${HOLOCHAIN_BIN%/}"
+    HOLOCHAIN_BIN="$HC_BIN_DIR/holochain"
+  else
+    echo "HOLOCHAIN_BIN is a directory but does not hold BOTH holochain and hc: $HOLOCHAIN_BIN" >&2
+    echo "  (the CLI writes conductor-config.yaml in ITS schema — a half-adopted pair cannot boot)" >&2
+    exit 1
+  fi
+fi
+
 FORK_BIN_DIR="$(detect_fork_bin || true)"
 if [ -z "${HOLOCHAIN_BIN:-}" ] && [ -n "$FORK_BIN_DIR" ]; then
   HOLOCHAIN_BIN="$FORK_BIN_DIR/holochain"
-  # The matching CLI has to win PATH too, or `hc sandbox` rewrites the config in
-  # the stock schema and the fork conductor refuses the file it just wrote.
-  export PATH="$FORK_BIN_DIR:$PATH"
 fi
 HOLOCHAIN_BIN="${HOLOCHAIN_BIN:-}"
+
+# The matching CLI has to win PATH for **generate AND run**, not just run.
+# `hc sandbox` REWRITES conductor-config.yaml (that is how `-f` pins admin
+# ports), so the CLI decides the schema the conductor is then handed. The old
+# code prepended PATH only inside holochain_bin_export(), which the `run` sites
+# call and the `generate` site does not — that asymmetry is exactly how a fork
+# conductor got 0.6.0-schema configs. Do it ONCE, here, at script scope.
+if [ -n "$HOLOCHAIN_BIN" ]; then
+  HC_BIN_DIR="${HC_BIN_DIR:-$(dirname "$HOLOCHAIN_BIN")}"
+  [ -x "$HC_BIN_DIR/hc" ] && export PATH="$HC_BIN_DIR:$PATH"
+fi
 
 # Export the conductor-binary selection into the CURRENT shell. Call it inside a
 # subshell right before launching `hc sandbox`.
@@ -336,6 +384,77 @@ holochain_bin_export() {
   [ -x "$HOLOCHAIN_BIN" ] || { echo "HOLOCHAIN_BIN is not executable: $HOLOCHAIN_BIN" >&2; exit 1; }
   export HC_HOLOCHAIN_PATH="$HOLOCHAIN_BIN"
   export PATH="$(dirname "$HOLOCHAIN_BIN"):$PATH"
+}
+
+hc_version()        { hc --version 2>&1 | head -1 | awk '{print $NF}'; }
+conductor_version() {
+  if [ -n "$HOLOCHAIN_BIN" ]; then "$HOLOCHAIN_BIN" --version 2>&1 | head -1 | awk '{print $NF}'
+  else holochain --version 2>&1 | head -1 | awk '{print $NF}'; fi
+}
+
+# ---------------------------------------------------------------------------
+# REFUSE TO START ON A MISMATCHED PAIR.
+#
+# The `hc` CLI writes the conductor's config; the conductor parses it. When they
+# are different builds the config is written in one schema and read in another,
+# and the failure surfaces as a config PARSE error at boot with the reason only
+# in the conductor log — measured both directions on 2026-08-21: 0.6.3 refuses
+# `network.base64_auth_material` ("expected one of base64_auth_material_bootstrap,
+# base64_auth_material_relay, …"), and once that key is dropped it fails on
+# `missing field relay_url`, which 0.6.0 never writes.
+#
+# The gate compares the FULL version, not the major.minor "minor line": 0.6.0
+# and 0.6.3 agree on 0.6 and are still schema-incompatible — a minor-line check
+# would have passed the exact pair that cost the evening. Both versions are
+# printed either way so the mismatch is readable, not inferred.
+#
+# MESH_ALLOW_TOOLCHAIN_SKEW=1 downgrades the refusal to a warning for the one
+# case where it is deliberate (proving what a skewed pair does).
+# ---------------------------------------------------------------------------
+assert_toolchain_parity() {
+  local hv cv
+  hv="$(hc_version)"; cv="$(conductor_version)"
+  if [ "$hv" = "$cv" ]; then
+    echo "toolchain: holochain $cv + hc $hv  ($(command -v hc))"
+    return 0
+  fi
+  echo "" >&2
+  echo "REFUSING TO START — the conductor and the hc CLI are different builds:" >&2
+  echo "  holochain: $(if [ -n "$HOLOCHAIN_BIN" ]; then echo "$HOLOCHAIN_BIN"; else command -v holochain; fi)  -> $cv" >&2
+  echo "  hc:        $(command -v hc)  -> $hv" >&2
+  echo "" >&2
+  echo "  \`hc sandbox\` REWRITES conductor-config.yaml in its own schema, so the" >&2
+  echo "  conductor is handed a file it may refuse to parse (0.6.0 hc + 0.6.3" >&2
+  echo "  conductor: 'unknown field base64_auth_material', then 'missing field" >&2
+  echo "  relay_url'). Point HOLOCHAIN_BIN at a DIRECTORY holding both binaries:" >&2
+  echo "     HOLOCHAIN_BIN=/path/to/fork-bin ./hc-mesh.sh start" >&2
+  echo "  (MESH_ALLOW_TOOLCHAIN_SKEW=1 to proceed anyway — deliberate skew only.)" >&2
+  echo "" >&2
+  [ "${MESH_ALLOW_TOOLCHAIN_SKEW:-0}" = "1" ] || exit 1
+  echo "WARN: proceeding on a skewed pair because MESH_ALLOW_TOOLCHAIN_SKEW=1" >&2
+}
+
+# ---------------------------------------------------------------------------
+# The generate-time transport subcommand is NOT the same word on both lines.
+# Stock 0.6.0 offers `webrtc <SIGNAL_URL>`; the fork's 0.6.3 `hc` replaced it
+# with `quic <RELAY_URL>` (the iroh transport), and passing the stock word to
+# the fork CLI dies before anything is written:
+#     error: unrecognized subcommand 'webrtc'
+# Read the grammar from the CLI that will actually run rather than branching on
+# a version number — the CLI is the authority on its own subcommands.
+#
+# MESH_FORK_RELAY_URL is a placeholder on a loopback mesh: peers reach each
+# other directly and the relay only matters for NAT traversal, so pointing it
+# at the doorway (an http URL that parses) is enough. It must be a real URL —
+# `relay_url: null` is rejected with `relative URL without a base: "null"`.
+# ---------------------------------------------------------------------------
+mesh_network_args() { # -> the `network …` tail for `hc sandbox generate`
+  local relay="${MESH_FORK_RELAY_URL:-http://localhost:$DOORWAY_PORT}"
+  if hc sandbox generate network --help 2>&1 | grep -qE '^\s+quic\b'; then
+    echo "network --bootstrap http://localhost:$DOORWAY_PORT/bootstrap quic $relay"
+  else
+    echo "network --bootstrap http://localhost:$DOORWAY_PORT/bootstrap webrtc ws://signal.localhost:$DOORWAY_PORT"
+  fi
 }
 
 stop_all() {
@@ -392,7 +511,9 @@ status_all() {
     _hc_desc="$(command -v holochain) ($(holochain --version 2>&1 | head -1)) [STOCK — alpha runs the fork, so this mesh is NOT at parity]"
   fi
   echo "conductor NEXT LAUNCH: $_hc_desc"
-  echo "hc CLI:            $(command -v hc) ($(hc --version 2>&1 | head -1))"
+  # The CLI is half the boot: it writes the config the conductor must parse, so
+  # a version skew here is a start failure waiting to happen, not a detail.
+  echo "hc CLI:            $(command -v hc) ($(hc --version 2>&1 | head -1))$([ "$(hc_version)" = "$(conductor_version)" ] && printf ' [matches the conductor]' || printf ' [MISMATCH — `start` will refuse; see HOLOCHAIN_BIN]')"
   echo "probe env:  PEER_STORAGE_URLS=\"$(peer_csv)\" CONDUCTOR_URLS=\"$(conductor_csv)\" INTERNAL_DOORWAY_URL=\"localhost:$DOORWAY_PORT\" E2E_DOORWAY_B=\"http://localhost:${DOORWAY_B_PORT:-8889}\" API_KEY_ADMIN=\"${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}\""
 }
 
@@ -591,6 +712,11 @@ restart_conductors() {
   for _ in "${PEERS[@]}"; do
     fports+="${fports:+,}$(admin_port $i)"; aports+="${aports:+,}$(app_port $i)"; i=$((i+1))
   done
+
+  # A restart re-runs `hc sandbox run`, which rewrites conductor-config.yaml in
+  # the CLI's schema before the conductor reads it — so the pair must agree here
+  # too, not only at generate time.
+  [ "${MESH_CONDUCTOR_LAUNCH:-hc}" = "direct" ] || assert_toolchain_parity
 
   # Exact pids only. Every lookup below matches an argv substring unique to the
   # target process AND excludes this shell — `pkill -f holochain` would match
@@ -831,6 +957,9 @@ print(next((i["id"] for i in items if i.get("dhtAnchorHash")), ""))
 }
 
 start_all() {
+  # The CLI writes the config the conductor must parse — refuse a mismatched
+  # pair before anything is generated, not after three conductors panic.
+  assert_toolchain_parity
   mkdir -p "$MESH_DIR" "$LOGDIR" "$LOCAL_DEV_DIR"
 
   # Peer policy: the storage binary loads ./config/peer-policy.toml relative to
@@ -976,11 +1105,11 @@ EOF
       fports+="${fports:+,}$(admin_port $i)"; rports+="${rports:+,}$(app_port $i)"; i=$((i+1))
     done
 
-    echo -n "generating ${#PEERS[@]} conductor sandboxes (cold install can take ~2-4 min)"
+    local netargs; netargs="$(mesh_network_args)"
+    echo -n "generating ${#PEERS[@]} conductor sandboxes ($netargs; cold install can take ~2-4 min)"
     timeout 300 sh -c "echo test | hc sandbox --piped -f $fports generate -n ${#PEERS[@]} \
       --app-id elohim --in-process-lair --root \"\$PWD\" -d $MESH_PEERS \
-      \"$HAPP_PATH\" network --bootstrap http://localhost:$DOORWAY_PORT/bootstrap \
-      webrtc ws://signal.localhost:$DOORWAY_PORT" > .sandbox_log 2>&1
+      \"$HAPP_PATH\" $netargs" > .sandbox_log 2>&1
     gen_status=$?
     echo " done"
     if [ "$gen_status" -ne 0 ] || grep -qa "Payload: Could not" .sandbox_log; then
@@ -1023,6 +1152,18 @@ k2gossip["initiateIntervalMs"] = 1000
 k2gossip["minInitiateIntervalMs"] = 1000
 k2gossip["initialInitiateIntervalMs"] = 1000
 advanced["k2Gossip"] = k2gossip
+
+# The fork's `hc` (0.6.3 line, iroh/quic transport) writes a DEFAULT
+# `signal_url` pointing at a PUBLIC Holo server — measured 2026-08-21:
+# `signal_url: wss://dev-test-bootstrap2.holochain.org/` alongside the
+# loopback bootstrap_url and relay_url this script passes. It is almost
+# certainly inert while irohTransport is the active transport, so this
+# only SAYS SO rather than rewriting it: an isolated mesh should not
+# carry a public endpoint, and whether tx5 ever reads it on the fork has
+# not been measured. Settle it before the fork mesh is trusted offline.
+_sig = network.get("signal_url") or ""
+if _sig and "localhost" not in _sig and "127.0.0.1" not in _sig:
+    print(f"  WARN {path}: signal_url points off-box ({_sig}) — isolated-mesh sovereignty unverified on the fork line", file=sys.stderr)
 network["advanced"] = advanced
 
 with open(path, "w") as f:

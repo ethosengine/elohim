@@ -188,3 +188,74 @@ under `/tmp`; `-n 1` under `local-dev`; `-n 1` under a fresh non-setgid `/projec
 verbatim `-n 3` relaunch four minutes later generated all three. Treated as transient; the one concurrent
 variable was another session running throwaway sandboxes with the same `hc` at the time. If it recurs,
 capture `strace -f -e mkdirat,openat` around the generate before theorising about the mount.
+
+### Parity attempt 3 (2026-08-21, late) — the fork boots; `hc-mesh.sh` now carries the pair
+
+The gap named in "Parity attempt 2" is closed in the script, and the fork was proven to boot on a
+throwaway root (admin 4754 / app 4755, dead bootstrap+relay `:9999`, live mesh untouched, torn down
+by exact pid).
+
+**Three things were wrong, not one.** The one-liner from last night ("put the fork `hc` on PATH")
+was necessary and not sufficient:
+
+1. **`HOLOCHAIN_BIN` now accepts a BINARY or a DIRECTORY** holding `holochain` + `hc`. A directory
+   used to be rejected by `[ -x ]` and the start fell through silently — the shape that produced the
+   19:14 run where the conductor was fork and the CLI stayed stock.
+2. **The matching `hc` goes on PATH at script scope**, so `generate` gets it too. It was previously
+   prepended only inside `holochain_bin_export()`, which the `run` sites call and the `generate` site
+   does not — that asymmetry IS how a fork conductor received 0.6.0-schema configs.
+3. **The generate grammar is not the same word on both lines.** Stock 0.6.0 offers
+   `network … webrtc <SIGNAL_URL>`; the fork's 0.6.3 `hc` **replaced it with `quic <RELAY_URL>`** (the
+   iroh transport), and the stock word dies before anything is written:
+   `error: unrecognized subcommand 'webrtc'`. `mesh_network_args()` reads the grammar from
+   `hc sandbox generate network --help` — the CLI is the authority on its own subcommands — and
+   `MESH_FORK_RELAY_URL` (default: the doorway) fills the required relay argument. This also explains
+   last night's `missing field relay_url`: it is not a migration wart, it is the fork's transport
+   asking for its relay.
+
+**The refusal.** `assert_toolchain_parity` prints both versions and refuses to start when they differ,
+from `start` and from `conductors-restart` (skipped for `MESH_CONDUCTOR_LAUNCH=direct`, which uses no
+CLI). It compares the **FULL** version, not the major.minor "minor line": 0.6.0 and 0.6.3 agree on
+`0.6` and are still schema-incompatible, so a minor-line check would have passed the exact pair that
+cost the evening. `MESH_ALLOW_TOOLCHAIN_SKEW=1` overrides for a deliberate skew experiment.
+`status` now ends its `hc CLI:` line with `[matches the conductor]` or
+`[MISMATCH — start will refuse; see HOLOCHAIN_BIN]`.
+
+**Proof (throwaway, fork 0.6.3 `holochain` + `hc`):**
+
+```
+generate: hc sandbox --piped -f 4754 generate -n 1 --app-id elohim --in-process-lair \
+  --root $PWD -d forkpeer elohim.happ \
+  network --bootstrap http://localhost:9999/bootstrap quic http://localhost:9999
+  -> exit 0 in 26 s
+run:      hc sandbox --piped -f 4754 run -a -p=4755
+  -> hc-sandbox: Conductor launched #!0 {"admin_port":4754,"app_ports":[4755]}
+  -> list-apps: app elohim, roles [imagodei, infrastructure, lamad, mishpat, node_registry]
+```
+
+`app_ports` is **non-empty** — the 0.6.3-schema config written by the fork's own `hc` carries the app
+interface that a migrated 0.6.0 sandbox could not (`app_ports:[]` last night). The migration path was
+never the way in; **generating with the fork's `hc` is**.
+
+**Next morning, one line** (on a quiet box — the cold wasm install races the conductor's 60 s admin
+timeout):
+
+```bash
+just mesh stop
+HOLOCHAIN_BIN=/projects/.cargo-target-pool/family/dev/crates/dev/release just mesh start   # fork 0.6.3 pair
+just mesh prologue                       # then saga + inventory on the fork
+```
+
+Rebuild that pair from the submodule when the pool slot is gone: `cargo build --release -p holochain
+--bin holochain` and `-p holochain_cli --bin hc` (crates/dev slot, ~6 min incremental). The cargo-pool
+slot is deliberately **NOT** in `MESH_FORK_BIN_DIRS` auto-detect — a build-output directory appears
+merely because someone ran cargo, and switching the mesh's conductor on that evidence is the silent
+switch this file already paid for. `$MESH_DIR/fork-bin`, `$REPO_ROOT/.fork-bin` and
+`/opt/elohim/fork-bin` remain the opt-in homes; unset `HOLOCHAIN_BIN` with none of them present still
+means stock.
+
+**One open question the proof surfaced:** the fork's `hc` writes a default
+`signal_url: wss://dev-test-bootstrap2.holochain.org/` — a PUBLIC endpoint — beside the loopback
+`bootstrap_url`/`relay_url`. It is very likely inert while `irohTransport` is the active transport, so
+the config patch loop only WARNS rather than rewriting it. Settle whether tx5 ever reads it on the fork
+line before the fork mesh is called isolated.

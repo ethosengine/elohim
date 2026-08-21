@@ -134,6 +134,40 @@ declaration). The conductor side gets kitsune2 `k2Gossip` intervals patched
 to 1000ms test cadence post-generate. The profile block in `hc-mesh.sh` is
 the authoritative knob list.
 
+### Which conductor the mesh runs (`HOLOCHAIN_BIN`) — and why the `hc` CLI is half of it
+
+Alpha runs the conductor **fork**; a mesh on stock is not a proving ground for it, and
+`hc-mesh.sh status` says so on both the `conductor RUNNING:` and `conductor NEXT LAUNCH:` lines
+(`[FORK]` / `[STOCK — alpha runs the fork, so this mesh is NOT at parity]`).
+
+The CLI is not a detail: **`hc sandbox` REWRITES `conductor-config.yaml` in its own version's
+schema** (that is how `-f` pins admin ports), so a stock `hc` in front of a fork conductor hands the
+conductor a file it refuses to parse. Therefore:
+
+- `HOLOCHAIN_BIN` takes a **binary OR a directory** holding `holochain` + `hc`; the matching `hc`
+  goes on PATH for **`generate` AND `run`** (the old code did `run` only — that asymmetry is how a
+  fork conductor got 0.6.0-schema configs and three `hc sandbox run` panics).
+- `start` and `conductors-restart` **refuse a mismatched pair** and print both versions.
+  The check is on the FULL version, not the major.minor line — 0.6.0 and 0.6.3 agree on `0.6` and are
+  still schema-incompatible. `MESH_ALLOW_TOOLCHAIN_SKEW=1` overrides for a deliberate experiment.
+- The **generate transport subcommand differs by line**: stock 0.6.0 `network … webrtc <SIGNAL_URL>`,
+  fork 0.6.3 `network … quic <RELAY_URL>` (iroh). `mesh_network_args()` reads the grammar from
+  `hc sandbox generate network --help` rather than guessing; `MESH_FORK_RELAY_URL` (default: the
+  doorway) fills the relay argument, which must parse as a URL.
+- Auto-detect searches `$MESH_DIR/fork-bin`, `$REPO_ROOT/.fork-bin`, `/opt/elohim/fork-bin` — opt-in
+  homes only. A local fork build in the cargo-pool slot is passed **explicitly**:
+  `HOLOCHAIN_BIN=/projects/.cargo-target-pool/family/dev/crates/dev/release just mesh start`.
+- Do **not** migrate an existing stock sandbox to the fork — measured twice, it fails on schema and
+  lands `app_ports:[]`. `just mesh stop` then generate fresh with the fork's own `hc`.
+  Background: backlog `mesh-prologue-cast-and-env-gaps.md` (parity attempts 1–3).
+
+`conductors-restart` is still **half an operation**: it leaves each storage peer's app-websocket
+handles pointing at a conductor that no longer honors them. Follow it with `storage-restart` and
+confirm with `zome-probe`. The bridge supervisor re-mints the three supervised roles, but the
+PeerStatus heartbeat holds a fourth, unsupervised client — so `/health conductor.zomePath` flaps
+`live↔dead` on a ~60 s cycle until storage restarts (backlog
+`storage-stale-app-interface-token-after-conductor-restart.md`).
+
 `just mesh monitor` (hc-mesh-monitor.py, port 4210 via the `mesh-monitor`
 devfile endpoint; honors `MESH_MONITOR_PORT`) serves the one-page live
 dashboard: component liveness, per-peer convergence gauges, a gate-legs
@@ -269,6 +303,7 @@ pnpm exec ng serve --proxy-config proxy.conf.mjs --disable-host-check
 | `app/elohim-app/scripts/hc-mesh-prologue.sh` | Act I Prologue cast (seeds an already-running mesh) |
 | `app/elohim-app/scripts/hc-mesh-spin-detector.sh` | conductor spin detector (CPU + log-rate spectroscopy → SPIN/QUIET + JSON) |
 | `app/elohim-app/scripts/hc-mesh-chaos-rekey.sh` | stage the unfetchable-dependency class: author on one peer, re-key it, measure the survivors |
+| `app/elohim-app/scripts/hc-mesh-perf-watch.sh` | continuous 15 s timing watch: per-service CPU, direct-vs-doorway latency, breaker state, storage zome path; writes `$MESH_DIR/perf/watch.jsonl` + SPIKE lines to `perf/watch.spikes`. Run it after `start` — it is how the doorway first-SSR-render stall was found |
 | `genesis/orchestrator/gate-runner.mjs` | manifest gate selection/execution |
 | `genesis/agentic/bin/pool-lib.sh` | cargo-pool family and slot authority |
 | `elohim/holochain/local-dev/.hc_ports` | local conductor ports |
