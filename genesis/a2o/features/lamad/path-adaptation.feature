@@ -1,4 +1,4 @@
-@e2e @lamad @browser-only @adaptation
+@e2e @lamad @browser-only @adaptation @act:i
 Feature: Adaptive Path Progression
   As a learner with prior knowledge or self-discovery insights,
   I want the learning path to recognize what I already know,

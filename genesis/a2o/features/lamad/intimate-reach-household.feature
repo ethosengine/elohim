@@ -32,7 +32,7 @@ Feature: Intimate-reach content within a household
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
 
-  @wip
+  @wip @act:i
   Scenario: Jessica reads the couple's love map; anonymous visitors cannot
     Given human "Matthew" is logged in on doorway "alpha" with device
     And human "Jessica" is logged in on doorway "alpha" with device
@@ -43,7 +43,7 @@ Feature: Intimate-reach content within a household
     When an anonymous client GETs content "love-map-matthew-jessica"
     Then the 403 body requiredReach is "intimate"
 
-  @wip
+  @wip @act:i
   Scenario: A household member outside the couple scope cannot read couple content
     Given human "James" is logged in on doorway "alpha" with device
     And humans "Matthew" and "Jessica" have a mutual intimate relationship with dual consent
@@ -53,7 +53,7 @@ Feature: Intimate-reach content within a household
     Then the request by "James" is refused with status 403
     And the 403 body requiredReach is "intimate"
 
-  @wip @requires:multi-node
+  @wip @requires:multi-node @act:i
   Scenario: James stewards the couple's resiliency bytes without read access
     Given human "James" is logged in on doorway "alpha" with device
     And content "love-map-matthew-jessica" is stewarded by "Matthew" at reach "intimate"
@@ -65,7 +65,7 @@ Feature: Intimate-reach content within a household
     When "James" requests content "love-map-matthew-jessica"
     Then the request by "James" is refused with status 403
 
-  @wip @browser-only
+  @wip @browser-only @act:i
   Scenario: Matthew feels the intimate boundary on the content card
     # Story-first: no content-reach "intimate" badge exists in the app today -
     # the only reach badge (gate-artifact-card) speaks qahal ReachTier
@@ -76,7 +76,7 @@ Feature: Intimate-reach content within a household
     Then a reach badge shows scope "intimate"
     And the badge names the consented audience "Jessica"
 
-  @wip @browser-only
+  @wip @browser-only @act:i
   Scenario: James's steward view shows opaque stewarded bytes, never content
     # Story-first: asserts opacity THROUGH the steward's own surfaces - the
     # peer-topology drill-down shows counts and bytes, and nothing anywhere
@@ -89,7 +89,7 @@ Feature: Intimate-reach content within a household
     When "James" opens the content viewer for "love-map-matthew-jessica"
     Then the viewer shows a locked state naming the required reach "intimate"
 
-  @wip @envisioned @requires:multi-node
+  @wip @envisioned @requires:multi-node @act:i
   Scenario: Replicated shards are encrypted - senseless bits in the steward's pantry
     # Story-first capture for substrate that does NOT exist yet: RS(4,3) shards
     # are PLAINTEXT today (sharding.rs is erasure coding only - zero
@@ -108,7 +108,7 @@ Feature: Intimate-reach content within a household
     Then they are ciphertext with no recoverable fragment of the love map
     And only the keys of "Matthew" and "Jessica" can unwrap the content key
 
-  @wip @envisioned @requires:shem
+  @wip @envisioned @requires:shem @act:iii
   Scenario: Adam's family stewards the couple's shards across households
     # The cross-household variant of the same story: replication to another
     # FAMILY's stewarded compute. Held behind shem (remote multi-tenant canvas);

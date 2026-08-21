@@ -1,3 +1,4 @@
+@act:i @e2e
 Feature: EPR relationship navigation boxes
   Learners see the typed relationships declared in a concept's EPR Head
   as navigable cards with trust signals (reach + stewardship resilience).

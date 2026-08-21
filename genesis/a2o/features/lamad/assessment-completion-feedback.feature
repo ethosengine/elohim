@@ -9,7 +9,7 @@ Feature: Assessment Completion Feedback
 
   # ─── Discovery Completion ───────────────────────────────────────────────────
 
-  @discovery @happy-path @requires:shem
+  @discovery @happy-path @requires:shem @act:iii
   Scenario: Learner sees personalized discovery result after completing assessment
     Given human "Terrance" is logged in on doorway "alpha" with device
     When I navigate to the "Know Thyself" path
@@ -22,7 +22,7 @@ Feature: Assessment Completion Feedback
     And the completion description should reference the primary type
     And the profile link should read "View on your profile"
 
-  @discovery @subscales @requires:shem
+  @discovery @subscales @requires:shem @act:iii
   Scenario: Discovery completion shows subscale breakdown bars
     Given human "Susan" is logged in on doorway "alpha" with device
     When I navigate to the "Know Thyself" path
@@ -33,7 +33,7 @@ Feature: Assessment Completion Feedback
     And the subscale breakdown should be visible
     And each subscale bar should have a non-zero width
 
-  @discovery @attestation @requires:shem
+  @discovery @attestation @requires:shem @act:iii
   Scenario: Discovery completion records an attestation
     Given human "Terrance" is logged in on doorway "alpha" with device
     And Terrance has not completed any discovery assessments
@@ -45,7 +45,7 @@ Feature: Assessment Completion Feedback
     And the "attachment-aware" attestation should be recorded
     And I should see the "first-discovery" attestation badge on my profile
 
-  @discovery @continue @requires:shem
+  @discovery @continue @requires:shem @act:iii
   Scenario: Learner continues after discovery feedback
     Given human "Terrance" is logged in on doorway "alpha" with device
     When I navigate to the "Know Thyself" path
@@ -58,7 +58,7 @@ Feature: Assessment Completion Feedback
 
   # ─── Mastery Completion ─────────────────────────────────────────────────────
 
-  @mastery @happy-path
+  @mastery @happy-path @act:i
   Scenario: Learner sees score feedback after passing a mastery quiz
     Given human "Matthew" is logged in on doorway "alpha" with device
     And the "Elohim Protocol" path exists
@@ -71,7 +71,7 @@ Feature: Assessment Completion Feedback
     And the result card should have the "passed" style
     And the profile link should read "View your Dashboard"
 
-  @mastery @failing
+  @mastery @failing @act:i
   Scenario: Learner sees encouragement after failing a mastery quiz
     Given human "Matthew" is logged in on doorway "alpha" with device
     And the "Elohim Protocol" path exists
@@ -83,7 +83,7 @@ Feature: Assessment Completion Feedback
     And the result card should have the "failed" style
     And no hex badge preview should be displayed
 
-  @mastery @no-attestation
+  @mastery @no-attestation @act:i
   Scenario: Mastery completion does not record a discovery attestation
     Given human "Matthew" is logged in on doorway "alpha" with device
     And the "Elohim Protocol" path exists
@@ -95,7 +95,7 @@ Feature: Assessment Completion Feedback
 
   # ─── Reflection Mode ────────────────────────────────────────────────────────
 
-  @reflection @requires:shem
+  @reflection @requires:shem @act:iii
   Scenario: Reflection assessment shows generic completion
     Given human "Susan" is logged in on doorway "alpha" with device
     When I navigate to a reflection assessment
@@ -107,7 +107,7 @@ Feature: Assessment Completion Feedback
 
   # ─── Edge Cases ─────────────────────────────────────────────────────────────
 
-  @regression @requires:shem
+  @regression @requires:shem @act:iii
   Scenario: No console errors during completion feedback
     Given human "Terrance" is logged in on doorway "alpha" with device
     When I navigate to the "Know Thyself" path

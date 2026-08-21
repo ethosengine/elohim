@@ -1,4 +1,4 @@
-@lamad @attention @analytics
+@lamad @attention @analytics @act:i @e2e
 Feature: Protocol-Native Attention Analytics
   As a learner on the Elohim Protocol
   I want my content interactions recorded as economic events

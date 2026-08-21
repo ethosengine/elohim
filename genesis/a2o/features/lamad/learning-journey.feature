@@ -1,4 +1,4 @@
-@e2e @lamad @browser-only
+@e2e @lamad @browser-only @act:i
 Feature: Lamad Learning Journey
   As a learner (Traveler)
   I want to follow a curated path through the Elohim Protocol

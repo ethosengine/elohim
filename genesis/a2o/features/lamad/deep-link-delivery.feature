@@ -1,4 +1,4 @@
-@e2e @lamad @epr-decomposition @b23 @regression @deep-link @requires:doorway
+@e2e @lamad @epr-decomposition @b23 @regression @deep-link @requires:doorway @act:i
 Feature: Deep links to lamad land on the rendered page, not a 404 shell
   A learner who is handed a URL — shared in a message, bookmarked, or opened
   cold in a fresh tab — lands on the actual rendered surface that URL names.

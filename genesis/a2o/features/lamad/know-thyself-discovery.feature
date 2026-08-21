@@ -1,4 +1,4 @@
-@e2e @lamad @browser-only @discovery @requires:shem
+@e2e @lamad @browser-only @discovery @act:i
 Feature: Know Thyself Discovery Path
   As a learner beginning their self-discovery journey,
   I want to complete discovery assessments on the know-thyself path,
@@ -12,7 +12,8 @@ Feature: Know Thyself Discovery Path
   # assessment-completion-summary component (app/lamad, completion-* testids) — canonical
   # coverage lives in assessment-completion-feedback.feature. See backlog
   # ci-genesis-discovery-result-testid-drift. Held from CI until reconciled/consolidated.
-  @values-hierarchy @wip
+  # HELD (2026-08-21): Superseded: the file's own comment says canonical coverage now lives in assessment-completion-feedback.feature; dead testids (backlog ci-genesis-discovery-result-testid-drift).
+  @values-hierarchy @wip @act:iii
   Scenario: Terrance completes the Values Hierarchy assessment
     Given human "Terrance" is logged in on doorway "alpha" with device
     When I navigate to the "Know Thyself" path
@@ -26,9 +27,10 @@ Feature: Know Thyself Discovery Path
 
   # @wip: asserts dead testid discovery-subscale-score (superseded by completion-subscales in the
   # shipped assessment-completion-summary component). See backlog ci-genesis-discovery-result-testid-drift.
-  @attachment-style @wip
-  Scenario: Susan completes the Attachment Style assessment
-    Given human "Susan" is logged in on doorway "alpha" with device
+  # HELD (2026-08-21): Superseded by assessment-completion-feedback.feature (duplicate coverage).
+  @attachment-style @wip @act:iii
+  Scenario: Jessica completes the Attachment Style assessment
+    Given human "Jessica" is logged in on doorway "alpha" with device
     When I navigate to the "Know Thyself" path
     And I advance to the "Attachment Style" assessment step
     And I start the assessment
@@ -39,7 +41,8 @@ Feature: Know Thyself Discovery Path
 
   # @wip: the badge assertion targets dead testid discovery-attestation-badge and depends on the
   # completion flow firing. See backlog ci-genesis-discovery-result-testid-drift.
-  @attestation @wip
+  # HELD (2026-08-21): Superseded by assessment-completion-feedback.feature (duplicate coverage).
+  @attestation @wip @act:iii
   Scenario: First discovery assessment earns a milestone attestation
     Given human "Terrance" is logged in on doorway "alpha" with device
     And Terrance has not completed any discovery assessments
