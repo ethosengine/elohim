@@ -1,4 +1,4 @@
-@e2e @elohim @browser-only @presence
+@e2e @elohim @browser-only @presence @act:i
 Feature: Elohim Presence
   As a learner, I want the elohim to offer transparent insights at key moments
   so that I understand the constitutional reasoning behind recommendations.

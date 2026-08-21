@@ -1,4 +1,4 @@
-@e2e @elohim @reach-negotiation @wip
+@e2e @elohim @reach-negotiation @wip @act:i
 Feature: Content Reach Negotiation
   As a human creating content in the Elohim Protocol,
   I want the Elohim agent to negotiate the appropriate reach for my content

@@ -1,4 +1,4 @@
-@e2e @elohim @network-health @requires:doorway
+@e2e @elohim @network-health @requires:doorway @act:i
 Feature: Network Health Posture — Aggregate Awareness and Attestation-Gated Introspection
   As a node operator or the elohim agent
   I want to understand the network's aggregate health and inspect individual peers
@@ -122,7 +122,7 @@ Feature: Network Health Posture — Aggregate Awareness and Attestation-Gated In
 
   # --- Attestation Lifecycle ---------------------------------------------------
 
-  @wip @requires:shem
+  @wip
   Scenario: Operator grants diagnostic attestation to a peer
     Given Matthew operates "matthew-home"
     When Matthew grants a diagnostic attestation to "terrance-laptop":
@@ -134,7 +134,7 @@ Feature: Network Health Posture — Aggregate Awareness and Attestation-Gated In
     Then "terrance-laptop" can request debug-level health from "matthew-home"
     And the attestation is stored in the trust cache with TTL
 
-  @wip @requires:shem
+  @wip
   Scenario: Diagnostic attestation expires and access reverts
     Given "terrance-laptop" holds a "compute:debug" attestation from "matthew-home"
     And the attestation expires
@@ -142,7 +142,7 @@ Feature: Network Health Posture — Aggregate Awareness and Attestation-Gated In
     Then the response is filtered to info level
     And "terrance-laptop" is informed the attestation has expired
 
-  @wip @requires:shem
+  @wip
   Scenario: Operator revokes diagnostic attestation
     Given "terrance-laptop" holds a "compute:debug" attestation from "matthew-home"
     When Matthew revokes the attestation
@@ -160,7 +160,7 @@ Feature: Network Health Posture — Aggregate Awareness and Attestation-Gated In
     Then the elohim agent incorporates the posture change into resilience reasoning
     And the resilience profile may update to reflect reduced network capacity
 
-  @wip @requires:shem
+  @wip
   Scenario: Elohim agent requests diagnostic attestation to investigate degradation
     Given "terrance-laptop" reports health=degraded in its CapacityAnnouncement
     When the elohim agent on "matthew-home" investigates the degradation
