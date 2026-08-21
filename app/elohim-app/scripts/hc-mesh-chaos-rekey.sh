@@ -50,6 +50,12 @@
 #                        (default: the UTC timestamp). Reuse it to resume a run.
 #   --phase P            run one phase instead of all four
 #   --measure-minutes M  detector run length after the re-key (default 3)
+#   --method M           reinstall (default) re-keys by wiping only the
+#                        conductor's chain + keystore and re-installing the happ
+#                        onto the kept wasm-cache — 12s, measured. regenerate
+#                        wipes the whole sandbox and re-generates it, which is
+#                        cleaner but races a 60s admin-websocket timeout during
+#                        the cold wasm install on a loaded host.
 #   --keep-storage-db 0  ALSO delete the peer's storage DB (default 1 = keep it,
 #                        which is the alpha shape; 0 is the control experiment)
 #
@@ -78,6 +84,7 @@ MEASURE_MINUTES=3
 ANCHOR_TIMEOUT=180
 WITNESS_TIMEOUT=240
 KEEP_STORAGE_DB=1
+REKEY_METHOD="${REKEY_METHOD:-reinstall}"
 TAG=""
 
 while [ $# -gt 0 ]; do
@@ -90,7 +97,8 @@ while [ $# -gt 0 ]; do
     --anchor-timeout)   ANCHOR_TIMEOUT="$2"; shift 2 ;;
     --witness-timeout)  WITNESS_TIMEOUT="$2"; shift 2 ;;
     --keep-storage-db)  KEEP_STORAGE_DB="$2"; shift 2 ;;
-    -h|--help)          sed -n '2,52p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --method)           REKEY_METHOD="$2"; shift 2 ;;
+    -h|--help)          awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "unknown option: $1 (try --help)" >&2; exit 2 ;;
   esac
 done
@@ -321,9 +329,21 @@ phase_rekey() {
     say "siblings survived the kill — good, the measure stays clean"
   fi
 
-  # --- destroy and regenerate ONLY this peer's sandbox ----------------------
-  say "deleting $PEER's sandbox: $PEER_SANDBOX (chain + keystore + DHT db)"
-  rm -rf "$PEER_SANDBOX"
+  # --- re-key this peer's conductor ----------------------------------------
+  # Two methods, both a TRUE re-key (a fresh keystore mints a new agent key):
+  #
+  #   reinstall (default) — delete only databases/ and ks/, keep wasm-cache and
+  #     the conductor config, then install+enable the happ on the running
+  #     conductor. Measured 2026-08-21: 12s, because the DNAs' compiled wasm is
+  #     already there. It is also the closer analogue of the alpha event, which
+  #     re-keyed conductors without changing the DNAs.
+  #   regenerate — delete the whole sandbox and `hc sandbox generate` it again.
+  #     Cleaner in principle, but its install runs inside the conductor's 60s
+  #     admin-websocket request timeout, and on a loaded host (load average 79,
+  #     with the mesh and two repair agents running) a COLD wasm compile does not
+  #     fit: measured 65s, "Websocket error: Timeout", twice in a row. Kept as a
+  #     fallback, with retries, for when a pristine sandbox is wanted on a quiet
+  #     box.
   if [ "$KEEP_STORAGE_DB" = "0" ]; then
     say "ALSO deleting $PEER's storage DB ($MESH_DIR/$PEER) — control experiment, not the alpha shape"
     rm -rf "${MESH_DIR:?}/$PEER"
@@ -331,24 +351,34 @@ phase_rekey() {
     say "KEEPING $PEER's storage DB ($MESH_DIR/$PEER) — its projections now reference a DEAD incarnation's actions (the alpha shape)"
   fi
 
-  # `hc sandbox generate` APPENDS to ./.hc; rewrite it afterwards so the index
-  # order stays [peer0, peer1, ...] and `run <index>` keeps meaning what it says.
-  say "regenerating $PEER's sandbox on the same ports (admin=$PEER_ADMIN app=$PEER_APP)"
-  ( cd "$LOCAL_DEV_DIR" && timeout 300 sh -c "echo test | hc sandbox --piped -f $PEER_ADMIN generate -n 1 \
-      --app-id elohim --in-process-lair --root \"\$PWD\" -d $PEER \
-      \"$HAPP_PATH\" network --bootstrap http://localhost:$DOORWAY_PORT/bootstrap \
-      webrtc ws://signal.localhost:$DOORWAY_PORT" ) > "$WORK_DIR/$TAG.generate.log" 2>&1
-  local gen_rc=$?
-  [ "$gen_rc" -eq 0 ] || fail "hc sandbox generate for $PEER failed (exit $gen_rc) — see $WORK_DIR/$TAG.generate.log"
-  [ -d "$PEER_SANDBOX" ] || fail "$PEER's sandbox was not created — see $WORK_DIR/$TAG.generate.log"
+  if [ "$REKEY_METHOD" = "reinstall" ]; then
+    [ -d "$PEER_SANDBOX" ] || fail "$PEER's sandbox is missing at $PEER_SANDBOX — use --method regenerate"
+    say "deleting $PEER's chain + keystore (databases/, ks/), KEEPING wasm-cache"
+    rm -rf "$PEER_SANDBOX/databases" "$PEER_SANDBOX/ks"
+  else
+    say "deleting $PEER's whole sandbox: $PEER_SANDBOX (chain + keystore + DHT db + wasm-cache)"
+    local attempt=1 gen_rc=1
+    while [ "$attempt" -le 3 ]; do
+      say "hc sandbox generate for $PEER (attempt $attempt/3; a cold wasm install races a 60s admin timeout)"
+      rm -rf "$PEER_SANDBOX"
+      ( cd "$LOCAL_DEV_DIR" && timeout 300 sh -c "echo test | hc sandbox --piped -f $PEER_ADMIN generate -n 1 --app-id elohim --in-process-lair --root \"\$PWD\" -d $PEER \"$HAPP_PATH\" network --bootstrap http://localhost:$DOORWAY_PORT/bootstrap webrtc ws://signal.localhost:$DOORWAY_PORT" ) > "$WORK_DIR/$TAG.generate.$attempt.log" 2>&1
+      gen_rc=$?
+      [ "$gen_rc" -eq 0 ] && break
+      say "  attempt $attempt failed (exit $gen_rc) — see $WORK_DIR/$TAG.generate.$attempt.log"
+      attempt=$((attempt + 1))
+    done
+    [ "$gen_rc" -eq 0 ] || fail "hc sandbox generate for $PEER failed 3x — the host is likely too loaded for a cold wasm install; use --method reinstall"
+  fi
 
+  # `hc sandbox generate` APPENDS to ./.hc; rewrite it so the index order stays
+  # [peer0, peer1, ...] and `run <index>` keeps meaning what it says.
   ( cd "$LOCAL_DEV_DIR" && { for name in "${PEERS[@]}"; do echo "$LOCAL_DEV_DIR/$name"; done > .hc; } )
   say ".hc rewritten in peer order: $(tr '\n' ' ' < "$LOCAL_DEV_DIR/.hc")"
 
-  # Keep the dev-tier gossip pacing hc-mesh.sh applies — a conductor generated
-  # without it starts its first kitsune2 round at PROD cadence (120s/300s) and
-  # the re-keyed peer would look partitioned for reasons that are not the class.
-  python3 - "$PEER_SANDBOX/conductor-config.yaml" <<'PYEOF'
+  # Keep the dev-tier gossip pacing hc-mesh.sh applies — a conductor without it
+  # starts its first kitsune2 round at PROD cadence (120s/300s), and the re-keyed
+  # peer would look partitioned for reasons that are not the class. Idempotent.
+  python3 - "$PEER_SANDBOX/conductor-config.yaml" <<'GOSSIPEOF'
 import sys, yaml
 path = sys.argv[1]
 with open(path) as f:
@@ -363,7 +393,7 @@ advanced["k2Gossip"] = k2
 network["advanced"] = advanced
 with open(path, "w") as f:
     yaml.safe_dump(cfg, f, default_flow_style=False, sort_keys=False)
-PYEOF
+GOSSIPEOF
   [ $? -eq 0 ] || fail "gossip-config patch failed for $PEER"
   say "dev-tier gossip patch applied (k2Gossip initiate=1000ms)"
 
@@ -371,12 +401,28 @@ PYEOF
   # every conductor into one prefix-less file, so a separate stream is the only
   # way the detector can attribute this peer's log rate to this peer.
   say "starting $PEER's conductor on its own log stream ($PEER_RUN_LOG)"
-  ( cd "$LOCAL_DEV_DIR" && nohup sh -c "echo test | hc sandbox --piped -f $PEER_ADMIN run $PEER_INDEX -p=$PEER_APP" \
-      > "$PEER_RUN_LOG" 2>&1 & )
+  ( cd "$LOCAL_DEV_DIR" && nohup sh -c "echo test | hc sandbox --piped -f $PEER_ADMIN run $PEER_INDEX -p=$PEER_APP" > "$PEER_RUN_LOG" 2>&1 & )
   local dl=$((SECONDS + 180))
   while [ "$SECONDS" -lt "$dl" ]; do port_listening "$PEER_ADMIN" && break; sleep 3; done
   port_listening "$PEER_ADMIN" || fail "$PEER's conductor did not come up on :$PEER_ADMIN — see $PEER_RUN_LOG"
   say "$PEER conductor up (admin :$PEER_ADMIN, pid $(conductor_pid "$PEER"))"
+
+  # reinstall: the conductor is now up with a fresh keystore and NO apps.
+  # Installing without --agent-key mints a new one — that IS the re-key.
+  if [ "$REKEY_METHOD" = "reinstall" ]; then
+    local iattempt=1 irc=1
+    while [ "$iattempt" -le 3 ]; do
+      ( cd "$LOCAL_DEV_DIR" && timeout 280 sh -c "echo test | hc sandbox --piped call --running $PEER_ADMIN install-app --app-id elohim \"$HAPP_PATH\"" ) > "$WORK_DIR/$TAG.install.$iattempt.log" 2>&1
+      irc=$?
+      [ "$irc" -eq 0 ] && break
+      say "  install-app attempt $iattempt/3 failed (exit $irc) — see $WORK_DIR/$TAG.install.$iattempt.log"
+      iattempt=$((iattempt + 1)); sleep 5
+    done
+    [ "$irc" -eq 0 ] || fail "install-app on $PEER failed 3x — see $WORK_DIR/$TAG.install.*.log"
+    say "happ installed on $PEER's new incarnation (attempt $iattempt)"
+    ( cd "$LOCAL_DEV_DIR" && timeout 120 sh -c "echo test | hc sandbox --piped call --running $PEER_ADMIN enable-app elohim" ) > "$WORK_DIR/$TAG.enable.log" 2>&1 || fail "enable-app on $PEER failed — see $WORK_DIR/$TAG.enable.log"
+    say "happ enabled on $PEER"
+  fi
 
   # --- new agent key, then storage back on it -------------------------------
   local newkey="" dl2=$((SECONDS + 120))

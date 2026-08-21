@@ -109,7 +109,7 @@ while [ $# -gt 0 ]; do
     --no-storage)    PROBE_STORAGE=0; shift ;;
     --top-threads)   TOP_THREADS="$2"; shift 2 ;;
     --quiet)         QUIET=1; shift ;;
-    -h|--help)       sed -n '2,60p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help)       awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "unknown option: $1 (try --help)" >&2; exit 2 ;;
   esac
 done
