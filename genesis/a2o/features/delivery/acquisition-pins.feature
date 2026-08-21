@@ -1,23 +1,45 @@
 @e2e @delivery @requires:doorway @act:i
-Feature: Acquisition pins — the device pin and the pull queue (slice 1)
-  The device pin is the airplane-mode floor (spec §1.1): declarable with no
-  hub, no conductor, no peers. The pull queue satisfies pins by byte-arrival,
-  never inventory-arrival (R-A).
+Feature: Acquisition pins — the device pin and the pull queue
+  A PIN is a person saying "keep this on my device." The device pin is the
+  airplane-mode floor: declarable with no hub, no conductor, no peers — just
+  the device and its own disk. The PULL QUEUE is what makes the promise true:
+  it goes and gets the bytes.
+
+  The one rule everything here turns on:
+
+    A pin is satisfied by BYTE ARRIVAL — the bytes on this device's disk,
+    readable — and never by INVENTORY ARRIVAL, some record saying they are
+    somewhere. A status that reports "done" from the inventory alone is the
+    system telling a person it holds something it does not.
+
+  `epr:strawberry-guide` is the fixture content this story pins: one ordinary
+  piece of published content, addressed the way all published content is
+  (`epr:` + its id). Nothing about it is special — that is the point.
 
   These scenarios exercise the /api/v1/pins own-node API on elohim-storage
-  directly (E2E_STORAGE_URL, default localhost:8090). The @requires:doorway
-  tag signals that a running elohim-storage instance is needed; the doorway
-  background step is omitted because the pin API is not proxied through the
-  doorway — it is always own-node.
+  directly. The pin API is never proxied through a doorway: a pin is a promise
+  a device makes about itself, so it is always answered own-node.
 
+  Design: genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md
+  (the provide loop: 2026-06-08-epr-acquisition-slice2b-provide-loop-design.md).
   The binding two-node byte-arrival regression is the Rust integration test
-  elohim/elohim-storage/tests/acquisition_pull_e2e.rs — see spec §11.
+  elohim/elohim-storage/tests/acquisition_pull_e2e.rs.
+
+  # Test environment: E2E_STORAGE_URL is peer A (default localhost:8090) and
+  # E2E_STORAGE_JESSICA (or E2E_STORAGE_URL_B) is peer B. Scenarios tagged
+  # @requires:owned-substrate write to, or restart, the mesh; each such step
+  # answers 'skipped' unless the operator sets A2O_ALLOW_DESTRUCTIVE=1. A @wip
+  # scenario is one whose step definitions are not wired to a real observation
+  # yet — it is documentary until they are.
 
   Scenario: A pin is creatable and durable with no network at all
     When I POST a pin for "epr:strawberry-guide" to /api/v1/pins
     Then the pin response status is 201
     And GET /api/v1/pins lists one active pin for "epr:strawberry-guide"
 
+  # A CLUSTER pin says "keep this on the whole cluster" — one declaration standing
+  # in for whatever set of devices satisfies it. Resolving that set is not built,
+  # so the node refuses rather than accepting a promise it cannot keep.
   Scenario: Cluster pins are honestly refused until the closure resolver lands
     When I POST a pin with kind "cluster" for "epr:cluster-target" to /api/v1/pins
     Then the pin response status is 501
@@ -31,16 +53,17 @@ Feature: Acquisition pins — the device pin and the pull queue (slice 1)
     When peer B pins "epr:strawberry-guide"
     And the pull queue drains
     Then peer B's pull status shows fetched 1 of total 1
-    And the content row exists in peer B's local projection
+    And peer B's local projection carries the row at the moment of that claim
     # BORN RED, measured 2026-08-21 on the household mesh: peer B's rollup answered
-    # {total:1, fetched:1, caughtUp:true} while GET /db/content/strawberry-guide on that
-    # same peer was still 404; the row appeared ~20s later. So "caught up" is being
-    # published from the fetch ledger alone, ahead of the projection it is supposed to
-    # be reporting on — inventory-arrival wearing byte-arrival's clothes (R-A). It
-    # matters to a person, not just a test: a device that pins a guide, sees the pin go
-    # green, and opens it gets "not found" for something it was just told it holds.
-    # The last assertion is deliberately taken at the moment of the claim and reports
-    # the measured lag when the row lands late, so the gap can never pass as a slow success.
+    # {total:1, fetched:1, caughtUp:true} while asking that same peer for the content
+    # returned "not found"; the row appeared about 20 seconds later. So "caught up" is
+    # published from the fetch ledger alone, ahead of the store it is supposed to be
+    # reporting on — inventory arrival wearing byte arrival's clothes. It matters to a
+    # person, not just to a test: a device that pins a guide, watches the pin go green,
+    # and opens it is told the guide is not there.
+    # The last step is deliberately read AT the moment of the claim, which is why its
+    # wording says so. When the row lands late it still fails, and names how late — a
+    # settle window here would launder the gap into a pass.
 
   # --- Provide loop (slice 2b, rung 4): pin-as-peer + per-EPR pull rollup ---
   # The provide pin (provide:true) makes a caught-up commons pin a serveable
@@ -66,10 +89,14 @@ Feature: Acquisition pins — the device pin and the pull queue (slice 1)
     And the pull queue drains
     Then peer B's pull status shows fetched 1 of total 1
     And peer B fetched the bytes from peer A
+    # Bounded honestly: nothing records WHICH peer supplied a given blob, so the last
+    # step asserts the two things that are observable — peer B now serves the bytes
+    # itself, and peer A was a connected peer able to supply them. Traced provenance
+    # would need a surface that does not exist.
 
   # --- Acquisition constraint regressions -----------------------------------
   # Harvested from the 2026-07-26 resiliency-saga overnight cure sprint, where
-  # both defects below sat INSIDE the eight-deep chapter-5 deadlock chain: each
+  # both defects below sat inside an eight-deep chain of stacked acquisition defects: each
   # was invisible until the one above it was cured, and neither announced itself
   # — acquisition simply went quiet. These scenarios name the constraints so the
   # quiet has a witness.

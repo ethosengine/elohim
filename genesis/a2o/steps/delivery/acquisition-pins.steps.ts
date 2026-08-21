@@ -465,11 +465,7 @@ Then(
     const { status, body } = await getJsonFrom(state.b, `/api/v1/pins/${state.id}/pull`);
     assert.equal(status, 200, `peer B's pull rollup for "${state.id}" returned ${status}`);
     const rollup = body as Record<string, unknown>;
-    assert.equal(
-      rollup['total'],
-      total,
-      `expected total ${total}; got ${JSON.stringify(rollup)}`
-    );
+    assert.equal(rollup['total'], total, `expected total ${total}; got ${JSON.stringify(rollup)}`);
     assert.equal(
       rollup['fetched'],
       fetched,
@@ -487,7 +483,9 @@ Then(
  * local readability is the inventory-arrival failure this story exists to catch,
  * and a settle window here would launder it into a pass.
  */
-Then("the content row exists in peer B's local projection", async function (this: E2EWorld) {
+Then("peer B's local projection carries the row at the moment of that claim", async function (
+  this: E2EWorld
+) {
   const state = twoNode(this);
   const first = await getJsonFrom(state.b, `/db/content/${state.id}`);
   if (first.status === 200) return;
@@ -502,7 +500,7 @@ Then("the content row exists in peer B's local projection", async function (this
         `peer B's pull for "${state.id}" reported caughtUp/fetched BEFORE its own projection ` +
           `carried the row: /db/content/${state.id} was 404 at the moment of the claim and ` +
           `became readable ${Math.round((Date.now() - started) / 1000)}s later. That gap is ` +
-          'inventory-arrival wearing byte-arrival\'s clothes (R-A): a caller that trusts ' +
+          "inventory-arrival wearing byte-arrival's clothes (R-A): a caller that trusts " +
           'caughtUp and reads immediately gets a 404 for content it was just told it has.'
       );
     }
@@ -525,11 +523,14 @@ Then('peer B fetched the bytes from peer A', async function (this: E2EWorld) {
   assert.equal(content.status, 200, `peer B holds no row for "${state.id}"`);
   const blobHash = (content.body as Record<string, unknown>)['blobHash'];
   if (typeof blobHash === 'string' && blobHash.length > 0) {
-    const { status } = await request(`${state.b}/blob/${blobHash}`, { method: 'GET' });
+    // undici's `request` answers with `statusCode`, not `status` — the latter
+    // is not on ResponseData at all, so this read was `undefined` and the
+    // assertion could never see the real HTTP code.
+    const { statusCode } = await request(`${state.b}/blob/${blobHash}`, { method: 'GET' });
     assert.equal(
-      status,
+      statusCode,
       200,
-      `peer B has the row for "${state.id}" but cannot serve its blob ${blobHash} (HTTP ${status})`
+      `peer B has the row for "${state.id}" but cannot serve its blob ${blobHash} (HTTP ${statusCode})`
     );
   }
   const peers = await getJsonFrom(state.b, '/api/v1/peers/delivery');
@@ -598,41 +599,42 @@ Then('the pull status is null', function (this: E2EWorld) {
   );
 });
 
-When('the first acquisition reconcile completes with zero active pins', async function (
-  this: E2EWorld
-) {
-  const base = storageUrl();
-  const { body } = await getJsonFrom(base, PINS_PATH);
-  const pins = ((body as Record<string, unknown>)['pins'] ?? []) as Record<string, unknown>[];
-  const active = pins.filter(p => p['status'] === 'active');
-  if (active.length > 0) {
-    // eslint-disable-next-line no-console
-    console.log(
-      `  ⏭️  SKIPPED (fixture): peer ${base} holds ${active.length} active pin(s), so its first ` +
-        'reconcile cannot complete with an EMPTY desired set. This half of the contract needs a ' +
-        'peer with no pins — point E2E_STORAGE_URL at an unpinned household member.'
-    );
-    return 'skipped';
-  }
-  // Wait out one reconcile cadence (60s) plus slack for the census to land.
-  const budgetMs = Number(process.env['E2O_RECONCILE_TIMEOUT_MS'] ?? 120_000);
-  const deadline = Date.now() + budgetMs;
-  while (Date.now() < deadline) {
-    const metrics = await request(`${base}/metrics`);
-    const text = await metrics.body.text();
-    if (/^elohim_acquisition_reconcile_initialized 1$/m.test(text)) {
-      const { body: statusBody } = await getJsonFrom(base, '/p2p/status');
-      p2pStatusStore.set(this, statusBody as Record<string, unknown>);
-      return undefined;
+When(
+  'the first acquisition reconcile completes with zero active pins',
+  async function (this: E2EWorld) {
+    const base = storageUrl();
+    const { body } = await getJsonFrom(base, PINS_PATH);
+    const pins = ((body as Record<string, unknown>)['pins'] ?? []) as Record<string, unknown>[];
+    const active = pins.filter(p => p['status'] === 'active');
+    if (active.length > 0) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `  ⏭️  SKIPPED (fixture): peer ${base} holds ${active.length} active pin(s), so its first ` +
+          'reconcile cannot complete with an EMPTY desired set. This half of the contract needs a ' +
+          'peer with no pins — point E2E_STORAGE_URL at an unpinned household member.'
+      );
+      return 'skipped';
     }
-    await new Promise(r => setTimeout(r, 5_000));
+    // Wait out one reconcile cadence (60s) plus slack for the census to land.
+    const budgetMs = Number(process.env['E2O_RECONCILE_TIMEOUT_MS'] ?? 120_000);
+    const deadline = Date.now() + budgetMs;
+    while (Date.now() < deadline) {
+      const metrics = await request(`${base}/metrics`);
+      const text = await metrics.body.text();
+      if (/^elohim_acquisition_reconcile_initialized 1$/m.test(text)) {
+        const { body: statusBody } = await getJsonFrom(base, '/p2p/status');
+        p2pStatusStore.set(this, statusBody as Record<string, unknown>);
+        return undefined;
+      }
+      await new Promise(r => setTimeout(r, 5_000));
+    }
+    assert.fail(
+      `no acquisition reconcile completed on ${base} within ${budgetMs}ms ` +
+        '(elohim_acquisition_reconcile_initialized never reached 1)'
+    );
+    return undefined;
   }
-  assert.fail(
-    `no acquisition reconcile completed on ${base} within ${budgetMs}ms ` +
-      '(elohim_acquisition_reconcile_initialized never reached 1)'
-  );
-  return undefined;
-});
+);
 
 Then(
   'the pull status reports total {int}, fetched {int}, pending {int}, and failed {int}',
@@ -646,7 +648,12 @@ Then(
         'never the unmeasured null.'
     );
     assert.deepEqual(
-      { total: pull['total'], fetched: pull['fetched'], pending: pull['pending'], failed: pull['failed'] },
+      {
+        total: pull['total'],
+        fetched: pull['fetched'],
+        pending: pull['pending'],
+        failed: pull['failed'],
+      },
       { total, fetched, pending, failed },
       `unexpected pull rollup: ${JSON.stringify(pull)}`
     );
@@ -673,17 +680,17 @@ Then(
   }
 );
 
-Then('the acquisition active pins metric is {int}', async function (
-  this: E2EWorld,
-  expected: number
-) {
-  const value = await metricValue(storageUrl(), 'elohim_acquisition_active_pins');
-  assert.equal(
-    value,
-    expected,
-    `elohim_acquisition_active_pins is ${String(value)}, expected ${expected}`
-  );
-});
+Then(
+  'the acquisition active pins metric is {int}',
+  async function (this: E2EWorld, expected: number) {
+    const value = await metricValue(storageUrl(), 'elohim_acquisition_active_pins');
+    assert.equal(
+      value,
+      expected,
+      `elohim_acquisition_active_pins is ${String(value)}, expected ${expected}`
+    );
+  }
+);
 
 Then(
   'the acquisition reconcile outcome {string} was counted',

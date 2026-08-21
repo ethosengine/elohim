@@ -241,3 +241,38 @@ When(
     );
   }
 );
+
+/**
+ * "Present and not the old opaque value" is not the same as "names a seam": a
+ * shed tagged `unknown` or `error` would satisfy both and still tell an
+ * operator nothing. The shed vocabulary is closed — every value the compose
+ * layer can emit is one of these — so the assertion checks membership, which is
+ * what the scenario's title actually promises.
+ */
+const KNOWN_SHED_SEAMS = [
+  'renderer-app-mismatch',
+  'shell-no-projection',
+  'shell-breaker-open',
+  'shell-fetch-failed',
+  'shell-root-missing',
+  'render-root-missing',
+  'render-root-unclosed',
+  'auth-mode-not-supported',
+  'error-backoff',
+  'overflow',
+];
+
+Then(
+  'the raw HTTP response header "x-ssr-skipped" names a known compose seam',
+  function (this: E2EWorld) {
+    const capture = storedCapture(this);
+    const value = capture.headers['x-ssr-skipped'] ?? '';
+    assert.ok(
+      KNOWN_SHED_SEAMS.includes(value),
+      `x-ssr-skipped is "${value}", which is not one of the typed compose seams ` +
+        `[${KNOWN_SHED_SEAMS.join(', ')}]. A shed that answers with a value outside the ` +
+        'vocabulary is the opacity defect again under a new string — the header must name a ' +
+        'seam an operator can act on, not merely differ from the old one.'
+    );
+  }
+);

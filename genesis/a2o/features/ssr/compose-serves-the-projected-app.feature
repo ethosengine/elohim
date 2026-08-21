@@ -8,6 +8,16 @@ Feature: SSR compose serves the projected app's own markup — or names why it s
   So that the manifesto page is readable at the address it lives at, and a skipped SSR names
   the seam that skipped it instead of hiding every cause behind one opaque tag
 
+  Three words this story leans on, so nothing below depends on knowing them already:
+    * A peer PROJECTS an app when it answers that app's routes and serves its bundles. One
+      peer may project many apps; whether it can RENDER any of them is a separate fact.
+    * To SHED is to decline to server-render and answer with the client-side-rendering (CSR)
+      shell instead — a correct, deliberate answer, not an error. What matters is whether the
+      peer paid for a render before shedding, and whether it said why.
+    * The COMPOSE step is where a rendered document is spliced into the shell that will be
+      served. It is the seam that can splice the WRONG app's markup, so it is the seam that
+      has to refuse.
+
   A serving peer (doorway projection today; a capable storage sidecar or steward hub on the
   same primitive — SSR is p2p-native, not doorway-owned) may project MANY apps while holding
   a renderer for only SOME of them. Two constraints discovered by driving the live system to
@@ -40,8 +50,8 @@ Feature: SSR compose serves the projected app's own markup — or names why it s
   Scenario: A route projected to an app the renderer does not serve skips render-free
     # The regression anchor: with only the landing bundle loaded, a lamad route must NOT
     # burn a V8 render just to discard it — the skip happens before rendering and says why.
+    Given the loaded SSR bundle serves a different app than the route's projection
     When the raw HTTP response for "/lamad/path/elohim-protocol" is captured
-    And the loaded SSR bundle serves a different app than the route's projection
     Then the raw HTTP response status is 200
     And the raw HTTP response header "x-ssr-skipped" is "renderer-app-mismatch"
     And no SSR render trace is recorded for the request
@@ -57,9 +67,10 @@ Feature: SSR compose serves the projected app's own markup — or names why it s
     And the raw HTTP response body carries a client bundle script
 
   # Still @wip: the proof needs a SECOND server bundle staged — the one for the route's own
-  # projected app. A peer whose Prologue staged only the landing server bundle has nothing to
-  # observe here, so the Given holds the scenario rather than failing it. Sheds @wip when
-  # multi-bundle renderer selection stages a lamad-spa server bundle.
+  # projected app. A household mesh stages its bundles once at start-up (`just mesh prologue`),
+  # and that step stages only the landing server bundle today, so such a peer has nothing to
+  # observe here and the Given holds the scenario rather than failing it. Sheds @wip when
+  # multi-bundle renderer selection stages a second app's server bundle.
   @requires:ssr-bundle @wip
   Scenario: A projected app with its own server bundle composes its own selector
     # Selector-agnosticism proof: when a lamad server bundle is loaded for lamad-spa, the
@@ -76,6 +87,14 @@ Feature: SSR compose serves the projected app's own markup — or names why it s
     # stall behind one string. Every shed now self-classifies: renderer-app-mismatch,
     # shell-fetch-failed (with elapsed_ms in the peer log), shell-root-missing,
     # render-root-missing, shell-breaker-open, shell-no-projection.
+    #
+    # SCOPE, stated so the proof is not overread: the route read here is whichever shed this
+    # peer can actually construct — by default the same cross-app route as the first scenario
+    # (E2E_SSR_SHED_ROUTE picks a different seam where one is staged). So this proves the
+    # NEGATIVE for real — the opaque "shell-unavailable" is gone and a typed reason is present
+    # — while the other five reasons stay unproven here until a peer can stage them. Each of
+    # those deserves its own scenario when its seam becomes constructible.
     When the raw HTTP response for an SSR-eligible route that sheds to CSR is captured
     Then the raw HTTP response header "x-ssr-skipped" is present
     And the raw HTTP response header "x-ssr-skipped" is not "shell-unavailable"
+    And the raw HTTP response header "x-ssr-skipped" names a known compose seam
