@@ -158,7 +158,14 @@ ECHO_LEDGER_PATH = re.compile(r"deprecations\.jsonl", re.IGNORECASE)
 #   single doc has no path prefix — the command gate below covers that case).
 ECHO_HISTORY_PATH_RE = re.compile(
     r"genesis/docs/content/elohim-protocol/history/"
-    r"|genesis/data/timeline/(?:backlog|chronicle)/"
+    # Guard S (2026-08-21, fp f3f29da98c96): widened from the specific
+    # backlog|chronicle subdirs to the whole timeline/ tree — a frontmatter-
+    # convention `head`/`find` over genesis/data/timeline (root, not spelling
+    # "backlog/"/"chronicle/") re-captured a canonical row's own title as a
+    # NEW deprecation. A description of a deprecation is not an emission.
+    # \b (not a trailing slash) so a bare root path with no trailing slash
+    # (e.g. `find genesis/data/timeline -maxdepth 2 ...`) still matches.
+    r"|genesis/data/timeline\b"
     r"|genesis/docs/superpowers/"
     r"|\.superpowers/"
     r"|(?:^|/)CLAUDE\.md\b"
@@ -587,7 +594,10 @@ _CMD_GIT_HISTORY_RE = re.compile(
 )
 _CMD_HISTORY_TREE_RE = re.compile(
     r"genesis/docs/content/elohim-protocol/history/"
-    r"|genesis/data/timeline/(?:backlog|chronicle)/"
+    # Guard S (2026-08-21, fp f3f29da98c96) — see ECHO_HISTORY_PATH_RE's
+    # comment: widened to the whole timeline/ tree, not just backlog|chronicle;
+    # \b not a trailing slash so a bare root path (no trailing "/") matches.
+    r"|genesis/data/timeline\b"
     r"|genesis/docs/superpowers/"
     r"|\.superpowers/"
     r"|(?:^|/|\s)CLAUDE\.md\b"
