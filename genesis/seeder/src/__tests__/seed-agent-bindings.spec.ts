@@ -20,17 +20,20 @@ import {
   candidateConductorUrls,
   isZomeTimeout,
 } from '../seed-agent-bindings.js';
+import { parseConductorUrls } from '../seed-conductor-identities.js';
 
-const ALPHA_URLS = [
-  // adam is FIRST on purpose — this is the ordering that made the bug.
-  'ws://elohim-adam-alpha.elohim-alpha.svc.cluster.local:4445',
-  'ws://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:4445',
-  'ws://elohim-jessica-alpha.elohim-alpha.svc.cluster.local:4445',
-  'ws://elohim-james-alpha.elohim-alpha.svc.cluster.local:4445',
-  'ws://elohim-gertrude-alpha.elohim-alpha.svc.cluster.local:4445',
-  'ws://elohim-susan-alpha.elohim-alpha.svc.cluster.local:4445',
-  'ws://elohim-eve-alpha.elohim-alpha.svc.cluster.local:4445',
-];
+const ALPHA_URLS = parseConductorUrls(
+  [
+    // adam is FIRST on purpose — this is the ordering that made the bug.
+    'ws://elohim-adam-alpha.elohim-alpha.svc.cluster.local:4445',
+    'ws://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:4445',
+    'ws://elohim-jessica-alpha.elohim-alpha.svc.cluster.local:4445',
+    'ws://elohim-james-alpha.elohim-alpha.svc.cluster.local:4445',
+    'ws://elohim-gertrude-alpha.elohim-alpha.svc.cluster.local:4445',
+    'ws://elohim-susan-alpha.elohim-alpha.svc.cluster.local:4445',
+    'ws://elohim-eve-alpha.elohim-alpha.svc.cluster.local:4445',
+  ].join(',')
+);
 
 describe('candidateConductorUrls — name-affine targeting', () => {
   it('resolves each human to THEIR OWN pod, never the first url in the list', () => {
@@ -73,9 +76,9 @@ describe('candidateConductorUrls — name-affine targeting', () => {
   });
 
   it('keeps the legacy walk for non-affine url sets (local dev)', () => {
-    const localUrls = ['ws://localhost:4445'];
-    expect(candidateConductorUrls('human-pete-pastor', localUrls)).toEqual(localUrls);
-    expect(candidateConductorUrls('human-adam-firstman', localUrls)).toEqual(localUrls);
+    const localUrls = parseConductorUrls('ws://localhost:4445');
+    expect(candidateConductorUrls('human-pete-pastor', localUrls)).toEqual(['ws://localhost:4445']);
+    expect(candidateConductorUrls('human-adam-firstman', localUrls)).toEqual(['ws://localhost:4445']);
   });
 
   it('an empty CONDUCTOR_URLS yields no candidates', () => {

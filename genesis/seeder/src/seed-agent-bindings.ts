@@ -70,9 +70,10 @@ import { deterministicPeerId, resolvePeerId, type Archetype } from './peer-id.js
 // these helpers are the genesis #1119 founder-FATAL fix, and re-copying them
 // is exactly how this seeder drifted back to first-reachable-wins.
 import {
-  conductorUrlForHuman,
   humanShortName,
-  urlsAreNameAffine,
+  parseConductorUrls,
+  resolveCandidateUrls,
+  type ConductorUrlEntry,
 } from './seed-conductor-identities.js';
 
 // Canonical artifact filename from build-artifacts.json — single source of
@@ -288,18 +289,20 @@ export function isZomeTimeout(message: string): boolean {
 /**
  * The conductor URLs this human's bindings may be written on.
  *
- * Name-affine URL sets (alpha/CI) resolve to EXACTLY the human's own pod —
- * an empty list means "no pod deployed", which is a skip, not a failure.
- * Non-affine sets (local dev, a single `ws://localhost:4445`) keep the
- * legacy walk.
+ * Name-affine URL sets (alpha/CI, or an explicit `name=url` CONDUCTOR_URLS
+ * entry — see seed-conductor-identities.ts) resolve to EXACTLY the human's
+ * own pod — an empty list means "no pod deployed", which is a skip, not a
+ * failure. A fully unnamed, non-hostname-affine set (local dev, a single
+ * `ws://localhost:4445`) keeps the legacy walk. Thin wrapper over
+ * resolveCandidateUrls — kept SHARED with seed-conductor-identities.ts on
+ * purpose; re-deriving this logic here is exactly how the bindings seeder
+ * drifted back to first-reachable-wins (genesis #1380–#1386).
  */
 export function candidateConductorUrls(
   humanId: string,
-  conductorUrls: string[],
+  conductorUrls: ConductorUrlEntry[],
 ): string[] {
-  if (!urlsAreNameAffine(conductorUrls)) return conductorUrls;
-  const ownUrl = conductorUrlForHuman(humanId, conductorUrls);
-  return ownUrl ? [ownUrl] : [];
+  return resolveCandidateUrls(humanId, conductorUrls);
 }
 
 /**
@@ -312,7 +315,7 @@ export function candidateConductorUrls(
  */
 async function seedBindingsForHuman(
   human: HumansJsonHuman,
-  conductorUrls: string[],
+  conductorUrls: ConductorUrlEntry[],
   appIdPrefix: string,
 ): Promise<BindingResult> {
   const plans = plansForHuman(human);
@@ -439,10 +442,7 @@ export async function main(): Promise<void> {
   const conductorUrlsRaw = process.env.CONDUCTOR_URLS ?? '';
   const appIdPrefix = process.env.INSTALLED_APP_ID ?? 'elohim';
 
-  const conductorUrls = conductorUrlsRaw
-    .split(',')
-    .map(u => u.trim())
-    .filter(Boolean);
+  const conductorUrls = parseConductorUrls(conductorUrlsRaw);
 
   const __dirname = dirname(fileURLToPath(import.meta.url));
   const jsonPath = resolve(__dirname, '../../data/humans/humans.json');
@@ -466,7 +466,7 @@ export async function main(): Promise<void> {
   console.log('=== Seed Agent Peer Bindings ===\n');
   console.log(`App ID prefix: ${appIdPrefix}`);
   console.log(
-    `Conductors:    ${conductorUrls.length > 0 ? conductorUrls.join(', ') : '(none — set CONDUCTOR_URLS)'}`,
+    `Conductors:    ${conductorUrls.length > 0 ? conductorUrls.map(e => e.url).join(', ') : '(none — set CONDUCTOR_URLS)'}`,
   );
   console.log(
     `Humans:        ${targets.length} node/device/doorway of ${humansJson.humans.length} total`,
@@ -584,7 +584,7 @@ export async function main(): Promise<void> {
     console.error(
       '  CONDUCTOR_URLS carries no `elohim-<name>-<env>` url matching any node/device/doorway human.',
     );
-    console.error(`  CONDUCTOR_URLS = ${conductorUrls.join(', ')}`);
+    console.error(`  CONDUCTOR_URLS = ${conductorUrls.map(e => e.url).join(', ')}`);
     process.exit(1);
   }
 

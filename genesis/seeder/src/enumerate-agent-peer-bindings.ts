@@ -116,7 +116,7 @@ async function activeBindings(
 }
 
 function expectedHumanId(url: string, humanIds: string[]): string | null {
-  return humanIds.find(id => conductorUrlForHuman(id, [url]) === url) ?? null;
+  return humanIds.find(id => conductorUrlForHuman(id, [{ name: null, url }]) === url) ?? null;
 }
 
 function readTargetHumanIds(): string[] {

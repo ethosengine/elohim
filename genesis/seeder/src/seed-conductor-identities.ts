@@ -8,8 +8,22 @@
  * Runs BEFORE seed-humans.ts (which registers with doorway).
  *
  * Environment variables:
- *   CONDUCTOR_URLS               Comma-separated conductor app WebSocket URLs
- *                                e.g. ws://elohim-adam-alpha:4445,ws://elohim-eve-alpha:4445
+ *   CONDUCTOR_URLS               Comma-separated conductor app WebSocket URLs.
+ *                                Two entry forms, freely mixed:
+ *                                  - hostname (today's cluster form), affine
+ *                                    when it follows `elohim-<name>-<env>`:
+ *                                    ws://elohim-adam-alpha:4445,ws://elohim-eve-alpha:4445
+ *                                  - named `name=url` (same `name=value`
+ *                                    convention as PEER_STORAGE_URLS — see
+ *                                    peer-id.ts's parseNamedCsv), for hosts
+ *                                    with no name-bearing hostname (local
+ *                                    `just mesh`, all on localhost):
+ *                                    matthew=ws://localhost:4445,jessica=ws://localhost:4455,james=ws://localhost:4465
+ *                                A named entry is name-affine for that human
+ *                                exactly as a hostname match is. The list is
+ *                                name-affine as a whole the moment ANY entry
+ *                                is named or hostname-affine — see
+ *                                urlsAreNameAffine / resolveCandidateUrls.
  *   INSTALLED_APP_ID             Holochain app ID prefix (default: elohim)
  *   CONDUCTOR_CONNECT_TIMEOUT_MS Per-connect timeout (default: 10000) — fail fast on
  *                                unreachable conductors so the stage's catchError can
@@ -25,12 +39,41 @@
  *
  * Conductor affinity: a human seeds ONLY onto their own pod, resolved by the
  * `elohim-<name>-<env>` service naming convention — the same rule
- * genesis/Jenkinsfile uses to build CONDUCTOR_URLS. First-reachable-wins is
- * how genesis #1119 got the founder FATAL: every human probed matthew's
+ * genesis/Jenkinsfile uses to build CONDUCTOR_URLS — OR by an explicit
+ * `name=url` CONDUCTOR_URLS entry (see above). First-reachable-wins is how
+ * genesis #1119 got the founder FATAL: every human probed matthew's
  * conductor first, saw SOME human existed (the old exists-check never compared
  * ids), and reported a no-op "exists" while matthew himself (doorway phase)
- * was filtered out entirely. When CONDUCTOR_URLS carries no name-affine URLs
- * (local dev), the legacy walk applies, but with the id-aware exists check.
+ * was filtered out entirely.
+ *
+ * A second-order variant of the same defect hit the local `just mesh`: its
+ * CONDUCTOR_URLS (`ws://localhost:4445,ws://localhost:4455,ws://localhost:4465`)
+ * carries no `elohim-<name>-` hostname segment at all, so the WHOLE list read
+ * as non-affine and the legacy first-reachable-wins walk applied to every
+ * human — including ADAM, who has no conductor in the mesh at all. ADAM
+ * walked the list, found james's pod (4465) unclaimed, and squatted on it;
+ * every subsequent human (jessica, james, eve, pete, terrance) then hit that
+ * pod first and reported `[C] Conflict` against a name that wasn't theirs.
+ * The fix is the named `name=url` form: once ANY entry in CONDUCTOR_URLS
+ * carries a name, the list is name-affine as a whole (`urlsAreNameAffine`),
+ * and a human with no matching name/hostname resolves to ZERO candidates
+ * (`resolveCandidateUrls`) — `[-] Skipped`, never a cast onto someone else's
+ * conductor. The legacy first-reachable-wins walk survives only for a FULLY
+ * unnamed, non-hostname-affine list (a loopback mesh with no name=url
+ * entries at all) — main() prints a loud warning when that path is taken,
+ * since the cast is then genuinely arbitrary.
+ *
+ * Deriving a name from PEER_STORAGE_URLS by index was considered (matching
+ * CONDUCTOR_URLS[i] to the i-th PEER_STORAGE_URLS entry) and rejected: it's
+ * a coincidence of list ORDER, not a fact the storage surface asserts. No
+ * read-only elohim-storage route exposes which Holochain conductor a storage
+ * pod is wired to (`HOLOCHAIN_APP_URL`) — `GET /auth/me`'s `conductorEndpoint`
+ * is the storage pod's OWN libp2p peer id / bind address (identity.rs /
+ * http.rs `handle_auth_me`), and `GET /health`'s `conductor.mode` is only
+ * `embedded`/`external`, never a URL. `GET /p2p/status` is the same libp2p
+ * identity, again not a Holochain conductor URL. So this script does NOT
+ * guess a conductor's owner from PEER_STORAGE_URLS index alignment — pass
+ * `name=url` CONDUCTOR_URLS entries explicitly instead.
  *
  *   seed-results-conductor-identities.json — structured per-human results,
  *     written next to the script. The Jenkinsfile reads this to emit a
@@ -48,6 +91,7 @@ import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AdminWebsocket, AppWebsocket, type AppInfo } from '@holochain/client';
+import { parseNamedCsv } from './peer-id.js';
 
 // Canonical artifact filename from build-artifacts.json — single source of
 // truth across Groovy + TypeScript + JS. Resolved once at module load so
@@ -291,24 +335,96 @@ export function humanShortName(humanId: string): string {
   return humanId.replace(/^human-/, '').split('-')[0];
 }
 
-/** A URL set is name-affine when any URL follows `elohim-<name>-<env>`. */
-const NAME_AFFINE_RE = /elohim-[a-z0-9]+-/;
-
-export function urlsAreNameAffine(conductorUrls: string[]): boolean {
-  return conductorUrls.some(u => NAME_AFFINE_RE.test(u));
+/** One parsed CONDUCTOR_URLS entry — named (`name=url`) or bare (`url`). */
+export interface ConductorUrlEntry {
+  /** null for a bare/unnamed entry — hostname affinity is the only signal. */
+  name: string | null;
+  url: string;
 }
 
 /**
- * Resolve the conductor URL that belongs to this human via the
- * `elohim-<name>-<env>` service convention. Null when the human has no
- * deployed conductor in the list.
+ * Parse CONDUCTOR_URLS. Reuses peer-id.ts's parseNamedCsv (the same
+ * `name=value` convention PEER_STORAGE_URLS already uses) — a bare entry
+ * with no `name=` prefix comes back with `name: null` and keeps today's
+ * hostname-affinity behaviour untouched.
+ */
+export function parseConductorUrls(raw: string): ConductorUrlEntry[] {
+  return parseNamedCsv(raw).map(({ name, value }) => ({ name, url: value }));
+}
+
+/** A URL follows `elohim-<name>-<env>` — capture group extracts `<name>`. */
+const NAME_AFFINE_RE = /elohim-([a-z0-9]+)-/;
+
+/** The short name a hostname-convention URL implies, or null if none. */
+function hostnameAffineName(url: string): string | null {
+  return NAME_AFFINE_RE.exec(url)?.[1] ?? null;
+}
+
+/**
+ * The list is name-affine as a whole the moment ANY entry is explicitly
+ * named OR follows the `elohim-<name>-<env>` hostname convention. This is a
+ * property of the WHOLE list, not any one human — it is what
+ * resolveCandidateUrls consults to decide whether an unmatched human is
+ * skipped (affine list) or falls into the legacy first-reachable-wins walk
+ * (fully unnamed, non-hostname list — local loopback mesh with no names).
+ */
+export function urlsAreNameAffine(entries: ConductorUrlEntry[]): boolean {
+  return entries.some(e => e.name !== null || NAME_AFFINE_RE.test(e.url));
+}
+
+/**
+ * Resolve the conductor URL that belongs to this human — an explicit
+ * `name=url` entry matching `humanShortName(humanId)` exactly, or (when no
+ * named entry matches) the `elohim-<name>-<env>` hostname convention. Named
+ * entries are checked first so a mixed list can override a stale/absent
+ * hostname match. Null when the human has no matching entry in the list.
  */
 export function conductorUrlForHuman(
   humanId: string,
-  conductorUrls: string[]
+  entries: ConductorUrlEntry[]
 ): string | null {
   const name = humanShortName(humanId);
-  return conductorUrls.find(u => u.includes(`elohim-${name}-`)) ?? null;
+  const named = entries.find(e => e.name === name);
+  if (named) return named.url;
+  return entries.find(e => hostnameAffineName(e.url) === name)?.url ?? null;
+}
+
+/**
+ * Resolve the ordered list of conductor URLs to try for a human.
+ *
+ * - Name-affine list (ANY entry named or hostname-affine): exactly the
+ *   human's own URL, or none. NEVER the whole list — this is the local-mesh
+ *   fix: a human with no matching entry (adam, on `just mesh`) must be
+ *   skipped, not cast onto whichever OTHER human's conductor answers first.
+ * - Fully unnamed, non-hostname-affine list (a bare loopback mesh with no
+ *   names at all): the legacy first-reachable-wins walk — every URL, in
+ *   order. main() warns loudly when this path is taken.
+ */
+export function resolveCandidateUrls(
+  humanId: string,
+  entries: ConductorUrlEntry[]
+): string[] {
+  if (urlsAreNameAffine(entries)) {
+    const own = conductorUrlForHuman(humanId, entries);
+    return own ? [own] : [];
+  }
+  return entries.map(e => e.url);
+}
+
+/**
+ * Cast-table label for one CONDUCTOR_URLS entry — printed at the top of
+ * main() so an operator can see the resolved binding before any connection
+ * is attempted. Pure; exported for tests.
+ */
+export function describeConductorEntry(entry: ConductorUrlEntry): string {
+  if (entry.name !== null) {
+    return `${entry.name} → ${entry.url} (named)`;
+  }
+  const hostname = hostnameAffineName(entry.url);
+  if (hostname !== null) {
+    return `${hostname} → ${entry.url} (hostname-affine)`;
+  }
+  return `? → ${entry.url} (unnamed)`;
 }
 
 /**
@@ -332,13 +448,14 @@ export function extractHumanId(result: unknown): string | undefined {
 // =============================================================================
 
 /**
- * Seed one human onto THEIR conductor (name-affine), or — when CONDUCTOR_URLS
- * has no name-affine URLs (local dev) — walk the list with the id-aware
- * exists check.
+ * Seed one human onto THEIR conductor (name-affine — by explicit `name=url`
+ * entry or the `elohim-<name>-<env>` hostname convention), or — when
+ * CONDUCTOR_URLS has NO named or hostname-affine entries at all (a bare
+ * loopback mesh) — walk the whole list with the id-aware exists check.
  */
 async function seedHumanOnConductor(
   human: HumansJsonHuman,
-  conductorUrls: string[],
+  conductorUrls: ConductorUrlEntry[],
   appIdPrefix: string
 ): Promise<ConductorResult> {
   const base: Pick<ConductorResult, 'displayName' | 'humanId'> = {
@@ -347,17 +464,18 @@ async function seedHumanOnConductor(
   };
 
   // Name-affine targeting: this human's own pod, or nothing. The legacy
-  // walk survives only for non-affine URL sets (local dev).
+  // walk survives only when NOTHING in the list is named or hostname-affine
+  // (a bare loopback mesh) — resolveCandidateUrls never falls back to the
+  // full list once ANY entry elsewhere in the set is affine.
   const affine = urlsAreNameAffine(conductorUrls);
-  const ownUrl = conductorUrlForHuman(human.id, conductorUrls);
-  const candidates = affine ? (ownUrl ? [ownUrl] : []) : conductorUrls;
+  const candidates = resolveCandidateUrls(human.id, conductorUrls);
 
   if (candidates.length === 0) {
     return {
       ...base,
       conductorUrl: '(none)',
       result: 'skipped',
-      error: `no conductor deployed for this human (no elohim-${humanShortName(human.id)}-* in CONDUCTOR_URLS)`,
+      error: `no conductor deployed for this human (no elohim-${humanShortName(human.id)}-* or name=url entry in CONDUCTOR_URLS)`,
     };
   }
 
@@ -455,10 +573,7 @@ async function main(): Promise<void> {
   const conductorUrlsRaw = process.env.CONDUCTOR_URLS ?? '';
   const appIdPrefix = process.env.INSTALLED_APP_ID ?? 'elohim';
 
-  const conductorUrls = conductorUrlsRaw
-    .split(',')
-    .map(u => u.trim())
-    .filter(Boolean);
+  const conductorUrls = parseConductorUrls(conductorUrlsRaw);
 
   // Load humans.json (generated artifact from genesis/data/humans/*.md)
   const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -480,16 +595,37 @@ async function main(): Promise<void> {
 
   console.log('=== Seed Conductor Identities ===\n');
   console.log(`App ID prefix: ${appIdPrefix}`);
-  console.log(
-    `Conductors:    ${conductorUrls.length > 0 ? conductorUrls.join(', ') : '(none — set CONDUCTOR_URLS)'}`
-  );
+  if (conductorUrls.length > 0) {
+    console.log('Cast:');
+    for (const entry of conductorUrls) {
+      console.log(`  ${describeConductorEntry(entry)}`);
+    }
+  } else {
+    console.log('Conductors:    (none — set CONDUCTOR_URLS)');
+  }
   console.log(`Humans:        ${targets.length} node/device/doorway of ${humansJson.humans.length} total`);
   console.log('');
 
   if (conductorUrls.length === 0) {
     console.error('ERROR: CONDUCTOR_URLS is not set. Set it to comma-separated conductor app WebSocket URLs.');
     console.error('  Example: CONDUCTOR_URLS=ws://elohim-adam-alpha:4445,ws://elohim-eve-alpha:4445');
+    console.error('  Or the named local-mesh form: CONDUCTOR_URLS=matthew=ws://localhost:4445,jessica=ws://localhost:4455,james=ws://localhost:4465');
     process.exit(1);
+  }
+
+  // A fully unnamed, non-hostname-affine list (bare loopback mesh) makes
+  // resolveCandidateUrls fall back to first-reachable-wins for EVERY human —
+  // genuinely arbitrary. Say so loudly instead of casting silently (the
+  // ADAM-onto-james's-conductor defect this file's header documents).
+  if (!urlsAreNameAffine(conductorUrls)) {
+    console.warn(
+      'WARN: loopback mesh without names — cast is first-reachable-wins; pass name=url entries.\n' +
+        '  Every human below will walk this whole list in order and bind to whichever pod\n' +
+        '  answers first, INCLUDING humans with no conductor of their own (they will be cast\n' +
+        '  onto someone else\'s conductor and reported as a false [C] Conflict downstream).\n' +
+        '  Fix: CONDUCTOR_URLS="matthew=ws://localhost:4445,jessica=ws://localhost:4455,james=ws://localhost:4465"'
+    );
+    console.log('');
   }
 
   // Sort: doorway (founder hosts) first, then node, then device

@@ -66,6 +66,37 @@ const DEFAULT_STORAGE_URL_TEMPLATE =
 const DEFAULT_RESOLVE_TIMEOUT_MS = 5000;
 
 /**
+ * One parsed `name=value` (or bare, unnamed) CSV entry.
+ */
+export interface NamedCsvEntry {
+  /** null when the entry carries no `name=` prefix — a bare value. */
+  name: string | null;
+  value: string;
+}
+
+/**
+ * Parse a comma-separated `name=value` list — the convention shared by
+ * PEER_STORAGE_URLS, CONDUCTOR_URLS's named form (seed-conductor-identities),
+ * and substrate-verify. An entry with no `=` (or an empty name before it) is
+ * unnamed: its whole trimmed text becomes `value`, `name` is null. Callers
+ * that require a name (e.g. PEER_STORAGE_URLS) simply never match an unnamed
+ * entry; callers that accept mixed named/unnamed lists (CONDUCTOR_URLS) can
+ * branch on `name === null`. Empty entries (blank between commas) are
+ * dropped, not returned as `{name: null, value: ''}`.
+ */
+export function parseNamedCsv(csv: string): NamedCsvEntry[] {
+  return csv
+    .split(',')
+    .map(entry => entry.trim())
+    .filter(Boolean)
+    .map(entry => {
+      const eq = entry.indexOf('=');
+      if (eq <= 0) return { name: null, value: entry };
+      return { name: entry.slice(0, eq), value: entry.slice(eq + 1) };
+    });
+}
+
+/**
  * Storage-pod base URL for a human. Resolution order:
  *   1. PEER_STORAGE_URLS — the `name=host:port` CSV convention shared with
  *      substrate-verify / seed-provide-rows / the Jenkinsfile's
@@ -79,13 +110,9 @@ export function storageUrlForHuman(humanId: string): string {
   const shortName = humanId.replace(/^human-/, '').split('-')[0];
   const csv = process.env.PEER_STORAGE_URLS;
   if (csv) {
-    for (const entry of csv.split(',')) {
-      const trimmed = entry.trim();
-      const eq = trimmed.indexOf('=');
-      if (eq <= 0) continue;
-      if (trimmed.slice(0, eq) === shortName) {
-        const hostPort = trimmed.slice(eq + 1);
-        return hostPort.includes('://') ? hostPort : `http://${hostPort}`;
+    for (const { name, value } of parseNamedCsv(csv)) {
+      if (name === shortName) {
+        return value.includes('://') ? value : `http://${value}`;
       }
     }
   }
