@@ -202,9 +202,31 @@ fn normalize_create_input(
 
     // Pre-normalize: plain string → one-element array (both fields are
     // array-typed in the view and array-JSON in storage).
+    //
+    // A string that is ALREADY an encoded JSON array is parsed, never wrapped
+    // again. The seeder sends exactly that shape —
+    // `genesis/seeder/src/seed-operator-bindings.ts` builds
+    // `inScopeOf: JSON.stringify(spec.scopes)` — and the unconditional wrap
+    // stored it as one opaque element, so the value round-tripped through
+    // `ReaCommitmentView` as
+    // `["[\"host:alpha.elohim.host\",\"epr_root:elohim-host-landing\"]"]`
+    // and no scope filter could ever match a member.
+    //
+    // The detector PARSES rather than sniffing the first byte: a scalar that
+    // merely starts with `[` but is not a `Vec<String>` array stays a scalar.
     for key in ["resourceClassifiedAs", "inScopeOf"] {
         if let Some(s) = raw.get(key).and_then(|v| v.as_str()).map(String::from) {
-            raw[key] = serde_json::Value::Array(vec![serde_json::Value::String(s)]);
+            let already_encoded = s
+                .trim_start()
+                .starts_with('[')
+                .then(|| serde_json::from_str::<Vec<String>>(&s).ok())
+                .flatten();
+            raw[key] = match already_encoded {
+                Some(items) => serde_json::Value::Array(
+                    items.into_iter().map(serde_json::Value::String).collect(),
+                ),
+                None => serde_json::Value::Array(vec![serde_json::Value::String(s)]),
+            };
         }
     }
 
@@ -371,5 +393,85 @@ mod tests {
             + body["collectivePct"].as_u64().unwrap()
             + body["freePct"].as_u64().unwrap();
         assert_eq!(sum, 100, "ratio pcts must sum to 100, got {body:?}");
+    }
+
+    /// The seeder sends these fields ALREADY JSON-encoded
+    /// (`genesis/seeder/src/seed-operator-bindings.ts:253`:
+    /// `inScopeOf: JSON.stringify(spec.scopes)`). The plain-string pre-wrap
+    /// wrapped that encoded string in a SECOND array, so the value round-tripped
+    /// through `ReaCommitmentView` as one opaque element —
+    /// `["[\"host:alpha.elohim.host\",\"epr_root:elohim-host-landing\"]"]` —
+    /// and no scope filter could ever match a member.
+    #[test]
+    fn already_encoded_json_array_strings_are_parsed_not_double_wrapped() {
+        let raw = serde_json::json!({
+            "id": "hosting-agreement-ef5a1e65191a56a9",
+            "action": "delegates-compute",
+            "provider": "matthew",
+            "receiver": "elohim-commons",
+            "resourceClassifiedAs": "[\"compute\"]",
+            "inScopeOf": "[\"host:alpha.elohim.host\",\"epr_root:elohim-host-landing\"]",
+        });
+
+        let input = normalize_create_input(raw).expect("seeded body must normalize");
+
+        assert_eq!(
+            input.in_scope_of.as_deref(),
+            Some(r#"["host:alpha.elohim.host","epr_root:elohim-host-landing"]"#),
+            "an already-encoded array must be parsed, never re-wrapped"
+        );
+        assert_eq!(
+            input.resource_classified_as.as_deref(),
+            Some(r#"["compute"]"#)
+        );
+    }
+
+    /// A plain scalar keeps wrapping — the legacy flat shape (a bare
+    /// `"compute"`) is still a live wire form and must land as a one-element
+    /// JSON array so the view's parse-as-array read succeeds.
+    #[test]
+    fn plain_scalar_array_fields_still_wrap() {
+        let raw = serde_json::json!({
+            "id": "c1",
+            "action": "delegates-compute",
+            "provider": "matthew",
+            "receiver": "elohim-commons",
+            "resourceClassifiedAs": "compute",
+            "inScopeOf": "host:alpha.elohim.host",
+        });
+
+        let input = normalize_create_input(raw).expect("legacy body must normalize");
+
+        assert_eq!(
+            input.resource_classified_as.as_deref(),
+            Some(r#"["compute"]"#)
+        );
+        assert_eq!(
+            input.in_scope_of.as_deref(),
+            Some(r#"["host:alpha.elohim.host"]"#)
+        );
+    }
+
+    /// A real JSON array (the canonical view shape) is untouched, and a string
+    /// that merely LOOKS bracket-ish but is not a `Vec<String>` array stays a
+    /// scalar — the detector parses, it does not sniff the first byte.
+    #[test]
+    fn native_arrays_pass_through_and_non_array_brackets_stay_scalar() {
+        let raw = serde_json::json!({
+            "id": "c2",
+            "action": "delegates-compute",
+            "provider": "matthew",
+            "receiver": "elohim-commons",
+            "resourceClassifiedAs": ["compute", "storage"],
+            "inScopeOf": "[not json",
+        });
+
+        let input = normalize_create_input(raw).expect("view body must normalize");
+
+        assert_eq!(
+            input.resource_classified_as.as_deref(),
+            Some(r#"["compute","storage"]"#)
+        );
+        assert_eq!(input.in_scope_of.as_deref(), Some(r#"["[not json"]"#));
     }
 }
