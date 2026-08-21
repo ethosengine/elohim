@@ -5,6 +5,32 @@ Feature: Delivery Diagnostics — Observability and Controlled Degradation
   So that I can diagnose delivery issues, verify fallback behavior, and understand
   what my network is actually capable of
 
+  THE DELIVERY LAYERS, top to bottom. Every scenario below names one of these, and
+  the peer-capability scenarios describe the same layers from a neighbour's point of
+  view rather than from the doorway's:
+
+    | layer              | who answers            | what it means                                    |
+    |--------------------|------------------------|--------------------------------------------------|
+    | service worker     | the browser itself     | already-cached responses, no network at all       |
+    | projection cache   | the doorway            | the app's files, kept ready; storage is untouched |
+    | storage-extraction | elohim-storage         | individual files unpacked from the ZIP on the node|
+    | blob-decompress    | elohim-storage         | no unpacked copy left; the ZIP is opened per read |
+
+  A response says which one answered it, and "storage-proxy" in the cache-miss
+  scenario means only "the doorway did not answer — it went to storage"; which of
+  the two storage layers served is the finer distinction the fallback walk draws.
+
+  A PEER advertises the same facts about itself: `serves_extracted` is "I can hand
+  you one file" (the storage-extraction layer), `serves_compressed` is "I can hand
+  you the whole ZIP" (blob-decompress), `cache_tier` names the highest layer that
+  peer keeps warm, and `ready_content` lists what is warm right now. That is what
+  makes a capability summary readable as delivery posture: it says, per peer, how
+  cheaply this network can give a learner the next file they need.
+
+  Matthew is the operator throughout — the person with access to the diagnostic and
+  admin routes. Terrance is a learner, and appears where the point is the experience
+  the operator is diagnosing rather than the diagnosis itself.
+
   This epic exists because Matthew discovered the need for projection caching by
   observing Evolution of Trust cause storage OOM under browser load. The ability
   to see what each layer does — and turn layers off to observe the result — is

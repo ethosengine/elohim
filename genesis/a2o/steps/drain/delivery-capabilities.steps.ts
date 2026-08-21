@@ -343,3 +343,32 @@ Then('the new response is cached with the new blob_hash', async function (this: 
       `(baseline ${String(state.originalHash)})`
   );
 });
+
+/**
+ * Name the propagation trigger the invalidation actually rests on, so the
+ * causal chain is visible in the Gherkin rather than implied: elohim-storage
+ * publishes an SSE event stream, the doorway's storage-events subscriber
+ * consumes it, and a content.{created,updated,deleted} event for a slug clears
+ * every cached file for that slug. Nothing polls; nothing compares hashes at
+ * request time. This step asserts the stream the whole mechanism hangs off is
+ * actually being consumed — a doorway with a dead subscription would evict
+ * nothing and the next step's failure would look like a cache bug.
+ */
+When(
+  'storage publishes the content-changed event for {string}',
+  async function (this: E2EWorld, _slug: string) {
+    const base = doorwayUrl(this);
+    const { status, body } = await getJson(`${base}/admin/self-healing`);
+    assert.equal(status, 200, `GET /admin/self-healing returned ${status}`);
+    const warmup = (body as Record<string, unknown>)['warmup'] as
+      | Record<string, unknown>
+      | undefined;
+    assert.ok(
+      warmup && warmup['lastError'] === null,
+      'the doorway is not consuming storage events cleanly ' +
+        `(warmup.lastError=${JSON.stringify(warmup?.['lastError'])}). Eviction is PUSHED over ` +
+        "that stream, so with it broken no re-seed can reach the cache and the next step's " +
+        'failure would read as a cache bug rather than a dead subscription.'
+    );
+  }
+);

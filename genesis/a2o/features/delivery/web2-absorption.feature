@@ -1,20 +1,28 @@
-# NOT @requires:shem: every scenario here is single-doorway (one doorway's projection
-# cache in front of one storage). shem is the remote multi-tenant canvas; carrying that
-# tag is what moved this feature in and out of held/ with the shem flip (41c565f3e)
-# rather than with anything it actually depends on.
+# Every scenario here runs against a single doorway in front of a single storage node.
+# Nothing depends on remote multi-tenant compute, so this feature carries no tag for it.
 @e2e @content @delivery @requires:doorway @requires:seeded-content
 Feature: Web2 Absorption — Doorway Projection Cache
   As a learner visiting via browser
   I want HTML5 apps to load without 502 errors
   So that the protocol experience works regardless of how many learners are on at once
 
-  Doorway's projection cache absorbs browser traffic patterns (30+ concurrent
-  asset requests per HTML5 app) before they reach storage. Storage is a P2P node,
-  not a CDN. The cache is permanent architecture — the onboarding flywheel that
-  protects the entire network.
+  An HTML5 app ships as one ZIP blob. A browser opening it does not fetch one
+  thing — it fetches the entry page and then every asset that page references,
+  30+ requests in a burst. Storage is a peer's node, not a CDN, and a handful of
+  learners arriving at once is enough to bury it. So the doorway keeps a copy of
+  the app's files and answers from that.
 
-  The invariant: the ZIP blob is truth. MongoDB cache is a projection that can be
-  rebuilt from the blob. Hash-based invalidation propagates on re-seed.
+  It is called a PROJECTION cache because it is derived, never authoritative:
+  every entry can be thrown away and rebuilt from the ZIP blob, which is the only
+  source of truth. That is what makes it safe to evict aggressively.
+
+  How a stale entry finds out it is stale: elohim-storage publishes an event
+  stream, the doorway subscribes to it, and a content.created/updated/deleted
+  event for a slug clears every cached file for that slug. The next request for
+  it re-resolves the blob hash from storage and re-populates. Nothing polls, and
+  nothing compares hashes at request time — the eviction is pushed.
+
+  `evolution-of-trust` is the bundled HTML5 app used as the fixture throughout.
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
@@ -31,6 +39,12 @@ Feature: Web2 Absorption — Doorway Projection Cache
     And the projection cache contains entries for "evolution-of-trust"
     And each cache entry records the blob_hash from storage
 
+  # An EPR agreement is the protocol's record of permission: the terms under which one party
+  # may hold and serve another's content. "Self-negotiated" means the doorway writes its own —
+  # it is caching on its own initiative, so it records the permission it is acting under rather
+  # than waiting to be granted one. The point of putting that id on a cache entry is provenance:
+  # every copy the doorway serves can name what entitled it to hold that copy.
+  #
   # Still @wip, and for a reason worth naming: no surface exposes a cache ENTRY. The doorway
   # publishes GET /admin/cache/stats (counts only), so "each entry carries an agreement_id"
   # is unobservable from outside the process — the claim has no witness, in a test or for an
@@ -52,9 +66,9 @@ Feature: Web2 Absorption — Doorway Projection Cache
     And zero requests reach elohim-storage
 
   # A "browser" here is the whole bundle, not one file: 30 browsers fan ~1200 requests at
-  # one doorway from a single source IP, past the membrane's 900-second ban threshold. That
-  # is an act which changes the mesh for every other run on it, so the first step holds the
-  # scenario unless the operator has said go.
+  # one doorway from a single source IP, past the doorway's own rate limiter, which bans a
+  # source for 900 seconds at that volume. That is an act which changes the mesh for every
+  # other run on it, so the first step holds the scenario unless the operator has said go.
   @requires:owned-substrate @act:i
   Scenario: Storage remains stable under concurrent browser load
     Given this run owns the doorway's request budget
@@ -81,6 +95,7 @@ Feature: Web2 Absorption — Doorway Projection Cache
   Scenario: Re-seeded content invalidates stale cache entries
     Given the projection cache for "evolution-of-trust" is warm with blob_hash "sha256-old"
     When "evolution-of-trust" is re-seeded with a new ZIP blob
+    And storage publishes the content-changed event for "evolution-of-trust"
     Then the projection cache entries for "evolution-of-trust" with hash "sha256-old" are evicted
     And the next request for "evolution-of-trust" proxies to storage
     And the new response is cached with the new blob_hash
