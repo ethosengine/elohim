@@ -276,6 +276,8 @@ run_seed_leg "seed-commitments" soft \
 #    Nothing plays that part here, so Act I casts jessica co-stewarding the
 #    landing EPR — the pledge saga ch09's `commonsCommitments` counts and the
 #    distribution round its `stewardingCollectives` scope depends on.
+# mkdir before use: step 6 creates MESH_DIR, and this leg runs before it.
+mkdir -p "$MESH_DIR"
 DRILL_PAIRS_PATH="$MESH_DIR/drill-custody-pairs.json"
 rm -f "$DRILL_PAIRS_PATH"
 export DRILL_PAIRS_PATH
