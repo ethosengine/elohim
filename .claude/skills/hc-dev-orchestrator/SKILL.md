@@ -70,7 +70,10 @@ their pacing environment into new npm aliases.
 `hc-mesh.sh` brings the mesh's PROCESSES up; it does not cast the household.
 Once `just mesh start` reports both doorways healthy, run the Prologue to
 seed the Act I substrate a2o's `@act:i` scenarios need — named conductor
-identities, the landing + lamad-spa bundles (browser AND the landing's SSR
+identities, the base corpus rows every later leg patches bytes onto
+(`elohim-host-landing`, `lamad-spa`, `evolution-of-trust` — seed a row here or
+its stage leg 404s and the scenarios that need it env-red on the
+precondition), the landing + lamad-spa bundles (browser AND the landing's SSR
 server bundle), the full CI-order seed chain (identities cast BEFORE `seed-humans` on the mesh — doorway A's hosted pool is matthew's conductor, so hosted registrations must not claim it first), and the household fixture
 manifest `genesis/a2o/src/framework/fixtures/household-mesh.ts` resolves
 against, and Act I's own cast — the drill fixtures two resilience features
