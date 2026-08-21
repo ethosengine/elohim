@@ -115,6 +115,17 @@ Splitting the key (or weighting by route class) would have contained this incide
 counter-argument is real: a genuinely dead peer should shed everything, and per-route keys multiply
 the state a half-open trial has to cover. Decide deliberately; do not drift into it.
 
+**Decided 2026-08-21 (operator):** the breaker key stays per-endpoint; it is the *shed* that becomes
+class-aware, not the circuit. Freshness tolerance is graded by the read's declared stakes —
+`Knowledge` (content/blob/app-bundle) → serve the last-good bytes marked `x-elohim-freshness: amber`;
+`ValueCoupled` → amber with warning; `Authority` (auth/session/identity/governance, head-declare,
+all writes) and `CounterEvidence` → green-only, i.e. the existing honest 503 (plus
+`x-elohim-freshness-required: green`). Stage (`ELOHIM_NETWORK_STAKES`, Bootstrap default) prices the
+non-floor rows. Being behind becomes a trust signal on the wire, not an outage. Predicate lives in
+`crates/seam-contracts` (`freshness::verdict`), consumed by the doorway first; storage's own
+projector-lag shed consuming the same predicate is rung 2. Spec of record: memory
+`project_freshness_graded_by_declared_stakes`; a2o flip authority: `@concern:doorway-failover`.
+
 **2b. The unexplained ignition, and the one thing this investigation did NOT close.** `/p2p/status`
 is served by a `tokio::watch` borrow — zero I/O, no DB, no conductor — yet three independent
 verifiers measured it at **12.018–12.071 s against BOTH matthew and adam** at different times. A
