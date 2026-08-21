@@ -48,35 +48,69 @@ pub struct CreateNodeStewardshipInput {
 // CRUD Operations — StewardedNode
 // ============================================================================
 
-/// Insert a new stewarded node record.
+/// Outcome of `create_stewarded_node`.
 ///
-/// Returns the created `StewardedNode` row. Errors if the `id` already exists.
+/// A duplicate registration of an existing content-addressed/deterministic
+/// row is not an internal error (concern canon C6b idempotent effect, C10
+/// contract honesty): the caller gets back the existing row, discriminated
+/// by whether the resubmitted payload matches what is already on record.
+#[derive(Debug, Clone)]
+pub enum StewardedNodeOutcome {
+    /// No row existed for this id — a fresh row was inserted.
+    Created(StewardedNode),
+    /// A row already existed and the caller's payload matches its
+    /// content-bearing fields byte-for-byte — safe to treat as success.
+    ExistingMatch(StewardedNode),
+    /// A row already existed but the caller's payload disagrees with it on
+    /// at least one content-bearing field — a genuine conflict, not a retry.
+    ExistingConflict(StewardedNode),
+}
+
+impl StewardedNodeOutcome {
+    /// Unwrap to the row regardless of outcome — convenience for callers
+    /// (tests, upstream callers) that only need the row.
+    pub fn into_row(self) -> StewardedNode {
+        match self {
+            Self::Created(n) | Self::ExistingMatch(n) | Self::ExistingConflict(n) => n,
+        }
+    }
+}
+
+/// Register a stewarded node idempotently.
+///
+/// Returns `StewardedNodeOutcome::Created` on first registration. A
+/// resubmission of the same `id` is NOT an internal error — SQLite's
+/// `UNIQUE constraint failed` is caught at the `INSERT` via
+/// `ON CONFLICT DO NOTHING`, then the existing row is compared against the
+/// caller's payload: an identical resubmission comes back as
+/// `ExistingMatch` (map to HTTP 200), a payload that disagrees on a
+/// content-bearing field comes back as `ExistingConflict` (map to HTTP 409).
 pub fn create_stewarded_node(
     conn: &mut SqliteConnection,
     input: CreateStewardedNodeInput,
-) -> Result<StewardedNode, StorageError> {
+) -> Result<StewardedNodeOutcome, StorageError> {
     let id = if input.id.is_empty() {
         Uuid::new_v4().to_string()
     } else {
-        input.id
+        input.id.clone()
     };
 
     let now = current_timestamp();
 
     let new_node = NewStewardedNode {
         id: id.clone(),
-        display_name: input.display_name,
-        claim_status: input.claim_status,
+        display_name: input.display_name.clone(),
+        claim_status: input.claim_status.clone(),
         cpu_cores: input.cpu_cores,
         memory_gb: input.memory_gb,
         storage_tb: input.storage_tb,
         bandwidth_mbps: input.bandwidth_mbps,
-        steward_tier: input.steward_tier,
+        steward_tier: input.steward_tier.clone(),
         custodian_opt_in: input.custodian_opt_in,
-        region: input.region,
-        context_epr_id: input.context_epr_id,
-        dht_anchor_hash: input.dht_anchor_hash,
-        h_app_id: input.h_app_id,
+        region: input.region.clone(),
+        context_epr_id: input.context_epr_id.clone(),
+        dht_anchor_hash: input.dht_anchor_hash.clone(),
+        h_app_id: input.h_app_id.clone(),
         // Archetype/household fields populated by Task C5 upsert_from_shape;
         // legacy callers leave them null/default.
         device_archetype_id: None,
@@ -91,25 +125,57 @@ pub fn create_stewarded_node(
         signed_at: None,
     };
 
-    diesel::insert_into(stewarded_nodes::table)
+    let inserted = diesel::insert_into(stewarded_nodes::table)
         .values(&new_node)
+        .on_conflict(stewarded_nodes::id)
+        .do_nothing()
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Failed to insert stewarded node: {}", e)))?;
 
-    // Set created_at / updated_at via an immediate update so the returned row has timestamps.
-    // (Diesel insert_into doesn't support DEFAULT expressions for SQLite TEXT columns.)
-    diesel::update(stewarded_nodes::table.filter(stewarded_nodes::id.eq(&id)))
-        .set((
-            stewarded_nodes::created_at.eq(&now),
-            stewarded_nodes::updated_at.eq(&now),
-        ))
-        .execute(conn)
-        .map_err(|e| {
-            StorageError::Internal(format!("Failed to set timestamps on stewarded node: {}", e))
-        })?;
+    if inserted == 1 {
+        // Set created_at / updated_at via an immediate update so the returned row has timestamps.
+        // (Diesel insert_into doesn't support DEFAULT expressions for SQLite TEXT columns.)
+        diesel::update(stewarded_nodes::table.filter(stewarded_nodes::id.eq(&id)))
+            .set((
+                stewarded_nodes::created_at.eq(&now),
+                stewarded_nodes::updated_at.eq(&now),
+            ))
+            .execute(conn)
+            .map_err(|e| {
+                StorageError::Internal(format!("Failed to set timestamps on stewarded node: {}", e))
+            })?;
 
-    get_stewarded_node_by_id(conn, &id)?
-        .ok_or_else(|| StorageError::Internal("StewardedNode not found after insert".to_string()))
+        let row = get_stewarded_node_by_id(conn, &id)?.ok_or_else(|| {
+            StorageError::Internal("StewardedNode not found after insert".to_string())
+        })?;
+        return Ok(StewardedNodeOutcome::Created(row));
+    }
+
+    // ON CONFLICT DO NOTHING fired — a row with this id already exists.
+    // Compare the caller's payload against the existing row's
+    // content-bearing fields. dht_anchor_hash and h_app_id are excluded:
+    // they are context-injected (zome-commit / app_ctx), never part of the
+    // client's registration payload.
+    let existing = get_stewarded_node_by_id(conn, &id)?.ok_or_else(|| {
+        StorageError::Internal("StewardedNode disappeared after conflicting insert".to_string())
+    })?;
+
+    let matches = existing.display_name == input.display_name
+        && existing.claim_status == input.claim_status
+        && existing.cpu_cores == input.cpu_cores
+        && existing.memory_gb == input.memory_gb
+        && existing.storage_tb == input.storage_tb
+        && existing.bandwidth_mbps == input.bandwidth_mbps
+        && existing.steward_tier == input.steward_tier
+        && existing.custodian_opt_in == input.custodian_opt_in
+        && existing.region == input.region
+        && existing.context_epr_id == input.context_epr_id;
+
+    if matches {
+        Ok(StewardedNodeOutcome::ExistingMatch(existing))
+    } else {
+        Ok(StewardedNodeOutcome::ExistingConflict(existing))
+    }
 }
 
 /// Retrieve a stewarded node by its stable ID.
@@ -304,45 +370,100 @@ pub fn list_by_household_with_peer_status(
 // CRUD Operations — NodeStewardship
 // ============================================================================
 
-/// Insert a new node stewardship relationship.
+/// Outcome of `create_node_stewardship`. Mirrors `StewardedNodeOutcome` — a
+/// duplicate `(node_id, human_id)` submission is not an internal error
+/// (concern canon C6b idempotent effect, C10 contract honesty).
+#[derive(Debug, Clone)]
+pub enum NodeStewardshipOutcome {
+    /// No row existed for this `(node_id, human_id)` pair — freshly inserted.
+    Created(NodeStewardship),
+    /// A row already existed and the caller's payload matches its
+    /// content-bearing fields — safe to treat as success.
+    ExistingMatch(NodeStewardship),
+    /// A row already existed but disagrees with the caller's payload on at
+    /// least one content-bearing field — a genuine conflict.
+    ExistingConflict(NodeStewardship),
+}
+
+impl NodeStewardshipOutcome {
+    /// Unwrap to the row regardless of outcome.
+    pub fn into_row(self) -> NodeStewardship {
+        match self {
+            Self::Created(s) | Self::ExistingMatch(s) | Self::ExistingConflict(s) => s,
+        }
+    }
+}
+
+/// Grant a node stewardship relationship idempotently.
 ///
-/// The composite primary key is `(node_id, human_id)`. Returns the created row.
+/// The composite primary key is `(node_id, human_id)`. A resubmission of the
+/// same pair is caught at the `INSERT` via `ON CONFLICT DO NOTHING` rather
+/// than surfacing SQLite's `UNIQUE constraint failed` as an internal error;
+/// the existing row is then compared against the caller's payload to
+/// discriminate `ExistingMatch` (HTTP 200) from `ExistingConflict` (HTTP 409).
 pub fn create_node_stewardship(
     conn: &mut SqliteConnection,
     input: CreateNodeStewardshipInput,
-) -> Result<NodeStewardship, StorageError> {
+) -> Result<NodeStewardshipOutcome, StorageError> {
     let now = current_timestamp();
 
     let new_rel = NewNodeStewardship {
         node_id: input.node_id.clone(),
         human_id: input.human_id.clone(),
         affinity_score: input.affinity_score,
-        relationship: input.relationship,
-        context_epr_id: input.context_epr_id,
+        relationship: input.relationship.clone(),
+        context_epr_id: input.context_epr_id.clone(),
     };
 
-    diesel::insert_into(node_stewardship::table)
+    let inserted = diesel::insert_into(node_stewardship::table)
         .values(&new_rel)
+        .on_conflict((node_stewardship::node_id, node_stewardship::human_id))
+        .do_nothing()
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Failed to insert node stewardship: {}", e)))?;
 
-    // Set granted_at timestamp
-    diesel::update(
-        node_stewardship::table
-            .filter(node_stewardship::node_id.eq(&input.node_id))
-            .filter(node_stewardship::human_id.eq(&input.human_id)),
-    )
-    .set(node_stewardship::granted_at.eq(&now))
-    .execute(conn)
-    .map_err(|e| {
-        StorageError::Internal(format!(
-            "Failed to set granted_at on node stewardship: {}",
-            e
-        ))
-    })?;
+    if inserted == 1 {
+        // Set granted_at timestamp
+        diesel::update(
+            node_stewardship::table
+                .filter(node_stewardship::node_id.eq(&input.node_id))
+                .filter(node_stewardship::human_id.eq(&input.human_id)),
+        )
+        .set(node_stewardship::granted_at.eq(&now))
+        .execute(conn)
+        .map_err(|e| {
+            StorageError::Internal(format!(
+                "Failed to set granted_at on node stewardship: {}",
+                e
+            ))
+        })?;
 
-    get_node_stewardship(conn, &input.node_id, &input.human_id)?
-        .ok_or_else(|| StorageError::Internal("NodeStewardship not found after insert".to_string()))
+        let row =
+            get_node_stewardship(conn, &input.node_id, &input.human_id)?.ok_or_else(|| {
+                StorageError::Internal("NodeStewardship not found after insert".to_string())
+            })?;
+        return Ok(NodeStewardshipOutcome::Created(row));
+    }
+
+    // ON CONFLICT DO NOTHING fired — a row for this (node_id, human_id) pair
+    // already exists. Compare content-bearing fields against the caller's
+    // payload (granted_at is a server-stamped timestamp, not payload).
+    let existing =
+        get_node_stewardship(conn, &input.node_id, &input.human_id)?.ok_or_else(|| {
+            StorageError::Internal(
+                "NodeStewardship disappeared after conflicting insert".to_string(),
+            )
+        })?;
+
+    let matches = existing.affinity_score == input.affinity_score
+        && existing.relationship == input.relationship
+        && existing.context_epr_id == input.context_epr_id;
+
+    if matches {
+        Ok(NodeStewardshipOutcome::ExistingMatch(existing))
+    } else {
+        Ok(NodeStewardshipOutcome::ExistingConflict(existing))
+    }
 }
 
 /// Retrieve a specific stewardship record by `(node_id, human_id)`.
@@ -422,6 +543,28 @@ mod tests {
         }
     }
 
+    /// Insert a human fixture row — `node_stewardship.human_id` carries a
+    /// `REFERENCES humans(id)` FK, enforced under the test pool's SQLite
+    /// connection, so stewardship tests need a real humans row to point at.
+    fn insert_human(conn: &mut SqliteConnection, id: &str) {
+        crate::db::humans::create_human(
+            conn,
+            crate::db::humans::CreateHumanInput {
+                id: id.to_string(),
+                agent_pub_key: None,
+                display_name: format!("Human {id}"),
+                bio: None,
+                affinities: "[]".to_string(),
+                profile_reach: "public".to_string(),
+                location: None,
+                profile_photo_url: None,
+                h_app_id: "elohim".to_string(),
+                household_id: None,
+            },
+        )
+        .expect("create human fixture");
+    }
+
     /// Insert a peer status row joined to a node id (peer_id == node id).
     fn insert_peer(conn: &mut SqliteConnection, peer_id: &str, status: &str, updated_at: i64) {
         upsert_peer(
@@ -498,5 +641,207 @@ mod tests {
         let count =
             distinct_active_households(&mut conn, 120, now).expect("distinct_active_households");
         assert_eq!(count, 0, "a node with no joined peer status is not counted");
+    }
+
+    // ========================================================================
+    // Idempotent registration — StewardedNode
+    // ========================================================================
+
+    /// Build a `CreateStewardedNodeInput` matching the exact seeder payload
+    /// shape (see `genesis/seeder/src/seed-nodes.ts` `registerNode`), varied
+    /// only by the fields the test cares about.
+    fn seeder_node_input(id: &str, display_name: &str, cpu_cores: i32) -> CreateStewardedNodeInput {
+        CreateStewardedNodeInput {
+            id: id.to_string(),
+            display_name: display_name.to_string(),
+            claim_status: "unclaimed".to_string(),
+            cpu_cores,
+            memory_gb: 16,
+            storage_tb: 2.0,
+            bandwidth_mbps: 500,
+            steward_tier: "household".to_string(),
+            custodian_opt_in: 1,
+            region: Some("us-east".to_string()),
+            context_epr_id: Some("epr:node-context:1".to_string()),
+            dht_anchor_hash: None,
+            h_app_id: "elohim".to_string(),
+        }
+    }
+
+    /// First registration of a node id creates the row.
+    #[test]
+    fn create_stewarded_node_first_call_creates() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        let outcome = create_stewarded_node(&mut conn, seeder_node_input("n-alpha", "Alpha", 4))
+            .expect("create_stewarded_node");
+
+        match outcome {
+            StewardedNodeOutcome::Created(row) => {
+                assert_eq!(row.id, "n-alpha");
+                assert_eq!(row.display_name, "Alpha");
+            }
+            other => panic!("expected Created, got {other:?}"),
+        }
+    }
+
+    /// Regression: registering the exact same node payload twice (the seeder's
+    /// re-run shape) must NOT surface a 500-class internal error — it must
+    /// come back as an idempotent ExistingMatch carrying the same row, so a
+    /// resumed/retried seed run does not fail.
+    #[test]
+    fn create_stewarded_node_duplicate_matching_payload_is_existing_match_not_error() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        let first = create_stewarded_node(&mut conn, seeder_node_input("n-beta", "Beta", 8))
+            .expect("first create_stewarded_node");
+        let first_row = match first {
+            StewardedNodeOutcome::Created(row) => row,
+            other => panic!("expected Created on first call, got {other:?}"),
+        };
+
+        let second = create_stewarded_node(&mut conn, seeder_node_input("n-beta", "Beta", 8))
+            .expect("duplicate create_stewarded_node must not error");
+
+        match second {
+            StewardedNodeOutcome::ExistingMatch(row) => {
+                assert_eq!(row.id, first_row.id);
+                assert_eq!(row.display_name, first_row.display_name);
+                assert_eq!(row.cpu_cores, first_row.cpu_cores);
+            }
+            other => panic!("expected ExistingMatch, got {other:?}"),
+        }
+    }
+
+    /// A resubmission under the same id but with a content-bearing field that
+    /// disagrees with the row on record is a genuine conflict, not a silent
+    /// no-op — the caller gets the existing row back so it can compare.
+    #[test]
+    fn create_stewarded_node_duplicate_conflicting_payload_is_existing_conflict() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        create_stewarded_node(&mut conn, seeder_node_input("n-gamma", "Gamma", 4))
+            .expect("first create_stewarded_node");
+
+        // Same id, different cpu_cores — a disagreeing resubmission.
+        let second = create_stewarded_node(&mut conn, seeder_node_input("n-gamma", "Gamma", 16))
+            .expect("conflicting create_stewarded_node must not error");
+
+        match second {
+            StewardedNodeOutcome::ExistingConflict(row) => {
+                assert_eq!(row.id, "n-gamma");
+                // The row on record still reflects the FIRST registration —
+                // the conflicting resubmission never overwrote it.
+                assert_eq!(row.cpu_cores, 4);
+            }
+            other => panic!("expected ExistingConflict, got {other:?}"),
+        }
+    }
+
+    // ========================================================================
+    // Idempotent registration — NodeStewardship
+    // ========================================================================
+
+    fn steward_input(
+        node_id: &str,
+        human_id: &str,
+        affinity_score: f64,
+        relationship: &str,
+    ) -> CreateNodeStewardshipInput {
+        CreateNodeStewardshipInput {
+            node_id: node_id.to_string(),
+            human_id: human_id.to_string(),
+            affinity_score,
+            relationship: relationship.to_string(),
+            context_epr_id: Some("epr:stewardship-context:1".to_string()),
+        }
+    }
+
+    #[test]
+    fn create_node_stewardship_first_call_creates() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        insert_node(&mut conn, "n-stew-1", None);
+        insert_human(&mut conn, "h-matthew");
+
+        let outcome = create_node_stewardship(
+            &mut conn,
+            steward_input("n-stew-1", "h-matthew", 0.9, "primary"),
+        )
+        .expect("create_node_stewardship");
+
+        match outcome {
+            NodeStewardshipOutcome::Created(row) => {
+                assert_eq!(row.node_id, "n-stew-1");
+                assert_eq!(row.human_id, "h-matthew");
+            }
+            other => panic!("expected Created, got {other:?}"),
+        }
+    }
+
+    /// Regression: re-granting the exact same stewardship (node_id, human_id,
+    /// payload) must not 500 — the seeder re-runs this call idempotently.
+    #[test]
+    fn create_node_stewardship_duplicate_matching_payload_is_existing_match_not_error() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        insert_node(&mut conn, "n-stew-2", None);
+        insert_human(&mut conn, "h-adam");
+
+        create_node_stewardship(
+            &mut conn,
+            steward_input("n-stew-2", "h-adam", 0.75, "primary"),
+        )
+        .expect("first create_node_stewardship");
+
+        let second = create_node_stewardship(
+            &mut conn,
+            steward_input("n-stew-2", "h-adam", 0.75, "primary"),
+        )
+        .expect("duplicate create_node_stewardship must not error");
+
+        match second {
+            NodeStewardshipOutcome::ExistingMatch(row) => {
+                assert_eq!(row.node_id, "n-stew-2");
+                assert_eq!(row.human_id, "h-adam");
+                assert_eq!(row.affinity_score, 0.75);
+            }
+            other => panic!("expected ExistingMatch, got {other:?}"),
+        }
+    }
+
+    /// A resubmission for the same (node_id, human_id) pair with a different
+    /// affinity_score/relationship is a genuine conflict.
+    #[test]
+    fn create_node_stewardship_duplicate_conflicting_payload_is_existing_conflict() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        insert_node(&mut conn, "n-stew-3", None);
+        insert_human(&mut conn, "h-jane");
+
+        create_node_stewardship(
+            &mut conn,
+            steward_input("n-stew-3", "h-jane", 0.5, "primary"),
+        )
+        .expect("first create_node_stewardship");
+
+        let second = create_node_stewardship(
+            &mut conn,
+            steward_input("n-stew-3", "h-jane", 0.5, "secondary"),
+        )
+        .expect("conflicting create_node_stewardship must not error");
+
+        match second {
+            NodeStewardshipOutcome::ExistingConflict(row) => {
+                assert_eq!(row.node_id, "n-stew-3");
+                assert_eq!(row.human_id, "h-jane");
+                // The row on record still reflects the FIRST registration.
+                assert_eq!(row.relationship, "primary");
+            }
+            other => panic!("expected ExistingConflict, got {other:?}"),
+        }
     }
 }

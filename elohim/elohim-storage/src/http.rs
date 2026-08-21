@@ -9129,9 +9129,25 @@ impl HttpServer {
                 input.h_app_id = app_ctx.h_app_id.clone();
 
                 match crate::db::stewarded_nodes::create_stewarded_node(&mut conn, input) {
-                    Ok(node) => {
+                    Ok(crate::db::stewarded_nodes::StewardedNodeOutcome::Created(node)) => {
                         let view: StewardedNodeView = node.into();
                         Ok(response::created(&view))
+                    }
+                    // A resubmission of an already-registered node whose payload
+                    // matches what's on record is not an error (C6b idempotent
+                    // effect) — hand back the existing row with 200.
+                    Ok(crate::db::stewarded_nodes::StewardedNodeOutcome::ExistingMatch(node)) => {
+                        let view: StewardedNodeView = node.into();
+                        Ok(response::ok(&view))
+                    }
+                    // A resubmission whose payload disagrees with the existing row
+                    // is a genuine conflict (C10 contract honesty) — 409 with the
+                    // existing row so the caller can see what it disagrees with.
+                    Ok(crate::db::stewarded_nodes::StewardedNodeOutcome::ExistingConflict(
+                        node,
+                    )) => {
+                        let view: StewardedNodeView = node.into();
+                        Ok(response::json_response(StatusCode::CONFLICT, &view))
                     }
                     Err(e) => Ok(response::error_response(e)),
                 }
@@ -9224,7 +9240,19 @@ impl HttpServer {
                     input_view.into();
 
                 match crate::db::stewarded_nodes::create_node_stewardship(&mut conn, input) {
-                    Ok(stewardship) => {
+                    Ok(outcome) => {
+                        // Idempotent-effect discrimination (C6b/C10): a
+                        // resubmission of the same (node_id, human_id) pair is
+                        // not an internal error. Matching payload -> 200 with
+                        // the existing row; disagreeing payload -> 409 with
+                        // the existing row so the caller can see the conflict.
+                        use crate::db::stewarded_nodes::NodeStewardshipOutcome as O;
+                        let status = match &outcome {
+                            O::Created(_) => StatusCode::CREATED,
+                            O::ExistingMatch(_) => StatusCode::OK,
+                            O::ExistingConflict(_) => StatusCode::CONFLICT,
+                        };
+                        let stewardship = outcome.into_row();
                         let name =
                             crate::db::humans::get_human_by_id(&mut conn, &stewardship.human_id)
                                 .ok()
@@ -9233,7 +9261,7 @@ impl HttpServer {
                                 .unwrap_or_else(|| stewardship.human_id.clone());
                         let view =
                             crate::views::node_stewardship_view_from_with_name(stewardship, name);
-                        Ok(response::created(&view))
+                        Ok(response::json_response(status, &view))
                     }
                     Err(e) => Ok(response::error_response(e)),
                 }
@@ -14512,6 +14540,43 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
         .route(
             Route::post("/api/v1/nodes/shape")
                 .handler("post_node_shape")
+                .build(),
+        )
+        // =====================================================================
+        // /db/nodes — stewarded node registry + stewardship relationships
+        // =====================================================================
+        // Read/write. Diesel projection of the physical node registry (source
+        // of truth: NodeRegistration DHT entry, node-registry DNA). Registration
+        // and stewardship-grant are idempotent (C6b): a resubmission of an
+        // already-registered node/stewardship pair is never a 500 — it comes
+        // back 200 (matching payload) or 409 (conflicting payload), both
+        // carrying the row on record. These handlers existed and worked when
+        // called directly against elohim-storage, but were never declared here,
+        // so the doorway RouteRegistry (compiled from this manifest) 404'd every
+        // /db/nodes* request proxied through a doorway — see http.rs handle_nodes_list
+        // / handle_node_by_id / handle_node_stewardship (~line 9086+).
+        .route(
+            Route::get("/db/nodes")
+                .handler("list_stewarded_nodes")
+                .cache_ttl(30)
+                .build(),
+        )
+        .route(
+            Route::post("/db/nodes")
+                .handler("register_stewarded_node")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::get("/db/nodes/{id}")
+                .handler("get_stewarded_node")
+                .cache_ttl(30)
+                .build(),
+        )
+        .route(
+            Route::post("/db/nodes/{id}/stewardship")
+                .handler("create_node_stewardship")
+                .auth_required()
                 .build(),
         )
         // =====================================================================
