@@ -341,7 +341,15 @@ async function declareContent(
     signal: AbortSignal.timeout(30_000),
   });
   if (response.ok) return 'created';
-  return `HTTP ${response.status} ${(await response.text()).slice(0, 200)}`;
+
+  // The GET above reads through the `require_provenance` gate, so a row that
+  // exists but has neither a dht_anchor_hash nor a p2p_published_at answers 404
+  // — and the insert then trips the UNIQUE constraint with a 500. That is the
+  // row EXISTING, not a failure; reporting it as one would make an idempotent
+  // re-seed look broken on every run.
+  const text = await response.text();
+  if (text.includes('UNIQUE') || text.includes('already exists')) return 'exists';
+  return `HTTP ${response.status} ${text.slice(0, 200)}`;
 }
 
 /** One self-custody pair per (peer, fixture) — the shape seed-commitments.ts reads. */
@@ -574,13 +582,26 @@ if (isMain) {
       console.warn(`  [?] some holders refused the bytes: ${push.failures.join('; ')}`);
     }
 
-    const declared = await declareContent(storageUrl, fixture, blob, apiKey);
-    if (declared === 'created' || declared === 'exists') {
-      console.log(`  [${declared === 'created' ? '+' : '='}] content row ${declared}`);
+    // Declared on EVERY peer, not just the authoring one: each peer keeps its
+    // own content table, the insert path is what fires that peer's own
+    // distribute_shards round, and a scenario reading through a doorway whose
+    // primary never heard of the row gets a 404 that looks like a heal defect.
+    const declareTargets = [...new Set([storageUrl, ...peerUrls])];
+    const outcomes = await Promise.all(
+      declareTargets.map(target => declareContent(target, fixture, blob, apiKey)),
+    );
+    const landed = outcomes.filter(o => o === 'created' || o === 'exists').length;
+    if (landed > 0) {
+      console.log(`  [+] content row on ${landed}/${declareTargets.length} peer(s)`);
       seeded.push({ contentId: fixture.id, hash: blob.hash, sizeBytes: blob.data.length });
     } else {
-      console.error(`  [X] content declare failed: ${declared}`);
+      console.error(`  [X] content declare failed everywhere: ${outcomes.join(' | ')}`);
       failed += 1;
+    }
+    for (const [index, outcome] of outcomes.entries()) {
+      if (outcome !== 'created' && outcome !== 'exists') {
+        console.warn(`  [?] ${declareTargets[index]}: ${outcome}`);
+      }
     }
   }
 
