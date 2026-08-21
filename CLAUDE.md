@@ -29,6 +29,7 @@ just gate elohim-storage      # explicit manifest project or owning path
 just test app                 # focused test family
 just dev start                # isolated conductor + storage + doorway
 just mesh status              # local multi-peer mesh
+just mesh prologue            # Act I Prologue: cast + seed + stage + fixture manifest (run after `just mesh start`)
 just seed validate            # non-writing schema validation
 just look page <url>          # eyes-first render
 just status habits
