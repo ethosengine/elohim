@@ -413,11 +413,39 @@ fn validate_schema_version_header(req: &Request<Incoming>) -> Result<Option<u32>
     }
 }
 
-/// Check whether an identifier looks like a content address (sha256-...) rather
-/// than a human-readable slug. Used by `/apps/` routes to decide whether to
-/// resolve via `slug_index` or treat the identifier as a direct blob hash.
+/// Check whether an identifier is a content address rather than a
+/// human-readable slug. Used by `/apps/` routes to decide whether to resolve
+/// via `slug_index` or treat the identifier as a direct blob address.
+///
+/// TWO spellings of one address are accepted, and both are canonical inputs:
+///
+/// - **CIDv1 base32** (`bafkrei…` raw+sha2-256, `bafyrei…` dag-cbor) — the
+///   canonical protocol address (root CLAUDE.md / p2p-design-gate). This is
+///   what `X-Content-Address` reports, so a client that round-trips that header
+///   back into `/apps/{identifier}/…` MUST resolve; before this recognizer knew
+///   CIDv1, it fell through to slug lookup and 404'd `App not found: bafkrei…`.
+/// - **`sha256-{hex}`** — the legacy alias, and the on-disk blob-store key.
+///
+/// A CID candidate is validated with the `cid` crate rather than matched on its
+/// `baf` prefix, so a slug that merely starts with `baf` (`bafflegab-app`)
+/// stays a slug.
 fn is_content_address(identifier: &str) -> bool {
-    identifier.starts_with("sha256-") && identifier.len() > 10
+    if identifier.starts_with("sha256-") && identifier.len() > 10 {
+        return true;
+    }
+    identifier.starts_with("baf") && cid::Cid::from_str(identifier).is_ok()
+}
+
+/// Canonical `sha256-{hex}` form of a content address (CIDv1 or `sha256-…`),
+/// or `None` when the identifier is not an address at all.
+///
+/// Both spellings of one address normalize to a single key so `/apps/{cid}/…`
+/// and `/apps/{sha256-…}/…` share ONE extraction-cache entry (and one blob
+/// path) instead of extracting the same bundle twice under two names.
+fn canonical_content_address(identifier: &str) -> Option<String> {
+    BlobStore::parse_content_address(identifier)
+        .ok()
+        .map(|hex| format!("sha256-{}", hex))
 }
 
 /// Fix B syncing-status JSON body for the `GET /blob/{hash}` route: the
@@ -7314,17 +7342,21 @@ impl HttpServer {
                 .unwrap());
         }
 
-        // Resolve identifier: content address bypasses slug_index lookup
+        // Resolve identifier: content address bypasses slug_index lookup. A
+        // CIDv1 and its `sha256-{hex}` alias normalize to one canonical key.
         let is_cid = is_content_address(identifier);
+        let canonical = canonical_content_address(identifier)
+            .filter(|_| is_cid)
+            .unwrap_or_else(|| identifier.to_string());
         let (resolved_slug, blob_hash) = if is_cid {
-            (None, Some(identifier.to_string()))
+            (None, Some(canonical.clone()))
         } else {
             let hash = self.slug_index.read().await.get(identifier).cloned();
             (Some(identifier.to_string()), hash)
         };
 
-        // Cache key: use slug when available, otherwise the CID itself
-        let cache_key = resolved_slug.as_deref().unwrap_or(identifier);
+        // Cache key: use slug when available, otherwise the canonical address
+        let cache_key = resolved_slug.as_deref().unwrap_or(canonical.as_str());
 
         // Check extraction cache warmth
         let (ready, delivery_mode) = match (&self.extraction_cache, &blob_hash) {
@@ -7420,10 +7452,16 @@ impl HttpServer {
                 .unwrap());
         }
 
-        // Resolve identifier: content address bypasses slug_index lookup
+        // Resolve identifier: content address bypasses slug_index lookup. A
+        // CIDv1 (`bafkrei…`) and its `sha256-{hex}` alias normalize to one
+        // canonical key, so the two spellings of one address share a single
+        // extraction-cache entry and one blob path.
         let is_cid = is_content_address(identifier);
+        let canonical = canonical_content_address(identifier)
+            .filter(|_| is_cid)
+            .unwrap_or_else(|| identifier.to_string());
         let (resolved_slug, cached_blob_hash) = if is_cid {
-            (None, Some(identifier.to_string()))
+            (None, Some(canonical.clone()))
         } else {
             let hash = {
                 let index = self.slug_index.read().await;
@@ -7432,8 +7470,8 @@ impl HttpServer {
             (Some(identifier.to_string()), hash)
         };
 
-        // Cache key: use slug when available, otherwise the CID itself
-        let cache_key = resolved_slug.as_deref().unwrap_or(identifier);
+        // Cache key: use slug when available, otherwise the canonical address
+        let cache_key = resolved_slug.as_deref().unwrap_or(canonical.as_str());
 
         debug!(identifier = %identifier, file_path = %file_path, is_cid = %is_cid, "App file request");
 
@@ -15835,6 +15873,100 @@ mod apps_resolver_heal_tests {
             BlobHealOutcome::Syncing { started } => assert!(started),
             other => panic!("expected Syncing, got {other:?}"),
         }
+    }
+
+    /// CIDv1 base32 (`bafkrei…` raw+sha2-256) is the CANONICAL content address
+    /// per the p2p-design-gate; bare `sha256-…` is the legacy alias. Both must
+    /// read as content addresses so `/apps/{address}/…` bypasses slug lookup.
+    /// A slug that merely starts with `baf` must stay a slug — the recognizer
+    /// validates with the `cid` crate rather than pattern-matching a prefix.
+    #[test]
+    fn is_content_address_recognizes_cidv1_and_rejects_slugs() {
+        let sha = format!("sha256-{}", "a".repeat(64));
+        assert!(is_content_address(&sha), "legacy sha256- form");
+
+        let cid = BlobStore::hash_to_cid(&sha).unwrap().to_string();
+        assert!(cid.starts_with("bafkrei"), "raw+sha2-256 CIDv1, got {cid}");
+        assert!(
+            is_content_address(&cid),
+            "CIDv1 base32 is a content address"
+        );
+
+        assert!(!is_content_address("evolution-of-trust"));
+        assert!(
+            !is_content_address("bafflegab-app"),
+            "hyphenated slug is not a CID"
+        );
+        assert!(!is_content_address("baf"));
+        assert!(!is_content_address(""));
+    }
+
+    /// Both spellings of ONE content address normalize to the same canonical
+    /// `sha256-{hex}` blob key, so `/apps/{cid}/…` and `/apps/{sha256-…}/…`
+    /// share one extraction-cache entry instead of extracting the bundle twice.
+    #[test]
+    fn canonical_content_address_collapses_both_spellings() {
+        let sha = format!("sha256-{}", "b".repeat(64));
+        let cid = BlobStore::hash_to_cid(&sha).unwrap().to_string();
+        assert_eq!(
+            canonical_content_address(&cid).as_deref(),
+            Some(sha.as_str())
+        );
+        assert_eq!(
+            canonical_content_address(&sha).as_deref(),
+            Some(sha.as_str())
+        );
+        assert_eq!(canonical_content_address("evolution-of-trust"), None);
+    }
+
+    /// The regression: `GET /apps/bafkrei…/index.html` 404'd with
+    /// "App not found: bafkrei…" because `is_content_address()` knew only the
+    /// legacy prefix, so the canonical address fell through to slug lookup.
+    /// A locally-present blob must serve under its CIDv1 identifier.
+    #[tokio::test]
+    async fn apps_resolver_serves_local_hit_via_cidv1_identifier() {
+        let server = test_server().await;
+        let zip = tiny_zip();
+        let stored = server.blob_store.store(&zip).await.unwrap();
+        let cid = BlobStore::hash_to_cid(&stored.hash).unwrap().to_string();
+        assert!(cid.starts_with("baf"), "CIDv1 identifier, got {cid}");
+
+        let resp = server
+            .handle_app_request(&format!("/apps/{cid}/index.html"), "")
+            .await
+            .unwrap();
+        let (status, body) = body_string(resp).await;
+        assert_eq!(
+            status,
+            StatusCode::OK,
+            "CID identifier must serve, body={body}"
+        );
+        assert!(body.contains("<title>ok</title>"));
+    }
+
+    /// The capability probe shares the recognizer: a CIDv1 identifier must be
+    /// reported as a blob hash, never resolved through `slug_index`.
+    #[tokio::test]
+    async fn app_capability_reports_blob_hash_for_cidv1_identifier() {
+        let server = test_server().await;
+        let sha = format!("sha256-{}", "c".repeat(64));
+        let cid = BlobStore::hash_to_cid(&sha).unwrap().to_string();
+        let resp = server
+            .handle_app_capability(&format!("/apps/{cid}/_capability"))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.headers()
+                .get("X-Blob-Hash")
+                .and_then(|v| v.to_str().ok()),
+            Some(sha.as_str()),
+            "CID identifier normalizes to the canonical sha256- blob key"
+        );
+        assert!(
+            resp.headers().get("X-Content-Slug").is_none(),
+            "a content address is never a slug"
+        );
     }
 }
 
