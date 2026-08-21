@@ -119,6 +119,44 @@ lazy_static! {
     )
     .unwrap();
 
+    // ── SSR RENDER COST — the doorway's only CPU-bound work ──────────────────
+    //
+    // The render is the one thing this gateway does that is not I/O. It runs on
+    // a dedicated `angular-renderer` OS thread (elohim-render), so it does not
+    // occupy a tokio worker — but its cost was entirely UNMEASURED, and on
+    // 2026-08-21 a stall that began at the first lamad render was diagnosed from
+    // log-line arrival rates because nothing counted renders at all. A cold
+    // render parses a ~51MB bundle; a warm one settles to tens of ms. Those two
+    // regimes must be distinguishable in a scrape, not inferred.
+
+    /// Wall-clock cost of one SSR render, in milliseconds, as the doorway
+    /// experienced it (handoff → reply, including any queue wait on the
+    /// capacity-1 isolate). Buckets straddle the warm regime (tens of ms) and
+    /// the cold-start regime (tens of seconds) so the first-render cliff is
+    /// visible as a bimodal distribution rather than an average that describes
+    /// neither mode.
+    pub static ref SSR_RENDER_DURATION_MS: HistogramVec = HistogramVec::new(
+        HistogramOpts::new(
+            "doorway_ssr_render_duration_ms",
+            "Wall-clock cost of one SSR render in milliseconds, by outcome.",
+        )
+        .buckets(vec![
+            10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1_000.0, 2_500.0, 5_000.0,
+            10_000.0, 30_000.0, 60_000.0,
+        ]),
+        &["outcome"],
+    )
+    .unwrap();
+
+    /// Renders in flight right now. The direct read of "is this doorway busy
+    /// rendering?" — the question the 2026-08-21 timeline had to reconstruct
+    /// from log-line arrival rates.
+    pub static ref SSR_RENDER_INFLIGHT: IntGauge = IntGauge::new(
+        "doorway_ssr_render_inflight",
+        "SSR renders currently executing.",
+    )
+    .unwrap();
+
     // ── R-CHAIN HOP TIMING — the read journey's per-hop cost ─────────────────
     //
     // The fast lane (Chain R) of the latency valueflow chain: browser-initiated,
@@ -551,6 +589,18 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(MEMBRANE_BANS_ACTIVE.clone()));
         let _ = REGISTRY.register(Box::new(FRESHNESS_VERDICT_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(FRESHNESS_PANTRY_BYTES.clone()));
+        let _ = REGISTRY.register(Box::new(SSR_RENDER_DURATION_MS.clone()));
+        let _ = REGISTRY.register(Box::new(SSR_RENDER_INFLIGHT.clone()));
+        // Pre-touch the closed outcome vocabulary. A label-bearing collector
+        // emits NO series until a label combination is observed — which is
+        // exactly why `doorway_conductor_close_code_total` was absent from live
+        // /metrics while readers assumed it was zero. A doorway that has served
+        // no render must read as a MEASURED zero, not as a missing metric.
+        for outcome in SSR_RENDER_OUTCOMES {
+            SSR_RENDER_DURATION_MS
+                .with_label_values(&[outcome])
+                .observe(0.0);
+        }
         let _ = REGISTRY.register(Box::new(HOP_DURATION_MS.clone()));
         // Pre-touch every hop so a doorway that never took one (e.g. no blob
         // request in the window) reads as a MEASURED zero rather than an absent
@@ -672,6 +722,45 @@ pub fn inbound_max() -> i64 {
 /// shed atomic the handoff §6 calls for).
 pub fn admission_shed_total() -> u64 {
     ADMISSION_SHED_TOTAL.get()
+}
+
+/// A render produced markup.
+pub const SSR_OUTCOME_OK: &str = "ok";
+/// A render failed (error, empty output, or the wall-time budget expired) and
+/// the request shed to the hydratable bundle fallback.
+pub const SSR_OUTCOME_FAILED: &str = "failed";
+/// The closed outcome vocabulary, pre-touched at boot.
+pub const SSR_RENDER_OUTCOMES: [&str; 2] = [SSR_OUTCOME_OK, SSR_OUTCOME_FAILED];
+
+/// Record one completed SSR render's wall-clock cost and outcome.
+pub fn observe_ssr_render(outcome: &str, duration_ms: f64) {
+    SSR_RENDER_DURATION_MS
+        .with_label_values(&[outcome])
+        .observe(duration_ms);
+}
+
+/// RAII in-flight tracker for one SSR render. Decrements on EVERY terminal path
+/// including a dropped (cancelled) request future — an in-flight gauge that can
+/// only be decremented explicitly drifts upward forever under client
+/// disconnects, and a gauge that lies is worse than no gauge.
+pub struct SsrRenderInFlight;
+
+impl SsrRenderInFlight {
+    pub fn enter() -> Self {
+        SSR_RENDER_INFLIGHT.inc();
+        Self
+    }
+}
+
+impl Drop for SsrRenderInFlight {
+    fn drop(&mut self) {
+        SSR_RENDER_INFLIGHT.dec();
+    }
+}
+
+/// Renders currently executing — the `/admin/self-healing` read of render load.
+pub fn ssr_render_inflight() -> i64 {
+    SSR_RENDER_INFLIGHT.get()
 }
 
 /// Membrane: record one verdict outcome ∈ {allow, shape, challenge, deny}.

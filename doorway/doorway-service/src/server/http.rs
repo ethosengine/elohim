@@ -329,6 +329,11 @@ pub struct AppState {
     /// ONE pooled HTTP client for the storage proxy (connect 3s / request 12s).
     /// Replaces per-request `reqwest::Client::new()` in forward_to_storage.
     pub storage_proxy_client: Arc<reqwest::Client>,
+    /// Pool-free client for the SSR render's V8 `fetch` shim. Separate from
+    /// `storage_proxy_client` so a parked render thread cannot strand a
+    /// connection the proxy path will later check out and hang on. See
+    /// [`init_ssr_render_client`].
+    pub ssr_render_client: Arc<reqwest::Client>,
 
     /// Per-upstream circuit breakers for the storage proxy (Pillar 2 layer 4).
     pub upstream_breakers: Arc<crate::routes::UpstreamBreakers>,
@@ -418,6 +423,60 @@ fn init_storage_proxy_client() -> Arc<reqwest::Client> {
             .timeout(std::time::Duration::from_secs(
                 crate::routes::storage_proxy::STORAGE_PROXY_REQUEST_TIMEOUT_SECS,
             ))
+            .build()
+            .unwrap_or_default(),
+    )
+}
+
+/// The HTTP client the SSR render's V8 `fetch` shim uses — deliberately its OWN
+/// client, and deliberately POOL-FREE.
+///
+/// WHY THIS IS NOT `storage_proxy_client`. The SSR render runs on a dedicated
+/// `angular-renderer` OS thread that owns the V8 isolate, driven by its own
+/// `current_thread` tokio runtime (elohim-render/src/angular.rs:316-366). That
+/// much is sound — the handoff is a non-blocking `try_send` and the caller awaits
+/// with `tokio::time::timeout`, so a render never occupies a tokio worker.
+///
+/// What is NOT sound is sharing a POOLED client across that boundary.
+/// hyper-util spawns each new connection's driver task onto whatever runtime is
+/// current when the connection is established — during a render, the render
+/// thread's runtime. When the render finishes, that thread returns to
+/// `for work in rx`, a **`std::sync::mpsc` blocking recv executed inside
+/// `block_on`** (angular.rs:25, 315, 329, 344), and the runtime stops polling
+/// forever. Every connection driver parked on it freezes — while the connections
+/// sit in the SHARED pool looking perfectly healthy. The main runtime then checks
+/// them out for proxy reads, `/health`, `/admin/self-healing`, everything, and
+/// each request hangs until the 12s client timeout.
+///
+/// MEASURED (local mesh 2026-08-21 20:22): doorway A served 169 requests in the
+/// 10s before its first lamad SSR render, then 23 → 15 → 3 → 2 → 1. Every request
+/// through the doorway took **exactly 12.00s** — `STORAGE_PROXY_REQUEST_TIMEOUT_
+/// SECS` to the millisecond — while the same storage answered a DIRECT probe in
+/// 1.6ms and `/admin/self-healing` was unreachable. Then the breaker opened on
+/// the doorway's OWN poisoned pool, `/health` degraded, saga ch01 went red.
+/// Exactly-the-timeout is the tell: a slow upstream gives a spread of latencies,
+/// a client-side timeout on a connection that never yields a byte gives one
+/// number, repeatedly. Storage was never slow.
+///
+/// `pool_max_idle_per_host(0)` is the containment: a render fetch's connection
+/// dies with the render that opened it, so a parked render thread leaves nothing
+/// behind for anyone to check out. The cost is a fresh connect per render fetch —
+/// paid on the render's own thread, against a local upstream, and bounded by
+/// `connect_timeout`. That is the correct trade against parking the whole gateway.
+///
+/// Reproduced and pinned in `tests/ssr_render_client_isolation.rs`.
+pub fn init_ssr_render_client() -> Arc<reqwest::Client> {
+    Arc::new(
+        reqwest::Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(
+                crate::routes::storage_proxy::STORAGE_PROXY_CONNECT_TIMEOUT_SECS,
+            ))
+            .timeout(std::time::Duration::from_secs(
+                crate::routes::storage_proxy::STORAGE_PROXY_REQUEST_TIMEOUT_SECS,
+            ))
+            // The whole point: never hand a connection back to a pool that
+            // another runtime could later check out. See above.
+            .pool_max_idle_per_host(0)
             .build()
             .unwrap_or_default(),
     )
@@ -613,6 +672,7 @@ impl AppState {
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
+            ssr_render_client: init_ssr_render_client(),
             upstream_breakers: Arc::new(crate::routes::UpstreamBreakers::default()),
             membrane_cfg: crate::server::membrane::edge_guard_config(),
             membrane_guard: std::sync::Mutex::new(crate::server::membrane::EdgeGuardStore::new(
@@ -730,6 +790,7 @@ impl AppState {
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
+            ssr_render_client: init_ssr_render_client(),
             upstream_breakers: Arc::new(crate::routes::UpstreamBreakers::default()),
             membrane_cfg: crate::server::membrane::edge_guard_config(),
             membrane_guard: std::sync::Mutex::new(crate::server::membrane::EdgeGuardStore::new(
@@ -862,6 +923,7 @@ impl AppState {
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
+            ssr_render_client: init_ssr_render_client(),
             upstream_breakers: Arc::new(crate::routes::UpstreamBreakers::default()),
             membrane_cfg: crate::server::membrane::edge_guard_config(),
             membrane_guard: std::sync::Mutex::new(crate::server::membrane::EdgeGuardStore::new(
@@ -1009,6 +1071,7 @@ impl AppState {
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
+            ssr_render_client: init_ssr_render_client(),
             upstream_breakers: Arc::new(crate::routes::UpstreamBreakers::default()),
             membrane_cfg: crate::server::membrane::edge_guard_config(),
             membrane_guard: std::sync::Mutex::new(crate::server::membrane::EdgeGuardStore::new(
@@ -4164,7 +4227,10 @@ async fn serve_ssr_route(
         let user_credential = build_ssr_user_credential(&req);
         let fetcher: Arc<dyn elohim_render::DataFetcher> = Arc::new(
             crate::ssr::ResolverFetcher::new(
-                Arc::clone(&state.storage_proxy_client),
+                // NOT storage_proxy_client: a render fetch's connection is
+                // established on the render thread's runtime, which stops being
+                // polled the moment the render ends. See init_ssr_render_client.
+                Arc::clone(&state.ssr_render_client),
                 endpoint.clone(),
             )
             .maybe_with_user_credential(user_credential),
@@ -4242,7 +4308,24 @@ async fn serve_ssr_route(
                 ..Default::default()
             },
         };
-        return match renderer.render(ctx).await {
+        // Measure the render. The doorway's ONE piece of CPU-bound work was
+        // entirely uncounted: on 2026-08-21 the stall that began at the first
+        // lamad render had to be diagnosed from log-line arrival rates, because
+        // no metric said a render was happening, how long it took, or how many
+        // were in flight. The in-flight tracker is RAII so a cancelled request
+        // cannot leave the gauge stuck high.
+        let _render_inflight = crate::metrics::SsrRenderInFlight::enter();
+        let render_started = std::time::Instant::now();
+        let render_result = renderer.render(ctx).await;
+        crate::metrics::observe_ssr_render(
+            if render_result.is_ok() {
+                crate::metrics::SSR_OUTCOME_OK
+            } else {
+                crate::metrics::SSR_OUTCOME_FAILED
+            },
+            render_started.elapsed().as_secs_f64() * 1000.0,
+        );
+        return match render_result {
             Ok(mut out) => {
                 // Stamp the correlation token onto the trace so the header + Loki
                 // line join browser ↔ doorway ↔ peer.
