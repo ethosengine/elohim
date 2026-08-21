@@ -80,10 +80,7 @@ just mesh start                # bring the mesh up first — the Prologue never 
 ./app/elohim-app/scripts/hc-mesh.sh prologue   # (or: bash hc-mesh-prologue.sh directly)
 ```
 
-`just mesh prologue` needs one addition to the `mesh` recipe's action
-whitelist in the root `justfile` (`start|stop|status|probe|prologue)` on the
-`case` line, plus the same addition to its usage message) — not yet wired;
-until then invoke `hc-mesh.sh prologue` directly.
+`just mesh prologue` is routed by the root `justfile` (`mesh` recipe whitelist); `hc-mesh.sh prologue` is the same entry point.
 
 **The cast fix — named `CONDUCTOR_URLS`.** An unnamed loopback conductor URL
 (`ws://localhost:4445,ws://localhost:4455,...`) resolves by first-reachable-
@@ -137,6 +134,31 @@ devfile endpoint; honors `MESH_MONITOR_PORT`) serves the one-page live
 dashboard: component liveness, per-peer convergence gauges, a gate-legs
 panel mirroring `fleet-quiesce-gate.sh`'s exact PASS predicate, log tails,
 and a phase/progress status bar.
+
+### Chaos and spin detection (`hc-mesh-spin-detector.sh`, `hc-mesh-chaos-rekey.sh`)
+
+The alpha conductor spin (sys-validation retrying unfetchable dependencies every 10 s,
+read-pool saturation logged at ~1000 lines/s — backlog
+`alpha-conductor-sys-validation-spin-unfetchable-deps.md`) is measured and staged at the desk:
+
+```bash
+bash app/elohim-app/scripts/hc-mesh-spin-detector.sh --window 20 --cycles 9        # verdict SPIN|QUIET + JSON
+bash app/elohim-app/scripts/hc-mesh-chaos-rekey.sh --peer james --tag act1 --phase author   # james-originated content, referenced by the others
+bash app/elohim-app/scripts/hc-mesh-chaos-rekey.sh --peer james --tag act1 --phase rekey    # destroy james's chain (conductor + key), keep his storage DB
+bash app/elohim-app/scripts/hc-mesh-chaos-rekey.sh --peer james --tag act1 --phase measure  # detector for 3+ min on the survivors
+```
+
+The detector reads per-conductor CPU from `/proc`, log-rate spectroscopy from `.sandbox_run_log`
+(saturation / `No peers to fetch` / `missing dependencies` with the count extracted) and says `SPIN`
+when the missing-dependency count is non-decreasing across ≥3 cycles with saturation above threshold.
+It is validated against alpha-shaped synthetic logs both ways. The three conductors are children of
+ONE `hc sandbox run` parent: a single-peer kill may drag the others down; the script restarts them
+from their existing sandboxes (no regenerate, no re-key) and says so loudly, because it changes the
+measure. Scenario: `genesis/a2o/features/resilience/conductor-validation-spin.feature`.
+
+**Trap:** `just mesh stop` kills by `pgrep -f` patterns (`elohim-storag[e]`, `doorwa[y]`, `hc sandbox`) —
+a shell whose command line contains those strings (an env assignment, a `pgrep -af …` argument) is
+SIGTERM'd too (exit 144). Run `just mesh stop` alone in its own command.
 
 ## Build and gate
 
@@ -226,6 +248,8 @@ pnpm exec ng serve --proxy-config proxy.conf.mjs --disable-host-check
 | `app/elohim-app/scripts/hc-mesh.sh` | local multi-peer mesh |
 | `app/elohim-app/scripts/hc-mesh-quiesce.sh` | bounded quiesce measure |
 | `app/elohim-app/scripts/hc-mesh-prologue.sh` | Act I Prologue cast (seeds an already-running mesh) |
+| `app/elohim-app/scripts/hc-mesh-spin-detector.sh` | conductor spin detector (CPU + log-rate spectroscopy → SPIN/QUIET + JSON) |
+| `app/elohim-app/scripts/hc-mesh-chaos-rekey.sh` | stage the unfetchable-dependency class: author on one peer, re-key it, measure the survivors |
 | `genesis/orchestrator/gate-runner.mjs` | manifest gate selection/execution |
 | `genesis/agentic/bin/pool-lib.sh` | cargo-pool family and slot authority |
 | `elohim/holochain/local-dev/.hc_ports` | local conductor ports |
