@@ -23,7 +23,7 @@ Feature: Conductor memory soak — a node stays alive under sustained load
 
   # --- Capability proof: the bridge that holds ------------------------------
 
-  @wip
+  @wip @act:ii
   Scenario: A busy anchor conductor sustains a multi-hour soak without OOM-restart
     Given human "James" runs a high-fanout anchor conductor on doorway "alpha"
     And the conductor is built with the jemalloc allocator
@@ -39,7 +39,7 @@ Feature: Conductor memory soak — a node stays alive under sustained load
 
   # --- Failure regression: the constraint anchor ----------------------------
 
-  @wip @regression
+  @wip @regression @act:ii
   Scenario: Without the jemalloc allocator, a busy conductor OOM-cycles under load
     Given a conductor built with the default glibc allocator
     And it serves sustained mesh traffic on a high-fanout anchor
@@ -55,7 +55,7 @@ Feature: Conductor memory soak — a node stays alive under sustained load
 
   # --- Observability gate: the diagnostic that enabled the cure -------------
 
-  @wip
+  @wip @act:i
   Scenario: An operator can read the conductor's leak-vs-cache memory verdict
     Given human "Matthew" is observing node health on doorway "alpha"
     When the conductor's memory is sampled

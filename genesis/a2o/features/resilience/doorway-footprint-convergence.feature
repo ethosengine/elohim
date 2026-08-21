@@ -1,4 +1,4 @@
-@e2e @resilience @federation @convergence-bar @regression @requires:household-nodes @concern:reconcile-inventory @dataplane
+@e2e @resilience @federation @convergence-bar @regression @requires:household-nodes @concern:reconcile-inventory @dataplane @act:i
 Feature: Federated doorways agree on the commons resilience footprint
   As a commons steward asking the mesh whether an EPR is held
   I want any two doorways to testify the same commitment-backed holder footprint

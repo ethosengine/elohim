@@ -1,4 +1,4 @@
-@e2e @resilience @governance @local @wip @concern:blob-durability @dataplane
+@e2e @resilience @governance @local @wip @concern:blob-durability @dataplane @act:i
 Feature: Governed auto-distribution via a revocable compute delegation
   As Matthew dogfooding a keyless Eclipse Che peer-client
   I want my content writes to drive distribute_shards only while a bounded, revocable
@@ -58,6 +58,8 @@ Feature: Governed auto-distribution via a revocable compute delegation
 
   # --- Bounded-minimum guard: no unbounded delegation ----------------------
 
+  # HELD (2026-08-21): explicitly unit-covered in seed-delegates-compute.test.ts;
+  # this a2o row duplicates it for the governance principle only.
   @regression
   Scenario: An unbounded compute delegation is refused at grant time
     When a "delegates-compute" grant is requested with a wildcard epr scope "*" but no finite rate and no finite ttl

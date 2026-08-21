@@ -1,4 +1,4 @@
-@e2e @resilience @resilience-card-lighting @concern:reconcile-inventory @dataplane
+@e2e @resilience @resilience-card-lighting @concern:reconcile-inventory @dataplane @act:i
 Feature: The commitment-backed card lights for a healed household
   As a household deciding whether the network is holding what matters to me
   I want the "commitment-backed" count to reflect the provide commitments my

@@ -1,4 +1,4 @@
-@e2e @resilience @resilience-dimensions @concern:blob-durability @dataplane
+@e2e @resilience @resilience-dimensions @concern:blob-durability @dataplane @act:i
 Feature: Resilience dimensions — the matrix that proves the felt-durability surface
   As a person deciding whether to trust this network with what matters to me
   I want every dimension of the resilience story — who protects it, how many
@@ -66,12 +66,17 @@ Feature: Resilience dimensions — the matrix that proves the felt-durability su
     # peers, multiplying counts per household — inflating status toward
     # protected. Pinned deterministically in the Rust D2 tests.
 
+  # HELD (2026-08-21): 'non-negative peerCount' on an unsigned count is
+  # unfalsifiable — it can only fail if the field is absent.
+  @wip
   Scenario: The header connection chip shows a live peer count
     When I request "/health" on doorway "alpha"
     Then the response reports a non-negative "peerCount"
 
   # --- D3: commitment-backing -------------------------------------------------
 
+  # HELD (2026-08-21): duplicates commitment-backed-card-lighting.feature's
+  # first scenario almost verbatim.
   @wip
   Scenario: A stewarding household with an active provide commitment is commitment-backed
     Given household "matthew-home" stewards content "dim-backed"
@@ -137,6 +142,8 @@ Feature: Resilience dimensions — the matrix that proves the felt-durability su
     And devices that report no storage are absent from the sums, not zeroed
     And the committed figure reflects only custody-blob commitments by Matthew's bound peers
 
+  # HELD (2026-08-21): already pinned by peer_capacity_service's Rust tests;
+  # this a2o row duplicates a unit boundary.
   @wip
   Scenario: A peer's capacity view never wraps an over-pledge into compliance
     Given a peer with no known disk capacity holds a storage pledge

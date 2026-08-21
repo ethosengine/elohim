@@ -20,23 +20,23 @@ Feature: Delivery reconciles to the available compute when a peer goes offline
   Background:
     Given the substrate signal has been read for this run
 
-  @e2e
+  @e2e @act:host
   Scenario: The household is never gated by a remote peer
     Then household person "Matthew" is reachable for testing
     And household person "Jessica" is reachable for testing
     And household person "James" is reachable for testing
 
-  @e2e
+  @e2e @act:host
   Scenario: A remote-only person is reachable exactly when the remote peer is up
     Then remote-only person "Gertrude" is reachable only when the remote peer is available
 
-  @e2e
+  @e2e @act:host
   Scenario: The run only ever scales down remote-only people, never the household
     When the household and a remote-only person are checked for reachability
     Then no household person has been scaled out this run
     And every person scaled out this run is a remote-only person
 
-  @wip
+  @wip @act:i
   Scenario: A household learner keeps reading while the remote peer is offline
     Given the remote peer is offline
     And human "Matthew" is logged in on doorway "alpha" with device
@@ -53,7 +53,7 @@ Feature: Delivery reconciles to the available compute when a peer goes offline
   # is missing from its OWN conductor (the DHT notary view), never from peer
   # bytes. Convergence becomes a property of the running mesh, not of a lucky
   # signal at author time.
-  @wip @regression
+  @wip @regression @act:i
   Scenario: A peer-discovered commitment converges from the own conductor
     Given a commitment exists on the household mesh that one peer missed the signal for
     And that peer's projection is missing the commitment

@@ -18,7 +18,7 @@ Feature: Observable + contract-aware auto-distribute
   # mesh to place it across >=2 households within 30s. That write-plus-placement
   # loop is what the local-stack profile exists for; against a deployed shared
   # fleet it would author test content into the substrate it is measuring.
-  @resilience-p1 @local
+  @resilience-p1 @local @act:i
   Scenario: Full placement across two households
     Given the cluster has peers in at least 2 distinct households each with an active "commons" provide commitment
     When I ingest a "commons"-reach content item "content-alpha"
@@ -29,7 +29,7 @@ Feature: Observable + contract-aware auto-distribute
   # --- Placement gap on short commitments ----------------------------------
 
   # @local: same ingest-then-place loop as the scenario above.
-  @resilience-p1 @local
+  @resilience-p1 @local @act:i
   Scenario: Placement gap when commitments are short
     Given the cluster has peers in 2 households but only 1 has an active "commons" provide commitment
     When I ingest a "commons"-reach content item "content-beta"
@@ -42,7 +42,7 @@ Feature: Observable + contract-aware auto-distribute
   # unconditionally, so both Then assertions are unreachable and this scenario measures
   # nothing. Sheds @wip when the step drives a real content-viewer — it is a browser
   # scenario, so it wants @browser-only then.
-  @resilience-p1 @wip
+  @resilience-p1 @wip @act:i
   Scenario: Content-viewer resilience tooltip is live
     Given "content-alpha" has been distributed to at least 2 households
     When I open the content-viewer for "content-alpha"
@@ -51,7 +51,7 @@ Feature: Observable + contract-aware auto-distribute
 
   # --- Shefa signals card --------------------------------------------------
 
-  @wip @resilience-p1
+  @wip @resilience-p1 @act:i
   Scenario: Shefa signals card reflects current placement gaps
     Given at least one placement gap exists in "/api/v1/placement-gaps"
     When I open "/shefa/dashboard"
@@ -60,7 +60,7 @@ Feature: Observable + contract-aware auto-distribute
 
   # --- Doorway admin snapshot icons ----------------------------------------
 
-  @wip @resilience-p1
+  @wip @resilience-p1 @act:i
   Scenario: Doorway admin content list shows resilience snapshot icons
     Given "content-alpha" is in the admin content list on doorway "alpha"
     When I open the admin content list
@@ -74,7 +74,7 @@ Feature: Observable + contract-aware auto-distribute
   # not per-peer. Reciprocity is a stewardship flow (inflow/outflow/net), not
   # a moral score.
 
-  @browser-only @resilience-p1
+  @browser-only @resilience-p1 @act:i
   Scenario: Operator can see their household device cluster
     Given human "Matthew" is logged in on doorway "alpha" with device
     And Matthew's household has 2 devices joined to a single steward
@@ -88,14 +88,14 @@ Feature: Observable + contract-aware auto-distribute
     # and archetype-label exact-text assertions tighten in iter-2+ once the
     # seeded multi-device shape is verified live.
 
-  @wip @resilience-p1
+  @wip @resilience-p1 @act:i
   Scenario: Cluster page shows offline device with last-seen freshness
     Given Matthew's household has device "matthew-mobile" archetype "mobile"
     And "matthew-mobile" went offline 4 minutes ago
     When Matthew opens "/shefa/cluster"
     Then the tile for "matthew-mobile" shows status "asleep · 4 min ago"
 
-  @browser-only @resilience-p1 @requires:shem
+  @browser-only @resilience-p1 @requires:shem @act:iii
   Scenario: Peer-topology page aggregates by household, not by peer
     Given human "Matthew" is logged in on doorway "alpha" with device
     And Matthew's substrate is reciprocally hosting with 3 distinct households
@@ -107,14 +107,14 @@ Feature: Observable + contract-aware auto-distribute
     # Constraint: per-peer rows would be drilldown noise; the resilience unit is
     # the household. See memory: "Household is the resilience unit".
 
-  @wip @resilience-p1
+  @wip @resilience-p1 @act:i
   Scenario: Peer-topology surfaces resilience-cliff warning
     Given one peer household holds the only external replica of any of Matthew's content
     When Matthew opens "/shefa/peers"
     Then the page renders a "resilience cliff" warning
     And the count of cliff households is non-zero
 
-  @browser-only @resilience-p1 @requires:shem
+  @browser-only @resilience-p1 @requires:shem @act:iii
   Scenario: Reciprocity page shows inflow, outflow, and net hosting
     Given human "Matthew" is logged in on doorway "alpha" with device
     And Adam has committed 5 GB to host Matthew's content and delivered 4.5 GB
@@ -125,7 +125,7 @@ Feature: Observable + contract-aware auto-distribute
     And exactly 1 outflow row is visible (Pete)
     And the "net" line reflects Matthew is net-hosted on balance
 
-  @browser-only @resilience-p1
+  @browser-only @resilience-p1 @act:i
   Scenario: Doorway operator dashboard topology tab is reachable
     Given human "Matthew" is logged in on doorway-app "alpha" with device
     And an operator opens the doorway admin dashboard
@@ -140,7 +140,7 @@ Feature: Observable + contract-aware auto-distribute
   # learner-facing concept card surfaces it inline (no extra fetch). Details
   # tier (4-dot expansion + diversity hint) is fetched lazily on tooltip open.
 
-  @wip @resilience-p1
+  @wip @resilience-p1 @act:i
   Scenario: Concept card renders distribution badge when summary is hydrated
     Given content "concept-foo" has been distributed to multiple replicas
     And the substrate hydrates "concept.distribution" on the head response
@@ -150,7 +150,7 @@ Feature: Observable + contract-aware auto-distribute
     # Constraint: the learner experience must not pay an extra round-trip per
     # card. Hydration happens once on the head response; the card just renders.
 
-  @wip @resilience-p1
+  @wip @resilience-p1 @act:i
   Scenario: Concept card hides badge when distribution is not yet known
     Given content "concept-bar" has no blob_hash yet (pre-distribution)
     When Matthew sees a concept card for "concept-bar"
@@ -164,7 +164,7 @@ Feature: Observable + contract-aware auto-distribute
   # on the content-viewer header so a steward sees both at once. The two
   # widgets share a row; they do NOT merge data shapes.
 
-  @wip @resilience-p1
+  @wip @resilience-p1 @act:i
   Scenario: Content-viewer header renders distribution and resilience together
     Given content "content-alpha" has been distributed to at least 2 households
     And the EPR head response hydrates both "resilience" and "distribution" fields
@@ -187,7 +187,7 @@ Feature: Observable + contract-aware auto-distribute
   # wolf: until a snapshot loads the segment is a neutral glyph that makes
   # no status claim, and a fetch error stays neutral rather than alarming.
 
-  @browser-only @resilience-p1
+  @browser-only @resilience-p1 @act:i
   Scenario: Protocol omni toolbar surfaces the live resilience snapshot
     Given "content-alpha" has been distributed to at least 2 households
     When I open the EPR resource page for "content-alpha"
@@ -225,7 +225,7 @@ Feature: Observable + contract-aware auto-distribute
   # not the phantom contract). The landing-slug target remains valid: live
   # probes (2026-07-11) confirmed BOTH doorways return 200 with
   # protectionStatus (+ feltStatus on /household) for elohim-host-landing.
-  @browser-only @resilience-p1 @regression
+  @browser-only @resilience-p1 @regression @act:i
   Scenario: Native omni chrome resilience segment speaks the real snapshot contract
     Given I open the doorway landing page in the browser
     When I expand the native omni chrome
@@ -235,7 +235,7 @@ Feature: Observable + contract-aware auto-distribute
     When I click the native omni resilience glyph
     Then the native omni resilience drilldown card is visible with a headline
 
-  @browser-only @resilience-p1 @regression
+  @browser-only @resilience-p1 @regression @act:i
   Scenario: Omni resilience tooltip folds down into the viewport, never up out of it
     # Regression anchor: the icon-density tooltip was hard-coded to flip UP
     # (bottom: 125%); protocol-omni is fixed to the top viewport edge, so on
@@ -249,7 +249,7 @@ Feature: Observable + contract-aware auto-distribute
     Then the omni resilience tooltip is fully inside the viewport
     And the omni resilience tooltip renders below the resilience icon
 
-  @browser-only @resilience-p1
+  @browser-only @resilience-p1 @act:i
   Scenario: Clicking the omni resilience icon folds down the resilience hypercard
     # Progressive disclosure (omnibar spec §11): tooltip is the zero-click
     # glance; click folds down a hypercard panel with the context-density
@@ -263,7 +263,7 @@ Feature: Observable + contract-aware auto-distribute
     And the resilience hypercard names the stewarding collective count
     And the resilience hypercard offers a "View full resilience" action
 
-  @browser-only @resilience-p1 @regression
+  @browser-only @resilience-p1 @regression @act:i
   Scenario: Resilience hypercard stays fully inside a phone viewport
     # Regression anchor: the hypercard pinned inset-inline-start:0 to the tiny
     # icon wrap with a 240px min width; from the omni toolbar on a 390px phone
@@ -281,7 +281,7 @@ Feature: Observable + contract-aware auto-distribute
     And the resilience hypercard panel is visible below the icon
     And the omni resilience icon meets the minimum tap target size
 
-  @wip @browser-only @resilience-p1
+  @wip @browser-only @resilience-p1 @act:i
   Scenario: Content-viewer resilience fold-downs stay inside a phone viewport
     # Capability proof for the SECOND host of the same constraint: the
     # content-viewer's resilience icon trails the title's last line, so its
@@ -296,7 +296,7 @@ Feature: Observable + contract-aware auto-distribute
     And I click the content-viewer resilience icon
     Then the content-viewer resilience hypercard is fully inside the viewport
 
-  @browser-only @resilience-p1
+  @browser-only @resilience-p1 @act:i
   Scenario: View full resilience flips the hypercard in place without navigating
     # HyperCard semantics: cards flip in place — deepening disclosure never
     # requires leaving the page. No full-resilience route exists, and none
@@ -309,7 +309,7 @@ Feature: Observable + contract-aware auto-distribute
     Then the resilience hypercard shows the full resilience card
     And the browser URL is unchanged
 
-  @browser-only @resilience-p1
+  @browser-only @resilience-p1 @act:i
   Scenario: Escape closes the resilience hypercard and returns focus to the icon
     Given "content-alpha" has been distributed to at least 2 households
     When I open the EPR resource page for "content-alpha"
@@ -319,7 +319,7 @@ Feature: Observable + contract-aware auto-distribute
     Then the resilience hypercard panel is not visible
     And the omni resilience icon has focus
 
-  @wip @resilience-p1
+  @wip @resilience-p1 @act:i
   Scenario: Distribution badge defers details fetch until tooltip opens
     Given a content-viewer is open for "content-alpha"
     And the distribution badge has a "blobHash" but no expanded details yet
@@ -340,7 +340,7 @@ Feature: Observable + contract-aware auto-distribute
   # (constituents-preserving), exposing the deficit — so a consumer sees not just
   # "how many stewards" but "how many distinct-collective slots short of the floor."
 
-  @wip @regression
+  @wip @regression @act:i
   Scenario: Resilience snapshot reports the diversity shortfall, not just a count
     Given a "standard"-tier content item with 2 distinct stewarding collectives (floor is 3)
     When the operator requests "/api/v1/resilience/{cid}/household"
@@ -350,7 +350,7 @@ Feature: Observable + contract-aware auto-distribute
     # The visible payoff of replacing rows.len() with descent-preserving aggregation —
     # the count alone could not say "1 collective short of the floor."
 
-  @wip
+  @wip @act:i
   Scenario: coverageShortfall is a present 0 when the floor is met (absent != zero)
     Given a "standard"-tier content item with 3+ distinct stewarding collectives (floor is 3)
     When the operator requests "/api/v1/resilience/{cid}/household"

@@ -1,4 +1,4 @@
-@e2e @resilience @felt @grandma-vertical @concern:blob-durability @dataplane
+@e2e @resilience @felt @grandma-vertical @concern:blob-durability @dataplane @act:i
 Feature: Grandma's photos survive a node loss; the family sees they're held
   As a family member of someone whose edge node has gone offline
   I want to see, in named human terms, that her memories are still held by people who love her
@@ -119,6 +119,8 @@ Feature: Grandma's photos survive a node loss; the family sees they're held
     When they open "who holds these"
     Then they can see each holder and revoke a holder's access
 
+  # HELD (2026-08-21): the observed-care event type does not exist yet; sibling-stub
+  # attach point.
   @wip @s-care
   Scenario: Accepting an invite to help emits an observed-care economic event
     # O2 care-valueflows stub (genesis/.../vision-gap-care-valueflows-stub.md)
