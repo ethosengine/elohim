@@ -62,3 +62,19 @@ Saga in order on the mesh today: 17 passed / 2 failed (ch09, ch10) / 2 undefined
 has been on the alpha shelf as "dead custody-announce plane"). With the cast fixed, ch10 and the
 household-formation reds should re-measure; ch09 still needs the doorway's pull-plane `replicates-commons`
 for the landing, which needs known peers — re-measure after the re-cast before calling it a defect.
+
+## Addendum 2026-08-21 (evening) — regeneration under load, and the re-key that needs no regeneration
+
+- **`hc sandbox generate` runs the happ install inside the conductor's 60 s admin-websocket timeout.** A COLD
+  wasm compile of the five DNAs took 65 s on this box at load ~79 (mesh + two cargo gates) → `Websocket
+  error: Timeout`, twice; `generate` refuses an existing directory, so every retry pays the full cold cost.
+  `just mesh start` regeneration is therefore load-sensitive: regenerate on a quiet box, or warm the
+  `wasm-cache` first. (Found by rehearsing the chaos re-key in a throwaway root — chaos agent, 20f5a6dcd.)
+- **A re-key never needed a new sandbox, only a new key.** `hc-mesh-chaos-rekey.sh --method reinstall`
+  deletes only `databases/` + `ks/`, keeps `wasm-cache` and the conductor config, boots, then
+  `hc sandbox call install-app` (mints a fresh agent key) + `enable-app`: ~12 s, identical DNA hashes (the
+  re-keyed peer rejoins the SAME DHT instead of partitioning), and the closer analogue of the 2026-07-24
+  alpha event. `--method regenerate` keeps the full wipe for a quiet box (3 attempts, per-attempt logs).
+- Cast order fixed in the Prologue (35a2a58b6): identities BEFORE hosted registrations; proven on the next
+  regeneration (a conductor that already embodies a UUID cannot be un-embodied).
+
