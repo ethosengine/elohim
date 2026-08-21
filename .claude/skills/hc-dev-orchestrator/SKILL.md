@@ -37,11 +37,21 @@ DNA/WASM builds remain in-tree because `hc dna pack` requires `./target`.
 
 ## Multi-peer mesh
 
-The alpha-shaped local topology is one doorway plus N conductor/storage peers
-(default matthew, jessica, james), all on loopback:
+The alpha-shaped local topology is two doorways (A `:8888` alpha stand-in,
+bootstrap+signal owner; B `:8889` apex/elohim.host stand-in, jessica-primary)
+plus N conductor/storage peers (default matthew, jessica, james), all on
+loopback — fronted by a loopback `mongod` (`:27017`, dbpath `$MESH_DIR/mongo`)
+so both doorways boot **archive-backed** (Mongo-side projection archive:
+`app_file_cache` / warm-shell `ShellArchive` / resolver store, one database per
+doorway: `doorway-a`, `doorway-b`). Without the binary (`MONGOD_BIN` unset and
+no `mongod` on `$PATH`/`~/bin`) the doorways run archive-less with an INERT
+warm-shell store — the production shape 18a65fd0d found un-wired — and
+`mesh status` says so. The image ships `mongod` (che-devworkspaces udi-plus);
+a2o resolves `alpha-A`/`elohim.host` to `E2E_DOORWAY_ALPHA`/`E2E_DOORWAY_B`,
+so the failover feature runs against the local pair unchanged:
 
 ```bash
-just mesh start
+just mesh start                # mongod → doorway A → doorway B → conductors → storage peers
 just mesh status
 just mesh probe
 just mesh quiesce
@@ -118,6 +128,8 @@ just status saga
 | Conductor app | 4445 | WebSocket |
 | Conductor admin | dynamic | `elohim/holochain/local-dev/.hc_ports` |
 | Storage | 8090 | `/health`, `/db/stats` |
+| Doorway B (mesh) | 8889 | `/health` |
+| mongod (mesh) | 27017 | tcp open; `$MESH_DIR/logs/mongod.log` |
 
 ## Load-bearing runtime facts
 

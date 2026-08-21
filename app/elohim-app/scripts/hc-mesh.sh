@@ -25,6 +25,11 @@
 #   DOORWAY_PORT    Doorway HTTP port (default: 8888)
 #   STORAGE_BIN     elohim-storage binary (default: pool release slot)
 #   DOORWAY_BIN     doorway binary (default: pool debug slot)
+#   MONGOD_BIN      mongod binary (default: first of $PATH mongod, ~/bin/mongod);
+#                   empty/absent => the doorways run WITHOUT an archive (inert
+#                   warm-shell store, memory-only projection) exactly as before
+#   MONGO_PORT      loopback mongod port for the doorways' projection archive
+#                   (default: 27017 — the doorway's own MONGODB_URI default)
 #
 #   Dev-tier pacing profile (see the block below the port-scheme helpers —
 #   minutes-quiesce plan W3): MESH_RECONCILE_SECS, MESH_CONTEST_BACKOFF,
@@ -64,6 +69,16 @@ HAPP_PATH="$HAPP_WORKDIR/elohim.happ"
 POOL="/projects/.cargo-target-pool/family/dev"
 STORAGE_BIN="${STORAGE_BIN:-$POOL/elohim__elohim-storage/release/release/elohim-storage}"
 DOORWAY_BIN="${DOORWAY_BIN:-$POOL/doorway__doorway-service/dev/debug/doorway}"
+# mongod backs the doorways' Mongo-side projection archive (app_file_cache /
+# warm-shell ShellArchive / DoorwayResolver store). Without it every doorway
+# constructs an INERT WarmShellStore and a memory-only projection — which is
+# precisely the production shape 18a65fd0d found un-wired, so the archive leg
+# of the boot-order self-heal family could never be proven on this mesh.
+# Loopback-only, per-doorway database (doorway-a / doorway-b) so A and B do
+# not share an archive and mask each other's boot-order gaps.
+MONGOD_BIN="${MONGOD_BIN-$(command -v mongod 2>/dev/null || { [ -x "$HOME/bin/mongod" ] && echo "$HOME/bin/mongod"; })}"
+MONGO_PORT="${MONGO_PORT:-27017}"
+MONGO_DIR="$MESH_DIR/mongo"
 LOGDIR="$MESH_DIR/logs"
 
 # Port scheme per peer index i (0-based): admin 4444+10i, app 4445+10i,
@@ -147,6 +162,8 @@ stop_all() {
   kill $(pgrep -f "[h]c sandbox") 2>/dev/null
   kill $(pgrep -f "elohim-storag[e]") 2>/dev/null
   kill $(pgrep -f "(debug|release)/doorwa[y]") 2>/dev/null
+  # mongod: exact dbpath identity, never a bare "mongod" pattern.
+  kill $(pgrep -f "mongod --dbpath $MESH_DIR/mong[o]") 2>/dev/null
   sleep 1
   echo "mesh stopped"
 }
@@ -161,6 +178,10 @@ status_all() {
   done
   printf "doorway  :%s " "$DOORWAY_PORT"
   curl -s -m 2 "http://localhost:$DOORWAY_PORT/health" >/dev/null && echo UP || echo down
+  printf "doorwayB :%s " "${DOORWAY_B_PORT:-8889}"
+  curl -s -m 2 "http://localhost:${DOORWAY_B_PORT:-8889}/health" >/dev/null && echo UP || echo down
+  printf "mongod   :%s " "$MONGO_PORT"
+  if (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null; then echo "UP (archive-backed doorways)"; else echo "down (doorways run archive-less: inert warm shell)"; fi
   echo
   echo "probe env:  PEER_STORAGE_URLS=\"$(peer_csv)\" INTERNAL_DOORWAY_URL=\"localhost:$DOORWAY_PORT\" E2E_DOORWAY_B=\"http://localhost:${DOORWAY_B_PORT:-8889}\""
 }
@@ -224,6 +245,28 @@ EOF
     (cd "$HAPP_WORKDIR" && hc app pack . -o elohim.happ) || exit 1
   fi
 
+  # 0. mongod — the doorways' projection archive. Must be listening BEFORE a
+  #    doorway boots: AppState::init_projection binds the archive at startup
+  #    (bind_warm_shell_to_archive), and a doorway that boots archive-less
+  #    stays inert for its whole life. Optional: no binary => skip, and the
+  #    doorways degrade to today's memory-only shape (status says so).
+  if [ -n "$MONGOD_BIN" ] && [ -x "$MONGOD_BIN" ]; then
+    if ! (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null; then
+      mkdir -p "$MONGO_DIR"
+      "$MONGOD_BIN" --dbpath "$MONGO_DIR" --bind_ip 127.0.0.1 --port "$MONGO_PORT" \
+        --fork --logpath "$LOGDIR/mongod.log" >/dev/null 2>&1 \
+        || echo "WARN: mongod failed to start (see $LOGDIR/mongod.log) — doorways will run archive-less" >&2
+      for _ in $(seq 1 20); do
+        (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null && break; sleep 1
+      done
+      echo "mongod up on :$MONGO_PORT (dbpath $MONGO_DIR)"
+    else
+      echo "mongod already up on :$MONGO_PORT"
+    fi
+  else
+    echo "mongod not found (MONGOD_BIN unset/absent) — doorways will run archive-less (inert warm shell)"
+  fi
+
   # 1. Doorway first: it is the island DHT's bootstrap + signal home.
   if ! curl -s -m 2 "http://localhost:$DOORWAY_PORT/health" >/dev/null; then
     local i=0 primary="" extras=""
@@ -240,6 +283,7 @@ EOF
     # unstaged slug degrades to CSR with x-ssr-skipped. The landing browser
     # bundle carries only index.csr.html, so WITHOUT SSR the / mount 404s.
     DOORWAY_ID="${DOORWAY_ID:-alpha-elohim-host}" \
+    MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-a" \
     SSR_BUNDLE_PATH="${SSR_BUNDLE_PATH:-$REPO_ROOT/app/elohim-app/dist/elohim-app/server/main.server.mjs}" \
     SSR_BUNDLE_SLUG="${SSR_BUNDLE_SLUG:-elohim-host-landing}" \
     SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
@@ -262,6 +306,7 @@ EOF
   DOORWAY_B_PORT="${DOORWAY_B_PORT:-8889}"
   if ! curl -s -m 2 "http://localhost:$DOORWAY_B_PORT/health" >/dev/null; then
     DOORWAY_ID="${DOORWAY_B_ID:-apex-elohim-host}" \
+    MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-b" \
     SSR_BUNDLE_PATH="${SSR_BUNDLE_PATH:-$REPO_ROOT/app/elohim-app/dist/elohim-app/server/main.server.mjs}" \
     SSR_BUNDLE_SLUG="${SSR_BUNDLE_SLUG:-elohim-host-landing}" \
     SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
