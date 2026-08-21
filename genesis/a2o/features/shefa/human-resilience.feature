@@ -12,7 +12,7 @@ Feature: Human Resilience Profile
 
   # --- Solo Conductor: Cold Start -----------------------------------------
 
-  @wip
+  @wip @act:i
   Scenario: Matthew alone — single conductor, at risk
     Given human "Matthew" is logged in on doorway "alpha" with device
     And Matthew has 1 conductor running
@@ -24,7 +24,7 @@ Feature: Human Resilience Profile
 
   # --- Household Reciprocation --------------------------------------------
 
-  @wip @requires:household-nodes
+  @wip @requires:household-nodes @act:i
   Scenario: Matthew + Jessica — household reciprocation, partial protection
     Given human "Matthew" is logged in on doorway "alpha" with device
     And human "Jessica" is in Matthew's household with relationship "spouse"
@@ -37,7 +37,7 @@ Feature: Human Resilience Profile
   # --- Community Depth ----------------------------------------------------
 
   # household arm is household-testable; Pete's congregation reach is the shem dependency — split when shem returns
-  @wip @requires:shem
+  @wip @requires:shem @act:iii
   Scenario: Matthew + Jessica + Pete — community depth through trust topology
     Given human "Matthew" is logged in on doorway "alpha" with device
     And human "Jessica" is in Matthew's household with relationship "spouse"
@@ -53,7 +53,7 @@ Feature: Human Resilience Profile
 
   # --- Full Network -------------------------------------------------------
 
-  @wip @requires:shem
+  @wip @requires:shem @act:iii
   Scenario: Full network — 5 conductors, protected
     Given human "Matthew" is logged in on doorway "alpha" with device
     And human "Susan" is in Matthew's household with relationship "spouse"
@@ -69,7 +69,7 @@ Feature: Human Resilience Profile
 
   # --- Cold Start: Newcomer -----------------------------------------------
 
-  @wip
+  @wip @act:i
   Scenario: Maria — cold start zero peers
     Given human "Maria" is logged in on doorway "alpha" with device
     And Maria has no connections
@@ -80,7 +80,7 @@ Feature: Human Resilience Profile
 
   # --- Building Resilience ------------------------------------------------
 
-  @wip @requires:household-nodes
+  @wip @requires:household-nodes @act:iii
   Scenario: Maria builds resilience through first connection
     Given human "Maria" is logged in on doorway "alpha" with device
     And Maria is connected with Susan via relationship "neighbor"
@@ -92,7 +92,7 @@ Feature: Human Resilience Profile
 
   # --- Degradation --------------------------------------------------------
 
-  @wip @requires:household-nodes
+  @wip @requires:household-nodes @act:i
   Scenario: Degradation — Matthew goes offline, Jessica's resilience drops
     Given human "Jessica" is logged in on doorway "alpha" with device
     And Jessica previously had protection status "protected"
@@ -103,7 +103,7 @@ Feature: Human Resilience Profile
 
   # --- Recovery -----------------------------------------------------------
 
-  @wip @requires:household-nodes
+  @wip @requires:household-nodes @act:i
   Scenario: Recovery — after-action review when Matthew returns
     Given human "Jessica" is logged in on doorway "alpha" with device
     And Jessica had an active emergency mutual aid event
@@ -115,7 +115,7 @@ Feature: Human Resilience Profile
 
   # --- Right to Be Forgotten ---------------------------------------------
 
-  @wip
+  @wip @act:i
   Scenario: Right to be forgotten — releasing expired content
     Given human "Matthew" is logged in on doorway "alpha" with device
     And Matthew has content that is expired or superseded
@@ -124,7 +124,7 @@ Feature: Human Resilience Profile
 
   # --- Per-Content Sensitivity --------------------------------------------
 
-  @wip
+  @wip @act:i
   Scenario: Per-content sensitivity — medical records vs shared media
     Given human "Matthew" is logged in on doorway "alpha" with device
     And Matthew has private-reach content tagged "medical"
@@ -135,7 +135,7 @@ Feature: Human Resilience Profile
 
   # --- Elohim Discernment -------------------------------------------------
 
-  @wip
+  @wip @act:i
   Scenario: Elohim discernment — institutional attestation for sensitive data
     Given human "Matthew" is logged in on doorway "alpha" with device
     And Matthew has private-reach content tagged "medical"
@@ -150,7 +150,7 @@ Feature: Human Resilience Profile
   # the adapter contract is locked at unit level; this scenario covers the
   # runtime UX expectation that the flip is invisible to the human.
 
-  @wip @graphql-parity @browser
+  @wip @graphql-parity @browser @act:i
   Scenario: Operator flips useGraphqlTopology — human sees the same cluster numbers
     Given human "Matthew" is logged in on doorway "alpha" with device
     And Matthew's cluster dashboard shows 2 devices with a combined storage total

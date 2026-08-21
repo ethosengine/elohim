@@ -1,4 +1,4 @@
-@e2e @shefa @governance @limitarian-governor @requires:doorway @requires:seeded-content
+@e2e @shefa @governance @limitarian-governor @requires:doorway @requires:seeded-content @act:i
 Feature: A community ratifies the limit it cannot set for itself
   The attention economy's externality is that every participant benefits locally
   from concentration — so the limit must be supplied by the layer that
