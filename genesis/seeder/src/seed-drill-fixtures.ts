@@ -215,32 +215,79 @@ export function fixtureBlob(fixture: DrillFixture): { data: Buffer; hash: string
 // Live-mesh legs
 // =============================================================================
 
-/** Push the fixture bytes through EVERY doorway so every peer really holds them. */
-async function pushToAllDoorways(
+/**
+ * Put the bytes on EVERY household peer.
+ *
+ * Both surfaces, deliberately: the doorway's `PUT /admin/seed/blob` (which
+ * forwards to the doorway's own primary storage and is the path
+ * seed-commitments.ts already uses) AND each peer's own `PUT /blob/{hash}`.
+ * The doorways front only their primaries — on the Act I mesh that is matthew
+ * and jessica — so a doorway-only push leaves the third peer without the bytes,
+ * and `assertUnderCustody` checks EVERY peer's local store. Waiting for
+ * inventory gossip to close that gap would make the drill's precondition a race.
+ *
+ * Content-addressed, so every one of these is idempotent.
+ */
+async function pushToAllHolders(
   doorwayUrls: string[],
-  fixture: DrillFixture,
+  storageUrls: string[],
   blob: { data: Buffer; hash: string },
+  mimeType: string,
   apiKey: string | undefined,
-): Promise<string[]> {
+  entryPoint?: string,
+): Promise<{ placed: number; failures: string[] }> {
   const failures: string[] = [];
+  let placed = 0;
+
+  const headers = (): Record<string, string> => ({
+    'Content-Type': mimeType,
+    'X-Blob-Hash': blob.hash,
+    'X-Blob-Size': String(blob.data.length),
+    ...(entryPoint ? { 'X-Entry-Point': entryPoint } : {}),
+    ...(apiKey ? { 'X-Api-Key': apiKey } : {}),
+  });
+
   for (const url of doorwayUrls) {
-    const response = await fetch(`${url.replace(/\/+$/, '')}/admin/seed/blob`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/zip',
-        'X-Blob-Hash': blob.hash,
-        'X-Blob-Size': String(blob.data.length),
-        'X-Entry-Point': 'index.html',
-        ...(apiKey ? { 'X-Api-Key': apiKey } : {}),
-      },
-      body: blob.data,
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (!response.ok) {
-      failures.push(`${url}: HTTP ${response.status} ${(await response.text()).slice(0, 160)}`);
+    try {
+      const response = await fetch(`${url.replace(/\/+$/, '')}/admin/seed/blob`, {
+        method: 'PUT',
+        headers: headers(),
+        body: blob.data,
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (response.ok) placed += 1;
+      else failures.push(`${url}: HTTP ${response.status} ${(await response.text()).slice(0, 120)}`);
+    } catch (error) {
+      failures.push(`${url}: ${String(error)}`);
     }
   }
-  return failures;
+
+  for (const url of storageUrls) {
+    try {
+      const base = url.replace(/\/+$/, '');
+      // Recognize bytes already held before re-PUTting them: a peer that the
+      // doorway push already reached does not need a second copy pushed at it.
+      const existing = await fetch(`${base}/blob/${blob.hash}`, {
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (existing.ok) {
+        placed += 1;
+        continue;
+      }
+      const response = await fetch(`${base}/blob/${blob.hash}`, {
+        method: 'PUT',
+        headers: headers(),
+        body: blob.data,
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (response.ok) placed += 1;
+      else failures.push(`${url}: HTTP ${response.status} ${(await response.text()).slice(0, 120)}`);
+    } catch (error) {
+      failures.push(`${url}: ${String(error)}`);
+    }
+  }
+
+  return { placed, failures };
 }
 
 /**
@@ -455,24 +502,20 @@ async function resolveExistingSubject(
     };
   }
 
-  // Replicate to every doorway so all three peers really hold it.
-  let pushed = 0;
-  for (const url of doorways) {
-    const response = await fetch(`${url}/admin/seed/blob`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': String(row['mimeType'] ?? 'application/octet-stream'),
-        'X-Blob-Hash': declaredHash,
-        'X-Blob-Size': String(bytes.length),
-        ...(apiKey ? { 'X-Api-Key': apiKey } : {}),
-      },
-      body: bytes,
-      signal: AbortSignal.timeout(60_000),
-    });
-    if (response.ok) pushed += 1;
-  }
+  // Replicate to every holder so all three peers really hold it — the same
+  // both-surfaces push the minted fixtures use, for the same reason.
+  const push = await pushToAllHolders(
+    doorways,
+    storageUrls,
+    { data: bytes, hash: declaredHash },
+    String(row['mimeType'] ?? 'application/octet-stream'),
+    apiKey,
+  );
 
-  return { subject: { contentId, hash: declaredHash, sizeBytes: bytes.length }, pushed };
+  return {
+    subject: { contentId, hash: declaredHash, sizeBytes: bytes.length },
+    pushed: push.placed,
+  };
 }
 
 // =============================================================================
@@ -502,18 +545,34 @@ if (isMain) {
 
   let failed = 0;
   const seeded: CustodySubject[] = [];
+  const peerUrls = parseNamedCsv(process.env.PEER_STORAGE_URLS ?? '').map(entry =>
+    entry.value.includes('://') ? entry.value : `http://${entry.value}`,
+  );
 
   for (const fixture of DRILL_FIXTURES) {
     const blob = fixtureBlob(fixture);
     console.log(`\n-- ${fixture.id} (${blob.hash.slice(0, 22)}..., ${blob.data.length} bytes) --`);
 
-    const pushFailures = await pushToAllDoorways(doorways, fixture, blob, apiKey);
-    if (pushFailures.length > 0) {
-      console.error(`  [X] blob push failed: ${pushFailures.join('; ')}`);
+    const push = await pushToAllHolders(
+      doorways,
+      peerUrls,
+      blob,
+      'application/zip',
+      apiKey,
+      'index.html',
+    );
+    if (push.placed === 0) {
+      console.error(`  [X] blob push failed everywhere: ${push.failures.join('; ')}`);
       failed += 1;
       continue;
     }
-    console.log(`  [+] bytes pushed through ${doorways.length} doorway(s)`);
+    console.log(`  [+] bytes placed on ${push.placed} holder(s)`);
+    if (push.failures.length > 0) {
+      // Partial placement is reported, never swallowed: `assertUnderCustody`
+      // checks EVERY peer, so a peer that missed the bytes turns into a custody
+      // red later, and that red must be traceable to here.
+      console.warn(`  [?] some holders refused the bytes: ${push.failures.join('; ')}`);
+    }
 
     const declared = await declareContent(storageUrl, fixture, blob, apiKey);
     if (declared === 'created' || declared === 'exists') {
@@ -529,17 +588,13 @@ if (isMain) {
   // fixtures. Unlike heal-target/chaos-ladder this row already exists with its
   // own artifact, so the bytes are RECOVERED (never minted) — see
   // resolveExistingSubject for the two admissible sources and the refusal.
-  const peerUrls = parseNamedCsv(process.env.PEER_STORAGE_URLS ?? '').map(entry =>
-    entry.value.includes('://') ? entry.value : `http://${entry.value}`,
-  );
-
   const commonsEprId = process.env.COMMONS_CUSTODY_EPR_ID || 'manifesto';
   console.log(`\n-- ${commonsEprId} (existing commons EPR) --`);
   const existing = await resolveExistingSubject(doorways, peerUrls, commonsEprId, apiKey);
   if ('subject' in existing) {
     console.log(
       `  [+] recovered ${existing.subject.sizeBytes} bytes for ${existing.subject.hash.slice(0, 22)}... ` +
-        `and replicated through ${existing.pushed}/${doorways.length} doorway(s)`,
+        `and placed them on ${existing.pushed} holder(s)`,
     );
     seeded.push(existing.subject);
   } else {
