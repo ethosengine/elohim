@@ -257,6 +257,36 @@ run_seed_leg "seed-epr-atom" soft \
   'STORAGE_URL="$STORAGE_URL" npx tsx src/seed-epr-atom.ts'
 run_seed_leg "seed-commitments" soft \
   'DOORWAY_URL="$DOORWAY_A_URL" CONTENT_BLOB_HASH="${CONTENT_BLOB_HASH:-}" CONTENT_BLOB_SIZE_BYTES="${CONTENT_BLOB_SIZE_BYTES:-}" npx tsx src/seed-commitments.ts'
+# Act I's own cast, seeded AFTER the substrate chain because every leg below
+# reads what that chain wrote (humans + household + the staged bundle blobs).
+#
+# 1. Drill fixtures: `heal-target` and `chaos-ladder` are named by
+#    features/resilience/{app-blob-heal-on-read,chaos-peer-churn}.feature and
+#    created by nothing else on this mesh; their steps say so in as many words
+#    ("is not seeded on this mesh, so the heal-on-read drill has nothing to
+#    break"). The leg also brings the existing commons EPR (`manifesto`) under
+#    household custody when — and only when — its declared bytes can be
+#    RECOVERED from a peer or proved from its own contentBody.
+# 2. Their custody promises, authored through seed-commitments.ts so the
+#    `custody-blob` wire contract lives in exactly one place. Skipped cleanly
+#    when leg 1 wrote no pairs (an empty promise set is worse than none: the
+#    chaos drill would kill peers to watch nothing).
+# 3. The co-steward agreement: on alpha chapter 5 authors a `replicates-commons`
+#    commitment at RUN time for its own e2e content, with adam as co-steward.
+#    Nothing plays that part here, so Act I casts jessica co-stewarding the
+#    landing EPR — the pledge saga ch09's `commonsCommitments` counts and the
+#    distribution round its `stewardingCollectives` scope depends on.
+DRILL_PAIRS_PATH="$MESH_DIR/drill-custody-pairs.json"
+rm -f "$DRILL_PAIRS_PATH"
+export DRILL_PAIRS_PATH
+
+run_seed_leg "seed-drill-fixtures" soft \
+  'DOORWAY_URL="$DOORWAY_A_URL" DOORWAY_B_URL="$DOORWAY_B_URL" STORAGE_URL="$STORAGE_URL" PEER_STORAGE_URLS="$PEER_STORAGE_URLS" DRILL_CUSTODY_PAIRS_OUT="$DRILL_PAIRS_PATH" npx tsx src/seed-drill-fixtures.ts'
+run_seed_leg "seed-drill-custody" soft \
+  'if [ -s "$DRILL_PAIRS_PATH" ]; then DOORWAY_URL="$DOORWAY_A_URL" CUSTODY_PAIRS_JSON="$DRILL_PAIRS_PATH" npx tsx src/seed-commitments.ts; else echo "no drill custody pairs written (leg 1 found no seedable fixture) — nothing to promise"; fi'
+run_seed_leg "seed-household-costeward" soft \
+  'DOORWAY_URL="$DOORWAY_A_URL" DOORWAY_B_URL="$DOORWAY_B_URL" STORAGE_URL="$STORAGE_URL" PEER_STORAGE_URLS="$PEER_STORAGE_URLS" npx tsx src/seed-household-costeward.ts'
+
 run_seed_leg "seed-nodes" soft \
   'STORAGE_URL="$STORAGE_URL" npx tsx src/seed-nodes.ts'
 run_seed_leg "seed-delegates-compute" soft \
