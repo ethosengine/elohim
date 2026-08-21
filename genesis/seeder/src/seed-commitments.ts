@@ -311,16 +311,57 @@ export async function resolveCustodyBlobDescriptor(
       `${label}: content row "${pair.contentId}" at ${endpoint} has no ${field} for artifactRole "${pair.artifactRole}".`,
     );
   }
+  const normalizedResolvedHash = normalizeBlobHash(resolvedHash);
 
-  const blobSizeBytes =
+  // blobSizeBytes resolution order: declared pair value → the content row's
+  // own contentSizeBytes → CONTENT_BLOB_SIZE_BYTES when CONTENT_BLOB_HASH
+  // names this SAME resolved blob (the mesh/CI env this pair's hash was
+  // staged under) → GET /blob/<hash> and read its Content-Length (GET, never
+  // HEAD — content-addressed blob routes 404 on HEAD even when GET 200s,
+  // matching DoorwayClient.blobExists()'s existing note; no Range, for the
+  // same reason). A deploy-time-only field like serverBlobHash routinely
+  // lands on the content row with contentSizeBytes still null (a PATCH sets
+  // only the hash field), so this mesh needs a real fallback, not just a
+  // row-field read.
+  let blobSizeBytes: number | undefined =
     pair.blobSizeBytes ?? (typeof row.contentSizeBytes === 'number' ? row.contentSizeBytes : undefined);
+
+  if (blobSizeBytes === undefined) {
+    const envHash = process.env.CONTENT_BLOB_HASH;
+    const envSize = parseInt(process.env.CONTENT_BLOB_SIZE_BYTES || '', 10);
+    if (envHash && Number.isFinite(envSize) && envSize > 0 && normalizeBlobHash(envHash) === normalizedResolvedHash) {
+      blobSizeBytes = envSize;
+    }
+  }
+
+  if (blobSizeBytes === undefined) {
+    const blobEndpoint = `${storageUrl}/blob/${normalizedResolvedHash}`;
+    try {
+      const blobResponse = await fetchImpl(blobEndpoint, {
+        signal: AbortSignal.timeout(opts.timeoutMs ?? 5000),
+      });
+      if (blobResponse.ok) {
+        const contentLength = blobResponse.headers.get('content-length');
+        const parsed = contentLength ? parseInt(contentLength, 10) : NaN;
+        if (Number.isFinite(parsed) && parsed > 0) {
+          blobSizeBytes = parsed;
+        }
+      }
+    } catch {
+      // A network failure on the blob GET isn't itself fatal — fall through
+      // to the "cannot resolve" error below, which names every tier tried.
+    }
+  }
+
   if (typeof blobSizeBytes !== 'number' || blobSizeBytes <= 0) {
     throw new Error(
-      `${label}: cannot resolve blobSizeBytes for contentId "${pair.contentId}" — pair didn't declare it and the row's contentSizeBytes is missing/invalid.`,
+      `${label}: cannot resolve blobSizeBytes for contentId "${pair.contentId}" — pair didn't declare it, the ` +
+        `row's contentSizeBytes is missing/invalid, CONTENT_BLOB_SIZE_BYTES doesn't name this blob, and GET ` +
+        `${storageUrl}/blob/${normalizedResolvedHash} had no usable Content-Length.`,
     );
   }
 
-  return { blobHash: normalizeBlobHash(resolvedHash), blobSizeBytes };
+  return { blobHash: normalizedResolvedHash, blobSizeBytes };
 }
 
 /**
@@ -567,6 +608,24 @@ export async function seedCustodyCommitments(
     resolvedPairs.push(pair);
     const resolvedPair: ResolvedCustodyPair = { ...pair, ...blob };
     const body = buildCustodyCommitmentBody(resolvedPair, peerIds);
+
+    // GET-before-POST idempotency check (mirrors activateCustodyCommitments'
+    // existing read-first rule below): the storage/doorway create handler
+    // upserts on a duplicate id and returns 200/201 with the EXISTING row —
+    // it never answers 409. Trusting `response.ok` on the POST alone silently
+    // double-counted "created" on every re-run with the same (provider,
+    // receiver, blob) triple (verified live: re-POSTing an existing id
+    // returns HTTP 201 carrying the ORIGINAL row's note/metadata/createdAt,
+    // unchanged). Recognize the existing row from a plain read FIRST — same
+    // idempotency posture as the activation phase, applied to the create
+    // phase too. A non-404 read failure falls through to the write (fail
+    // toward the write, never silently skip a resolvable pair).
+    const existing = await client.getCommitment(body.id);
+    if (existing.ok) {
+      console.log(`  [=] ${label} (idempotent re-run)`);
+      alreadyExists += 1;
+      continue;
+    }
 
     const response = await client.createCommitment(body);
 

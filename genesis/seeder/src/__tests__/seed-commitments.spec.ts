@@ -398,23 +398,145 @@ describe('resolveCustodyBlobDescriptor', () => {
     ).rejects.toThrow(/has no serverBlobHash/);
   });
 
-  it('an unresolvable blobSizeBytes (no declared value, no contentSizeBytes on the row) fails fast', async () => {
-    const fetchImpl = vi.fn(
-      async () =>
-        new Response(JSON.stringify({ serverBlobHash: 'sha256-56adaebb' }), {
-          status: 200,
-        }),
-    );
-    await expect(
-      resolveCustodyBlobDescriptor(
+  it('an unresolvable blobSizeBytes (no declared value, no contentSizeBytes on the row, no matching env, blob GET 404s) fails fast', async () => {
+    let prevHash: string | undefined;
+    let prevSize: string | undefined;
+    prevHash = process.env.CONTENT_BLOB_HASH;
+    prevSize = process.env.CONTENT_BLOB_SIZE_BYTES;
+    delete process.env.CONTENT_BLOB_HASH;
+    delete process.env.CONTENT_BLOB_SIZE_BYTES;
+    try {
+      const fetchImpl = vi.fn(async (url: string) => {
+        if (url.endsWith('/db/content/elohim-host-landing')) {
+          return new Response(JSON.stringify({ serverBlobHash: 'sha256-56adaebb' }), { status: 200 });
+        }
+        if (url.includes('/blob/')) {
+          return new Response('not found', { status: 404 });
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      });
+      await expect(
+        resolveCustodyBlobDescriptor(
+          {
+            ...basePair,
+            contentId: 'elohim-host-landing',
+            artifactRole: 'ssr-server',
+          },
+          { fetchImpl },
+        ),
+      ).rejects.toThrow(/cannot resolve blobSizeBytes/);
+    } finally {
+      if (prevHash === undefined) delete process.env.CONTENT_BLOB_HASH;
+      else process.env.CONTENT_BLOB_HASH = prevHash;
+      if (prevSize === undefined) delete process.env.CONTENT_BLOB_SIZE_BYTES;
+      else process.env.CONTENT_BLOB_SIZE_BYTES = prevSize;
+    }
+  });
+
+  it('falls back to CONTENT_BLOB_SIZE_BYTES when CONTENT_BLOB_HASH names the same resolved blob', async () => {
+    let prevHash: string | undefined;
+    let prevSize: string | undefined;
+    prevHash = process.env.CONTENT_BLOB_HASH;
+    prevSize = process.env.CONTENT_BLOB_SIZE_BYTES;
+    process.env.CONTENT_BLOB_HASH = 'sha256-56adaebb';
+    process.env.CONTENT_BLOB_SIZE_BYTES = '17905368';
+    try {
+      const fetchImpl = vi.fn(async (url: string) => {
+        if (url.endsWith('/db/content/elohim-host-landing')) {
+          return new Response(JSON.stringify({ serverBlobHash: 'sha256-56adaebb' }), { status: 200 });
+        }
+        throw new Error(`unexpected fetch (should not need /blob/): ${url}`);
+      });
+      const resolved = await resolveCustodyBlobDescriptor(
         {
           ...basePair,
           contentId: 'elohim-host-landing',
           artifactRole: 'ssr-server',
         },
         { fetchImpl },
-      ),
-    ).rejects.toThrow(/cannot resolve blobSizeBytes/);
+      );
+      expect(resolved.blobSizeBytes).toBe(17905368);
+      // Never needed the /blob/ GET fallback — the env tier resolved it first.
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    } finally {
+      if (prevHash === undefined) delete process.env.CONTENT_BLOB_HASH;
+      else process.env.CONTENT_BLOB_HASH = prevHash;
+      if (prevSize === undefined) delete process.env.CONTENT_BLOB_SIZE_BYTES;
+      else process.env.CONTENT_BLOB_SIZE_BYTES = prevSize;
+    }
+  });
+
+  it('CONTENT_BLOB_SIZE_BYTES is ignored when CONTENT_BLOB_HASH names a DIFFERENT blob (falls through to the GET tier)', async () => {
+    let prevHash: string | undefined;
+    let prevSize: string | undefined;
+    prevHash = process.env.CONTENT_BLOB_HASH;
+    prevSize = process.env.CONTENT_BLOB_SIZE_BYTES;
+    process.env.CONTENT_BLOB_HASH = 'sha256-someOTHERblob';
+    process.env.CONTENT_BLOB_SIZE_BYTES = '999';
+    try {
+      const fetchImpl = vi.fn(async (url: string) => {
+        if (url.endsWith('/db/content/elohim-host-landing')) {
+          return new Response(JSON.stringify({ serverBlobHash: 'sha256-56adaebb' }), { status: 200 });
+        }
+        if (url.includes('/blob/sha256-56adaebb')) {
+          return new Response(null, { status: 200, headers: { 'content-length': '17905368' } });
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      });
+      const resolved = await resolveCustodyBlobDescriptor(
+        {
+          ...basePair,
+          contentId: 'elohim-host-landing',
+          artifactRole: 'ssr-server',
+        },
+        { fetchImpl },
+      );
+      // NOT 999 — the mismatched env value must never be trusted for a
+      // different blob; the real size came from the GET fallback instead.
+      expect(resolved.blobSizeBytes).toBe(17905368);
+    } finally {
+      if (prevHash === undefined) delete process.env.CONTENT_BLOB_HASH;
+      else process.env.CONTENT_BLOB_HASH = prevHash;
+      if (prevSize === undefined) delete process.env.CONTENT_BLOB_SIZE_BYTES;
+      else process.env.CONTENT_BLOB_SIZE_BYTES = prevSize;
+    }
+  });
+
+  it('falls back to GET /blob/<hash> Content-Length when neither the row nor a matching env has a usable size', async () => {
+    let prevHash: string | undefined;
+    let prevSize: string | undefined;
+    prevHash = process.env.CONTENT_BLOB_HASH;
+    prevSize = process.env.CONTENT_BLOB_SIZE_BYTES;
+    delete process.env.CONTENT_BLOB_HASH;
+    delete process.env.CONTENT_BLOB_SIZE_BYTES;
+    try {
+      const fetchImpl = vi.fn(async (url: string) => {
+        if (url.endsWith('/db/content/elohim-host-landing')) {
+          return new Response(JSON.stringify({ serverBlobHash: 'sha256-56adaebb' }), { status: 200 });
+        }
+        if (url.includes('/blob/sha256-56adaebb')) {
+          // GET, not HEAD — content-addressed blob routes 404 on HEAD even
+          // when GET 200s on this mesh; the resolver must never issue HEAD.
+          return new Response(null, { status: 200, headers: { 'content-length': '17905368' } });
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      });
+      const resolved = await resolveCustodyBlobDescriptor(
+        {
+          ...basePair,
+          contentId: 'elohim-host-landing',
+          artifactRole: 'ssr-server',
+        },
+        { fetchImpl },
+      );
+      expect(resolved.blobSizeBytes).toBe(17905368);
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    } finally {
+      if (prevHash === undefined) delete process.env.CONTENT_BLOB_HASH;
+      else process.env.CONTENT_BLOB_HASH = prevHash;
+      if (prevSize === undefined) delete process.env.CONTENT_BLOB_SIZE_BYTES;
+      else process.env.CONTENT_BLOB_SIZE_BYTES = prevSize;
+    }
   });
 });
 
@@ -562,15 +684,18 @@ describe('seedCustodyCommitments (offline) — contentId pair drives create + ac
       throw new Error(`unexpected fetch: ${url}`);
     });
 
-    const createCommitment = vi.fn(
-      async (_body: { resourceClassifiedAs: string[] }) => new Response('{}', { status: 200 }),
-    );
-    const getCommitment = vi.fn(
-      async (id: string) =>
-        new Response(JSON.stringify({ id, state: 'proposed' }), {
-          status: 200,
-        }),
-    );
+    // Stateful, mirroring the real storage/doorway backend: 404 before the row
+    // exists (the seedCustodyCommitments create-phase pre-check), 200
+    // proposed once createCommitment has run (the activation phase's read).
+    let rowCreated = false;
+    const createCommitment = vi.fn(async (_body: { resourceClassifiedAs: string[] }) => {
+      rowCreated = true;
+      return new Response('{}', { status: 200 });
+    });
+    const getCommitment = vi.fn(async (id: string) => {
+      if (!rowCreated) return new Response('not found', { status: 404 });
+      return new Response(JSON.stringify({ id, state: 'proposed' }), { status: 200 });
+    });
     const patchCommitmentState = vi.fn(async (_id: string, _state: string) => new Response('{}', { status: 200 }));
     const client = {
       createCommitment,
@@ -587,10 +712,54 @@ describe('seedCustodyCommitments (offline) — contentId pair drives create + ac
     };
     expect(sentBody.resourceClassifiedAs).toEqual(['sha256-56adaebb']);
 
-    // The activation step ran and issued the PATCH for the same (proposed) row.
-    expect(getCommitment).toHaveBeenCalledTimes(1);
+    // getCommitment runs TWICE: once as the create-phase pre-check (404 —
+    // the row doesn't exist yet) and once as the activation-phase read (200
+    // proposed, after createCommitment ran). The activation step then issued
+    // the PATCH for that same (proposed) row.
+    expect(getCommitment).toHaveBeenCalledTimes(2);
     expect(patchCommitmentState).toHaveBeenCalledTimes(1);
     expect(patchCommitmentState.mock.calls[0][1]).toBe('active');
+  });
+
+  it('a pair whose id already exists is recognized via GET and never re-POSTed — a re-run reports already-exists, not created', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (url.endsWith('/db/content/elohim-host-landing')) {
+        return new Response(
+          JSON.stringify({ serverBlobHash: 'sha256-56adaebb', contentSizeBytes: 999 }),
+          { status: 200 },
+        );
+      }
+      if (url.endsWith('/auth/me')) {
+        return new Response(JSON.stringify({ agentPubKey: REAL }), { status: 200 });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+
+    // The row already exists — GET returns it 200/active on every call, the
+    // same shape a re-POST to the real backend upserts-and-returns-201 for
+    // (verified live: re-POSTing an existing id returns HTTP 201 carrying
+    // the ORIGINAL row unchanged — never 409). createCommitment must never
+    // be reached at all once the pre-check finds the row.
+    const createCommitment = vi.fn(async () => new Response('{}', { status: 201 }));
+    const getCommitment = vi.fn(
+      async (id: string) => new Response(JSON.stringify({ id, state: 'active' }), { status: 200 }),
+    );
+    const patchCommitmentState = vi.fn(async () => new Response('{}', { status: 200 }));
+    const client = {
+      createCommitment,
+      getCommitment,
+      patchCommitmentState,
+    } as unknown as CommitmentClient;
+
+    const result = await seedCustodyCommitments(client, [contentIdPair], { fetchImpl });
+
+    expect(createCommitment).not.toHaveBeenCalled();
+    expect(result.created).toBe(0);
+    expect(result.alreadyExists).toBe(1);
+    // Activation still runs and recognizes the already-active row (no PATCH).
+    expect(patchCommitmentState).not.toHaveBeenCalled();
   });
 });
 
