@@ -407,13 +407,73 @@ restart_conductors() {
   echo "app interfaces up on $aports: $app_up/${#PEERS[@]}"
   [ "$app_up" -lt "${#PEERS[@]}" ] && echo "  WARN: an app interface did not return — storage peers cannot make zome calls" >&2
   echo
-  echo "storage peers (NOT restarted — check they reconnect on their own):"
-  local j=0
+  # Storage peers are NOT restarted here, and /health is NOT the question to ask
+  # them. Each peer authenticates a websocket to its conductor's APP interface
+  # with a token minted at ITS startup; a conductor restart invalidates that
+  # token ("Authentication failed with reason: Invalid token" in the conductor
+  # log), and the peer does not re-mint it. The result is a peer that answers
+  # /health with a cheerful 200 while every zome call fails with "Websocket
+  # closed: No connection" — writes still land in its database but nothing can
+  # be anchored, and reanchor_backfill quietly stops being able to do its job.
+  # Measured 2026-08-21: still broken 90s after the restart on all three peers,
+  # with newly written rows stuck at trust:published and a NULL anchor.
+  #
+  # So probe the ZOME PATH, not the HTTP path, and say plainly which peers need
+  # a deliberate restart. This action will not restart them: a storage restart
+  # is a different blast radius and may collide with whoever else is working.
+  echo "storage peers (NOT restarted — probing the ZOME path, not just /health):"
+  local j=0 needs_restart=""
   for name in "${PEERS[@]}"; do
-    printf "  %-8s :%s " "$name" "$(http_port $j)"
-    curl -s -m 3 "http://localhost:$(http_port $j)/health" >/dev/null && echo "UP" || echo "DOWN <-- needs a deliberate restart"
+    local port body
+    port="$(http_port $j)"
+    printf "  %-8s :%s " "$name" "$port"
+    if ! curl -s -m 3 "http://localhost:$port/health" >/dev/null; then
+      echo "DOWN (not serving at all)"
+    else
+      # Probe an endpoint that MUST make a zome call. /health, /db/humans and
+      # even /p2p/status are answered from the local database and stay cheerful
+      # while the conductor link is dead; head-record has to ask the conductor.
+      #
+      # Two traps, both hit while building this:
+      #   - /db/p2p/conductor-diagnostics answers "no embedded conductor admin
+      #     connection" for every EXTERNAL-conductor topology, which is this
+      #     mesh's normal shape. It cannot tell healthy from broken.
+      #   - head-record on a NULL-ANCHORED row short-circuits with "no notarized
+      #     head declared" BEFORE reaching the conductor, so an unanchored probe
+      #     row reports a DEAD peer as alive. Pick an ANCHORED row.
+      local probe_id
+      probe_id="$(curl -s -m 8 "http://localhost:$port/db/content?limit=25" 2>/dev/null \
+        | python3 -c '
+import json, sys
+try:
+    items = json.load(sys.stdin).get("items", [])
+except Exception:
+    items = []
+print(next((i["id"] for i in items if i.get("dhtAnchorHash")), ""))
+' 2>/dev/null)"
+      if [ -z "$probe_id" ]; then
+        echo "serving, but no ANCHORED content to probe the zome path with (inconclusive)"
+      else
+        body="$(curl -s -m 15 -H "Authorization: Bearer ${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}" \
+          "http://localhost:$port/db/content/$probe_id/head-record" 2>/dev/null)"
+        case "$body" in
+          *"Zome call failed"*|*"Websocket closed"*|*"No connection"*)
+            echo "serving, but ZOME CALLS ARE DEAD (stale app-interface token) <-- restart this peer"
+            needs_restart+="${needs_restart:+ }$name" ;;
+          "") echo "serving, zome probe timed out <-- check this peer"
+            needs_restart+="${needs_restart:+ }$name" ;;
+          *) echo "UP (zome path alive)" ;;
+        esac
+      fi
+    fi
     j=$((j+1))
   done
+  if [ -n "$needs_restart" ]; then
+    echo
+    echo "  These peers hold a stale conductor token and must be restarted deliberately:"
+    echo "    $needs_restart"
+    echo "  Until then they accept writes that can never be anchored."
+  fi
 }
 
 start_all() {
