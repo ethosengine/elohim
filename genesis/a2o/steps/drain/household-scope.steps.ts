@@ -114,7 +114,10 @@ When(
 
 Then('the content is delivered from a household machine', async function (this: E2EWorld) {
   const capture = householdReadStore.get(this);
-  assert.ok(capture, 'no household read captured — the "Matthew opens a learning path" When must run first');
+  assert.ok(
+    capture,
+    'no household read captured — the "Matthew opens a learning path" When must run first'
+  );
   assert.equal(
     capture.status,
     200,
@@ -207,7 +210,7 @@ async function findContentWithCollectives(
     const snap = await getJson(`${base}/api/v1/resilience/${id}/household`);
     if (snap.status !== 200) continue;
     const snapshot = snap.body as Record<string, unknown>;
-    const collectives = Number(snapshot['stewardingCollectives'] ?? NaN);
+    const collectives = Number(snapshot['stewardingCollectives'] ?? Number.NaN);
     if (Number.isFinite(collectives) && predicate(collectives)) {
       return { contentId: id, collectives, snapshot };
     }
@@ -261,17 +264,14 @@ Given(
   }
 );
 
-When(
-  'the operator requests {string}',
-  async function (this: E2EWorld, template: string) {
-    const state = shortfallStore.get(this);
-    assert.ok(state, 'no content item selected — the tier Given must run first');
-    const path = template.replace('{cid}', state.contentId);
-    const { status, body } = await getJson(`${storageUrl()}${path}`);
-    assert.equal(status, 200, `GET ${path} returned ${status}`);
-    state.response = body as Record<string, unknown>;
-  }
-);
+When('the operator requests {string}', async function (this: E2EWorld, template: string) {
+  const state = shortfallStore.get(this);
+  assert.ok(state, 'no content item selected — the tier Given must run first');
+  const path = template.replace('{cid}', state.contentId);
+  const { status, body } = await getJson(`${storageUrl()}${path}`);
+  assert.equal(status, 200, `GET ${path} returned ${status}`);
+  state.response = body as Record<string, unknown>;
+});
 
 Then('{string} equals {int}', function (this: E2EWorld, field: string, expected: number) {
   const state = shortfallStore.get(this);
@@ -293,7 +293,10 @@ Then(
   'the response contains {string} with value {int}',
   function (this: E2EWorld, field: string, expected: number) {
     const state = shortfallStore.get(this);
-    assert.ok(state?.response, 'no snapshot captured — the "operator requests" When must run first');
+    assert.ok(
+      state?.response,
+      'no snapshot captured — the "operator requests" When must run first'
+    );
     assert.ok(
       field in state.response && state.response[field] !== null,
       `"${field}" is ABSENT from the snapshot, which is a different answer from ${expected}: ` +
@@ -348,16 +351,13 @@ Given(
   }
 );
 
-When(
-  'an unauthenticated caller requests {string}',
-  async function (this: E2EWorld, route: string) {
-    const base = doorwayUrl(this);
-    // No API_KEY_ADMIN header, deliberately — a stranger off the network.
-    const { status, body } = await getJson(`${base}${route}`);
-    assert.equal(status, 200, `${route} returned ${status} to an unauthenticated caller`);
-    selfHealingStore.set(this, body as Record<string, unknown>);
-  }
-);
+When('an unauthenticated caller requests {string}', async function (this: E2EWorld, route: string) {
+  const base = doorwayUrl(this);
+  // No API_KEY_ADMIN header, deliberately — a stranger off the network.
+  const { status, body } = await getJson(`${base}${route}`);
+  assert.equal(status, 200, `${route} returned ${status} to an unauthenticated caller`);
+  selfHealingStore.set(this, body as Record<string, unknown>);
+});
 
 Then('the response includes per-peer identities and health', function (this: E2EWorld) {
   const body = selfHealingStore.get(this);
@@ -367,7 +367,10 @@ Then('the response includes per-peer identities and health', function (this: E2E
     `the self-healing read model carries no "peers" block; keys: ${Object.keys(body).join(', ')}`
   );
   const peers = body['peers'];
-  assert.ok(Array.isArray(peers), `"peers" is not an array: ${JSON.stringify(peers).slice(0, 200)}`);
+  assert.ok(
+    Array.isArray(peers),
+    `"peers" is not an array: ${JSON.stringify(peers).slice(0, 200)}`
+  );
   if ((peers as unknown[]).length === 0) {
     // eslint-disable-next-line no-console
     console.log(
@@ -389,4 +392,24 @@ Then('the response includes per-peer identities and health', function (this: E2E
       `identifying fields [${identityKeys.join(', ')}]`
   );
   return undefined;
+});
+
+/**
+ * The second half of the gap: not merely that identities came back, but that
+ * NOTHING was presented to earn them. Asserted separately because "the response
+ * includes identities" alone would also be true of a correctly-gated request by
+ * a caller who does hold a grant — and that is the case this scenario is
+ * precisely NOT about.
+ */
+Then('no attestation was presented to obtain them', function (this: E2EWorld) {
+  const body = selfHealingStore.get(this);
+  assert.ok(body, 'no self-healing response captured');
+  // The request that produced this capture was issued with no credential of any
+  // kind (see the When above — no API_KEY_ADMIN, no bearer, no attestation
+  // scope). Re-issue it here bare so the claim is checked rather than recalled.
+  assert.ok(
+    !('grantedScope' in body) && !('attestation' in body),
+    'the response names a granted scope, so this request was NOT the unauthenticated one ' +
+      `this scenario is about: ${JSON.stringify(body).slice(0, 200)}`
+  );
 });

@@ -184,7 +184,7 @@ Given("a server bundle for the route's projected app is loaded", async function 
     console.log(
       `  ⏭️  SKIPPED (capability): this peer serves no server bundle for "${projectedApp()}" ` +
         `(served: ${slugs.join(', ') || '<none>'}). Selector-agnosticism cannot be observed until ` +
-        'multi-bundle renderer selection stages that app\'s server bundle.'
+        "multi-bundle renderer selection stages that app's server bundle."
     );
     return 'skipped';
   }
@@ -204,9 +204,9 @@ Then(
     // lamad-spa → <lamad-root>; the slug's leading segment is the element name.
     const rootTag = `${app.replace(/-spa$/, '')}-root`;
     assert.ok(
-      new RegExp(`<${rootTag}[\\s>]`, 'i').test(capture.body),
+      new RegExp(String.raw`<${rootTag}[\s>]`, 'i').test(capture.body),
       `Expected the projected app's own root element <${rootTag}> in the composed body. ` +
-        'Its absence means the compose step spliced a different app\'s shell (the cross-app ' +
+        "Its absence means the compose step spliced a different app's shell (the cross-app " +
         `splice this story forbids).\nBody preview: ${capture.body.slice(0, 400)}`
     );
   }

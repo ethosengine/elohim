@@ -251,15 +251,26 @@ Feature: Network Health Posture — Aggregate Awareness and Attestation-Gated In
     Then the diagnostics surface loads (the gate is discoverability, not access)
     And Matthew can pin it to navigation so it persists across reloads
 
-  # This scenario asserts a gap, on purpose: it passes while the deanonymization surface is
-  # open, and its FIRST step holds the scenario the day admin routes start refusing strangers
-  # — at which point the story should be rewritten as the enforcement it then describes.
-  Scenario: Self-healing read model exposes peer identities without attestation today
+  # An ATTESTATION here is a signed, revocable, time-limited grant one peer gives another,
+  # naming a scope (`compute:debug`, `compute:trace`) that says how deep the holder may look
+  # inside it. Every scenario above earns its depth that way. This one is the exception, and
+  # the exception is the point.
+  @gap:open
+  Scenario: Anyone on the network can read who this doorway's peers are
     Given doorway "alpha" serves "GET /admin/self-healing"
     And no ingress rule restricts "/admin/*" to operator networks
     When an unauthenticated caller requests "/admin/self-healing"
     Then the response includes per-peer identities and health
-    # Open, operator-owned gap: the "operator-only" property is aspirational —
-    # ingress protection for /admin/* is not enforced, so this is a deanonymization
-    # surface. When ingress gating lands, this should converge to the
-    # attestation-gated introspection model above (compute:debug scope).
+    And no attestation was presented to obtain them
+    # THIS SCENARIO ASSERTS A GAP, NOT A REQUIREMENT. It passes today because a stranger
+    # really can list this doorway's peers — their identities and their health — without
+    # holding any grant at all. That is a deanonymization surface: the peer list says who is
+    # on this network and which of them are struggling, and everything above this line in
+    # this file exists to make exactly that kind of look something a peer has to be GRANTED.
+    #
+    # It is written as a passing test so the gap has a witness that cannot be forgotten, and
+    # so closing it is loud: the day ingress gating refuses strangers on /admin/*, the second
+    # Given holds this scenario and says so, and it should then be rewritten as the
+    # enforcement it describes — converging on the compute:debug introspection model above.
+    # The @gap:open tag is what distinguishes this from a scenario that endorses the
+    # behaviour it observes; drop the tag when the behaviour is the one we want.

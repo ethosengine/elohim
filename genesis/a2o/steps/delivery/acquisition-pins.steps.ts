@@ -440,7 +440,7 @@ When('the pull queue drains', async function (this: E2EWorld) {
       last = JSON.stringify(rollup);
       // caughtUp true is the measured, non-null answer; null means "keep waiting".
       if (rollup['caughtUp'] === true) return;
-      if (typeof rollup['failed'] === 'number' && (rollup['failed'] as number) > 0) {
+      if (typeof rollup['failed'] === 'number' && rollup['failed'] > 0) {
         assert.fail(
           `peer B's pull for "${state.id}" reported failures before draining: ${last}. ` +
             'A failed fetch is a real acquisition red, not a slow one.'
@@ -483,34 +483,35 @@ Then(
  * local readability is the inventory-arrival failure this story exists to catch,
  * and a settle window here would launder it into a pass.
  */
-Then("peer B's local projection carries the row at the moment of that claim", async function (
-  this: E2EWorld
-) {
-  const state = twoNode(this);
-  const first = await getJsonFrom(state.b, `/db/content/${state.id}`);
-  if (first.status === 200) return;
+Then(
+  "peer B's local projection carries the row at the moment of that claim",
+  async function (this: E2EWorld) {
+    const state = twoNode(this);
+    const first = await getJsonFrom(state.b, `/db/content/${state.id}`);
+    if (first.status === 200) return;
 
-  const budgetMs = Number(process.env['E2O_PROJECTION_LAG_BUDGET_MS'] ?? 60_000);
-  const started = Date.now();
-  while (Date.now() - started < budgetMs) {
-    await new Promise(r => setTimeout(r, 2_000));
-    const { status } = await getJsonFrom(state.b, `/db/content/${state.id}`);
-    if (status === 200) {
-      assert.fail(
-        `peer B's pull for "${state.id}" reported caughtUp/fetched BEFORE its own projection ` +
-          `carried the row: /db/content/${state.id} was 404 at the moment of the claim and ` +
-          `became readable ${Math.round((Date.now() - started) / 1000)}s later. That gap is ` +
-          "inventory-arrival wearing byte-arrival's clothes (R-A): a caller that trusts " +
-          'caughtUp and reads immediately gets a 404 for content it was just told it has.'
-      );
+    const budgetMs = Number(process.env['E2O_PROJECTION_LAG_BUDGET_MS'] ?? 60_000);
+    const started = Date.now();
+    while (Date.now() - started < budgetMs) {
+      await new Promise(r => setTimeout(r, 2_000));
+      const { status } = await getJsonFrom(state.b, `/db/content/${state.id}`);
+      if (status === 200) {
+        assert.fail(
+          `peer B's pull for "${state.id}" reported caughtUp/fetched BEFORE its own projection ` +
+            `carried the row: /db/content/${state.id} was 404 at the moment of the claim and ` +
+            `became readable ${Math.round((Date.now() - started) / 1000)}s later. That gap is ` +
+            "inventory-arrival wearing byte-arrival's clothes (R-A): a caller that trusts " +
+            'caughtUp and reads immediately gets a 404 for content it was just told it has.'
+        );
+      }
     }
+    assert.fail(
+      `peer B (${state.b}) never carried a local row for "${state.id}" within ${budgetMs}ms of a ` +
+        'caught-up pull claim (HTTP ' +
+        `${first.status} throughout) — the pin reported complete and the content is not there.`
+    );
   }
-  assert.fail(
-    `peer B (${state.b}) never carried a local row for "${state.id}" within ${budgetMs}ms of a ` +
-      'caught-up pull claim (HTTP ' +
-      `${first.status} throughout) — the pin reported complete and the content is not there.`
-  );
-});
+);
 
 /**
  * Attribution, honestly bounded: no surface names WHICH peer supplied a given
@@ -551,6 +552,12 @@ Then('peer B fetched the bytes from peer A', async function (this: E2EWorld) {
 // that has just restarted — a process action, gated.
 // ---------------------------------------------------------------------------
 
+/**
+ * Absolute interpreter path — an unqualified `bash` would resolve through PATH,
+ * which a test process does not control. Same convention as steps/mesh/*.
+ */
+const BASH_BIN = process.env['E2E_BASH_BIN'] ?? '/bin/bash';
+
 /** genesis/a2o/steps/delivery → repo root → app/elohim-app/scripts/hc-mesh.sh */
 function hcMeshScriptPath(): string {
   return fileURLToPath(new URL('../../../../app/elohim-app/scripts/hc-mesh.sh', import.meta.url));
@@ -564,7 +571,7 @@ Given(
       return 'skipped';
     }
     const script = hcMeshScriptPath();
-    const result = spawnSync('bash', [script, 'storage-restart', peer], {
+    const result = spawnSync(BASH_BIN, [script, 'storage-restart', peer], {
       encoding: 'utf8',
       timeout: 300_000,
     });
@@ -664,7 +671,7 @@ Then(
 async function metricValue(base: string, name: string): Promise<number | undefined> {
   const { body } = await request(`${base}/metrics`);
   const text = await body.text();
-  const m = new RegExp(`^${name}\\s+([0-9.eE+-]+)$`, 'm').exec(text);
+  const m = new RegExp(String.raw`^${name}\s+([0-9.eE+-]+)$`, 'm').exec(text);
   return m ? Number(m[1]) : undefined;
 }
 
@@ -698,7 +705,7 @@ Then(
     const { body } = await request(`${storageUrl()}/metrics`);
     const text = await body.text();
     const m = new RegExp(
-      `^elohim_acquisition_reconcile_outcomes_total\\{outcome="${outcome}"\\}\\s+([0-9.eE+-]+)$`,
+      String.raw`^elohim_acquisition_reconcile_outcomes_total\{outcome="${outcome}"\}\s+([0-9.eE+-]+)$`,
       'm'
     ).exec(text);
     assert.ok(

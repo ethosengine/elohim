@@ -89,7 +89,10 @@ const deliveryPeersStore = new WeakMap<E2EWorld, DeliveryPeer[]>();
 
 function storedPeers(world: E2EWorld): DeliveryPeer[] {
   const peers = deliveryPeersStore.get(world);
-  assert.ok(peers, 'no delivery-peer capture — a "queries delivery capabilities" step must run first');
+  assert.ok(
+    peers,
+    'no delivery-peer capture — a "queries delivery capabilities" step must run first'
+  );
   return peers;
 }
 
@@ -117,17 +120,26 @@ When(
   async function (this: E2EWorld, _actor: string) {
     const { status, body } = await getJson(`${storageUrl()}/api/v1/peers/delivery`);
     assert.equal(status, 200, `GET /api/v1/peers/delivery returned ${status}`);
-    assert.ok(Array.isArray(body), `expected an array of peers; got ${JSON.stringify(body).slice(0, 200)}`);
+    assert.ok(
+      Array.isArray(body),
+      `expected an array of peers; got ${JSON.stringify(body).slice(0, 200)}`
+    );
     deliveryPeersStore.set(this, body as DeliveryPeer[]);
   }
 );
 
-When('{word} requests the delivery capability summary', async function (this: E2EWorld, _actor: string) {
-  const { status, body } = await getJson(`${storageUrl()}/api/v1/peers/delivery`);
-  assert.equal(status, 200, `GET /api/v1/peers/delivery returned ${status}`);
-  assert.ok(Array.isArray(body), `expected an array of peers; got ${JSON.stringify(body).slice(0, 200)}`);
-  deliveryPeersStore.set(this, body as DeliveryPeer[]);
-});
+When(
+  '{word} requests the delivery capability summary',
+  async function (this: E2EWorld, _actor: string) {
+    const { status, body } = await getJson(`${storageUrl()}/api/v1/peers/delivery`);
+    assert.equal(status, 200, `GET /api/v1/peers/delivery returned ${status}`);
+    assert.ok(
+      Array.isArray(body),
+      `expected an array of peers; got ${JSON.stringify(body).slice(0, 200)}`
+    );
+    deliveryPeersStore.set(this, body as DeliveryPeer[]);
+  }
+);
 
 Given(
   'doorway {string} is connected to {int} peers',
@@ -146,23 +158,20 @@ Given(
   }
 );
 
-Then(
-  'the response shows serves_extracted and serves_compressed status',
-  function (this: E2EWorld) {
-    const caps = allCapabilities(storedPeers(this));
-    assert.ok(
-      caps.includes('serves_compressed'),
-      `no peer advertises "serves_compressed"; advertised: [${caps.join(', ')}]`
-    );
-    assert.ok(
-      caps.includes('serves_extracted'),
-      'no peer advertises "serves_extracted" — the delivery-peer row carries only ' +
-        `[${caps.join(', ')}]. A client choosing a peer to fetch individual files from cannot ` +
-        'tell whether ANY peer can serve them file-by-file, so it must fall back to whole-blob ' +
-        'download every time.'
-    );
-  }
-);
+Then('the response shows serves_extracted and serves_compressed status', function (this: E2EWorld) {
+  const caps = allCapabilities(storedPeers(this));
+  assert.ok(
+    caps.includes('serves_compressed'),
+    `no peer advertises "serves_compressed"; advertised: [${caps.join(', ')}]`
+  );
+  assert.ok(
+    caps.includes('serves_extracted'),
+    'no peer advertises "serves_extracted" — the delivery-peer row carries only ' +
+      `[${caps.join(', ')}]. A client choosing a peer to fetch individual files from cannot ` +
+      'tell whether ANY peer can serve them file-by-file, so it must fall back to whole-blob ' +
+      'download every time.'
+  );
+});
 
 Then('the response shows cache_tier', function (this: E2EWorld) {
   const caps = allCapabilities(storedPeers(this));
@@ -197,7 +206,8 @@ Then('the summary lists each peer with:', function (this: E2EWorld, table: DataT
   const peers = storedPeers(this);
   assert.ok(peers.length > 0, 'the delivery capability summary is empty — no peers to describe');
   const wanted = table.hashes().map(row => String(row['field']));
-  const camel = (snake: string): string => snake.replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase());
+  const camel = (snake: string): string =>
+    snake.replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase());
 
   const missing: string[] = [];
   for (const field of wanted) {
@@ -270,27 +280,24 @@ Given(
   }
 );
 
-When(
-  '{string} is re-seeded with a new ZIP blob',
-  async function (this: E2EWorld, slug: string) {
-    if (!destructiveGate(`re-seed "${slug}" on ${storageUrl()} with a new blob`)) {
-      return 'skipped';
-    }
-    const state = reseedStore.get(this);
-    assert.ok(state, 'no warm-cache baseline — the "is warm with blob_hash" Given must run first');
-    const { statusCode, body } = await request(`${storageUrl()}/db/content/${slug}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ blobHash: `sha256-a2o-reseed-${Date.now()}` }),
-    });
-    const text = await body.text();
-    assert.ok(
-      statusCode >= 200 && statusCode < 300,
-      `re-seeding "${slug}" returned ${statusCode}: ${text.slice(0, 300)}`
-    );
-    return undefined;
+When('{string} is re-seeded with a new ZIP blob', async function (this: E2EWorld, slug: string) {
+  if (!destructiveGate(`re-seed "${slug}" on ${storageUrl()} with a new blob`)) {
+    return 'skipped';
   }
-);
+  const state = reseedStore.get(this);
+  assert.ok(state, 'no warm-cache baseline — the "is warm with blob_hash" Given must run first');
+  const { statusCode, body } = await request(`${storageUrl()}/db/content/${slug}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ blobHash: `sha256-a2o-reseed-${Date.now()}` }),
+  });
+  const text = await body.text();
+  assert.ok(
+    statusCode >= 200 && statusCode < 300,
+    `re-seeding "${slug}" returned ${statusCode}: ${text.slice(0, 300)}`
+  );
+  return undefined;
+});
 
 Then(
   'the projection cache entries for {string} with hash {string} are evicted',
@@ -364,7 +371,7 @@ When(
       | Record<string, unknown>
       | undefined;
     assert.ok(
-      warmup && warmup['lastError'] === null,
+      warmup?.['lastError'] === null,
       'the doorway is not consuming storage events cleanly ' +
         `(warmup.lastError=${JSON.stringify(warmup?.['lastError'])}). Eviction is PUSHED over ` +
         "that stream, so with it broken no re-seed can reach the cache and the next step's " +

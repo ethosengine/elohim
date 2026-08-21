@@ -334,11 +334,24 @@ Feature: Observable + contract-aware auto-distribute
     # Operational parameters: 1 round-trip per blob_hash per session; informs
     # path-page rendering budget (≤1 head fetch + lazy details on demand).
 
-  # --- coverageShortfall: the descent-erasure cure's observable contract -----
-  # Story-harvested 2026-06-20 on the recursive-CoverageRollup branch (Weave Epic #1).
-  # The graph-backed resilience snapshot now aggregates stewards via CoverageRollup
-  # (constituents-preserving), exposing the deficit — so a consumer sees not just
-  # "how many stewards" but "how many distinct-collective slots short of the floor."
+  # --- coverageShortfall: how far short of safe, not just how many copies -----
+  #
+  # The vocabulary these two scenarios turn on, since the numbers mean nothing without it:
+  #
+  #   HOUSEHOLD    — the people and machines at one place, sharing one fate. A power cut, a
+  #                  stolen laptop or a house fire takes the whole household at once, which is
+  #                  why copies inside one household barely count as copies.
+  #   COLLECTIVE   — the group that stewards a copy on its own hardware. DISTINCT collectives
+  #                  are what survive each other, so this — not peers, not devices — is the
+  #                  thing worth counting.
+  #   FLOOR        — how many distinct collectives a piece of content needs before we are
+  #                  willing to say it is safe. It is set by the content's TIER: "standard"
+  #                  content has a floor of 3.
+  #   SHORTFALL    — floor minus what was achieved. The number that says how much recruiting
+  #                  is left to do, which a bare count of stewards can never say.
+  #
+  # A count alone cannot tell an operator "one collective short"; that is the whole reason the
+  # snapshot aggregates in a way that preserves the deficit rather than collapsing to a total.
 
   # Read-only: the step looks for a content item this mesh has ACTUALLY placed across the
   # named number of collectives rather than staging one — a manufactured item would prove
