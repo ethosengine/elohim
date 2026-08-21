@@ -705,7 +705,17 @@ CFGEOF
     (
       export RUST_LOG="$MESH_RUST_LOG"
       holochain_bin_export
-      setsid nohup sh -c "echo test | hc sandbox --piped -f $fports run -a" >> .sandbox_run_log 2>&1 &
+      # MESH_ATTACH_APP_PORTS=1 re-attaches the app interfaces. Normally OFF,
+      # because interfaces are persistent and re-attaching them makes the
+      # supervisor exit 0 and take the conductors with it. It is needed exactly
+      # once after a config-schema migration: the fork's hc rewrites
+      # conductor-config.yaml in the 0.6.3 schema and the persistent app
+      # interfaces do NOT survive that rewrite (`app_ports:[]` on first boot),
+      # so without this the conductors come up with no app interface and every
+      # storage peer is left with nothing to talk to.
+      local _pflag=""
+      [ "${MESH_ATTACH_APP_PORTS:-0}" = "1" ] && _pflag=" -p=$aports"
+      setsid nohup sh -c "echo test | hc sandbox --piped -f $fports run -a$_pflag" >> .sandbox_run_log 2>&1 &
     )
   fi
 

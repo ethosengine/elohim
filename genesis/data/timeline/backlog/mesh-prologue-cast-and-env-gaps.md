@@ -113,3 +113,39 @@ for the landing, which needs known peers — re-measure after the re-cast before
   re-mints it) — `/health` stays 200 and writes still return 201 while nothing can be anchored. So
   `conductors-restart` is only half an operation: follow it with `storage-restart`, and confirm with
   `zome-probe`. Backlog: `storage-stale-app-interface-token-after-conductor-restart.md`.
+
+### Parity attempt 2026-08-21 (late) — fork 0.6.3 does NOT yet boot on these sandboxes
+
+With a matching pair in hand (`holochain` + `hc`, both 0.6.3, auto-detected from
+`$MESH_DIR/fork-bin`), the fork got FURTHER than before but did not hold. Recorded so the next
+attempt starts here instead of rediscovering it:
+
+- **The fork's `hc` does launch the fork conductor.** `.sandbox_run_log` shows the healthy marker that
+  was missing all evening — `hc-sandbox: Conductor launched #!0/1/2` on 4444/4454/4464 — so the CLI and
+  conductor agree once they are the same version.
+- **But every launch reports `app_ports:[]`.** The persistent app interfaces from the 0.6.0 config do
+  not survive into the 0.6.3 run, so the conductors come up with nothing for a storage peer to talk to.
+  `MESH_ATTACH_APP_PORTS=1` (re-adding `-p`) does not help — it reintroduces the supervisor-exits-0
+  failure. The remaining path is to attach once over the admin API
+  (`hc sandbox call --running <admin> add-app-ws <port>`) and let it persist.
+- **Direct launch is not available on the fork.** It fails at `network: missing field relay_url`, which
+  0.6.0 never writes. `relay_url: null` is rejected too (`relative URL without a base: "null"`) — the
+  field wants a real URL. The fork's `hc` normalizes this at launch; a direct launch does not. So
+  `MESH_CONDUCTOR_LAUNCH=direct` is a STOCK-only tool today, and per-conductor logs come with it.
+- **Do not hand-migrate the network block by trial.** Each guess costs a full mesh outage, and the
+  0.6.0/0.6.3 network schemas may admit no common config. Let the fork's own `hc` write it.
+- **The mesh was returned to stock 0.6.0** (3 admin + 3 app interfaces, all three storage peers
+  zome-alive, installed DNA hashes unchanged). Conductor DB backups from before the attempt are at
+  `/tmp/elohim-local-mesh/sandbox-db-backup` (192 MB, all three peers) and were never needed — no 0.6.3
+  boot got far enough to migrate a database.
+- **The parity gap is therefore still OPEN**, and now visible rather than silent: `hc-mesh.sh status`
+  prints `[STOCK — alpha runs the fork, so this mesh is NOT at parity]`.
+
+**What the instrumentation proved on the way**, which is the durable win: with `MESH_RUST_LOG` set and
+per-conductor logs, james's conductor showed the alpha lines verbatim —
+`holochain_cascade: No peers to fetch record from e=NoPeersForLocation("get", 4176063473)` and
+`sys_validation_workflow: Sys validation sleeping for 10s, with 0 fetched of 1 missing dependencies`.
+The mesh CAN show this class now; it could not this morning. Matthew's showed the storage-plane
+counterpart, `declare_canonical_head: target action ... is not retrievable` — a dead-key anchor being
+re-declared and failing, which is the defect filed as
+`rekeyed-peer-serves-dead-key-anchors-as-notarized.md` seen from the conductor side.
