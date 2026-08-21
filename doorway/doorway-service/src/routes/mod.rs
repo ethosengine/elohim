@@ -80,7 +80,7 @@ pub use federation::{
     handle_doorway_keys, handle_federation_doorways, handle_federation_hosted_binding,
     handle_federation_p2p_peers,
 };
-pub use health::{health_check, readiness_check, startup_check, version_info};
+pub use health::{health_check, readiness_check, serving_check, startup_check, version_info};
 pub use identity::{
     handle_did_document, handle_did_endpoint, handle_identity_api_request,
     handle_universal_resolver,

@@ -1650,6 +1650,7 @@ async fn handle_watchdog_probe(
             watchdog_liveness_response(start, &heartbeat, threshold_ms)
         }
         (&Method::GET, "/health/startup") => routes::startup_check(Arc::clone(&state)).await,
+        (&Method::GET, "/health/serving") => routes::serving_check(Arc::clone(&state)),
         (&Method::GET, "/ready") | (&Method::GET, "/readyz") => {
             routes::readiness_check(Arc::clone(&state))
         }
@@ -2828,7 +2829,12 @@ async fn dispatch_to_projected_epr(
             .warm_shell
             .lookup(&projection.epr_id, &projection.entry_file)
             .await;
-        let upstream_available = !state.upstream_breakers.is_open(&storage_url);
+        // `would_shed` is a READ. The obvious `is_open` is a gate: it consumes
+        // the one half-open trial, and this planner has no guard to record an
+        // outcome with — so it would steal the trial from the `begin()` caller
+        // a few lines below and leave the breaker shedding every route on the
+        // peer. (2026-08-20: that is exactly what latched elohim.host.)
+        let upstream_available = !state.upstream_breakers.would_shed(&storage_url);
         // Serve warm whenever the decision says so; an upgrade/fetch falls
         // through to the proxy below, which stocks nothing but behaves exactly
         // as it does today.
@@ -3706,11 +3712,14 @@ async fn resolve_projected_shell(
     storage_url: &str,
 ) -> Result<(String, ShellProvenance), SsrFallbackReason> {
     // Endpoint key shared with `forward_to_storage`/the EPR dispatch, so one
-    // breaker per storage peer governs every path. `is_open` only READS the
-    // circuit — a warm serve must never consume a half-open trial it isn't
-    // going to resolve (the 2026-07-20 half-open LATCH shape).
+    // breaker per storage peer governs every path. A warm serve must never
+    // consume a half-open trial it isn't going to resolve (the 2026-07-20
+    // half-open LATCH shape) — so this asks `would_shed`, which is a true
+    // read. The comment here used to claim `is_open` "only READS the circuit";
+    // it does not, it admits a trial, and that claim sat directly on top of the
+    // bug it described until 2026-08-21.
     let endpoint = storage_url.trim_end_matches('/');
-    let upstream_available = !state.upstream_breakers.is_open(endpoint);
+    let upstream_available = !state.upstream_breakers.would_shed(endpoint);
     let shell_url = projected_shell_url(storage_url, projection);
 
     let outcome = crate::render::warm_shell::resolve_shell(
@@ -3804,14 +3813,24 @@ async fn fetch_shell_from_upstream(
             }
         }
         Ok(resp) => {
+            let status_u16 = resp.status().as_u16();
             tracing::warn!(
                 target: "doorway::ssr",
                 shell_url = %shell_url,
-                status = resp.status().as_u16(),
+                status = status_u16,
                 elapsed_ms = fetch_started.elapsed().as_millis() as u64,
                 "SSR shell fetch: non-success status"
             );
-            trial.record(false);
+            // Defer to the ONE classifier. This arm recorded an unconditional
+            // failure, so a 404 shell (normal for an unseeded slug) or a 503
+            // (upstream backpressure — liveness PROVEN) counted toward opening
+            // a breaker that is keyed by ENDPOINT, taking every `/db` route on
+            // the peer down with it. Only a never-answered upstream — the
+            // `Err` arm below — is a breaker failure.
+            trial.record(
+                crate::routes::storage_proxy::ProxyOutcome::classify(status_u16)
+                    != crate::routes::storage_proxy::ProxyOutcome::Failure,
+            );
             None
         }
         Err(e) => {
@@ -4575,6 +4594,10 @@ async fn handle_request(
         (Method::GET, "/health/startup") => {
             to_boxed(routes::startup_check(Arc::clone(&state)).await)
         }
+
+        // Serving probe - 503 when an upstream breaker is shedding. NOT a k8s
+        // probe (see routes::health::serving_check): /health is liveness.
+        (Method::GET, "/health/serving") => to_boxed(routes::serving_check(Arc::clone(&state))),
 
         // Liveness probe - returns 200 if doorway is running
         (Method::GET, "/health") | (Method::GET, "/healthz") => {
@@ -6157,6 +6180,9 @@ fn admission_exempt(path: &str, is_upgrade: bool) -> bool {
         "/health"
             | "/healthz"
             | "/health/startup"
+            // 503 here IS the signal. Shedding it under admission pressure
+            // would make the probe indistinguishable from the fault it reports.
+            | "/health/serving"
             | "/ready"
             | "/readyz"
             | "/version"
@@ -7511,6 +7537,7 @@ mod admission_tests {
             "/health",
             "/healthz",
             "/health/startup",
+            "/health/serving",
             "/ready",
             "/readyz",
             "/version",
@@ -7600,7 +7627,10 @@ mod admission_tests {
             "ceiling floored"
         );
         let breakers = std::sync::Arc::new(crate::routes::UpstreamBreakers::default());
-        assert!(!breakers.is_open("http://x:8090"), "fresh breaker closed");
+        assert!(
+            !breakers.is_open_admitting_trial("http://x:8090"),
+            "fresh breaker closed"
+        );
     }
 
     #[test]
@@ -7612,6 +7642,7 @@ mod admission_tests {
             "/health",
             "/healthz",
             "/health/startup",
+            "/health/serving",
             "/ready",
             "/readyz",
             "/version",

@@ -68,6 +68,9 @@ pub struct HealthResponse {
     /// Backing-aware DHT-participation identity (Tier C — peer-discovery spec).
     #[serde(rename = "dhtBacking")]
     pub dht_backing: DhtBacking,
+    /// Whether the SERVING path can actually answer — the per-upstream circuit
+    /// breakers this doorway proxies through. See [`ServingHealth`].
+    pub serving: ServingHealth,
     /// Whether zome discovery has completed (zome_configs populated)
     #[serde(rename = "discoveryComplete")]
     pub discovery_complete: bool,
@@ -238,6 +241,84 @@ pub struct ConductorHealth {
     pub pools_total: usize,
 }
 
+/// One upstream's breaker as the serving path sees it.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ServingUpstream {
+    /// Storage endpoint this doorway proxies to.
+    pub endpoint: String,
+    /// "closed" | "half-open" | "open".
+    pub circuit: &'static str,
+    /// Consecutive recorded failures.
+    pub error_streak: u32,
+    /// True when this endpoint is shedding calls right now.
+    pub shedding: bool,
+}
+
+/// Can this doorway actually SERVE?
+///
+/// WHY THIS BLOCK EXISTS. `healthy` was a hardcoded `true` ("the service is
+/// running") and `status` was `"online"` whenever the conductor was connected
+/// — and in DEV_MODE `conductor_connected` is forced true regardless. Both
+/// background health pollers, meanwhile, reach storage on their OWN private
+/// reqwest clients, which are breaker-blind. So on 2026-08-20 elohim.host
+/// reported `healthy: true, status: "online"` continuously while every
+/// `/db/content/*` read returned 503 `cause=upstream`: nothing in the health
+/// response had ever consulted the serving path. This block does.
+///
+/// It is deliberately BODY-ONLY. `/health` on :8080 is simultaneously the
+/// startup, readiness AND liveness probe for the doorway container
+/// (`genesis/orchestrator/manifests/doorway/alpha{,-b}.yaml`), so demoting its
+/// HTTP status when an upstream sheds would CrashLoop the pod and, via
+/// readiness, pull a doorway that can still serve warm shells out of the
+/// Service — turning a degraded peer into a dead one, on both doorways at once
+/// (they flap independently but overlap). The status-code-bearing signal lives
+/// at `/health/serving`, which nothing in k8s probes.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ServingHealth {
+    /// True when ANY upstream is shedding — the doorway cannot serve that peer
+    /// at all. Cheap and fast: a shed costs single-digit milliseconds.
+    pub shedding: bool,
+    /// True when ANY upstream has a non-zero error streak — the SLOW regime.
+    ///
+    /// This exists because `shedding` alone is blind for exactly
+    /// `UPSTREAM_CIRCUIT_FAIL_THRESHOLD - 1` (= 2) failures, and that blind
+    /// window is the expensive one. While the circuit is still Closed each
+    /// request rides the full upstream budget — `EPR_DISPATCH_TIMEOUT_SECS`
+    /// twice over on `/`, measured at 20.4s — and only the third failure opens
+    /// the circuit, after which sheds cost ~5ms. So a shedding-only signal is
+    /// honest precisely when the failure is cheap and blind precisely when a
+    /// person is staring at a 20-second page load. A non-zero streak means at
+    /// least one real upstream timeout just happened; any recorded success
+    /// resets it to zero, so a healthy doorway reads 0.
+    pub degrading: bool,
+    /// Per-upstream breaker state.
+    pub upstreams: Vec<ServingUpstream>,
+}
+
+impl ServingHealth {
+    /// Read the live breaker map. Uses `snapshot()`, which is non-mutating —
+    /// observing health must never consume a half-open trial.
+    pub fn observe(breakers: &crate::routes::UpstreamBreakers) -> Self {
+        let upstreams: Vec<ServingUpstream> = breakers
+            .snapshot()
+            .into_iter()
+            .map(|s| ServingUpstream {
+                endpoint: s.endpoint,
+                circuit: s.circuit,
+                error_streak: s.error_streak,
+                shedding: s.skipped,
+            })
+            .collect();
+        Self {
+            shedding: upstreams.iter().any(|u| u.shedding),
+            degrading: upstreams.iter().any(|u| u.error_streak > 0),
+            upstreams,
+        }
+    }
+}
+
 /// Projection role details
 #[derive(Serialize)]
 pub struct ProjectionRole {
@@ -352,9 +433,21 @@ fn build_health_response(state: &AppState) -> HealthResponse {
         signal_shared,
     };
 
+    // The serving path, read from the live breaker map (non-mutating).
+    let serving = ServingHealth::observe(&state.upstream_breakers);
+
     HealthResponse {
-        healthy: true, // Service is running
-        status,
+        // `healthy` used to be a hardcoded `true` meaning "the process is up".
+        // That is what let elohim.host report green through a total /db outage
+        // on 2026-08-20. It now means "the process is up AND its serving path
+        // can answer". The HTTP status is deliberately unchanged (see
+        // `ServingHealth` — this endpoint is the k8s liveness probe).
+        healthy: !serving.shedding && !serving.degrading,
+        status: if serving.shedding || serving.degrading {
+            "degraded"
+        } else {
+            status
+        },
         registration_open,
         version: env!("CARGO_PKG_VERSION"),
         uptime,
@@ -382,6 +475,7 @@ fn build_health_response(state: &AppState) -> HealthResponse {
         },
         p2p,
         dht_backing,
+        serving,
         discovery_complete: *state.discovery_ready.borrow(),
         error,
     }
@@ -404,6 +498,44 @@ pub fn health_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
         .header("Content-Type", "application/json")
         .body(Full::new(Bytes::from(body)))
         .unwrap()
+}
+
+/// Handle the serving probe (`/health/serving`) — the status-code-bearing
+/// answer to "can this doorway actually serve right now?".
+///
+/// 200 when every upstream breaker is closed; **503 + Retry-After** when any is
+/// shedding, with the same `ServingHealth` body `/health` carries.
+///
+/// This is the endpoint an alert, an a2o scenario, or an operator should watch.
+/// It is deliberately NOT any Kubernetes probe: `/health` is simultaneously the
+/// startup, readiness and liveness probe for the doorway container, so a
+/// serving-aware status code there would CrashLoop the pod (liveness) and pull
+/// a doorway that can still serve warm shells out of the Service (readiness).
+/// Splitting the signal from the probe is the whole point — the gap this closes
+/// is that on 2026-08-20 NOTHING returned a bad status code while elohim.host
+/// 503'd every content read for hours.
+pub fn serving_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let serving = ServingHealth::observe(&state.upstream_breakers);
+    let body = serde_json::to_string(&serving)
+        .unwrap_or_else(|_| r#"{"shedding":true,"degrading":true,"upstreams":[]}"#.to_string());
+
+    // 503 on EITHER regime: an open circuit (cannot serve) or a non-zero error
+    // streak (serving, but riding upstream timeouts — the 20s-page regime).
+    let failing = serving.shedding || serving.degrading;
+    let mut builder = Response::builder()
+        .header("Content-Type", "application/json")
+        .status(if failing {
+            StatusCode::SERVICE_UNAVAILABLE
+        } else {
+            StatusCode::OK
+        });
+    if failing {
+        builder = builder.header(
+            "Retry-After",
+            crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS.to_string(),
+        );
+    }
+    builder.body(Full::new(Bytes::from(body))).unwrap()
 }
 
 /// Handle readiness probe (/ready, /readyz)
@@ -555,6 +687,123 @@ mod tests {
     fn test_state() -> AppState {
         let args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
         AppState::new(args)
+    }
+
+    /// Drive `state`'s breaker for `ep` into a shedding (Open) state.
+    fn open_the_breaker(state: &AppState, ep: &str) {
+        for _ in 0..crate::routes::upstream_health::UPSTREAM_CIRCUIT_FAIL_THRESHOLD {
+            state.upstream_breakers.record(ep, false);
+        }
+    }
+
+    #[test]
+    fn health_is_green_when_nothing_is_shedding() {
+        let state = test_state();
+        let r = build_health_response(&state);
+        assert!(r.healthy);
+        assert!(!r.serving.shedding);
+        assert!(r.serving.upstreams.is_empty(), "no upstream seen yet");
+    }
+
+    #[test]
+    fn health_stops_reporting_green_while_the_serving_path_sheds() {
+        // THE REGRESSION THIS CLOSES. On 2026-08-20 elohim.host answered
+        // /health with healthy=true, status="online" while every
+        // /db/content/* read returned 503 cause=upstream for hours, because
+        // `healthy` was a hardcoded `true` and nothing consulted the breakers.
+        let state = test_state();
+        let ep = "http://elohim-adam-alpha.elohim-alpha.svc.cluster.local:8090";
+        open_the_breaker(&state, ep);
+
+        let r = build_health_response(&state);
+        assert!(
+            !r.healthy,
+            "a doorway whose only upstream is shedding is NOT healthy"
+        );
+        assert_eq!(r.status, "degraded");
+        assert!(r.serving.shedding);
+
+        let up = &r.serving.upstreams;
+        assert_eq!(up.len(), 1);
+        assert_eq!(up[0].endpoint, ep);
+        assert_eq!(up[0].circuit, "open");
+        assert!(up[0].shedding);
+        assert_eq!(
+            up[0].error_streak,
+            crate::routes::upstream_health::UPSTREAM_CIRCUIT_FAIL_THRESHOLD
+        );
+
+        // ...and it is visible in the wire body, camelCase.
+        let json = serde_json::to_value(&r).unwrap();
+        assert_eq!(json["healthy"], serde_json::json!(false));
+        assert_eq!(json["serving"]["shedding"], serde_json::json!(true));
+        assert_eq!(json["serving"]["upstreams"][0]["errorStreak"], 3);
+    }
+
+    #[test]
+    fn health_is_demoted_in_the_slow_regime_before_the_circuit_ever_opens() {
+        // THE BLIND WINDOW. `shedding` alone only becomes true on the THIRD
+        // consecutive failure. The first two ride the full upstream budget —
+        // that is the 10s/20s page load a person actually experiences — and a
+        // shedding-only signal reads green through exactly that window. One
+        // recorded failure is enough to stop claiming health.
+        let state = test_state();
+        let ep = "http://peer:8090";
+        state.upstream_breakers.record(ep, false);
+
+        let r = build_health_response(&state);
+        assert!(!r.serving.shedding, "one failure does not open the circuit");
+        assert!(r.serving.degrading, "but it IS the slow regime");
+        assert!(!r.healthy, "and health must not read green through it");
+        assert_eq!(r.status, "degraded");
+
+        // A recorded success clears it.
+        state.upstream_breakers.record(ep, true);
+        let r = build_health_response(&state);
+        assert!(!r.serving.degrading);
+        assert!(r.healthy);
+    }
+
+    #[test]
+    fn health_keeps_returning_200_while_shedding() {
+        // THE SAFETY RAIL. /health on :8080 is simultaneously the startup,
+        // readiness AND liveness probe for the doorway container. If this
+        // endpoint ever answers non-2xx on a degraded upstream, kubelet
+        // CrashLoops the pod and readiness pulls it from the Service — an
+        // upstream blip would become a doorway outage, on a pair that flaps
+        // independently but overlaps. The honest signal goes in the BODY here
+        // and in the STATUS CODE at /health/serving.
+        let state = Arc::new(test_state());
+        open_the_breaker(&state, "http://peer:8090");
+        let resp = health_check(Arc::clone(&state));
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "liveness must not flip on a shedding upstream"
+        );
+    }
+
+    #[test]
+    fn serving_probe_carries_the_status_code_health_cannot() {
+        let state = Arc::new(test_state());
+        let r = serving_check(Arc::clone(&state));
+        assert_eq!(r.status(), StatusCode::OK, "nothing shedding yet");
+
+        // A single failure — still Closed, but already the slow regime.
+        state.upstream_breakers.record("http://peer:8090", false);
+        assert_eq!(
+            serving_check(Arc::clone(&state)).status(),
+            StatusCode::SERVICE_UNAVAILABLE,
+            "the slow regime is a serving failure even before the circuit opens"
+        );
+
+        open_the_breaker(&state, "http://peer:8090");
+        let r = serving_check(Arc::clone(&state));
+        assert_eq!(r.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            r.headers().get("Retry-After").unwrap(),
+            &crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS.to_string()
+        );
     }
 
     #[test]

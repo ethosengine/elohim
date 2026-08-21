@@ -2162,6 +2162,23 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
                                     sh "kubectl apply -f ${manifest}"
                                 }
 
+                                // The doorway PodMonitor — scrapes BOTH doorways.
+                                // Applied through the tolerant helper rather than the
+                                // strict loop above, because jenkins-deployer's grant on
+                                // monitoring.coreos.com/podmonitors is operator-applied and
+                                // may be absent (backlog ci-rbac-jenkins-deployer); a
+                                // Forbidden here must not red an otherwise-good deploy,
+                                // and the helper fails on anything that is NOT that
+                                // Forbidden. Nothing applied this file before, which is why
+                                // the 2026-08-20 selector fix (8a4fe1ab1 — matchLabels
+                                // `app: elohim-doorway` silently excluded doorway B, whose
+                                // pods label themselves `elohim-doorway-b`) never reached
+                                // the cluster, and doorway B still had NO scrape target
+                                // during the investigation of its own outage.
+                                if (targetEnv == 'alpha') {
+                                    sh "bash '${env.WORKSPACE}/scripts/ci/apply-doorway-manifest.sh' genesis/orchestrator/manifests/infra/alpha-doorway-podmonitor.yaml"
+                                }
+
                                 // Deploy each human in parallel — see deployHumansInParallel
                                 // for rationale. Per-peer test-result shape; partial
                                 // failures → UNSTABLE (stage), junit XML per peer.

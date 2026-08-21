@@ -590,7 +590,12 @@ where
             // HONOR upstream backpressure (429/503) — surface catching-up to the
             // client (preserve upstream Retry-After, else cooldown).
             if matches!(status_u16, 429 | 503) {
-                trial.record(false);
+                // Breaker-neutral, exactly as the non-blob sibling above and as
+                // ProxyOutcome::classify declares: honored backpressure proves
+                // the upstream is ALIVE. Recording it as a FAILURE here meant
+                // three shed blob fetches opened the breaker for EVERY route on
+                // the peer — the amplification `classify` exists to prevent.
+                trial.record(true);
                 let upstream_ra = upstream
                     .headers()
                     .get(reqwest::header::RETRY_AFTER)
@@ -967,7 +972,7 @@ mod tests {
         // Recovery: the next gate call admits a fresh trial (the live symptom
         // was that it never did).
         assert!(
-            !breakers.is_open(&storage_url),
+            !breakers.is_open_admitting_trial(&storage_url),
             "cooldown elapsed: a fresh trial is admitted after the cancelled one"
         );
     }

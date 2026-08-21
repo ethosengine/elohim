@@ -212,13 +212,22 @@ impl ExtractionCache {
     }
 
     /// Evict an app's cached files.
+    ///
+    /// The prefix delete is UNCONDITIONAL — deliberately not gated on the index
+    /// entry existing. `put_app` removes the index entry BEFORE it writes and
+    /// re-inserts it only on success, so any failed `put_app` leaves files on
+    /// disk with no index entry. Gating the delete on `index.remove(..).is_some()`
+    /// then made the NEXT `put_app` skip the delete and write the new bundle ON
+    /// TOP of the orphaned one: every file present in the old bundle but absent
+    /// from the new one survived and was served, under an index entry claiming
+    /// the new blob hash. `delete_prefix` is a no-op on a missing path
+    /// (`disk.rs` returns `Ok(0)`), so this costs nothing in the common case.
     pub async fn evict_app(&self, app_id: &str) -> Result<(), CacheError> {
         let mut index = self.index.write().await;
-        if index.remove(app_id).is_some() {
-            // delete_prefix expects the app directory prefix
-            let prefix = format!("{}/", app_id);
-            self.backend.delete_prefix(&prefix).await?;
-        }
+        index.remove(app_id);
+        // delete_prefix expects the app directory prefix
+        let prefix = format!("{}/", app_id);
+        self.backend.delete_prefix(&prefix).await?;
         Ok(())
     }
 
@@ -354,6 +363,74 @@ mod tests {
 
         let js = cache.get_file("app1", "js/main.js").await;
         assert_eq!(js, Some(b"console.log('hi')".to_vec()));
+    }
+
+    #[tokio::test]
+    async fn a_failed_put_leaves_no_orphan_files_for_the_next_put_to_inherit() {
+        // Reproduces the shape a failed `put_app` leaves behind: files on disk
+        // with NO index entry (put_app removes the entry before writing and
+        // restores it only on success). The next put_app used to SKIP the
+        // prefix delete in that state — because `index.remove()` returned None
+        // — and wrote the new bundle on top of the orphan.
+        let (cache, _tmp) = test_cache(3600, 1024 * 1024).await;
+        cache
+            .put_app("app1", "hash-v1", sample_files())
+            .await
+            .unwrap();
+
+        // Simulate the post-failure state: entry gone, files still on disk.
+        cache.index.write().await.remove("app1");
+        assert_eq!(
+            cache.get_file("app1", "js/main.js").await,
+            None,
+            "no index entry -> reads miss, but the BYTES are still there"
+        );
+
+        // A v2 bundle that does NOT contain js/main.js.
+        let v2 = vec![("index.html".to_string(), b"<html>v2</html>".to_vec())];
+        cache.put_app("app1", "hash-v2", v2).await.unwrap();
+
+        assert_eq!(
+            cache.get_file("app1", "index.html").await,
+            Some(b"<html>v2</html>".to_vec())
+        );
+        assert_eq!(
+            cache.get_file("app1", "js/main.js").await,
+            None,
+            "the orphaned v1 file must NOT survive into the v2 extraction"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_extraction_flight_grants_rights_to_exactly_one_caller() {
+        // The contract `serve_app_file`'s coalescing loop depends on: while an
+        // extraction is registered every other caller is told to wait, and once
+        // it finishes, a re-entering waiter becomes the single new extractor.
+        // Before 2026-08-21 a waiter whose post-wait cache re-check missed fell
+        // through and extracted WITHOUT re-entering, so every waiter became a
+        // simultaneous extractor and their concurrent put_app calls raced.
+        let (cache, _tmp) = test_cache(3600, 1024 * 1024).await;
+
+        assert!(
+            cache.begin_extraction("app1").is_none(),
+            "first caller owns the flight"
+        );
+        assert!(
+            cache.begin_extraction("app1").is_some(),
+            "second caller must WAIT, not extract"
+        );
+        assert!(cache.begin_extraction("app1").is_some(), "and a third");
+
+        cache.finish_extraction("app1");
+
+        assert!(
+            cache.begin_extraction("app1").is_none(),
+            "after finish, a re-entering waiter becomes the new sole extractor"
+        );
+        assert!(
+            cache.begin_extraction("app1").is_some(),
+            "and everyone else waits on IT — never a second concurrent extractor"
+        );
     }
 
     #[tokio::test]

@@ -721,10 +721,69 @@ habits:
       through a sibling's shed, and whichever serves resolves the same
       declared head. Federation failover, not per-host luck.
     status: red
-    active: false
+    active: true
     checks:
       - "a2o @concern:doorway-failover (genesis/a2o/features/dataplane/doorway-failover.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
     evidence: >
+      DELTA 2026-08-21 (STAYS RED — cause NAMED and four cures landed
+      host-green; the a2o @concern:doorway-failover scenario is still the flip
+      authority and has NOT run): the apex 503 was never the projector and
+      never adam. Four links, each measured. (1) STORAGE's /apps extraction
+      flight leaked a herd: a waiter whose post-wait cache re-check MISSED fell
+      through and extracted WITHOUT ever registering in in_flight, then created
+      a guard that broadcast finish_extraction for a flight it never held. So
+      when the first extractor's put_app failed, every waiter missed and all
+      became simultaneous extractors, and their concurrent put_app calls raced
+      evict_app's remove_dir_all against each other's directory writes ->
+      "Failed to cache extraction (non-fatal) … Directory not empty (os error
+      39)", logged TWICE 8ms apart, identifier=elohim-host-landing, 2026-08-20
+      20:11:27Z. put_app clears the index entry BEFORE writing and restores it
+      only on success, so each failure left the app permanently uncached and
+      every later request re-extracted the whole bundle — self-sustaining.
+      (2) The SSR shell fetch rides EPR_DISPATCH_TIMEOUT_SECS=10, SHORTER than
+      the proxy's STORAGE_PROXY_REQUEST_TIMEOUT_SECS=12, so the homepage render
+      trips the breaker first; three timeouts in ~25s = the threshold.
+      (3) The breaker is keyed by ENDPOINT, not route, so it then sheds EVERY
+      route on that peer — /db/content answered in 40-114ms throughout and was
+      shed as collateral. Two sites also recorded a Failure for an upstream
+      429/503, against ProxyOutcome::classify's explicit rule that answered
+      backpressure proves liveness. (4) UpstreamBreakers::is_open() is a GATE,
+      not a read — it advances Open->HalfOpen and CONSUMES the one half-open
+      trial — and two `/`-path planners called it with no BreakerTrial guard,
+      so no outcome was ever recorded and the circuit re-latched every
+      STALE_HALFOPEN_COOLDOWN_MULTIPLIER x cooldown = 120s. Fixed 2026-07-21
+      (f5e22baa2), REINTRODUCED 2026-08-18 (f0b908660, warm-boot shell cache),
+      whose in-tree comment asserted "is_open only READS the circuit" while
+      sitting directly on the bug it named.
+      LIVE PROOF of the shape, 2026-08-21 11:59Z: elohim.host / -> 503 in
+      20.751s carrying x-ssr-skipped:shell-fetch-failed and
+      x-elohim-hop-serve-ms:10004.681 — the 10s budget expiring to the
+      millisecond, twice sequentially — while its OWN
+      /db/content/elohim-host-landing -> 200 in 0.114s and its /health still
+      read healthy:true,status:"online". doorway-alpha in the same minute sat
+      circuit:closed/errorStreak:2 (the blind window) with /db -> 503 after
+      12.034s. BILATERAL, never an adam defect: breaker_open_total climbed
+      A 56->303 and B 47->295 over 13h, and doorway_upstream_backpressure_
+      honored_total reads 0 on BOTH — the opens are never-answered hops, not
+      storage backpressure.
+      CURES (host-green, NOT deployed): the extraction flight re-enters instead
+      of falling through and only its owner guards it
+      (MAX_EXTRACTION_COALESCE_ROUNDS); evict_app deletes the prefix
+      unconditionally so a failed put cannot leave an orphan the next put
+      inherits; both `/`-path planners use a new non-mutating would_shed() and
+      the raw gate is #[cfg(test)] so production cannot reach it a fourth time;
+      both classify violations defer to the one classifier; snapshot() stops
+      reporting a HalfOpen circuit as skipped:false; /health gains a `serving`
+      block and demotes on BOTH the shedding and the slow regime (errorStreak>0
+      — the blind window above is exactly where a shedding-only signal lies),
+      and /health/serving carries the status code /health cannot, because
+      /health on :8080 is simultaneously the startup, readiness AND liveness
+      probe and must never flip. Gates: `just gate doorway` exit 0,
+      `just gate elohim-storage` exit 0, elohim-cache-core 47/47, 6 new breaker
+      tests + 5 new health tests + 2 new cache tests, all red-first.
+      OPEN: fleet verification via [build:edge] [edge:validate-only], and
+      whether the endpoint-keyed breaker should be route-class aware — backlog
+      doorway-breaker-trial-theft-fleet-verification.md.
       DELTA 2026-08-18c (batch closed on dev — pre-push review pass, 57688ae4a):
       both cures below were hardened before landing, red-first — warm_shell keys
       the stocking on the head declared when the fetch was DECIDED (a projection
@@ -813,7 +872,7 @@ habits:
       Agent-to-transport identity bindings are cross-signed and verifiable; no
       economic attribution rides a self-asserted binding.
     status: red
-    active: true
+    active: false
     checks:
       - "cargo test --test binding_attribution_refuses_sentinel (elohim/elohim-storage — the admissibility decision: a sentinel is inadmissible AND a real cross-signature is admitted; no longer #[ignore]d, so it counts in the gate)"
       - "cargo test --test binding_attribution_cut (elohim/elohim-storage — the same decision end-to-end through the projection: sentinel projects unverified, cross-signed projects cross_signed, Enforce admits only the proven peer and COUNTS the refusal, Observe is behaviour-preserving, a poisoned signature neither panics nor attributes, a lifted proof does not attach)"
@@ -1285,16 +1344,44 @@ habits:
       capacity is shed BEFORE dispatch (costing the conductor nothing), and no
       pacing controller closes a loop over a signal that is not monotonic in the
       quantity it controls.
-    status: red
+    status: green
     active: false
     checks:
       - "cargo test --lib conductor_admission (elohim/elohim-storage) — 9 tests: the gate bounds concurrency at capacity, a full gate sheds rather than queueing forever, occupancy rises/falls with held permits, background yields to interactive under contention, and sizing mirrors the conductor's own incoming_request_concurrency_limit (db_max_readers − 3)"
       - "cargo test --lib reconcile_rails::tests::aimd_shrinks_on_a_call_level_failure (elohim/elohim-storage) — the Err arm the controller used to never hear from"
       - "cargo test --lib head_batch_resolver::tests::queue_wait_reads_as_headroom_when_the_conductor_stalls_in_the_extern (elohim/elohim-storage) — the sign inversion, stated as arithmetic: a 9s round-trip with 8.9s in-wasm reads as 100ms of queue-wait, UNDER the backpressure threshold, and grows the batch 32→48"
       - "LIVE-LOCAL (GREEN 2026-08-18): python3 app/elohim-app/scripts/hc-admission-probe.py --concurrency 64 --seconds 20 against `just dev start` (or an island conductor + storage). Asserts the gate bounds a REAL conductor: in_flight present and pinned at capacity under load, hold_ms populated per zome, and L = lambda*W closing to within 1%. This is the leg that moved the habit off 'proven to bound a semaphore'."
-      - "LIVE-FLEET (the one leg still unproven, and the one the habit's invariant is finally about): elohim_conductor_admission_in_flight present on an alpha pod's /metrics with elohim_conductor_admission_hold_ms populated. Local proof does not carry it — alpha adds the doorway as a SECOND ungated client of the same pool, real gossip/validation load the gate cannot see, and a cgroup CPU ceiling. Until a deploy carries this, the sizing verdict below is a local one."
+      - "LIVE-FLEET: elohim_conductor_admission_in_flight present on an alpha pod's /metrics with elohim_conductor_admission_hold_ms populated per zome. This is the leg local proof cannot carry — alpha adds the doorway as a SECOND ungated client of the same pool, real gossip/validation load the gate cannot see, and a cgroup CPU ceiling. Query: elohim_conductor_admission_hold_ms_count and elohim_conductor_admission_in_flight over job=\"elohim-alpha/elohim-edgenode\"."
       - "cargo test --lib admission_egress (elohim/elohim-storage) + cargo test --lib source_chain::tests — a shed reaches the WIRE as backpressure (503 + Retry-After + X-Available-Permits + {status:catching-up}), and no handler launders ADMISSION_SHED_MARKER on the way there"
     evidence: >
+      DELTA 2026-08-20 (GREEN — the LIVE-FLEET leg is measured, and it was the
+      only leg outstanding): elohim_conductor_admission_in_flight and
+      elohim_conductor_admission_hold_ms are BOTH live on the alpha fleet, on
+      all 7 edgenode pods, read from Prometheus (job
+      "elohim-alpha/elohim-edgenode") 2026-08-20 ~22:35Z. hold_ms is populated
+      per zome — 21 series, 3 zomes (content_store / infrastructure / imagodei)
+      x 7 pods — with per-pod observation totals 405..1190 (matthew 1190 =
+      715 content_store + 434 infrastructure + 41 imagodei; adam 506; james 648;
+      jessica 618; gertrude 546; eve 554; susan 405). in_flight reads 0..2
+      across the fleet in the same instant (matthew 1, adam 1, susan 1,
+      gertrude 1, eve 2, james 0, jessica 0). So the gate is not merely
+      compiled onto the fleet: it is ADMITTING and TIMING real conductor calls
+      on every peer, and L and W are externally readable per zome — which is
+      exactly what the invariant asks ("occupancy (L) and hold-time (W) are
+      exported so Little's Law is computable"), now on the substrate the
+      invariant was finally about rather than on a local island. The five cargo
+      legs were re-run host-green on this tree the same day: conductor_admission
+      9 passed, reconcile_rails::tests::aimd_shrinks_on_a_call_level_failure 1,
+      head_batch_resolver::tests::queue_wait_reads_as_headroom_when_the_conductor_stalls_in_the_extern
+      1, admission_egress 3, source_chain::tests 2 — 0 failed, exit 0 each.
+      WHAT THIS DOES NOT CLAIM, and what the guard still watches: the fleet
+      capacity A/B has NOT been re-run, so the local sizing verdict (the pool
+      was OVERSUBSCRIBED; d(lambda)/d(capacity) <= 0) remains a LOCAL one and
+      nobody should touch db_max_readers on alpha on its authority. Guard risk 3
+      is also unchanged and now visible in the same window: the doorway is a
+      second, ungated client of the same pool, so these occupancy readings are
+      elohim-storage's share only. Green means the pool is honestly
+      REPRESENTED on the fleet, not that it is correctly SIZED there.
       DELTA 2026-08-18b (batch closed on dev — pre-push review pass, 57688ae4a):
       the last api-layer launderer of ADMISSION_SHED_MARKER is closed. The wrap
       is now canonical in conductor_admission::zome_unavailable_error (source_chain

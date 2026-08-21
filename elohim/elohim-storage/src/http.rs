@@ -141,6 +141,16 @@ const MAX_CONCURRENT_REQUESTS: usize = 64;
 /// enough concurrency cost memory/fds), just bounded on their own budget.
 const MAX_CONCURRENT_READS: usize = 256;
 
+/// How many times a coalesced `/apps` reader re-enters the extraction flight
+/// after its post-wait cache re-check misses, before extracting anyway.
+///
+/// Re-entering is the correct move (the previous extractor may have failed, so
+/// SOMEONE must extract) but it must be bounded: if every extraction keeps
+/// failing, an unbounded retry turns the herd into a spin. Three rounds is
+/// enough for the ordinary "the winner failed, the next one succeeds" case and
+/// short enough that a genuinely broken bundle still reaches its honest error.
+const MAX_EXTRACTION_COALESCE_ROUNDS: u32 = 3;
+
 /// Retry-After (seconds) when storage sheds at the request-admission ceiling.
 const STORAGE_SHED_RETRY_AFTER_SECS: u64 = 2;
 
@@ -7476,10 +7486,20 @@ impl HttpServer {
         }
 
         // --- Slow path: DB lookup + ZIP extraction ---
-        // Thundering herd protection: if another request is already extracting
-        // this app, wait for it to finish then retry from cache.
+        // Thundering herd protection: at most ONE extractor per app_id at a
+        // time. Everyone else waits on the broadcast and re-reads the cache.
+        let mut won_extraction_rights = true;
+        let mut coalesce_rounds = 0u32;
         if let Some(ref cache) = self.extraction_cache {
-            if let Some(mut rx) = cache.begin_extraction(cache_key) {
+            // Re-enter the flight on every miss. A waiter whose post-wait
+            // re-check misses must ACQUIRE extraction rights, never extract
+            // unregistered — see `won_extraction_rights` below.
+            loop {
+                let Some(mut rx) = cache.begin_extraction(cache_key) else {
+                    // Nobody is extracting and `begin_extraction` just
+                    // registered US. We own the flight.
+                    break;
+                };
                 // Another request is extracting — wait for it
                 debug!(identifier = %identifier, "Waiting for in-flight extraction");
                 let _ = rx.recv().await; // ignore errors — extractor may have finished
@@ -7528,16 +7548,50 @@ impl HttpServer {
                         return Ok(builder.body(Full::new(Bytes::from(index_html))).unwrap());
                     }
                 }
-                // Extraction failed or file not found — fall through to extract ourselves
+                // The post-wait re-check MISSED. Historically this fell
+                // straight through and extracted — without ever registering in
+                // `in_flight`. That is the thundering-herd hole: when the first
+                // extractor's `put_app` fails it leaves NO index entry, so every
+                // waiter misses here, and all of them became simultaneous
+                // extractors. Their concurrent `put_app` calls then raced
+                // `evict_app`'s `remove_dir_all` against each other's directory
+                // writes -> `Directory not empty (os error 39)` -> `put_app`
+                // returns Err after removing the index entry and before
+                // re-inserting it -> the app is permanently uncached -> every
+                // later request re-extracts the whole bundle -> more
+                // concurrency. Self-sustaining, and measured live on
+                // 2026-08-20 (adam + matthew, identifier=elohim-host-landing,
+                // two failures 8ms apart), where the resulting multi-second
+                // `/apps/<id>/index.html` reads blew the doorway's 10s SSR
+                // shell budget three times in a row and opened the per-ENDPOINT
+                // upstream breaker, shedding every `/db` route on the peer.
+                //
+                // So: go round again and contend for the flight properly.
+                coalesce_rounds += 1;
+                if coalesce_rounds >= MAX_EXTRACTION_COALESCE_ROUNDS {
+                    warn!(
+                        identifier = %identifier,
+                        rounds = coalesce_rounds,
+                        "extraction coalescing gave up after repeated post-wait misses — \
+                         extracting WITHOUT the flight (bounded livelock escape)"
+                    );
+                    won_extraction_rights = false;
+                    break;
+                }
             }
-            // We're first — create drop guard that calls finish_extraction on ALL exit paths
-            // (including early returns for 404, empty hash, corrupt ZIP, etc.)
         }
-        // Guard lives until end of function — any return triggers finish_extraction
-        let _extraction_guard = self
-            .extraction_cache
-            .as_ref()
-            .map(|c| c.extraction_guard(cache_key));
+        // Guard lives until end of function — any return triggers
+        // finish_extraction. Created ONLY when we actually hold the flight: a
+        // caller that took the bounded livelock escape above never registered,
+        // and dropping a guard it never earned would broadcast `finish` for the
+        // real extractor and release the next herd early.
+        let _extraction_guard = if won_extraction_rights {
+            self.extraction_cache
+                .as_ref()
+                .map(|c| c.extraction_guard(cache_key))
+        } else {
+            None
+        };
 
         debug!(identifier = %identifier, "Cache MISS — extracting from ZIP");
 

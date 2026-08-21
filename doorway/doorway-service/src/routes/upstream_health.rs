@@ -125,16 +125,52 @@ impl UpstreamBreakers {
         }
     }
 
-    /// True if a call to `endpoint` should be SHED (circuit open and not yet
-    /// admitting a half-open trial). Side effect: advances Open→HalfOpen when
-    /// the cooldown has elapsed (admits exactly one trial).
+    /// Read-only availability query for a *planning* caller: true when a call
+    /// to `endpoint` would be shed right now. It NEVER mutates — it does not
+    /// advance Open→HalfOpen, and it never admits or consumes a half-open
+    /// trial.
     ///
-    /// PREFER [`UpstreamBreakers::begin`]: a caller that gets `false` here has
-    /// possibly consumed the one half-open trial and MUST record an outcome on
-    /// every terminal path — *including paths that never run* because the
-    /// request future was dropped (client disconnect, task cancellation). Only
-    /// the guard returned by `begin` can honour that on a dropped future.
-    pub fn is_open(&self, endpoint: &str) -> bool {
+    /// Use this to DECIDE (serve warm? attempt a fetch?). Use
+    /// [`UpstreamBreakers::begin`] to CALL.
+    ///
+    /// Deliberately conservative: an Open circuit whose cooldown has already
+    /// elapsed still reads as "would shed", even though the next gate call
+    /// would admit a trial. A planner that guessed "available" here would only
+    /// go on to lose the gate race behind it; a planner that serves from its
+    /// warm cache instead has avoided a doomed upstream read. The guarded
+    /// caller does the advancing — that is the whole division of labour.
+    ///
+    /// WHY THIS EXISTS. The obvious-looking `is_open` is a GATE, not a read: it
+    /// consumes the one half-open trial and hands it to a caller with no guard,
+    /// so no outcome is ever recorded. Two `/`-path planners called it, and
+    /// because the breaker map is keyed by ENDPOINT the resulting stuck
+    /// half-open shed EVERY route on that peer — including `/db/content` reads
+    /// that answer in tens of milliseconds. Fixed 2026-07-21 (f5e22baa2),
+    /// reintroduced 2026-08-18 (f0b908660), re-fixed here with a read that
+    /// cannot steal.
+    pub fn would_shed(&self, endpoint: &str) -> bool {
+        let map = self.breakers.lock().unwrap();
+        map.get(endpoint)
+            .is_some_and(|entry| entry.cb.state() != CircuitState::Closed)
+    }
+
+    /// TEST-ONLY gate primitive: true if a call should be SHED.
+    ///
+    /// **This is not a read.** It advances Open→HalfOpen when the cooldown has
+    /// elapsed and ADMITS (consumes) the one half-open trial, handing it to a
+    /// caller with no guard and no `Drop` — so if that caller never records an
+    /// outcome, the breaker sheds every route on the endpoint until a stale
+    /// re-admit, which the same caller then steals again.
+    ///
+    /// Production must use [`UpstreamBreakers::begin`] (gate + RAII guard that
+    /// records on every terminal path, including a dropped future) or
+    /// [`UpstreamBreakers::would_shed`] (a true read). This is `cfg(test)`
+    /// precisely so the footgun cannot be reached from production a third time:
+    /// the unit tests below already asserted the latch behaviour and still did
+    /// not stop two call sites from reintroducing it, because nothing tested
+    /// that no PRODUCTION site calls it. A compile error is that missing rail.
+    #[cfg(test)]
+    pub fn is_open_admitting_trial(&self, endpoint: &str) -> bool {
         self.admit(endpoint, self.tick()) == Admission::Shed
     }
 
@@ -209,9 +245,14 @@ impl UpstreamBreakers {
         map.iter()
             .map(|(endpoint, entry)| {
                 let cb = &entry.cb;
+                // `skipped` answers "is this endpoint shedding right now?".
+                // HalfOpen reported FALSE, which read as reassuring on
+                // /admin/self-healing during the 2026-08-20 incident — but a
+                // HalfOpen circuit has its one trial outstanding and sheds
+                // every OTHER caller, so the honest answer is true.
                 let (circuit, skipped) = match cb.state() {
                     CircuitState::Closed => ("closed", false),
-                    CircuitState::HalfOpen => ("half-open", false),
+                    CircuitState::HalfOpen => ("half-open", true),
                     CircuitState::Open => ("open", true),
                 };
                 BreakerSnapshot {
@@ -306,12 +347,12 @@ mod tests {
     fn opens_after_threshold_then_sheds() {
         let b = UpstreamBreakers::new(3, 1_000_000); // huge cooldown so it stays open
         let ep = "http://broken:8090";
-        assert!(!b.is_open(ep), "closed on first sight");
+        assert!(!b.is_open_admitting_trial(ep), "closed on first sight");
         b.record(ep, false);
         b.record(ep, false);
-        assert!(!b.is_open(ep), "2 < 3: still closed");
+        assert!(!b.is_open_admitting_trial(ep), "2 < 3: still closed");
         b.record(ep, false);
-        assert!(b.is_open(ep), "3rd failure opens -> shed");
+        assert!(b.is_open_admitting_trial(ep), "3rd failure opens -> shed");
     }
 
     #[test]
@@ -321,15 +362,121 @@ mod tests {
         for _ in 0..10 {
             b.record(ep, true);
         }
-        assert!(!b.is_open(ep));
+        assert!(!b.is_open_admitting_trial(ep));
+    }
+
+    // ---------------------------------------------------------------------
+    // The rail that was missing on 2026-08-18. `halfopen_without_record_
+    // deadlocks_forever` (below) already asserted the LATCH, and two production
+    // call sites still reintroduced it, because nothing asserted that the
+    // planner's availability query is non-consuming. These do.
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn would_shed_never_consumes_the_half_open_trial() {
+        // Zero cooldown so the trial is available immediately — same harness
+        // convention as `halfopen_without_record_deadlocks_forever` (there is
+        // no wall-clock fast-forward here; the tick-injected variant below
+        // covers the cooldown boundary).
+        let b = UpstreamBreakers::new(1, 0);
+        let ep = "http://peer:8090";
+        b.record(ep, false); // -> Open, with a trial immediately available
+        assert_eq!(circuit_of(&b, ep), "open");
+
+        // A planner asks a hundred times. It must steal nothing.
+        for _ in 0..100 {
+            assert!(b.would_shed(ep), "an open circuit reads as shedding");
+        }
+        assert_eq!(
+            circuit_of(&b, ep),
+            "open",
+            "would_shed must NOT advance Open->HalfOpen: the trial is still unclaimed"
+        );
+
+        // ...so the guarded caller behind it still gets the trial. Under the
+        // old `is_open` planner this returned None and the breaker latched.
+        let trial = b
+            .begin(ep)
+            .expect("the trial survived the planner and reached the guarded caller");
+        trial.record(true);
+        assert_eq!(
+            circuit_of(&b, ep),
+            "closed",
+            "the guarded caller's recorded success closes the circuit"
+        );
+    }
+
+    #[test]
+    fn would_shed_does_not_advance_across_the_cooldown_boundary() {
+        // The tick-injected version: `admit` is the mutating gate, `would_shed`
+        // is the read. Crossing the cooldown must be the GATE's doing, never
+        // the planner's.
+        let b = UpstreamBreakers::new(1, 30);
+        let ep = "http://peer:8090";
+        b.record(ep, false); // opens at tick ~0
+
+        for _ in 0..50 {
+            assert!(b.would_shed(ep));
+        }
+        // The gate, asked at a tick past the cooldown, still finds the trial
+        // unconsumed — proof the 50 reads above advanced nothing.
+        assert_eq!(
+            b.admit(ep, 31),
+            Admission::Trial,
+            "the cooldown-crossing trial was never stolen by would_shed"
+        );
+    }
+
+    #[test]
+    fn would_shed_is_true_while_a_trial_is_outstanding() {
+        // A HalfOpen circuit sheds every caller except the one holding the
+        // trial, so a planner must read it as unavailable and serve warm.
+        let b = UpstreamBreakers::new(1, 0);
+        let ep = "http://peer:8090";
+        b.record(ep, false);
+        let _outstanding = b.begin(ep).expect("cooldown 0 admits a trial at once");
+        assert_eq!(circuit_of(&b, ep), "half-open");
+        assert!(
+            b.would_shed(ep),
+            "half-open with an outstanding trial sheds everyone else"
+        );
+    }
+
+    #[test]
+    fn would_shed_is_false_for_an_unknown_or_healthy_endpoint() {
+        let b = UpstreamBreakers::new(3, 30);
+        assert!(!b.would_shed("http://never-seen:8090"), "no breaker yet");
+        b.record("http://fine:8090", true);
+        assert!(!b.would_shed("http://fine:8090"));
+    }
+
+    #[test]
+    fn snapshot_reports_half_open_as_skipping() {
+        // /admin/self-healing showed `circuit: half-open, skipped: false` during
+        // the 2026-08-20 elohim.host incident, which read as "not shedding"
+        // while every route on the peer was in fact shedding.
+        let b = UpstreamBreakers::new(1, 0);
+        let ep = "http://peer:8090";
+        b.record(ep, false);
+        let _outstanding = b.begin(ep).expect("admits a trial");
+        let snap = b
+            .snapshot()
+            .into_iter()
+            .find(|s| s.endpoint == ep)
+            .expect("snapshot carries the endpoint");
+        assert_eq!(snap.circuit, "half-open");
+        assert!(
+            snap.skipped,
+            "a half-open circuit with an outstanding trial IS skipping calls"
+        );
     }
 
     #[test]
     fn distinct_endpoints_isolated() {
         let b = UpstreamBreakers::new(1, 1_000_000);
         b.record("http://a", false); // a opens
-        assert!(b.is_open("http://a"));
-        assert!(!b.is_open("http://b"), "b unaffected by a");
+        assert!(b.is_open_admitting_trial("http://a"));
+        assert!(!b.is_open_admitting_trial("http://b"), "b unaffected by a");
     }
 
     /// Non-consuming state lookup for one endpoint via `snapshot()` (never
@@ -376,7 +523,7 @@ mod tests {
         // half-open-admitting call: it returns false ("not open" -> caller
         // may proceed) and consumes the one trial.
         assert!(
-            !b.is_open(ep),
+            !b.is_open_admitting_trial(ep),
             "cooldown elapsed: half-open admits one trial"
         );
         assert_eq!(circuit_of(&b, ep), "half-open");
@@ -385,7 +532,7 @@ mod tests {
         // passing recovers it; only a recorded outcome can.
         for _ in 0..50 {
             assert!(
-                b.is_open(ep),
+                b.is_open_admitting_trial(ep),
                 "half-open trial already consumed and never recorded: permanent shed"
             );
         }
@@ -407,7 +554,10 @@ mod tests {
         let b = UpstreamBreakers::new(1, 0); // zero cooldown: immediate half-open
         let ep = "http://records-correctly:8090";
         b.record(ep, false); // opens
-        assert!(!b.is_open(ep), "cooldown elapsed: admits first trial");
+        assert!(
+            !b.is_open_admitting_trial(ep),
+            "cooldown elapsed: admits first trial"
+        );
         assert_eq!(circuit_of(&b, ep), "half-open");
         b.record(ep, false); // the trial's outcome: failure -> re-opens
         assert_eq!(
@@ -419,12 +569,15 @@ mod tests {
         // is_open() call (cooldown already elapsed) admits a fresh trial
         // instead of shedding forever.
         assert!(
-            !b.is_open(ep),
+            !b.is_open_admitting_trial(ep),
             "cooldown elapsed again: admits a fresh trial"
         );
         b.record(ep, true); // this time the trial succeeds
         assert_eq!(circuit_of(&b, ep), "closed");
-        assert!(!b.is_open(ep), "recorded success closes the circuit");
+        assert!(
+            !b.is_open_admitting_trial(ep),
+            "recorded success closes the circuit"
+        );
     }
 
     #[test]
@@ -462,7 +615,7 @@ mod tests {
         let trial = b.begin(ep).expect("cooldown elapsed: fresh trial admitted");
         trial.record(true);
         assert_eq!(circuit_of(&b, ep), "closed");
-        assert!(!b.is_open(ep));
+        assert!(!b.is_open_admitting_trial(ep));
     }
 
     #[test]
@@ -483,7 +636,7 @@ mod tests {
             0,
             "cancellation on a closed circuit records nothing"
         );
-        assert!(!b.is_open(ep));
+        assert!(!b.is_open_admitting_trial(ep));
     }
 
     #[test]
@@ -540,6 +693,6 @@ mod tests {
         assert_eq!(snap[0].error_streak, 1);
         // snapshot() must NOT have advanced Open→HalfOpen (it used state(), not
         // should_skip): the breaker is still open on the next read.
-        assert!(b.is_open("http://x"));
+        assert!(b.is_open_admitting_trial("http://x"));
     }
 }
