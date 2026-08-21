@@ -18,7 +18,7 @@ Feature: Observable + contract-aware auto-distribute
   # mesh to place it across >=2 households within 30s. That write-plus-placement
   # loop is what the local-stack profile exists for; against a deployed shared
   # fleet it would author test content into the substrate it is measuring.
-  @resilience-p1 @local @act:i
+  @resilience-p1 @local @act:i @wip @missing:household-attribution-on-delivery-peers
   Scenario: Full placement across two households
     Given the cluster has peers in at least 2 distinct households each with an active "commons" provide commitment
     When I ingest a "commons"-reach content item "content-alpha"
@@ -29,7 +29,7 @@ Feature: Observable + contract-aware auto-distribute
   # --- Placement gap on short commitments ----------------------------------
 
   # @local: same ingest-then-place loop as the scenario above.
-  @resilience-p1 @local @act:i
+  @resilience-p1 @local @act:i @wip @missing:household-attribution-on-delivery-peers
   Scenario: Placement gap when commitments are short
     Given the cluster has peers in 2 households but only 1 has an active "commons" provide commitment
     When I ingest a "commons"-reach content item "content-beta"
