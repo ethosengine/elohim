@@ -1,4 +1,4 @@
-@e2e @storage @wip
+@e2e @storage @wip @act:i
 Feature: Fair-share limits keep storage honest — no free-riding, no giving it all away
   As the steward of my family's home server
   I want the protocol to hold a fair balance between space I keep, space I lend to friends, and space I share with everyone

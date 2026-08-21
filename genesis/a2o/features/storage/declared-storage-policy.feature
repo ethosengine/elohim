@@ -1,4 +1,4 @@
-@e2e @storage @wip @wip-tier-controller
+@e2e @storage @wip @wip-tier-controller @act:i
 Feature: Content keeps the promises its app declared — cheap to keep, ready when wanted
   As a parent with years of family videos
   I want our videos to rest cheaply in deep storage most of the time, but play within moments when someone presses play

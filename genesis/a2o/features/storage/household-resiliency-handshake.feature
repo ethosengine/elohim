@@ -1,4 +1,4 @@
-@e2e @storage @wip
+@e2e @storage @wip @act:i
 Feature: Households commit to back each other up
   As a family in a small circle of people we trust
   I want our home to keep a copy of another family's memories, and they keep a copy of ours

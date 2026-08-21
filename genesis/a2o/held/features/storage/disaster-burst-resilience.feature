@@ -1,4 +1,6 @@
-@e2e @storage @wip @wip-collective-steward
+# HELD (2026-08-21): gated on a collective-steward primitive that does not exist;
+# "within hours" is outside any CI window at every act.
+@e2e @storage @wip @wip-collective-steward @act:ii
 Feature: When disaster strikes, the wider community absorbs the load
   As a family in a region hit by a storm
   I want our church community's shared server to hold more of our memories for a while
