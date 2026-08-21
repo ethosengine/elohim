@@ -1,4 +1,4 @@
-@e2e @auth @browser-only @peer-oauth-portal @wip
+@e2e @auth @browser-only @peer-oauth-portal @wip @act:i
 Feature: RP consent — external app requests user claims
   Per RFC-6749, when an external relying party redirects the user to the
   authorization endpoint, the portal renders a consent surface that names

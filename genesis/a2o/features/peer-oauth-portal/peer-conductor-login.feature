@@ -3,6 +3,7 @@ Feature: Mode B — Peer-conductor login
   My conductor on my own storage instance is the auth authority.
   Doorway is at most a transparent ingress, or absent entirely (Tauri).
 
+  @act:i
   Scenario: Sign-in via doorway-routed peer-conductor
     Given matthew has graduated to running his own conductor
     And alpha.elohim.host is configured to route auth requests for matthew to his conductor
@@ -11,7 +12,7 @@ Feature: Mode B — Peer-conductor login
     Then the response reports trustMode "peer-conductor" and authority "matthew's conductor"
     And the trust-indicator reads "Your conductor — alpha.elohim.host is helping with ingress"
 
-  @manual @tauri-only @skip
+  @manual @tauri-only @skip @act:host
   Scenario: Sign-in via Tauri direct (no doorway)
     # Requires a Tauri webview test harness, which the project does not
     # provide. Per the peer OAuth portal spec §6.2, Tauri is operator-owned
