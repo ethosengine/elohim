@@ -22,7 +22,7 @@ while true; do
   brk=$(curl -s -m 5 http://localhost:8888/admin/self-healing 2>/dev/null | python3 -c "import sys,json; u=json.load(sys.stdin).get('upstreams') or []; print(','.join(x.get('circuit','?') for x in u) or '?')" 2>/dev/null || echo '?')
   zp=$(for p in 8090 8091 8092; do curl -s -m 5 http://localhost:$p/health 2>/dev/null | python3 -c "import sys,json; print((json.load(sys.stdin).get('conductor') or {}).get('zomePath','?'))" 2>/dev/null || echo '?'; done | paste -sd,)
   line="$line,\"breakerA\":\"$brk\",\"zomePath\":\"$zp\"}"; echo "$line" >> $OUT/watch.jsonl
-  [ "$brk" != "closed" ] && [ "$brk" != "?" ] && echo "$ts SPIKE breakerA=$brk" >> $OUT/watch.spikes
+  case ",$brk," in *,closed,*) ;; esac; [ "$brk" != "?" ] && [ -n "$(tr "," "\n" <<<"$brk" | grep -vx closed)" ] && echo "$ts SPIKE breakerA=$brk" >> $OUT/watch.spikes
   case "$zp" in *dead*) echo "$ts SPIKE zomePath=$zp" >> $OUT/watch.spikes;; esac
   sleep "$INTERVAL"
 done
