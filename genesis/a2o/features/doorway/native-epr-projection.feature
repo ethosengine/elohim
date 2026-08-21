@@ -1,4 +1,4 @@
-@epr-decomposition @b22 @doorway @projection
+@epr-decomposition @b22 @doorway @projection @act:i
 Feature: Doorway natively projects EPRs at author-declared URL paths
   As a steward of a doorway, I declare which EPRs my doorway hosts
   and at what URL paths, so visitors reach the protocol-native experience
@@ -17,7 +17,7 @@ Feature: Doorway natively projects EPRs at author-declared URL paths
     And the lamad bundle's <base href> is "/lamad/"
     And Angular client-side router handles "/concept/fair-exchange"
 
-  @wip @cache-eviction
+  @cache-eviction @requires:owned-substrate
   Scenario: Bundle redeploy evicts doorway cache
     Given the lamad-spa EPR's blob is sha256-OLD
     When a deploy PATCHes the lamad-spa EPR with blobHash sha256-NEW

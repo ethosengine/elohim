@@ -22,10 +22,11 @@
 
 import { strict as assert } from 'node:assert';
 
-import { Given, When, Then } from '@cucumber/cucumber';
+import { After, Given, When, Then } from '@cucumber/cucumber';
 
 import { request } from 'undici';
 
+import { resolveDoorwayUrl as resolveFixtureDoorwayUrl } from '../../src/framework/fixtures/household-mesh.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
@@ -47,6 +48,38 @@ const projectionSecondaryResponses = new WeakMap<E2EWorld, ProjectionResponse>()
 /** Inline base-href detector. Bounded char classes avoid catastrophic backtracking. */
 const BASE_HREF_PATTERN = /<base[ \t]+[^>]{0,200}href=["']([^"']{1,500})["']/i;
 
+/**
+ * Why this response is not the page we asked for, when the doorway told us.
+ *
+ * A `503 {"status":"catching-up"}` with `cause:"upstream"` is NOT the projector
+ * lagging — it is the doorway's breaker to its storage peer sitting open, i.e.
+ * a doorway→storage availability failure. Saying so in the assertion is the
+ * difference between a red that routes triage to the substrate-trust runbook
+ * and a red that reads as "the SPA is broken". Returns '' when the response is
+ * not a shed, so a genuine wrong-content-type red stays unadorned.
+ */
+function describeShed(resp: ProjectionResponse): string {
+  if (resp.status !== 503) return '';
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(resp.body.toString('utf-8')) as Record<string, unknown>;
+  } catch {
+    return ` (status 503, unparseable body)`;
+  }
+  if (body['status'] !== 'catching-up') return ` (status ${resp.status})`;
+  const cause = typeof body['cause'] === 'string' ? body['cause'] : 'unreported';
+  const circuit = typeof body['circuit'] === 'string' ? body['circuit'] : 'unreported';
+  if (cause === 'upstream') {
+    return (
+      ` — the doorway is SHEDDING: 503 catching-up, cause=upstream, circuit=${circuit}. ` +
+      "That is the doorway's breaker to its storage peer, not the SPA and not the projector: " +
+      'an under-load storage stall opens the circuit for minutes. Runbook ' +
+      '"substrate-trust-contract", not the admission runbook.'
+    );
+  }
+  return ` — the doorway is SHEDDING: 503 catching-up, cause=${cause}, circuit=${circuit}`;
+}
+
 async function getRaw(url: string): Promise<ProjectionResponse> {
   const { statusCode, headers, body } = await request(url);
   const data = Buffer.from(await body.arrayBuffer());
@@ -66,15 +99,28 @@ async function getRaw(url: string): Promise<ProjectionResponse> {
  */
 function resolveDoorwayUrl(world: E2EWorld, hostname: string): string {
   const envByHost: Record<string, string | undefined> = {
+    // The feature also says a bare "alpha" (the re-grant row's "the alpha
+    // doorway"). Without this key that name fell through every candidate and
+    // was dialled as a HOSTNAME — `getaddrinfo ENOTFOUND alpha` — because this
+    // feature has no Background registering a doorway to fall back to.
+    alpha: process.env['E2E_DOORWAY_ALPHA'],
     'alpha.elohim.host': process.env['E2E_DOORWAY_ALPHA'],
-    'elohim.host': process.env['E2E_DOORWAY_PRIMARY'] ?? process.env['E2E_DOORWAY_HOSTED'],
+    'elohim.host':
+      process.env['E2E_DOORWAY_B'] ??
+      process.env['E2E_DOORWAY_BETA'] ??
+      process.env['E2E_DOORWAY_PRIMARY'] ??
+      process.env['E2E_DOORWAY_HOSTED'],
   };
-  const env = envByHost[hostname];
-  if (env && env.length > 0) return env;
   // Fall back to the first registered doorway if no env var was set —
   // useful for local-stack runs where there is exactly one doorway.
   const firstDoorway = [...world.doorways.values()][0];
-  if (firstDoorway) return firstDoorway.url;
+  // Then the household fixture manifest, which is what an Act I mesh run
+  // actually has: the production prose names hosts, the mesh has ports.
+  let fixtureId = hostname;
+  if (hostname.startsWith('alpha')) fixtureId = 'alpha';
+  else if (hostname === 'elohim.host') fixtureId = 'beta';
+  const resolved = resolveFixtureDoorwayUrl(fixtureId, [envByHost[hostname], firstDoorway?.url]);
+  if (resolved) return resolved;
   return `https://${hostname}`;
 }
 
@@ -108,12 +154,63 @@ Given(
   }
 );
 
+/**
+ * Cache eviction, on a substrate that lets us move a head.
+ *
+ * `sha256-OLD` / `sha256-NEW` in the feature are PLACEHOLDERS — prose standing
+ * in for "the hash before" and "the hash after". Nothing on any mesh is
+ * addressed that way, so these steps read the real current head rather than
+ * matching the literal.
+ *
+ * The substitute bundle is the LANDING EPR's blob: a blob that genuinely exists
+ * on this mesh, with genuinely different bytes. PATCHing lamad-spa to a hash no
+ * peer holds would 404 the household's /lamad and prove nothing about eviction;
+ * pointing it at a real neighbouring bundle changes the head for real and the
+ * doorway either notices or it does not. The original head is restored in the
+ * After hook below, including on failure.
+ *
+ * DESTRUCTIVE: it moves a declared head, which is a DHT write. Held behind
+ * A2O_ALLOW_DESTRUCTIVE=1.
+ */
+const cacheEviction = new WeakMap<
+  E2EWorld,
+  { eprSlug: string; originalBlobHash: string; newBlobHash?: string; beforeBody?: Buffer }
+>();
+
+function destructiveAllowed(): boolean {
+  return process.env['A2O_ALLOW_DESTRUCTIVE'] === '1';
+}
+
+/** Skip (never fail, never pend) with the action this run declined to take. */
+function holdDestructive(wouldDo: string): 'skipped' {
+  // eslint-disable-next-line no-console
+  console.log(
+    `  ⏭️  DESTRUCTIVE HELD: would ${wouldDo}. Set A2O_ALLOW_DESTRUCTIVE=1 to run it. ` +
+      'Skipped, not failed.'
+  );
+  return 'skipped';
+}
+
+async function contentBlobHash(base: string, slug: string): Promise<string> {
+  const resp = await getRaw(`${base.replace(/\/$/, '')}/db/content/${slug}`);
+  assert.equal(resp.status, 200, `GET /db/content/${slug} returned ${resp.status}`);
+  const row = JSON.parse(resp.body.toString('utf-8')) as { blobHash?: string };
+  const hash = row.blobHash;
+  assert.ok(hash, `content row "${slug}" carries no blobHash — nothing to evict a cache for`);
+  return hash;
+}
+
 Given(
   /^the ([\w-]+) EPR's blob is ([\w-]+)$/,
-  function (this: E2EWorld, _eprSlug: string, _blobHash: string) {
-    // Cache-eviction scenario — blob mutation isn't wired through a2o yet.
-    // Tracked under B15 (doorway SSE refresh) + B22 (this feature).
-    return 'pending';
+  async function (this: E2EWorld, eprSlug: string, _placeholder: string) {
+    const base = resolveDoorwayUrl(this, 'alpha');
+    const originalBlobHash = await contentBlobHash(base, eprSlug);
+    const before = await getRaw(`${base.replace(/\/$/, '')}/lamad/index.html`);
+    cacheEviction.set(this, {
+      eprSlug,
+      originalBlobHash,
+      beforeBody: before.status === 200 ? before.body : undefined,
+    });
   }
 );
 
@@ -147,11 +244,45 @@ When('an anonymous browser GETs {string}', async function (this: E2EWorld, urlSt
 
 When(
   /^a deploy PATCHes the ([\w-]+) EPR with blobHash ([\w-]+)$/,
-  function (this: E2EWorld, _eprSlug: string, _newBlobHash: string) {
-    // Mutation path isn't a2o-runnable until B15/B16 land — see above.
-    return 'pending';
+  async function (this: E2EWorld, eprSlug: string, _placeholder: string) {
+    const state = cacheEviction.get(this);
+    assert.ok(state, 'the blob-is-OLD Given must run before the PATCH');
+    if (!destructiveAllowed()) {
+      return holdDestructive(
+        `PATCH /db/content/${eprSlug} to a different real bundle head (a DHT write) and restore it after`
+      );
+    }
+    const base = resolveDoorwayUrl(this, 'alpha');
+    // A real, different, locally-held bundle — see the note above.
+    const newBlobHash = await contentBlobHash(base, 'elohim-host-landing');
+    assert.notEqual(
+      newBlobHash,
+      state.originalBlobHash,
+      'the substitute bundle has the SAME head as the one under test — moving it would prove nothing'
+    );
+    const { statusCode } = await request(`${base.replace(/\/$/, '')}/db/content/${eprSlug}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ blobHash: newBlobHash }),
+    });
+    assert.ok(
+      statusCode >= 200 && statusCode < 300,
+      `PATCH /db/content/${eprSlug} returned ${statusCode}`
+    );
+    state.newBlobHash = newBlobHash;
   }
 );
+
+After({ tags: '@cache-eviction' }, async function (this: E2EWorld) {
+  const state = cacheEviction.get(this);
+  if (!state?.newBlobHash) return;
+  const base = resolveDoorwayUrl(this, 'alpha');
+  await request(`${base.replace(/\/$/, '')}/db/content/${state.eprSlug}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ blobHash: state.originalBlobHash }),
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Then — response assertions
@@ -163,7 +294,10 @@ Then("the response serves the landing EPR's bundle entry file", function (this: 
   // Substrate check: bundle entry file is HTML and big enough to not be
   // a placeholder error page.
   const ct = resp.headers['content-type'] ?? '';
-  assert.ok(ct.includes('text/html'), `Expected HTML bundle entry, got Content-Type "${ct}"`);
+  assert.ok(
+    ct.includes('text/html'),
+    `Expected HTML bundle entry, got Content-Type "${ct}"${describeShed(resp)}`
+  );
   assert.ok(
     resp.body.length > 200,
     `Bundle entry suspiciously small (${resp.body.length} bytes) — likely a placeholder`
@@ -182,7 +316,10 @@ Then(
     const resp = projectionResponses.get(this);
     assert.ok(resp, NO_PROJECTION_RESPONSE);
     const ct = resp.headers['content-type'] ?? '';
-    assert.ok(ct.includes('text/html'), `Expected HTML SPA fallback, got Content-Type "${ct}"`);
+    assert.ok(
+      ct.includes('text/html'),
+      `Expected HTML SPA fallback, got Content-Type "${ct}"${describeShed(resp)}`
+    );
     const html = resp.body.toString('utf-8');
     // The SPA shell is recognisable by an Angular root element or an
     // app-root tag — either is acceptable.
@@ -220,17 +357,56 @@ Then('Angular client-side router handles {string}', function (this: E2EWorld, _p
 
 Then(
   "within {int} seconds, the doorway's cache for {string} is evicted",
-  function (this: E2EWorld, _seconds: number, _path: string) {
-    // Requires the PATCH → cache-eviction wiring (B15). Pending.
-    return 'pending';
+  { timeout: 30_000 },
+  async function (this: E2EWorld, seconds: number, path: string) {
+    const state = cacheEviction.get(this);
+    assert.ok(state, 'the blob-is-OLD Given must run before this assertion');
+    if (!state.newBlobHash) {
+      return holdDestructive('observe the eviction of a head this run declined to move');
+    }
+    const base = resolveDoorwayUrl(this, 'alpha');
+    const deadline = Date.now() + seconds * 1000;
+    let last = Buffer.alloc(0);
+    while (Date.now() < deadline) {
+      const resp = await getRaw(`${base.replace(/\/$/, '')}${path}`);
+      last = resp.body;
+      if (!state.beforeBody || !resp.body.equals(state.beforeBody)) return;
+      await new Promise<void>(resolve => setTimeout(resolve, 250));
+    }
+    assert.fail(
+      `${path} still served the SAME ${last.length} bytes ${seconds}s after the head moved — ` +
+        "the doorway's cache was not evicted by the PATCH"
+    );
   }
 );
 
 Then(
   /^the next browser request to "([^"]+)" serves bytes from ([\w-]+)$/,
-  function (this: E2EWorld, _path: string, _expectedBlobHash: string) {
-    // Paired with the PATCH/eviction step — pending until that lands.
-    return 'pending';
+  async function (this: E2EWorld, path: string, _placeholder: string) {
+    const state = cacheEviction.get(this);
+    assert.ok(state, 'the blob-is-OLD Given must run before this assertion');
+    if (!state.newBlobHash) {
+      return holdDestructive('read back the bundle behind a head this run declined to move');
+    }
+    const base = resolveDoorwayUrl(this, 'alpha');
+    // The declared head really moved …
+    const served = await contentBlobHash(base, state.eprSlug);
+    assert.equal(
+      served,
+      state.newBlobHash,
+      `content row "${state.eprSlug}" still declares ${served} after the PATCH`
+    );
+    // … and the path serves a real page from it, not an error or an empty body.
+    const resp = await getRaw(`${base.replace(/\/$/, '')}${path}`);
+    assert.equal(resp.status, 200, `${path} returned ${resp.status} after the head moved`);
+    const ct = resp.headers['content-type'] ?? '';
+    assert.ok(ct.includes('text/html'), `${path} served as "${ct}"${describeShed(resp)}`);
+    assert.ok(resp.body.length > 200, `${path} served ${resp.body.length} bytes — a placeholder`);
+    // Residue, stated rather than hidden: the doorway serves an index.html
+    // EXTRACTED from the bundle, not the blob itself, so this proves the new
+    // head is the one being served and that it serves a page — not byte
+    // identity with the new bundle's own index.html. Closing that needs a
+    // bundle-authoring fixture the harness does not have.
   }
 );
 
@@ -471,6 +647,21 @@ Then(
   /^the previous grant-less commitment is marked superseded and walkable on the chain$/,
   async function (this: E2EWorld) {
     if (this.contentIds.get(REGRANT_SKIP_KEY)) return 'pending';
+    if (this.contentIds.get('regrant:already-granted')) {
+      // The scenario's premise is a GRANT-LESS row being superseded. This
+      // substrate's row already carries its claims, so nothing was superseded
+      // and there is no chain to walk — asserting one anyway reds on the
+      // fixture's shape rather than on the supersession contract. Skipped (not
+      // failed, and not pending: cucumber is strict, so pending reds the run
+      // exactly like a failure), with the premise named.
+      // eslint-disable-next-line no-console
+      console.log(
+        '  ⏭️  PREMISE ABSENT: the active project-epr row already carries routeClaims, so no ' +
+          'grant-less predecessor exists to supersede — the supersession chain is untestable ' +
+          'on this substrate until a grant-less row is seeded. Skipped, not failed.'
+      );
+      return 'skipped';
+    }
     const predecessorId = this.contentIds.get(REGRANT_KEY)!;
     const successorId = this.contentIds.get(REGRANT_SUCCESSOR_KEY);
     const base = this.contentIds.get(
