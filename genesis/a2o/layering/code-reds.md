@@ -132,3 +132,20 @@ seed succeeds; if any stays red, it is a genuine code-red that was hiding behind
 All 25 are Act I reds: they were produced by a household mesh with no fleet, no shem and no observability
 stack. That is the layering argument in one measurement — **a household run is a real proving ground, and
 the suite has been paying fleet prices to learn less.**
+
+## Disposition (2026-08-21, same day — all on branch `fix/doorway-breaker-trial-theft-and-apps-extraction-herd`)
+
+| # | verdict | commit | note |
+|---|---|---|---|
+| 1–2 | **doorway defect, fixed** | `21b59b654` | honor-backpressure branch re-minted storage's informative 503 as `catching-up`; diagnostic probes now relay upstream verbatim. Residual: `/db/p2p/conductor-diagnostics` reports only the *embedded* conductor — blind for externally-run conductors (mesh; check alpha) |
+| 3–6 | **seed defect, fixed** | `7aae6c9d9` | `seed.ts` wrote a literal `reach: 'public'` for every row (mesh AND fleet); gate enforces correctly. Open operator decision: ungraded default stays `public` (`UNAUTHORED_CORPUS_REACH`) — flipping it takes the anonymous corpus from ~3400 rows to ~90 |
+| 7–8 | **test-side, fixed** | `95a2e5941` | docId pinned to an alpha-only node; producer healthy (same head on both peers in ~2 s). "Converged" now means head-set equality, not two non-empty arrays |
+| 9 | **test-side, fixed** | `95a2e5941` | `maxAttempts` halved the step's own 15 s budget; rows anchor 8–19 s after POST inside storage's documented drain window. Gate exonerated |
+| 10–11 | re-measure | — | doorway B was mid-catch-up behind the 3,400-head seed; not a defect until re-measured quiesced |
+| 12 | held | — | dead custody-announce plane, already shelved |
+| 13–14 | **test-side, fixed + new storage defect** | `658372c56` | CID assertion fixed; uncovered `is_content_address()` knowing only `sha256-` → CID `/apps/` 404 (storage agent dispatched) |
+| 15 | open | — | `X-Cache: BYPASS` on the mesh — investigate before trusting cache-layer measures |
+| 16 | **test-side, fixed + storage defect** | `658372c56` | host literal was correct; real bug is `normalize_create_input` double-wrapping `inScopeOf` (storage agent dispatched) |
+| 17 | **genuine, open** | — | footprint snapshot has an empty holder set on both doorways — gap between "commitment exists" and "holder populated" |
+| §B | **seeder defect, fixed; 3/7 green** | `822c32f16` | two legs hard-required CI-only env; remaining: `collective_cid` unstamped (genuine), participants (Act I `per-human-conductor: false`, honest), ch09/ch10 wait on the landing self-custody pair (seeder follow-up in flight); custody seeder also found NON-idempotent (6→12 rows per run) |
+| new | **storage defect, open** | — | reach-carrying `PATCH /db/content/{id}` returns 200 and applies nothing (storage agent dispatched) |
