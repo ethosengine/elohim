@@ -164,3 +164,20 @@ touched here.
   serving path is shedding OR degrading — the gap that let this run for hours unflagged.
 - a2o `@concern:doorway-failover` and saga ch04 `@concern:saga-04-doorway-serves` green on a
   validate-only run.
+
+## Mesh evidence 2026-08-21 19:38 — the breaker under concurrent suite load
+
+On the fresh mesh (stock conductor, storage debug build with all of today's fixes), with the Act I inventory
++ several scoped runs + seven dry-runs in flight (load ~22), doorway A recorded FIVE `storage forward failed
+(connect/timeout)` against matthew :8090 inside one ~60 s window (19:38:31–19:39) — the 2-failure threshold
+opened the circuit, `/health` went `degraded`, saga ch01 ("peer alpha-A is healthy") failed, and the circuit
+sat open/half-open for minutes while matthew answered `/db/content` in **1.6 ms direct** and 3–4 ms via the
+doorway a minute later, at 0.32 cores, admission in-flight 0. No peer or conductor restarted (all pids from
+19:25). So: a transient stall (the storage HTTP runtime is `worker_threads(2)` shared with the libp2p loop —
+the "unclosed ignition" above) is amplified into minutes of shed by the breaker's sensitivity, and **storage
+exports no request-duration histogram**, so the stall itself is invisible except through the doorway's
+failures. Two bounded follow-ups: (1) a `elohim_http_request_duration_ms` histogram on storage (C8);
+(2) breaker threshold/window as a function of observed RTT rather than a fixed streak of 2 — or at least a
+minimum window (N failures within T seconds) so a one-second stall cannot open it. Measure on the mesh with
+`just test mesh` under load before changing either.
+
