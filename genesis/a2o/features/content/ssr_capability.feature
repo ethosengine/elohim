@@ -1,4 +1,5 @@
-@act:i @e2e
+# HELD (2026-08-21): every scenario has undefined steps (114 total) — story-first placeholder; remove @wip when steps land.
+@act:i @e2e @wip
 Feature: SSR capability is advertised, honored, and accountable
   As a substrate operator
   I want each doorway to declare its SSR capability honestly

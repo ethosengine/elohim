@@ -5,7 +5,8 @@
 # elohim/sdk/schemas/v1/registries/axes/*.axis.json. These scenarios capture the laws as regression
 # stories for when axis cards are read by a counterparty rather than only by our own gates.
 
-@concern:closure-posture @slice:closure-posture-1 @act:host @e2e
+# HELD (2026-08-21): every scenario has undefined steps (54 total) — story-first placeholder; remove @wip when steps land.
+@concern:closure-posture @slice:closure-posture-1 @act:host @e2e @wip
 Feature: An axis declares what its silence means, so a stranger can read it safely
 
   As a peer negotiating with an agent whose code I do not share and cannot audit

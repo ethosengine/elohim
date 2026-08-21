@@ -1,6 +1,8 @@
 @e2e @lamad @love-map @requires:household-nodes @act:i
 # Matthew/Jessica dyad (household spouse pair) — household-class compute. The privacy scenario's
 # third-party non-participant check uses James, the household's other member.
+# HELD (2026-08-21): every scenario has undefined steps (13 total) — story-first placeholder; remove @wip when steps land.
+@wip
 Feature: Love Map Path Negotiation
   As intimate partners (Matthew and Jessica),
   we want to negotiate and follow an emergent learning path together,

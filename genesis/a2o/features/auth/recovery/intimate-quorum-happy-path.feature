@@ -1,4 +1,5 @@
-@stage1-structural @recovery-m3 @requires:shem @act:iii @e2e
+# HELD (2026-08-21): every scenario has undefined steps (38 total) — story-first placeholder; remove @wip when steps land.
+@stage1-structural @recovery-m3 @requires:shem @act:iii @e2e @wip
 Feature: Intimate Quorum Happy Path — A Lost Pubkey Is Restored Through Emergency Contacts
 
   The claimant Abby has lost access to her agent key. She has three emergency

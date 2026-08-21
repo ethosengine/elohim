@@ -1,4 +1,5 @@
-@stage1-structural @recovery-m3 @requires:shem @act:iii @e2e
+# HELD (2026-08-21): every scenario has undefined steps (16 total) — story-first placeholder; remove @wip when steps land.
+@stage1-structural @recovery-m3 @requires:shem @act:iii @e2e @wip
 Feature: Freeze-Floor Gate Blocks Intimate-Layer Rotation
 
   When an elohim defender (or, pre-M5, a manually committed IdentityFreeze)

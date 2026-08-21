@@ -1,4 +1,5 @@
-@recovery-m4 @emergency-contact-quorum @e2e
+# HELD (2026-08-21): every scenario has undefined steps (76 total) — story-first placeholder; remove @wip when steps land.
+@recovery-m4 @emergency-contact-quorum @e2e @wip
 Feature: Emergency Contacts Kill a Captured Key by Quorum
 
   When a person's only key is captured by an attacker, that person cannot

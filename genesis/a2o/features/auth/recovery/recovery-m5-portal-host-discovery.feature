@@ -1,4 +1,5 @@
-@recovery-m5 @account-pillar @portal-host @act:i @e2e
+# HELD (2026-08-21): every scenario has undefined steps (2 total) — story-first placeholder; remove @wip when steps land.
+@recovery-m5 @account-pillar @portal-host @act:i @e2e @wip
 Feature: Adding and listing portal hosts
   As a steward
   I want to declare which URLs may render my auth portal

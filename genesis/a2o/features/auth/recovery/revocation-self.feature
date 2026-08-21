@@ -1,4 +1,5 @@
-@recovery-m4 @self-revocation @e2e
+# HELD (2026-08-21): every scenario has undefined steps (36 total) — story-first placeholder; remove @wip when steps land.
+@recovery-m4 @self-revocation @e2e @wip
 Feature: Self-Revocation of a Stolen Device Key
 
   A person who still controls at least one trusted device can immediately

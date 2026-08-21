@@ -1,4 +1,5 @@
-@lamad @attention @analytics @act:i @e2e
+# HELD (2026-08-21): every scenario has undefined steps (48 total) — story-first placeholder; remove @wip when steps land.
+@lamad @attention @analytics @act:i @e2e @wip
 Feature: Protocol-Native Attention Analytics
   As a learner on the Elohim Protocol
   I want my content interactions recorded as economic events

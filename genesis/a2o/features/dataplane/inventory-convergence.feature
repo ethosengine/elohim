@@ -45,6 +45,8 @@ Feature: Inventory-gossip apply plane converges under WAN-adversarial gossip
     Then peer "alpha-A" /health p2p.caughtUp is true
     And peer "elohim.host" /health p2p.caughtUp is true
 
+  # HELD (2026-08-21): 2 undefined step(s) — story-first placeholder; remove @wip when steps land.
+  @wip
   Scenario: the admission plane keeps headroom instead of wedging under the CPU storm
     # The non-idempotent re-apply + re-score pegs the runtime; HTTP admission backs up and
     # semaphore headroom collapses toward zero. A converged plane leaves permits available.

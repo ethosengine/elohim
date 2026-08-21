@@ -1,4 +1,5 @@
-@e2e @step-zero @cross-mesh @phase-1-federation @requires:shem @requires:alpha-cluster-6peer @act:iii
+# HELD (2026-08-21): every scenario has undefined steps (16 total) — story-first placeholder; remove @wip when steps land.
+@e2e @step-zero @cross-mesh @phase-1-federation @requires:shem @requires:alpha-cluster-6peer @act:iii @wip
 Feature: Cross-mesh DHT discovery survives the doorway-A / doorway-B partition
 
   The federation-wiring-audit Phase 1 split the alpha cluster's signaling
