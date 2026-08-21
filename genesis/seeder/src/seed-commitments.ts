@@ -23,6 +23,17 @@
  * Jenkinsfile sweep chose different successors, and no validation tied
  * the seeded pair to the documented story. The named-pair a2o scenario in
  * features/resilience/household-reciprocity.feature is the standing flag.)
+ *
+ * CONTENT_BLOB_HASH / CONTENT_BLOB_SIZE_BYTES are optional on a live mesh:
+ * in CI, genesis/Jenkinsfile's "Upload Blob-Backed Content" stage always
+ * exports them (a real manifesto-blob upload) before this stage's `when{}`
+ * lets it run. A standalone/local-mesh seed chain has no such stage — when
+ * both are unset (and CUSTODY_PAIRS_JSON isn't given either), this script
+ * uploads a small deterministic dev-fixture blob directly via the doorway's
+ * `PUT /admin/seed/blob` (same path substrate-verify.ts's upload step uses)
+ * so the default pairs have a REAL, locally-resolvable blob instead of a
+ * hard requirement the caller has to satisfy by hand. Passing either env
+ * explicitly always takes precedence over the fallback.
  */
 
 import { readFileSync } from 'node:fs';
@@ -506,25 +517,56 @@ export class CommitmentClient extends DoorwayClient {
 // Seeding (fail-fast on non-409 errors)
 // =============================================================================
 
+/** Summary counts from {@link seedCustodyCommitments}, used by the standalone
+ * runner to pick the right exit code (Jenkinsfile's runProbedSeeder contract:
+ * 0=clean, 1=total, 2=partial). */
+export interface SeedCustodyCommitmentsResult {
+  created: number;
+  alreadyExists: number;
+  skipped: number;
+  total: number;
+}
+
 export async function seedCustodyCommitments(
   client: CommitmentClient,
   pairs: CustodyPair[],
   opts: ResolvePeerIdOptions = {},
-): Promise<void> {
+): Promise<SeedCustodyCommitmentsResult> {
   console.log(`[seed-commitments] Seeding ${pairs.length} custody-blob commitments...`);
 
   let created = 0;
   let alreadyExists = 0;
+  let skipped = 0;
+  const resolvedPairs: CustodyPair[] = [];
 
   for (const pair of pairs) {
+    const label = `${pair.providerHumanId.replace(/^human-/, '')}→${pair.receiverHumanId.replace(/^human-/, '')}`;
+
     // Resolve the blob descriptor (blobHash pass-through, or contentId +
     // explicit artifactRole → exact row field) and the real peer ids from the
     // live storage pods — per-host cached, so the activate phase below
-    // recomputes the SAME content-addressed body.id.
-    const blob = await resolveCustodyBlobDescriptor(pair, opts);
+    // recomputes the SAME content-addressed body.id. A pair unresolvable on
+    // THIS mesh (e.g. LANDING_SELF_CUSTODY_PLEDGE's serverBlobHash, which is
+    // only minted at deploy time — "absent beats fabricated", same posture
+    // seed-epr-atom.ts already takes on this exact artifact) is skipped
+    // loudly rather than crashing the whole leg: one pair's resolution gap
+    // must never cost the rest of the household its custody commitments.
+    let blob: { blobHash: string; blobSizeBytes: number };
+    let peerIds: CustodyPeerIds;
+    try {
+      blob = await resolveCustodyBlobDescriptor(pair, opts);
+      peerIds = await resolveCustodyPeerIds(pair, opts);
+    } catch (err) {
+      console.warn(
+        `  [?] ${label}: SKIPPED (unresolvable on this mesh) — ${err instanceof Error ? err.message : String(err)}`,
+      );
+      skipped += 1;
+      continue;
+    }
+
+    resolvedPairs.push(pair);
     const resolvedPair: ResolvedCustodyPair = { ...pair, ...blob };
-    const body = buildCustodyCommitmentBody(resolvedPair, await resolveCustodyPeerIds(pair, opts));
-    const label = `${pair.providerHumanId.replace(/^human-/, '')}→${pair.receiverHumanId.replace(/^human-/, '')}`;
+    const body = buildCustodyCommitmentBody(resolvedPair, peerIds);
 
     const response = await client.createCommitment(body);
 
@@ -548,9 +590,15 @@ export async function seedCustodyCommitments(
     process.exit(1);
   }
 
-  console.log(`[seed-commitments] Done. created=${created} already-exists=${alreadyExists} total=${pairs.length}`);
+  console.log(
+    `[seed-commitments] Done. created=${created} already-exists=${alreadyExists} skipped=${skipped} total=${pairs.length}`,
+  );
 
-  await activateCustodyCommitments(client, pairs, opts);
+  if (resolvedPairs.length > 0) {
+    await activateCustodyCommitments(client, resolvedPairs, opts);
+  }
+
+  return { created, alreadyExists, skipped, total: pairs.length };
 }
 
 /**
@@ -760,6 +808,48 @@ export async function seedCapacityPledge(client: CommitmentClient): Promise<void
 }
 
 // =============================================================================
+// Mesh-local dev-fixture blob (fallback when CONTENT_BLOB_HASH is unset)
+// =============================================================================
+
+/**
+ * Upload a tiny deterministic dev-fixture blob via the SAME admin seed path
+ * substrate-verify.ts's `upload` subcommand uses (`PUT /admin/seed/blob`,
+ * unauthenticated on a dev-mode doorway) and stamp CONTENT_BLOB_HASH /
+ * CONTENT_BLOB_SIZE_BYTES from the result. Only called when the caller gave
+ * neither CUSTODY_PAIRS_JSON nor a real CONTENT_BLOB_HASH/SIZE — CI always
+ * supplies the real blob env first, so this path never runs there.
+ *
+ * Fail-fast on upload failure (loud, single line) — never silently invent a
+ * hash the custody sweep could never resolve.
+ */
+async function provisionDevFixtureBlob(client: CommitmentClient): Promise<void> {
+  const data = Buffer.from(
+    'elohim household custody dev fixture\n' +
+      'source: genesis/seeder/src/seed-commitments.ts (mesh-local fallback — ' +
+      'no CONTENT_BLOB_HASH env, no substrate-verify upload stage)\n',
+    'utf8',
+  );
+  const blobHash = `sha256-${createHash('sha256').update(data).digest('hex')}`;
+
+  const push = await client.pushBlob(blobHash, data, { hash: blobHash, sizeBytes: data.length, mimeType: 'text/plain' });
+  if (!push.success) {
+    console.error(
+      `ERROR: CONTENT_BLOB_HASH/CONTENT_BLOB_SIZE_BYTES unset and the mesh-local dev-fixture ` +
+        `blob upload failed: ${push.error}. Set CONTENT_BLOB_HASH + CONTENT_BLOB_SIZE_BYTES ` +
+        `explicitly (or CUSTODY_PAIRS_JSON) to bypass.`,
+    );
+    process.exit(1);
+  }
+
+  process.env.CONTENT_BLOB_HASH = blobHash;
+  process.env.CONTENT_BLOB_SIZE_BYTES = String(data.length);
+  console.log(
+    `[seed-commitments] CONTENT_BLOB_HASH/SIZE unset — uploaded mesh-local dev-fixture blob ` +
+      `${blobHash} (${data.length} bytes)`,
+  );
+}
+
+// =============================================================================
 // Standalone execution
 // =============================================================================
 
@@ -768,20 +858,11 @@ if (isMain) {
   const doorwayUrl = process.env.DOORWAY_URL || 'http://localhost:8888';
   const apiKey = process.env.DOORWAY_API_KEY;
 
-  const pairsJsonPath = process.env.CUSTODY_PAIRS_JSON;
-  const pairs: CustodyPair[] = pairsJsonPath
-    ? (JSON.parse(readFileSync(pairsJsonPath, 'utf-8')) as CustodyPair[])
-    : defaultCustodyPairs();
-
-  // The terrance-drift flag: never seed custody for suspended personas.
-  assertPairsNotSuspended(pairs, loadSuspendedHumanPrefixes());
-
   const client = new CommitmentClient({ baseUrl: doorwayUrl, apiKey });
 
   console.log('='.repeat(60));
   console.log('REA Custody-Blob Commitment Seeder');
   console.log(`  Target: ${doorwayUrl}`);
-  console.log(`  Pairs:  ${pairs.length}`);
   console.log('='.repeat(60));
   console.log();
 
@@ -791,7 +872,43 @@ if (isMain) {
     process.exit(1);
   }
 
-  await seedCustodyCommitments(client, pairs);
+  const pairsJsonPath = process.env.CUSTODY_PAIRS_JSON;
+  const hasBlobEnv =
+    !!process.env.CONTENT_BLOB_HASH && parseInt(process.env.CONTENT_BLOB_SIZE_BYTES || '0', 10) > 0;
+  if (!pairsJsonPath && !hasBlobEnv) {
+    await provisionDevFixtureBlob(client);
+  }
+
+  const pairs: CustodyPair[] = pairsJsonPath
+    ? (JSON.parse(readFileSync(pairsJsonPath, 'utf-8')) as CustodyPair[])
+    : defaultCustodyPairs();
+
+  // The terrance-drift flag: never seed custody for suspended personas.
+  assertPairsNotSuspended(pairs, loadSuspendedHumanPrefixes());
+
+  console.log(`  Pairs:  ${pairs.length}`);
+  console.log();
+
+  const result = await seedCustodyCommitments(client, pairs);
   await seedCapacityPledge(client);
+
+  // Partial-vs-total contract (Jenkinsfile's runProbedSeeder): 0=clean,
+  // 2=partial (some pairs unresolvable on this mesh), 1=total (handled above
+  // by the per-pair process.exit(1) on a real HTTP/shape failure).
+  if (result.skipped > 0 && result.created + result.alreadyExists > 0) {
+    console.error(
+      `=== Results: ${result.created} created, ${result.alreadyExists} already-exists, ${result.skipped} skipped (${result.total} total) — partial ===`,
+    );
+    process.exit(2);
+  }
+  if (result.skipped > 0 && result.created + result.alreadyExists === 0) {
+    console.error(
+      `=== Results: 0 created, 0 already-exists, ${result.skipped} skipped (${result.total} total) — total failure ===`,
+    );
+    process.exit(1);
+  }
+  console.log(
+    `=== Results: ${result.created} created, ${result.alreadyExists} already-exists, 0 skipped (${result.total} total) ===`,
+  );
   process.exit(0);
 }

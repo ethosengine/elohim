@@ -16,6 +16,16 @@
  *
  * Or with a custom pairs file:
  *   DELEGATES_PAIRS_JSON=./pairs.json npx tsx src/seed-delegates-compute.ts
+ *
+ * MATTHEW_AGENT_CID / SEED_NOW_ISO / SEED_VALID_UNTIL_ISO are all optional on
+ * a live mesh: when unset, MATTHEW_AGENT_CID resolves from STORAGE_URL's own
+ * `GET /auth/me` (matthew's live session — the same resolution seed-commitments
+ * uses for custody peer ids), and the dates default to now / now+30d. This is a
+ * mesh-local fallback only — no CI stage exports these envs today (this script
+ * is a manual/local-mesh lever, not wired into genesis/Jenkinsfile), so the
+ * fallback is exercised whenever the caller doesn't supply them, not just in
+ * dev. Passing MATTHEW_AGENT_CID/SEED_NOW_ISO/SEED_VALID_UNTIL_ISO explicitly
+ * always takes precedence.
  */
 
 import { createHash } from 'node:crypto';
@@ -152,6 +162,9 @@ export async function seedDelegatesComputeCommitments(
   token: string,
   pairs: DelegatesComputePair[],
 ): Promise<void> {
+  let created = 0;
+  let idempotent = 0;
+
   for (const pair of pairs) {
     const body = buildDelegatesComputeBody(pair);
     const res = await fetch(`${storageUrl}/admin/seed/delegates-compute`, {
@@ -161,37 +174,78 @@ export async function seedDelegatesComputeCommitments(
     });
     if (res.ok) {
       console.log(`[+] delegates-compute ${body.cid} (active)`);
+      created += 1;
       continue;
     }
     if (res.status === 403) {
-      console.error('[x] ALLOW_SEED_DELEGATES_COMPUTE is not set on this node — refusing to seed');
+      // Loud, unambiguous total-failure line — matches the other legs'
+      // "=== Results: ... ===" convention so a chain grep never misses this
+      // exit(1) (Jenkinsfile's runProbedSeeder partial-vs-total contract:
+      // 0=clean, 1=total, 2=partial; this leg has no partial state).
+      console.error('=== Results: 0 created, 0 idempotent, ALLOW_SEED_DELEGATES_COMPUTE not set on this node ===');
       process.exit(1);
     }
     const text = await res.text();
     if (res.status === 409 || /exists/i.test(text)) {
       console.log(`[=] delegates-compute ${body.cid} (idempotent)`);
+      idempotent += 1;
       continue;
     }
-    console.error(`[x] delegates-compute ${body.cid}: ${res.status} ${text}`);
+    console.error(`=== Results: ${created} created, ${idempotent} idempotent, FAILED on ${body.cid}: HTTP ${res.status} ${text} ===`);
     process.exit(1);
   }
+
+  console.log(`=== Results: ${created} created, ${idempotent} idempotent, 0 failed (${pairs.length} total) ===`);
 }
 
-function requireEnv(k: string): string {
-  const v = process.env[k];
-  if (!v) {
-    console.error(`missing env ${k}`);
-    process.exit(1);
+/**
+ * Resolve MATTHEW_AGENT_CID: explicit env wins, else fetch matthew's live
+ * agentPubKey from STORAGE_URL's own `GET /auth/me`. Mirrors the peer-id
+ * resolution seed-commitments.ts already relies on (`resolveCustodyPeerIds`) —
+ * on a live mesh the storage pod IS the agent's session, so there is no need
+ * to make the caller compute a value the pod already knows. Throws (never
+ * process.exit) so the caller can print one clear final error line.
+ */
+async function resolveMatthewAgentCid(storageUrl: string): Promise<string> {
+  const envCid = process.env.MATTHEW_AGENT_CID;
+  if (envCid) return envCid;
+
+  const endpoint = `${storageUrl.replace(/\/+$/, '')}/auth/me`;
+  let response: Response;
+  try {
+    response = await fetch(endpoint, { signal: AbortSignal.timeout(5000) });
+  } catch (err) {
+    throw new Error(
+      `MATTHEW_AGENT_CID not set and ${endpoint} was unreachable — ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
-  return v;
+  if (!response.ok) {
+    throw new Error(`MATTHEW_AGENT_CID not set and ${endpoint} returned HTTP ${response.status}`);
+  }
+  const body = (await response.json()) as { agentPubKey?: unknown };
+  if (typeof body.agentPubKey !== 'string' || !body.agentPubKey.startsWith('uhCAk')) {
+    throw new Error(`MATTHEW_AGENT_CID not set and ${endpoint} did not return a Holochain agentPubKey`);
+  }
+  console.log(`[seed-delegates-compute] MATTHEW_AGENT_CID unset — resolved ${body.agentPubKey.slice(0, 16)}… from ${endpoint}`);
+  return body.agentPubKey;
+}
+
+/** Explicit env wins; otherwise a loud, logged default (now / now+30d). */
+function resolveDateEnv(key: string, fallback: () => string): string {
+  const v = process.env[key];
+  if (v) return v;
+  const resolved = fallback();
+  console.log(`[seed-delegates-compute] ${key} unset — defaulting to ${resolved}`);
+  return resolved;
 }
 
 /**
  * Default pair: Matthew→Che self-contract (provider == recipient == MATTHEW_AGENT_CID).
- * Phase-0 <PERFORMER_CLAIM> value from env. Dates from env (no Date.now()).
+ * Phase-0 <PERFORMER_CLAIM> value from env, or resolved live from storageUrl's
+ * /auth/me when unset. Dates from env, or defaulted to now / now+30d when unset.
  */
-export function defaultDelegatesComputePairs(): DelegatesComputePair[] {
-  const m = requireEnv('MATTHEW_AGENT_CID'); // the Phase-0 <PERFORMER_CLAIM> value
+export async function defaultDelegatesComputePairs(storageUrl: string): Promise<DelegatesComputePair[]> {
+  const m = await resolveMatthewAgentCid(storageUrl);
   return [
     {
       scope: 'orchestrate-node',
@@ -203,8 +257,8 @@ export function defaultDelegatesComputePairs(): DelegatesComputePair[] {
         rate_per_hour: 60,
         rotation_ttl_days: 30,
       },
-      validFromIso: requireEnv('SEED_NOW_ISO'),
-      validUntilIso: requireEnv('SEED_VALID_UNTIL_ISO'),
+      validFromIso: resolveDateEnv('SEED_NOW_ISO', () => new Date().toISOString()),
+      validUntilIso: resolveDateEnv('SEED_VALID_UNTIL_ISO', () => new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()),
       fixture: 'che-dogfood-self-contract',
     },
   ];
@@ -220,9 +274,15 @@ if (isMain) {
   const token = process.env.STORAGE_TOKEN || '';
 
   const pairsJsonPath = process.env.DELEGATES_PAIRS_JSON;
-  const pairs: DelegatesComputePair[] = pairsJsonPath
-    ? (JSON.parse(readFileSync(pairsJsonPath, 'utf-8')) as DelegatesComputePair[])
-    : defaultDelegatesComputePairs();
+  let pairs: DelegatesComputePair[];
+  try {
+    pairs = pairsJsonPath
+      ? (JSON.parse(readFileSync(pairsJsonPath, 'utf-8')) as DelegatesComputePair[])
+      : await defaultDelegatesComputePairs(storageUrl);
+  } catch (err) {
+    console.error(`=== Results: 0 created, 0 idempotent, FAILED to resolve pairs: ${err instanceof Error ? err.message : String(err)} ===`);
+    process.exit(1);
+  }
 
   // Suspended-persona guard (mirrors the terrance-drift guard in seed-commitments.ts).
   assertPairsNotSuspendedByFixture(pairs, loadSuspendedPersonas());
