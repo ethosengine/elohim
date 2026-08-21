@@ -1,4 +1,4 @@
-@e2e @doorway @resilience @regression @requires:doorway @wip
+@e2e @doorway @resilience @regression @requires:doorway @act:i
 Feature: Doorway self-protects and stays within capacity under load
   As a household member whose doorway fronts storage and a pool of peer conductors
   I want the gateway to protect itself — gate broken upstreams during warm-up,
@@ -30,7 +30,7 @@ Feature: Doorway self-protects and stays within capacity under load
   # of the serial pass, caps the whole pass with a total budget under the kill
   # window, and yields the worker periodically so warm-up never starves liveness.
 
-  @regression
+  @regression @requires:owned-substrate
   Scenario: A repeatedly-failing warm-up upstream is gated out of the serial pass
     # Constraint: without the breaker, every broken upstream re-entered the full
     # backoff ladder one at a time, serializing CPU churn that froze the gateway.
@@ -48,7 +48,7 @@ Feature: Doorway self-protects and stays within capacity under load
     Then the doorway abandons the remaining streams for this pass
     And the liveness probe answers throughout the warm-up pass
 
-  @regression
+  @regression @requires:owned-substrate
   Scenario: The upstream gate never empties the node off the network
     # Anti-self-partition invariant (gate_upstreams never returns []). If EVERY
     # upstream looks unhealthy, the gate must still hand back the full set to try —
@@ -87,7 +87,7 @@ Feature: Doorway self-protects and stays within capacity under load
     Then both are served without consuming an inbound permit
     And only non-exempt requests receive the 503 catching-up shed
 
-  @regression
+  @regression @requires:owned-substrate
   Scenario: A failing storage upstream trips the breaker and the doorway stops hammering it
     # Constraint: outbound self-protection. After the failure threshold the breaker
     # opens and the doorway sheds catching-up WITHOUT calling storage at all — it
