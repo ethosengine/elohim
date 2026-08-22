@@ -29,13 +29,18 @@ Routes live in `build_manifest()`: GET/POST `/p2p/sync-mode` (idempotent POST; o
 now proxies `syncPaused` / `syncReasons` from its cached storage observation. Gate registered
 in `elohim/elohim-storage/seam-registry.yaml` (`sync_gate_effective_sync`, kind verdict-fn).
 
-**Honest residue:** the live mesh still runs the PRE-fix binaries (routes 404 there until the
-next deploy/restart), so `deployment/sync-control.feature` has not been re-run against a
-running node — unit + contract coverage is the current proof (22 new tests green). The
-`@regression` "no sync-mode preference set" scenario asserts `syncMode === undefined` and will
-now fail BY DESIGN once a new binary serves; its own step text says to revisit it when the
-gate exists. C12 remains partial: POSTs are `auth_required` at the doorway proxy, but the
-storage node has no finer /p2p admin-auth class.
+**Runtime proof (2026-08-22 wave-3 roll, new binary serving):** default posture live-verified
+(`GET /p2p/sync-mode` → `{"mode":"sync","network":"unknown","effective":{"syncing":true,"reasons":[]}}`);
+the WifiOnlyOnCellular verdict fires live (`syncPaused:true`, reason `wifi-only-on-cellular`)
+and releases on wifi; `deployment/sync-control.feature` scoped run = 4 passed
+(pause, wifi-only×cellular, wifi resume, transition audit log) + 2 honest skips
+(fresh-default departed on a shared mesh; idle mesh has no pending backlog), 0 failed —
+after fixing a STEP defect (746b035cd: the "on cellular" Givens never declared the network,
+so the C4 permissive-unknown default correctly refused to suppress). The `@regression`
+default scenario was rewritten to assert the explicit default (8ff712805).
+**Residue:** the import/bulk/drain suppression scenarios (`p2p-validation.feature`) are
+blocked by alpha-shaped connected-peers Givens — re-scope in flight; C12 remains partial
+(no finer /p2p admin-auth class on the storage node).
 
 ## Why
 

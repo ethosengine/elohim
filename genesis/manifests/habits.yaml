@@ -234,6 +234,13 @@ habits:
     checks:
       - "a2o @concern:blob-durability — 8 scenarios across genesis/a2o/features/resilience/ (governed-distribution, salvage-placement, chaos-peer-churn, grandma-photos-survive-node-loss, app-blob-heal-on-read, observable-distribution, resilience-dimensions, household-diversity-dataplane)"
     evidence: >
+      2026-08-22 DELTA (local-mesh evidence; no status flip — already green): the
+      resiliency-saga scoped lane reached 21/22 passed + 1 @requires:owned-substrate
+      skip, 0 failed on the 3-peer household mesh (wave3c, commit 833ba4c58 serving) —
+      the T21 double-wrap cure restored CID-addressed byte replication (evolution-of-trust
+      bytes 200 on all three peers, zero T21 rejections, invalid_markers:0), and ch05/06/10/11
+      flipped green via consent-pin seeding, served-head adoption + per-peer serverBlobHash
+      stamp, and household-id canonicalization. Fleet confirmation rides the next edge roll.
       2026-08-20 MEASURE DELTA (scope, not a status flip): the #1489 red-triage
       pass retagged observable-distribution.feature. "Content-viewer resilience
       tooltip is live" gained @wip — openContentViewerStub() in
