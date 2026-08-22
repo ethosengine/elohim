@@ -1,6 +1,6 @@
 ---
 name: ci-pull-policy-always-freshness
-title: CI pull policy: Always, freshness over outage-resilience
+title: "CI pull policy — Always, freshness over outage-resilience"
 description: "CI pods keep imagePullPolicy Always: IfNotPresent on :latest buries toolchain drift (#1218); outage mitigations revert at recovery; digest-pin for permanence."
 metadata: 
   node_type: memory
