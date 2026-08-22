@@ -21,6 +21,10 @@ import {
   requireFixturePrimaryStorageUrl,
   requireFixtureStoragePeer,
 } from '../src/framework/fixtures/household-mesh.js';
+import {
+  destructiveAllowed,
+  DESTRUCTIVE_HELD_HINT,
+} from '../src/framework/fixtures/substrate-scope.js';
 import { retry } from '../src/framework/utils/retry.js';
 import { E2EWorld } from '../src/framework/world.js';
 
@@ -621,22 +625,17 @@ function peerPid(name: HouseholdPeerName): number {
 // ---------------------------------------------------------------------------
 // Destructive gate — SIGSTOPping a live mesh peer is an inducement on shared
 // state, same class as the conductor-bounce legs in
-// steps/mesh/peer-conductor-resilience.steps.ts, and rides the same gate:
-// off by default, A2O_ALLOW_DESTRUCTIVE=1 to run. A held step returns
+// steps/mesh/peer-conductor-resilience.steps.ts, and rides the same gate
+// (substrate-scope.ts destructiveAllowed: the lane's declared owned-substrate
+// cap, or A2O_ALLOW_DESTRUCTIVE=1). A held step returns
 // 'skipped' (never 'pending'), which skips the rest of its scenario.
 // ---------------------------------------------------------------------------
-
-const DESTRUCTIVE_ENV = 'A2O_ALLOW_DESTRUCTIVE';
-
-function destructiveAllowed(): boolean {
-  return process.env[DESTRUCTIVE_ENV] === '1';
-}
 
 function holdDestructive(wouldDo: string): 'skipped' {
   // eslint-disable-next-line no-console
   console.warn(
-    `  ⏭️  HELD (destructive): ${wouldDo}. The mesh is shared, so this leg is off by default — ` +
-      `set ${DESTRUCTIVE_ENV}=1 to run it.`
+    `  ⏭️  HELD (destructive): ${wouldDo}. A shared mesh holds this leg by default — ` +
+      `${DESTRUCTIVE_HELD_HINT}`
   );
   return 'skipped';
 }

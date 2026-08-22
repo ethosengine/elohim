@@ -171,6 +171,46 @@ export function isCapAvailable(cap: string): boolean {
   return status === AVAILABLE;
 }
 
+/** The cap that says a lane OWNS its substrate (may kill peers, restart conductors, write pins,
+ * delete blobs). TRUE only in the Act I household contract; FALSE on every shared fleet. */
+export const OWNED_SUBSTRATE_CAP = 'owned-substrate';
+
+/** The operator switch every destructive gate honours: `1` forces destructive steps ON, `0`
+ * forces them OFF, anything else defers to the declared cap. */
+export const DESTRUCTIVE_ENV = 'A2O_ALLOW_DESTRUCTIVE';
+
+/** The one sentence a held destructive step prints — so every gate names the same two ways in. */
+export const DESTRUCTIVE_HELD_HINT =
+  `Set ${DESTRUCTIVE_ENV}=1, or run on a lane whose cluster-state declares ` +
+  `${OWNED_SUBSTRATE_CAP} available (the Act I household contract, ` +
+  'ELOHIM_CLUSTER_STATE_PATH_OVERRIDE=genesis/manifests/cluster-state.act1-household.yaml), to enable.';
+
+/**
+ * May this run mutate the substrate? ONE answer for every destructive gate under steps/.
+ *
+ * Before this helper each step file re-read `A2O_ALLOW_DESTRUCTIVE` on its own, so a lane that
+ * DECLARED `owned-substrate: available` (the household mesh — the only lane where destructive
+ * chapters can run at all) still held every destructive step unless the operator also remembered
+ * a second switch. Two homes for one fact is how saga chapter 11 sat skipped on a mesh that owned
+ * itself (2026-08-22). The declared cap is the authority; the env var is the operator override.
+ *
+ * Precedence:
+ *   1. `A2O_ALLOW_DESTRUCTIVE=1` → on; `=0` → off (explicit operator intent wins either way);
+ *   2. else the per-cap runtime override `ELOHIM_CAP_OWNED_SUBSTRATE_STATUS` (CI probe channel);
+ *   3. else the active lane's cluster-state declares `owned-substrate` `available: true` → on;
+ *   4. else OFF. Deliberately NOT fail-open, unlike isCapAvailable(): an unreadable or silent
+ *      cluster-state must never switch kill/restart/delete ON by accident. The shared fleet
+ *      declares the cap false on purpose; a lane that says nothing is treated the same way.
+ */
+export function destructiveAllowed(): boolean {
+  const raw = (process.env[DESTRUCTIVE_ENV] ?? '').trim();
+  if (raw === '1') return true;
+  if (raw === '0') return false;
+  const override = capEnvOverride(OWNED_SUBSTRATE_CAP);
+  if (override) return override === AVAILABLE;
+  return clusterCapStatus(OWNED_SUBSTRATE_CAP) === AVAILABLE;
+}
+
 const REQUIRES_TAG = /^@requires:([a-z0-9][a-z0-9-]*)$/;
 const ACT_TAG = /^@act:(i|ii|iii|host)$/;
 

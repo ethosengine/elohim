@@ -31,19 +31,24 @@ import { Given, When, Then, DataTable } from '@cucumber/cucumber';
 
 import { request } from 'undici';
 
+import {
+  destructiveAllowed,
+  DESTRUCTIVE_HELD_HINT,
+} from '../../src/framework/fixtures/substrate-scope.js';
+
 import type { E2EWorld } from '../../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
 // Destructive gate — shared convention with steps/mesh/*
 // ---------------------------------------------------------------------------
 
-const DESTRUCTIVE_ENABLED = process.env['A2O_ALLOW_DESTRUCTIVE'] === '1';
+const DESTRUCTIVE_ENABLED = destructiveAllowed();
 
 function destructiveGate(whatItWouldDo: string): boolean {
   if (DESTRUCTIVE_ENABLED) return true;
   // eslint-disable-next-line no-console
   console.log(
-    `  ⏭️  SKIPPED (destructive, gated): would ${whatItWouldDo}. Set A2O_ALLOW_DESTRUCTIVE=1 to enable.`
+    `  ⏭️  SKIPPED (destructive, gated): would ${whatItWouldDo}. ${DESTRUCTIVE_HELD_HINT}`
   );
   return false;
 }

@@ -66,6 +66,10 @@ import {
   requireFixturePrimaryStorageUrl,
   requireFixtureStoragePeer,
 } from '../../src/framework/fixtures/household-mesh.js';
+import {
+  destructiveAllowed,
+  DESTRUCTIVE_HELD_HINT,
+} from '../../src/framework/fixtures/substrate-scope.js';
 import { retry } from '../../src/framework/utils/retry.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
@@ -235,23 +239,16 @@ function servingPeerName(doorwayId = 'alpha'): HouseholdPeerName {
 /**
  * The one switch that actually holds the destructive leg.
  *
- * `@requires:owned-substrate` is declared AVAILABLE in the Act I lane contract,
- * so it gates nothing on this mesh: it says which substrate the drill needs,
- * not whether we may fire it today. Off by default; every kill, restart and
- * wipe below asks first, and answers `skipped` (not `pending` — cucumber-js is
- * strict, and a pending step reds the run exactly like a failure) when held.
- * Read-only probes are never gated.
+ * `@requires:owned-substrate` says which substrate the drill needs; whether the
+ * lane OWNS it is the same declared cap, read by substrate-scope.ts
+ * destructiveAllowed() (or forced either way with A2O_ALLOW_DESTRUCTIVE).
+ * Every kill, restart and wipe below asks first, and answers `skipped` (not
+ * `pending` — cucumber-js is strict, and a pending step reds the run exactly
+ * like a failure) when held. Read-only probes are never gated.
  */
-function destructiveAllowed(): boolean {
-  return process.env['A2O_ALLOW_DESTRUCTIVE'] === '1';
-}
-
 function holdDestructive(description: string): 'skipped' | undefined {
   if (destructiveAllowed()) return undefined;
-  process.stdout.write(
-    `[a2o] destructive step HELD: ${description}. ` +
-      'Set A2O_ALLOW_DESTRUCTIVE=1 to let this drill touch the mesh.\n'
-  );
+  process.stdout.write(`[a2o] destructive step HELD: ${description}. ${DESTRUCTIVE_HELD_HINT}\n`);
   return 'skipped';
 }
 

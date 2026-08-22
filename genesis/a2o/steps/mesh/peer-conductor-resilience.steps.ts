@@ -83,6 +83,10 @@ import {
   requireFixtureDoorwayUrl,
   type HouseholdMeshFixture,
 } from '../../src/framework/fixtures/household-mesh.js';
+import {
+  destructiveAllowed,
+  DESTRUCTIVE_HELD_HINT,
+} from '../../src/framework/fixtures/substrate-scope.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
@@ -456,16 +460,10 @@ async function burst(url: string, count: number, timeoutMs: number): Promise<Htt
  * the disposition steps/common.steps.ts already gives a held scenario, and a
  * skipped step skips the rest of its scenario.
  */
-const DESTRUCTIVE_ENV = 'A2O_ALLOW_DESTRUCTIVE';
-
-function destructiveAllowed(): boolean {
-  return process.env[DESTRUCTIVE_ENV] === '1';
-}
-
 function holdDestructive(wouldDo: string): 'skipped' {
   console.warn(
-    `  ⏭️  HELD (destructive): ${wouldDo}. The mesh is shared, so this leg is off by default — ` +
-      `set ${DESTRUCTIVE_ENV}=1 to run it.`
+    `  ⏭️  HELD (destructive): ${wouldDo}. A shared mesh holds this leg by default — ` +
+      `${DESTRUCTIVE_HELD_HINT}`
   );
   return 'skipped';
 }

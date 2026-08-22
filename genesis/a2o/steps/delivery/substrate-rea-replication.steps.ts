@@ -35,6 +35,10 @@ import {
   requireFixtureDoorwayUrl,
   requireFixturePoolStorageUrls,
 } from '../../src/framework/fixtures/household-mesh.js';
+import {
+  destructiveAllowed,
+  DESTRUCTIVE_HELD_HINT,
+} from '../../src/framework/fixtures/substrate-scope.js';
 import { E2EWorld } from '../../src/framework/world.js';
 import { fetchApp, responseStore } from '../delivery.steps.js';
 
@@ -339,15 +343,14 @@ When(
   "doorway {string}'s pod is restarted",
   { timeout: DOORWAY_RESTART_STEP_TIMEOUT_MS },
   async function (this: E2EWorld, doorwayId: string) {
-    // The real gate. @requires:owned-substrate says what a scenario NEEDS; it
-    // does not say whether this operator wants it to happen right now, and on a
-    // lane whose cluster-state does not declare the cap it fails open anyway.
-    // One env switch, default off, so this file is safe to run anywhere.
-    if (process.env['A2O_ALLOW_DESTRUCTIVE'] !== '1') {
+    // The real gate: the lane's declared owned-substrate cap, or the operator's
+    // explicit A2O_ALLOW_DESTRUCTIVE switch (substrate-scope.ts destructiveAllowed —
+    // never fail-open, so this file is safe to run anywhere).
+    if (!destructiveAllowed()) {
       // eslint-disable-next-line no-console
       console.log(
         `  ⏭️  DESTRUCTIVE HELD: would SIGTERM doorway "${doorwayId}" and re-exec it from its own ` +
-          '/proc argv+environ+cwd. Set A2O_ALLOW_DESTRUCTIVE=1 to run it. Skipped, not failed.'
+          `/proc argv+environ+cwd. ${DESTRUCTIVE_HELD_HINT} Skipped, not failed.`
       );
       return 'skipped';
     }

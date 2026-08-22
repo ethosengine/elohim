@@ -27,6 +27,10 @@ import { After, Given, When, Then } from '@cucumber/cucumber';
 import { request } from 'undici';
 
 import { resolveDoorwayUrl as resolveFixtureDoorwayUrl } from '../../src/framework/fixtures/household-mesh.js';
+import {
+  destructiveAllowed,
+  DESTRUCTIVE_HELD_HINT,
+} from '../../src/framework/fixtures/substrate-scope.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
@@ -169,24 +173,19 @@ Given(
  * doorway either notices or it does not. The original head is restored in the
  * After hook below, including on failure.
  *
- * DESTRUCTIVE: it moves a declared head, which is a DHT write. Held behind
- * A2O_ALLOW_DESTRUCTIVE=1.
+ * DESTRUCTIVE: it moves a declared head, which is a DHT write. Held unless the
+ * lane owns its substrate (substrate-scope.ts destructiveAllowed).
  */
 const cacheEviction = new WeakMap<
   E2EWorld,
   { eprSlug: string; originalBlobHash: string; newBlobHash?: string; beforeBody?: Buffer }
 >();
 
-function destructiveAllowed(): boolean {
-  return process.env['A2O_ALLOW_DESTRUCTIVE'] === '1';
-}
-
 /** Skip (never fail, never pend) with the action this run declined to take. */
 function holdDestructive(wouldDo: string): 'skipped' {
   // eslint-disable-next-line no-console
   console.log(
-    `  ⏭️  DESTRUCTIVE HELD: would ${wouldDo}. Set A2O_ALLOW_DESTRUCTIVE=1 to run it. ` +
-      'Skipped, not failed.'
+    `  ⏭️  DESTRUCTIVE HELD: would ${wouldDo}. ${DESTRUCTIVE_HELD_HINT} ` + 'Skipped, not failed.'
   );
   return 'skipped';
 }

@@ -28,9 +28,13 @@ import {
   actBaselineCaps,
   undeclaredCapsWarned,
   resetUndeclaredCapWarnings,
+  destructiveAllowed,
+  DESTRUCTIVE_ENV,
+  OWNED_SUBSTRATE_CAP,
 } from '../substrate-scope.js';
 
 const TMP_PREFIX = 'substrate-scope-';
+const CLUSTER_STATE_FILE = 'cluster-state.yaml';
 const PATH_ENV = 'ELOHIM_CLUSTER_STATE_PATH_OVERRIDE';
 const SHEM = 'shem';
 const ALPHA = 'alpha-cluster-6peer';
@@ -47,6 +51,8 @@ const CAP_ENV = [
   'ELOHIM_REMOTE_COMPUTE_STATUS',
   'ELOHIM_CAP_SHEM_STATUS',
   'ELOHIM_CAP_ALPHA_CLUSTER_6PEER_STATUS',
+  'ELOHIM_CAP_OWNED_SUBSTRATE_STATUS',
+  'A2O_ALLOW_DESTRUCTIVE',
 ];
 
 function clearCapEnv(): void {
@@ -56,7 +62,7 @@ function clearCapEnv(): void {
 /** A realistic multi-resource cluster-state.yaml fixture (household up, shem down, alpha degraded,
  * harbor up) — with role/note multi-line scalars like the real file, to exercise the parser. */
 function writeClusterState(dir: string): string {
-  const path = join(dir, 'cluster-state.yaml');
+  const path = join(dir, CLUSTER_STATE_FILE);
   writeFileSync(
     path,
     [
@@ -490,5 +496,80 @@ void describe('the REAL act contracts (guards the lane files themselves)', () =>
   });
   void it('act iii baseline carries shem', () => {
     assert.ok(actBaselineCaps('iii').includes(SHEM));
+  });
+});
+
+/** The destructive gate — ONE answer for every kill/restart/write step, read from the declared
+ * `owned-substrate` cap with the env var as operator override. Never fail-open. */
+void describe('destructiveAllowed', () => {
+  let workDir: string;
+
+  function writeOwnedSubstrate(available: boolean): string {
+    const path = join(workDir, CLUSTER_STATE_FILE);
+    writeFileSync(
+      path,
+      [
+        RESOURCES,
+        `  ${OWNED_SUBSTRATE_CAP}:`,
+        '    role: the lane OWNS its substrate',
+        available ? AVAIL_TRUE : AVAIL_FALSE,
+        `  ${HOUSEHOLD}:`,
+        AVAIL_TRUE,
+        '',
+      ].join('\n')
+    );
+    return path;
+  }
+
+  beforeEach(() => {
+    workDir = mkdtempSync(join(tmpdir(), TMP_PREFIX));
+    clearCapEnv();
+    delete process.env[PATH_ENV];
+  });
+
+  afterEach(() => {
+    clearCapEnv();
+    delete process.env[PATH_ENV];
+    rmSync(workDir, { recursive: true, force: true });
+  });
+
+  void it('is ON when the active lane declares owned-substrate available (no env needed)', () => {
+    process.env[PATH_ENV] = writeOwnedSubstrate(true);
+    assert.equal(destructiveAllowed(), true);
+  });
+
+  void it('is OFF when the active lane declares owned-substrate unavailable', () => {
+    process.env[PATH_ENV] = writeOwnedSubstrate(false);
+    assert.equal(destructiveAllowed(), false);
+  });
+
+  void it('A2O_ALLOW_DESTRUCTIVE=1 forces ON even on a lane that declares the cap false', () => {
+    process.env[PATH_ENV] = writeOwnedSubstrate(false);
+    process.env[DESTRUCTIVE_ENV] = '1';
+    assert.equal(destructiveAllowed(), true);
+  });
+
+  void it('A2O_ALLOW_DESTRUCTIVE=0 forces OFF even on a lane that owns its substrate', () => {
+    process.env[PATH_ENV] = writeOwnedSubstrate(true);
+    process.env[DESTRUCTIVE_ENV] = '0';
+    assert.equal(destructiveAllowed(), false);
+  });
+
+  void it('the per-cap runtime override channel wins over the durable declaration', () => {
+    process.env[PATH_ENV] = writeOwnedSubstrate(false);
+    process.env['ELOHIM_CAP_OWNED_SUBSTRATE_STATUS'] = AVAILABLE;
+    assert.equal(destructiveAllowed(), true);
+  });
+
+  void it('never fails open: an unreadable cluster-state holds destructive steps', () => {
+    process.env[PATH_ENV] = join(workDir, 'does-not-exist.yaml');
+    assert.equal(destructiveAllowed(), false);
+  });
+
+  void it('never fails open: a lane whose cluster-state is silent on the cap holds them', () => {
+    const path = join(workDir, CLUSTER_STATE_FILE);
+    writeFileSync(path, [RESOURCES, `  ${HOUSEHOLD}:`, AVAIL_TRUE, ''].join('\n'));
+    process.env[PATH_ENV] = path;
+    assert.equal(destructiveAllowed(), false);
   });
 });

@@ -38,6 +38,10 @@ import { Given, When, Then } from '@cucumber/cucumber';
 import { request } from 'undici';
 
 import { probeP2PStatus } from '../../src/framework/dataplane/surfaces.js';
+import {
+  destructiveAllowed,
+  DESTRUCTIVE_HELD_HINT,
+} from '../../src/framework/fixtures/substrate-scope.js';
 
 import type { E2EWorld } from '../../src/framework/world.js';
 
@@ -252,7 +256,7 @@ Then(
 // against a mesh the suite owns.
 // ---------------------------------------------------------------------------
 
-const DESTRUCTIVE_ENABLED = process.env['A2O_ALLOW_DESTRUCTIVE'] === '1';
+const DESTRUCTIVE_ENABLED = destructiveAllowed();
 
 /**
  * Gate for every step below that writes to, or restarts, the mesh. Logs one
@@ -263,7 +267,7 @@ function destructiveGate(whatItWouldDo: string): boolean {
   if (DESTRUCTIVE_ENABLED) return true;
   // eslint-disable-next-line no-console
   console.log(
-    `  ⏭️  SKIPPED (destructive, gated): would ${whatItWouldDo}. Set A2O_ALLOW_DESTRUCTIVE=1 to enable.`
+    `  ⏭️  SKIPPED (destructive, gated): would ${whatItWouldDo}. ${DESTRUCTIVE_HELD_HINT}`
   );
   return false;
 }

@@ -78,6 +78,10 @@ import {
   requireFixtureStoragePeer,
   type HouseholdMeshFixture,
 } from '../../src/framework/fixtures/household-mesh.js';
+import {
+  destructiveAllowed,
+  DESTRUCTIVE_HELD_HINT,
+} from '../../src/framework/fixtures/substrate-scope.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
@@ -233,13 +237,13 @@ async function sleep(ms: number): Promise<void> {
 // even runs when the first one is held.
 // ---------------------------------------------------------------------------
 
-const DESTRUCTIVE = process.env['A2O_ALLOW_DESTRUCTIVE'] === '1';
+const DESTRUCTIVE = destructiveAllowed();
 
 /** Log the reason and mark the step (and every later step this scenario) skipped, not failed. */
 function skipHeldDestructive(reason: string): 'skipped' {
   // eslint-disable-next-line no-console
   console.log(
-    `  ⏭️  DESTRUCTIVE STEP HELD: ${reason} Set A2O_ALLOW_DESTRUCTIVE=1 to construct this for real ` +
+    `  ⏭️  DESTRUCTIVE STEP HELD: ${reason} ${DESTRUCTIVE_HELD_HINT} ` +
       '(same disposition steps/common.steps.ts already gives a substrate-held scenario).'
   );
   return 'skipped';
