@@ -6211,3 +6211,56 @@ fn answer_envelope_adoption_mappings_land_on_legal_states() {
     assert_eq!(doorway["stale"], "present");
     assert_eq!(doorway["unreachable"], "unreachable");
 }
+
+// ── Legacy /db/collectives wire shape (shefa CollectiveView) ─────────────────
+//
+// NOTE: unlike the Cat-A `CollabCollectiveView` (governed by
+// `views/collective-view.schema.json`), the legacy `GET /db/collectives/{id}`
+// wire shape has no JSON Schema yet — this serde assertion is its contract
+// pin until one is authored.
+
+/// `collectiveCid` (the DHT-notarized `collective:{action_hash}` stamp) must
+/// ride the `/db/collectives/{id}` wire in camelCase, nullable pre-coherence —
+/// the qahal household-formation cid scenario reads it from this route.
+#[test]
+fn db_collective_view_projects_collective_cid() {
+    use elohim_views::CollectiveView;
+
+    let v = CollectiveView {
+        id: "family-dowell".into(),
+        name: "Dowell Family".into(),
+        description: None,
+        governance_layer: "family".into(),
+        constitutional_parent_id: None,
+        reach: "intimate".into(),
+        region: None,
+        collective_cid: Some("collective:uhCkkCollectiveActionHash0001".into()),
+        metadata: None,
+        created_by: Some("agent:uhCAkFounderPubKey0001".into()),
+        created_at: "2026-08-22T00:00:00Z".into(),
+        updated_at: "2026-08-22T00:00:00Z".into(),
+        dissolved_at: None,
+    };
+    let json = serde_json::to_value(&v).unwrap();
+    assert_eq!(
+        json.get("collectiveCid").and_then(|c| c.as_str()),
+        Some("collective:uhCkkCollectiveActionHash0001"),
+        "collectiveCid must serialize camelCase on the /db/collectives wire"
+    );
+    assert!(
+        !json.as_object().unwrap().contains_key("collective_cid"),
+        "snake_case must never leave the Rust boundary"
+    );
+
+    // Pre-coherence rows (not yet notarized) serialize the field as null,
+    // not absent — the client distinguishes "no CID yet" from an old server.
+    let pre = CollectiveView {
+        collective_cid: None,
+        ..v
+    };
+    let json = serde_json::to_value(&pre).unwrap();
+    assert!(
+        json.get("collectiveCid").is_some_and(Value::is_null),
+        "collectiveCid must be null (present) pre-coherence"
+    );
+}

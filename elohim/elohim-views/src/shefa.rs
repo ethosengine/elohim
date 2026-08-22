@@ -511,6 +511,11 @@ pub struct CollectiveView {
     /// Compared by string equality in resilience distribution bucketing — no
     /// fixed vocabulary. NULL ⇒ region unknown.
     pub region: Option<String>,
+    /// Canonical DHT-notarized CID: `collective:{action_hash}`. Stamped by the
+    /// `CollectiveCommitted` projection; NULL pre-coherence (row not yet
+    /// notarized). Lets `GET /db/collectives/{id}` consumers join to the
+    /// Cat-A Collective entry without a second lookup.
+    pub collective_cid: Option<String>,
     pub metadata: Option<JsonVal>,
     pub created_by: Option<String>,
     pub created_at: String,

@@ -35,6 +35,7 @@ impl From<Collective> for CollectiveView {
             constitutional_parent_id: c.constitutional_parent_id,
             reach: c.reach,
             region: c.region,
+            collective_cid: c.collective_cid,
             metadata: parse_json_opt(&c.metadata_json),
             created_by: c.created_by,
             created_at: c.created_at,

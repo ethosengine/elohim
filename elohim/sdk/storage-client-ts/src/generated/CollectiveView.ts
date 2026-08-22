@@ -10,4 +10,11 @@ export type CollectiveView = { id: string, name: string, description: string | n
  * Compared by string equality in resilience distribution bucketing — no
  * fixed vocabulary. NULL ⇒ region unknown.
  */
-region: string | null, metadata: JsonValue | null, createdBy: string | null, createdAt: string, updatedAt: string, dissolvedAt: string | null, };
+region: string | null, 
+/**
+ * Canonical DHT-notarized CID: `collective:{action_hash}`. Stamped by the
+ * `CollectiveCommitted` projection; NULL pre-coherence (row not yet
+ * notarized). Lets `GET /db/collectives/{id}` consumers join to the
+ * Cat-A Collective entry without a second lookup.
+ */
+collectiveCid: string | null, metadata: JsonValue | null, createdBy: string | null, createdAt: string, updatedAt: string, dissolvedAt: string | null, };
