@@ -369,7 +369,31 @@ impl RendererRegistry {
             .parent()
             .map(std::path::Path::to_path_buf)
             .unwrap_or_else(|| std::path::PathBuf::from("."));
-        let src = crate::ssr::DoorwayBundleSource::new(storage_url.clone());
+        // BOOT BUDGET (structural no-overwhelm). Materialization runs BEFORE the
+        // listener binds, so an unresponsive storage peer used to take the whole
+        // node off the network: measured 2026-08-22 on the household mesh with
+        // every storage peer SIGSTOPped, two slugs × two 30s resolves serialized
+        // into a 91s pre-listen stall — no `/health`, no watchdog, no shed, just
+        // an absent port. The pass is now bounded end-to-end; whatever it cannot
+        // materialize inside the budget is DEFERRED to the reconcile adoption
+        // pass (which already converges a late-declared head), not abandoned.
+        let boot_budget = std::env::var("DOORWAY_SSR_BOOT_BUDGET_SECS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .filter(|&v| v > 0)
+            .unwrap_or(DEFAULT_SSR_BOOT_BUDGET_SECS);
+        let boot_head_timeout = std::env::var("DOORWAY_SSR_BOOT_HEAD_TIMEOUT_SECS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .filter(|&v| v > 0)
+            .unwrap_or(crate::ssr::DEFAULT_BOOT_HEAD_TIMEOUT_SECS);
+        let boot_deadline = std::time::Instant::now() + std::time::Duration::from_secs(boot_budget);
+        let src = crate::ssr::DoorwayBundleSource::bounded(
+            storage_url.clone(),
+            std::time::Duration::from_secs(boot_head_timeout),
+            std::time::Duration::from_secs(crate::ssr::DEFAULT_BLOB_TIMEOUT_SECS),
+            boot_deadline,
+        );
 
         // Bootstrap default fetcher per isolate — every render swaps in its own
         // per-request fetcher via ctx.data_fetcher, so this one is never used
@@ -480,6 +504,17 @@ impl RendererRegistry {
         // ONLY that app.
         let mut extra: Vec<(String, Arc<dyn elohim_render::Renderer>)> = Vec::new();
         for slug in slugs.iter().skip(1) {
+            if src.budget_exhausted() {
+                tracing::warn!(
+                    target: "doorway::ssr",
+                    event = "ssr-boot-budget-exhausted",
+                    slug = %slug,
+                    budget_secs = boot_budget,
+                    "SSR boot materialize budget exhausted — deferring this app (and any \
+                     remaining) to the reconcile adoption pass so the listener binds now"
+                );
+                continue;
+            }
             let app_dir = bundle_parent.join("apps").join(slug);
             if let Err(e) = std::fs::create_dir_all(&app_dir) {
                 tracing::warn!(
@@ -1216,6 +1251,13 @@ impl RendererRegistry {
 /// point is to be serving shortly after the head is declared, without an
 /// operator restart. Steady-state (all heads served) returns to the configured
 /// `DOORWAY_BUNDLE_RECONCILE_SECS` cadence.
+/// Whole-pass ceiling for BOOT-time server-bundle materialization, in seconds.
+/// Parameter-bearing: it must stay well under the liveness-kill window, because
+/// nothing in this pass runs concurrently with the listener bind — every second
+/// spent here is a second the node answers nothing at all. Override with
+/// `DOORWAY_SSR_BOOT_BUDGET_SECS`.
+pub const DEFAULT_SSR_BOOT_BUDGET_SECS: u64 = 20;
+
 pub const BUNDLE_ADOPTION_POLL_SECS: u64 = 30;
 
 /// Pure adoption-target decision: the CONFIGURED slugs this doorway is not yet

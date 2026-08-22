@@ -25,6 +25,7 @@ use async_trait::async_trait;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use elohim_render::{DataFetcher, FetchRequest, FetchResponse, FetcherTrust, RenderError, Result};
 
@@ -359,21 +360,85 @@ fn strip_to_path(url: &str) -> &str {
 /// materialize (this runs at most once per doorway startup, not per request).
 pub struct DoorwayBundleSource {
     storage_base: String,
+    /// Per-request ceiling for the `/db/content/{slug}` metadata read.
+    head_timeout: Duration,
+    /// Per-request ceiling for the `/blob/{hash}` byte read (a server bundle is
+    /// megabytes, so it legitimately needs a longer window than the head read).
+    blob_timeout: Duration,
+    /// Optional WHOLE-PASS deadline. Every request clamps its own timeout to the
+    /// remaining budget, and once the deadline has passed a request fails
+    /// immediately WITHOUT touching the network. `None` = unbounded pass (the
+    /// reconcile/adoption path, which runs off the boot critical path).
+    deadline: Option<Instant>,
 }
+
+/// Default `/db/content/{slug}` metadata-read ceiling for a BOOT materialize.
+/// A healthy peer answers this in milliseconds; the value only has to cover a
+/// slow-but-alive upstream, because a stalled one must not hold the listener.
+pub const DEFAULT_BOOT_HEAD_TIMEOUT_SECS: u64 = 5;
+
+/// Default `/blob/{hash}` byte-read ceiling (megabytes off a local peer).
+pub const DEFAULT_BLOB_TIMEOUT_SECS: u64 = 30;
 
 impl DoorwayBundleSource {
     pub fn new(storage_base_url: String) -> Self {
         Self {
             storage_base: storage_base_url.trim_end_matches('/').to_string(),
+            head_timeout: Duration::from_secs(DEFAULT_BLOB_TIMEOUT_SECS),
+            blob_timeout: Duration::from_secs(DEFAULT_BLOB_TIMEOUT_SECS),
+            deadline: None,
+        }
+    }
+
+    /// A source scoped to ONE bounded pass: per-request ceilings plus a whole-pass
+    /// deadline. This is what the boot path uses — the doorway must not hold its
+    /// listener bind behind an unresponsive storage peer (measured 2026-08-22 on
+    /// the household mesh: with all three peers SIGSTOPped, two slugs × two
+    /// 30s resolves serialized to a 91s pre-listen stall, i.e. the node was OFF
+    /// THE NETWORK — no `/health`, no watchdog — for the whole window).
+    pub fn bounded(
+        storage_base_url: String,
+        head_timeout: Duration,
+        blob_timeout: Duration,
+        deadline: Instant,
+    ) -> Self {
+        Self {
+            storage_base: storage_base_url.trim_end_matches('/').to_string(),
+            head_timeout,
+            blob_timeout,
+            deadline: Some(deadline),
+        }
+    }
+
+    /// Whether the pass budget is spent. Callers iterating slugs check this
+    /// BETWEEN slugs so the remainder is deferred rather than half-attempted.
+    pub fn budget_exhausted(&self) -> bool {
+        self.deadline.is_some_and(|d| Instant::now() >= d)
+    }
+
+    /// This request's effective timeout: the configured ceiling clamped to what
+    /// is left of the pass budget. `None` once the budget is spent — the caller
+    /// must fail without a network call.
+    fn effective_timeout(&self, configured: Duration) -> Option<Duration> {
+        match self.deadline {
+            None => Some(configured),
+            Some(deadline) => {
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                if remaining.is_zero() {
+                    None
+                } else {
+                    Some(configured.min(remaining))
+                }
+            }
         }
     }
 
     /// Build a fresh blocking client. Each call site spawns its own thread, so
     /// sharing a client across threads is not needed — a fresh per-call client
     /// keeps the implementation simple and avoids `Arc` across the spawn boundary.
-    fn make_client() -> reqwest::blocking::Client {
+    fn make_client(timeout: Duration) -> reqwest::blocking::Client {
         reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
+            .timeout(timeout)
             .build()
             .unwrap_or_default()
     }
@@ -387,11 +452,16 @@ impl DoorwayBundleSource {
     /// HTTP call (and its dedicated-OS-thread isolation) lives here once.
     fn fetch_content_body(&self, slug: &str) -> elohim_render::Result<String> {
         let url = format!("{}/db/content/{}", self.storage_base, slug);
+        let Some(timeout) = self.effective_timeout(self.head_timeout) else {
+            return Err(RenderError::Bootstrap(format!(
+                "content GET skipped: bundle pass budget exhausted before `{url}`"
+            )));
+        };
         // Run on a dedicated OS thread so `reqwest::blocking` can create its own
         // tokio runtime without conflicting with an ambient tokio context (the
         // `with_projection` async constructor calls `init_renderer`).
         std::thread::spawn(move || {
-            let client = DoorwayBundleSource::make_client();
+            let client = DoorwayBundleSource::make_client(timeout);
             let resp = client
                 .get(&url)
                 .send()
@@ -422,9 +492,14 @@ impl elohim_render::BundleSource for DoorwayBundleSource {
 
     fn fetch_blob(&self, hash: &str) -> elohim_render::Result<Vec<u8>> {
         let url = format!("{}/blob/{}", self.storage_base, hash);
+        let Some(timeout) = self.effective_timeout(self.blob_timeout) else {
+            return Err(RenderError::Bootstrap(format!(
+                "fetch_blob skipped: bundle pass budget exhausted before `{url}`"
+            )));
+        };
         // Same thread-isolation rationale as resolve_blob_hash above.
         std::thread::spawn(move || {
-            let client = DoorwayBundleSource::make_client();
+            let client = DoorwayBundleSource::make_client(timeout);
             let resp = client
                 .get(&url)
                 .send()
@@ -485,6 +560,67 @@ pub fn parse_server_blob_hash(body: &str) -> elohim_render::Result<String> {
 mod tests {
     use super::*;
     use elohim_render::BundleSource;
+
+    // ── boot materialize budget (structural no-overwhelm) ───────────────────
+    //
+    // The pass runs BEFORE the listener binds, so an unbounded resolve is not
+    // "slow boot" — it is the node absent from the network with no /health and
+    // no watchdog. Measured 2026-08-22 on the household mesh with every storage
+    // peer SIGSTOPped: 91s pre-listen stall, and the a2o restart drill's 90s
+    // health budget expired against a port that was never opened.
+
+    #[test]
+    fn an_unbounded_source_keeps_its_configured_timeout() {
+        let src = DoorwayBundleSource::new("http://x".into());
+        assert_eq!(
+            src.effective_timeout(Duration::from_secs(30)),
+            Some(Duration::from_secs(30)),
+            "no deadline configured => the request keeps its own ceiling"
+        );
+        assert!(!src.budget_exhausted());
+    }
+
+    #[test]
+    fn a_bounded_source_clamps_each_request_to_the_remaining_budget() {
+        let src = DoorwayBundleSource::bounded(
+            "http://x".into(),
+            Duration::from_secs(5),
+            Duration::from_secs(30),
+            Instant::now() + Duration::from_secs(2),
+        );
+        let effective = src
+            .effective_timeout(Duration::from_secs(30))
+            .expect("budget is not spent yet");
+        assert!(
+            effective <= Duration::from_secs(2),
+            "a 30s blob read may not outlive a 2s pass budget (got {effective:?})"
+        );
+        assert!(!src.budget_exhausted());
+    }
+
+    #[test]
+    fn a_spent_budget_fails_without_a_network_call() {
+        let src = DoorwayBundleSource::bounded(
+            "http://x".into(),
+            Duration::from_secs(5),
+            Duration::from_secs(30),
+            Instant::now() - Duration::from_secs(1),
+        );
+        assert!(src.budget_exhausted(), "the deadline is already behind us");
+        assert_eq!(
+            src.effective_timeout(Duration::from_secs(30)),
+            None,
+            "past the deadline the caller must fail fast, never dial"
+        );
+        // And the BundleSource surface honours it: an Err, not a 30s hang.
+        let err = src
+            .resolve_server_blob_hash("elohim-host-landing")
+            .expect_err("a spent budget cannot resolve a head");
+        assert!(
+            format!("{err}").contains("budget exhausted"),
+            "the refusal names the budget so a deferral is not read as an outage: {err}"
+        );
+    }
 
     #[test]
     fn strip_absolute_url_to_path() {
