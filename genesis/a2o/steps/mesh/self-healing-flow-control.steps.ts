@@ -1198,6 +1198,8 @@ interface BreakerTripState {
   peerName: HouseholdPeerName;
   storageUrl: string;
   endpointFragment: string;
+  /** Failing proxied requests this drill has issued — the ceiling on honest outcome records. */
+  issuedFailures: number;
 }
 
 const breakerTrips = new WeakMap<E2EWorld, BreakerTripState>();
@@ -1237,9 +1239,20 @@ async function tripStorageBreaker(world: E2EWorld, doorway: string): Promise<Bre
     });
   }
 
-  for (let attempt = 0; attempt < UPSTREAM_CIRCUIT_FAIL_THRESHOLD; attempt += 1) {
-    await getRaw(`${doorway}${UNKNOWN_CONTENT_PATH}`, { timeoutMs: 20_000 }).catch(() => undefined);
-  }
+  // CONCURRENTLY, not one after another. The breaker opens on failThreshold
+  // failures WITHIN failWindowSeconds (3 within 20s — /admin/self-healing
+  // publishes both under upstreamPolicy). A stalled peer costs
+  // STORAGE_PROXY_REQUEST_TIMEOUT_SECS(12) per attempt, so three SERIAL probes
+  // land their failures ~12s apart and the third sees only two inside the
+  // window — the trip was timing-marginal and depended on unrelated background
+  // traffic to top it up. Fired together they all fail at ~t+12s, inside one
+  // window, which is what "returned errors past the upstream failure threshold"
+  // actually means.
+  await Promise.all(
+    Array.from({ length: UPSTREAM_CIRCUIT_FAIL_THRESHOLD }, async () =>
+      getRaw(`${doorway}${UNKNOWN_CONTENT_PATH}`, { timeoutMs: 20_000 }).catch(() => undefined)
+    )
+  );
 
   // Which upstream did the doorway actually charge for these failures?
   const opened = await fetchSelfHealing(doorway)
@@ -1249,6 +1262,7 @@ async function tripStorageBreaker(world: E2EWorld, doorway: string): Promise<Bre
     peerName: primaryPeerName('alpha'),
     storageUrl: opened?.endpoint ?? primaryStorageUrl('alpha'),
     endpointFragment: endpointFragmentOf(opened?.endpoint ?? primaryStorageUrl('alpha')),
+    issuedFailures: UPSTREAM_CIRCUIT_FAIL_THRESHOLD,
   };
   breakerTrips.set(world, state);
   return state;
@@ -1372,10 +1386,20 @@ When(
   'that failure mode repeats past the upstream failure threshold',
   async function (this: E2EWorld) {
     // tripStorageBreaker already drove UPSTREAM_CIRCUIT_FAIL_THRESHOLD attempts
-    // in the Given step (the peer is still paused) — re-affirm via one more
-    // real proxied attempt so this step itself performs a live probe.
+    // in the Given step (the pool is still paused) — re-affirm via one more
+    // real proxied attempt so this step itself performs a live probe. It is
+    // COUNTED, because the Then's anti-double-count claim is about outcomes per
+    // request, not about a fixed number.
     const url = doorwayUrl(this, 'alpha');
-    await getRaw(`${url}${UNKNOWN_CONTENT_PATH}`, { timeoutMs: 15_000 }).catch(() => undefined);
+    const before = await getRaw(`${url}${UNKNOWN_CONTENT_PATH}`, { timeoutMs: 15_000 }).catch(
+      () => undefined
+    );
+    // A shed (503 catching-up, answered in milliseconds) means the breaker was
+    // ALREADY open and this probe never reached the upstream — so it records no
+    // outcome and must not be counted.
+    if (before !== undefined && before.status !== 503) {
+      breakerTripState(this).issuedFailures += 1;
+    }
   }
 );
 
@@ -1390,14 +1414,21 @@ Then('the breaker opens for that upstream', async function (this: E2EWorld) {
     'open',
     `breaker circuit is "${upstream.circuit}", expected "open"`
   );
-  // "records exactly one outcome per terminal path" -> error_streak must sit
-  // at the fail threshold, never inflated by a double-count on the same
-  // terminal failure.
-  assert.equal(
-    upstream.errorStreak,
-    UPSTREAM_CIRCUIT_FAIL_THRESHOLD,
-    `error_streak is ${upstream.errorStreak}, expected exactly ${UPSTREAM_CIRCUIT_FAIL_THRESHOLD} ` +
-      '— a higher count would mean an outcome was recorded more than once for the same terminal path'
+  // "records exactly one outcome per terminal path": the streak must be at
+  // least the threshold (or the circuit could not be open) and at most the
+  // number of failing requests this drill actually issued. Pinning it to the
+  // THRESHOLD was wrong in both directions — the scenario's own When issues a
+  // further failing probe, so 4 records for 4 failed requests is the correct
+  // one-outcome-per-path behaviour, not a double count.
+  assert.ok(
+    upstream.errorStreak >= UPSTREAM_CIRCUIT_FAIL_THRESHOLD,
+    `error_streak is ${upstream.errorStreak}, below the ${UPSTREAM_CIRCUIT_FAIL_THRESHOLD} that ` +
+      'must have been recorded for the circuit to be open'
+  );
+  assert.ok(
+    upstream.errorStreak <= state.issuedFailures,
+    `error_streak is ${upstream.errorStreak} for ${state.issuedFailures} failing request(s) — a ` +
+      'higher count means an outcome was recorded more than once for the same terminal path'
   );
 });
 
@@ -1433,12 +1464,14 @@ Given(
       );
     }
     const url = doorwayUrl(this, 'alpha');
-    const state = await tripStorageBreaker(this, url);
-    // Resume the peer so the wall-clock cooldown genuinely admits a healthy
+    await tripStorageBreaker(this, url);
+    // Resume EVERY peer so the wall-clock cooldown genuinely admits a healthy
     // trial rather than another failure — the storage-proxy breaker is a
-    // REAL-clock breaker (unlike Plan A's frozen-tick warm-up breaker), so
-    // this wait is real time, not simulated.
-    resumePeerProcess(state.peerName);
+    // REAL-clock breaker (unlike Plan A's frozen-tick warm-up breaker), so this
+    // wait is real time, not simulated. (The trip pauses the whole pool, so
+    // resuming only the primary would leave the peer this route actually
+    // targets still stalled, and the "healthy trial" would be another failure.)
+    for (const name of ALL_HOUSEHOLD_PEERS) resumePeerProcess(name);
     await sleep((UPSTREAM_CIRCUIT_COOLDOWN_SECS + 2) * 1_000);
   }
 );
