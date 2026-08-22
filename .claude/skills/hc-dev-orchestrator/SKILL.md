@@ -79,7 +79,11 @@ identities, the base corpus rows every later leg patches bytes onto
 (`elohim-host-landing`, `lamad-spa`, `evolution-of-trust` — seed a row here or
 its stage leg 404s and the scenarios that need it env-red on the
 precondition), the landing + lamad-spa bundles (browser AND the landing's SSR
-server bundle), the full CI-order seed chain (identities cast BEFORE `seed-humans` on the mesh — doorway A's hosted pool is matthew's conductor, so hosted registrations must not claim it first), and the household fixture
+server bundle, whose `serverBlobHash` is then stamped on EVERY peer's row —
+the field is a diesel-direct deploy-projection artifact no sync plane
+carries, so without the per-peer stamp doorway B's declared read stays NULL
+and resiliency-saga ch06's cross-doorway scenario pends forever), the full
+CI-order seed chain (identities cast BEFORE `seed-humans` on the mesh — doorway A's hosted pool is matthew's conductor, so hosted registrations must not claim it first), and the household fixture
 manifest `genesis/a2o/src/framework/fixtures/household-mesh.ts` resolves
 against, and Act I's own cast — the drill fixtures two resilience features
 name (`heal-target`, `chaos-ladder`) with their household custody promises,

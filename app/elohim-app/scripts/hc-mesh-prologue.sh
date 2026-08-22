@@ -240,6 +240,61 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# 4b. Per-peer serverBlobHash stamp — the deploy-projection mirror.
+#
+# serverBlobHash is a deploy-time projection artifact, deliberately EXCLUDED
+# from the notarized content entry (elohim-storage http.rs
+# patch_needs_conductor: "the diesel-direct write is correct"). That means NO
+# sync plane carries it between peers: DECLARE_ONLY propagates only the head
+# action hash, and the projection reconcile rebuilds rows from the DHT entry,
+# which doesn't hold this field. The stage-landing-server-A PATCH above lands
+# on doorway A's primary backend (matthew) ONLY — jessica and james stay
+# NULL, so the resiliency-saga ch06 cross-doorway scenario ("the served head
+# matches the declared head on peer elohim.host" — declared read = doorway B
+# → jessica) returns an honest 'pending' forever. Production stamps the field
+# per serving host at deploy time; this leg is that stamp for the household.
+#
+# Hash source is the ARTIFACT, not the serve path: CONTENT_BLOB_HASH above is
+# the read-back of the value stage-spa-blob.sh derived by zipping the server
+# dist and VERIFIED post-PATCH (its drift seatbelt) — never "whatever a
+# doorway currently serves". Idempotent: an already-current peer is a no-op.
+# ---------------------------------------------------------------------------
+banner "4b. per-peer serverBlobHash stamp (deploy-projection mirror)"
+stamp_server_projection_peers() {
+  if [ -z "$CONTENT_BLOB_HASH" ]; then
+    echo "  ⊘ no CONTENT_BLOB_HASH resolved (stage-landing-server-A red?) — nothing to stamp" >&2
+    return 1
+  fi
+  local rc=0 i=0 name port url current
+  for name in "${PEERS[@]}"; do
+    port="$(http_port $i)"; url="http://localhost:$port"; i=$((i+1))
+    current="$(curl -fsS -m 10 "$url/db/content/elohim-host-landing" \
+      | python3 -c "import sys, json; print(json.load(sys.stdin).get('serverBlobHash') or '')" 2>/dev/null)" || current=""
+    if [ "$current" = "$CONTENT_BLOB_HASH" ]; then
+      echo "  = $name ($url): serverBlobHash already current — no-op"
+      continue
+    fi
+    if ! curl -fsS -m 15 -X PATCH -H 'Content-Type: application/json' \
+        -d "{\"serverBlobHash\":\"$CONTENT_BLOB_HASH\"}" \
+        "$url/db/content/elohim-host-landing" >/dev/null; then
+      echo "  ✗ $name ($url): serverBlobHash PATCH failed" >&2
+      rc=1
+      continue
+    fi
+    current="$(curl -fsS -m 10 "$url/db/content/elohim-host-landing" \
+      | python3 -c "import sys, json; print(json.load(sys.stdin).get('serverBlobHash') or '')" 2>/dev/null)" || current=""
+    if [ "$current" = "$CONTENT_BLOB_HASH" ]; then
+      echo "  ✓ $name ($url): serverBlobHash stamped = $CONTENT_BLOB_HASH"
+    else
+      echo "  ✗ $name ($url): serverBlobHash drift after PATCH: expected $CONTENT_BLOB_HASH, got ${current:-<empty>}" >&2
+      rc=1
+    fi
+  done
+  return $rc
+}
+run_leg "stamp-server-projection-peers" soft stamp_server_projection_peers
+
+# ---------------------------------------------------------------------------
 # 5. Substrate chain. Conductor Identities now runs BEFORE Seed Humans — the
 #    reverse of genesis/Jenkinsfile's CI order (Seed Humans -> Presences ->
 #    Collectives -> Accounts -> Conductor Identities -> Provide Rows -> Agent
