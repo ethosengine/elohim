@@ -65,3 +65,51 @@ but not a resolution.
 - Worktree delta size at each commit sweep (2.79 MB as of 2026-08-05).
 - `permit` : `refuse` ratio (currently ~53:1) — if advisories dominate this hard, the injects may
   be too broad, which is a separate finding about rule tuning.
+
+---
+
+## Measurement, 2026-08-22 — and the rule this class was missing
+
+**The growth is now three-fold and the read path still does not exist.**
+
+| observed | size | source |
+|---|---|---|
+| 2026-08-05 | 2,798,458 B | this row, at authoring |
+| (undated) | ~4.3 MB | `genesis/manifests/habits.yaml:1691` — *"written with zero readers, which needs a read path or a stop-write"* |
+| **2026-08-22** | **7,806,004 B** | measured this session |
+
+A repo-wide grep for a read path (`read`/`load`/`open(`/`json.loads` against the filename) returns
+**nothing**. Every reference is a writer (`_lib/epr_meta.py:1566,1587`; `hooks/epr-meta-git-gate.py:12`;
+`package-projections.mjs:50,382`), a `"ledger":` declaration under `.epr-meta/elohim/packages/`, or prose.
+Three independent surfaces have now flagged it — this row, the habits register, and the
+2026-08-22 artifact subtraction audit — and it has grown through all three.
+
+**Why deleting it does not close this row.** The file returns on the next hook fire. The stop-write
+touches ~30 package declarations plus a projected hook sitting behind a pre-push projection-drift gate
+(`.husky/pre-push.bash:136-147`), so it is a scoped change, not a `git rm`.
+
+**The rule the class was missing** (named 2026-08-22, from the operator's observation that Jenkins has
+both halves and we use only one):
+
+> Every retained artifact needs TWO things — an **automatic forgetting rule** (a clock, a count, or a
+> comet tier) and a **PIN that survives it, released by a DECISION rather than by time.**
+
+This ledger has neither, which is why "rotate or compress" read as an open design question rather than
+a policy choice: the question was never *how* to rotate, it was that no artifact class in this repo had
+a declared forgetting rule paired with a decision-gated pin. The shape already exists four times over
+and was nowhere named — Jenkins `buildDiscarder(logRotator(numToKeepStr))` runs at 20/100/50/30/30
+across five pipelines with **no** `keepLog` pin anywhere in the repo; `memkit-retention.py` runs a
+HEAD/TAIL/CORE comet whose spine is permanent but *automatic*, not decision-gated; `.epr-meta`
+`retire-when:` is a decision-gated pin for **rules**; `habits.yaml` `best_observed:` is one for a
+habit's high-water mark. **Nothing pins a result or a ledger row.**
+
+So the concrete shape of the fix for this row: a forgetting rule (rows older than N, or beyond the
+newest N per fingerprint), plus a pin for any row that is standing evidence for an open question —
+released when that question closes, not when a counter rolls. A `decision: permit` row with no open
+question behind it is exactly what the forgetting rule should take, and it is 1,760 of the 1,954 rows
+this row was authored about.
+
+**Still an operator decision** (unchanged from the original framing, now with the cost priced):
+stop-write versus keep-writing-and-forget-on-a-rule. The audit that re-measured this recommends
+scoping the stop-write separately from any deletion, because deleting first guarantees the file
+returns before the scoped change lands.
