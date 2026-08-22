@@ -10,7 +10,7 @@
 //!     ▼
 //! Signal::App { signal: AppSignal }
 //!     │
-//!     │  rmp_serde::from_slice → serde_json::Value
+//!     │  direct typed rmp_serde::from_slice (byte-array hash tolerant)
 //!     ▼
 //! Try RecoveryV2Signal decode (tag = "type", no content wrapper)
 //!   OR ImagodeiSignal decode  (tag = "type", content = "payload")
@@ -231,7 +231,8 @@ fn translate_recovery_v2(signal: RecoveryV2Signal) -> Option<DnaSignal> {
 /// Translate an `ImagodeiSignal` into a `DnaSignal`, if the variant is
 /// consumed by the reconcile controller.
 ///
-/// Only `AgentPeerBindingCreated` produces a signal. All others return `None`.
+/// `AgentPeerBindingCreated`, `CollectiveCommitted`, `MembershipCommitted`,
+/// and `HostedAgentBindingCreated` produce signals. All others return `None`.
 fn translate_imagodei(signal: ImagodeiSignal) -> Option<DnaSignal> {
     let emitted_at = Utc::now();
 
@@ -240,17 +241,15 @@ fn translate_imagodei(signal: ImagodeiSignal) -> Option<DnaSignal> {
             action_hash,
             binding,
         } => {
+            let action_hash = action_hash.0;
             let valid_from = micros_to_datetime(binding.valid_from);
             let valid_until = binding.valid_until.map(micros_to_datetime);
             let device_archetype = parse_device_archetype(&binding.device_archetype);
-            // The DNA emits superseded_by as a JSON string when present (the
-            // ActionHash of the binding being superseded), or null/absent when
-            // this is a fresh binding. Pull the string out of the Value if it
-            // is a string; treat anything else (null, object, etc.) as absent.
-            let superseded_by = binding
-                .superseded_by
-                .as_ref()
-                .and_then(|v| v.as_str().map(|s| s.to_string()));
+            // The DNA emits superseded_by as an `Option<ActionHash>` — raw
+            // bytes on the conductor wire, base64 string in JSON-context
+            // fixtures. `HoloHashB64` normalizes both; absent/null means this
+            // is a fresh binding.
+            let superseded_by = binding.superseded_by.map(|h| h.0);
 
             Some(DnaSignal::AgentPeerBinding(AgentPeerBindingSignal {
                 action_hash: action_hash.clone(),
@@ -282,6 +281,7 @@ fn translate_imagodei(signal: ImagodeiSignal) -> Option<DnaSignal> {
             collective,
             ..
         } => {
+            let action_hash = action_hash.0;
             let collective_cid = format!("collective:{action_hash}");
             Some(DnaSignal::CollectiveProjected(CollectiveProjectedSignal {
                 collective_cid: collective_cid.clone(),
@@ -310,7 +310,7 @@ fn translate_imagodei(signal: ImagodeiSignal) -> Option<DnaSignal> {
                 None
             };
             Some(DnaSignal::MembershipProjected(MembershipProjectedSignal {
-                action_hash,
+                action_hash: action_hash.0,
                 collective_cid: membership.collective_cid,
                 member_cid: membership.member_cid,
                 member_kind: membership.member_kind.as_db_str().to_string(),
@@ -333,8 +333,8 @@ fn translate_imagodei(signal: ImagodeiSignal) -> Option<DnaSignal> {
             installed_app_id,
             bound_at_micros,
         } => Some(DnaSignal::HostedAgentBinding(HostedAgentBindingSignal {
-            action_hash,
-            agent_pub_key,
+            action_hash: action_hash.0,
+            agent_pub_key: agent_pub_key.0,
             doorway_id,
             doorway_url,
             installed_app_id,
@@ -374,44 +374,90 @@ fn parse_device_archetype(s: &str) -> DeviceArchetype {
     }
 }
 
+/// Mirror-variant tags for the storage-side `RecoveryV2Signal` enum. A decode
+/// failure on one of these tags is a REAL projection miss (loud) — same
+/// classification pattern as `signals::IMAGODEI_MIRROR_VARIANTS`.
+const RECOVERY_V2_MIRROR_VARIANTS: &[&str] = &[
+    "RecoveryRequestCreated",
+    "IntimateWitnessSubmitted",
+    "KeyRotationCommitted",
+    "KeyRevocationRequested",
+    "RevocationVoteSubmitted",
+    "KeyRevocationEffective",
+];
+
 /// Attempt to decode an app-signal byte payload as `RecoveryV2Signal` or
 /// `ImagodeiSignal`, returning the translated `DnaSignal` if recognized.
 ///
-/// Wire format: MessagePack-encoded `serde_json::Value`, then re-decoded as
-/// the target enum. Both signal enums use internally-tagged serde (`tag = "type"`).
+/// Wire format: the conductor emits app signals as MessagePack (`ExternIO` ==
+/// `rmp_serde::to_vec_named` over the DNA-side enum), where the DNA's
+/// `ActionHash`/`EntryHash`/`AgentPubKey` fields serialize as raw 39-BYTE
+/// ARRAYS. The decode is therefore a DIRECT typed `rmp_serde` pass into the
+/// `HoloHashB64`-typed mirrors — the old `rmp → serde_json::Value` pre-pass
+/// died on those byte arrays (`serde_json::Value` cannot represent them) and
+/// silently dropped every real `CollectiveCommitted`/`MembershipCommitted`
+/// signal at `debug!` level (2026-08-22 root cause; same class as the
+/// 2026-06-12/13 `InfrastructureSignal`/`MishpatSignal` cures in `signals.rs`).
 ///
 /// Returns `None` for:
-/// - MessagePack decode failures (malformed wire data)
-/// - Neither enum matches (e.g. lamad DNA signals on the same conductor)
+/// - Foreign signals (another DNA/family's tag on the shared app interface) —
+///   logged at `debug!`
+/// - Mirror-tagged payloads that fail the typed decode — a REAL wire-shape
+///   regression, logged LOUD at `warn!` with the variant tag
+/// - Undecodable payloads (not even the tag reads) — logged at `debug!`
 /// - Recognized variants not consumed by the controller
 fn try_decode_and_translate(bytes: &[u8], _db_pool: Option<&Arc<DbPool>>) -> Option<DnaSignal> {
-    // Step 1: decode MessagePack → JSON Value.
-    let value = match rmp_serde::from_slice::<serde_json::Value>(bytes) {
-        Ok(v) => v,
-        Err(e) => {
-            debug!(error = %e, "Failed to msgpack-decode app signal payload");
-            return None;
-        }
-    };
-
-    // Step 2a: try RecoveryV2Signal (tag = "type", no content wrapper).
-    // RecoveryV2Signal variants have the `type` tag directly on the object.
-    if let Ok(rv2) = serde_json::from_value::<RecoveryV2Signal>(value.clone()) {
+    // Step 1: direct typed decode — RecoveryV2Signal (tag = "type", no
+    // content wrapper; variant tags are disjoint from ImagodeiSignal's).
+    if let Ok(rv2) = rmp_serde::from_slice::<RecoveryV2Signal>(bytes) {
         return translate_recovery_v2(rv2);
     }
 
-    // Step 2b: try ImagodeiSignal (tag = "type", content = "payload").
-    // ImagodeiSignal wraps variant payload under a "payload" key.
-    if let Ok(imago) = serde_json::from_value::<ImagodeiSignal>(value.clone()) {
-        return translate_imagodei(imago);
-    }
+    // Step 2: direct typed decode — ImagodeiSignal (tag = "type",
+    // content = "payload").
+    let typed_err = match rmp_serde::from_slice::<ImagodeiSignal>(bytes) {
+        Ok(imago) => return translate_imagodei(imago),
+        Err(e) => e,
+    };
 
-    // Step 3: unrecognized signal — another DNA on the same conductor.
-    debug!(
-        value_type = %value.get("type").and_then(|t| t.as_str()).unwrap_or("<none>"),
-        "App signal not recognized as RecoveryV2Signal or ImagodeiSignal — skipping"
-    );
-    None
+    // Step 3: classify the miss. Tag-only peek: serde skips the payload via
+    // IgnoredAny (which, unlike `serde_json::Value`, tolerates msgpack byte
+    // arrays).
+    #[derive(serde::Deserialize)]
+    struct TagOnly {
+        #[serde(rename = "type")]
+        type_tag: String,
+    }
+    match rmp_serde::from_slice::<TagOnly>(bytes) {
+        Ok(tag)
+            if crate::signals::IMAGODEI_MIRROR_VARIANTS.contains(&tag.type_tag.as_str())
+                || RECOVERY_V2_MIRROR_VARIANTS.contains(&tag.type_tag.as_str()) =>
+        {
+            crate::metrics::inc_signal_decode_miss("imagodei");
+            warn!(
+                type_tag = %tag.type_tag,
+                error = %typed_err,
+                "REAL imagodei app-signal decode miss — mirror tag present but typed decode \
+                 failed (wire-shape regression, signal DROPPED)"
+            );
+            None
+        }
+        Ok(tag) => {
+            debug!(
+                type_tag = %tag.type_tag,
+                "App signal not recognized as RecoveryV2Signal or ImagodeiSignal — skipping"
+            );
+            None
+        }
+        Err(tag_err) => {
+            debug!(
+                typed_error = %typed_err,
+                tag_error = %tag_err,
+                "Failed to msgpack-decode app signal payload"
+            );
+            None
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1249,6 +1295,165 @@ mod tests {
             DnaSignal::MembershipProjected(sig) => {
                 assert_eq!(sig.member_kind, "elohim_agent");
                 assert_eq!(sig.role_context, "observer");
+            }
+            other => panic!("expected MembershipProjected, got {other:?}"),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Wire-conformance: the REAL conductor msgpack wire (2026-08-22 fix)
+    // -----------------------------------------------------------------------
+    //
+    // The JSON-context tests above feed base64 STRING hashes, which prove
+    // serde tag/field shape but say NOTHING about the conductor wire. The
+    // conductor emits app signals as MessagePack (`ExternIO` ==
+    // `rmp_serde::to_vec_named`), where the DNA-side `ActionHash` /
+    // `EntryHash` / `AgentPubKey` serialize as raw 39-BYTE ARRAYS. The old
+    // `rmp → serde_json::Value` pre-pass (no byte-array representation in
+    // `serde_json::Value`) + the all-`String` mirror dropped every real
+    // `CollectiveCommitted` / `MembershipCommitted` signal at `debug!` level
+    // — `on_collective_projected` / `on_membership_projected` never ran on
+    // any conductor. These tests FAIL against that old code path.
+
+    /// DNA-shaped `Collective` — field-identical to
+    /// `imagodei_integrity::Collective` (all plain Strings + u64).
+    #[derive(serde::Serialize)]
+    struct DnaCollective {
+        founder_agent_cid: String,
+        charter: String,
+        display_name: String,
+        created_at_block_height: u64,
+        salt: String,
+        anchor_agreement_cid: Option<String>,
+    }
+
+    /// DNA-shaped `Membership` — field-identical to
+    /// `imagodei_integrity::Membership`. `member_kind` / `role` are unit enum
+    /// variants on the DNA side, which rmp_serde encodes as plain strings —
+    /// byte-identical to these `String` fields.
+    #[derive(serde::Serialize)]
+    struct DnaMembership {
+        member_cid: String,
+        member_kind: String,
+        collective_cid: String,
+        role: String,
+        sponsor_cid: Option<String>,
+        joined_at_block_height: u64,
+        withdrawn_at_block_height: Option<u64>,
+    }
+
+    /// DNA-shaped `ImagodeiSignal` variants with REAL `holo_hash` types —
+    /// mirrors `imagodei::ImagodeiSignal` (`tag = "type", content = "payload"`).
+    #[derive(serde::Serialize)]
+    #[serde(tag = "type", content = "payload")]
+    enum DnaImagodeiSignal {
+        CollectiveCommitted {
+            action_hash: holochain_types::prelude::ActionHash,
+            entry_hash: holochain_types::prelude::EntryHash,
+            collective: DnaCollective,
+            author: holochain_types::prelude::AgentPubKey,
+        },
+        MembershipCommitted {
+            action_hash: holochain_types::prelude::ActionHash,
+            entry_hash: holochain_types::prelude::EntryHash,
+            membership: DnaMembership,
+            author: holochain_types::prelude::AgentPubKey,
+        },
+    }
+
+    /// THE root-cause regression test: decode `CollectiveCommitted` from the
+    /// REAL conductor wire — `rmp_serde::to_vec_named` over the DNA-side enum
+    /// shape with raw-byte `holo_hash` values — and assert the translation to
+    /// `DnaSignal::CollectiveProjected` with the canonical base64 action hash.
+    #[test]
+    fn collective_committed_decodes_from_conductor_msgpack_wire() {
+        use holochain_types::prelude::{ActionHash, AgentPubKey, EntryHash};
+
+        let action_hash = ActionHash::from_raw_36(vec![0x11; 36]);
+        let entry_hash = EntryHash::from_raw_36(vec![0x22; 36]);
+        let author = AgentPubKey::from_raw_36(vec![0x33; 36]);
+
+        let dna_signal = DnaImagodeiSignal::CollectiveCommitted {
+            action_hash: action_hash.clone(),
+            entry_hash,
+            collective: DnaCollective {
+                founder_agent_cid: "agent:uhCAkFounderPubKey0001".into(),
+                charter: r#"{"kind":"household","slugAlias":"family-dowell"}"#.into(),
+                display_name: "Dowell Family".into(),
+                created_at_block_height: 42,
+                salt: "deadbeefdeadbeefdeadbeefdeadbeef".into(),
+                anchor_agreement_cid: None,
+            },
+            author,
+        };
+
+        // emit_signal encodes via ExternIO == holochain_serialized_bytes ==
+        // rmp_serde::to_vec_named.
+        let wire = rmp_serde::to_vec_named(&dna_signal).expect("encode DNA signal");
+
+        let dns = try_decode_and_translate(&wire, None)
+            .expect("conductor msgpack wire format must decode and translate");
+        match dns {
+            DnaSignal::CollectiveProjected(sig) => {
+                // Normalized to holochain's canonical base64 ("u" + base64url-
+                // no-pad over the raw 39 bytes) — matches holo_hash Display.
+                assert_eq!(sig.action_hash, format!("{action_hash}"));
+                assert_eq!(
+                    sig.collective_cid,
+                    format!("collective:{action_hash}"),
+                    "collective_cid must be collective:{{canonical b64 action_hash}}"
+                );
+                assert_eq!(sig.display_name, "Dowell Family");
+                assert_eq!(sig.founder_agent_cid, "agent:uhCAkFounderPubKey0001");
+                assert_eq!(
+                    sig.charter.as_deref(),
+                    Some(r#"{"kind":"household","slugAlias":"family-dowell"}"#)
+                );
+            }
+            other => panic!("expected CollectiveProjected, got {other:?}"),
+        }
+    }
+
+    /// Companion root-cause test: `MembershipCommitted` from the REAL
+    /// conductor wire translates to `DnaSignal::MembershipProjected`.
+    #[test]
+    fn membership_committed_decodes_from_conductor_msgpack_wire() {
+        use holochain_types::prelude::{ActionHash, AgentPubKey, EntryHash};
+
+        let action_hash = ActionHash::from_raw_36(vec![0x44; 36]);
+        let entry_hash = EntryHash::from_raw_36(vec![0x55; 36]);
+        let author = AgentPubKey::from_raw_36(vec![0x66; 36]);
+
+        let dna_signal = DnaImagodeiSignal::MembershipCommitted {
+            action_hash: action_hash.clone(),
+            entry_hash,
+            membership: DnaMembership {
+                member_cid: "agent:uhCAkAlicePubKey0001".into(),
+                member_kind: "Person".into(),
+                collective_cid: "collective:uhCkkCollectiveActionHash0001".into(),
+                role: "Contributor".into(),
+                sponsor_cid: None,
+                joined_at_block_height: 43,
+                withdrawn_at_block_height: None,
+            },
+            author,
+        };
+
+        let wire = rmp_serde::to_vec_named(&dna_signal).expect("encode DNA signal");
+
+        let dns = try_decode_and_translate(&wire, None)
+            .expect("conductor msgpack wire format must decode and translate");
+        match dns {
+            DnaSignal::MembershipProjected(sig) => {
+                assert_eq!(sig.action_hash, format!("{action_hash}"));
+                assert_eq!(
+                    sig.collective_cid,
+                    "collective:uhCkkCollectiveActionHash0001"
+                );
+                assert_eq!(sig.member_cid, "agent:uhCAkAlicePubKey0001");
+                assert_eq!(sig.member_kind, "person");
+                assert_eq!(sig.role_context, "contributor");
+                assert!(sig.departed_at.is_none());
             }
             other => panic!("expected MembershipProjected, got {other:?}"),
         }

@@ -1242,6 +1242,17 @@ pub enum ImagodeiDnaSignal {
 // Holochain Timestamp fields (valid_from, valid_until) serialize as microseconds
 // i64 from the DNA side. We store them as `i64` and convert to DateTime<Utc> in
 // the translator.
+//
+// WIRE FORMAT (2026-08-22 collective-projection root cause): the conductor
+// encodes app signals as MessagePack (`ExternIO`), where the DNA-side
+// `ActionHash` / `EntryHash` / `AgentPubKey` fields serialize as raw 39-BYTE
+// ARRAYS — NOT base64 strings. The old mirror declared these fields `String`
+// (and the subscriber pre-decoded through `serde_json::Value`, which has no
+// byte-array representation), so every real `CollectiveCommitted` /
+// `MembershipCommitted` signal failed decode and was dropped at `debug!`
+// level. Identical class to the `InfrastructureSignal` (d33b0e1f5) and
+// `MishpatSignal` cures of 2026-06-12/13 — hash-bearing fields MUST be
+// `HoloHashB64`, and the decode MUST be a direct typed `rmp_serde` pass.
 
 /// Storage-side mirror of the `AgentPeerBinding` entry as it arrives in the
 /// `AgentPeerBindingCreated` signal payload.
@@ -1265,45 +1276,51 @@ pub struct AgentPeerBindingPayload {
     // superseded_by is extracted by translate_imagodei.
     #[serde(default)]
     pub signature: Vec<u8>,
+    /// `Option<ActionHash>` on the DNA side — raw 39-byte array on the
+    /// conductor wire when present, so it MUST be `HoloHashB64` (a
+    /// `serde_json::Value` here cannot represent msgpack bytes and would
+    /// fail the whole variant decode whenever a binding supersedes another).
     #[serde(default)]
-    pub superseded_by: Option<serde_json::Value>,
+    pub superseded_by: Option<HoloHashB64>,
 }
 
 /// Storage-side mirror of the imagodei DNA `ImagodeiSignal` enum.
 ///
 /// The DNA side uses `#[serde(tag = "type", content = "payload")]`. This mirror
-/// uses the same structure. Only `AgentPeerBindingCreated` is consumed by
-/// `HolochainAppSignalStream`; other variants are decoded and silently skipped.
+/// uses the same structure. Only `AgentPeerBindingCreated`,
+/// `CollectiveCommitted`, `MembershipCommitted`, and
+/// `HostedAgentBindingCreated` are consumed by `HolochainAppSignalStream`;
+/// other variants are decoded and silently skipped.
 ///
-/// `action_hash` in each variant is an `ActionHash` on the DNA side, which
-/// serializes as a base64 `String` over the app-signal wire.
+/// `action_hash` / `entry_hash` / `author` are `ActionHash` / `EntryHash` /
+/// `AgentPubKey` on the DNA side — raw 39-byte arrays on the conductor
+/// msgpack wire — so every one of them is mirrored as `HoloHashB64`
+/// (normalizes bytes OR base64 strings; JSON-context fixtures keep working).
+///
+/// The unconsumed `*Committed` variants deliberately mirror ONLY
+/// `action_hash`: serde ignores unknown fields in struct variants, so the
+/// entry payload (which carries further byte-array hashes) is skipped via
+/// `IgnoredAny` internally — a flattened `serde_json::Value` here would
+/// choke on those bytes and misclassify the variant as a decode miss.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "payload")]
 pub enum ImagodeiSignal {
     HumanCommitted {
-        action_hash: String,
-        // remaining fields unused — not decoded
-        #[serde(flatten)]
-        _rest: serde_json::Value,
+        action_hash: HoloHashB64,
+        // remaining fields unused — ignored by serde
     },
     AgentCommitted {
-        action_hash: String,
-        #[serde(flatten)]
-        _rest: serde_json::Value,
+        action_hash: HoloHashB64,
     },
     RelationshipCommitted {
-        action_hash: String,
-        #[serde(flatten)]
-        _rest: serde_json::Value,
+        action_hash: HoloHashB64,
     },
     AttestationCommitted {
-        action_hash: String,
-        #[serde(flatten)]
-        _rest: serde_json::Value,
+        action_hash: HoloHashB64,
     },
     /// Consumed by `HolochainAppSignalStream` → `DnaSignal::AgentPeerBinding`.
     AgentPeerBindingCreated {
-        action_hash: String,
+        action_hash: HoloHashB64,
         binding: AgentPeerBindingPayload,
     },
     /// Emitted by the imagodei coordinator `post_commit` when a `Collective`
@@ -1317,10 +1334,10 @@ pub enum ImagodeiSignal {
     /// `MembershipCommitted` in the same batch so the storage projector can
     /// upsert the Collective row before its memberships arrive.
     CollectiveCommitted {
-        action_hash: String,
-        entry_hash: String,
+        action_hash: HoloHashB64,
+        entry_hash: HoloHashB64,
         collective: CollectivePayload,
-        author: String,
+        author: HoloHashB64,
     },
     /// Emitted by the imagodei coordinator `post_commit` when a `Membership`
     /// entry is committed (Wave 2 T4 — prioritizer epic).
@@ -1329,10 +1346,10 @@ pub enum ImagodeiSignal {
     /// `ReconcileController::on_membership_projected` → upsert
     /// `collective_participations` keyed by `dht_anchor_hash = action_hash`.
     MembershipCommitted {
-        action_hash: String,
-        entry_hash: String,
+        action_hash: HoloHashB64,
+        entry_hash: HoloHashB64,
         membership: MembershipPayload,
-        author: String,
+        author: HoloHashB64,
     },
     /// Emitted by the imagodei coordinator `create_hosted_agent_binding`
     /// (doorway-federation-failover T2.2).
@@ -1345,14 +1362,29 @@ pub enum ImagodeiSignal {
     /// The payload is flat because the binding is a Category-A2 LINK — there is
     /// no entry struct to mirror; the whole payload rides the link tag.
     HostedAgentBindingCreated {
-        action_hash: String,
-        agent_pub_key: String,
+        action_hash: HoloHashB64,
+        agent_pub_key: HoloHashB64,
         doorway_id: String,
         doorway_url: String,
         installed_app_id: String,
         bound_at_micros: i64,
     },
 }
+
+/// Mirror-variant names for `ImagodeiSignal`: a decode failure on one of
+/// these tags is a REAL projection miss (loud); any other tag is a foreign
+/// signal sharing the app interface (quiet). Same classification pattern as
+/// `INFRA_MIRROR_VARIANTS` / `MISHPAT_MIRROR_VARIANTS`.
+pub const IMAGODEI_MIRROR_VARIANTS: &[&str] = &[
+    "HumanCommitted",
+    "AgentCommitted",
+    "RelationshipCommitted",
+    "AttestationCommitted",
+    "AgentPeerBindingCreated",
+    "CollectiveCommitted",
+    "MembershipCommitted",
+    "HostedAgentBindingCreated",
+];
 
 // =============================================================================
 // CollectivePayload / MembershipPayload
