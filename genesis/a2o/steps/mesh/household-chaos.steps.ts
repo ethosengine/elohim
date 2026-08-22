@@ -42,7 +42,7 @@
  */
 
 import { strict as assert } from 'node:assert';
-import { execFile, execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { copyFile, mkdir, readdir, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
@@ -66,6 +66,10 @@ import {
   requireFixturePrimaryStorageUrl,
   requireFixtureStoragePeer,
 } from '../../src/framework/fixtures/household-mesh.js';
+import {
+  discoverStoragePeerPid,
+  writeRestartCapture,
+} from '../../src/framework/fixtures/process-control.js';
 import {
   destructiveAllowed,
   DESTRUCTIVE_HELD_HINT,
@@ -114,6 +118,26 @@ interface PeerHandle {
   url: string;
   /** Transport cid as this peer reports it on /p2p/status. Measured lazily. */
   peerId?: string;
+  /** Holochain agent key from the household fixture (stamped by hc-mesh.sh). */
+  agentPubKey?: string;
+}
+
+/**
+ * Does a custody commitment's `provider` name this peer? Commitments carry the
+ * Holochain agent key (seed-commitments resolves `/auth/me`), `/p2p/status`
+ * reports the libp2p transport id, and reconcile/custody.rs matches either —
+ * so must the drill. 2026-08-22: every chaos-peer-churn custody assertion red
+ * on "no commitment names matthew (12D3Koo…)" while matthew's agent key was
+ * right there on the row.
+ */
+function providerNamesPeer(provider: string, peer: PeerHandle): boolean {
+  return (
+    provider === peer.peerId || (peer.agentPubKey !== undefined && provider === peer.agentPubKey)
+  );
+}
+
+function peerIdentities(peer: PeerHandle): string {
+  return [peer.peerId, peer.agentPubKey].filter(Boolean).join(' | ') || 'unmeasured';
 }
 
 interface CustodyCredit {
@@ -168,10 +192,14 @@ function drill(world: E2EWorld): DrillState {
   if (existing) return existing;
 
   const manifest = fixture();
-  const peers = HOUSEHOLD_PEERS.map(name => ({
-    name,
-    url: requireFixtureStoragePeer(manifest, name).url,
-  }));
+  const peers: PeerHandle[] = HOUSEHOLD_PEERS.map(name => {
+    const entry = requireFixtureStoragePeer(manifest, name) as { agentPubKey?: string };
+    return {
+      name,
+      url: requireFixtureStoragePeer(manifest, name).url,
+      agentPubKey: entry.agentPubKey,
+    };
+  });
   const floor = manifest.connectedPeersFloor ?? peers.length - 1;
   assert.ok(
     Number.isInteger(floor) && floor >= 0,
@@ -275,24 +303,6 @@ function holdDestructive(description: string): 'skipped' | undefined {
  * `pgrep -f` pattern, which also matches the runner's own shell and self-kills
  * the run. More than one match is refused rather than guessed.
  */
-function discoverPeerPid(port: string): number | undefined {
-  const listing = execFileSync('/usr/bin/ps', ['-eo', 'pid=,args='], { encoding: 'utf8' });
-  const matches: number[] = [];
-  for (const line of listing.split('\n')) {
-    const trimmed = line.trim();
-    const split = trimmed.indexOf(' ');
-    if (split < 0) continue;
-    const candidate = Number(trimmed.slice(0, split));
-    const argv = trimmed.slice(split + 1).split(/\s+/);
-    if (!argv.some(arg => arg.includes('elohim-storage'))) continue;
-    if (!argv.some((arg, index) => arg === '--http-port' && argv[index + 1] === port)) continue;
-    if (candidate > 1 && candidate !== process.pid && candidate !== process.ppid) {
-      matches.push(candidate);
-    }
-  }
-  return matches.length === 1 ? matches[0] : undefined;
-}
-
 async function verifiedPeerPid(name: HouseholdPeerName): Promise<number> {
   const manifest = fixture();
   let pid = requireFixturePeerPid(manifest, name);
@@ -308,7 +318,7 @@ async function verifiedPeerPid(name: HouseholdPeerName): Promise<number> {
     // Re-derive from the process table rather than red on a bookkeeping fact,
     // and say out loud that it happened so a genuinely absent peer still reads
     // as absent rather than as a lookup that quietly found something.
-    const rediscovered = discoverPeerPid(port);
+    const rediscovered = discoverStoragePeerPid(port);
     assert.ok(
       rediscovered,
       `household fixture names pid ${pid} for peer "${name}", /proc/${pid} is gone, and no single ` +
@@ -368,6 +378,18 @@ function peerLogPath(name: HouseholdPeerName): string {
   return peer.logPath;
 }
 
+/** Persist environ + exe where `hc-mesh.sh storage-restart` looks, or refuse to kill. */
+function captureForRestart(name: HouseholdPeerName, pid: number): void {
+  try {
+    writeRestartCapture(path.join(MESH_DIR, 'storage-restart'), name, pid);
+  } catch (error) {
+    assert.fail(
+      `refusing to kill household peer "${name}" (pid ${pid}): could not capture its environment ` +
+        `for restart (${String(error)}) — it would not come back`
+    );
+  }
+}
+
 /**
  * Kill ONE peer by its exact fixture pid, after preserving the environment
  * hc-mesh.sh needs to bring it back. Never a pattern match.
@@ -377,18 +399,11 @@ async function killPeer(state: DrillState, name: HouseholdPeerName): Promise<voi
   const pid = await verifiedPeerPid(name);
 
   // hc-mesh.sh restart_storage recovers a dead peer from the last capture in
-  // $MESH_DIR/storage-restart/<name>.environ. Capture it while /proc still
-  // exists, or a killed peer becomes unrestartable.
-  const workdir = path.join(MESH_DIR, 'storage-restart');
-  await mkdir(workdir, { recursive: true });
-  try {
-    await copyFile(`/proc/${pid}/environ`, path.join(workdir, `${name}.environ`));
-  } catch (error) {
-    assert.fail(
-      `refusing to kill household peer "${name}" (pid ${pid}): could not capture its environment ` +
-        `for restart (${String(error)}) — it would not come back`
-    );
-  }
+  // $MESH_DIR/storage-restart/<name>.{environ,exe}. Capture it while /proc still
+  // exists, or a killed peer becomes unrestartable. (Read to EOF, never
+  // copyFile: procfs reports st_size 0 and copyFile writes an empty capture —
+  // the 2026-08-22 cascade.)
+  captureForRestart(name, pid);
 
   process.kill(pid, 'SIGKILL');
   state.down.add(name);
@@ -400,13 +415,11 @@ async function killPeersTogether(
 ): Promise<void> {
   // Capture every environ first, then fire the signals back-to-back so the
   // losses really are simultaneous rather than serialised behind file IO.
-  const workdir = path.join(MESH_DIR, 'storage-restart');
-  await mkdir(workdir, { recursive: true });
   const pids: { name: HouseholdPeerName; pid: number }[] = [];
   for (const name of names) {
     if (state.down.has(name)) continue;
     const pid = await verifiedPeerPid(name);
-    await copyFile(`/proc/${pid}/environ`, path.join(workdir, `${name}.environ`));
+    captureForRestart(name, pid);
     pids.push({ name, pid });
   }
   for (const { name, pid } of pids) {
@@ -419,10 +432,32 @@ async function killPeersTogether(
 async function restartPeers(state: DrillState, names: readonly HouseholdPeerName[]): Promise<void> {
   const targets = names.filter(name => state.down.has(name));
   if (targets.length === 0) return;
-  await execFileAsync('bash', [HC_MESH_SH, 'storage-restart', ...targets], {
-    timeout: 240_000,
-    maxBuffer: 8 * 1024 * 1024,
-  });
+  let output = '';
+  try {
+    const result = await execFileAsync('bash', [HC_MESH_SH, 'storage-restart', ...targets], {
+      timeout: 240_000,
+      maxBuffer: 8 * 1024 * 1024,
+    });
+    output = `${result.stdout}${result.stderr}`;
+  } catch (error) {
+    const failed = error as { stdout?: string; stderr?: string };
+    assert.fail(
+      `hc-mesh.sh storage-restart ${targets.join(' ')} failed (${String(error)}):\n` +
+        `${failed.stdout ?? ''}${failed.stderr ?? ''}`.trim().split('\n').slice(-20).join('\n')
+    );
+  }
+  // The script's own wait is the budget; this is the drill's proof, by PORT,
+  // never by a remembered pid: a peer the script reports restarted must answer.
+  for (const name of targets) {
+    const url = requireFixtureStoragePeer(fixture(), name).url;
+    const { status } = await getRaw(`${url}/health`);
+    assert.strictEqual(
+      status,
+      200,
+      `household peer "${name}" did not come back after storage-restart (GET ${url}/health → ` +
+        `${status}). Script output:\n${output.trim().split('\n').slice(-20).join('\n')}`
+    );
+  }
   for (const name of targets) state.down.delete(name);
 }
 
@@ -944,8 +979,8 @@ async function assertUnderCustody(
   let holding = 0;
   for (const peer of state.peers) {
     assert.ok(
-      peer.peerId && providers.has(peer.peerId),
-      `no custody-blob commitment names ${peer.name} (${peer.peerId ?? 'unmeasured'}) as ` +
+      [...providers].some(provider => providerNamesPeer(provider, peer)),
+      `no custody-blob commitment names ${peer.name} (${peerIdentities(peer)}) as ` +
         `provider for ${hash} — providers on record: ${[...providers].join(', ') || 'none'}`
     );
     assert.ok(
@@ -1097,16 +1132,15 @@ Then(
     await measurePeerIds(state);
     for (const peer of state.peers) {
       const credits = creditsFor(await custodyCredits(peer.url), hash);
-      const perProvider = new Map<string, number>();
-      for (const credit of credits) {
-        perProvider.set(credit.provider, (perProvider.get(credit.provider) ?? 0) + 1);
-      }
       for (const household of state.peers) {
+        const copies = credits.filter(credit =>
+          providerNamesPeer(credit.provider, household)
+        ).length;
         assert.equal(
-          perProvider.get(household.peerId ?? '') ?? 0,
+          copies,
           1,
-          `${peer.name} records ${perProvider.get(household.peerId ?? '') ?? 0} custody copies of ` +
-            `${hash} for ${household.name}; churn must be idempotent — exactly one`
+          `${peer.name} records ${copies} custody copies of ${hash} for ${household.name}; ` +
+            'churn must be idempotent — exactly one'
         );
       }
     }
@@ -1124,9 +1158,8 @@ Then(
       'no settled custody record was captured — run the settled-record Given first'
     );
     await measurePeerIds(state);
-    const byPeerId = new Map(state.peers.map(peer => [peer.peerId ?? '', peer.name]));
     for (const record of settled) {
-      const name = byPeerId.get(record.provider);
+      const name = state.peers.find(peer => providerNamesPeer(record.provider, peer))?.name;
       if (!name) continue; // custodian outside this household — not ours to assert about
       assert.ok(
         await localBlobPresent(name, record.blobHash),
@@ -1517,8 +1550,8 @@ Given(
     await peerStatus(jessica);
     const credits = creditsFor(await custodyCredits(jessica.url), hash);
     assert.ok(
-      credits.some(credit => credit.provider === jessica.peerId),
-      `no custody-blob commitment names Jessica (${jessica.peerId ?? 'unmeasured'}) as provider ` +
+      credits.some(credit => providerNamesPeer(credit.provider, jessica)),
+      `no custody-blob commitment names Jessica (${peerIdentities(jessica)}) as provider ` +
         `for ${hash} — recovery has no promise to act on. Providers on record: ` +
         `${[...new Set(credits.map(c => c.provider))].join(', ') || 'none'}`
     );

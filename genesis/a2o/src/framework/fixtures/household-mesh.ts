@@ -28,6 +28,14 @@ export interface StoragePeerFixture {
   url?: string;
   pid?: number;
   pidFile?: string;
+  /**
+   * The peer's Holochain agent key (`uhCAk…`), stamped by `hc-mesh.sh`
+   * (`refresh_fixture_pids`) from the running process's AGENT_PUBKEY. Custody
+   * commitments name providers in THIS namespace (seed-commitments resolves
+   * `/auth/me`), while `/p2p/status` reports the libp2p transport id — a drill
+   * matching a provider must accept either (reconcile/custody.rs contract).
+   */
+  agentPubKey?: string;
 }
 
 export interface HouseholdMeshFixture {

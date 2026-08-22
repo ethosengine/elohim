@@ -57,8 +57,6 @@
  */
 
 import { strict as assert } from 'node:assert';
-import { execFileSync, spawn } from 'node:child_process';
-import { openSync, readFileSync, realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 
 import { Given, Then, When } from '@cucumber/cucumber';
@@ -78,6 +76,7 @@ import {
   requireFixtureStoragePeer,
   type HouseholdMeshFixture,
 } from '../../src/framework/fixtures/household-mesh.js';
+import { doorwayPidForPort, reexecProcess } from '../../src/framework/fixtures/process-control.js';
 import {
   destructiveAllowed,
   DESTRUCTIVE_HELD_HINT,
@@ -251,58 +250,12 @@ function skipHeldDestructive(reason: string): 'skipped' {
 
 // ---------------------------------------------------------------------------
 // Doorway restart — a re-exec of the SAME process (argv/env/cwd read back out
-// of /proc before the kill, replayed after), the sanctioned technique landed
-// in steps/delivery/substrate-rea-replication.steps.ts's
-// "doorway {string}'s pod is restarted" step. That file's helpers
-// (doorwayPidForPort, readNulList, waitForDoorwayHealthy) are module-private
-// (no `export`), so this is a parallel local implementation of the identical
-// technique — not an import — kept in lockstep by citing that file's line
-// numbers rather than copy-pasting blind. The pid is found by an EXACT argv
-// match on the listen port, refusing on zero OR more than one match: a drill
-// that guesses which of two candidates to kill is a drill that eventually
-// kills the wrong thing.
+// of /proc before the kill, replayed after). The technique lives ONCE in
+// src/framework/fixtures/process-control.ts (doorwayPidForPort, reexecProcess),
+// shared with steps/delivery/substrate-rea-replication.steps.ts's
+// "doorway {string}'s pod is restarted" step. The pid is found by an EXACT
+// argv match on the listen port, refusing on zero OR more than one match.
 // ---------------------------------------------------------------------------
-
-function readNulSeparatedProcFile(path: string): string[] {
-  return readFileSync(path, 'utf8').split('\0').filter(Boolean);
-}
-
-function doorwayPidForPort(port: string): number {
-  // Absolute path: the pid this returns is about to be signalled, so the
-  // binary that produced it must not be resolvable through a writable PATH.
-  const listing = execFileSync('/usr/bin/ps', ['-eo', 'pid=,args='], { encoding: 'utf8' });
-  const matches: number[] = [];
-  for (const line of listing.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    const split = trimmed.indexOf(' ');
-    if (split < 0) continue;
-    const pid = Number(trimmed.slice(0, split));
-    const args = trimmed.slice(split + 1);
-    const argv = args.split(/\s+/);
-    const isDoorway = argv[0]?.endsWith('/doorway') || argv[0] === 'doorway';
-    if (!isDoorway) continue;
-    const listenIdx = argv.indexOf('--listen');
-    if (listenIdx < 0) continue;
-    const listen = argv[listenIdx + 1] ?? '';
-    if (listen.endsWith(`:${port}`)) matches.push(pid);
-  }
-  assert.ok(
-    matches.length > 0,
-    `no doorway process is listening on port ${port} — nothing to restart`
-  );
-  assert.equal(
-    matches.length,
-    1,
-    `${matches.length} doorway processes claim port ${port} (pids ${matches.join(', ')}) — refusing to guess`
-  );
-  const pid = matches[0];
-  assert.ok(
-    pid > 1 && pid !== process.pid && pid !== process.ppid,
-    `refusing to signal pid ${pid}: it is this test run or its parent`
-  );
-  return pid;
-}
 
 async function waitForDoorwayHealthy(url: string, budgetMs: number): Promise<void> {
   const deadline = Date.now() + budgetMs;
@@ -338,37 +291,10 @@ async function restartDoorwayAlpha(world: E2EWorld): Promise<void> {
   const port = new URL(url).port || '80';
   const pid = doorwayPidForPort(port);
 
-  const argv = readNulSeparatedProcFile(`/proc/${pid}/cmdline`);
-  const env: Record<string, string> = {};
-  for (const entry of readNulSeparatedProcFile(`/proc/${pid}/environ`)) {
-    const eq = entry.indexOf('=');
-    if (eq > 0) env[entry.slice(0, eq)] = entry.slice(eq + 1);
-  }
-  const cwd = realpathSync(`/proc/${pid}/cwd`);
-  const [command, ...args] = argv;
-  assert.ok(command, `could not read argv for doorway pid ${pid}`);
-
-  process.kill(pid, 'SIGTERM');
-  const graceDeadline = Date.now() + DOORWAY_RESTART_GRACE_MS;
-  while (Date.now() < graceDeadline) {
-    try {
-      process.kill(pid, 0);
-    } catch {
-      break;
-    }
-    await sleep(250);
-  }
-  try {
-    process.kill(pid, 0);
-    process.kill(pid, 'SIGKILL');
-  } catch {
-    // already gone — the graceful stop worked
-  }
-
-  const logPath = fixture().doorways?.['alpha']?.logPath;
-  const out = logPath ? openSync(logPath, 'a') : 'ignore';
-  const child = spawn(command, args, { cwd, env, detached: true, stdio: ['ignore', out, out] });
-  child.unref();
+  await reexecProcess(pid, {
+    graceMs: DOORWAY_RESTART_GRACE_MS,
+    logPath: fixture().doorways?.['alpha']?.logPath,
+  });
 
   await waitForDoorwayHealthy(url, DOORWAY_RESTART_HEALTH_BUDGET_MS);
   world.onCleanup(async () => {
