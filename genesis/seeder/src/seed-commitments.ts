@@ -182,8 +182,17 @@ export interface CapacityPledgeBody {
 // Body builder (testable in isolation)
 // =============================================================================
 
+/**
+ * Apply the legacy `sha256-` marker ONLY to bare 64-hex input. CID-form
+ * (`baf…`) and already-marked addresses pass through untouched: prefixing a
+ * CID-form blob hash mints a double-wrapped `sha256-<cid>` address that NO
+ * peer accepts — the responder's strict parse rejects it (T21) on every
+ * fetch retry forever, so the blob can never replicate (backlog
+ * blob-fetch-sha256-prefixed-cid-rejection; live rows minted by the
+ * pre-fix version of this exact function).
+ */
 function normalizeBlobHash(input: string): string {
-  return input.startsWith('sha256-') ? input : `sha256-${input}`;
+  return /^[0-9a-fA-F]{64}$/.test(input) ? `sha256-${input}` : input;
 }
 
 /** Resolved provider/receiver agent-CID pair for one custody commitment. */

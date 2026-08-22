@@ -7,10 +7,50 @@ title: "Blob pull requests double-wrap CID-form blob hashes as sha256-<cid>, so 
 slug: "blob-fetch-sha256-prefixed-cid-rejection"
 written: "2026-08-22"
 author: "orchestrator"
-status: "backlog"
+status: "fixed-pending-runtime-proof"
 priority: "high"
 severity: high
 ---
+
+## Fix (2026-08-22, branch fix/doorway-breaker-trial-theft-and-apps-extraction-herd)
+
+Root cause found: NOT a Rust fetch-path wrap. The double-wrapped marker was **minted at seed
+time** by `genesis/seeder/src/seed-commitments.ts` `normalizeBlobHash` (prefixed `sha256-`
+onto anything not already prefixed — including CID-form blob hashes), reached the drill
+custody pairs via `seed-drill-fixtures.ts` `resolveExistingSubject` (manifesto's
+`content.blob_hash` is the bare CID), and was notarized into `rea_commitments`
+`custody-blob` rows on all three household peers (`resource_classified_as =
+["sha256-bafkrei…"]`, verified in james's content.db). The T23 custody reconcile sweep then
+kicked that literal onto the wire every tick — the ~2min T21 rejection drumbeat.
+
+Landed:
+
+- **Seeder (constructor)**: `normalizeBlobHash` in `seed-commitments.ts` (+ the same inline
+  pattern in `blob-manager.ts`, `seed-sqlite.ts` ×2) now prefixes ONLY bare 64-hex; CID-form
+  and already-marked addresses pass through untouched.
+- **Rust requester hygiene** (`elohim-storage`): new `blob_fetch::normalize_fetch_address`
+  (bare hex → prefixed; `sha256-<hex>`/CID untouched; double-wrapped `sha256-<cid>`
+  REPAIRED to the inner CID; anything else refused) enforced at the `race_fetch` choke
+  point — a malformed address never reaches the wire (`FetchOutcome::InvalidAddress`,
+  terminal, WARN). `verify_blob_hash`/`manifest_hash_matches` are now CID-digest-aware.
+- **Retry hygiene (sweep driver)**: `reconcile_pass` normalizes markers before any fetch
+  decision — CID/double-wrapped markers are re-keyed to the canonical on-disk
+  `sha256-<hex>` key (so the presence check stops re-kicking once bytes land, and the
+  inventory join finds real holders); unrecognizable markers are counted
+  (`ReconcileOutcome::invalid_markers`, logged in the T23 pass line) and skipped — never
+  kicked. Responder stays strict (T21 unchanged).
+- Regression tests: `normalize_fetch_address_*` (all three forms + repair + garbage),
+  `verify_blob_hash_accepts_cid_form`,
+  `race_fetch_gives_up_on_invalid_address_without_wire_request`,
+  `double_wrapped_cid_marker_is_repaired_before_kick`,
+  `double_wrapped_cid_marker_stops_kicking_once_bytes_land`,
+  `invalid_marker_is_counted_and_never_kicked`.
+
+**Honest status**: code + tests landed on the branch; the live mesh still runs the old
+binary, so the drumbeat continues until the next binary roll. Runtime proof (the "done
+when" below — bytes replicate, T21 stops) waits for that roll. The three existing
+notarized `sha256-bafkrei…` rows stay in the DHT; the repaired requester now reads them
+as their canonical `sha256-<hex>` key, so no data healing is required for the fetch path.
 
 ## What was observed (live, local mesh 2026-08-22 ~02:30)
 

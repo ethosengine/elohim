@@ -230,7 +230,11 @@ pub async fn fetch_shards_via_swarm(
             }
             // A shard hash is never itself a composite — a Manifest reply
             // here means a misbehaving or confused peer; treat as a miss.
-            FetchOutcome::Manifest { .. } | FetchOutcome::Miss => {
+            // InvalidAddress: the manifest carried a shard hash that is not a
+            // valid content address (race_fetch refused to send it and
+            // already WARNed) — a corrupt manifest row, counted as failed so
+            // the composite is never served truncated.
+            FetchOutcome::Manifest { .. } | FetchOutcome::Miss | FetchOutcome::InvalidAddress => {
                 shards_failed += 1;
                 crate::metrics::inc_blob_swarm_shard_fetched("miss");
             }
@@ -374,7 +378,10 @@ pub async fn race_fetch_with_swarm(
                 },
             }
         }
-        FetchOutcome::Miss => SwarmRaceOutcome::Miss,
+        // Terminal miss: race_fetch refused to put a malformed content
+        // address on the wire (and WARNed with the address). No retry at
+        // this layer can succeed until the row carrying it is healed.
+        FetchOutcome::Miss | FetchOutcome::InvalidAddress => SwarmRaceOutcome::Miss,
         FetchOutcome::NoCandidates => SwarmRaceOutcome::NoCandidates,
     }
 }

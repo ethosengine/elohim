@@ -147,9 +147,12 @@ export class BlobManager {
     // Get existing blob hash (supports both camelCase from JSON and snake_case)
     const existingHash = content.blobHash || content.blobHash;
 
-    // Normalize hash format (ensure sha256- prefix)
+    // Normalize hash format: legacy sha256- prefix ONLY on bare hex — a
+    // CID-form hash (`baf…`) must pass through untouched, or it becomes the
+    // double-wrapped `sha256-<cid>` address no peer accepts (T21 rejection;
+    // backlog blob-fetch-sha256-prefixed-cid-rejection).
     const normalizedExistingHash = existingHash
-      ? (existingHash.startsWith('sha256-') ? existingHash : `sha256-${existingHash}`)
+      ? (/^[0-9a-fA-F]{64}$/.test(existingHash) ? `sha256-${existingHash}` : existingHash)
       : null;
 
     // Check if content already has a blob reference

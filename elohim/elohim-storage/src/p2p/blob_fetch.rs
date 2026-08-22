@@ -33,11 +33,13 @@ use crate::db::peer_blob_inventory::record_fetch_success;
 use crate::error::StorageError;
 use crate::sharding::ShardManifest;
 use chrono::Utc;
+use cid::Cid;
 use diesel::Connection;
 use diesel::RunQueryDsl;
 use diesel::SqliteConnection;
 use futures::stream::{FuturesUnordered, StreamExt};
 use sha2::{Digest, Sha256};
+use std::str::FromStr;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 
@@ -57,6 +59,77 @@ pub enum BlobFetchReply {
     /// No direct bytes, but the peer resolved a durable manifest for the
     /// hash. Boxed — see the size-note on `FetchOutcome::Manifest`.
     Manifest(Box<ShardManifest>),
+}
+
+/// The sha256 hex digest a content address names, for any recognizable form:
+///
+/// - CIDv1 (`bafkrei…` raw, `bafyrei…` dag-cbor — both carry a sha2-256
+///   multihash): the wrapped digest.
+/// - `sha256-<64 hex>` (canonical legacy marker): the hex part.
+/// - bare 64-hex: itself.
+/// - `sha256-<CID>` (the double-wrapped seed defect this module repairs —
+///   a CID-form blob hash wrapped in the legacy marker by an address
+///   constructor that assumed bare hex): the CID's wrapped digest.
+///
+/// Returns `None` for anything else (test fixtures like `"sha256-shardA"`,
+/// slugs, garbage) so callers can keep their legacy lenient comparison for
+/// non-address strings.
+pub fn content_address_hex(addr: &str) -> Option<String> {
+    // Hex forms FIRST: a bare 64-hex string starting with a multibase prefix
+    // character (`f` = base16, `b` = base32) could otherwise be misread as a
+    // CID by the parser. Mirrors `BlobStore::parse_content_address`'s intent
+    // with the precedence hardened for the hex-shaped majority.
+    let bare = addr.strip_prefix("sha256-").unwrap_or(addr);
+    if bare.len() == 64 && bare.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Some(bare.to_lowercase());
+    }
+    if let Ok(c) = Cid::from_str(addr) {
+        return Some(hex::encode(c.hash().digest()));
+    }
+    // Double-wrapped `sha256-<cid>`: recover the digest from the inner CID.
+    if bare != addr {
+        if let Ok(c) = Cid::from_str(bare) {
+            return Some(hex::encode(c.hash().digest()));
+        }
+    }
+    None
+}
+
+/// Build the outgoing wire address for a blob fetch from a stored blob-hash
+/// value, whatever form the row carries.
+///
+/// Contract (backlog `blob-fetch-sha256-prefixed-cid-rejection`):
+/// - CID-form (`baf…`) passes through untouched.
+/// - Already-marked `sha256-<64 hex>` passes through untouched.
+/// - Bare 64-hex gets the legacy `sha256-` prefix.
+/// - `sha256-<CID>` — the double-wrapped defect minted by seed-side
+///   `normalizeBlobHash` (`sha256-` prefixed onto a CID-form blob hash) —
+///   is REPAIRED to the inner CID rather than sent as-is: no responder
+///   accepts the double-wrapped form (T21 rejects it), so passing it
+///   through would re-create the infinite rejection drumbeat this fix
+///   removes.
+/// - Anything else is an error: a malformed address must never reach the
+///   wire, where the responder's strict parse would reject it on every
+///   retry forever.
+pub fn normalize_fetch_address(addr: &str) -> Result<String, StorageError> {
+    if let Some(bare) = addr.strip_prefix("sha256-") {
+        if bare.len() == 64 && bare.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Ok(addr.to_string());
+        }
+        if Cid::from_str(bare).is_ok() {
+            return Ok(bare.to_string());
+        }
+        return Err(StorageError::InvalidContentAddress(addr.to_string()));
+    }
+    // Bare hex BEFORE the CID parse: a 64-hex string starting with a multibase
+    // prefix character (`f`/`b`) must be read as hex, not as a CID.
+    if addr.len() == 64 && addr.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Ok(format!("sha256-{addr}"));
+    }
+    if Cid::from_str(addr).is_ok() {
+        return Ok(addr.to_string());
+    }
+    Err(StorageError::InvalidContentAddress(addr.to_string()))
 }
 
 /// Outcome of a race-fetch.
@@ -79,6 +152,13 @@ pub enum FetchOutcome {
     Miss,
     /// Inventory had no candidates to try (either empty or none connected).
     NoCandidates,
+    /// The requested address is not a valid content address in any accepted
+    /// form (`normalize_fetch_address` refused it). NO wire request was sent:
+    /// every responder would reject it (T21) on every retry forever, so the
+    /// only honest outcome is to give up immediately and say so. Callers must
+    /// treat this as terminal for the address — retrying cannot succeed until
+    /// the row that carries it is healed.
+    InvalidAddress,
 }
 
 /// Case-insensitive, prefix-tolerant match between a manifest's own
@@ -87,7 +167,13 @@ pub enum FetchOutcome {
 /// side and raw hex on the other still compare equal. A mismatch here means
 /// the peer answered for the wrong blob — never trust it.
 fn manifest_hash_matches(manifest: &ShardManifest, requested_hash: &str) -> bool {
-    let norm = |s: &str| s.strip_prefix("sha256-").unwrap_or(s).to_lowercase();
+    // Digest-aware first (CID vs `sha256-<hex>` vs bare hex all name the same
+    // digest), then the legacy lenient strip-and-lowercase for strings that
+    // are not content addresses at all (fixture/test values).
+    let norm = |s: &str| {
+        content_address_hex(s)
+            .unwrap_or_else(|| s.strip_prefix("sha256-").unwrap_or(s).to_lowercase())
+    };
     norm(&manifest.blob_hash) == norm(requested_hash)
 }
 
@@ -109,6 +195,26 @@ pub async fn race_fetch(
     parallelism: usize,
     per_peer_timeout: Duration,
 ) -> FetchOutcome {
+    // Requester-side address hygiene at the single choke point every
+    // `/elohim/blob/1.0.0` request funnels through: CID and `sha256-<hex>`
+    // forms pass untouched, bare hex gets the legacy marker, and the
+    // double-wrapped `sha256-<cid>` seed defect is repaired to the inner CID.
+    // A string that is no content address in any form never reaches the wire
+    // — the responder's strict T21 parse would reject it on every retry
+    // forever (the 2-minute drumbeat this guard removes).
+    let blob_hash: String = match normalize_fetch_address(blob_hash) {
+        Ok(addr) => addr,
+        Err(_) => {
+            tracing::warn!(
+                target: "elohim_storage::blob_fetch",
+                hash = %blob_hash,
+                "T21: refusing to fetch a malformed content address — no peer \
+                 can accept it; giving up (the row carrying it needs healing)"
+            );
+            return FetchOutcome::InvalidAddress;
+        }
+    };
+    let blob_hash = blob_hash.as_str();
     let connected: Vec<String> = candidates.into_iter().filter(|p| is_connected(p)).collect();
 
     if connected.is_empty() {
@@ -382,17 +488,24 @@ pub async fn finalize_quilt_draw(
 /// Verify that `bytes` has the sha256 hex digest matching `expected_hex`.
 /// Comparison is case-insensitive (both sides lowercased).
 ///
-/// Accepts both raw hex (`"a7ffc6f8..."`) and the canonical `"sha256-<hex>"`
-/// form used at the HTTP boundary. The `sha256-` prefix is stripped before
-/// comparison; without this, callers that normalize to the prefixed form
-/// (see `http.rs` `handle_get_blob`) would always see a hash mismatch and
-/// silently return `FetchOutcome::Miss`.
+/// Accepts raw hex (`"a7ffc6f8..."`), the canonical `"sha256-<hex>"` form
+/// used at the HTTP boundary, and CID-form addresses (`bafkrei…`/`bafyrei…`,
+/// whose multihash wraps the same sha2-256 digest). Without the prefix
+/// strip, callers that normalize to the prefixed form (see `http.rs`
+/// `handle_get_blob`) would always see a hash mismatch and silently return
+/// `FetchOutcome::Miss`; without the CID extraction, a fetch addressed by a
+/// CID-form blob hash could never verify its received bytes.
 pub fn verify_blob_hash(bytes: &[u8], expected_hex: &str) -> bool {
-    let hex_part = expected_hex.strip_prefix("sha256-").unwrap_or(expected_hex);
+    let expected = content_address_hex(expected_hex).unwrap_or_else(|| {
+        expected_hex
+            .strip_prefix("sha256-")
+            .unwrap_or(expected_hex)
+            .to_lowercase()
+    });
     let mut hasher = Sha256::new();
     hasher.update(bytes);
     let actual_hex = hex::encode(hasher.finalize());
-    actual_hex == hex_part.to_lowercase()
+    actual_hex == expected
 }
 
 /// Extract race-fetch parameters from the runtime `Config`.
@@ -432,6 +545,95 @@ mod tests {
         let (bytes, hex) = known_blob();
         let upper = hex.to_uppercase();
         assert!(verify_blob_hash(&bytes, &upper));
+    }
+
+    /// Backlog `blob-fetch-sha256-prefixed-cid-rejection` regression #1:
+    /// address construction for all three legitimate input forms. Bare hex
+    /// gets the legacy marker; already-marked and CID-form addresses pass
+    /// through untouched (the double-wrap `sha256-<cid>` was minted by a
+    /// constructor that prefixed unconditionally).
+    #[test]
+    fn normalize_fetch_address_bare_hex_gets_legacy_prefix() {
+        let (_, hex) = known_blob();
+        assert_eq!(
+            normalize_fetch_address(&hex).unwrap(),
+            format!("sha256-{hex}")
+        );
+    }
+
+    #[test]
+    fn normalize_fetch_address_already_marked_passes_through() {
+        let (_, hex) = known_blob();
+        let marked = format!("sha256-{hex}");
+        assert_eq!(normalize_fetch_address(&marked).unwrap(), marked);
+    }
+
+    #[test]
+    fn normalize_fetch_address_cid_passes_through() {
+        let cid = BlobStore::compute_cid(b"hello world").to_string();
+        assert!(cid.starts_with("baf"), "raw-codec CIDv1 is base32 baf…");
+        assert_eq!(normalize_fetch_address(&cid).unwrap(), cid);
+    }
+
+    /// The live defect: a CIDv1 double-wrapped in the legacy `sha256-` marker
+    /// (james's mesh logged `hash="sha256-bafkrei…"` rejected by every peer at
+    /// ~2min cadence). The constructor must REPAIR it to the inner CID — the
+    /// form responders accept — never emit it as-is.
+    #[test]
+    fn normalize_fetch_address_repairs_double_wrapped_cid() {
+        let cid = BlobStore::compute_cid(b"hello world").to_string();
+        let double_wrapped = format!("sha256-{cid}");
+        assert_eq!(normalize_fetch_address(&double_wrapped).unwrap(), cid);
+    }
+
+    #[test]
+    fn normalize_fetch_address_rejects_garbage() {
+        assert!(normalize_fetch_address("not-an-address").is_err());
+        assert!(normalize_fetch_address("sha256-not-hex-not-cid").is_err());
+        assert!(normalize_fetch_address("").is_err());
+    }
+
+    /// A CID-form expected address must verify against the bytes it wraps —
+    /// the CID's multihash IS the sha2-256 digest of the bytes. Without this,
+    /// a fetch addressed by CID could receive correct bytes and still report
+    /// a mismatch (silent `FetchOutcome::Miss`).
+    #[test]
+    fn verify_blob_hash_accepts_cid_form() {
+        let (bytes, _) = known_blob();
+        let cid = BlobStore::compute_cid(&bytes).to_string();
+        assert!(verify_blob_hash(&bytes, &cid));
+        // And the repaired double-wrap resolves to the same digest.
+        assert!(verify_blob_hash(&bytes, &format!("sha256-{cid}")));
+    }
+
+    /// Retry hygiene at the wire choke point: a malformed address never
+    /// produces a `P2PCommand::FetchBlob` — `race_fetch` gives up immediately
+    /// with `InvalidAddress` (an honest terminal outcome) instead of letting
+    /// every responder reject the request forever.
+    #[tokio::test]
+    async fn race_fetch_gives_up_on_invalid_address_without_wire_request() {
+        let peer = test_peer_id();
+        let (cmd_tx, mut cmd_rx) = mpsc::channel::<crate::p2p::P2PCommand>(4);
+
+        let outcome = race_fetch(
+            "sha256-definitely-not-a-content-address",
+            vec![peer.to_string()],
+            &cmd_tx,
+            |_| true,
+            1,
+            Duration::from_secs(1),
+        )
+        .await;
+
+        assert!(
+            matches!(outcome, FetchOutcome::InvalidAddress),
+            "expected InvalidAddress, got {outcome:?}"
+        );
+        drop(cmd_tx);
+        assert!(
+            cmd_rx.recv().await.is_none(),
+            "no wire request may be sent for a malformed address"
+        );
     }
 
     /// T19 review Fix #1 regression: the call site in `http.rs::race_fetch`
@@ -811,7 +1013,9 @@ mod tests {
     #[tokio::test]
     async fn race_fetch_accepts_matching_manifest_reply() {
         let peer = test_peer_id();
-        let hash = "sha256-composite-target".to_string();
+        // A real canonical address: race_fetch now validates the requested
+        // address before putting it on the wire.
+        let hash = format!("sha256-{}", "a".repeat(64));
         let manifest = fixture_manifest(&hash);
         let manifest_for_responder = manifest.clone();
 
@@ -855,8 +1059,10 @@ mod tests {
     #[tokio::test]
     async fn race_fetch_rejects_manifest_hash_mismatch() {
         let peer = test_peer_id();
-        let requested_hash = "sha256-composite-target".to_string();
-        let wrong_manifest = fixture_manifest("sha256-a-totally-different-blob");
+        // Real canonical addresses: race_fetch now validates the requested
+        // address before putting it on the wire.
+        let requested_hash = format!("sha256-{}", "a".repeat(64));
+        let wrong_manifest = fixture_manifest(&format!("sha256-{}", "b".repeat(64)));
 
         let (cmd_tx, mut cmd_rx) = mpsc::channel::<crate::p2p::P2PCommand>(4);
         let responder = tokio::spawn(async move {

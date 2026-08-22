@@ -360,8 +360,11 @@ async function blobExists(hash: string): Promise<boolean> {
 function findHtml5AppBlob(concept: ConceptJson, contentDir: string): { data: Buffer; hash: string } | null {
   // Get existing hash (supports both camelCase and snake_case)
   const existingHash = concept.blobHash || concept.blobHash;
+  // Legacy sha256- prefix ONLY on bare hex — CID-form (`baf…`) passes through
+  // untouched (double-wrapping mints an address no peer accepts; backlog
+  // blob-fetch-sha256-prefixed-cid-rejection).
   const normalizedHash = existingHash
-    ? (existingHash.startsWith('sha256-') ? existingHash : `sha256-${existingHash}`)
+    ? (/^[0-9a-fA-F]{64}$/.test(existingHash) ? `sha256-${existingHash}` : existingHash)
     : null;
 
   // Check metadata.localZipPath first
@@ -1183,7 +1186,8 @@ async function main() {
         // Check if there's a hash reference we should verify
         const existingHash = app.blobHash || app.blob_hash;
         if (existingHash) {
-          const normalizedHash = existingHash.startsWith('sha256-') ? existingHash : `sha256-${existingHash}`;
+          // Legacy sha256- prefix ONLY on bare hex — never double-wrap a CID.
+          const normalizedHash = /^[0-9a-fA-F]{64}$/.test(existingHash) ? `sha256-${existingHash}` : existingHash;
           const exists = await blobExists(normalizedHash);
           if (!exists) {
             console.warn(`   ⚠️ ${app.id}: blob_hash exists but blob not found in storage`);

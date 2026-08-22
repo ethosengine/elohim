@@ -267,6 +267,20 @@ impl FetchKicker for RaceFetchKicker {
                         "T23: race-fetch found no connected candidates"
                     );
                 }
+                // Terminal for this address: race_fetch refused to put a
+                // malformed content address on the wire (and already logged
+                // it at WARN). reconcile_pass normalizes markers before
+                // kicking, so reaching this arm means a caller bypassed that
+                // hygiene — do not retry; the row carrying the address needs
+                // healing.
+                FetchOutcome::InvalidAddress => {
+                    warn!(
+                        target: "elohim_storage::reconcile",
+                        hash = %hash_owned,
+                        "T23: kicked address is not a valid content address; \
+                         giving up (no retry can succeed)"
+                    );
+                }
             }
         });
     }

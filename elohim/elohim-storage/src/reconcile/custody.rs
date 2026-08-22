@@ -99,6 +99,13 @@ pub struct ReconcileOutcome {
     pub fallback_kicks: u32,
     pub placement_gaps_emitted: u32,
     pub commitments_examined: u32,
+    /// Commitments whose blob marker is not a valid content address in ANY
+    /// accepted form (`blob_fetch::normalize_fetch_address` refused it).
+    /// These are skipped WITHOUT a fetch kick: no responder can accept the
+    /// address, so retrying every sweep tick would drum the wire forever
+    /// (the T21 rejection drumbeat). The count is the honest failure record
+    /// — a non-zero value means rows need healing, not more retries.
+    pub invalid_markers: u32,
 }
 
 /// Timing parameters for a reconcile pass.
@@ -185,8 +192,51 @@ pub fn reconcile_pass(
         // list's primary element. Reading the raw column directly was
         // latent-buggy on array-wrapped `["sha256-…"]` rows (U1, 2026-06-19) —
         // route through the accessor so both bare and list forms resolve.
-        let Some(blob_hash) = commitment.primary_classification() else {
+        let Some(raw_marker) = commitment.primary_classification() else {
             continue;
+        };
+
+        // Address hygiene BEFORE any fetch decision. Markers arrive in three
+        // legitimate forms (bare hex, `sha256-<hex>`, CID) plus one known
+        // defect: seed-side normalizeBlobHash double-wrapped CID-form blob
+        // hashes as `sha256-<cid>` (backlog
+        // blob-fetch-sha256-prefixed-cid-rejection) — those rows made every
+        // sweep tick kick a wire request no responder accepts (T21 rejection,
+        // ~2min drumbeat, no give-up). normalize_fetch_address repairs the
+        // double-wrap and refuses anything unrecognizable, so a malformed row
+        // is counted + skipped instead of drummed.
+        if crate::p2p::blob_fetch::normalize_fetch_address(&raw_marker).is_err() {
+            outcome.invalid_markers += 1;
+            tracing::warn!(
+                target: "elohim_storage::reconcile",
+                commitment_id = %commitment.id,
+                marker = %raw_marker,
+                "T23: custody-blob marker is not a valid content address in any \
+                 form; skipping (no fetch kick — the row needs healing, retries \
+                 cannot succeed)"
+            );
+            continue;
+        }
+        // Hex-form markers (bare hex or `sha256-<hex>`) keep their exact
+        // stored spelling — they were always wire-acceptable and are the form
+        // the local snapshot + gossip inventory speak. CID-form and repaired
+        // double-wrapped markers are RE-KEYED to the canonical on-disk key
+        // (`sha256-<wrapped digest hex>`): that is what the blob store files
+        // bytes under and what inventory advertises, so the presence check
+        // stops re-kicking once the bytes land instead of drumming forever.
+        let is_hex_form = {
+            let bare = raw_marker.strip_prefix("sha256-").unwrap_or(&raw_marker);
+            bare.len() == 64 && bare.chars().all(|c| c.is_ascii_hexdigit())
+        };
+        let blob_hash = if is_hex_form {
+            raw_marker
+        } else {
+            match crate::p2p::blob_fetch::content_address_hex(&raw_marker) {
+                Some(hex) => format!("sha256-{hex}"),
+                // Unreachable given normalize_fetch_address succeeded, but
+                // never panic a sweep on it.
+                None => raw_marker,
+            }
         };
 
         if is_self(&commitment.provider) {
@@ -1142,6 +1192,132 @@ mod tests {
 
         assert_eq!(outcome.kicks_fired, 1, "bare custody row still resolves");
         assert_eq!(kicker.kicks.lock().unwrap()[0].0, blob_hash);
+    }
+
+    /// Backlog `blob-fetch-sha256-prefixed-cid-rejection`: a custody row whose
+    /// marker is a CIDv1 double-wrapped in the legacy `sha256-` prefix (the
+    /// seed-side normalizeBlobHash defect) must be REPAIRED and re-keyed to
+    /// the canonical on-disk form (`sha256-<wrapped digest hex>`) before any
+    /// fetch decision — the kick goes out under an address peers accept and
+    /// inventory actually advertises, never the double-wrapped literal that
+    /// every responder rejects (T21) on a ~2min drumbeat.
+    #[test]
+    fn double_wrapped_cid_marker_is_repaired_before_kick() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        let bytes = b"evolution-of-trust-bundle";
+        let (cid, store_key) = crate::blob_store::BlobStore::compute_addresses(bytes);
+        let double_wrapped = format!("sha256-{cid}");
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &double_wrapped);
+
+        // Inventory advertises the canonical on-disk key (what list_hashes /
+        // the broadcaster actually publish).
+        let now = chrono::Utc::now();
+        let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        apply_snapshot(
+            &mut conn,
+            "peer_X",
+            std::slice::from_ref(&store_key),
+            1,
+            &when,
+        )
+        .unwrap();
+
+        let kicker = RecordingKicker {
+            kicks: Mutex::new(Vec::new()),
+        };
+        let outcome = reconcile_pass(
+            &mut conn,
+            "self_cid",
+            None,
+            &StaticStore(vec![]),
+            &kicker,
+            default_cfg(),
+            now,
+            &[],
+        )
+        .unwrap();
+
+        assert_eq!(outcome.kicks_fired, 1, "repaired marker must still heal");
+        assert_eq!(outcome.invalid_markers, 0);
+        let kicks = kicker.kicks.lock().unwrap();
+        assert_eq!(
+            kicks[0].0, store_key,
+            "kick must use the canonical store key, never the double-wrapped literal"
+        );
+        assert_eq!(kicks[0].1, vec!["peer_X".to_string()]);
+    }
+
+    /// The drum-stop half of the repair: once the bytes land (filed under the
+    /// canonical `sha256-<hex>` key), a double-wrapped marker must read as
+    /// PRESENT — no further kicks, ever.
+    #[test]
+    fn double_wrapped_cid_marker_stops_kicking_once_bytes_land() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        let bytes = b"evolution-of-trust-bundle";
+        let (cid, store_key) = crate::blob_store::BlobStore::compute_addresses(bytes);
+        let double_wrapped = format!("sha256-{cid}");
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &double_wrapped);
+
+        let kicker = RecordingKicker {
+            kicks: Mutex::new(Vec::new()),
+        };
+        let outcome = reconcile_pass(
+            &mut conn,
+            "self_cid",
+            None,
+            &StaticStore(vec![store_key]),
+            &kicker,
+            default_cfg(),
+            chrono::Utc::now(),
+            &["peer_A".to_string()],
+        )
+        .unwrap();
+
+        assert_eq!(
+            outcome.kicks_fired, 0,
+            "bytes present under the canonical key must stop the drum"
+        );
+        assert!(kicker.kicks.lock().unwrap().is_empty());
+    }
+
+    /// Retry hygiene: a marker that is no content address in ANY form is
+    /// counted and skipped — never kicked (a kick could only be rejected by
+    /// every responder on every sweep tick forever).
+    #[test]
+    fn invalid_marker_is_counted_and_never_kicked() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        insert_custody_commitment(
+            &mut conn,
+            "c1",
+            "self_cid",
+            "other_cid",
+            "sha256-not-hex-not-a-cid",
+        );
+
+        let kicker = RecordingKicker {
+            kicks: Mutex::new(Vec::new()),
+        };
+        let outcome = reconcile_pass(
+            &mut conn,
+            "self_cid",
+            None,
+            &StaticStore(vec![]),
+            &kicker,
+            default_cfg(),
+            chrono::Utc::now(),
+            &["peer_A".to_string()], // connected fallback available — must still not kick
+        )
+        .unwrap();
+
+        assert_eq!(outcome.invalid_markers, 1);
+        assert_eq!(outcome.kicks_fired, 0);
+        assert!(kicker.kicks.lock().unwrap().is_empty());
     }
 
     #[test]
