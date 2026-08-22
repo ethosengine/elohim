@@ -1,4 +1,5 @@
 ---
+index: false
 name: feedback-human-loop-not-terminal-authority
 title: Human-in-the-loop is not the terminal authority
 description: Human-must-decide as a guaranteed floor is a capture vector; neither species is terminal, the method is; watch this training reflex in governance text

@@ -1,4 +1,5 @@
 ---
+index: false
 name: subagent-liveness-clock-skew
 title: Subagent liveness ≠ transcript mtime
 description: "Container clocks skew hours apart — never infer agent death from transcript mtime vs date; check writer-relative freshness and TaskStop live racers first."

@@ -1,4 +1,5 @@
 ---
+index: false
 id: project-storage-metrics-surface-and-leak-verdict
 name: project_storage_metrics_surface_and_leak_verdict
 title: Storage /metrics surface + conductor-leak verdict

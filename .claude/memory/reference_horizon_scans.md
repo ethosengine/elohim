@@ -1,4 +1,5 @@
 ---
+index: false
 name: reference_horizon_scans
 description: "Horizon scans live in .claude/memory-kit/horizon-scans/; latest 2026-08-13 (topic-scoped, context engineering); FULL quarterly sweep still owed — substrate/arxiv legs unrun since 2026-05-14."
 title: LLM-memory horizon scans

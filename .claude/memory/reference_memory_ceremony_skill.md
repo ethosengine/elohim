@@ -1,4 +1,5 @@
 ---
+index: false
 name: reference_memory_ceremony_skill
 title: /memory-ceremony skill
 description: "Four-phase substrate-currency ceremony (librarian/historian/cartographer/storyteller); deliverable is gospel-tier rewrites; /hygiene-sweep is the sibling byte-budget cadence."

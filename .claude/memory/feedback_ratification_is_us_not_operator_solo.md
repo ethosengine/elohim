@@ -1,4 +1,5 @@
 ---
+index: false
 name: feedback-ratification-is-us-not-operator-solo
 title: Ratification is peer acceptance at the branch rung, by us
 description: Governance ratification = deliberation by operator+agents (the pre-p2p community) completing at dev-merge acceptance — never a solo operator stamp

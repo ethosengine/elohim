@@ -1,7 +1,7 @@
 ---
 name: user_operator_resource_reality_and_thesis
 title: "One dev, a day job, out-of-pocket — and that IS the proof"
-description: Elohim is one developer with a full-time day job, funding tooling out of pocket; never assume institutional resources or compare us as the well-funded party.
+description: "One developer with a full-time day job funding tooling out of pocket — never assume institutional resources or compare us as the well-funded party."
 metadata: 
   node_type: memory
   type: user

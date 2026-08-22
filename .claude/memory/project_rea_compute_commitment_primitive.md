@@ -2,7 +2,7 @@
 id: project-rea-compute-commitment-primitive
 name: rea-compute-commitment-primitive
 title: REA compute-commitment primitive (gospel-tier)
-description: "One primitive for all bounded authority delegation: Mishpat::Commitment + delegates-compute action, on-chain standing/revocation; displaces X-API-Key grants."
+description: "One primitive for bounded authority delegation: Mishpat::Commitment + delegates-compute action, on-chain revocation; displaces X-API-Key grants."
 metadata: 
   node_type: memory
   type: project

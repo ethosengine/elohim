@@ -1,4 +1,5 @@
 ---
+index: false
 id: project-brit-rakia-nexus-ci
 name: project_brit_rakia_nexus_ci
 title: brit/rakia Nexus CI wiring

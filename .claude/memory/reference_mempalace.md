@@ -1,4 +1,5 @@
 ---
+index: false
 id: reference-mempalace
 name: MemPalace — wired historian + librarian substrate
 title: MemPalace — wired substrate

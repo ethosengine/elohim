@@ -1,4 +1,5 @@
 ---
+index: false
 id: project-hub-optional-floor
 name: Hub-optional floor — laptop is a full participant
 title: Hub-optional floor — laptop is full participant

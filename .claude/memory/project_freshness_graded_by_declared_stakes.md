@@ -1,4 +1,5 @@
 ---
+index: false
 name: project_freshness_graded_by_declared_stakes
 title: Freshness graded by declared stakes
 description: Operator decision 2026-08-21 — doorway staleness tolerance is graded by the EPR's declared stakes (kind×reach×coupling×NetworkStage), not uniform honest-shed; being behind is an amber trust signal, not a 503.

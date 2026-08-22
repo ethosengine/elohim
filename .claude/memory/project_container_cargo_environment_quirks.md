@@ -1,4 +1,5 @@
 ---
+index: false
 id: project-container-cargo-environment-quirks
 name: container-cargo-environment-quirks
 title: Container cargo quirks

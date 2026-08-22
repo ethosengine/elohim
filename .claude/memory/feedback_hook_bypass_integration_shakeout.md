@@ -1,4 +1,5 @@
 ---
+index: false
 name: hook-bypass-integration-shakeout
 title: Hook-bypass grant for CI-pipeline integration shakeout
 description: The agent working ON the CI pipeline may push --no-verify during integration shakeout only if gates already ran green; CI becomes its verification surface.

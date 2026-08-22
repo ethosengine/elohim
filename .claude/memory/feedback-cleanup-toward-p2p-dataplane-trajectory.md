@@ -1,7 +1,7 @@
 ---
 name: feedback-cleanup-toward-p2p-dataplane-trajectory
 title: Per-host scaffold — clean up toward P2P dataplane
-description: "Per-host/per-row blob modeling is MVP scaffold toward the synced P2P dataplane; clean up trajectory drift as you go — never extend the scaffold."
+description: "Per-host/per-row blob modeling is MVP scaffold toward the synced P2P dataplane — clean up drift as you go, never extend the scaffold."
 metadata: 
   node_type: memory
   type: feedback

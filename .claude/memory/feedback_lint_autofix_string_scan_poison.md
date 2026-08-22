@@ -2,7 +2,7 @@
 id: feedback-lint-autofix-string-scan-poison
 name: lint-autofix-string-scan-poison
 title: Lint autofix string-scan poison
-description: eslint --fix prefer-set-has on STRINGS builds a Set of chars, inverting string-scan assertions; run the full suite after any --fix and disable-comment the scans.
+description: "eslint --fix prefer-set-has on STRINGS builds a Set of chars, inverting string-scan assertions; run the full suite after any --fix."
 metadata: 
   node_type: memory
   type: feedback

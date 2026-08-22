@@ -1,4 +1,5 @@
 ---
+index: false
 name: feedback_mesh_is_the_proving_ground
 title: The local mesh is the proving ground
 description: Operator rule 2026-08-21 — drive design and development on the local mesh (`just mesh`, Act I) and prove there; the fleet CONFIRMS delivery, it does not discover. Land the valueflow chain locally first.

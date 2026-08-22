@@ -1,4 +1,5 @@
 ---
+index: false
 name: agent-agnostic-backlog-delegation
 title: Disjoint side-tasks go to the shared backlog
 description: "Well-specified disjoint tasks belong in genesis/data/timeline/backlog (not session lists) so ANY agent — Claude, Codex, Gemini — can claim them; offer during CI waits"

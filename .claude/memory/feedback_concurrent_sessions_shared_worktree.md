@@ -1,4 +1,5 @@
 ---
+index: false
 name: concurrent-sessions-shared-worktree
 title: Concurrent sessions share the worktree
 description: "Sessions co-commit on shift/* in ONE worktree — never bulk-revert ambient mods; commit path-limited (-m … -- paths); never amend without re-checking HEAD."

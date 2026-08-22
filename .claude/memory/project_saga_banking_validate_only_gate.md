@@ -1,4 +1,5 @@
 ---
+index: false
 name: saga-banking-validate-only-gate
 title: "Saga banking = validate-only run; gate reads matthew"
 description: "Bank saga/notary measures via [edge:validate-only] (exists since 2026-07-30); the quiesce gate reads MATTHEW only, not the shem trio — bites on every banking attempt"

@@ -1,4 +1,5 @@
 ---
+index: false
 name: doorway-ssr-arm-shadowed-chrome-every-serve
 title: EPR dispatch routes into SSR; chrome on every serve
 description: "EPR-matched GETs divert to serve_ssr_route on SsrRoute disposition (shed → chrome-carrying bundle + x-ssr-skipped); page-borne wiring goes on BOTH serve paths"

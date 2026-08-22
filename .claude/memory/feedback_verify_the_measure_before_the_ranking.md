@@ -1,7 +1,7 @@
 ---
 name: feedback_verify_the_measure_before_the_ranking
 title: Verify a drift audit's measure before acting on its ranking
-description: A drift audit can be the dominant source of its own findings — spot-check the top-ranked surface's findings against disk before letting the ranking drive work.
+description: "A drift audit can be the dominant source of its own findings — spot-check the top-ranked surface against disk before the ranking drives work."
 metadata:
   type: feedback
 ---

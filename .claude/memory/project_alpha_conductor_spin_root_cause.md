@@ -1,4 +1,5 @@
 ---
+index: false
 name: project_alpha_conductor_spin_root_cause
 title: Alpha conductor spin — sys-validation retry loop
 description: 2026-08-21 — every alpha storage pod pegged at CPU quota for 48h+ = the conductor's sys-validation spinning on 353–2849 unfetchable dependencies; the pool saturation (Util 4037%) came from an UNBOUNDED join_all local re-lookup, not the network fetch. Cure 1 lives on fork branch fix/sys-validation-unfetchable-deps-backoff (pointer not bumped).

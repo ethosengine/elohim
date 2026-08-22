@@ -1,7 +1,7 @@
 ---
 name: scope-flag-beats-prose-note
 title: Scope flag beats prose note
-description: "When a source says a cap is down, the `available:` flag + scope-reconcile win over prose/stale memory; @requires:<cap> = satisfiable-when-available, not held."
+description: "The `available:` flag + scope-reconcile beat prose/stale memory on whether a cap is down; @requires:<cap> = satisfiable-when-available, not held."
 metadata:
   node_type: memory
   type: feedback

@@ -1,4 +1,5 @@
 ---
+index: false
 name: project_per_node_memory_is_conductor_authority_arc
 title: Per-node GB memory = conductor full-arc authority
 description: "Per-node 2→4GB+ climb (james OOM) = conductor full-arc DHT working set; target_arc_factor defaults to 1 so RAM ∝ corpus; arc-factor<1 is the scale lever."

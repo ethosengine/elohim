@@ -1,4 +1,5 @@
 ---
+index: false
 name: feedback-justice-mishpat-not-punishment-guard
 title: Justice = Mishpat/capability, NOT punishment (framing guard)
 description: "Justice = restored capability (Mishpat), never punishment — only boundaries + negotiated consequences; reject 'blind justice' for El Roi's witnessed sight."

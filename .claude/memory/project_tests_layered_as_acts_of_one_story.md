@@ -1,7 +1,7 @@
 ---
 name: project_tests_layered_as_acts_of_one_story
 title: Tests layered as acts of one story
-description: Operator direction 2026-08-21 — test layers are ACTS of one unifying story (household → neighbourhood → commons), each act a NetworkStage and a substrate; the story drives narrative interpretability coherence across the whole suite, not just per feature file.
+description: "Test layers are ACTS of one story — household → neighbourhood → commons, each act a NetworkStage and a substrate; coherence across the suite, not per feature file."
 metadata:
   type: project
 ---

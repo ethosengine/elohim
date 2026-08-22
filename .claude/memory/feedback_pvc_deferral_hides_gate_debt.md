@@ -1,7 +1,7 @@
 ---
 name: feedback_pvc_deferral_hides_gate_debt
 title: PVC-deferral hides gate debt
-description: Chronic 85%+ disk pressure defers HEAVY_GATES, so dev "green" = deferred not passed; triage integration reds by origin/dev byte-identity, not as regressions.
+description: "Chronic 85%+ disk pressure defers HEAVY_GATES — dev 'green' = deferred, not passed; triage integration reds by origin/dev byte-identity."
 metadata: 
   node_type: memory
   type: feedback

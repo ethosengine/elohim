@@ -1,7 +1,7 @@
 ---
 name: tiered-quilt-unblock-state
 title: Tiered-quilt unblock state
-description: "Attestation consolidation (wave-0) LANDED at 34fcf1070 — don't re-plan it; real remaining = Stage-B rename + tier-substrate waves (unblocks weave-epic-arc #2)."
+description: "Attestation consolidation (wave-0) LANDED — don't re-plan it; remaining = Stage-B rename + tier-substrate waves (unblocks weave-epic-arc #2)."
 metadata: 
   node_type: memory
   type: project

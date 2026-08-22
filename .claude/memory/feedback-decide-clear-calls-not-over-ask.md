@@ -1,7 +1,7 @@
 ---
 name: feedback-decide-clear-calls-not-over-ask
 title: Decide clear calls yourself; don't over-ask the user
-description: "Don't park decisions with obvious defaults on the user — decide and proceed; reserve AskUserQuestion for genuine forks with real trade-offs the user owns."
+description: "Decide clear calls with obvious defaults yourself; reserve AskUserQuestion for genuine forks with real trade-offs the user owns."
 metadata: 
   node_type: memory
   type: feedback

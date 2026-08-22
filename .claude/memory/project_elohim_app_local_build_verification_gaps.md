@@ -2,7 +2,7 @@
 id: project-elohim-app-local-build-verification-gaps
 name: project_elohim_app_local_build_verification_gaps
 title: elohim-app local build verification gaps
-description: "In-container elohim-app gates gap: tsc/JIT miss strictTemplates AOT errors — verify via direct `ng build`; buffer bundle error = install-state, not code."
+description: "In-container gates miss strictTemplates AOT errors (tsc/JIT) — verify with a direct `ng build`; buffer bundle error = install-state, not code."
 metadata: 
   node_type: memory
   type: project

@@ -1,4 +1,5 @@
 ---
+index: false
 id: project-conductor-signal-msgpack-decode-class
 name: conductor-signal-msgpack-decode-class
 title: Conductor signal msgpack decode class

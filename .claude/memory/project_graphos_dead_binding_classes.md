@@ -1,7 +1,7 @@
 ---
 name: graphos-dead-binding-classes
 title: Graphos dead-binding classes
-description: "6 causes of theming theater — ghost names, border IACVT, inline hardcodes, setProperty clobber, inert kebab attrs, homonym fixtures; only renders catch them"
+description: "6 theming-theater causes: ghost names, border IACVT, inline hardcodes, setProperty clobber, inert kebab attrs, homonym fixtures — only renders catch them."
 metadata: 
   node_type: memory
   type: project

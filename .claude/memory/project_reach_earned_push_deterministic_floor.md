@@ -1,6 +1,6 @@
 ---
 name: project_reach_earned_push_deterministic_floor
-description: Pre-push gate is protocol dogfooded — repo push is a reach-earned attestation at the deterministic floor; CID artifacts attest CID vs source before landing.
+description: "The pre-push gate dogfoods the protocol — a repo push is a reach-earned attestation at the deterministic floor."
 title: Repo push = reach-earned attestation (deterministic floor)
 metadata: 
   node_type: memory

@@ -1,4 +1,5 @@
 ---
+index: false
 name: project_dataplane_next_lens_diversity_placement
 title: Dataplane next lens = diversity placement
 description: Diversity-aware salvage placement (1a+1b landed) is INERT in prod — household_id NULL from identity-coherence gaps, not scope reads; degrades safely to XOR.

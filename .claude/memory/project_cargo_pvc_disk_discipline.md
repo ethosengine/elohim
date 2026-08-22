@@ -1,7 +1,7 @@
 ---
 name: project_cargo_pvc_disk_discipline
-title: Cargo/PVC disk-pressure discipline (umbrella)
-description: "PVC/cargo disk discipline: act at 85%+, cargo-pool legacy-targets reclaim, disk-guard hook denies heavy cargo, DWARF footprint, multi-agent cargo pacing."
+title: Cargo/PVC disk + native build-env discipline (umbrella)
+description: "Cargo disk + build-env: act at 85% PVC, cargo-pool reclaim, disk-guard hook; CARGO_TARGET_DIR per workspace, no nextest here, sweettest needs RUSTFLAGS=\"\"."
 metadata:
   type: project
 ---
@@ -15,3 +15,6 @@ Folds the disk-pressure and cargo-target-pool discipline cluster. Members:
 - [[project_devspace_disk_cleanup_procedure]] — pool families dominate disk pressure; act at 85%+; reclaim ladder ends in operator-gated family prune — never prune the active family mid-push.
 - [[project_cargo_disk_guard_override]] — at the 85% hard-ceiling the PreToolUse hook DENIES heavy cargo; FORCE_HEAVY_GATES does not bypass it — free non-pool space or bump volume_hard_pct.
 - [[project_rust_build_footprint_anatomy]] — 71% of pool = ~1GB DWARF test binaries (79% debuginfo); retention policy not Rust is the cause; evict first; −57% profile landed in root .cargo/config.toml.
+- [[feedback_cargo_target_dir_for_native_builds]] — Native (non-WASM) cargo builds need CARGO_TARGET_DIR at the pool slot per workspace; forgotten legacy target/ dirs balloon to ~30G. WASM workspaces stay default.
+- [[project_container_cargo_environment_quirks]] — No nextest here (plain cargo test, unpiped exit codes); /projects target dirs ENOENT → use /tmp; WASM-warmed slot corrupts native builds; explicit cd per gate.
+- [[project_sweettest_native_build_env]] — Sweettest needs RUSTFLAGS="" (WASM getrandom flag breaks native link), BINDGEN_EXTRA_CLANG_ARGS for clang-21; `just pack` (not build) refreshes the .dna bundle.

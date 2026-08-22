@@ -2,7 +2,7 @@
 id: feedback-frontend-review-eyes-first
 name: frontend-review-eyes-first
 title: Frontend review = eyes first
-description: Render the surface before code review (pnpm look, graphos sheet); canonical = looking-at-frontend skill; can't-find ≠ never-implemented — suspect reachability.
+description: "Render before code-reviewing frontend (pnpm look, graphos sheet); canonical = looking-at-frontend skill; can't-find ≠ never-implemented."
 metadata: 
   node_type: memory
   type: feedback

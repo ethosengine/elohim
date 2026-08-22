@@ -2,7 +2,7 @@
 id: feedback-managed-surface-edit-discipline
 name: feedback-managed-surface-edit-discipline
 title: Managed-surface edit discipline
-description: CLAUDE.md/spec/plan edits use cite tooling (seal/describe/propagate/refresh); scope lives ONLY in _lib/managed_surfaces.py; stale cite → --refresh.
+description: "CLAUDE.md/spec/plan edits go through the cite tooling (seal/describe/propagate/refresh); scope lives ONLY in _lib/managed_surfaces.py."
 metadata:
   type: feedback
 cites:

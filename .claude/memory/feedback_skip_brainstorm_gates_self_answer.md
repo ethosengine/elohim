@@ -1,7 +1,7 @@
 ---
 name: feedback_skip_brainstorm_gates_self_answer
 title: Skip brainstorm gates — self-answer, present one summary
-description: "Operator wants design questions self-answered from evidence, then ONE recommended-design summary with defense — not one-question-at-a-time gated dialogue."
+description: "Self-answer design questions from evidence, then present ONE recommended-design summary with defense — not gated one-question-at-a-time dialogue."
 metadata: 
   node_type: memory
   type: feedback

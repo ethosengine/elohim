@@ -1,4 +1,5 @@
 ---
+index: false
 id: project-sprint-branch-not-orchestrator-indexed
 name: project_sprint_branch_not_orchestrator_indexed
 title: sprint/* not orchestrator-indexed

@@ -1,4 +1,5 @@
 ---
+index: false
 name: project_full_arc_authority_disables_network_get
 title: Full-arc authority disables every network get
 description: "On a full-arc fleet every zome get/get_links is local-only — a link miss means gossip failed, not that the data is absent."

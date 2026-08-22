@@ -1,4 +1,5 @@
 ---
+index: false
 id: project-ci-playwright-image
 name: ci-playwright image is ci-builder + playwright layer
 title: ci-playwright = ci-builder + playwright

@@ -1,4 +1,5 @@
 ---
+index: false
 name: feedback_work_stays_in_operator_visible_tree
 title: Work stays in the operator-visible tree
 description: "All work lands in /projects/elohim (the operator's VS Code mount); never create sibling worktrees like /projects/elohim-wt-land — invisible work is unreviewable."

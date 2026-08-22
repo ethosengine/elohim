@@ -1,4 +1,5 @@
 ---
+index: false
 name: overnight-permission-stalls
 title: Overnight permission stalls
 description: An idle overnight session may be blocked on a permission prompt (auth paths), not done; check the transcript tail and never race a blocked session.

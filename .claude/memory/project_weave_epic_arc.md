@@ -1,7 +1,7 @@
 ---
 name: weave-epic-arc
 title: The Weave Epic arc
-description: "Weave lens seeds 4 subsystems (VSM recursion, tier-capability, compute contracts, replica encryption); COMPOSE-don't-fork — only new DHT entry is KeyEnvelope"
+description: "Weave lens seeds 4 subsystems (VSM recursion, tier-capability, compute contracts, replica encryption); compose-don't-fork, one new DHT entry."
 metadata: 
   node_type: memory
   type: project

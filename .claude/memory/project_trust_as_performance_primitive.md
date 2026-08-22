@@ -1,7 +1,7 @@
 ---
 name: project_trust_as_performance_primitive
 title: "Trust: security AND performance — the compute/trust gradient"
-description: "Security and performance COMPOSE, they don't trade off — the compute/trust gradient makes high-trust peer edges blazing fast while keeping commons browsing witnessed-safe."
+description: "Security and performance COMPOSE — the compute/trust gradient makes high-trust peer edges fast while commons browsing stays witnessed-safe."
 metadata: 
   node_type: memory
   type: project

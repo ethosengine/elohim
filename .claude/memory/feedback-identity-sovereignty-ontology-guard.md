@@ -1,4 +1,5 @@
 ---
+index: false
 name: feedback-identity-sovereignty-ontology-guard
 title: Identity sovereignty ontology guard
 description: "\"Self-sovereign\" must never be the apex identity tier — community governance backstops individuals; AI agents re-leak the crypto framing at tier-naming."

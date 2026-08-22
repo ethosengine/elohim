@@ -1,7 +1,7 @@
 ---
 name: project_self_healing_control_plane_vision
 title: Self-healing control plane — four pillars, no-overwhelm
-description: "Four-pillar actuatable no-overwhelm control plane (observe + REA actuation, Auto defaults); plans A–D MERGED TO DEV (branch consolidated + deleted) — verify in-tree, not on the dead branch."
+description: "Four-pillar actuatable no-overwhelm control plane (observe + REA actuation); plans A-D merged to dev — verify in-tree, not on the deleted branch."
 metadata: 
   node_type: memory
   type: project

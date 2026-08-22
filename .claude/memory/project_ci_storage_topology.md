@@ -1,4 +1,5 @@
 ---
+index: false
 id: project-ci-storage-topology
 name: CI build storage topology — migrated openebs-jiva → openebs-hostpath; hostpath needs deterministic node pinning
 title: CI build storage — hostpath PVCs in jenkins ns, node-pinned

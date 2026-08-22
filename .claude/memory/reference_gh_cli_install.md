@@ -1,4 +1,5 @@
 ---
+index: false
 name: reference_gh_cli_install
 title: gh CLI not preinstalled
 description: gh vanishes with the ephemeral container; restore the Go binary to /home/user/bin; GH_TOKEN (EthosengineBot, repo+admin:org) auths it; curl REST needs no install

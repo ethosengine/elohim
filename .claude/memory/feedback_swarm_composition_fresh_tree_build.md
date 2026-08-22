@@ -1,4 +1,5 @@
 ---
+index: false
 id: feedback-swarm-composition-fresh-tree-build
 name: After editing swarm composition, do a fresh-tree cargo build before committing
 title: Swarm edits need fresh-tree build first

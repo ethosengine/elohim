@@ -1,7 +1,7 @@
 ---
 name: scribe-authoring-loop-first-run
 title: Scribe authoring loop — first run complete
-description: scribe (Opus 4.6 primary writer) + dispatcher technical review + fresh blind-reader ran end-to-end 2026-08-15 on backlog rows 16/16a; storyteller conversion awaits operator sign-off.
+description: "scribe (writer) + dispatcher technical review + fresh blind-reader ran end-to-end on backlog rows 16/16a; storyteller conversion awaits sign-off."
 metadata: 
   node_type: memory
   type: project

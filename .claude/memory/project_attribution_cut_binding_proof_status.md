@@ -1,7 +1,7 @@
 ---
 name: project-attribution-cut-binding-proof-status
 title: Attribution cut — bindings carry proof_status
-description: Economic joins take AttributableBindings (typed cut); posture stays observe until the LIVE unverified count hits zero — minting existing is not the gate.
+description: "Economic joins take AttributableBindings (typed cut); posture stays observe until LIVE unverified hits zero — minting existing isn't the gate."
 metadata: 
   node_type: memory
   title: Attribution cut — bindings carry proof_status

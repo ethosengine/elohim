@@ -1,4 +1,5 @@
 ---
+index: false
 id: project-sweettest-native-build-env
 name: sweettest-native-build-env
 title: Sweettest native build env

@@ -1,4 +1,5 @@
 ---
+index: false
 name: project_iroh_dataplane_actual_state
 title: iroh dataplane actual state — merge-ready, dual-stack gap
 description: Dual ENABLED in alpha manifests 2026-08-05 (deploy pending) w/ sovereign never-n0 iroh defaults; proof = "Dual: DualGossipPublisher wired into P2PNode" + irohNodeId, NOT the degraded-wrapper log.

@@ -1,7 +1,7 @@
 ---
 name: project_earned_reach_governance_pr_ceremony_vision
 title: Earned-reach governance = story+REA+council PR-ceremony
-description: Sub-commons peers fork/merge/compete; earned reach for high-stakes artifacts becomes a story+REA+governance PR-ceremony affirmed by councils of Elohim (holonic sociocracy) over the p2p blobstore.
+description: "Earned reach for high-stakes artifacts = a story+REA governance PR-ceremony affirmed by councils of Elohim; sub-commons peers fork/merge/compete."
 metadata: 
   node_type: memory
   type: project

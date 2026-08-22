@@ -1,4 +1,5 @@
 ---
+index: false
 name: project_ssr_render_trace_and_fixed_fetcher
 title: SSR render-trace + per-request fetcher swap (elohim-render)
 description: "elohim-render SSR core: render() uses ctx.data_fetcher; RenderTerminal splits truthful-empty vs stall; compose derives the root tag (never hardcode app-root) + typed ComposeError skip vocabulary."

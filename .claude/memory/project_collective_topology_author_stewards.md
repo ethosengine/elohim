@@ -1,7 +1,7 @@
 ---
 name: collective-topology-author-stewards
 title: Collective topology + per-corpus author-steward routing
-description: Content→steward routing is per-corpus to real personas, never one synthetic genesis identity; adam stewards genesis, FCT routes with the church collective.
+description: "Content→steward routing is per-corpus to real personas, never one synthetic genesis identity; adam stewards genesis, FCT the church collective."
 metadata: 
   node_type: memory
   type: project

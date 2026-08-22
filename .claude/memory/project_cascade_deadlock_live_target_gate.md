@@ -1,4 +1,5 @@
 ---
+index: false
 name: project_cascade_deadlock_live_target_gate
 title: Cascade deadlock — live-target gate blocks its own fix
 description: A live-target E2E gate on the only waited-on Level-0 pipeline deadlocks the edge deploy that fixes that target; fixed via catchError→UNSTABLE.

@@ -1,4 +1,5 @@
 ---
+index: false
 id: feedback-sprint-dod-includes-prepush-gates
 name: sprint-dod-includes-prepush-gates
 title: Sprint DoD includes pre-push gates

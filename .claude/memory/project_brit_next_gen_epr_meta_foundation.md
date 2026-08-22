@@ -1,7 +1,7 @@
 ---
 name: project_brit_next_gen_epr_meta_foundation
 title: brit next-gen epr-meta foundation + composition-snapshot
-description: "Content-addressed epr-meta in brit supersedes the parent Python cite tooling; parity PROVEN vs the live oracle, integrated to brit main 2026-06-30 (FF)."
+description: "Content-addressed epr-meta in brit supersedes the parent Python cite tooling; parity PROVEN vs the live oracle, integrated to brit main."
 metadata: 
   node_type: memory
   type: project

@@ -1,4 +1,5 @@
 ---
+index: false
 id: project-local-stack-dht-anchor-gap
 name: local-stack-dht-anchor-gap
 title: Local stack DHT-anchor gap

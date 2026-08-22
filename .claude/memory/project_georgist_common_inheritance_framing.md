@@ -1,4 +1,5 @@
 ---
+index: false
 name: project_georgist_common_inheritance_framing
 title: Georgism modernized — the common-inheritance frame
 description: "Frame the corpus's Georgist stance via reproducibility + digital enclosure, never literal \"land\"; bites when writing/refining economic stances"

@@ -1,6 +1,6 @@
 ---
 name: project_rea_valueflows_are_our_workflow_layer
-description: Saga + habits + commitment:claim over EPR recipes ARE our platform-agnostic workflows — peer-native vs Linear tickets; the gap is projective (nothing re-reads it mid-run).
+description: "Saga + habits + commitment:claim over EPR recipes ARE our workflows — peer-native vs tickets; the gap is projective (nothing re-reads it mid-run)."
 title: REA valueflows over EPRs are our workflow layer
 metadata: 
   node_type: memory

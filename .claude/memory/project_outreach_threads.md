@@ -1,6 +1,6 @@
 ---
 name: project_outreach_threads
-description: "Cold/warm outreach threads: Stephen Lewis (canteen/creator-payments), John Richardson (Polity/Ethelo data-coop), Monty Lynn (ACU), AI future-of-work scholars."
+description: "Cold/warm outreach threads: Lewis (canteen), Richardson (Polity/Ethelo), Monty Lynn, AI-future-of-work, Audrey Tang/civic.ai, Andy Crouch, Andrew Root, Brynjolfsson, p2panda chat."
 title: Outreach threads (umbrella)
 metadata: 
   node_type: memory
@@ -21,3 +21,4 @@ Folds the person/institution outreach-thread cluster. Members:
 - [[project_andy_crouch_outreach_thread]] — 2026-07-14 confessional faith-register cold email to Andy Crouch (Praxis) off his talk; "Claude made me cry → enclosure is the danger"; commons owned-by-no-one, no-equity ask; subject "RE: Adaptive Challenges".
 - [[project_p2panda_rocketchat_outreach]] — 2026-08-06 p2panda Rocket.Chat intro post; FIRST public dev-community outreach (channel, not named person); personal-arc credentialing, AI-ethics stance named head-on, repo/pipelines/deployments shared openly, no ask; public chaos-engineering/failover commitment.
 - [[project_andrew_root_outreach_thread]] — 2026-07-23 cold email to Andrew Root (Luther Sem) + co-host Derek Tronsgard off the "Can I Get an A.I.Men" episode; AI made in *our* image vs Root's demonic read, guarded by "nothing created is to be worshipped"; real fear is Grok/MechaHitler owning the dial, not a pastor-bot; Jezebel-spirit flag in the P.S.
+- [[project_brynjolfsson_wemustactnow_outreach]] — Cold email to Erik Brynjolfsson + the We Must Act Now team (Elohim Protocol as a working example of their "build the institutions" call); sent 2026-07-17.

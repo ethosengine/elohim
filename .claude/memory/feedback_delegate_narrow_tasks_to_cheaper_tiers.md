@@ -1,4 +1,5 @@
 ---
+index: false
 name: feedback_delegate_narrow_tasks_to_cheaper_tiers
 title: Delegate narrow tasks to Opus/Sonnet; top-tier fleets burn the limit
 description: "Operator directive 2026-07-02: top-tier agent fleets burn the session limit — delegate narrow, crisply-defined tasks to opus/sonnet; keep the top tier for orchestration and judgment."

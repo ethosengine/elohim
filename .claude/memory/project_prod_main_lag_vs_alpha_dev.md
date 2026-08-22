@@ -1,4 +1,5 @@
 ---
+index: false
 name: project_prod_main_lag_vs_alpha_dev
 title: Per-host doorway deploy lag (elohim.host = dev alpha-b)
 description: A UI bug on one doorway host but not another is per-host deploy lag, not code; two catchError-swallowed legs (edge container + spa-blob) leave a host stale.

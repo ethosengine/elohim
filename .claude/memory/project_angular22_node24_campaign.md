@@ -1,7 +1,7 @@
 ---
 name: project_angular22_node24_campaign
 title: Angular 22 + Node 24 campaign — state and lessons
-description: "Angular22+Node24 LANDED on dev 2026-07-30, wave 0-failed, alpha deployed; SSR follow-ups settled (shim sort() stall fix, trust-scoped cache); OnPush/vitest-blindness lessons."
+description: "Angular22+Node24 landed on dev and deployed to alpha; SSR follow-ups settled (shim sort() stall, trust-scoped cache); OnPush/vitest-blindness lessons."
 metadata: 
   node_type: memory
   type: project

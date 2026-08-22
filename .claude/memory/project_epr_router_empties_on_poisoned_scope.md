@@ -1,4 +1,5 @@
 ---
+index: false
 name: project_epr_router_empties_on_poisoned_scope
 title: EprRouter empties on one poisoned scope row
 description: "One poisoned scope row empties EprRouter (Welcome at /, 404 /lamad): fail-closed collect + stale-binary array-wrap; resolvers degrade per-row (f38be2635)."

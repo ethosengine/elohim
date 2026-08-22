@@ -1,4 +1,5 @@
 ---
+index: false
 id: project-inventory-exchange-not-byte-replication
 name: P2P inventory exchange ≠ byte replication
 title: P2P inventory ≠ byte replication

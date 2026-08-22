@@ -1,4 +1,5 @@
 ---
+index: false
 name: project_andy_crouch_outreach_thread
 description: Confessional faith-register cold email to Andy Crouch (Praxis) after his talk; Elohim Protocol as commons owned-by-no-one; sent 2026-07-14.
 title: Andy Crouch / Praxis outreach thread

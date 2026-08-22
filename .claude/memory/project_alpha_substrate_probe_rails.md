@@ -1,7 +1,7 @@
 ---
 name: alpha-substrate-probe-rails
 title: Alpha substrate probe rails
-description: "Doorway reads are per-doorway single-target (A→matthew, B→adam), NOT matthew-only; conductor projection fans the pool. /p2p/status now doorway-proxied (2026-07-07). Loki 502s → untrustworthy zeros."
+description: "Doorway reads are per-doorway single-target (A→matthew, B→adam); conductor projection fans the pool; Loki 502s = untrustworthy zeros."
 metadata: 
   node_type: memory
   type: project

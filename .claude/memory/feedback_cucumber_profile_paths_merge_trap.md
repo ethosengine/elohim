@@ -1,7 +1,7 @@
 ---
 name: feedback_cucumber_profile_paths_merge_trap
 title: Cucumber profile paths MERGE with positionals
-description: a2o cucumber trap — `npx cucumber-js -p local <files>` (and the profile-less form) runs the WHOLE suite because profile `paths` MERGE with CLI positionals; scope with `--config <empty>` (path resolves from the REPO ROOT) or `-p local --name '^…$'`.
+description: "a2o trap: `cucumber-js -p local <files>` runs the WHOLE suite — profile `paths` MERGE with positionals; scope via `--config <empty>` (repo-root-relative) or `--name`."
 metadata:
   type: feedback
 ---
