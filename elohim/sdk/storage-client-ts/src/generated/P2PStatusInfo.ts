@@ -52,9 +52,27 @@ pull: PullStatusInfo | null,
  */
 projectionReconcile: ProjectionReconcileStatus | null, 
 /**
- * True when sync/replication is paused for backpressure (bulk write in progress).
+ * True when the unified SyncGate holds sync for ANY reason (operator
+ * pause, wifi-only on cellular, import/bulk backpressure, drain backlog).
  */
 syncPaused: boolean, 
+/**
+ * Operator/device sync mode from the unified SyncGate: "sync" |
+ * "paused" | "wifi-only". Sticky across restart (SQLite-persisted
+ * operational state — `db::sync_mode`).
+ */
+syncMode: string, 
+/**
+ * Device-declared network class: "wifi" | "cellular" | "unknown".
+ * "unknown" is honest and permissive — it never suppresses under
+ * wifi-only; the device/steward layer declares it via the API.
+ */
+networkClass: string, 
+/**
+ * Reasons currently holding sync (kebab-case, e.g. "operator-paused",
+ * "drain-backlog"). Empty exactly when `sync_paused` is false.
+ */
+syncReasons: Array<string>, 
 /**
  * D.7 dedup LRU: number of unique CIDs currently in the dedup window.
  */

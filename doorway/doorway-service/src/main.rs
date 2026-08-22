@@ -603,6 +603,14 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
                                 divergent_anchor: recon["divergentAnchor"]
                                     .as_u64()
                                     .map(|n| n as usize),
+                                // Unified SyncGate verdict (additive; None on
+                                // an older storage binary that lacks them).
+                                sync_paused: status["syncPaused"].as_bool(),
+                                sync_reasons: status["syncReasons"].as_array().map(|a| {
+                                    a.iter()
+                                        .filter_map(|v| v.as_str().map(String::from))
+                                        .collect()
+                                }),
                                 ..Default::default()
                             };
                             *p2p_health.write().await =

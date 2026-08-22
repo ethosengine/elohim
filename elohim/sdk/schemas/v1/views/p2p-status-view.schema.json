@@ -16,6 +16,9 @@
     "relayMode",
     "replication",
     "syncPaused",
+    "syncMode",
+    "networkClass",
+    "syncReasons",
     "dedupUniqueLen",
     "dedupTotalSeen",
     "reconcilePassesTotal",
@@ -75,7 +78,25 @@
     },
     "syncPaused": {
       "type": "boolean",
-      "description": "True when sync/replication is paused for backpressure (bulk write in progress). Operators and elohim agents use this to understand node load state."
+      "description": "True when the unified SyncGate holds sync for ANY reason (operator pause, wifi-only on cellular, import/bulk backpressure, drain backlog). Operators and elohim agents use this to understand node load state; syncReasons names what holds it."
+    },
+    "syncMode": {
+      "type": "string",
+      "enum": ["sync", "paused", "wifi-only"],
+      "description": "Operator/device sync mode from the unified SyncGate. Sticky across restart (SQLite-persisted operational state, Category C)."
+    },
+    "networkClass": {
+      "type": "string",
+      "enum": ["wifi", "cellular", "unknown"],
+      "description": "Device-declared network class (declared via the API — never sniffed by the storage node). 'unknown' is honest and permissive: it never suppresses under wifi-only."
+    },
+    "syncReasons": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["operator-paused", "wifi-only-on-cellular", "import-in-progress", "bulk-write-in-progress", "drain-backlog"]
+      },
+      "description": "Reasons currently holding sync (kebab-case). Empty exactly when syncPaused is false."
     },
     "dedupUniqueLen": {
       "type": "integer",

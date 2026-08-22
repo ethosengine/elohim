@@ -104,6 +104,17 @@ pub struct P2PHealth {
     /// Absent when there is no cached snapshot or the lock is unavailable.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub observed_age_ms: Option<u64>,
+    /// Storage's unified SyncGate verdict (`syncPaused` on `/p2p/status`):
+    /// true when the storage sidecar is holding sync for ANY reason (operator
+    /// pause, wifi-only on cellular, import/bulk backpressure, drain backlog).
+    /// None until the cached storage status supplies the field.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sync_paused: Option<bool>,
+    /// Reasons currently holding sync (kebab-case, from storage
+    /// `/p2p/status.syncReasons`). None when the cached status lacks the
+    /// field; empty exactly when `syncPaused` is false.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sync_reasons: Option<Vec<String>>,
     /// Whether this P2P status is too old to treat as current. Always present:
     /// an unavailable snapshot is stale rather than silently omitted.
     pub stale: bool,
@@ -118,6 +129,8 @@ impl Default for P2PHealth {
             caught_up: None,
             converged: None,
             divergent_anchor: None,
+            sync_paused: None,
+            sync_reasons: None,
             observed_age_ms: None,
             stale: true,
         }
@@ -1362,6 +1375,8 @@ mod tests {
             caught_up: Some(true),
             converged: Some(false),
             divergent_anchor: Some(1_860),
+            sync_paused: Some(true),
+            sync_reasons: Some(vec!["drain-backlog".to_string()]),
             observed_age_ms: Some(4_000),
             stale: false,
         };
@@ -1370,6 +1385,8 @@ mod tests {
         assert_eq!(json["converged"], serde_json::json!(false));
         assert_eq!(json["observedAgeMs"], serde_json::json!(4_000));
         assert_eq!(json["stale"], serde_json::json!(false));
+        assert_eq!(json["syncPaused"], serde_json::json!(true));
+        assert_eq!(json["syncReasons"], serde_json::json!(["drain-backlog"]));
     }
 
     #[test]

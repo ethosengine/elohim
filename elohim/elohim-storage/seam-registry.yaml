@@ -1865,3 +1865,83 @@ decisionPoints:
       - path: elohim/elohim-storage/src/services/custody_rotation.rs
         testName: rotation_makes_the_custody_fold_report_stocked
         kind: unit
+
+  - name: sync_gate_effective_sync
+    kind: verdict-fn
+    sourceLocation:
+      file: src/p2p/sync_gate.rs
+      modulePath: p2p::sync_gate::effective_sync
+      line: 172
+    summary: >
+      The ONE reason-carrying verdict for "may sync run right now?" — composes the operator
+      mode (sync | paused | wifi-only), the device-DECLARED network class (wifi | cellular |
+      unknown; never sniffed), and the three pre-existing internal suppression sources
+      (ImportInProgress, BulkWriteInProgress, DrainBacklog) as a monotonic OR. Every surface
+      reads this gate: the P2P event-loop tick guards (SyncGate::suppressed), /p2p/status
+      syncPaused/syncMode/networkClass/syncReasons, GET/POST /p2p/sync-mode, and the doorway
+      /health p2p block (proxied syncPaused/syncReasons). Deliberately NO second pause plane —
+      the prior shared AtomicBool's call-sites (bulk create, account import, drain
+      auto-suppress) route through the gate's counter/flag sources. Design:
+      genesis/data/timeline/backlog/p2p-sync-mode-unified-gate-design.md (p2p-design-gate run
+      2026-08-22; SyncModeState + SyncModeTransition both Ephemeral/C, SQLite operational,
+      history capped at 500).
+    concernIds:
+      - id: C2
+        status: answered
+        justification: >
+          Suppression is a monotonic OR — no source can un-suppress another; pinned by
+          composition_is_monotonic_or_naming_every_active_source.
+      - id: C3
+        status: answered
+        justification: >
+          Every suppression source has a release path (operator POST, network-class change,
+          RAII guard drop on operation end, drain backlog clearing) and reasons[] names what
+          holds it; guard-release pinned by gate_counters_release_only_when_last_operation_ends.
+      - id: C4
+        status: answered
+        justification: >
+          network=unknown is honest and does NOT suppress under wifi-only — the cellular guard
+          is an opt-in protection and unknown is surfaced, never guessed. Pinned by
+          wifi_only_on_unknown_network_does_not_suppress; unrecognized mode/network strings are
+          parse rejections (mode_and_network_parse_reject_unknown_strings), never a guess.
+      - id: C6b
+        status: answered
+        justification: >
+          POST /p2p/sync-mode is idempotent — a same-mode POST is a no-op that still returns
+          200 and appends NO history row; pinned by
+          http::sync_mode_control_tests::sync_mode_post_is_idempotent_and_records_history.
+      - id: C8
+        status: answered
+        justification: >
+          Every mode/network transition appends a bounded history row with source + reason
+          (operator | network-change), pruned at 500 (db::sync_mode::tests::
+          transition_history_prunes_to_cap); served newest-first at /p2p/sync-mode/history.
+      - id: C12
+        status: partial
+        justification: >
+          The POSTs are operator levers: declared auth_required in build_manifest() so the
+          doorway proxy gates them, but there is no finer /p2p admin-auth class on the storage
+          node itself today — that gap is noted here and in the design row rather than papered
+          over.
+    contractTests:
+      - path: elohim/elohim-storage/src/p2p/sync_gate.rs
+        testName: composition_is_monotonic_or_naming_every_active_source
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/sync_gate.rs
+        testName: wifi_only_on_cellular_suppresses
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/sync_gate.rs
+        testName: wifi_only_on_unknown_network_does_not_suppress
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/sync_gate.rs
+        testName: gate_counters_release_only_when_last_operation_ends
+        kind: unit
+      - path: elohim/elohim-storage/src/http.rs
+        testName: sync_mode_post_is_idempotent_and_records_history
+        kind: unit
+      - path: elohim/elohim-storage/src/http.rs
+        testName: sync_mode_is_sticky_across_restart_via_hydration
+        kind: unit
+      - path: elohim/elohim-storage/src/db/sync_mode.rs
+        testName: transition_history_prunes_to_cap
+        kind: unit

@@ -33,6 +33,15 @@
       "minimum": 0,
       "description": "Anchor divergence count from the last storage observation."
     },
+    "syncPaused": {
+      "type": "boolean",
+      "description": "Storage's unified SyncGate verdict from the cached /p2p/status: true when the sidecar is holding sync for ANY reason (operator pause, wifi-only on cellular, import/bulk backpressure, drain backlog). Absent until the storage sidecar supplies it."
+    },
+    "syncReasons": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Reasons currently holding sync (kebab-case, from storage /p2p/status.syncReasons). Absent when the cached status lacks the field; empty exactly when syncPaused is false."
+    },
     "observedAgeMs": {
       "type": "integer",
       "minimum": 0,

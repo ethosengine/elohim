@@ -275,6 +275,8 @@ fn doorway_health_p2p_matches_schema() {
         caught_up: Some(true),
         converged: Some(false),
         divergent_anchor: Some(1_860),
+        sync_paused: Some(true),
+        sync_reasons: Some(vec!["operator-paused".to_string()]),
         observed_age_ms: Some(4_000),
         stale: false,
     };

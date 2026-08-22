@@ -7,10 +7,35 @@ title: "Sync-mode control: one reason-carrying SyncGate unifying operator mode, 
 slug: "p2p-sync-mode-unified-gate-design"
 written: "2026-08-22"
 author: "orchestrator"
-status: "backlog"
+status: "fixed-pending-runtime-proof"
 priority: "medium"
 severity: medium
 ---
+
+## Status (2026-08-22): implemented — fixed-pending-runtime-proof
+
+Landed on `fix/doorway-breaker-trial-theft-and-apps-extraction-herd` (elohim-storage +
+doorway-service). The unified `SyncGate` (`src/p2p/sync_gate.rs`, pure `effective_sync`
+verdict fn) replaced the shared `sync_paused` AtomicBool — the three existing internal
+suppression call-sites (bulk create, account import, drain auto-suppress) now route
+through the gate's counter/flag sources; event-loop tick guards read `SyncGate::suppressed()`.
+Routes live in `build_manifest()`: GET/POST `/p2p/sync-mode` (idempotent POST; optional
+`networkClass` folded into the body), POST `/p2p/network-class`, GET `/p2p/sync-mode/history`
+(top-level array, `timestamp`+`trigger` wire fields per the a2o steps). State is SQLite
+(`sync_mode_state` singleton + `sync_mode_transitions` capped at 500, migration
+`2026-08-22-120000_sync_mode_state`), hydrated sticky-across-restart in
+`HttpServer::with_p2p_handle`. `/p2p/status` gained additive `syncMode` / `networkClass` /
+`syncReasons` (schema + contract tests + ts codegen updated); doorway `/health` `p2p` block
+now proxies `syncPaused` / `syncReasons` from its cached storage observation. Gate registered
+in `elohim/elohim-storage/seam-registry.yaml` (`sync_gate_effective_sync`, kind verdict-fn).
+
+**Honest residue:** the live mesh still runs the PRE-fix binaries (routes 404 there until the
+next deploy/restart), so `deployment/sync-control.feature` has not been re-run against a
+running node — unit + contract coverage is the current proof (22 new tests green). The
+`@regression` "no sync-mode preference set" scenario asserts `syncMode === undefined` and will
+now fail BY DESIGN once a new binary serves; its own step text says to revisit it when the
+gate exists. C12 remains partial: POSTs are `auth_required` at the doorway proxy, but the
+storage node has no finer /p2p admin-auth class.
 
 ## Why
 

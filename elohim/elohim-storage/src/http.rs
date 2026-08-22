@@ -322,7 +322,11 @@ pub struct HttpServer {
     /// peer store (`agent_info`) and transport/fetch state (`dump_network_stats`
     /// / `dump_network_metrics`). Cat-C operational read: the handle an
     /// operator, a negotiating peer, or an embedded agent uses to see WHY a
-    /// cross-conductor fetch is failing. None = route answers 503.
+    /// cross-conductor fetch is failing. None here is NOT terminal for the
+    /// route: on an external-conductor node (`--admin-url` mode, e.g. the
+    /// local mesh) the handler falls back to `hc_registry`'s per-role admin
+    /// connections — it answers 503 only when no admin-capable connection
+    /// exists at all.
     admin_websocket: Option<Arc<holochain_client::AdminWebsocket>>,
     /// FeedbackSignal fan-out context (Phase 3.5 T22).
     /// When set, `PUT /api/v1/epr` with FeedbackSignal kind runs
@@ -990,9 +994,38 @@ impl HttpServer {
         self
     }
 
-    /// Set the P2P handle for status endpoint
+    /// Set the P2P handle for status endpoint.
+    ///
+    /// If a DB pool is already attached (`with_db_pool` runs first in main.rs
+    /// and in the test builders), the persisted sync-mode state is hydrated
+    /// into the shared SyncGate here — the operator's pause is STICKY across
+    /// restart. Absent/unreadable state falls back to the gate defaults
+    /// (mode=sync, network=unknown — the honest pre-feature behavior).
     #[cfg(feature = "p2p")]
     pub fn with_p2p_handle(mut self, handle: crate::p2p::P2PHandle) -> Self {
+        use crate::p2p::sync_gate::{NetworkClass, SyncMode};
+        if let Some(ref pool) = self.db_pool {
+            if let Ok(mut conn) = pool.get() {
+                match crate::db::sync_mode::load_state(&mut conn) {
+                    Ok(Some((mode_s, network_s))) => {
+                        let gate = handle.sync_gate();
+                        if let Some(mode) = SyncMode::parse(&mode_s) {
+                            gate.set_mode(mode);
+                        }
+                        if let Some(network) = NetworkClass::parse(&network_s) {
+                            gate.set_network(network);
+                        }
+                        info!(
+                            mode = %mode_s,
+                            network_class = %network_s,
+                            "sync-mode state hydrated from SQLite (sticky across restart)"
+                        );
+                    }
+                    Ok(None) => {}
+                    Err(e) => warn!(error = %e, "sync-mode state hydration failed; using defaults"),
+                }
+            }
+        }
         self.p2p_handle = Some(handle);
         self
     }
@@ -1384,6 +1417,17 @@ impl HttpServer {
             (Method::GET, "/p2p/status") => self.handle_p2p_status().await,
             #[cfg(feature = "p2p")]
             (Method::GET, "/p2p/peers") => self.handle_p2p_peers().await,
+
+            // Sync-mode control surface (unified SyncGate; design:
+            // genesis/data/timeline/backlog/p2p-sync-mode-unified-gate-design.md).
+            #[cfg(feature = "p2p")]
+            (Method::GET, "/p2p/sync-mode") => self.handle_sync_mode_get(),
+            #[cfg(feature = "p2p")]
+            (Method::POST, "/p2p/sync-mode") => self.handle_sync_mode_post(req).await,
+            #[cfg(feature = "p2p")]
+            (Method::POST, "/p2p/network-class") => self.handle_network_class_post(req).await,
+            #[cfg(feature = "p2p")]
+            (Method::GET, "/p2p/sync-mode/history") => self.handle_sync_mode_history(),
 
             // Delivery peers — discovered peers with delivery capabilities
             // Used by frontend for multi-peer app delivery scoring
@@ -3815,7 +3859,17 @@ impl HttpServer {
         // byte-identical to before (full P2PStatusInfo incl. provideLoop). The
         // transport seam is NOT consulted here so libp2p behavior is preserved.
         if let Some(ref handle) = self.p2p_handle {
-            let status = handle.status();
+            let mut status = handle.status();
+            // Overlay the LIVE SyncGate verdict: the watch-channel snapshot
+            // refreshes on the status cadence, but sync-mode changes (operator
+            // POST, network-class declaration) must be visible immediately —
+            // every surface reads the ONE gate, never a stale second copy.
+            let gate = handle.sync_gate();
+            let verdict = gate.verdict();
+            status.sync_paused = !verdict.syncing;
+            status.sync_mode = gate.mode().as_str().to_string();
+            status.network_class = gate.network().as_str().to_string();
+            status.sync_reasons = verdict.reason_strings();
             let json = serde_json::to_string(&status).map_err(|e| {
                 StorageError::Internal(format!("Failed to serialize P2P status: {}", e))
             })?;
@@ -3850,6 +3904,245 @@ impl HttpServer {
                 r#"{"error": "P2P networking not enabled"}"#,
             )))
             .unwrap())
+    }
+
+    /// GET /p2p/sync-mode — the unified SyncGate's current control state and
+    /// effective verdict: `{mode, network, effective: {syncing, reasons}}`.
+    /// Design: genesis/data/timeline/backlog/p2p-sync-mode-unified-gate-design.md.
+    #[cfg(feature = "p2p")]
+    fn handle_sync_mode_get(&self) -> Result<Response<Full<Bytes>>, StorageError> {
+        let Some(ref handle) = self.p2p_handle else {
+            return Ok(response::service_unavailable("P2P networking not enabled"));
+        };
+        Ok(response::ok(&Self::sync_mode_view(handle)))
+    }
+
+    /// Serialize the gate's current state as the sync-mode wire view.
+    #[cfg(feature = "p2p")]
+    fn sync_mode_view(handle: &crate::p2p::P2PHandle) -> serde_json::Value {
+        let gate = handle.sync_gate();
+        let verdict = gate.verdict();
+        serde_json::json!({
+            "mode": gate.mode().as_str(),
+            "network": gate.network().as_str(),
+            "effective": {
+                "syncing": verdict.syncing,
+                "reasons": verdict.reason_strings(),
+            },
+        })
+    }
+
+    /// Persist the gate's (mode, network) to the SQLite operational state
+    /// (best effort — the in-memory gate has already changed; a missing pool
+    /// only costs restart-stickiness, and is logged, never fabricated away).
+    #[cfg(feature = "p2p")]
+    fn persist_sync_mode_state(&self, handle: &crate::p2p::P2PHandle) {
+        let Some(ref pool) = self.db_pool else {
+            warn!("sync-mode change not persisted: no DB pool (will not survive restart)");
+            return;
+        };
+        let gate = handle.sync_gate();
+        match pool.get() {
+            Ok(mut conn) => {
+                if let Err(e) = crate::db::sync_mode::save_state(
+                    &mut conn,
+                    gate.mode().as_str(),
+                    gate.network().as_str(),
+                ) {
+                    warn!(error = %e, "sync-mode change not persisted");
+                }
+            }
+            Err(e) => warn!(error = %e, "sync-mode change not persisted: pool unavailable"),
+        }
+    }
+
+    /// Append a sync-mode transition history row (bounded, best effort).
+    #[cfg(feature = "p2p")]
+    fn append_sync_mode_transition(&self, from: &str, to: &str, source: &str, reason: &str) {
+        let Some(ref pool) = self.db_pool else {
+            return;
+        };
+        match pool.get() {
+            Ok(mut conn) => {
+                if let Err(e) =
+                    crate::db::sync_mode::append_transition(&mut conn, from, to, source, reason)
+                {
+                    warn!(error = %e, "sync-mode transition not recorded");
+                }
+            }
+            Err(e) => warn!(error = %e, "sync-mode transition not recorded: pool unavailable"),
+        }
+    }
+
+    /// POST /p2p/sync-mode `{mode, networkClass?}` — set the operator sync
+    /// mode (idempotent: a same-mode POST is a no-op and still 200; no
+    /// history row is appended for a no-op). `networkClass` may be folded
+    /// into the same body (the device declares its network; the storage node
+    /// never sniffs it).
+    #[cfg(feature = "p2p")]
+    async fn handle_sync_mode_post(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("read body: {e}")))?
+            .to_bytes();
+        Ok(self.apply_sync_mode_post(&body))
+    }
+
+    /// Body-level core of POST /p2p/sync-mode (unit-testable without a hyper
+    /// `Incoming` body).
+    #[cfg(feature = "p2p")]
+    fn apply_sync_mode_post(&self, body: &[u8]) -> Response<Full<Bytes>> {
+        use crate::p2p::sync_gate::{NetworkClass, SyncMode};
+
+        let Some(handle) = self.p2p_handle.clone() else {
+            return response::service_unavailable("P2P networking not enabled");
+        };
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct SyncModeReq {
+            mode: String,
+            network_class: Option<String>,
+        }
+        let parsed: SyncModeReq = match serde_json::from_slice(body) {
+            Ok(v) => v,
+            Err(e) => return response::bad_request(&format!("Invalid JSON: {e}")),
+        };
+        let Some(mode) = SyncMode::parse(&parsed.mode) else {
+            return response::bad_request(&format!(
+                "Invalid mode '{}' — expected sync | paused | wifi-only",
+                parsed.mode
+            ));
+        };
+        let network = match parsed.network_class.as_deref() {
+            Some(s) => match NetworkClass::parse(s) {
+                Some(n) => Some(n),
+                None => {
+                    return response::bad_request(&format!(
+                        "Invalid networkClass '{s}' — expected wifi | cellular | unknown"
+                    ));
+                }
+            },
+            None => None,
+        };
+
+        let gate = handle.sync_gate();
+        let prev_mode = gate.set_mode(mode);
+        if prev_mode != mode {
+            self.append_sync_mode_transition(
+                prev_mode.as_str(),
+                mode.as_str(),
+                "operator",
+                "operator set sync mode",
+            );
+        }
+        if let Some(network) = network {
+            let prev_net = gate.set_network(network);
+            if prev_net != network {
+                let m = gate.mode().as_str();
+                self.append_sync_mode_transition(
+                    m,
+                    m,
+                    "network-change",
+                    &format!(
+                        "network class {} -> {}",
+                        prev_net.as_str(),
+                        network.as_str()
+                    ),
+                );
+            }
+        }
+        self.persist_sync_mode_state(&handle);
+        response::ok(&Self::sync_mode_view(&handle))
+    }
+
+    /// POST /p2p/network-class `{networkClass}` — the device/steward layer
+    /// declares the active network class (wifi | cellular | unknown).
+    /// Detection is NOT the storage node's job; unknown is honest and does
+    /// not suppress under wifi-only.
+    #[cfg(feature = "p2p")]
+    async fn handle_network_class_post(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("read body: {e}")))?
+            .to_bytes();
+        Ok(self.apply_network_class_post(&body))
+    }
+
+    /// Body-level core of POST /p2p/network-class (unit-testable).
+    #[cfg(feature = "p2p")]
+    fn apply_network_class_post(&self, body: &[u8]) -> Response<Full<Bytes>> {
+        use crate::p2p::sync_gate::NetworkClass;
+
+        let Some(handle) = self.p2p_handle.clone() else {
+            return response::service_unavailable("P2P networking not enabled");
+        };
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct NetworkClassReq {
+            network_class: String,
+        }
+        let parsed: NetworkClassReq = match serde_json::from_slice(body) {
+            Ok(v) => v,
+            Err(e) => return response::bad_request(&format!("Invalid JSON: {e}")),
+        };
+        let Some(network) = NetworkClass::parse(&parsed.network_class) else {
+            return response::bad_request(&format!(
+                "Invalid networkClass '{}' — expected wifi | cellular | unknown",
+                parsed.network_class
+            ));
+        };
+
+        let gate = handle.sync_gate();
+        let prev = gate.set_network(network);
+        if prev != network {
+            let m = gate.mode().as_str();
+            self.append_sync_mode_transition(
+                m,
+                m,
+                "network-change",
+                &format!("network class {} -> {}", prev.as_str(), network.as_str()),
+            );
+            self.persist_sync_mode_state(&handle);
+        }
+        response::ok(&Self::sync_mode_view(&handle))
+    }
+
+    /// GET /p2p/sync-mode/history — bounded transition audit log, newest
+    /// first. Wire shape per the a2o acceptance steps: each entry carries
+    /// `timestamp` and `trigger` (plus fromMode/toMode/reason).
+    #[cfg(feature = "p2p")]
+    fn handle_sync_mode_history(&self) -> Result<Response<Full<Bytes>>, StorageError> {
+        let Some(ref pool) = self.db_pool else {
+            return Ok(response::service_unavailable(
+                "Database pool not configured — sync-mode history unavailable",
+            ));
+        };
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("pool: {e}")))?;
+        let rows = crate::db::sync_mode::list_transitions(&mut conn)
+            .map_err(|e| StorageError::Internal(format!("sync-mode history: {e}")))?;
+        let entries: Vec<serde_json::Value> = rows
+            .into_iter()
+            .map(|r| {
+                serde_json::json!({
+                    "timestamp": r.at,
+                    "fromMode": r.from_mode,
+                    "toMode": r.to_mode,
+                    "trigger": r.source,
+                    "reason": r.reason,
+                })
+            })
+            .collect();
+        Ok(response::ok(&entries))
     }
 
     /// Handle /p2p/peers — connected peers with identify info
@@ -5699,9 +5992,12 @@ impl HttpServer {
         // The guard resumes sync automatically when dropped.
         #[cfg(feature = "p2p")]
         let _sync_guard = if count >= 50 {
-            self.p2p_handle
-                .as_ref()
-                .map(|h| h.pause_sync(&format!("bulk content create ({} items)", count)))
+            self.p2p_handle.as_ref().map(|h| {
+                h.pause_sync(
+                    crate::p2p::sync_gate::SyncSuppressReason::BulkWriteInProgress,
+                    &format!("bulk content create ({} items)", count),
+                )
+            })
         } else {
             None
         };
@@ -5870,8 +6166,8 @@ impl HttpServer {
     /// is LOAD-BEARING — authentication is checked BEFORE any existence lookup so
     /// a non-author probe against a nonexistent id gets 401/403, never a 404 that
     /// would leak existence or mis-signal "not the author" as "not found".
-    /// GET /db/p2p/conductor-diagnostics — Cat-C operational read of the
-    /// embedded conductor's network view (dht-unity plan T3).
+    /// GET /db/p2p/conductor-diagnostics — Cat-C operational read of this
+    /// node's conductor network view (dht-unity plan T3), embedded OR external.
     ///
     /// Returns the conductor's peer store (`agent_info` — every AgentInfoSigned
     /// it currently holds, projected to url/space/timestamps) plus live
@@ -5891,9 +6187,21 @@ impl HttpServer {
         if method != Method::GET {
             return Ok(response::method_not_allowed());
         }
-        let Some(admin) = &self.admin_websocket else {
+        // Admin-connection selection: prefer the embedded conductor's dedicated
+        // admin handle (alpha fleet — conductor in-pod, wired at startup); fall
+        // back to any live external-conductor bridge in the HcClientRegistry
+        // (local mesh — storage dialed `--admin-url ws://localhost:4444`; every
+        // registry role holds an AdminWebsocket to that same conductor, and the
+        // bridge supervisor keeps it fresh across conductor restarts). 503 only
+        // when NEITHER exists — that is the honest "no conductor" answer, not
+        // a topology artifact.
+        let Some(admin) = self.admin_websocket.as_deref().cloned().or_else(|| {
+            self.hc_registry
+                .as_ref()
+                .and_then(|r| r.any_admin_websocket())
+        }) else {
             return Ok(response::service_unavailable(
-                "conductor diagnostics unavailable: no embedded conductor admin connection",
+                "conductor diagnostics unavailable: no conductor admin connection (embedded or external)",
             ));
         };
 
@@ -11017,10 +11325,10 @@ impl HttpServer {
         // The guard resumes sync automatically when dropped (even on error/panic).
         #[cfg(feature = "p2p")]
         let _sync_guard = self.p2p_handle.as_ref().map(|h| {
-            h.pause_sync(&format!(
-                "account import for {} ({} items)",
-                human_id, item_count
-            ))
+            h.pause_sync(
+                crate::p2p::sync_gate::SyncSuppressReason::ImportInProgress,
+                &format!("account import for {} ({} items)", human_id, item_count),
+            )
         });
 
         info!(
@@ -12904,6 +13212,34 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
             Route::get("/p2p/status")
                 .handler("p2p_status")
                 .cache_ttl(2)
+                .build(),
+        )
+        // Sync-mode control surface (unified SyncGate; Cat-C node-local
+        // operational state — design:
+        // genesis/data/timeline/backlog/p2p-sync-mode-unified-gate-design.md).
+        // GET reads are live verdicts (never cached); the POSTs are operator
+        // levers → auth_required through the doorway proxy (C12: there is no
+        // finer /p2p admin-auth class today — that gap is noted in the design).
+        .route(
+            Route::get("/p2p/sync-mode")
+                .handler("sync_mode_get")
+                .build(),
+        )
+        .route(
+            Route::post("/p2p/sync-mode")
+                .handler("sync_mode_set")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::post("/p2p/network-class")
+                .handler("network_class_set")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::get("/p2p/sync-mode/history")
+                .handler("sync_mode_history")
                 .build(),
         )
         // =====================================================================
@@ -16286,6 +16622,150 @@ mod auth_me_tests {
             "GET /api/v1/status/projector missing from build_manifest — doorway \
              cannot proxy projector lag/caughtUp to the stability surface"
         );
+    }
+}
+
+// =============================================================================
+// Sync-mode control tests — unified SyncGate HTTP surface.
+// Design: genesis/data/timeline/backlog/p2p-sync-mode-unified-gate-design.md.
+// =============================================================================
+#[cfg(all(test, feature = "p2p"))]
+mod sync_mode_control_tests {
+    use super::*;
+    use crate::test_util::test_pool;
+    use http_body_util::BodyExt;
+
+    async fn body_json(resp: Response<Full<Bytes>>) -> serde_json::Value {
+        let bytes = BodyExt::collect(resp.into_body()).await.unwrap().to_bytes();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    async fn test_server_with_pool(pool: crate::db::DbPool) -> HttpServer {
+        let blob_store = Arc::new(
+            crate::blob_store::BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap())
+            .with_db_pool(pool)
+            .with_p2p_handle(crate::p2p::P2PHandle::for_testing())
+    }
+
+    #[test]
+    fn build_manifest_declares_sync_mode_routes() {
+        let manifest = build_manifest();
+        let has = |method: doorway_client::HttpMethod, path: &str| {
+            manifest
+                .routes
+                .iter()
+                .any(|r| r.method == method && r.path == path)
+        };
+        assert!(has(doorway_client::HttpMethod::Get, "/p2p/sync-mode"));
+        assert!(has(doorway_client::HttpMethod::Post, "/p2p/sync-mode"));
+        assert!(has(doorway_client::HttpMethod::Post, "/p2p/network-class"));
+        assert!(has(
+            doorway_client::HttpMethod::Get,
+            "/p2p/sync-mode/history"
+        ));
+        // Operator levers require auth through the doorway proxy (C12).
+        for (m, p) in [
+            (doorway_client::HttpMethod::Post, "/p2p/sync-mode"),
+            (doorway_client::HttpMethod::Post, "/p2p/network-class"),
+        ] {
+            let route = manifest
+                .routes
+                .iter()
+                .find(|r| r.method == m && r.path == p)
+                .unwrap();
+            assert!(route.auth_required, "{p} must be auth_required");
+        }
+    }
+
+    #[tokio::test]
+    async fn sync_mode_post_is_idempotent_and_records_history() {
+        let pool = test_pool();
+        let server = test_server_with_pool(pool.clone()).await;
+
+        // First pause: 200, mode transitions sync -> paused, one history row.
+        let resp = server.apply_sync_mode_post(br#"{"mode":"paused"}"#);
+        assert_eq!(resp.status(), StatusCode::OK);
+        let view = body_json(resp).await;
+        assert_eq!(view["mode"], "paused");
+        assert_eq!(view["effective"]["syncing"], false);
+        assert_eq!(view["effective"]["reasons"][0], "operator-paused");
+
+        // Same-mode POST is a no-op, still 200, and appends NO history row.
+        let resp = server.apply_sync_mode_post(br#"{"mode":"paused"}"#);
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        // Resume: second history row.
+        let resp = server.apply_sync_mode_post(br#"{"mode":"sync"}"#);
+        assert_eq!(resp.status(), StatusCode::OK);
+        let view = body_json(resp).await;
+        assert_eq!(view["mode"], "sync");
+        assert_eq!(view["effective"]["syncing"], true);
+
+        let history = body_json(server.handle_sync_mode_history().unwrap()).await;
+        let entries = history.as_array().expect("history is a top-level array");
+        assert_eq!(entries.len(), 2, "idempotent POST must not append a row");
+        // Newest first, wire fields per the a2o steps: timestamp + trigger.
+        assert_eq!(entries[0]["toMode"], "sync");
+        assert_eq!(entries[0]["trigger"], "operator");
+        assert!(entries[0]["timestamp"].is_string());
+        assert_eq!(entries[1]["fromMode"], "sync");
+        assert_eq!(entries[1]["toMode"], "paused");
+    }
+
+    #[tokio::test]
+    async fn invalid_mode_is_rejected_not_guessed() {
+        let server = test_server_with_pool(test_pool()).await;
+        let resp = server.apply_sync_mode_post(br#"{"mode":"turbo"}"#);
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn wifi_only_pauses_on_cellular_and_resumes_on_wifi() {
+        let server = test_server_with_pool(test_pool()).await;
+
+        // Fold networkClass into the sync-mode POST (design allows either).
+        let resp =
+            server.apply_sync_mode_post(br#"{"mode":"wifi-only","networkClass":"cellular"}"#);
+        assert_eq!(resp.status(), StatusCode::OK);
+        let view = body_json(resp).await;
+        assert_eq!(view["mode"], "wifi-only");
+        assert_eq!(view["network"], "cellular");
+        assert_eq!(view["effective"]["syncing"], false);
+        assert_eq!(view["effective"]["reasons"][0], "wifi-only-on-cellular");
+
+        // Device joins wifi: the sibling route lifts the suppression.
+        let resp = server.apply_network_class_post(br#"{"networkClass":"wifi"}"#);
+        assert_eq!(resp.status(), StatusCode::OK);
+        let view = body_json(resp).await;
+        assert_eq!(view["effective"]["syncing"], true);
+
+        // Network changes are audited with the network-change trigger.
+        let history = body_json(server.handle_sync_mode_history().unwrap()).await;
+        assert!(history
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e["trigger"] == "network-change"));
+    }
+
+    #[tokio::test]
+    async fn sync_mode_is_sticky_across_restart_via_hydration() {
+        let pool = test_pool();
+        let server = test_server_with_pool(pool.clone()).await;
+        let resp = server.apply_sync_mode_post(br#"{"mode":"paused"}"#);
+        assert_eq!(resp.status(), StatusCode::OK);
+        drop(server);
+
+        // "Restart": a fresh server + fresh gate over the same DB hydrates
+        // the persisted mode in with_p2p_handle.
+        let server2 = test_server_with_pool(pool).await;
+        let view = body_json(server2.handle_sync_mode_get().unwrap()).await;
+        assert_eq!(view["mode"], "paused", "operator pause must be sticky");
+        assert_eq!(view["effective"]["syncing"], false);
     }
 }
 

@@ -205,6 +205,10 @@ pub mod lens_market;
 // k>=5 firewall enforced by concentration_service (writer side).
 pub mod concentration_snapshots;
 
+// Sync-mode operational state + bounded transition history (Category C — unified SyncGate).
+// Source of truth: local (operational); reconstruction default mode='sync', network='unknown'.
+pub mod sync_mode;
+
 use std::path::Path;
 use std::time::Duration;
 

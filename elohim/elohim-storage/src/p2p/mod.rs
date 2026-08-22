@@ -67,6 +67,7 @@ pub mod revocation_attestation_message;
 pub mod salvage_gossip;
 pub mod shamir_transport;
 pub mod shard_protocol;
+pub mod sync_gate;
 pub mod sync_protocol;
 pub mod sync_round;
 pub mod topics;
@@ -99,7 +100,6 @@ use libp2p::{
 };
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
@@ -732,10 +732,12 @@ pub struct P2PNode {
     /// retry left matthew↔jessica partitioned for pod lifetimes while each
     /// held 10-11 unrelated connections (genesis #1119).
     bootstrap_peer_ids: Arc<DashMap<String, PeerId>>,
-    /// Backpressure flag: when true, sync/replication cycles are skipped.
-    /// Set by bulk write operations (account import, content bulk) to prevent
-    /// P2P sync from competing for memory during heavy writes.
-    sync_paused: Arc<AtomicBool>,
+    /// Unified sync gate: when its verdict is suppressed, sync/replication
+    /// cycles are skipped. Composes the EXISTING backpressure sources (account
+    /// import, content bulk, drain backlog) with the operator mode and the
+    /// declared network class — one reason-carrying verdict, no second pause
+    /// plane. See [`sync_gate::SyncGate`].
+    sync_gate: Arc<sync_gate::SyncGate>,
     /// PeerId → agent CID mapping for reach enforcement.
     /// Backed by `HolochainBackedPeerIdentityMap` once a db_pool is attached
     /// (via `with_db_pool`). Falls back to `StubIdentityMap` (always-Anonymous)
@@ -938,8 +940,20 @@ pub struct P2PStatusInfo {
     /// conductor; peers as discovery). None when the reconcile task is not
     /// running (missing lamad HcClient / pool / disabled).
     pub projection_reconcile: Option<projection_reconcile::ProjectionReconcileStatus>,
-    /// True when sync/replication is paused for backpressure (bulk write in progress).
+    /// True when the unified SyncGate holds sync for ANY reason (operator
+    /// pause, wifi-only on cellular, import/bulk backpressure, drain backlog).
     pub sync_paused: bool,
+    /// Operator/device sync mode from the unified SyncGate: "sync" |
+    /// "paused" | "wifi-only". Sticky across restart (SQLite-persisted
+    /// operational state — `db::sync_mode`).
+    pub sync_mode: String,
+    /// Device-declared network class: "wifi" | "cellular" | "unknown".
+    /// "unknown" is honest and permissive — it never suppresses under
+    /// wifi-only; the device/steward layer declares it via the API.
+    pub network_class: String,
+    /// Reasons currently holding sync (kebab-case, e.g. "operator-paused",
+    /// "drain-backlog"). Empty exactly when `sync_paused` is false.
+    pub sync_reasons: Vec<String>,
     /// D.7 dedup LRU: number of unique CIDs currently in the dedup window.
     #[ts(type = "number")]
     pub dedup_unique_len: usize,
@@ -1244,17 +1258,22 @@ pub enum P2PCommand {
     },
 }
 
-/// RAII guard that resumes P2P sync when dropped.
+/// RAII guard that releases its sync-suppression source when dropped.
 /// Created by `P2PHandle::pause_sync()` — ensures sync always resumes
-/// even if the bulk write panics or returns early.
+/// even if the bulk write panics or returns early. Counter-backed in the
+/// gate, so overlapping operations release only when the LAST one ends.
 pub struct SyncPauseGuard {
-    flag: Arc<AtomicBool>,
+    gate: Arc<sync_gate::SyncGate>,
+    source: sync_gate::SyncSuppressReason,
 }
 
 impl Drop for SyncPauseGuard {
     fn drop(&mut self) {
-        self.flag.store(false, Ordering::Release);
-        info!("P2P sync resumed (backpressure released)");
+        self.gate.end_source(self.source);
+        info!(
+            source = self.source.as_str(),
+            "P2P sync backpressure source released"
+        );
     }
 }
 
@@ -1267,8 +1286,9 @@ pub struct P2PHandle {
     agent_pubkey: String,
     /// Shared ref to delivery peer registry (populated by P2P event loop)
     delivery_peers: Arc<DashMap<String, DeliveryPeer>>,
-    /// Shared backpressure flag — set by bulk write handlers, read by event loop
-    sync_paused: Arc<AtomicBool>,
+    /// Shared unified sync gate — bulk write handlers register suppression
+    /// sources, HTTP handlers set mode/network, the event loop reads verdicts.
+    sync_gate: Arc<sync_gate::SyncGate>,
     /// Last gossiped inventory snapshot hashes.
     /// Stage 1: initialized empty. Stage 2 broadcaster timer populates via
     /// `set_last_gossiped_inventory`. The diagnostic endpoint reads this to
@@ -1333,13 +1353,27 @@ impl P2PHandle {
     }
 
     /// Pause sync/replication cycles for backpressure during bulk writes.
-    /// Returns a guard that automatically resumes sync when dropped.
-    pub fn pause_sync(&self, reason: &str) -> SyncPauseGuard {
-        self.sync_paused.store(true, Ordering::Release);
-        info!(reason = %reason, "P2P sync paused for backpressure");
+    /// Returns a guard that automatically releases the source when dropped.
+    /// `source` should be `ImportInProgress` or `BulkWriteInProgress` — the
+    /// two counter-backed internal suppression sources of the unified gate.
+    pub fn pause_sync(
+        &self,
+        source: sync_gate::SyncSuppressReason,
+        reason: &str,
+    ) -> SyncPauseGuard {
+        self.sync_gate.begin_source(source);
+        info!(source = source.as_str(), reason = %reason, "P2P sync paused for backpressure");
         SyncPauseGuard {
-            flag: Arc::clone(&self.sync_paused),
+            gate: Arc::clone(&self.sync_gate),
+            source,
         }
+    }
+
+    /// The unified sync gate shared with the P2P event loop. HTTP handlers use
+    /// this to read/set the operator mode and declared network class and to
+    /// serve live verdicts on `/p2p/status` and `/p2p/sync-mode`.
+    pub fn sync_gate(&self) -> &Arc<sync_gate::SyncGate> {
+        &self.sync_gate
     }
 
     /// Construct a minimal `P2PHandle` for unit/integration tests.
@@ -1438,6 +1472,9 @@ impl P2PHandle {
             pull: None,
             projection_reconcile: None,
             sync_paused: false,
+            sync_mode: sync_gate::SyncMode::Sync.as_str().to_string(),
+            network_class: sync_gate::NetworkClass::Unknown.as_str().to_string(),
+            sync_reasons: vec![],
             dedup_unique_len: 0,
             dedup_total_seen: 0,
             reconcile_passes_total: 0,
@@ -1454,7 +1491,7 @@ impl P2PHandle {
             command_tx,
             agent_pubkey: "stub-agent".to_string(),
             delivery_peers: Arc::new(DashMap::new()),
-            sync_paused: Arc::new(AtomicBool::new(false)),
+            sync_gate: Arc::new(sync_gate::SyncGate::new()),
             last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
             // Stub state — NOT shared with any P2PNode; acquisition_per_pin() always empty here.
             acquisition: acquisition::AcquisitionState::new(),
@@ -1507,7 +1544,7 @@ impl P2PHandle {
             command_tx,
             agent_pubkey,
             delivery_peers: Arc::new(DashMap::new()),
-            sync_paused: Arc::new(AtomicBool::new(false)),
+            sync_gate: Arc::new(sync_gate::SyncGate::new()),
             last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
             // Stub state — NOT shared with any P2PNode; acquisition_per_pin() always empty here.
             acquisition: acquisition::AcquisitionState::new(),
@@ -2500,6 +2537,9 @@ impl P2PNode {
             pull: None,
             projection_reconcile: None,
             sync_paused: false,
+            sync_mode: sync_gate::SyncMode::Sync.as_str().to_string(),
+            network_class: sync_gate::NetworkClass::Unknown.as_str().to_string(),
+            sync_reasons: vec![],
             dedup_unique_len: 0,
             dedup_total_seen: 0,
             reconcile_passes_total: 0,
@@ -2586,7 +2626,7 @@ impl P2PNode {
             identify_cache: Arc::new(DashMap::new()),
             peer_metrics: Arc::new(DashMap::new()),
             bootstrap_peer_ids: Arc::new(DashMap::new()),
-            sync_paused: Arc::new(AtomicBool::new(false)),
+            sync_gate: Arc::new(sync_gate::SyncGate::new()),
             identity_map,
             dedup: Arc::new(dedup::DedupLru::new()),
             pending_kad_get_providers: Arc::new(tokio::sync::Mutex::new(
@@ -3003,6 +3043,7 @@ impl P2PNode {
                     kicks_fired = outcome.kicks_fired,
                     fallback_kicks = outcome.fallback_kicks,
                     placement_gaps = outcome.placement_gaps_emitted,
+                    invalid_markers = outcome.invalid_markers,
                     connected_peers = connected_peers.len(),
                     "T23: custody reconcile pass completed"
                 );
@@ -3218,7 +3259,7 @@ impl P2PNode {
                 }
                 _ = sync_interval.tick() => {
                     drop(swarm);
-                    if self.sync_paused.load(Ordering::Acquire) {
+                    if self.sync_gate.suppressed() {
                         debug!("Skipping sync round (backpressure)");
                     } else {
                         self.initiate_sync_round().await;
@@ -3226,7 +3267,7 @@ impl P2PNode {
                 }
                 _ = replication_interval.tick() => {
                     drop(swarm);
-                    if self.sync_paused.load(Ordering::Acquire) {
+                    if self.sync_gate.suppressed() {
                         debug!("Skipping replication cycle (backpressure)");
                     } else {
                         self.run_replication_cycle().await;
@@ -3234,7 +3275,7 @@ impl P2PNode {
                 }
                 _ = gap_dispatch_interval.tick() => {
                     drop(swarm);
-                    if self.sync_paused.load(Ordering::Acquire) {
+                    if self.sync_gate.suppressed() {
                         debug!("Skipping gap dispatch (backpressure)");
                     } else {
                         self.drain_gap_queue().await;
@@ -3242,7 +3283,7 @@ impl P2PNode {
                 }
                 _ = acquisition_reconcile_interval.tick() => {
                     drop(swarm);
-                    let outcome = if self.sync_paused.load(Ordering::Acquire) {
+                    let outcome = if self.sync_gate.suppressed() {
                         warn!(
                             target: "elohim_storage::acquisition",
                             "acquisition reconcile skipped: sync backpressure is paused"
@@ -3261,13 +3302,13 @@ impl P2PNode {
                 }
                 _ = provide_reconcile_interval.tick() => {
                     drop(swarm);
-                    if !self.sync_paused.load(Ordering::Acquire) {
+                    if !self.sync_gate.suppressed() {
                         self.run_provide_reconcile().await;
                     }
                 }
                 _ = acquisition_dispatch_interval.tick() => {
                     drop(swarm);
-                    if !self.sync_paused.load(Ordering::Acquire) {
+                    if !self.sync_gate.suppressed() {
                         self.drain_acquisition_queue().await;
                     }
                 }
@@ -3285,11 +3326,11 @@ impl P2PNode {
                     if published > 0 {
                         let status = self.status_tx.borrow().clone();
                         let pending = status.drain.map(|d| d.pending).unwrap_or(0);
-                        if pending > 100 && !self.sync_paused.load(Ordering::Acquire) {
-                            self.sync_paused.store(true, Ordering::Release);
-                            info!(pending, "Sync auto-suppressed: drain backlog > 100");
-                        } else if pending <= 100 && self.sync_paused.load(Ordering::Acquire) {
-                            self.sync_paused.store(false, Ordering::Release);
+                        if pending > 100 {
+                            if self.sync_gate.set_drain_backlog(true) {
+                                info!(pending, "Sync auto-suppressed: drain backlog > 100");
+                            }
+                        } else if self.sync_gate.set_drain_backlog(false) {
                             info!(pending, "Sync auto-resumed: drain backlog cleared");
                         }
                     }
@@ -8119,7 +8160,7 @@ impl P2PNode {
             command_tx: self.command_tx.clone(),
             agent_pubkey: self.identity.agent_pubkey().to_string(),
             delivery_peers: Arc::clone(&self.delivery_peers),
-            sync_paused: Arc::clone(&self.sync_paused),
+            sync_gate: Arc::clone(&self.sync_gate),
             last_gossiped: Arc::clone(&self.last_gossiped),
             // Clone shares the Arc<RwLock<...>> inside AcquisitionState.
             acquisition: self.acquisition.clone(),
@@ -8871,6 +8912,7 @@ impl P2PNode {
         // Preserve the iroh NodeId set once by `set_iroh_node_id` (main.rs dual
         // block) — the periodic libp2p-only rebuild must not clobber it to None.
         let iroh_node_id = self.status_tx.borrow().iroh_node_id.clone();
+        let sync_verdict = self.sync_gate.verdict();
         let status = P2PStatusInfo {
             peer_id: self.peer_id().to_string(),
             listen_addresses,
@@ -8885,7 +8927,10 @@ impl P2PNode {
             drain,
             pull,
             projection_reconcile,
-            sync_paused: self.sync_paused.load(Ordering::Acquire),
+            sync_paused: !sync_verdict.syncing,
+            sync_mode: self.sync_gate.mode().as_str().to_string(),
+            network_class: self.sync_gate.network().as_str().to_string(),
+            sync_reasons: sync_verdict.reason_strings(),
             dedup_unique_len,
             dedup_total_seen,
             reconcile_passes_total: recon.reconcile_passes_total,

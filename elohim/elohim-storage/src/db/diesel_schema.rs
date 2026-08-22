@@ -1876,6 +1876,30 @@ diesel::table! {
     }
 }
 
+// Sync-mode operational state (unified SyncGate — Category C, node-local).
+// Source of truth: local (operational). Reconstruction default: mode='sync',
+// network_class='unknown'. Migration: 2026-08-22-120000_sync_mode_state.
+diesel::table! {
+    sync_mode_state (id) {
+        id -> Integer,
+        mode -> Text,
+        network_class -> Text,
+        updated_at -> Text,
+    }
+}
+
+// Bounded sync-mode transition audit log (Category C; capped ~500 rows).
+diesel::table! {
+    sync_mode_transitions (id) {
+        id -> Integer,
+        at -> Text,
+        from_mode -> Text,
+        to_mode -> Text,
+        source -> Text,
+        reason -> Text,
+    }
+}
+
 diesel::allow_tables_to_appear_in_same_query!(
     acquisition_pins,
     accumulation_status,

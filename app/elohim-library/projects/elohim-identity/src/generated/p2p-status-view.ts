@@ -50,9 +50,27 @@ export interface P2PStatusView {
    */
   drain?: DrainStatusView | null;
   /**
-   * True when sync/replication is paused for backpressure (bulk write in progress). Operators and elohim agents use this to understand node load state.
+   * True when the unified SyncGate holds sync for ANY reason (operator pause, wifi-only on cellular, import/bulk backpressure, drain backlog). Operators and elohim agents use this to understand node load state; syncReasons names what holds it.
    */
   syncPaused: boolean;
+  /**
+   * Operator/device sync mode from the unified SyncGate. Sticky across restart (SQLite-persisted operational state, Category C).
+   */
+  syncMode: 'sync' | 'paused' | 'wifi-only';
+  /**
+   * Device-declared network class (declared via the API — never sniffed by the storage node). 'unknown' is honest and permissive: it never suppresses under wifi-only.
+   */
+  networkClass: 'wifi' | 'cellular' | 'unknown';
+  /**
+   * Reasons currently holding sync (kebab-case). Empty exactly when syncPaused is false.
+   */
+  syncReasons: (
+    | 'operator-paused'
+    | 'wifi-only-on-cellular'
+    | 'import-in-progress'
+    | 'bulk-write-in-progress'
+    | 'drain-backlog'
+  )[];
   /**
    * D.7 dedup LRU: number of unique CIDs currently in the dedup window.
    */
