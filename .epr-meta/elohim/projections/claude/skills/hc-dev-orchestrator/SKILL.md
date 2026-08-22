@@ -146,7 +146,10 @@ head divergence has no adopt discharge without it), `ADOPT_CONTEST_FANOUT=1`
 first-try), `ELOHIM_NETWORK_STAKES=simulacra` (the explicit Simulacra
 declaration). The conductor side gets kitsune2 `k2Gossip` intervals patched
 to 1000ms test cadence post-generate. The profile block in `hc-mesh.sh` is
-the authoritative knob list.
+the authoritative knob list. Beside the profile, every storage peer gets the three seed-only levers
+`ALLOW_SEED_NETWORK_STAKES=1`, `ALLOW_SEED_DELEGATES_COMPUTE=1`, `ALLOW_SEED_SHARD_MANIFEST=1`
+(the last unlocks `PUT /admin/seed/shard-manifest`; grandma-photos's four scenarios pend on a 403
+without it) — mesh-only preproduction levers, never a prod default.
 
 ### Which conductor the mesh runs (`HOLOCHAIN_BIN`) — and why the `hc` CLI is half of it
 
@@ -197,7 +200,10 @@ not answer `/health` by port afterwards; an empty `.environ` is named out loud (
 environment is authoritative; `MESH_RESTART_APPLY_PROFILE=1` overlays THIS script's dev-tier
 pacing knobs on the re-exec (a knob added after boot reaches a running mesh without regenerating
 it; never touches `AGENT_PUBKEY`), and `MESH_RESTART_ENV_OVERLAY="K=V K=V"` overlays ad-hoc keys.
-The restart re-resolves every peer's pid AND `agentPubKey` into the household fixture
+The re-exec closes inherited fds ≥3 first — a caller holding a `flock` (the a2o
+mesh lock `/tmp/elohim-local-mesh/a2o.lock`, which serializes concurrent agents' mesh-touching
+commands) otherwise leaks the lock into the long-lived peer (2026-08-22: three peers owned the lock
+for 40 min). The restart re-resolves every peer's pid AND `agentPubKey` into the household fixture
 (`fixture-refresh` does only that): the a2o chaos drills kill and verify peers BY THAT PID, so a
 stale fixture reads as `kill ESRCH`, and custody commitments name providers by agent key.
 
