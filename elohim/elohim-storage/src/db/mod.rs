@@ -44,6 +44,7 @@ pub mod imagodei_observations;
 pub mod knowledge_maps_diesel;
 pub mod local_sessions;
 pub mod manifests;
+pub mod memberships;
 pub mod places;
 pub mod rea_commitments;
 pub mod relationships_diesel;
@@ -220,6 +221,7 @@ use tracing::info;
 use crate::error::StorageError;
 pub use context::AppContext;
 pub use context::HUMANS_HAPP_ID;
+pub use context::PARTICIPATIONS_HAPP_ID;
 // Re-export so api/* modules can use `crate::db::SqliteConnection` directly.
 pub use diesel::sqlite::SqliteConnection;
 

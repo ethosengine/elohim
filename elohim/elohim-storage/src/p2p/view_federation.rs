@@ -105,6 +105,23 @@ pub const PROJECTION_INVENTORY_TABLE_CONTENT: &str = "content";
 /// written into a consumer's projection without an own-conductor read.
 pub const PROJECTION_INVENTORY_TABLE_COLLECTIVES: &str = "collectives";
 
+/// The COLLECTIVE-PARTICIPATIONS projection table (cross-peer membership
+/// reconcile). Serves this peer's DHT-anchored participation rows so a peer that
+/// never saw a `MembershipCommitted` signal — `post_commit` fires only on the
+/// AUTHORING conductor, and each household member affirms on their OWN one — can
+/// discover WHICH Membership anchors exist and resolve each against its OWN
+/// conductor (`imagodei::get_membership_by_action`).
+///
+/// BOTH the `id` and `dhtAnchorHash` slots carry the Membership ActionHash. The
+/// diesel row id is a peer-local UUID: two peers projecting the same Membership
+/// mint different ones, so advertising it would put a value on the wire that a
+/// heal must remember never to trust. The anchor IS the identity — the same
+/// idempotency key the local projector uses (see
+/// `db::collectives::list_participation_anchor_inventory`). Discovery-only: the
+/// advertised anchor is never written into a consumer's projection without an
+/// own-conductor read.
+pub const PROJECTION_INVENTORY_TABLE_PARTICIPATIONS: &str = "collective_participations";
+
 /// Protocol identifier for federated view-slice fetch.
 pub const VIEW_FEDERATION_PROTOCOL_ID: &str = "/elohim/view-federation/1.0.0";
 
@@ -789,6 +806,7 @@ fn build_inventory_payload(
     if table != PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS
         && table != PROJECTION_INVENTORY_TABLE_CONTENT
         && table != PROJECTION_INVENTORY_TABLE_COLLECTIVES
+        && table != PROJECTION_INVENTORY_TABLE_PARTICIPATIONS
     {
         return empty();
     }
@@ -1014,6 +1032,80 @@ fn build_inventory_payload(
                         served = payload.entries.len(),
                         total,
                         "ProjectionInventory: collectives inventory windowed/trimmed \
+                         (honest total on the wire lets the requester window the remainder)"
+                    );
+                }
+                tracing::info!(
+                    target: "elohim_storage::view_federation",
+                    table = %table,
+                    entries = payload.entries.len(),
+                    total,
+                    "ProjectionInventory: serving local inventory"
+                );
+                (
+                    serde_json::to_value(payload).unwrap_or(serde_json::Value::Null),
+                    FreshnessState::Live,
+                )
+            }
+            Err(e) => {
+                tracing::warn!(
+                    target: "elohim_storage::view_federation",
+                    table = %table,
+                    error = %e,
+                    "ProjectionInventory: local inventory query failed; returning empty"
+                );
+                empty()
+            }
+        };
+    }
+
+    // Collective participations (cross-peer membership reconcile) — rows
+    // carrying a Membership ActionHash only. Scoped internally by the canonical
+    // participations partition (`db::context::PARTICIPATIONS_HAPP_ID`), NOT by
+    // `app_ctx`: the whole point of that constant is that no caller can hand
+    // this query the operating content scope.
+    if table == PROJECTION_INVENTORY_TABLE_PARTICIPATIONS {
+        return match crate::db::collectives::list_participation_anchor_inventory(
+            &mut conn,
+            i64::from(offset),
+            PROJECTION_INVENTORY_CAP,
+        ) {
+            Ok((anchors, db_total)) => {
+                let total = usize::try_from(db_total).unwrap_or(usize::MAX);
+                let served = anchors.len();
+                let cap_truncated = (offset as usize).saturating_add(served) < total;
+                let entries = anchors
+                    .into_iter()
+                    // BOTH slots carry the anchor — see the table const for why
+                    // the peer-local row UUID is deliberately not advertised.
+                    .map(|anchor| ProjectionInventoryEntry {
+                        id: anchor.clone(),
+                        dht_anchor_hash: anchor,
+                        // Declared-head hints are a CONTENT-table concept.
+                        declared_head_action_hash: None,
+                        declared_head_at: None,
+                    })
+                    .collect();
+                let mut payload = ProjectionInventoryPayload {
+                    table: table.to_string(),
+                    total,
+                    entries,
+                    // `in_sync` is a CONTENT-table concept (the head-plane
+                    // digest join) — participations has no such digest.
+                    in_sync: None,
+                    head_set_snapshot: None,
+                };
+                let byte_dropped = fit_inventory_to_budget(&mut payload, INVENTORY_PAYLOAD_BUDGET);
+                if cap_truncated || byte_dropped > 0 {
+                    tracing::warn!(
+                        target: "elohim_storage::view_federation",
+                        table = %table,
+                        cap = PROJECTION_INVENTORY_CAP,
+                        offset = offset,
+                        dropped = byte_dropped,
+                        served = payload.entries.len(),
+                        total,
+                        "ProjectionInventory: participations inventory windowed/trimmed \
                          (honest total on the wire lets the requester window the remainder)"
                     );
                 }
@@ -1453,6 +1545,75 @@ mod tests {
             "the collective CID rides the dhtAnchorHash slot — it IS the reconciliation identity"
         );
         assert_eq!(payload.total, 1);
+    }
+
+    /// Responder contract for the `collective_participations` table: a real pool
+    /// serves ONLY rows carrying a Membership ActionHash, `Live`, with the
+    /// anchor in BOTH slots. A locally-authored participation (account-import,
+    /// seed POST) has no DHT identity to reconcile on and must never reach the
+    /// wire — and the peer-local row UUID must never reach it either.
+    #[test]
+    fn participations_inventory_serves_the_anchor_in_both_slots() {
+        use crate::db::collectives::{
+            create_collective, create_participation, CreateCollectiveInput,
+            CreateParticipationInput,
+        };
+        use crate::db::diesel_schema::collective_participations;
+        use diesel::prelude::*;
+        let pool = crate::test_util::test_pool();
+        let ctx = crate::db::AppContext::default_lamad();
+        const ANCHOR: &str = "uhCkkMembershipActionHash000000000000000000";
+        {
+            let mut conn = pool.get().expect("pool conn");
+            create_collective(
+                &mut conn,
+                &ctx,
+                &CreateCollectiveInput::stub("household-dowell"),
+            )
+            .unwrap();
+            let mk = |id: &str, human: &str| CreateParticipationInput {
+                id: Some(id.to_string()),
+                collective_id: "household-dowell".to_string(),
+                human_id: human.to_string(),
+                intimacy_level: "connection".to_string(),
+                role_context: None,
+                governance_weight: 1.0,
+                consent_state: "consented".to_string(),
+                metadata_json: None,
+            };
+            create_participation(&mut conn, &mk("anchored", "human-matthew-manager")).unwrap();
+            create_participation(&mut conn, &mk("local-only", "human-jessica-spouse")).unwrap();
+            diesel::update(
+                collective_participations::table
+                    .filter(collective_participations::id.eq("anchored")),
+            )
+            .set(collective_participations::dht_anchor_hash.eq(Some(ANCHOR)))
+            .execute(&mut conn)
+            .unwrap();
+        }
+
+        let (val, state) = build_inventory_payload(
+            Some(&pool),
+            PROJECTION_INVENTORY_TABLE_PARTICIPATIONS,
+            0,
+            None,
+        );
+        assert_eq!(state, FreshnessState::Live);
+        let payload: ProjectionInventoryPayload = serde_json::from_value(val).unwrap();
+        assert_eq!(payload.table, "collective_participations");
+        assert_eq!(
+            payload.total, 1,
+            "the un-anchored local row is not advertised"
+        );
+        assert_eq!(payload.entries.len(), 1);
+        assert_eq!(
+            payload.entries[0].dht_anchor_hash, ANCHOR,
+            "the Membership ActionHash IS the reconciliation identity"
+        );
+        assert_eq!(
+            payload.entries[0].id, ANCHOR,
+            "the id slot repeats the anchor — the peer-local row UUID never reaches the wire"
+        );
     }
 
     #[test]

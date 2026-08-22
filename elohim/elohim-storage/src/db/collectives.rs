@@ -7,7 +7,7 @@ use diesel::prelude::*;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use super::context::AppContext;
+use super::context::{AppContext, PARTICIPATIONS_HAPP_ID};
 use super::diesel_schema::{collective_participations, collectives};
 use super::models::{
     consent_states, current_timestamp, governance_layers, intimacy_levels, Collective,
@@ -710,6 +710,92 @@ pub fn collective_ids_present(
     Ok(found.into_iter().collect())
 }
 
+/// `(dht_anchor_hash, dht_anchor_hash)` inventory for the
+/// `collective_participations` reconcile stream, plus the honest whole-corpus
+/// total (offset-invariant, so a requester can detect a windowed page).
+///
+/// **NULL / empty `dht_anchor_hash` rows are EXCLUDED, by design** — the same
+/// ruling the collectives arm makes about NULL-cid rows. A participation row
+/// born from a local account-import or a seed POST carries no DHT identity to
+/// reconcile ON; advertising it would invite peers to diff against a peer-local
+/// UUID that names nothing notarized. Such rows stay upgradable IN PLACE: the
+/// shared mapping in [`crate::db::memberships::project_membership`] merges a
+/// conductor-read `Membership` onto the existing `(collective_id, human_id)`
+/// row and stamps its anchor the moment the Membership entry is resolved.
+///
+/// **BOTH slots carry the anchor.** The diesel `id` is a peer-local UUID —
+/// meaningless across peers and actively dangerous as a reconciliation key
+/// (two peers projecting the SAME Membership mint different UUIDs). The
+/// `dht_anchor_hash` — the `Membership` entry's ActionHash, which is exactly
+/// the idempotency key the local projector already uses — IS the identity, so
+/// the `id` slot repeats it rather than advertising something a heal must
+/// remember never to trust.
+///
+/// Departed rows are deliberately INCLUDED (unlike dissolved collectives): a
+/// departure is DHT truth carried by the same entry, and a peer that has never
+/// seen the Membership at all needs the departure as much as the join.
+/// Ordered `updated_at DESC, id ASC` — hot set first, mirroring the other
+/// inventories.
+pub fn list_participation_anchor_inventory(
+    conn: &mut SqliteConnection,
+    offset: i64,
+    cap: i64,
+) -> Result<(Vec<String>, i64), StorageError> {
+    let total: i64 = collective_participations::table
+        .filter(collective_participations::h_app_id.eq(PARTICIPATIONS_HAPP_ID))
+        .filter(collective_participations::dht_anchor_hash.is_not_null())
+        .filter(collective_participations::dht_anchor_hash.ne(""))
+        .count()
+        .get_result(conn)
+        .map_err(|e| {
+            StorageError::Internal(format!("participation anchor inventory count failed: {e}"))
+        })?;
+
+    let rows: Vec<Option<String>> = collective_participations::table
+        .filter(collective_participations::h_app_id.eq(PARTICIPATIONS_HAPP_ID))
+        .filter(collective_participations::dht_anchor_hash.is_not_null())
+        .filter(collective_participations::dht_anchor_hash.ne(""))
+        .order((
+            collective_participations::updated_at.desc(),
+            collective_participations::id.asc(),
+        ))
+        .offset(offset.max(0))
+        .limit(cap)
+        .select(collective_participations::dht_anchor_hash)
+        .load(conn)
+        .map_err(|e| {
+            StorageError::Internal(format!("participation anchor inventory load failed: {e}"))
+        })?;
+
+    // `IS NOT NULL` guarantees `Some`; `filter_map` discards defensively rather
+    // than unwrap (the same discipline the content/collectives inventories use).
+    Ok((rows.into_iter().flatten().collect(), total))
+}
+
+/// Which of `anchors` this peer already holds in its participation projection.
+///
+/// The reconcile arm's ONE presence query: an anchor present here is in sync (a
+/// row already carries this Membership), an anchor absent is a gap the own
+/// conductor can answer for.
+///
+/// NOTE: same `SQLITE_MAX_VARIABLE_NUMBER` caveat as
+/// [`collective_ids_present`] — callers must chunk large id sets.
+pub fn participation_anchors_present(
+    conn: &mut SqliteConnection,
+    anchors: &[String],
+) -> Result<std::collections::HashSet<String>, StorageError> {
+    if anchors.is_empty() {
+        return Ok(Default::default());
+    }
+    let found: Vec<Option<String>> = collective_participations::table
+        .filter(collective_participations::h_app_id.eq(PARTICIPATIONS_HAPP_ID))
+        .filter(collective_participations::dht_anchor_hash.eq_any(anchors))
+        .select(collective_participations::dht_anchor_hash)
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("participation presence query failed: {e}")))?;
+    Ok(found.into_iter().flatten().collect())
+}
+
 /// Dissolve a collective (sets dissolved_at timestamp)
 pub fn dissolve_collective(
     conn: &mut SqliteConnection,
@@ -983,16 +1069,22 @@ pub fn gap_fill_household_collective_cid_via_membership(
 
 // ============================================================================
 // Participation Read Operations
+//
+// EVERY function below scopes by [`PARTICIPATIONS_HAPP_ID`] and takes NO
+// `AppContext`. That is the anti-drift shape, not an omission: the write side
+// (account-import) and the read side (the legacy participants route) had
+// silently disagreed — `"qahal"` vs `"lamad"` — and no signature stopped them.
+// With the scope owned here, a caller cannot hand in the operating content
+// scope by accident. See `db::context::PARTICIPATIONS_HAPP_ID`.
 // ============================================================================
 
 /// Get all active participations for a human
 pub fn get_participations_for_human(
     conn: &mut SqliteConnection,
-    ctx: &AppContext,
     human_id: &str,
 ) -> Result<Vec<CollectiveParticipation>, StorageError> {
     collective_participations::table
-        .filter(collective_participations::h_app_id.eq(&ctx.h_app_id))
+        .filter(collective_participations::h_app_id.eq(PARTICIPATIONS_HAPP_ID))
         .filter(collective_participations::human_id.eq(human_id))
         .filter(collective_participations::departed_at.is_null())
         .order(collective_participations::joined_at.desc())
@@ -1003,11 +1095,10 @@ pub fn get_participations_for_human(
 /// Get all active participants of a collective
 pub fn get_participants_of_collective(
     conn: &mut SqliteConnection,
-    ctx: &AppContext,
     collective_id: &str,
 ) -> Result<Vec<CollectiveParticipation>, StorageError> {
     collective_participations::table
-        .filter(collective_participations::h_app_id.eq(&ctx.h_app_id))
+        .filter(collective_participations::h_app_id.eq(PARTICIPATIONS_HAPP_ID))
         .filter(collective_participations::collective_id.eq(collective_id))
         .filter(collective_participations::departed_at.is_null())
         .order(collective_participations::joined_at.asc())
@@ -1022,7 +1113,6 @@ pub fn get_participants_of_collective(
 /// Create a participation (tolerates UNIQUE constraint violations for re-seeding)
 pub fn create_participation(
     conn: &mut SqliteConnection,
-    ctx: &AppContext,
     input: &CreateParticipationInput,
 ) -> Result<CollectiveParticipation, StorageError> {
     if !intimacy_levels::is_valid(&input.intimacy_level) {
@@ -1040,7 +1130,7 @@ pub fn create_participation(
 
     // Check if participation already exists (upsert for re-seeding)
     let existing: Option<CollectiveParticipation> = collective_participations::table
-        .filter(collective_participations::h_app_id.eq(&ctx.h_app_id))
+        .filter(collective_participations::h_app_id.eq(PARTICIPATIONS_HAPP_ID))
         .filter(collective_participations::collective_id.eq(&input.collective_id))
         .filter(collective_participations::human_id.eq(&input.human_id))
         .first(conn)
@@ -1075,7 +1165,7 @@ pub fn create_participation(
 
     let new = NewCollectiveParticipation {
         id: &id,
-        h_app_id: &ctx.h_app_id,
+        h_app_id: PARTICIPATIONS_HAPP_ID,
         collective_id: &input.collective_id,
         human_id: &input.human_id,
         intimacy_level: &input.intimacy_level,
@@ -1104,7 +1194,6 @@ pub fn create_participation(
 /// Update participation intimacy level
 pub fn update_participation_intimacy(
     conn: &mut SqliteConnection,
-    ctx: &AppContext,
     participation_id: &str,
     new_level: &str,
 ) -> Result<CollectiveParticipation, StorageError> {
@@ -1118,7 +1207,7 @@ pub fn update_participation_intimacy(
 
     diesel::update(
         collective_participations::table
-            .filter(collective_participations::h_app_id.eq(&ctx.h_app_id))
+            .filter(collective_participations::h_app_id.eq(PARTICIPATIONS_HAPP_ID))
             .filter(collective_participations::id.eq(participation_id)),
     )
     .set((
@@ -1141,13 +1230,12 @@ pub fn update_participation_intimacy(
 /// Depart from a collective (sets departed_at — soft exit)
 pub fn depart_collective(
     conn: &mut SqliteConnection,
-    ctx: &AppContext,
     collective_id: &str,
     human_id: &str,
 ) -> Result<bool, StorageError> {
     let updated = diesel::update(
         collective_participations::table
-            .filter(collective_participations::h_app_id.eq(&ctx.h_app_id))
+            .filter(collective_participations::h_app_id.eq(PARTICIPATIONS_HAPP_ID))
             .filter(collective_participations::collective_id.eq(collective_id))
             .filter(collective_participations::human_id.eq(human_id))
             .filter(collective_participations::departed_at.is_null()),
@@ -1332,7 +1420,6 @@ mod tests {
             .execute(&mut conn)
             .expect("enable FK enforcement");
         let lamad_ctx = AppContext::new("lamad");
-        let qahal_ctx = AppContext::new("qahal");
 
         let part_input = CreateParticipationInput {
             id: None,
@@ -1346,7 +1433,7 @@ mod tests {
         };
 
         // The storm shape: no parent row anywhere → FK constraint failure.
-        let err = create_participation(&mut conn, &qahal_ctx, &part_input)
+        let err = create_participation(&mut conn, &part_input)
             .expect_err("participation without FK parent must fail");
         assert!(
             err.to_string().contains("FOREIGN KEY constraint failed"),
@@ -1359,7 +1446,7 @@ mod tests {
         let stub = CreateCollectiveInput::stub("household-dowell");
         create_collective(&mut conn, &lamad_ctx, &stub).expect("stub create");
         assert!(collective_id_exists(&mut conn, "household-dowell").expect("probe"));
-        create_participation(&mut conn, &qahal_ctx, &part_input)
+        create_participation(&mut conn, &part_input)
             .expect("participation lands once the stub parent exists");
 
         // Convergence: the authoritative projection's later lamad-scoped
@@ -1851,8 +1938,7 @@ mod tests {
             consent_state: "consented".to_string(),
             metadata_json: None,
         };
-        let part =
-            create_participation(&mut conn, &ctx, &part_input).expect("create participation");
+        let part = create_participation(&mut conn, &part_input).expect("create participation");
 
         assert_eq!(
             part.member_kind, "person",

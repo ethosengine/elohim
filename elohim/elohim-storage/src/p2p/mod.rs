@@ -54,6 +54,7 @@ pub mod inventory_broadcaster;
 pub mod inventory_gossip;
 pub mod kad_store;
 pub mod observation_gossip;
+pub mod participations_reconcile; // cross-peer membership arm of the projection reconcile
 pub mod projection_ack_handler; // Phase 4 T4 — ack-projection side-projection writer
 pub mod projection_reconcile; // P1 reconciliation stream — REA commitments converge from own conductor
 pub mod reach_authorization;

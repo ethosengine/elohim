@@ -832,21 +832,6 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         Ok(())
     }
 
-    /// Wave 2 T5: upsert a `collective_participations` row from a
-    /// `MembershipCommitted` imagodei DNA signal.
-    ///
-    /// Idempotency key: `dht_anchor_hash = action_hash`.  Re-delivered signals
-    /// update the existing row rather than inserting a duplicate.
-    ///
-    /// `human_id` = `member_cid`: the canonical member_cid doubles as
-    /// `human_id` for live agent members (satisfying the NOT NULL constraint).
-    ///
-    /// `collective_id` is resolved to the `collectives.id` for `collective_cid`
-    /// if the row exists; if absent (race between Collective + Membership
-    /// commits), falls back to `collective_cid` so the row is not lost.
-    ///
-    /// If no DB pool is wired (test stub constructed via `new()`), logs at
-    /// debug level and returns `Ok(())`.
     /// T2.2: project a hosted-at binding into `hosted_agent_bindings`.
     ///
     /// The DHT truth is a Category-A2 link; `signal.action_hash` (the CreateLink
@@ -946,13 +931,26 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         Ok(())
     }
 
+    /// Wave 2 T5 / cross-peer reconcile: project a `MembershipCommitted`
+    /// imagodei DNA signal into `collective_participations`.
+    ///
+    /// Thin by construction — the whole mapping (collective_id + human_id
+    /// resolution, the `dht_anchor_hash` idempotency key, and the
+    /// `humans.agent_pub_key` / `humans.household_id` backfill) lives in
+    /// [`crate::db::memberships::project_membership`], SHARED with the
+    /// cross-peer participations reconcile arm in
+    /// `p2p::projection_reconcile`. `post_commit` fires only on the AUTHORING
+    /// conductor, so that arm is the only way a peer ever sees a Membership
+    /// authored elsewhere; both arms landing through one mapping is what keeps
+    /// them from drifting.
+    ///
+    /// If no DB pool is wired (test stub constructed via `new()`), logs at
+    /// debug level and returns `Ok(())`.
     async fn on_membership_projected(
         &mut self,
         signal: MembershipProjectedSignal,
     ) -> Result<(), ReconcileError> {
-        use crate::db::context::AppContext;
-        use crate::db::diesel_schema::{collective_participations, collectives};
-        use diesel::prelude::*;
+        use crate::db::memberships::{project_membership, MembershipProjection};
 
         let pool = match self.db_pool.as_ref() {
             Some(p) => p,
@@ -978,276 +976,35 @@ impl<S: DnaSignalStream> ReconcileController<S> {
             }
         };
 
-        let ctx = AppContext::new("lamad");
-
-        // Resolve collective_id: prefer the collectives row whose collective_cid
-        // matches.  If absent (Collective arrives after Membership in a race),
-        // use the collective_cid as the id directly so the row is not lost.
-        let collective_id: String = collectives::table
-            .filter(collectives::h_app_id.eq(&ctx.h_app_id))
-            .filter(collectives::collective_cid.eq(&signal.collective_cid))
-            .select(collectives::id)
-            .first::<String>(&mut conn)
-            .unwrap_or_else(|_| signal.collective_cid.clone());
-
-        // Check for an existing row keyed by dht_anchor_hash to decide
-        // insert vs update.
-        let existing_id: Option<String> = collective_participations::table
-            .filter(collective_participations::h_app_id.eq(&ctx.h_app_id))
-            .filter(collective_participations::dht_anchor_hash.eq(Some(&signal.action_hash)))
-            .select(collective_participations::id)
-            .first::<String>(&mut conn)
-            .optional()
-            .unwrap_or(None);
-
-        // Tracks whether the participation row was successfully written. The
-        // household_id stamp below is gated on this so a failed insert/update
-        // never leaves a human with a household_id but no participation row.
-        let participation_ok: bool;
-
-        if let Some(existing_id) = existing_id {
-            // Re-delivery: update the mutable fields.
-            let updated = diesel::update(
-                collective_participations::table
-                    .filter(collective_participations::id.eq(&existing_id)),
-            )
-            .set((
-                collective_participations::member_cid.eq(Some(&signal.member_cid)),
-                collective_participations::member_kind.eq(&signal.member_kind),
-                collective_participations::role_context.eq(Some(&signal.role_context)),
-                collective_participations::departed_at.eq(signal.departed_at.as_deref()),
-                collective_participations::updated_at
-                    .eq(chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()),
-            ))
-            .execute(&mut conn)
-            .map_err(|e| {
-                warn!(
-                    member_cid = %signal.member_cid,
-                    dht_anchor_hash = %signal.action_hash,
-                    error = %e,
-                    "on_membership_projected: update of existing row failed (non-fatal)"
-                );
-            });
-            participation_ok = updated.is_ok();
-            debug!(
-                member_cid = %signal.member_cid,
-                dht_anchor_hash = %signal.action_hash,
-                "collective_participations row updated on re-delivery"
-            );
-        } else {
-            // First delivery: insert.
-            use crate::db::collectives::{create_participation, CreateParticipationInput};
-            use crate::db::models::intimacy_levels;
-
-            let input = CreateParticipationInput {
-                id: None, // auto-generated
-                collective_id: collective_id.clone(),
-                // human_id = member_cid (canonical member_cid doubles as human_id
-                // for live agent members; satisfies NOT NULL constraint).
-                human_id: signal.member_cid.clone(),
-                intimacy_level: intimacy_levels::RECOGNITION.to_string(),
-                role_context: Some(signal.role_context.clone()),
-                governance_weight: 1.0,
-                consent_state: crate::db::models::consent_states::CONSENTED.to_string(),
-                metadata_json: None,
-            };
-
-            match create_participation(&mut conn, &ctx, &input) {
-                Ok(row) => {
-                    // Stamp the DHT-derived columns that create_participation
-                    // does not accept as input fields.
-                    let _ = diesel::update(
-                        collective_participations::table
-                            .filter(collective_participations::id.eq(&row.id)),
-                    )
-                    .set((
-                        collective_participations::member_cid.eq(Some(&signal.member_cid)),
-                        collective_participations::member_kind.eq(&signal.member_kind),
-                        collective_participations::dht_anchor_hash.eq(Some(&signal.action_hash)),
-                        collective_participations::departed_at.eq(signal.departed_at.as_deref()),
-                    ))
-                    .execute(&mut conn)
-                    .map_err(|e| {
-                        warn!(
-                            member_cid = %signal.member_cid,
-                            error = %e,
-                            "on_membership_projected: DHT-column stamp failed (non-fatal)"
-                        );
-                    });
-                    participation_ok = true;
-                    debug!(
-                        member_cid = %signal.member_cid,
-                        collective_id = %collective_id,
-                        dht_anchor_hash = %signal.action_hash,
-                        "collective_participations row inserted from DHT signal"
-                    );
-                }
-                Err(e) => {
-                    participation_ok = false;
-                    warn!(
-                        member_cid = %signal.member_cid,
-                        collective_id = %collective_id,
-                        error = %e,
-                        "on_membership_projected: create_participation failed"
-                    );
-                }
-            }
-        }
-
-        // Backfill the member's household_id from this collective membership.
-        //
-        // Both resilience snapshot() joins read humans.household_id, and nothing
-        // else in production populates it. A membership signal is the canonical
-        // source: the member now belongs to this collective. We stamp idempotently
-        // — only NULL household_id rows are touched, so a human already placed in a
-        // household (or a re-delivery) is never overwritten. A failure here WARNs
-        // and never aborts the membership projection (the participation row is the
-        // primary product of this handler).
-        //
-        // Four guards make this stamp production-correct (not a no-op or over-broad):
-        //
-        //  (a) KEYING — `member_cid` is the imagodei `encode_agent_cid` form
-        //      `agent:{pubkey}` (qahal_coordinator.rs). Production `humans` rows
-        //      are keyed by slug `id` (`human-alice-...`) with `agent_pub_key`
-        //      carrying the RAW base64 pubkey (`uhCAk...`, NO `agent:` prefix —
-        //      see seeder bootstrap.ts `uint8ArrayToBase64(cellId[1])`). The
-        //      resilience snapshot() joins on `humans.agent_pub_key = peer_id`,
-        //      so the stamp MUST light the same rows that join reads. We match
-        //      BOTH vocabularies: `id == member_cid` (in case a row was keyed by
-        //      the CID directly) OR `agent_pub_key == <member_cid sans agent:>`
-        //      (the production shape that aligns with the resilience join).
-        //
-        //  (b) COLLECTIVE KIND — only HOUSEHOLD collectives populate
-        //      humans.household_id. A qahal/community membership arriving first
-        //      must not permanently stamp the wrong household_id (the NULL-only
-        //      guard would then block correction). We look up the projected
-        //      collectives row and stamp only when governance_layer == FAMILY
-        //      (the household marker set by on_collective_projected ~line 751).
-        //
-        //  (c) DEPARTED — a departure (`departed_at` set) must never stamp.
-        //
-        //  (d) ORDERING — gated on `participation_ok`; a failed participation
-        //      insert/update must not yield household_id-without-participation.
-        let member_agent_key = signal
-            .member_cid
-            .strip_prefix("agent:")
-            .unwrap_or(&signal.member_cid);
-
-        // (b): resolve the collective's governance_layer; stamp only households.
-        let collective_is_household: bool = collectives::table
-            .filter(collectives::h_app_id.eq(&ctx.h_app_id))
-            .filter(collectives::collective_cid.eq(&signal.collective_cid))
-            .select(collectives::governance_layer)
-            .first::<String>(&mut conn)
-            .ok()
-            .map(|layer| layer == crate::db::models::governance_layers::FAMILY)
-            .unwrap_or(false);
-
-        let skip_reason = if signal.departed_at.is_some() {
-            Some("member departed (departed_at set)")
-        } else if !participation_ok {
-            Some("participation row was not written")
-        } else if !collective_is_household {
-            Some("collective is not a household (governance_layer != family)")
-        } else {
-            None
+        let projection = MembershipProjection {
+            action_hash: &signal.action_hash,
+            collective_cid: &signal.collective_cid,
+            member_cid: &signal.member_cid,
+            member_kind: &signal.member_kind,
+            role_context: &signal.role_context,
+            departed_at: signal.departed_at.as_deref(),
         };
 
-        if let Some(reason) = skip_reason {
-            debug!(
-                member_cid = %signal.member_cid,
-                collective_cid = %signal.collective_cid,
-                reason,
-                "on_membership_projected: household_id stamp skipped"
-            );
-        } else {
-            use crate::db::diesel_schema::humans;
-
-            // Stamp humans.agent_pub_key from the membership signal BEFORE the
-            // household_id stamp below — this is the fix for the documented
-            // all-zeros-resilience-card root cause (NULL humans.agent_pub_key;
-            // see elohim-storage/CLAUDE.md "Identity & Transport-Identity
-            // Coherence" and the coherent-transport-identity-resolver design
-            // §3.4 "stopgap"). Two guards make this production-correct:
-            //
-            //  - NULL-only + matched by `humans::id` only (never the
-            //    `agent_pub_key` OR-arm the household_id stamp below uses — we
-            //    cannot match on the very column we are about to write).
-            //    Overwriting a set key is exclusively `rekey_human_agent_key`'s
-            //    job (db/humans.rs); this stamp must never block a later
-            //    key-supersede, so it only ever fills a NULL.
-            //  - Namespace guard: only write when `member_agent_key` is
-            //    agent_cid-shaped (`uhCAk…`) per `identity_namespace`. A
-            //    transport id (libp2p `12D3Koo…`, iroh hex) landing in this
-            //    join-key column is exactly the raw-string cross-namespace
-            //    join bug the CLAUDE.md doc warns about — skip and observe
-            //    instead of writing it.
-            if crate::identity_namespace::is_agent_cid(member_agent_key) {
-                match diesel::update(
-                    humans::table
-                        .filter(humans::id.eq(&signal.member_cid))
-                        .filter(humans::agent_pub_key.is_null()),
-                )
-                .set(humans::agent_pub_key.eq(Some(member_agent_key)))
-                .execute(&mut conn)
-                {
-                    Ok(n) if n > 0 => {
-                        debug!(
-                            member_cid = %signal.member_cid,
-                            collective_cid = %signal.collective_cid,
-                            "on_membership_projected: stamped humans.agent_pub_key"
-                        );
-                    }
-                    Ok(_) => {
-                        // No-op: human row absent (no row keyed by member_cid)
-                        // or agent_pub_key already set. Honest.
-                    }
-                    Err(e) => {
-                        warn!(
-                            member_cid = %signal.member_cid,
-                            collective_cid = %signal.collective_cid,
-                            error = %e,
-                            "on_membership_projected: agent_pub_key stamp failed (non-fatal)"
-                        );
-                    }
-                }
-            } else {
-                crate::identity_namespace::observe_agent_cid_write(
-                    "humans.agent_pub_key",
-                    Some(member_agent_key),
+        match project_membership(&mut conn, &projection) {
+            Ok(outcome) => {
+                debug!(
+                    member_cid = %signal.member_cid,
+                    collective_cid = %signal.collective_cid,
+                    dht_anchor_hash = %signal.action_hash,
+                    ?outcome,
+                    "Projected collective membership"
                 );
             }
-
-            match diesel::update(
-                humans::table
-                    .filter(
-                        humans::id
-                            .eq(&signal.member_cid)
-                            .or(humans::agent_pub_key.eq(member_agent_key)),
-                    )
-                    .filter(humans::household_id.is_null()),
-            )
-            .set(humans::household_id.eq(Some(&signal.collective_cid)))
-            .execute(&mut conn)
-            {
-                Ok(n) if n > 0 => {
-                    debug!(
-                        member_cid = %signal.member_cid,
-                        collective_cid = %signal.collective_cid,
-                        "on_membership_projected: stamped humans.household_id"
-                    );
-                }
-                Ok(_) => {
-                    // No-op: human row absent or household_id already set. Honest.
-                }
-                Err(e) => {
-                    warn!(
-                        member_cid = %signal.member_cid,
-                        collective_cid = %signal.collective_cid,
-                        error = %e,
-                        "on_membership_projected: household_id stamp failed (non-fatal)"
-                    );
-                }
+            Err(e) => {
+                // Non-fatal, exactly as before: a projection failure must not
+                // abort the signal stream. The reconcile arm retries the same
+                // anchor on its next sweep.
+                warn!(
+                    member_cid = %signal.member_cid,
+                    collective_cid = %signal.collective_cid,
+                    error = %e,
+                    "on_membership_projected: projection failed"
+                );
             }
         }
 

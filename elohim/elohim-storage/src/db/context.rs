@@ -19,6 +19,33 @@
 /// ("decide ONE scope, flip both together").
 pub const HUMANS_HAPP_ID: &str = "imagodei";
 
+/// Canonical `h_app_id` scope for the `collective_participations` projection.
+///
+/// Participation in a collective is the **qahal** (community) pillar's
+/// projection — and the table's own DDL already says so: `h_app_id TEXT NOT NULL
+/// DEFAULT 'qahal'` (`migrations/2026-01-08-000000_initial/up.sql`).
+///
+/// This constant exists because the write and read sides drifted apart exactly
+/// as `HUMANS_HAPP_ID`'s did: account-import wrote participations under
+/// `"qahal"` while the legacy `GET /db/collectives/{id}/participants` route and
+/// the `MembershipProjected` signal projector wrote/read `"lamad"` (the
+/// operating content scope). Rows written by one surface were invisible to the
+/// other — the empty `{"items": [], "count": 0}` the household-formation E2E
+/// measured on alpha 2026-08-20.
+///
+/// Every participation read AND write scopes by this constant. It is not passed
+/// as an `AppContext` parameter on purpose: the participation functions in
+/// [`crate::db::collectives`] take no `ctx`, so a caller CANNOT hand them the
+/// operating content scope by accident. "Decide ONE scope, flip both together"
+/// is enforced by the signature, not by remembering a filter.
+///
+/// NOTE the deliberate asymmetry with the parent `collectives` table, which
+/// stays app-scoped (`lamad`) — its cross-peer reconcile arm and its
+/// `CollectiveProjected` signal arm both read/write there, and the
+/// participation FK references bare `collectives(id)` across scopes (see
+/// [`crate::db::collectives::collective_id_exists`]).
+pub const PARTICIPATIONS_HAPP_ID: &str = "qahal";
+
 /// App context passed to all database operations for multi-tenant isolation
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AppContext {
@@ -91,5 +118,16 @@ mod tests {
         // scope; every household-join reader MUST filter humans by it (not the
         // operating content scope "lamad"), or the join silently empties.
         assert_eq!(super::HUMANS_HAPP_ID, "imagodei");
+    }
+
+    #[test]
+    fn participations_happ_id_matches_the_table_default() {
+        // The initial migration declares
+        //   h_app_id TEXT NOT NULL DEFAULT 'qahal'
+        // on `collective_participations`. A constant that disagreed with the
+        // column default would let an INSERT that omits the column land under a
+        // scope no reader filters by — the same silent-empty class the
+        // account-import (`qahal`) vs legacy-route (`lamad`) split produced.
+        assert_eq!(super::PARTICIPATIONS_HAPP_ID, "qahal");
     }
 }

@@ -376,7 +376,6 @@ mod tests {
         collective_slug: &str,
         human_id: &str,
     ) {
-        let app_ctx = ctx();
         let input = CreateParticipationInput {
             id: Some(format!("part-{collective_slug}-{human_id}")),
             collective_id: collective_slug.to_string(),
@@ -387,7 +386,7 @@ mod tests {
             consent_state: "consented".to_string(),
             metadata_json: None,
         };
-        create_participation(conn, &app_ctx, &input).expect("seed participation");
+        create_participation(conn, &input).expect("seed participation");
     }
 
     /// Seed a participation row with member_cid set (CID-canonical path).

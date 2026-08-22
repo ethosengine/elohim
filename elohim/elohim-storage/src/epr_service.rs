@@ -495,7 +495,7 @@ impl EprService {
 
             "community" => {
                 let participations =
-                    crate::db::collectives::get_participations_for_human(conn, app_ctx, &human.id)
+                    crate::db::collectives::get_participations_for_human(conn, &human.id)
                         .map_err(|e| format!("Participation lookup failed: {}", e))?;
 
                 if participations
@@ -707,9 +707,8 @@ impl EprService {
 
         let steward_human_ids = self.get_steward_human_ids(conn, app_ctx, content_id)?;
 
-        let participations =
-            crate::db::collectives::get_participations_for_human(conn, app_ctx, &human.id)
-                .map_err(|e| format!("Participation lookup failed: {}", e))?;
+        let participations = crate::db::collectives::get_participations_for_human(conn, &human.id)
+            .map_err(|e| format!("Participation lookup failed: {}", e))?;
 
         let mut result = Err("No shared collective with content steward".to_string());
         for participation in &participations {
@@ -718,7 +717,6 @@ impl EprService {
             }
             let members = crate::db::collectives::get_participants_of_collective(
                 conn,
-                app_ctx,
                 &participation.collective_id,
             )
             .map_err(|e| format!("Members lookup failed: {}", e))?;

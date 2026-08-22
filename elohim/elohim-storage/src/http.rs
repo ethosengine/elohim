@@ -5380,18 +5380,14 @@ impl HttpServer {
         if let Some(coll_path) = resource_path.strip_prefix("collectives/") {
             // Check for participants sub-path
             if let Some(rest) = coll_path.strip_suffix("/participants") {
-                return self
-                    .handle_collective_participants(req, method, rest, &app_ctx)
-                    .await;
+                return self.handle_collective_participants(req, method, rest).await;
             }
             // Check for participants/{human_id} delete pattern
             if coll_path.contains("/participants/") {
                 let parts: Vec<&str> = coll_path.splitn(3, '/').collect();
                 if parts.len() == 3 && parts[1] == "participants" {
                     return self
-                        .handle_collective_participant_depart(
-                            req, method, parts[0], parts[2], &app_ctx,
-                        )
+                        .handle_collective_participant_depart(req, method, parts[0], parts[2])
                         .await;
                 }
             }
@@ -5404,7 +5400,7 @@ impl HttpServer {
         // Participations by human route
         if let Some(human_id) = resource_path.strip_prefix("participations/") {
             return self
-                .handle_participations_by_human(req, method, human_id, &app_ctx)
+                .handle_participations_by_human(req, method, human_id)
                 .await;
         }
 
@@ -11165,18 +11161,23 @@ impl HttpServer {
     }
 
     /// GET/POST /db/collectives/{id}/participants
+    ///
+    /// Takes NO `AppContext`: participations live under the canonical
+    /// `db::context::PARTICIPATIONS_HAPP_ID` scope, owned by the db layer. This
+    /// route used to be handed the operating content scope (`lamad`) while
+    /// account-import wrote `qahal`, so it answered `{"items": [], "count": 0}`
+    /// for a household whose memberships plainly existed.
     async fn handle_collective_participants(
         &self,
         req: Request<Incoming>,
         method: Method,
         collective_id: &str,
-        ctx: &AppContext,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         let mut conn = self.get_diesel_conn()?;
 
         match method {
             Method::GET => {
-                match collectives::get_participants_of_collective(&mut conn, ctx, collective_id) {
+                match collectives::get_participants_of_collective(&mut conn, collective_id) {
                     Ok(items) => {
                         let views: Vec<CollectiveParticipationView> = items
                             .into_iter()
@@ -11223,7 +11224,7 @@ impl HttpServer {
                     metadata_json: None,
                 };
 
-                match collectives::create_participation(&mut conn, ctx, &participation_input) {
+                match collectives::create_participation(&mut conn, &participation_input) {
                     Ok(p) => Ok(response::created(&CollectiveParticipationView::from(p))),
                     Err(e) => Ok(response::error_response(e)),
                 }
@@ -11233,20 +11234,21 @@ impl HttpServer {
     }
 
     /// DELETE /db/collectives/{id}/participants/{human_id} - Depart from collective
+    ///
+    /// Scope-free for the same reason as [`Self::handle_collective_participants`].
     async fn handle_collective_participant_depart(
         &self,
         _req: Request<Incoming>,
         method: Method,
         collective_id: &str,
         human_id: &str,
-        ctx: &AppContext,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         if method != Method::DELETE {
             return Ok(response::method_not_allowed());
         }
 
         let mut conn = self.get_diesel_conn()?;
-        match collectives::depart_collective(&mut conn, ctx, collective_id, human_id) {
+        match collectives::depart_collective(&mut conn, collective_id, human_id) {
             Ok(true) => Ok(response::ok(&serde_json::json!({"departed": true}))),
             Ok(false) => Ok(response::not_found("Participation not found")),
             Err(e) => Ok(response::error_response(e)),
@@ -11254,19 +11256,20 @@ impl HttpServer {
     }
 
     /// GET /db/participations/{human_id} - All collectives for a human
+    ///
+    /// Scope-free for the same reason as [`Self::handle_collective_participants`].
     async fn handle_participations_by_human(
         &self,
         _req: Request<Incoming>,
         method: Method,
         human_id: &str,
-        ctx: &AppContext,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         if method != Method::GET {
             return Ok(response::method_not_allowed());
         }
 
         let mut conn = self.get_diesel_conn()?;
-        match collectives::get_participations_for_human(&mut conn, ctx, human_id) {
+        match collectives::get_participations_for_human(&mut conn, human_id) {
             Ok(items) => {
                 let views: Vec<CollectiveParticipationView> = items
                     .into_iter()
@@ -11496,8 +11499,6 @@ impl HttpServer {
                 .get()
                 .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
 
-            let qahal_ctx = AppContext::new("qahal");
-
             for coll_seed in &package.collectives {
                 // Ensure the FK parent exists before joining. Collective
                 // definitions are seeded to a SINGLE peer (seed-collectives.ts)
@@ -11550,8 +11551,7 @@ impl HttpServer {
                     metadata_json: None,
                 };
 
-                match collectives::create_participation(&mut conn, &qahal_ctx, &participation_input)
-                {
+                match collectives::create_participation(&mut conn, &participation_input) {
                     Ok(_) => collectives_joined += 1,
                     Err(e) => {
                         errors.push(format!(
@@ -11702,10 +11702,8 @@ impl HttpServer {
 
         // Phase 4: Gather collective participations
         let collective_seeds: Vec<CollectiveSeedView> = {
-            let qahal_ctx = AppContext::new("qahal");
             let participations =
-                collectives::get_participations_for_human(&mut conn, &qahal_ctx, human_id)
-                    .unwrap_or_default();
+                collectives::get_participations_for_human(&mut conn, human_id).unwrap_or_default();
 
             participations
                 .into_iter()

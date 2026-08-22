@@ -179,6 +179,114 @@ pub fn decode_collective_cid(
     })
 }
 
+/// Wire mirror of `imagodei_integrity::qahal::Membership` — the DHT entry body
+/// as it arrives inside a `Record`'s `Entry::App` msgpack bytes.
+///
+/// A LOCAL mirror for the same reason [`CollectiveWire`] is one: elohim-storage
+/// does not link the DNA crates. The two enum fields reuse the storage-side
+/// signal mirrors ([`crate::signals::MemberKindPayload`] /
+/// [`crate::signals::MembershipRolePayload`]) rather than re-declaring them, so
+/// the conductor-read path and the post-commit signal path can never disagree
+/// about how a role maps to a `role_context` string.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct MembershipWire {
+    pub member_cid: String,
+    pub member_kind: crate::signals::MemberKindPayload,
+    pub collective_cid: String,
+    pub role: crate::signals::MembershipRolePayload,
+    #[serde(default)]
+    pub sponsor_cid: Option<String>,
+    #[serde(default)]
+    pub joined_at_block_height: u64,
+    #[serde(default)]
+    pub withdrawn_at_block_height: Option<u64>,
+}
+
+/// Resolve a `Membership` ActionHash against the OWN conductor's imagodei cell
+/// (`get_membership_by_action`).
+///
+/// The participations arm's analogue of [`get_collective_by_cid`]: the
+/// reconcile leg learns WHICH Membership anchors exist from peers (discovery),
+/// then reads the entry BODY exclusively from its own conductor. No peer bytes
+/// ever enter the projection.
+///
+/// `Ok(None)` means the own conductor cannot see the entry (not yet gossiped
+/// in, or a foreign-DHT anchor) — retried on the NEXT sweep, never immediately.
+/// A malformed anchor is an `InvalidInput` error, not a miss: it can never
+/// resolve, so re-attempting it every sweep would burn a round-trip forever.
+///
+/// NOTE the coordinator returns `ExternResult<Record>`, NOT `Option<Record>` —
+/// a missing Membership arrives as a wasm error carrying `"Membership not
+/// found"`. That string match is the only available not-found signal, so it is
+/// classified here (and ONLY here) rather than leaking a "the conductor is
+/// broken" error into the heal loop; anything else propagates as `Err`.
+pub async fn get_membership_by_anchor(
+    hc: &Arc<HcClient>,
+    action_hash_b64: &str,
+) -> Result<Option<MembershipWire>, StorageError> {
+    let action_hash = decode_action_hash(action_hash_b64)?;
+    let payload = rmp_serde::to_vec_named(&action_hash).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode ActionHash for get_membership_by_action: {e}"
+        ))
+    })?;
+    let bytes = match hc
+        .call_zome_imagodei(IMAGODEI_ZOME, "get_membership_by_action", payload)
+        .await
+    {
+        Ok(b) => b,
+        Err(e) if is_membership_not_found(&e) => return Ok(None),
+        Err(e) => return Err(e),
+    };
+    // TYPED `Record` decode — a `serde_json::Value` pre-pass or a hand-rolled
+    // mirror drops the holo_hash fields inside `SignedActionHashed` (the
+    // msgpack raw-bytes decode class).
+    let record: holochain_types::prelude::Record = rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode Record from get_membership_by_action: {e}"
+        ))
+    })?;
+    // A record whose entry is absent (a delete/tombstone) is not a Membership.
+    let Some(holochain_types::prelude::Entry::App(eb)) = record.entry.as_option() else {
+        return Ok(None);
+    };
+    let membership: MembershipWire = rmp_serde::from_slice(eb.bytes()).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode Membership entry for {action_hash_b64}: {e}"
+        ))
+    })?;
+    Ok(Some(membership))
+}
+
+/// Whether a `get_membership_by_action` error is the coordinator's own
+/// not-found, rather than a transport/conductor fault. Both strings come from
+/// `qahal_coordinator::get_membership_by_action`'s two `wasm_error!` arms.
+fn is_membership_not_found(err: &StorageError) -> bool {
+    let lowered = err.to_string().to_ascii_lowercase();
+    lowered.contains("membership not found") || lowered.contains("membership update record missing")
+}
+
+/// Decode a bare `uhCkk…` HoloHash-display string back to its `ActionHash`.
+///
+/// Pure + total: every failure mode is a legible `InvalidInput`. Carries the
+/// same PANIC GUARD [`decode_collective_cid`] documents — `holo_hash_decode`
+/// opens with `&s[..1]` and PANICS on an empty string, and this value arrives
+/// from a PEER's advertised inventory, so an empty anchor would abort the whole
+/// reconcile task (the one-poisoned-row class).
+pub fn decode_action_hash(
+    action_hash_b64: &str,
+) -> Result<holochain_types::prelude::ActionHash, StorageError> {
+    let raw = action_hash_b64.trim();
+    if !raw.starts_with('u') {
+        return Err(StorageError::InvalidInput(format!(
+            "invalid ActionHash '{action_hash_b64}': must be a 'u'-prefixed HoloHash"
+        )));
+    }
+    holochain_types::prelude::ActionHash::try_from(raw).map_err(|e| {
+        StorageError::InvalidInput(format!("invalid ActionHash '{action_hash_b64}': {e}"))
+    })
+}
+
 /// Round-trip `create_rea_commitment` through the local conductor.
 ///
 /// Returns raw MessagePack bytes encoding `shefa_types::ReaCommitmentOutput`.

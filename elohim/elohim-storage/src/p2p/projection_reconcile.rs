@@ -92,6 +92,46 @@
 //! `h_app_id` partition: this arm reads AND writes `lamad`
 //! (`AppContext::default_lamad()`) — the same scope
 //! `ReconcileController::on_collective_projected` projects signals into.
+//!
+//! ## The participations arm (cross-peer membership)
+//!
+//! The fourth arm ([`discover_participations`] + [`heal_participations`]) closes
+//! the same hole one level down, for `collective_participations`. A household's
+//! members each affirm membership on their OWN conductor, and
+//! `MembershipCommitted` `post_commit` fires only there — so a participation row
+//! authored by jessica's node was, before this arm, invisible on matthew's
+//! forever. That is what the household-formation E2E measured on 2026-08-20:
+//! `GET /db/collectives/family-dowell/participants` answered
+//! `{"items": [], "count": 0}` on the peer it reads, while the memberships
+//! plainly existed on the peers that authored them.
+//!
+//! Three decisions, mirroring the collectives arm:
+//!
+//! - **The identity is the `dht_anchor_hash`** — the Membership entry's
+//!   ActionHash, which is ALREADY the local projector's idempotency key. The
+//!   diesel row id is a peer-local UUID (two peers projecting one Membership
+//!   mint different ones), so it never reaches the wire; the responder puts the
+//!   anchor in both inventory slots
+//!   ([`crate::db::collectives::list_participation_anchor_inventory`]).
+//! - **No divergence class.** A row EITHER carries an anchor or it does not.
+//!   There is no "same row, different anchor" case to adjudicate the way the
+//!   collectives arm's routing alias creates one, so this arm's gap set is pure
+//!   absence — every admitted gap is healable.
+//! - **Own [`GapTracker`], own [`HealPacing`] budget, ordered LAST** (after the
+//!   collectives arm), for the same reason: the corpus is tiny and the arms
+//!   ahead of it carry the fleet's real backlog.
+//!
+//! Row content comes EXCLUSIVELY from the own conductor's `Membership` entry
+//! ([`crate::services::conductor_writes::get_membership_by_anchor`] →
+//! `imagodei::get_membership_by_action`), projected through the ONE mapping
+//! [`crate::db::memberships::project_membership`] that the post-commit signal
+//! arm also uses — so the identity resolution and the household backfill cannot
+//! drift between the two arms.
+//!
+//! `h_app_id` partition: participations are written and read under the canonical
+//! [`crate::db::PARTICIPATIONS_HAPP_ID`] (`qahal`), owned by the db-layer
+//! functions themselves (they take no `AppContext`), so this arm cannot scope
+//! them wrongly even by accident.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -106,7 +146,8 @@ use crate::p2p::head_record_client::PeerHeadRecordFetcher;
 use crate::p2p::reconcile_rails::GapTracker;
 use crate::p2p::view_federation::{
     PROJECTION_INVENTORY_CAP, PROJECTION_INVENTORY_TABLE_COLLECTIVES,
-    PROJECTION_INVENTORY_TABLE_CONTENT, PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS,
+    PROJECTION_INVENTORY_TABLE_CONTENT, PROJECTION_INVENTORY_TABLE_PARTICIPATIONS,
+    PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS,
 };
 use crate::p2p::P2PHandle;
 use crate::services::provide_loop_status::ProvideLoopState;
@@ -145,7 +186,7 @@ const WITNESS_SWEEP_BUDGET: Duration = Duration::from_secs(120);
 /// not-yet-gossiped entry). The next sweep that re-discovers it from a peer
 /// resets nothing; the failed-count persists for the life of THIS tracker, but
 /// the tracker is rebuilt each sweep, so a transient miss self-heals.
-const MAX_RETRIES: u32 = 3;
+pub(crate) const MAX_RETRIES: u32 = 3;
 
 /// Sweeps an exhausted [`MissLedger`] entry stays dormant before it is re-admitted
 /// for one more round of attempts.
@@ -369,7 +410,7 @@ impl MissLedger {
 }
 
 /// Per-peer deadline for a single `ProjectionInventory` federation request.
-const PEER_TIMEOUT: Duration = Duration::from_secs(10);
+pub(crate) const PEER_TIMEOUT: Duration = Duration::from_secs(10);
 
 // ── Heal-leg pacing (the saturated-conductor cure) ──────────────────────────
 //
@@ -452,6 +493,12 @@ const CONTENT_LEG_BUDGET: Duration = Duration::from_secs(120);
 /// help this one.
 const COLLECTIVES_LEG_BUDGET: Duration = Duration::from_secs(30);
 
+/// Per-leg wall-clock budget for the participations arm. Runs LAST, after the
+/// collectives arm, with the same smallest reserved slice and for the same
+/// reason: a household's membership corpus is a handful of rows, one conductor
+/// round-trip each, and the arms ahead of it own the fleet's real backlog.
+const PARTICIPATIONS_LEG_BUDGET: Duration = Duration::from_secs(30);
+
 /// Injectable pacing for the heal legs (retry + budget). Defaults come from the
 /// consts above; tests override with a fast profile (no real sleeps, generous
 /// budgets) so the retry/outcome logic is exercised without wall-clock waits.
@@ -464,6 +511,7 @@ pub struct HealPacing {
     pub rea_leg_budget: Duration,
     pub content_leg_budget: Duration,
     pub collectives_leg_budget: Duration,
+    pub participations_leg_budget: Duration,
     /// Consecutive NEVER-ANSWERED calls (synthetic per-attempt timeout, or a
     /// dead/refused conductor socket) that shed the rest of a leg. `0` disables
     /// the circuit (never opens).
@@ -584,6 +632,7 @@ impl Default for HealPacing {
             rea_leg_budget: REA_LEG_BUDGET,
             content_leg_budget: CONTENT_LEG_BUDGET,
             collectives_leg_budget: COLLECTIVES_LEG_BUDGET,
+            participations_leg_budget: PARTICIPATIONS_LEG_BUDGET,
             circuit_timeout_threshold: HEAL_CIRCUIT_TIMEOUT_THRESHOLD,
             witness_max_per_tick: WITNESS_MAX_PER_TICK,
             witness_sweep_budget: WITNESS_SWEEP_BUDGET,
@@ -607,6 +656,7 @@ impl HealPacing {
             rea_leg_budget: Duration::from_secs(3600),
             content_leg_budget: Duration::from_secs(3600),
             collectives_leg_budget: Duration::from_secs(3600),
+            participations_leg_budget: Duration::from_secs(3600),
             // Circuit OFF by default in tests: the existing retry/outcome cases
             // drive deliberate timeout streaks and must not be shed mid-set. The
             // circuit's own tests opt in explicitly.
@@ -774,7 +824,7 @@ fn classify_conductor_error_text(msg: &str) -> Option<ConductorErrorClass> {
 /// identical to a timeout — it means "reconnect now might help" where a timeout
 /// means "the conductor is busy, wait" — but both leave a verified peer path as
 /// the only way forward, which is precisely what adoption is.
-fn is_transient_conductor_error(err: &crate::error::StorageError) -> bool {
+pub(crate) fn is_transient_conductor_error(err: &crate::error::StorageError) -> bool {
     !matches!(classify_conductor_error(err), ConductorErrorClass::Other)
 }
 
@@ -859,14 +909,14 @@ fn should_retry_attempt(err: &crate::error::StorageError) -> bool {
 /// conductor either, but it is LOCAL capacity pressure, and letting it open the
 /// circuit would shed a leg a perfectly responsive conductor was serving.
 #[derive(Debug)]
-struct HealCircuit {
+pub(crate) struct HealCircuit {
     threshold: u32,
     consecutive_timeouts: u32,
     open: bool,
 }
 
 impl HealCircuit {
-    fn new(threshold: u32) -> Self {
+    pub(crate) fn new(threshold: u32) -> Self {
         Self {
             threshold,
             consecutive_timeouts: 0,
@@ -875,7 +925,7 @@ impl HealCircuit {
     }
 
     /// Fold one attempt outcome into the circuit.
-    fn record<T>(&mut self, outcome: &Result<T, crate::error::StorageError>) {
+    pub(crate) fn record<T>(&mut self, outcome: &Result<T, crate::error::StorageError>) {
         match outcome {
             // A success closes the circuit outright.
             Ok(_) => {
@@ -901,11 +951,11 @@ impl HealCircuit {
         }
     }
 
-    fn is_open(&self) -> bool {
+    pub(crate) fn is_open(&self) -> bool {
         self.open
     }
 
-    fn consecutive_timeouts(&self) -> u32 {
+    pub(crate) fn consecutive_timeouts(&self) -> u32 {
         self.consecutive_timeouts
     }
 }
@@ -938,7 +988,7 @@ fn classify_reauthor_failure_class(err: &crate::error::StorageError) -> Option<&
 
 /// The classified result of healing ONE row, for the `/metrics` outcome counter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum HealOutcomeKind {
+pub(crate) enum HealOutcomeKind {
     /// Conductor answered and the projection write succeeded on the first attempt.
     Healed,
     /// Conductor answered and the write succeeded, but only after ≥1 transient
@@ -1021,7 +1071,7 @@ enum HealOutcomeKind {
 }
 
 impl HealOutcomeKind {
-    fn label(self) -> &'static str {
+    pub(crate) fn label(self) -> &'static str {
         match self {
             HealOutcomeKind::Healed => "healed",
             HealOutcomeKind::TimeoutRetried => "timeout_retried",
@@ -1254,9 +1304,9 @@ pub(crate) fn conductor_missing_should_route_to_adopt(peer_advertises_declaratio
 
 /// Outcome of the bounded-retry conductor call for one row: the final result plus
 /// whether any transient retry was taken (so a success-after-retry is countable).
-struct RetryResult<T> {
-    result: Result<T, crate::error::StorageError>,
-    retried: bool,
+pub(crate) struct RetryResult<T> {
+    pub(crate) result: Result<T, crate::error::StorageError>,
+    pub(crate) retried: bool,
 }
 
 /// Call the conductor for one row with a per-attempt timeout and bounded transient
@@ -1264,7 +1314,7 @@ struct RetryResult<T> {
 /// (timeout-class) error or a per-attempt timeout backs off (jittered) and retries
 /// up to `pacing.max_row_retries`. Generic over the call closure so it is unit-
 /// testable with a fake op (no conductor).
-async fn call_with_retry<T, F, Fut>(pacing: &HealPacing, mut op: F) -> RetryResult<T>
+pub(crate) async fn call_with_retry<T, F, Fut>(pacing: &HealPacing, mut op: F) -> RetryResult<T>
 where
     F: FnMut() -> Fut,
     Fut: std::future::Future<Output = Result<T, crate::error::StorageError>>,
@@ -1541,6 +1591,7 @@ pub struct SweepPlan {
     rea: ReaDiscovery,
     content: ContentDiscovery,
     collectives: CollectivesDiscovery,
+    participations: crate::p2p::participations_reconcile::ParticipationsDiscovery,
 }
 
 /// What the per-tick heal scheduler should do, given whether the lamad bridge is
@@ -1638,7 +1689,7 @@ pub fn heal_decision(bridge_up: bool, heal_in_flight: bool) -> HealAction {
 /// bounds a lying always-`has_more` peer on the ListDocuments chain. A genuine
 /// corpus larger than this windows its first N rows per rotation (raise
 /// deliberately if a real projection ever approaches it).
-const MAX_INVENTORY_WINDOW_TOTAL: u64 = 100_000;
+pub(crate) const MAX_INVENTORY_WINDOW_TOTAL: u64 = 100_000;
 
 /// Rotating per-table window cursor for the `ProjectionInventory` reconcile.
 ///
@@ -1663,7 +1714,7 @@ impl InventoryWindow {
     }
 
     /// The offset to request for `table` this sweep (0 until advanced).
-    fn offset_for(&self, table: &str) -> u32 {
+    pub(crate) fn offset_for(&self, table: &str) -> u32 {
         self.offsets.get(table).copied().unwrap_or(0)
     }
 
@@ -1676,7 +1727,7 @@ impl InventoryWindow {
     /// `max_total` is clamped to [`MAX_INVENTORY_WINDOW_TOTAL`] BEFORE the wrap
     /// test, so a single peer's inflated `total` can never push the offset onto
     /// the `u32` saturation plateau where it would never wrap (see the const).
-    fn advance(&mut self, table: &str, requested: u32, max_total: u64) {
+    pub(crate) fn advance(&mut self, table: &str, requested: u32, max_total: u64) {
         let page = u32::try_from(PROJECTION_INVENTORY_CAP).unwrap_or(u32::MAX);
         let bounded_total = max_total.min(MAX_INVENTORY_WINDOW_TOTAL);
         let next = requested.saturating_add(page);
@@ -1817,6 +1868,9 @@ pub async fn run_discovery(
     let rea = discover_rea(p2p, pool, window, misses).await;
     let content = discover_content(p2p, pool, window, misses).await;
     let collectives = discover_collectives(p2p, pool, window, misses).await;
+    let participations =
+        crate::p2p::participations_reconcile::discover_participations(p2p, pool, window, misses)
+            .await;
 
     // Persistent known-gap / known-divergent gauges, hosted on `misses`
     // (`MissLedger::tracked` / `divergent_tracked`) — published HERE, not in
@@ -1828,6 +1882,7 @@ pub async fn run_discovery(
         ("rea", PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS),
         ("content", PROJECTION_INVENTORY_TABLE_CONTENT),
         ("collectives", PROJECTION_INVENTORY_TABLE_COLLECTIVES),
+        ("participations", PROJECTION_INVENTORY_TABLE_PARTICIPATIONS),
     ] {
         let known_divergent = misses.divergent_tracked(table);
         let known_gaps = misses.tracked(table).saturating_sub(known_divergent);
@@ -1859,6 +1914,10 @@ pub async fn run_discovery(
         collectives_gaps = collectives.tracker.counts().pending,
         collectives_divergent_cid = collectives.divergent_cid,
         collectives_local_anchored = collectives.local_anchored,
+        participations_peers_asked = participations.peers_asked,
+        participations_ids_discovered = participations.ids_discovered,
+        participations_gaps = participations.tracker.counts().pending,
+        participations_local_anchored = participations.local_anchored,
         "projection-reconcile: discovery complete (heal scheduled separately)"
     );
 
@@ -1866,6 +1925,7 @@ pub async fn run_discovery(
         rea,
         content,
         collectives,
+        participations,
     }
 }
 
@@ -1898,6 +1958,7 @@ pub async fn run_heal(
         rea,
         content,
         collectives,
+        participations,
     } = plan;
     // Bounded heal pacing (per-row transient retry + per-leg wall-clock budget).
     // REA runs FIRST with its own reserved budget so its small backlog is never
@@ -2038,6 +2099,44 @@ pub async fn run_heal(
     )
     .await;
 
+    // Participations arm — LAST, with its own reserved budget, for the same
+    // reason the collectives arm runs before it: the corpus is tiny and the
+    // arms ahead of it carry the fleet's real backlog. This arm has NO
+    // divergence class (the anchor IS the row key), so its gauges publish
+    // zero divergence honestly rather than folding a term that cannot exist.
+    let crate::p2p::participations_reconcile::ParticipationsDiscovery {
+        tracker: mut participations_tracker,
+        discovered_by: participations_discovered_by,
+        exhausted_persistent: participations_exhausted,
+        peers_asked: participations_peers_asked,
+        ids_discovered: participations_ids_discovered,
+        local_anchored: participations_local_anchored,
+        measured: participations_measured,
+    } = participations;
+    // Same measured-gate as the REA arm above (see its comment for the why).
+    crate::metrics::set_projection_reconcile_measured("participations", participations_measured);
+    if participations_measured {
+        crate::metrics::set_projection_reconcile_gauges(
+            "participations",
+            participations_tracker.counts().pending as u64,
+            participations_local_anchored as u64,
+            participations_exhausted as u64,
+            0,
+            0,
+        );
+    }
+    let crate::p2p::participations_reconcile::ParticipationsHealOutcome {
+        healed: participations_healed,
+        conductor_missing: participations_missing,
+    } = crate::p2p::participations_reconcile::heal_participations(
+        &mut participations_tracker,
+        &participations_discovered_by,
+        hc,
+        pool,
+        &pacing,
+    )
+    .await;
+
     // ADOPT-BEFORE-AUTHOR context for BOTH witness sweeps below. They are the
     // two paths that MINT roots, so they are the two that must first ask whether
     // a canonical head already exists. The fetcher rides the same view-federation
@@ -2091,13 +2190,18 @@ pub async fn run_heal(
         counts,
         content_tracker.counts(),
         collectives_tracker.counts(),
+        participations_tracker.counts(),
     ]);
     // MEASURED precondition (the N2 false-green): every arm short-circuits to an
     // `empty()` discovery on a DB/query error, and those all-zero counts reach
     // `publish_sweep` looking exactly like a healthy in-sync sweep. Requiring
     // that every arm observed its state AND that at least one peer was asked is
     // what keeps "could not measure" from publishing as "converged".
-    let measured = rea_measured && content_measured && collectives_measured && peers_asked > 0;
+    let measured = rea_measured
+        && content_measured
+        && collectives_measured
+        && participations_measured
+        && peers_asked > 0;
     state
         .publish_sweep(
             sweep_counts,
@@ -2130,6 +2234,11 @@ pub async fn run_heal(
         collectives_missing,
         collectives_divergent_cid = collectives_divergent,
         collectives_local_anchored,
+        participations_peers_asked,
+        participations_ids_discovered,
+        participations_healed,
+        participations_missing,
+        participations_local_anchored,
         "projection-reconcile: heal complete"
     );
 }
