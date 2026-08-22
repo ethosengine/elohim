@@ -724,8 +724,14 @@ mod tests {
     #[test]
     fn reconcile_cadence_guards_zero_and_absent() {
         use std::time::Duration;
-        assert_eq!(reconcile_cadence(None), Duration::from_secs(DEFAULT_RECONCILE_SECS));
-        assert_eq!(reconcile_cadence(Some(0)), Duration::from_secs(DEFAULT_RECONCILE_SECS));
+        assert_eq!(
+            reconcile_cadence(None),
+            Duration::from_secs(DEFAULT_RECONCILE_SECS)
+        );
+        assert_eq!(
+            reconcile_cadence(Some(0)),
+            Duration::from_secs(DEFAULT_RECONCILE_SECS)
+        );
         assert_eq!(reconcile_cadence(Some(10)), Duration::from_secs(10));
     }
 
