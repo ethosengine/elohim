@@ -162,3 +162,22 @@ Feature: Doorway failover — two doorways, one name, one truth
     # BORN RED 2026-08-21 with the two scenarios above — same missing cure.
     Then doorway "alpha-A" advertises a freshness stage, with authority green-only and knowledge amber-ok
     And doorway "elohim.host" advertises a freshness stage, with authority green-only and knowledge amber-ok
+
+  Scenario: A completed warmup always has a servable head to show for it
+    # MEASURED 2026-08-21 (local mesh): a warmup pass that streamed nothing
+    # from storage — pool unreachable, or reachable and empty — used to
+    # report `completed: true` anyway, so a doorway that never actually
+    # warmed looked identical to one that had, and went on serving an empty
+    # projection until someone restarted it. "Completed" now means what it
+    # says: it always has a servable head to show for it.
+    Then a completed warmup on doorway "alpha-A" has a servable head to show for it
+    And a completed warmup on doorway "elohim.host" has a servable head to show for it
+
+  Scenario: The startup surface and the shed decision read one breaker
+    # MEASURED 2026-08-21 (local mesh): a doorway actively shedding 503
+    # "catching-up" for every request answered its OWN /health/startup with
+    # every upstream circuit "closed" — a second, private breaker map the
+    # shed decision never consulted. An operator reading the startup surface
+    # saw a healthy doorway that was refusing everything.
+    Then the startup surface's circuit for doorway "alpha-A" agrees with its own shed decision
+    And the startup surface's circuit for doorway "elohim.host" agrees with its own shed decision

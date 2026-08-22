@@ -936,6 +936,23 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         }
     }
 
+    // Shell pre-warm (best-effort, off the request path). `hydrate` above only
+    // converges what the doorway's OWN Mongo archive already holds; a genuinely
+    // cold archive (fresh deploy, fresh mesh) still needs one upstream fetch per
+    // mount before `warm_shell` is warm. MEASURED (local mesh regen,
+    // 2026-08-22): `GET /` 503'd at 11.1s on the FIRST request with
+    // servedBundleHeads populated and the breaker closed — the render engine
+    // was warm, the shell store was not, and nobody had paid that cost before a
+    // real browser did. Spawned (not awaited) so a slow first fetch never
+    // delays the HTTP listener binding; see `prewarm_projected_shells` for why
+    // repeat calls (this one and the periodic-refresh one below) are cheap.
+    tokio::spawn({
+        let state = Arc::clone(&state);
+        async move {
+            doorway::server::http::prewarm_projected_shells(&state).await;
+        }
+    });
+
     // Periodic EPR-router self-heal refresh (operator-free recovery).
     //
     // The B12 boot-fetch above is a one-shot with a 10s timeout. If storage is
@@ -957,6 +974,7 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             .and_then(|v| v.parse::<u64>().ok())
             .unwrap_or(30);
         let refresh_epr_router = Arc::clone(&state.epr_router);
+        let refresh_state = Arc::clone(&state);
         let refresh_node_id = state.args.node_id.to_string();
         let refresh_doorway_id = state.args.doorway_id.clone().unwrap_or(refresh_node_id);
         let configured_pool_size = refresh_configured_urls.len();
@@ -991,6 +1009,13 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
                     &refresh_epr_router,
                     "periodic refresh",
                 );
+                // A mount that just appeared here (storage was still catching
+                // up at boot) never got the boot-time warm_shell.hydrate() or
+                // prewarm_projected_shells() pass — give it the same
+                // pre-warming a boot-time mount gets, off the request path.
+                // Awaited inline: this loop already runs on its own
+                // `refresh_secs` cadence, not the request hot path.
+                doorway::server::http::prewarm_projected_shells(&refresh_state).await;
             }
         });
         info!(

@@ -3317,6 +3317,81 @@ mod epr_dispatch_breaker_tests {
             "http://storage:8090/apps/elohim-host-landing/index.html?spaFallback=0"
         );
     }
+
+    /// Mirrors this module's own rationale for staying network-free: the
+    /// WarmupEmpty short-circuit runs BEFORE `state.upstream_breakers` or
+    /// `state.storage_proxy_client` are touched at all, so it is exactly the
+    /// kind of pure, fast-fail path this module tests without a live
+    /// AppState/upstream — no network access required, no live storage
+    /// needed. Closes the measured 10.0s `GET /` stall (see the variant's doc
+    /// comment): a doorway with no served head must never gamble the full
+    /// `EPR_DISPATCH_TIMEOUT_SECS` wall on a shell fetch.
+    #[tokio::test]
+    async fn resolve_projected_shell_short_circuits_when_warmup_is_empty() {
+        use crate::config::Args;
+        use crate::projection::warm_stream::WarmupState;
+        use clap::Parser;
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        args.storage_url = Some("http://storage:8090".to_string());
+        let mut state = AppState::new(args);
+        let ws = Arc::new(WarmupState::new());
+        ws.in_progress.store(false, Relaxed);
+        ws.completed_empty.store(true, Relaxed);
+        ws.completed.store(false, Relaxed);
+        state.warmup_state = Some(ws);
+
+        let projection = shell_projection(false);
+        let result = resolve_projected_shell(&state, &projection, "http://storage:8090").await;
+
+        assert!(matches!(result, Err(SsrFallbackReason::WarmupEmpty)));
+    }
+
+    /// The complement: a doorway with no warmup task at all — `None` is a
+    /// real third answer, see `WarmupState::is_empty_warm` — must NOT be
+    /// short-circuited; the normal cache-first shell resolution still runs.
+    /// Points at a loopback port nothing listens on (`127.0.0.1:1`, no DNS
+    /// involved) so the eventual `Cold + unreachable ⇒ Shed` connect failure
+    /// resolves near-instantly instead of needing a live upstream — this test
+    /// proves the request fails on the ABSENCE of an answer, never on the
+    /// WarmupEmpty gate.
+    #[tokio::test]
+    async fn resolve_projected_shell_does_not_short_circuit_with_no_warmup_task() {
+        use crate::config::Args;
+        use clap::Parser;
+
+        let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        args.storage_url = Some("http://127.0.0.1:1".to_string());
+        let state = AppState::new(args);
+        assert!(state.warmup_state.is_none());
+
+        let projection = shell_projection(false);
+        let result = resolve_projected_shell(&state, &projection, "http://127.0.0.1:1").await;
+
+        assert!(
+            !matches!(result, Err(SsrFallbackReason::WarmupEmpty)),
+            "no warmup task must never read as an empty one: {result:?}"
+        );
+    }
+
+    /// `prewarm_projected_shells` is a boot/refresh-tick background helper —
+    /// it must never touch the network (or panic) on a doorway with no
+    /// `STORAGE_URL` configured at all, exactly the guard
+    /// `compose_render_with_shell` already relies on
+    /// (`SsrFallbackReason::ShellNoProjection`'s sibling condition).
+    #[tokio::test]
+    async fn prewarm_projected_shells_is_a_no_op_without_a_storage_url() {
+        use crate::config::Args;
+        use clap::Parser;
+
+        let args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        assert!(args.storage_url.is_none());
+        let state = AppState::new(args);
+
+        // Must return promptly with no panic and no network access attempted.
+        prewarm_projected_shells(&state).await;
+    }
 }
 
 /// The anon-readable reach set — the doorway's HALF of the substrate's anon
@@ -3553,6 +3628,7 @@ enum SsrFallback {
 
 /// The point at which SSR fell back — drives `x-ssr-skipped` observability and
 /// selects the legacy fallback shape.
+#[derive(Debug)]
 enum SsrFallbackReason {
     AuthModeUnsupported,
     Overflow,
@@ -3586,6 +3662,17 @@ enum SsrFallbackReason {
     ShellBreakerOpen,
     /// The shell HTTP fetch failed (non-2xx, timeout, connect error).
     ShellFetchFailed,
+    /// This doorway's own warmup pass has produced NOTHING (see
+    /// `WarmupState::is_empty_warm`) — a cold shell cache with a closed
+    /// breaker used to fall into `ShellPlan::Fetch` here regardless, paying
+    /// the full `EPR_DISPATCH_TIMEOUT_SECS` (10s) wall for a shell no upstream
+    /// has ever confirmed serving. MEASURED (local mesh 2026-08-21): `GET /`
+    /// 503'd at exactly 10.0s, recurring, while `/db/content/*` through the
+    /// SAME doorway answered in 3-57ms with the breaker closed the whole
+    /// time — the stall was not upstream unavailability, it was this doorway
+    /// gambling the full budget on a shell it had no local evidence for. No
+    /// served head ⇒ skip the fetch, fall back to the CSR shell NOW.
+    WarmupEmpty,
     /// The splice itself refused — typed by `elohim_render::ComposeError`
     /// (render-root-missing / render-root-unclosed / shell-root-missing).
     Compose(elohim_render::ComposeError),
@@ -3605,6 +3692,7 @@ impl SsrFallbackReason {
             SsrFallbackReason::ShellNoProjection => "shell-no-projection",
             SsrFallbackReason::ShellBreakerOpen => "shell-breaker-open",
             SsrFallbackReason::ShellFetchFailed => "shell-fetch-failed",
+            SsrFallbackReason::WarmupEmpty => "warmup-empty",
             SsrFallbackReason::Compose(e) => e.reason_str(),
         }
     }
@@ -3767,6 +3855,7 @@ async fn ssr_fallback_response(
             | SsrFallbackReason::ShellNoProjection
             | SsrFallbackReason::ShellBreakerOpen
             | SsrFallbackReason::ShellFetchFailed
+            | SsrFallbackReason::WarmupEmpty
             | SsrFallbackReason::Compose(_) => ssr_spa_shell_fallback_with_skip_reason(
                 Some(reason.as_skip_str()),
                 Some(chrome_context_json),
@@ -3894,6 +3983,25 @@ async fn resolve_projected_shell(
     // read. The comment here used to claim `is_open` "only READS the circuit";
     // it does not, it admits a trial, and that claim sat directly on top of the
     // bug it described until 2026-08-21.
+
+    // No served head, anywhere: this doorway's own warmup pass produced NOTHING
+    // (see `WarmupState::is_empty_warm`), so there is no local evidence the
+    // shell this request would fetch exists at all. MEASURED (local mesh
+    // 2026-08-21): with the breaker CLOSED and `/db/content/*` answering in
+    // 3-57ms on the same peer, `GET /` still 503'd at exactly 10.0s — cache
+    // Cold + breaker closed used to fall straight into `ShellPlan::Fetch`
+    // below regardless, paying the FULL EPR_DISPATCH_TIMEOUT_SECS wall on a
+    // shell request with no local corroboration it would ever answer fast.
+    // Skip the fetch outright and let the caller fall back to the CSR shell
+    // NOW — never a doomed 10s stall on the browser hot path.
+    if state
+        .warmup_state
+        .as_ref()
+        .is_some_and(|ws| ws.is_empty_warm())
+    {
+        return Err(SsrFallbackReason::WarmupEmpty);
+    }
+
     let endpoint = storage_url.trim_end_matches('/');
     let upstream_available = !state.upstream_breakers.would_shed(endpoint);
     let shell_url = projected_shell_url(storage_url, projection);
@@ -3928,6 +4036,69 @@ async fn resolve_projected_shell(
                 Err(SsrFallbackReason::ShellFetchFailed)
             } else {
                 Err(SsrFallbackReason::ShellBreakerOpen)
+            }
+        }
+    }
+}
+
+/// Best-effort background pre-warm: resolve every EPR-mounted app's shell NOW,
+/// off the request hot path, so a real browser's first `/` never pays the Cold
+/// `ShellPlan::Fetch` tax `resolve_projected_shell` above budgets
+/// `EPR_DISPATCH_TIMEOUT_SECS` for.
+///
+/// MEASURED (local mesh regen, 2026-08-22 — the fresh evidence that refined
+/// this from "shell fetch hangs" to "cold-cache first-fetch legitimately takes
+/// several seconds and nobody pays it before a real user does"): doorway B
+/// `GET /` 503'd at 11.1s with `servedBundleHeads` already populated and the
+/// breaker CLOSED; the immediate re-probe was 200 in 13.4s then 200 in 2.5ms.
+/// The renderer (registry-materialized at boot) was warm; the WARM SHELL
+/// store (the separate Mongo-backed `app_file_cache` `resolve_projected_shell`
+/// reads) was cold — nothing had ever fetched-and-cached this app's index.html
+/// document, so the first real request paid that cost and rode past the shed
+/// wall. Boot already hydrates `warm_shell` from the Mongo archive
+/// (`main.rs`), but ONLY for mounts the EPR router already knew about at that
+/// instant — a mount that appears via the periodic self-heal refresh (storage
+/// was still catching up at boot) never gets hydrated OR pre-fetched again.
+///
+/// Call after boot's warm-boot hydrate and after every periodic EPR-router
+/// refresh tick (`main.rs`) — never on the request path. Each mount pays this
+/// cost AT MOST once per (slug, entry_file, storage head): once `warm_shell`
+/// holds a shell at the declared head, `resolve_projected_shell`'s `AtHead`
+/// class always `ServeWarm`s, so repeated calls here are cheap no-ops. If this
+/// doorway's own warmup is still empty (`WarmupState::is_empty_warm`),
+/// `resolve_projected_shell` short-circuits to `WarmupEmpty` immediately —
+/// there is nothing yet worth pre-warming.
+pub async fn prewarm_projected_shells(state: &AppState) {
+    let Some(storage_url) = state.args.storage_url.as_deref() else {
+        return;
+    };
+    // Dedup by (epr_id, entry_file): several mount paths commonly resolve to
+    // the SAME app (e.g. `/` and `/threshold` both landing) and must not pay
+    // the fetch twice.
+    let mut seen = std::collections::HashSet::new();
+    let targets: Vec<elohim_views::projection::EprProjectionView> = state
+        .epr_router
+        .mount_url_paths()
+        .into_iter()
+        .filter_map(|p| state.epr_router.dispatch(&p))
+        .filter(|projection| {
+            seen.insert((projection.epr_id.clone(), projection.entry_file.clone()))
+        })
+        .collect();
+
+    for projection in &targets {
+        match resolve_projected_shell(state, projection, storage_url).await {
+            // Already warm at the declared head, or freshly converged this
+            // call — either way, no browser will pay this fetch now.
+            Ok(_) => {}
+            Err(reason) => {
+                tracing::debug!(
+                    target: "doorway::ssr",
+                    app = %projection.epr_id,
+                    reason = reason.as_skip_str(),
+                    "shell pre-warm did not resolve (best-effort; the lazy \
+                     per-request path still converges when it can)"
+                );
             }
         }
     }
@@ -6978,6 +7149,10 @@ mod ssr_session_tests {
             SsrFallbackReason::ShellFetchFailed.as_skip_str(),
             "shell-fetch-failed"
         );
+        // No served head — skip the upstream fetch entirely rather than
+        // gambling the full EPR_DISPATCH_TIMEOUT_SECS wall. See the variant
+        // doc comment for the measured 10.0s stall this closes.
+        assert_eq!(SsrFallbackReason::WarmupEmpty.as_skip_str(), "warmup-empty");
         assert_eq!(
             SsrFallbackReason::Compose(elohim_render::ComposeError::ShellRootMissing {
                 tag: "lamad-root".into()

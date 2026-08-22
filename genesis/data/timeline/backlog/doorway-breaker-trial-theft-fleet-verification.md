@@ -194,3 +194,52 @@ the runtime that serves proxy/health/admin and parks it (~60 s cold). Cure direc
 render pool + per-render budget that sheds to the bundle path, `doorway_ssr_render_duration_ms`, pre-warm
 the first render off the request path. Doorway agent dispatched with this as item 5.
 
+## Mesh evidence 2026-08-22 00:56 — warmup false-green + the shell-fetch half of the first-render stall
+
+Local mesh regen probes (`### probes 00:56:19`, `/tmp/elohim-local-mesh/regen6.log`):
+
+```
+:8888 / 200 5.106252s
+:8889 / 503 11.111940s
+:8888 warmup.completed True heads None content 10
+:8889 warmup.completed True heads None content 10
+```
+
+Both doorways' warmup HAD produced content (10 rows) — this is a DIFFERENT case from the pure
+empty-projection false-green (item 1 below): `warmup.completed=True` here is an honest true, not a
+false one. The stall is the FIRST `GET /` on each doorway; a coordinator re-probe confirmed the shape
+directly: doorway B `GET /` 503'd at 11.1s with `servedBundleHeads` already populated (materialized
+~40s earlier) and the breaker CLOSED; the immediate re-probe was 200 in 13.4s then 200 in 2.5ms.
+Doorway A showed the same pattern (5.1s then ~3ms). This is a THIRD stacked cause under the same
+"first `/` is slow" umbrella as the 2026-08-21 20:30 correction above (cold V8 render) and the
+2026-08-21 warm-shell-dead-code fix (`bind_warm_shell_to_archive()`): the renderer (registry-materialized
+at boot) and the projection (warmup-produced) were both warm, but `resolve_projected_shell`'s SEPARATE
+Mongo-backed `warm_shell` store — the cache holding the app's `index.html` shell document composed
+into the render — was cold for this app on this doorway, because `main.rs`'s boot-time
+`warm_shell.hydrate()` only covers mounts the EPR router already knew about AT THAT INSTANT, and the
+periodic EPR-router self-heal refresh (every `DOORWAY_EPR_REFRESH_SECS`, default 30s) never repeated
+the hydrate/fetch for mounts that appear later. `decide_shell_serve(Cold, breaker-closed) = Fetch`, so
+the first real request paid the upstream shell fetch cost itself (a real few-second cost, not a hang)
+and rode past the 10s `EPR_DISPATCH_TIMEOUT_SECS` shed wall on doorway B.
+
+**Fixed** (`doorway/doorway-service/src/server/http.rs`, `src/main.rs`,
+`src/projection/warm_stream.rs`, `src/routes/health.rs`):
+
+1. `WarmupState` gains `completed_empty`/`produced` — a pass that streamed nothing no longer reports
+   `completed: true`; it re-warms every `WARMUP_REWARM_POLL_SECS` (30s) until a pass produces records.
+2. `/health/startup`'s warmup block and the shed decision now read the SAME breaker map
+   (`state.upstream_breakers`) — the warmup task's private `WarmStreamHealth` gate is no longer
+   advertised as live upstream health.
+3. New `SsrFallbackReason::WarmupEmpty`: `resolve_projected_shell` short-circuits to the CSR fallback
+   immediately (no fetch attempted) when this doorway's own warmup is empty — closes the case where
+   the WHOLE projection, not just the shell, has nothing to serve.
+4. New `prewarm_projected_shells()`: resolves every EPR-mounted app's shell proactively, off the
+   request path, called once after boot's `warm_shell.hydrate()` and again after every periodic
+   EPR-router refresh tick — so a mount that appears late (or a Mongo archive that starts genuinely
+   cold) gets pre-fetched before a real browser's first `/`, not on it.
+
+**Not done here** (separate, larger follow-up, already tracked above as item 5 of the 20:30
+correction): a dedicated bounded render pool / per-render budget for the ACTUAL V8 render execution.
+Tonight's fix closes the shell-fetch half of "first `/` is slow"; the cold-render-parks-the-shared-runtime
+half (2026-08-21 20:30 correction) is unchanged.
+

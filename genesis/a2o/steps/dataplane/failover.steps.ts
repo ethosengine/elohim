@@ -5,8 +5,10 @@
  * serving/shedding/dead vocabulary; classifyDoorwayState() in
  * src/framework/dataplane/surfaces.ts is the single implementation of it.
  *
- * Six steps live here — three classification/head steps, then three
- * freshness steps (added 2026-08-21) that read the wire trust signal:
+ * Eight steps live here — three classification/head steps, three
+ * freshness steps (added 2026-08-21) that read the wire trust signal, and
+ * two warmup/breaker-honesty steps (added 2026-08-22, seatbelts for
+ * measured false-greens on the local mesh):
  *   1. `Then doorway {string} classifies as serving or shedding, not dead`
  *      — the honest-classification bar. Fails ONLY on 'dead'; shedding is a
  *      pass (it is the specified degraded contract, not an outage).
@@ -34,6 +36,17 @@
  *   6. `Then doorway {string} advertises a freshness stage, with authority
  *      green-only and knowledge amber-ok` — the advertised policy (C7): what
  *      the doorway publishes must equal what it would serve.
+ *   7. `Then a completed warmup on doorway {string} has a servable head to
+ *      show for it` — MEASURED (local mesh, 2026-08-21): a warmup pass that
+ *      streamed nothing used to store `completed: true` unconditionally, so
+ *      a doorway that never warmed looked identical to one that had.
+ *      `completed=true` must never coexist with `completedEmpty=true` or an
+ *      empty `servedBundleHeads[]`.
+ *   8. `Then the startup surface's circuit for doorway {string} agrees with
+ *      its own shed decision` — MEASURED (local mesh, 2026-08-21): a doorway
+ *      shedding 503 on every request answered its OWN /health/startup with
+ *      every upstream circuit "closed" — a second, private breaker map the
+ *      shed decision never consulted. Both surfaces now read the same map.
  *
  * Wire contract for 4-6 (doorway freshness spec, 2026-08-21):
  *   x-elohim-freshness: green|amber            (every proxied GET)
@@ -57,6 +70,7 @@ import { Then } from '@cucumber/cucumber';
 
 import {
   classifyDoorwayState,
+  getRaw,
   getRawWithHeaders,
   probeDeclaredHead,
   resolvePeerUrl,
@@ -467,5 +481,127 @@ Then(
       `${where}: the knowledge row does not advertise "amber-ok" (policy: ` +
         `${JSON.stringify(policy)}) — knowledge reads are the ones that may ride behind`
     );
+  }
+);
+
+// ---------------------------------------------------------------------------
+// 7. A completed warmup always has a servable head to show for it
+// ---------------------------------------------------------------------------
+//
+// MEASURED (local mesh, 2026-08-21): doorway A booted at 22:55; storage came
+// up at ~23:07. The warmup pass ran against empty/unreachable storage and
+// stored `completed: true` unconditionally, with `projection.content: 0` and
+// `servedBundleHeads: []` — and a completed warmup never re-ran, so the
+// doorway served an empty projection until someone restarted it.
+// `WarmupState::completed` (doorway/doorway-service/src/projection/
+// warm_stream.rs) now means what it says: a pass that streamed nothing is
+// `completedEmpty`, never `completed`, and the task keeps re-warming on its
+// own once the pool has something.
+
+const WARMUP_STEP_TIMEOUT_MS = CLASSIFY_TIMEOUT_MS + 5_000;
+
+Then(
+  'a completed warmup on doorway {string} has a servable head to show for it',
+  { timeout: WARMUP_STEP_TIMEOUT_MS },
+  async function (this: E2EWorld, peerName: string) {
+    const peerUrl = resolvePeerUrl(peerName);
+    const { status, text } = await getRaw(`${peerUrl}/health/startup`, {
+      timeoutMs: CLASSIFY_TIMEOUT_MS,
+    });
+    assert.strictEqual(
+      status,
+      200,
+      `doorway "${peerName}" (${peerUrl}): GET /health/startup returned ${status}`
+    );
+    const body = JSON.parse(text) as Record<string, unknown>;
+    const warmup = body['warmup'] as Record<string, unknown> | null | undefined;
+    assert.ok(warmup, `doorway "${peerName}": /health/startup carries no warmup block`);
+
+    if (warmup['completed'] !== true) {
+      // Vacuous: this doorway's warmup has not finished yet, so the
+      // "completed ⇒ servable head" implication has nothing to check.
+      return 'pending';
+    }
+
+    assert.notStrictEqual(
+      warmup['completedEmpty'],
+      true,
+      `doorway "${peerName}": warmup.completed=true AND warmup.completedEmpty=true — ` +
+        'contradictory verdict, the two must never both be true'
+    );
+
+    const heads = body['servedBundleHeads'];
+    assert.ok(
+      Array.isArray(heads) && heads.length > 0,
+      `doorway "${peerName}": warmup.completed=true but servedBundleHeads is ` +
+        `${JSON.stringify(heads)} — the exact false-green measured 2026-08-21: a warmup that ` +
+        'produced nothing must never report itself complete'
+    );
+  }
+);
+
+// ---------------------------------------------------------------------------
+// 8. The startup surface and the shed decision read one breaker
+// ---------------------------------------------------------------------------
+//
+// MEASURED (local mesh, 2026-08-21): a shed 503 named
+// `{"circuit":"open","errorStreak":3}` while THIS SAME doorway's
+// /health/startup warmup block named every upstream `circuit: closed,
+// errorStreak: 0` — an operator reading the startup surface saw a healthy
+// doorway that was refusing everything. Both numbers were true of DIFFERENT
+// breakers: the shed decision reads `state.upstream_breakers`; the startup
+// block used to read `WarmStreamHealth`, the warmup task's own private map,
+// frozen at whatever it last saw. Both surfaces now read the SAME breaker
+// (doorway/doorway-service/src/routes/health.rs — "ONE BREAKER, ONE VIEW").
+
+Then(
+  "the startup surface's circuit for doorway {string} agrees with its own shed decision",
+  { timeout: WARMUP_STEP_TIMEOUT_MS },
+  async function (this: E2EWorld, peerName: string) {
+    const peerUrl = resolvePeerUrl(peerName);
+    const { status, text } = await getRaw(`${peerUrl}/health/startup`, {
+      timeoutMs: CLASSIFY_TIMEOUT_MS,
+    });
+    assert.strictEqual(
+      status,
+      200,
+      `doorway "${peerName}" (${peerUrl}): GET /health/startup returned ${status}`
+    );
+    const body = JSON.parse(text) as Record<string, unknown>;
+    const startupUpstreams = body['upstreams'] as
+      | { upstream?: string; circuit?: string }[]
+      | undefined;
+    const serving = body['serving'] as Record<string, unknown> | undefined;
+    const servingUpstreams = serving?.['upstreams'] as
+      | { upstream?: string; circuit?: string }[]
+      | undefined;
+
+    assert.ok(
+      Array.isArray(startupUpstreams),
+      `doorway "${peerName}": /health/startup carries no top-level "upstreams" — is this ` +
+        'doorway older than the ONE BREAKER, ONE VIEW fix (2026-08-22)?'
+    );
+    assert.ok(
+      Array.isArray(servingUpstreams),
+      `doorway "${peerName}": /health/startup's "serving.upstreams" is missing`
+    );
+
+    for (const entry of startupUpstreams) {
+      const match: { upstream?: string; circuit?: string } | undefined = servingUpstreams.find(
+        s => s.upstream === entry.upstream
+      );
+      assert.ok(
+        match,
+        `doorway "${peerName}": upstream "${entry.upstream}" named in /health/startup's top-` +
+          'level "upstreams" has no counterpart in "serving.upstreams"'
+      );
+      assert.strictEqual(
+        match.circuit,
+        entry.circuit,
+        `doorway "${peerName}": /health/startup reports circuit="${entry.circuit}" for ` +
+          `"${entry.upstream}" but the shed decision (serving.upstreams) reports ` +
+          `"${match.circuit}" — two breaker views disagree, exactly the measured 2026-08-21 gap`
+      );
+    }
   }
 );

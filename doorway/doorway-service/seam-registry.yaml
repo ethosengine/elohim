@@ -170,10 +170,13 @@ decisionPoints:
       modulePath: server::http::SsrFallbackReason
       line: 3171
     summary: >
-      Why an SSR-eligible route shed to the projected fallback bundle instead — 12 variants
+      Why an SSR-eligible route shed to the projected fallback bundle instead — 13 variants
       (AuthModeUnsupported, Overflow, SpecParseError, RendererAbsent, RenderError, ErrorBackoff,
-      EmptyRender, RendererAppMismatch, and the granular Shell*/Compose variants). Tags the
-      response with an x-ssr-skipped header.
+      EmptyRender, RendererAppMismatch, WarmupEmpty, and the granular Shell*/Compose variants).
+      WarmupEmpty (added 2026-08-22) skips the upstream shell fetch entirely when this doorway's
+      own warmup has produced no served head, closing a measured 10.0s `GET /` stall that rode
+      the full EPR_DISPATCH_TIMEOUT_SECS budget on a shell no upstream had ever confirmed. Tags
+      the response with an x-ssr-skipped header.
     concernIds:
       - id: C8
         status: answered
