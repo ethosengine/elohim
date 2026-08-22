@@ -72,15 +72,13 @@ const DEFAULT_REPORT_CANDIDATES = [
   // report is also detected generically at load time (see loadLatestReport)
   // in case a future run repeats the mistake under a different name.
   // eslint-disable-next-line sonarjs/publicly-writable-directories
-  '/tmp/elohim-local-mesh/reports/wave1b-saga.json',
+  '/tmp/elohim-local-mesh/reports/wave3c-saga.json',
   // eslint-disable-next-line sonarjs/publicly-writable-directories
-  '/tmp/elohim-local-mesh/reports/wave1b-lamad-ssr.json',
+  '/tmp/elohim-local-mesh/reports/wave3-synccontrol2.json',
   // eslint-disable-next-line sonarjs/publicly-writable-directories
-  '/tmp/elohim-local-mesh/reports/wave1b-mesh.json',
+  '/tmp/elohim-local-mesh/reports/wave3-p2pval.json',
   // eslint-disable-next-line sonarjs/publicly-writable-directories
-  '/tmp/elohim-local-mesh/reports/wave1.json',
-  // eslint-disable-next-line sonarjs/publicly-writable-directories
-  '/tmp/elohim-local-mesh/reports/inventory2.json',
+  '/tmp/elohim-local-mesh/reports/wave3-full.json',
 ];
 const CONCURRENCY = Number(process.env['CENSUS_CONCURRENCY'] ?? 4);
 const PROBE_TIMEOUT_MS = 3000;
