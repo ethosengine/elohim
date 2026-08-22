@@ -9,9 +9,13 @@
 //! This backfill closes that gap without a re-seed:
 //!   1. Find content rows with a non-empty `blob_hash` and NO matching
 //!      `shard_manifests` row (for the given `h_app_id`).
-//!   2. For each: load the blob, encode + persist a manifest via the shared
-//!      `db::shard_manifests::record_manifest_from_bytes` helper (the same one
-//!      the `POST /db/content` create path uses — single source of truth).
+//!   2. For each: persist a manifest via the shared, shape-aware
+//!      `db::shard_manifests::record_manifest_for_blob` helper (the same one
+//!      the `POST /db/content` create path uses — single source of truth). It
+//!      reuses an already-known manifest for the blob's hash when one exists
+//!      (the common case for a `"chunked"`/`"rs-*"` blob whose composite is
+//!      never stored under its own hash — only its shards under theirs), and
+//!      otherwise falls back to loading the blob and encoding fresh.
 //!   3. When a p2p handle is available, also `distribute_shards` so shards fan
 //!      out to peers (that's what writes `shard_locations` on receiving peers
 //!      and lights "stewarding collectives").
@@ -333,42 +337,50 @@ pub fn select_redistribution_candidates(
 }
 
 /// Encode + persist the manifest for one candidate. Returns `Ok(true)` if a
-/// manifest was recorded, `Ok(false)` if the blob bytes were absent locally
-/// (skip-and-warn), or `Err` on encode/persist failure (logged by the caller).
+/// manifest was recorded, `Ok(false)` if neither the blob bytes NOR an
+/// existing manifest were found locally (skip-and-warn), or `Err` on
+/// encode/persist failure (logged by the caller).
+///
+/// Shape-aware: routes through `db::shard_manifests::record_manifest_for_blob`,
+/// which reuses an already-known manifest for `blob_hash` (the common case for
+/// a `"chunked"`/`"rs-*"` blob — e.g. the landing bundle — whose composite is
+/// never stored under its own hash, only its shards under theirs) before
+/// falling back to a bytes read. A bare `blob_store.get(blob_hash)` here would
+/// silently miss every such blob even though the manifest, and every shard
+/// byte it names, is already on disk.
 async fn record_one(
     pool: &DbPool,
     blob_store: &BlobStore,
     candidate: &BackfillCandidate,
     h_app_id: &str,
 ) -> Result<bool, StorageError> {
-    let data = match blob_store.get(&candidate.blob_hash).await {
-        Ok(d) => d,
-        Err(_) => {
-            tracing::warn!(
-                content_id = %candidate.content_id,
-                blob_hash = %candidate.blob_hash,
-                "shard_manifest_backfill: blob bytes absent locally; skipping"
-            );
-            return Ok(false);
-        }
-    };
-
     let mut conn = pool
         .get()
         .map_err(|e| StorageError::Internal(e.to_string()))?;
 
-    crate::db::shard_manifests::record_manifest_from_bytes(
+    match crate::db::shard_manifests::record_manifest_for_blob(
         &mut conn,
+        blob_store,
         &candidate.content_id,
         h_app_id,
         &candidate.blob_hash,
         candidate.blob_cid.as_deref(),
-        &data,
         &candidate.content_format,
         &candidate.reach,
-    )?;
-
-    Ok(true)
+    )
+    .await
+    {
+        Ok(_) => Ok(true),
+        Err(StorageError::NotFound(_)) => {
+            tracing::warn!(
+                content_id = %candidate.content_id,
+                blob_hash = %candidate.blob_hash,
+                "shard_manifest_backfill: blob bytes absent locally and no manifest known; skipping"
+            );
+            Ok(false)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 /// Record an honest, idempotent placement gap for a redistribution candidate whose
@@ -435,6 +447,12 @@ fn record_bytes_not_local_gap(
 /// Loads the blob (already verified present during `record_one`, but re-loads
 /// because distribution is a separate, network-bound step) and fans shards out
 /// to peers. Best-effort: failures are logged, never propagated.
+///
+/// Shape-aware: routes through `db::shard_manifests::read_blob_bytes_for_manifest`,
+/// which falls back to reassembling from the candidate's manifest shards when
+/// the composite is absent — the shape a `"chunked"`/`"rs-*"` blob actually
+/// takes. A bare `blob_store.get(blob_hash)` here reads as "bytes not local"
+/// for such a blob even when every shard byte it names is already on disk.
 #[cfg(feature = "p2p")]
 async fn distribute_one(
     handle: &crate::p2p::P2PHandle,
@@ -443,18 +461,37 @@ async fn distribute_one(
     candidate: &BackfillCandidate,
     h_app_id: &str,
 ) {
-    let data = match blob_store.get(&candidate.blob_hash).await {
+    let mut conn = match pool.get() {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!(
+                content_id = %candidate.content_id,
+                error = %e,
+                "shard_manifest_backfill: DB connection unavailable for distribution"
+            );
+            return;
+        }
+    };
+
+    let data = match crate::db::shard_manifests::read_blob_bytes_for_manifest(
+        &mut conn,
+        blob_store,
+        &candidate.blob_hash,
+    )
+    .await
+    {
         Ok(d) => d,
         Err(_) => {
             // HONESTY (the silent-bail this closes): a redistribution candidate
-            // whose bytes are NOT local cannot be distributed by this node — it
-            // holds a manifest but cannot source the bytes, so it cannot be the
-            // distributor. Pre-fix this was a bare `return`: no log, no gap row, no
-            // metric. That invisibility hid elohim-host-landing's non-distribution
-            // for a DAY (the card read `distributionState:"measured"` + `stewarding:0`
-            // + `placementGaps:[]` — measured yet dark, with nothing explaining why).
-            // Make it visible three ways: a WARN, a precise metric, and an idempotent
-            // placement gap the resilience card reads.
+            // whose bytes are NOT local (composite absent AND no manifest to
+            // reassemble from, or a shard genuinely missing) cannot be
+            // distributed by this node. Pre-fix this was a bare `return`: no
+            // log, no gap row, no metric. That invisibility hid
+            // elohim-host-landing's non-distribution for a DAY (the card read
+            // `distributionState:"measured"` + `stewarding:0` +
+            // `placementGaps:[]` — measured yet dark, with nothing explaining
+            // why). Make it visible three ways: a WARN, a precise metric, and
+            // an idempotent placement gap the resilience card reads.
             crate::metrics::inc_shard_redistribute_bytes_missing();
             tracing::warn!(
                 content_id = %candidate.content_id,
@@ -463,16 +500,12 @@ async fn distribute_one(
                 "shard_manifest_backfill: redistribution candidate bytes absent locally — \
                  cannot distribute; recording bytes-not-local placement gap"
             );
-            if let Ok(mut conn) = pool.get() {
-                if let Err(e) =
-                    record_bytes_not_local_gap(&mut conn, &candidate.content_id, h_app_id)
-                {
-                    tracing::warn!(
-                        content_id = %candidate.content_id,
-                        error = %e,
-                        "shard_manifest_backfill: bytes-not-local gap write failed (non-fatal)"
-                    );
-                }
+            if let Err(e) = record_bytes_not_local_gap(&mut conn, &candidate.content_id, h_app_id) {
+                tracing::warn!(
+                    content_id = %candidate.content_id,
+                    error = %e,
+                    "shard_manifest_backfill: bytes-not-local gap write failed (non-fatal)"
+                );
             }
             return;
         }
@@ -1454,6 +1487,111 @@ mod tests {
             let ids: Vec<&str> = remaining.iter().map(|c| c.content_id.as_str()).collect();
             assert_eq!(ids, vec!["absent"]);
         }
+    }
+
+    /// The mesh-measured defect this closes: a landing-bundle-shaped blob
+    /// (`"chunked"` encoding, ~16MB+, composite NEVER stored under its own
+    /// hash — only its shards under theirs) already got a manifest at ingest
+    /// time (`put_blob_bytes`, filed under a `blob:{cid}` projection id). A
+    /// content row pointing at that same `blob_hash` — the `POST /db/content`
+    /// create for the bundle's slug — is a Part A backfill candidate (no
+    /// `(content_id, h_app_id)` manifest row yet). The NEXT backfill sweep
+    /// must pick it up and reuse the real, already-stored shard hashes rather
+    /// than skip-and-warn on the (genuinely absent) composite.
+    #[tokio::test]
+    async fn run_once_picks_up_chunk_stored_blob_with_no_composite_on_next_run() {
+        let pool = test_pool();
+        let blob_store = BlobStore::new_memory();
+
+        // Shards already on disk under THEIR OWN hashes — exactly what
+        // `put_blob_bytes` leaves for a `"chunked"`-encoded blob.
+        let shard_a = blob_store
+            .store(b"landing bundle shard one---")
+            .await
+            .expect("store shard a");
+        let shard_b = blob_store
+            .store(b"landing bundle shard two---")
+            .await
+            .expect("store shard b");
+        let mut composite = Vec::new();
+        composite.extend_from_slice(b"landing bundle shard one---");
+        composite.extend_from_slice(b"landing bundle shard two---");
+        let composite_hash = crate::blob_store::BlobStore::compute_hash(&composite);
+
+        let manifest = crate::sharding::ShardManifest {
+            blob_cid: format!("bafkrei-{composite_hash}"),
+            blob_hash: composite_hash.clone(),
+            total_size: composite.len() as u64,
+            mime_type: "html5-app".to_string(),
+            encoding: "chunked".to_string(),
+            data_shards: 2,
+            total_shards: 2,
+            shard_size: shard_a.size_bytes,
+            shard_hashes: vec![shard_a.hash.clone(), shard_b.hash.clone()],
+            reach: "commons".to_string(),
+            author_id: None,
+            created_at: "2026-08-21T00:00:00Z".to_string(),
+            verified_at: None,
+        };
+
+        {
+            let mut conn = pool.get().expect("conn");
+            // Ingest-time manifest projection, filed under `blob:{cid}` — the
+            // same call `put_blob_bytes` makes, and NOT under the content id
+            // used below.
+            crate::db::shard_manifests::record_generated_manifest(
+                &mut conn,
+                &format!("blob:{}", manifest.blob_cid),
+                "lamad",
+                &manifest,
+            )
+            .expect("seed ingest-time manifest");
+            insert_content(&mut conn, "elohim-host-landing", Some(&composite_hash));
+        }
+
+        // Confirms the shape under test: the composite is genuinely absent.
+        assert!(
+            blob_store.get(&composite_hash).await.is_err(),
+            "a chunked blob's composite must never be stored under its own hash"
+        );
+
+        let config = BackfillConfig {
+            batch_size: 10,
+            item_delay: Duration::from_millis(0),
+            batch_pause: Duration::from_millis(0),
+        };
+        let report = run_once(
+            &pool,
+            &blob_store,
+            "lamad",
+            &config,
+            #[cfg(feature = "p2p")]
+            None,
+        )
+        .await
+        .expect("run_once");
+
+        assert_eq!(report.candidates, 1);
+        assert_eq!(
+            report.recorded, 1,
+            "the chunk-stored blob must gain a manifest, not be skipped as missing"
+        );
+        assert_eq!(report.missing_blob, 0);
+        assert_eq!(report.failed, 0);
+
+        let mut conn = pool.get().expect("conn");
+        let row =
+            crate::db::shard_manifests::get_manifest(&mut conn, "lamad", "elohim-host-landing")
+                .expect("get manifest")
+                .expect("manifest must be persisted for the content id");
+        assert_eq!(row.encoding, "chunked");
+        let shard_hashes: Vec<String> =
+            serde_json::from_str(&row.shard_hashes_json).expect("decode shard hashes");
+        assert_eq!(
+            shard_hashes,
+            vec![shard_a.hash, shard_b.hash],
+            "shard hashes must be the REAL, already-stored chunk hashes"
+        );
     }
 
     /// Wave 1.2 honesty-boundary proof-gate: the backfill flips the resilience

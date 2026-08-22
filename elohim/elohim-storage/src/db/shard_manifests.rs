@@ -8,6 +8,7 @@ use diesel::prelude::*;
 
 use super::diesel_schema::shard_manifests;
 use super::models::{NewShardManifest, ShardManifestRow};
+use crate::blob_store::BlobStore;
 use crate::sharding::ShardManifest;
 use crate::StorageError;
 
@@ -86,6 +87,95 @@ pub fn record_manifest_from_bytes(
     };
 
     upsert_manifest(conn, &new_manifest)
+}
+
+/// Shape-aware entry point every manifest PRODUCER (`POST /db/content`,
+/// `/db/content/bulk`, `services::shard_manifest_backfill`) should call instead
+/// of the bare `blob_store.get(blob_hash)` → `record_manifest_from_bytes` pair.
+///
+/// `put_blob_bytes` (`PUT /blob/{hash}`, proxied at `PUT /admin/seed/blob`)
+/// already shard-encodes and persists a manifest for EVERY blob it stores —
+/// but a `"chunked"`/`"rs-*"` blob (> `sharding::SINGLE_SHARD_MAX`, ~16MB)
+/// never stores its composite under the blob's own hash, only its shards
+/// under their own hashes. So a bare `blob_store.get(blob_hash)` NotFounds for
+/// that shape even though the manifest — and every shard byte it names — is
+/// already sitting on disk. [`resolve_manifest_by_hash`] finds that existing
+/// manifest (any `(content_id, h_app_id)` row keyed to the same `blob_hash`
+/// names the same shard set, content-addressed) and this function reuses it
+/// for the NEW `(content_id, h_app_id)` projection at chunk-list cost — no
+/// bytes read, no reassembly of a multi-megabyte bundle.
+///
+/// Falls back to reading the composite and deriving a fresh manifest via
+/// [`record_manifest_from_bytes`] only when no manifest is known yet for this
+/// hash (a genuinely new, `"none"`-encoded blob whose composite IS stored
+/// under its own name).
+#[allow(clippy::too_many_arguments)]
+pub async fn record_manifest_for_blob(
+    conn: &mut SqliteConnection,
+    blob_store: &BlobStore,
+    content_id: &str,
+    h_app_id: &str,
+    blob_hash: &str,
+    blob_cid: Option<&str>,
+    content_format: &str,
+    reach: &str,
+) -> Result<ShardManifestRow, StorageError> {
+    if let Some(existing) = resolve_manifest_by_hash(conn, blob_hash) {
+        return record_generated_manifest(conn, content_id, h_app_id, &existing);
+    }
+
+    let data = blob_store.get(blob_hash).await?;
+
+    record_manifest_from_bytes(
+        conn,
+        content_id,
+        h_app_id,
+        blob_hash,
+        blob_cid,
+        &data,
+        content_format,
+        reach,
+    )
+}
+
+/// Shape-aware blob byte read for producers that need the ACTUAL bytes, not
+/// just a manifest — e.g. `p2p::distribute_shards`, which pushes real shard
+/// payloads to peers over the wire.
+///
+/// Tries the composite first (the common, cheap case: a `"none"`-encoded blob
+/// ≤ `sharding::SINGLE_SHARD_MAX` is stored whole under its own hash). Falls
+/// back to reassembling from an EXISTING manifest's already-stored shards —
+/// the shape a `"chunked"`/`"rs-*"` blob actually takes, where the composite
+/// is never written under its own address. Reads only the shard bytes a known
+/// manifest names; never invents shard hashes and never reassembles when no
+/// manifest is known (that case has nothing to reassemble FROM, so it is a
+/// plain `NotFound`).
+pub async fn read_blob_bytes_for_manifest(
+    conn: &mut SqliteConnection,
+    blob_store: &BlobStore,
+    hash: &str,
+) -> Result<Vec<u8>, StorageError> {
+    if let Ok(bytes) = blob_store.get(hash).await {
+        return Ok(bytes);
+    }
+
+    let manifest = resolve_manifest_by_hash(conn, hash)
+        .ok_or_else(|| StorageError::NotFound(hash.to_string()))?;
+
+    let encoder = crate::sharding::ShardEncoder::new(crate::sharding::ShardConfig::default());
+    let mut shards = Vec::with_capacity(manifest.shard_hashes.len());
+    for shard_hash in &manifest.shard_hashes {
+        let shard = blob_store.get(shard_hash).await.map_err(|e| {
+            StorageError::Internal(format!(
+                "shard {shard_hash} missing while reassembling {hash} from its manifest: {e}"
+            ))
+        })?;
+        shards.push(Some(shard));
+    }
+
+    encoder
+        .reconstruct(&manifest, &shards)
+        .map_err(StorageError::from)
 }
 
 pub fn upsert_manifest(
@@ -252,5 +342,171 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().expect("conn");
         assert!(resolve_manifest_by_hash(&mut conn, "sha256-never-persisted").is_none());
+    }
+
+    /// Seeds a `"chunked"`-encoded blob exactly the shape `put_blob_bytes`
+    /// leaves for anything above `sharding::SINGLE_SHARD_MAX`: each shard
+    /// stored under its OWN hash, no composite ever written under the
+    /// blob_hash. Returns the manifest (real, content-addressed shard hashes
+    /// — never invented) and the full composite bytes for assertions.
+    async fn seed_chunk_stored_blob(blob_store: &BlobStore) -> (ShardManifest, Vec<u8>) {
+        let shard_a = blob_store
+            .store(b"first shard payload-")
+            .await
+            .expect("store shard a");
+        let shard_b = blob_store
+            .store(b"second shard payload")
+            .await
+            .expect("store shard b");
+
+        let mut composite = Vec::new();
+        composite.extend_from_slice(b"first shard payload-");
+        composite.extend_from_slice(b"second shard payload");
+        let composite_hash = BlobStore::compute_hash(&composite);
+
+        let manifest = ShardManifest {
+            blob_cid: format!("bafkrei-{composite_hash}"),
+            blob_hash: composite_hash,
+            total_size: composite.len() as u64,
+            mime_type: "html5-app".to_string(),
+            encoding: "chunked".to_string(),
+            data_shards: 2,
+            total_shards: 2,
+            shard_size: shard_a.size_bytes,
+            shard_hashes: vec![shard_a.hash.clone(), shard_b.hash.clone()],
+            reach: "commons".to_string(),
+            author_id: None,
+            created_at: "2026-08-21T00:00:00Z".to_string(),
+            verified_at: None,
+        };
+
+        (manifest, composite)
+    }
+
+    /// The core defect this closes: a `"chunked"` blob (no composite under its
+    /// own hash — landing-bundle shape) already has a manifest from ingest
+    /// (`put_blob_bytes`, filed under a `blob:{cid}` projection id). A LATER
+    /// producer for a DIFFERENT `(content_id, h_app_id)` — the `POST
+    /// /db/content` create path, standing in for `elohim-host-landing` — must
+    /// reuse that manifest's REAL shard hashes rather than NotFound-ing on a
+    /// bare composite read.
+    #[tokio::test]
+    async fn record_manifest_for_blob_reuses_existing_manifest_for_chunk_stored_blob() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let blob_store = BlobStore::new_memory();
+
+        let (manifest, _composite) = seed_chunk_stored_blob(&blob_store).await;
+        record_generated_manifest(
+            &mut conn,
+            &format!("blob:{}", manifest.blob_cid),
+            "lamad",
+            &manifest,
+        )
+        .expect("seed ingest-time manifest projection");
+
+        // Confirms the shape under test: the composite is genuinely absent, so
+        // a passing assertion below cannot be a silent fallback to a
+        // successful composite read.
+        assert!(
+            blob_store.get(&manifest.blob_hash).await.is_err(),
+            "a chunked blob's composite must never be stored under its own hash"
+        );
+
+        let row = record_manifest_for_blob(
+            &mut conn,
+            &blob_store,
+            "elohim-host-landing",
+            "lamad",
+            &manifest.blob_hash,
+            Some(&manifest.blob_cid),
+            "html5-app",
+            "commons",
+        )
+        .await
+        .expect("manifest must be produced from the already-known shard set");
+
+        assert_eq!(row.content_id, "elohim-host-landing");
+        assert_eq!(row.encoding, "chunked");
+        assert_eq!(row.blob_hash, manifest.blob_hash);
+        let shard_hashes: Vec<String> =
+            serde_json::from_str(&row.shard_hashes_json).expect("decode shard hashes");
+        assert_eq!(
+            shard_hashes, manifest.shard_hashes,
+            "shard hashes must be the REAL, already-stored chunk hashes — never re-derived or invented"
+        );
+    }
+
+    /// Composite blob (`"none"` encoding, ≤ `SINGLE_SHARD_MAX`) with no
+    /// pre-existing manifest: unchanged behaviour — derive fresh from bytes.
+    #[tokio::test]
+    async fn record_manifest_for_blob_derives_from_bytes_when_no_manifest_known() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let blob_store = BlobStore::new_memory();
+
+        let stored = blob_store
+            .store(b"<html>small composite blob</html>")
+            .await
+            .expect("store composite blob");
+
+        let row = record_manifest_for_blob(
+            &mut conn,
+            &blob_store,
+            "small-doc",
+            "lamad",
+            &stored.hash,
+            None,
+            "html5-app",
+            "commons",
+        )
+        .await
+        .expect("manifest derived from composite bytes");
+
+        assert_eq!(row.encoding, "none");
+        let shard_hashes: Vec<String> =
+            serde_json::from_str(&row.shard_hashes_json).expect("decode shard hashes");
+        assert_eq!(shard_hashes, vec![stored.hash.clone()]);
+    }
+
+    /// `read_blob_bytes_for_manifest` — the bytes-needing sibling
+    /// (`p2p::distribute_shards`) — must reassemble the composite from a known
+    /// manifest's already-stored shards when the composite itself is absent.
+    #[tokio::test]
+    async fn read_blob_bytes_for_manifest_reassembles_from_shards_when_composite_absent() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let blob_store = BlobStore::new_memory();
+
+        let (manifest, composite) = seed_chunk_stored_blob(&blob_store).await;
+        record_generated_manifest(
+            &mut conn,
+            &format!("blob:{}", manifest.blob_cid),
+            "lamad",
+            &manifest,
+        )
+        .expect("seed manifest");
+
+        let bytes = read_blob_bytes_for_manifest(&mut conn, &blob_store, &manifest.blob_hash)
+            .await
+            .expect("bytes reassembled from the manifest's shards");
+
+        assert_eq!(
+            bytes, composite,
+            "reassembled bytes must equal the original composite"
+        );
+    }
+
+    /// No composite AND no manifest known: honestly `NotFound`, never a panic
+    /// or an invented reassembly.
+    #[tokio::test]
+    async fn read_blob_bytes_for_manifest_errors_when_truly_absent() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let blob_store = BlobStore::new_memory();
+
+        let result =
+            read_blob_bytes_for_manifest(&mut conn, &blob_store, "sha256-never-seen").await;
+        assert!(matches!(result, Err(StorageError::NotFound(_))));
     }
 }

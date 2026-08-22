@@ -5547,7 +5547,12 @@ impl HttpServer {
                 #[cfg(feature = "p2p")]
                 let distribution_data = (manifest_data.0.clone(), manifest_data.1.clone());
 
-                // Record shard manifest if content has a blob
+                // Record shard manifest if content has a blob. Shape-aware: a
+                // "chunked"/"rs-*" blob (e.g. an SPA bundle above
+                // sharding::SINGLE_SHARD_MAX) never stores its composite under
+                // its own hash — only its shards under theirs — so this must
+                // NOT gate on a bare blob_store read first. record_manifest_for_blob
+                // reuses the manifest ingest already produced when one is known.
                 if result.is_ok() && manifest_data.1.is_some() {
                     if let Some(ref pool) = self.db_pool {
                         let blob_store = self.blob_store.clone();
@@ -5556,29 +5561,29 @@ impl HttpServer {
                             manifest_data;
                         let blob_hash = blob_hash.unwrap(); // Safe: checked above
                         tokio::spawn(async move {
-                            if let Ok(data) = blob_store.get(&blob_hash).await {
-                                if let Ok(mut conn) = pool.get() {
-                                    match crate::db::shard_manifests::record_manifest_from_bytes(
-                                        &mut conn,
-                                        &content_id,
-                                        "lamad",
-                                        &blob_hash,
-                                        blob_cid.as_deref(),
-                                        &data,
-                                        &content_format,
-                                        &reach,
-                                    ) {
-                                        Ok(row) => tracing::debug!(
-                                            content_id = %content_id,
-                                            encoding = %row.encoding,
-                                            "Recorded shard manifest"
-                                        ),
-                                        Err(e) => tracing::warn!(
-                                            content_id = %content_id,
-                                            error = %e,
-                                            "Failed to record shard manifest"
-                                        ),
-                                    }
+                            if let Ok(mut conn) = pool.get() {
+                                match crate::db::shard_manifests::record_manifest_for_blob(
+                                    &mut conn,
+                                    &blob_store,
+                                    &content_id,
+                                    "lamad",
+                                    &blob_hash,
+                                    blob_cid.as_deref(),
+                                    &content_format,
+                                    &reach,
+                                )
+                                .await
+                                {
+                                    Ok(row) => tracing::debug!(
+                                        content_id = %content_id,
+                                        encoding = %row.encoding,
+                                        "Recorded shard manifest"
+                                    ),
+                                    Err(e) => tracing::warn!(
+                                        content_id = %content_id,
+                                        error = %e,
+                                        "Failed to record shard manifest"
+                                    ),
                                 }
                             }
                         });
@@ -5596,7 +5601,22 @@ impl HttpServer {
                             let blob_store = self.blob_store.clone();
                             let blob_hash = blob_hash.clone();
                             tokio::spawn(async move {
-                                if let Ok(data) = blob_store.get(&blob_hash).await {
+                                // Shape-aware: a "chunked"/"rs-*" blob's composite
+                                // is never stored under its own hash, so a bare
+                                // blob_store read here would silently skip
+                                // distribution for it even though its shards (and
+                                // the manifest naming them) are already on disk.
+                                let Ok(mut conn) = pool.get() else {
+                                    return;
+                                };
+                                if let Ok(data) =
+                                    crate::db::shard_manifests::read_blob_bytes_for_manifest(
+                                        &mut conn,
+                                        &blob_store,
+                                        &blob_hash,
+                                    )
+                                    .await
+                                {
                                     match handle
                                         .distribute_shards(&content_id, &data, &pool, "lamad")
                                         .await
@@ -5702,7 +5722,13 @@ impl HttpServer {
                     .filter_map(|(id, bh, _, _, _)| bh.as_ref().map(|h| (id.clone(), h.clone())))
                     .collect();
 
-                // Record shard manifests for items with blobs
+                // Record shard manifests for items with blobs. Routes through
+                // the same shape-aware `record_manifest_for_blob` helper the
+                // single-item create path uses (single source of truth) rather
+                // than re-deriving the encode-from-bytes logic inline: a
+                // "chunked"/"rs-*" blob's composite is never stored under its
+                // own hash, so gating on a bare blob_store read here silently
+                // dropped every such bundle from bulk manifest recording.
                 if let Some(ref pool) = self.db_pool {
                     let blob_store = self.blob_store.clone();
                     let pool = pool.clone();
@@ -5716,56 +5742,27 @@ impl HttpServer {
                                 items_with_blobs
                             {
                                 let blob_hash = blob_hash.unwrap(); // Safe: filtered above
-                                if let Ok(data) = blob_store.get(&blob_hash).await {
-                                    let encoder = crate::sharding::ShardEncoder::new(
-                                        crate::sharding::ShardConfig::default(),
-                                    );
-                                    let manifest = match encoder.create_manifest(
-                                        &data,
+                                let Ok(mut conn) = pool.get() else {
+                                    continue;
+                                };
+                                if let Err(e) =
+                                    crate::db::shard_manifests::record_manifest_for_blob(
+                                        &mut conn,
+                                        &blob_store,
+                                        &content_id,
+                                        "lamad",
+                                        &blob_hash,
+                                        blob_cid.as_deref(),
                                         &content_format,
                                         &reach,
-                                    ) {
-                                        Ok(m) => m,
-                                        Err(e) => {
-                                            tracing::warn!(
-                                                content_id = %content_id,
-                                                error = %e,
-                                                "shard manifest encode failed; skipping persistence"
-                                            );
-                                            continue;
-                                        }
-                                    };
-                                    let shard_hashes_json =
-                                        serde_json::to_string(&manifest.shard_hashes)
-                                            .unwrap_or_else(|_| "[]".to_string());
-                                    if let Ok(mut conn) = pool.get() {
-                                        let new_manifest = crate::db::models::NewShardManifest {
-                                            content_id: &content_id,
-                                            h_app_id: "lamad",
-                                            blob_hash: &blob_hash,
-                                            blob_cid: blob_cid.as_deref(),
-                                            encoding: &manifest.encoding,
-                                            data_shard_count: manifest.data_shards as i32,
-                                            parity_shard_count: (manifest.total_shards
-                                                - manifest.data_shards)
-                                                as i32,
-                                            shard_hashes_json: &shard_hashes_json,
-                                            total_size_bytes: manifest.total_size as i64,
-                                            shard_size_bytes: manifest.shard_size as i64,
-                                            mime_type: &manifest.mime_type,
-                                            reach: &reach,
-                                        };
-                                        if let Err(e) = crate::db::shard_manifests::upsert_manifest(
-                                            &mut conn,
-                                            &new_manifest,
-                                        ) {
-                                            tracing::warn!(
-                                                content_id = %content_id,
-                                                error = %e,
-                                                "Failed to record shard manifest"
-                                            );
-                                        }
-                                    }
+                                    )
+                                    .await
+                                {
+                                    tracing::warn!(
+                                        content_id = %content_id,
+                                        error = %e,
+                                        "Failed to record shard manifest"
+                                    );
                                 }
                             }
                             tracing::debug!("Bulk shard manifest recording complete");
@@ -5782,7 +5779,20 @@ impl HttpServer {
                         let blob_store = self.blob_store.clone();
                         tokio::spawn(async move {
                             for (content_id, blob_hash) in distribution_items {
-                                if let Ok(data) = blob_store.get(&blob_hash).await {
+                                // Shape-aware read: falls back to reassembling
+                                // from a known manifest's shards when the
+                                // composite ("chunked"/"rs-*" blobs) is absent.
+                                let Ok(mut conn) = pool.get() else {
+                                    continue;
+                                };
+                                if let Ok(data) =
+                                    crate::db::shard_manifests::read_blob_bytes_for_manifest(
+                                        &mut conn,
+                                        &blob_store,
+                                        &blob_hash,
+                                    )
+                                    .await
+                                {
                                     let _ = handle
                                         .distribute_shards(&content_id, &data, &pool, "lamad")
                                         .await;
