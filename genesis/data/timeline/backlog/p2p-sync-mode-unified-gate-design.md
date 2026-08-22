@@ -38,9 +38,14 @@ and releases on wifi; `deployment/sync-control.feature` scoped run = 4 passed
 after fixing a STEP defect (746b035cd: the "on cellular" Givens never declared the network,
 so the C4 permissive-unknown default correctly refused to suppress). The `@regression`
 default scenario was rewritten to assert the explicit default (8ff712805).
-**Residue:** the import/bulk/drain suppression scenarios (`p2p-validation.feature`) are
-blocked by alpha-shaped connected-peers Givens — re-scope in flight; C12 remains partial
-(no finer /p2p admin-auth class on the storage node).
+**Residue closed (2026-08-22, bc215f632):** the import/bulk/drain scenarios re-scoped to a
+live-fabric floor ("at least 1 connected peer") — scoped run 4 passed / 3 honest skips / 0
+failed. The RAII error-path resume proved live; the import/bulk pause guards are confirmed
+taken (http.rs:11327, :5994) but their windows (~10-13ms) sit far below the 200ms status
+sampler, so those Thens skip under a 1s observability floor rather than fabricate a pass.
+**Remaining:** (1) no race-free suppression observability exists — a monotonic
+suppression-begin counter in /metrics would make the pause Thens exact (bounded follow-up);
+(2) C12 partial: no finer /p2p admin-auth class on the storage node.
 
 ## Why
 
