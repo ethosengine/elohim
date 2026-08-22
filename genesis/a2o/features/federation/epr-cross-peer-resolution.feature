@@ -28,12 +28,14 @@ Feature: EPR Cross-Peer Content Resolution
   # DB — a federation peer of doorway-A rather than an alias of it
   # (genesis/scripts/ci/e2e-verify-api.sh points E2E_DOORWAY_STAGING at
   # E2E_DOORWAY_BETA, which genesis/Jenkinsfile householdMeshEnv() resolves).
-  # @requires:shem because doorway-B's backing storage is adam, who is pinned to
-  # the remote pool: no shem, no second peer. Where a fleet declares no second
-  # doorway the two names collapse, and the step definitions detect that by
-  # comparing the resolved URLs (distinctPeers in
-  # genesis/a2o/steps/federation-epr.steps.ts) and HOLD as pending naming the
-  # collapse — a tautology is never allowed to pass as a crossing.
+  # On Act I the same fact is doorway B of the household mesh — jessica-primary
+  # (:8889 → :8091), its own storage and projection DB — reached as
+  # E2E_DOORWAY_BETA / doorways.beta, which the step layer accepts for "staging"
+  # (peerUrl in genesis/a2o/steps/federation-epr.steps.ts). Where a fleet
+  # declares no second doorway the two names collapse, and the step definitions
+  # detect that by comparing the resolved URLs (distinctPeers, same file) and
+  # HOLD as pending naming the collapse — a tautology is never allowed to pass
+  # as a crossing.
   Scenario: Content stewarded by another peer resolves with full body
     # Pete stewards a curriculum module on peer "alpha". When peer
     # "staging" needs it for a learner, the protocol resolves Pete's
@@ -75,8 +77,8 @@ Feature: EPR Cross-Peer Content Resolution
   # remote peer holds it. That is now reachable: staging is doorway-B, a genuinely separate
   # peer (see the first scenario). Because the stamp is written ONLY on that arm, reading it
   # back is proof the read crossed peers rather than being served from a local row.
-  # @requires:shem for the same reason as above — doorway-B is adam-backed, and adam is
-  # pinned to the remote pool.
+  # Needs the same second peer as the first scenario: doorway B (alpha: adam-backed
+  # elohim.host; Act I: the household mesh's jessica-primary doorway).
   Scenario: P2P-resolved content is tagged for diagnostics
     # When content arrives via cross-peer resolution rather than local
     # storage, the local record carries that provenance. Operators can

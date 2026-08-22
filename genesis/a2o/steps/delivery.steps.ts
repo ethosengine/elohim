@@ -522,15 +522,43 @@ function describeEntries(entries: AppFileResponse[], limit = 5): string {
     .join('\n');
 }
 
-/** Fetch every named file of an app once, keeping the file name with the response. */
+/**
+ * How many requests ONE simulated browser keeps in flight to one origin.
+ * Browsers cap HTTP/1.1 connections per host at 6 (Chrome, Firefox, Safari),
+ * so a page's 40-asset burst reaches the doorway six-wide, not forty-wide.
+ * Firing every file at once modelled 30 browsers as 1200 simultaneous GETs —
+ * past the doorway's 256-permit read admission pool
+ * (doorway-service/src/server/http.rs, `DEFAULT_MAX_INFLIGHT`), which sheds
+ * 503 by design — and so measured a load no browser produces (2026-08-22 run
+ * 20260822T201747Z-3bd326d6: "Browser 11: js/core/SlideSelect.js returned
+ * 503"). 30 browsers × 6 = 180 in flight is the real shape of that load.
+ */
+const BROWSER_CONNECTIONS_PER_ORIGIN = 6;
+
+/**
+ * Fetch every named file of an app once, keeping the file name with the
+ * response, at most `BROWSER_CONNECTIONS_PER_ORIGIN` in flight — the way a
+ * browser drains a page's asset list.
+ */
 async function fetchAppFiles(
   baseUrl: string,
   slug: string,
   files: string[]
 ): Promise<AppFileResponse[]> {
-  return Promise.all(
-    files.map(async file => ({ file, resp: await fetchApp(baseUrl, `/apps/${slug}/${file}`) }))
+  const results: AppFileResponse[] = new Array<AppFileResponse>(files.length);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < files.length) {
+      const index = next;
+      next += 1;
+      const file = files[index];
+      results[index] = { file, resp: await fetchApp(baseUrl, `/apps/${slug}/${file}`) };
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(BROWSER_CONNECTIONS_PER_ORIGIN, files.length) }, worker)
   );
+  return results;
 }
 
 /** The app slug the scenario is currently working with. */
@@ -567,6 +595,39 @@ export async function appAssetPaths(baseUrl: string, slug: string): Promise<stri
 /** Entry document + every relative asset it references. */
 export async function appFileSet(baseUrl: string, slug: string): Promise<string[]> {
   return [APP_ENTRY_FILE, ...(await appAssetPaths(baseUrl, slug))];
+}
+
+/**
+ * ONE simulated browser's load of an app through the doorway: the entry document
+ * plus every relative asset it references, captured per file so a layer
+ * assertion can name the file that missed.
+ *
+ * Shared with steps/ui/delivery.steps.ts, whose "<human> loads <app>" verbs fall
+ * back to this in HTTP mode instead of holding: a headless fetch of the same file
+ * set a browser bursts, carrying the per-file X-Cache evidence a Playwright page
+ * load cannot see (it captures console and failed requests, not response
+ * headers). The entry document's response is also captured as THE response for
+ * the single-response layer assertions ("the serving layer is …") — the first
+ * thing an operator walking the fallback chain reads.
+ */
+export async function captureHttpAppLoad(world: E2EWorld, appSlug: string): Promise<void> {
+  const doorway = [...world.doorways.values()][0];
+  assert.ok(doorway, NO_DOORWAY);
+  const files = await appFileSet(doorway.url, appSlug);
+  const entries = await fetchAppFiles(doorway.url, appSlug, files);
+  world.contentIds.set('currentAppSlug', appSlug);
+  loadStore.set(world, { slug: appSlug, files, browsers: [entries] });
+  const entry = entries.find(e => e.file === APP_ENTRY_FILE);
+  if (entry) responseStore.set(world, entry.resp);
+}
+
+/** Per-file outcomes of the last captured app load, or undefined when none was captured. */
+export function capturedAppLoadFiles(
+  world: E2EWorld
+): { file: string; status: number }[] | undefined {
+  const capture = loadStore.get(world);
+  if (!capture) return undefined;
+  return allEntries(capture).map(e => ({ file: e.file, status: e.resp.status }));
 }
 
 When(

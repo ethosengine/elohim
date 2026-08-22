@@ -27,6 +27,7 @@ import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.
 import { getFixture, isHumanDeployed } from '../../src/framework/fixtures/humans.js';
 import { Human } from '../../src/framework/human.js';
 import { E2EWorld } from '../../src/framework/world.js';
+import { captureHttpAppLoad, capturedAppLoadFiles } from '../delivery.steps.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -45,6 +46,12 @@ const NO_DOORWAY_MSG = 'No doorway configured';
  * API stage instead of throwing; genesis #1080 failed "Operator walks the
  * fallback chain" with a hard throw here). In playwright mode a missing
  * device is still a real error.
+ *
+ * The app-LOAD verbs are the exception: a load is a file-set burst whose
+ * evidence is per-file X-Cache, which only the HTTP layer carries, so in HTTP
+ * mode they fall back to `captureHttpAppLoad` (steps/delivery.steps.ts) and
+ * MEASURE rather than hold. Console/SW evidence steps still hold — that
+ * evidence exists only in a browser.
  */
 function requirePlaywright(world: E2EWorld, humanName: string): PlaywrightDevice | null {
   if (world.deviceMode !== 'playwright') return null;
@@ -404,9 +411,13 @@ When(
  */
 When(
   '{word} loads the html5-app {string}',
+  { timeout: 120_000 },
   async function (this: E2EWorld, humanName: string, appSlug: string) {
     const device = requirePlaywright(this, humanName);
-    if (!device) return 'pending';
+    if (!device) {
+      await captureHttpAppLoad(this, appSlug);
+      return;
+    }
     const doorway = [...this.doorways.values()][0];
     assert.ok(doorway, NO_DOORWAY_MSG);
 
@@ -425,18 +436,25 @@ When(
  * Example: When Terrance loads "evolution-of-trust"
  * Example: When Matthew loads "evolution-of-trust"
  */
-When('{word} loads {string}', async function (this: E2EWorld, humanName: string, appSlug: string) {
-  const device = requirePlaywright(this, humanName);
-  if (!device) return 'pending';
-  const doorway = [...this.doorways.values()][0];
-  assert.ok(doorway, NO_DOORWAY_MSG);
+When(
+  '{word} loads {string}',
+  { timeout: 120_000 },
+  async function (this: E2EWorld, humanName: string, appSlug: string) {
+    const device = requirePlaywright(this, humanName);
+    if (!device) {
+      await captureHttpAppLoad(this, appSlug);
+      return;
+    }
+    const doorway = [...this.doorways.values()][0];
+    assert.ok(doorway, NO_DOORWAY_MSG);
 
-  device.clearCapture();
-  await device.page.goto(`${doorway.url}/apps/${appSlug}/index.html`, {
-    waitUntil: 'networkidle',
-    timeout: 30_000,
-  });
-});
+    device.clearCapture();
+    await device.page.goto(`${doorway.url}/apps/${appSlug}/index.html`, {
+      waitUntil: 'networkidle',
+      timeout: 30_000,
+    });
+  }
+);
 
 /**
  * Reload a cached app (for offline resilience scenarios).
@@ -573,16 +591,30 @@ Then(
 );
 
 /**
- * Verify no failed requests for /apps/ paths.
+ * Verify no failed requests for /apps/ paths. In HTTP mode the evidence is the
+ * per-file status of the load `captureHttpAppLoad` just made — every file of the
+ * bundle, by name, so a failure names the file rather than a count.
  *
  * Example: Then all app files are served with 200 status
  */
 Then(
   'all app files are served with {int} status',
   // eslint-disable-next-line @typescript-eslint/require-await
-  async function (this: E2EWorld, _expectedStatus: number) {
+  async function (this: E2EWorld, expectedStatus: number) {
     const device = firstPlaywright(this);
-    if (!device) return 'pending';
+    if (!device) {
+      const files = capturedAppLoadFiles(this);
+      assert.ok(files, 'No app load captured — run a "<human> loads ..." step first');
+      assert.ok(files.length > 0, 'The app load captured zero files');
+      const wrong = files.filter(f => f.status !== expectedStatus);
+      assert.equal(
+        wrong.length,
+        0,
+        `${wrong.length}/${files.length} app files were not served with ${expectedStatus}:\n` +
+          wrong.map(f => `  ${f.file} -> ${f.status}`).join('\n')
+      );
+      return;
+    }
 
     const failed = device.failedRequests.filter(r => r.url.includes(APPS_PATH));
     const failedLines = failed

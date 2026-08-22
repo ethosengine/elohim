@@ -80,16 +80,40 @@ function withoutTrailingSlashes(value: string): string {
 }
 
 /**
+ * The second peer has one identity and three spellings. The feature says
+ * "staging" — CI's E2E_DOORWAY_STAGING, which e2e-verify-api.sh points at
+ * E2E_DOORWAY_BETA. The household lane stages the same fact as doorway B:
+ * `E2E_DOORWAY_BETA` / `E2E_DOORWAY_B` in the Prologue's env block and
+ * `doorways.beta` in the fixture manifest (jessica-primary, its own storage and
+ * projection DB — a real federation peer of A). One resolution order here, so a
+ * run never has to spell the CI name to get the crossing it already staged.
+ */
+const PEER_ENV_ALIASES: Record<string, readonly string[]> = {
+  staging: ['E2E_DOORWAY_STAGING', 'E2E_DOORWAY_BETA', 'E2E_DOORWAY_B'],
+};
+const PEER_FIXTURE_ALIASES: Record<string, readonly string[]> = {
+  staging: ['staging', 'beta'],
+};
+
+/**
  * Resolve a peer name from the feature ("alpha", "staging") to a doorway URL.
  * Env first (that is what CI sets), then the household-mesh fixture manifest.
  */
 function peerUrl(peerName: string): string {
   const envName = `E2E_DOORWAY_${peerName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
-  const url =
-    process.env[envName] ?? fixtureDoorwayUrl(loadHouseholdMeshFixture(), peerName) ?? undefined;
+  const envNames = PEER_ENV_ALIASES[peerName] ?? [envName];
+  let url = envNames.map(name => process.env[name]).find(Boolean);
+  if (!url) {
+    const fixture = loadHouseholdMeshFixture();
+    for (const id of PEER_FIXTURE_ALIASES[peerName] ?? [peerName]) {
+      url = fixtureDoorwayUrl(fixture, id);
+      if (url) break;
+    }
+  }
   assert.ok(
     url,
-    `No URL for peer "${peerName}" — set ${envName} or declare it in the household-mesh fixture`
+    `No URL for peer "${peerName}" — set ${envNames.join(' or ')} or declare it in the ` +
+      `household-mesh fixture`
   );
   return withoutTrailingSlashes(url);
 }
@@ -472,7 +496,8 @@ function collapsedPeersNote(a: string, b: string): string {
     `peers "${a}" and "${b}" resolve to the same URL on this substrate ` +
     `(${url ?? '<undeclared>'}). A cross-peer claim proved against one host is not ` +
     `proved. CI points E2E_DOORWAY_STAGING at E2E_DOORWAY_BETA when the fleet ` +
-    `declares a second doorway (genesis/scripts/ci/e2e-verify-api.sh); this run did not.`
+    `declares a second doorway (genesis/scripts/ci/e2e-verify-api.sh), and the household ` +
+    `lane declares it as E2E_DOORWAY_BETA / doorways.beta; this run declared neither.`
   );
 }
 
