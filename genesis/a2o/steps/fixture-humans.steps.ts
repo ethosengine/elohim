@@ -14,12 +14,45 @@ import { Given } from '@cucumber/cucumber';
 import { ensureFixtureAdmin } from '../src/framework/api/admin-bootstrap.js';
 import { BrowserDevice } from '../src/framework/devices/browser-device.js';
 import { PlaywrightDevice } from '../src/framework/devices/playwright-device.js';
-import { resolveDoorwayUrl } from '../src/framework/fixtures/household-mesh.js';
-import { getFixture, isHumanDeployed } from '../src/framework/fixtures/humans.js';
+import {
+  loadHouseholdMeshFixture,
+  resolveDoorwayUrl,
+} from '../src/framework/fixtures/household-mesh.js';
+import {
+  autoSkippedHumans,
+  getFixture,
+  isHumanDeployed,
+} from '../src/framework/fixtures/humans.js';
 import { Human } from '../src/framework/human.js';
 import { DoorwayDashboardPage } from '../src/framework/pages/index.js';
 import { doorwayToAppUrl } from '../src/framework/utils/url.js';
 import { DoorwayEntry, E2EWorld } from '../src/framework/world.js';
+
+/**
+ * Can this human log in on THIS lane?
+ *
+ * deployments.json is the k8s roster: which humans have a conductor POD, and
+ * on which pool. `isHumanDeployed` reads it two ways — a hard `suspended`
+ * (the operator retired the pod AND the seeder skips the human, so no account
+ * exists anywhere) and a soft pool-skip (the human's only pool, shem, is
+ * unavailable to this run). The soft skip is a statement about pods, not about
+ * accounts: a household lane that OWNS its substrate (`processControl: true`
+ * in the fixture manifest — `just mesh prologue`) seeds every fixture human as
+ * a hosted registration on doorway A's pool, matthew's conductor, so susan's
+ * or gertrude's remote pod being down on shem says nothing about whether she
+ * can log in here. On that lane the soft skip is lifted and the login is
+ * attempted for real: it passes on its own evidence or reds honestly. A hard
+ * suspension still holds everywhere — that human was never seeded.
+ */
+function loginableOnThisLane(humanName: string): boolean {
+  if (isHumanDeployed(humanName)) return true;
+  if (!autoSkippedHumans().includes(humanName.toLowerCase())) return false;
+  try {
+    return loadHouseholdMeshFixture().processControl === true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Login a pre-seeded fixture human via HTTP (BrowserDevice).
@@ -30,7 +63,7 @@ import { DoorwayEntry, E2EWorld } from '../src/framework/world.js';
 Given(
   'human {string} is logged in on doorway {string}',
   async function (this: E2EWorld, humanName: string, doorwayId: string) {
-    if (!isHumanDeployed(humanName)) {
+    if (!loginableOnThisLane(humanName)) {
       // Conductor suspended in deployments.json (e.g. shem outage). The
       // human's account may not be seeded; skip the scenario rather than
       // fail. Toggle "suspended": false in deployments.json to re-enable.
@@ -94,7 +127,7 @@ function resolveDoorwayFor(world: E2EWorld, doorwayId: string): DoorwayEntry {
 Given(
   'human {string} is logged in on doorway {string} with device',
   async function (this: E2EWorld, humanName: string, doorwayId: string) {
-    if (!isHumanDeployed(humanName)) {
+    if (!loginableOnThisLane(humanName)) {
       return 'pending';
     }
     const fixture = getFixture(humanName);
@@ -147,7 +180,7 @@ Given(
 Given(
   'human {string} is logged in on doorway-app {string} with device',
   async function (this: E2EWorld, humanName: string, doorwayId: string) {
-    if (!isHumanDeployed(humanName)) {
+    if (!loginableOnThisLane(humanName)) {
       return 'pending';
     }
     const fixture = getFixture(humanName);
