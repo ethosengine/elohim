@@ -8,6 +8,20 @@ Feature: Peer recovery — a wiped device recovers its stewarded content from th
   the household's mutual custody commitments are real promises that
   re-materialize my stewarded content without anyone running a script.
 
+  # VOCABULARY. "The manifesto blob" is the Act I fixture content — one seeded
+  # document the Prologue replicates across the household, standing in for any
+  # stewarded content. A "custody-blob commitment" is a household peer's
+  # recorded promise to hold a named blob (provider = that peer); it is notarized
+  # on the DHT and each peer keeps a local PROJECTION (a database table) of the
+  # commitments it has seen. The "custody sweep" is the periodic pass on each
+  # peer that compares its commitments against its local store; a "kick" is the
+  # sweep's recovery action — a fetch it fires for a blob it promised to hold but
+  # does not have. The "recovery window" is the drill's bound on that sweep
+  # (E2E_CUSTODY_SWEEP_WINDOW_MS, default 300 s; the sweep itself runs every
+  # 120 s by default). A "serve-blob" economic event is the REA record of which peer
+  # supplied the bytes, so mutual aid inside a household is accounted, not
+  # anonymous.
+  #
   # Evidence anchor (2026-06-10 Phase 0, EPR durability arc): jessica's
   # projection sat at local_total=0 / ids_discovered=0 for 24h while matthew
   # held 16 DHT-anchored custody rows — convergence existed on paper only.
