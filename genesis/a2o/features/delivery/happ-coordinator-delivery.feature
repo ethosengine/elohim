@@ -45,7 +45,7 @@ Feature: hApp coordinator delivery — a shipped zome fix reaches running conduc
     # Informs: prod can enable coordinator hot-swap WITHOUT enabling re-key
     # reinstalls — they are different upgrade classes.
 
-  @requires:owned-substrate
+  @requires:owned-substrate @requires:embedded-conductor
   Scenario: An operator can see which drift class the installer decided on
     Given a conductor that just completed its hApp lifecycle check
     When the operator reads the node's startup log

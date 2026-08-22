@@ -116,3 +116,26 @@ curl -s -H "Authorization: Bearer mesh-admin-dev-key" \
 
 The finish line: every id answers with either an anchor authored by the peer's
 CURRENT agent key, or a status/trust tier that admits it cannot be proven.
+
+## 2026-08-22 (wave3 triage): the fossil population also survives the boot-time membership reconcile, and sits in custody rows
+
+Two more storage-plane faces of the same dead-key residue, measured on the household mesh
+after the 2026-08-22 01:19 james re-key (`chaos-rekey a2o-70809`):
+
+1. **`humans.agent_pub_key` fossil not converged by the boot pass.**
+   `features/dataplane/resilience-identity-coherence.feature` "No household-member human on
+   alpha-A carries a fossil agentPubKey" red: `human-james-son` on matthew's peer still
+   carried the PRE-re-key key `uhCAkkAYh…` (live key `uhCAkXieZ…`). Matthew's storage
+   booted 03:44:57 — AFTER the re-key — so the boot-time membership-truth key-supersede
+   pass (`services/membership_identity_reconcile.rs`) had its window on exactly the
+   "unambiguous lone resolvable fossil" case it exists for, and left it. Either the pass's
+   fossil test has the same present/absent blindness as `reanchor_backfill` (a dead key is
+   not NULL), or the membership truth it reconciles against itself still names the dead key.
+
+2. **Custody-blob commitments accumulate fossil providers.** The `chaos-ladder` blob's
+   custody rows on matthew list FOUR providers: jessica + james-old (`uhCAkkAYh…`, authored
+   00:54 pre-re-key) + james-new (`uhCAkXieZ…`, re-authored 02:19) + matthew. The dead
+   incarnation stays on the provider record indefinitely — a recovery drill consulting
+   custody credits sees a promise from an agent that no longer exists. Same
+   decide-point as §"What to decide" item 1: provider liveness needs to be part of the
+   custody-credit read (or a supersede pass must re-home the row), not only the anchor read.

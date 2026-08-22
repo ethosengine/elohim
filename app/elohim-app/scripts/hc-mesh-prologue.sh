@@ -136,7 +136,7 @@ say "CONDUCTOR_URLS=$CONDUCTOR_URLS"
 #    because jessica (doorway B's primary) has NO row on A's storage backend
 #    otherwise — jessica's own scenarios need her doorway to have seeded her.
 #
-# FOUR ids, because each one is a precondition something downstream asserts
+# FIVE ids, because each one is a precondition something downstream asserts
 # and none of them is created by any other leg:
 #
 #   elohim-host-landing  the apex EPR — the projection root, and the subject of
@@ -162,12 +162,20 @@ say "CONDUCTOR_URLS=$CONDUCTOR_URLS"
 #                        `/db/content/manifesto` — without this leg every one of
 #                        them env-reds on "Content not found: manifesto" before
 #                        exercising anything it meant to test.
+#   community-garden-club  the community-reach fixture — genesis/data/lamad/
+#                        content/community-garden-club.json, authored
+#                        `"reach": "community"` so an ANONYMOUS client is
+#                        refused with 403 + requiredReach (auth/
+#                        reach-commons.feature "Anonymous reader is rejected
+#                        for community-reach content"). Without this leg the
+#                        gate scenario 404s on a missing row instead of
+#                        exercising the reach refusal (wave3-full 2026-08-22).
 #
 # Order matters and is load-bearing: these rows must exist BEFORE
 # seed-projections (2-3) and BEFORE the stage legs (4), which patch bytes onto
 # rows this leg creates. seed.ts is idempotent — an already-seeded id is a skip.
 # ---------------------------------------------------------------------------
-BASE_CORPUS_IDS="elohim-host-landing,lamad-spa,evolution-of-trust,manifesto"
+BASE_CORPUS_IDS="elohim-host-landing,lamad-spa,evolution-of-trust,manifesto,community-garden-club"
 banner "1. seed.ts (base corpus) via A and B"
 run_seed_leg "seed-base-corpus-via-A" hard \
   'DOORWAY_URL="$DOORWAY_A_URL" npx tsx src/seed.ts --ids="$BASE_CORPUS_IDS"'

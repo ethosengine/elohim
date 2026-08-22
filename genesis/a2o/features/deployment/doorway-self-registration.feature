@@ -17,11 +17,13 @@ Feature: Doorway Self-Registration
     When Matthew checks doorway status
     Then the status should include an orchestrator section
 
+  @requires:orchestrator
   Scenario: Matthew sees his own node in the admin dashboard
     When Matthew queries the admin nodes endpoint
     Then the response should include at least 1 node
     And at least one node should have status "online"
 
+  @requires:orchestrator
   Scenario: Matthew's node reports real hardware capacity
     When Matthew queries the admin nodes endpoint
     Then at least one node should report cpu cores greater than 0

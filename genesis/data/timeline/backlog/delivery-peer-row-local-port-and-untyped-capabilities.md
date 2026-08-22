@@ -93,3 +93,21 @@ defaulting to `DEFAULT_HTTP_PORT` (8090) for un-upgraded peers) and is applied t
 `DeliveryPeer` row from both the mDNS-discovery insert and the Identify-received handler
 (whichever fires second wins, so ordering can't leave a stale port). Parts 2 and 3
 (untyped `capabilities` string array, missing `ready_content`) are untouched — still open.
+
+## 4. (2026-08-22, wave3 triage) `serves_extracted` is never announced, even with the extraction cache enabled
+
+Part 2's "every row read `["serves_compressed"]` alone" now has a mechanism. Each mesh
+peer's `config.toml` carries `[extraction_cache] enabled = true`, and
+`epr_service.rs::handle_query_delivery` does consult the live cache — but that typed answer
+has no HTTP trigger (see above). The ANNOUNCED capabilities that populate the delivery-peer
+row come from a `NodeCapabilities` whose `serves_extracted` defaults to `false`
+(`identity.rs:57`), and the capability profiles that would set it true
+(`NodeCapabilities::home_node()` / `network_node()`, `identity.rs:144/162`) are referenced
+only from `#[cfg(test)]` code — nothing at runtime derives the announcement from the
+actually-running extraction cache. So a node that CAN serve extracted files tells the mesh
+it can't, permanently. Evidence: wave3-full 2026-08-22, delivery-diagnostics "Operator can
+query a peer's delivery capabilities" red with `[serves_compressed, serves_compressed]`;
+live probe of `GET :8090/api/v1/peers/delivery` reproduces. Fix direction: derive the
+announced `DeliveryCapabilities` from `config.extraction_cache.enabled` (or the constructed
+cache handle) at identity build time, or project the typed `DeliveryInfo` onto the row as
+part 3 already proposes — either closes this.

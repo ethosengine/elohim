@@ -574,8 +574,11 @@ Then(
       | { upstream?: string; circuit?: string }[]
       | undefined;
     const serving = body['serving'] as Record<string, unknown> | undefined;
+    // serving.upstreams keys each entry `endpoint` (routes/health.rs UpstreamServing),
+    // while the top-level warmup view keys it `upstream` — same breaker, two field
+    // names. Accept either so the step tests breaker AGREEMENT, not key spelling.
     const servingUpstreams = serving?.['upstreams'] as
-      | { upstream?: string; circuit?: string }[]
+      | { endpoint?: string; upstream?: string; circuit?: string }[]
       | undefined;
 
     assert.ok(
@@ -589,9 +592,8 @@ Then(
     );
 
     for (const entry of startupUpstreams) {
-      const match: { upstream?: string; circuit?: string } | undefined = servingUpstreams.find(
-        s => s.upstream === entry.upstream
-      );
+      const match: { endpoint?: string; upstream?: string; circuit?: string } | undefined =
+        servingUpstreams.find(s => (s.endpoint ?? s.upstream) === entry.upstream);
       assert.ok(
         match,
         `doorway "${peerName}": upstream "${entry.upstream}" named in /health/startup's top-` +

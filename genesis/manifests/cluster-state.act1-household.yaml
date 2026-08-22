@@ -138,6 +138,20 @@ resources:
     available: false
     note: Act I assembles binaries the pipeline already built, or builds them locally; it pulls no images.
 
+  orchestrator:
+    role: doorway orchestrator (mDNS node discovery, provisioning, /admin/nodes dashboard)
+    available: false
+    note: Act I doorways launch WITHOUT --orchestrator-enabled (hc-mesh.sh), so GET /admin/nodes
+          answers 503 "Orchestrator not enabled" by design. Lift by adding --orchestrator-enabled
+          to the mesh doorway launch and flipping this to true.
+
+  embedded-conductor:
+    role: elohim-storage running with its EMBEDDED conductor (happ_manager owns the hApp lifecycle)
+    available: false
+    note: Act I installs the hApp via `hc sandbox generate` against a stock external conductor, so
+          happ_manager::ensure_happ_installed never executes here — coordinator-drift decisions
+          (sync_coordinators) cannot be observed on this lane. An embedded-conductor mesh mode lifts this.
+
   alpha-cluster-6peer:
     role: the deployed alpha soak cluster
     available: false

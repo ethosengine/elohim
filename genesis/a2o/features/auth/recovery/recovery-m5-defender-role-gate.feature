@@ -10,7 +10,14 @@ Feature: submit_specialist_revocation gated by local defender role marker
   # ─────────────────────────────────────────────────────────
   # Stubbed Ok(false) in M5 — rejection path works naturally
   # ─────────────────────────────────────────────────────────
+  # @wip: both scenarios drive POST /api/v1/account/specialist-revocation,
+  # an HTTP bridge route no service serves yet (doorway proxies to
+  # elohim-storage, which answers "Unknown account route"). The imagodei
+  # coordinator zome function exists; the Phase-11 bridge wiring
+  # (imagodei → elohim-agent) is what these scenarios wait on. They shed
+  # @wip when that route lands and go truly RED→green.
 
+  @wip
   Scenario: Without role marker — coordinator rejects
     Given the calling elohim-agent has no DefenderManifest configured
     When I call submit_specialist_revocation with a valid SubmitSpecialistRevocationInput
@@ -20,6 +27,7 @@ Feature: submit_specialist_revocation gated by local defender role marker
   # Success path — gated on Phase-11 bridge (imagodei → elohim-agent wiring)
   # ─────────────────────────────────────────────────────────
 
+  @wip
   Scenario: With role marker — coordinator accepts
     Given the calling elohim-agent has a DefenderManifest listing the target human
     When I call submit_specialist_revocation with a valid SubmitSpecialistRevocationInput
