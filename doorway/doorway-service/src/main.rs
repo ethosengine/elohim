@@ -648,25 +648,40 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         }
     }
 
-    // CONCURRENT, not serial. This runs BEFORE the listener binds, and each
-    // manifest fetch waits out its own client timeout against an unresponsive
-    // peer — so a serial loop made the pre-listen stall PROPORTIONAL to the
-    // number of dead peers (measured 2026-08-22 on the household mesh: one
-    // SIGSTOPped peer = a flat 10s added to boot, i.e. 30s with the household's
-    // three). Boot cost is now one peer's timeout, not the sum; every other
-    // property (idempotent install, background retry for the stragglers) is
-    // unchanged.
-    let registration_results =
-        futures_util::future::join_all(peer_urls.iter().map(|storage_url| {
-            let registry = state.route_registry.clone();
-            async move {
-                (
-                    storage_url.clone(),
-                    registry.register_steward_peer(storage_url).await,
-                )
-            }
-        }))
-        .await;
+    // FETCH concurrently, INSTALL in declared order.
+    //
+    // Concurrent fetch: this runs BEFORE the listener binds and each manifest
+    // fetch waits out its own client timeout against an unresponsive peer, so a
+    // serial loop made the pre-listen stall PROPORTIONAL to the number of dead
+    // peers (measured 2026-08-22 on the household mesh: one SIGSTOPped peer = a
+    // flat 10s added to boot, i.e. 30s with the household's three). Boot now
+    // costs one peer's timeout, not the sum.
+    //
+    // Ordered install: install order IS peer priority — RouteRegistry::
+    // match_request returns matches ordered by insertion and the router takes
+    // the first — so installing concurrently too would hand priority to
+    // whichever peer answered fastest, and the doorway's effective primary
+    // storage peer would be whoever won a race that boot. Everything else
+    // (idempotent install, background retry for the stragglers) is unchanged.
+    let fetches = futures_util::future::join_all(peer_urls.iter().map(|storage_url| async move {
+        (
+            storage_url.clone(),
+            crate::services::route_registry::fetch_steward_manifest(storage_url).await,
+        )
+    }))
+    .await;
+
+    let mut registration_results: Vec<(String, Result<usize, String>)> = Vec::new();
+    for (storage_url, manifest) in fetches {
+        let outcome = match manifest {
+            Ok(manifest) => Ok(state
+                .route_registry
+                .install_steward_routes(&storage_url, &manifest)
+                .await),
+            Err(e) => Err(e),
+        };
+        registration_results.push((storage_url, outcome));
+    }
 
     let mut registered = 0usize;
     let mut pending_peers: Vec<String> = Vec::new();
