@@ -79,6 +79,35 @@ habits:
       - "cargo test --test sync_libp2p_convergence (elohim/elohim-storage)"
       - ".claude/scripts/latency-scoreboard.py --local (and --deployed) — bounded convergence, not merely eventual: a CONJUNCTION of speed AND this habit's trust invariant, never speed alone. A fast stale head is worse than a slow correct one, so this check can only ever narrow the habit, never carry it."
     evidence: >
+      DELTA 2026-08-22 (household lane; NO status change — three reds classified, one
+      cure landed unverified): (1) content-sync "authored node converges on a second
+      peer within 30 s" FAILED inside the full-lane run (run 20260822T170136Z: 18
+      failures, chaos drills concurrent) and PASSED 4/4 scoped at rest minutes later
+      (reports/cucumber-mesh-content-sync.json) — a load-sensitive window, not a
+      defect; read the next full-lane red as contention first. (2) identity-coherence
+      "lone fossil agentPubKey for human-james-son" root-caused: james was re-keyed at
+      RUNTIME by chaos-rekey (…7LDZ -> …5gpm at 17:15Z) and no household membership
+      under the new key exists on the DHT (participants of collective:uhCkkoQ… read 0
+      on every peer; jessica carries no james row at all), so matthew's row (…kAYh,
+      older than both) and the custody providers faithfully follow DEAD membership
+      truth — no supersede pass, boot or periodic, can converge to a key membership
+      never names. Cure landed for the narrower class (elohim-storage main.rs: the
+      membership-truth key-supersede pass re-runs every MEMBERSHIP_RECONCILE_SECS=300
+      instead of boot-only, so a member who DOES re-join under a new key no longer
+      needs its household-mates restarted), UNVERIFIED here because its input is
+      empty; the wider gap — a re-keyed peer must re-affirm household membership
+      under its new key, a DHT Membership supersession (p2p-design-gate) — is named,
+      not built. (3) conductor-validation-spin "undisturbed household is quiet" is an
+      HONEST red: the shared-log conductor is emitting "0 fetched of 1 missing
+      dependencies" every ~5s hours after the last drill — sys-validation spinning on
+      a dependency no peer can supply, the post-re-key shape, on a mesh re-keyed three
+      times today; and the re-key scenario's 12-minute ETIMEDOUT now carries the chaos
+      script's clock-stamped transcript (conductor-spin.steps.ts) so the next red
+      names the phase that stalled. The register read 0/11 saga chapters all morning
+      while a 10/11 household report sat on disk: saga-status.py read the fleet's
+      single mutable slot only; it now shares habits-status.py's run-identified
+      discovery, newest `generatedAt` across lanes.
+
       DELTA 2026-08-20b (latency instrument born; NO status change — the
       instrument is not the outcome): doorway had exactly ONE histogram and it
       timed session LIFETIME, so lane C had no request-duration series at all
@@ -234,6 +263,32 @@ habits:
     checks:
       - "a2o @concern:blob-durability — 8 scenarios across genesis/a2o/features/resilience/ (governed-distribution, salvage-placement, chaos-peer-churn, grandma-photos-survive-node-loss, app-blob-heal-on-read, observable-distribution, resilience-dimensions, household-diversity-dataplane)"
     evidence: >
+      DELTA 2026-08-22b (household lane, runs 20260822T170136Z + 180614Z): saga chapter 11
+      — the one @requires:owned-substrate skip the delta below records — is now GREEN
+      3/3 on the household lane: a want NO peer holds (`epr:jessica-unheld-want`, the
+      step proves 404 on every peer before pinning) exhausts the peer-sized 3-probe
+      budget in three 60s reconcile cycles, retires, increments
+      elohim_acquisition_pin_retirements_total{reason="exhausted"}, and the queue is
+      caught-up again by the next cycle. It had been skipped for TWO reasons, neither
+      the mechanism: every destructive gate re-read A2O_ALLOW_DESTRUCTIVE on its own
+      (nine step files), so a lane that DECLARED owned-substrate still held every
+      destructive step — now ONE gate (substrate-scope.ts destructiveAllowed: the
+      declared cap, env var as override, never fail-open); and the scenario named the
+      household's own landing page, which every peer holds, so its pin could only be
+      satisfied, never exhausted. The same full-lane run carries 3 chaos-peer-churn
+      reds, classified NOT a durability regression: "flapping" + "two-peer loss" red
+      on `"manifesto" has no custody footprint on this mesh` — no custody-blob row
+      carries contentId=manifesto, /api/v1/resilience/manifesto/household reads
+      commitmentBacked 1 / hasHouseholds 0 — a SEED gap (hc-mesh-prologue's
+      seed-commitments custody leg for the commons EPR did not land); "cascading" reds
+      on `no custody-blob commitment names matthew (12D3KooW…) as provider` because the
+      step matches `provider` against the libp2p peerId while the 81 rows on matthew
+      carry BOTH namespaces (agent keys x49 including two fossil james keys, peerIds
+      x24) and reconcile/custody.rs documents EITHER-namespace matching — the step
+      must accept either. observed_status red stands until the seed leg lands and the
+      step is corrected; status green is unchanged because neither red is the
+      invariant failing.
+
       2026-08-22 DELTA (local-mesh evidence; no status flip — already green): the
       resiliency-saga scoped lane reached 21/22 passed + 1 @requires:owned-substrate
       skip, 0 failed on the 3-peer household mesh (wave3c, commit 833ba4c58 serving) —
@@ -734,6 +789,15 @@ habits:
     checks:
       - "a2o @concern:doorway-failover (genesis/a2o/features/dataplane/doorway-failover.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
     evidence: >
+      DELTA 2026-08-22 (household lane, run 20260822T170136Z-519d4f6b, sut
+      sha256:2c012553c2e79dfb, 3-peer mesh + two local doorways): @concern:doorway-failover
+      passed=9 failed=0 — the first MEASURED green for this concern since the cures
+      above landed. Status stays red on purpose: this habit names the edge Dataplane
+      Validation lane as its flip authority, and the fleet has not run since #1376
+      (11:08Z, 76/80 skips). Confirm with `[build:edge] [edge:validate-only]` — the
+      cluster is quiesced (matthew caughtUp, both doorways 200 on the canonical head),
+      and a bare [build:edge] would throw that away to measure it.
+
       DELTA 2026-08-21c (freshness verdict + amber pantry landed host-green,
       commits 5da4c3b0e + ccf0138a9): status stays red — the a2o scenario is
       the flip authority.
@@ -1008,6 +1072,9 @@ habits:
       - "a2o @concern:operator-runtime-surface (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — @wip DROPPED 2026-08-18 by operator decision: COUNTS in the edge Dataplane Validation byConcern rollup; also runnable locally with npx cucumber-js --tags '@concern:operator-runtime-surface')"
       - "cargo test --test operator_verbs (elohim/elohim-storage — 9 tests: holder accepted + attestation names grant cid AND recorded event id; no-grant refused; revoked refused; no verified performer refused; loopless peer honest 503 with no phantom rate charge; accepted use recorded bounded_by the grant; refusals record nothing; rate_per_hour ceiling refuses the over-limit use)"
     evidence: >
+      DELTA 2026-08-22 (household lane, run 20260822T170136Z-519d4f6b):
+      operator-runtime-surface passed=3 failed=0 on the 3-peer mesh. No change.
+
       DELTA 2026-08-19b (GREEN — edge #1366 deploy run, in-pipeline quiesce
       gate A-QUIESCED then validation): operator-runtime-surface passed=4
       failed=0 pending=0 — the positive path now returns 200 with the
