@@ -649,6 +649,11 @@ for item in overlay.split("\n"):
     if "=" in item:
         k, v = item.split("=", 1); env[k] = v
 os.chdir(cwd)
+# Drop every inherited descriptor above stderr before exec. A caller that runs
+# this script under `flock` (the a2o mesh lock) otherwise hands its lock fd to
+# the long-lived peer, which then holds the lock forever (2026-08-22 deadlock:
+# three storage peers owned a2o.lock; every waiter stalled for 40 min).
+os.closerange(3, 65536)
 os.execve(binpath, [binpath, "--http-port", port], env)
 ' "$envfile" "$bin" "$port" "$cwd" "$(restart_env_overlay)" >> "$LOGDIR/$name.log" 2>&1 &
     disown 2>/dev/null || true
