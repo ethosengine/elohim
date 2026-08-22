@@ -110,7 +110,7 @@ cucumber, never substituted for it.
 **The scoping rule, because it has bitten twice.** cucumber-js *merges* a profile's `paths` with CLI
 positionals instead of replacing them, so `cucumber-js --profile mesh features/x.feature` runs the
 whole tree **plus** that file. When a scope argument is given, `just test mesh` therefore generates a
-config at `$MESH_DIR/reports/cucumber-mesh-scoped.mjs` that re-exports the `mesh` profile **minus
+config at `genesis/a2o/reports/cucumber-mesh-scoped.mjs` that re-exports the `mesh` profile **minus
 `paths`**, and passes it as `--config`. Two consequences worth knowing: cucumber resolves `--config`
 with `path.join(cwd, …)`, so the path must be **relative to `genesis/a2o`** (an absolute one is
 silently mangled); and with no `paths` at all cucumber's own default is `features/**/*.feature`, so an

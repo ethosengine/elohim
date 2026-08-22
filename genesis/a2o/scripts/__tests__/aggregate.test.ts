@@ -3,9 +3,32 @@ import { describe, it } from 'node:test';
 
 import { aggregate } from '../lib/aggregate.js';
 
+import type { DeclaredConcernSet } from '../lib/declared-concerns.js';
 import type { ConsoleArtifact } from '../lib/load-console.js';
 import type { GapFinding } from '../lib/load-coverage-gap.js';
 import type { ScenarioResult } from '../lib/load-cucumber.js';
+import type { RunEnv } from '../lib/run-env.js';
+
+/**
+ * A fleet run's env block (Law II): one measure, many environments. Inline so
+ * these fixtures stay readable — the env is OBSERVED by run-env.ts, which is
+ * unit-tested against an injected probe in run-env.spec.ts.
+ */
+const ALPHA_FLEET_ENV: RunEnv = {
+  lane: 'alpha-fleet',
+  peers: 7,
+  processControl: false,
+  networkStage: 'bootstrap',
+  sut: 'sha256:0123456789abcdef',
+  sutParts: { storage: 'tree:aaaa', doorway: 'tree:bbbb' },
+  unknown: ['clusterState', 'pvcPressure', 'liveDns'],
+};
+
+/** The denominator, declared OUTSIDE the run (Law I). */
+const DECLARED: DeclaredConcernSet = {
+  source: 'habits.yaml:checks + @concern registry',
+  concerns: ['content-sync', 'notary-authority', 'peer-mesh'],
+};
 
 function input() {
   const scenarios: ScenarioResult[] = [
@@ -83,6 +106,9 @@ void describe('aggregate', () => {
       runId: 'r1',
       profile: 'alpha',
       doorway: 'https://d.alpha',
+      gitCommit: 'a2736cdab2989e843d80179dca6710245a38f8d1',
+      env: ALPHA_FLEET_ENV,
+      declaredConcerns: DECLARED,
     });
     assert.equal(r.summary.scenarios.total, 3);
     assert.equal(r.summary.scenarios.passed, 1);
@@ -319,6 +345,39 @@ void describe('aggregate', () => {
     assert.ok(failure.screenshotPath);
     assert.match(failure.screenshotPath, /^reports\/screenshots\/lamad-d\//);
     assert.match(failure.screenshotPath, /--\*\.png$/);
+  });
+
+  void it('carries gitCommit and the env block through to the report', () => {
+    const { scenarios, console, gaps } = input();
+    const r = aggregate({
+      scenarios,
+      consoleArtifacts: console,
+      gaps,
+      runId: 'r1',
+      profile: 'alpha',
+      gitCommit: 'a2736cdab2989e843d80179dca6710245a38f8d1',
+      env: ALPHA_FLEET_ENV,
+      declaredConcerns: DECLARED,
+    });
+    assert.equal(r.gitCommit, 'a2736cdab2989e843d80179dca6710245a38f8d1');
+    assert.deepEqual(r.env, ALPHA_FLEET_ENV);
+    // `unknown` survives the round-trip: an empty array would be a CLAIM, and
+    // dropping the field is not the same statement as making it.
+    assert.deepEqual(r.env?.unknown, ['clusterState', 'pvcPressure', 'liveDns']);
+  });
+
+  void it('omits gitCommit, env and declared when the caller supplies none', () => {
+    const { scenarios, console, gaps } = input();
+    const r = aggregate({
+      scenarios,
+      consoleArtifacts: console,
+      gaps,
+      runId: 'r1',
+      profile: 'alpha',
+    });
+    assert.equal(r.gitCommit, undefined);
+    assert.equal(r.env, undefined);
+    assert.equal(r.declared, undefined);
   });
 
   void it('omits screenshotPath on scenario-failure findings outside playwright mode', () => {

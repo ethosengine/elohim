@@ -86,6 +86,14 @@ recipes:
       - name: validation
         artifactKind: "a2o:verdict"
         paths:
+          # Run-identified reports (`sprint-report-<lane>-<runId>.json`) are the durable
+          # history; the legacy single mutable slot stays named so archived runs that
+          # predate run-identification still bind. Verified 2026-08-22: `validation` is
+          # NOT in project.rs::RESOURCE_STAGES and derive_recipe never iterates it, so
+          # these globs mint NO commitments/events/labels however many files they match
+          # (26-file probe: 0 new). `paths:` are excluded from the hashed ProcessSpec
+          # atom, so widening them cannot move the recipe CID either.
+          - "genesis/a2o/reports/sprint-report-*-*.json"
           - "genesis/a2o/reports/sprint-report-dataplane.json"
     edges:
       - { from: epic, to: scenario, meaningful: false, validators: [] }

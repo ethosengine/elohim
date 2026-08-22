@@ -20,10 +20,18 @@ const addFormatsFn: (ajv: AjvNs.default) => void =
   (addFormatsNs as unknown as (ajv: AjvNs.default) => void);
 
 import { aggregate } from './lib/aggregate.js';
+import { readDeclaredConcerns } from './lib/declared-concerns.js';
 import { loadConsoleArtifacts } from './lib/load-console.js';
 import { loadCoverageGap } from './lib/load-coverage-gap.js';
 import { loadCucumber } from './lib/load-cucumber.js';
 import { renderMarkdown } from './lib/render-markdown.js';
+import { computeRunEnv, createRunEnvProbe, resolveGitCommit } from './lib/run-env.js';
+
+import type { SprintReport } from './lib/aggregate.js';
+
+/** genesis/a2o/scripts/ -> repo root. */
+const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+const HABITS_PATH = join(REPO_ROOT, 'genesis/manifests/habits.yaml');
 
 interface Args {
   reportsDir: string;
@@ -35,6 +43,13 @@ interface Args {
   runId: string;
   profile: string;
   doorway?: string;
+  /**
+   * Which lane produced this run — `household` (local mesh) or `alpha-fleet`.
+   * OPTIONAL, and every existing caller omits it: without it the lane is
+   * derived from the profile (see laneForProfile), so
+   * scripts/ci/run-dataplane-validation.sh keeps working unchanged.
+   */
+  lane?: string;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -52,6 +67,7 @@ function parseArgs(argv: string[]): Args {
     runId: opts.get('--run-id') ?? process.env.BUILD_TAG ?? new Date().toISOString(),
     profile: opts.get('--profile') ?? process.env.CUCUMBER_PROFILE ?? 'unknown',
     doorway: opts.get('--doorway') ?? process.env.E2E_DOORWAY_ALPHA,
+    lane: opts.get('--lane') ?? process.env.A2O_LANE,
   };
 }
 
@@ -70,6 +86,13 @@ function main() {
   const consoleArtifacts = loadConsoleArtifacts(args.consoleDir);
   const gaps = loadCoverageGap(args.coverageGapPath);
 
+  // The derivation key (Law II) and the denominator (Law I). Both are computed
+  // outside aggregate(): the environment is observed here, and the declared
+  // concern set is READ from the covenant file rather than from the run.
+  const probe = createRunEnvProbe(REPO_ROOT);
+  const env = computeRunEnv(probe, { profile: args.profile, lane: args.lane });
+  const declaredConcerns = readDeclaredConcerns(HABITS_PATH);
+
   const report = aggregate({
     scenarios,
     consoleArtifacts,
@@ -77,6 +100,9 @@ function main() {
     runId: args.runId,
     profile: args.profile,
     doorway: args.doorway,
+    gitCommit: resolveGitCommit(probe),
+    env,
+    declaredConcerns,
   });
 
   // Schema-validate before writing
@@ -104,6 +130,55 @@ function main() {
   console.log(
     `Findings: ${report.summary.findings.total} (scenarios: ${report.summary.scenarios.total})`
   );
+  console.log(
+    `Lane: ${env.lane} · peers ${env.peers} · processControl ${env.processControl} · ` +
+      `stage ${env.networkStage} · sut ${env.sut}` +
+      (env.unknown.length > 0 ? ` · unknown: ${env.unknown.join(', ')}` : '')
+  );
+  printDeclaredHeadline(report);
+}
+
+/**
+ * Law I's five-number headline on the console: declared · permitted · refused ·
+ * referred · not measured. `referred` is 0 by construction — `Decision::Refer`
+ * has no producer on this path (guidestar §S5) — and is printed anyway so a
+ * producer cannot arrive silently.
+ */
+function printDeclaredHeadline(report: SprintReport): void {
+  const declared = report.declared;
+  if (!declared) return;
+
+  // A zero denominator must never render as clean (Law I): if habits.yaml could
+  // not be read, every number below is 0 for the wrong reason. The loud line
+  // goes to stderr so a CI log scanner cannot miss it.
+  if (declared.unreadable) {
+    console.error(`DENOMINATOR UNREADABLE — ${declared.unreadable}`);
+    console.error(
+      `  Every declared/not-measured count below is 0 because the covenant could not be read,` +
+        ` NOT because coverage is complete. This run measured nothing it can account for.`
+    );
+  }
+
+  const byConcern = report.summary.byConcern;
+  let permitted = 0;
+  let refused = 0;
+  for (const name of declared.exercised) {
+    if ((byConcern[name]?.failed ?? 0) > 0) refused += 1;
+    else permitted += 1;
+  }
+
+  const missing = declared.notMeasured;
+  console.log(
+    `declared ${declared.concerns.length} · permitted ${permitted} · refused ${refused} · ` +
+      `referred 0 · NOT MEASURED ${missing.length}` +
+      (missing.length > 0 ? ` (${missing.join(', ')})` : '')
+  );
+  if (declared.notMeasuredRanAndSkipped.length > 0) {
+    console.log(
+      `  of those, RAN AND SKIPPED (apparatus, not scope): ` +
+        declared.notMeasuredRanAndSkipped.join(', ')
+    );
+  }
 }
 
 main();

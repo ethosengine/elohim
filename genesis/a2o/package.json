@@ -40,7 +40,6 @@
     "scan:coverage": "tsx scripts/scan-coverage.ts",
     "scan:coverage:ci": "tsx scripts/scan-coverage.ts --ci",
     "explore": "tsx scripts/explore-session.ts",
-    "publish:results": "tsx scripts/publish-results.ts",
     "local:check": "tsx scripts/local-stack.ts",
     "local:seed": "tsx scripts/local-stack.ts --seed",
     "build:sprint-report": "tsx scripts/build-sprint-report.ts",

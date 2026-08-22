@@ -14,6 +14,86 @@
       "description": "cucumber profile (alpha, local, browser, delivery, ...)"
     },
     "doorway": { "type": "string", "description": "Doorway base URL the run targeted" },
+    "gitCommit": {
+      "type": "string",
+      "description": "The commit this run measured: GIT_COMMIT when CI sets it, else `git rev-parse HEAD`. OMITTED when neither answers — an unknown commit is never rendered as a present one. Same field name and shape as CoverageGapReport.gitCommit (scripts/types.ts); this is not a second convention. Optional so reports archived before 2026-08-22 still validate; build-sprint-report.ts always emits it when git can answer."
+    },
+    "env": {
+      "type": "object",
+      "description": "Law II (guidestar 2026-08-22 §3) — the environment component of the derivation key. Localdev and the fleet are ONE measure applied to one subject differing in exactly this block, so two runs are comparable by diffing it. Optional so pre-2026-08-22 reports still validate; always emitted by build-sprint-report.ts.",
+      "required": ["lane", "peers", "processControl", "networkStage", "sut", "sutParts", "unknown"],
+      "additionalProperties": false,
+      "properties": {
+        "lane": {
+          "type": "string",
+          "description": "household | alpha-fleet | another declared lane"
+        },
+        "peers": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Observed peer count. 0 WITH \"peers\" named in `unknown` when this lane cannot observe it — never a guess."
+        },
+        "processControl": {
+          "type": "boolean",
+          "description": "Can this lane kill a peer? True on the local mesh (real PIDs on this host), false against a deployed fleet. The trust direction reverses for destructive chapters: only the true lane holds evidence for them."
+        },
+        "networkStage": {
+          "type": "string",
+          "description": "simulacra | bootstrap | coordinated | enforced — or \"unknown\" with \"networkStage\" named in `unknown` when no probe or declaration answered."
+        },
+        "sut": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{16}$",
+          "description": "Content hash over sutParts — the SYSTEM UNDER TEST. Mandatory because an a2o scenario is not the code: without it a source edit moves neither subject nor env, and a fold reports a hit for a binary nobody ran."
+        },
+        "sutParts": {
+          "type": "object",
+          "description": "What went into `sut`, so a divergence is diagnosable rather than merely detectable. Only OBTAINED parts appear here; a part that could not be obtained is named in `unknown` and left out of the hash.",
+          "additionalProperties": { "type": "string" }
+        },
+        "unknown": {
+          "type": "array",
+          "description": "Components this lane could not hash, NAMED — declared, never omitted, the same discipline as Interval::unknown() over a nullable. An empty array is the claim that nothing was unknown; omitting the field would not be the same statement.",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "declared": {
+      "type": "object",
+      "description": "Law I (guidestar 2026-08-22 §3) — the denominator, declared OUTSIDE the run. `concerns` is read from genesis/manifests/habits.yaml `checks:` strings, never computed by the runner: a tag-scoped run must still report every unexercised declared concern in `notMeasured`. Optional so pre-2026-08-22 reports still validate; always emitted by build-sprint-report.ts.",
+      "required": ["source", "concerns", "exercised", "notMeasured", "notMeasuredRanAndSkipped"],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Where the denominator was read from, e.g. \"habits.yaml:checks + @concern registry\". Carries its own failure: an unreadable denominator says so here rather than reporting an empty one as complete."
+        },
+        "unreadable": {
+          "type": "string",
+          "description": "Present ONLY when habits.yaml could not be read. A zero denominator must never render as clean: `concerns: 0` / `notMeasured: 0` is byte-identical to perfect coverage for every count-based reader, so the failure gets a field of its own."
+        },
+        "concerns": {
+          "type": "array",
+          "description": "Every concern this lane is DECLARED to measure.",
+          "items": { "type": "string" }
+        },
+        "exercised": {
+          "type": "array",
+          "description": "The declared concerns this run produced a REAL VERDICT for — at least one pass or one fail. Presence in byConcern is NOT enough: guidestar §S3 maps `Skipped` → NOT MEASURED, and on edge #1376 (3 passed / 1 failed / 76 skipped) a presence rule renders `not measured 1` against the worked example's 11.",
+          "items": { "type": "string" }
+        },
+        "notMeasured": {
+          "type": "array",
+          "description": "concerns - exercised: every declared concern this run produced no verdict for, whether it ran-and-skipped or never ran at all. DERIVED here, never emitted by a failing runner — this is the count a re-scope must not be able to make vanish.",
+          "items": { "type": "string" }
+        },
+        "notMeasuredRanAndSkipped": {
+          "type": "array",
+          "description": "The subset of notMeasured whose scenarios RAN and were skipped, as opposed to never appearing in this run. Both are NOT MEASURED; a skipped apparatus is a fixture/gate first move, an absent concern is a scope/registry first move.",
+          "items": { "type": "string" }
+        }
+      }
+    },
     "summary": {
       "type": "object",
       "required": ["scenarios", "findings", "byConcern"],
@@ -52,12 +132,21 @@
           "description": "Per-concern rollup keyed by @concern:<name> Gherkin tag. Always present; empty when no scenarios carry the tag.",
           "additionalProperties": {
             "type": "object",
-            "required": ["passed", "failed", "pending", "scenarios"],
+            "required": ["passed", "failed", "pending", "skipped", "scenarios"],
             "additionalProperties": false,
             "properties": {
               "passed": { "type": "integer", "minimum": 0 },
               "failed": { "type": "integer", "minimum": 0 },
-              "pending": { "type": "integer", "minimum": 0 },
+              "pending": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "NO VERDICT — the union of pending + undefined + skipped. Deliberately the union: fulfill.rs:250 (`failed==0 && pending==0 && passed>0`) and saga-status.py:288 (`pending>0 -> pending-env`) both read it as \"this concern did not fully answer\", and narrowing it would let 3-passed-1-skipped read all-green."
+              },
+              "skipped": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "How many of `pending` RAN AND WERE SKIPPED (as opposed to pending/undefined). Carried as itself because guidestar §S3 supersedes the skipped→pending collapse by name."
+              },
               "scenarios": {
                 "type": "array",
                 "items": {
@@ -66,7 +155,10 @@
                   "additionalProperties": false,
                   "properties": {
                     "name": { "type": "string" },
-                    "status": { "type": "string", "enum": ["passed", "failed", "pending"] },
+                    "status": {
+                      "type": "string",
+                      "enum": ["passed", "failed", "pending", "skipped"]
+                    },
                     "surface": { "type": "string", "description": "feature file path" }
                   }
                 }
