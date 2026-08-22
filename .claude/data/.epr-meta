@@ -31,6 +31,37 @@ rules:
       a session handoff's durable facts belong in memory files or as commentary
       citing a habit (genesis/manifests/habits.yaml). If none of those fit,
       that is usually the signal the content is conversation-scoped — let it go.
+  - id: new-ledger-declares-mode-reader-and-drain
+    class: inject
+    when: { write: "*.jsonl", new: true }
+    dedupe-of: ".claude/scripts/_lib/findings_ledger.py (the shared row primitive and the live-set vs append-only mode contract)"
+    why: >
+      A new ledger here IS a legitimate birth — this directory's own guide says so — and that is
+      exactly where the cost is decided, so decide it before the first row.
+      (1) REACH the row primitive: _lib/findings_ledger.py already owns the shape ({fp, first_seen,
+      status, ...}), the flock'd read-check-append, and the drain. A second hand-rolled appender is
+      a second ontology.
+      (2) DECLARE THE MODE, because the two are not interchangeable: LIVE-SET (one row per live
+      condition, DELETED when it drains — reading answers "what is wrong now") or APPEND-ONLY
+      (every row a historical fact, never removed — reading answers "what happened"). An
+      append-only ledger that gets drained destroys the growth-rate measure it exists to compute.
+      (3) NAME THE READER, by path, in this manifest. governance-findings.jsonl reached 7,806,004
+      bytes with zero readers — a repo-wide grep for read/load/open against its name returns
+      nothing — and genesis/manifests/habits.yaml has said so since it was 4.3MB. Two more ledgers
+      here are 0 bytes. A writer without a reader is the instrument-with-no-reader shape this layer
+      has grown at least six times.
+      (4) DECLARE A FORGETTING RULE (a count, an age, or a comet tier), and if any row can be
+      standing evidence for an open question, a PIN that survives it — SET AND RELEASED BY A
+      DECISION, NEVER BY A CLOCK. Rotation without a pin deletes the evidence for an unresolved
+      question on a counter; a pin without a release is a leak wearing a policy's clothes. The
+      shape already exists four times in this repo and is nowhere named: Jenkins
+      buildDiscarder(logRotator(numToKeepStr)) runs at 20/100/50/30/30 with no keepLog pin
+      anywhere; memkit-retention.py's HEAD/TAIL/CORE comet keeps a permanent spine but releases it
+      automatically; .epr-meta `retire-when:` is a decision-gated pin for RULES; habits.yaml
+      `best_observed:` is one for a high-water mark. Nothing pins a result or a ledger row.
+    retire-when: >
+      when a ledger under .claude/data cannot be opened except through findings_ledger.py, so mode,
+      reader, forgetting rule and pin are structural rather than remembered
 ---
 
 # .claude/data — deterministic ledgers, not a document store

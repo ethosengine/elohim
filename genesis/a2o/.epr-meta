@@ -36,6 +36,37 @@ rules:
       A new subdirectory under genesis/a2o/ must be born with its own .epr-meta —
       place one alongside the first file so governance is never silently dropped by
       descending one directory. See genesis/a2o/features/dataplane/.epr-meta as an example.
+  - id: run-results-reach-the-run-witness
+    class: inject
+    when:
+      write: "*.ts"
+      contains-any: ["reports/", "REPORT_PATH", "writeReport", "-report.json", "-results.json"]
+    dedupe-of: "genesis/a2o/schemas/sprint-report.schema.json (the run envelope, Ajv-strict-validated before every write in scripts/build-sprint-report.ts) + elohim/sdk/schemas/v1/views/verdict-view.schema.json (the per-check evidence)"
+    why: >
+      This file mints a result artifact, and the shape is OWNED — do not hand-roll one.
+      A verification result is exactly three things and there is no fourth: one ASSERTION is a
+      CheckWitness{checkId, outcome, summary, observed} (elohim/epr/src/verdict.rs); one RUN is the
+      envelope {runId, gitCommit, env{}, declared{}} carrying checks[]; the MEMO of a run is a
+      measure-fold@1 keyed (subject x measure@version x env).
+      `check_id` IS the `@concern:` tag IS the `checks:` string in genesis/manifests/habits.yaml —
+      that one identifier is the only join between this artifact, the register, and CI. Reuse it.
+      OUTCOME IS THREE-VALUED AND CLOSED: passed | failed | skipped. There is no `warn`. An
+      unreachable probe is `skipped` with its reason in `summary`; a measured negative is `failed`
+      and the decision to keep it non-blocking stays at the gate; genuinely undecidable is
+      Decision::Refer{ContestedEvidence}. An assertion that never ran is ABSENT from checks[] and
+      surfaces in declared.notMeasured — absence is DERIVED against a denominator declared outside
+      the run, never emitted by the runner that failed.
+      IF THE BYTES COME FROM A TOOL WE DO NOT OWN (cucumber-js, cargo test, clippy, junit): that is
+      a FOREIGN measure. Do not conform the tool and do not write a new schema for it — declare a
+      row in .claude/epr-meta/measures.yaml (family, procedure naming the external producer, unit
+      naming its shape) and translate at the point of READ. Variety belongs at the edge; the core
+      stays narrow.
+      Reasoning: genesis/docs/superpowers/specs/2026-08-22-verification-as-memoized-derivation-guidestar.md
+      (§2 the classification, §5 what is refused).
+    retire-when: >
+      when every writer in this lane obtains the envelope from a shared writer in
+      genesis/a2o/scripts/lib/ rather than constructing an object literal — at that point the shape
+      is reached by construction and an advisory pointing at it has nothing left to add
 ---
 # genesis/a2o — acceptance-to-outcome testing
 
