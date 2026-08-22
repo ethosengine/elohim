@@ -1,8 +1,22 @@
 @recovery-m5 @defender-stub @act:i @e2e
 Feature: submit_specialist_revocation gated by local defender role marker
-  As an elohim-agent acting on a human's behalf
+  As an elohim-agent that a human designated as one of their recovery defenders
   I want submit_specialist_revocation to verify my defender role
-  So that the structural quorum gate from M4 retains its meaning
+  So that only the defenders the human chose can strip a compromised key —
+  never an arbitrary agent claiming the power
+
+  When a human's device key is compromised, their designated defenders — the
+  peers the human chose in advance to guard their recovery — attest a
+  specialist revocation that strips the compromised key. Recovery milestone
+  M4 established the structural quorum: revocation takes agreement from the
+  human's defender circle, not any one actor. This milestone (M5) adds the
+  local half of that promise: an agent that is NOT in the human's
+  DefenderManifest (the human's own declaration of who defends them) is
+  refused at the coordinator, so an attacker who compromises one agent
+  cannot impersonate a defender and vote a key away. Without this gate the
+  M4 quorum counts votes from anyone — which is no quorum at all; the human
+  consequence would be losing keys, and with them years of identity and
+  household state, to whoever asks loudest.
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
