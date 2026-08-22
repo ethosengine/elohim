@@ -263,6 +263,28 @@ habits:
     checks:
       - "a2o @concern:blob-durability — 8 scenarios across genesis/a2o/features/resilience/ (governed-distribution, salvage-placement, chaos-peer-churn, grandma-photos-survive-node-loss, app-blob-heal-on-read, observable-distribution, resilience-dimensions, household-diversity-dataplane)"
     evidence: >
+      DELTA 2026-08-22c (CLOSING MEASUREMENT, household lane, run
+      20260822T183819Z-123cea49 on the committed tree): 164 passed / 42 failed / 35
+      pending / 23 skipped, against the morning's 159 / 18 / 35 / 52. Read the 42 in
+      two halves. 17 are the morning's reds still standing (one healed: the wedged
+      request path); every one is classified in the deltas above. 25 are NEW and every
+      one of them is a previously-HELD destructive scenario that the unified gate now
+      lets RUN — self-healing-flow-control (10: doorway re-exec with paused peers,
+      breaker/half-open, warm-up budgets), peer-conductor-connection-resilience (4),
+      peer-loss-failover (2), and 7 ECONNREFUSED where a drill killed jessica and its
+      own restore never brought her back. That is the lane's destructive backlog
+      MEASURED for the first time instead of silently skipped — the denominator moved,
+      not the invariant. Two cascades the first whole run exposed are cured in
+      hc-mesh.sh (123cea498): the re-exec'd doorway's cold membrane banning the
+      lane's own loopback client (403 x-membrane:deny), and fixture pids going stale
+      after storage-restart (kill ESRCH). First move next sprint: the drills'
+      peer-restore path (a killed peer must come back by the drill's own hand, by
+      port, never by a remembered pid), then self-healing-flow-control's ten. The
+      habit-bound concerns on this run: doorway-failover 9/0, operator-runtime-surface
+      3/0, saga-11 3/0, notary-authority 4/0, federation-deploy 2/0,
+      reach-enforced-http 3/0; blob-durability 1/4 (chaos + heal-on-read, seed gaps
+      above); content-sync 3/1 (the 30s window, again under lane load — 4/4 scoped).
+
       DELTA 2026-08-22b (household lane, runs 20260822T170136Z + 180614Z): saga chapter 11
       — the one @requires:owned-substrate skip the delta below records — is now GREEN
       3/3 on the household lane: a want NO peer holds (`epr:jessica-unheld-want`, the
