@@ -36,6 +36,7 @@ import { Given, When, Then } from '@cucumber/cucumber';
 import { request } from 'undici';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
+import { resolveDoorwayUrl } from '../../src/framework/fixtures/household-mesh.js';
 import { AccountShellPage } from '../../src/framework/pages/account/account-shell.page.js';
 import { SecuritySigninPane } from '../../src/framework/pages/account/security-signin-pane.page.js';
 import { E2EWorld } from '../../src/framework/world.js';
@@ -724,16 +725,62 @@ Then('I see the existing hosted account view', function (this: E2EWorld) {
 // portal-host-discovery — add portal host (503) + validator gate (http URL)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Shared body for both portal-hosts POST step shapes.
+ *
+ * Doorway resolution: the portal-host-discovery scenarios carry no Background
+ * (the validator-gate scenario has no Given at all), so a doorway may never
+ * have been registered in the world. Resolve in the standard order — what the
+ * world was GIVEN wins, then `E2E_DOORWAY_ALPHA`, then the household-mesh
+ * fixture. When nothing resolves this is absent substrate, not a product red:
+ * skip with a named reason.
+ */
+async function postPortalHosts(world: E2EWorld, jsonPayload: string): Promise<void | string> {
+  let doorwayUrl: string | undefined;
+  for (const [, doorway] of world.doorways) {
+    doorwayUrl = doorway.url;
+    break;
+  }
+  if (!doorwayUrl) {
+    try {
+      doorwayUrl = resolveDoorwayUrl('alpha', [process.env['E2E_DOORWAY_ALPHA']]);
+    } catch {
+      doorwayUrl = undefined; // fixture declares alpha absent / manifest unreadable
+    }
+  }
+  if (!doorwayUrl) {
+    // eslint-disable-next-line no-console
+    console.log(
+      '  ⏭️  SKIPPED (substrate): no doorway resolvable for POST /api/v1/account/portal-hosts ' +
+        '— no doorway registered in the world, E2E_DOORWAY_ALPHA unset, and the household ' +
+        'fixture names none. Run against a mesh (`just mesh prologue` env) or set E2E_DOORWAY_ALPHA.'
+    );
+    return 'skipped';
+  }
+
+  const token = getFirstAuthToken(world);
+  const payload = JSON.parse(jsonPayload) as Record<string, unknown>;
+
+  const result = await rawPost(doorwayUrl, '/api/v1/account/portal-hosts', payload, token);
+  world.contentIds.set('lastStatusCode', String(result.statusCode));
+  world.contentIds.set('lastResponseBody', result.body);
+  return undefined;
+}
+
 When(
   String.raw`I POST {string} to \/api\/v1\/account\/portal-hosts`,
   async function (this: E2EWorld, jsonPayload: string) {
-    const doorwayUrl = requireDoorwayUrl(this);
-    const token = getFirstAuthToken(this);
-    const payload = JSON.parse(jsonPayload) as Record<string, unknown>;
+    return postPortalHosts(this, jsonPayload);
+  }
+);
 
-    const result = await rawPost(doorwayUrl, '/api/v1/account/portal-hosts', payload, token);
-    this.contentIds.set('lastStatusCode', String(result.statusCode));
-    this.contentIds.set('lastResponseBody', result.body);
+// The recovery-m5-portal-host-discovery feature writes the payload INLINE
+// (unquoted JSON braces), which no cucumber-expression parameter can match —
+// a regex step captures the whole `{…}` object verbatim instead.
+When(
+  /^I POST (\{.+\}) to \/api\/v1\/account\/portal-hosts$/,
+  async function (this: E2EWorld, jsonPayload: string) {
+    return postPortalHosts(this, jsonPayload);
   }
 );
 

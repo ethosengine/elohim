@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 import { Given, When, Then } from '@cucumber/cucumber';
 
-import { allRelationships } from '../src/framework/fixtures/humans.js';
+import { allRelationships, getFixture } from '../src/framework/fixtures/humans.js';
 import { E2EWorld } from '../src/framework/world.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -123,6 +123,51 @@ Given(
       'false',
       'Expected mutual attestation to be false'
     );
+  }
+);
+
+Given(
+  'James is a member of the same household as Matthew and Jessica, but not the couple',
+  function (this: E2EWorld) {
+    // Privacy-scenario precondition, verified against humans.json rather than
+    // assumed: James must share the couple's household (so proximity alone is
+    // what's being tested) while holding NO spouse edge with either of them
+    // (so the love-map gate, not membership, is what hides the path).
+    const james = getFixture('James');
+    const matthew = getFixture('Matthew');
+    const jessica = getFixture('Jessica');
+
+    const jamesHousehold = james.raw.householdId;
+    assert.ok(jamesHousehold, 'humans.json: James has no householdId — fixture gap');
+    assert.strictEqual(
+      matthew.raw.householdId,
+      jamesHousehold,
+      `humans.json: Matthew's household "${matthew.raw.householdId}" != James's ` +
+        `"${jamesHousehold}" — the privacy scenario needs a same-household non-participant`
+    );
+    assert.strictEqual(
+      jessica.raw.householdId,
+      jamesHousehold,
+      `humans.json: Jessica's household "${jessica.raw.householdId}" != James's ` +
+        `"${jamesHousehold}" — the privacy scenario needs a same-household non-participant`
+    );
+
+    const coupleIds = new Set([matthew.id, jessica.id]);
+    const spouseEdgesWithJames = allRelationships().filter(
+      r =>
+        r.relationshipType === 'spouse' &&
+        ((r.source === james.id && coupleIds.has(r.target)) ||
+          (r.target === james.id && coupleIds.has(r.source)))
+    );
+    assert.equal(
+      spouseEdgesWithJames.length,
+      0,
+      'humans.json: James holds a spouse relationship with Matthew or Jessica — he IS the ' +
+        'couple, so the non-participant privacy scenario is unfalsifiable: ' +
+        JSON.stringify(spouseEdgesWithJames)
+    );
+
+    this.contentIds.set('nonParticipant', james.id);
   }
 );
 

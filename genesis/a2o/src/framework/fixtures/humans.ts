@@ -27,6 +27,7 @@ import type { HumanCredentials } from '../human.js';
 
 export interface HumansJsonHuman {
   id: string;
+  householdId?: string;
   displayName: string;
   bio: string;
   category: string;

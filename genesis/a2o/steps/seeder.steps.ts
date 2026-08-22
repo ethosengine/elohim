@@ -363,7 +363,12 @@ Then('no errors mention {string}', function (this: E2EWorld, _substring: string)
 // ---------------------------------------------------------------------------
 
 interface DeploymentRegistryFile {
-  humans?: { humanId: string; name?: string }[];
+  humans?: {
+    humanId: string;
+    name?: string;
+    humanLabel?: string;
+    nodeTypes?: string[];
+  }[];
 }
 
 const REGISTRY_STATE = Symbol.for('a2o.deploymentRegistryState');
@@ -403,3 +408,56 @@ Then('the registry contains a record for each name:', function (this: E2EWorld, 
     `deployment registry is missing expected humans: ${missing.join(', ')}`
   );
 });
+
+Then('every nodeTypes value is one of:', function (this: E2EWorld, table: DataTable) {
+  const registry = regState(this).registry;
+  assert.ok(registry, 'deployment registry not loaded — missing Given step');
+  assert.ok(Array.isArray(registry.humans), 'registry missing "humans" array');
+
+  // The table's first row is its header ("nodeType"); rows() excludes it.
+  const allowed = new Set(table.rows().map(row => row[0]));
+
+  const violations: string[] = [];
+  for (const human of registry.humans ?? []) {
+    for (const nodeType of human.nodeTypes ?? []) {
+      if (!allowed.has(nodeType)) {
+        violations.push(`${human.humanId ?? human.name ?? '(unnamed record)'}: "${nodeType}"`);
+      }
+    }
+  }
+  assert.equal(
+    violations.length,
+    0,
+    'genesis/orchestrator/data/deployments.json declares nodeTypes outside the allowed cluster ' +
+      `vocabulary [${[...allowed].join(', ')}] — pods with these affinities are unschedulable: ` +
+      violations.join('; ')
+  );
+});
+
+Then(
+  'for every record the humanId equals {string} concatenated with humanLabel',
+  function (this: E2EWorld, prefix: string) {
+    const registry = regState(this).registry;
+    assert.ok(registry, 'deployment registry not loaded — missing Given step');
+    assert.ok(Array.isArray(registry.humans), 'registry missing "humans" array');
+
+    const violations: string[] = [];
+    for (const human of registry.humans ?? []) {
+      if (typeof human.humanLabel !== 'string' || human.humanLabel.length === 0) {
+        violations.push(`${human.humanId ?? human.name ?? '(unnamed record)'}: missing humanLabel`);
+        continue;
+      }
+      const expected = `${prefix}${human.humanLabel}`;
+      if (human.humanId !== expected) {
+        violations.push(`humanId "${human.humanId}" != expected "${expected}"`);
+      }
+    }
+    assert.equal(
+      violations.length,
+      0,
+      'genesis/orchestrator/data/deployments.json breaks the humanId convention ' +
+        `("${prefix}" + humanLabel) — K8s labels and persona records would disagree: ` +
+        violations.join('; ')
+    );
+  }
+);
