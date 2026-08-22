@@ -618,6 +618,29 @@ function peerPid(name: HouseholdPeerName): number {
   return requireFixturePeerPid(loadHouseholdMeshFixture(), name);
 }
 
+// ---------------------------------------------------------------------------
+// Destructive gate — SIGSTOPping a live mesh peer is an inducement on shared
+// state, same class as the conductor-bounce legs in
+// steps/mesh/peer-conductor-resilience.steps.ts, and rides the same gate:
+// off by default, A2O_ALLOW_DESTRUCTIVE=1 to run. A held step returns
+// 'skipped' (never 'pending'), which skips the rest of its scenario.
+// ---------------------------------------------------------------------------
+
+const DESTRUCTIVE_ENV = 'A2O_ALLOW_DESTRUCTIVE';
+
+function destructiveAllowed(): boolean {
+  return process.env[DESTRUCTIVE_ENV] === '1';
+}
+
+function holdDestructive(wouldDo: string): 'skipped' {
+  // eslint-disable-next-line no-console
+  console.warn(
+    `  ⏭️  HELD (destructive): ${wouldDo}. The mesh is shared, so this leg is off by default — ` +
+      `set ${DESTRUCTIVE_ENV}=1 to run it.`
+  );
+  return 'skipped';
+}
+
 function pausePeerProcess(name: HouseholdPeerName): void {
   process.kill(peerPid(name), 'SIGSTOP');
 }
@@ -726,6 +749,9 @@ Given('every household peer meets its connected-peers floor', async function (th
 });
 
 When("Jessica's storage peer goes down", function (this: E2EWorld) {
+  if (!destructiveAllowed()) {
+    return holdDestructive("SIGSTOP jessica's live storage process");
+  }
   pausePeer(this, 'jessica');
 });
 
@@ -755,6 +781,9 @@ Then('the serving peer is a surviving household peer', function (this: E2EWorld)
 Given(
   "Jessica's storage peer was down while the mesh kept serving",
   async function (this: E2EWorld) {
+    if (!destructiveAllowed()) {
+      return holdDestructive("SIGSTOP jessica's live storage process");
+    }
     const state = await establishReplicatedManifesto(this);
     for (const peer of state.peers) await assertConnectedFloor(state, peer);
     pausePeer(this, 'jessica');
@@ -864,6 +893,9 @@ Given("Jessica's storage peer holds content it stewards locally", async function
 });
 
 When('every other household peer is unreachable', function (this: E2EWorld) {
+  if (!destructiveAllowed()) {
+    return holdDestructive("SIGSTOP matthew's and james's live storage processes");
+  }
   pausePeer(this, 'matthew');
   pausePeer(this, 'james');
 });
