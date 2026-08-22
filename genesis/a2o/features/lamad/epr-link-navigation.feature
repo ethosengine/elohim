@@ -1,4 +1,7 @@
-@act:i @e2e
+# @browser: every scenario drives a page (signs in, opens a concept, clicks a
+# card, reads the URL) — Playwright is the driving mechanism, so the browser lane
+# runs it; in the HTTP lane the steps hold at "a learner has signed in".
+@act:i @e2e @browser
 Feature: EPR relationship navigation boxes
   Learners see the typed relationships declared in a concept's EPR Head
   as navigable cards with trust signals (reach + stewardship resilience).

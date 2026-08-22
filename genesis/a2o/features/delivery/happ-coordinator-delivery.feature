@@ -34,9 +34,21 @@ Feature: hApp coordinator delivery — a shipped zome fix reaches running conduc
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
 
+  # Both lifecycle scenarios observe happ_manager::ensure_happ_installed —
+  # the ONLY path that decides and logs coordinator drift
+  # (elohim/elohim-storage/src/main.rs, the --embedded-conductor boot branch;
+  # sync_coordinators in src/happ_manager.rs). Act I installs the hApp with
+  # `hc sandbox generate` against an external conductor and launches storage
+  # without --embedded-conductor, so that decision never runs on the household
+  # lane — cluster-state.act1-household.yaml declares `embedded-conductor:
+  # available: false` for exactly this. The tag makes the hold substrate-true
+  # (HELD, not pending) until an embedded-conductor mesh mode exists. A second,
+  # independent gap stays in the steps: no fixture authors a SECOND bundle whose
+  # coordinator wasm alone differs (DNA-build tooling, not step glue).
+  #
   # Constraint documentation, not a regression guard: this scenario proves
   # the permanent structural blindness the feature exists to work around.
-  @requires:owned-substrate
+  @requires:owned-substrate @requires:embedded-conductor
   Scenario: Without coordinator drift detection, a coordinator-only fix never deploys
     Given a conductor with the elohim hApp installed from an earlier bundle
     And a new bundle whose infrastructure coordinator zome changed but whose integrity zomes did not
@@ -47,7 +59,7 @@ Feature: hApp coordinator delivery — a shipped zome fix reaches running conduc
     # DNA-hash-granular staleness check is structurally blind to
     # coordinator-only changes. uhCok… in errors is a WASM hash; uhC0k… a DNA hash.
 
-  @requires:owned-substrate
+  @requires:owned-substrate @requires:embedded-conductor
   Scenario: Coordinator drift is healed by hot-swap without re-keying the agent
     Given a conductor with the elohim hApp installed and an agent key holding DHT state
     And a new bundle whose infrastructure coordinator wasm hash differs from the installed cell's

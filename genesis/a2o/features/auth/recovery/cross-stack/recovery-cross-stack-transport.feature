@@ -5,8 +5,12 @@
 # deployed API suite when shem flipped back on (41c565f3e).
 # Every step below is DEFINED and deliberately `pending`: the fixture has no HTTP admin
 # surface for cucumber to drive yet (plan 2026-05-10-iroh-recovery-e2e.md Plans 1+4).
-# Pending, not undefined — the debt stays visible in the run report.
-@e2e @auth @recovery-cross-stack @iroh @phase11-gate5 @act:host
+# @wip (2026-08-22): the runtime these steps drive — a fixture-helper binary exposing
+# MultiStackFixture's five nodes over HTTP — is unbuilt, so on every lane all five
+# scenarios pend at the Background's first step. Held as @wip until Plans 1+4 land;
+# the Rust twin (elohim/elohim-storage/tests/iroh_recovery_cross_stack.rs) carries the
+# proof meanwhile. Sheds @wip when the Background step binds to a live fixture.
+@e2e @auth @recovery-cross-stack @iroh @phase11-gate5 @act:host @wip
 Feature: Recovery completes across mixed iroh/libp2p share-holder transports
 
   Cutover gate #5 (spec 2026-05-08-iroh-libp2p-complementarity.md line 514).

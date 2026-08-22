@@ -1,4 +1,7 @@
-@recovery-m5 @auth-portal-convergence @act:i @e2e
+# @browser: every scenario navigates and clicks the account surface — Playwright is the
+# driving mechanism (steps/ui/account-m5.steps.ts), so the browser lane runs it; in the
+# HTTP lane the steps hold at the first navigation.
+@recovery-m5 @auth-portal-convergence @act:i @e2e @browser
 Feature: Doorway redirects steward humans to their portal host
   As a steward who has graduated from hosted to peer-native
   I want doorway/account to point me at my own steward

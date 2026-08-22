@@ -1,4 +1,7 @@
-@recovery-m5 @account-pillar @act:i @e2e
+# @browser: every scenario navigates and clicks the account surface — Playwright is the
+# driving mechanism (steps/ui/account-m5.steps.ts), so the browser lane runs it; in the
+# HTTP lane the steps hold at the first navigation.
+@recovery-m5 @account-pillar @act:i @e2e @browser
 Feature: Listing my keys in the account-management surface
   As a steward
   I want to see my active key and revocation history
