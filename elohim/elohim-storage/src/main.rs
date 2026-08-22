@@ -2818,6 +2818,19 @@ async fn async_main(
             // populate the real `httpPort` on their `DeliveryPeer` row for
             // this node instead of guessing 8090.
             http_port: config.http_port,
+            // Declared on the same Identify string: this node serves
+            // extracted files iff it runs an extraction cache (built below
+            // from the same flag and attached via `set_extraction_cache`).
+            serves_extracted: config.extraction_cache.enabled,
+            // Ping cadence knobs; a failed ping closes the connection.
+            ping_interval_secs: std::env::var("P2P_PING_INTERVAL_SECS")
+                .ok()
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(elohim_storage::p2p::DEFAULT_PING_INTERVAL_SECS),
+            ping_timeout_secs: std::env::var("P2P_PING_TIMEOUT_SECS")
+                .ok()
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(elohim_storage::p2p::DEFAULT_PING_TIMEOUT_SECS),
             ..Default::default()
         };
 

@@ -399,8 +399,30 @@ pub struct DeliveryPeer {
     pub multiaddrs: Vec<String>,
     /// Network proximity: "lan" (mDNS) or "wan"
     pub network: String,
-    /// Capability strings from CapacityAnnouncement (e.g., "serves_extracted", "warm:sha256-abc")
+    /// Capability strings exactly as the peer self-declared them on its
+    /// libp2p Identify `agent_version` (`caps=` token — see
+    /// `parse_capabilities_from_agent_version`), e.g. `serves_compressed`,
+    /// `serves_extracted`, `cache_tier:extraction`. Kept verbatim for
+    /// consumers that still string-match; the typed projections below are
+    /// what a client should read.
     pub capabilities: Vec<String>,
+    /// Typed projection of `capabilities`: this peer can hand a client ONE
+    /// file out of an app bundle (the storage-extraction delivery layer).
+    /// `false` until the peer's Identify handshake has declared it — a peer
+    /// that never said either reads as "cannot", which is the safe default
+    /// for a client choosing where to fetch from (it falls back to the whole
+    /// blob, which every peer serves).
+    #[serde(default)]
+    pub serves_extracted: bool,
+    /// Typed projection of `capabilities`: this peer serves the raw blob.
+    /// Every elohim-storage peer can, so this is `true` from discovery.
+    #[serde(default)]
+    pub serves_compressed: bool,
+    /// Typed projection of the `cache_tier:<tier>` capability — the highest
+    /// delivery layer this peer keeps warm: `projection`, `extraction` or
+    /// `blob-only`. `blob-only` until the peer declares otherwise.
+    #[serde(default = "DeliveryPeer::default_cache_tier")]
+    pub cache_tier: String,
     /// When this peer was last seen (unix ms)
     pub last_seen: u64,
     /// HTTP port for direct file serving (default 8090)
@@ -432,6 +454,38 @@ pub struct DeliveryPeer {
     /// no active commitments. See the handler for the full derivation.
     #[serde(default)]
     pub commitments: Vec<String>,
+}
+
+impl DeliveryPeer {
+    /// The tier a peer is assumed to hold before it declares one.
+    pub(crate) fn default_cache_tier() -> String {
+        "blob-only".to_string()
+    }
+
+    /// The capability set a freshly discovered peer is credited with before
+    /// its Identify handshake lands: raw-blob service only. Every
+    /// elohim-storage node serves raw blobs (`epr_service::handle_query_delivery`
+    /// answers `serves_compressed: true` unconditionally), so this is a floor,
+    /// never a guess about extraction.
+    pub(crate) fn discovery_floor_capabilities() -> Vec<String> {
+        vec!["serves_compressed".to_string()]
+    }
+
+    /// Replace this row's capability facts with a peer's self-declared set
+    /// (typed fields are derived from the strings, so the two can never
+    /// disagree). The `warm:<hash>` vocabulary is accepted and kept verbatim
+    /// in `capabilities`; nothing on the Identify path carries it today.
+    pub(crate) fn apply_capabilities(&mut self, caps: &[String]) {
+        self.capabilities = caps.to_vec();
+        self.serves_extracted = caps.iter().any(|c| c == "serves_extracted");
+        self.serves_compressed = caps.iter().any(|c| c == "serves_compressed");
+        self.cache_tier = caps
+            .iter()
+            .find_map(|c| c.strip_prefix("cache_tier:"))
+            .filter(|tier| !tier.is_empty())
+            .map(str::to_string)
+            .unwrap_or_else(Self::default_cache_tier);
+    }
 }
 use crate::sync::{DocStore, StreamTracker, SyncManager};
 use elohim_cache_core::extraction::ExtractionCache;
@@ -561,6 +615,20 @@ pub struct P2PConfig {
     /// of a fleet-wide 8090 guess. See
     /// `genesis/data/timeline/backlog/delivery-peer-row-local-port-and-untyped-capabilities.md`.
     pub http_port: u16,
+    /// Whether THIS node serves individual extracted app files (it runs an
+    /// `ExtractionCache` — `Config::extraction_cache.enabled`). Advertised to
+    /// peers on the same Identify `agent_version` as `http_port` so their
+    /// `DeliveryPeer` row for this node carries `serves_extracted` /
+    /// `cache_tier` as declared facts, not a permanent `false` (backlog §4).
+    pub serves_extracted: bool,
+    /// libp2p ping cadence (seconds). A connection whose ping fails is CLOSED
+    /// (see the `Ping` arm in `handle_behaviour_event`) so a peer that stops
+    /// answering — paused, wedged, gone dark without a FIN — leaves the
+    /// connected set within `ping_interval + ping_timeout` instead of sitting
+    /// in it until the 300 s idle timeout. Defaults are libp2p's (15 s / 20 s).
+    pub ping_interval_secs: u64,
+    /// libp2p ping timeout (seconds); see `ping_interval_secs`.
+    pub ping_timeout_secs: u64,
 }
 
 impl Default for P2PConfig {
@@ -595,9 +663,24 @@ impl Default for P2PConfig {
             sync_interval_secs: None,
             acquisition_reconcile_secs: None,
             http_port: DEFAULT_HTTP_PORT,
+            serves_extracted: false,
+            ping_interval_secs: DEFAULT_PING_INTERVAL_SECS,
+            ping_timeout_secs: DEFAULT_PING_TIMEOUT_SECS,
         }
     }
 }
+
+/// libp2p's own ping defaults, restated so the config knob has a named floor.
+pub const DEFAULT_PING_INTERVAL_SECS: u64 = 15;
+pub const DEFAULT_PING_TIMEOUT_SECS: u64 = 20;
+
+/// Cadence of the LAN re-dial arm: every tick, each mDNS-discovered peer that
+/// is neither connected nor being dialed is dialed again on its last-known
+/// multiaddrs. mDNS itself re-queries only every ~5 min and Kademlia's
+/// periodic bootstrap is on the same order, so without this arm a household
+/// link dropped by a failed ping (peer paused, wedged, rebooted) stays down
+/// for minutes after the peer is back.
+pub(crate) const LAN_REDIAL_INTERVAL_SECS: u64 = 10;
 
 /// Concurrent inbound view-federation slice-builds permitted per node.
 ///
@@ -831,6 +914,11 @@ struct CachedIdentifyInfo {
     /// Already defaulted to `DEFAULT_HTTP_PORT` at insertion time when the
     /// suffix is absent/unparseable — never `None` here.
     http_port: u16,
+    /// The peer's self-declared delivery capabilities (`caps=` token on the
+    /// same `agent_version`), parsed by `parse_capabilities_from_agent_version`.
+    /// `None` for a peer that predates the token — its delivery row keeps
+    /// the discovery floor rather than inventing a declaration.
+    capabilities: Option<Vec<String>>,
 }
 
 /// Per-peer runtime metrics tracked from swarm events.
@@ -2316,12 +2404,34 @@ pub(crate) const DEFAULT_HTTP_PORT: u16 = 8090;
 /// mixed-version fleet degrades to today's behavior rather than erroring.
 fn parse_http_port_from_agent_version(agent_version: &str) -> Option<u16> {
     agent_version
-        .rsplit_once("http_port=")
-        .and_then(|(_, port_str)| port_str.trim().parse::<u16>().ok())
+        .split_whitespace()
+        .find_map(|token| token.strip_prefix("http_port="))
+        .and_then(|port_str| port_str.parse::<u16>().ok())
         // Port 0 is never a servable HTTP port ("any port" bind syntax at
         // best) — treat it as absent so callers fall back to the default
         // instead of projecting an undialable row.
         .filter(|port| *port != 0)
+}
+
+/// Parse the self-declared delivery capabilities a peer appends to its libp2p
+/// Identify `agent_version` (`"<user_agent> http_port=<port> caps=<a,b,c>"` —
+/// see `behaviour::ElohimStorageBehaviour::new`, the sole encoder; the
+/// vocabulary is `identity::DeliveryCapabilities::to_capability_strings`).
+///
+/// Returns `None` when the token is absent (a peer that predates it) so the
+/// caller keeps the discovery floor instead of inventing a declaration. An
+/// empty `caps=` is a declaration of nothing and yields `Some(vec![])`.
+fn parse_capabilities_from_agent_version(agent_version: &str) -> Option<Vec<String>> {
+    agent_version
+        .split_whitespace()
+        .find_map(|token| token.strip_prefix("caps="))
+        .map(|list| {
+            list.split(',')
+                .map(str::trim)
+                .filter(|c| !c.is_empty())
+                .map(str::to_string)
+                .collect()
+        })
 }
 
 /// Decide a delivery-peer row's `http_port` on an mDNS (re)discovery.
@@ -2412,12 +2522,82 @@ mod http_port_advertisement_tests {
         assert_eq!(resolve_discovery_http_port(None, None), DEFAULT_HTTP_PORT);
     }
 
+    /// The `caps=` token rides the same string as `http_port=`; neither may
+    /// swallow the other (the old `rsplit_once("http_port=")` parse would
+    /// have read `"8091 caps=…"` as the port and defaulted to 8090).
+    #[test]
+    fn http_port_and_caps_tokens_coexist_on_one_agent_version() {
+        let agent_version =
+            "elohim-storage/1.2.3+abc1234 http_port=8091 caps=serves_compressed,serves_extracted,cache_tier:extraction";
+        assert_eq!(
+            parse_http_port_from_agent_version(agent_version),
+            Some(8091)
+        );
+        assert_eq!(
+            super::parse_capabilities_from_agent_version(agent_version).as_deref(),
+            Some(
+                &[
+                    "serves_compressed".to_string(),
+                    "serves_extracted".to_string(),
+                    "cache_tier:extraction".to_string()
+                ][..]
+            )
+        );
+    }
+
+    /// A peer that predates the token declares nothing — `None`, never an
+    /// invented empty set — so its row keeps the discovery floor.
+    #[test]
+    fn absent_caps_token_is_none_and_empty_token_is_empty() {
+        assert_eq!(
+            super::parse_capabilities_from_agent_version("elohim-storage/1.2.3 http_port=8090"),
+            None
+        );
+        assert_eq!(
+            super::parse_capabilities_from_agent_version("elohim-storage/1.2.3 caps="),
+            Some(vec![])
+        );
+    }
+
+    /// The typed row fields are derived from the declared strings, so the
+    /// HTTP consumer reads `servesExtracted: true` / `cacheTier: "extraction"`
+    /// for a peer that said so — and the floor for one that has not.
+    #[test]
+    fn apply_capabilities_projects_typed_fields() {
+        let mut row = sample_peer(8090);
+        row.apply_capabilities(&DeliveryPeer::discovery_floor_capabilities());
+        assert!(!row.serves_extracted);
+        assert!(row.serves_compressed);
+        assert_eq!(row.cache_tier, "blob-only");
+
+        row.apply_capabilities(&[
+            "serves_extracted".to_string(),
+            "serves_compressed".to_string(),
+            "cache_tier:extraction".to_string(),
+        ]);
+        assert!(row.serves_extracted);
+        assert!(row.serves_compressed);
+        assert_eq!(row.cache_tier, "extraction");
+        let json = serde_json::to_value(&row).unwrap();
+        assert_eq!(json["servesExtracted"], true);
+        assert_eq!(json["servesCompressed"], true);
+        assert_eq!(json["cacheTier"], "extraction");
+        assert!(json["capabilities"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c == "serves_extracted"));
+    }
+
     fn sample_peer(http_port: u16) -> DeliveryPeer {
         DeliveryPeer {
             peer_id: "12D3KooWExamplePeer".to_string(),
             multiaddrs: vec!["/ip4/192.168.1.42/tcp/4001".to_string()],
             network: "lan".to_string(),
             capabilities: vec!["serves_compressed".to_string()],
+            serves_extracted: false,
+            serves_compressed: true,
+            cache_tier: DeliveryPeer::default_cache_tier(),
             last_seen: 1_700_000_000_000,
             http_port,
             household_id: None,
@@ -3064,6 +3244,46 @@ impl P2PNode {
         }
     }
 
+    /// LAN re-dial arm: dial every mDNS-discovered peer that is neither
+    /// connected nor already being dialed, on its last-known multiaddrs.
+    /// `PeerCondition::DisconnectedAndNotDialing` makes the swarm the single
+    /// judge of "already in flight", so a paused peer whose handshake is
+    /// still timing out is not stacked with a second dial every tick.
+    fn redial_disconnected_lan_peers(&self, swarm: &mut Swarm<ElohimStorageBehaviour>) {
+        use libp2p::swarm::dial_opts::{DialOpts, PeerCondition};
+        let candidates: Vec<(PeerId, Vec<Multiaddr>)> = self
+            .delivery_peers
+            .iter()
+            .filter(|entry| entry.value().network == "lan")
+            .filter_map(|entry| {
+                let peer_id = entry.key().parse::<PeerId>().ok()?;
+                if swarm.is_connected(&peer_id) {
+                    return None;
+                }
+                let addrs: Vec<Multiaddr> = entry
+                    .value()
+                    .multiaddrs
+                    .iter()
+                    .filter_map(|a| a.parse::<Multiaddr>().ok())
+                    .collect();
+                (!addrs.is_empty()).then_some((peer_id, addrs))
+            })
+            .collect();
+        for (peer_id, addrs) in candidates {
+            let opts = DialOpts::peer_id(peer_id)
+                .condition(PeerCondition::DisconnectedAndNotDialing)
+                .addresses(addrs)
+                .build();
+            match swarm.dial(opts) {
+                Ok(()) => {
+                    info!(peer = %peer_id, "LAN peering: re-dialing discovered peer that dropped")
+                }
+                Err(libp2p::swarm::DialError::DialPeerConditionFalse(_)) => {}
+                Err(e) => debug!(peer = %peer_id, error = %e, "LAN peering: re-dial failed"),
+            }
+        }
+    }
+
     /// Start listening and event loop
     pub async fn start(&self) -> Result<(), StorageError> {
         let mut swarm = self.swarm.write().await;
@@ -3248,6 +3468,13 @@ impl P2PNode {
             };
         // Track consecutive retry attempts for exponential backoff cap.
         let mut consecutive_empty_ticks: u32 = 0;
+        // LAN re-dial arm (see `LAN_REDIAL_INTERVAL_SECS`). First tick is
+        // deferred one period so boot-time mDNS discovery gets to dial first.
+        let mut lan_redial_interval = tokio::time::interval_at(
+            tokio::time::Instant::now() + Duration::from_secs(LAN_REDIAL_INTERVAL_SECS),
+            Duration::from_secs(LAN_REDIAL_INTERVAL_SECS),
+        );
+        lan_redial_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         let mut command_rx = self.command_rx.lock().await;
 
         loop {
@@ -3346,6 +3573,10 @@ impl P2PNode {
                 }
                 _ = verify_interval.tick() => {
                     self.verify_shard_locations(&mut swarm).await;
+                    drop(swarm);
+                }
+                _ = lan_redial_interval.tick() => {
+                    self.redial_disconnected_lan_peers(&mut swarm);
                     drop(swarm);
                 }
                 _ = bootstrap_retry_interval.tick() => {
@@ -5859,7 +6090,11 @@ impl P2PNode {
                     // never-seen, never-identified peer starts at
                     // `DEFAULT_HTTP_PORT`; the Identify handler refreshes the
                     // row once the handshake lands.
-                    let cached_http_port = self.identify_cache.get(&key).map(|c| c.http_port);
+                    let (cached_http_port, cached_caps) = self
+                        .identify_cache
+                        .get(&key)
+                        .map(|c| (Some(c.http_port), c.capabilities.clone()))
+                        .unwrap_or((None, None));
 
                     self.delivery_peers
                         .entry(key.clone())
@@ -5871,18 +6106,35 @@ impl P2PNode {
                             p.network = "lan".to_string();
                             p.http_port =
                                 resolve_discovery_http_port(cached_http_port, Some(p.http_port));
+                            if let Some(ref caps) = cached_caps {
+                                p.apply_capabilities(caps);
+                            }
                         })
-                        .or_insert_with(|| DeliveryPeer {
-                            peer_id: key,
-                            multiaddrs: vec![addr_str],
-                            network: "lan".to_string(),
-                            capabilities: vec!["serves_compressed".to_string()],
-                            last_seen: now_ms,
-                            http_port: resolve_discovery_http_port(cached_http_port, None),
-                            // Enriched at request time by the HTTP handler — the
-                            // discovery path has no DB access.
-                            household_id: None,
-                            commitments: Vec::new(),
+                        .or_insert_with(|| {
+                            let mut row = DeliveryPeer {
+                                peer_id: key,
+                                multiaddrs: vec![addr_str],
+                                network: "lan".to_string(),
+                                capabilities: Vec::new(),
+                                serves_extracted: false,
+                                serves_compressed: false,
+                                cache_tier: DeliveryPeer::default_cache_tier(),
+                                last_seen: now_ms,
+                                http_port: resolve_discovery_http_port(cached_http_port, None),
+                                // Enriched at request time by the HTTP handler — the
+                                // discovery path has no DB access.
+                                household_id: None,
+                                commitments: Vec::new(),
+                            };
+                            // A peer identified before it was discovered keeps its
+                            // declaration; otherwise it starts at the floor every
+                            // node meets until its Identify handshake lands.
+                            row.apply_capabilities(
+                                cached_caps
+                                    .as_deref()
+                                    .unwrap_or(&DeliveryPeer::discovery_floor_capabilities()),
+                            );
+                            row
                         });
                 }
             }
@@ -6841,6 +7093,7 @@ impl P2PNode {
                 );
                 let http_port = parse_http_port_from_agent_version(&info.agent_version)
                     .unwrap_or(DEFAULT_HTTP_PORT);
+                let capabilities = parse_capabilities_from_agent_version(&info.agent_version);
                 // Cache identify info for /p2p/peers endpoint
                 self.identify_cache.insert(
                     peer_id.to_string(),
@@ -6849,14 +7102,19 @@ impl P2PNode {
                         protocols: info.protocols.iter().map(|p| p.to_string()).collect(),
                         listen_addrs: info.listen_addrs.iter().map(|a| a.to_string()).collect(),
                         http_port,
+                        capabilities: capabilities.clone(),
                     },
                 );
                 // mDNS discovery (which populates `delivery_peers`) can fire
                 // before this Identify handshake completes and default the
-                // row to `DEFAULT_HTTP_PORT` — refresh it now that the peer's
-                // real port is known.
+                // row to `DEFAULT_HTTP_PORT` / the discovery-floor
+                // capabilities — refresh both now that the peer has declared
+                // its real port and what it can serve.
                 if let Some(mut p) = self.delivery_peers.get_mut(&peer_id.to_string()) {
                     p.http_port = http_port;
+                    if let Some(ref caps) = capabilities {
+                        p.apply_capabilities(caps);
+                    }
                 }
                 if let Some(mut m) = self.peer_metrics.get_mut(&peer_id.to_string()) {
                     m.last_seen_ms = now_unix_ms();
@@ -6925,8 +7183,34 @@ impl P2PNode {
                     });
             }
             behaviour::ElohimStorageBehaviourEvent::Ping(ping::Event {
-                result: Err(_), ..
-            }) => {}
+                peer,
+                connection,
+                result: Err(failure),
+            }) => {
+                // libp2p ≥0.43 no longer closes a connection whose ping
+                // fails — it only reports it. Left alone, a peer that has
+                // stopped answering (SIGSTOP'd, wedged, or gone dark without
+                // a FIN) stays in `connected_peers()` until the 300 s idle
+                // timeout, so `/p2p/status` keeps reporting a full floor and
+                // the custody fallback keeps racing a peer that cannot
+                // answer. Close it; the LAN re-dial arm and the T24 bootstrap
+                // retry bring the link back once the peer answers again.
+                // `Unsupported` is a protocol mismatch, not silence — leave
+                // those connections alone.
+                if matches!(failure, ping::Failure::Unsupported) {
+                    debug!(peer = %peer, "Ping unsupported by peer; connection left open");
+                } else {
+                    let mut swarm = self.swarm.write().await;
+                    let closed = swarm.close_connection(connection);
+                    drop(swarm);
+                    info!(
+                        peer = %peer,
+                        failure = %failure,
+                        closed,
+                        "Ping failed; closing the connection so the connected set reflects liveness"
+                    );
+                }
+            }
 
             behaviour::ElohimStorageBehaviourEvent::RelayClient(
                 relay::client::Event::ReservationReqAccepted {

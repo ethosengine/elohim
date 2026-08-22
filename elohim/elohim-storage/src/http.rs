@@ -472,6 +472,26 @@ fn canonical_content_address(identifier: &str) -> Option<String> {
         .map(|hex| format!("sha256-{}", hex))
 }
 
+/// The one spelling `X-Content-Address` reports: CIDv1 base32 (`bafkrei…`).
+///
+/// Internally an app is keyed by its blob-store key (`sha256-{hex}`) — the
+/// `/apps/{cid}/…` path normalizes to it, and a content row seeded before the
+/// CID-first migration still carries it as `blobHash`. Echoing that key on
+/// the wire made the SAME bundle answer `bafkrei…` on its slug URL and
+/// `sha256-…` on its CID URL (a2o `content-addressing.feature`, 2026-08-22),
+/// so a client could not compare the two addresses. Render every emission
+/// through here; an input that is neither spelling is passed through so a
+/// malformed key is still visible rather than silently dropped.
+fn content_address_header(blob_hash: &str) -> String {
+    if blob_hash.starts_with("sha256-") {
+        BlobStore::hash_to_cid(blob_hash)
+            .map(|cid| cid.to_string())
+            .unwrap_or_else(|_| blob_hash.to_string())
+    } else {
+        blob_hash.to_string()
+    }
+}
+
 /// Fix B syncing-status JSON body for the `GET /blob/{hash}` route: the
 /// in-request heal budget expired while bytes are still being pulled from peers
 /// in the background. Paired with a 503 + `Retry-After: 5`. Deliberately
@@ -7803,7 +7823,7 @@ impl HttpServer {
         if let Some(hash) = &blob_hash {
             builder = builder
                 .header("X-Blob-Hash", hash.as_str())
-                .header("X-Content-Address", hash.as_str());
+                .header("X-Content-Address", content_address_header(hash));
         }
         if let Some(ref slug) = resolved_slug {
             builder = builder.header("X-Content-Slug", slug.as_str());
@@ -7913,7 +7933,7 @@ impl HttpServer {
                         .header(header::CONTENT_LENGTH, data.len())
                         .header(header::CACHE_CONTROL, "public, max-age=3600")
                         .header("X-Cache", "HIT")
-                        .header("X-Content-Address", hash.as_str());
+                        .header("X-Content-Address", content_address_header(hash));
                     if let Some(ref slug) = resolved_slug {
                         builder = builder
                             .header("X-Slug", slug.as_str())
@@ -7937,7 +7957,7 @@ impl HttpServer {
                             .header(header::CACHE_CONTROL, "public, max-age=3600")
                             .header("X-Cache", "HIT")
                             .header("X-SPA-Fallback", "1")
-                            .header("X-Content-Address", hash.as_str());
+                            .header("X-Content-Address", content_address_header(hash));
                         if let Some(ref slug) = resolved_slug {
                             builder = builder
                                 .header("X-Slug", slug.as_str())
@@ -7978,7 +7998,7 @@ impl HttpServer {
                         .header(header::CACHE_CONTROL, "public, max-age=3600")
                         .header("X-Cache", "HIT-COALESCED");
                     if let Some(ref hash) = cached_blob_hash {
-                        builder = builder.header("X-Content-Address", hash.as_str());
+                        builder = builder.header("X-Content-Address", content_address_header(hash));
                     }
                     if let Some(ref slug) = resolved_slug {
                         builder = builder
@@ -8002,7 +8022,8 @@ impl HttpServer {
                             .header("X-Cache", "HIT-COALESCED")
                             .header("X-SPA-Fallback", "1");
                         if let Some(ref hash) = cached_blob_hash {
-                            builder = builder.header("X-Content-Address", hash.as_str());
+                            builder =
+                                builder.header("X-Content-Address", content_address_header(hash));
                         }
                         if let Some(ref slug) = resolved_slug {
                             builder = builder
@@ -8275,7 +8296,7 @@ impl HttpServer {
                             .header(header::CACHE_CONTROL, "public, max-age=3600")
                             .header("X-Cache", "MISS")
                             .header("X-SPA-Fallback", "1")
-                            .header("X-Content-Address", &blob_hash);
+                            .header("X-Content-Address", content_address_header(&blob_hash));
                         if let Some(ref slug) = resolved_slug {
                             builder = builder
                                 .header("X-Slug", slug.as_str())
@@ -8311,7 +8332,7 @@ impl HttpServer {
             .header(header::CONTENT_LENGTH, contents.len())
             .header(header::CACHE_CONTROL, "public, max-age=3600")
             .header("X-Cache", "MISS")
-            .header("X-Content-Address", &blob_hash);
+            .header("X-Content-Address", content_address_header(&blob_hash));
         if let Some(ref slug) = resolved_slug {
             builder = builder
                 .header("X-Slug", slug.as_str())
@@ -16438,6 +16459,19 @@ mod apps_resolver_heal_tests {
             Some(sha.as_str())
         );
         assert_eq!(canonical_content_address("evolution-of-trust"), None);
+    }
+
+    /// `X-Content-Address` reports ONE spelling whichever way the bundle was
+    /// addressed or seeded: the blob-store key renders as its CIDv1, a CID
+    /// passes through, and a malformed key is left visible.
+    #[test]
+    fn content_address_header_renders_cidv1_for_every_input_spelling() {
+        let sha = format!("sha256-{}", "b".repeat(64));
+        let cid = BlobStore::hash_to_cid(&sha).unwrap().to_string();
+        assert!(cid.starts_with("bafkrei"));
+        assert_eq!(content_address_header(&sha), cid);
+        assert_eq!(content_address_header(&cid), cid);
+        assert_eq!(content_address_header("sha256-not-hex"), "sha256-not-hex");
     }
 
     /// The regression: `GET /apps/bafkrei…/index.html` 404'd with

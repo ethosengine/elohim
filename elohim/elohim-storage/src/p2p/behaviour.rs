@@ -471,12 +471,31 @@ impl ElohimStorageBehaviour {
         // `p2p::mod::parse_http_port_from_agent_version`, the sole decoder,
         // and `genesis/data/timeline/backlog/
         // delivery-peer-row-local-port-and-untyped-capabilities.md`.
+        //
+        // A `caps=<a,b,c>` token follows it — this node's self-declared
+        // delivery capabilities (`identity::DeliveryCapabilities`
+        // vocabulary), derived from whether it actually runs an extraction
+        // cache (`config.serves_extracted`). Decoded by
+        // `p2p::mod::parse_capabilities_from_agent_version` onto the typed
+        // `DeliveryPeer` fields, so `serves_extracted` on the HTTP row is a
+        // declared fact rather than a permanent default-false.
+        let declared = crate::identity::DeliveryCapabilities {
+            serves_extracted: config.serves_extracted,
+            serves_compressed: true,
+            ready_content: vec![],
+            cache_tier: if config.serves_extracted {
+                crate::identity::CacheTier::Extraction
+            } else {
+                crate::identity::CacheTier::BlobOnly
+            },
+        };
         let identify = identify::Behaviour::new(
             identify::Config::new("/elohim/id/1.0.0".to_string(), keypair.public())
                 .with_agent_version(format!(
-                    "{} http_port={}",
+                    "{} http_port={} caps={}",
                     elohim_compute::BuildInfo::new("elohim-storage").user_agent(),
-                    config.http_port
+                    config.http_port,
+                    declared.to_capability_strings().join(",")
                 )),
         );
 
@@ -489,7 +508,15 @@ impl ElohimStorageBehaviour {
             },
         );
 
-        let ping = ping::Behaviour::new(ping::Config::new());
+        // Ping cadence is a config knob (`P2P_PING_INTERVAL_SECS` /
+        // `P2P_PING_TIMEOUT_SECS`); a failed ping closes its connection in
+        // `P2PNode::handle_behaviour_event`, so these two numbers bound how
+        // long a silent peer can stay in the connected set.
+        let ping = ping::Behaviour::new(
+            ping::Config::new()
+                .with_interval(Duration::from_secs(config.ping_interval_secs.max(1)))
+                .with_timeout(Duration::from_secs(config.ping_timeout_secs.max(1))),
+        );
 
         // Gossipsub — pub/sub for recovery invitation broadcast (M3) and
         // identity binding propagation (A.10: mid-session rotation).
