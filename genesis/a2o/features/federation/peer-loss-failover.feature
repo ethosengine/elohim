@@ -23,6 +23,11 @@ Feature: Peer-loss failover — reads keep serving while a household peer is dow
     Then fetching the manifesto blob through the doorway still returns the content
     And the serving peer is a surviving household peer
 
+  # "Parity" is each peer's gossip view agreeing with its own filesystem, and
+  # Jessica holding no fewer blobs than before she went dark. Household peers
+  # legitimately hold DIFFERENT blob sets (the seeding peer carries the corpus,
+  # the others hold what custody placed on them), so equal counts across the
+  # mesh is not the claim — it was never true, outage or not.
   Scenario: A returning peer re-syncs without operator help
     Given Jessica's storage peer was down while the mesh kept serving
     When Jessica's storage peer comes back
@@ -34,6 +39,11 @@ Feature: Peer-loss failover — reads keep serving while a household peer is dow
     When each peer's live peer set is inspected
     Then every household peer lists every other household peer as connected
 
+  # A paused peer sends no FIN; what makes it leave Jessica's connected set is
+  # a failed libp2p ping, on which elohim-storage closes the connection (ping
+  # interval 15 s + timeout 20 s by default, so ≤ ~35 s). Before that close
+  # landed (2026-08-22) a silent peer stayed "connected" for the 300 s idle
+  # timeout and this status read a full floor with the whole mesh paused.
   Scenario: A single device still functions without the mesh
     Given Jessica's storage peer holds content it stewards locally
     When every other household peer is unreachable

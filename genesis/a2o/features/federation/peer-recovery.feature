@@ -28,7 +28,15 @@ Feature: Peer recovery — a wiped device recovers its stewarded content from th
     And the custody sweep on Jessica's peer reports a kick for the manifesto blob
     And a "serve-blob" economic event records which household peer aided the recovery
 
-  @requires:owned-substrate
+  # HELD (2026-08-22, run 20260822T201747Z-3bd326d6): the inventory-blind
+  # starting condition cannot be CONSTRUCTED on the household mesh. The gossip
+  # inventory is the persisted `peer_blob_inventory` table, so a restart hands
+  # Jessica back all 77 entries, and elohim-storage has no verb that clears it
+  # (nor one that holds inventory receipt). The drill's own Given measures and
+  # names the gap rather than passing against a peer that was never blind.
+  # Sheds @wip when a destructive-gated inventory-reset verb exists and
+  # steps/mesh/household-chaos.steps.ts calls it under the owned-substrate gate.
+  @wip @requires:owned-substrate
   Scenario: Recovery does not depend on gossip inventory health
     Given Jessica's peer was restarted and its gossip inventory is empty
     And a custody-blob commitment names Jessica's peer as provider for the manifesto blob
@@ -37,7 +45,13 @@ Feature: Peer recovery — a wiped device recovers its stewarded content from th
     Then the sweep falls back to racing the connected household peers
     And the sweep outcome reports the kick as an inventory-blind fallback
 
-  @requires:owned-substrate
+  # HELD (2026-08-22, same run): needs a WIPED commitment projection on Jessica
+  # (she holds 84 custody-blob rows), and elohim-storage has no verb to clear
+  # one — no DELETE on /db/rea_commitments, no /admin projection-reset. The
+  # Given measures and names that gap. Sheds @wip when a destructive-gated
+  # projection-reset verb exists and the chaos steps establish the
+  # precondition with it (and restore afterwards).
+  @wip @requires:owned-substrate
   Scenario: A wiped peer's commitment projection reconciles from its own conductor
     Given Jessica's peer projection holds no custody-blob commitment rows
     And another household peer's projection holds the custody-blob commitment rows

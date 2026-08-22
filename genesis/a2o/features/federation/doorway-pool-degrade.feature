@@ -11,6 +11,18 @@ Feature: Doorway EPR router degrades through the storage pool
   # while the same pod's /db proxy was serving 3 rows from a pool peer
   # (matthew). elohim.host 302'd to /threshold for ten days.
   # Journal: .claude/deliver/journal-resilient-dual-doorway.md
+  #
+  # PRECONDITION, measured 2026-08-22 on the Act I household mesh (run
+  # 20260822T201747Z-3bd326d6): every household peer holds every doorway's
+  # project-epr rows, because the Prologue seeds them to all three. The
+  # "primary returns zero rows" shape is an INCIDENT shape — elohim-storage has
+  # no verb that shades or drops one peer's projections, and deleting the rows
+  # would race the 30 s projection reconcile that exists to heal exactly that
+  # gap (and "empty everywhere" would take both doorways dark for every later
+  # run). So each Given OBSERVES the precondition and holds the scenario with
+  # that reason when the primary is healthy, rather than failing on a premise
+  # the substrate does not offer. The degrade path itself is bound by the
+  # doorway's mock-pool unit tests (doorway-service/src/projection/epr_router.rs).
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
