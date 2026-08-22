@@ -384,7 +384,13 @@ async function main(): Promise<void> {
       nodeView = await getNode(storageUrl, entry.nodeId);
       nodeViewCache.set(entry.nodeId, nodeView);
     }
-    const alreadySteward = nodeView?.stewards.some(s => s.humanId === entry.humanId) ?? false;
+    // Explicit param type: in CI the workspace-package imports can fail with
+    // TS2307 (filtered as install noise by typecheck-seeder.sh), which degrades
+    // nodeView to `any` — an un-annotated callback param then cascades into a
+    // TS7006 that DOES fail the stage (genesis #1497). Structural annotation
+    // keeps the check real in both environments without a new import.
+    const alreadySteward =
+      nodeView?.stewards.some((s: { humanId: string }) => s.humanId === entry.humanId) ?? false;
     const result = await createStewardship(storageUrl, entry, contextEprId, alreadySteward);
 
     const icon = result === 'created' ? '+' : result === 'exists' ? '=' : 'X';
