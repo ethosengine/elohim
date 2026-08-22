@@ -614,12 +614,18 @@ Then(
         state.peerCount < state.totalPeers,
       `peer_count (${state.peerCount}) == total_peers (${state.totalPeers}) on the "Starting cache ` +
         'stream warm-up (health-gated)" line — gate_upstreams() did not pre-filter anything, even ' +
-        'though the constructed peer went on to fail mid-pass. STRUCTURAL FINDING: gate_upstreams() ' +
-        'is the FIRST-EVER read of warmup_state.health each boot, so its breaker map is always empty ' +
-        'when it runs — a peer can only be excluded BEFORE the loop if it failed in an EARLIER pass, ' +
-        'and the single-pass doorway never has one. The mid-pass "bailing retry ladder early" line ' +
-        "(a real, different mechanism) is what a SIGSTOPped peer actually produces — this scenario's " +
-        'specific "before the serial loop runs" claim is unreachable in the current design.'
+        'though the constructed peer went on to fail mid-pass. STRUCTURAL FINDING, with the ' +
+        'arithmetic: gate_upstreams() reads warmup_state.health at the TOP of a pass, and a peer is ' +
+        'only excluded once it has WARMUP_CIRCUIT_FAIL_THRESHOLD(3) recorded failures. Under ' +
+        'SIGSTOP the kernel still ACKs the SYN, so each attempt fails by TIMING OUT at ' +
+        'WARMUP_STREAM_TIMEOUT_SECS(45); attempt 2 starts at 45+WARMUP_RETRY_BASE_SECS(10)=55s and ' +
+        'is cut mid-flight by WARMUP_TOTAL_BUDGET_SECS(75) — so exactly ONE failure is recorded per ' +
+        'pass. The outer re-warm loop does re-enter (produced==0) after ' +
+        'WARMUP_REWARM_POLL_SECS(30), so the breaker reaches 3 only on the ~4th pass, i.e. ~315s of ' +
+        'the peer staying paused. The gate is therefore not unreachable in principle — it is ' +
+        'unreachable inside one boot-drill window, and a fast-FAILING upstream (connection refused) ' +
+        'would reach it in one pass. The mid-pass "bailing retry ladder early" line is a real but ' +
+        "DIFFERENT mechanism, so it is not accepted as evidence for this scenario's pre-loop claim."
     );
   }
 );
@@ -775,11 +781,15 @@ Then('the set is non-empty and contains every configured upstream', function (th
     // meaningfully tested would be theatre; fail honestly instead.
     assert.fail(
       `gate_upstreams() never reached its all-skipped branch (no anti-self-partition event) even ` +
-        `though every configured peer was paused before this restart, because it is called ONCE, ` +
-        `as the FIRST read of a fresh WarmStreamHealth, on every single-pass boot. peer_count=` +
-        `${state.peerCount} of total_peers=${totalPeers} merely reflects the always-taken branch. ` +
-        "This scenario's precondition is structurally unreachable in the current single-pass " +
-        'warm-up design — not merely "not yet observed".'
+        `though every configured peer was paused before this restart. peer_count=` +
+        `${state.peerCount} of total_peers=${totalPeers} reflects the always-taken branch. ` +
+        "STRUCTURAL FINDING, sharper than the sibling scenario's: the all-skipped branch needs " +
+        "EVERY peer's circuit open, but the warm-up pass is SERIAL and bounded by " +
+        'WARMUP_TOTAL_BUDGET_SECS(75) while a SIGSTOPped peer costs WARMUP_STREAM_TIMEOUT_SECS(45) ' +
+        'per attempt — so a pass never gets PAST THE FIRST PEER. Peers 2..N are never attempted, ' +
+        'never record an outcome, and can never open. No amount of waiting reaches the all-open ' +
+        'state through this fixture; it needs upstreams that fail FAST (connection refused, not ' +
+        'SIGSTOP) so a single pass can charge every peer.'
     );
   }
 });
