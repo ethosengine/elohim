@@ -58,6 +58,7 @@
 
 import { strict as assert } from 'node:assert';
 import { readFile } from 'node:fs/promises';
+import { request as httpRequest } from 'node:http';
 
 import { Given, Then, When } from '@cucumber/cucumber';
 
@@ -917,8 +918,7 @@ async function saturateInboundAdmission(
   url: string
 ): Promise<InboundSaturationRig> {
   const concurrency = Number(
-    process.env['E2E_INBOUND_SATURATION_BURST'] ??
-      DOORWAY_MAX_INFLIGHT_READ * SATURATION_OVERSHOOT
+    process.env['E2E_INBOUND_SATURATION_BURST'] ?? DOORWAY_MAX_INFLIGHT_READ * SATURATION_OVERSHOOT
   );
   const load = sustainedLoad(`${url}${SATURATING_READ_PATH}`, concurrency);
   const rig: InboundSaturationRig = {
@@ -1044,6 +1044,63 @@ Given(
   }
 );
 
+/**
+ * A request carrying real `Connection: Upgrade` headers.
+ *
+ * undici REFUSES to send a `connection` header at all (InvalidArgumentError:
+ * "invalid connection header"), so the shared `getRawWithHeaders` cannot express
+ * this probe — and the doorway's exemption is keyed on exactly those headers
+ * (`admission_exempt(path, is_upgrade)`). node:http will send them, so the
+ * upgrade probe drops to the lower-level client rather than pretending a request
+ * without the header tests the same thing.
+ */
+async function rawUpgradeRequest(url: string, timeoutMs: number): Promise<RawHttpResponse> {
+  const target = new URL(url);
+  return new Promise<RawHttpResponse>(resolve => {
+    const req = httpRequest(
+      {
+        hostname: target.hostname,
+        port: target.port,
+        path: `${target.pathname}${target.search}`,
+        method: 'GET',
+        agent: false,
+        headers: {
+          Connection: 'Upgrade',
+          Upgrade: 'websocket',
+          'Sec-WebSocket-Version': '13',
+          'Sec-WebSocket-Key': 'ZTJlLXNlbGYtaGVhbGluZy1wcm9iZQ==',
+        },
+      },
+      response => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk: Buffer) => chunks.push(chunk));
+        response.on('end', () => {
+          const headers: Record<string, string | undefined> = {};
+          for (const [key, value] of Object.entries(response.headers)) {
+            headers[key.toLowerCase()] = Array.isArray(value) ? value.join(', ') : value;
+          }
+          resolve({
+            status: response.statusCode ?? 0,
+            text: Buffer.concat(chunks).toString('utf8'),
+            headers,
+          });
+        });
+      }
+    );
+    req.setTimeout(timeoutMs, () =>
+      req.destroy(new Error(`upgrade probe timed out after ${timeoutMs}ms`))
+    );
+    req.on('upgrade', (response, socket) => {
+      socket.destroy();
+      resolve({ status: response.statusCode ?? 101, text: '', headers: {} });
+    });
+    req.on('error', error => {
+      resolve({ status: 0, text: `upgrade probe failed: ${String(error)}`, headers: {} });
+    });
+    req.end();
+  });
+}
+
 interface ExemptProbesState {
   liveness: RawHttpResponse;
   webSocketUpgrade: RawHttpResponse;
@@ -1062,15 +1119,7 @@ When(
       // request carries upgrade headers (server/http.rs) — targeting the same
       // normally-gated read path isolates the upgrade exemption from the
       // liveness-path exemption tested above.
-      getRawWithHeaders(`${rig.doorwayUrl}${CHEAP_READ_PATH}`, {
-        timeoutMs: 10_000,
-        headers: {
-          connection: 'Upgrade',
-          upgrade: 'websocket',
-          'sec-websocket-version': '13',
-          'sec-websocket-key': 'ZTJlLXNlbGYtaGVhbGluZy1wcm9iZQ==',
-        },
-      }),
+      rawUpgradeRequest(`${rig.doorwayUrl}${CHEAP_READ_PATH}`, 10_000),
     ]);
     exemptProbes.set(this, { liveness, webSocketUpgrade });
   }
@@ -1080,6 +1129,17 @@ function exemptProbeState(world: E2EWorld): ExemptProbesState {
   const state = exemptProbes.get(world);
   assert.ok(state, 'exempt probes were not issued yet');
   return state;
+}
+
+/**
+ * The non-exempt request this scenario issued, or — for a scenario whose
+ * non-exempt request IS the saturation rig's probe — that probe.
+ */
+function nonExemptRequestOrRigProbe(world: E2EWorld): RawHttpResponse {
+  const explicit = nonExemptRequests.get(world);
+  if (explicit) return explicit.response;
+  const rig = inboundRig(world);
+  return { status: rig.probeStatus, text: rig.probeBody, headers: {} };
 }
 
 function isAdmissionShed(response: RawHttpResponse): boolean {
@@ -1103,7 +1163,12 @@ Then('both are served without consuming an inbound permit', function (this: E2EW
 });
 
 Then('only non-exempt requests receive the 503 catching-up shed', function (this: E2EWorld) {
-  const { response: nonExempt } = nonExemptRequest(this);
+  // This scenario has no "a non-exempt request arrives" When of its own — the
+  // saturation rig's OWN probe is the non-exempt request, issued against the
+  // same saturated node. (Reaching for the sibling scenario's WeakMap entry read
+  // as "no non-exempt request was issued yet": each scenario gets a fresh
+  // world.)
+  const nonExempt = nonExemptRequestOrRigProbe(this);
   const { liveness, webSocketUpgrade } = exemptProbeState(this);
   assert.ok(
     isAdmissionShed(nonExempt),
