@@ -778,9 +778,15 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         // wall). Overflow sheds to the projected-bundle fallback — today's
         // serving behavior — so the bound degrades safely. No renderer → None
         // (nothing to render, no limiter). See doorway::render::ssr_semaphore_permits.
+        //
+        // "Renderer present" includes MAY-BECOME-present: with reconcile enabled
+        // (SSR slugs configured) a renderer can be ADOPTED after boot when its
+        // late-declared head appears — and it must arrive already bounded, not
+        // render unbounded because the semaphore was sized before it existed. An
+        // unused semaphore on a renderer-less doorway costs nothing.
         state.render_semaphore = doorway::render::ssr_semaphore_permits(
             render_capability.as_ref(),
-            state.renderer_registry.any_loaded(),
+            state.renderer_registry.any_loaded() || state.renderer_registry.reconcile_enabled(),
         )
         .map(|permits| std::sync::Arc::new(tokio::sync::Semaphore::new(permits)));
         state.render_capability = render_capability;
@@ -1419,12 +1425,18 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         }
     }
 
-    // SSR bundle-head reconcile tick (Track-4 T4-1): converge each served SSR
-    // slug toward its declared serverBlobHash without a restart. Interval is
-    // DOORWAY_BUNDLE_RECONCILE_SECS (default 300; 0 disables). Only spawned when
-    // the registry actually has a declared-head source (an SSR doorway with at
-    // least one configured slug) — an image-baked / SSR-disabled registry has
-    // nothing to reconcile.
+    // SSR bundle-head reconcile tick (Track-4 T4-1/T4-2): converge each served
+    // SSR slug toward its declared serverBlobHash without a restart, and ADOPT
+    // configured slugs whose head was declared only after boot (wave-2
+    // 2026-08-22: doorway up 02:12, head declared 02:13-02:20,
+    // servedBundleHeads [] until an 02:24 restart). Interval is
+    // DOORWAY_BUNDLE_RECONCILE_SECS (default 300; 0 disables); while a
+    // configured slug still awaits adoption the loop polls at the faster
+    // BUNDLE_ADOPTION_POLL_SECS so a late declaration converges promptly. Only
+    // spawned when the registry actually has a declared-head source (an SSR
+    // doorway with at least one configured slug — regardless of whether boot
+    // materialized it) — an image-baked / SSR-disabled registry has nothing to
+    // reconcile.
     {
         let reconcile_secs = std::env::var("DOORWAY_BUNDLE_RECONCILE_SECS")
             .ok()
@@ -1434,22 +1446,49 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             let reconcile_state = Arc::clone(&state);
             tokio::spawn(async move {
                 let period = std::time::Duration::from_secs(reconcile_secs);
+                let adoption_period = std::time::Duration::from_secs(
+                    doorway::render::registry::BUNDLE_ADOPTION_POLL_SECS,
+                );
                 loop {
-                    tokio::time::sleep(period).await;
+                    let sleep_for = if reconcile_state.renderer_registry.awaiting_adoption() {
+                        std::cmp::min(period, adoption_period)
+                    } else {
+                        period
+                    };
+                    tokio::time::sleep(sleep_for).await;
+                    // Respect the warm-stream upstream breaker: when the circuit
+                    // for the reconcile upstream is open, skip this pass (retry
+                    // next tick) rather than stack more GETs on a peer already
+                    // judged failing. Read-only probe — never perturbs the
+                    // breaker, and an untracked upstream reads closed.
+                    if let (Some(ws), Some(upstream)) = (
+                        reconcile_state.warmup_state.as_ref(),
+                        reconcile_state.renderer_registry.reconcile_upstream(),
+                    ) {
+                        if ws.health.is_circuit_open(&upstream) {
+                            tracing::debug!(
+                                upstream = %upstream,
+                                "SSR bundle reconcile: upstream circuit open — skipping tick"
+                            );
+                            continue;
+                        }
+                    }
                     let outcomes = reconcile_state
                         .renderer_registry
                         .reconcile(&reconcile_state.cache)
                         .await;
                     let refreshed = outcomes.iter().filter(|o| o.outcome == "refreshed").count();
+                    let adopted = outcomes.iter().filter(|o| o.outcome == "adopted").count();
                     let failed = outcomes.iter().filter(|o| o.outcome == "failed").count();
                     let unreachable = outcomes
                         .iter()
                         .filter(|o| o.outcome == "unreachable")
                         .count();
-                    if refreshed > 0 || failed > 0 || unreachable > 0 {
+                    if refreshed > 0 || adopted > 0 || failed > 0 || unreachable > 0 {
                         info!(
-                            "SSR bundle reconcile: {} refreshed, {} failed, {} unreachable ({} slugs checked)",
+                            "SSR bundle reconcile: {} refreshed, {} adopted, {} failed, {} unreachable ({} slugs checked)",
                             refreshed,
+                            adopted,
                             failed,
                             unreachable,
                             outcomes.len()

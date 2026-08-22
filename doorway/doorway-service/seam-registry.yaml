@@ -25,7 +25,7 @@ decisionPoints:
     sourceLocation:
       file: src/render/registry.rs
       modulePath: render::registry::decide_reconcile
-      line: 1104
+      line: 1493
     summary: >
       Compares the currently-materialized SSR bundle head against a freshly-resolved declared
       head: Err (read failure) safe-degrades to Unreachable; equal is UpToDate; different is
@@ -53,7 +53,7 @@ decisionPoints:
     sourceLocation:
       file: src/render/registry.rs
       modulePath: render::registry::ReconcileDecision
-      line: 1092
+      line: 1414
     summary: Unreachable(String) / UpToDate(String) / Stale(String) — the decide_reconcile outcome.
     notes: >
       An independent THIRD derivation of the honest-absence type, alongside elohim-storage's
@@ -72,6 +72,37 @@ decisionPoints:
         kind: unit
       - path: doorway/doorway-service/src/render/registry.rs
         testName: decide_reconcile_read_failure_is_unreachable_safe_degrade
+        kind: unit
+
+  - name: adoption_targets
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/render/registry.rs
+      modulePath: render::registry::adoption_targets
+      line: 1226
+    summary: >
+      Names the CONFIGURED SSR app slugs this serving node holds no bundle head for — the slugs
+      whose server head was not yet declared upstream when boot materialize ran, and which the
+      heads-keyed reconcile walk therefore cannot see. Each named slug gets a declared-head
+      re-check on the reconcile tick and is materialized + loaded (adopted) the moment the
+      declaration appears — a head declared at ANY time converges without a process restart
+      (wave-2 2026-08-22: servedBundleHeads stayed [] until an operator restart).
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          A missing head is treated as honest absence, never concluded: the slug stays a named
+          adoption target every tick until its declared head resolves, and a still-undeclared
+          head produces an "undeclared" outcome (no head fabricated) rather than silence.
+    contractTests:
+      - path: doorway/doorway-service/src/render/registry.rs
+        testName: adoption_targets_names_only_unserved_configured_slugs
+        kind: unit
+      - path: doorway/doorway-service/src/render/registry.rs
+        testName: late_declared_head_is_adopted_and_served
+        kind: unit
+      - path: doorway/doorway-service/src/render/registry.rs
+        testName: non_default_adoption_does_not_touch_the_default_renderer
         kind: unit
 
   - name: classify_dispatch

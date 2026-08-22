@@ -27,7 +27,14 @@
 //! 2. re-resolves each slug's declared `serverBlobHash` on a background tick
 //!    ([`reconcile`]) and, on mismatch, re-materializes into a FRESH directory,
 //!    builds a new isolate, and HOT-SWAPS the registry entry in place —
-//!    converge-to-declared-head without a process restart.
+//!    converge-to-declared-head without a process restart;
+//! 3. ADOPTS late-declared heads (T4-2): a configured slug whose head was not
+//!    declared upstream at boot (materialize failed → no head recorded) is
+//!    re-checked on the same reconcile tick — one cheap declared-head GET per
+//!    tick — and materialized + loaded the moment the declaration appears.
+//!    MEASURED (local mesh wave-2, 2026-08-22): doorway up at 02:12, Prologue
+//!    declared the server head 02:13–02:20 → `servedBundleHeads: []` on both
+//!    doorways until a 02:24 restart. Boot failure must defer, never conclude.
 //!
 //! Hot-swap is safe because each `AngularRenderer` owns its own V8 isolate on
 //! its own OS thread (the isolate never crosses threads): building a new one
@@ -181,6 +188,11 @@ struct ReconcileCtx {
     storage_url: String,
     bundle_parent: PathBuf,
     soft_budget_ms: u64,
+    /// The CONFIGURED slug list (ordered; first = default app). Reconcile's
+    /// adoption pass converges toward THIS set, not merely toward the slugs
+    /// that happened to materialize at boot — a slug whose head was declared
+    /// after boot is otherwise invisible to a heads-keyed walk.
+    slugs: Vec<String>,
 }
 
 /// Mutable registry contents guarded by one `RwLock`. Reads (the SSR hot path:
@@ -380,6 +392,12 @@ impl RendererRegistry {
         // location, exactly like the retired single-slug init. No slug at all →
         // load the image-baked bundle as an app-unknown default.
         let default_app = slugs.first().cloned();
+        // Whether the default app's bytes are on disk and loadable: true for the
+        // no-slug image-baked path (bytes baked into the image), or after a
+        // successful boot materialize. When FALSE the default renderer is not
+        // built and no head is recorded — but the registry is NOT emptied: the
+        // reconcile adoption pass converges once the head is declared upstream.
+        let mut default_materialized = default_app.is_none();
         if let Some(slug) = &default_app {
             // The server bundle is resolved from the EPR node's
             // `serverBlobHash` field (not the browser `blobHash`). On resolve
@@ -406,37 +424,55 @@ impl RendererRegistry {
                         "SSR server bundle materialized from substrate"
                     );
                     heads.insert(slug.clone(), boot_head(&src, slug, pre));
+                    default_materialized = true;
                 }
                 Err(e) => {
+                    // Do NOT empty the registry: the head is very likely just not
+                    // declared upstream YET (fresh mesh — the doorway can boot
+                    // before the deploy declares serverBlobHash). Boot proceeds
+                    // renderer-less for this app and the reconcile tick's
+                    // adoption pass materializes it the moment it is declared.
+                    // (MEASURED wave-2 2026-08-22: returning empty here left
+                    // servedBundleHeads [] until an operator restart.)
                     tracing::warn!(
                         target: "doorway::ssr",
                         slug = %slug,
-                        "SSR server bundle materialization failed: {}",
+                        "SSR server bundle materialization failed: {} — head not \
+                         yet declared or storage unreachable; deferring this app \
+                         to the reconcile adoption pass",
                         e
                     );
-                    return Self::empty();
                 }
             }
         }
-        let default_renderer = match elohim_render::AngularRenderer::with_soft_budget(
-            std::path::PathBuf::from(&bundle_path),
-            make_fetcher(),
-            soft_budget_ms,
-        ) {
-            Ok(r) => {
-                tracing::info!(
-                    target: "doorway::ssr",
-                    bundle = %bundle_path,
-                    app = default_app.as_deref().unwrap_or("<unknown>"),
-                    storage = %storage_url,
-                    "SSR renderer ready"
-                );
-                Some(Arc::new(r) as Arc<dyn elohim_render::Renderer>)
+        let default_renderer = if default_materialized {
+            match elohim_render::AngularRenderer::with_soft_budget(
+                std::path::PathBuf::from(&bundle_path),
+                make_fetcher(),
+                soft_budget_ms,
+            ) {
+                Ok(r) => {
+                    tracing::info!(
+                        target: "doorway::ssr",
+                        bundle = %bundle_path,
+                        app = default_app.as_deref().unwrap_or("<unknown>"),
+                        storage = %storage_url,
+                        "SSR renderer ready"
+                    );
+                    Some(Arc::new(r) as Arc<dyn elohim_render::Renderer>)
+                }
+                Err(e) => {
+                    tracing::warn!(target: "doorway::ssr", "SSR disabled: {}", e);
+                    // A head we are not serving must not be attested — drop it so
+                    // the adoption pass rebuilds renderer + head together.
+                    if let Some(slug) = &default_app {
+                        heads.remove(slug);
+                    }
+                    None
+                }
             }
-            Err(e) => {
-                tracing::warn!(target: "doorway::ssr", "SSR disabled: {}", e);
-                return Self::empty();
-            }
+        } else {
+            None
         };
 
         // Extra apps (slugs beyond the first): each materializes into its own
@@ -529,6 +565,7 @@ impl RendererRegistry {
                 storage_url,
                 bundle_parent,
                 soft_budget_ms,
+                slugs,
             })
         };
 
@@ -617,6 +654,27 @@ impl RendererRegistry {
     /// test/image-baked registries.
     pub fn reconcile_enabled(&self) -> bool {
         self.reconcile_ctx.is_some()
+    }
+
+    /// The storage upstream declared heads are read from, when reconcile is
+    /// enabled. Lets the tick loop consult the warm-stream circuit for this
+    /// upstream BEFORE spending a pass on it.
+    pub fn reconcile_upstream(&self) -> Option<String> {
+        self.reconcile_ctx.as_ref().map(|c| c.storage_url.clone())
+    }
+
+    /// True while at least one CONFIGURED slug has no served head — i.e. the
+    /// adoption pass still has work (a boot-time materialize failed, typically
+    /// because the head was not yet declared). The tick loop polls faster in
+    /// this state ([`BUNDLE_ADOPTION_POLL_SECS`]), mirroring the warm-stream
+    /// re-warm poll: converge shortly after the declaration appears, then
+    /// settle back to the steady-state reconcile cadence.
+    pub fn awaiting_adoption(&self) -> bool {
+        let Some(ctx) = &self.reconcile_ctx else {
+            return false;
+        };
+        let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
+        ctx.slugs.iter().any(|s| !inner.heads.contains_key(s))
     }
 
     /// Run ONE reconcile pass over every served slug: re-resolve its declared
@@ -854,6 +912,165 @@ impl RendererRegistry {
             }
         }
 
+        // ── Adoption pass (T4-2): late-declared heads ────────────────────────
+        // A configured slug with NO served head never entered `targets` above —
+        // its boot materialize failed, almost always because the doorway booted
+        // BEFORE the deploy declared the slug's serverBlobHash. Re-check the
+        // declared head here (one cheap GET per missing slug per tick) and
+        // materialize + load the moment a declaration appears. Idempotent: with
+        // no missing slug the loop body never runs; a still-undeclared head
+        // logs and retries next tick — a head is NEVER fabricated.
+        let served: HashSet<String> = {
+            let inner = self.inner.read().unwrap_or_else(|e| e.into_inner());
+            inner.heads.keys().cloned().collect()
+        };
+        for slug in adoption_targets(&ctx.slugs, &served) {
+            let is_default = ctx.slugs.first() == Some(&slug);
+            let declared = resolve_declared(&ctx.storage_url, &slug).await;
+            let declared_hash = match declared {
+                Err(err) => {
+                    // Honest absence: still undeclared (or storage unreachable).
+                    // No head, no renderer — retry next tick.
+                    tracing::debug!(
+                        target: "doorway::ssr",
+                        slug = %slug,
+                        error = %err,
+                        "bundle adoption: declared head still absent — retrying next tick"
+                    );
+                    outcomes.push(SlugOutcome {
+                        slug,
+                        outcome: "undeclared".into(),
+                        server_blob_hash: None,
+                        declared_server_blob_hash: None,
+                        error: Some(err),
+                    });
+                    continue;
+                }
+                Ok(h) => h,
+            };
+
+            // Same per-slug concurrency guard as the Stale branch (background
+            // tick + admin refresh must not race two materialize passes).
+            if !self.try_begin_refresh(&slug, &declared_hash) {
+                outcomes.push(SlugOutcome {
+                    slug,
+                    outcome: "refreshing".into(),
+                    server_blob_hash: None,
+                    declared_server_blob_hash: Some(declared_hash),
+                    error: None,
+                });
+                continue;
+            }
+
+            tracing::info!(
+                target: "doorway::ssr",
+                slug = %slug,
+                head = %declared_hash,
+                "bundle adoption: late-declared head observed — materializing"
+            );
+            let built = tokio::task::spawn_blocking({
+                let storage_url = ctx.storage_url.clone();
+                let bundle_parent = ctx.bundle_parent.clone();
+                let slug = slug.clone();
+                let declared_hash = declared_hash.clone();
+                let soft_budget_ms = ctx.soft_budget_ms;
+                move || {
+                    materialize_and_build(
+                        &storage_url,
+                        &bundle_parent,
+                        &slug,
+                        &declared_hash,
+                        soft_budget_ms,
+                    )
+                }
+            })
+            .await;
+            let outcome = match built {
+                Ok(Ok(new_renderer)) => {
+                    // Same attestation TOCTOU guard as the Stale branch: attest
+                    // only a head that held steady across the materialize window.
+                    let post = resolve_declared(&ctx.storage_url, &slug).await;
+                    match post {
+                        Ok(ref h2) if h2 == &declared_hash => {
+                            let old = self.adopt_renderer(
+                                &slug,
+                                new_renderer,
+                                &declared_hash,
+                                is_default,
+                            );
+                            let cleared = cache.invalidate_pattern("ssr-");
+                            tracing::info!(
+                                target: "doorway::ssr",
+                                slug = %slug,
+                                head = %declared_hash,
+                                cache_entries_cleared = cleared,
+                                "bundle adoption: late-declared head materialized and serving"
+                            );
+                            if let Some(old) = old {
+                                self.graveyard.bury(old);
+                            }
+                            SlugOutcome {
+                                slug: slug.clone(),
+                                outcome: "adopted".into(),
+                                server_blob_hash: Some(declared_hash.clone()),
+                                declared_server_blob_hash: Some(declared_hash.clone()),
+                                error: None,
+                            }
+                        }
+                        other => {
+                            // Head moved during materialize (or re-read failed):
+                            // we cannot attest what we built. Discard; the next
+                            // tick re-adopts against the settled head. No head
+                            // record is written — nothing is serving.
+                            self.graveyard.bury(new_renderer);
+                            tracing::info!(
+                                target: "doorway::ssr",
+                                slug = %slug,
+                                "bundle adoption: declared head moved during \
+                                 materialize — deferring to next tick"
+                            );
+                            SlugOutcome {
+                                slug: slug.clone(),
+                                outcome: "undeclared".into(),
+                                server_blob_hash: None,
+                                declared_server_blob_hash: other
+                                    .ok()
+                                    .or(Some(declared_hash.clone())),
+                                error: None,
+                            }
+                        }
+                    }
+                }
+                Ok(Err(e)) => {
+                    tracing::warn!(
+                        target: "doorway::ssr",
+                        slug = %slug,
+                        "bundle adoption: materialize failed — retrying next tick: {}",
+                        e
+                    );
+                    SlugOutcome {
+                        slug: slug.clone(),
+                        outcome: "failed".into(),
+                        server_blob_hash: None,
+                        declared_server_blob_hash: Some(declared_hash.clone()),
+                        error: Some(e),
+                    }
+                }
+                Err(join_e) => {
+                    let e = format!("adoption task panicked: {join_e}");
+                    SlugOutcome {
+                        slug: slug.clone(),
+                        outcome: "failed".into(),
+                        server_blob_hash: None,
+                        declared_server_blob_hash: Some(declared_hash.clone()),
+                        error: Some(e),
+                    }
+                }
+            };
+            self.end_refresh(&slug);
+            outcomes.push(outcome);
+        }
+
         // Reap isolates displaced this pass (and any whose in-flight requests
         // have since drained) off the async runtime — the terminal Drop joins a
         // worker thread and must never run on a tokio worker.
@@ -949,6 +1166,41 @@ impl RendererRegistry {
         old
     }
 
+    /// Install a renderer + head for a slug that had NO head record (the
+    /// adoption arm — a head declared after boot). The `swap_renderer` sibling
+    /// updates an existing head; this one CREATES it, status `Current`, so the
+    /// slug appears on `servedBundleHeads` and in every later reconcile pass.
+    /// Returns any displaced renderer `Arc` (for off-runtime teardown) — none
+    /// in the normal adoption flow.
+    fn adopt_renderer(
+        &self,
+        slug: &str,
+        new_renderer: Arc<dyn elohim_render::Renderer>,
+        new_hash: &str,
+        is_default: bool,
+    ) -> Option<Arc<dyn elohim_render::Renderer>> {
+        let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
+        let old = inner
+            .by_app
+            .insert(slug.to_string(), Arc::clone(&new_renderer));
+        if is_default {
+            inner.default_renderer = Some(new_renderer);
+            inner.default_app = Some(slug.to_string());
+        }
+        inner.heads.insert(
+            slug.to_string(),
+            BundleHead {
+                slug: slug.to_string(),
+                server_blob_hash: new_hash.to_string(),
+                materialized_at: chrono::Utc::now(),
+                status: HeadStatus::Current,
+                declared_server_blob_hash: Some(new_hash.to_string()),
+                last_error: None,
+            },
+        );
+        old
+    }
+
     /// Test-only: install an explicit head record. Lets swap/mark transitions be
     /// exercised without a live storage backend or a V8 isolate.
     #[cfg(test)]
@@ -956,6 +1208,27 @@ impl RendererRegistry {
         let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         inner.heads.insert(head.slug.clone(), head);
     }
+}
+
+/// How fast the reconcile tick polls while a configured slug still awaits
+/// adoption (no served head). Same order as the EPR router's self-heal refresh
+/// and the warm-stream re-warm poll (`WARMUP_REWARM_POLL_SECS`) — the whole
+/// point is to be serving shortly after the head is declared, without an
+/// operator restart. Steady-state (all heads served) returns to the configured
+/// `DOORWAY_BUNDLE_RECONCILE_SECS` cadence.
+pub const BUNDLE_ADOPTION_POLL_SECS: u64 = 30;
+
+/// Pure adoption-target decision: the CONFIGURED slugs this doorway is not yet
+/// serving a bundle head for. These are exactly the slugs the heads-keyed
+/// reconcile walk cannot see — each needs a declared-head re-check (and, once
+/// declared, materialize + load). Order-preserving over `configured`;
+/// idempotent — once a slug is served it never reappears.
+pub fn adoption_targets(configured: &[String], served: &HashSet<String>) -> Vec<String> {
+    configured
+        .iter()
+        .filter(|s| !served.contains(*s))
+        .cloned()
+        .collect()
 }
 
 /// Boot-time head record for a slug whose bundle just materialized.
@@ -1317,6 +1590,105 @@ mod tests {
             vec![("lamad-spa".into(), stub("lamad"))],
         );
         assert_eq!(reg.app_names(), "elohim-host-landing,lamad-spa");
+    }
+
+    // ── adoption: late-declared heads (T4-2, wave-2 2026-08-22) ──────────────
+
+    /// The regression this pins: a server-tier head declared AFTER the doorway
+    /// booted (boot materialize failed → no head recorded) must be visible to
+    /// the reconcile pass. The heads-keyed walk cannot see it — only the
+    /// configured-slugs adoption walk can.
+    #[test]
+    fn adoption_targets_names_only_unserved_configured_slugs() {
+        let configured = vec!["elohim-host-landing".to_string(), "lamad-spa".to_string()];
+
+        // Boot produced nothing (both heads undeclared at 02:12): every
+        // configured slug is an adoption target.
+        let served = HashSet::new();
+        assert_eq!(adoption_targets(&configured, &served), configured);
+
+        // One head materialized at boot: only the other remains a target.
+        let served: HashSet<String> = ["lamad-spa".to_string()].into();
+        assert_eq!(
+            adoption_targets(&configured, &served),
+            vec!["elohim-host-landing".to_string()]
+        );
+
+        // All served: the adoption pass is a no-op (idempotent — re-checking
+        // with no new head does nothing).
+        let served: HashSet<String> = configured.iter().cloned().collect();
+        assert!(adoption_targets(&configured, &served).is_empty());
+    }
+
+    /// The full late-declaration story, at the testable seam: boot recorded NO
+    /// head for the configured slug → the reconcile pass names it as an
+    /// adoption target → the declared head appears upstream → `adopt_renderer`
+    /// installs renderer + head → `servedBundleHeads` reports it `current` and
+    /// the next pass has nothing to adopt. (Wave-2 measured: this previously
+    /// required an operator restart.)
+    #[test]
+    fn late_declared_head_is_adopted_and_served() {
+        let configured = vec!["elohim-host-landing".to_string()];
+        // Boot: materialize failed (head not yet declared) — empty registry,
+        // but the configured slug list survives.
+        let reg = RendererRegistry::with_entries(None, None, vec![]);
+        assert!(!reg.any_loaded());
+        assert_eq!(reg.heads_json(), serde_json::json!([]));
+
+        // Reconcile pass: the slug is an adoption target…
+        let served: HashSet<String> = reg.heads_snapshot().into_iter().map(|h| h.slug).collect();
+        let targets = adoption_targets(&configured, &served);
+        assert_eq!(targets, configured);
+
+        // …the guard admits exactly one concurrent adopter…
+        assert!(reg.try_begin_refresh("elohim-host-landing", "sha256-abc"));
+        assert!(
+            !reg.try_begin_refresh("elohim-host-landing", "sha256-abc"),
+            "concurrent adoption of the same slug must be refused"
+        );
+
+        // …and adoption installs renderer + head together.
+        let old = reg.adopt_renderer("elohim-host-landing", stub("landing"), "sha256-abc", true);
+        reg.end_refresh("elohim-host-landing");
+        assert!(old.is_none(), "no prior renderer to displace");
+        assert!(reg.any_loaded());
+        assert!(reg.select(Some("elohim-host-landing")).is_some());
+        assert!(
+            reg.select(None).is_some(),
+            "a default-app adoption must also serve no-projection routes"
+        );
+
+        let heads = reg.heads_snapshot();
+        assert_eq!(heads.len(), 1);
+        assert_eq!(heads[0].slug, "elohim-host-landing");
+        assert_eq!(heads[0].server_blob_hash, "sha256-abc");
+        assert_eq!(heads[0].status, HeadStatus::Current);
+        assert_eq!(
+            heads[0].declared_server_blob_hash.as_deref(),
+            Some("sha256-abc")
+        );
+
+        // Idempotent: once served, the slug is never re-adopted.
+        let served: HashSet<String> = reg.heads_snapshot().into_iter().map(|h| h.slug).collect();
+        assert!(adoption_targets(&configured, &served).is_empty());
+    }
+
+    #[test]
+    fn non_default_adoption_does_not_touch_the_default_renderer() {
+        let reg = RendererRegistry::with_entries(
+            Some(stub("landing")),
+            Some("elohim-host-landing".into()),
+            vec![],
+        );
+        reg.adopt_renderer("lamad-spa", stub("lamad"), "sha256-def", false);
+        assert!(reg.select(Some("lamad-spa")).is_some());
+        // The default renderer still serves the default app, untouched.
+        assert!(reg.select(None).is_some(), "default renderer retained");
+        assert_eq!(
+            reg.heads_snapshot().len(),
+            1,
+            "only the adopted slug has a head"
+        );
     }
 
     // ── decide_reconcile: current / stale / safe-degrade arms ────────────────

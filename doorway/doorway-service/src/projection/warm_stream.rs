@@ -190,6 +190,16 @@ impl WarmStreamHealth {
         cb.record_outcome(ok, tick);
     }
 
+    /// Read-only circuit probe: is this upstream's breaker currently open?
+    /// Unlike [`should_skip`](Self::should_skip) this NEVER creates a breaker
+    /// entry — an untracked upstream reads closed. Consumed by ticks outside
+    /// the warm-stream (e.g. the SSR bundle reconcile loop) that must respect
+    /// the upstream breaker without perturbing it.
+    pub fn is_circuit_open(&self, url: &str) -> bool {
+        let map = self.breakers.lock().unwrap();
+        map.get(url).map(CircuitBreaker::is_open).unwrap_or(false)
+    }
+
     pub fn snapshot(&self) -> Vec<UpstreamHealth> {
         let map = self.breakers.lock().unwrap();
         map.iter()
@@ -927,6 +937,22 @@ mod tests {
         }
         // Now open: next pass within cooldown skips.
         assert!(h.should_skip(url, WARMUP_CIRCUIT_FAIL_THRESHOLD as u64));
+    }
+
+    /// The read-only probe used by ticks OUTSIDE the warm-stream (SSR bundle
+    /// reconcile): reports an open circuit without creating breaker entries —
+    /// an untracked upstream must read closed and stay untracked.
+    #[test]
+    fn is_circuit_open_is_read_only_and_reports_open() {
+        let h = WarmStreamHealth::new(1, 100);
+        assert!(!h.is_circuit_open("http://unknown:8090"));
+        assert!(
+            h.snapshot().is_empty(),
+            "probing an unknown upstream must not create a breaker entry"
+        );
+        h.record_outcome("http://a:8090", false, 0); // threshold 1 → opens
+        assert!(h.is_circuit_open("http://a:8090"));
+        assert!(!h.is_circuit_open("http://b:8090"));
     }
 
     #[test]
