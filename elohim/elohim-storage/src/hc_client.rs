@@ -535,6 +535,18 @@ impl HcClient {
         &self.cell_id
     }
 
+    /// A handle to this client's conductor ADMIN websocket.
+    ///
+    /// `AdminWebsocket` is Clone (its internal state is refcounted), so this
+    /// is a cheap handle to the SAME live connection — not a new dial. Lets
+    /// admin-plane reads (`GET /db/p2p/conductor-diagnostics`: `agent_info`,
+    /// `dump_network_stats`, `dump_network_metrics`) work on an EXTERNAL
+    /// conductor (`--admin-url` mode), where no embedded-conductor admin
+    /// handle exists but every registry role already holds one.
+    pub fn admin_websocket(&self) -> AdminWebsocket {
+        self.admin_ws.clone()
+    }
+
     /// Get DNA hash bytes
     pub fn dna_hash(&self) -> Vec<u8> {
         self.cell_id.dna_hash().get_raw_39().to_vec()

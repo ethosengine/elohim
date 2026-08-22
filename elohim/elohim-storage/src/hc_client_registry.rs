@@ -165,6 +165,24 @@ impl HcClientRegistry {
         self.set_client("lamad", hc);
     }
 
+    /// An ADMIN websocket handle from ANY currently-live role, or `None` when
+    /// no role is connected (fail closed — the caller answers 503).
+    ///
+    /// Every role dials the SAME conductor admin URL ([`HcRegistryInputs::
+    /// admin_url`]), so which role supplies the handle is immaterial for
+    /// admin-plane reads (`agent_info`, `dump_network_stats`,
+    /// `dump_network_metrics`). Roles are probed in [`SUPERVISED_ROLES`] order.
+    /// Because the handle is snapshotted from the supervised registry, a
+    /// conductor restart heals this path the same way it heals zome forwarding:
+    /// the supervisor swaps in a fresh [`HcClient`] and the next snapshot sees
+    /// its live admin connection.
+    pub fn any_admin_websocket(&self) -> Option<holochain_client::AdminWebsocket> {
+        SUPERVISED_ROLES
+            .iter()
+            .find_map(|role| self.client(role))
+            .map(|hc| hc.admin_websocket())
+    }
+
     async fn connect_role(inputs: &HcRegistryInputs, role: &str) -> Option<Arc<HcClient>> {
         // Retry with exponential backoff. The conductor's cells transition
         // through CellDisabled state during the first ~15s post-pod-boot
@@ -461,6 +479,18 @@ mod supervised_slot_tests {
         reg.set_client("infrastructure", None);
         reg.set_client("nonexistent-role", None);
         assert!(reg.infrastructure_client().is_none());
+    }
+
+    #[test]
+    fn any_admin_websocket_fails_closed_on_an_empty_registry() {
+        // The conductor-diagnostics fallback (`GET /db/p2p/conductor-
+        // diagnostics` on an external-conductor node) must 503 honestly when
+        // NO admin-capable connection exists — an empty registry yields None,
+        // never a stale or fabricated handle. (The positive path — a live
+        // role's admin handle — needs a real conductor and is exercised by
+        // the a2o dataplane scenarios, not constructible offline.)
+        let reg = HcClientRegistry::empty();
+        assert!(reg.any_admin_websocket().is_none());
     }
 
     #[test]
