@@ -173,7 +173,8 @@ interface ResilienceContext {
   conductorCalls: HttpSample[];
   concurrentProbe?: HttpSample;
   blockedPath?: { url: string; settled: Promise<HttpSample[]> };
-  ssrBurst?: { settled: Promise<RawHttpResponse[]> };
+  ssrBurst?: { stop: () => void; settled: Promise<unknown> };
+  ssrSaturationBaseline?: number;
   ssrShed?: RawHttpResponse & { elapsedMs: number };
   contentRead?: HttpSample;
 }
@@ -313,6 +314,30 @@ async function readStatusPeers(base: string): Promise<PeerSnapshotWire[]> {
   return peers;
 }
 
+/**
+ * Keep `concurrency` SSR renders of `url` in flight until stopped. The render
+ * semaphore is only exhausted while requests are actually holding permits, so a
+ * scenario that asserts shedding has to hold the load across its own steps
+ * rather than fire once and hope.
+ */
+function sustainedRenders(
+  url: string,
+  concurrency: number
+): { stop: () => void; settled: Promise<unknown> } {
+  let running = true;
+  const workers = Array.from({ length: concurrency }, async () => {
+    while (running) {
+      await getRawWithHeaders(url, { timeoutMs: 30_000 }).catch(() => null);
+    }
+  });
+  return {
+    stop: () => {
+      running = false;
+    },
+    settled: Promise.allSettled(workers),
+  };
+}
+
 function durationToMs(value: string, unit: string): number {
   const amount = Number.parseFloat(value);
   switch (unit) {
@@ -329,13 +354,72 @@ function durationToMs(value: string, unit: string): number {
   }
 }
 
-/** Every reconnect delay the doorway announced, oldest first. */
-function reconnectDelaysFromLog(log: string): number[] {
-  const delays: number[] = [];
-  for (const match of log.matchAll(RECONNECT_LOG_RE)) {
-    delays.push(durationToMs(match[1], match[2]));
+/** The doorway's first line of every boot — everything after it is THIS boot. */
+const BOOT_MARKER = '"message":"doorway starting"';
+
+/**
+ * Trim a doorway log tail to the CURRENT boot. `conn_id` restarts at 0 in a
+ * fresh process, so two boots' ladders would otherwise merge under one key.
+ */
+function sinceLastBoot(log: string): string {
+  const index = log.lastIndexOf(BOOT_MARKER);
+  return index === -1 ? log : log.slice(index);
+}
+
+/**
+ * Reconnect ladders, grouped by the connection loop climbing them.
+ *
+ * A doorway runs MANY connection loops at once — the app pool's workers, the
+ * admin pool's workers, and each per-conductor pool's — and each climbs its OWN
+ * ReconnectBackoff. Read as one flat sequence, four workers all sitting on the
+ * same rung look like a ladder that never doubles: the household mesh measured
+ * exactly that on 2026-08-22 ("3200, 3200, 3200, 3200, 3200"), which is four
+ * healthy ladders interleaved, not one stuck loop. worker/conductor.rs now names
+ * the loop (`conn_id`) and numbers the rung (`attempt`) on the line, so the
+ * ladders can be separated before any monotonicity claim is made about them.
+ *
+ * An older binary without the fields degrades to ONE 'unattributed' group — the
+ * previous behaviour, and the caller says so in its failure text.
+ */
+function reconnectLaddersFromLog(log: string): Map<string, number[]> {
+  const ladders = new Map<string, number[]>();
+  for (const raw of sinceLastBoot(log).split('\n')) {
+    const trimmed = raw.trim();
+    if (!trimmed.includes('Reconnecting to conductor in')) continue;
+    let connId = 'unattributed';
+    let delayMs: number | null = null;
+    try {
+      const parsed = JSON.parse(trimmed) as { fields?: Record<string, unknown> };
+      const fields = parsed.fields ?? {};
+      if (typeof fields['conn_id'] === 'number') connId = `conn-${fields['conn_id']}`;
+      if (typeof fields['delay_ms'] === 'number') delayMs = fields['delay_ms'];
+    } catch {
+      // Not a JSON line (a plain-text tail) — fall through to the regex below.
+    }
+    if (delayMs === null) {
+      RECONNECT_LOG_RE.lastIndex = 0;
+      const match = RECONNECT_LOG_RE.exec(trimmed);
+      if (!match) continue;
+      delayMs = durationToMs(match[1], match[2]);
+    }
+    const ladder = ladders.get(connId) ?? [];
+    ladder.push(delayMs);
+    ladders.set(connId, ladder);
   }
-  return delays;
+  return ladders;
+}
+
+/**
+ * The single longest per-connection ladder — the one this suite's monotonicity
+ * assertions are entitled to reason about.
+ */
+function reconnectDelaysFromLog(log: string): number[] {
+  const ladders = reconnectLaddersFromLog(log);
+  let longest: number[] = [];
+  for (const delays of ladders.values()) {
+    if (delays.length > longest.length) longest = delays;
+  }
+  return longest;
 }
 
 function lastMatch(log: string, pattern: RegExp): RegExpMatchArray | null {
@@ -348,9 +432,11 @@ function requireDelays(world: E2EWorld, minimum: number): number[] {
   const delays = ctx(world).reconnectDelaysMs;
   assert.ok(
     delays.length >= minimum,
-    `the doorway log records only ${delays.length} "Reconnecting to conductor in …" lines; ` +
-      `this assertion needs ${minimum}. The reconnect ladder has no metric — the log line ` +
-      'in worker/conductor.rs is the only place the delay is published.'
+    `the doorway log's longest single-connection reconnect ladder has only ${delays.length} rung(s) ` +
+      `this boot; this assertion needs ${minimum}. The ladder has no metric — the log line in ` +
+      'worker/conductor.rs is the only place the delay is published, and it is grouped by its ' +
+      '`conn_id` field (a doorway too old to emit that field collapses every loop into one ' +
+      'unattributed group, which cannot be reasoned about monotonically).'
   );
   return delays.slice(-minimum);
 }
@@ -1323,10 +1409,24 @@ Given(
       200,
       `GET ${base}/ answered ${first.status} — there is no SSR route to saturate on this doorway`
     );
-    const flights = Array.from({ length: 12 }, async () =>
-      getRawWithHeaders(`${base}/`, { timeoutMs: 30_000 })
-    );
-    ctx(this).ssrBurst = { settled: Promise.all(flights) };
+    // SUSTAINED, not one-shot. A burst of 12 renders drains in a couple of
+    // seconds, so by the time the next step had polled the log for the
+    // saturation line and the When had issued its probe, the queue was idle
+    // again and the probe was RENDERED — no shed, no x-ssr-skipped, and the
+    // scenario failed against a doorway that had behaved correctly (measured
+    // 2026-08-22). The load is held until scenario cleanup, so the shed window
+    // covers the steps that assert it and stops the moment they are done.
+    // Baseline BEFORE the load: the saturation line is counted across a 2 MB log
+    // tail that already holds earlier scenarios' (and earlier boots') lines, so
+    // "> 0" would be satisfied by history. Only GROWTH proves this load saturated.
+    ctx(this).ssrSaturationBaseline = countOccurrences(doorwayLog(), SSR_SATURATED_LOG_LINE);
+    ctx(this).ssrBurst = sustainedRenders(`${base}/`, 12);
+    this.onCleanup(async () => {
+      const burst = ctx(this).ssrBurst;
+      if (!burst) return;
+      burst.stop();
+      await burst.settled;
+    });
   }
 );
 
@@ -1336,8 +1436,9 @@ Given(
   async function (this: E2EWorld) {
     const burstPromise = ctx(this).ssrBurst;
     assert.ok(burstPromise, 'no render burst is in flight — run the in-flight-render step first');
+    const baseline = ctx(this).ssrSaturationBaseline ?? 0;
     const saturated = await pollUntil(
-      () => countOccurrences(doorwayLog(), SSR_SATURATED_LOG_LINE) > 0 || null,
+      () => countOccurrences(doorwayLog(), SSR_SATURATED_LOG_LINE) > baseline || null,
       30_000,
       1_000
     );
@@ -1395,8 +1496,11 @@ Then(
       200,
       `/health answered ${health.status} while the render queue was saturated`
     );
-    const burstPromise = ctx(this).ssrBurst;
-    if (burstPromise) await burstPromise.settled;
+    const burst = ctx(this).ssrBurst;
+    if (burst) {
+      burst.stop();
+      await burst.settled;
+    }
   }
 );
 

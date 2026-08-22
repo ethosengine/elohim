@@ -186,6 +186,48 @@ async function readDoorwayLogLines(doorwayId = 'alpha'): Promise<DoorwayLogLine[
   return parseLogLines(text);
 }
 
+/** The doorway's first line of every boot (main.rs, before anything else). */
+const BOOT_MARKER = 'doorway starting';
+
+/**
+ * The lines of the CURRENT boot only.
+ *
+ * The mesh doorway appends to ONE log file across every restart, so the whole
+ * file is a stack of boots going back days. A pass-scoped assertion read against
+ * the unscoped file reads the FIRST boot's evidence, not this one's — which is
+ * how "this pass's log" dumps used to start at the top of a 34k-line file.
+ * Everything a warm-up/restart drill asserts is scoped here, at the last
+ * `doorway starting` marker.
+ */
+function linesSinceLastBoot(lines: DoorwayLogLine[]): DoorwayLogLine[] {
+  let start = 0;
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    if (lines[i].fields.message === BOOT_MARKER) {
+      start = i;
+      break;
+    }
+  }
+  return lines.slice(start);
+}
+
+/**
+ * Host aliases the mesh mixes freely: the fixture says `localhost`, the doorway
+ * is launched with `127.0.0.1`, and both name the same peer. Compared as
+ * `host:port` with the alias folded, never as raw strings — a raw compare made
+ * `/admin/self-healing`'s `upstreams[].endpoint` ("http://127.0.0.1:8090")
+ * invisible to a step looking for "localhost:8090".
+ */
+function authorityOf(url: string): string {
+  const withoutScheme = withoutTrailingSlash(url).replace(/^[a-z]+:\/\//, '');
+  const authority = withoutScheme.split('/')[0];
+  return authority.replace(/^localhost:/, '127.0.0.1:');
+}
+
+/** Do two URLs name the same peer (scheme- and alias-insensitive, path ignored)? */
+function sameUpstream(a: string, b: string): boolean {
+  return authorityOf(a) === authorityOf(b);
+}
+
 // ---------------------------------------------------------------------------
 // Process control — SIGSTOP/SIGCONT by the fixture's EXACT pid only, never a
 // pattern kill. Mirrors federation-failover.steps.ts's pausePeer/resumePeer
@@ -337,6 +379,40 @@ const WARMUP_PASS_TERMINAL_MESSAGES = new Set([
   'Upstream circuit opened; bailing retry ladder early',
 ]);
 
+/**
+ * The lines warm_stream.rs emits when a peer FAILS its stream — as distinct from
+ * the terminal set above, which also contains the SUCCESS line. An evidence
+ * assertion built on the terminal set counted a healthy peer's completion as a
+ * failure; these three are the honest failure vocabulary:
+ *   - "Cache stream warm-up failed, retrying"          (attempt < MAX_WARMUP_RETRIES)
+ *   - "Cache stream warm-up failed after max retries"  (ladder exhausted)
+ *   - "Upstream circuit opened; bailing retry ladder early" (breaker bailed the ladder)
+ */
+const WARMUP_FAILURE_MESSAGES = new Set([
+  'Cache stream warm-up failed, retrying',
+  'Cache stream warm-up failed after max retries',
+  'Upstream circuit opened; bailing retry ladder early',
+]);
+
+/**
+ * This pass's recorded warm-up FAILURES for one peer.
+ *
+ * Every warm_stream.rs failure line keys the peer on `storage_url` — the peer's
+ * BASE url ("http://127.0.0.1:8091"), not the `/api/v1/cache/stream` url that
+ * only the "Connected to cache stream" line carries in `url`. Matching a
+ * suffixed stream url against `storage_url` therefore never matched anything, so
+ * the evidence read as "no recorded failure" no matter what the peer did. Both
+ * field spellings are accepted here and compared by peer authority, so the
+ * fixture's `localhost` and the doorway's `127.0.0.1` name the same peer.
+ */
+function warmupFailureLinesFor(state: WarmupPassState, peerUrl: string): DoorwayLogLine[] {
+  return state.lines.filter(l => {
+    if (!WARMUP_FAILURE_MESSAGES.has(l.fields.message ?? '')) return false;
+    const keyed = l.fields['storage_url'] ?? l.fields['url'];
+    return typeof keyed === 'string' && sameUpstream(keyed, peerUrl);
+  });
+}
+
 async function constructWarmupBoot(
   world: E2EWorld,
   stoppedPeers: readonly HouseholdPeerName[]
@@ -402,12 +478,12 @@ function findUpstream(
   view: SelfHealingView,
   endpointFragment: string
 ): SelfHealingUpstream | undefined {
-  return view.upstreams.find(u => u.endpoint.includes(endpointFragment));
+  return view.upstreams.find(u => sameUpstream(u.endpoint, endpointFragment));
 }
 
-/** The host:port fragment `/admin/self-healing`'s `upstreams[].endpoint` keys on. */
+/** The host:port `/admin/self-healing`'s `upstreams[].endpoint` keys on. */
 function endpointFragmentOf(url: string): string {
-  return withoutTrailingSlash(url).replace(/^https?:\/\//, '');
+  return authorityOf(url);
 }
 
 // ===========================================================================
@@ -426,7 +502,9 @@ interface WarmupPassState {
 const warmupStates = new WeakMap<E2EWorld, WarmupPassState>();
 
 async function loadWarmupPassState(world: E2EWorld): Promise<WarmupPassState> {
-  const lines = await readDoorwayLogLines('alpha');
+  // THIS boot's lines only — the restart drill's whole point is that the pass
+  // ran against the peer state we just constructed.
+  const lines = linesSinceLastBoot(await readDoorwayLogLines('alpha'));
   const startedLine = lines.find(
     l => l.fields.message === 'Starting cache stream warm-up (health-gated)'
   );
@@ -439,7 +517,9 @@ async function loadWarmupPassState(world: E2EWorld): Promise<WarmupPassState> {
       .filter(Boolean)
   );
   const configured = poolStorageUrls('alpha').map(u => `${u}/api/v1/cache/stream`);
-  const gatedUrls = configured.filter(streamUrl => !connectedUrls.has(streamUrl));
+  const gatedUrls = configured.filter(
+    streamUrl => ![...connectedUrls].some(connected => sameUpstream(connected, streamUrl))
+  );
   const state: WarmupPassState = {
     lines,
     startedLine,
@@ -474,17 +554,12 @@ Given(
       );
     }
     const state = await constructWarmupBoot(this, [WARMUP_BROKEN_PEER]);
-    const streamUrl = `${requireFixtureStoragePeer(fixture(), WARMUP_BROKEN_PEER).url}/api/v1/cache/stream`;
-    const failureLines = state.lines.filter(
-      l => l.fields['url'] === streamUrl || l.fields['storage_url'] === streamUrl
-    );
-    const failureCount = failureLines.filter(l =>
-      WARMUP_PASS_TERMINAL_MESSAGES.has(l.fields.message ?? '')
-    ).length;
+    const peerUrl = requireFixtureStoragePeer(fixture(), WARMUP_BROKEN_PEER).url;
+    const failureCount = warmupFailureLinesFor(state, peerUrl).length;
     assert.ok(
       failureCount >= 1,
       `restarted doorway with "${WARMUP_BROKEN_PEER}" paused, but this pass's log shows no recorded ` +
-        `failure for ${streamUrl} (log messages observed: ` +
+        `failure for ${peerUrl} (this boot's messages: ` +
         `${JSON.stringify(state.lines.map(l => l.fields.message))})`
     );
     if (failureCount < WARMUP_CIRCUIT_FAIL_THRESHOLD) {
@@ -580,15 +655,11 @@ Given(
       );
     }
     const state = await constructWarmupBoot(this, WARMUP_SLOW_PEERS);
-    const stalledStreamUrls = WARMUP_SLOW_PEERS.map(
-      name => `${requireFixtureStoragePeer(fixture(), name).url}/api/v1/cache/stream`
+    const stalledPeerUrls = WARMUP_SLOW_PEERS.map(
+      name => requireFixtureStoragePeer(fixture(), name).url
     );
-    const sawFailure = stalledStreamUrls.some(streamUrl =>
-      state.lines.some(
-        l =>
-          (l.fields['url'] === streamUrl || l.fields['storage_url'] === streamUrl) &&
-          WARMUP_PASS_TERMINAL_MESSAGES.has(l.fields.message ?? '')
-      )
+    const sawFailure = stalledPeerUrls.some(
+      peerUrl => warmupFailureLinesFor(state, peerUrl).length > 0
     );
     assert.ok(
       sawFailure,
@@ -737,7 +808,8 @@ Then('the doorway records an "anti-self-partition" self-heal event', function (t
 
 interface InboundSaturationRig {
   doorwayUrl: string;
-  burstPromises: Promise<unknown>[];
+  stop: () => void;
+  settled: Promise<unknown>;
   saturated: boolean;
   probeStatus: number;
   probeBody: string;
@@ -746,9 +818,62 @@ interface InboundSaturationRig {
 const inboundRigs = new WeakMap<E2EWorld, InboundSaturationRig>();
 
 /**
- * Fire a burst of concurrent, non-mutating reads well past
- * DEFAULT_MAX_INFLIGHT_READ (512) so the doorway's own read-admission
- * semaphore is genuinely exhausted for the window this function measures.
+ * A read heavy enough that serving it HOLDS an admission permit for a
+ * measurable window.
+ *
+ * The suite used to saturate with `?limit=1`. Measured on the mesh 2026-08-22:
+ * 576 concurrent `limit=1` reads all answered 200 and the probe was admitted —
+ * the doorway answers a one-row read in ~2ms, so the client can never keep 512
+ * of them simultaneously in flight and the ceiling is never reached. Saturation
+ * is a function of permit HOLD TIME, not request count; the same 576 against
+ * `limit=2000` sheds ~90 with 503. This is the honest construction of "the
+ * permits are exhausted" — real load the node genuinely cannot absorb at once,
+ * not a bigger count of work it finds trivial.
+ */
+const SATURATING_READ_PATH = '/db/content?limit=2000';
+
+interface SustainedLoad {
+  stop: () => void;
+  settled: Promise<unknown>;
+}
+
+/**
+ * Hold `concurrency` requests in flight until stopped — as opposed to firing
+ * one burst and hoping the later steps land inside its shadow. A one-shot burst
+ * drains in seconds, so the scenario's own When ("a non-exempt request arrives")
+ * measured an UNSATURATED doorway and the Then asserted a shed that had already
+ * stopped happening. The load is stopped in scenario cleanup, so the window is
+ * exactly the scenario, never longer.
+ */
+function sustainedLoad(url: string, concurrency: number): SustainedLoad {
+  let running = true;
+  const workers = Array.from({ length: concurrency }, async () => {
+    while (running) {
+      await getRaw(url, { timeoutMs: 25_000 }).catch(() => null);
+    }
+  });
+  return {
+    stop: () => {
+      running = false;
+    },
+    settled: Promise.allSettled(workers),
+  };
+}
+
+/** Probe until the node sheds (503) or the budget runs out; returns the last answer. */
+async function probeUntilShed(url: string, budgetMs: number): Promise<RawHttpResponse> {
+  const deadline = Date.now() + budgetMs;
+  let last = await getRawWithHeaders(url, { timeoutMs: 10_000 });
+  while (last.status !== 503 && Date.now() < deadline) {
+    await sleep(100);
+    last = await getRawWithHeaders(url, { timeoutMs: 10_000 });
+  }
+  return last;
+}
+
+/**
+ * Drive the doorway's own read-admission semaphore (DEFAULT_MAX_INFLIGHT_READ,
+ * 512) to exhaustion and KEEP it there for the scenario.
  * DESTRUCTIVE/HEAVY: real concurrent load against the live mesh — hold for
  * explicit operator go before ever executing.
  */
@@ -756,26 +881,29 @@ async function saturateInboundAdmission(
   world: E2EWorld,
   url: string
 ): Promise<InboundSaturationRig> {
-  const burstSize = Number(
+  const concurrency = Number(
     process.env['E2E_INBOUND_SATURATION_BURST'] ?? DOORWAY_MAX_INFLIGHT_READ + 64
   );
-  const burstPromises = Array.from({ length: burstSize }, async () =>
-    getRaw(`${url}${CHEAP_READ_PATH}`, { timeoutMs: 25_000 }).catch(() => null)
-  );
-  // Give the burst a moment to actually land in-flight before probing.
-  await sleep(150);
-  const probe = await getRaw(`${url}${CHEAP_READ_PATH}`, { timeoutMs: 10_000 });
+  const load = sustainedLoad(`${url}${SATURATING_READ_PATH}`, concurrency);
   const rig: InboundSaturationRig = {
     doorwayUrl: url,
-    burstPromises,
-    saturated: probe.status === 503,
-    probeStatus: probe.status,
-    probeBody: probe.text,
+    stop: load.stop,
+    settled: load.settled,
+    saturated: false,
+    probeStatus: 0,
+    probeBody: '',
   };
   inboundRigs.set(world, rig);
   world.onCleanup(async () => {
-    await Promise.allSettled(rig.burstPromises);
+    load.stop();
+    await load.settled;
   });
+  // Let the load actually land in flight, then probe until it sheds.
+  await sleep(250);
+  const probe = await probeUntilShed(`${url}${SATURATING_READ_PATH}`, 10_000);
+  rig.saturated = probe.status === 503;
+  rig.probeStatus = probe.status;
+  rig.probeBody = probe.text;
   return rig;
 }
 
@@ -1317,7 +1445,8 @@ Then(
 
 interface StorageSaturationRig {
   storageUrl: string;
-  burstPromises: Promise<unknown>[];
+  stop: () => void;
+  settled: Promise<unknown>;
   probeStatus: number;
   probeHeaders: Record<string, string | undefined>;
   probeBody: string;
@@ -1326,9 +1455,10 @@ interface StorageSaturationRig {
 const storageRigs = new WeakMap<E2EWorld, StorageSaturationRig>();
 
 /**
- * Fire a burst of concurrent, non-mutating reads well past
- * MAX_CONCURRENT_READS (256) directly against ONE storage peer (bypassing
- * doorway) so its per-request inflight semaphore is genuinely exhausted.
+ * Hold real concurrent, non-mutating reads against ONE storage peer (bypassing
+ * doorway) past MAX_CONCURRENT_READS (256) so its per-request inflight
+ * semaphore is genuinely exhausted for the length of the scenario — same
+ * hold-time construction as the doorway rig above, for the same reason.
  * DESTRUCTIVE/HEAVY: real concurrent load against a live household storage
  * peer — hold for explicit operator go.
  */
@@ -1336,25 +1466,28 @@ async function saturateStorageInflight(
   world: E2EWorld,
   storageUrl: string
 ): Promise<StorageSaturationRig> {
-  const burstSize = Number(
+  const concurrency = Number(
     process.env['E2E_STORAGE_SATURATION_BURST'] ?? STORAGE_MAX_CONCURRENT_READS + 32
   );
-  const burstPromises = Array.from({ length: burstSize }, async () =>
-    getRaw(`${storageUrl}${CHEAP_READ_PATH}`, { timeoutMs: 25_000 }).catch(() => null)
-  );
-  await sleep(150);
-  const probe = await getRawWithHeaders(`${storageUrl}${CHEAP_READ_PATH}`, { timeoutMs: 10_000 });
+  const load = sustainedLoad(`${storageUrl}${SATURATING_READ_PATH}`, concurrency);
   const rig: StorageSaturationRig = {
     storageUrl,
-    burstPromises,
-    probeStatus: probe.status,
-    probeHeaders: probe.headers,
-    probeBody: probe.text,
+    stop: load.stop,
+    settled: load.settled,
+    probeStatus: 0,
+    probeHeaders: {},
+    probeBody: '',
   };
   storageRigs.set(world, rig);
   world.onCleanup(async () => {
-    await Promise.allSettled(rig.burstPromises);
+    load.stop();
+    await load.settled;
   });
+  await sleep(250);
+  const probe = await probeUntilShed(`${storageUrl}${SATURATING_READ_PATH}`, 10_000);
+  rig.probeStatus = probe.status;
+  rig.probeHeaders = probe.headers;
+  rig.probeBody = probe.text;
   return rig;
 }
 
