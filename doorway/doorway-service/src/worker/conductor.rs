@@ -26,6 +26,7 @@ use futures_util::future::BoxFuture;
 use futures_util::{SinkExt, StreamExt};
 use std::collections::HashMap;
 use std::io::Cursor;
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
@@ -68,6 +69,10 @@ const REMINT_MIN_INTERVAL: Duration = Duration::from_secs(30);
 const AUTH_ACK_WINDOW: Duration = Duration::from_millis(500);
 
 /// Exponential reconnect backoff that only resets after a stable session.
+/// Process-wide connection-loop id source. Only ever used for log attribution,
+/// so a plain relaxed counter is sufficient.
+static NEXT_CONN_ID: AtomicU64 = AtomicU64::new(0);
+
 struct ReconnectBackoff {
     delay: Duration,
 }
@@ -232,6 +237,16 @@ async fn connection_loop(
 ) {
     let mut backoff = ReconnectBackoff::new();
     let mut last_remint: Option<Instant> = None;
+    // Per-connection identity for the reconnect ladder. A doorway runs MANY
+    // connection loops at once (app pool + admin pool + per-conductor pools),
+    // each climbing its OWN ladder. Without an identity on the line, a reader
+    // tailing the log sees N interleaved ladders as one flat sequence and cannot
+    // tell a healthy 100→200→400 climb from a stuck loop — which is exactly how
+    // the household mesh read "3200, 3200, 3200, 3200, 3200" off four workers
+    // all sitting on the same rung (2026-08-22). `conn_id` groups the lines;
+    // `attempt` numbers the rung within that group.
+    let conn_id = NEXT_CONN_ID.fetch_add(1, AtomicOrdering::Relaxed);
+    let mut ladder_attempt: u64 = 0;
 
     loop {
         // The owning handle(s) dropped while we were disconnected — shut down
@@ -317,7 +332,15 @@ async fn connection_loop(
         // the 30s ceiling was indistinguishable in a scrape from one that never
         // reconnects at all.
         crate::metrics::inc_reconnect_ladder_step(reconnect_delay);
-        warn!("Reconnecting to conductor in {:?}...", reconnect_delay);
+        ladder_attempt += 1;
+        warn!(
+            conn_id,
+            attempt = ladder_attempt,
+            delay_ms = reconnect_delay.as_millis() as u64,
+            conductor_url = %conductor_url,
+            "Reconnecting to conductor in {:?}...",
+            reconnect_delay
+        );
         tokio::time::sleep(reconnect_delay).await;
     }
 }
