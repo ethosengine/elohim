@@ -156,10 +156,19 @@ function runScript(
     maxBuffer: 32 * 1024 * 1024,
     env: process.env,
   });
-  if (result.error) {
-    throw new Error(`${script} ${args.join(' ')} could not run: ${result.error.message}`);
-  }
   const out = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+  if (result.error) {
+    // A timeout (spawnSync ETIMEDOUT) still carries the partial transcript, and the
+    // chaos script stamps every `say` line with a UTC clock — so the red names the
+    // phase that stalled instead of just "could not run" (2026-08-22: a 12-minute
+    // re-key timeout reported nothing about the nine minutes it spent before the key
+    // actually changed). Last 40 lines: enough to see the stall, small enough to read.
+    const tail = out.trim().split('\n').slice(-40).join('\n');
+    throw new Error(
+      `${script} ${args.join(' ')} could not run: ${result.error.message}` +
+        (tail ? `\n--- last output before the failure ---\n${tail}` : '')
+    );
+  }
   if (result.signal) {
     throw new Error(`${script} was killed by ${result.signal} after ${timeoutMs}ms\n${out}`);
   }
