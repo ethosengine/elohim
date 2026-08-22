@@ -45,6 +45,27 @@ pub use config::Args;
 pub use server::{run, AppState};
 pub use types::{DoorwayError, Result};
 
+/// Derive the app-interface WebSocket URL from a conductor URL by replacing the
+/// port with `app_port`.
+///
+/// The inverse of [`derive_admin_url_from_app`], and the reason BOTH exist: the
+/// doorway is configured with two DIFFERENT conventions and they must not be
+/// confused. `CONDUCTOR_URL` (singular) is the **admin** URL — that is the
+/// flag's own documented contract, and it is what `hc-mesh.sh` / `hc-start.sh`
+/// pass. `CONDUCTOR_URLS` (plural) is a list of **app** URLs — that is what the
+/// deploy pipeline's `computeConductorUrls` emits (`:8445`, the socat app port).
+/// Anything that needs the other side derives it; nothing assumes.
+pub fn derive_app_url_from_conductor(conductor_url: &str, app_port: u16) -> String {
+    if let Some(host_start) = conductor_url.find("://") {
+        let after_scheme = &conductor_url[host_start + 3..];
+        if let Some(port_start) = after_scheme.rfind(':') {
+            let host = &after_scheme[..port_start];
+            return format!("{}://{}:{}", &conductor_url[..host_start], host, app_port);
+        }
+    }
+    format!("ws://localhost:{app_port}")
+}
+
 /// Derive admin WebSocket URL from app URL by replacing the port.
 ///
 /// The admin port is the app port minus 1 (socat convention: 8444=admin, 8445=app).

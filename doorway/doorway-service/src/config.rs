@@ -328,6 +328,14 @@ pub struct NatsArgs {
     pub nats_password: Option<String>,
 }
 
+/// Parse the port out of a `scheme://host:port` URL. `None` when absent or
+/// unparseable — the caller then falls back to deriving rather than guessing.
+fn url_port(url: &str) -> Option<u16> {
+    let after_scheme = url.split("://").nth(1)?;
+    let host_port = after_scheme.split('/').next()?;
+    host_port.rsplit(':').next()?.parse::<u16>().ok()
+}
+
 impl Args {
     /// Get effective admin URL (falls back to conductor_url if not set)
     pub fn admin_url(&self) -> &str {
@@ -349,8 +357,23 @@ impl Args {
         }
     }
 
-    /// Get the list of conductor app interface URLs
-    /// Prefers CONDUCTOR_URLS (multi-conductor) over single CONDUCTOR_URL
+    /// Get the list of conductor **app interface** URLs.
+    ///
+    /// Prefers `CONDUCTOR_URLS` (multi-conductor, already app URLs — the deploy
+    /// pipeline's `computeConductorUrls` emits `:8445`) over the single
+    /// `CONDUCTOR_URL`, which by its own flag documentation is the **admin**
+    /// URL and therefore has to be CONVERTED, not passed through.
+    ///
+    /// The pass-through was a real cross-convention bug (measured 2026-08-22 on
+    /// the household mesh, where `--conductor-url ws://localhost:4444` is the
+    /// admin socket): the single admin URL entered this app-URL list verbatim,
+    /// so the conductor registry then ran `derive_admin_url_from_app` (port − 1)
+    /// on an ADMIN url and registered `ws://localhost:4443` — a port nothing
+    /// listens on. Every registry-keyed admin consumer (the projection signal
+    /// subscriber, agent-registry refresh, the post-restart app-auth re-mint)
+    /// dialled that dead socket forever: `Conductor connection failed: Admin
+    /// WebSocket connect to ws://localhost:4443 failed: Connection refused`,
+    /// climbing its own backoff ladder and never healing.
     pub fn conductor_url_list(&self) -> Vec<String> {
         if let Some(ref urls) = self.conductor_urls {
             urls.split(',')
@@ -358,8 +381,26 @@ impl Args {
                 .filter(|s| !s.is_empty())
                 .collect()
         } else {
-            vec![self.conductor_url.clone()]
+            vec![self.single_conductor_app_url()]
         }
+    }
+
+    /// The single `CONDUCTOR_URL` expressed as an APP-interface URL.
+    ///
+    /// The port decides, so BOTH live conventions keep working and neither has
+    /// to be guessed at: a URL already inside the configured app-port range is
+    /// an app URL and passes through untouched (alpha's
+    /// `--conductor-url ws://elohim-matthew-alpha:4445`, and any socat topology
+    /// whose app port is not `APP_PORT_MIN`); anything else is the admin URL the
+    /// flag documents (`hc-mesh.sh` / `hc-start.sh` pass `:4444`) and is
+    /// converted to `APP_PORT_MIN`.
+    fn single_conductor_app_url(&self) -> String {
+        if let Some(port) = url_port(&self.conductor_url) {
+            if self.is_valid_app_port(port) {
+                return self.conductor_url.clone();
+            }
+        }
+        crate::derive_app_url_from_conductor(&self.conductor_url, self.app_port_min)
     }
 
     /// Check if an app port is within the allowed range
@@ -401,5 +442,75 @@ impl Args {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod conductor_url_convention_tests {
+    use super::*;
+    use clap::Parser;
+
+    fn args_with(argv: &[&str]) -> Args {
+        let mut full = vec!["doorway", "--listen", "127.0.0.1:0"];
+        full.extend_from_slice(argv);
+        Args::parse_from(full)
+    }
+
+    /// The mesh convention (and the flag's own documentation):
+    /// `--conductor-url` is the ADMIN socket. The registry consumes this list as
+    /// APP urls and runs `derive_admin_url_from_app` (port − 1) over it, so an
+    /// admin URL passed through verbatim became `4443` — a port nothing listens
+    /// on, and the reason the projection subscriber, the agent-registry refresh
+    /// and the post-restart app-auth re-mint never connected on the household
+    /// mesh (measured 2026-08-22).
+    #[test]
+    fn an_admin_conductor_url_is_converted_to_the_app_port() {
+        let args = args_with(&["--conductor-url", "ws://localhost:4444"]);
+        assert_eq!(args.conductor_url_list(), vec!["ws://localhost:4445"]);
+        assert_eq!(
+            crate::derive_admin_url_from_app(&args.conductor_url_list()[0]),
+            "ws://localhost:4444",
+            "and the registry's own inverse now lands back on the real admin port"
+        );
+    }
+
+    /// The alpha convention: `--conductor-url ws://elohim-matthew-alpha:4445` is
+    /// already an APP url. A URL inside the app-port range passes through
+    /// untouched, so this fix cannot move a working deployment.
+    #[test]
+    fn an_app_conductor_url_passes_through_untouched() {
+        let args = args_with(&["--conductor-url", "ws://elohim-matthew-alpha:4445"]);
+        assert_eq!(
+            args.conductor_url_list(),
+            vec!["ws://elohim-matthew-alpha:4445"]
+        );
+    }
+
+    /// A socat topology whose app port is not `APP_PORT_MIN` (the 8444/8445
+    /// convention `derive_admin_url_from_app` documents) still passes through —
+    /// the port range, not a hardcoded number, is what decides.
+    #[test]
+    fn a_non_default_app_port_inside_the_range_passes_through() {
+        let args = args_with(&["--conductor-url", "ws://peer:8445"]);
+        assert_eq!(args.conductor_url_list(), vec!["ws://peer:8445"]);
+    }
+
+    /// `CONDUCTOR_URLS` (plural) is authoritative and already app URLs — the
+    /// deploy pipeline's `computeConductorUrls` emits them. Untouched.
+    #[test]
+    fn the_plural_list_is_never_rewritten() {
+        let args = args_with(&["--conductor-urls", "ws://a:4445,ws://b:8445"]);
+        assert_eq!(
+            args.conductor_url_list(),
+            vec!["ws://a:4445", "ws://b:8445"]
+        );
+    }
+
+    #[test]
+    fn url_port_parses_or_declines() {
+        assert_eq!(url_port("ws://localhost:4444"), Some(4444));
+        assert_eq!(url_port("ws://localhost:4444/path"), Some(4444));
+        assert_eq!(url_port("ws://localhost"), None);
+        assert_eq!(url_port("localhost:4444"), None);
     }
 }

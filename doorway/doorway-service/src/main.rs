@@ -648,14 +648,30 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         }
     }
 
+    // CONCURRENT, not serial. This runs BEFORE the listener binds, and each
+    // manifest fetch waits out its own client timeout against an unresponsive
+    // peer — so a serial loop made the pre-listen stall PROPORTIONAL to the
+    // number of dead peers (measured 2026-08-22 on the household mesh: one
+    // SIGSTOPped peer = a flat 10s added to boot, i.e. 30s with the household's
+    // three). Boot cost is now one peer's timeout, not the sum; every other
+    // property (idempotent install, background retry for the stragglers) is
+    // unchanged.
+    let registration_results =
+        futures_util::future::join_all(peer_urls.iter().map(|storage_url| {
+            let registry = state.route_registry.clone();
+            async move {
+                (
+                    storage_url.clone(),
+                    registry.register_steward_peer(storage_url).await,
+                )
+            }
+        }))
+        .await;
+
     let mut registered = 0usize;
     let mut pending_peers: Vec<String> = Vec::new();
-    for storage_url in &peer_urls {
-        match state
-            .route_registry
-            .register_steward_peer(storage_url)
-            .await
-        {
+    for (storage_url, result) in registration_results {
+        match result {
             Ok(count) => {
                 tracing::info!(
                     routes = count,
@@ -670,7 +686,7 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
                     storage_url = %storage_url,
                     "Failed to register steward peer — will retry in background until it registers"
                 );
-                pending_peers.push(storage_url.clone());
+                pending_peers.push(storage_url);
             }
         }
     }
@@ -1922,18 +1938,13 @@ async fn discover_existing_agents(registry: &ConductorRegistry, conductor_urls: 
     }
 }
 
-/// Derive app WebSocket URL from conductor admin URL
+/// Derive app WebSocket URL from conductor admin URL.
+///
+/// ONE home for the derivation: `doorway::derive_app_url_from_conductor`, beside
+/// its inverse `derive_admin_url_from_app`, so the two configuration conventions
+/// cannot drift apart in a second copy.
 fn derive_app_url(conductor_url: &str, app_port: u16) -> String {
-    // If the URL contains "localhost" or an IP, replace the port
-    if let Some(host_start) = conductor_url.find("://") {
-        let after_scheme = &conductor_url[host_start + 3..];
-        if let Some(port_start) = after_scheme.rfind(':') {
-            let host = &after_scheme[..port_start];
-            return format!("{}://{}:{}", &conductor_url[..host_start], host, app_port);
-        }
-    }
-    // Fallback: just use the default
-    format!("ws://localhost:{app_port}")
+    doorway::derive_app_url_from_conductor(conductor_url, app_port)
 }
 
 #[cfg(test)]
