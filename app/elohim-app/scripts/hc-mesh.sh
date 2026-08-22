@@ -634,9 +634,37 @@ os.execve(binpath, [binpath, "--http-port", port], env)
     printf "."; sleep 3
   done
   echo
+  refresh_fixture_pids
   # /health is not the question. "Serving" and "able to anchor" are different
   # claims and only one of them matters.
   probe_zome_paths
+}
+
+# The household fixture (written once by hc-mesh-prologue.sh) names each storage
+# peer's pid, and the a2o chaos drills kill/verify peers BY THAT PID. An in-place
+# restart mints new pids, so a fixture left behind turns every later drill into
+# `kill ESRCH` / "/proc/<pid> is gone" (2026-08-22: 3 chaos-peer-churn reds from
+# one storage-restart). Re-resolve every peer's pid from its listening port.
+refresh_fixture_pids() {
+  local fixture="$MESH_DIR/household-fixture.json"
+  [ -s "$fixture" ] || return 0
+  python3 - "$fixture" "$MESH_PEERS" <<'PY'
+import json, subprocess, sys
+fixture, peers = sys.argv[1], sys.argv[2].split(',')
+d = json.load(open(fixture))
+sp = d.setdefault('storagePeers', {})
+changed = []
+for i, name in enumerate(peers):
+    port = 8090 + i
+    out = subprocess.run(['bash', '-c', f"ss -ltnp | grep ':{port} ' | sed -n 's/.*pid=\\([0-9]*\\).*/\\1/p' | head -1"],
+                         capture_output=True, text=True).stdout.strip()
+    if out and name in sp and sp[name].get('pid') != int(out):
+        changed.append(f"{name}:{sp[name].get('pid')}->{out}")
+        sp[name]['pid'] = int(out)
+if changed:
+    json.dump(d, open(fixture, 'w'), indent=2)
+    print('fixture pids refreshed: ' + ' '.join(changed))
+PY
 }
 
 # Report, per peer, whether its ZOME path is alive — i.e. whether it can still
@@ -1041,9 +1069,18 @@ EOF
     # bundle carries only index.csr.html, so WITHOUT SSR the / mount 404s.
     DOORWAY_ID="${DOORWAY_ID:-alpha-elohim-host}" \
     DOORWAY_HEALTH_PORT="${DOORWAY_A_HEALTH_PORT:-8079}" \
+    # Membrane thresholds (per client IP per 60s window; doorway membrane.rs defaults
+    # 300/600/1200, ban 900s). Every a2o request on this mesh arrives from ONE loopback
+    # address, and the destructive/load scenarios the owned lane runs (warm-up budgets,
+    # reconnect churn, coalescing cold reads) exceed 1200/min — 2026-08-22 a re-exec'd
+    # doorway A answered 403 {"error":"Forbidden"} x-membrane:deny to the rest of the lane.
+    # Override per run; the fleet keeps the binary defaults.
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-a" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
     API_KEY_ADMIN="${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}" \
+    DOORWAY_MEMBRANE_SHAPE_THRESHOLD="${DOORWAY_MEMBRANE_SHAPE_THRESHOLD:-100000}" \
+    DOORWAY_MEMBRANE_CHALLENGE_THRESHOLD="${DOORWAY_MEMBRANE_CHALLENGE_THRESHOLD:-200000}" \
+    DOORWAY_MEMBRANE_BAN_THRESHOLD="${DOORWAY_MEMBRANE_BAN_THRESHOLD:-400000}" \
     SSR_BUNDLE_PATH="${SSR_BUNDLE_PATH:-$REPO_ROOT/app/elohim-app/dist/elohim-app/server/main.server.mjs}" \
     SSR_BUNDLE_SLUG="${SSR_BUNDLE_SLUG:-elohim-host-landing}" \
     SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
@@ -1071,6 +1108,9 @@ EOF
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-b" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
     API_KEY_ADMIN="${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}" \
+    DOORWAY_MEMBRANE_SHAPE_THRESHOLD="${DOORWAY_MEMBRANE_SHAPE_THRESHOLD:-100000}" \
+    DOORWAY_MEMBRANE_CHALLENGE_THRESHOLD="${DOORWAY_MEMBRANE_CHALLENGE_THRESHOLD:-200000}" \
+    DOORWAY_MEMBRANE_BAN_THRESHOLD="${DOORWAY_MEMBRANE_BAN_THRESHOLD:-400000}" \
     SSR_BUNDLE_PATH="${SSR_BUNDLE_PATH:-$REPO_ROOT/app/elohim-app/dist/elohim-app/server/main.server.mjs}" \
     SSR_BUNDLE_SLUG="${SSR_BUNDLE_SLUG:-elohim-host-landing}" \
     SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
