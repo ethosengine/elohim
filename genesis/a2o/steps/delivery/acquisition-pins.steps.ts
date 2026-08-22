@@ -569,7 +569,8 @@ function hcMeshScriptPath(): string {
 
 Given(
   'a storage peer has restarted and no acquisition reconcile has completed',
-  function (this: E2EWorld) {
+  { timeout: 320_000 },
+  async function (this: E2EWorld) {
     const peer = process.env['E2E_MESH_RESTART_PEER'] ?? 'matthew';
     if (!destructiveGate(`restart mesh storage peer "${peer}" via hc-mesh.sh storage-restart`)) {
       return 'skipped';
@@ -585,6 +586,27 @@ Given(
       `${script} storage-restart ${peer} exited ${String(result.status)}: ` +
         `${(result.stderr ?? '').slice(-2000)}`
     );
+    // The precondition is "no reconcile has completed yet" — OBSERVE it. The
+    // restart tool returns only after its /health + zome-path probes, and on the
+    // household mesh the acquisition tick is 10 s (ACQUISITION_RECONCILE_SECS)
+    // with its first pass at t=0, so by the time this peer is reachable its
+    // first census has usually already completed (measured 2026-08-22, run
+    // 20260822T223129Z-3e79e77b: pull already {total:23, fetched:23}). That is
+    // a timing limit of the restart tool, not a storage answer, so the drill
+    // holds rather than asserting null against a finished census.
+    const { body } = await getJsonFromAfterRestart(storageUrl(), '/p2p/status');
+    const pull = (body as Record<string, unknown> | null)?.['pull'];
+    if (pull !== null && pull !== undefined) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `  ⏭️  HELD (precondition): peer "${peer}" completed its first acquisition reconcile ` +
+          `before it was reachable (pull=${JSON.stringify(pull)}). The boot-state window is ` +
+          "shorter than storage-restart's readiness wait at this reconcile cadence — restart " +
+          'with MESH_RESTART_ENV_OVERLAY="ACQUISITION_RECONCILE_SECS=120" on an unpinned peer ' +
+          'to observe it.'
+      );
+      return 'skipped';
+    }
     return undefined;
   }
 );

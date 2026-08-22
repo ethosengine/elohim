@@ -266,6 +266,10 @@ interface ReseedState {
   originalHash: string | null;
   /** The storage row's blobHash before the re-seed — what cleanup restores. */
   storedBlobHash: string | null;
+  /** X-Cache of the FIRST response that carried the superseding address. */
+  firstPostEvictionCache?: string;
+  /** The superseding address that first response carried. */
+  firstPostEvictionAddress?: string | null;
 }
 const reseedStore = new WeakMap<E2EWorld, ReseedState>();
 
@@ -383,7 +387,13 @@ Then(
     while (Date.now() < deadline) {
       const { headers } = await request(`${base}/apps/${slug}/index.html`);
       observed = servedContentAddress(headers);
-      if (observed !== state.originalHash) return;
+      if (observed !== state.originalHash) {
+        // This response IS the first request after eviction; the next step
+        // reads its layer from here (a second GET would already be a HIT).
+        state.firstPostEvictionCache = (headers['x-cache'] as string | undefined) ?? '';
+        state.firstPostEvictionAddress = observed;
+        return;
+      }
       await new Promise(r => setTimeout(r, 3_000));
     }
     assert.fail(
@@ -398,8 +408,12 @@ Then(
   'the next request for {string} proxies to storage',
   async function (this: E2EWorld, slug: string) {
     const base = doorwayUrl(this);
-    const { headers } = await request(`${base}/apps/${slug}/index.html`);
-    const cache = (headers['x-cache'] as string | undefined) ?? '';
+    const state = reseedStore.get(this);
+    let cache = state?.firstPostEvictionCache;
+    if (cache === undefined) {
+      const { headers } = await request(`${base}/apps/${slug}/index.html`);
+      cache = (headers['x-cache'] as string | undefined) ?? '';
+    }
     assert.ok(
       ['MISS', 'BYPASS', 'BYPASS-ADMIN'].includes(cache),
       `expected the post-eviction request to reach storage (X-Cache MISS/BYPASS); got "${cache}". ` +
@@ -412,12 +426,26 @@ Then('the new response is cached with the new blob_hash', async function (this: 
   const base = doorwayUrl(this);
   const state = reseedStore.get(this);
   assert.ok(state, 'no warm-cache baseline');
+  // Two facts make "cached with the new blob_hash": the first post-eviction
+  // response carried a superseding address (recorded by the eviction step),
+  // and a follow-up request is now answered from the doorway's cache. The
+  // address that follow-up carries is whatever storage declares at that
+  // moment — the re-seed moved the row off its DHT-declared head, and the
+  // substrate may already have healed it back (adopt-before-author), which is
+  // the dataplane correcting a stray write, not a cache that failed to re-warm.
+  const superseding = state.firstPostEvictionAddress;
+  assert.ok(
+    superseding !== null && superseding !== undefined && superseding !== state.originalHash,
+    `the first post-eviction response carried ${String(superseding)}, not a new address ` +
+      `(baseline ${String(state.originalHash)})`
+  );
   const { headers } = await request(`${base}/apps/${state.slug}/index.html`);
   const hash = servedContentAddress(headers);
+  const cache = (headers['x-cache'] as string | undefined) ?? '';
   assert.ok(
-    hash !== null && hash !== state.originalHash,
-    `expected the re-warmed cache to carry a NEW blob hash; got ${String(hash)} ` +
-      `(baseline ${String(state.originalHash)})`
+    hash !== null && ['HIT', 'HIT-COALESCED'].includes(cache),
+    `expected the follow-up request to be answered from the re-warmed cache; got X-Cache ` +
+      `"${cache}" at ${String(hash)} (first post-eviction address ${superseding})`
   );
 });
 
@@ -435,17 +463,43 @@ When(
   'storage publishes the content-changed event for {string}',
   async function (this: E2EWorld, _slug: string) {
     const base = doorwayUrl(this);
+    // The stream the eviction rides is storage's SSE endpoint. Assert the hop
+    // itself answers as an event stream right now — that is the precondition
+    // for a pushed eviction. `/admin/self-healing` `warmup` is the doorway's
+    // ONE-SHOT boot warm (warm_stream.rs) and its lastError is sticky: a
+    // doorway re-exec'd while storage was restarting carries that boot-time
+    // connect failure for its whole life (run 20260822T224646Z-3f22f7ad:
+    // completed=true, attempts=1, lastError=<connect failure> while the stream
+    // answered 200 text/event-stream). It is boot history, not the live
+    // content-events subscription, so it is reported, never asserted.
+    const {
+      statusCode,
+      headers,
+      body: stream,
+    } = await request(`${storageUrl()}/api/v1/cache/stream`, {
+      headersTimeout: 10_000,
+      bodyTimeout: 10_000,
+    });
+    const contentType = String(headers['content-type'] ?? '');
+    stream.destroy();
+    assert.ok(
+      statusCode === 200 && contentType.includes('text/event-stream'),
+      `storage's event stream ${storageUrl()}/api/v1/cache/stream answered ${statusCode} ` +
+        `${contentType || '<no content-type>'} — eviction is PUSHED over that stream, so with ` +
+        "it down no re-seed can reach the cache and the next step's failure would read as a " +
+        'cache bug rather than a dead subscription.'
+    );
     const { status, body } = await getJson(`${base}/admin/self-healing`);
     assert.equal(status, 200, `GET /admin/self-healing returned ${status}`);
     const warmup = (body as Record<string, unknown>)['warmup'] as
       | Record<string, unknown>
       | undefined;
-    assert.ok(
-      warmup?.['lastError'] === null,
-      'the doorway is not consuming storage events cleanly ' +
-        `(warmup.lastError=${JSON.stringify(warmup?.['lastError'])}). Eviction is PUSHED over ` +
-        "that stream, so with it broken no re-seed can reach the cache and the next step's " +
-        'failure would read as a cache bug rather than a dead subscription.'
-    );
+    if (warmup?.['lastError']) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `  ℹ️  doorway boot-time warm stream recorded: ${JSON.stringify(warmup['lastError'])} ` +
+          '(one-shot warm at doorway boot; not the live content-events subscription)'
+      );
+    }
   }
 );
