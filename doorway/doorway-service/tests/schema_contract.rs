@@ -213,20 +213,28 @@ fn auth_response_minimal_matches_schema() {
 
     let json = serde_json::to_value(&response).unwrap();
     let obj = json.as_object().unwrap();
+    // `isSteward` is deliberately NOT in the absent set: it always serializes
+    // (e6b74e684) — a hosted visitor's client must read an explicit
+    // `isSteward: false` to select the visitor surface, since an omitted field
+    // is indistinguishable from an old doorway that never emitted the claim.
     for absent in [
         "doorwayId",
         "doorwayUrl",
         "installedAppId",
         "profile",
-        "isSteward",
         "portalHostUrl",
     ] {
         assert!(
             !obj.contains_key(absent),
-            "{} must be absent when None/false (serde skip_serializing_if)",
+            "{} must be absent when None (serde skip_serializing_if)",
             absent
         );
     }
+    assert_eq!(
+        obj.get("isSteward"),
+        Some(&serde_json::Value::Bool(false)),
+        "isSteward must be PRESENT and false for a hosted visitor (always-serialize)"
+    );
     validate_against_schema("views/auth-response.schema.json", &json);
 }
 

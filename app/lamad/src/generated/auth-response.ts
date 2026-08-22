@@ -39,7 +39,7 @@ export interface AuthResponse {
   installedAppId?: string;
   profile?: HumanProfileResponse;
   /**
-   * True when the human's stewardship is substrate-confirmed. ABSENT when false (serde skip_serializing_if = Not::not), so presence implies true
+   * True when the human's stewardship is substrate-confirmed. Always serialized (true AND false): a hosted visitor's client must read an explicit false to select the visitor surface — an omitted field is indistinguishable from an old doorway that never emitted the claim
    */
   isSteward?: boolean;
   /**
