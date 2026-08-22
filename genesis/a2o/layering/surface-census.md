@@ -1,27 +1,27 @@
 # Surface census — mechanical WIRE/FIXTURE/IMPLEMENT/STRUCTURAL/DEFECT classification
 
-_Generated 2026-08-21T23:14:08.253Z by `pnpm census` (`scripts/surface-census.ts`). Population: every `@wip` or failed Act I/host scenario, joined against a scoped `cucumber-js --dry-run` bind check and live read-only probes of the surfaces its steps name. Re-run with `pnpm census` (or `pnpm census -- --fresh` to bypass the dry-run cache) — the classifier is read-only against the mesh (GET only) and idempotent._
+_Generated 2026-08-21T23:24:09.122Z by `pnpm census` (`scripts/surface-census.ts`). Population: every `@wip` or failed Act I/host scenario, joined against a scoped `cucumber-js --dry-run` bind check and live read-only probes of the surfaces its steps name. Re-run with `pnpm census` (or `pnpm census -- --fresh` to bypass the dry-run cache) — the classifier is read-only against the mesh (GET only) and idempotent._
 
 Mesh health: doorway UP, storage UP — full probe.
 
-Latest mesh report cross-referenced for DEFECT-STALE: (none found — no DEFECT-STALE class possible this run)
+Latest mesh report(s) cross-referenced for DEFECT-STALE: (none found — no DEFECT-STALE class possible this run)
 
 ## Totals
 
 | class | count |
 |---|---|
-| WIRE | 311 |
+| WIRE | 312 |
 | FIXTURE | 45 |
-| IMPLEMENT-BOUNDED | 4 |
+| IMPLEMENT-BOUNDED | 3 |
 | IMPLEMENT-DESIGN | 0 |
-| STRUCTURAL | 66 |
+| STRUCTURAL | 68 |
 | DEFECT-STALE | 0 |
 | UNCLASSIFIED | 91 |
-| **total classified** | **517** |
+| **total classified** | **519** |
 
 ## First ten cheapest, per class
 
-### WIRE (311 total)
+### WIRE (312 total)
 
 - `features/auth/recovery/recovery-m5-portal-host-discovery.feature` — Add a portal host — write step glue (1 step(s) unbound, class b)
 - `features/auth/recovery/recovery-m5-portal-host-discovery.feature` — Validator rejects http URL — write step glue (1 step(s) unbound, class b)
@@ -47,14 +47,13 @@ Latest mesh report cross-referenced for DEFECT-STALE: (none found — no DEFECT-
 - `features/delivery/client-resilience.feature` — SW probes peer capability before fetching assets — precondition missing: E2E_DEVICE_MODE
 - `features/delivery/client-resilience.feature` — SW fetches individual files from a peer with warm extraction — precondition missing: E2E_DEVICE_MODE
 
-### IMPLEMENT-BOUNDED (4 total)
+### IMPLEMENT-BOUNDED (3 total)
 
 - `features/browser/doorway-dashboard-health.feature` — Dashboard handles missing orchestrator gracefully — add: doorway_auth_token
 - `features/peer-oauth-portal/rp-consent.feature` — User approves a per-claim consent — add: elohim_session
 - `features/peer-oauth-portal/rp-consent.feature` — User declines consent — add: elohim_session
-- `features/resilience/resilience-dimensions.feature` — The tooltip's peers-online number counts only stewarding households — add: onlinePeerCount
 
-### STRUCTURAL (66 total)
+### STRUCTURAL (68 total)
 
 - `features/auth/contributor-presence-claim-ceremony.feature` — The claim convening is convened and witnessed — needs shem (multi-tenant commons canvas — no household analog)
 - `features/auth/contributor-presence-claim-ceremony.feature` — The negotiated backfill is recorded as append-only events — needs shem (multi-tenant commons canvas — no household analog)
@@ -94,7 +93,6 @@ these need a manual look, not a mechanical one:
 - `/api/peers`
 - `/api/v1`
 - `/api/v1/blob`
-- `/api/v1/epr/elohim-host-landing/nav-context`
 - `/api/v1/households`
 - `/api/v1/identity/heal`
 - `/api/v1/peers`
@@ -107,10 +105,6 @@ these need a manual look, not a mechanical one:
 - `/db/schemas/oauth_session.rs`
 - `/health/metrics`
 - `/p2p`
-- `cid`
-- `derivedFrom`
-- `partOf`
-- `related`
 
 ## Full census — every `@wip` or failed Act I/host scenario
 
@@ -171,8 +165,8 @@ these need a manual look, not a mechanical one:
 | `features/content/epr-content-addressing.feature` | Floor reaches bypass standing while commons demands the conservative fallback bar | b | WIRE | `/threshold/dashboard` | — | write step glue (5 step(s) unbound, class b) |
 | `features/content/epr-content-addressing.feature` | Following an EPR link transfers reading context to the destination | b | FIXTURE | `/threshold/dashboard` | — | precondition missing: E2E_DEVICE_MODE |
 | `features/content/epr-content-addressing.feature` | Legacy standing-policy keys are inert — canonical vocabulary governs composition thresholds | b | WIRE | `/threshold/dashboard` | — | write step glue (5 step(s) unbound, class b) |
-| `features/content/landing-backing-claims.feature` | The claims name the stewardship and custody assertions | b | FIXTURE | `/health` | — | precondition missing: E2E_SHEM_HOST |
-| `features/content/landing-backing-claims.feature` | The governance leg resolves to the landing surface's own governance state | b | FIXTURE | `/health` | — | precondition missing: E2E_SHEM_HOST |
+| `features/content/landing-backing-claims.feature` | The claims name the stewardship and custody assertions | b | FIXTURE | `/api/v1/epr/elohim-host-landing/nav-context`, `/health` | — | precondition missing: E2E_SHEM_HOST |
+| `features/content/landing-backing-claims.feature` | The governance leg resolves to the landing surface's own governance state | b | FIXTURE | `/api/v1/epr/elohim-host-landing/nav-context`, `/health` | — | precondition missing: E2E_SHEM_HOST |
 | `features/content/landing-backing-claims.feature` | The landing surface is stewarded, and the steward is the one it declares | b | WIRE | `/db/content`, `/db/allocations` | — | write step glue (1 step(s) unbound, class b) |
 | `features/content/landing-discovery.feature` | A curious visitor opens the evolution-of-trust explorable | a | STRUCTURAL | — | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/content/landing-discovery.feature` | A reference card whose body cannot be reached still renders a legible fallback | a | STRUCTURAL | — | — | needs shem (multi-tenant commons canvas — no household analog) |
@@ -488,7 +482,7 @@ these need a manual look, not a mechanical one:
 | `features/peer-oauth-portal/rp-consent.feature` | User approves a per-claim consent | a | IMPLEMENT-BOUNDED | `/auth/login` | `elohim_session` | add: elohim_session |
 | `features/peer-oauth-portal/rp-consent.feature` | User declines consent | a | IMPLEMENT-BOUNDED | — | `elohim_session` | add: elohim_session |
 | `features/protocol/landing-page-dogfood.feature` | The protocol-signal badge renders on the landing page | a | FIXTURE | — | — | precondition missing: E2E_DEVICE_MODE |
-| `features/protocol/protocol-omni.feature` | The EPR nav-context endpoint serves a navigation projection | a | UNCLASSIFIED | — | — | insufficient surface signal — no HTTP/metric/field surface named in step text or glue |
+| `features/protocol/protocol-omni.feature` | The EPR nav-context endpoint serves a navigation projection | a | UNCLASSIFIED | `/api/v1/epr/elohim-host-landing/nav-context`, `cid`, `partOf`, `related`, `derivedFrom` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/qahal/collective-governance.feature` | Anonymous voting | c | WIRE | — | — | write step glue (5 step(s) unbound, class c) |
 | `features/qahal/collective-governance.feature` | Block a proposal with justification | c | WIRE | — | — | write step glue (5 step(s) unbound, class c) |
 | `features/qahal/collective-governance.feature` | Bridging statement surfaces common ground | c | WIRE | — | — | write step glue (5 step(s) unbound, class c) |
@@ -525,7 +519,7 @@ these need a manual look, not a mechanical one:
 | `features/qahal/collective-governance.feature` | SLA overdue triggers visual warning | c | WIRE | — | — | write step glue (6 step(s) unbound, class c) |
 | `features/qahal/collective-governance.feature` | Stewards score competing content revisions | c | WIRE | — | — | write step glue (6 step(s) unbound, class c) |
 | `features/qahal/collective-governance.feature` | Vote on a proposal | c | WIRE | — | — | write step glue (5 step(s) unbound, class c) |
-| `features/qahal/household-formation.feature` | Ceremony custody is anchored, fixture custody is marked | a | UNCLASSIFIED | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/api/v1/commitments` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
+| `features/qahal/household-formation.feature` | Ceremony custody is anchored, fixture custody is marked | a | UNCLASSIFIED | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/qahal/household-formation.feature` | James's membership is sponsored, not self-granted | a | UNCLASSIFIED | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/db/collectives` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/qahal/plural-mishpat-lenses.feature` | A malformed lens is surfaced but flagged, never silently dropped | b | WIRE | — | — | write step glue (6 step(s) unbound, class b) |
 | `features/qahal/plural-mishpat-lenses.feature` | Affinity ranks lenses by the distinct members who exercise them | b | WIRE | — | — | write step glue (7 step(s) unbound, class b) |
@@ -536,19 +530,19 @@ these need a manual look, not a mechanical one:
 | `features/resilience/app-blob-heal-on-read.feature` | No peer holds the bytes — the 404 names the missing blob | a | UNCLASSIFIED | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/resilience/app-blob-heal-on-read.feature` | Proactive replication leaves a serve-blob delivery trail, like an on-demand heal | a | UNCLASSIFIED | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/api/v1/pins`, `/api/v1/economic-events`, `/p2p/status` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/resilience/app-blob-heal-on-read.feature` | The heal books a serve-blob REA event for the source peer | a | UNCLASSIFIED | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/api/v1/economic-events`, `/p2p/status` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
-| `features/resilience/commitment-backed-card-lighting.feature` | A healed household's commons provide commitment lights the card | b | STRUCTURAL | `/api/v1/resilience/card-commons/household`, `commitmentBackedCollectives` | — | needs shem (multi-tenant commons canvas — no household analog) |
+| `features/resilience/commitment-backed-card-lighting.feature` | A healed household's commons provide commitment lights the card | b | STRUCTURAL | `/api/v1/resilience/card-commons/household`, `/api/v1/resilience/grandma-album-1974/household`, `commitmentBackedCollectives` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/commitment-backed-card-lighting.feature` | Provide author skips rather than writing an unjoinable provider | b | STRUCTURAL | — | — | needs shem (multi-tenant commons canvas — no household analog) |
-| `features/resilience/commitment-backed-card-lighting.feature` | The card counts a commitment whose classification is a JSON list | b | STRUCTURAL | `/api/v1/resilience/card-list/household`, `commitmentBackedCollectives` | — | needs shem (multi-tenant commons canvas — no household analog) |
+| `features/resilience/commitment-backed-card-lighting.feature` | The card counts a commitment whose classification is a JSON list | b | STRUCTURAL | `/api/v1/resilience/card-list/household`, `/api/v1/resilience/grandma-album-1974/household`, `commitmentBackedCollectives` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/commitment-backed-card-lighting.feature` | Transport-id provider commitments never light the household card | b | STRUCTURAL | — | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/conductor-memory-soak.feature` | An operator can read the conductor's leak-vs-cache memory verdict | b | WIRE | — | — | write step glue (5 step(s) unbound, class b) |
-| `features/resilience/governed-distribution.feature` | A bounded grant lets keyless Che drive governed distribution | b | STRUCTURAL | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/api/v1/resilience/governed-alpha/household`, `/db/humans` | — | needs shem (multi-tenant commons canvas — no household analog) |
+| `features/resilience/governed-distribution.feature` | A bounded grant lets keyless Che drive governed distribution | b | STRUCTURAL | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/api/v1/resilience/governed-alpha/household` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/governed-distribution.feature` | A Che-facing doorway refuses to boot in an insecure posture | b | STRUCTURAL | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/governed-distribution.feature` | An unbounded compute delegation is refused at grant time | b | STRUCTURAL | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/governed-distribution.feature` | Observe mode forwards an ungranted write instead of blocking it | b | STRUCTURAL | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/governed-distribution.feature` | Revoking the grant denies the next distribution request | b | STRUCTURAL | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/grandma-photos-survive-node-loss.feature` | Accepting "who holds my photos" surfaces the holders and a revoke control | b | WIRE | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | write step glue (3 step(s) unbound, class b) |
 | `features/resilience/grandma-photos-survive-node-loss.feature` | Accepting an invite to help emits an observed-care economic event | b | WIRE | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | write step glue (3 step(s) unbound, class b) |
-| `features/resilience/grandma-photos-survive-node-loss.feature` | The "watching" message names which holder lapsed | b | WIRE | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/api/v1/resilience/summer-1974/household`, `/db/humans`, `feltStatus` | — | write step glue (2 step(s) unbound, class b) |
+| `features/resilience/grandma-photos-survive-node-loss.feature` | The "watching" message names which holder lapsed | b | WIRE | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/api/v1/resilience/summer-1974/household`, `feltStatus` | — | write step glue (2 step(s) unbound, class b) |
 | `features/resilience/grandma-photos-survive-node-loss.feature` | The Family Vault surface shows the holders by name | b | WIRE | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | write step glue (4 step(s) unbound, class b) |
 | `features/resilience/household-diversity-dataplane.feature` | Salvage candidates carry real households once humans are imagodei-populated | b | STRUCTURAL | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/observable-distribution.feature` | Cluster page shows offline device with last-seen freshness | a | STRUCTURAL | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | needs shem (multi-tenant commons canvas — no household analog) |
@@ -559,7 +553,9 @@ these need a manual look, not a mechanical one:
 | `features/resilience/observable-distribution.feature` | Content-viewer resilience tooltip is live | a | STRUCTURAL | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/observable-distribution.feature` | Distribution badge defers details fetch until tooltip opens | b | STRUCTURAL | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/observable-distribution.feature` | Doorway admin content list shows resilience snapshot icons | a | STRUCTURAL | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/db/content` | — | needs shem (multi-tenant commons canvas — no household analog) |
+| `features/resilience/observable-distribution.feature` | Full placement across two households | a | STRUCTURAL | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/db/humans`, `/api/v1/resilience/content-alpha/household`, `/api/v1/placement-gaps`, `placementGaps`, `protectionStatus` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/observable-distribution.feature` | Peer-topology surfaces resilience-cliff warning | a | STRUCTURAL | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | needs shem (multi-tenant commons canvas — no household analog) |
+| `features/resilience/observable-distribution.feature` | Placement gap when commitments are short | a | STRUCTURAL | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/db/humans`, `/api/v1/placement-gaps` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/observable-distribution.feature` | Shefa signals card reflects current placement gaps | a | STRUCTURAL | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/api/v1/placement-gaps`, `/db/humans` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/operational-weave.feature` | A deferred lens field is absent from the response, not zero | b | WIRE | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/api/v1/weave` | — | write step glue (2 step(s) unbound, class b) |
 | `features/resilience/operational-weave.feature` | An unsampled custodian does not zero the cluster capacity | b | WIRE | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/api/v1/weave` | — | write step glue (4 step(s) unbound, class b) |
@@ -577,14 +573,14 @@ these need a manual look, not a mechanical one:
 | `features/resilience/resilience-dimensions.feature` | Stewards without region data are honest unknowns, not zeros | b | WIRE | `/api/v1/resilience/dim-noregion/household` | — | write step glue (3 step(s) unbound, class b) |
 | `features/resilience/resilience-dimensions.feature` | The cluster page shows an honest free/used/committed triptych | b | FIXTURE | `/threshold/dashboard`, `/health` | — | precondition missing: E2E_DEVICE_MODE |
 | `features/resilience/resilience-dimensions.feature` | The header connection chip shows a live peer count | a | UNCLASSIFIED | `/health` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
-| `features/resilience/resilience-dimensions.feature` | The tooltip's peers-online number counts only stewarding households | b | IMPLEMENT-BOUNDED | `/api/v1/resilience/dim-triad/household` | `onlinePeerCount` | add: onlinePeerCount |
+| `features/resilience/resilience-dimensions.feature` | The tooltip's peers-online number counts only stewarding households | b | WIRE | `/api/v1/resilience/dim-triad/household`, `details.onlinePeers.live` | — | write step glue (2 step(s) unbound, class b) |
 | `features/resilience/resilience-dimensions.feature` | Three households with two live peers reach protected | b | WIRE | `/api/v1/resilience/dim-triad/household`, `protectionStatus` | — | write step glue (2 step(s) unbound, class b) |
 | `features/resilience/resilience-dimensions.feature` | Two stewarding households lift content to partial | b | WIRE | `/api/v1/resilience/dim-pair/household`, `protectionStatus`, `stewardingCollectives` | — | write step glue (1 step(s) unbound, class b) |
 | `features/resilience/salvage-placement.feature` | A blob already held at its target level triggers no salvage adoption | b | WIRE | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | write step glue (5 step(s) unbound, class b) |
 | `features/resilience/salvage-placement.feature` | A peer that has not opted in to salvage capacity is never conscripted | b | WIRE | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | write step glue (7 step(s) unbound, class b) |
 | `features/resilience/salvage-placement.feature` | A spare peer that is not among the closest holders defers to those who are | b | WIRE | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | write step glue (6 step(s) unbound, class b) |
 | `features/resilience/salvage-placement.feature` | An under-replicated blob is adopted by the closest opt-in peer and the replica count rises | b | WIRE | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | write step glue (9 step(s) unbound, class b) |
-| `features/resilience/salvage-placement.feature` | The family sees a thin blob become protected after a peer adopts it | b | WIRE | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/api/v1/resilience/family-album/household`, `/db/humans`, `feltStatus.reassurance` | — | write step glue (4 step(s) unbound, class b) |
+| `features/resilience/salvage-placement.feature` | The family sees a thin blob become protected after a peer adopts it | b | WIRE | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/api/v1/resilience/family-album/household`, `feltStatus.reassurance` | — | write step glue (4 step(s) unbound, class b) |
 | `features/resilience/substrate-reconciliation.feature` | A peer-discovered commitment converges from the own conductor | b | WIRE | — | — | write step glue (7 step(s) unbound, class b) |
 | `features/shefa/human-resilience.feature` | Degradation — Matthew goes offline, Jessica's resilience drops | b | STRUCTURAL | `/threshold/dashboard` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/shefa/human-resilience.feature` | Elohim discernment — institutional attestation for sensitive data | b | STRUCTURAL | `/threshold/dashboard` | — | needs shem (multi-tenant commons canvas — no household analog) |

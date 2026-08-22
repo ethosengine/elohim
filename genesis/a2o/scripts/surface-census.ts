@@ -61,7 +61,22 @@ const STORAGE_URL = process.env['CENSUS_STORAGE_URL'] ?? 'http://localhost:8090'
 // the fixture there; `just mesh` writes reports there) — not an arbitrary publicly-writable path.
 const DEFAULT_FIXTURE_PATH = '/tmp/elohim-local-mesh/household-fixture.json'; // eslint-disable-line sonarjs/publicly-writable-directories
 const HOUSEHOLD_FIXTURE_PATH = process.env['E2E_HOUSEHOLD_FIXTURE_PATH'] ?? DEFAULT_FIXTURE_PATH;
-const LATEST_REPORT_CANDIDATES = [
+// Default candidate reports, newest/most-specific first — ALL non-empty ones
+// found are merged (not "first wins"), so a saga-lane report and a mesh-lane
+// report covering disjoint scenario sets both contribute DEFECT-STALE signal.
+const DEFAULT_REPORT_CANDIDATES = [
+  // wave1-saga.json (2026-08-21) was a VOID run — `--profile saga` launched
+  // without the `just test mesh` env block, so all 25 scenarios self-skipped
+  // in 0.2s with zero evidence. NOT listed here; wave1b-saga.json is the
+  // real re-measurement after the corpus repair + doorway restart. A void
+  // report is also detected generically at load time (see loadLatestReport)
+  // in case a future run repeats the mistake under a different name.
+  // eslint-disable-next-line sonarjs/publicly-writable-directories
+  '/tmp/elohim-local-mesh/reports/wave1b-saga.json',
+  // eslint-disable-next-line sonarjs/publicly-writable-directories
+  '/tmp/elohim-local-mesh/reports/wave1b-lamad-ssr.json',
+  // eslint-disable-next-line sonarjs/publicly-writable-directories
+  '/tmp/elohim-local-mesh/reports/wave1b-mesh.json',
   // eslint-disable-next-line sonarjs/publicly-writable-directories
   '/tmp/elohim-local-mesh/reports/wave1.json',
   // eslint-disable-next-line sonarjs/publicly-writable-directories
@@ -73,6 +88,12 @@ const PROBE_TIMEOUT_MS = 3000;
 const FRESH = process.argv.includes('--fresh');
 const LIMIT_ARG = process.argv.find(a => a.startsWith('--limit='));
 const LIMIT = LIMIT_ARG ? Number(LIMIT_ARG.slice('--limit='.length)) : undefined;
+// --report <path> is repeatable and REPLACES the defaults entirely (an
+// explicit ask for exactly these reports); omit it to merge the defaults.
+const REPORT_ARGS = process.argv
+  .filter(a => a.startsWith('--report='))
+  .map(a => a.slice('--report='.length));
+const REPORT_CANDIDATES = REPORT_ARGS.length > 0 ? REPORT_ARGS : DEFAULT_REPORT_CANDIDATES;
 
 // ---------------------------------------------------------------------------
 // small shared helpers
@@ -722,15 +743,40 @@ function indexReportFeatures(features: RawFeature[]): Map<string, ReportEntry> {
   return byKey;
 }
 
-function loadLatestReport(): { path: string; byKey: Map<string, ReportEntry> } | null {
-  for (const path of LATEST_REPORT_CANDIDATES) {
+/** A report whose EVERY scenario is 'skipped' carries no evidence — it means
+ * the harness never actually ran the suite (env block missing, profile
+ * misconfigured, wrong working directory), not that every scenario is
+ * legitimately gated. wave1-saga.json (2026-08-21) was exactly this: 25/25
+ * skipped in 0.2s because `--profile saga` launched without the `just test
+ * mesh` env exports. Detected generically (not by filename) so a future
+ * mistake under a different name is still caught. */
+function isVoidReport(byKey: Map<string, ReportEntry>): boolean {
+  return byKey.size > 0 && [...byKey.values()].every(e => e.status === 'skipped');
+}
+
+/** Merges EVERY non-empty candidate report — a saga-lane report and a
+ * mesh-lane report cover disjoint scenario sets, and both should contribute
+ * DEFECT-STALE signal. Candidates are ordered newest/most-specific first, so
+ * on a key collision the FIRST report to claim a key wins. */
+function loadLatestReport(): { paths: string[]; byKey: Map<string, ReportEntry> } | null {
+  const paths: string[] = [];
+  const byKey = new Map<string, ReportEntry>();
+  for (const path of REPORT_CANDIDATES) {
     if (!existsSync(path) || statSync(path).size === 0) continue;
     const raw = readFileSync(path, 'utf8');
     if (raw.trim() === '') continue;
     const features = JSON.parse(raw) as RawFeature[];
-    return { path, byKey: indexReportFeatures(features) };
+    const reportByKey = indexReportFeatures(features);
+    if (isVoidReport(reportByKey)) {
+      log(`Report ${path} is VOID (every scenario skipped — harness likely never ran) — ignored.`);
+      continue;
+    }
+    for (const [key, entry] of reportByKey) {
+      if (!byKey.has(key)) byKey.set(key, entry);
+    }
+    paths.push(path);
   }
-  return null;
+  return paths.length > 0 ? { paths, byKey } : null;
 }
 
 function reportKey(scenario: CensusScenario): string {
@@ -947,11 +993,22 @@ function unclassifiedReason(
   entry: ReportEntry | undefined,
   hasReport: boolean
 ): string {
-  if (bind === 'a' && hasExists && entry !== undefined && entry.status !== 'failed') {
-    return `fully wired, named surfaces exist, latest mesh run reported "${entry.status}" (not failed) — the @wip tag looks stale; check the feature's wip reason`;
+  if (bind === 'a' && hasExists && entry?.status === 'passed') {
+    return 'fully wired, named surfaces exist, latest mesh run reported "passed" — the @wip tag looks stale; untag it (or capture the real remaining reason)';
   }
-  if (bind === 'a' && hasExists && !hasReport) {
+  // A report entry that is neither 'passed' nor 'failed' (cucumber-js also
+  // emits 'skipped'/'pending', including the mesh lane's own @requires-gate
+  // HELDs) is NOT evidence the scenario is fine — it wasn't exercised. Fall
+  // through to the same "no usable verdict" message as no report at all.
+  if (bind === 'a' && hasExists && (!hasReport || entry === undefined)) {
     return 'fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run)';
+  }
+  if (bind === 'a' && hasExists && entry !== undefined) {
+    return (
+      `fully wired, named surfaces exist, but the latest mesh run reported "${entry.status}" ` +
+      '(not passed or failed — likely a `@requires:` substrate gate HELD it) — not evidence either way; ' +
+      're-run once the gated capability is available'
+    );
   }
   return 'insufficient surface signal — no HTTP/metric/field surface named in step text or glue';
 }
@@ -1056,8 +1113,12 @@ function meshHealthLine(health: MeshHealth): string {
   );
 }
 
-function writeReport(rows: CensusRow[], reportPath: string | null, health: MeshHealth): void {
+function writeReport(rows: CensusRow[], reportPaths: string[], health: MeshHealth): void {
   const generatedAt = new Date().toISOString();
+  const reportLine =
+    reportPaths.length > 0
+      ? reportPaths.join(', ')
+      : '(none found — no DEFECT-STALE class possible this run)';
   const lines = [
     '# Surface census — mechanical WIRE/FIXTURE/IMPLEMENT/STRUCTURAL/DEFECT classification',
     '',
@@ -1069,7 +1130,7 @@ function writeReport(rows: CensusRow[], reportPath: string | null, health: MeshH
     '',
     meshHealthLine(health),
     '',
-    `Latest mesh report cross-referenced for DEFECT-STALE: ${reportPath ?? '(none found — no DEFECT-STALE class possible this run)'}`,
+    `Latest mesh report(s) cross-referenced for DEFECT-STALE: ${reportLine}`,
     '',
     ...renderTotals(rows),
     '',
@@ -1105,7 +1166,7 @@ async function main(): Promise<void> {
   ensureEmptyConfig();
 
   const latest = loadLatestReport();
-  if (latest) log(`Latest report: ${latest.path}`);
+  if (latest) log(`Latest report(s): ${latest.paths.join(', ')}`);
   else log('No non-empty latest mesh report found — DEFECT-STALE will not fire this run.');
 
   const files = candidateFeatureFiles(latest?.byKey ?? null);
@@ -1174,7 +1235,7 @@ async function main(): Promise<void> {
     };
   });
 
-  writeReport(rows, latest?.path ?? null, health);
+  writeReport(rows, latest?.paths ?? [], health);
   log(`Wrote ${relative(A2O_ROOT, OUT_PATH)} (${rows.length} rows).`);
 }
 
