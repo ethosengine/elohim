@@ -137,8 +137,20 @@ fn compute_base(
     //
     // Loader degrades to an empty relation on query failure, so a DB hiccup folds
     // to honest zeros rather than darking the whole card.
-    let commitment_relation =
-        crate::db::rea_commitments::load_replication_commitment_relation(conn, h_app_id);
+    // The commitment relation's `household_id` values come from the same
+    // dual-vocabulary `humans` column the holder relation reads, so they get the
+    // SAME alias canonicalization — otherwise a fallback-only human's
+    // commitments (cid-form household) would silently miss the (slug-form)
+    // steward set they back.
+    let cid_to_canonical = load_collective_cid_alias_map(conn)?;
+    let commitment_relation: Vec<_> =
+        crate::db::rea_commitments::load_replication_commitment_relation(conn, h_app_id)
+            .into_iter()
+            .map(|mut row| {
+                row.household_id = canonicalize_household_id(row.household_id, &cid_to_canonical);
+                row
+            })
+            .collect();
     let commitment_backed_replication =
         replication_commitment::commitment_backed_replication_for_households(
             &commitment_relation,
@@ -262,6 +274,11 @@ pub fn snapshot_with_staleness_secs(
         .load::<(Option<String>, Option<String>)>(&mut conn)
         .map_err(|e| StorageError::Internal(format!("commitment-backed query: {e}")))?;
 
+    // Distinct-household count under the SAME household-vocabulary
+    // canonicalization as the holder relation (one physical household must not
+    // count twice because its members' `humans.household_id` values straddle
+    // the slug and cid namespaces).
+    let cid_to_canonical = load_collective_cid_alias_map(&mut conn)?;
     let commitment_backed_collectives: i32 = candidate_rows
         .into_iter()
         .filter(|(_, classified)| {
@@ -269,7 +286,7 @@ pub fn snapshot_with_staleness_secs(
                 .iter()
                 .any(|c| c == &scope)
         })
-        .filter_map(|(household_id, _)| household_id)
+        .filter_map(|(household_id, _)| canonicalize_household_id(household_id, &cid_to_canonical))
         .collect::<HashSet<String>>()
         .len() as i32;
 
@@ -458,6 +475,43 @@ pub(crate) fn load_holder_relation(
         .load(conn)
         .map_err(|e| StorageError::Internal(format!("holder relation: {e}")))?;
 
+    // Household-vocabulary normalization (2026-08-22 card-tells-truth divergence).
+    // `humans.household_id` is written in TWO namespaces for the SAME physical
+    // household: the slug id (`household-dowell`, seeder/membership-signal path)
+    // and the DHT-canonical cid (`collective:{action_hash}`, the
+    // `identity_fill` CREATE path — it writes the membership `household_cid`
+    // verbatim because no slug row exists to pair it with). The collectives
+    // projection on THIS node already declares the alias
+    // (`collectives.collective_cid`), but the fold never consulted it, so one
+    // peer counted `{household-dowell}` = 1 steward household while another
+    // counted `{household-dowell, collective:…}` = 2 for identical custody
+    // facts — the two doorways told different truths from the same
+    // shard_locations. Canonicalize cid-form household ids onto the collectives
+    // row's `id` (the key every downstream consumer joins on: labels,
+    // peer_statuses, stewarded_nodes) using ONLY local tables — the peer still
+    // serves its own verified truth, now internally coherent across namespaces.
+    let cid_to_canonical = load_collective_cid_alias_map(conn)?;
+    let rows: Vec<HolderJoinRow> = rows
+        .into_iter()
+        .map(|(shard_hash, peer_id, household_id, human_id, region)| {
+            match household_id
+                .as_deref()
+                .and_then(|h| cid_to_canonical.get(h))
+            {
+                Some((canonical_id, alias_region)) => (
+                    shard_hash,
+                    peer_id,
+                    Some(canonical_id.clone()),
+                    human_id,
+                    // The cid-form household missed the id-keyed left join, so its
+                    // region came back NULL; fill from the alias target row.
+                    region.or_else(|| alias_region.clone()),
+                ),
+                None => (shard_hash, peer_id, household_id, human_id, region),
+            }
+        })
+        .collect();
+
     // Dedup against duplicate-`agent_pub_key` inflation. `humans.agent_pub_key` is
     // only non-uniquely indexed (idx_humans_agent_pub_key, NOT UNIQUE), so a
     // CID-keyed fallback human row can coexist with the canonical slug-keyed row
@@ -504,6 +558,62 @@ pub(crate) fn load_holder_relation(
             ))
     });
     Ok(out)
+}
+
+/// Load the collective-cid → canonical-collective-id alias map — the local
+/// vocabulary bridge between the two `household_id` namespaces found in
+/// `humans` (slug ids vs DHT-canonical `collective:{action_hash}` cids; see the
+/// normalization comment in [`load_holder_relation`]). The read is
+/// `h_app_id`-agnostic on `collectives`, mirroring the holder-relation
+/// left-join (a scope filter here would ship a silent no-op under the
+/// qahal/lamad ctx drift class). Collision (two collectives rows sharing a cid)
+/// resolves deterministically: prefer the non-`collective:`-prefixed id, then
+/// lexicographic min. Value carries the row's region so a cid-form holder that
+/// missed the id-keyed region join can be backfilled.
+fn load_collective_cid_alias_map(
+    conn: &mut diesel::SqliteConnection,
+) -> Result<std::collections::HashMap<String, (String, Option<String>)>, StorageError> {
+    use crate::db::diesel_schema::collectives;
+
+    let alias_rows: Vec<(String, Option<String>, Option<String>)> = collectives::table
+        .filter(collectives::collective_cid.is_not_null())
+        .select((
+            collectives::id,
+            collectives::collective_cid,
+            collectives::region,
+        ))
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("collective cid aliases: {e}")))?;
+    let mut cid_to_canonical: std::collections::HashMap<String, (String, Option<String>)> =
+        std::collections::HashMap::new();
+    for (id, cid, region) in alias_rows {
+        let Some(cid) = cid else { continue };
+        match cid_to_canonical.get(&cid) {
+            Some((existing, _))
+                if (existing.starts_with("collective:"), existing.as_str())
+                    <= (id.starts_with("collective:"), id.as_str()) => {}
+            _ => {
+                cid_to_canonical.insert(cid, (id, region));
+            }
+        }
+    }
+    Ok(cid_to_canonical)
+}
+
+/// Canonicalize one optional household id through the alias map: a cid-form id
+/// with a declared alias becomes the collectives row's id; everything else
+/// passes through unchanged.
+fn canonicalize_household_id(
+    household_id: Option<String>,
+    cid_to_canonical: &std::collections::HashMap<String, (String, Option<String>)>,
+) -> Option<String> {
+    match household_id
+        .as_deref()
+        .and_then(|h| cid_to_canonical.get(h))
+    {
+        Some((canonical_id, _)) => Some(canonical_id.clone()),
+        None => household_id,
+    }
 }
 
 /// Count online/degraded peers across the stewarding households, applying an
@@ -618,6 +728,109 @@ mod tests {
             },
         )
         .expect("seed peer_status");
+    }
+
+    /// Two humans of the SAME physical household, one recorded under the slug
+    /// vocabulary (`household-dowell`, seeder/membership-signal path) and one
+    /// under the DHT-cid vocabulary (`collective:{action_hash}`, the
+    /// `identity_fill` CREATE path), must fold to ONE steward household when the
+    /// local collectives projection declares the alias
+    /// (`collectives.collective_cid`). This is the 2026-08-22 card-tells-truth
+    /// divergence: doorway A (all-slug humans) said `stewardingCollectives: 1`
+    /// while doorway B (mixed-vocabulary humans) said 2 for identical custody
+    /// facts. Also asserts the alias target's region backfills the cid-form
+    /// holder (it missed the id-keyed left join).
+    #[test]
+    fn holder_relation_canonicalizes_collective_cid_household_aliases() {
+        use crate::db::diesel_schema::{collectives, humans, shard_locations};
+        use crate::db::models::{NewHuman, NewShardLocation};
+
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        diesel::insert_into(collectives::table)
+            .values((
+                collectives::id.eq("household-dowell"),
+                collectives::h_app_id.eq("lamad"),
+                collectives::name.eq("Dowell Household"),
+                collectives::governance_layer.eq("family"),
+                collectives::reach.eq("trusted"),
+                collectives::created_at.eq("2026-08-22 00:00:00"),
+                collectives::updated_at.eq("2026-08-22 00:00:00"),
+                collectives::region.eq("tech-valley"),
+                collectives::collective_cid.eq("collective:uhCkkALIAS"),
+            ))
+            .execute(&mut *conn)
+            .expect("seed collective");
+
+        for human in [
+            // Slug-vocabulary row (canonical seeded human).
+            NewHuman {
+                id: "human-jessica-spouse".into(),
+                agent_pub_key: Some("uhCAkJESSICA".into()),
+                display_name: "Jessica".into(),
+                bio: None,
+                affinities: "[]".into(),
+                profile_reach: "commons".into(),
+                location: None,
+                profile_photo_url: None,
+                h_app_id: "imagodei".into(),
+                household_id: Some("household-dowell".into()),
+            },
+            // DHT-cid-vocabulary row (identity_fill CREATE shape: id = member_cid,
+            // household_id = the membership household_cid, verbatim).
+            NewHuman {
+                id: "agent:uhCAkMATTHEW".into(),
+                agent_pub_key: Some("uhCAkMATTHEW".into()),
+                display_name: "agent:uhCAkMATTHEW".into(),
+                bio: None,
+                affinities: "[]".into(),
+                profile_reach: "commons".into(),
+                location: None,
+                profile_photo_url: None,
+                h_app_id: "imagodei".into(),
+                household_id: Some("collective:uhCkkALIAS".into()),
+            },
+        ] {
+            diesel::insert_into(humans::table)
+                .values(&human)
+                .execute(&mut *conn)
+                .expect("seed human");
+        }
+
+        for peer in ["uhCAkJESSICA", "uhCAkMATTHEW"] {
+            diesel::insert_into(shard_locations::table)
+                .values(&NewShardLocation {
+                    shard_hash: "sha256-shard-1",
+                    peer_id: peer,
+                    h_app_id: "lamad",
+                    status: "confirmed",
+                })
+                .execute(&mut *conn)
+                .expect("seed shard location");
+        }
+
+        let relation = load_holder_relation(&mut conn, "lamad", &["sha256-shard-1".to_string()])
+            .expect("holder relation");
+
+        assert_eq!(relation.len(), 2, "both holders survive");
+        for row in &relation {
+            assert_eq!(
+                row.hub_id.as_deref(),
+                Some("household-dowell"),
+                "cid-form household_id canonicalizes onto the collectives slug id"
+            );
+            assert_eq!(
+                row.region.as_deref(),
+                Some("tech-valley"),
+                "alias target's region backfills the cid-form holder"
+            );
+        }
+        assert_eq!(
+            resiliency::stewarding_hubs(&relation).len(),
+            1,
+            "one physical household folds to ONE steward household across vocabularies"
+        );
     }
 
     /// A 900s window counts a peer heartbeated 60s ago and excludes one 901s stale

@@ -45,3 +45,34 @@ route.
 When `ALLOW_SEED_SHARD_MANIFEST`'s 403 is lifted: if the costeward leg derives
 consent from participants, it lands on this surface — both (a) and (b) become
 its preconditions.
+
+## (c) Same class, third instance: canonical `humans` rows never heal cross-peer (household-vocabulary split)
+
+The saga ch10 card-tells-truth divergence (2026-08-22: doorway A said
+`stewardingCollectives: 1`, doorway B said 2 for the SAME `elohim-host-landing`
+custody facts) was this class wearing the resilience card. The custody plane
+AGREED — both peers' `shard_manifests` + `shard_locations` held both holder
+agents — but the slug-keyed fixture `humans` rows (`human-matthew-manager` →
+`household-dowell`, seeded via doorway A) exist only on matthew: there is no
+humans/membership reconcile arm, so jessica/james only ever get the
+`identity_fill` CREATE fallback (`id = agent:{pubkey}`,
+`household_id = collective:{action_hash}` verbatim). One physical household then
+splits into two id vocabularies inside a single peer's fold.
+
+**Read-side cure landed** (bounded, same branch):
+`services/household_resilience.rs` now canonicalizes cid-form
+`humans.household_id` values through the local `collectives.collective_cid`
+alias (which the collectives arm DOES replicate — both peers already held
+`household-dowell ↔ collective:uhCkkoQQ…`) in the holder relation, the
+replication-commitment relation, and the commitment-backed-collectives count.
+Counts now agree; the fold serves only local truth (verify-locally-then-serve
+intact).
+
+**Still open in this class:** the canonical slug `humans` rows themselves
+(display names, and any peer whose `collectives` projection lacks the
+`collective_cid` alias) never converge cross-peer — jessica renders label
+`household-dowell` where matthew renders `Dowell Household`, and her placeholder
+collectives row carries no region (regional-distribution buckets still
+diverge). Closing that is the humans/participations reconcile arm this file
+tracks — one arm shape, three projections (participations, humans, collectives
+metadata refresh).
