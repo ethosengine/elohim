@@ -197,9 +197,29 @@ make it land on the right row:
    `services/household_resilience.rs`) remains what makes the counts agree in
    the meantime. Unchanged by this work.
 
+## Runtime observations (2026-08-22 wave-4 mesh roll, new binary serving)
+
+**The arm heals cross-peer, live.** Within minutes of boot,
+`GET /db/collectives/household-dowell/participants` showed jessica holding
+matthew's AND james's rows, and james holding gertrude's and jessica's —
+rows neither peer authored. Probe #1 below is substantially answered.
+Partial convergence at measure time: matthew's own fold still held only his
+own row (1/2/2 across the three peers, unchanged across a ~2min window) —
+either the discovery cadence hadn't reached matthew's requester leg yet or
+that leg warrants a look on the next pass.
+
+**Probe #2's target has a vocabulary split the probes above didn't name:**
+the household-formation scenarios read `family-dowell` (0 participation
+rows on every peer, `collectiveCid` null there), while account-import and
+the live healing all operate on `household-dowell`. The formation
+ceremony's Memberships and the fixture participations land under different
+collective slugs — same household-vocabulary class as (c). Until that
+seam is picked (ceremony writes to family-dowell? scenario should read
+household-dowell?), probe #2 cannot go green regardless of this arm.
+
 ## Runtime proof this row is still waiting on
 
-Nothing below has run against a live peer.
+Nothing below has run against a live peer (except as noted above).
 
 1. On the mesh, `projection-reconcile[participations]: peer inventory received`
    appears with non-zero `entries` on a peer that did NOT author the membership,

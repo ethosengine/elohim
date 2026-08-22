@@ -287,13 +287,28 @@ stage_once() {
     # those two exits as "verify by content address" rather than as failure;
     # every other exit still fails the attempt.
     local put_rc=0
-    curl -fSs -X PUT \
+    local put_response=""
+    put_response="$(curl -fSs -X PUT \
         -H 'Content-Type: application/zip' \
         -H "X-Blob-Hash: ${SPA_HASH}" \
         -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
         --data-binary @spa-bundle.zip \
-        "${DOORWAY_EPR_URL}/admin/seed/blob" || put_rc=$?
+        "${DOORWAY_EPR_URL}/admin/seed/blob")" || put_rc=$?
+    [ -n "${put_response}" ] && echo "${put_response}"
     if [ "${put_rc}" -eq 0 ]; then
+        # A 200 with forwarded_to_storage:false means the bytes reached ONLY the
+        # doorway's 1h write-through cache — storage (the authoritative store)
+        # never durably accepted them. Declaring a head against those bytes
+        # mints a declared-vs-available divergence (2026-08-22 local mesh: a
+        # 69MB bundle hit a storage-side shard-verify drop; the leg stamped ✓
+        # and every peer declared a bundle nobody could materialize). The
+        # retry ladder is the right response: the doorway re-forwards from its
+        # cache on each already_cached re-PUT, so a transient boot-pressure
+        # failure heals on retry, and a persistent one reds the stage honestly.
+        if printf '%s' "${put_response}" | grep -q '"forwarded_to_storage":false'; then
+            echo "  ✗ [${SLUG}] doorway cached the blob but storage forwarding FAILED (forwarded_to_storage:false) — refusing to call this staged" >&2
+            return 1
+        fi
         echo "  ✓ [${SLUG}] blob uploaded (via /admin/seed/blob)"
     elif [ "${put_rc}" -eq 55 ] || [ "${put_rc}" -eq 56 ]; then
         if curl -fsS -o /dev/null --max-time 60 "${DOORWAY_EPR_URL}/blob/${SPA_HASH}"; then
