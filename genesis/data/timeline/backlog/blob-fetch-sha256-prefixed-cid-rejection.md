@@ -7,7 +7,7 @@ title: "Blob pull requests double-wrap CID-form blob hashes as sha256-<cid>, so 
 slug: "blob-fetch-sha256-prefixed-cid-rejection"
 written: "2026-08-22"
 author: "orchestrator"
-status: "fixed-pending-runtime-proof"
+status: "resolved"
 priority: "high"
 severity: high
 ---
@@ -46,11 +46,14 @@ Landed:
   `double_wrapped_cid_marker_stops_kicking_once_bytes_land`,
   `invalid_marker_is_counted_and_never_kicked`.
 
-**Honest status**: code + tests landed on the branch; the live mesh still runs the old
-binary, so the drumbeat continues until the next binary roll. Runtime proof (the "done
-when" below — bytes replicate, T21 stops) waits for that roll. The three existing
-notarized `sha256-bafkrei…` rows stay in the DHT; the repaired requester now reads them
-as their canonical `sha256-<hex>` key, so no data healing is required for the fetch path.
+**Runtime proof (2026-08-22 wave-3 roll, commit 833ba4c58 serving)**: after the mesh
+binary roll, james logged ZERO `T21: rejected blob request` lines (drumbeat previously
+~2min cadence), every T23 custody pass reports `invalid_markers: 0`, and
+`GET /blob/bafkreihokma4…` answers 200 on all three peers — including james, which
+lacked the bytes before the fix. Responder strictness intact: a hand-built
+double-wrapped `sha256-bafkrei…` request still receives 400. The three existing
+notarized `sha256-bafkrei…` rows stay in the DHT; the repaired requester reads them
+as their canonical `sha256-<hex>` key, so no data healing was required.
 
 ## What was observed (live, local mesh 2026-08-22 ~02:30)
 
