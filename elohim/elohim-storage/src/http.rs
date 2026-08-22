@@ -1148,6 +1148,17 @@ impl HttpServer {
         let path = req.uri().path().to_string();
         let method = req.method().clone();
 
+        // Design-decision toolkit: elohim_http_request_duration_ms +
+        // elohim_http_requests_in_flight. Started here, BEFORE the admission
+        // gate below, so a shed request is counted too — this guard is the
+        // single place every request (including ones this dispatcher refuses)
+        // is measured. `Drop` guarantees exactly one observation regardless of
+        // which exit this function takes (early return, escaped error, the
+        // normal tail, or the future being dropped mid-await on client
+        // disconnect) — see `metrics::RequestMetricsGuard` for why that matters
+        // for a stalled request that never reports a status.
+        let __req_metrics = crate::metrics::RequestMetricsGuard::start(&path);
+
         // Extract observation session ID before req is consumed -- used by middleware aspect.
         let obs_session_id: Option<String> = req
             .headers()
@@ -1208,6 +1219,7 @@ impl HttpServer {
                         available,
                         "storage request admission at ceiling — shedding (503 + Retry-After)"
                     );
+                    __req_metrics.finish(StatusCode::SERVICE_UNAVAILABLE.as_u16());
                     return Ok(crate::services::response::too_many_requests_with_retry(
                         STORAGE_SHED_RETRY_AFTER_SECS,
                         available,
@@ -1569,6 +1581,10 @@ impl HttpServer {
             (Method::GET, "/api/v1/events") => {
                 if let Some(ref services) = self.services {
                     let response = crate::sse::create_sse_stream(&services.events);
+                    // SSE stream — count connection-establishment, not stream
+                    // lifetime; the stream itself is a long-lived body, not a
+                    // request the histogram's buckets are shaped for.
+                    __req_metrics.finish(response.status().as_u16());
                     return Ok(response.map(Either::Right));
                 } else {
                     Ok(response::service_unavailable("Event bus not available"))
@@ -1582,6 +1598,9 @@ impl HttpServer {
                         pool.clone(),
                         "lamad", // Default app context for cache stream
                     );
+                    // Same rationale as the SSE arm above: count establishment,
+                    // not the stream's lifetime.
+                    __req_metrics.finish(response.status().as_u16());
                     return Ok(response.map(Either::Right));
                 } else {
                     Ok(response::service_unavailable("Database not available"))
@@ -2019,14 +2038,10 @@ impl HttpServer {
 
         match result {
             Ok(mut response) => {
+                let status = response.status().as_u16();
                 // Observation middleware aspect: record non-2xx failures when session is active.
                 if let Some(ref session_id) = obs_session_id {
-                    self.maybe_observe_request(
-                        session_id,
-                        &method_str,
-                        &path,
-                        response.status().as_u16(),
-                    );
+                    self.maybe_observe_request(session_id, &method_str, &path, status);
                 }
 
                 // Add CORS headers to ALL responses (not just preflight)
@@ -2047,11 +2062,14 @@ impl HttpServer {
                         "Content-Type, Authorization, X-Agent-Id, X-Agent-Cid, X-Schema-Version, X-Observation-Id",
                     ),
                 );
+                __req_metrics.finish(status);
                 Ok(response.map(Either::Left))
             }
             Err(e) => {
                 error!(error = %e, "Request error");
-                Ok(Self::escaped_error_response(&e).map(Either::Left))
+                let response = Self::escaped_error_response(&e);
+                __req_metrics.finish(response.status().as_u16());
+                Ok(response.map(Either::Left))
             }
         }
     }

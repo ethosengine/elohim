@@ -1820,6 +1820,57 @@ lazy_static! {
     .unwrap();
 }
 
+// ── HTTP dispatch wrapper — the request-duration histogram this file was
+// missing entirely until 2026-08-21: the doorway's 2-failure breaker opened on
+// a ~60s storage stall under suite load while storage answered in 1.6ms a
+// minute later, and there was no series here to say which request stalled,
+// for how long, or whether it ever produced a status code at all. See
+// genesis/data/timeline/backlog/doorway-breaker-trial-theft-fleet-verification.md
+// "Mesh evidence 2026-08-21 19:38". A separate `lazy_static!` block for the
+// same macro-recursion reason noted above the Q3/Q4 block.
+lazy_static! {
+    /// Wall-clock cost of one HTTP request through `http.rs::handle_request`,
+    /// by `route_class` (a small closed set derived from the path prefix —
+    /// see [`classify_http_route`], NEVER the raw path or an id, which would
+    /// make this series' cardinality unbounded) and `status_class`
+    /// (`"2xx"|"4xx"|"5xx"`). Observed on every exit from the dispatch
+    /// wrapper — the normal success/error tail, an early return (admission
+    /// shed, an SSE/stream upgrade), or a request that is dropped before it
+    /// ever reports a status (client disconnect, cancellation, a panic) via
+    /// the [`RequestMetricsGuard`] `Drop` fallback — so a request that burns
+    /// the full client timeout is IN this distribution, not silently omitted.
+    /// That silent omission (only counting requests that finish fast) is the
+    /// coordinated-omission trap this instrument exists to close: it is
+    /// exactly what hid the stall behind a healthy-looking `/metrics` reading
+    /// a minute later.
+    ///
+    /// Buckets span 1ms (a cheap `/health`) to 12s (past the doorway's own
+    /// forwarding timeout), roughly log-spaced, so both ends of the route
+    /// roster land inside a bucket instead of pinning the tail.
+    pub static ref HTTP_REQUEST_DURATION_MS: HistogramVec = HistogramVec::new(
+        HistogramOpts::new(
+            "elohim_http_request_duration_ms",
+            "Wall-clock cost of one HTTP request through the dispatch wrapper, by route_class and status_class.",
+        )
+        .buckets(vec![
+            1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1_000.0, 2_000.0, 5_000.0,
+            12_000.0,
+        ]),
+        &["route_class", "status_class"],
+    )
+    .unwrap();
+
+    /// Requests currently inside `handle_request` — the occupancy signal a
+    /// stall shows up on directly (rising and staying up) independent of
+    /// whether any individual request has finished long enough yet to land in
+    /// the duration histogram.
+    pub static ref HTTP_REQUESTS_IN_FLIGHT: IntGauge = IntGauge::new(
+        "elohim_http_requests_in_flight",
+        "HTTP requests currently being handled by the dispatch wrapper.",
+    )
+    .unwrap();
+}
+
 /// Register every toolkit collector into [`REGISTRY`]. Idempotent (guarded by a
 /// `Once`), so calling it more than once at boot is safe. Call exactly once early
 /// in storage startup; `/metrics` reads the registry thereafter.
@@ -2180,6 +2231,8 @@ pub fn register_all() {
                     .observe(0.0);
             }
         }
+        let _ = REGISTRY.register(Box::new(HTTP_REQUEST_DURATION_MS.clone()));
+        let _ = REGISTRY.register(Box::new(HTTP_REQUESTS_IN_FLIGHT.clone()));
     });
 }
 
@@ -2415,6 +2468,116 @@ pub fn inc_blob_swarm_shard_fetched(outcome: &str) {
 /// Record one composite blob fully reassembled from swarm-fetched shards (Q4).
 pub fn inc_blob_swarm_composite_completed() {
     BLOB_SWARM_COMPOSITE_COMPLETED.inc();
+}
+
+// ── HTTP dispatch wrapper (route_class × status_class) ───────────────────────
+
+/// Bucket a request path into a CLOSED route class for the
+/// `elohim_http_request_duration_ms` / in-flight labels. Prefix-matched, most
+/// specific first, so cardinality stays fixed at these 9 values regardless of
+/// what a client sends — an unrecognized (or hostile) path lands on
+/// `"other"`, it never mints a new series. Label-only: this classifies a
+/// measurement and must never be read to decide how a request is served.
+pub fn classify_http_route(path: &str) -> &'static str {
+    if path.starts_with("/blob/")
+        || path.starts_with("/shard/")
+        || path.starts_with("/manifest")
+        || path.starts_with("/dag/")
+        || path.starts_with("/ipfs/")
+    {
+        "blob"
+    } else if path.starts_with("/apps/")
+        || path.starts_with("/chrome/")
+        || path.starts_with("/spa/")
+    {
+        "apps"
+    } else if path.starts_with("/sync/") {
+        "sync"
+    } else if path.starts_with("/admin") {
+        "admin"
+    } else if path.starts_with("/api/") {
+        "api"
+    } else if path.starts_with("/p2p/") {
+        "p2p"
+    } else if path.starts_with("/db/")
+        || path.starts_with("/epr-head/")
+        || path.starts_with("/import/")
+    {
+        "content"
+    } else if path.starts_with("/health")
+        || path.starts_with("/version")
+        || path.starts_with("/metrics")
+    {
+        "health"
+    } else {
+        "other"
+    }
+}
+
+/// Bucket an HTTP status into the closed `status_class` vocabulary. Any status
+/// outside 2xx/4xx — including the `599` sentinel [`RequestMetricsGuard`] uses
+/// when a request exits without ever reporting one (cancellation, a panic, an
+/// early return nobody instrumented) — lands on `"5xx"`: the conservative
+/// choice, since an unreported outcome is exactly what an operator watching
+/// this series needs flagged as a possible failure, never silently folded
+/// into success.
+fn status_class(status: u16) -> &'static str {
+    match status {
+        200..=299 => "2xx",
+        400..=499 => "4xx",
+        _ => "5xx",
+    }
+}
+
+/// RAII guard for `http.rs::handle_request` — the single dispatch point every
+/// request passes through. Guarantees ONE `elohim_http_request_duration_ms`
+/// observation per request no matter which of the wrapper's several exit
+/// points is taken (the normal tail, an early `return` for admission-shed or
+/// a streaming upgrade, an escaped-error arm, or the future simply being
+/// dropped mid-await because the client disconnected) — because `Drop` runs
+/// on every one of those, not just fall-through. That is the fix for the
+/// coordinated-omission gap this instrument exists to close: a request that
+/// stalls for the full client timeout and is then abandoned still gets
+/// counted, at whatever elapsed time it reached.
+pub struct RequestMetricsGuard {
+    start: std::time::Instant,
+    route_class: &'static str,
+    status: Option<u16>,
+}
+
+impl RequestMetricsGuard {
+    /// Start tracking one request: bumps the in-flight gauge immediately. The
+    /// paired decrement lives in `Drop`, so every exit path balances the
+    /// gauge automatically, including ones added later without touching this
+    /// file.
+    pub fn start(path: &str) -> Self {
+        HTTP_REQUESTS_IN_FLIGHT.inc();
+        Self {
+            start: std::time::Instant::now(),
+            route_class: classify_http_route(path),
+            status: None,
+        }
+    }
+
+    /// Report the outcome status at a known exit point. Consumes the guard so
+    /// a call site cannot double-report; `Drop` fires immediately after,
+    /// observing with this status. Call sites that never reach a status
+    /// (cancellation, panic) simply drop the guard without calling this —
+    /// `Drop`'s `599` sentinel covers them.
+    pub fn finish(mut self, status: u16) {
+        self.status = Some(status);
+    }
+}
+
+impl Drop for RequestMetricsGuard {
+    fn drop(&mut self) {
+        let elapsed = self.start.elapsed();
+        let status = self.status.unwrap_or(599);
+        HTTP_REQUEST_DURATION_MS
+            .with_label_values(&[self.route_class, status_class(status)])
+            .observe(elapsed.as_secs_f64() * 1_000.0);
+        HTTP_REQUESTS_IN_FLIGHT.dec();
+    }
 }
 
 /// Render the registry in Prometheus text exposition format (the `/metrics` body).
@@ -4698,6 +4861,210 @@ mod tests {
                 .get(),
             before + 1,
             "a known reach value is a real label, not a clamp target"
+        );
+    }
+
+    // ── HTTP dispatch wrapper (elohim_http_request_duration_ms) ──────────────
+
+    const HTTP_ROUTE_CLASS_SET: [&str; 9] = [
+        "content", "blob", "apps", "sync", "api", "admin", "health", "p2p", "other",
+    ];
+
+    /// Representative paths pulled from the live `http.rs` match block (as of
+    /// the addition of this instrument) must land on the class an operator
+    /// would expect, and every classification — representative or not — must
+    /// stay inside the 9-value closed set.
+    #[test]
+    fn classify_http_route_maps_representative_paths_and_stays_bounded() {
+        let cases: &[(&str, &str)] = &[
+            ("/blob/sha256-abc", "blob"),
+            ("/shard/sha256-abc", "blob"),
+            ("/manifest/sha256-abc", "blob"),
+            ("/manifest", "blob"),
+            ("/dag/bafyreiabc/links", "blob"),
+            ("/ipfs/bafkreiabc", "blob"),
+            ("/apps/lamad", "apps"),
+            ("/chrome/omnibar.js", "apps"),
+            ("/spa/index.html", "apps"),
+            ("/sync/v1/round", "sync"),
+            ("/admin/write-through", "admin"),
+            ("/admin", "admin"),
+            ("/api/v1/pins", "api"),
+            ("/api/v1/events", "api"),
+            ("/p2p/status", "p2p"),
+            ("/p2p/peers", "p2p"),
+            ("/db/content/foo", "content"),
+            ("/epr-head/abc-123", "content"),
+            ("/import/progress", "content"),
+            ("/health", "health"),
+            ("/health/serving", "health"),
+            ("/version", "health"),
+            ("/metrics", "health"),
+            ("/", "other"),
+            ("/session/exchange", "other"),
+            ("/auth/me", "other"),
+            ("/_capability", "other"),
+        ];
+        for (path, expected) in cases {
+            let got = classify_http_route(path);
+            assert_eq!(
+                got, *expected,
+                "path {path} classified as {got}, expected {expected}"
+            );
+            assert!(
+                HTTP_ROUTE_CLASS_SET.contains(&got),
+                "classify_http_route({path}) returned {got}, outside the 9-value closed set"
+            );
+        }
+    }
+
+    /// No matter what a client sends — an unknown route, a path-traversal
+    /// attempt, an id-bearing path a naive classifier might echo back — the
+    /// classifier must return one of exactly 9 fixed strings. Never the raw
+    /// path: that would make this label's cardinality unbounded and turn the
+    /// instrument itself into an outage vector.
+    #[test]
+    fn classify_http_route_never_yields_an_unbounded_label() {
+        let hostile_paths = [
+            "",
+            "/",
+            "/blob/",
+            "/blob/../../../../../../etc/shadow",
+            "/api/v1/content/00000000-0000-0000-0000-000000000000",
+            "/db/content/some-very-long-random-id-that-should-never-become-a-label-9f8e7d6c",
+            "/nonexistent/route/that/does/not/exist/anywhere",
+            "/%00%00",
+            "/blob/deadbeef?../../escape",
+        ];
+        for path in hostile_paths {
+            let got = classify_http_route(path);
+            assert!(
+                HTTP_ROUTE_CLASS_SET.contains(&got),
+                "path {path:?} produced label {got:?}, outside the closed 9-value set"
+            );
+            assert_ne!(
+                got, path,
+                "the classifier must never echo the raw path back as a label"
+            );
+        }
+    }
+
+    #[test]
+    fn status_class_buckets_into_the_closed_three_value_vocabulary() {
+        for status in [
+            0u16, 100, 200, 201, 204, 299, 300, 302, 400, 404, 429, 499, 500, 503, 599, 65535,
+        ] {
+            let class = status_class(status);
+            assert!(
+                class == "2xx" || class == "4xx" || class == "5xx",
+                "status {status} classified as {class}, outside the closed 2xx|4xx|5xx vocabulary"
+            );
+        }
+        assert_eq!(status_class(200), "2xx");
+        assert_eq!(status_class(404), "4xx");
+        assert_eq!(status_class(503), "5xx");
+        assert_eq!(
+            status_class(599),
+            "5xx",
+            "the guard's unreported-outcome sentinel must land on 5xx, never silently pass as success"
+        );
+    }
+
+    /// The whole point of the guard: a request dropped WITHOUT ever calling
+    /// `finish()` — the shape of a cancelled/timed-out request, where the
+    /// client walks away and hyper drops the future mid-handler — must still
+    /// land in the histogram and release the in-flight gauge. This is the
+    /// coordinated-omission gap the doorway-breaker incident hit: storage
+    /// exported nothing for the stalled request because nothing observed it
+    /// before it was gone.
+    #[test]
+    fn request_metrics_guard_observes_a_dropped_unfinished_request() {
+        let route_class = "other";
+        let path = "/__test_request_metrics_guard_dropped__";
+        assert_eq!(classify_http_route(path), route_class);
+
+        let before_in_flight = HTTP_REQUESTS_IN_FLIGHT.get();
+        let before_count = HTTP_REQUEST_DURATION_MS
+            .with_label_values(&[route_class, "5xx"])
+            .get_sample_count();
+
+        {
+            let guard = RequestMetricsGuard::start(path);
+            assert_eq!(
+                HTTP_REQUESTS_IN_FLIGHT.get(),
+                before_in_flight + 1,
+                "starting a guard must bump in-flight immediately"
+            );
+            drop(guard); // never called .finish() — simulates cancellation
+        }
+
+        assert_eq!(
+            HTTP_REQUESTS_IN_FLIGHT.get(),
+            before_in_flight,
+            "Drop must release the in-flight permit even without finish()"
+        );
+        assert_eq!(
+            HTTP_REQUEST_DURATION_MS
+                .with_label_values(&[route_class, "5xx"])
+                .get_sample_count(),
+            before_count + 1,
+            "an unfinished/cancelled request must still be observed exactly once, under the 5xx sentinel"
+        );
+    }
+
+    /// An explicit error status reported via `finish()` must land under its
+    /// own `status_class`, and an errored request must be observed just like
+    /// a successful one — never dropped from the distribution because it
+    /// failed.
+    #[test]
+    fn request_metrics_guard_observes_an_explicit_error_finish() {
+        let route_class = "admin";
+        let path = "/admin/some-op";
+        assert_eq!(classify_http_route(path), route_class);
+
+        let before_count = HTTP_REQUEST_DURATION_MS
+            .with_label_values(&[route_class, "5xx"])
+            .get_sample_count();
+        let before_in_flight = HTTP_REQUESTS_IN_FLIGHT.get();
+
+        let guard = RequestMetricsGuard::start(path);
+        guard.finish(503);
+
+        assert_eq!(
+            HTTP_REQUEST_DURATION_MS
+                .with_label_values(&[route_class, "5xx"])
+                .get_sample_count(),
+            before_count + 1,
+            "an explicit error status must be observed under its own status_class"
+        );
+        assert_eq!(
+            HTTP_REQUESTS_IN_FLIGHT.get(),
+            before_in_flight,
+            "finish() must release the in-flight permit via Drop, same as any other exit"
+        );
+    }
+
+    /// A successful request must be observed under 2xx, distinguishing it
+    /// from the error path in the same histogram.
+    #[test]
+    fn request_metrics_guard_observes_a_success_finish() {
+        let route_class = "blob";
+        let path = "/blob/sha256-abcdef";
+        assert_eq!(classify_http_route(path), route_class);
+
+        let before_count = HTTP_REQUEST_DURATION_MS
+            .with_label_values(&[route_class, "2xx"])
+            .get_sample_count();
+
+        let guard = RequestMetricsGuard::start(path);
+        guard.finish(200);
+
+        assert_eq!(
+            HTTP_REQUEST_DURATION_MS
+                .with_label_values(&[route_class, "2xx"])
+                .get_sample_count(),
+            before_count + 1,
+            "a successful request must be observed under 2xx"
         );
     }
 }
