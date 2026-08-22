@@ -331,6 +331,19 @@ pub struct ServingHealth {
     /// shows and what the status code means cannot drift apart.
     #[serde(rename = "rolesDiscovered", skip_serializing_if = "Option::is_none")]
     pub roles_discovered: Option<usize>,
+    /// True when the warmup finished a pass having produced NOTHING, so this
+    /// doorway is serving an empty projection while it waits to re-warm.
+    ///
+    /// A doorway in this state answers every content route from an empty
+    /// projection: `/health/startup` reads `projection.content: 0` and
+    /// `servedBundleHeads: []`, and `/` pays a full 10s shell-fetch budget for a
+    /// bundle nothing ever stocked before shedding. It is not serving, and until
+    /// now nothing said so — `completed: true` made it look warm.
+    ///
+    /// `Option` for the same reason `freshness` is: the breaker-only
+    /// [`ServingHealth::observe`] form has no `AppState` to read warmup from.
+    #[serde(rename = "warmupEmpty", skip_serializing_if = "Option::is_none")]
+    pub warmup_empty: Option<bool>,
 }
 
 impl ServingHealth {
@@ -352,6 +365,7 @@ impl ServingHealth {
             degrading: upstreams.iter().any(|u| u.error_streak > 0),
             upstreams,
             freshness: None,
+            warmup_empty: None,
             // Breaker-only form: no AppState, so no role count. `None` is a
             // real third answer ("not observed here"), never a silent zero —
             // a zero would 503 every caller of the breaker-only form.
@@ -380,6 +394,10 @@ impl ServingHealth {
         } else {
             None
         };
+        // Only a doorway that RUNS a warmup can be judged empty-warm; one
+        // without a warmup task reports `None` ("not observed here") rather than
+        // a `false` it did not earn.
+        health.warmup_empty = state.warmup_state.as_ref().map(|ws| ws.is_empty_warm());
         health
     }
 }
@@ -607,7 +625,14 @@ pub fn serving_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
     // every registration returned HTTP 500 AGENT_KEY_ERROR — the same
     // nothing-carries-a-bad-status-code hole this endpoint exists to close.
     let conductor_blind = serving.roles_discovered == Some(0);
-    let failing = serving.shedding || serving.degrading || conductor_blind;
+    // A doorway whose warmup produced nothing serves an empty projection — every
+    // content route answers from a projection with no rows, and `/` burns the
+    // full shell-fetch budget for a bundle that was never stocked. Added
+    // 2026-08-21 alongside the honest `completed` flag: the boot-order case
+    // (doorway up at 22:55, storage at ~23:07) previously answered
+    // /health/serving with 200 forever.
+    let warmup_empty = serving.warmup_empty == Some(true);
+    let failing = serving.shedding || serving.degrading || conductor_blind || warmup_empty;
     let mut builder = Response::builder()
         .header("Content-Type", "application/json")
         .status(if failing {
@@ -725,19 +750,74 @@ pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
         })
     });
 
+    // ONE BREAKER, ONE VIEW.
+    //
+    // MEASURED (local mesh, 2026-08-21): doorway A shed 503
+    // `{"status":"catching-up","circuit":"open","errorStreak":3}` on every
+    // request while THIS endpoint reported every upstream `circuit: closed,
+    // errorStreak: 0`. An operator reading /health/startup saw a healthy
+    // doorway that was refusing everything.
+    //
+    // Both numbers were true of DIFFERENT breakers. The shed decision reads
+    // `state.upstream_breakers` (storage_proxy / catching_up); this block used
+    // to read `WarmStreamHealth`, a SECOND per-upstream circuit map private to
+    // the warmup task, with its own threshold, its own cooldown, and a tick
+    // domain of warm-up PASS COUNTERS rather than wall clock. Once warmup
+    // completed, that map froze at whatever it last saw — typically all-closed,
+    // forever — and went on being advertised as if it were live upstream health.
+    //
+    // `state.upstream_breakers` is authoritative by definition: it is the map
+    // the shed decision consults, so it is the only one that can answer "is this
+    // doorway refusing requests?". Both keys below now read it. The warmup
+    // task's internal gate still gates the warmup loop — that is a legitimate
+    // private concern — it is simply no longer ADVERTISED as the answer to a
+    // question it cannot answer.
+    //
+    // `snapshot()` is non-mutating: observing health must never admit a
+    // half-open trial.
+    let authoritative_upstreams: Vec<serde_json::Value> = state
+        .upstream_breakers
+        .snapshot()
+        .into_iter()
+        .map(|b| {
+            serde_json::json!({
+                "upstream": b.endpoint,
+                "circuit": b.circuit,
+                "errorStreak": b.error_streak,
+                "recentFailures": b.recent_failures,
+                // The breaker tracks no last-good timestamp yet (same honest
+                // null the self-healing UpstreamView carries).
+                "lastGood": serde_json::Value::Null,
+                "skipped": b.skipped,
+            })
+        })
+        .collect();
+
     let warmup = if let Some(ref ws) = state.warmup_state {
         serde_json::json!({
             "inProgress": ws.in_progress.load(std::sync::atomic::Ordering::Relaxed),
             "attempts": ws.attempts.load(std::sync::atomic::Ordering::Relaxed),
             "maxAttempts": ws.max_attempts.load(std::sync::atomic::Ordering::Relaxed),
             "completed": ws.completed.load(std::sync::atomic::Ordering::Relaxed),
+            // A pass that ran to the end having streamed NOTHING. `completed`
+            // used to be stored unconditionally, so this state was reported as
+            // a successful warmup — indistinguishable from a real one, and
+            // never retried. See WarmupState::completed_empty.
+            "completedEmpty": ws.completed_empty.load(std::sync::atomic::Ordering::Relaxed),
+            "produced": ws.produced.load(std::sync::atomic::Ordering::Relaxed),
             "lastError": ws.last_error.lock().unwrap().clone(),
             "budgetSecs": crate::projection::warm_stream::WARMUP_TOTAL_BUDGET_SECS,
-            "upstreams": ws.health.snapshot(),
+            // Authoritative — see above. NOT ws.health.snapshot().
+            "upstreams": authoritative_upstreams.clone(),
         })
     } else {
         serde_json::json!(null)
     };
+
+    // The live serving answer, in the SAME shape /health and /health/serving
+    // carry, from the SAME breaker map. A reader polling /health/startup during
+    // recovery can now see the shed without cross-referencing another endpoint.
+    let serving = ServingHealth::observe(&state.upstream_breakers);
 
     // Served SSR bundle-head attestations (Track-4 T4-1). Each entry:
     // {slug, serverBlobHash, materializedAt (rfc3339), status (current|stale|
@@ -763,6 +843,10 @@ pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
         "rootProjection": root_projection,
         "warmup": warmup,
         "servedBundleHeads": served_bundle_heads,
+        // The live shed answer, same source + shape as /health and
+        // /health/serving. See the ONE BREAKER, ONE VIEW note above.
+        "serving": serving,
+        "upstreams": authoritative_upstreams,
     })
     .to_string();
 
@@ -922,6 +1006,137 @@ mod tests {
         for _ in 0..crate::routes::upstream_health::UPSTREAM_CIRCUIT_FAIL_THRESHOLD {
             state.upstream_breakers.record(ep, false);
         }
+    }
+
+    /// ONE BREAKER, ONE VIEW.
+    ///
+    /// MEASURED (local mesh 2026-08-21): doorway A shed 503
+    /// `{"status":"catching-up","circuit":"open","errorStreak":3}` on every
+    /// request while `/health/startup` reported every upstream
+    /// `circuit: closed, errorStreak: 0` — so an operator reading the startup
+    /// surface saw a healthy doorway that was refusing everything. Both numbers
+    /// were true of DIFFERENT breakers: the shed decision reads
+    /// `upstream_breakers`; the startup block read `WarmStreamHealth`, the
+    /// warmup task's private map, frozen at whatever it last saw.
+    ///
+    /// This drives the AUTHORITATIVE breaker into a shed and asserts every
+    /// surface says so together.
+    #[tokio::test]
+    async fn startup_and_serving_report_the_same_breaker_state() {
+        let state = Arc::new(test_state());
+        let ep = "http://storage-a:8090";
+        open_the_breaker(&state, ep);
+
+        // The authoritative answer.
+        let serving = ServingHealth::observe(&state.upstream_breakers);
+        assert!(serving.shedding, "the breaker is open — this doorway sheds");
+
+        let resp = startup_check(Arc::clone(&state)).await;
+        let bytes = http_body_util::BodyExt::collect(resp.into_body())
+            .await
+            .expect("startup body")
+            .to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).expect("startup json");
+
+        let upstreams = json["upstreams"].as_array().cloned().unwrap_or_default();
+        assert_eq!(upstreams.len(), 1, "the one known upstream");
+        assert_eq!(upstreams[0]["upstream"], ep);
+        assert_eq!(
+            upstreams[0]["circuit"], "open",
+            "/health/startup MUST report the shed the serving path is actually \
+             doing — this disagreement read as a healthy doorway"
+        );
+        assert_eq!(
+            upstreams[0]["errorStreak"],
+            serde_json::json!(crate::routes::upstream_health::UPSTREAM_CIRCUIT_FAIL_THRESHOLD),
+            "errorStreak must match the authoritative breaker"
+        );
+
+        // The warmup block's array is the SAME binding, so it cannot diverge.
+        // (This state has no warmup task, so the block is null; when a doorway
+        // has one, the two are equal by construction — pinned here so a future
+        // edit cannot re-point it at a private map.)
+        if !json["warmup"].is_null() {
+            assert_eq!(
+                json["warmup"]["upstreams"], json["upstreams"],
+                "the warmup block must not carry a second, disagreeing breaker view"
+            );
+        }
+
+        // ...and the startup surface answers the live serving question in the
+        // same shape /health and /health/serving use.
+        assert_eq!(json["serving"]["shedding"], serde_json::json!(true));
+        assert_eq!(
+            json["serving"]["upstreams"][0]["circuit"],
+            serde_json::json!("open")
+        );
+    }
+
+    /// A warmup that produced nothing must not read as serving.
+    ///
+    /// MEASURED (local mesh 2026-08-21): doorway A booted at 22:55, storage came
+    /// up at ~23:07. The warmup ran against unreachable/empty storage, stored
+    /// `completed: true` unconditionally, and never re-ran — so
+    /// `/health/startup` showed a completed warmup beside `projection.content:
+    /// 0` and `servedBundleHeads: []`, and `/health/serving` answered 200 while
+    /// the doorway served an empty projection until someone restarted it.
+    #[test]
+    fn an_empty_warmup_is_not_serving() {
+        use crate::projection::warm_stream::WarmupState;
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let mut state = dev_state();
+        discover_role(&state, "imagodei");
+        let ws = Arc::new(WarmupState::new());
+        // The pass ran to the end and produced NOTHING.
+        ws.in_progress.store(false, Relaxed);
+        ws.completed_empty.store(true, Relaxed);
+        ws.completed.store(false, Relaxed);
+        state.warmup_state = Some(Arc::clone(&ws));
+        let state = Arc::new(state);
+
+        assert!(ws.is_empty_warm(), "a produced-nothing pass is empty-warm");
+
+        let serving = ServingHealth::observe_with_freshness(&state);
+        assert_eq!(serving.warmup_empty, Some(true));
+        assert_eq!(
+            serving_check(Arc::clone(&state)).status(),
+            StatusCode::SERVICE_UNAVAILABLE,
+            "a doorway serving an empty projection is NOT serving — this 200'd \
+             for the whole boot-order window"
+        );
+    }
+
+    #[test]
+    fn a_productive_warmup_serves() {
+        use crate::projection::warm_stream::WarmupState;
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let mut state = dev_state();
+        discover_role(&state, "imagodei");
+        let ws = Arc::new(WarmupState::new());
+        ws.in_progress.store(false, Relaxed);
+        ws.produced.store(1_234, Relaxed);
+        ws.completed.store(true, Relaxed);
+        ws.completed_empty.store(false, Relaxed);
+        state.warmup_state = Some(ws);
+        let state = Arc::new(state);
+
+        let serving = ServingHealth::observe_with_freshness(&state);
+        assert_eq!(serving.warmup_empty, Some(false));
+        assert_eq!(serving_check(Arc::clone(&state)).status(), StatusCode::OK);
+    }
+
+    /// A doorway with no warmup task at all must not be 503'd for an empty
+    /// warmup it was never asked to run — `None` is a real third answer.
+    #[test]
+    fn no_warmup_task_is_not_judged_empty() {
+        let state = dev_state();
+        discover_role(&state, "imagodei");
+        let state = Arc::new(state);
+        let serving = ServingHealth::observe_with_freshness(&state);
+        assert_eq!(serving.warmup_empty, None);
+        assert_eq!(serving_check(state).status(), StatusCode::OK);
     }
 
     #[test]
