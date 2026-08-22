@@ -1,8 +1,17 @@
 @e2e @deployment @p2p @epic:elohim-p2p-infrastructure @act:i
 Feature: P2P Peer Validation
-  As a deployment pipeline
-  I want to validate that P2P peers are connected and syncing
-  So that I can verify the distributed data layer is operational
+  As a peer steward keeping a household node on modest hardware
+  I want my node to prove its peers are connected and to pause sync while heavy writes run
+  So that my community's content keeps flowing and my node is not killed mid-import
+
+  A node syncs with its peers and absorbs bulk writes (account imports, content
+  seeding) on the SAME small memory budget. On a 256MB container, a phone, or a
+  Raspberry Pi, running both at once has crashed the process out of memory and
+  taken the steward's node offline in the middle of a seed. These scenarios
+  validate the protections that keep such a node alive: peer connectivity is
+  observable from the outside, and sync yields to heavy writes — pausing during
+  imports and bulk creation, auto-suppressing while the publish backlog drains,
+  and always resuming afterward, even when a write fails.
 
   Background:
     Given doorway "alpha" is healthy at env "E2E_DOORWAY_ALPHA"
@@ -33,10 +42,18 @@ Feature: P2P Peer Validation
   # Informs: peer diversity presets (home_node vs steward vs phone),
   #   operator documentation, container sizing recommendations
   # Review after: delta-sync protocol replaces full-state inventory exchange
+  #
+  # Fabric scope: the peer counts above are the INCIDENT's operational
+  # parameters, not preconditions. The pause/resume semantics under test are
+  # peer-count-independent, so each scenario's fabric Given asserts a live
+  # floor — at least 1 connected peer — because a fabric with zero connected
+  # peers has no sync traffic to suppress and cannot prove anything. The floor
+  # holds at any real mesh size (a 3-node household reports 2 connected peers
+  # from any member's own view; alpha reports more).
 
   @regression @requires:owned-substrate
   Scenario: Storage pauses P2P sync during account import
-    Given elohim-storage on doorway "alpha" has 3 connected peers
+    Given elohim-storage on doorway "alpha" has at least 1 connected peer
     When a seeder POSTs an account package for "Matthew" with 200 content items
     Then the P2P status should report sync_paused as true during the import
     And sync/replication cycles should be skipped until the import completes
@@ -45,7 +62,7 @@ Feature: P2P Peer Validation
 
   @requires:owned-substrate
   Scenario: Storage pauses P2P sync during bulk content creation
-    Given elohim-storage on doorway "alpha" has 3 connected peers
+    Given elohim-storage on doorway "alpha" has at least 1 connected peer
     When a seeder POSTs a bulk content batch of 100 items
     Then the P2P status should report sync_paused as true during the write
     And after the bulk response returns, sync_paused should be false
@@ -53,7 +70,7 @@ Feature: P2P Peer Validation
 
   @requires:owned-substrate
   Scenario: Sync resumes even if bulk write fails
-    Given elohim-storage on doorway "alpha" has 3 connected peers
+    Given elohim-storage on doorway "alpha" has at least 1 connected peer
     And P2P sync is active
     When a bulk content request fails mid-write due to invalid JSON
     Then sync_paused should be false after the error response
@@ -61,7 +78,7 @@ Feature: P2P Peer Validation
 
   @regression @requires:owned-substrate
   Scenario: Sync auto-suppressed while drain backlog is large
-    Given elohim-storage on doorway "alpha" has 5 connected peers
+    Given elohim-storage on doorway "alpha" has at least 1 connected peer
     And 3424 content items have been bulk-seeded
     When the drain publish queue has more than 100 items pending
     Then sync_paused should be true (auto-suppressed by drain)
