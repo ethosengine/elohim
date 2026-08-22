@@ -24,6 +24,25 @@ use elohim_views::acquisition::EprPullStatusView;
 /// must mean actually-unsatisfiable.
 const MIN_RETRIES: u32 = 3;
 
+/// Default cadence (seconds) of the acquisition AND provide reconcile ticks in
+/// `P2PNode::run`. Before this constant the tick was a hardcoded
+/// `Duration::from_secs(60)` with no operator lever, so a chapter-11 a2o
+/// scenario that can only WAIT for the budget to exhaust spent ~5 minutes on a
+/// 3-peer loopback mesh. The mesh's dev-tier pacing profile (`hc-mesh.sh`)
+/// now declares `ACQUISITION_RECONCILE_SECS` the same way it declares
+/// `PROJECTION_RECONCILE_SECS`; prod keeps this default.
+pub const DEFAULT_RECONCILE_SECS: u64 = 60;
+
+/// The reconcile tick duration for a configured cadence. `None` and `Some(0)`
+/// both fall back to [`DEFAULT_RECONCILE_SECS`] — tokio's ticker panics on a
+/// zero period, and "reconcile never" is not a cadence this loop offers.
+pub fn reconcile_cadence(secs: Option<u64>) -> std::time::Duration {
+    std::time::Duration::from_secs(match secs {
+        Some(0) | None => DEFAULT_RECONCILE_SECS,
+        Some(n) => n,
+    })
+}
+
 /// The per-item retry budget for a fabric of `connected_peers` peers: enough
 /// attempts that the rotation can reach EVERY connected provider at least once,
 /// never fewer than [`MIN_RETRIES`].
@@ -700,6 +719,14 @@ mod tests {
             pin_cooled_down("2026-07-31 12:00:00", now),
             "the SQL-default format (no T/Z) is unparseable here — re-admit, never strand"
         );
+    }
+
+    #[test]
+    fn reconcile_cadence_guards_zero_and_absent() {
+        use std::time::Duration;
+        assert_eq!(reconcile_cadence(None), Duration::from_secs(DEFAULT_RECONCILE_SECS));
+        assert_eq!(reconcile_cadence(Some(0)), Duration::from_secs(DEFAULT_RECONCILE_SECS));
+        assert_eq!(reconcile_cadence(Some(10)), Duration::from_secs(10));
     }
 
     #[test]

@@ -550,6 +550,10 @@ pub struct P2PConfig {
     /// in `run()` while `Config::sync_interval_secs` existed, was documented, and
     /// was read by nothing — the one cadence knob for the plane was inert.
     pub sync_interval_secs: Option<u64>,
+    /// Acquisition + provide reconcile cadence in seconds, threaded from
+    /// `ACQUISITION_RECONCILE_SECS` (main.rs). `None`/`Some(0)` fall back to
+    /// [`acquisition::DEFAULT_RECONCILE_SECS`] via [`acquisition::reconcile_cadence`].
+    pub acquisition_reconcile_secs: Option<u64>,
     /// This node's own HTTP port (`Config::http_port`), advertised to peers
     /// via the libp2p Identify `agent_version` suffix (see
     /// `behaviour::ElohimStorageBehaviour::new`) so the receiving side can
@@ -589,6 +593,7 @@ impl Default for P2PConfig {
             salvage_target_replicas: 2,
             salvage_recheck_seconds: 300,
             sync_interval_secs: None,
+            acquisition_reconcile_secs: None,
             http_port: DEFAULT_HTTP_PORT,
         }
     }
@@ -3146,13 +3151,16 @@ impl P2PNode {
         // Acquisition reconcile: diff active pins against local inventory (spec §4.2).
         // First tick fires at t=0 (parity with gap_dispatch_interval); it
         // no-ops cheaply when no pins are registered yet.
-        let mut acquisition_reconcile_interval = tokio::time::interval(Duration::from_secs(60));
+        // Cadence: `ACQUISITION_RECONCILE_SECS` via P2PConfig (default 60s).
+        let reconcile_cadence =
+            acquisition::reconcile_cadence(self.config.acquisition_reconcile_secs);
+        let mut acquisition_reconcile_interval = tokio::time::interval(reconcile_cadence);
         acquisition_reconcile_interval
             .set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         // Provide reconcile: caught-up commons pins → notarized
         // replicates-commons Commitments (spec slice-2b §provide-loop). Same
-        // 60s cadence as acquisition; logical-key dedup survives restart.
-        let mut provide_reconcile_interval = tokio::time::interval(Duration::from_secs(60));
+        // cadence as acquisition; logical-key dedup survives restart.
+        let mut provide_reconcile_interval = tokio::time::interval(reconcile_cadence);
         provide_reconcile_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         // Acquisition dispatch: drain the acquisition queue every 5 seconds.
         let mut acquisition_dispatch_interval = tokio::time::interval(Duration::from_secs(5));

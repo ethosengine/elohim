@@ -2809,6 +2809,11 @@ async fn async_main(
             // Sync round cadence — Config::sync_interval_secs existed and was read
             // by nothing until now (the tick in P2PNode::run was hardcoded 60s).
             sync_interval_secs: Some(config.sync_interval_secs),
+            // Acquisition/provide reconcile cadence — the mesh's dev-tier pacing
+            // profile declares it (hc-mesh.sh); unset keeps the 60s default.
+            acquisition_reconcile_secs: std::env::var("ACQUISITION_RECONCILE_SECS")
+                .ok()
+                .and_then(|v| v.parse::<u64>().ok()),
             // Advertised to peers via Identify `agent_version` so they can
             // populate the real `httpPort` on their `DeliveryPeer` row for
             // this node instead of guessing 8090.
@@ -4044,123 +4049,26 @@ async fn async_main(
         http_server = http_server.with_hc_registry(registry.clone());
     }
 
-    // One-shot household_id backfill — fills legacy `humans.household_id IS NULL`
-    // rows from DHT household memberships, the same value the live reconcile path
-    // stamps (`on_membership_projected`). The replayer reads household collectives
-    // from the local projection, then reads each household's members back from the
-    // imagodei conductor. Best-effort: a missing imagodei client or unreachable
-    // conductor degrades to an empty/partial mapping — never a startup failure.
-    // The backfill is idempotent and NULL-only, so it never overwrites a
-    // create-time or live-stamped value.
+    // Membership-truth reconcile: boot pass + periodic key-supersede (NULL-only
+    // household_id backfill, then the agent-key SUPERSEDE + rekey cascade).
+    // Cadence from MEMBERSHIP_RECONCILE_SECS (default 300; `0` = boot-only).
+    // Best-effort: no imagodei client degrades to a debug line, never a startup
+    // failure. The loop itself lives with the pass it drives.
     if let (Some(pool), Some(imagodei)) = (
         db_pool.as_ref(),
         hc_registry_for_http
             .as_ref()
             .and_then(|r| r.imagodei_client()),
     ) {
-        let pool_clone = pool.clone();
-        // Cadence. Boot-only was the first slice ("re-keys happen at deploy =
-        // restart, and this runs on every boot"). The household lane disproved
-        // it (2026-08-22): a peer re-keyed at RUNTIME (chaos-rekey, the alpha
-        // shape) leaves its household-mates — which never restart — carrying
-        // its fossil key forever, and the fossil poisons the resilience custody
-        // join on both sides. So the same pass re-runs every
-        // MEMBERSHIP_RECONCILE_SECS (default 300; `0` restores boot-only). It is
-        // safe to repeat: supersede fires only on a forced 1:1 bijection, the
-        // backfill is NULL-only, and a fully-converged projection mints nothing.
-        let reconcile_secs = std::env::var("MEMBERSHIP_RECONCILE_SECS")
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or(300);
-        let mut reconcile_shutdown = shutdown_tx.subscribe();
-        tokio::spawn(async move {
-            use elohim_storage::services::holochain_humans_replayer::{
-                snapshot_household_ids, ConductorMembershipReader,
-            };
-            // humans/collectives projections are lamad-app-scoped (see the
-            // reconcile controller's `default_lamad` ctx for the same junction).
-            let ctx = elohim_storage::db::AppContext::default_lamad();
-            let reader = ConductorMembershipReader {
-                hc_client: imagodei,
-            };
-            loop {
-                match snapshot_household_ids(&pool_clone, &ctx, &reader).await {
-                    Ok(snapshot) => {
-                        // (1) NULL-only household_id backfill FIRST — populates
-                        // `humans.household_id` so the key-supersede pass below can
-                        // scope humans to their household. Consumes a clone of the
-                        // pairs; the reconcile below reuses the same snapshot. Backfill
-                        // is NULL-only so an incomplete read is harmless here (a missing
-                        // member just leaves a household_id NULL, never a wrong write).
-                        if let Err(e) =
-                            elohim_storage::services::household_backfill::run_once_by_membership(
-                                &pool_clone,
-                                snapshot.pairs.clone(),
-                            )
-                        {
-                            warn!(error = %e, "household_backfill failed (non-fatal)");
-                        }
-
-                        // (2) Membership-truth key SUPERSEDE + rekey cascade: converge
-                        // SET-but-stale `humans.agent_pub_key` (NON-self rows a peer
-                        // re-key fossilised) to the live membership key, cascading
-                        // `shard_locations.peer_id` + `rea_commitments.provider` so the
-                        // resilience stewarding join re-aligns. Runs at boot and then on
-                        // the MEMBERSHIP_RECONCILE_SECS cadence (see the loop header
-                        // above). The cascade is scoped to `lamad` (the
-                        // dataplane the resilience card reads); humans are matched
-                        // h_app_id-agnostically. See the module docs for the safe-
-                        // pairing constraint (the membership entry carries no stable
-                        // human_id, so supersede fires only on an unambiguous 1:1).
-                        match elohim_storage::services::membership_identity_reconcile::reconcile_membership_keys(
-                        &pool_clone,
-                        &ctx.h_app_id,
-                        snapshot.pairs,
-                        &snapshot.incomplete_households,
-                        &snapshot.withdrawn_households,
-                    ) {
-                        Ok(stats)
-                            if stats.superseded > 0
-                                || stats.ambiguous_skipped > 0
-                                || stats.incomplete_read_skipped > 0
-                                || stats.withdrawn_abstain_skipped > 0 =>
-                        {
-                            info!(
-                                superseded = stats.superseded,
-                                shard_locations = stats.shard_locations_reattributed,
-                                commitments = stats.commitments_reattributed,
-                                ambiguous_skipped = stats.ambiguous_skipped,
-                                incomplete_read_skipped = stats.incomplete_read_skipped,
-                                withdrawn_abstain_skipped = stats.withdrawn_abstain_skipped,
-                                "membership_identity_reconcile: key-supersede pass applied"
-                            );
-                        }
-                        Ok(_) => {}
-                        Err(e) => {
-                            warn!(error = %e, "membership_identity_reconcile failed (non-fatal)")
-                        }
-                    }
-                    }
-                    Err(e) => {
-                        warn!(error = %e, "household_backfill snapshot failed (non-fatal)");
-                    }
-                }
-                if reconcile_secs == 0 {
-                    break; // boot-only, by operator choice
-                }
-                tokio::select! {
-                    _ = tokio::time::sleep(std::time::Duration::from_secs(reconcile_secs)) => {}
-                    _ = reconcile_shutdown.recv() => break,
-                }
-            }
-        });
-        info!(
-            reconcile_secs,
-            "membership_identity_reconcile task started (boot pass + periodic key-supersede)"
+        elohim_storage::services::membership_identity_reconcile::spawn_periodic(
+            pool.clone(),
+            imagodei,
+            shutdown_tx.subscribe(),
+            elohim_storage::services::membership_identity_reconcile::reconcile_secs_from_env(),
         );
     } else {
         tracing::debug!(
-            "household_id backfill skipped: db pool or imagodei conductor client unavailable"
+            "membership_identity_reconcile skipped: db pool or imagodei conductor client unavailable"
         );
     }
 

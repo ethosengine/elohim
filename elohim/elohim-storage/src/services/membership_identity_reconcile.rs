@@ -72,10 +72,16 @@
 //! `default_lamad` ctx). Getting either scope wrong ships a silent no-op.
 
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use diesel::prelude::*;
 
-use crate::db::DbPool;
+use crate::db::{AppContext, DbPool};
+use crate::hc_client::HcClient;
+use crate::services::holochain_humans_replayer::{
+    snapshot_household_ids, ConductorMembershipReader, MembershipReader,
+};
+use crate::services::household_backfill;
 use crate::StorageError;
 
 /// Outcome counts for one reconciliation pass (returned for logging + tests).
@@ -136,6 +142,110 @@ fn key_prefix(key: &str) -> String {
 /// run over the same mapping is a no-op (the fossils are gone). A DB failure on
 /// ONE household is logged and skipped — it never aborts the remaining households
 /// in the pass (arbitrary HashMap order must not pick victims).
+/// Env var naming the periodic cadence (seconds) of [`spawn_periodic`].
+pub const RECONCILE_SECS_ENV: &str = "MEMBERSHIP_RECONCILE_SECS";
+/// Default cadence: re-run the pass every 5 minutes. `0` restores boot-only.
+pub const DEFAULT_RECONCILE_SECS: u64 = 300;
+
+/// Read [`RECONCILE_SECS_ENV`]; unparsable or unset → [`DEFAULT_RECONCILE_SECS`].
+pub fn reconcile_secs_from_env() -> u64 {
+    std::env::var(RECONCILE_SECS_ENV)
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(DEFAULT_RECONCILE_SECS)
+}
+
+/// One membership-truth pass against the conductor's current household read:
+///
+/// 1. NULL-only `humans.household_id` backfill FIRST, so the supersede pass can
+///    scope humans to their household (a missing member leaves a NULL, never a
+///    wrong write);
+/// 2. the key SUPERSEDE + rekey cascade ([`reconcile_membership_keys`]) over the
+///    same snapshot, cascading within `ctx.h_app_id`.
+///
+/// Every failure is logged and swallowed: this is a reconciler, and the next
+/// tick gets another chance. Nothing here is a startup failure.
+pub async fn run_membership_pass(pool: &DbPool, ctx: &AppContext, reader: &dyn MembershipReader) {
+    let snapshot = match snapshot_household_ids(pool, ctx, reader).await {
+        Ok(snapshot) => snapshot,
+        Err(e) => {
+            tracing::warn!(error = %e, "household_backfill snapshot failed (non-fatal)");
+            return;
+        }
+    };
+    if let Err(e) = household_backfill::run_once_by_membership(pool, snapshot.pairs.clone()) {
+        tracing::warn!(error = %e, "household_backfill failed (non-fatal)");
+    }
+    match reconcile_membership_keys(
+        pool,
+        &ctx.h_app_id,
+        snapshot.pairs,
+        &snapshot.incomplete_households,
+        &snapshot.withdrawn_households,
+    ) {
+        Ok(stats)
+            if stats.superseded > 0
+                || stats.ambiguous_skipped > 0
+                || stats.incomplete_read_skipped > 0
+                || stats.withdrawn_abstain_skipped > 0 =>
+        {
+            tracing::info!(
+                superseded = stats.superseded,
+                shard_locations = stats.shard_locations_reattributed,
+                commitments = stats.commitments_reattributed,
+                ambiguous_skipped = stats.ambiguous_skipped,
+                incomplete_read_skipped = stats.incomplete_read_skipped,
+                withdrawn_abstain_skipped = stats.withdrawn_abstain_skipped,
+                "membership_identity_reconcile: key-supersede pass applied"
+            );
+        }
+        Ok(_) => {}
+        Err(e) => {
+            tracing::warn!(error = %e, "membership_identity_reconcile failed (non-fatal)")
+        }
+    }
+}
+
+/// Spawn the membership-truth task: one pass at boot, then one every
+/// `reconcile_secs` until `shutdown` fires (`0` = boot-only, by operator choice).
+///
+/// Boot-only was the first slice ("re-keys happen at deploy = restart"). The
+/// household lane disproved it (2026-08-22): a peer re-keyed at RUNTIME
+/// (chaos-rekey, the alpha shape) leaves its household-mates — which never
+/// restart — carrying its fossil key forever, poisoning the resilience custody
+/// join on both sides. Repeating is safe: supersede fires only on a forced 1:1
+/// bijection, the backfill is NULL-only, and a converged projection mints nothing.
+///
+/// `humans`/`collectives` projections are lamad-app-scoped (the reconcile
+/// controller's `default_lamad` ctx is the same junction).
+pub fn spawn_periodic(
+    pool: DbPool,
+    imagodei: Arc<HcClient>,
+    mut shutdown: tokio::sync::broadcast::Receiver<()>,
+    reconcile_secs: u64,
+) -> tokio::task::JoinHandle<()> {
+    tracing::info!(
+        reconcile_secs,
+        "membership_identity_reconcile task started (boot pass + periodic key-supersede)"
+    );
+    tokio::spawn(async move {
+        let ctx = AppContext::default_lamad();
+        let reader = ConductorMembershipReader {
+            hc_client: imagodei,
+        };
+        loop {
+            run_membership_pass(&pool, &ctx, &reader).await;
+            if reconcile_secs == 0 {
+                break;
+            }
+            tokio::select! {
+                _ = tokio::time::sleep(std::time::Duration::from_secs(reconcile_secs)) => {}
+                _ = shutdown.recv() => break,
+            }
+        }
+    })
+}
+
 pub fn reconcile_membership_keys(
     pool: &DbPool,
     cascade_h_app_id: &str,
