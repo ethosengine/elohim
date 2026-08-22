@@ -5,6 +5,19 @@ Feature: hApp coordinator delivery — a shipped zome fix reaches running conduc
   without my agent identity being destroyed and re-minted
   So that the network heals by upgrade, not by wipe
 
+  A hApp bundles one or more DNAs. Each DNA has integrity zomes (which
+  define the DNA hash and the validation rules peers hold each other to)
+  and coordinator zomes (the application behavior). A conductor runs
+  installed hApps under an agent key — the persistent identity whose DHT
+  state accumulates for years. Because the DNA hash covers integrity zomes
+  and modifiers ONLY, a coordinator-only fix does not move the hash: any
+  hash-granular staleness check is structurally blind to it. That blindness
+  is permanent Holochain behavior — the first scenario documents the
+  constraint (it always passes; it is not a guard that a fix could regress),
+  and the following scenarios prove the cure built around it: the
+  update_coordinators hot-swap, which delivers new behavior with no re-key
+  and no DHT churn.
+
   # Evidence anchor (2026-06-11, EPR durability arc): the attestation-lockout
   # fix (2f02879d) changed only the infrastructure COORDINATOR zome. A
   # Holochain DNA hash covers integrity zomes + modifiers only, so the new
@@ -21,7 +34,9 @@ Feature: hApp coordinator delivery — a shipped zome fix reaches running conduc
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
 
-  @regression @requires:owned-substrate
+  # Constraint documentation, not a regression guard: this scenario proves
+  # the permanent structural blindness the feature exists to work around.
+  @requires:owned-substrate
   Scenario: Without coordinator drift detection, a coordinator-only fix never deploys
     Given a conductor with the elohim hApp installed from an earlier bundle
     And a new bundle whose infrastructure coordinator zome changed but whose integrity zomes did not
