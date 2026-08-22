@@ -4,10 +4,18 @@ Feature: Doorway Self-Registration
   I want my doorway to register itself as a node in the orchestrator
   So that my operator dashboard shows my node's status and capacity
 
-  Matthew's doorway IS his node. When the orchestrator starts, the doorway
+  Matthew's doorway IS his node. The orchestrator is the doorway's node-
+  registry subsystem (enabled with --orchestrator-enabled): it accepts each
+  node's self-registration and serves the admin nodes endpoint — the data
+  contract Matthew's admin dashboard renders. When it starts, the doorway
   should register itself so Matthew sees at least his own machine in the
   admin dashboard. Without this, the dashboard is empty and gives no
   feedback about the network he is stewarding.
+
+  The first scenario carries no @requires:orchestrator tag on purpose: a
+  doorway always reports an orchestrator section in its status (stating
+  enabled/disabled honestly), so orchestrator AWARENESS is testable on any
+  fabric — only the registered-nodes scenarios need the subsystem enabled.
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
