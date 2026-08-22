@@ -71,7 +71,9 @@ test target="changed" scope="":
         export ELOHIM_CLUSTER_STATE_PATH_OVERRIDE="{{ root }}/genesis/manifests/cluster-state.act1-household.yaml"
         export ELOHIM_REMOTE_COMPUTE_STATUS=unavailable
         mkdir -p "$MESH_DIR/reports"
-        export CUCUMBER_JSON_REPORT="$MESH_DIR/reports/mesh.json"
+        # Default, not a force: a caller-supplied CUCUMBER_JSON_REPORT survives, so a
+        # scoped run's report isn't clobbered by a later full-lane run.
+        export CUCUMBER_JSON_REPORT="${CUCUMBER_JSON_REPORT:-$MESH_DIR/reports/mesh.json}"
         cd "{{ a2o_dir }}"
         if [[ -z "{{ scope }}" ]]; then
           exec pnpm exec cucumber-js --profile mesh
