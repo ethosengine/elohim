@@ -422,6 +422,21 @@ pub struct ProjectionRole {
     pub writer: bool,
 }
 
+/// The coupling rule for `conductor.connected`, as a pure function so it can be
+/// exercised over every combination without standing up a real worker pool.
+///
+/// BOTH halves are required and NEITHER is dev-mode-optional:
+/// * `workers_live` — the pool has at least one connected worker. Without it the
+///   doorway has no session to call through.
+/// * `roles_discovered > 0` — discovery mapped at least one role. Without it
+///   every zome call fails `No zome config found for role …`.
+///
+/// The field is what `/health`'s own docs tell the seeder to check before
+/// seeding, so it may never disagree with `connected_workers` sitting beside it.
+pub(crate) fn conductor_is_connected(workers_live: bool, roles_discovered: usize) -> bool {
+    workers_live && roles_discovered > 0
+}
+
 /// Build health response with current state
 fn build_health_response(state: &AppState) -> HealthResponse {
     let args = &state.args;
@@ -470,11 +485,17 @@ fn build_health_response(state: &AppState) -> HealthResponse {
     // serves nothing, so it is not "connected" in any sense a caller can use.
     // (`readiness_check` keeps its dev-mode "always ready" contract explicitly
     // rather than inheriting it from this flag — see there.)
-    let conductor_connected = if args.dev_mode {
-        roles_discovered > 0
-    } else {
-        actual_conductor_connected && roles_discovered > 0
-    };
+    //
+    // The WORKER tally is the other half, and it is NOT dev-mode-optional. A
+    // dev-mode carve-out that gated on the role map alone still reported
+    // `connected: true` with `connected_workers: 0` after a conductor restart
+    // (roles_discovered is a cached boot artifact — it survives the pool losing
+    // every session). Dev mode's real contract is "a conductor is optional",
+    // which `status`/`healthy` express below; it is never a licence for
+    // `conductor.connected` to disagree with `conductor.connected_workers`.
+    // (Measured on the household mesh 2026-08-22 —
+    // features/doorway/peer-conductor-connection-resilience.feature.)
+    let conductor_connected = conductor_is_connected(actual_conductor_connected, roles_discovered);
 
     // Check if projection/cache is enabled
     let cache_enabled = state.projection.is_some();
@@ -941,9 +962,35 @@ mod tests {
         let r = build_health_response(&state);
         assert_eq!(r.conductor.roles_discovered, 1);
         assert!(
-            r.conductor.connected,
-            "a doorway that can resolve roles reports a usable conductor"
+            !r.conductor.connected,
+            "a role map alone is not a session — this state has no pool, so the \
+             claim stays false"
         );
+        assert!(
+            conductor_is_connected(true, r.conductor.roles_discovered),
+            "a doorway with BOTH a live worker and a resolved role map reports a \
+             usable conductor"
+        );
+    }
+
+    /// The mesh regression this closes (2026-08-22,
+    /// features/doorway/peer-conductor-connection-resilience.feature): a
+    /// conductor restart drops every pool session, but `roles_discovered` is a
+    /// cached boot artifact and survives it. The dev-mode carve-out gated on the
+    /// role map ALONE, so `/health` answered `connected: true` beside
+    /// `connected_workers: 0` — the two fields telling opposite stories.
+    #[test]
+    fn connected_never_disagrees_with_the_worker_tally() {
+        assert!(
+            !conductor_is_connected(false, 5),
+            "no live worker means not connected, however many roles are cached"
+        );
+        assert!(
+            !conductor_is_connected(true, 0),
+            "a live worker with no roles serves nothing"
+        );
+        assert!(conductor_is_connected(true, 5));
+        assert!(!conductor_is_connected(false, 0));
     }
 
     /// `/health/serving` is the status-code-bearing probe — the endpoint that
