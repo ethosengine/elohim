@@ -9,8 +9,8 @@ graduation-trigger: first cut landed (doorway hop histograms + PodMonitor select
 created: 2026-08-20
 topic: [latency, dataplane, measurement, composition-spike, peer-diversity, reactive-controllers, two-tier-validation, observability, habits]
 cites:
-  - genesis/docs/superpowers/plans/2026-08-20-three-lane-dataplane-performance-contract.md
-  - genesis/docs/superpowers/plans/2026-08-16-minutes-quiesce-fixture-trust-swarm-plan.md
+  - "three-lane-dataplane-performance-contract | Three-lane dataplane performance contract | sha256:a1f0976972c3b800 | path: genesis/docs/superpowers/plans/2026-08-20-three-lane-dataplane-performance-contract.md"
+  - "minutes-quiesce-fixture-trust-swarm-plan | Minutes-Scale Quiesce | sha256:1e9a73a2c24ba5b0 | path: genesis/docs/superpowers/plans/2026-08-16-minutes-quiesce-fixture-trust-swarm-plan.md"
   - genesis/manifests/habits.yaml
   - elohim/elohim-storage/src/metrics.rs
   - doorway/doorway-service/src/metrics.rs
