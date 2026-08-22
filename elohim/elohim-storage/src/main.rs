@@ -4059,6 +4059,20 @@ async fn async_main(
             .and_then(|r| r.imagodei_client()),
     ) {
         let pool_clone = pool.clone();
+        // Cadence. Boot-only was the first slice ("re-keys happen at deploy =
+        // restart, and this runs on every boot"). The household lane disproved
+        // it (2026-08-22): a peer re-keyed at RUNTIME (chaos-rekey, the alpha
+        // shape) leaves its household-mates — which never restart — carrying
+        // its fossil key forever, and the fossil poisons the resilience custody
+        // join on both sides. So the same pass re-runs every
+        // MEMBERSHIP_RECONCILE_SECS (default 300; `0` restores boot-only). It is
+        // safe to repeat: supersede fires only on a forced 1:1 bijection, the
+        // backfill is NULL-only, and a fully-converged projection mints nothing.
+        let reconcile_secs = std::env::var("MEMBERSHIP_RECONCILE_SECS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(300);
+        let mut reconcile_shutdown = shutdown_tx.subscribe();
         tokio::spawn(async move {
             use elohim_storage::services::holochain_humans_replayer::{
                 snapshot_household_ids, ConductorMembershipReader,
@@ -4069,35 +4083,36 @@ async fn async_main(
             let reader = ConductorMembershipReader {
                 hc_client: imagodei,
             };
-            match snapshot_household_ids(&pool_clone, &ctx, &reader).await {
-                Ok(snapshot) => {
-                    // (1) NULL-only household_id backfill FIRST — populates
-                    // `humans.household_id` so the key-supersede pass below can
-                    // scope humans to their household. Consumes a clone of the
-                    // pairs; the reconcile below reuses the same snapshot. Backfill
-                    // is NULL-only so an incomplete read is harmless here (a missing
-                    // member just leaves a household_id NULL, never a wrong write).
-                    if let Err(e) =
-                        elohim_storage::services::household_backfill::run_once_by_membership(
-                            &pool_clone,
-                            snapshot.pairs.clone(),
-                        )
-                    {
-                        warn!(error = %e, "household_backfill failed (non-fatal)");
-                    }
+            loop {
+                match snapshot_household_ids(&pool_clone, &ctx, &reader).await {
+                    Ok(snapshot) => {
+                        // (1) NULL-only household_id backfill FIRST — populates
+                        // `humans.household_id` so the key-supersede pass below can
+                        // scope humans to their household. Consumes a clone of the
+                        // pairs; the reconcile below reuses the same snapshot. Backfill
+                        // is NULL-only so an incomplete read is harmless here (a missing
+                        // member just leaves a household_id NULL, never a wrong write).
+                        if let Err(e) =
+                            elohim_storage::services::household_backfill::run_once_by_membership(
+                                &pool_clone,
+                                snapshot.pairs.clone(),
+                            )
+                        {
+                            warn!(error = %e, "household_backfill failed (non-fatal)");
+                        }
 
-                    // (2) Membership-truth key SUPERSEDE + rekey cascade: converge
-                    // SET-but-stale `humans.agent_pub_key` (NON-self rows a peer
-                    // re-key fossilised) to the live membership key, cascading
-                    // `shard_locations.peer_id` + `rea_commitments.provider` so the
-                    // resilience stewarding join re-aligns. Boot-only is acceptable
-                    // for this slice: re-keys happen at deploy = restart, and this
-                    // runs on every boot. The cascade is scoped to `lamad` (the
-                    // dataplane the resilience card reads); humans are matched
-                    // h_app_id-agnostically. See the module docs for the safe-
-                    // pairing constraint (the membership entry carries no stable
-                    // human_id, so supersede fires only on an unambiguous 1:1).
-                    match elohim_storage::services::membership_identity_reconcile::reconcile_membership_keys(
+                        // (2) Membership-truth key SUPERSEDE + rekey cascade: converge
+                        // SET-but-stale `humans.agent_pub_key` (NON-self rows a peer
+                        // re-key fossilised) to the live membership key, cascading
+                        // `shard_locations.peer_id` + `rea_commitments.provider` so the
+                        // resilience stewarding join re-aligns. Runs at boot and then on
+                        // the MEMBERSHIP_RECONCILE_SECS cadence (see the loop header
+                        // above). The cascade is scoped to `lamad` (the
+                        // dataplane the resilience card reads); humans are matched
+                        // h_app_id-agnostically. See the module docs for the safe-
+                        // pairing constraint (the membership entry carries no stable
+                        // human_id, so supersede fires only on an unambiguous 1:1).
+                        match elohim_storage::services::membership_identity_reconcile::reconcile_membership_keys(
                         &pool_clone,
                         &ctx.h_app_id,
                         snapshot.pairs,
@@ -4125,12 +4140,24 @@ async fn async_main(
                             warn!(error = %e, "membership_identity_reconcile failed (non-fatal)")
                         }
                     }
+                    }
+                    Err(e) => {
+                        warn!(error = %e, "household_backfill snapshot failed (non-fatal)");
+                    }
                 }
-                Err(e) => {
-                    warn!(error = %e, "household_backfill snapshot failed (non-fatal)");
+                if reconcile_secs == 0 {
+                    break; // boot-only, by operator choice
+                }
+                tokio::select! {
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(reconcile_secs)) => {}
+                    _ = reconcile_shutdown.recv() => break,
                 }
             }
         });
+        info!(
+            reconcile_secs,
+            "membership_identity_reconcile task started (boot pass + periodic key-supersede)"
+        );
     } else {
         tracing::debug!(
             "household_id backfill skipped: db pool or imagodei conductor client unavailable"
