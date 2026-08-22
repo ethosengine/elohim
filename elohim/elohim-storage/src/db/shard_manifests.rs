@@ -164,13 +164,34 @@ pub async fn read_blob_bytes_for_manifest(
 
     let encoder = crate::sharding::ShardEncoder::new(crate::sharding::ShardConfig::default());
     let mut shards = Vec::with_capacity(manifest.shard_hashes.len());
+    let mut present_count = 0usize;
     for shard_hash in &manifest.shard_hashes {
-        let shard = blob_store.get(shard_hash).await.map_err(|e| {
-            StorageError::Internal(format!(
-                "shard {shard_hash} missing while reassembling {hash} from its manifest: {e}"
-            ))
-        })?;
-        shards.push(Some(shard));
+        match blob_store.get(shard_hash).await {
+            Ok(shard) => {
+                present_count += 1;
+                shards.push(Some(shard));
+            }
+            // A missing shard is a per-slot `None`, not a hard failure:
+            // `ShardEncoder::reconstruct` accepts `&[Option<Vec<u8>>]` and for
+            // `rs-*` encodings tolerates up to `total_shards - data_shards`
+            // absent slots — bailing on the FIRST miss threw away exactly the
+            // resilience the parity shards were stored to provide.
+            Err(_) => shards.push(None),
+        }
+    }
+
+    // Mirror `reconstruct`'s own floor (sharding.rs, `present_count >=
+    // data_shards`) so the failure is honest and named HERE, where the shard
+    // hashes are known: below the floor no encoding can recover the bytes.
+    // `"none"`/`"chunked"` manifests have `data_shards == total_shards`, so
+    // for them any missing shard still errors, unchanged.
+    if present_count < manifest.data_shards as usize {
+        return Err(StorageError::Internal(format!(
+            "cannot reassemble {hash} from its {encoding} manifest: only {present_count} of {total} shards present locally, need at least {needed}",
+            encoding = manifest.encoding,
+            total = manifest.shard_hashes.len(),
+            needed = manifest.data_shards,
+        )));
     }
 
     encoder
@@ -495,6 +516,101 @@ mod tests {
             bytes, composite,
             "reassembled bytes must equal the original composite"
         );
+    }
+
+    /// Seeds an `rs-4-7`-encoded blob the shape the RS band leaves on disk:
+    /// every shard under its own content hash, no composite under the
+    /// blob_hash — except the first `absent_shards` shards, which are never
+    /// stored (simulating local loss / partial replication). Returns the
+    /// manifest and the original bytes. Uses a small-threshold config to hit
+    /// the RS band without a >64MB fixture; reconstruction reads its
+    /// parameters from the MANIFEST, so the reader's default-config encoder
+    /// still applies.
+    async fn seed_rs_stored_blob(
+        blob_store: &BlobStore,
+        absent_shards: usize,
+    ) -> (ShardManifest, Vec<u8>) {
+        let encoder = crate::sharding::ShardEncoder::new(crate::sharding::ShardConfig {
+            shard_size: 25,
+            rs_data_shards: 4,
+            rs_parity_shards: 3,
+            rs_threshold: 50,
+            single_shard_max: 10,
+        });
+
+        let data: Vec<u8> = (0..100u32).map(|i| (i % 256) as u8).collect();
+        let manifest = encoder
+            .create_manifest(&data, "application/octet-stream", "commons")
+            .expect("create rs manifest");
+        assert_eq!(manifest.encoding, "rs-4-7");
+
+        let shards = encoder
+            .create_shards(&data, &manifest.encoding)
+            .expect("create rs shards");
+        assert_eq!(shards.len(), manifest.shard_hashes.len());
+
+        for shard in shards.iter().skip(absent_shards) {
+            blob_store.store(shard).await.expect("store shard");
+        }
+
+        (manifest, data)
+    }
+
+    /// The resilience defect this closes: an `rs-*` manifest missing ONE
+    /// shard locally must still reconstruct — `ShardEncoder::reconstruct`
+    /// tolerates up to `total_shards - data_shards` absent slots, and the
+    /// old loop bailed on the FIRST miss instead of passing `None` through.
+    #[tokio::test]
+    async fn read_blob_bytes_for_manifest_tolerates_missing_shards_within_rs_parity() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let blob_store = BlobStore::new_memory();
+
+        // 2 of 7 shards absent — rs-4-7 tolerates up to 3.
+        let (manifest, data) = seed_rs_stored_blob(&blob_store, 2).await;
+        record_generated_manifest(
+            &mut conn,
+            &format!("blob:{}", manifest.blob_cid),
+            "lamad",
+            &manifest,
+        )
+        .expect("seed manifest");
+
+        let bytes = read_blob_bytes_for_manifest(&mut conn, &blob_store, &manifest.blob_hash)
+            .await
+            .expect("rs parity must cover the missing shards");
+        assert_eq!(bytes, data, "reconstructed bytes must equal the original");
+    }
+
+    /// More shards absent than parity allows: an honest error naming the
+    /// shortfall (present vs needed), never fabricated bytes.
+    #[tokio::test]
+    async fn read_blob_bytes_for_manifest_errors_honestly_when_missing_exceeds_rs_parity() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let blob_store = BlobStore::new_memory();
+
+        // 4 of 7 shards absent — only 3 remain, below the data_shards=4 floor.
+        let (manifest, _data) = seed_rs_stored_blob(&blob_store, 4).await;
+        record_generated_manifest(
+            &mut conn,
+            &format!("blob:{}", manifest.blob_cid),
+            "lamad",
+            &manifest,
+        )
+        .expect("seed manifest");
+
+        let result =
+            read_blob_bytes_for_manifest(&mut conn, &blob_store, &manifest.blob_hash).await;
+        match result {
+            Err(StorageError::Internal(msg)) => {
+                assert!(
+                    msg.contains("only 3 of 7 shards present") && msg.contains("need at least 4"),
+                    "error must name the real shortfall, got: {msg}"
+                );
+            }
+            other => panic!("expected honest Internal error, got {other:?}"),
+        }
     }
 
     /// No composite AND no manifest known: honestly `NotFound`, never a panic

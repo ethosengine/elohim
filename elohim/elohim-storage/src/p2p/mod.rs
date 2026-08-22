@@ -2275,6 +2275,23 @@ fn parse_http_port_from_agent_version(agent_version: &str) -> Option<u16> {
     agent_version
         .rsplit_once("http_port=")
         .and_then(|(_, port_str)| port_str.trim().parse::<u16>().ok())
+        // Port 0 is never a servable HTTP port ("any port" bind syntax at
+        // best) — treat it as absent so callers fall back to the default
+        // instead of projecting an undialable row.
+        .filter(|port| *port != 0)
+}
+
+/// Decide a delivery-peer row's `http_port` on an mDNS (re)discovery.
+///
+/// `ConnectionClosed` clears `identify_cache`, so a fast mDNS rediscovery can
+/// observe `cached = None` for a peer whose REAL port was already learned on
+/// the previous connection and is still on the existing row. Resetting to
+/// `DEFAULT_HTTP_PORT` there regressed a correct row until Identify
+/// re-completed — instead, prefer the cached (freshest) self-declaration,
+/// then the row's existing value, and only for a never-identified,
+/// never-seen peer fall back to the default.
+fn resolve_discovery_http_port(cached: Option<u16>, existing: Option<u16>) -> u16 {
+    cached.or(existing).unwrap_or(DEFAULT_HTTP_PORT)
 }
 
 #[cfg(test)]
@@ -2287,7 +2304,10 @@ mod http_port_advertisement_tests {
     //! `agent_version` suffix and projects onto the `DeliveryPeer` HTTP row
     //! as `httpPort`; an unparseable/absent suffix (an un-upgraded peer)
     //! degrades to `DEFAULT_HTTP_PORT` rather than erroring.
-    use super::{parse_http_port_from_agent_version, DeliveryPeer, DEFAULT_HTTP_PORT};
+    use super::{
+        parse_http_port_from_agent_version, resolve_discovery_http_port, DeliveryPeer,
+        DEFAULT_HTTP_PORT,
+    };
 
     #[test]
     fn parses_http_port_suffix_from_agent_version() {
@@ -2313,6 +2333,40 @@ mod http_port_advertisement_tests {
     fn malformed_suffix_returns_none() {
         let agent_version = "elohim-storage/1.2.3 http_port=not-a-port";
         assert_eq!(parse_http_port_from_agent_version(agent_version), None);
+    }
+
+    /// Port 0 is never a servable HTTP port — a `http_port=0` suffix is
+    /// treated as absent (→ default fallback), not projected onto peer rows.
+    #[test]
+    fn zero_port_suffix_is_rejected_as_absent() {
+        let agent_version = "elohim-storage/1.2.3+abc1234 http_port=0";
+        assert_eq!(parse_http_port_from_agent_version(agent_version), None);
+        assert_eq!(
+            parse_http_port_from_agent_version(agent_version).unwrap_or(DEFAULT_HTTP_PORT),
+            DEFAULT_HTTP_PORT
+        );
+    }
+
+    /// The transient regression this pins: `ConnectionClosed` clears
+    /// `identify_cache`, so a fast mDNS rediscovery sees `cached = None` for
+    /// a peer whose real port (e.g. jessica's :8091) is already on the
+    /// existing `delivery_peers` row. The row must KEEP that port rather
+    /// than resetting to `DEFAULT_HTTP_PORT` until Identify re-completes.
+    #[test]
+    fn rediscovery_without_identify_cache_keeps_existing_row_port() {
+        assert_eq!(resolve_discovery_http_port(None, Some(8091)), 8091);
+    }
+
+    /// A fresh Identify declaration wins over whatever the row held.
+    #[test]
+    fn rediscovery_prefers_cached_identify_port_over_existing_row() {
+        assert_eq!(resolve_discovery_http_port(Some(8092), Some(8091)), 8092);
+    }
+
+    /// A never-identified, never-seen peer starts at the default.
+    #[test]
+    fn first_discovery_without_identify_defaults() {
+        assert_eq!(resolve_discovery_http_port(None, None), DEFAULT_HTTP_PORT);
     }
 
     fn sample_peer(http_port: u16) -> DeliveryPeer {
@@ -5747,14 +5801,15 @@ impl P2PNode {
                     // libp2p transport port and has no bearing on it (see
                     // `DEFAULT_HTTP_PORT`'s doc comment). If the Identify
                     // handshake has already completed for this peer, its
-                    // self-declared port is cached here; otherwise this mDNS
-                    // insert defaults to `DEFAULT_HTTP_PORT` and the Identify
-                    // handler refreshes the row once the handshake lands.
-                    let http_port = self
-                        .identify_cache
-                        .get(&key)
-                        .map(|c| c.http_port)
-                        .unwrap_or(DEFAULT_HTTP_PORT);
+                    // self-declared port is cached here. When the cache is
+                    // empty (never identified, OR just cleared by
+                    // `ConnectionClosed`), an EXISTING row keeps its
+                    // previously-learned port rather than regressing to the
+                    // default — see `resolve_discovery_http_port`. Only a
+                    // never-seen, never-identified peer starts at
+                    // `DEFAULT_HTTP_PORT`; the Identify handler refreshes the
+                    // row once the handshake lands.
+                    let cached_http_port = self.identify_cache.get(&key).map(|c| c.http_port);
 
                     self.delivery_peers
                         .entry(key.clone())
@@ -5764,7 +5819,8 @@ impl P2PNode {
                             }
                             p.last_seen = now_ms;
                             p.network = "lan".to_string();
-                            p.http_port = http_port;
+                            p.http_port =
+                                resolve_discovery_http_port(cached_http_port, Some(p.http_port));
                         })
                         .or_insert_with(|| DeliveryPeer {
                             peer_id: key,
@@ -5772,7 +5828,7 @@ impl P2PNode {
                             network: "lan".to_string(),
                             capabilities: vec!["serves_compressed".to_string()],
                             last_seen: now_ms,
-                            http_port,
+                            http_port: resolve_discovery_http_port(cached_http_port, None),
                             // Enriched at request time by the HTTP handler — the
                             // discovery path has no DB access.
                             household_id: None,
