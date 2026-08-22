@@ -18,3 +18,4 @@ appears here: the fleet confirms a batch; it does not move this table.
 |---|---|---|---|---|---|---|---|---|---|
 | −1 | 2026-08-21 13:43 | 194 | 101 | 39 | 1 | 26 | 52 % | ~516 `@wip` total | first inventory, pre-layering, alpha-shaped tags |
 | 0 | 2026-08-21 19:58 | 363 | 106 | 55 | 159 | 35 | 29 % | 482 (101 bound / 305 partial / 76 none) | post-layering: un-parking + `@e2e` lifted eligibility; the 159 undefined were placeholders → `@wip`-swept (103) |
+| 1b | 2026-08-22 01:32 | 227 | 134 | 58 | 0 | 35 | 59 % | census re-run pending | wave-1 was unmeasurable (container restart killed the lane); regen6 full chain: corpus fix landed `/lamad` on both doorways, boot-order restart fixed empty `servedBundleHeads`; saga scoped 15/6/1 — 4 of 6 saga fails share one cause-chain (ch05 no co-steward pin → ch09/10/11), expected to collapse when the chunk-aware storage binary (c04c2b423) rolls |
