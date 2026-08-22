@@ -8,7 +8,7 @@ metadata:
   title: "Fleet ceiling: three concurrent agents, orchestrator does design"
   type: feedback
   originSessionId: 77071821-7182-463a-ae84-0c496dd5f84e
-  modified: 2026-08-22T04:12:21.457Z
+  modified: 2026-08-22T04:38:31.043Z
 ---
 
 Operator directive (2026-08-22): keep **three agents active at all times** — more than that risks crashing the dev workspace (it has restarted twice under load). The orchestrator's job while the fleet runs: watch what comes back, look for opportunities to accelerate development, improve the test suite, enhance the valueflow, pursue design and performance improvements, help anything that escalates, and supply design input when an implementing agent needs it to finish coherently.
@@ -17,4 +17,4 @@ Operator directive (2026-08-22): keep **three agents active at all times** — m
 
 **Terminal goal (operator, 2026-08-22):** as agents prove features working/complete on the localdev mesh, the point is to get the **resiliency saga completed** (all 11 chapters green). Queue ordering serves saga chapters first.
 
-**How to apply:** Treat the fleet as a fixed-size worker pool: when one agent finishes, backfill from the queue immediately; never spawn a 4th while three run. The orchestrator stays out of grunt work and does judgment: triage returns, design decisions, queue ordering. Related: [[delegate-narrow-tasks-to-cheaper-tiers]], [[subagent-disjointness-read-write]].
+**How to apply:** Treat the fleet as a fixed-size worker pool: when one agent finishes, backfill from the queue immediately; never spawn a 4th while three run. The ceiling counts **the whole dispatch tree, not just top-level agents** (re-affirmed by the operator 2026-08-22: "over 3 dispatched agents and you start risking crashing the container") — a delegated task whose instructions tell it to spawn its own blind-reader/sub-analyst pushes the total to 4. So either (a) run 2 top-level + let one spawn its child, or (b) dispatch 3 top-level and pull child-spawning duties (blind-reader loops, sub-analysts) back to the orchestrator to run when a slot frees. The orchestrator stays out of grunt work and does judgment: triage returns, design decisions, queue ordering. Related: [[delegate-narrow-tasks-to-cheaper-tiers]], [[subagent-disjointness-read-write]].
