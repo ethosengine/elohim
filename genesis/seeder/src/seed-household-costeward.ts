@@ -41,6 +41,23 @@
  * Which is why this seeder runs three legs in that order, and why leg 1 is a
  * hard precondition for legs 2-3 counting at all.
  *
+ * ## Leg 0 — the household consent pin (ch05 station A)
+ *
+ * Runs BEFORE the ladder because it is the CONSENT the whole downstream
+ * pipeline (provide tick → mishpat notarization → rea mirror) hangs off:
+ * saga ch05 station A reads `GET /api/v1/pins` on doorway alpha-A for an
+ * active item pin whose head references the commons EPR, and ch11's first
+ * scenario reads `GET /api/v1/pins/<id>/pull` — pull state only materializes
+ * from an active pin. `POST /api/v1/pins` is the explicit stewardship-
+ * acceptance act (`{headRef, kind:"item", provide:true}` — the same own-node
+ * surface acquisition-pins.feature exercises); the handler upserts on
+ * (agent, head_ref, kind), so a re-run is a no-op by construction, and this
+ * leg additionally GETs-before-POSTs so an existing active pin is reported
+ * `[=]` rather than re-written. The pin is device-keyed on the wire (the
+ * create handler's slice-1 identity placeholder), so the household member's
+ * live agent key is resolved as a WITNESS of "this is household-dowell's
+ * node", never sent in the body — no identity is fabricated.
+ *
  * ## Leg 1 — distribution ladder (the ch10 enabler)
  *
  * Tried in honesty order, first rung that answers wins:
@@ -123,6 +140,13 @@ export const DEFAULT_HOUSEHOLD_ID = 'household-dowell';
 
 /** The Act I co-steward — jessica co-stewards matthew's landing EPR. */
 export const DEFAULT_CO_STEWARD_HUMAN_ID = 'human-jessica-spouse';
+
+/**
+ * The household member whose node declares the leg-0 consent pin — matthew,
+ * because doorway alpha-A (the surface ch05 station A reads) proxies HIS
+ * storage's pins list.
+ */
+export const DEFAULT_PIN_STEWARD_HUMAN_ID = 'human-matthew-manager';
 
 /**
  * Bytes the co-steward's `content`-variant pledge records for legibility.
@@ -292,18 +316,50 @@ function storageBase(humanId: string): string {
 }
 
 /**
+ * Retry a transiently-failing probe a few times with a short backoff.
+ *
+ * Exists because conductor-backed key resolution (`GET /auth/me`) was seen to
+ * time out transiently on the household mesh (wave-2b) while the pod was
+ * otherwise healthy. Three attempts, short backoff — this is a flake
+ * absorber, never a wait-for-deploy loop.
+ */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  attempts = 3,
+  backoffMs = 1500,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        await new Promise(resolve => setTimeout(resolve, backoffMs * attempt));
+      }
+    }
+  }
+  throw lastError;
+}
+
+/**
  * The agent key a human's pod reports RIGHT NOW.
  *
  * No fallback to the `humans` row on purpose (same posture as
  * seed-commitments' `resolveCustodyPeerIds`): an unreachable pod is an honest
  * seed failure, never authority to author a commitment in a stale identity
  * namespace.
+ *
+ * `storageUrlOverride` bypasses the PEER_STORAGE_URLS/template lookup when the
+ * caller already knows the pod (leg 0 probes the SAME node it pins on).
  */
 export async function resolveLiveAgentKey(
   humanId: string,
   fetchImpl: typeof fetch = fetch,
+  storageUrlOverride?: string,
 ): Promise<string> {
-  const url = `${storageBase(humanId)}/auth/me`;
+  const base = (storageUrlOverride ?? storageBase(humanId)).replace(/\/+$/, '');
+  const url = `${base}/auth/me`;
   const response = await fetchImpl(url, { signal: AbortSignal.timeout(5000) });
   if (!response.ok) {
     throw new Error(`${humanId}: GET ${url} returned HTTP ${response.status}`);
@@ -341,6 +397,83 @@ async function readContentRow(
     throw new Error(`GET ${url} returned HTTP ${response.status}`);
   }
   return (await response.json()) as Record<string, unknown>;
+}
+
+// =============================================================================
+// Leg 0 — household consent pin (ch05 station A)
+// =============================================================================
+
+export interface ConsentPinLegResult {
+  status: 'already-pinned' | 'created' | 'failed';
+  detail: string;
+}
+
+/**
+ * Ensure the household's stewardship consent pin exists on the pin node's own
+ * `/api/v1/pins` surface — the explicit-consent leg saga ch05 station A reads.
+ *
+ * GET-before-POST: an existing ACTIVE item pin whose headRef matches either
+ * spelling (`elohim-host-landing` / `epr:elohim-host-landing` — the namespace
+ * rule station A guards) is recognized and left alone. Otherwise POST
+ * `{headRef, kind:"item", provide:true}`; the handler upserts on
+ * (agent, head_ref, kind), so even a raced double-create converges on one row.
+ * The bare spelling is posted deliberately: current handlers strip `epr:` at
+ * the boundary, and on older binaries a bare headRef still groups correctly
+ * on the `/pull` route's exact-match lookup.
+ */
+export async function seedConsentPin(opts: {
+  storageUrl: string;
+  contentId: string;
+  fetchImpl?: typeof fetch;
+}): Promise<ConsentPinLegResult> {
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  const base = opts.storageUrl.replace(/\/+$/, '');
+  const accepted = new Set([opts.contentId, `epr:${opts.contentId}`]);
+
+  const list = await fetchImpl(`${base}/api/v1/pins`, { signal: AbortSignal.timeout(10_000) });
+  if (!list.ok) {
+    return {
+      status: 'failed',
+      detail: `GET ${base}/api/v1/pins → HTTP ${list.status}`,
+    };
+  }
+  const pins = (((await list.json()) as { pins?: unknown }).pins ?? []) as Record<
+    string,
+    unknown
+  >[];
+  const existing = pins.find(
+    p => accepted.has(String(p['headRef'])) && p['status'] === 'active' && p['kind'] === 'item',
+  );
+  if (existing) {
+    return {
+      status: 'already-pinned',
+      detail: `pin #${String(existing['id'])} already active for ${String(existing['headRef'])} (idempotent — no write)`,
+    };
+  }
+
+  const created = await fetchImpl(`${base}/api/v1/pins`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ headRef: opts.contentId, kind: 'item', provide: true }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  const text = await created.text();
+  if (!created.ok) {
+    return {
+      status: 'failed',
+      detail: `POST ${base}/api/v1/pins → HTTP ${created.status} ${text.slice(0, 200)}`,
+    };
+  }
+  let pinId = '?';
+  try {
+    pinId = String((JSON.parse(text) as { id?: unknown }).id ?? '?');
+  } catch {
+    // 2xx with an unparseable body still created the pin; id stays unknown.
+  }
+  return {
+    status: 'created',
+    detail: `pin #${pinId} created (headRef=${opts.contentId}, kind=item, provide=true) → HTTP ${created.status}`,
+  };
 }
 
 // =============================================================================
@@ -643,6 +776,43 @@ if (isMain) {
 
   let partial = 0;
 
+  // --- Leg 0 -----------------------------------------------------------------
+  console.log('\n-- leg 0: household consent pin (ch05 station A) --');
+  const pinStewardHumanId = process.env.PIN_STEWARD_HUMAN_ID || DEFAULT_PIN_STEWARD_HUMAN_ID;
+  // Doorway alpha-A reads its OWN storage's pins list, so the pin lands on the
+  // pin steward's node — STORAGE_URL when set (the local-mesh spelling), else
+  // the per-human resolution the other legs use.
+  const pinStorageUrl = (process.env.STORAGE_URL || storageBase(pinStewardHumanId)).replace(
+    /\/+$/,
+    '',
+  );
+  // Witness the node's live member identity (this is household-dowell's
+  // consent, declared from its member's device). The pin wire is device-keyed
+  // (slice-1 placeholder), so the key is logged, never sent — and a transient
+  // conductor key-resolution timeout (seen on wave-2b) is absorbed by retry,
+  // while a persistent failure is reported without blocking the consent act.
+  try {
+    const pinNodeKey = await withRetry(() =>
+      resolveLiveAgentKey(pinStewardHumanId, fetch, pinStorageUrl),
+    );
+    console.log(`  [=] ${pinStewardHumanId} live agent key: ${pinNodeKey.slice(0, 20)}...`);
+  } catch (error) {
+    console.warn(
+      `  [?] could not witness ${pinStewardHumanId}'s live agent key at ${pinStorageUrl} — ` +
+        `pin proceeds device-keyed (${String(error)})`,
+    );
+  }
+  try {
+    const pinResult = await seedConsentPin({ storageUrl: pinStorageUrl, contentId });
+    const pinMark =
+      pinResult.status === 'failed' ? 'X' : pinResult.status === 'already-pinned' ? '=' : '+';
+    console.log(`  [${pinMark}] ${pinStorageUrl} ${pinResult.status} — ${pinResult.detail}`);
+    if (pinResult.status === 'failed') partial += 1;
+  } catch (error) {
+    console.error(`  [X] consent pin leg failed — ${String(error)}`);
+    partial += 1;
+  }
+
   // --- Leg 1 -----------------------------------------------------------------
   console.log('\n-- leg 1: distribution ladder (ch10 enabler) --');
   // Run the ladder on EVERY peer's storage, not just the authoring one.
@@ -685,7 +855,7 @@ if (isMain) {
   console.log('\n-- leg 2: co-steward replicates-commons agreement (ch09 count) --');
   let providerAgentKey = '';
   try {
-    providerAgentKey = await resolveLiveAgentKey(coStewardHumanId);
+    providerAgentKey = await withRetry(() => resolveLiveAgentKey(coStewardHumanId));
     console.log(`  [=] ${coStewardHumanId} live agent key: ${providerAgentKey.slice(0, 20)}...`);
   } catch (error) {
     console.error(`  [X] cannot resolve ${coStewardHumanId}'s live agent key — ${String(error)}`);
