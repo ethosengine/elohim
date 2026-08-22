@@ -160,6 +160,27 @@ pub struct Content {
     #[serde(skip)]
     #[ts(skip)]
     pub canonical_earned: Option<i32>,
+    /// LIVENESS verdict for `dht_anchor_hash`, taken against the CURRENT local
+    /// conductor incarnation: `"live"` | `"dead"` | `"unverified"` (NULL ≡
+    /// unverified). See [`crate::db::content_diesel::AnchorState`].
+    ///
+    /// `dht_anchor_hash` answers "was this ever authored?"; this answers "can
+    /// anybody still produce the action behind it?". They diverge after a
+    /// conductor re-key, where the hash survives in the kept projection but the
+    /// chain that signed it does not (2026-08-21 RCA). NULL is the honest
+    /// default — absence of an answer must never do the work of evidence.
+    /// Internal-only on this model (`serde(skip)`/`ts(skip)`); the honest READ
+    /// surface is `ContentView::dht_anchor_state`. Classification: C
+    /// (operational — the next reconcile sweep re-derives it).
+    #[serde(skip)]
+    #[ts(skip)]
+    pub dht_anchor_state: Option<String>,
+    /// When the [`Self::dht_anchor_state`] verdict was taken (SQLite datetime).
+    /// Makes a stale `dead` legible as stale rather than eternal. NULL = never
+    /// asked. Classification: C.
+    #[serde(skip)]
+    #[ts(skip)]
+    pub dht_anchor_checked_at: Option<String>,
 }
 
 /// Content with tags attached (API response)

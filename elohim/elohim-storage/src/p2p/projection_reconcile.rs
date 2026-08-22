@@ -2348,6 +2348,59 @@ async fn witness_ghost_anchors(
         return;
     }
 
+    // ── RECORD THE LIVENESS VERDICT ─────────────────────────────────────────
+    //
+    // `ghosts` IS the dead-anchor set, and it costs nothing extra to say so:
+    // these ids are anchored (the query above filtered `dht_anchor_hash IS NOT
+    // NULL`) AND this conductor answered ABSENT for them (that is what put them
+    // in `ghost_candidates`). The verdict rides the round-trip `heal_content`
+    // already paid — the read path must NEVER buy its own.
+    //
+    // Why this matters (2026-08-21 re-key RCA): before this, the sweep tried to
+    // re-author these rows and, when that did not land, left them looking
+    // exactly like healthy rows — `dht_anchor_hash` set, `trust: "notarized"`,
+    // invisible to `reanchor_backfill`'s NULL-anchor selection. Persisting the
+    // verdict makes a dead anchor say so on the read AND puts the row on the
+    // heal loop's second arm (`list_dead_anchor_content_ids`), so a re-author
+    // that fails this tick is retried instead of forgotten.
+    //
+    // Honest about its own freshness: `heal_content`'s backoff replay can put an
+    // id here from a CACHED absence rather than a fresh call (bounded by
+    // `config::heal_missing_backoff_window`). The verdict recorded is therefore
+    // "this conductor's standing answer is absent", stamped with when we last
+    // acted on it — never a claim that a call was made this instant.
+    {
+        let ghost_ids: Vec<String> = ghosts.iter().map(|(id, _, _)| id.clone()).collect();
+        match pool.get() {
+            Ok(mut conn) => {
+                match crate::db::content_diesel::mark_anchor_state(
+                    &mut conn,
+                    &app_ctx,
+                    &ghost_ids,
+                    crate::db::content_diesel::AnchorState::Dead,
+                ) {
+                    Ok(n) if n > 0 => tracing::warn!(
+                        marked = n,
+                        "projection-reconcile[ghost-witness]: rows anchored to actions this \
+                         conductor cannot resolve — marked dead (read surface downgrades from \
+                         notarized; queued for re-authoring under the current key)"
+                    ),
+                    Ok(_) => {}
+                    // Non-fatal by design: failing to RECORD the verdict must
+                    // never stop the sweep from acting on it.
+                    Err(e) => tracing::warn!(
+                        error = %e,
+                        "projection-reconcile[ghost-witness]: could not record dead-anchor verdict"
+                    ),
+                }
+            }
+            Err(e) => tracing::warn!(
+                error = %e,
+                "projection-reconcile[ghost-witness]: db conn failed for dead-anchor verdict"
+            ),
+        }
+    }
+
     let content_service = crate::services::ContentService::new(
         pool.clone(),
         app_ctx,

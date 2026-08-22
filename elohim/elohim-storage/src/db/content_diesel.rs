@@ -39,6 +39,207 @@ pub enum MinTrust {
     Green,
 }
 
+// ============================================================================
+// Anchor liveness (the DEAD-anchor class)
+// ============================================================================
+
+/// Liveness verdict for a row's `dht_anchor_hash`, taken against the CURRENT
+/// local conductor incarnation.
+///
+/// `dht_anchor_hash` present/absent is a ONE-bit test — "was this ever
+/// authored?" — and that is the only test `reanchor_backfill` applied. After a
+/// conductor re-key (chain + keystore deleted, storage projection deliberately
+/// kept) the column still holds action hashes signed by an agent key no living
+/// chain can present. A DEAD anchor is indistinguishable from a LIVE one under
+/// present/absent, so those rows were skipped as healthy forever while the read
+/// surface went on calling them `notarized` — the strongest provenance claim
+/// this system makes, asserted about a signature nobody can produce
+/// (2026-08-21 RCA, `genesis/data/timeline/backlog/`
+/// `rekeyed-peer-serves-dead-key-anchors-as-notarized.md`).
+///
+/// The verdict is written by the reconcile SWEEP (which already pays the
+/// conductor round-trip that produces it — see
+/// `p2p::projection_reconcile::witness_ghost_anchors`) and READ from SQL. It
+/// must never be computed per-read: a per-read conductor call is exactly the
+/// cost this projection exists to avoid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnchorState {
+    /// The local conductor resolved this id — the anchor is backed.
+    Live,
+    /// The row IS anchored and the local conductor answered ABSENT for it. The
+    /// re-adoption candidate class: re-author under the live key, never
+    /// silently rewrite.
+    Dead,
+    /// Not asked, or the ask was inconclusive (transport failure, backpressure,
+    /// or the row carries no anchor to judge). The honest default — absence of
+    /// an answer must never do the work of evidence (cf. the ghost-declaration
+    /// deadlock, 2026-08-10).
+    Unverified,
+}
+
+impl AnchorState {
+    /// Column form. `Unverified` persists as NULL, not a literal, so an
+    /// un-swept row and an inconclusive sweep are the SAME state on disk
+    /// (there is no third thing to distinguish, and a literal would make the
+    /// default look like a measurement).
+    pub fn as_column(self) -> Option<&'static str> {
+        match self {
+            AnchorState::Live => Some("live"),
+            AnchorState::Dead => Some("dead"),
+            AnchorState::Unverified => None,
+        }
+    }
+
+    /// Read the column back. Any unrecognized literal degrades to
+    /// `Unverified` — a value this build does not understand is not evidence
+    /// of death, and must never be laundered into one.
+    pub fn from_column(raw: Option<&str>) -> Self {
+        match raw {
+            Some("live") => AnchorState::Live,
+            Some("dead") => AnchorState::Dead,
+            _ => AnchorState::Unverified,
+        }
+    }
+
+    /// Wire form for the read surface — `ContentView::dht_anchor_state`.
+    /// Unlike [`Self::as_column`], `Unverified` is NAMED here: a reader asking
+    /// "can you prove this?" deserves "I have not checked" rather than a
+    /// missing key that reads as an older server.
+    pub fn as_wire(self) -> &'static str {
+        match self {
+            AnchorState::Live => "live",
+            AnchorState::Dead => "dead",
+            AnchorState::Unverified => "unverified",
+        }
+    }
+
+    /// True when this verdict revokes the row's claim to notarized provenance.
+    pub fn is_dead(self) -> bool {
+        matches!(self, AnchorState::Dead)
+    }
+}
+
+/// The local conductor's answer for one content id, reduced to the three
+/// outcomes that bear on anchor liveness.
+///
+/// Mirrors `seam_contracts::Answer` as consumed by
+/// `p2p::projection_reconcile::heal_content`, but stays a LOCAL leaf type: the
+/// classifier is pure and unit-testable without the p2p layer, and
+/// `db::content_diesel` must not take a dependency UP on it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConductorAnswer {
+    /// The conductor resolved a head for this id.
+    Present,
+    /// The conductor has NO record — both the canonical link and the per-root
+    /// chain are locally absent.
+    Absent,
+    /// The question could not be put (transport failure, backpressure, budget
+    /// exhausted). NOT an answer.
+    Unreachable,
+}
+
+/// Classify one row's anchor liveness. Pure + total.
+///
+/// The two load-bearing refusals:
+/// - A row with **no anchor** is `Unverified`, NEVER `Dead`. The NULL-anchor
+///   class belongs to `reanchor_backfill`'s bootstrap arm; collapsing the two
+///   would let a never-authored row enter the re-adoption path twice.
+/// - An **unreachable** conductor is `Unverified`, NEVER `Dead`. Downgrading a
+///   row's provenance because the transport hiccuped would make silence into
+///   evidence — the precise failure the ghost-declaration deadlock taught.
+pub fn classify_anchor_state(anchor: Option<&str>, answer: ConductorAnswer) -> AnchorState {
+    match (anchor, answer) {
+        (None, _) => AnchorState::Unverified,
+        (Some(a), _) if a.trim().is_empty() => AnchorState::Unverified,
+        (Some(_), ConductorAnswer::Present) => AnchorState::Live,
+        (Some(_), ConductorAnswer::Absent) => AnchorState::Dead,
+        (Some(_), ConductorAnswer::Unreachable) => AnchorState::Unverified,
+    }
+}
+
+/// Record the liveness verdict for a set of ids, stamping `dht_anchor_checked_at`.
+///
+/// Bulk (ONE statement per call) because the caller is a sweep: the whole point
+/// of persisting the verdict is that the READ path never pays for it.
+/// Deliberately scoped to `dht_anchor_hash IS NOT NULL` — a NULL-anchor row has
+/// no anchor to judge, and marking one would hand `reanchor_backfill` the same
+/// row on both of its arms.
+///
+/// NOTE: same `SQLITE_MAX_VARIABLE_NUMBER` caveat as [`content_ids_present`] —
+/// chunk large id sets.
+pub fn mark_anchor_state(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    ids: &[String],
+    state: AnchorState,
+) -> Result<usize, StorageError> {
+    use diesel::dsl::sql;
+    use diesel::sql_types::Text;
+
+    if ids.is_empty() {
+        return Ok(0);
+    }
+    diesel::update(
+        content::table
+            .filter(content::h_app_id.eq(&ctx.h_app_id))
+            .filter(content::id.eq_any(ids))
+            .filter(content::dht_anchor_hash.is_not_null()),
+    )
+    .set((
+        content::dht_anchor_state.eq(state.as_column()),
+        content::dht_anchor_checked_at.eq(sql::<Text>("CURRENT_TIMESTAMP").nullable()),
+    ))
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("mark_anchor_state failed: {e}")))
+}
+
+/// Heal candidates for the DEAD-anchor class — the second arm
+/// `reanchor_backfill` was missing.
+///
+/// The deliberate twin of [`list_unanchored_content_ids`], and DISJOINT from it
+/// by construction (`dht_anchor_hash IS NOT NULL` here, `IS NULL` there), so no
+/// row can enter the sweep on both arms. Same `(id, reach, content_type)` shape
+/// so the caller's re-author loop is shared, and the same
+/// `(created_at, id)` ordering so a capped sweep drains oldest-first
+/// deterministically.
+pub fn list_dead_anchor_content_ids(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    limit: i64,
+) -> Result<Vec<(String, String, String)>, StorageError> {
+    if limit <= 0 {
+        return Ok(Vec::new());
+    }
+    content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::dht_anchor_hash.is_not_null())
+        .filter(content::dht_anchor_state.eq("dead"))
+        .select((content::id, content::reach, content::content_type))
+        .order((content::created_at.asc(), content::id.asc()))
+        .limit(limit)
+        .load::<(String, String, String)>(conn)
+        .map_err(|e| StorageError::Internal(format!("list_dead_anchor_content_ids failed: {e}")))
+}
+
+/// Count rows standing in the DEAD-anchor class — rows this node is currently
+/// serving under an anchor its own conductor cannot resolve. Counted INTO the
+/// `pending` the sweep publishes to `/p2p/status` (see
+/// `services::reanchor_backfill::run_once`), so `caughtUp` cannot read green
+/// while a dead population stands; the two arms stay separately legible in
+/// `ReanchorReport` and the sweep's log line.
+pub fn count_dead_anchor_content(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+) -> Result<i64, StorageError> {
+    content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::dht_anchor_hash.is_not_null())
+        .filter(content::dht_anchor_state.eq("dead"))
+        .count()
+        .get_result(conn)
+        .map_err(|e| StorageError::Internal(format!("count_dead_anchor_content failed: {e}")))
+}
+
 /// Apply the trust gate as a per-row WHERE filter on a boxed `content` query.
 ///
 /// REQ-N7: this is a per-row WHERE filter, never a fail-closed collect. The
@@ -1018,6 +1219,16 @@ pub fn upsert_with_anchor(
             }
         }
     }
+
+    // REVIVE. Every path above reached here by the conductor RETURNING an
+    // action hash for this id, which is a live observation of exactly the thing
+    // `dht_anchor_state` records. Stamp it `live` in ONE statement rather than
+    // threading the column through four SET clauses — and, load-bearing, this
+    // is what retires a row from the DEAD-anchor heal arm once it has been
+    // re-authored under the current key. Without it a healed row would be
+    // re-selected every sweep forever (the same perpetual-retry shape the
+    // already-anchored recovery fixed on the NULL arm).
+    mark_anchor_state(conn, ctx, &[id.to_string()], AnchorState::Live)?;
 
     Ok(())
 }
@@ -2219,6 +2430,8 @@ mod tests {
                 declared_head_at BIGINT,
                 canonical_declared_at BIGINT,
                 canonical_earned INTEGER,
+                dht_anchor_state TEXT,
+                dht_anchor_checked_at TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
@@ -4716,5 +4929,238 @@ mod tests {
             row.crdt_converged_at.is_some(),
             "amber marker is harmless residue — never cleared by the stamp"
         );
+    }
+
+    // ========================================================================
+    // Anchor liveness — the DEAD-anchor class (2026-08-21 re-key RCA)
+    // ========================================================================
+
+    /// Insert an anchored row directly, so the liveness tests do not depend on
+    /// the create/upsert paths they are meant to be independent of.
+    fn insert_anchored_row(
+        conn: &mut SqliteConnection,
+        ctx: &AppContext,
+        id: &str,
+        anchor: Option<&str>,
+    ) {
+        let new = NewContent {
+            id,
+            h_app_id: &ctx.h_app_id,
+            title: id,
+            description: None,
+            content_type: "concept",
+            content_format: "markdown",
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "public",
+            created_by: None,
+            content_body: None,
+            dht_anchor_hash: anchor,
+            server_blob_hash: None,
+        };
+        diesel::insert_into(content::table)
+            .values(&new)
+            .execute(conn)
+            .expect("insert anchored row");
+    }
+
+    fn anchor_state_of(conn: &mut SqliteConnection, ctx: &AppContext, id: &str) -> AnchorState {
+        let raw: Option<String> = content::table
+            .filter(content::h_app_id.eq(&ctx.h_app_id))
+            .filter(content::id.eq(id))
+            .select(content::dht_anchor_state)
+            .first::<Option<String>>(conn)
+            .expect("row exists");
+        AnchorState::from_column(raw.as_deref())
+    }
+
+    #[test]
+    fn classifier_separates_dead_from_live_from_null() {
+        // THE defect in one assertion: a row that IS anchored whose own
+        // conductor answers ABSENT is DEAD — a state the present/absent test
+        // `reanchor_backfill` applied could not express, which is why a
+        // re-keyed peer served dead-key anchors as `notarized` forever.
+        assert_eq!(
+            classify_anchor_state(Some("uhCkkDPLSsQyl7TDAiFAWo"), ConductorAnswer::Absent),
+            AnchorState::Dead
+        );
+        // Live: the conductor resolved it.
+        assert_eq!(
+            classify_anchor_state(Some("uhCkkDPLSsQyl7TDAiFAWo"), ConductorAnswer::Present),
+            AnchorState::Live
+        );
+        // A NULL-anchor row is NEVER dead — it belongs to reanchor_backfill's
+        // bootstrap arm, and collapsing the two classes would put one row on
+        // both arms of the same sweep.
+        assert_eq!(
+            classify_anchor_state(None, ConductorAnswer::Absent),
+            AnchorState::Unverified
+        );
+        assert_eq!(
+            classify_anchor_state(None, ConductorAnswer::Present),
+            AnchorState::Unverified
+        );
+        // An empty-string anchor is a corrupt write, not a claim to judge —
+        // same discipline `declared_head_for` applies to declarations.
+        assert_eq!(
+            classify_anchor_state(Some("   "), ConductorAnswer::Absent),
+            AnchorState::Unverified
+        );
+        // LOAD-BEARING: an unreachable conductor is NOT evidence of death.
+        // Downgrading provenance on a transport hiccup would make silence do
+        // the work of evidence — the ghost-declaration deadlock's exact shape.
+        assert_eq!(
+            classify_anchor_state(Some("uhCkkDPLSsQyl7TDAiFAWo"), ConductorAnswer::Unreachable),
+            AnchorState::Unverified
+        );
+    }
+
+    #[test]
+    fn unverified_persists_as_null_and_round_trips() {
+        assert_eq!(AnchorState::Unverified.as_column(), None);
+        assert_eq!(AnchorState::Dead.as_column(), Some("dead"));
+        assert_eq!(AnchorState::Live.as_column(), Some("live"));
+        assert_eq!(AnchorState::from_column(None), AnchorState::Unverified);
+        assert_eq!(AnchorState::from_column(Some("dead")), AnchorState::Dead);
+        assert_eq!(AnchorState::from_column(Some("live")), AnchorState::Live);
+        // A literal this build does not understand degrades to Unverified —
+        // never laundered into a death verdict.
+        assert_eq!(
+            AnchorState::from_column(Some("entombed")),
+            AnchorState::Unverified
+        );
+        // The wire NAMES unverified (a missing key would read as an old server).
+        assert_eq!(AnchorState::Unverified.as_wire(), "unverified");
+        assert!(AnchorState::Dead.is_dead());
+        assert!(!AnchorState::Live.is_dead());
+        assert!(!AnchorState::Unverified.is_dead());
+    }
+
+    #[test]
+    fn dead_marking_is_anchored_only_and_selects_the_heal_candidates() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        insert_anchored_row(&mut conn, &ctx, "rekeyed-01", Some("uhCkkDEAD01"));
+        insert_anchored_row(&mut conn, &ctx, "rekeyed-02", Some("uhCkkDEAD02"));
+        insert_anchored_row(&mut conn, &ctx, "healthy-01", Some("uhCkkLIVE01"));
+        insert_anchored_row(&mut conn, &ctx, "never-authored", None);
+
+        // The sweep marks the anchored ∩ conductor-absent set. `never-authored`
+        // is handed in deliberately: the writer must REFUSE it (NULL anchor),
+        // or one row would enter both heal arms.
+        let marked = mark_anchor_state(
+            &mut conn,
+            &ctx,
+            &[
+                "rekeyed-01".to_string(),
+                "rekeyed-02".to_string(),
+                "never-authored".to_string(),
+            ],
+            AnchorState::Dead,
+        )
+        .unwrap();
+        assert_eq!(marked, 2, "a NULL-anchor row has no anchor to judge");
+        assert_eq!(
+            anchor_state_of(&mut conn, &ctx, "never-authored"),
+            AnchorState::Unverified
+        );
+
+        // The heal arm sees exactly the dead rows — never the live one, never
+        // the NULL-anchor one (disjoint from list_unanchored_content_ids).
+        let dead = list_dead_anchor_content_ids(&mut conn, &ctx, 100).unwrap();
+        let dead_ids: Vec<&str> = dead.iter().map(|(id, _, _)| id.as_str()).collect();
+        assert_eq!(dead_ids, vec!["rekeyed-01", "rekeyed-02"]);
+        assert_eq!(count_dead_anchor_content(&mut conn, &ctx).unwrap(), 2);
+
+        let unanchored = list_unanchored_content_ids(&mut conn, &ctx, 100).unwrap();
+        let unanchored_ids: Vec<&str> = unanchored.iter().map(|(id, _, _)| id.as_str()).collect();
+        assert_eq!(
+            unanchored_ids,
+            vec!["never-authored"],
+            "the two heal arms must partition the candidate space, not overlap"
+        );
+
+        // The verdict carries WHEN it was taken, so a stale `dead` is legible
+        // as stale rather than eternal.
+        let checked: Option<String> = content::table
+            .filter(content::id.eq("rekeyed-01"))
+            .select(content::dht_anchor_checked_at)
+            .first::<Option<String>>(&mut conn)
+            .unwrap();
+        assert!(checked.is_some(), "the verdict must record its timestamp");
+
+        // A bounded sweep drains oldest-first, deterministically.
+        let capped = list_dead_anchor_content_ids(&mut conn, &ctx, 1).unwrap();
+        assert_eq!(capped.len(), 1);
+        assert_eq!(
+            list_dead_anchor_content_ids(&mut conn, &ctx, 0)
+                .unwrap()
+                .len(),
+            0
+        );
+    }
+
+    #[test]
+    fn reauthoring_a_dead_row_retires_it_from_the_heal_arm() {
+        // The end of the thrash: once a dead row is re-authored under the live
+        // key, `upsert_with_anchor` observes a real action hash and revives the
+        // verdict. Without this the healed row would be re-selected every
+        // sweep forever.
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        insert_anchored_row(&mut conn, &ctx, "rekeyed-01", Some("uhCkkDEADKEY"));
+        mark_anchor_state(
+            &mut conn,
+            &ctx,
+            &["rekeyed-01".to_string()],
+            AnchorState::Dead,
+        )
+        .unwrap();
+        assert_eq!(count_dead_anchor_content(&mut conn, &ctx).unwrap(), 1);
+
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "rekeyed-01",
+            ContentProjectionPatch::default(),
+            "uhCkkFRESHLIVEKEY",
+            HeadElection::PreserveExistingDeclaration,
+        )
+        .unwrap();
+
+        assert_eq!(
+            anchor_state_of(&mut conn, &ctx, "rekeyed-01"),
+            AnchorState::Live,
+            "a conductor that returned an action hash IS a live observation"
+        );
+        assert_eq!(
+            count_dead_anchor_content(&mut conn, &ctx).unwrap(),
+            0,
+            "a re-authored row must leave the dead-anchor candidate set"
+        );
+    }
+
+    #[test]
+    fn anchor_state_is_app_scoped() {
+        // The verdict is per-conductor, and a conductor serves one app scope —
+        // marking must never reach across it.
+        let mut conn = setup_test_db();
+        let lamad = AppContext::new("lamad");
+        let elohim = AppContext::new("elohim");
+        insert_anchored_row(&mut conn, &lamad, "shared-id", Some("uhCkkA"));
+        insert_anchored_row(&mut conn, &elohim, "shared-id-2", Some("uhCkkB"));
+
+        mark_anchor_state(
+            &mut conn,
+            &lamad,
+            &["shared-id".to_string(), "shared-id-2".to_string()],
+            AnchorState::Dead,
+        )
+        .unwrap();
+        assert_eq!(count_dead_anchor_content(&mut conn, &lamad).unwrap(), 1);
+        assert_eq!(count_dead_anchor_content(&mut conn, &elohim).unwrap(), 0);
     }
 }

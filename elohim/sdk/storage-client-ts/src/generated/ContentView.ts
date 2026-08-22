@@ -21,5 +21,33 @@ metadata: JsonValue | null, reach: string, validationStatus: string, createdBy: 
  * `"unconfirmed"` (amber — CRDT-converged-only or all-null; served like HTTP
  * "Not secure"). NEVER derive authority/attribution from this field — an
  * "unconfirmed" row is functional-but-not-notarized.
+ *
+ * LIVENESS: `dht_anchor_hash` being SET is not sufficient for
+ * `"notarized"` — the anchor must also not be known-dead. See
+ * [`Self::dht_anchor_state`].
  */
-trust: string, };
+trust: string, 
+/**
+ * Liveness of [`Self::dht_anchor_hash`] against the serving node's CURRENT
+ * conductor incarnation: `"live"` | `"dead"` | `"unverified"`.
+ *
+ * `dht_anchor_hash` answers "was this ever authored?"; this answers "can
+ * anybody still produce the action behind it?". After a conductor re-key
+ * (chain and keystore replaced, the storage projection kept) the hash
+ * survives but the chain that signed it does not — and before this field
+ * existed the row went on claiming `trust: "notarized"`, the strongest
+ * provenance claim this system makes, about a signature no living chain
+ * could present (2026-08-21 RCA).
+ *
+ * `"dead"` means the serving node's own conductor answered ABSENT for this
+ * id; such a row is queued for re-authoring under the live key and its
+ * `trust` falls back to whatever non-anchor evidence it still has.
+ * `"unverified"` is the honest default — not yet asked, or the ask could
+ * not be put. Absence of an answer is never evidence of death, so an
+ * unverified row is treated exactly like a live one for `trust`.
+ *
+ * OPTIONAL on the wire: absent means a serving node that predates the
+ * liveness projection. Consumers must treat `None` as "unverified", never
+ * as "dead".
+ */
+dhtAnchorState?: string, };

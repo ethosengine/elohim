@@ -39,6 +39,8 @@ fn test_conn() -> SqliteConnection {
             declared_head_at BIGINT,
             canonical_declared_at BIGINT,
             canonical_earned INTEGER,
+            dht_anchor_state TEXT,
+            dht_anchor_checked_at TEXT,
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
             updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         )

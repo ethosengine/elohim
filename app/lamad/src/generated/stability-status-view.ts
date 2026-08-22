@@ -23,10 +23,25 @@ export interface StabilityStatusView {
   upstreams: {
     endpoint: string;
     circuit: 'closed' | 'half-open' | 'open';
+    /**
+     * Consecutive recorded failures, unbounded in time (any recorded success resets it to zero). Time-blind by construction: a streak spanning minutes reads identically to a burst inside one second.
+     */
     errorStreak: number;
+    /**
+     * Failures still inside upstreamPolicy.failWindowSeconds as of this observation. THIS is the count measured against upstreamPolicy.failThreshold to open the circuit; errorStreak is the older time-blind count, kept for continuity. An errorStreak far above recentFailures means the failures are spread out — slow-and-recovering, not down.
+     */
+    recentFailures: number;
     lastGood: string | null;
     skipped: boolean;
   }[];
+  /**
+   * The live circuit OPEN CONDITION every entry in `upstreams` is judged by: failThreshold failures landing within failWindowSeconds of each other open a circuit, which then sheds for cooldownSeconds before admitting one half-open trial. Read off the breaker map's own fields rather than restated from constants, so this surface cannot advertise a window the gate does not decide with (C7).
+   */
+  upstreamPolicy: {
+    failThreshold: number;
+    failWindowSeconds: number;
+    cooldownSeconds: number;
+  };
   projector: {
     lagSeconds: number | null;
     caughtUp: boolean | null;

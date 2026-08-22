@@ -1,0 +1,33 @@
+-- Anchor LIVENESS — the second class of anchor defect the heal loop was blind to.
+--
+-- Source of truth: the LOCAL conductor incarnation. Classification: C
+-- (operational — reconstructable from the next reconcile sweep's answer).
+--
+-- WHY (2026-08-21 re-keyed-peer RCA). `dht_anchor_hash` answers "did this row
+-- ever get authored?" and nothing else. After a conductor re-key (chain and
+-- keystore deleted, storage DB deliberately kept) the column still holds action
+-- hashes authored by an agent key no living chain can present. `trust_label`
+-- read the column's PRESENCE and kept answering `notarized` — the strongest
+-- provenance claim this system makes, asserted about a signature nobody can
+-- produce. Meanwhile `reanchor_backfill` selected on `dht_anchor_hash IS NULL`,
+-- so a DEAD anchor was indistinguishable from a LIVE one under the only test
+-- the heal path applied (present/absent) and the rows were skipped as healthy
+-- forever.
+--
+-- This column carries the liveness verdict separately from the hash, so the
+-- three states are distinguishable:
+--   NULL / 'unverified' — not yet asked, or the ask was inconclusive. The
+--                         honest default: absence of an answer must never do
+--                         the work of evidence (cf. the ghost-declaration
+--                         deadlock, 2026-08-10).
+--   'live'              — the local conductor resolved this id this sweep.
+--   'dead'              — the local conductor answered ABSENT for an id whose
+--                         row IS anchored. The re-adoption candidate class.
+--
+-- `dht_anchor_checked_at` records WHEN the verdict was taken, so a stale `dead`
+-- is legible as stale rather than eternal.
+--
+-- Additive and backfill-free: NULL is the correct value for every existing row,
+-- and the next reconcile sweep populates the ones it resolves.
+ALTER TABLE content ADD COLUMN dht_anchor_state TEXT;
+ALTER TABLE content ADD COLUMN dht_anchor_checked_at TEXT;

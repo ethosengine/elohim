@@ -9,6 +9,7 @@ use elohim_views::{
     HumanRelationshipView, RelationshipView, RelationshipWithContentView,
 };
 
+use crate::db::content_diesel::AnchorState;
 use crate::db::models::{
     App, Content, ContentMastery, ContentWithTags, HumanRelationship, Relationship,
     RelationshipWithContent,
@@ -41,7 +42,19 @@ impl From<Content> for ContentView {
         // covers BOTH the crdt_converged_at-only (amber) row and the all-null
         // row — a converged-only row is functional but must never read as
         // notarized. Computed by reference before the fields are moved.
-        let trust = trust_label(c.dht_anchor_hash.is_some(), c.p2p_published_at.is_some());
+        // LIVENESS (2026-08-21 re-key RCA): an anchor the serving node's own
+        // conductor cannot resolve is NOT a notarization. Before this, the
+        // label read the column's PRESENCE, so a re-keyed peer went on
+        // answering `notarized` for actions signed by a chain that no longer
+        // exists. A dead anchor simply stops counting as an anchor here — the
+        // row falls back to whatever evidence it still has, and
+        // `dht_anchor_state` says why. `unverified`/NULL is NOT death: absence
+        // of an answer must never do the work of evidence.
+        let anchor_state = AnchorState::from_column(c.dht_anchor_state.as_deref());
+        let trust = trust_label(
+            c.dht_anchor_hash.is_some() && !anchor_state.is_dead(),
+            c.p2p_published_at.is_some(),
+        );
         Self {
             id: c.id,
             h_app_id: c.h_app_id,
@@ -62,6 +75,10 @@ impl From<Content> for ContentView {
             content_body: c.content_body,
             dht_anchor_hash: c.dht_anchor_hash,
             trust,
+            // Always NAMED, never omitted for a stored row: a missing key reads
+            // as "an older server" and a reader asking "can you prove this?"
+            // deserves "I have not checked" instead.
+            dht_anchor_state: Some(anchor_state.as_wire().to_string()),
         }
     }
 }
@@ -134,6 +151,10 @@ pub fn content_view_from_epr_head(head: &crate::epr_codec::EprHead) -> ContentVi
         // fetches, so it labels honestly as unconfirmed (never over-claim a
         // notarization the projection cannot evidence).
         trust: trust_label(false, false),
+        // No anchor to judge on an EPR-head projection, and no conductor was
+        // asked — `None` (rather than a fabricated verdict) is the honest
+        // answer, and consumers read it as unverified.
+        dht_anchor_state: None,
     }
 }
 
@@ -322,6 +343,8 @@ mod trust_label_tests {
             declared_head_at: None,
             canonical_declared_at: None,
             canonical_earned: None,
+            dht_anchor_state: None,
+            dht_anchor_checked_at: None,
         }
     }
 

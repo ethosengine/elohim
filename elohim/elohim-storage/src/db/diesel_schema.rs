@@ -90,6 +90,8 @@ diesel::table! {
         declared_head_at -> Nullable<BigInt>,
         canonical_declared_at -> Nullable<BigInt>,
         canonical_earned -> Nullable<Integer>,
+        dht_anchor_state -> Nullable<Text>,
+        dht_anchor_checked_at -> Nullable<Text>,
     }
 }
 

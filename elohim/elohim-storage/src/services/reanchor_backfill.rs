@@ -54,6 +54,11 @@ pub(crate) fn is_canonical_content_type(content_type: &str) -> bool {
         || ALL_CONTENT_TYPES.contains(&content_type)
 }
 
+/// One heal candidate as both selection arms return it: `(id, reach,
+/// content_type)`. Named so the two arms' shared shape is a contract rather
+/// than a coincidence — the loop below re-authors either kind identically.
+pub(crate) type ReanchorCandidate = (String, String, String);
+
 /// Tuning for a single re-anchor sweep.
 #[derive(Debug, Clone)]
 pub struct ReanchorConfig {
@@ -102,6 +107,15 @@ pub struct ReanchorReport {
     pub skipped: usize,
     /// NULL-anchor rows remaining AFTER the sweep (for `/p2p/status` pending).
     pub remaining: usize,
+    /// DEAD-anchor candidates selected this sweep — rows this node was serving
+    /// under an anchor its OWN conductor answered ABSENT for (the re-keyed-peer
+    /// class, 2026-08-21). Counted apart from `candidates` so "how much of this
+    /// sweep was re-adoption rather than first authorship" is directly readable.
+    pub dead_candidates: usize,
+    /// DEAD-anchor rows remaining AFTER the sweep. A non-zero value beside a
+    /// zero `remaining` is the honest shape of "nothing to author, something to
+    /// re-adopt" — the state the NULL-only selection could not express.
+    pub dead_remaining: usize,
 }
 
 /// True when a re-author error means the content is ALREADY committed to the
@@ -217,31 +231,68 @@ pub async fn run_once(
 ) -> Result<ReanchorReport, StorageError> {
     let app_ctx = crate::db::AppContext::default_lamad();
 
-    let candidates: Vec<(String, String, String)> = {
+    // TWO candidate arms, disjoint by construction (`dht_anchor_hash IS NULL`
+    // vs `IS NOT NULL AND dht_anchor_state = 'dead'`), sharing ONE budget so a
+    // large dead population can never unbound the sweep's conductor load.
+    //
+    // Arm 1 — NEVER AUTHORED (the cold-seed class this sweep was built for).
+    // Arm 2 — DEAD ANCHOR (the re-keyed-peer class, 2026-08-21): the row IS
+    // anchored, but the local conductor answered ABSENT for it, so the anchor
+    // names an action no living chain can present. `reanchor_backfill` selected
+    // on NULL only, which made DEAD indistinguishable from LIVE under the one
+    // test it applied (present/absent) and skipped these rows as healthy
+    // forever while the read surface went on calling them `notarized`.
+    //
+    // Both arms run the SAME re-author loop below, and that is the point: for a
+    // dead-anchor row `update_via_conductor`'s empty patch reaches
+    // `call_update_content`, the conductor answers "no Content entry found",
+    // and the EXISTING stale-anchor heal branch re-publishes the full entry via
+    // `create_content` — a re-adoption under the CURRENT key. Fills-never-moves
+    // holds: the row is re-AUTHORED, never silently rewritten to point at
+    // somebody else's action.
+    let (candidates, dead_candidates): (Vec<ReanchorCandidate>, Vec<ReanchorCandidate>) = {
         let mut conn = pool
             .get()
             .map_err(|e| StorageError::Internal(format!("reanchor: db conn: {e}")))?;
-        crate::db::content_diesel::list_unanchored_content_ids(
+        let unanchored = crate::db::content_diesel::list_unanchored_content_ids(
             &mut conn,
             &app_ctx,
             cfg.max_per_sweep,
-        )?
+        )?;
+        // Never-authored rows keep first claim on the budget: a row with no
+        // anchor at all is serving NOTHING, while a dead-anchor row is at least
+        // serving bytes (dishonestly labelled, which the read surface now says
+        // out loud). The remainder of a capped sweep heals next tick.
+        let dead_budget = cfg.max_per_sweep.saturating_sub(unanchored.len() as i64);
+        let dead = crate::db::content_diesel::list_dead_anchor_content_ids(
+            &mut conn,
+            &app_ctx,
+            dead_budget,
+        )?;
+        (unanchored, dead)
     };
 
     let mut report = ReanchorReport {
         candidates: candidates.len(),
+        dead_candidates: dead_candidates.len(),
         ..Default::default()
     };
+    let candidates: Vec<ReanchorCandidate> =
+        candidates.into_iter().chain(dead_candidates).collect();
 
     if candidates.is_empty() {
-        // Nothing to heal — caught up. Publish so the card shows green.
+        // Nothing to heal on EITHER arm — caught up. Publish so the card shows
+        // green. (Before the dead arm existed this logged "no NULL-anchor
+        // content — nothing to heal" while a whole dead population sat
+        // untouched; the emptiness test now covers both classes.)
         state.publish_reanchor_sweep(0, 0, 0).await;
         return Ok(report);
     }
 
     tracing::info!(
         candidates = report.candidates,
-        "reanchor_backfill: re-authoring NULL-anchor content via conductor (cold-seed recovery)"
+        dead_candidates = report.dead_candidates,
+        "reanchor_backfill: re-authoring NULL-anchor and DEAD-anchor content via conductor"
     );
 
     for (id, reach, content_type) in &candidates {
@@ -436,22 +487,32 @@ pub async fn run_once(
 
     // Recount remaining NULL-anchor rows so pending/caughtUp are honest even
     // when a sweep was capped at max_per_sweep or some re-authors failed.
-    report.remaining = {
+    (report.remaining, report.dead_remaining) = {
         let mut conn = pool
             .get()
             .map_err(|e| StorageError::Internal(format!("reanchor: recount conn: {e}")))?;
-        crate::db::content_diesel::count_unanchored_content(&mut conn, &app_ctx)? as usize
+        (
+            crate::db::content_diesel::count_unanchored_content(&mut conn, &app_ctx)? as usize,
+            crate::db::content_diesel::count_dead_anchor_content(&mut conn, &app_ctx)? as usize,
+        )
     };
 
     // `completed` = rows brought to a settled state this sweep. Fresh re-authors,
     // already-anchored recoveries, ADOPTED heads and HELD rows are all rows that
     // no longer need this sweep's attention, so all four count toward progress;
     // `remaining` (recounted above) already excludes the anchored ones.
+    //
+    // `pending` sums BOTH arms: `/p2p/status` derives `caughtUp` from it, and a
+    // node with nothing left to author but a standing DEAD-anchor population is
+    // NOT caught up — it is serving rows under anchors its own conductor cannot
+    // resolve. Reporting green there is the same measured-yet-dark dishonesty
+    // this whole class exists to close. The arms stay separately legible in
+    // `ReanchorReport` and in the sweep-complete log line below.
     state
         .publish_reanchor_sweep(
             report.reanchored + report.already_anchored + report.adopted + report.held,
             report.failed,
-            report.remaining,
+            report.remaining + report.dead_remaining,
         )
         .await;
 
@@ -462,6 +523,8 @@ pub async fn run_once(
         held = report.held,
         failed = report.failed,
         remaining = report.remaining,
+        dead_candidates = report.dead_candidates,
+        dead_remaining = report.dead_remaining,
         "reanchor_backfill: sweep complete"
     );
 
@@ -519,6 +582,32 @@ mod tests {
     }
 
     #[test]
+    fn report_separates_the_dead_arm_from_the_never_authored_arm() {
+        // The re-keyed-peer defect's accounting shape: "no NULL-anchor content
+        // (nothing to heal)" was TRUE and useless — the dead population was
+        // invisible to it. `remaining` (never-authored) and `dead_remaining`
+        // (anchored-but-unprovable) are separate numbers because they are
+        // separate obligations: one is first authorship, the other is
+        // re-adoption under the current key.
+        let report = ReanchorReport {
+            candidates: 0,
+            dead_candidates: 5,
+            remaining: 0,
+            dead_remaining: 5,
+            ..Default::default()
+        };
+        assert_eq!(
+            report.candidates, 0,
+            "nothing to author — the old sweep's whole story"
+        );
+        assert_ne!(
+            report.dead_remaining, 0,
+            "…and yet five rows are being served under anchors nobody can \
+             produce. A single `remaining` could not say this."
+        );
+    }
+
+    #[test]
     fn empty_candidate_report_is_caught_up_shaped() {
         // The report shape an all-anchored DB produces (no candidates).
         let report = ReanchorReport::default();
@@ -526,6 +615,8 @@ mod tests {
         assert_eq!(report.reanchored, 0);
         assert_eq!(report.already_anchored, 0);
         assert_eq!(report.remaining, 0);
+        assert_eq!(report.dead_candidates, 0);
+        assert_eq!(report.dead_remaining, 0);
     }
 
     #[test]

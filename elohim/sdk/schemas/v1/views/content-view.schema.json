@@ -26,7 +26,11 @@
     "dhtAnchorHash": { "type": ["string", "null"] },
     "trust": {
       "type": "string",
-      "description": "REQ-F10 trust legibility label: 'notarized' (green/DHT-notarized) | 'published' (peer-attested) | 'unconfirmed' (amber/CRDT-converged-only or all-null). Never an authority/attribution source."
+      "description": "REQ-F10 trust legibility label: 'notarized' (green/DHT-notarized) | 'published' (peer-attested) | 'unconfirmed' (amber/CRDT-converged-only or all-null). Never an authority/attribution source. A set dhtAnchorHash is not sufficient for 'notarized' — see dhtAnchorState: a known-dead anchor stops counting as a notarization."
+    },
+    "dhtAnchorState": {
+      "type": ["string", "null"],
+      "description": "Liveness of dhtAnchorHash against the serving node's CURRENT conductor incarnation: 'live' | 'dead' | 'unverified'. dhtAnchorHash answers 'was this ever authored?'; this answers 'can anybody still produce the action behind it?' — they diverge after a conductor re-key, where the hash survives in the kept projection but the chain that signed it does not. OPTIONAL: absent/null means a serving node that predates the liveness projection; consumers MUST read that as 'unverified', never as 'dead'."
     }
   },
   "additionalProperties": false

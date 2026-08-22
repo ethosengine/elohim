@@ -1568,7 +1568,32 @@ fn sample_content_view(server_blob_hash: Option<String>) -> elohim_views::Conten
         // No dht_anchor_hash and no p2p_published marker on this fixture → the
         // REQ-F10 trust label is "unconfirmed" (amber). Schema requires `trust`.
         trust: "unconfirmed".into(),
+        // No anchor on this fixture → nothing to judge for liveness.
+        dht_anchor_state: Some("unverified".into()),
     }
+}
+
+/// A row whose anchor the serving conductor cannot resolve must NOT read as
+/// `notarized`, and must say so on the wire under a key the schema declares
+/// (`content-view.schema.json` is `additionalProperties: false`, so this also
+/// proves the field is declared). The 2026-08-21 re-key defect in one test.
+#[test]
+fn dead_anchor_state_conforms_and_is_camel_case() {
+    let mut v = sample_content_view(None);
+    v.dht_anchor_hash = Some("uhCkkDPLSsQyl7TDAiFAWoMmeZKTqXB5XPmOKyYOV".into());
+    v.dht_anchor_state = Some("dead".into());
+    v.trust = "unconfirmed".into();
+    let json = serde_json::to_value(&v).unwrap();
+    assert_eq!(
+        json.get("dhtAnchorState").and_then(|x| x.as_str()),
+        Some("dead"),
+        "the liveness verdict must surface as camelCase dhtAnchorState"
+    );
+    assert!(
+        json.get("dht_anchor_state").is_none(),
+        "snake_case must not leak to the wire"
+    );
+    validate_against_schema("views/content-view.schema.json", &json);
 }
 
 /// Round-trip: a `ContentView` carrying `serverBlobHash` conforms to the schema,
