@@ -30,6 +30,19 @@ Feature: submit_specialist_revocation gated by local defender role marker
   # coordinator zome function exists; the Phase-11 bridge wiring
   # (imagodei → elohim-agent) is what these scenarios wait on. They shed
   # @wip when that route lands and go truly RED→green.
+  #
+  # DEFERRED blind-reader findings (2026-08-22, rounds 1-2; BLOCKERs cleared,
+  # remaining MAJORs deferred until the bridge lands because their repairs
+  # rework @wip steps that cannot be verified yet):
+  # - Acceptance scenario must prove the GATE was the deciding factor:
+  #   identical inputs to the rejection scenario, differing only in the
+  #   DefenderManifest — plus an assertion tying acceptance to the check.
+  # - Introduce the compromised human by name in a Given (the "target
+  #   human" currently has no antecedent).
+  # - Resolve the manifest direction: it lists which humans THIS agent
+  #   defends — make the Given text say so.
+  # - Assert revokedKey VALUE matches the compromised key, not mere
+  #   field presence.
 
   @wip
   Scenario: Without role marker — coordinator rejects
