@@ -86,6 +86,16 @@ Feature: Doorway failover — two doorways, one name, one truth
   stage are the ones these scenarios probe: authority is green-only and
   knowledge is amber-ok in every stage.
 
+  HOW A DOORWAY GETS READY TO SERVE. A doorway does not open cold: at
+  startup it WARMS UP — streams its content, humans and relationships from
+  its storage pool before it will call itself ready. A doorway also holds a
+  BREAKER per storage peer, the live open/closed circuit that decides
+  whether a request to that peer is honoured or shed — the same decision
+  behind every "shedding" answer above. Both are self-reported on the
+  doorway's STARTUP SURFACE, its own status page, so an operator (or this
+  suite) can read "am I actually ready?" and "am I actually refusing
+  requests?" without guessing from outside.
+
   BORN RED means a scenario specifies behaviour that does not exist yet: it
   fails on purpose, its assertion is the specification for the cure, and it is
   never weakened to make a run green.
@@ -164,6 +174,10 @@ Feature: Doorway failover — two doorways, one name, one truth
     And doorway "elohim.host" advertises a freshness stage, with authority green-only and knowledge amber-ok
 
   Scenario: A completed warmup always has a servable head to show for it
+    # A false "completed" is not just an internal bookkeeping error — it is
+    # the difference between an operator who KNOWS to restart a stuck
+    # doorway and one who doesn't, so the person at the door keeps waiting
+    # longer than they had to.
     # MEASURED 2026-08-21 (local mesh): a warmup pass that streamed nothing
     # from storage — pool unreachable, or reachable and empty — used to
     # report `completed: true` anyway, so a doorway that never actually
@@ -174,10 +188,13 @@ Feature: Doorway failover — two doorways, one name, one truth
     And a completed warmup on doorway "elohim.host" has a servable head to show for it
 
   Scenario: The startup surface and the shed decision read one breaker
+    # An operator who trusts a lying startup page cannot fix a shedding
+    # doorway they believe is healthy — so the person at the door stays
+    # locked out longer than the outage itself required.
     # MEASURED 2026-08-21 (local mesh): a doorway actively shedding 503
     # "catching-up" for every request answered its OWN /health/startup with
     # every upstream circuit "closed" — a second, private breaker map the
     # shed decision never consulted. An operator reading the startup surface
     # saw a healthy doorway that was refusing everything.
-    Then the startup surface's circuit for doorway "alpha-A" agrees with its own shed decision
-    And the startup surface's circuit for doorway "elohim.host" agrees with its own shed decision
+    Then doorway "alpha-A" cannot look healthy on its startup page while it is actually shedding
+    And doorway "elohim.host" cannot look healthy on its startup page while it is actually shedding

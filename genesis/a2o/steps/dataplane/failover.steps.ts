@@ -42,11 +42,13 @@
  *      a doorway that never warmed looked identical to one that had.
  *      `completed=true` must never coexist with `completedEmpty=true` or an
  *      empty `servedBundleHeads[]`.
- *   8. `Then the startup surface's circuit for doorway {string} agrees with
- *      its own shed decision` — MEASURED (local mesh, 2026-08-21): a doorway
- *      shedding 503 on every request answered its OWN /health/startup with
- *      every upstream circuit "closed" — a second, private breaker map the
- *      shed decision never consulted. Both surfaces now read the same map.
+ *   8. `Then doorway {string} cannot look healthy on its startup page while
+ *      it is actually shedding` — MEASURED (local mesh, 2026-08-21): a
+ *      doorway shedding 503 on every request answered its OWN
+ *      /health/startup with every upstream circuit "closed" — a second,
+ *      private breaker map the shed decision never consulted. Both surfaces
+ *      now read the same map (compared here via each named upstream's
+ *      circuit field).
  *
  * Wire contract for 4-6 (doorway freshness spec, 2026-08-21):
  *   x-elohim-freshness: green|amber            (every proxied GET)
@@ -555,7 +557,7 @@ Then(
 // (doorway/doorway-service/src/routes/health.rs — "ONE BREAKER, ONE VIEW").
 
 Then(
-  "the startup surface's circuit for doorway {string} agrees with its own shed decision",
+  'doorway {string} cannot look healthy on its startup page while it is actually shedding',
   { timeout: WARMUP_STEP_TIMEOUT_MS },
   async function (this: E2EWorld, peerName: string) {
     const peerUrl = resolvePeerUrl(peerName);
