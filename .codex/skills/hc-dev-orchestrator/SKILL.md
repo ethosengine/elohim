@@ -139,7 +139,9 @@ profile — it is additive, not a filter.
 The mesh runs a declared dev-tier pacing profile (a preproduction-stakes
 declaration, never a prod default) exported to the storage peers by
 `hc-mesh.sh` — each knob overridable via its `MESH_*` twin:
-`PROJECTION_RECONCILE_SECS=30`, `CONTEST_BACKOFF_SECONDS=120`,
+`PROJECTION_RECONCILE_SECS=30`, `ACQUISITION_RECONCILE_SECS=10` (acquisition + provide pin
+reconcile tick — prod default 60s; chapter 11's exhaustion wait is bounded by it, 290 s → 50 s),
+`CONTEST_BACKOFF_SECONDS=120`,
 `HEAL_MISSING_BACKOFF_SECONDS=60`, `ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS=600`,
 `ELOHIM_HEAD_CORPUS_DIGEST=1`, `ELOHIM_ADOPT_BEFORE_AUTHOR=1` (cross-peer
 head divergence has no adopt discharge without it), `ADOPT_CONTEST_FANOUT=1`
@@ -186,10 +188,21 @@ PeerStatus heartbeat holds a fourth, unsupervised client — so `/health conduct
 `storage-restart [peer…]` re-execs each storage peer in place from its captured `/proc` environ
 (conductors untouched; a chaos-re-keyed `AGENT_PUBKEY` survives). The mesh runs the
 **doorway-family debug** binary (`/projects/.cargo-target-pool/family/doorway/elohim__elohim-storage/dev/debug/elohim-storage`),
-not the release path the script defaults to — pass `STORAGE_BIN=<that path>` explicitly, and rebuild
-into that slot first (`CARGO_TARGET_DIR=<slot> cargo build --bin elohim-storage`) when a Rust cure
-must reach the mesh. The restart re-resolves every peer's pid into the household fixture: the a2o
-chaos drills kill and verify peers BY THAT PID, so a stale fixture reads as `kill ESRCH`.
+not the release path the script defaults to — rebuild into that slot first
+(`CARGO_TARGET_DIR=<slot> cargo build --bin elohim-storage`) when a Rust cure must reach the mesh.
+A live peer's binary is read from `/proc/<pid>/exe` and recorded beside the environ
+(`$MESH_DIR/storage-restart/<name>.exe`); a DEAD peer is restored from that record, then a running
+sibling's exe, then `STORAGE_BIN` — so the default path no longer has to exist. The restart FAILS
+(non-zero, `storage-restart FAILED for: …`) when any requested peer has no usable capture or does
+not answer `/health` by port afterwards; an empty `.environ` is named out loud (a capture taken with
+`fs.copyFile` on procfs is 0 bytes — the 2026-08-22 cascade; read to EOF instead, which is what
+`genesis/a2o/src/framework/fixtures/process-control.ts` `writeRestartCapture` does). The captured
+environment is authoritative; `MESH_RESTART_APPLY_PROFILE=1` overlays THIS script's dev-tier
+pacing knobs on the re-exec (a knob added after boot reaches a running mesh without regenerating
+it; never touches `AGENT_PUBKEY`), and `MESH_RESTART_ENV_OVERLAY="K=V K=V"` overlays ad-hoc keys.
+The restart re-resolves every peer's pid AND `agentPubKey` into the household fixture
+(`fixture-refresh` does only that): the a2o chaos drills kill and verify peers BY THAT PID, so a
+stale fixture reads as `kill ESRCH`, and custody commitments name providers by agent key.
 
 `just mesh monitor` (hc-mesh-monitor.py, port 4210 via the `mesh-monitor`
 devfile endpoint; honors `MESH_MONITOR_PORT`) serves the one-page live
@@ -243,7 +256,10 @@ consequences are already handled by `hc-mesh.sh`: doorways launch with generous,
 churn scenarios exceed the binary's 1200/min ban — a tripped membrane answers `403 x-membrane:deny`
 to the rest of the lane), and `storage-restart` refreshes fixture pids. A scoped run overwrites the
 full-lane cucumber JSON unless you pass your own `CUCUMBER_JSON_REPORT=<path>`; every run still mints
-its own run-identified sprint report.
+its own run-identified sprint report. Process control (find a pid by exact argv on
+its port, capture environ+exe to EOF, SIGTERM→SIGKILL, re-exec the same argv/env/cwd) lives ONCE in
+`src/framework/fixtures/process-control.ts`; a custody provider matches a peer by libp2p peerId OR
+the fixture's `agentPubKey` (reconcile/custody.rs accepts either namespace).
 
 ## Build and gate
 
