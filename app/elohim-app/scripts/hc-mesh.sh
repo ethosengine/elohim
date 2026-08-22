@@ -181,6 +181,9 @@ p2p_port()   { echo $((9701 + $1)); }
 # 403 by default; the Act I Prologue's stage-manifest leg and
 # seed-delegates-compute.ts honest-fail without them. Mesh-only preproduction
 # levers, same as ELOHIM_NETWORK_STAKES=simulacra above — never a prod default.
+# ALLOW_SEED_SHARD_MANIFEST=1 is the third (services/seed_shard_manifest.rs; alpha
+# sets it per env in elohim/holochain/Jenkinsfile) — grandma-photos's four
+# scenarios pend on a 403 without it.
 # ---------------------------------------------------------------------------
 PROJECTION_RECONCILE_SECS="${MESH_RECONCILE_SECS:-30}"
 # Acquisition/provide pin reconcile tick. Chapter 11's exhaustion scenario can
@@ -701,7 +704,10 @@ restart_env_overlay() {
       "ELOHIM_HEAD_CORPUS_DIGEST=$ELOHIM_HEAD_CORPUS_DIGEST" \
       "ELOHIM_ADOPT_BEFORE_AUTHOR=$ELOHIM_ADOPT_BEFORE_AUTHOR" \
       "ADOPT_CONTEST_FANOUT=$ADOPT_CONTEST_FANOUT" \
-      "ELOHIM_NETWORK_STAKES=$ELOHIM_NETWORK_STAKES"
+      "ELOHIM_NETWORK_STAKES=$ELOHIM_NETWORK_STAKES" \
+      "ALLOW_SEED_NETWORK_STAKES=1" \
+      "ALLOW_SEED_DELEGATES_COMPUTE=1" \
+      "ALLOW_SEED_SHARD_MANIFEST=1"
   fi
   local kv
   for kv in ${MESH_RESTART_ENV_OVERLAY:-}; do printf '%s\n' "$kv"; done
@@ -1358,6 +1364,7 @@ PYEOF
       ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
       ALLOW_SEED_NETWORK_STAKES=1 \
       ALLOW_SEED_DELEGATES_COMPUTE=1 \
+      ALLOW_SEED_SHARD_MANIFEST=1 \
       nohup "$STORAGE_BIN" --http-port "$(http_port $i)" > "$LOGDIR/$name.log" 2>&1 &
       echo "storage $name: http=$(http_port $i) p2p=$(p2p_port $i) agent=${agent:0:16}..."
     else
