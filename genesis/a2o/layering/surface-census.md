@@ -1,31 +1,177 @@
 # Surface census — mechanical WIRE/FIXTURE/IMPLEMENT/STRUCTURAL/DEFECT classification
 
-_Generated 2026-08-21T23:24:09.122Z by `pnpm census` (`scripts/surface-census.ts`). Population: every `@wip` or failed Act I/host scenario, joined against a scoped `cucumber-js --dry-run` bind check and live read-only probes of the surfaces its steps name. Re-run with `pnpm census` (or `pnpm census -- --fresh` to bypass the dry-run cache) — the classifier is read-only against the mesh (GET only) and idempotent._
+_Generated 2026-08-22T01:35:15.953Z by `pnpm census` (`scripts/surface-census.ts`). Population: every `@wip` or failed Act I/host scenario, joined against a scoped `cucumber-js --dry-run` bind check and live read-only probes of the surfaces its steps name. Re-run with `pnpm census` (or `pnpm census -- --fresh` to bypass the dry-run cache) — the classifier is read-only against the mesh (GET only) and idempotent._
 
 Mesh health: doorway UP, storage UP — full probe.
 
-Latest mesh report(s) cross-referenced for DEFECT-STALE: (none found — no DEFECT-STALE class possible this run)
+Latest mesh report(s) cross-referenced for DEFECT-STALE: /tmp/elohim-local-mesh/reports/mesh.json
 
 ## Totals
 
 | class | count |
 |---|---|
-| WIRE | 312 |
-| FIXTURE | 45 |
+| WIRE | 311 |
+| FIXTURE | 58 |
 | IMPLEMENT-BOUNDED | 3 |
 | IMPLEMENT-DESIGN | 0 |
-| STRUCTURAL | 68 |
-| DEFECT-STALE | 0 |
-| UNCLASSIFIED | 91 |
-| **total classified** | **519** |
+| STRUCTURAL | 73 |
+| DEFECT-STALE | 38 |
+| UNCLASSIFIED | 92 |
+| **total classified** | **575** |
+
+## Wave1b re-run — manual reclassification (2026-08-22)
+
+The mechanical classifier above cross-references failures against `mesh.json` but has no
+way to tell "genuine defect" apart from "known scope mismatch" or "endpoint not yet
+designed" from an assertion string alone. Reading the actual `mesh.json` failure bodies
+surfaces two recurring patterns that were sitting in DEFECT-STALE for the wrong reason;
+reclassified by hand below with the exact scenario each covers.
+
+**Pattern 1 — missing corpus row, not a defect (`DEFECT-STALE` → `FIXTURE`).** Six
+scenarios fail with "Content not found: manifesto" (or the same 404-instead-of-expected-status
+shape on a different content id) — the same class as the wave1 lamad-spa gap: a seeded
+corpus row the Prologue doesn't create, not broken code.
+
+- `features/auth/reach-commons.feature` :: Anonymous reader can read the manifesto (earned commons reach)
+- `features/auth/reach-commons.feature` :: Anonymous reader is rejected for community-reach content (403 with requiredReach) — got 404 not 403, i.e. the community-reach content item itself doesn't exist either; same missing-corpus-row shape, different content id
+- `features/content/epr-content-addressing.feature` :: Blob content loads via CID
+- `features/content/epr-content-addressing.feature` :: EPR Head carries three-pillar metadata
+- `features/federation/peer-recovery.feature` :: A wiped device recovers its stewarded content from the mesh
+- `features/resilience/chaos-peer-churn.feature` :: Simultaneous loss of two peers leaves the survivor degrading honestly
+
+(`features/federation/peer-loss-failover.feature`'s three scenarios and
+`features/resilience/chaos-peer-churn.feature`'s "A flapping peer never corrupts what the
+mesh believes" show this SAME manifesto-404 in their live `mesh.json` failure body too, but
+the mechanical classifier already parks them in FIXTURE for a missing-env-var reason that
+fires first — no reclassification needed, just noting the underlying cause agrees.)
+
+Two DEFECT-STALE scenarios in these same files stay put — their failures are a different,
+real root cause, not the corpus gap: `features/federation/peer-recovery.feature` :: A wiped
+peer's commitment projection reconciles from its own conductor (no way to clear a peer's
+existing projection — a missing operator verb) and
+`features/resilience/chaos-peer-churn.feature` :: Cascading peer loss degrades the
+protection status honestly, step by step (a real provider-identity mismatch).
+
+**Pattern 2a — fleet-size scope mismatch, not a defect (`DEFECT-STALE` → `FIXTURE`).** Five
+scenarios assert `connectedPeers >= 3` or `>= 5`; this household mesh is a 3-peer fabric (2
+connected from any one member's own view), and these assertions were written for the
+7-peer alpha fleet. The scenario is honest about the mesh it's running on — the fixture
+(fleet size) doesn't match what the scenario needs, which is the same shape as an
+`E2E_*` precondition gap.
+
+- `features/deployment/p2p-validation.feature` :: Storage pauses P2P sync during account import
+- `features/deployment/p2p-validation.feature` :: Storage pauses P2P sync during bulk content creation
+- `features/deployment/p2p-validation.feature` :: Sync auto-suppressed while drain backlog is large
+- `features/deployment/p2p-validation.feature` :: Sync resumes even if bulk write fails
+- `features/deployment/sync-control.feature` :: Without sync mode control, mobile device burns cellular data
+
+**Pattern 2b — endpoint never designed, not a regression (`DEFECT-STALE` → `IMPLEMENT-DESIGN`).**
+Five scenarios fail on `POST /p2p/sync-mode` or `GET /p2p/sync-mode/history` returning 404.
+Each failure carries its own FINDING note: `P2PStatusInfo` (`elohim/elohim-storage/src/p2p/mod.rs`)
+has no `syncMode`/`networkClass` field, and `elohim-storage/src/http.rs` has no handler for
+either route — the endpoint was never built, so this is a route-absent design gap (the
+census script's own `IMPLEMENT-DESIGN` class), not a wired path that broke. The mechanical
+classifier missed it only because these scenarios drive the endpoint through a POST helper
+step rather than a literal `I query "<path>"` GET the static prober recognizes.
+
+- `features/deployment/sync-control.feature` :: Operator pauses sync explicitly
+- `features/deployment/sync-control.feature` :: Operator resumes sync after pause
+- `features/deployment/sync-control.feature` :: Sync mode transitions are logged for auditability
+- `features/deployment/sync-control.feature` :: Wifi-only mode pauses sync when cellular is the active network
+- `features/deployment/sync-control.feature` :: Wifi-only mode resumes sync when device joins wifi
+
+One further `deployment/p2p-validation.feature` DEFECT-STALE row — "P2P status endpoint
+exposes sync_paused state" (doorway `/health` never proxies the `syncPaused` field
+elohim-storage's own `/p2p/status` already carries) — is a real gap outside both patterns
+above; left classified DEFECT-STALE (arguably IMPLEMENT-BOUNDED once someone triages it,
+but that call is deliberately left to a human, not inferred here).
+
+**Pattern 3 — missing category-tagged corpus, not an allocator defect (`DEFECT-STALE` →
+`FIXTURE`).** Five `content/stewardship-allocation.feature` scenarios fail on an empty or
+under-populated content universe for a given category/tag ("No content found with tag
+'value-scanner'", "No multi-steward allocation among the 1 scanned 'fct' items", "Average
+stewards per content item is 1.00, expected > 1", etc.). Per the corpus seeder's live
+investigation: the allocator already implements multi-steward `CATEGORY_STEWARD_MAP`
+behavior correctly — this is a Prologue-seeding gap (the tagged corpus rows these
+scenarios need aren't created yet), not a code defect, and not something that needs an
+`IMPLEMENT` verb. The seeder is adding the tagged rows to the Prologue directly; expect
+these to flip to passing on the next wave with no code change.
+
+- `features/content/stewardship-allocation.feature` :: Faith content stewarded by pastoral affinity
+- `features/content/stewardship-allocation.feature` :: No steward has exclusive ownership
+- `features/content/stewardship-allocation.feature` :: Stewardship reflects human affinities
+- `features/content/stewardship-allocation.feature` :: Uncategorized content falls back to bootstrap steward
+- `features/content/stewardship-allocation.feature` :: Value-scanner content has multiple stewards
+
+**Adjusted totals after manual reclassification:**
+
+| class | mechanical | adjusted |
+|---|---|---|
+| WIRE | 311 | 311 |
+| FIXTURE | 58 | 74 |
+| IMPLEMENT-BOUNDED | 3 | 3 |
+| IMPLEMENT-DESIGN | 0 | 5 |
+| STRUCTURAL | 73 | 73 |
+| DEFECT-STALE | 38 | 17 |
+| UNCLASSIFIED | 92 | 92 |
+| **total classified** | **575** | **575** |
+
+## @wip staleness check against mesh.json (2026-08-22)
+
+**Zero `feature:scenario` lines are provably stale** (a `@wip` scenario whose live run
+reported `status === passed`). This isn't a clean bill of health on the existing `@wip`
+backlog — it's a structural blind spot in this run's only surviving evidence:
+
+- The `mesh` cucumber profile (`cucumber.mjs`) runs with `tags: '@e2e and not @wip and not
+  @browser and not @browser-only'` — every `@wip`-tagged scenario is excluded from
+  execution, and therefore from `mesh.json`, by construction. Verified directly: no `@wip`
+  tag appears anywhere in `mesh.json`'s 264 scenario or 79 feature tag lists.
+- The `saga` profile carries no such tag filter, so `@wip` scenarios under
+  `features/dataplane/resiliency-saga/**` DO run there — but this run's scoped saga JSON
+  was clobbered by the later full-lane write before the justfile fix (`5951ff8a8`) landed
+  mid-run (01:20:20, after the saga stage had already finished at ~00:57). Only the
+  aggregate console summary survived: 22 scenarios, 15 passed / 6 failed / 1 pending — not
+  enough to attribute pass/fail to individual scenarios.
+- The 92 `UNCLASSIFIED` rows split into two buckets, neither of which yields stale-`@wip`
+  evidence: 50 are bind-class-a (fully wired) `@wip` scenarios with no `mesh.json` entry at
+  all (excluded by the tag filter above — this is exactly the population `@wip` untagging
+  would need saga/alpha/local-lane coverage to resolve, not `mesh.json`); 42 have no
+  HTTP/metric/field surface the static prober can name in step text or glue at all (a
+  prober blind spot, independent of report coverage).
+
+Re-running `just test mesh features/dataplane/resiliency-saga` alone (now that the report
+path fix survives a later full-lane run) is the next re-measurement that could actually
+populate this check for the saga scenarios; the household mesh's `mesh` profile will never
+be able to, by design.
+
+## Fixture-aware scoping fix (2026-08-22)
+
+`features/dataplane/resilience-identity-coherence.feature` :: No household-placed human on
+alpha-A is missing its agent_pub_key — sits in `FIXTURE` this run (gated on
+`E2E_SHEM_HOST`, so it never executed under the household mesh). Per the corpus seeder's
+live investigation against alpha directly (not this run's evidence, but verified live, not
+hypothesis): when it DOES run, it reports 4 offenders — `human-adam-firstman`,
+`human-eve-firstwoman`, `human-gertrude-grandma`, `human-susan-household` — all narrative
+household members with zero conductors on the 3-node household mesh. `seed-humans`
+deliberately writes `agentPubKey` NULL for them (agent keys are conductor-minted; there is
+no truthful seed source), so the blanket invariant was flagging fixture households as
+identity-coherence violations. This is `STRUCTURAL`, not a defect.
+
+Fixed directly (small, in-slice): `steps/dataplane.steps.ts`'s `no HOUSEHOLD-member human
+on peer {string} is missing its agentPubKey` step now scopes the invariant to
+DHT-observable households only — mirroring the sibling fossil-check step's existing
+"observable" scoping (`every observable HOUSEHOLD-member human on peer {string} has a
+non-fossil agentPubKey`, same file). A household with zero live members on this peer is out
+of scope entirely; once any one member resolves to a real key, every other member of that
+same household must too — that's the actual coherence bug the scenario guards. No
+`@requires:` tag added — the scoping happens at the assertion layer, not the gate.
 
 ## First ten cheapest, per class
 
-### WIRE (312 total)
+### WIRE (311 total)
 
 - `features/auth/recovery/recovery-m5-portal-host-discovery.feature` — Add a portal host — write step glue (1 step(s) unbound, class b)
 - `features/auth/recovery/recovery-m5-portal-host-discovery.feature` — Validator rejects http URL — write step glue (1 step(s) unbound, class b)
-- `features/content/landing-backing-claims.feature` — The landing surface is stewarded, and the steward is the one it declares — write step glue (1 step(s) unbound, class b)
 - `features/delivery/delivery-diagnostics.feature` — Without projection cache, browser load overwhelms storage — write step glue (1 step(s) unbound, class b)
 - `features/delivery/landing-page.feature` — An SSR render that activates no route component sheds to the bundle fallback — write step glue (1 step(s) unbound, class b)
 - `features/deployment/human-device-mapping.feature` — Every nodeTypes entry is in the allowed cluster vocabulary — write step glue (1 step(s) unbound, class b)
@@ -33,13 +179,14 @@ Latest mesh report(s) cross-referenced for DEFECT-STALE: (none found — no DEFE
 - `features/lamad/love-map-negotiation.feature` — Love map path is invisible to non-participants — write step glue (1 step(s) unbound, class b)
 - `features/resilience/resilience-dimensions.feature` — Content stewarded by no household reads at-risk, honestly — write step glue (1 step(s) unbound, class b)
 - `features/resilience/resilience-dimensions.feature` — Two stewarding households lift content to partial — write step glue (1 step(s) unbound, class b)
+- `features/auth/conductor-pool-recovery.feature` — Doorway exposes orphan-mapping count for operators — write step glue (2 step(s) unbound, class b)
 
-### FIXTURE (45 total)
+### FIXTURE (58 total)
 
 - `features/content/epr-content-addressing.feature` — EPR popover surfaces all three pillars when present — precondition missing: E2E_DEVICE_MODE
 - `features/content/epr-content-addressing.feature` — Following an EPR link transfers reading context to the destination — precondition missing: E2E_DEVICE_MODE
-- `features/content/landing-backing-claims.feature` — The governance leg resolves to the landing surface's own governance state — precondition missing: E2E_SHEM_HOST
-- `features/content/landing-backing-claims.feature` — The claims name the stewardship and custody assertions — precondition missing: E2E_SHEM_HOST
+- `features/dataplane/resilience-identity-coherence.feature` — No household-placed human on alpha-A is missing its agent_pub_key — precondition missing: E2E_SHEM_HOST
+- `features/dataplane/resilience-identity-coherence.feature` — No household-member human on alpha-A carries a fossil agentPubKey — precondition missing: E2E_SHEM_HOST
 - `features/delivery/client-resilience.feature` — Service Worker registers in browser — precondition missing: E2E_DEVICE_MODE
 - `features/delivery/client-resilience.feature` — Service Worker registers in Tauri WebView — precondition missing: E2E_DEVICE_MODE
 - `features/delivery/client-resilience.feature` — Cached app works offline — precondition missing: E2E_DEVICE_MODE
@@ -53,7 +200,7 @@ Latest mesh report(s) cross-referenced for DEFECT-STALE: (none found — no DEFE
 - `features/peer-oauth-portal/rp-consent.feature` — User approves a per-claim consent — add: elohim_session
 - `features/peer-oauth-portal/rp-consent.feature` — User declines consent — add: elohim_session
 
-### STRUCTURAL (68 total)
+### STRUCTURAL (73 total)
 
 - `features/auth/contributor-presence-claim-ceremony.feature` — The claim convening is convened and witnessed — needs shem (multi-tenant commons canvas — no household analog)
 - `features/auth/contributor-presence-claim-ceremony.feature` — The negotiated backfill is recorded as append-only events — needs shem (multi-tenant commons canvas — no household analog)
@@ -66,18 +213,31 @@ Latest mesh report(s) cross-referenced for DEFECT-STALE: (none found — no DEFE
 - `features/content/landing-discovery.feature` — A curious visitor opens the evolution-of-trust explorable — needs shem (multi-tenant commons canvas — no household analog)
 - `features/content/landing-discovery.feature` — A reference card whose body cannot be reached still renders a legible fallback — needs shem (multi-tenant commons canvas — no household analog)
 
-### UNCLASSIFIED (91 total)
+### DEFECT-STALE (38 total)
+
+- `features/auth/reach-commons.feature` — Anonymous reader can read the manifesto (earned commons reach) — AssertionError [ERR_ASSERTION]: anonymous read was not served: body: {"error":"Content not found: manifesto"}
+- `features/auth/reach-commons.feature` — Anonymous reader is rejected for community-reach content (403 with requiredReach) — AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+- `features/auth/recovery/recovery-m5-defender-role-gate.feature` — Without role marker — coordinator rejects — AssertionError [ERR_ASSERTION]: Expected error mentioning "not a configured defender" but got: {"error":"Not Found","path":"/api/v1/account/specialist-revocation","hint":"Use WebSocket connection to /admin or /app/:port"}
+- `features/auth/recovery/recovery-m5-defender-role-gate.feature` — With role marker — coordinator accepts — AssertionError [ERR_ASSERTION]: Expected 200 (ActionHash) but got 404
+- `features/content/epr-content-addressing.feature` — Blob content loads via CID — AssertionError [ERR_ASSERTION]: Content manifesto not found
+- `features/content/epr-content-addressing.feature` — EPR Head carries three-pillar metadata — AssertionError [ERR_ASSERTION]: Content manifesto not found in storage
+- `features/content/stewardship-allocation.feature` — Value-scanner content has multiple stewards — AssertionError [ERR_ASSERTION]: No content found with tag "value-scanner" — allocator holds 8 allocation rows across 8 content items, 0 of them multi-steward. An empty content universe is a READER problem (reach/visibility or seeding), not an allocation problem.
+- `features/content/stewardship-allocation.feature` — Stewardship reflects human affinities — AssertionError [ERR_ASSERTION]: No content found with tag "public-observer" — allocator holds 8 allocation rows across 8 content items, 0 of them multi-steward. An empty content universe is a READER problem (reach/visibility or seeding), not an allocation problem.
+- `features/content/stewardship-allocation.feature` — Faith content stewarded by pastoral affinity — AssertionError [ERR_ASSERTION]: No multi-steward allocation among the 1 scanned "fct" items.
+- `features/content/stewardship-allocation.feature` — Uncategorized content falls back to bootstrap steward — AssertionError [ERR_ASSERTION]: Expected type "curator", got "original_creator" for matthew-dowell
+
+### UNCLASSIFIED (92 total)
 
 - `features/auth/agency-pipeline-coherence.feature` — Matthew's pipeline shows hosted-steward as an in-between state — fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run)
 - `features/auth/agency-pipeline-coherence.feature` — James's pipeline reflects no stewardship affordance — fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run)
 - `features/auth/steward-login-portal-handoff.feature` — Matthew's login response carries his portal host URL — fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run)
 - `features/auth/steward-login-portal-handoff.feature` — Doorway redirects Matthew to his portal host after auth — fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run)
 - `features/content/contributor-presences.feature` — Learner sees contributor presences below the content — insufficient surface signal — no HTTP/metric/field surface named in step text or glue
+- `features/content/landing-backing-claims.feature` — The landing surface is stewarded, and the steward is the one it declares — fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run)
 - `features/content/relationship-idempotency.feature` — A spouse relationship authored by both parties is created once — insufficient surface signal — no HTTP/metric/field surface named in step text or glue
 - `features/content/relationship-idempotency.feature` — Re-importing an account package does not error — insufficient surface signal — no HTTP/metric/field surface named in step text or glue
 - `features/content/relationship-idempotency.feature` — Adam-Eve UNIQUE constraint does not fail the seed — insufficient surface signal — no HTTP/metric/field surface named in step text or glue
 - `features/dataplane/contributor-presence-witnessed-holding.feature` — Every fixture resident exists as a commons-stewarded contributor presence — fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run)
-- `features/dataplane/contributor-presence-witnessed-holding.feature` — Steward-authored witnessed ascriptions cover fixture-resident household residency — insufficient surface signal — no HTTP/metric/field surface named in step text or glue
 
 ## Surfaces the probe could not classify
 
@@ -92,19 +252,32 @@ these need a manual look, not a mechanical one:
 - `/api`
 - `/api/peers`
 - `/api/v1`
+- `/api/v1/account/specialist-revocation`
 - `/api/v1/blob`
+- `/api/v1/commitments/facing/rea.`
 - `/api/v1/households`
 - `/api/v1/identity/heal`
 - `/api/v1/peers`
+- `/api/v1/peers/delivery.`
 - `/api/v1/resilience`
 - `/auth/callback.`
 - `/auth/portal`
 - `/db`
-- `/db/content/evolution-of-trust`
 - `/db/content/manifesto`
 - `/db/schemas/oauth_session.rs`
 - `/health/metrics`
 - `/p2p`
+- `/p2p/mod.rs`
+- `/p2p/status.connectedPeers`
+- `/p2p/status.drain`
+- `/p2p/status.drain.total`
+- `/p2p/status.networkClass`
+- `/p2p/status.pull`
+- `/p2p/status.pull.pending`
+- `/p2p/status.syncMode`
+- `/p2p/status.syncPaused`
+- `/sync`
+- `/sync/projector.rs`
 
 ## Full census — every `@wip` or failed Act I/host scenario
 
@@ -117,8 +290,12 @@ these need a manual look, not a mechanical one:
 | `features/auth/contributor-presence-claim-ceremony.feature` | A settlement is appealable through correcting events | a | STRUCTURAL | — | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/auth/contributor-presence-claim-ceremony.feature` | The claim convening is convened and witnessed | a | STRUCTURAL | — | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/auth/contributor-presence-claim-ceremony.feature` | The negotiated backfill is recorded as append-only events | a | STRUCTURAL | — | — | needs shem (multi-tenant commons canvas — no household analog) |
+| `features/auth/reach-commons.feature` | Anonymous reader can read the manifesto (earned commons reach) | a | DEFECT-STALE | `/db/content` | — | AssertionError [ERR_ASSERTION]: anonymous read was not served: body: {"error":"Content not found: manifesto"} |
+| `features/auth/reach-commons.feature` | Anonymous reader is rejected for community-reach content (403 with requiredReach) | a | DEFECT-STALE | `/db/content` | — | AssertionError [ERR_ASSERTION]: Expected values to be strictly equal: |
 | `features/auth/recovery/identity-key-lineage-recovery.feature` | A community-authorized key rotation preserves attribution, standing, and claims | c | WIRE | — | — | write step glue (14 step(s) unbound, class c) |
 | `features/auth/recovery/identity-key-lineage-recovery.feature` | An un-authorized key rotation cannot capture the identity | c | WIRE | — | — | write step glue (10 step(s) unbound, class c) |
+| `features/auth/recovery/recovery-m5-defender-role-gate.feature` | With role marker — coordinator accepts | a | DEFECT-STALE | — | — | AssertionError [ERR_ASSERTION]: Expected 200 (ActionHash) but got 404 |
+| `features/auth/recovery/recovery-m5-defender-role-gate.feature` | Without role marker — coordinator rejects | a | DEFECT-STALE | — | — | AssertionError [ERR_ASSERTION]: Expected error mentioning "not a configured defender" but got: {"error":"Not Found","path":"/api/v1/account/specialist-revocation","hint":"Use WebSocket connection to /admin or /app/:port"} |
 | `features/auth/recovery/recovery-m5-portal-host-discovery.feature` | Add a portal host | b | WIRE | `/api/v1/account/portal-hosts` | — | write step glue (1 step(s) unbound, class b) |
 | `features/auth/recovery/recovery-m5-portal-host-discovery.feature` | Validator rejects http URL | b | WIRE | `/api/v1/account/portal-hosts` | — | write step glue (1 step(s) unbound, class b) |
 | `features/auth/recovery/recovery-shamir-optional.feature` | Recovery never asks Matthew to choose Path A or Path B | c | STRUCTURAL | — | — | needs shem (multi-tenant commons canvas — no household analog) |
@@ -159,15 +336,15 @@ these need a manual look, not a mechanical one:
 | `features/content/epistemic-standing.feature` | Emergent truth is served honestly as emergent | c | WIRE | — | — | write step glue (7 step(s) unbound, class c) |
 | `features/content/epistemic-standing.feature` | Peer review accumulates into reviewed standing mechanically | c | WIRE | — | — | write step glue (7 step(s) unbound, class c) |
 | `features/content/epistemic-standing.feature` | Two peers folding the same reviews reach identical standing | c | WIRE | — | — | write step glue (6 step(s) unbound, class c) |
+| `features/content/epr-content-addressing.feature` | Blob content loads via CID | a | DEFECT-STALE | `/threshold/dashboard`, `/db/content` | — | AssertionError [ERR_ASSERTION]: Content manifesto not found |
+| `features/content/epr-content-addressing.feature` | EPR Head carries three-pillar metadata | a | DEFECT-STALE | `/threshold/dashboard`, `/db/content` | — | AssertionError [ERR_ASSERTION]: Content manifesto not found in storage |
 | `features/content/epr-content-addressing.feature` | EPR Head signature is verifiable end-to-end | b | WIRE | `/threshold/dashboard` | — | write step glue (4 step(s) unbound, class b) |
 | `features/content/epr-content-addressing.feature` | EPR link to a versioned-since-authored CID degrades gracefully | b | WIRE | `/threshold/dashboard` | — | write step glue (5 step(s) unbound, class b) |
 | `features/content/epr-content-addressing.feature` | EPR popover surfaces all three pillars when present | b | FIXTURE | `/threshold/dashboard` | — | precondition missing: E2E_DEVICE_MODE |
 | `features/content/epr-content-addressing.feature` | Floor reaches bypass standing while commons demands the conservative fallback bar | b | WIRE | `/threshold/dashboard` | — | write step glue (5 step(s) unbound, class b) |
 | `features/content/epr-content-addressing.feature` | Following an EPR link transfers reading context to the destination | b | FIXTURE | `/threshold/dashboard` | — | precondition missing: E2E_DEVICE_MODE |
 | `features/content/epr-content-addressing.feature` | Legacy standing-policy keys are inert — canonical vocabulary governs composition thresholds | b | WIRE | `/threshold/dashboard` | — | write step glue (5 step(s) unbound, class b) |
-| `features/content/landing-backing-claims.feature` | The claims name the stewardship and custody assertions | b | FIXTURE | `/api/v1/epr/elohim-host-landing/nav-context`, `/health` | — | precondition missing: E2E_SHEM_HOST |
-| `features/content/landing-backing-claims.feature` | The governance leg resolves to the landing surface's own governance state | b | FIXTURE | `/api/v1/epr/elohim-host-landing/nav-context`, `/health` | — | precondition missing: E2E_SHEM_HOST |
-| `features/content/landing-backing-claims.feature` | The landing surface is stewarded, and the steward is the one it declares | b | WIRE | `/db/content`, `/db/allocations` | — | write step glue (1 step(s) unbound, class b) |
+| `features/content/landing-backing-claims.feature` | The landing surface is stewarded, and the steward is the one it declares | a | UNCLASSIFIED | `/db/content`, `/db/allocations` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/content/landing-discovery.feature` | A curious visitor opens the evolution-of-trust explorable | a | STRUCTURAL | — | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/content/landing-discovery.feature` | A reference card whose body cannot be reached still renders a legible fallback | a | STRUCTURAL | — | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/content/landing-discovery.feature` | A visitor who is unsure is carried to the who-are-you self-router | a | STRUCTURAL | — | — | needs shem (multi-tenant commons canvas — no household analog) |
@@ -195,7 +372,13 @@ these need a manual look, not a mechanical one:
 | `features/content/ssr_capability.feature` | storage layers the capability into the peer-status view | c | WIRE | `/admin/capability` | — | write step glue (7 step(s) unbound, class c) |
 | `features/content/ssr_capability.feature` | the derived claim does not implicitly offer authenticated SSR | c | WIRE | `/admin/capability` | — | write step glue (7 step(s) unbound, class c) |
 | `features/content/ssr_capability.feature` | V8 fetch shim forwards the user's auth header to outbound storage fetches | c | WIRE | — | — | write step glue (8 step(s) unbound, class c) |
+| `features/content/stewardship-allocation.feature` | Faith content stewarded by pastoral affinity | a | DEFECT-STALE | `/admin`, `/db/content`, `/db/allocations` | — | AssertionError [ERR_ASSERTION]: No multi-steward allocation among the 1 scanned "fct" items. |
+| `features/content/stewardship-allocation.feature` | No steward has exclusive ownership | a | DEFECT-STALE | `/admin` | — | AssertionError [ERR_ASSERTION]: Average stewards per content item is 1.00, expected > 1 |
+| `features/content/stewardship-allocation.feature` | Stewardship reflects human affinities | a | DEFECT-STALE | `/admin`, `/db/content`, `/db/allocations` | — | AssertionError [ERR_ASSERTION]: No content found with tag "public-observer" — allocator holds 8 allocation rows across 8 content items, 0 of them multi-steward. An empty content universe is a READER problem (reach/visibility or seeding), not an allocation problem. |
+| `features/content/stewardship-allocation.feature` | Uncategorized content falls back to bootstrap steward | a | DEFECT-STALE | `/admin` | — | AssertionError [ERR_ASSERTION]: Expected type "curator", got "original_creator" for matthew-dowell |
+| `features/content/stewardship-allocation.feature` | Value-scanner content has multiple stewards | a | DEFECT-STALE | `/admin`, `/db/content`, `/db/allocations` | — | AssertionError [ERR_ASSERTION]: No content found with tag "value-scanner" — allocator holds 8 allocation rows across 8 content items, 0 of them multi-steward. An empty content universe is a READER problem (reach/visibility or seeding), not an allocation problem. |
 | `features/dataplane/blob-replication.feature` | Declared reach maps to its replica target — no silent floor collapse | b | WIRE | — | — | write step glue (5 step(s) unbound, class b) |
+| `features/dataplane/content-sync.feature` | Author a content node and confirm it converges on a second peer within 30 s | a | STRUCTURAL | `/threshold/dashboard` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/dataplane/contributor-presence-witnessed-holding.feature` | Every fixture resident exists as a commons-stewarded contributor presence | a | UNCLASSIFIED | `/db/presences`, `/db/humans` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/dataplane/contributor-presence-witnessed-holding.feature` | No household-placed row is orphaned under the evolved invariant | a | UNCLASSIFIED | `/auth/contributor-presence-claim-ceremony.feature` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/dataplane/contributor-presence-witnessed-holding.feature` | Steward-authored witnessed ascriptions cover fixture-resident household residency | a | UNCLASSIFIED | — | — | insufficient surface signal — no HTTP/metric/field surface named in step text or glue |
@@ -203,9 +386,16 @@ these need a manual look, not a mechanical one:
 | `features/dataplane/doorway-catching-up-page.feature` | a cache-warm doorway renders the shell without a synchronous upstream fetch | b | WIRE | — | — | write step glue (4 step(s) unbound, class b) |
 | `features/dataplane/notary-authority.feature` | A declared canonical head rings the upgrade doorbell — every peer re-verifies and adopts within one sync window (RED — no doorbell) | a | UNCLASSIFIED | — | — | insufficient surface signal — no HTTP/metric/field surface named in step text or glue |
 | `features/dataplane/operator-commitment-gated-verbs.feature` | a peer serves its own runtime telemetry | a | UNCLASSIFIED | — | — | insufficient surface signal — no HTTP/metric/field surface named in step text or glue |
+| `features/dataplane/resilience-identity-coherence.feature` | No household-member human on alpha-A carries a fossil agentPubKey | a | FIXTURE | `/db/humans` | — | precondition missing: E2E_SHEM_HOST |
+| `features/dataplane/resilience-identity-coherence.feature` | No household-placed human on alpha-A is missing its agent_pub_key | a | FIXTURE | `/db/humans`, `/db/p2p/conductor-diagnostics` | — | precondition missing: E2E_SHEM_HOST |
+| `features/dataplane/resiliency-saga/05-co-steward-agreement.feature` | A stewardship pin with provide intent is active and caught up | a | DEFECT-STALE | `/api/v1/pins`, `/api/v1/commitments` | — | AssertionError [ERR_ASSERTION]: No active item pin references "elohim-host-landing" on alpha-A — no household has declared consent to steward it (5 pins listed). |
 | `features/dataplane/resiliency-saga/08-capacity-reported.feature` | The cluster reports a non-negative stewarded-bytes aggregate | a | FIXTURE | `elohim_custodian_stewarded_bytes` | — | precondition missing: E2E_DOORWAY_METRICS_ALPHA, E2E_STORAGE_ALPHA, E2E_METRICS_, E2E_STORAGE_, E2E_SHEM_HOST |
+| `features/dataplane/resiliency-saga/09-projectors-carry.feature` | The household resilience snapshot carries the co-steward's commitment-backed count | a | DEFECT-STALE | `/api/v1/resilience/elohim-host-landing/household`, `/db/humans`, `commitmentBackedReplication.commonsCommitments`, `commitmentBackedReplication.totalPledgedBytes` | — | AssertionError [ERR_ASSERTION]: Expected "commitmentBackedReplication.commonsCommitments" >= 1; got: 0 |
+| `features/dataplane/resiliency-saga/10-card-tells-truth.feature` | Both doorways report the same non-zero stewarding count for elohim-host-landing | a | DEFECT-STALE | `/db/content` | — | AssertionError [ERR_ASSERTION]: stewardingCollectives on alpha-A is 0 — expected > 0 (the resilience card must not read zero) |
 | `features/dataplane/resiliency-saga/10-card-tells-truth.feature` | The rendered resilience card shows the truth on elohim.host | a | UNCLASSIFIED | `/db/humans` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/dataplane/resiliency-saga/11-pull-queue-retires.feature` | a retired pin is re-admitted once a peer's inventory names its head_ref again | a | UNCLASSIFIED | `/api/v1/pins`, `elohim_acquisition_pin_retirements_total` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
+| `features/dataplane/resiliency-saga/11-pull-queue-retires.feature` | an unsatisfiable pin retires once the peer-sized retry budget exhausts | a | DEFECT-STALE | `/api/v1/pins`, `/p2p/status`, `elohim_acquisition_pin_retirements_total` | — | AssertionError [ERR_ASSERTION]: this mesh's real acquisition fabric has 2 connected peer(s) at http://localhost:8090 — the chapter's worked example names a 6-peer alpha fabric; this is a household mesh with 3 total members (2 connected from any one member's own view). The retry budget the "probed on N distinct peers" step below actually checks is max(3, connectedPeers), so this mismatch alone does not prevent that step from passing. |
+| `features/dataplane/resiliency-saga/11-pull-queue-retires.feature` | the household's pin for elohim-host-landing reaches caught-up within a bounded window | a | FIXTURE | `/api/v1/pins`, `/api/v1/commitments`, `elohim_acquisition_pins_retired` | — | precondition missing: E2E_DOORWAY_METRICS_ALPHA, E2E_STORAGE_ALPHA, E2E_METRICS_, E2E_STORAGE_, E2E_SHEM_HOST |
 | `features/delivery/acquisition-pins.feature` | An error-class shard response releases its in-flight dispatch slot | a | UNCLASSIFIED | `/p2p/status` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/delivery/acquisition-pins.feature` | Retries of one item probe distinct peers, never one peer three times | a | UNCLASSIFIED | `/p2p/status` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/delivery/client-resilience.feature` | Cached app survives storage pod restart | b | FIXTURE | `/db/content`, `/threshold/dashboard` | — | precondition missing: E2E_DEVICE_MODE |
@@ -221,15 +411,20 @@ these need a manual look, not a mechanical one:
 | `features/delivery/client-resilience.feature` | WASM cache falls back to network when content not cached | a | FIXTURE | `/db/content`, `/threshold/dashboard` | — | precondition missing: E2E_DEVICE_MODE |
 | `features/delivery/client-resilience.feature` | WASM cache provides sub-millisecond content lookups | a | FIXTURE | `/db/content`, `/threshold/dashboard` | — | precondition missing: E2E_DEVICE_MODE |
 | `features/delivery/client-resilience.feature` | WASM cache unavailable degrades gracefully | a | FIXTURE | `/db/content`, `/threshold/dashboard` | — | precondition missing: E2E_DEVICE_MODE |
+| `features/delivery/content-addressing.feature` | CID URL serves same content without slug lookup | a | DEFECT-STALE | `/health`, `/db/content` | — | AssertionError [ERR_ASSERTION]: Header "X-Content-Address" value "sha256-ee5301c995967ff1e0a7b07a7f5e2de4f5f547bb3718547d33248453b77cb30f" does not look like a CID content address (expected bafkrei…) |
 | `features/delivery/content-addressing.feature` | Re-seeded content with new CID invalidates old mapping | b | WIRE | `/health`, `/db/content` | — | write step glue (3 step(s) unbound, class b) |
 | `features/delivery/content-addressing.feature` | Service worker caches by content address | b | WIRE | `/health`, `/db/content` | — | write step glue (3 step(s) unbound, class b) |
 | `features/delivery/delivery-diagnostics.feature` | Capability summary explains what the network can actually deliver | b | WIRE | `/db/content` | — | write step glue (5 step(s) unbound, class b) |
 | `features/delivery/delivery-diagnostics.feature` | Cold-cache HTML5 app loads via SW ZIP delivery without crashing storage | a | FIXTURE | `/db/content` | — | precondition missing: E2E_DEVICE_MODE |
 | `features/delivery/delivery-diagnostics.feature` | Operator can bypass Service Worker cache for diagnostics | a | FIXTURE | `/db/content` | — | precondition missing: E2E_DEVICE_MODE |
+| `features/delivery/delivery-diagnostics.feature` | Operator can query a peer's delivery capabilities | a | DEFECT-STALE | `/db/content`, `/health`, `/api/v1/peers/delivery` | — | AssertionError [ERR_ASSERTION]: no peer advertises "serves_extracted" — the delivery-peer row carries only [serves_compressed, serves_compressed]. A client choosing a peer to fetch individual files from cannot tell whether ANY peer can serve them file-by-file, so it must fall back to whole-blob download every time. |
+| `features/delivery/delivery-diagnostics.feature` | Operator can see all peers and their delivery capabilities | a | DEFECT-STALE | `/db/content`, `/api/v1/peers/delivery` | — | AssertionError [ERR_ASSERTION]: this mesh advertises 2 delivery peer(s) from http://localhost:8090, not 3. The household triad gives any one member two connected peers; a scenario that names a different fabric size needs that fabric, not a rewritten expectation. |
 | `features/delivery/delivery-diagnostics.feature` | Same-origin ingress enables SW interception for /apps/ requests | a | FIXTURE | `/db/content` | — | precondition missing: E2E_DEVICE_MODE |
 | `features/delivery/delivery-diagnostics.feature` | Service Worker reports delivery source for each request | a | FIXTURE | `/db/content` | — | precondition missing: E2E_DEVICE_MODE |
 | `features/delivery/delivery-diagnostics.feature` | With projection cache enabled, same load is absorbed | a | UNCLASSIFIED | `/db/content`, `/health` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/delivery/delivery-diagnostics.feature` | Without projection cache, browser load overwhelms storage | b | WIRE | `/db/content` | — | write step glue (1 step(s) unbound, class b) |
+| `features/delivery/happ-coordinator-delivery.feature` | An operator can see which drift class the installer decided on | a | FIXTURE | `/health` | — | precondition missing: E2E_STORAGE_ |
+| `features/delivery/happ-coordinator-delivery.feature` | Coordinator drift is healed by hot-swap without re-keying the agent | a | FIXTURE | `/db/p2p/conductor-diagnostics`, `/health`, `/db/content/elohim-host-landing` | — | precondition missing: E2E_STORAGE_ |
 | `features/delivery/landing-page.feature` | An SSR render that activates no route component sheds to the bundle fallback | b | WIRE | — | — | write step glue (1 step(s) unbound, class b) |
 | `features/delivery/landing-page.feature` | Landing page has proper SEO meta tags | b | WIRE | — | — | write step glue (3 step(s) unbound, class b) |
 | `features/delivery/landing-page.feature` | The deployed host serves the live epic-card deck | a | FIXTURE | — | — | precondition missing: E2E_DEVICE_MODE |
@@ -259,7 +454,7 @@ these need a manual look, not a mechanical one:
 | `features/delivery/spa-bundle-delivery.feature` | /apps/ still serves html5-apps and is not intercepted by the root app | a | UNCLASSIFIED | `/health/startup`, `/db/content`, `/health` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/delivery/spa-bundle-delivery.feature` | /health/startup returns live startup status as JSON | a | UNCLASSIFIED | `/health`, `/health/startup` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/delivery/spa-bundle-delivery.feature` | /threshold is still accessible as the operator dashboard | a | UNCLASSIFIED | `/health/startup`, `/threshold` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
-| `features/delivery/spa-bundle-delivery.feature` | API routes are not caught by the root app catch-all | a | UNCLASSIFIED | `/health/startup`, `/threshold` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
+| `features/delivery/spa-bundle-delivery.feature` | API routes are not caught by the root app catch-all | a | UNCLASSIFIED | `/health/startup`, `/db/content/evolution-of-trust`, `/threshold` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/delivery/spa-bundle-delivery.feature` | Bootstrap page auto-navigates when rootApp becomes ready | a | FIXTURE | `/health/startup`, `/health` | — | precondition missing: E2E_DEVICE_MODE |
 | `features/delivery/spa-bundle-delivery.feature` | Bootstrap page falls back to reload timer when /health/startup is unreachable | a | FIXTURE | `/health/startup`, `/health` | — | precondition missing: E2E_DEVICE_MODE |
 | `features/delivery/spa-bundle-delivery.feature` | Bootstrap page is shown when SPA blob is not yet extracted | a | FIXTURE | `/health/startup` | — | precondition missing: E2E_DEVICE_MODE |
@@ -285,6 +480,8 @@ these need a manual look, not a mechanical one:
 | `features/deployment/compute-commitment-bounds.feature` | Substrate denies a compute request that exceeds bounds | c | STRUCTURAL | — | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/deployment/compute-commitment-bounds.feature` | Substrate handles all three trigger kinds without elohim | c | STRUCTURAL | — | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/deployment/compute-commitment-bounds.feature` | Substrate negotiates a compute request without elohim | c | STRUCTURAL | — | — | needs shem (multi-tenant commons canvas — no household analog) |
+| `features/deployment/doorway-self-registration.feature` | Matthew sees his own node in the admin dashboard | a | DEFECT-STALE | `/admin` | — | Error: GET /admin/nodes returned 503: { |
+| `features/deployment/doorway-self-registration.feature` | Matthew's node reports real hardware capacity | a | DEFECT-STALE | `/admin` | — | Error: GET /admin/nodes returned 503: { |
 | `features/deployment/hub-topology.feature` | Church basement hub carries a hundred spokes through one Tier 3 | b | WIRE | — | — | write step glue (6 step(s) unbound, class b) |
 | `features/deployment/hub-topology.feature` | CollectiveHub adds spokes through governance consent | b | WIRE | — | — | write step glue (5 step(s) unbound, class b) |
 | `features/deployment/hub-topology.feature` | Extended family with two hubs provides mutual relational backup | b | WIRE | — | — | write step glue (5 step(s) unbound, class b) |
@@ -312,6 +509,11 @@ these need a manual look, not a mechanical one:
 | `features/deployment/node-resource-tunables.feature` | Breaches of these limits aggregate into the resource-shape report | c | WIRE | — | — | write step glue (5 step(s) unbound, class c) |
 | `features/deployment/node-resource-tunables.feature` | Each node resource limit is a named per-node tunable with a safe default | c | WIRE | — | — | write step glue (5 step(s) unbound, class c) |
 | `features/deployment/node-resource-tunables.feature` | The conductor arc factor is bounded to {0,1} — fractional is refused, not silently clamped | c | WIRE | — | — | write step glue (4 step(s) unbound, class c) |
+| `features/deployment/p2p-validation.feature` | P2P status endpoint exposes sync_paused state | a | DEFECT-STALE | `/health` | — | AssertionError [ERR_ASSERTION]: doorway /health p2p.syncPaused is undefined (type undefined) — expected a boolean. FINDING (2026-08-21): elohim-storage DOES expose sync_paused (camelCase syncPaused) on its direct GET /p2p/status (P2PStatusInfo), but the doorway-facing GET /health surface (doorway/doorway-service/src/routes/health.rs HealthP2P) never proxies it — an operator or agent watching only the doorway health endpoint cannot see backpressure state today. |
+| `features/deployment/p2p-validation.feature` | Storage pauses P2P sync during account import | a | DEFECT-STALE | — | — | AssertionError [ERR_ASSERTION]: elohim-storage on doorway "alpha" /p2p/status.connectedPeers is 2, expected >= 3 |
+| `features/deployment/p2p-validation.feature` | Storage pauses P2P sync during bulk content creation | a | DEFECT-STALE | `/db/content/bulk` | — | AssertionError [ERR_ASSERTION]: elohim-storage on doorway "alpha" /p2p/status.connectedPeers is 2, expected >= 3 |
+| `features/deployment/p2p-validation.feature` | Sync auto-suppressed while drain backlog is large | a | DEFECT-STALE | — | — | AssertionError [ERR_ASSERTION]: elohim-storage on doorway "alpha" /p2p/status.connectedPeers is 2, expected >= 5 |
+| `features/deployment/p2p-validation.feature` | Sync resumes even if bulk write fails | a | DEFECT-STALE | `/db/content/bulk` | — | AssertionError [ERR_ASSERTION]: elohim-storage on doorway "alpha" /p2p/status.connectedPeers is 2, expected >= 3 |
 | `features/deployment/peer-diversity.feature` | Biometric fob provides strongest identity attestation | a | UNCLASSIFIED | — | — | insufficient surface signal — no HTTP/metric/field surface named in step text or glue |
 | `features/deployment/peer-diversity.feature` | Carrier-grade NAT devices must use relay | a | UNCLASSIFIED | — | — | insufficient surface signal — no HTTP/metric/field surface named in step text or glue |
 | `features/deployment/peer-diversity.feature` | Cliff-degradation devices need proactive replication | a | UNCLASSIFIED | — | — | insufficient surface signal — no HTTP/metric/field surface named in step text or glue |
@@ -330,7 +532,13 @@ these need a manual look, not a mechanical one:
 | `features/deployment/peer-diversity.feature` | Raspberry Pi can steward modest content volumes | a | UNCLASSIFIED | — | — | insufficient surface signal — no HTTP/metric/field surface named in step text or glue |
 | `features/deployment/seeder-registry-coherence.feature` | Seeder is idempotent across reruns | a | UNCLASSIFIED | — | — | insufficient surface signal — no HTTP/metric/field surface named in step text or glue |
 | `features/deployment/sync-control.feature` | Each archetype has a sensible default sync mode | a | UNCLASSIFIED | — | — | insufficient surface signal — no HTTP/metric/field surface named in step text or glue |
+| `features/deployment/sync-control.feature` | Operator pauses sync explicitly | a | DEFECT-STALE | — | — | AssertionError [ERR_ASSERTION]: cannot establish precondition "the peer's sync mode is sync" — POST /p2p/sync-mode returned 404 (Not Found). FINDING (2026-08-21): elohim-storage has no sync-mode control surface. P2PStatusInfo (elohim/elohim-storage/src/p2p/mod.rs) carries no syncMode/networkClass field — only the AUTOMATIC backpressure flag sync_paused (camelCase syncPaused). No handler for POST /p2p/sync-mode, POST /p2p/network-class, or GET /p2p/sync-mode/history exists in elohim-storage/src/http.rs. The endpoint names probed here follow the /p2p/status naming convention as the most plausible target — this step fails with the REAL HTTP response from that (currently 404) route rather than fabricating a pass. |
+| `features/deployment/sync-control.feature` | Operator resumes sync after pause | a | DEFECT-STALE | — | — | AssertionError [ERR_ASSERTION]: cannot establish precondition "the peer's sync mode is paused" — POST /p2p/sync-mode returned 404 (Not Found). FINDING (2026-08-21): elohim-storage has no sync-mode control surface. P2PStatusInfo (elohim/elohim-storage/src/p2p/mod.rs) carries no syncMode/networkClass field — only the AUTOMATIC backpressure flag sync_paused (camelCase syncPaused). No handler for POST /p2p/sync-mode, POST /p2p/network-class, or GET /p2p/sync-mode/history exists in elohim-storage/src/http.rs. The endpoint names probed here follow the /p2p/status naming convention as the most plausible target — this step fails with the REAL HTTP response from that (currently 404) route rather than fabricating a pass. |
+| `features/deployment/sync-control.feature` | Sync mode transitions are logged for auditability | a | DEFECT-STALE | — | — | AssertionError [ERR_ASSERTION]: cannot establish precondition — GET /p2p/sync-mode/history returned 404 (Not Found). FINDING (2026-08-21): elohim-storage has no sync-mode control surface. P2PStatusInfo (elohim/elohim-storage/src/p2p/mod.rs) carries no syncMode/networkClass field — only the AUTOMATIC backpressure flag sync_paused (camelCase syncPaused). No handler for POST /p2p/sync-mode, POST /p2p/network-class, or GET /p2p/sync-mode/history exists in elohim-storage/src/http.rs. The endpoint names probed here follow the /p2p/status naming convention as the most plausible target — this step fails with the REAL HTTP response from that (currently 404) route rather than fabricating a pass. |
 | `features/deployment/sync-control.feature` | Sync state is visible in the operator dashboard | a | UNCLASSIFIED | — | — | insufficient surface signal — no HTTP/metric/field surface named in step text or glue |
+| `features/deployment/sync-control.feature` | Wifi-only mode pauses sync when cellular is the active network | a | DEFECT-STALE | — | — | AssertionError [ERR_ASSERTION]: cannot establish precondition device "2019 Android Phone" with sync mode "wifi-only" — POST /p2p/sync-mode returned 404. FINDING (2026-08-21): elohim-storage has no sync-mode control surface. P2PStatusInfo (elohim/elohim-storage/src/p2p/mod.rs) carries no syncMode/networkClass field — only the AUTOMATIC backpressure flag sync_paused (camelCase syncPaused). No handler for POST /p2p/sync-mode, POST /p2p/network-class, or GET /p2p/sync-mode/history exists in elohim-storage/src/http.rs. The endpoint names probed here follow the /p2p/status naming convention as the most plausible target — this step fails with the REAL HTTP response from that (currently 404) route rather than fabricating a pass. |
+| `features/deployment/sync-control.feature` | Wifi-only mode resumes sync when device joins wifi | a | DEFECT-STALE | `/p2p/status` | — | AssertionError [ERR_ASSERTION]: cannot establish precondition device "2019 Android Phone" with sync mode "wifi-only" — POST /p2p/sync-mode returned 404. FINDING (2026-08-21): elohim-storage has no sync-mode control surface. P2PStatusInfo (elohim/elohim-storage/src/p2p/mod.rs) carries no syncMode/networkClass field — only the AUTOMATIC backpressure flag sync_paused (camelCase syncPaused). No handler for POST /p2p/sync-mode, POST /p2p/network-class, or GET /p2p/sync-mode/history exists in elohim-storage/src/http.rs. The endpoint names probed here follow the /p2p/status naming convention as the most plausible target — this step fails with the REAL HTTP response from that (currently 404) route rather than fabricating a pass. |
+| `features/deployment/sync-control.feature` | Without sync mode control, mobile device burns cellular data | a | DEFECT-STALE | — | — | AssertionError [ERR_ASSERTION]: peer /p2p/status.connectedPeers is 2, expected >= 5 — the regression this scenario documents (unconditional cellular gossip) needs a REAL multi-peer gossip fabric to be meaningful; this mesh is not connected enough. |
 | `features/devflow/agent-identity-claim-and-acceptance.feature` | A commit's co-author roster reaches the produce event, sorted and additive | c | WIRE | — | — | write step glue (5 step(s) unbound, class c) |
 | `features/devflow/agent-identity-claim-and-acceptance.feature` | A contested identity escalates the next acceptance to Audit | c | WIRE | — | — | write step glue (5 step(s) unbound, class c) |
 | `features/devflow/agent-identity-claim-and-acceptance.feature` | A governance decision stamps who was acting when it was asked for | c | WIRE | — | — | write step glue (4 step(s) unbound, class c) |
@@ -363,6 +571,10 @@ these need a manual look, not a mechanical one:
 | `features/devflow/run-plane.feature` | Writing the same correction twice at one commit leaves one record | c | WIRE | — | — | write step glue (7 step(s) unbound, class c) |
 | `features/doorway/native-epr-projection.feature` | An alias grant colliding with a reserved prefix is rejected at create time | a | UNCLASSIFIED | `/api/v1/commitments` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/doorway/native-epr-projection.feature` | Federation — same EPR projected on second doorway serves same content | a | FIXTURE | — | — | precondition missing: E2E_DOORWAY_PRIMARY, E2E_DOORWAY_HOSTED |
+| `features/doorway/peer-conductor-connection-resilience.feature` | Auth-rejected peer conductor is retried with exponential backoff | a | STRUCTURAL | `/health`, `/db/content` | — | needs shem (multi-tenant commons canvas — no household analog) |
+| `features/doorway/peer-conductor-connection-resilience.feature` | Reconnect churn is visible to operators | a | STRUCTURAL | `/status.json` | — | needs shem (multi-tenant commons canvas — no household analog) |
+| `features/doorway/peer-conductor-connection-resilience.feature` | Reconnect cycles do not leak connection tasks | a | STRUCTURAL | `/status.json` | — | needs shem (multi-tenant commons canvas — no household analog) |
+| `features/doorway/peer-conductor-connection-resilience.feature` | Unstable sessions do not reset the backoff clock | a | STRUCTURAL | — | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/doorway/self-healing-flow-control.feature` | An operator or agent can read the unified self-healing model | a | UNCLASSIFIED | `/health`, `/admin/self-healing` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/doorway/self-healing-flow-control.feature` | The storage breaker recovers after its cooldown | a | UNCLASSIFIED | `/admin/self-healing` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/elohim-core/chrome-preferences.feature` | Chrome follows the theme toggle | b | FIXTURE | — | — | precondition missing: E2E_DEVICE_MODE |
@@ -409,6 +621,11 @@ these need a manual look, not a mechanical one:
 | `features/elohim/network-health-posture.feature` | Stability view on a single node degrades honestly, never fabricating doorway-role state | b | WIRE | — | — | write step glue (5 step(s) unbound, class b) |
 | `features/elohim/network-health-posture.feature` | Stability view served through a doorway is the full composed self-healing model | b | WIRE | — | — | write step glue (5 step(s) unbound, class b) |
 | `features/elohim/network-health-posture.feature` | Trace-level health requires a compute:trace attestation | b | WIRE | — | — | write step glue (5 step(s) unbound, class b) |
+| `features/federation/cross-doorway-content.feature` | Content created on alpha is discoverable from staging | a | FIXTURE | — | — | precondition missing: E2E_DOORWAY_STAGING |
+| `features/federation/cross-doorway-content.feature` | Content created on staging is discoverable from alpha | a | FIXTURE | — | — | precondition missing: E2E_DOORWAY_STAGING |
+| `features/federation/doorway-pool-degrade.feature` | Empty everywhere is a genuine empty state, not a silent wipe | a | FIXTURE | `/db/rea_commitments`, `/api/v1/federation/coherence` | — | precondition missing: E2E_EPR_REFRESH_WINDOW_MS |
+| `features/federation/doorway-pool-degrade.feature` | Router populates from a pool peer when the primary returns no rows | a | FIXTURE | `/db/rea_commitments`, `/api/v1/federation/coherence` | — | precondition missing: E2E_EPR_REFRESH_WINDOW_MS |
+| `features/federation/doorway-pool-degrade.feature` | The apex front door serves through the degraded primary | a | FIXTURE | `/api/v1/federation/coherence`, `/db/rea_commitments` | — | precondition missing: E2E_DOORWAY_APEX |
 | `features/federation/epr-cross-peer-resolution.feature` | Attestation-gated content requires prerequisite mastery | b | STRUCTURAL | `/p2p/status` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/federation/epr-cross-peer-resolution.feature` | Community-reach guide accessible only to consented collective members | b | STRUCTURAL | `/p2p/status` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/federation/epr-cross-peer-resolution.feature` | Cross-peer fetch surfaces transient peer-offline as a soft state | b | STRUCTURAL | `/p2p/status` | — | needs shem (multi-tenant commons canvas — no household analog) |
@@ -435,6 +652,11 @@ these need a manual look, not a mechanical one:
 | `features/federation/peer-advertisement.feature` | Receiving peer builds neighbor table from announcements | a | UNCLASSIFIED | — | — | insufficient surface signal — no HTTP/metric/field surface named in step text or glue |
 | `features/federation/peer-advertisement.feature` | Stale announcements are evicted from neighbor table | a | UNCLASSIFIED | — | — | insufficient surface signal — no HTTP/metric/field surface named in step text or glue |
 | `features/federation/peer-advertisement.feature` | Storage filling updates capacity announcement | a | UNCLASSIFIED | — | — | insufficient surface signal — no HTTP/metric/field surface named in step text or glue |
+| `features/federation/peer-loss-failover.feature` | A returning peer re-syncs without operator help | a | FIXTURE | `/p2p/status`, `/api/v1/diagnostics/inventory-parity` | — | precondition missing: E2E_PEER_RESYNC_WINDOW_MS, E2E_CONNECTED_PEERS_FLOOR |
+| `features/federation/peer-loss-failover.feature` | A single device still functions without the mesh | a | FIXTURE | `/p2p/status` | — | precondition missing: E2E_CONNECTED_PEERS_FLOOR, E2E_PEER_DEGRADE_WINDOW_MS |
+| `features/federation/peer-loss-failover.feature` | Reads still serve while one household peer is down | a | FIXTURE | `/p2p/status` | — | precondition missing: E2E_CONNECTED_PEERS_FLOOR |
+| `features/federation/peer-recovery.feature` | A wiped device recovers its stewarded content from the mesh | a | DEFECT-STALE | `/health`, `/p2p/status`, `/api/v1/commitments`, `/api/v1/economic-events` | — | Error: GET http://localhost:8888/db/content/manifesto returned 404: {"error":"Content not found: manifesto"} |
+| `features/federation/peer-recovery.feature` | A wiped peer's commitment projection reconciles from its own conductor | a | DEFECT-STALE | `/db/rea_commitments`, `/admin`, `/api/v1/commitments`, `/p2p/status` | — | AssertionError [ERR_ASSERTION]: Jessica's projection already holds 19 custody-blob rows. This drill needs a wiped projection, and elohim-storage has no verb to clear one (no DELETE on /db/rea_commitments, no /admin projection-reset) — establish it out of band or add the verb |
 | `features/lamad/attention-analytics.feature` | Bounce view does not generate an economic event | c | WIRE | — | — | write step glue (5 step(s) unbound, class c) |
 | `features/lamad/attention-analytics.feature` | Content view generates an economic event after dwell threshold | c | WIRE | — | — | write step glue (8 step(s) unbound, class c) |
 | `features/lamad/attention-analytics.feature` | Duplicate views within session are deduplicated | c | WIRE | — | — | write step glue (6 step(s) unbound, class c) |
@@ -519,8 +741,10 @@ these need a manual look, not a mechanical one:
 | `features/qahal/collective-governance.feature` | SLA overdue triggers visual warning | c | WIRE | — | — | write step glue (6 step(s) unbound, class c) |
 | `features/qahal/collective-governance.feature` | Stewards score competing content revisions | c | WIRE | — | — | write step glue (6 step(s) unbound, class c) |
 | `features/qahal/collective-governance.feature` | Vote on a proposal | c | WIRE | — | — | write step glue (5 step(s) unbound, class c) |
+| `features/qahal/household-formation.feature` | All three members are affirmed participants | a | DEFECT-STALE | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/db/collectives` | — | AssertionError [ERR_ASSERTION]: triad member(s) missing from participants: human-matthew-manager, human-jessica-spouse, human-james-son. Present (0 of 0 row(s)): <none>. A member is absent here when their conductor never affirmed membership, or when their Membership was authored on a peer whose projection has not reached this one. |
 | `features/qahal/household-formation.feature` | Ceremony custody is anchored, fixture custody is marked | a | UNCLASSIFIED | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/qahal/household-formation.feature` | James's membership is sponsored, not self-granted | a | UNCLASSIFIED | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/db/collectives` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
+| `features/qahal/household-formation.feature` | The household collective is coherent — family-layer, CID-stamped | a | DEFECT-STALE | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/db/collectives` | — | AssertionError [ERR_ASSERTION]: collective "family-dowell" carries no canonical collective_cid on this storage peer (got: undefined). The row EXISTS — governanceLayer="family" — so the projection plainly ran. Row keys: ["id","name","description","governanceLayer","constitutionalParentId","reach","region","metadata","createdBy","createdAt","updatedAt","dissolvedAt"]. If no cid key appears there, the read view does not project the column and no ceremony can satisfy this; if the key is present and null, the cid is genuinely unstamped on THIS peer — check which conductor authored create_collective and whether projection_reconcile has gap-filled it. |
 | `features/qahal/plural-mishpat-lenses.feature` | A malformed lens is surfaced but flagged, never silently dropped | b | WIRE | — | — | write step glue (6 step(s) unbound, class b) |
 | `features/qahal/plural-mishpat-lenses.feature` | Affinity ranks lenses by the distinct members who exercise them | b | WIRE | — | — | write step glue (7 step(s) unbound, class b) |
 | `features/qahal/plural-mishpat-lenses.feature` | An un-notarized lens never enters the market (fail-closed) | b | WIRE | — | — | write step glue (4 step(s) unbound, class b) |
@@ -530,11 +754,16 @@ these need a manual look, not a mechanical one:
 | `features/resilience/app-blob-heal-on-read.feature` | No peer holds the bytes — the 404 names the missing blob | a | UNCLASSIFIED | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/resilience/app-blob-heal-on-read.feature` | Proactive replication leaves a serve-blob delivery trail, like an on-demand heal | a | UNCLASSIFIED | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/api/v1/pins`, `/api/v1/economic-events`, `/p2p/status` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
 | `features/resilience/app-blob-heal-on-read.feature` | The heal books a serve-blob REA event for the source peer | a | UNCLASSIFIED | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/api/v1/economic-events`, `/p2p/status` | — | fully wired, named surfaces exist — no live mesh report this run to confirm pass/fail (re-run `pnpm census` after a mesh test run) |
+| `features/resilience/chaos-peer-churn.feature` | A flapping peer never corrupts what the mesh believes | a | FIXTURE | `/health`, `/api/v1/commitments` | — | precondition missing: E2E_CUSTODY_SETTLE_MS |
+| `features/resilience/chaos-peer-churn.feature` | Cascading peer loss degrades the protection status honestly, step by step | a | DEFECT-STALE | `/health` | — | AssertionError [ERR_ASSERTION]: no custody-blob commitment names matthew (12D3KooWSN43tNScVjQS7W5aUaYKdvwHcCLX7AbuF3fNhQSXy8Pg) as provider for sha256-f85393f900eadcb6405ca5a7a1fb567acb812b9dec319882d4c2e13d2b06bfe0 — providers on record: uhCAkT8lH19d6YgXVwvryke_KfMfDqAoHSgd54Bm0DIQH8gUuWPKu, uhCAkkAYhKQH349-IIOJvIOgDtT7m4F4M-_lV6Kihw7jv5a44Jm7f |
+| `features/resilience/chaos-peer-churn.feature` | Simultaneous loss of two peers leaves the survivor degrading honestly | a | DEFECT-STALE | `/health`, `/p2p/status` | — | Error: GET http://localhost:8888/db/content/manifesto returned 404: {"error":"Content not found: manifesto"} |
 | `features/resilience/commitment-backed-card-lighting.feature` | A healed household's commons provide commitment lights the card | b | STRUCTURAL | `/api/v1/resilience/card-commons/household`, `/api/v1/resilience/grandma-album-1974/household`, `commitmentBackedCollectives` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/commitment-backed-card-lighting.feature` | Provide author skips rather than writing an unjoinable provider | b | STRUCTURAL | — | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/commitment-backed-card-lighting.feature` | The card counts a commitment whose classification is a JSON list | b | STRUCTURAL | `/api/v1/resilience/card-list/household`, `/api/v1/resilience/grandma-album-1974/household`, `commitmentBackedCollectives` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/commitment-backed-card-lighting.feature` | Transport-id provider commitments never light the household card | b | STRUCTURAL | — | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/conductor-memory-soak.feature` | An operator can read the conductor's leak-vs-cache memory verdict | b | WIRE | — | — | write step glue (5 step(s) unbound, class b) |
+| `features/resilience/conductor-validation-spin.feature` | A re-keyed household peer leaves the others at rest, not grinding | a | DEFECT-STALE | `/health`, `/db/content` | — | Error: /projects/elohim/app/elohim-app/scripts/hc-mesh-chaos-rekey.sh --peer james --tag a2o-70809 --phase rekey could not run: spawnSync bash ETIMEDOUT |
+| `features/resilience/doorway-footprint-convergence.feature` | Two doorways testify the same footprint for one commons EPR | a | FIXTURE | — | — | precondition missing: E2E_COMMONS_EPR_ID |
 | `features/resilience/governed-distribution.feature` | A bounded grant lets keyless Che drive governed distribution | b | STRUCTURAL | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery`, `/api/v1/resilience/governed-alpha/household` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/governed-distribution.feature` | A Che-facing doorway refuses to boot in an insecure posture | b | STRUCTURAL | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | needs shem (multi-tenant commons canvas — no household analog) |
 | `features/resilience/governed-distribution.feature` | An unbounded compute delegation is refused at grant time | b | STRUCTURAL | `/health`, `/api/v1/cluster`, `/api/v1/peers/delivery` | — | needs shem (multi-tenant commons canvas — no household analog) |

@@ -773,7 +773,9 @@ Then(
 
 /**
  * Assert that no human carrying a household_id (already placed in a household by
- * on_membership_projected) is missing its agent_pub_key.
+ * on_membership_projected) is missing its agent_pub_key — SCOPED to households
+ * that are DHT-observable on this peer (at least one member already carries an
+ * agent_pub_key here).
  *
  * This is the LIVE-OBSERVABLE consequence of the identity-coherence stamp
  * (reconcile/controller.rs on_membership_projected — unit-anchored in
@@ -782,8 +784,17 @@ Then(
  * snapshot's `humans.agent_pub_key = peer_id` join (the documented all-zeros-
  * resilience-card root cause). Zero matching rows is an honest pass, not a
  * fabricated one — the invariant is an implication (household_id set ⇒
- * agent_pub_key set), always checkable regardless of how many households are
- * currently seeded on the peer.
+ * agent_pub_key set).
+ *
+ * The scope restriction mirrors the sibling fossil-check step below
+ * ("every observable HOUSEHOLD-member human ... has a non-fossil agentPubKey"):
+ * `seed-humans` deliberately writes agent_pub_key NULL for a narrative/fixture
+ * household with zero conductors on this mesh (agent keys are conductor-minted;
+ * there is no truthful seed source), so a household where EVERY member is NULL
+ * is out of scope entirely — it has never been observed here, not violated the
+ * invariant. Once any one member of a household resolves to a real key on this
+ * peer, the household is provably observable, and every OTHER member of that
+ * same household must resolve too — that's the actual bug this scenario guards.
  */
 Then(
   'no HOUSEHOLD-member human on peer {string} is missing its agentPubKey',
@@ -806,18 +817,29 @@ Then(
       throw new Error(`GET /db/humans on ${peerName}: response is not valid JSON`);
     }
     const items = body.items ?? [];
-    const offenders = items
-      .filter(h => h['householdId'] !== null && h['householdId'] !== undefined)
-      .filter(
-        h => h['agentPubKey'] === null || h['agentPubKey'] === undefined || h['agentPubKey'] === ''
-      )
+    const householdPlaced = items.filter(
+      h => h['householdId'] !== null && h['householdId'] !== undefined
+    );
+    const hasAgentPubKey = (h: Record<string, unknown>): boolean =>
+      typeof h['agentPubKey'] === 'string' && h['agentPubKey'] !== '';
+    // Only households with at least one DHT-observable member on THIS peer are
+    // in scope — a fully-narrative household (zero conductors here) has no
+    // truthful key source at all, so it can never satisfy the invariant and
+    // must not be counted as an offender.
+    const observableHouseholdIds = new Set(
+      householdPlaced.filter(hasAgentPubKey).map(h => h['householdId'])
+    );
+    const offenders = householdPlaced
+      .filter(h => observableHouseholdIds.has(h['householdId']))
+      .filter(h => !hasAgentPubKey(h))
       .map(h => h['id']);
     assert.strictEqual(
       offenders.length,
       0,
       `${offenders.length} human(s) on ${peerName} carry a household_id but a NULL ` +
-        `agent_pub_key (the all-zeros-resilience-card gap: ${JSON.stringify(offenders)}) — ` +
-        `the household-resilience snapshot's agent_pub_key join silently empties for these rows.`
+        `agent_pub_key in an otherwise-observable household (the all-zeros-resilience-card ` +
+        `gap: ${JSON.stringify(offenders)}) — the household-resilience snapshot's ` +
+        `agent_pub_key join silently empties for these rows.`
     );
   }
 );

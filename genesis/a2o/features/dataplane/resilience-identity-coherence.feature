@@ -31,7 +31,12 @@ Feature: Membership projection stamps the member's agent key — household resil
     # the household-resilience snapshot's join silently drops that human's
     # devices/peer_statuses row instead of lighting the card. Zero household-
     # placed humans on the peer is an honest pass, not a fabricated one — the
-    # invariant is an implication (household_id set => agent_pub_key set).
+    # invariant is an implication (household_id set => agent_pub_key set),
+    # SCOPED to households this peer can actually observe: a narrative/fixture
+    # household with zero conductors on this mesh has no truthful key source at
+    # all (seed-humans deliberately writes agent_pub_key NULL for it), so it
+    # sits out of scope entirely rather than counting as an offender — mirrors
+    # the sibling fossil-check scenario's "observable" scoping below.
     Then no HOUSEHOLD-member human on peer "alpha-A" is missing its agentPubKey
 
   # Landed with the boot-time membership-truth key-supersede pass
