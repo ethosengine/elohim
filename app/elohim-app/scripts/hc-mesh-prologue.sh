@@ -283,6 +283,49 @@ run_seed_leg "seed-agent-bindings" soft \
   'CONDUCTOR_URLS="$CONDUCTOR_URLS" npx tsx src/seed-agent-bindings.ts'
 run_seed_leg "seed-household-formation" hard \
   'CONDUCTOR_URLS="$CONDUCTOR_URLS" STORAGE_URL="$STORAGE_URL" DOORWAY_URL="$DOORWAY_A_URL" CONTENT_BLOB_HASH="${CONTENT_BLOB_HASH:-}" CONTENT_BLOB_SIZE_BYTES="${CONTENT_BLOB_SIZE_BYTES:-}" npx tsx src/seed-household-formation.ts'
+
+# ---------------------------------------------------------------------------
+# 5b. Stewardship-affinity fixture corpus — a minimal set of category-tagged
+#    content rows so seed-stewardship (next leg) has something to exercise
+#    its multi-steward CATEGORY_STEWARD_MAP paths on. Without this, the only
+#    content in storage is the structural BASE_CORPUS_IDS rows above (plus a
+#    handful of household/e2e fixtures), none of which carry a
+#    `metadata.category` the map recognizes — every allocation falls through
+#    to the single-steward `matthew-dowell @ 1.0` default, and
+#    content/stewardship-allocation.feature's `@distribution`/`@affinity`
+#    scenarios can never find a multi-steward item.
+#
+# ONE representative id per category the feature actually asserts on
+# (content/stewardship-allocation.feature), each already carrying BOTH an
+# exact-match tag (what `searchContent([category])` filters on) and a
+# matching `metadata.category` (what seed-stewardship.ts's
+# CATEGORY_STEWARD_MAP keys off) — no new fixture authoring, just wiring
+# existing genesis/data/lamad/content/ rows into this mesh's corpus:
+#
+#   feature-value-scanner-caregiver-scenarios-family   category=value-scanner
+#     → Adam highest (0.35), Jessica + Matthew also listed, no 100% steward.
+#   feature-public-observer-board-member-scenarios-educational
+#                                                       category=public-observer
+#     → Eve highest (0.50), method "computed", contribution type "curator".
+#   fct-module-01-church-dilemma                       category=fct
+#     → Pastor Pete listed, ratio ~0.50.
+#
+# The "uncategorized falls back to bootstrap steward" scenario needs no new
+# row — `elohim-protocol`/`foundations-christian-technology`/`lamad-spa` (all
+# already in BASE_CORPUS_IDS or seeded structurally) are already
+# matthew-dowell @ 1.0 / computed / curator.
+#
+# None of the three authors a `reach` grade, so `seedReach` gives them the
+# UNAUTHORED_CORPUS_REACH default (`public`) — anonymous-readable, no
+# staging/declare step needed (unlike the BASE_CORPUS_IDS rows above).
+# ---------------------------------------------------------------------------
+STEWARDSHIP_FIXTURE_IDS="feature-value-scanner-caregiver-scenarios-family,feature-public-observer-board-member-scenarios-educational,fct-module-01-church-dilemma"
+banner "5b. seed.ts (stewardship-affinity fixture corpus) via A and B"
+run_seed_leg "seed-stewardship-fixtures-via-A" hard \
+  'DOORWAY_URL="$DOORWAY_A_URL" npx tsx src/seed.ts --ids="$STEWARDSHIP_FIXTURE_IDS"'
+run_seed_leg "seed-stewardship-fixtures-via-B" hard \
+  'DOORWAY_URL="$DOORWAY_B_URL" npx tsx src/seed.ts --ids="$STEWARDSHIP_FIXTURE_IDS"'
+
 run_seed_leg "seed-stewardship" soft \
   'DOORWAY_URL="$DOORWAY_A_URL" npx tsx src/seed-stewardship.ts'
 run_seed_leg "seed-epr-atom" soft \
