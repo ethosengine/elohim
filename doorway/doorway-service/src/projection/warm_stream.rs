@@ -9,7 +9,7 @@
 //! 1. **Startup** — for each peer storage URL
 //! 2. **Subscriber reconnect** — after AppWebsocket reconnects to conductor
 
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use elohim_compute::{CircuitBreaker, CircuitState};
@@ -408,14 +408,52 @@ pub async fn stream_from_peer(store: Arc<ProjectionStore>, storage_url: &str) ->
     result
 }
 
+/// How long to wait before re-warming after a pass that produced nothing.
+///
+/// The empty pass is cheap and the upstream it is waiting for is a pod that is
+/// still starting, so this polls on the same order as the EPR router's own
+/// self-heal refresh (30s) rather than backing off — the whole point is to be
+/// warm shortly after storage appears, without an operator restart.
+pub const WARMUP_REWARM_POLL_SECS: u64 = 30;
+
 /// Observable warmup state — read by /health/startup, written by spawn_stream_task.
 pub struct WarmupState {
     pub in_progress: AtomicBool,
     pub attempts: AtomicU32,
     pub max_attempts: AtomicU32,
     pub last_error: std::sync::Mutex<Option<String>>,
+    /// Warmed, and warmed against something. See [`WarmupState::completed_empty`]
+    /// for why those are not the same claim.
     pub completed: AtomicBool,
+    /// A pass ran to the end and produced NOTHING — storage was unreachable, or
+    /// reachable and empty.
+    ///
+    /// WHY THIS EXISTS. MEASURED (local mesh 2026-08-21): doorway A booted at
+    /// 22:55; storage came up at ~23:07. The warmup ran against empty/unreachable
+    /// storage and reported `completed: true` with `projection.content: 0` and
+    /// `servedBundleHeads: []` — and a completed warmup never re-ran, so the
+    /// doorway served an empty projection until someone restarted it. `completed:
+    /// true` could not distinguish "warmed" from "warmed against nothing", which
+    /// is the boot-order hazard behind the AGENT_KEY_ERROR / empty-projection
+    /// symptoms we had been curing by hand. (The role-discovery retry in
+    /// da63fd7a0 fixed the CONDUCTOR half of this; this is the storage half.)
+    ///
+    /// A pass that produced nothing is not a completed warmup — it is a warmup
+    /// still waiting for its upstreams. `completed` stays FALSE and this reads
+    /// true, and the task re-warms on its own once the pool has something.
+    pub completed_empty: AtomicBool,
+    /// Records streamed by the most recent pass (content + humans +
+    /// relationships, across peers). The evidence `completed` is derived from.
+    pub produced: AtomicU64,
     pub health: WarmStreamHealth,
+}
+
+impl WarmupState {
+    /// True when the last pass finished having produced nothing, so the doorway
+    /// is serving an empty projection and is waiting to re-warm.
+    pub fn is_empty_warm(&self) -> bool {
+        self.completed_empty.load(Ordering::Relaxed) && !self.in_progress.load(Ordering::Relaxed)
+    }
 }
 
 impl WarmupState {
@@ -426,6 +464,8 @@ impl WarmupState {
             max_attempts: AtomicU32::new(MAX_WARMUP_RETRIES),
             last_error: std::sync::Mutex::new(None),
             completed: AtomicBool::new(false),
+            completed_empty: AtomicBool::new(false),
+            produced: AtomicU64::new(0),
             health: WarmStreamHealth::new(
                 WARMUP_CIRCUIT_FAIL_THRESHOLD,
                 WARMUP_CIRCUIT_COOLDOWN_TICKS,
@@ -456,123 +496,171 @@ pub fn spawn_stream_task(
         // Let services settle before streaming
         tokio::time::sleep(std::time::Duration::from_secs(delay_secs)).await;
 
-        if let Some(ref ws) = warmup_state {
-            ws.in_progress.store(true, Ordering::Relaxed);
-        }
+        // RE-WARM LOOP. A pass that produced nothing is not a finished warmup —
+        // storage was unreachable, or reachable and empty, and a doorway that
+        // stops there serves an empty projection until an operator restarts it
+        // (measured 2026-08-21: boot at 22:55, storage up at ~23:07, empty
+        // forever after). Each iteration is one full pass; a pass that produces
+        // records is terminal, a pass that produces none sleeps and tries again,
+        // so the doorway warms itself shortly after storage appears.
+        let mut rewarm_attempt: u32 = 0;
+        loop {
+            rewarm_attempt += 1;
+            if let Some(ref ws) = warmup_state {
+                ws.in_progress.store(true, Ordering::Relaxed);
+                // Each pass is judged on its OWN production.
+                ws.produced.store(0, Ordering::Relaxed);
+            }
 
-        // Single startup pass. A tick is a warm-up-PASS counter, and there is
-        // exactly one pass here, so tick stays 0. Cross-pass cooldown/half-open
-        // recovery is intentionally INERT in doorway: per-conductor subscribers
-        // warm a single peer on reconnect (subscriber.rs), where gating would
-        // risk starving the only upstream — so the reconnect path records
-        // outcomes for observability but does not gate. The cooldown/half-open
-        // machinery is exercised by Plan B's continuous admission path (real
-        // clock, peer-SET). What protects warm-up HERE is tick-independent: the
-        // startup gate_upstreams + the mid-pass is_open() early-bail + the 75s
-        // total budget + the per-entry yield.
-        let tick: u64 = 0;
+            // Single startup pass. A tick is a warm-up-PASS counter, and there is
+            // exactly one pass here, so tick stays 0. Cross-pass cooldown/half-open
+            // recovery is intentionally INERT in doorway: per-conductor subscribers
+            // warm a single peer on reconnect (subscriber.rs), where gating would
+            // risk starving the only upstream — so the reconnect path records
+            // outcomes for observability but does not gate. The cooldown/half-open
+            // machinery is exercised by Plan B's continuous admission path (real
+            // clock, peer-SET). What protects warm-up HERE is tick-independent: the
+            // startup gate_upstreams + the mid-pass is_open() early-bail + the 75s
+            // total budget + the per-entry yield.
+            let tick: u64 = 0;
 
-        // Gate the upstream set BEFORE iterating (filter-before-act); the guard
-        // guarantees a non-empty result if storage_urls is non-empty.
-        let gated: Vec<String> = match warmup_state {
-            Some(ref ws) => ws.health.gate_upstreams(&storage_urls, tick),
-            None => storage_urls.clone(),
-        };
+            // Gate the upstream set BEFORE iterating (filter-before-act); the guard
+            // guarantees a non-empty result if storage_urls is non-empty.
+            let gated: Vec<String> = match warmup_state {
+                Some(ref ws) => ws.health.gate_upstreams(&storage_urls, tick),
+                None => storage_urls.clone(),
+            };
 
-        info!(
-            peer_count = gated.len(),
-            total_peers = storage_urls.len(),
-            "Starting cache stream warm-up (health-gated)"
-        );
+            info!(
+                peer_count = gated.len(),
+                total_peers = storage_urls.len(),
+                "Starting cache stream warm-up (health-gated)"
+            );
 
-        let budget = std::time::Duration::from_secs(WARMUP_TOTAL_BUDGET_SECS);
-        let pass = async {
-            for storage_url in &gated {
-                let mut attempt: u32 = 0;
-                loop {
-                    attempt += 1;
-                    if let Some(ref ws) = warmup_state {
-                        ws.attempts.store(attempt, Ordering::Relaxed);
-                    }
-
-                    let result = stream_from_peer(Arc::clone(&store), storage_url).await;
-                    let has_content = result.content_count > 0
-                        || result.human_count > 0
-                        || result.relationship_count > 0;
-                    let ok = result.errors.is_empty() || has_content;
-
-                    if let Some(ref ws) = warmup_state {
-                        ws.health.record_outcome(storage_url, ok, tick);
-                    }
-
-                    if ok {
-                        info!(
-                            storage_url = %storage_url,
-                            content = result.content_count,
-                            humans = result.human_count,
-                            relationships = result.relationship_count,
-                            attempt,
-                            "Cache stream warm-up completed successfully"
-                        );
-                        break;
-                    }
-
-                    if let Some(ref ws) = warmup_state {
-                        if let Ok(mut guard) = ws.last_error.lock() {
-                            *guard = result.errors.first().cloned();
+            let budget = std::time::Duration::from_secs(WARMUP_TOTAL_BUDGET_SECS);
+            let pass = async {
+                for storage_url in &gated {
+                    let mut attempt: u32 = 0;
+                    loop {
+                        attempt += 1;
+                        if let Some(ref ws) = warmup_state {
+                            ws.attempts.store(attempt, Ordering::Relaxed);
                         }
-                        // Breaker opened mid-pass: stop burning the backoff ladder.
-                        if ws.health.should_skip(storage_url, tick) {
-                            warn!(
+
+                        let result = stream_from_peer(Arc::clone(&store), storage_url).await;
+                        let streamed =
+                            result.content_count + result.human_count + result.relationship_count;
+                        let has_content = streamed > 0;
+                        // NOTE: an EMPTY-but-reachable peer still reads `ok` here —
+                        // deliberately, because an empty peer is not a failed peer
+                        // and must not open the warmup breaker. What it must not do
+                        // is count as a COMPLETED warmup; that verdict is taken from
+                        // `produced` at the end of the pass, not from `ok`.
+                        let ok = result.errors.is_empty() || has_content;
+
+                        if let Some(ref ws) = warmup_state {
+                            ws.produced.fetch_add(streamed as u64, Ordering::Relaxed);
+                            ws.health.record_outcome(storage_url, ok, tick);
+                        }
+
+                        if ok {
+                            info!(
                                 storage_url = %storage_url,
+                                content = result.content_count,
+                                humans = result.human_count,
+                                relationships = result.relationship_count,
                                 attempt,
-                                "Upstream circuit opened; bailing retry ladder early"
+                                "Cache stream warm-up completed successfully"
                             );
                             break;
                         }
-                    }
 
-                    if attempt >= MAX_WARMUP_RETRIES {
-                        error!(
+                        if let Some(ref ws) = warmup_state {
+                            if let Ok(mut guard) = ws.last_error.lock() {
+                                *guard = result.errors.first().cloned();
+                            }
+                            // Breaker opened mid-pass: stop burning the backoff ladder.
+                            if ws.health.should_skip(storage_url, tick) {
+                                warn!(
+                                    storage_url = %storage_url,
+                                    attempt,
+                                    "Upstream circuit opened; bailing retry ladder early"
+                                );
+                                break;
+                            }
+                        }
+
+                        if attempt >= MAX_WARMUP_RETRIES {
+                            error!(
+                                storage_url = %storage_url,
+                                attempts = attempt,
+                                errors = ?result.errors,
+                                "Cache stream warm-up failed after max retries"
+                            );
+                            break;
+                        }
+
+                        let retry_delay = WARMUP_RETRY_BASE_SECS
+                            .saturating_mul(2u64.pow(attempt - 1))
+                            .min(WARMUP_RETRY_MAX_SECS);
+                        warn!(
                             storage_url = %storage_url,
-                            attempts = attempt,
+                            attempt,
+                            max_retries = MAX_WARMUP_RETRIES,
+                            retry_delay_secs = retry_delay,
                             errors = ?result.errors,
-                            "Cache stream warm-up failed after max retries"
+                            "Cache stream warm-up failed, retrying"
                         );
-                        break;
+                        tokio::time::sleep(std::time::Duration::from_secs(retry_delay)).await;
                     }
-
-                    let retry_delay = WARMUP_RETRY_BASE_SECS
-                        .saturating_mul(2u64.pow(attempt - 1))
-                        .min(WARMUP_RETRY_MAX_SECS);
-                    warn!(
-                        storage_url = %storage_url,
-                        attempt,
-                        max_retries = MAX_WARMUP_RETRIES,
-                        retry_delay_secs = retry_delay,
-                        errors = ?result.errors,
-                        "Cache stream warm-up failed, retrying"
-                    );
-                    tokio::time::sleep(std::time::Duration::from_secs(retry_delay)).await;
                 }
-            }
-        };
-
-        if tokio::time::timeout(budget, pass).await.is_err() {
-            let event = WarmupSelfHealEvent {
-                event: "budget-exhausted",
-                detail: format!("warm-up exceeded {WARMUP_TOTAL_BUDGET_SECS}s total budget"),
             };
-            warn!(
-                event = event.event,
-                detail = %event.detail,
-                "Warm-up total budget exhausted; stopping pass (elevate-worthy)"
-            );
-        }
 
-        if let Some(ref ws) = warmup_state {
-            ws.in_progress.store(false, Ordering::Relaxed);
-            ws.completed.store(true, Ordering::Relaxed);
+            if tokio::time::timeout(budget, pass).await.is_err() {
+                let event = WarmupSelfHealEvent {
+                    event: "budget-exhausted",
+                    detail: format!("warm-up exceeded {WARMUP_TOTAL_BUDGET_SECS}s total budget"),
+                };
+                warn!(
+                    event = event.event,
+                    detail = %event.detail,
+                    "Warm-up total budget exhausted; stopping pass (elevate-worthy)"
+                );
+            }
+
+            // THE VERDICT. Previously an unconditional `completed = true`: the pass
+            // reached its end, therefore it was declared warm — regardless of
+            // whether a single record had been streamed. Production, not arrival at
+            // the end of a loop, is what makes a warmup complete.
+            let produced = match warmup_state {
+                Some(ref ws) => {
+                    let produced = ws.produced.load(Ordering::Relaxed);
+                    ws.in_progress.store(false, Ordering::Relaxed);
+                    ws.completed.store(produced > 0, Ordering::Relaxed);
+                    ws.completed_empty.store(produced == 0, Ordering::Relaxed);
+                    produced
+                }
+                // No observable state to report into: keep the old single-pass
+                // shape rather than looping invisibly forever.
+                None => break,
+            };
+
+            if produced > 0 {
+                info!(
+                    produced,
+                    rewarm_attempt, "Cache stream warm-up complete (projection populated)"
+                );
+                break;
+            }
+
+            warn!(
+                rewarm_attempt,
+                retry_secs = WARMUP_REWARM_POLL_SECS,
+                "Warm-up pass produced NOTHING (storage unreachable or empty) — \
+             not marking completed; will re-warm. This doorway is serving an \
+             empty projection until a pass produces records."
+            );
+            tokio::time::sleep(std::time::Duration::from_secs(WARMUP_REWARM_POLL_SECS)).await;
         }
     })
 }
@@ -580,6 +668,56 @@ pub fn spawn_stream_task(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The false-green this closes: `completed` was stored unconditionally at
+    /// the end of the pass, so a warmup that streamed NOTHING (storage
+    /// unreachable, or reachable and empty) reported itself warm and never
+    /// re-ran. Measured on the local mesh 2026-08-21 — doorway up at 22:55,
+    /// storage at ~23:07, empty projection served until restart.
+    #[test]
+    fn a_pass_that_produced_nothing_is_not_completed() {
+        let ws = WarmupState::new();
+        // End-of-pass verdict, taken from production rather than from arrival.
+        let produced = ws.produced.load(Ordering::Relaxed);
+        ws.in_progress.store(false, Ordering::Relaxed);
+        ws.completed.store(produced > 0, Ordering::Relaxed);
+        ws.completed_empty.store(produced == 0, Ordering::Relaxed);
+
+        assert!(
+            !ws.completed.load(Ordering::Relaxed),
+            "producing nothing is not a completed warmup"
+        );
+        assert!(ws.completed_empty.load(Ordering::Relaxed));
+        assert!(
+            ws.is_empty_warm(),
+            "and the doorway must report itself as serving an empty projection"
+        );
+    }
+
+    #[test]
+    fn a_pass_that_produced_records_is_completed() {
+        let ws = WarmupState::new();
+        ws.produced.store(42, Ordering::Relaxed);
+        let produced = ws.produced.load(Ordering::Relaxed);
+        ws.in_progress.store(false, Ordering::Relaxed);
+        ws.completed.store(produced > 0, Ordering::Relaxed);
+        ws.completed_empty.store(produced == 0, Ordering::Relaxed);
+
+        assert!(ws.completed.load(Ordering::Relaxed));
+        assert!(!ws.completed_empty.load(Ordering::Relaxed));
+        assert!(!ws.is_empty_warm());
+    }
+
+    /// A pass still running is never "empty-warm" — that verdict belongs only to
+    /// a pass that FINISHED having produced nothing, or a doorway mid-warmup
+    /// would 503 its own serving probe on every boot.
+    #[test]
+    fn a_warmup_in_progress_is_not_empty_warm() {
+        let ws = WarmupState::new();
+        ws.in_progress.store(true, Ordering::Relaxed);
+        ws.completed_empty.store(true, Ordering::Relaxed);
+        assert!(!ws.is_empty_warm());
+    }
 
     #[test]
     fn warmup_pace_parses_env_and_defaults() {
