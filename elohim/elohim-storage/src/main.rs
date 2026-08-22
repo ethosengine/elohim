@@ -1297,12 +1297,50 @@ async fn async_main(
     // does NOT abort startup — the node still serves HTTP/blobs.
     //
     let peer_policy_path = config.peer_policy_path.clone();
-    // Populated inside the Ok(policy_cfg) arm below; read by HTTP layer in Task 5.
-    // Underscore-prefixed until Task 5 threads it into the HTTP handler state.
+    // Populated below; read by HTTP layer in Task 5.
     let mut hc_registry_for_http: Option<
         std::sync::Arc<elohim_storage::hc_client_registry::HcClientRegistry>,
     > = None;
     if let Some(admin_url) = &args.admin_url {
+        // Registry connect + the bridge supervisor depend on NOTHING from
+        // PolicyConfig — hoisted above the policy-load branch below on
+        // purpose. Before this fix both lived inside PolicyConfig::load's
+        // Ok(..) arm, so a peer started without ELOHIM_STORAGE_PEER_POLICY_PATH
+        // (or pointed at a missing/malformed file — the common shape for a
+        // throwaway or fresh dev conductor) got NO conductor bridges and NO
+        // supervision at all: reproduced 2026-08-21 on a throwaway storage,
+        // it hit the ORIGINAL 77dd6b7b6 stale-token defect exactly (a
+        // restarted conductor stayed dead forever, nothing watching it) even
+        // though the fix for that defect was sitting a few hundred lines
+        // below, unreachable. `spawn_bridge_supervisor`'s own signature never
+        // took a PolicyConfig; only the network-forwarder wiring below
+        // genuinely needs `policy_cfg.network`.
+        let registry = elohim_storage::hc_client_registry::HcClientRegistry::connect(
+            &elohim_storage::hc_client_registry::HcRegistryInputs {
+                admin_url: admin_url.clone(),
+                app_url: args.app_url.clone(),
+                app_id: args.app_id.clone(),
+            },
+        )
+        .await;
+        let registry = std::sync::Arc::new(registry);
+
+        // Keep every role's bridge ALIVE for the life of the process — see
+        // `spawn_bridge_supervisor`'s own doc comment for the why. Runs
+        // whenever a conductor is configured (admin_url is set), independent
+        // of whether the peer-policy file loaded.
+        std::sync::Arc::clone(&registry).spawn_bridge_supervisor(
+            elohim_storage::hc_client_registry::HcRegistryInputs {
+                admin_url: admin_url.clone(),
+                app_url: args.app_url.clone(),
+                app_id: args.app_id.clone(),
+            },
+            shutdown_tx.clone(),
+        );
+
+        // Stash the registry in shared state for HTTP handlers.
+        hc_registry_for_http = Some(registry.clone());
+
         match elohim_storage::policy::PolicyConfig::load(&peer_policy_path) {
             Ok(policy_cfg) => {
                 // Peer-Stewarded Availability — conditionally spawn the
@@ -1334,15 +1372,8 @@ async fn async_main(
                     }
                 }
 
-                let registry = elohim_storage::hc_client_registry::HcClientRegistry::connect(
-                    &elohim_storage::hc_client_registry::HcRegistryInputs {
-                        admin_url: admin_url.clone(),
-                        app_url: args.app_url.clone(),
-                        app_id: args.app_id.clone(),
-                    },
-                )
-                .await;
-                let registry = std::sync::Arc::new(registry);
+                // registry already connected + supervised above (neither
+                // depends on policy_cfg) — reuse it.
 
                 // Heartbeat path + infrastructure-role signal subscribers.
                 //
@@ -1370,6 +1401,10 @@ async fn async_main(
                     let shutdown_tx = shutdown_tx.clone();
                     let blob_store = blob_store.clone();
                     let db_pool = db_pool.clone();
+                    // The heartbeat's Publisher/Probe resolve their client
+                    // THROUGH this registry slot on every tick (see below) —
+                    // this clone is what lets a supervisor re-mint reach them.
+                    let registry = registry.clone();
                     let peer_policy_path = peer_policy_path.clone();
                     let device_archetype = config.device_archetype.clone();
                     // GENESIS BOOTSTRAP STOPGAP captures (operator-authorized,
@@ -1413,6 +1448,20 @@ async fn async_main(
                         };
                         let agent = hc.cell_id().agent_pubkey().clone();
 
+                        // Write the connection back into the registry's
+                        // `infrastructure` slot. `infra_boot` already came
+                        // from there, but the LATE-connect arm above did not
+                        // — before this fix, a late-connected heartbeat client
+                        // was held ONLY in this task's local `hc` binding and
+                        // never reached the registry at all, so (a) the bridge
+                        // supervisor — which reads `registry.client(role)` to
+                        // decide whether a role is up to probe — never saw it
+                        // and never supervised it, and (b) nothing else on the
+                        // process (dna-hash reporting, other consumers of
+                        // `registry.infrastructure_client()`) did either.
+                        // Idempotent when it's already the boot-time value.
+                        registry.set_client("infrastructure", Some(hc.clone()));
+
                         // GENESIS BOOTSTRAP STOPGAP (operator-authorized, default
                         // OFF). Fill the configured human's NULL agent_pub_key
                         // (+ household_id) from THIS pod's own conductor cell key
@@ -1446,11 +1495,30 @@ async fn async_main(
                             }
                         }
 
-                        let publisher =
-                            elohim_storage::heartbeat::ZomeCallPublisher::new(hc.clone(), agent);
+                        // Resolve through the registry's `infrastructure`
+                        // slot on every publish/probe call, rather than
+                        // holding this task's own `hc` handle for the life of
+                        // the process. That handle-holding was the actual
+                        // defect: a conductor restart invalidates the
+                        // websocket + auth token, the supervisor re-mints a
+                        // FRESH HcClient into the registry slot, but a task
+                        // still clutching its own private Arc<HcClient> never
+                        // sees the swap and calls a corpse forever (60s
+                        // "conductor ping failed" / "heartbeat tick failed"
+                        // log lines, unboundedly — the fourth, unsupervised
+                        // client documented in the backlog). Going through the
+                        // registry makes the heartbeat automatically pick up
+                        // every re-mint the same way every other registry
+                        // reader already does.
+                        let publisher = elohim_storage::heartbeat::ZomeCallPublisher::new(
+                            registry.clone(),
+                            "infrastructure",
+                            agent,
+                        );
                         let probe = elohim_storage::heartbeat::DefaultProbe::new(
                             blob_store.clone(),
-                            hc.clone(),
+                            registry.clone(),
+                            "infrastructure",
                         );
                         let mut heartbeat = elohim_storage::heartbeat::HeartbeatTask::new(
                             policy_cfg, publisher, probe,
@@ -2443,36 +2511,11 @@ async fn async_main(
                     });
                 }
 
-                // Keep every role's bridge alive for the life of the process.
-                //
-                // Everything above this line handles a bridge that never came
-                // up. NOTHING above it handles a bridge that came up and then
-                // DIED — which is what a conductor-only restart does to all
-                // three roles at once: the app-authentication token is
-                // invalidated, both websockets close, `holochain_client` does
-                // not reconnect, and every zome call answers `Websocket closed:
-                // No connection` for the rest of the process's life while
-                // `/health` keeps answering 200 and `POST /db/content` keeps
-                // accepting writes that can never be anchored (reproduced on a
-                // throwaway conductor 2026-08-21; dead ≥95s and counting).
-                //
-                // The supervisor probes each live role and, on death, clears the
-                // handle (routes answer an honest, retryable 503) and re-runs
-                // the SAME `connect_role_forever` the boot path uses — which
-                // re-attaches the app interface, re-authorizes per-cell signing
-                // credentials and mints a FRESH auth token. Recovery is a
-                // re-mint, not a socket reconnect; there is no other way back.
-                std::sync::Arc::clone(&registry).spawn_bridge_supervisor(
-                    elohim_storage::hc_client_registry::HcRegistryInputs {
-                        admin_url: admin_url.clone(),
-                        app_url: args.app_url.clone(),
-                        app_id: args.app_id.clone(),
-                    },
-                    shutdown_tx.clone(),
-                );
-
-                // Stash the registry in shared state for HTTP handlers.
-                hc_registry_for_http = Some(registry);
+                // The bridge supervisor (keeps every role's connection alive
+                // for the life of the process — see its own doc comment) and
+                // the `hc_registry_for_http` stash were already done above,
+                // unconditionally on admin_url, before this policy-load
+                // branch even runs.
             }
             Err(e) => {
                 warn!(

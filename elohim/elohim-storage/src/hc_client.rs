@@ -31,23 +31,8 @@ use holochain_client::{
 };
 
 use crate::conductor_admission::AdmissionClass;
-use crate::conductor_bridge_health::bridge_health;
+use crate::conductor_bridge_health::{observe_role_zome_error, record_role_success};
 use crate::error::StorageError;
-
-/// Map a `holochain_client` zome-call failure onto a [`StorageError`] AND fold
-/// it into the process-wide zome-path observer.
-///
-/// Every zome-call site funnels through here so the observation cannot be
-/// forgotten at one of them: a bridge that dies on the mishpat cell is exactly
-/// as dead as one that dies on lamad, and `/health` must say so either way.
-/// Classification (transport-dead vs the conductor answering "no" vs an
-/// admission shed that never left this process) lives in
-/// [`crate::conductor_bridge_health::classify_zome_error`], NOT here.
-fn zome_call_failed(e: impl std::fmt::Display) -> StorageError {
-    let msg = format!("Zome call failed: {}", e);
-    bridge_health().observe_zome_error(&msg);
-    StorageError::Conductor(msg)
-}
 
 /// What the admission gate observed about one zome call.
 ///
@@ -139,6 +124,33 @@ pub struct HcClient {
 }
 
 impl HcClient {
+    /// This client's configured role, for keying the per-role zome-path
+    /// observer (see [`crate::conductor_bridge_health::RoleBridgeHealth`]).
+    /// Falls back to `"default"` for a client with no role configured (none
+    /// of today's production call sites leave `role` unset, but the fallback
+    /// keeps this total rather than panicking on a hypothetical one).
+    fn role_key(&self) -> &str {
+        self.config.role.as_deref().unwrap_or("default")
+    }
+
+    /// Map a `holochain_client` zome-call failure onto a [`StorageError`] AND
+    /// fold it into this client's ROLE-scoped zome-path observer (which
+    /// re-derives the process-wide aggregate — see
+    /// [`crate::conductor_bridge_health::observe_role_zome_error`]).
+    ///
+    /// Every zome-call site funnels through here so the observation cannot be
+    /// forgotten at one of them: a bridge that dies on the mishpat cell is
+    /// exactly as dead as one that dies on lamad, and `/health` must say so
+    /// either way — including WHICH role, now that the observer is per-role.
+    /// Classification (transport-dead vs the conductor answering "no" vs an
+    /// admission shed that never left this process) lives in
+    /// [`crate::conductor_bridge_health::classify_zome_error`], NOT here.
+    fn zome_call_failed(&self, e: impl std::fmt::Display) -> StorageError {
+        let msg = format!("Zome call failed: {}", e);
+        observe_role_zome_error(self.role_key(), &msg);
+        StorageError::Conductor(msg)
+    }
+
     /// Strip ws:// or wss:// prefix from URL to get socket address
     /// holochain_client expects "host:port" format, not "ws://host:port"
     fn to_socket_addr(url: &str) -> String {
@@ -396,8 +408,8 @@ impl HcClient {
                 ExternIO::from(payload),
             )
             .await
-            .map_err(zome_call_failed)?;
-        bridge_health().record_success();
+            .map_err(|e| self.zome_call_failed(e))?;
+        record_role_success(self.role_key());
         Ok(result.into_vec())
     }
 
@@ -437,8 +449,8 @@ impl HcClient {
                 ExternIO::from(payload),
             )
             .await
-            .map_err(zome_call_failed)?;
-        bridge_health().record_success();
+            .map_err(|e| self.zome_call_failed(e))?;
+        record_role_success(self.role_key());
         Ok(result.into_vec())
     }
 
@@ -502,8 +514,8 @@ impl HcClient {
                 ExternIO::from(payload),
             )
             .await
-            .map_err(zome_call_failed)?;
-        bridge_health().record_success();
+            .map_err(|e| self.zome_call_failed(e))?;
+        record_role_success(self.role_key());
 
         let timing = ZomeCallTiming {
             admission_wait: permit.wait(),
@@ -978,12 +990,12 @@ impl HcClient {
         // restart and nothing asked it a question until a person did, 90s later.
         match self.admin_ws.list_apps(None).await {
             Ok(_) => {
-                bridge_health().record_success();
+                record_role_success(self.role_key());
                 Ok(())
             }
             Err(e) => {
                 let msg = format!("Conductor ping failed: {}", e);
-                bridge_health().observe_zome_error(&msg);
+                observe_role_zome_error(self.role_key(), &msg);
                 Err(StorageError::Connection(msg))
             }
         }

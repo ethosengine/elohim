@@ -198,17 +198,36 @@ impl<P: Publisher, L: LiveProbe> HeartbeatTask<P, L> {
 /// The payload is serialized as MessagePack (with named fields) to match the
 /// DNA-side `PeerStatus` entry layout. See
 /// `elohim/holochain/dna/infrastructure/zomes/infrastructure_integrity/src/peer_status.rs`.
+/// Resolves its `HcClient` THROUGH the [`HcClientRegistry`](crate::hc_client_registry::HcClientRegistry)
+/// role slot on every publish, rather than holding a private `Arc<HcClient>`
+/// for the life of the process.
+///
+/// That handle-holding was the actual defect this type used to have: a
+/// conductor restart invalidates the app-authentication token and closes the
+/// websocket; the bridge supervisor (`hc_client_registry::spawn_bridge_supervisor`)
+/// notices and re-mints a FRESH `HcClient` into the registry slot — but a
+/// `Publisher` still clutching its own private `Arc<HcClient>` from boot never
+/// sees that swap and keeps calling a corpse forever. Resolving the client
+/// fresh from the registry on every call is what makes a supervisor re-mint
+/// actually reach this task, the same way it already reaches every other
+/// registry reader.
 pub struct ZomeCallPublisher {
-    hc: std::sync::Arc<crate::hc_client::HcClient>,
+    registry: std::sync::Arc<crate::hc_client_registry::HcClientRegistry>,
+    role: &'static str,
     agent: holochain_types::prelude::AgentPubKey,
 }
 
 impl ZomeCallPublisher {
     pub fn new(
-        hc: std::sync::Arc<crate::hc_client::HcClient>,
+        registry: std::sync::Arc<crate::hc_client_registry::HcClientRegistry>,
+        role: &'static str,
         agent: holochain_types::prelude::AgentPubKey,
     ) -> Self {
-        Self { hc, agent }
+        Self {
+            registry,
+            role,
+            agent,
+        }
     }
 }
 
@@ -273,8 +292,14 @@ impl Publisher for ZomeCallPublisher {
         let payload = rmp_serde::to_vec_named(&wire)
             .map_err(|e| anyhow::anyhow!("encode PeerStatus: {e}"))?;
 
-        self.hc
-            .call_zome("infrastructure", "record_peer_status", payload)
+        let hc = self.registry.client(self.role).ok_or_else(|| {
+            anyhow::anyhow!(
+                "{} bridge unavailable — the supervisor has not re-minted it yet",
+                self.role
+            )
+        })?;
+
+        hc.call_zome("infrastructure", "record_peer_status", payload)
             .await
             .map_err(|e| anyhow::anyhow!("record_peer_status zome call failed: {e}"))?;
         Ok(())
@@ -312,17 +337,20 @@ pub fn measure_free_pct(path: &std::path::Path) -> anyhow::Result<u8> {
 /// peer out of the general pool.
 pub struct DefaultProbe {
     storage_path: std::path::PathBuf,
-    hc: std::sync::Arc<crate::hc_client::HcClient>,
+    registry: std::sync::Arc<crate::hc_client_registry::HcClientRegistry>,
+    role: &'static str,
 }
 
 impl DefaultProbe {
     pub fn new(
         blob: std::sync::Arc<crate::blob_store::BlobStore>,
-        hc: std::sync::Arc<crate::hc_client::HcClient>,
+        registry: std::sync::Arc<crate::hc_client_registry::HcClientRegistry>,
+        role: &'static str,
     ) -> Self {
         Self {
             storage_path: blob.root_dir().to_path_buf(),
-            hc,
+            registry,
+            role,
         }
     }
 }
@@ -348,11 +376,22 @@ impl LiveProbe for DefaultProbe {
 
         // Conductor health: a successful `list_apps` via HcClient::ping is a
         // reasonable liveness check — admin websocket is responsive AND the
-        // conductor's app manager is answering queries.
-        let conductor_healthy = match self.hc.ping().await {
-            Ok(()) => true,
-            Err(e) => {
-                tracing::warn!("conductor ping failed: {e}");
+        // conductor's app manager is answering queries. Resolved through the
+        // registry (not a held handle) so a supervisor re-mint is reflected
+        // on the very next tick.
+        let conductor_healthy = match self.registry.client(self.role) {
+            Some(hc) => match hc.ping().await {
+                Ok(()) => true,
+                Err(e) => {
+                    tracing::warn!("conductor ping failed: {e}");
+                    false
+                }
+            },
+            None => {
+                tracing::warn!(
+                    role = self.role,
+                    "conductor bridge unavailable — supervisor has not re-minted it yet"
+                );
                 false
             }
         };
@@ -565,5 +604,38 @@ mod tests {
         task.tick_once().await.unwrap();
         let p = rx.recv().await.unwrap();
         assert_eq!(p.archetype_class.as_deref(), Some("home-nuc"));
+    }
+
+    // ---- ZomeCallPublisher resolves through the registry -------------------
+    //
+    // Regression coverage for the fourth-unsupervised-client defect: before
+    // this fix, `ZomeCallPublisher` held its own private `Arc<HcClient>` for
+    // the life of the process, so a bridge supervisor re-mint into the
+    // registry never reached it. Now it resolves `registry.client(role)` on
+    // every publish — proven here by an empty registry (no live conductor
+    // needed): the slot being `None` must surface as an honest error, never a
+    // panic, and the error must name which role is missing so an operator
+    // reading the log knows what to look for.
+
+    #[tokio::test]
+    async fn publisher_errors_honestly_when_its_registry_role_is_unset() {
+        let registry = std::sync::Arc::new(crate::hc_client_registry::HcClientRegistry::empty());
+        let agent = holochain_types::prelude::AgentPubKey::from_raw_36(vec![0u8; 36]);
+        let publisher = ZomeCallPublisher::new(registry, "infrastructure", agent);
+        let err = publisher
+            .publish(Published {
+                status: "online".into(),
+                flags: EvaluatedFlags {
+                    general_pool_member: true,
+                    accepting_stewardship_reserves: false,
+                },
+                archetype_class: None,
+            })
+            .await
+            .expect_err("no client in the registry slot must be an Err, never a panic");
+        assert!(
+            err.to_string().contains("infrastructure"),
+            "the error must name the unavailable role: {err}"
+        );
     }
 }

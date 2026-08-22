@@ -360,7 +360,7 @@ impl HcClientRegistry {
                     // a corpse, and `/health` stops advertising its DNA hashes.
                     registry.set_client(role, None);
                     drop(hc);
-                    crate::conductor_bridge_health::bridge_health().record_reconnect();
+                    crate::conductor_bridge_health::record_role_reconnect(role);
 
                     if let Some(fresh) =
                         Self::connect_role_forever(&inputs, role, reconnect_shutdown.subscribe())
@@ -470,5 +470,34 @@ mod supervised_slot_tests {
         // never fixes anything.
         assert!(BRIDGE_PROBE_INTERVAL < Duration::from_secs(60));
         assert!(BRIDGE_PROBE_INTERVAL >= Duration::from_secs(5));
+    }
+
+    #[tokio::test]
+    async fn spawn_bridge_supervisor_needs_no_policy_config() {
+        // Regression guard for the corollary defect: `spawn_bridge_supervisor`
+        // used to be called from inside `PolicyConfig::load`'s `Ok(..)` arm in
+        // main.rs, so a peer started without ELOHIM_STORAGE_PEER_POLICY_PATH
+        // (or pointed at a missing/malformed policy file — the common shape for
+        // a throwaway or fresh dev conductor) got NO bridge supervision at all,
+        // reproducing the original stale-token defect exactly: a restarted
+        // conductor stayed dead forever with nothing watching it. The
+        // function's own signature never took a `PolicyConfig` — proven here by
+        // construction: it spawns from nothing but a registry + connection
+        // inputs + a shutdown sender.
+        let reg = std::sync::Arc::new(HcClientRegistry::empty());
+        let (shutdown_tx, _rx) = tokio::sync::broadcast::channel::<()>(1);
+        reg.spawn_bridge_supervisor(
+            HcRegistryInputs {
+                admin_url: "ws://127.0.0.1:1".into(),
+                app_url: "ws://127.0.0.1:1".into(),
+                app_id: "elohim".into(),
+            },
+            shutdown_tx.clone(),
+        );
+        // Signal shutdown immediately so the spawned per-role loops exit
+        // promptly rather than sleeping out BRIDGE_PROBE_INTERVAL during the
+        // test run — this test asserts the call succeeds without a
+        // PolicyConfig, not the supervisor's steady-state probing behavior.
+        let _ = shutdown_tx.send(());
     }
 }

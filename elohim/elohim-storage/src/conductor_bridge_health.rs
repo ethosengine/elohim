@@ -229,9 +229,156 @@ impl BridgeHealth {
 /// and threading an `Arc` through all of them would be a signature change with
 /// no truth-layer benefit. Tests never touch this — they build their own
 /// [`BridgeHealth`] so parallel tests cannot poison one another.
+///
+/// Its `record_success`/`record_failure` calls are driven by
+/// [`resync_aggregate`] rather than directly from each zome call: see
+/// [`RoleBridgeHealth`] for why a raw interleaved event stream from more than
+/// one role flaps.
 pub fn bridge_health() -> &'static BridgeHealth {
     static HEALTH: OnceLock<BridgeHealth> = OnceLock::new();
     HEALTH.get_or_init(BridgeHealth::new)
+}
+
+/// Role-keyed registry of [`BridgeHealth`] observers.
+///
+/// WHY THIS EXISTS. `HcClient` instances are per-role (`infrastructure`,
+/// `imagodei`, `lamad`, ...), but every one of them used to fold its
+/// observations into the SAME global [`bridge_health`] singleton. One role
+/// dying on its own cadence (e.g. a stray unsupervised client hitting a dead
+/// bridge every 60s) and a completely different, healthy role succeeding on
+/// its own cadence (e.g. the bridge supervisor's 20s ping) land in ONE shared
+/// counter and alternate the reported verdict on whichever call happened to
+/// land last — the observed `zomePath` live↔dead flap. Tracking each role's
+/// evidence separately, and deriving the aggregate from every supervised
+/// role's CURRENT state (never from raw event order across roles), is the
+/// fix. See [`derive_supervised_status`] and `resync_aggregate`.
+pub struct RoleBridgeHealth {
+    roles: std::sync::RwLock<std::collections::HashMap<String, std::sync::Arc<BridgeHealth>>>,
+}
+
+impl RoleBridgeHealth {
+    pub fn new() -> Self {
+        Self {
+            roles: std::sync::RwLock::new(std::collections::HashMap::new()),
+        }
+    }
+
+    /// Get (or lazily create) the observer for `role`. Every `HcClient`
+    /// instance funnels its observations here keyed by its OWN configured
+    /// role, so a dead role's evidence never lands in another role's stream.
+    pub fn for_role(&self, role: &str) -> std::sync::Arc<BridgeHealth> {
+        if let Some(h) = self
+            .roles
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(role)
+        {
+            return std::sync::Arc::clone(h);
+        }
+        let mut w = self.roles.write().unwrap_or_else(|e| e.into_inner());
+        std::sync::Arc::clone(
+            w.entry(role.to_string())
+                .or_insert_with(|| std::sync::Arc::new(BridgeHealth::new())),
+        )
+    }
+
+    /// Snapshot every role this instance has observed (or had created via
+    /// [`Self::for_role`]), as of now. Order is unspecified (backed by a
+    /// `HashMap`) — callers that need a stable order sort by key.
+    pub fn snapshot_all(&self) -> Vec<(String, BridgeHealthSnapshot)> {
+        let now = now_ms();
+        self.roles
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .map(|(role, h)| (role.clone(), h.snapshot_at(now)))
+            .collect()
+    }
+
+    /// Derive the aggregate zome-path verdict from the CURRENT state of every
+    /// role in `supervised_roles` — never from raw interleaved events.
+    ///
+    /// - **Dead** iff ANY supervised role is currently observed dead (one bad
+    ///   role is enough to say the truth-writing path is compromised).
+    /// - **Live** once at least one supervised role is live and none are
+    ///   dead.
+    /// - **Unknown** only while EVERY supervised role has no evidence yet
+    ///   (fresh boot) — a node with no evidence has not earned a red, per
+    ///   [`ZomePathStatus`]'s own contract.
+    pub fn derive_supervised_status(&self, supervised_roles: &[&str]) -> ZomePathStatus {
+        let mut any_dead = false;
+        let mut any_live = false;
+        for role in supervised_roles {
+            match self.for_role(role).snapshot().status {
+                ZomePathStatus::Dead => any_dead = true,
+                ZomePathStatus::Live => any_live = true,
+                ZomePathStatus::Unknown => {}
+            }
+        }
+        if any_dead {
+            ZomePathStatus::Dead
+        } else if any_live {
+            ZomePathStatus::Live
+        } else {
+            ZomePathStatus::Unknown
+        }
+    }
+}
+
+impl Default for RoleBridgeHealth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// The ONE process-wide [`RoleBridgeHealth`]. Every `HcClient`, keyed by its
+/// own configured role, observes into here via [`observe_role_zome_error`] /
+/// [`record_role_success`] / [`record_role_reconnect`]. `/health`'s `perRole`
+/// block (see [`health_block`]) renders this directly.
+pub fn role_bridge_health() -> &'static RoleBridgeHealth {
+    static REG: OnceLock<RoleBridgeHealth> = OnceLock::new();
+    REG.get_or_init(RoleBridgeHealth::new)
+}
+
+/// Re-derive the process-wide [`bridge_health`] singleton from every
+/// supervised role's CURRENT state in [`role_bridge_health`]. Called after
+/// every role-scoped observation so the top-level `zomePath` `/health` has
+/// always carried stays in sync with the honest multi-role picture instead of
+/// the raw interleaved event stream that used to flap. `Unknown` leaves the
+/// singleton untouched (no evidence yet is not itself an observation).
+fn resync_aggregate() {
+    match role_bridge_health()
+        .derive_supervised_status(&crate::hc_client_registry::SUPERVISED_ROLES)
+    {
+        ZomePathStatus::Live => bridge_health().record_success(),
+        ZomePathStatus::Dead => bridge_health().record_failure(),
+        ZomePathStatus::Unknown => {}
+    }
+}
+
+/// Fold a zome-call error into ROLE's own observer (for the per-role map),
+/// classifying it first, then re-sync the process-wide aggregate. Call this
+/// instead of `bridge_health().observe_zome_error(..)` directly from any
+/// `HcClient` call site — the aggregate updates itself.
+pub fn observe_role_zome_error(role: &str, msg: &str) {
+    role_bridge_health().for_role(role).observe_zome_error(msg);
+    resync_aggregate();
+}
+
+/// Record evidence ROLE's path is live, then re-sync the process-wide
+/// aggregate. Call this instead of `bridge_health().record_success()`
+/// directly from any `HcClient` call site.
+pub fn record_role_success(role: &str) {
+    role_bridge_health().for_role(role).record_success();
+    resync_aggregate();
+}
+
+/// Count one supervisor-driven re-mint of ROLE's bridge, in both the
+/// per-role map and the process-wide total the top-level `bridgeReconnects`
+/// field has always carried.
+pub fn record_role_reconnect(role: &str) {
+    role_bridge_health().for_role(role).record_reconnect();
+    bridge_health().record_reconnect();
 }
 
 /// Does this error text mean the WEBSOCKET is gone (as opposed to the conductor
@@ -267,11 +414,42 @@ pub fn classify_zome_error(msg: &str) -> ZomeObservation {
     ZomeObservation::PathLive
 }
 
+/// The wire shape of one role's entry in the `perRole` map — same field
+/// names as the top-level block, minus `mode` (a process-level fact, not a
+/// per-role one).
+fn role_status_json(snap: &BridgeHealthSnapshot) -> serde_json::Value {
+    serde_json::json!({
+        "zomePath": snap.status.as_str(),
+        "lastZomeCallAgeSecs": snap.last_success_age_secs,
+        "lastZomeFailureAgeSecs": snap.last_failure_age_secs,
+        "consecutiveFailures": snap.consecutive_failures,
+        "bridgeReconnects": snap.reconnects,
+    })
+}
+
+/// Build the `perRole` object from an explicit [`RoleBridgeHealth`] — factored
+/// out of [`health_block`] so "one dead role among N" is a unit test against
+/// an isolated registry, never the process-wide singleton (parallel tests
+/// must never share that mutable global — see [`bridge_health`]'s doc).
+pub fn per_role_block(roles: &RoleBridgeHealth) -> serde_json::Value {
+    let mut map = serde_json::Map::new();
+    for (role, snap) in roles.snapshot_all() {
+        map.insert(role, role_status_json(&snap));
+    }
+    serde_json::Value::Object(map)
+}
+
 /// The `conductor` block `/health` and `/health/serving` both render.
 ///
 /// One builder, two surfaces — so the body a person reads and the status code a
 /// probe reads can never disagree about the same node (the drift that let
 /// `/health` say `ok` while every read 503'd).
+///
+/// `zomePath` and the other top-level scalars come from `snap` (typically
+/// [`bridge_health`]'s singleton, kept in sync with the honest multi-role
+/// picture by `resync_aggregate` on every role-scoped observation — see
+/// [`RoleBridgeHealth`]). `perRole` is ADDED beside them: a role → status map
+/// so a reader can see WHICH role is dead instead of only that something is.
 pub fn health_block(mode: &str, snap: &BridgeHealthSnapshot) -> serde_json::Value {
     serde_json::json!({
         "mode": mode,
@@ -280,6 +458,7 @@ pub fn health_block(mode: &str, snap: &BridgeHealthSnapshot) -> serde_json::Valu
         "lastZomeFailureAgeSecs": snap.last_failure_age_secs,
         "consecutiveFailures": snap.consecutive_failures,
         "bridgeReconnects": snap.reconnects,
+        "perRole": per_role_block(role_bridge_health()),
     })
 }
 
@@ -453,5 +632,95 @@ mod tests {
         let block = health_block("embedded", &BridgeHealth::new().snapshot_at(T0));
         assert_eq!(block["zomePath"], "unknown");
         assert!(block["lastZomeCallAgeSecs"].is_null());
+    }
+
+    // ---- per-role aggregation ---------------------------------------------
+    //
+    // These build their OWN `RoleBridgeHealth` instance rather than touching
+    // the process-wide `role_bridge_health()` singleton, for the same reason
+    // every other test in this file builds its own `BridgeHealth`: parallel
+    // `cargo test` threads share one process, and a test that mutated the
+    // real singleton would be flaky by construction (see `bridge_health`'s
+    // doc). The logic under test (`derive_supervised_status`, `per_role_block`)
+    // is the exact same code the production singleton uses — only the
+    // instance is isolated.
+
+    const SUPERVISED: [&str; 3] = ["infrastructure", "imagodei", "lamad"];
+
+    #[test]
+    fn one_dead_role_among_n_reads_dead_and_the_map_names_which() {
+        let roles = RoleBridgeHealth::new();
+        roles.for_role("infrastructure").record_success();
+        roles.for_role("imagodei").record_success();
+        roles.for_role("lamad").record_failure();
+
+        assert_eq!(
+            roles.derive_supervised_status(&SUPERVISED),
+            ZomePathStatus::Dead,
+            "one dead role among N must sink the aggregate"
+        );
+
+        let block = per_role_block(&roles);
+        assert_eq!(
+            block["lamad"]["zomePath"], "dead",
+            "the map must name lamad"
+        );
+        assert_eq!(block["infrastructure"]["zomePath"], "live");
+        assert_eq!(block["imagodei"]["zomePath"], "live");
+    }
+
+    #[test]
+    fn recovering_the_dead_role_flips_the_aggregate_back_to_live() {
+        // The exact recovery this whole module exists to prove: a supervisor
+        // re-mint lands, the next call on the recovered role succeeds, and
+        // the derived aggregate must clear WITHOUT anything else changing.
+        let roles = RoleBridgeHealth::new();
+        roles.for_role("infrastructure").record_success();
+        roles.for_role("imagodei").record_success();
+        roles.for_role("lamad").record_failure();
+        assert_eq!(
+            roles.derive_supervised_status(&SUPERVISED),
+            ZomePathStatus::Dead
+        );
+
+        roles.for_role("lamad").record_success();
+        assert_eq!(
+            roles.derive_supervised_status(&SUPERVISED),
+            ZomePathStatus::Live
+        );
+    }
+
+    #[test]
+    fn a_role_never_observed_does_not_manufacture_a_red() {
+        // A node that doesn't provision every supervised DNA (or hasn't made
+        // its first call yet) must not read Dead just because a role sits at
+        // Unknown while siblings are Live.
+        let roles = RoleBridgeHealth::new();
+        roles.for_role("infrastructure").record_success();
+        assert_eq!(
+            roles.derive_supervised_status(&SUPERVISED),
+            ZomePathStatus::Live
+        );
+    }
+
+    #[test]
+    fn fresh_registry_with_no_evidence_anywhere_is_unknown() {
+        let roles = RoleBridgeHealth::new();
+        assert_eq!(
+            roles.derive_supervised_status(&SUPERVISED),
+            ZomePathStatus::Unknown
+        );
+    }
+
+    #[test]
+    fn a_role_with_no_traffic_yet_is_absent_but_lazily_creatable() {
+        // `for_role` on a role nothing has touched yet must not panic and
+        // must read Unknown — the same "no evidence has not earned a red"
+        // contract a single `BridgeHealth` carries.
+        let roles = RoleBridgeHealth::new();
+        assert_eq!(
+            roles.for_role("mishpat").snapshot().status,
+            ZomePathStatus::Unknown
+        );
     }
 }
