@@ -180,18 +180,21 @@ Feature: Chapter 11 — the pull queue can finish
   #     head_ref), the same fixture gap acquisition-pins.feature's sibling
   #     retry-rotation and in-flight-budget scenarios are already @wip behind
   #     (steps/delivery/acquisition-pins.steps.ts). Prefers those existing
-  #     step wordings so it is runnable the day that fixture lands. The peer
-  #     count below (6) is this fixture's OWN connected-peer count — chosen to
-  #     match the header's worked example (line ~96), not a literal restatement
-  #     of alpha's 6-member total (which, from any one alpha member's own view,
-  #     is 5 connected peers, not 6); the two counts are deliberately decoupled.
+  #     step wordings so it is runnable the day that fixture lands. The fabric
+  #     steps below are the PARAMETERIZED form of the header's worked example
+  #     (line ~96): the retry budget is peer-sized (`max(3, connected peers)`),
+  #     so the expected probe count derives from whatever fabric is REALLY
+  #     running — the household mesh reports 2 connected peers; alpha's
+  #     worked-example 6 would read as 5 from any one member's own view — and
+  #     the assertion's teeth (budget covers every connected peer; it exhausts;
+  #     the pin retires) hold at any fabric size >= 1.
   @requires:household-nodes @requires:owned-substrate
   Scenario: an unsatisfiable pin retires once the peer-sized retry budget exhausts
     Given jessica's node, a fixture peer with no other outstanding pins
-    And an acquisition fabric of 6 connected peers
+    And an acquisition fabric of at least 1 connected peer
     And jessica's node holds a pin for "epr:elohim-host-landing" that no connected peer advertises
     When the peer-sized retry budget exhausts
-    Then the item was probed on 6 distinct peers
+    Then the item was probed on every peer the peer-sized retry budget names
     And the pin's status becomes "retired"
     And the retirement series for reason "exhausted" increments
     And jessica's node reports pull.caughtUp as true

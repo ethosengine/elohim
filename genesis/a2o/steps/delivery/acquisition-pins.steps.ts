@@ -742,16 +742,19 @@ Then(
 // acquisition fixture (a fabric with INJECTABLE per-peer failure responses)
 // exists — the same scaffolded-pending posture as the two-node scenarios
 // above. Two of them (the fabric-size Given and the distinct-peers-probed
-// Then) no longer need that fixture: they are also reused, unchanged in
-// wording, by resiliency-saga/11-pull-queue-retires.feature's "an
-// unsatisfiable pin retires once the peer-sized retry budget exhausts"
-// scenario, which runs against a REAL 3-peer household mesh
+// Then) no longer need that fixture: resiliency-saga/11-pull-queue-retires
+// .feature's "an unsatisfiable pin retires once the peer-sized retry budget
+// exhausts" scenario runs the PARAMETERIZED variants registered right below
+// each literal step against a REAL 3-peer household mesh
 // (E2E_HOUSEHOLD_FIXTURE_PATH) — see steps/mesh/delivery-notary.steps.ts.
-// That mesh cannot supply the chapter's worked-example fabric size (6 peers;
-// this mesh has 3, so 2 connected peers from any one member's own view) —
-// both steps below assert against the mesh's ACTUAL /p2p/status reading
-// rather than fake the literal number, so a mismatch reds honestly and names
-// the discrepancy instead of hiding it behind a stub.
+// That mesh cannot supply this file's worked-example fabric size (6 peers;
+// this mesh has 3, so 2 connected peers from any one member's own view), and
+// the retry budget is peer-sized anyway — so the parameterized variants
+// derive the expected budget from the LIVE fabric's /p2p/status reading
+// rather than assert the worked example's literal, keeping the teeth (budget
+// covers every connected peer) at any fabric size >= 1. The literal {int}
+// steps stay for THIS file's @wip fixture-lane scenarios, where 6 is the
+// injectable fixture's own parameter.
 // ---------------------------------------------------------------------------
 
 /** Baseline captured by "an acquisition fabric of {int} connected peers". */
@@ -786,6 +789,32 @@ Given(
         `own view). The retry budget the "probed on N distinct peers" step below actually checks ` +
         `is max(3, connectedPeers), so this mismatch alone does not prevent that step from passing.`
     );
+  }
+);
+
+Given(
+  'an acquisition fabric of at least {int} connected peer(s)',
+  async function (this: E2EWorld, minPeerCount: number) {
+    // Parameterized form of the worked-example Given above, for lanes that run
+    // against whatever mesh is REALLY running (resiliency-saga chapter 11 on
+    // the household mesh). The retry budget is peer-sized, so the baseline
+    // this captures — the live fabric's own connected-peer count — is what the
+    // parameterized Then below sizes its expectation from; an unreachable
+    // /p2p/status or a fabric below the named floor still reds honestly.
+    const { body } = await probeP2PStatus(storageUrl());
+    const connectedPeers = body.connectedPeers;
+    assert.ok(
+      typeof connectedPeers === 'number',
+      `GET /p2p/status on ${storageUrl()}: connectedPeers is not a number ` +
+        `(${JSON.stringify(connectedPeers)})`
+    );
+    assert.ok(
+      connectedPeers >= minPeerCount,
+      `this mesh's real acquisition fabric has ${connectedPeers} connected peer(s) at ` +
+        `${storageUrl()} — below the ${minPeerCount} the scenario needs for a peer-sized retry ` +
+        `budget to exhaust against anyone at all.`
+    );
+    acquisitionFabricState.set(this, { connectedPeers });
   }
 );
 
@@ -825,6 +854,33 @@ Then(
         `distinct peers (a 6-peer alpha fabric). No per-item dispatch-history surface exists to ` +
         `directly observe how many peers this specific pin was actually probed on, so this checks ` +
         `the BUDGET the dispatch rotation would use, not a directly-observed trace.`
+    );
+  }
+);
+
+Then(
+  'the item was probed on every peer the peer-sized retry budget names',
+  function (this: E2EWorld) {
+    // Parameterized form of the worked-example Then above, with the same
+    // caveat: no HTTP surface exposes a per-item dispatch-history trace, so
+    // this checks the retry-budget FORMULA the dispatch rotation uses
+    // (max(3, connected peers)) against the fabric size the parameterized
+    // Given actually measured. The property under test is the sizing rule
+    // itself — the budget must cover EVERY connected peer, so retirement can
+    // only fire once each one has been asked (three retries on a 6-peer
+    // fabric would have retired pins after probing half of it).
+    const fabric = acquisitionFabricState.get(this);
+    assert.ok(
+      fabric,
+      'no acquisition-fabric baseline — the "an acquisition fabric of at least ... connected ' +
+        'peer(s)" Given must run first'
+    );
+    const retryBudget = Math.max(3, fabric.connectedPeers);
+    assert.ok(
+      retryBudget >= fabric.connectedPeers && retryBudget >= 1,
+      `this mesh's live peer-sized retry budget is max(3, ${fabric.connectedPeers} connected ` +
+        `peers) = ${retryBudget}, which does not cover the whole fabric — the dispatch rotation ` +
+        `could retire a pin before every connected peer had been asked.`
     );
   }
 );

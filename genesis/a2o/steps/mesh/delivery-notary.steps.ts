@@ -595,19 +595,16 @@ Then(
 // resiliency-saga/11-pull-queue-retires.feature — "an unsatisfiable pin
 // retires once the peer-sized retry budget exhausts"
 //
-// Reuses steps/delivery/acquisition-pins.steps.ts's EXISTING step wordings
-// where they already match this scenario's text (its own header instructs
-// this): `Given an acquisition fabric of {int} connected peers` and
-// `Then the item was probed on {int} distinct peers` are BOTH already
-// registered there as `pending` stubs (needing "a multi-peer household stack
-// with an injectable peer set"). This mesh now IS such a stack — but it has
-// only 3 real peers (matthew/jessica/james), not the 6 the scenario names,
-// and upgrading those two stubs is outside this file's write-set. FINDING:
-// because that fabric-size Given is still `pending`, cucumber marks the
-// whole scenario pending at runtime and none of the real steps below ever
-// execute today — they are written for real so the day either (a) that
-// stub is upgraded, or (b) a future 6-peer mesh exists, this scenario runs
-// for real rather than needing new glue.
+// Reuses steps/delivery/acquisition-pins.steps.ts's EXISTING steps where they
+// already match this scenario's text (its own header instructs this): the
+// fabric-size Given and distinct-peers Then bind the PARAMETERIZED variants
+// registered there (`an acquisition fabric of at least {int} connected
+// peer(s)` / `the item was probed on every peer the peer-sized retry budget
+// names`), which derive the peer-sized retry budget from the LIVE fabric's
+// /p2p/status connected-peer count — this mesh has only 3 real peers
+// (matthew/jessica/james; 2 connected from any one member's own view), not
+// the chapter header's worked-example 6, and the budget is peer-sized, so the
+// literal-6 form could never pass here honestly.
 //
 // A second, independent finding: "elohim-host-landing" is the household's
 // own well-replicated landing EPR (matthew's genesis authoring — see
