@@ -381,7 +381,19 @@ Given(
         'first reconcile on this mesh, so there is no real pending-updates count to establish ' +
         'this precondition against.'
     );
-    state(this).pendingUpdatesBefore = body.pull?.pending ?? 0;
+    const pending = body.pull?.pending ?? 0;
+    if (pending === 0) {
+      // An idle mesh has no deferred backlog to absorb — the absorb assertion
+      // ("pending drops below the pre-resume value") is unfalsifiable from 0.
+      // Absent fixture precondition → skipped, never a fabricated pass/fail.
+      // eslint-disable-next-line no-console
+      console.log(
+        '  SKIPPED: peer /p2p/status.pull.pending is 0 — no real pending backlog exists on ' +
+          'this mesh to defer-and-absorb, so the precondition cannot be established.'
+      );
+      return 'skipped';
+    }
+    state(this).pendingUpdatesBefore = pending;
   }
 );
 
@@ -433,8 +445,22 @@ Given(
   }
 );
 
-Given('the device is currently on cellular', function (this: WorldWithDevice) {
+Given('the device is currently on cellular', async function (this: WorldWithDevice) {
   requireDevice(this);
+  // Wifi/cellular detection is NOT the storage node's job — the device layer
+  // DECLARES the active network via the API (design row
+  // p2p-sync-mode-unified-gate-design). Without this POST the node stays at
+  // networkClass "unknown", which deliberately does NOT suppress under
+  // wifi-only (permissive default, C4) — so the scenario would indict the
+  // binary for a precondition the step never established.
+  const url = primaryStorageUrl();
+  const result = await postRaw(`${url}${NETWORK_CLASS_ENDPOINT}`, { networkClass: 'cellular' });
+  assert.strictEqual(
+    result.status,
+    200,
+    `cannot establish precondition "on cellular" — POST ${NETWORK_CLASS_ENDPOINT} returned ` +
+      `${result.status}. ${SYNC_MODE_SURFACE_NOTE}`
+  );
 });
 
 Then('sync cycles do not run', async function (this: E2EWorld) {
@@ -474,6 +500,18 @@ Given(
   async function (this: WorldWithDevice) {
     requireDevice(this);
     const url = primaryStorageUrl();
+    // Declare the network like the bare "on cellular" Given does — the pause
+    // this precondition asserts is the GATE's WifiOnlyOnCellular verdict, which
+    // only exists once the device has declared cellular.
+    const declared = await postRaw(`${url}${NETWORK_CLASS_ENDPOINT}`, {
+      networkClass: 'cellular',
+    });
+    assert.strictEqual(
+      declared.status,
+      200,
+      `cannot establish precondition "on cellular" — POST ${NETWORK_CLASS_ENDPOINT} returned ` +
+        `${declared.status}. ${SYNC_MODE_SURFACE_NOTE}`
+    );
     const { body } = await probeP2PStatus(url);
     assert.strictEqual(
       body.syncPaused,
