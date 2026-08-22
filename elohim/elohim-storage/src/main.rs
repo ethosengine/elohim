@@ -2809,6 +2809,10 @@ async fn async_main(
             // Sync round cadence — Config::sync_interval_secs existed and was read
             // by nothing until now (the tick in P2PNode::run was hardcoded 60s).
             sync_interval_secs: Some(config.sync_interval_secs),
+            // Advertised to peers via Identify `agent_version` so they can
+            // populate the real `httpPort` on their `DeliveryPeer` row for
+            // this node instead of guessing 8090.
+            http_port: config.http_port,
             ..Default::default()
         };
 

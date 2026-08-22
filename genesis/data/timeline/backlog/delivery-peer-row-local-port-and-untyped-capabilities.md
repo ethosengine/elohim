@@ -85,3 +85,11 @@ all, so the typed answer that already exists cannot be asked for from outside th
 `features/delivery/peer-mesh.feature`'s "QueryDelivery protocol returns delivery info"
 stays `@wip` for exactly that reason. Projecting the typed `DeliveryInfo` shape onto the
 delivery-peer row would close both.
+
+**2026-08-21 — part 1 closed.** `extract_http_port` deleted; the peer's real port now
+travels via a `http_port=<port>` suffix on the libp2p Identify `agent_version` (self-declared
+by each node from `Config::http_port`, decoded by `parse_http_port_from_agent_version`,
+defaulting to `DEFAULT_HTTP_PORT` (8090) for un-upgraded peers) and is applied to the
+`DeliveryPeer` row from both the mDNS-discovery insert and the Identify-received handler
+(whichever fires second wins, so ordering can't leave a stale port). Parts 2 and 3
+(untyped `capabilities` string array, missing `ready_content`) are untouched — still open.

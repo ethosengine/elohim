@@ -549,6 +549,13 @@ pub struct P2PConfig {
     /// in `run()` while `Config::sync_interval_secs` existed, was documented, and
     /// was read by nothing — the one cadence knob for the plane was inert.
     pub sync_interval_secs: Option<u64>,
+    /// This node's own HTTP port (`Config::http_port`), advertised to peers
+    /// via the libp2p Identify `agent_version` suffix (see
+    /// `behaviour::ElohimStorageBehaviour::new`) so the receiving side can
+    /// populate `DeliveryPeer::http_port` with the peer's REAL port instead
+    /// of a fleet-wide 8090 guess. See
+    /// `genesis/data/timeline/backlog/delivery-peer-row-local-port-and-untyped-capabilities.md`.
+    pub http_port: u16,
 }
 
 impl Default for P2PConfig {
@@ -581,6 +588,7 @@ impl Default for P2PConfig {
             salvage_target_replicas: 2,
             salvage_recheck_seconds: 300,
             sync_interval_secs: None,
+            http_port: DEFAULT_HTTP_PORT,
         }
     }
 }
@@ -810,6 +818,11 @@ struct CachedIdentifyInfo {
     agent_version: String,
     protocols: Vec<String>,
     listen_addrs: Vec<String>,
+    /// The peer's REAL HTTP port, parsed from its self-declared
+    /// `agent_version` suffix by `parse_http_port_from_agent_version`.
+    /// Already defaulted to `DEFAULT_HTTP_PORT` at insertion time when the
+    /// suffix is absent/unparseable — never `None` here.
+    http_port: u16,
 }
 
 /// Per-peer runtime metrics tracked from swarm events.
@@ -2238,12 +2251,113 @@ impl P2PHandle {
 
 /// Map reach level string to numeric index for comparison.
 /// Used by the cache fast-path to compare ambient ceiling against requested reach.
-/// Extract an HTTP port hint from a multiaddr string.
-/// mDNS peers expose their libp2p port; HTTP is conventionally at 8090.
-fn extract_http_port(_addr: &str) -> u16 {
-    // Default HTTP port for elohim-storage — peers don't advertise
-    // HTTP port in multiaddr (that's for libp2p). The convention is 8090.
-    8090
+/// Fleet-wide default HTTP port, used until a peer's REAL port is learned.
+///
+/// A libp2p multiaddr carries only the transport (TCP/QUIC) port for the P2P
+/// swarm itself — it has no bearing on the peer's separate HTTP server port,
+/// so it can never be parsed out of one (the function that used to pretend
+/// otherwise, `extract_http_port`, always returned this constant regardless
+/// of its argument). The real value travels via the Identify `agent_version`
+/// suffix instead — see `parse_http_port_from_agent_version` and
+/// `behaviour::ElohimStorageBehaviour::new`. This constant is only the
+/// fallback for a peer whose Identify handshake hasn't completed yet, or
+/// who hasn't upgraded to advertise its port.
+pub(crate) const DEFAULT_HTTP_PORT: u16 = 8090;
+
+/// Parse the self-declared HTTP port a peer appends to its libp2p Identify
+/// `agent_version` string (`"<user_agent> http_port=<port>"` — see
+/// `behaviour::ElohimStorageBehaviour::new`, the sole encoder).
+///
+/// Returns `None` when the suffix is absent (an older peer that hasn't
+/// upgraded) or malformed; callers fall back to `DEFAULT_HTTP_PORT`, so a
+/// mixed-version fleet degrades to today's behavior rather than erroring.
+fn parse_http_port_from_agent_version(agent_version: &str) -> Option<u16> {
+    agent_version
+        .rsplit_once("http_port=")
+        .and_then(|(_, port_str)| port_str.trim().parse::<u16>().ok())
+}
+
+#[cfg(test)]
+mod http_port_advertisement_tests {
+    //! Regression coverage for
+    //! `genesis/data/timeline/backlog/delivery-peer-row-local-port-and-untyped-capabilities.md`
+    //! part 1: `httpPort` used to be a hardcoded 8090 for every peer row
+    //! (`extract_http_port` ignored its argument). These tests pin the
+    //! replacement mechanism: the peer's real port travels via the Identify
+    //! `agent_version` suffix and projects onto the `DeliveryPeer` HTTP row
+    //! as `httpPort`; an unparseable/absent suffix (an un-upgraded peer)
+    //! degrades to `DEFAULT_HTTP_PORT` rather than erroring.
+    use super::{parse_http_port_from_agent_version, DeliveryPeer, DEFAULT_HTTP_PORT};
+
+    #[test]
+    fn parses_http_port_suffix_from_agent_version() {
+        let agent_version = "elohim-storage/1.2.3+abc1234 http_port=8091";
+        assert_eq!(
+            parse_http_port_from_agent_version(agent_version),
+            Some(8091)
+        );
+    }
+
+    #[test]
+    fn missing_suffix_returns_none_and_falls_back_to_default() {
+        // An older peer that hasn't upgraded to advertise its port.
+        let agent_version = "elohim-storage/1.2.3+abc1234";
+        assert_eq!(parse_http_port_from_agent_version(agent_version), None);
+        assert_eq!(
+            parse_http_port_from_agent_version(agent_version).unwrap_or(DEFAULT_HTTP_PORT),
+            DEFAULT_HTTP_PORT
+        );
+    }
+
+    #[test]
+    fn malformed_suffix_returns_none() {
+        let agent_version = "elohim-storage/1.2.3 http_port=not-a-port";
+        assert_eq!(parse_http_port_from_agent_version(agent_version), None);
+    }
+
+    fn sample_peer(http_port: u16) -> DeliveryPeer {
+        DeliveryPeer {
+            peer_id: "12D3KooWExamplePeer".to_string(),
+            multiaddrs: vec!["/ip4/192.168.1.42/tcp/4001".to_string()],
+            network: "lan".to_string(),
+            capabilities: vec!["serves_compressed".to_string()],
+            last_seen: 1_700_000_000_000,
+            http_port,
+            household_id: None,
+            commitments: Vec::new(),
+        }
+    }
+
+    /// A received peer record whose Identify agent_version carried
+    /// `http_port=8091` projects `httpPort: 8091` onto the HTTP row —
+    /// the specific regression named in the backlog (matthew :8090,
+    /// jessica :8091, james :8092 all read back 8090 before this fix).
+    #[test]
+    fn peer_record_with_real_http_port_projects_onto_delivery_row() {
+        let parsed =
+            parse_http_port_from_agent_version("elohim-storage/1.2.3+abc1234 http_port=8091")
+                .unwrap_or(DEFAULT_HTTP_PORT);
+        assert_eq!(parsed, 8091);
+
+        let peer = sample_peer(parsed);
+        let json = serde_json::to_value(&peer).expect("DeliveryPeer serializes");
+        assert_eq!(json["httpPort"], serde_json::json!(8091));
+    }
+
+    /// A peer record missing the http_port suffix (un-upgraded peer, or no
+    /// Identify handshake yet) defaults to `DEFAULT_HTTP_PORT` (8090) —
+    /// fleet behavior is unchanged until peers upgrade.
+    #[test]
+    fn peer_record_missing_http_port_defaults_to_8090_on_delivery_row() {
+        let parsed = parse_http_port_from_agent_version("elohim-storage/1.2.3+abc1234")
+            .unwrap_or(DEFAULT_HTTP_PORT);
+        assert_eq!(parsed, DEFAULT_HTTP_PORT);
+        assert_eq!(parsed, 8090);
+
+        let peer = sample_peer(parsed);
+        let json = serde_json::to_value(&peer).expect("DeliveryPeer serializes");
+        assert_eq!(json["httpPort"], serde_json::json!(8090));
+    }
 }
 
 /// How often the drain loop scans the content table for unpublished rows.
@@ -5629,8 +5743,18 @@ impl P2PNode {
                     let key = peer_id.to_string();
                     let addr_str = addr.to_string();
 
-                    // Extract IP-based HTTP port hint (default 8090)
-                    let http_port = extract_http_port(&addr_str);
+                    // The peer's REAL HTTP port — a multiaddr carries only the
+                    // libp2p transport port and has no bearing on it (see
+                    // `DEFAULT_HTTP_PORT`'s doc comment). If the Identify
+                    // handshake has already completed for this peer, its
+                    // self-declared port is cached here; otherwise this mDNS
+                    // insert defaults to `DEFAULT_HTTP_PORT` and the Identify
+                    // handler refreshes the row once the handshake lands.
+                    let http_port = self
+                        .identify_cache
+                        .get(&key)
+                        .map(|c| c.http_port)
+                        .unwrap_or(DEFAULT_HTTP_PORT);
 
                     self.delivery_peers
                         .entry(key.clone())
@@ -5640,6 +5764,7 @@ impl P2PNode {
                             }
                             p.last_seen = now_ms;
                             p.network = "lan".to_string();
+                            p.http_port = http_port;
                         })
                         .or_insert_with(|| DeliveryPeer {
                             peer_id: key,
@@ -6608,6 +6733,8 @@ impl P2PNode {
                     protocols = ?info.protocols.len(),
                     "Identify: received peer info"
                 );
+                let http_port = parse_http_port_from_agent_version(&info.agent_version)
+                    .unwrap_or(DEFAULT_HTTP_PORT);
                 // Cache identify info for /p2p/peers endpoint
                 self.identify_cache.insert(
                     peer_id.to_string(),
@@ -6615,8 +6742,16 @@ impl P2PNode {
                         agent_version: info.agent_version.clone(),
                         protocols: info.protocols.iter().map(|p| p.to_string()).collect(),
                         listen_addrs: info.listen_addrs.iter().map(|a| a.to_string()).collect(),
+                        http_port,
                     },
                 );
+                // mDNS discovery (which populates `delivery_peers`) can fire
+                // before this Identify handshake completes and default the
+                // row to `DEFAULT_HTTP_PORT` — refresh it now that the peer's
+                // real port is known.
+                if let Some(mut p) = self.delivery_peers.get_mut(&peer_id.to_string()) {
+                    p.http_port = http_port;
+                }
                 if let Some(mut m) = self.peer_metrics.get_mut(&peer_id.to_string()) {
                     m.last_seen_ms = now_unix_ms();
                 }

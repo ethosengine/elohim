@@ -460,10 +460,24 @@ impl ElohimStorageBehaviour {
         // DCUtR for direct connection upgrade after relay
         let dcutr = dcutr::Behaviour::new(peer_id);
 
-        // Identify protocol — advertise who we are and what we support
+        // Identify protocol — advertise who we are and what we support.
+        //
+        // The `agent_version` carries a `http_port=<port>` suffix after the
+        // usual build-info user-agent string — this node's OWN real HTTP
+        // port (`config.http_port`, threaded from `Config::http_port`), so a
+        // receiving peer can populate `DeliveryPeer::http_port` correctly
+        // instead of guessing 8090 for everyone (a libp2p multiaddr carries
+        // no HTTP-port information at all). See
+        // `p2p::mod::parse_http_port_from_agent_version`, the sole decoder,
+        // and `genesis/data/timeline/backlog/
+        // delivery-peer-row-local-port-and-untyped-capabilities.md`.
         let identify = identify::Behaviour::new(
             identify::Config::new("/elohim/id/1.0.0".to_string(), keypair.public())
-                .with_agent_version(elohim_compute::BuildInfo::new("elohim-storage").user_agent()),
+                .with_agent_version(format!(
+                    "{} http_port={}",
+                    elohim_compute::BuildInfo::new("elohim-storage").user_agent(),
+                    config.http_port
+                )),
         );
 
         // AutoNAT — probe peers to detect NAT status
