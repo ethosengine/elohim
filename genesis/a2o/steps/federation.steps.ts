@@ -101,6 +101,13 @@ When(
  */
 Then(
   '{word} should see content {string} on doorway {string} within {int} seconds',
+  // The step's budget is written into the SCENARIO ("within 60 seconds"), and
+  // cucumber's global default deadline is 31s (common.steps.ts
+  // CUCUMBER_STEP_DEADLINE_MS) — so this step used to be killed at 31s while
+  // still inside the window the story granted it, reporting "function timed
+  // out" instead of the honest "not found within 60s". Opt out of the global
+  // default with headroom for the largest wait any scenario here names.
+  { timeout: 120_000 },
   async function (
     this: E2EWorld,
     humanName: string,
@@ -118,11 +125,20 @@ Then(
     const token = human.getToken(doorwayId);
     if (token) doorway.client.setToken(token);
 
-    const results = await waitForContentByTags(doorway.client, ['e2e', 'federation', runTag], {
-      timeoutMs: timeoutSeconds * 1000,
-      initialDelayMs: 2000,
-      maxDelayMs: 10_000,
-    });
+    // Wait for THIS item, not for any row sharing the 'e2e'/'federation' tags —
+    // otherwise the poll settles on a previous run's leftovers within seconds and
+    // the "within N seconds" the scenario grants is never actually spent.
+    const results = await waitForContentByTags(
+      doorway.client,
+      ['e2e', 'federation', runTag],
+      {
+        timeoutMs: timeoutSeconds * 1000,
+        maxAttempts: 40,
+        initialDelayMs: 2000,
+        maxDelayMs: 10_000,
+      },
+      r => r['title'] === contentAlias
+    );
 
     assert.ok(
       results.length > 0,

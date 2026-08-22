@@ -1295,6 +1295,58 @@ Then(
 );
 
 /**
+ * Assert that one entry of an array field on the last-captured surface carries
+ * a given `label`.
+ *
+ * The sibling above answers "does every entry have a cid?" — a shape question.
+ * This answers "is THAT atom in there?" — an identity question, and the only
+ * one that can catch a nav-context returning the right NUMBER of neighbours and
+ * the wrong ones.
+ *
+ * `label` is the referenced atom's schema_key, populated whenever the atom is
+ * held locally (epr_nav_context_view::nav_ref_for_cid). An entry for an atom
+ * this peer does not hold therefore carries a cid and NO label, which is a real
+ * and expected state — so a miss reports the labels that WERE present and how
+ * many entries were unlabelled, keeping "the atom is absent" distinguishable
+ * from "the atom is here but not locally held".
+ */
+Then(
+  'the entry labelled {string} appears under {string}',
+  function (this: E2EWorld, expectedLabel: string, arrayFieldName: string) {
+    const capture = lastCapture.get(this);
+    assert.ok(capture, NO_SURFACE_CAPTURE_MSG);
+    const body = capture.body as Record<string, unknown>;
+    const arr = body[arrayFieldName];
+    assert.ok(
+      Array.isArray(arr),
+      `Surface "${capture.path}": field "${arrayFieldName}" is not an array (got ${typeof arr})`
+    );
+    const labels: string[] = [];
+    let unlabelled = 0;
+    for (const entry of arr as unknown[]) {
+      const label =
+        entry !== null && typeof entry === 'object'
+          ? (entry as Record<string, unknown>)['label']
+          : undefined;
+      if (typeof label === 'string' && label.length > 0) labels.push(label);
+      else unlabelled += 1;
+    }
+    const unlabelledNoun = unlabelled === 1 ? 'y carries' : 'ies carry';
+    const unlabelledSuffix =
+      unlabelled > 0
+        ? `; ${unlabelled} further entr${unlabelledNoun} a cid but ` +
+          'no label (the atom is referenced but not held locally on this peer)'
+        : '';
+    assert.ok(
+      labels.includes(expectedLabel),
+      `Surface "${capture.path}": no entry under "${arrayFieldName}" is labelled ` +
+        `"${expectedLabel}". Labelled entries: ${JSON.stringify(labels)}` +
+        unlabelledSuffix
+    );
+  }
+);
+
+/**
  * Assert that a NESTED object field on the last-captured surface response
  * itself carries the named field. Used by the catching-up-page concern's
  * `admission.shedTotal` pin — a one-level-deep sibling of the top-level

@@ -62,19 +62,16 @@ Feature: The landing surface carries real backing claims
 
   # --- The claims say something true ---
 
-  # @wip: needs one new step-def — an assertion that `related` contains an entry
-  # whose `label` equals a given schema_key. The projection already returns
-  # `label` (EprNavRef.label = the referenced atom's schema_key, populated
-  # whenever the atom is held locally — epr_nav_context_view::nav_ref_for_cid),
-  # so this is a step-glue gap only, not a substrate gap.
-  # Gate condition: lifts when steps/dataplane.steps.ts (or a content-side
-  # sibling) gains `Then the entry labelled {string} appears under {string}`.
-  @wip
+  # The step-glue gap that held these two is closed: steps/dataplane.steps.ts
+  # carries `Then the entry labelled {string} appears under {string}`. `label` is
+  # the referenced atom's schema_key, populated whenever the atom is held locally
+  # (EprNavRef.label — epr_nav_context_view::nav_ref_for_cid), so an entry for an
+  # atom this peer does not hold carries a cid and no label; the assertion says
+  # which of the two it found.
   Scenario: The governance leg resolves to the landing surface's own governance state
     When I query "/api/v1/epr/elohim-host-landing/nav-context" on peer "alpha"
     Then the entry labelled "elohim-host-landing-governance" appears under "related"
 
-  @wip
   Scenario: The claims name the stewardship and custody assertions
     # Not "there are claims" — WHICH claims. The landing atom asserts exactly
     # two: who stewards this content and on what provenance, and that a
@@ -85,15 +82,12 @@ Feature: The landing surface carries real backing claims
 
   # --- The stewardship claim agrees with the stewardship rows ---
 
-  # @wip: needs one new step-def — a by-content-id allocation query. Every
-  # existing query step in steps/stewardship.steps.ts is category/tag-scoped and
-  # deliberately picks a MULTI-steward representative, so neither can address a
-  # single-steward surface like the landing page by id.
-  # Gate condition: lifts when steps/stewardship.steps.ts gains
-  # `When I query stewardship allocations for content {string}` (a thin wrapper
-  # over the client.getAllocationsForContent call the category step already
-  # makes) — the existing `... should be listed as a steward` /
-  # `... contribution type should be {string}` assertions then apply unchanged.
+  # The by-content-id query this needed now exists (steps/stewardship.steps.ts,
+  # `When I query stewardship allocations for content {string}`) — the step-glue
+  # gate is closed. What holds the scenario now is the substrate: a deployment
+  # whose stewardship_allocations table is empty has no rows for the landing
+  # atom or anything else, and the seeder's allocation pass is what fills it.
+  # Gate condition: lifts on a deployment where seed-stewardship.ts has run.
   @wip @stewardship
   Scenario: The landing surface is stewarded, and the steward is the one it declares
     # The stewardship claim's payload is produced by the SAME resolver that

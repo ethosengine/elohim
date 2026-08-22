@@ -52,16 +52,34 @@ export async function waitForContent(
 
 /**
  * Poll until content matching the given tags appears on a doorway.
+ *
+ * `match` narrows what counts as an arrival. Without it the poll settles the
+ * moment the search returns ANY row, and a tag list like ['e2e', 'federation',
+ * <runTag>] is matched loosely enough that older runs' rows satisfy it — so a
+ * caller that then asserts something about a SPECIFIC row was really asserting
+ * against the first poll tick, and its declared wait window was never spent.
+ * Measured 2026-08-21: a cross-doorway scenario with a 60s budget settled in
+ * ~8s on other rows and failed on the title check.
+ *
+ * Pass `match` whenever the caller's assertion is narrower than "something
+ * arrived", so the wait and the assertion ask the same question.
  */
 export async function waitForContentByTags(
   client: DoorwayClient,
   tags: string[],
-  opts: RetryOptions = {}
+  opts: RetryOptions = {},
+  match?: (row: Record<string, unknown>) => boolean
 ): Promise<Record<string, unknown>[]> {
   return retry(async () => {
     const results = await client.searchContent(tags);
     if (!results || results.length === 0) {
       throw new Error(`No content with tags [${tags.join(', ')}] on ${client.url}`);
+    }
+    if (match && !results.some(match)) {
+      throw new Error(
+        `${results.length} row(s) with tags [${tags.join(', ')}] on ${client.url}, ` +
+          'but none is the one awaited yet'
+      );
     }
     return results;
   }, opts);

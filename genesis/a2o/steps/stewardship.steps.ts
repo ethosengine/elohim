@@ -313,6 +313,35 @@ When(
   }
 );
 
+/**
+ * Query the allocations of ONE named content item.
+ *
+ * Every other query step in this file is category- or tag-scoped and
+ * deliberately picks a MULTI-steward representative, because those scenarios ask
+ * about the affinity engine's distribution. A single-steward surface — the
+ * landing page, stewarded by exactly one author — cannot be reached that way at
+ * all: the representative picker skips it by design.
+ *
+ * So this addresses the item by id and asserts nothing about the shape of the
+ * answer, leaving the existing "... should be listed as a steward" and
+ * "the contribution type should be ..." assertions to say what must be true.
+ * An id that carries no allocations fails HERE, naming the id, rather than
+ * surfacing later as a steward who is mysteriously absent.
+ */
+When(
+  'I query stewardship allocations for content {string}',
+  async function (this: E2EWorld, contentId: string) {
+    const client = getClient(this);
+    const allocations = await client.getAllocationsForContent(contentId);
+    assert.ok(
+      allocations.length > 0,
+      `Content "${contentId}" carries no stewardship allocations on this deployment`
+    );
+    this.contentIds.set('lastAllocations', JSON.stringify(allocations));
+    this.contentIds.set('lastQueryContentId', contentId);
+  }
+);
+
 When('I query stewardship allocations for any content category', async function (this: E2EWorld) {
   const client = getClient(this);
   const allAllocations = await client.listAllocations();
