@@ -98,6 +98,15 @@ export interface PostflightCheck {
 export interface ExpectedCounts {
   content: number;
   paths: number;
+  /**
+   * Rows the bulk import reported as already existing (skipped) — the
+   * idempotent re-run case. Existing-and-verified counts as success: the
+   * post-flight delta checks only demand NEW rows for the remainder
+   * (attempted - existing), so a re-run over a fully-seeded corpus passes
+   * honestly instead of failing on "0 new rows".
+   */
+  contentExisting?: number;
+  pathsExisting?: number;
 }
 
 // =============================================================================
@@ -449,28 +458,40 @@ export class SeedingVerification {
     const deltaContent = finalContent - preContent;
     const deltaPaths = finalPaths - prePaths;
 
+    // Idempotency-aware expectations: rows the bulk import reported as
+    // already existing (skipped) are SUCCESS, not shortfall — only the
+    // remainder is expected to appear as new rows in the delta. On a full
+    // re-run (everything already seeded) the expected-new counts are 0 and
+    // the sample verification below is what proves the rows actually exist.
+    const contentExisting = expected.contentExisting ?? 0;
+    const pathsExisting = expected.pathsExisting ?? 0;
+    const expectedNewContent = Math.max(0, expected.content - contentExisting);
+    const expectedNewPaths = Math.max(0, expected.paths - pathsExisting);
+    const existingNote = (existing: number) =>
+      existing > 0 ? ` (${existing} already existed and count as success)` : '';
+
     // Check content delta
     console.log('\n3. Verifying content was written...');
     const contentCheck: PostflightCheck = {
       name: 'content_count',
       status: 'pass',
       message: '',
-      expected: expected.content,
+      expected: expectedNewContent,
       actual: deltaContent,
     };
 
-    if (deltaContent === 0 && expected.content > 0) {
+    if (deltaContent === 0 && expectedNewContent > 0) {
       contentCheck.status = 'fail';
-      contentCheck.message = `No content was written! Expected ${expected.content}, got 0 new entries`;
+      contentCheck.message = `No content was written! Expected ${expectedNewContent} new entries, got 0${existingNote(contentExisting)}`;
       errors.push(contentCheck.message);
-    } else if (deltaContent < expected.content * 0.9) {
+    } else if (deltaContent < expectedNewContent * 0.9) {
       // Less than 90% of expected
       contentCheck.status = 'warn';
-      contentCheck.message = `Only ${deltaContent}/${expected.content} content entries written (${((deltaContent / expected.content) * 100).toFixed(1)}%)`;
+      contentCheck.message = `Only ${deltaContent}/${expectedNewContent} new content entries written (${((deltaContent / expectedNewContent) * 100).toFixed(1)}%)${existingNote(contentExisting)}`;
       warnings.push(contentCheck.message);
-    } else if (deltaContent >= expected.content) {
+    } else if (deltaContent >= expectedNewContent) {
       contentCheck.status = 'pass';
-      contentCheck.message = `✓ ${deltaContent} content entries written (expected ${expected.content})`;
+      contentCheck.message = `✓ ${deltaContent} new content entries written (expected ${expectedNewContent} new)${existingNote(contentExisting)}`;
     } else {
       contentCheck.status = 'pass';
       contentCheck.message = `${deltaContent} content entries written`;
@@ -484,21 +505,21 @@ export class SeedingVerification {
       name: 'paths_count',
       status: 'pass',
       message: '',
-      expected: expected.paths,
+      expected: expectedNewPaths,
       actual: deltaPaths,
     };
 
-    if (deltaPaths === 0 && expected.paths > 0) {
+    if (deltaPaths === 0 && expectedNewPaths > 0) {
       pathsCheck.status = 'fail';
-      pathsCheck.message = `No paths were written! Expected ${expected.paths}, got 0 new paths`;
+      pathsCheck.message = `No paths were written! Expected ${expectedNewPaths} new paths, got 0${existingNote(pathsExisting)}`;
       errors.push(pathsCheck.message);
-    } else if (deltaPaths < expected.paths) {
+    } else if (deltaPaths < expectedNewPaths) {
       pathsCheck.status = 'warn';
-      pathsCheck.message = `Only ${deltaPaths}/${expected.paths} paths written`;
+      pathsCheck.message = `Only ${deltaPaths}/${expectedNewPaths} new paths written${existingNote(pathsExisting)}`;
       warnings.push(pathsCheck.message);
     } else {
       pathsCheck.status = 'pass';
-      pathsCheck.message = `✓ ${deltaPaths} paths written (expected ${expected.paths})`;
+      pathsCheck.message = `✓ ${deltaPaths} new paths written (expected ${expectedNewPaths} new)${existingNote(pathsExisting)}`;
     }
     checks.push(pathsCheck);
     this.logCheck(pathsCheck);
@@ -524,7 +545,10 @@ export class SeedingVerification {
     console.log('📊 Post-flight Summary:');
     console.log(`   Content: ${preContent} → ${finalContent} (Δ ${deltaContent >= 0 ? '+' : ''}${deltaContent})`);
     console.log(`   Paths:   ${prePaths} → ${finalPaths} (Δ ${deltaPaths >= 0 ? '+' : ''}${deltaPaths})`);
-    console.log(`   Expected: ${expected.content} content, ${expected.paths} paths`);
+    console.log(`   Expected: ${expectedNewContent} new content, ${expectedNewPaths} new paths` +
+      (contentExisting > 0 || pathsExisting > 0
+        ? ` (already existing: ${contentExisting} content, ${pathsExisting} paths)`
+        : ''));
 
     if (success) {
       console.log('   ✅ Post-flight PASSED - seeding verified');

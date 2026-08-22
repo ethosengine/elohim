@@ -557,17 +557,53 @@ async function putAtom(storageUrl: string, atom: FinalizedAtom): Promise<EprAtom
   const apiKey = process.env.DOORWAY_API_KEY || process.env.STORAGE_API_KEY;
   if (apiKey) headers['X-API-Key'] = apiKey;
 
-  const response = await fetch(url, {
-    method: 'PUT',
-    headers,
-    body: JSON.stringify(atom.body),
-  });
+  // Catching-up (projector-backpressure) retry budget — the same bounded
+  // ladder doorway-client.ts hoists for every path it serves. This module
+  // PUTs with raw fetch (content-addressed CID URLs the client has no wrapper
+  // for), so it needs its own copy: under seed load the projector re-enters
+  // the `catching-up` admission state and SHEDS writes with
+  // 503 {"status":"catching-up"}. A shed write was REJECTED, not lost — retry
+  // until the projector drains, respecting Retry-After (capped), bounded.
+  const catchingUpMax = 12;
+  let response: Response;
+  let text: string;
+  for (let catchingUpAttempt = 0; ; catchingUpAttempt++) {
+    response = await fetch(url, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(atom.body),
+    });
 
-  if (response.ok) {
-    return { cid: cidStr, schemaKey: atom.schemaKey, skipped: false };
+    if (response.ok) {
+      return { cid: cidStr, schemaKey: atom.schemaKey, skipped: false };
+    }
+
+    text = await response.text();
+
+    const isCatchingUp =
+      response.status === 503 &&
+      (() => {
+        try {
+          return (JSON.parse(text) as { status?: string })?.status === 'catching-up';
+        } catch {
+          return false;
+        }
+      })();
+
+    if (isCatchingUp && catchingUpAttempt < catchingUpMax) {
+      const retryAfterRaw = response.headers.get('Retry-After');
+      const retryAfterSecs = retryAfterRaw ? parseInt(retryAfterRaw, 10) : NaN;
+      const delay = Math.min(Number.isFinite(retryAfterSecs) ? retryAfterSecs * 1000 : 5000, 15000);
+      console.log(
+        `   ⏳ Projector catching-up (503) on PUT ${url} — ` +
+          `retry ${catchingUpAttempt + 1}/${catchingUpMax} in ${delay / 1000}s`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      continue;
+    }
+
+    break;
   }
-
-  const text = await response.text();
 
   // A CID collision — an existing row under this CID whose stored canonical
   // bytes DIFFER from ours (storage answers 400 "… already exists with

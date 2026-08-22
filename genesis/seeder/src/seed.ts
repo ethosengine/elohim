@@ -863,8 +863,12 @@ interface HolochainConnection {
 interface SeedResult {
   contentAttempted: number;
   contentSucceeded: number;
+  /** Rows the bulk import reported as already existing — idempotent re-run skips, not failures. */
+  contentSkipped: number;
   pathsAttempted: number;
   pathsSucceeded: number;
+  /** Path rows the bulk import reported as already existing — idempotent re-run skips, not failures. */
+  pathsSkipped: number;
   sampleIds: string[];
 }
 
@@ -1022,8 +1026,10 @@ async function seedViaDoorway(): Promise<SeedResult> {
   const result: SeedResult = {
     contentAttempted: 0,
     contentSucceeded: 0,
+    contentSkipped: 0,
     pathsAttempted: 0,
     pathsSucceeded: 0,
+    pathsSkipped: 0,
     sampleIds: [],
   };
   timer.startPhase('Doorway Import');
@@ -1332,8 +1338,10 @@ async function seedViaDoorway(): Promise<SeedResult> {
       const elapsed = Date.now() - startTime;
       const rate = transformedItems.length / (elapsed / 1000);
 
-      // Track for verification
+      // Track for verification (skipped = already existing, an idempotent
+      // re-run success, not a shortfall)
       result.contentSucceeded = bulkResult.inserted;
+      result.contentSkipped = bulkResult.skipped;
 
       // Report errors if any
       if (bulkResult.errors.length > 0) {
@@ -1914,6 +1922,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
       const pathsRate = pathContentItems.length / (pathsElapsed / 1000);
 
       result.pathsSucceeded = pathsBulkResult.inserted;
+      result.pathsSkipped = pathsBulkResult.skipped;
 
       // Report errors if any
       if (pathsBulkResult.errors.length > 0) {
@@ -2148,7 +2157,14 @@ async function seed() {
   if (verification && connection) {
     console.log('\n🔬 Running post-flight verification...');
     const postflight = await verification.runPostflightVerification(
-      { content: seedResult.contentAttempted, paths: seedResult.pathsAttempted },
+      {
+        content: seedResult.contentAttempted,
+        paths: seedResult.pathsAttempted,
+        // Idempotent re-run accounting: already-existing rows are success, so
+        // post-flight only demands NEW rows for the remainder.
+        contentExisting: seedResult.contentSkipped,
+        pathsExisting: seedResult.pathsSkipped,
+      },
       seedResult.sampleIds.slice(0, 5)  // Verify first 5 sample IDs
     );
 
@@ -2181,9 +2197,10 @@ async function seed() {
     console.log(`   📈 Delta: +${postflight.delta.content} content, +${postflight.delta.paths} paths`);
     await connection.close();
     console.log('\n✅ Seeding verified successfully!');
-  } else if (seedResult.contentSucceeded !== seedResult.contentAttempted) {
+  } else if (seedResult.contentSucceeded + seedResult.contentSkipped !== seedResult.contentAttempted) {
     // Even without verification, warn if doorway reported failures
-    console.warn(`\n⚠️ Seeding completed with issues: ${seedResult.contentSucceeded}/${seedResult.contentAttempted} content items succeeded`);
+    // (already-existing skips are idempotent re-run success, not failures)
+    console.warn(`\n⚠️ Seeding completed with issues: ${seedResult.contentSucceeded} inserted + ${seedResult.contentSkipped} already existing of ${seedResult.contentAttempted} content items attempted`);
   }
 
   // ========================================
