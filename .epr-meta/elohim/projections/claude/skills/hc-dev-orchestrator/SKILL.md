@@ -180,6 +180,14 @@ PeerStatus heartbeat holds a fourth, unsupervised client — so `/health conduct
 `live↔dead` on a ~60 s cycle until storage restarts (backlog
 `storage-stale-app-interface-token-after-conductor-restart.md`).
 
+`storage-restart [peer…]` re-execs each storage peer in place from its captured `/proc` environ
+(conductors untouched; a chaos-re-keyed `AGENT_PUBKEY` survives). The mesh runs the
+**doorway-family debug** binary (`/projects/.cargo-target-pool/family/doorway/elohim__elohim-storage/dev/debug/elohim-storage`),
+not the release path the script defaults to — pass `STORAGE_BIN=<that path>` explicitly, and rebuild
+into that slot first (`CARGO_TARGET_DIR=<slot> cargo build --bin elohim-storage`) when a Rust cure
+must reach the mesh. The restart re-resolves every peer's pid into the household fixture: the a2o
+chaos drills kill and verify peers BY THAT PID, so a stale fixture reads as `kill ESRCH`.
+
 `just mesh monitor` (hc-mesh-monitor.py, port 4210 via the `mesh-monitor`
 devfile endpoint; honors `MESH_MONITOR_PORT`) serves the one-page live
 dashboard: component liveness, per-peer convergence gauges, a gate-legs
@@ -223,6 +231,16 @@ just test mesh '@act:i and @dataplane'
 scope argument makes it write a paths-less config so the run is actually scoped (cucumber merges a
 profile's `paths` with positionals otherwise). `@act:<i|ii|iii|host>` resolves to the act's baseline caps;
 an undeclared `@requires:` cap warns loudly once per run. Spec: `genesis/a2o/LAYERS.md`.
+
+Destructive steps (kill/restart/pin/delete) ride ONE gate — `substrate-scope.ts destructiveAllowed()`:
+the lane's declared `owned-substrate` cap (true only in `cluster-state.act1-household.yaml`), with
+`A2O_ALLOW_DESTRUCTIVE=1|0` as the operator override, never fail-open. So on this lane they RUN; two
+consequences are already handled by `hc-mesh.sh`: doorways launch with generous, overridable
+`DOORWAY_MEMBRANE_{SHAPE,CHALLENGE,BAN}_THRESHOLD` (every a2o request is one loopback client and the
+churn scenarios exceed the binary's 1200/min ban — a tripped membrane answers `403 x-membrane:deny`
+to the rest of the lane), and `storage-restart` refreshes fixture pids. A scoped run overwrites the
+full-lane cucumber JSON unless you pass your own `CUCUMBER_JSON_REPORT=<path>`; every run still mints
+its own run-identified sprint report.
 
 ## Build and gate
 
