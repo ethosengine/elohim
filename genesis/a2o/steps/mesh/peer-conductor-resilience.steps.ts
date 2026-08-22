@@ -37,6 +37,13 @@
  * DESTRUCTIVE STEPS — hold these until the caller says go:
  *   Given a peer conductor that restarts and invalidates previously issued app
  *         auth tokens                          (runs hc-mesh.sh conductors-restart)
+ *   Given the mesh conductors are restarted so the doorway must reconnect with
+ *         stale credentials                    (runs hc-mesh.sh conductors-restart;
+ *                                               the shared inducement leg for the
+ *                                               backoff / leak / churn scenarios —
+ *                                               nothing else makes the doorway
+ *                                               print "Reconnecting to conductor
+ *                                               in …" on a healthy mesh)
  *   When every main worker thread is parked at once
  *                                              (concurrency burst sized off the
  *                                               doorway's own worker-thread count)
@@ -45,7 +52,7 @@
  *   Given the SSR render isolate is busy with an in-flight render
  *                                              (concurrent render burst)
  * Both burst classes only issue ordinary HTTP GETs; neither signals a process.
- * The conductor restart is the only step that moves a process, and it does so
+ * The conductor restarts are the only steps that move a process, and they do so
  * through hc-mesh.sh — never a pkill/pgrep pattern (those match the runner's
  * own shell and self-kill the run).
  */
@@ -488,6 +495,59 @@ function meshScriptPath(): string {
   return fileURLToPath(new URL('../../../../app/elohim-app/scripts/hc-mesh.sh', import.meta.url));
 }
 
+/**
+ * Restart every mesh conductor through hc-mesh.sh — the only sanctioned way a
+ * step here moves a process. A restart invalidates issued app-auth tokens, so
+ * the doorway's pool workers and signal subscribers reconnect with stale
+ * tokens: auth-reject → ladder-climb → re-mint. That cycle is what makes the
+ * "Reconnecting to conductor in …" log lines, the session-gauge churn, and the
+ * reconnectAttempts counters actually move — on a healthy mesh nothing else
+ * induces them. Callers gate on destructiveAllowed() BEFORE reaching this.
+ */
+function restartMeshConductors(): void {
+  const fixture = mesh();
+  assert.equal(
+    fixture.processControl,
+    true,
+    `restarting a conductor needs process control over this mesh: ${
+      fixture.processControlReason ?? 'the manifest does not declare processControl: true'
+    }`
+  );
+  const script = meshScriptPath();
+  // Exact script, exact subcommand — never a pkill/pgrep pattern.
+  const result = spawnSync(BASH_BIN, [script, 'conductors-restart'], {
+    encoding: 'utf8',
+    timeout: 300_000,
+  });
+  assert.equal(
+    result.status,
+    0,
+    `${script} conductors-restart exited ${String(result.status)}: ${(result.stderr ?? '').slice(-2000)}`
+  );
+}
+
+/**
+ * Shared inducement leg for the backoff / leak / churn scenarios (1, 2, 3, 5).
+ * Their When/Then chains OBSERVE reconnect cycles; this Given is what CAUSES
+ * them. Same gate, same subcommand as the scenario-4 restart step — held
+ * ('skipped', never 'pending') unless A2O_ALLOW_DESTRUCTIVE=1, so an ungated
+ * run skips the scenario immediately instead of red-waiting on log lines that
+ * nothing induces.
+ */
+Given(
+  'the mesh conductors are restarted so the doorway must reconnect with stale credentials',
+  { timeout: STEP_LONG_MS },
+  function (this: E2EWorld) {
+    if (!destructiveAllowed()) {
+      return holdDestructive(
+        'this step would run `hc-mesh.sh conductors-restart`, restarting EVERY conductor in this mesh ' +
+          'to induce the auth-reject → ladder-climb → re-mint cycle the scenario observes'
+      );
+    }
+    restartMeshConductors();
+  }
+);
+
 /** Assert the pool-health fields cannot disagree with each other. */
 function assertPoolCoupling(health: HealthSurface): void {
   const c = health.conductor;
@@ -785,28 +845,10 @@ Given(
         'this step would run `hc-mesh.sh conductors-restart`, restarting EVERY conductor in this mesh'
       );
     }
-    const fixture = mesh();
-    assert.equal(
-      fixture.processControl,
-      true,
-      `restarting a conductor needs process control over this mesh: ${
-        fixture.processControlReason ?? 'the manifest does not declare processControl: true'
-      }`
-    );
     // Baselines BEFORE the restart, so the re-mint assertion counts only what
     // this scenario caused.
     ctx(this).remintBaseline = countOccurrences(doorwayLog(), REMINT_LOG_LINE);
-    const script = meshScriptPath();
-    // Exact script, exact subcommand — never a pkill/pgrep pattern.
-    const result = spawnSync(BASH_BIN, [script, 'conductors-restart'], {
-      encoding: 'utf8',
-      timeout: 300_000,
-    });
-    assert.equal(
-      result.status,
-      0,
-      `${script} conductors-restart exited ${String(result.status)}: ${(result.stderr ?? '').slice(-2000)}`
-    );
+    restartMeshConductors();
   }
 );
 

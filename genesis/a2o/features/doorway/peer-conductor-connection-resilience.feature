@@ -27,24 +27,35 @@ Feature: Doorway peer-conductor connections back off and do not leak
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
 
-  @act:i
+  # @requires:owned-substrate — these scenarios restart the mesh's conductors
+  # to CAUSE the reconnect cycles they observe (a restart invalidates issued
+  # app-auth tokens, so every doorway session reconnects with stale
+  # credentials: auth-reject → backoff ladder → token re-mint). The run must
+  # therefore own the substrate it bounces; the restart leg additionally holds
+  # itself ('skipped') unless A2O_ALLOW_DESTRUCTIVE=1, because the mesh is
+  # shared.
+
+  @act:i @requires:owned-substrate
   Scenario: Auth-rejected peer conductor is retried with exponential backoff
     Given a peer conductor in the pool accepts WebSocket connections but rejects the authenticate handshake
+    And the mesh conductors are restarted so the doorway must reconnect with stale credentials
     When the doorway's worker attempts to connect 5 times
     Then each retry delay at least doubles the previous delay up to the 30 second cap
     And the doorway marks the conductor pool unhealthy while disconnected
     And the doorway's other pool conductors continue serving requests
 
-  @act:i
+  @act:i @requires:owned-substrate
   Scenario: Unstable sessions do not reset the backoff clock
     Given a peer conductor that accepts connections but drops every session within 2 seconds
+    And the mesh conductors are restarted so the doorway must reconnect with stale credentials
     When the doorway reconnects through 5 flap cycles
     Then the reconnect delay keeps growing across cycles instead of resetting to the floor
     And the backoff resets only after a session stays healthy for the minimum stable window
 
-  @act:i
+  @act:i @requires:owned-substrate
   Scenario: Reconnect cycles do not leak connection tasks
     Given the doorway is connected to a peer conductor with an active signal subscriber
+    And the mesh conductors are restarted so the doorway must reconnect with stale credentials
     When the conductor session drops and reconnects 10 times
     Then the doorway holds exactly one live connection task per conductor worker
     And the doorway's task count stays flat across the cycles
@@ -56,9 +67,10 @@ Feature: Doorway peer-conductor connections back off and do not leak
     Then the doorway re-mints an app auth token from the conductor admin interface
     And zome calls through that conductor pool succeed within the recovery window
 
-  @act:i
+  @act:i @requires:owned-substrate
   Scenario: Reconnect churn is visible to operators
     Given a peer conductor that drops its signal subscriber session repeatedly
+    And the mesh conductors are restarted so the doorway must reconnect with stale credentials
     When the operator reads the doorway status endpoint
     Then the peer health snapshot shows a growing reconnect attempt count for that conductor
     And the peer is marked degraded with reason "reconnecting"
