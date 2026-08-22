@@ -592,8 +592,36 @@ Given(
 /** Capture of the last GET /p2p/status taken by this file's steps. */
 const p2pStatusStore = new WeakMap<E2EWorld, Record<string, unknown>>();
 
+/**
+ * undici keeps a keep-alive socket per origin. After `storage-restart` that
+ * pooled socket still points at the PRE-restart process: the restart script
+ * verified `/health` from its own curl, so the first in-process request after
+ * the restart finds the old socket half-closed and fails with
+ * `SocketError: other side closed` (2026-08-22 household run
+ * 20260822T201747Z-3bd326d6) — a client artifact, not a storage answer. Retry
+ * the read on that one error class so the assertion reads the NEW process.
+ */
+async function getJsonFromAfterRestart(
+  base: string,
+  path: string
+): Promise<{ status: number; body: unknown }> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      return await getJsonFrom(base, path);
+    } catch (error) {
+      const text = String((error as { cause?: unknown })?.cause ?? error);
+      const staleSocket = /other side closed|ECONNRESET|ECONNREFUSED|socket hang up/i.test(text);
+      if (!staleSocket) throw error;
+      lastError = error;
+      await new Promise(r => setTimeout(r, 1_000));
+    }
+  }
+  throw lastError;
+}
+
 When(String.raw`I GET \/p2p\/status`, async function (this: E2EWorld) {
-  const { status, body } = await getJsonFrom(storageUrl(), '/p2p/status');
+  const { status, body } = await getJsonFromAfterRestart(storageUrl(), '/p2p/status');
   assert.equal(status, 200, `GET /p2p/status returned ${status}`);
   p2pStatusStore.set(this, body as Record<string, unknown>);
 });

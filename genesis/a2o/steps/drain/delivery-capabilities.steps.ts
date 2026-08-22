@@ -262,9 +262,39 @@ Given("this run owns the doorway's request budget", function (this: E2EWorld) {
 
 interface ReseedState {
   slug: string;
+  /** The content address the doorway SERVED before the re-seed (X-Content-Address). */
   originalHash: string | null;
+  /** The storage row's blobHash before the re-seed — what cleanup restores. */
+  storedBlobHash: string | null;
 }
 const reseedStore = new WeakMap<E2EWorld, ReseedState>();
+
+/** The doorway reports the served bundle's address as X-Content-Address on every app
+ *  file response (doorway-service/src/routes/apps.rs `build_app_response`); X-Blob-Hash
+ *  exists only on the `_capability` probe. Reading the wrong header made both sides
+ *  `null` and the eviction unobservable (run 20260822T201747Z-3bd326d6). */
+function servedContentAddress(headers: Record<string, unknown>): string | null {
+  return (headers['x-content-address'] as string | undefined) ?? null;
+}
+
+/** Authorization the mesh's admin write routes accept; absent on substrates without one. */
+function adminHeaders(): Record<string, string> {
+  const key = process.env['API_KEY_ADMIN'];
+  return key ? { authorization: `Bearer ${key}` } : {};
+}
+
+/** PATCH one row's blobHash on the primary storage peer; returns the status and body. */
+async function patchBlobHash(
+  slug: string,
+  blobHash: string
+): Promise<{ status: number; text: string }> {
+  const { statusCode, body } = await request(`${storageUrl()}/db/content/${slug}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...adminHeaders() },
+    body: JSON.stringify({ blobHash }),
+  });
+  return { status: statusCode, text: await body.text() };
+}
 
 Given(
   'the projection cache for {string} is warm with blob_hash {string}',
@@ -277,11 +307,18 @@ Given(
       statusCode >= 200 && statusCode < 400,
       `warming "${slug}" through ${base} returned ${statusCode}`
     );
-    const observed = (headers['x-blob-hash'] as string | undefined) ?? null;
+    const observed = servedContentAddress(headers);
+    // The storage row is the thing the re-seed moves and cleanup must put back.
+    const { body: row } = await getJson(`${storageUrl()}/db/content/${slug}`);
+    const storedBlobHash = (row as Record<string, unknown> | null)?.['blobHash'];
     // The scenario's literal "sha256-old" is a stand-in for "whatever hash is
     // cached right now": the contract is that the CACHED hash is superseded,
     // not that it equals a particular string.
-    reseedStore.set(this, { slug, originalHash: observed });
+    reseedStore.set(this, {
+      slug,
+      originalHash: observed,
+      storedBlobHash: typeof storedBlobHash === 'string' ? storedBlobHash : null,
+    });
   }
 );
 
@@ -291,15 +328,43 @@ When('{string} is re-seeded with a new ZIP blob', async function (this: E2EWorld
   }
   const state = reseedStore.get(this);
   assert.ok(state, 'no warm-cache baseline — the "is warm with blob_hash" Given must run first');
-  const { statusCode, body } = await request(`${storageUrl()}/db/content/${slug}`, {
-    method: 'PATCH',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ blobHash: `sha256-a2o-reseed-${Date.now()}` }),
-  });
-  const text = await body.text();
   assert.ok(
-    statusCode >= 200 && statusCode < 300,
-    `re-seeding "${slug}" returned ${statusCode}: ${text.slice(0, 300)}`
+    state.storedBlobHash,
+    `storage holds no blobHash for "${slug}" — nothing to supersede or restore`
+  );
+  // "A new ZIP blob" must be a REAL bundle the peer holds, so the app keeps
+  // serving during the scenario and the new address is observable end to end.
+  // The previous shape PATCHed a fabricated `sha256-a2o-reseed-<ts>` and never
+  // restored it: the row pointed at bytes nobody had, doorway A served 404 for
+  // the app from then on, and four delivery-diagnostics scenarios in other
+  // runs went red on a fixture this step had poisoned (2026-08-22). The
+  // landing bundle is the stand-in: seeded on every household peer by the
+  // Prologue, a ZIP with its own index.html.
+  const { status: donorStatus, body: donor } = await getJson(
+    `${storageUrl()}/db/content/elohim-host-landing`
+  );
+  assert.equal(donorStatus, 200, `GET /db/content/elohim-host-landing returned ${donorStatus}`);
+  const newHash = (donor as Record<string, unknown>)['blobHash'];
+  assert.ok(
+    typeof newHash === 'string' && newHash !== state.storedBlobHash,
+    `no distinct donor bundle to re-seed "${slug}" with (landing blobHash ${String(newHash)})`
+  );
+  // Restore the row when the scenario ends, whatever happens in between — a
+  // moved head on a shared mesh is exactly the kind of change that outlives
+  // the run that made it. Same gate as the move itself.
+  const restoreTo = state.storedBlobHash;
+  this.onCleanup(async () => {
+    const { status, text } = await patchBlobHash(slug, restoreTo);
+    if (status < 200 || status >= 300) {
+      console.warn(
+        `  ⚠️  could not restore "${slug}" blobHash to ${restoreTo} (${status}): ${text.slice(0, 200)}`
+      );
+    }
+  });
+  const { status, text } = await patchBlobHash(slug, newHash);
+  assert.ok(
+    status >= 200 && status < 300,
+    `re-seeding "${slug}" returned ${status}: ${text.slice(0, 300)}`
   );
   return undefined;
 });
@@ -317,7 +382,7 @@ Then(
     let observed: string | null = null;
     while (Date.now() < deadline) {
       const { headers } = await request(`${base}/apps/${slug}/index.html`);
-      observed = (headers['x-blob-hash'] as string | undefined) ?? null;
+      observed = servedContentAddress(headers);
       if (observed !== state.originalHash) return;
       await new Promise(r => setTimeout(r, 3_000));
     }
@@ -348,7 +413,7 @@ Then('the new response is cached with the new blob_hash', async function (this: 
   const state = reseedStore.get(this);
   assert.ok(state, 'no warm-cache baseline');
   const { headers } = await request(`${base}/apps/${state.slug}/index.html`);
-  const hash = (headers['x-blob-hash'] as string | undefined) ?? null;
+  const hash = servedContentAddress(headers);
   assert.ok(
     hash !== null && hash !== state.originalHash,
     `expected the re-warmed cache to carry a NEW blob hash; got ${String(hash)} ` +
