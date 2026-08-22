@@ -22,20 +22,23 @@ Feature: User-controlled sync — mobile, wifi, and the operator's data plan
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
 
-  # --- Failure Regression: silent cellular sync ---
+  # --- Failure Regression: the default posture must be explicit, never absent ---
 
   @regression @act:i @requires:owned-substrate
-  Scenario: Without sync mode control, mobile device burns cellular data
-    Given device "2019 Android Phone" from the device portfolio
-    # 3GB RAM, carrier-grade NAT, 4G cellular as the only network
-    And the device is currently on cellular (not wifi)
-    And the peer has no sync-mode preference set
-    When 5 connected peers gossip 50 MB of new content over an hour
-    Then the device transfers ~50 MB over cellular without user consent
-    # Operational parameter: 50 MB / hour cellular = ~36 GB / month idle
-    # Constraint: any default that syncs over cellular is hostile to phone operators.
-    # Discovery anchor: 2026-04-29 brainstorm — the protocol must default to wifi-only
-    # for mobile archetypes, otherwise adoption capped to wifi-only households.
+  Scenario: Fresh peer with no operator preference syncs by default, observably
+    Given the peer has no sync-mode preference set
+    Then the P2P status reports syncMode "sync" and networkClass "unknown"
+    And the P2P status reports sync running with empty syncReasons
+    # syncReasons is the list naming whatever currently holds sync back
+    # (operator pause, wifi-only-on-cellular, import, bulk write, drain
+    # backlog) — empty means nothing is holding it.
+    # Regression guard: before the unified SyncGate (2026-08-22), /p2p/status
+    # carried no syncMode field — "no preference" was an ABSENT value, so an
+    # operator could not tell a syncing peer from a silently paused one. The
+    # default is now explicit and observable: syncMode "sync", networkClass
+    # "unknown", syncPaused false, syncReasons []. A fresh node must never
+    # silently start paused. Archetype-tuned defaults (phones -> wifi-only,
+    # so cellular data plans are not burned) are the scenario outline below.
 
   # --- Capability Proof: the three modes ---
 

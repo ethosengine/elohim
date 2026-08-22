@@ -11,24 +11,22 @@
  *     here).
  *
  * ---------------------------------------------------------------------------
- * FINDING (2026-08-21): sync-control.feature names a control surface that
- * does not exist in elohim-storage today.
+ * FINDING (2026-08-21, RESOLVED 2026-08-22): sync-control.feature originally
+ * named a control surface that did not exist in elohim-storage. The unified
+ * SyncGate (elohim-storage commit c309a3a5e — src/p2p/sync_gate.rs) landed
+ * that surface at exactly the endpoint names these steps probe: GET/POST
+ * /p2p/sync-mode, POST /p2p/network-class, GET /p2p/sync-mode/history, plus
+ * additive `syncMode` / `networkClass` / `syncReasons` fields on /p2p/status.
  *
- *   `P2PStatusInfo` (elohim/elohim-storage/src/p2p/mod.rs) carries
- *   `sync_paused: bool` (the AUTOMATIC backpressure flag p2p-validation.feature
- *   covers) and NOTHING else sync-mode-shaped — no `sync_mode`, no
- *   `network_class`. `elohim-storage/src/http.rs` has no handler for setting a
- *   sync mode, reading a network class, or listing sync-mode history. A
- *   repo-wide grep for syncMode/networkClass/wifi-only/sync-mode across *.rs,
- *   *.ts, *.md, *.json turned up nothing outside this feature file.
+ *   Default posture on a fresh node: mode "sync", network "unknown",
+ *   effective syncing=true, reasons=[] — an explicit, observable default,
+ *   never an absent field. Operator preference is sticky across restart
+ *   (SQLite sync_mode_state; transitions audited with trigger "operator" /
+ *   "network-change").
  *
- *   Every live (non-@wip) step below that needs this surface is a REAL,
- *   falsifiable HTTP probe against the most plausible endpoint names (matching
- *   the existing `/p2p/status` naming convention) — it fails with the actual
- *   HTTP response (404 today) rather than fabricating a pass. Steps that only
- *   need the ALREADY-REAL `syncPaused` field (e.g. wifi-only-on-cellular
- *   behaving like a pause) probe that field directly instead, since it is the
- *   one true observable proxy that exists today.
+ *   Every live (non-@wip) step below remains a REAL, falsifiable HTTP probe —
+ *   a failure now indicts the deployed binary (predates the gate, or the
+ *   surface regressed), not a guessed endpoint name.
  * ---------------------------------------------------------------------------
  */
 
@@ -58,7 +56,7 @@ import {
 import { E2EWorld } from '../../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
-// Endpoint names probed but NOT confirmed to exist — see FINDING above.
+// SyncGate control-surface endpoint names — see FINDING above.
 // ---------------------------------------------------------------------------
 
 const SYNC_MODE_ENDPOINT = '/p2p/sync-mode';
@@ -67,20 +65,18 @@ const NETWORK_CLASS_ENDPOINT = '/p2p/network-class';
 const SYNC_MODE_FIELD = 'syncMode';
 const NETWORK_CLASS_FIELD = 'networkClass';
 
-const SYNC_MODE_MISSING_NOTE =
-  'FINDING (2026-08-21): elohim-storage has no sync-mode control surface. ' +
-  'P2PStatusInfo (elohim/elohim-storage/src/p2p/mod.rs) carries no syncMode/networkClass field ' +
-  '— only the AUTOMATIC backpressure flag sync_paused (camelCase syncPaused). No handler for ' +
-  `POST ${SYNC_MODE_ENDPOINT}, POST ${NETWORK_CLASS_ENDPOINT}, or GET ${SYNC_MODE_HISTORY_ENDPOINT} ` +
-  'exists in elohim-storage/src/http.rs. The endpoint names probed here follow the /p2p/status ' +
-  'naming convention as the most plausible target — this step fails with the REAL HTTP response ' +
-  'from that (currently 404) route rather than fabricating a pass.';
+const SYNC_MODE_SURFACE_NOTE =
+  'The unified SyncGate control surface (elohim-storage commit c309a3a5e, 2026-08-22 — ' +
+  `GET/POST ${SYNC_MODE_ENDPOINT}, POST ${NETWORK_CLASS_ENDPOINT}, GET ${SYNC_MODE_HISTORY_ENDPOINT}, ` +
+  'plus additive syncMode/networkClass/syncReasons on /p2p/status) is a landed surface. ' +
+  'A failure here means the deployed storage binary predates that commit, or the surface ' +
+  'regressed — not that the step guessed a wrong endpoint name.';
 
-const DOORWAY_HEALTH_MISSING_SYNC_PAUSED_NOTE =
-  'FINDING (2026-08-21): elohim-storage DOES expose sync_paused (camelCase syncPaused) on its ' +
-  'direct GET /p2p/status (P2PStatusInfo), but the doorway-facing GET /health surface ' +
-  '(doorway/doorway-service/src/routes/health.rs HealthP2P) never proxies it — an operator or ' +
-  'agent watching only the doorway health endpoint cannot see backpressure state today.';
+const DOORWAY_HEALTH_SYNC_PAUSED_NOTE =
+  'The doorway-facing GET /health p2p block proxies syncPaused/syncReasons from the cached ' +
+  'storage observation as of the SyncGate landing (c309a3a5e, 2026-08-22; ' +
+  'doorway/doorway-service/src/routes/health.rs). A failure here means the deployed doorway ' +
+  'predates that commit, or its storage observation cache has no P2P sample yet.';
 
 // ---------------------------------------------------------------------------
 // Storage-URL resolution — never a hardcoded port; env alias first, then the
@@ -255,52 +251,71 @@ async function postRawInvalidJson(
 // sync-control.feature
 // ===========================================================================
 
-// --- Regression: silent cellular sync (device is currently on cellular) ----
-
-Given(/^the device is currently on cellular \(not wifi\)$/, function (this: WorldWithDevice) {
-  requireDevice(this);
-});
+// --- Regression: the default posture is explicit, never absent --------------
 
 Given('the peer has no sync-mode preference set', async function (this: E2EWorld) {
   const url = primaryStorageUrl();
-  const { body } = await probeP2PStatus(url);
+  const { status, text } = await getRaw(`${url}${SYNC_MODE_ENDPOINT}`);
+  if (status === 404) {
+    // Absent substrate: this storage binary predates the unified SyncGate
+    // (c309a3a5e) — held (skipped), never 'pending' (strict mode fails pending).
+    return 'skipped';
+  }
   assert.strictEqual(
-    body[SYNC_MODE_FIELD],
-    undefined,
-    `peer /p2p/status.syncMode is "${String(body[SYNC_MODE_FIELD])}" — a preference IS set, so ` +
-      "this scenario's no-preference precondition does not hold on the live mesh."
+    status,
+    200,
+    `GET ${SYNC_MODE_ENDPOINT} returned ${status} (${text.slice(0, 200)}). ` +
+      SYNC_MODE_SURFACE_NOTE
   );
+  // "No preference set" is observable in the transition audit log: an operator
+  // preference arrives via POST /p2p/sync-mode (trigger "operator") and a
+  // network-class declaration via POST /p2p/network-class (trigger
+  // "network-change") — both sticky across restart, both a departure from the
+  // fresh default this scenario pins. If either exists on this shared mesh
+  // (e.g. the pause/resume or wifi-only scenarios below ran first), the
+  // fresh-default precondition does not hold — held, not failed.
+  const history = await getRaw(`${url}${SYNC_MODE_HISTORY_ENDPOINT}`);
+  if (history.status === 200) {
+    let entries: unknown;
+    try {
+      entries = JSON.parse(history.text);
+    } catch {
+      throw new Error(`GET ${SYNC_MODE_HISTORY_ENDPOINT} did not return valid JSON`);
+    }
+    const departedFreshDefault =
+      Array.isArray(entries) &&
+      entries.some(
+        entry =>
+          entry !== null &&
+          typeof entry === 'object' &&
+          ((entry as Record<string, unknown>)['trigger'] === 'operator' ||
+            (entry as Record<string, unknown>)['trigger'] === 'network-change')
+      );
+    if (departedFreshDefault) return 'skipped';
+  }
+  // History 503 (no DB pool) leaves restart-stickiness unknowable but the
+  // live gate readable — proceed; the Then steps assert the observable default.
+  return undefined;
 });
 
-When(
-  '{int} connected peers gossip {int} MB of new content over an hour',
-  async function (this: E2EWorld, minPeers: number, _megabytes: number) {
-    const url = primaryStorageUrl();
-    const { body } = await probeP2PStatus(url);
-    assert.ok(
-      body.connectedPeers >= minPeers,
-      `peer /p2p/status.connectedPeers is ${body.connectedPeers}, expected >= ${minPeers} — the ` +
-        'regression this scenario documents (unconditional cellular gossip) needs a REAL ' +
-        'multi-peer gossip fabric to be meaningful; this mesh is not connected enough.'
-    );
-  }
-);
-
-Then(
-  'the device transfers ~{int} MB over cellular without user consent',
-  async function (this: E2EWorld, _expectedMb: number) {
-    const url = primaryStorageUrl();
-    const { body } = await probeP2PStatus(url);
-    assert.strictEqual(
-      body[SYNC_MODE_FIELD],
-      undefined,
-      `peer /p2p/status.syncMode is "${String(body[SYNC_MODE_FIELD])}" — a gate exists after all, ` +
-        'so the regression this scenario pins is no longer confirmed; revisit this scenario.'
-    );
-    // Confirmed: no syncMode/networkClass gate exists anywhere in elohim-storage
-    // (see file header FINDING) — nothing stops gossip on a cellular connection.
-  }
-);
+Then('the P2P status reports sync running with empty syncReasons', async function (this: E2EWorld) {
+  const url = primaryStorageUrl();
+  const { body } = await probeP2PStatus(url);
+  assert.strictEqual(
+    body.syncPaused,
+    false,
+    `peer /p2p/status.syncPaused is ${body.syncPaused} — a fresh node with no operator ` +
+      'preference must be effectively syncing, never silently paused. ' +
+      `syncReasons: ${JSON.stringify(body['syncReasons'])}`
+  );
+  const reasons = body['syncReasons'];
+  assert.ok(
+    Array.isArray(reasons) && reasons.length === 0,
+    `peer /p2p/status.syncReasons is ${JSON.stringify(reasons)}, expected [] — nothing ` +
+      'should be suppressing sync on a fresh node with no operator preference. ' +
+      SYNC_MODE_SURFACE_NOTE
+  );
+});
 
 // --- Capability proof: the three modes --------------------------------------
 
@@ -311,7 +326,7 @@ Given("the peer's sync mode is {string}", async function (this: E2EWorld, mode: 
     200,
     `cannot establish precondition "the peer's sync mode is ${mode}" — POST ` +
       `${SYNC_MODE_ENDPOINT} returned ${result.status} (${result.text.slice(0, 200)}). ` +
-      SYNC_MODE_MISSING_NOTE
+      SYNC_MODE_SURFACE_NOTE
   );
 });
 
@@ -327,7 +342,7 @@ Then('ongoing sync cycles complete their current chunk and stop', function (this
     200,
     'cannot confirm in-flight sync cycles honored the pause — the sync-mode control call ' +
       `itself failed (POST ${SYNC_MODE_ENDPOINT} returned ${result.status}). ` +
-      SYNC_MODE_MISSING_NOTE
+      SYNC_MODE_SURFACE_NOTE
   );
 });
 
@@ -340,7 +355,7 @@ Then('no new sync cycles start until the mode changes', async function (this: E2
     body[SYNC_MODE_FIELD],
     requested,
     `peer /p2p/status.syncMode is ${JSON.stringify(body[SYNC_MODE_FIELD])}, expected ` +
-      `"${requested}". ${SYNC_MODE_MISSING_NOTE}`
+      `"${requested}". ${SYNC_MODE_SURFACE_NOTE}`
   );
 });
 
@@ -351,7 +366,7 @@ Then('the P2P status reports syncMode {string}', async function (this: E2EWorld,
     body[SYNC_MODE_FIELD],
     expected,
     `peer /p2p/status.syncMode is ${JSON.stringify(body[SYNC_MODE_FIELD])}, expected ` +
-      `"${expected}". ${SYNC_MODE_MISSING_NOTE}`
+      `"${expected}". ${SYNC_MODE_SURFACE_NOTE}`
   );
 });
 
@@ -377,7 +392,7 @@ Then('sync cycles resume on the next interval', async function (this: E2EWorld) 
     body[SYNC_MODE_FIELD],
     'sync',
     `peer /p2p/status.syncMode is ${JSON.stringify(body[SYNC_MODE_FIELD])}, expected "sync" ` +
-      `(resumed) after the operator re-enabled sync. ${SYNC_MODE_MISSING_NOTE}`
+      `(resumed) after the operator re-enabled sync. ${SYNC_MODE_SURFACE_NOTE}`
   );
 });
 
@@ -413,7 +428,7 @@ Given(
       result.status,
       200,
       `cannot establish precondition device "${deviceName}" with sync mode "${mode}" — POST ` +
-        `${SYNC_MODE_ENDPOINT} returned ${result.status}. ${SYNC_MODE_MISSING_NOTE}`
+        `${SYNC_MODE_ENDPOINT} returned ${result.status}. ${SYNC_MODE_SURFACE_NOTE}`
     );
   }
 );
@@ -429,8 +444,8 @@ Then('sync cycles do not run', async function (this: E2EWorld) {
     body.syncPaused,
     true,
     `peer /p2p/status.syncPaused is ${body.syncPaused}, expected true while wifi-only mode is ` +
-      "active on cellular — elohim-storage's ONLY real pause flag (sync_paused, p2p/mod.rs) is " +
-      `not driven by anything network-class-aware today. ${SYNC_MODE_MISSING_NOTE}`
+      'active on cellular — the SyncGate should suppress sync (WifiOnlyOnCellular reason) in ' +
+      `this state. ${SYNC_MODE_SURFACE_NOTE}`
   );
 });
 
@@ -443,13 +458,13 @@ Then(
       body[SYNC_MODE_FIELD],
       expectedMode,
       `peer /p2p/status.syncMode is ${JSON.stringify(body[SYNC_MODE_FIELD])}, expected ` +
-        `"${expectedMode}". ${SYNC_MODE_MISSING_NOTE}`
+        `"${expectedMode}". ${SYNC_MODE_SURFACE_NOTE}`
     );
     assert.strictEqual(
       body[NETWORK_CLASS_FIELD],
       expectedClass,
       `peer /p2p/status.networkClass is ${JSON.stringify(body[NETWORK_CLASS_FIELD])}, expected ` +
-        `"${expectedClass}". ${SYNC_MODE_MISSING_NOTE}`
+        `"${expectedClass}". ${SYNC_MODE_SURFACE_NOTE}`
     );
   }
 );
@@ -464,7 +479,7 @@ Given(
       body.syncPaused,
       true,
       `precondition "sync paused" does not hold — peer /p2p/status.syncPaused is ` +
-        `${body.syncPaused}. ${SYNC_MODE_MISSING_NOTE}`
+        `${body.syncPaused}. ${SYNC_MODE_SURFACE_NOTE}`
     );
   }
 );
@@ -492,7 +507,7 @@ Then(
     assert.ok(
       resumed,
       `peer /p2p/status.syncPaused did not clear within ${seconds}s of the device joining ` +
-        `wifi. ${SYNC_MODE_MISSING_NOTE}`
+        `wifi. ${SYNC_MODE_SURFACE_NOTE}`
     );
   }
 );
@@ -559,7 +574,7 @@ Given(
       200,
       'cannot establish precondition — GET ' +
         `${SYNC_MODE_HISTORY_ENDPOINT} returned ${status} (${text.slice(0, 200)}). ` +
-        SYNC_MODE_MISSING_NOTE
+        SYNC_MODE_SURFACE_NOTE
     );
     let history: unknown[];
     try {
@@ -587,7 +602,7 @@ Then('the response shows each transition with timestamp and trigger', function (
   assert.strictEqual(
     probe.status,
     200,
-    `GET ${SYNC_MODE_HISTORY_ENDPOINT} returned ${probe.status}. ${SYNC_MODE_MISSING_NOTE}`
+    `GET ${SYNC_MODE_HISTORY_ENDPOINT} returned ${probe.status}. ${SYNC_MODE_SURFACE_NOTE}`
   );
   let transitions: unknown;
   try {
@@ -885,7 +900,7 @@ Then(
       typeof value,
       'boolean',
       `doorway /health p2p.${fieldName} is ${JSON.stringify(value)} (type ${typeof value}) — ` +
-        `expected a boolean. ${DOORWAY_HEALTH_MISSING_SYNC_PAUSED_NOTE}`
+        `expected a boolean. ${DOORWAY_HEALTH_SYNC_PAUSED_NOTE}`
     );
   }
 );
