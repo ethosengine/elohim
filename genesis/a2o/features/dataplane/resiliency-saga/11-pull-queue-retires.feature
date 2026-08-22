@@ -31,13 +31,15 @@
 # unsatisfiable want, set aside by the cure below), or terminal `failed`
 # (the pre-cure regression state this chapter proves no longer persists).
 #
-# jessica is a fixture household human (same convention as the fixture
-# humans used elsewhere in this suite): her node is NOT one of the live
-# alpha-lettered peers this chapter's live scenarios observe, and it is
-# instantiated directly by the two @wip scenarios below, not by anything
-# in the live Background. Her pin is the motivating human case for why a
-# stuck queue matters; only a fixture lane can hold a pin of hers
-# mid-exhaustion long enough to assert against it — this live lane cannot.
+# jessica is a household human (same cast as the rest of this suite): her
+# node is NOT one of the live alpha-lettered peers this chapter's live
+# scenarios observe. On the Act I household lane — the lane that OWNS its
+# substrate (cluster-state.act1-household.yaml: owned-substrate) — her node
+# is the mesh's own jessica peer, addressed directly by the exhaustion
+# scenario below, not by anything in the live Background. Her pin is the
+# motivating human case for why a stuck queue matters; only a lane that owns
+# its peers can hold a pin of hers mid-exhaustion long enough to assert
+# against it — the shared-fleet lane cannot.
 #
 # Fabric topology this chapter's Background assumes: alpha, the 6-peer
 # household+multi-tenant fabric documented in resiliency-saga/README.md, of
@@ -52,9 +54,10 @@
 # titled for what they OBSERVE, not for a fault they cause: a healthy node
 # reaching caught-up, and its retirement accounting being published. The full
 # cause-and-effect chain (an unsatisfiable pin, its retry budget exhausting,
-# and the resulting retirement) is proof-carried by the two @wip fixture-lane
-# scenarios below, which state that chain explicitly because a fixture lane,
-# unlike this live lane, can construct it.
+# and the resulting retirement) is proof-carried by the owned-substrate
+# scenarios below (exhaustion runs on the household lane today; re-admission
+# is still @wip), which state that chain explicitly because a lane that owns
+# its peers, unlike this live lane, can construct it.
 #
 # Regression note (observed 2026-07-30/31, 12h+ sustained): alpha-A ran 73
 # total / 3 fetched / 70 failed, caughtUp false, the whole time. Acquisition
@@ -90,14 +93,14 @@
 #
 # This chapter's two live scenarios prove those two series are PUBLISHED
 # (reachable, distinct); they do not themselves observe a pin transitioning
-# either direction — that causal proof is the @wip scenarios below. Retirement
+# either direction — that causal proof is the owned-substrate scenarios below. Retirement
 # only fires once every CONNECTED peer has been asked: the per-item retry
 # budget is sized from the live peer count (`max(3, connected peers)`),
 # because the dispatch rotation walks a different provider per retry. Three
 # retries on a 6-peer fabric would have retired pins after probing half of it
 # — a false negative, not a bounded one. This sizing rule is a design
 # parameter this live lane does not observe directly; it becomes assertable
-# in the @wip scenarios below.
+# in the owned-substrate scenarios below.
 #
 # Residue, stated plainly (two open gaps this chapter does not close):
 #   - Provide-loop consequence: this chapter's proof stops at
@@ -120,11 +123,11 @@ Feature: Chapter 11 — the pull queue can finish
   series (a count and a labeled reason total) are published rather than
   absent — visible to an OPERATOR today, so "everything arrived" can be told
   apart from "unsatisfiable wants were set aside." (A person-facing notice is
-  a separate, unclosed gap — see Residue in the header comment above.) The two @wip scenarios below
-  NAME the causal proof this live lane cannot construct — a pin actually
-  exhausting its budget, retiring, and being counted — but do not yet run
-  one; they are blocked on a fixture that does not exist yet (see their
-  station comments).
+  a separate, unclosed gap — see Residue in the header comment above.) The
+  owned-substrate scenarios below carry the causal proof this live lane cannot
+  construct — a pin actually exhausting its budget, retiring, and being
+  counted — on the household lane, the one lane that owns its peers;
+  re-admission is still @wip (see its station comment).
 
   Background:
     Given peer "alpha-A" at "alpha-A"
@@ -160,39 +163,50 @@ Feature: Chapter 11 — the pull queue can finish
   # directly instead of re-deriving it from Loki archaeology (the
   # after-the-fact log-reading this counter-wiring replaces).
   #
-  # This scenario's Given explicitly instantiates jessica's node (a fixture
-  # peer), NOT alpha-A — the shared Background above still runs first
-  # (Gherkin always runs the Background before every scenario), the same way
-  # chapter 6's cross-node scenarios layer a second `Given peer` on top of the
-  # shared alpha-A one; jessica's node, named in this scenario's own Given, is
-  # what the Then steps actually check against.
+  # This scenario addresses jessica's node — the household mesh's own jessica
+  # peer, resolved from the lane's household fixture — NOT alpha-A. The shared
+  # Background above still runs first (Gherkin always runs the Background
+  # before every scenario) but nothing below reads alpha-A; the same layering
+  # chapter 6's cross-node scenarios use. The opening Given does not create a
+  # peer, it asserts the state of one that already exists: caught up, nothing
+  # pending, so that the closing Then can attribute "caught up again" to the
+  # retirement and to nothing else.
   #
   #   chain: saga-11-pull-queue-retires
-  #   between: a pin admitted (jessica asks her node to hold
-  #     elohim-host-landing) -> the queue reads caught-up (finish line above)
+  #   between: a pin admitted (jessica asks her node to hold a want) -> the
+  #     queue reads caught-up (finish line above)
   #   missing node: the retry-budget exhaustion that turns "still trying" into
   #     "retired" — unobservable from the live lane because alpha-A's real
   #     pins are either already satisfied or already retired by the time this
   #     scenario runs; only a fixture lane can hold a pin mid-exhaustion long
   #     enough to assert against it.
-  #   current state: @wip — needs a household-scale acquisition fixture (an
-  #     injectable peer set that can be told to never advertise a given
-  #     head_ref), the same fixture gap acquisition-pins.feature's sibling
-  #     retry-rotation and in-flight-budget scenarios are already @wip behind
-  #     (steps/delivery/acquisition-pins.steps.ts). Prefers those existing
-  #     step wordings so it is runnable the day that fixture lands. The fabric
-  #     steps below are the PARAMETERIZED form of the header's worked example
-  #     (line ~96): the retry budget is peer-sized (`max(3, connected peers)`),
-  #     so the expected probe count derives from whatever fabric is REALLY
-  #     running — the household mesh reports 2 connected peers; alpha's
-  #     worked-example 6 would read as 5 from any one member's own view — and
-  #     the assertion's teeth (budget covers every connected peer; it exhausts;
-  #     the pin retires) hold at any fabric size >= 1.
+  #   current state: constructible on the household lane (2026-08-22), which
+  #     owns jessica's real peer. No injectable fixture peer was needed: an
+  #     `item` pin wants exactly its own head_ref, so a head_ref NO household
+  #     peer holds is dispatched to every connected peer, exhausts the
+  #     peer-sized budget against all of them, and retires. The want is
+  #     therefore NOT the household's landing page — every peer holds that
+  #     (chapter 5's story), so a pin for it would be SATISFIED, never
+  #     exhausted — but a head_ref the step first proves no peer serves. The
+  #     opening Given and the closing Then are the same assertion on purpose:
+  #     caught up before, caught up after, with one counted retirement in
+  #     between. The fabric steps are the PARAMETERIZED form of the header's
+  #     worked example (line ~96): the retry budget is peer-sized
+  #     (`max(3, connected peers)`), so the expected probe count derives from
+  #     whatever fabric is REALLY running — the household mesh reports 2
+  #     connected peers; alpha's worked-example 6 would read as 5 from any one
+  #     member's own view — and the assertion's teeth (budget covers every
+  #     connected peer; it exhausts; the pin retires) hold at any fabric size
+  #     >= 1. Re-pinning is idempotent (upsert resets a retired row to
+  #     `active`), so the scenario re-runs on the same mesh without cleanup.
   @requires:household-nodes @requires:owned-substrate
   Scenario: an unsatisfiable pin retires once the peer-sized retry budget exhausts
-    Given jessica's node, a fixture peer with no other outstanding pins
+    Given jessica's node reports pull.caughtUp as true
     And an acquisition fabric of at least 1 connected peer
-    And jessica's node holds a pin for "epr:elohim-host-landing" that no connected peer advertises
+    # "epr:jessica-unheld-want" is a FABRICATED head_ref — content that exists
+    # nowhere in this household by construction; the step proves that (404 from
+    # every peer) before it pins. It is not a real content id.
+    And jessica's node holds a pin for "epr:jessica-unheld-want" that no connected peer advertises
     When the peer-sized retry budget exhausts
     Then the item was probed on every peer the peer-sized retry budget names
     And the pin's status becomes "retired"
@@ -210,10 +224,13 @@ Feature: Chapter 11 — the pull queue can finish
   #   missing node: re-admission firing when a peer's inventory names the
   #     retired head_ref again — the primary arm proved here. The 6h-cooldown
   #     backstop is a second, still-unscenario'd arm of the same guarantee.
-  #   current state: @wip — same household-scale acquisition fixture as above.
-  @wip @requires:household-nodes
+  #   current state: @wip — unlike the exhaustion scenario above (which only
+  #     needs a want nobody holds), this one needs a household peer that can
+  #     be told to START advertising that same head_ref; no step can stage
+  #     bytes onto a specific peer under a chosen head_ref yet.
+  @wip @requires:household-nodes @requires:owned-substrate
   Scenario: a retired pin is re-admitted once a peer's inventory names its head_ref again
-    Given jessica's node, a fixture peer, has a pin for "epr:elohim-host-landing" in status "retired"
-    When a connected peer's inventory names "epr:elohim-host-landing" again
+    Given jessica's node, a fixture peer, has a pin for "epr:jessica-unheld-want" in status "retired"
+    When a connected peer's inventory names "epr:jessica-unheld-want" again
     Then the pin's status becomes "active"
     And the retirement series for reason "readmitted" increments

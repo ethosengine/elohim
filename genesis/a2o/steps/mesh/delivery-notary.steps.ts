@@ -118,6 +118,10 @@ import {
   requireFixtureStoragePeer,
   type HouseholdMeshFixture,
 } from '../../src/framework/fixtures/household-mesh.js';
+import {
+  destructiveAllowed,
+  DESTRUCTIVE_HELD_HINT,
+} from '../../src/framework/fixtures/substrate-scope.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
@@ -160,7 +164,7 @@ function requireProcessControl(fixture: HouseholdMeshFixture): void {
  * step in that scenario SKIPPED too — so gating the one destructive action
  * cleanly holds the whole scenario, never a partial run.
  */
-const DESTRUCTIVE_ENABLED = process.env['A2O_ALLOW_DESTRUCTIVE'] === '1';
+const DESTRUCTIVE_ENABLED = destructiveAllowed();
 
 /**
  * Returns true when destructive steps may run. When false, logs one line
@@ -172,7 +176,7 @@ function destructiveGate(whatItWouldDo: string): boolean {
   if (DESTRUCTIVE_ENABLED) return true;
   // eslint-disable-next-line no-console
   console.log(
-    `  ⏭️  SKIPPED (destructive, gated): would ${whatItWouldDo}. Set A2O_ALLOW_DESTRUCTIVE=1 to enable.`
+    `  ⏭️  SKIPPED (destructive, gated): would ${whatItWouldDo}. ${DESTRUCTIVE_HELD_HINT}`
   );
   return false;
 }
@@ -606,16 +610,16 @@ Then(
 // the chapter header's worked-example 6, and the budget is peer-sized, so the
 // literal-6 form could never pass here honestly.
 //
-// A second, independent finding: "elohim-host-landing" is the household's
-// own well-replicated landing EPR (matthew's genesis authoring — see
-// resiliency-saga chapter 5). On THIS real mesh matthew almost certainly
-// DOES advertise it, so a pin for it on jessica is likely to be SATISFIED
-// rather than exhaust its retry budget — the scenario's "that no connected
-// peer advertises" premise cannot be honestly constructed with this exact
-// content id on a real mesh where every peer already holds it. The steps
-// below still issue the real POST/probe and let the substrate answer
-// honestly; a red here would name that mismatch, not a broken retirement
-// mechanism.
+// The want is deliberately NOT the household's landing page. An `item` pin
+// wants exactly its own head_ref (p2p/mod.rs builds `pin_wants` as
+// `[head_ref]`, so total = 1), and "elohim-host-landing" is held by EVERY
+// household peer (resiliency-saga chapter 5) — a pin for it would be
+// SATISFIED from the first probe, never exhausted. The scenario names a
+// head_ref nothing in the mesh holds, and the Given below PROVES that premise
+// (404 from every fixture peer) before it pins, so a red here can only mean
+// the retirement mechanism, never a mis-stated precondition. Re-pinning is
+// idempotent: `upsert_pin` resets a retired row to `active` and the tracker
+// starts fresh, so the scenario re-runs on the same mesh without cleanup.
 // ---------------------------------------------------------------------------
 
 interface JessicaPinState {
@@ -628,80 +632,62 @@ function requireJessicaPinState(world: E2EWorld): JessicaPinState {
   const state = jessicaPinState.get(world);
   assert.ok(
     state,
-    'no jessica pin-lifecycle state — the "jessica\'s node, a fixture peer..." Given must run first'
+    'no jessica pin-lifecycle state — the "jessica\'s node holds a pin for ..." Given must run first'
   );
   return state;
 }
 
-Given(
-  "jessica's node, a fixture peer with no other outstanding pins",
-  async function (this: E2EWorld) {
-    const fixture = loadHouseholdMeshFixture();
-    const peer = requireFixtureStoragePeer(fixture, 'jessica');
-    const { status, text } = await getRaw(`${peer.url}/api/v1/pins`);
-    assert.strictEqual(
-      status,
-      200,
-      `GET /api/v1/pins on jessica (${peer.url}): HTTP ${status} — jessica's own-node pins API is ` +
-        `not reachable`
-    );
-    let body: { pins?: Record<string, unknown>[] } = {};
-    try {
-      body = JSON.parse(text) as { pins?: Record<string, unknown>[] };
-    } catch {
-      throw new Error('GET /api/v1/pins on jessica: response is not valid JSON');
-    }
-    const targetActive = (body.pins ?? []).find(
-      p =>
-        (p['headRef'] === 'elohim-host-landing' || p['headRef'] === 'epr:elohim-host-landing') &&
-        p['status'] === 'active'
-    );
-    if (targetActive) {
-      // The chapter's own station comment names this: the household-scale
-      // acquisition fixture does not exist, so the scenario has to borrow a
-      // real node — and jessica's real node legitimately holds this pin,
-      // because holding it is the story the rest of the saga tells. Failing
-      // here would red every healthy run on a precondition the harness cannot
-      // build, so this is HELD (skipped — never 'pending', which cucumber's
-      // strict default reds exactly like a failure).
-      //
-      //   chain: saga-11-pull-queue-retires
-      //   between: a pin admitted -> the queue reads caught-up
-      //   missing node: an UNSATISFIABLE want on a node with a clean pin
-      //     slate. Constructible two ways, neither taken here: an injectable
-      //     fixture peer, or naming a head_ref nothing in this mesh holds
-      //     instead of the household's own content (a .feature change, and one
-      //     that would move what the chapter is about).
-      //   current state: jessica's real pin for this head_ref is active and
-      //     satisfied.
-      // eslint-disable-next-line no-console
-      console.log(
-        '  ⏭️  PRECONDITION UNBUILDABLE: jessica holds an active, satisfied pin for ' +
-          `elohim-host-landing (${JSON.stringify(targetActive)}). A clean-slate fixture peer, or a ` +
-          'head_ref no peer holds, is needed before an exhaustion can be watched. Skipped, not failed.'
-      );
-      return 'skipped';
-    }
-    jessicaPinState.set(this, { storageUrl: peer.url });
-  }
-);
+/** A pin row names the head_ref the way the substrate stores it — `epr:`-prefixed (`upsert_pin`
+ * normalises the bare form the POST accepted) — so match on the bare id from either form. */
+function pinNamesHeadRef(pin: Record<string, unknown>, bareId: string): boolean {
+  return String(pin['headRef'] ?? '').replace(/^epr:/, '') === bareId;
+}
+
+/** jessica's own storage peer, from the household fixture (the lane that owns its substrate). */
+function jessicaStorageUrl(): string {
+  return requireFixtureStoragePeer(loadHouseholdMeshFixture(), 'jessica').url;
+}
+
+/** Every storage peer the household fixture names — the fabric a "no connected peer advertises"
+ * premise is CHECKED against, never assumed. */
+function fixtureStoragePeers(): { name: string; url: string }[] {
+  const fixture = loadHouseholdMeshFixture();
+  return Object.entries(fixture.storagePeers ?? {}).flatMap(([name, peer]) =>
+    peer.url ? [{ name, url: peer.url }] : []
+  );
+}
 
 Given(
   "jessica's node holds a pin for {string} that no connected peer advertises",
+  { timeout: 60_000 },
   async function (this: E2EWorld, headRef: string) {
     if (!destructiveGate(`POST a real pin for "${headRef}" to jessica's own node`)) {
       return 'skipped';
     }
-    const state = requireJessicaPinState(this);
     const id = headRef.replace(/^epr:/, '');
-    // DESTRUCTIVE — creates a real pin row on jessica's own node.
-    const resp = await postRaw(`${state.storageUrl}/api/v1/pins`, { headRef: id });
+    // The premise, proved: a head_ref some peer already serves would be
+    // satisfied (bytes arrive), not exhausted, and the When below would then
+    // wait ten minutes for a retirement that can never come.
+    const holders: string[] = [];
+    for (const peer of fixtureStoragePeers()) {
+      const { status } = await getRaw(`${peer.url}/db/content/${encodeURIComponent(id)}`);
+      if (status === 200) holders.push(`${peer.name} (${peer.url})`);
+    }
+    assert.strictEqual(
+      holders.length,
+      0,
+      `"${headRef}" is already served by ${holders.join(', ')} — a pin for it would be satisfied, ` +
+        'not exhausted. This scenario must name a want NO household peer holds.'
+    );
+    const storageUrl = jessicaStorageUrl();
+    // DESTRUCTIVE — creates (or re-activates) a real pin row on jessica's own node.
+    const resp = await postRaw(`${storageUrl}/api/v1/pins`, { headRef: id });
     assert.ok(
       resp.status === 200 || resp.status === 201,
       `POST /api/v1/pins on jessica for "${headRef}": HTTP ${resp.status} (body: ` +
         `${resp.text.slice(0, 200)})`
     );
-    state.headRef = id;
+    jessicaPinState.set(this, { storageUrl, headRef: id });
   }
 );
 
@@ -749,7 +735,7 @@ When(
         } catch {
           return undefined;
         }
-        const pin = (body.pins ?? []).find(p => p['headRef'] === state.headRef);
+        const pin = (body.pins ?? []).find(p => pinNamesHeadRef(p, state.headRef ?? ''));
         return pin && pin['status'] !== 'active' ? true : undefined;
       },
       { intervalMs: 10_000, timeoutMs: 10 * 60_000 }
@@ -762,7 +748,7 @@ Then("the pin's status becomes {string}", async function (this: E2EWorld, expect
   const { status, text } = await getRaw(`${state.storageUrl}/api/v1/pins`);
   assert.strictEqual(status, 200, `GET /api/v1/pins on jessica: HTTP ${status}`);
   const body = JSON.parse(text) as { pins?: Record<string, unknown>[] };
-  const pin = (body.pins ?? []).find(p => p['headRef'] === state.headRef);
+  const pin = (body.pins ?? []).find(p => pinNamesHeadRef(p, state.headRef ?? ''));
   assert.ok(
     pin,
     `no pin for "${state.headRef}" found on jessica (${(body.pins ?? []).length} pins listed)`
@@ -807,16 +793,40 @@ Then(
   }
 );
 
-Then("jessica's node reports pull.caughtUp as true", async function (this: E2EWorld) {
-  const state = requireJessicaPinState(this);
-  const { body } = await probeP2PStatus(state.storageUrl);
-  assert.ok(body.pull !== undefined, "jessica's /p2p/status carries no pull section");
-  assert.strictEqual(
-    body.pull?.caughtUp,
-    true,
-    `jessica's /p2p/status pull.caughtUp is ${JSON.stringify(body.pull?.caughtUp)}`
-  );
-});
+// Doubles as the scenario's opening Given (cucumber matches step TEXT, not
+// the keyword): caught up before the pin, caught up after its retirement.
+//
+// BOUNDED, not instantaneous: a retired pin leaves `list_active_pins` at once,
+// but its tracker — and so its `total`/`failed` share of the rollup — is only
+// dropped by the `trackers.retain` at the top of the NEXT acquisition
+// reconcile (60s cycle; p2p/acquisition.rs `exhausted_pin_ids` docs). Measured
+// 2026-08-22: retirement 18:04, rollup still 19 total / 18 fetched / 1 failed
+// seconds later, 18/18 caught-up by the following cycle. Two cycles plus slack
+// is the window; a node that is still not caught up after that has a pin the
+// retirement did not release, which is the regression this chapter exists for.
+const CAUGHT_UP_WINDOW_MS = 150_000;
+Then(
+  "jessica's node reports pull.caughtUp as true",
+  { timeout: CAUGHT_UP_WINDOW_MS + 15_000 },
+  async function (this: E2EWorld) {
+    const storageUrl = jessicaPinState.get(this)?.storageUrl ?? jessicaStorageUrl();
+    let lastPull: unknown;
+    const caughtUp = await pollForGauge<true>(
+      async () => {
+        const { body } = await probeP2PStatus(storageUrl);
+        assert.ok(body.pull !== undefined, "jessica's /p2p/status carries no pull section");
+        lastPull = body.pull;
+        return body.pull?.caughtUp === true ? true : undefined;
+      },
+      { intervalMs: 5_000, timeoutMs: CAUGHT_UP_WINDOW_MS }
+    );
+    assert.ok(
+      caughtUp,
+      `jessica's /p2p/status pull.caughtUp did not reach true within ${CAUGHT_UP_WINDOW_MS / 1000}s ` +
+        `(last pull: ${JSON.stringify(lastPull)})`
+    );
+  }
+);
 
 // ---------------------------------------------------------------------------
 // notary-authority.feature — "An archetype EPR upgrade elects the new head
