@@ -263,6 +263,31 @@ habits:
     checks:
       - "a2o @concern:blob-durability — 8 scenarios across genesis/a2o/features/resilience/ (governed-distribution, salvage-placement, chaos-peer-churn, grandma-photos-survive-node-loss, app-blob-heal-on-read, observable-distribution, resilience-dimensions, household-diversity-dataplane)"
     evidence: >
+      DELTA 2026-08-22d (SPRINT: saga performance + reliability + code quality,
+      household lane, closing run 20260822T201747Z-3bd326d6): 170 passed / 37 failed /
+      35 pending / 22 skipped in 20m58s, from 164 / 42 / 35 / 23. Saga 22/22 in 2m16s
+      (was 4.8 min): chapter 11's exhaustion wait 290 s → 50 s via a declared
+      ACQUISITION_RECONCILE_SECS knob (prod default unchanged at 60; mesh profile 10).
+      The dead-peer cascade (~21 reds) is cured at its root and PROVEN: the drill's
+      fs.copyFile on procfs wrote a 0-byte environ and storage-restart exited 0 on it;
+      now the capture reads to EOF with the exe recorded beside it, the script restores
+      a dead peer from that record and returns 1 if any target does not answer by port
+      (capture+SIGKILL jessica → storage-restart jessica → back with key, cadence and
+      fixture pid). Zero stale-pid/ECONNREFUSED-by-dead-peer reds remain; all five
+      services alive at the end of the lane. Chaos drills now red HONESTLY at their
+      custody precondition: manifesto commitmentBacked 1 / heldBy [] and chaos-ladder's
+      fossil matthew key are the substrate identity join (membership truth dead —
+      identity-coherence design pass, held), not the drill; the drills match a provider
+      by libp2p peerId OR agent key now (reconcile/custody.rs contract). Remaining 37 =
+      self-healing-flow-control 10 (doorway re-exec >90 s to healthy + 4 ECONNREFUSED
+      behind it, breaker/half-open, warm-up evidence), peer-conductor-resilience 4,
+      doorway-pool-degrade 3 (fixture expects 0 rows, mesh has 3), conductor-spin 3
+      (1 missing dependency on an undisturbed mesh; james authoring failed), identity
+      join 5 (household-formation 2, identity-coherence 1, chaos 3 precondition),
+      peer-recovery 2 (needs a wiped projection), peer-loss-failover 2, delivery-diag 2,
+      web2-absorption 2, content-sync 30 s under load, content-addressing header,
+      acquisition-pins socket close. Next: the doorway re-exec path in
+      self-healing-flow-control (one cause, 5 reds), then the identity join.
       DELTA 2026-08-22c (CLOSING MEASUREMENT, household lane, run
       20260822T183819Z-123cea49 on the committed tree): 164 passed / 42 failed / 35
       pending / 23 skipped, against the morning's 159 / 18 / 35 / 52. Read the 42 in
