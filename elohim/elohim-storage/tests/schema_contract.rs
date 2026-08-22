@@ -320,6 +320,11 @@ fn p2p_status_view_matches_schema() {
             reanchor_completed: 8,
             reanchor_failed: 1,
             reanchor_caught_up: true,
+            reanchor_dead_remaining: 0,
+            stuck_sweeps: 0,
+            dead_remaining_stuck: false,
+            reanchor_skipped_reach: 0,
+            reanchor_skipped_content_type: 0,
         }),
         // Dual-stack: exercise the additive irohNodeId serialization against the
         // schema (64-char hex NodeId).
@@ -367,6 +372,70 @@ fn p2p_status_view_with_null_drain_and_uninitialized_pull() {
         json.get("pull").is_some_and(serde_json::Value::is_null),
         "an uninitialized acquisition reconcile must serialize pull explicitly as null"
     );
+    validate_against_schema("views/p2p-status-view.schema.json", &json);
+}
+
+/// The stuck-vs-draining shape: a dead-anchor population that every sweep's
+/// skip-guards refuse, held past the threshold. `caughtUp` stays honestly false
+/// (the pending arithmetic is untouched) while `deadRemainingStuck` says the
+/// wedge needs a seed-data correction rather than more patience.
+#[test]
+fn p2p_status_view_with_stuck_dead_anchor_population_matches_schema() {
+    let status = P2PStatusInfo {
+        peer_id: "12D3KooWTest".to_string(),
+        listen_addresses: vec![],
+        connected_peers: 2,
+        bootstrap_nodes: vec![],
+        sync_documents: 0,
+        nat_status: "unknown".to_string(),
+        relay_reservations: 0,
+        announce_addresses: vec![],
+        relay_mode: "disabled".to_string(),
+        replication: ReplicationStatus::default(),
+        drain: None,
+        pull: None,
+        projection_reconcile: None,
+        sync_paused: false,
+        sync_mode: "sync".to_string(),
+        network_class: "unknown".to_string(),
+        sync_reasons: vec![],
+        dedup_unique_len: 0,
+        dedup_total_seen: 0,
+        reconcile_passes_total: 0,
+        kicks_fired_total: 0,
+        placement_gaps_emitted_total: 0,
+        provide_loop: Some(ProvideLoopStatus {
+            self_cid_source: "derived-libp2p-peer-id".to_string(),
+            active: true,
+            // Nothing left to author; two dead rows nobody can re-adopt.
+            reanchor_pending: 2,
+            reanchor_completed: 0,
+            reanchor_failed: 0,
+            reanchor_caught_up: false,
+            reanchor_dead_remaining: 2,
+            stuck_sweeps: 3,
+            dead_remaining_stuck: true,
+            reanchor_skipped_reach: 1,
+            reanchor_skipped_content_type: 1,
+        }),
+        iroh_node_id: None,
+    };
+
+    let json = serde_json::to_value(&status).unwrap();
+    let provide_loop = json.get("provideLoop").expect("provideLoop present");
+    // Wire names are camelCase and the stuck signal rides ALONGSIDE the
+    // untouched pending/caughtUp pair, never in place of it.
+    assert_eq!(provide_loop.get("deadRemainingStuck"), Some(&true.into()));
+    assert_eq!(provide_loop.get("stuckSweeps"), Some(&3.into()));
+    assert_eq!(provide_loop.get("reanchorDeadRemaining"), Some(&2.into()));
+    assert_eq!(provide_loop.get("reanchorSkippedReach"), Some(&1.into()));
+    assert_eq!(
+        provide_loop.get("reanchorSkippedContentType"),
+        Some(&1.into())
+    );
+    assert_eq!(provide_loop.get("reanchorCaughtUp"), Some(&false.into()));
+    assert_eq!(provide_loop.get("reanchorPending"), Some(&2.into()));
+
     validate_against_schema("views/p2p-status-view.schema.json", &json);
 }
 

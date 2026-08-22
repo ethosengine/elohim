@@ -36,4 +36,37 @@ reanchorFailed: number,
  * True when the re-anchor backfill has run AND found no NULL-anchor rows
  * left to re-author. False before the first run or while candidates remain.
  */
-reanchorCaughtUp: boolean, };
+reanchorCaughtUp: boolean, 
+/**
+ * The DEAD-anchor arm of `reanchorPending` on its own: rows anchored under
+ * an action no living chain can present, remaining after the last sweep.
+ * `reanchorPending` is still the SUM of both arms — this field splits it so
+ * "nothing to author, something to re-adopt" is directly readable.
+ */
+reanchorDeadRemaining: number, 
+/**
+ * Consecutive sweeps `reanchorDeadRemaining` has sat at the same non-zero
+ * value. 0 while the population is empty or moving. Watch it climb
+ * 1 → 2 → 3 to see a heal stall in progress.
+ */
+stuckSweeps: number, 
+/**
+ * True when the dead-anchor population is WEDGED rather than draining:
+ * `reanchorDeadRemaining > 0` for at least
+ * [`DEAD_REMAINING_STUCK_SWEEPS`] consecutive sweeps at the same value.
+ * Read this as *a seed-data correction is needed*, not *still healing* —
+ * `caughtUp` will not move on its own. `reanchorSkippedReach` /
+ * `reanchorSkippedContentType` name the likely reason.
+ */
+deadRemainingStuck: boolean, 
+/**
+ * Rows the LAST sweep skipped for a non-canonical `reach` (the DNA rejects
+ * them, so they are never re-authorable). Non-zero beside
+ * `deadRemainingStuck` names the wedge.
+ */
+reanchorSkippedReach: number, 
+/**
+ * Rows the LAST sweep skipped for a non-canonical `content_type`. Same
+ * class as `reanchorSkippedReach`, same fix (correct the seed data).
+ */
+reanchorSkippedContentType: number, };

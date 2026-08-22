@@ -153,6 +153,26 @@ export interface P2PStatusView {
      * True when the re-anchor backfill ran and found no NULL-anchor rows left. False before the first run or while candidates remain.
      */
     reanchorCaughtUp: boolean;
+    /**
+     * Additive/optional. The DEAD-anchor arm of reanchorPending on its own: rows anchored under an action no living chain can present, remaining after the last sweep. reanchorPending remains the SUM of both arms — this splits it so 'nothing to author, something to re-adopt' is directly readable. Omitted by nodes predating the stuck-vs-draining split.
+     */
+    reanchorDeadRemaining?: number;
+    /**
+     * Additive/optional. Consecutive sweeps reanchorDeadRemaining has sat at the same non-zero value. 0 while the population is empty or moving. Ephemeral (Category C), in-memory only — resets to 0 on restart and is re-earned over the next few sweeps.
+     */
+    stuckSweeps?: number;
+    /**
+     * Additive/optional. True when the dead-anchor population is WEDGED rather than draining (non-zero and unchanged for at least 3 consecutive sweeps). Read as 'a seed-data correction is needed', NOT 'still healing' — caughtUp will not move on its own. Does not affect caughtUp or the pending arithmetic; it is an observability split, not a gate loosening.
+     */
+    deadRemainingStuck?: boolean;
+    /**
+     * Additive/optional. Rows the LAST sweep skipped because their stored reach is outside the DNA vocabulary (never re-authorable). Non-zero beside deadRemainingStuck names the wedge.
+     */
+    reanchorSkippedReach?: number;
+    /**
+     * Additive/optional. Rows the LAST sweep skipped because their stored content_type is outside the vocabulary Content::validate() accepts. Same class as reanchorSkippedReach, same fix (correct the seed data).
+     */
+    reanchorSkippedContentType?: number;
   } | null;
   /**
    * The co-resident iroh node's NodeId (64-char hex), when this node runs the iroh transport stack alongside libp2p. Additive/optional — OMITTED from the wire on a libp2p-only node (dual-stack boot is mode-exclusive today). Set at the main.rs dual block from iroh_n.node_id().

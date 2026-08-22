@@ -36,7 +36,7 @@ use std::time::Duration;
 use crate::db::DbPool;
 use crate::generated_enums::{ALL_CONTENT_TYPES, CORE_REACH_LEVELS};
 use crate::services::head_adoption::{AdoptContext, AdoptOutcome};
-use crate::services::provide_loop_status::ProvideLoopState;
+use crate::services::provide_loop_status::{ProvideLoopState, ReanchorSweepResult};
 use crate::services::ContentService;
 use crate::StorageError;
 
@@ -101,10 +101,20 @@ pub struct ReanchorReport {
     pub adopted: usize,
     /// Rows the pre-flight left alone because they already carry a declaration.
     pub held: usize,
-    /// Rows skipped because their stored reach is non-canonical — not
-    /// re-authorable (the DNA rejects it), so re-attempting would fail
-    /// every sweep and saturate the conductor. Fix via the seed data.
+    /// Rows skipped because their stored reach OR content_type is
+    /// non-canonical — not re-authorable (the DNA rejects it), so re-attempting
+    /// would fail every sweep and saturate the conductor. Fix via the seed
+    /// data. Sum of the two split counters below.
     pub skipped: usize,
+    /// The `skipped` total split by cause: non-canonical `reach`. Reported
+    /// separately (and published to `/p2p/status`) because a standing non-zero
+    /// value beside an unmoved `dead_remaining` is what turns "still healing"
+    /// into "a seed-data correction is needed" — see
+    /// `provide_loop_status::is_dead_remaining_stuck`.
+    pub skipped_reach: usize,
+    /// The `skipped` total split by cause: non-canonical `content_type`.
+    /// Symmetric with `skipped_reach`, same fix.
+    pub skipped_content_type: usize,
     /// NULL-anchor rows remaining AFTER the sweep (for `/p2p/status` pending).
     pub remaining: usize,
     /// DEAD-anchor candidates selected this sweep — rows this node was serving
@@ -177,8 +187,14 @@ impl ReanchorReport {
         match outcome {
             RowOutcome::Reanchored => self.reanchored += 1,
             RowOutcome::AlreadyAnchored => self.already_anchored += 1,
-            RowOutcome::SkippedNonCanonicalReach => self.skipped += 1,
-            RowOutcome::SkippedNonCanonicalContentType => self.skipped += 1,
+            RowOutcome::SkippedNonCanonicalReach => {
+                self.skipped += 1;
+                self.skipped_reach += 1;
+            }
+            RowOutcome::SkippedNonCanonicalContentType => {
+                self.skipped += 1;
+                self.skipped_content_type += 1;
+            }
             RowOutcome::Failed => self.failed += 1,
             RowOutcome::Adopted => self.adopted += 1,
             RowOutcome::Held => self.held += 1,
@@ -285,7 +301,12 @@ pub async fn run_once(
         // green. (Before the dead arm existed this logged "no NULL-anchor
         // content — nothing to heal" while a whole dead population sat
         // untouched; the emptiness test now covers both classes.)
-        state.publish_reanchor_sweep(0, 0, 0).await;
+        //
+        // An all-zero result also RESETS the stuck detector: a drained dead
+        // population is done, not wedged.
+        state
+            .publish_reanchor_sweep(ReanchorSweepResult::default())
+            .await;
         return Ok(report);
     }
 
@@ -508,12 +529,21 @@ pub async fn run_once(
     // resolve. Reporting green there is the same measured-yet-dark dishonesty
     // this whole class exists to close. The arms stay separately legible in
     // `ReanchorReport` and in the sweep-complete log line below.
+    //
+    // The arms also go over SEPARATELY so the holder can watch the dead one
+    // across sweeps: a `dead_remaining` that never moves (every candidate hit
+    // the skip-guards above) is a seed-data correction waiting, not a heal in
+    // progress, and `/p2p/status` says so via `deadRemainingStuck`. The pending
+    // arithmetic is unchanged — only the reading of it gained a second axis.
     state
-        .publish_reanchor_sweep(
-            report.reanchored + report.already_anchored + report.adopted + report.held,
-            report.failed,
-            report.remaining + report.dead_remaining,
-        )
+        .publish_reanchor_sweep(ReanchorSweepResult {
+            completed: report.reanchored + report.already_anchored + report.adopted + report.held,
+            failed: report.failed,
+            remaining: report.remaining,
+            dead_remaining: report.dead_remaining,
+            skipped_reach: report.skipped_reach,
+            skipped_content_type: report.skipped_content_type,
+        })
         .await;
 
     tracing::info!(
@@ -523,6 +553,8 @@ pub async fn run_once(
         held = report.held,
         failed = report.failed,
         remaining = report.remaining,
+        skipped_reach = report.skipped_reach,
+        skipped_content_type = report.skipped_content_type,
         dead_candidates = report.dead_candidates,
         dead_remaining = report.dead_remaining,
         "reanchor_backfill: sweep complete"
@@ -708,5 +740,78 @@ mod tests {
             report.failed, 0,
             "an already-anchored row must NEVER be counted as failed"
         );
+    }
+
+    #[test]
+    fn skip_counters_split_by_cause_and_still_sum_to_skipped() {
+        // `skipped` stays the total (nothing downstream that reads it changes),
+        // but the two causes are now separately legible — they are what turns a
+        // frozen `dead_remaining` from "still healing" into "the seed data for
+        // these rows needs correcting", and they ride to /p2p/status as
+        // reanchorSkippedReach / reanchorSkippedContentType.
+        let mut report = ReanchorReport::default();
+        report.record(RowOutcome::SkippedNonCanonicalReach);
+        report.record(RowOutcome::SkippedNonCanonicalReach);
+        report.record(RowOutcome::SkippedNonCanonicalContentType);
+        assert_eq!(report.skipped_reach, 2);
+        assert_eq!(report.skipped_content_type, 1);
+        assert_eq!(
+            report.skipped,
+            report.skipped_reach + report.skipped_content_type,
+            "the split must partition the total, never double-count it"
+        );
+        // No other counter moves — a skip is neither progress nor failure.
+        assert_eq!(report.reanchored, 0);
+        assert_eq!(report.failed, 0);
+    }
+
+    #[tokio::test]
+    async fn a_fully_skip_guarded_sweep_publishes_the_stuck_shape() {
+        // The end-to-end accounting of the wedged case, without a conductor:
+        // every dead candidate hits a skip-guard, so `dead_remaining` cannot
+        // move, and after DEAD_REMAINING_STUCK_SWEEPS identical sweeps the
+        // status surface says "stuck" while `caughtUp` stays honestly false.
+        use crate::services::provide_loop_status::{
+            ProvideLoopState, ReanchorSweepResult, DEAD_REMAINING_STUCK_SWEEPS,
+        };
+
+        // The report a sweep over two un-re-authorable dead rows produces.
+        let mut report = ReanchorReport {
+            dead_candidates: 2,
+            remaining: 0,
+            dead_remaining: 2,
+            ..Default::default()
+        };
+        report.record(RowOutcome::SkippedNonCanonicalReach);
+        report.record(RowOutcome::SkippedNonCanonicalContentType);
+
+        let published = ReanchorSweepResult {
+            completed: report.reanchored + report.already_anchored + report.adopted + report.held,
+            failed: report.failed,
+            remaining: report.remaining,
+            dead_remaining: report.dead_remaining,
+            skipped_reach: report.skipped_reach,
+            skipped_content_type: report.skipped_content_type,
+        };
+        assert_eq!(published.completed, 0, "a skip-only sweep settles nothing");
+
+        let state = ProvideLoopState::new();
+        for _ in 0..DEAD_REMAINING_STUCK_SWEEPS {
+            state.publish_reanchor_sweep(published).await;
+        }
+
+        let snap = state.status().await;
+        assert!(
+            snap.dead_remaining_stuck,
+            "every candidate hit a permanent skip-guard — this is a seed-data \
+             correction, not a heal in progress"
+        );
+        assert_eq!(snap.stuck_sweeps, DEAD_REMAINING_STUCK_SWEEPS);
+        assert_eq!(snap.reanchor_skipped_reach, 1);
+        assert_eq!(snap.reanchor_skipped_content_type, 1);
+        // The tightening is untouched: pending still sums both arms and the
+        // node still reads NOT caught up.
+        assert_eq!(snap.reanchor_pending, 2);
+        assert!(!snap.reanchor_caught_up);
     }
 }
