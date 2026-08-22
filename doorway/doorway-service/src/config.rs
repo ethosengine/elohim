@@ -89,6 +89,15 @@ pub struct Args {
     #[arg(long, env = "DEV_MODE", default_value = "false")]
     pub dev_mode: bool,
 
+    /// Opt in to the multi-peer signal subscriber while in dev mode.
+    /// Dev mode skips the subscriber by default because many dev contexts run
+    /// with no conductor at all and would spin reconnect noise. Auth is NOT the
+    /// blocker — the subscriber self-authenticates via TypedAppClient — so set
+    /// this when the dev stack fronts real conductors (e.g. hc-mesh.sh).
+    /// No effect outside dev mode; PROJECTION_WRITER=false still disables.
+    #[arg(long, env = "DEV_SIGNAL_SUBSCRIBER", default_value = "false")]
+    pub dev_signal_subscriber: bool,
+
     /// NATS configuration
     #[command(flatten)]
     pub nats: NatsArgs,

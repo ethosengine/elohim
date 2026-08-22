@@ -1062,13 +1062,17 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
     //   projection_writer=true  → starts signal subscriber (populates MongoDB from DHT signals)
     //   projection_writer=false → reads from shared MongoDB, no subscriber (read replica mode)
     //
-    // In dev mode, the signal subscriber is always disabled (app interface requires auth).
+    // In dev mode, the signal subscriber is skipped by default: many dev-mode
+    // contexts run with no conductor at all and would spin reconnect noise.
+    // Auth is NOT the blocker (the subscriber self-authenticates via
+    // TypedAppClient), so --dev-signal-subscriber opts back in when the dev
+    // stack fronts real conductors (e.g. hc-mesh.sh).
     let _projection_handle = if let Some(ref projection_store) = state.projection {
-        if args.dev_mode || !args.projection_writer {
+        if !args.projection_writer || (args.dev_mode && !args.dev_signal_subscriber) {
             if !args.projection_writer {
                 info!("Projection reader: using shared MongoDB (PROJECTION_WRITER=false)");
             } else {
-                info!("Projection engine started (dev mode: signal subscriber disabled, app interface requires auth)");
+                info!("Projection engine started (dev mode: signal subscriber disabled; opt in with --dev-signal-subscriber)");
             }
 
             // Create engine without signals (it will still work for manual queries)

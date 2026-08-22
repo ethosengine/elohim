@@ -46,7 +46,12 @@ so both doorways boot **archive-backed** (Mongo-side projection archive:
 doorway: `doorway-a`, `doorway-b`). Without the binary (`MONGOD_BIN` unset and
 no `mongod` on `$PATH`/`~/bin`) the doorways run archive-less with an INERT
 warm-shell store — the production shape 18a65fd0d found un-wired — and
-`mesh status` says so. The image ships `mongod` (che-devworkspaces udi-plus);
+`mesh status` says so. Both doorways launch with `--dev-mode
+--dev-signal-subscriber` (env twin `DEV_SIGNAL_SUBSCRIBER`): dev mode alone
+skips the multi-peer signal subscriber (most dev contexts have no conductor),
+but the mesh fronts real conductors, so the opt-in lights the subscriber and
+`status.json` `compute.peers[]` populates — the surface the
+peer-conductor-resilience a2o reads. The image ships `mongod` (che-devworkspaces udi-plus);
 a2o resolves `alpha-A`/`elohim.host` to `E2E_DOORWAY_ALPHA`/`E2E_DOORWAY_B`,
 so the failover feature runs against the local pair unchanged:
 
