@@ -1192,29 +1192,53 @@ interface BreakerTripState {
 
 const breakerTrips = new WeakMap<E2EWorld, BreakerTripState>();
 
+/** Every household storage peer — the whole pool this doorway can proxy to. */
+const ALL_HOUSEHOLD_PEERS: readonly HouseholdPeerName[] = ['matthew', 'jessica', 'james'];
+
 /**
- * Pause the primary storage peer and drive UPSTREAM_CIRCUIT_FAIL_THRESHOLD
- * proxied requests through doorway so the storage-proxy breaker opens for
- * real (connect-timeout failures, STORAGE_PROXY_CONNECT_TIMEOUT_SECS=3 /
- * STORAGE_PROXY_REQUEST_TIMEOUT_SECS=12 per attempt). DESTRUCTIVE: pauses a
- * live household storage peer — hold for explicit operator go.
+ * Pause EVERY household storage peer and drive UPSTREAM_CIRCUIT_FAIL_THRESHOLD
+ * proxied requests through doorway so the storage-proxy breaker opens for real
+ * (connect/read-timeout failures, STORAGE_PROXY_CONNECT_TIMEOUT_SECS=3 /
+ * STORAGE_PROXY_REQUEST_TIMEOUT_SECS=12 per attempt).
+ *
+ * WHY THE WHOLE POOL, and why the keyed upstream is DISCOVERED rather than
+ * assumed. This step used to pause the doorway's PRIMARY peer and assert the
+ * breaker opened for that peer's endpoint. Measured on the household mesh
+ * 2026-08-22, neither half held: with the primary (8090) paused, every probe
+ * answered in ~10-140ms and no outcome was recorded against it at all, because
+ * the doorway's target for this route is a DIFFERENT single peer (8091) —
+ * routes/storage_proxy.rs is single-target dispatch, so pausing a peer the route
+ * does not target is invisible to it. With the whole pool paused the same probes
+ * take the full 12s, the breaker opens after 3, and a 4th is shed in ~12ms.
+ *
+ * The endpoint the breaker actually keyed is then READ BACK from
+ * /admin/self-healing rather than assumed from the fixture's primary — which
+ * peer a given route targets is the doorway's routing decision, not this step's.
+ *
+ * DESTRUCTIVE: pauses every live household storage peer for the length of the
+ * trip — hold for explicit operator go.
  */
 async function tripStorageBreaker(world: E2EWorld, doorway: string): Promise<BreakerTripState> {
-  const peerName = primaryPeerName('alpha');
-  pausePeerProcess(peerName);
-  world.onCleanup(async () => {
-    resumePeerProcess(peerName);
-    await Promise.resolve();
-  });
+  for (const name of ALL_HOUSEHOLD_PEERS) {
+    pausePeerProcess(name);
+    world.onCleanup(async () => {
+      resumePeerProcess(name);
+      await Promise.resolve();
+    });
+  }
 
   for (let attempt = 0; attempt < UPSTREAM_CIRCUIT_FAIL_THRESHOLD; attempt += 1) {
     await getRaw(`${doorway}${UNKNOWN_CONTENT_PATH}`, { timeoutMs: 20_000 }).catch(() => undefined);
   }
 
+  // Which upstream did the doorway actually charge for these failures?
+  const opened = await fetchSelfHealing(doorway)
+    .then(view => view.upstreams.find(u => u.circuit === 'open'))
+    .catch(() => undefined);
   const state: BreakerTripState = {
-    peerName,
-    storageUrl: primaryStorageUrl('alpha'),
-    endpointFragment: endpointFragmentOf(primaryStorageUrl('alpha')),
+    peerName: primaryPeerName('alpha'),
+    storageUrl: opened?.endpoint ?? primaryStorageUrl('alpha'),
+    endpointFragment: endpointFragmentOf(opened?.endpoint ?? primaryStorageUrl('alpha')),
   };
   breakerTrips.set(world, state);
   return state;
@@ -1232,8 +1256,8 @@ Given(
   async function (this: E2EWorld) {
     if (!DESTRUCTIVE) {
       return skipHeldDestructive(
-        "pauses the household's primary storage peer (SIGSTOP by exact pid) so the doorway's " +
-          'storage-proxy breaker trips for real.'
+        'pauses EVERY household storage peer (SIGSTOP by exact pid) so the route the doorway ' +
+          "actually targets genuinely fails and the doorway's storage-proxy breaker trips for real."
       );
     }
     const url = doorwayUrl(this, 'alpha');
@@ -1325,7 +1349,7 @@ Given(
     // silently downgrading the scenario's claim.
     if (!DESTRUCTIVE) {
       return skipHeldDestructive(
-        "pauses the household's primary storage peer to trip the storage-proxy breaker for real " +
+        'pauses EVERY household storage peer to trip the storage-proxy breaker for real ' +
           '(see the GAP comment above: the exact body-phase-stall trigger needs a mock upstream this ' +
           'fixture does not have — the constructed condition is the closest real substitute).'
       );
