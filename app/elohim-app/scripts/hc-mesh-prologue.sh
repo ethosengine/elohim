@@ -136,7 +136,7 @@ say "CONDUCTOR_URLS=$CONDUCTOR_URLS"
 #    because jessica (doorway B's primary) has NO row on A's storage backend
 #    otherwise — jessica's own scenarios need her doorway to have seeded her.
 #
-# THREE ids, because each one is a precondition something downstream asserts
+# FOUR ids, because each one is a precondition something downstream asserts
 # and none of them is created by any other leg:
 #
 #   elohim-host-landing  the apex EPR — the projection root, and the subject of
@@ -153,12 +153,21 @@ say "CONDUCTOR_URLS=$CONDUCTOR_URLS"
 #                        cache invalidation). seed.ts uploads its ZIP from
 #                        genesis/docs/content/fct/evolution-of-trust.zip and
 #                        declares the row in the same pass.
+#   manifesto            the protocol's public epic — genesis/data/lamad/content/
+#                        manifesto.json, authored `"reach": "commons"` so an
+#                        anonymous client can read it (auth/reach-commons.feature
+#                        @regression). federation/peer-loss-failover,
+#                        federation/peer-recovery, resilience/chaos-peer-churn,
+#                        and content/epr-content-addressing all reach it as
+#                        `/db/content/manifesto` — without this leg every one of
+#                        them env-reds on "Content not found: manifesto" before
+#                        exercising anything it meant to test.
 #
 # Order matters and is load-bearing: these rows must exist BEFORE
 # seed-projections (2-3) and BEFORE the stage legs (4), which patch bytes onto
 # rows this leg creates. seed.ts is idempotent — an already-seeded id is a skip.
 # ---------------------------------------------------------------------------
-BASE_CORPUS_IDS="elohim-host-landing,lamad-spa,evolution-of-trust"
+BASE_CORPUS_IDS="elohim-host-landing,lamad-spa,evolution-of-trust,manifesto"
 banner "1. seed.ts (base corpus) via A and B"
 run_seed_leg "seed-base-corpus-via-A" hard \
   'DOORWAY_URL="$DOORWAY_A_URL" npx tsx src/seed.ts --ids="$BASE_CORPUS_IDS"'
