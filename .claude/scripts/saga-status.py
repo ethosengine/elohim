@@ -11,9 +11,13 @@ any missing input, no network):
   2. FLOWS (optional) — .eprfs/status/flows.jsonl, the per-checkout EPR-REA sidecar. `epr flow
      project` mints one `a2o:scenario-green` Commitment per chapter; `epr flow fulfill` turns a
      green/red sprint-report into Produce (fulfilling)/Dismiss (regression) FlowEvents.
-  3. REPORT (optional) — genesis/a2o/reports/sprint-report-dataplane.json, the latest dataplane
-     validation run's summary.byConcern rollup (gitignored; may be absent locally — CI-only
-     until `genesis/scripts/jenkins-sync.sh` pulls it down).
+  3. REPORT (optional) — the NEWEST a2o sprint report in genesis/a2o/reports/ by its own
+     `generatedAt`, across every lane: run-identified names (`sprint-report-<lane>-<runId>.json`,
+     the household mesh lane writes these) and the legacy single mutable slot
+     (`sprint-report-<lane>.json`, the fleet lane — pulled down by `genesis/scripts/jenkins-sync.sh`).
+     Discovery is habits-status.py's `load_reports()` — ONE detector, so the two session-start
+     headlines can never read different lanes. Before 2026-08-22 this read the fleet slot only, and
+     a fresh household run sat beside a stale 76-skip fleet report while the headline said 0/11.
 
 Usage:
   saga-status.py            one line for the SessionStart context block
@@ -263,13 +267,43 @@ def _sort_key(occurred_at: str):
 # Report — optional
 # ---------------------------------------------------------------------------
 
-def load_report():
+def _load_legacy_slot():
     if not REPORT_PATH.exists():
         return None
     try:
         return json.loads(REPORT_PATH.read_text(encoding="utf-8", errors="replace"))
     except (OSError, json.JSONDecodeError, ValueError):
         return None
+
+
+def load_report():
+    """The newest sprint report across lanes, shaped like the report JSON this script always read
+    (`runId`, `generatedAt`, `summary.byConcern`). Reuses habits-status.py's `load_reports()` for
+    discovery (run-identified + legacy slot, ranked by `generatedAt`); if that import fails for any
+    reason, degrades to the legacy fleet slot alone — never to a traceback."""
+    try:
+        import importlib.util
+        path = SCRIPT.parent / "habits-status.py"
+        spec = importlib.util.spec_from_file_location("_habits_status_for_saga", path)
+        if spec is None or spec.loader is None:
+            return _load_legacy_slot()
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        reports = mod.load_reports()
+        if not reports:
+            return _load_legacy_slot()
+        newest = reports[0]
+        when = newest.get("when")
+        return {
+            "runId": newest.get("runId"),
+            "generatedAt": when.isoformat().replace("+00:00", "Z") if when else None,
+            "profile": newest.get("profile"),
+            "path": str(newest.get("path")),
+            "summary": {"byConcern": newest.get("byConcern") or {},
+                        "scenarios": newest.get("scenarios") or {}},
+        }
+    except Exception:
+        return _load_legacy_slot()
 
 
 def report_verdict(rollup):
@@ -398,9 +432,9 @@ def headline(rows, report, flows_present) -> str:
 def full(rows, report, flows_present) -> str:
     lines = [f"Resiliency saga — {SAGA_DIR}", ""]
     if report:
-        lines.append(f"report: runId={report.get('runId', '?')} generatedAt={report.get('generatedAt', '?')}")
+        lines.append(f"report: runId={report.get('runId', '?')} generatedAt={report.get('generatedAt', '?')} lane={report.get('profile', '?')}")
     else:
-        lines.append(f"report: (absent — {REPORT_PATH} not found locally; run genesis/scripts/jenkins-sync.sh)")
+        lines.append(f"report: (absent — no sprint report under {REPORT_PATH.parent}; run `just test mesh` or genesis/scripts/jenkins-sync.sh)")
     lines.append(f"flows:  {'present' if flows_present else '(absent — ' + str(FLOWS_PATH) + ' not found)'}")
     lines.append("")
 
