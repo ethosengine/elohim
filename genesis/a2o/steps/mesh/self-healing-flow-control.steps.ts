@@ -830,7 +830,22 @@ const inboundRigs = new WeakMap<E2EWorld, InboundSaturationRig>();
  * permits are exhausted" — real load the node genuinely cannot absorb at once,
  * not a bigger count of work it finds trivial.
  */
-const SATURATING_READ_PATH = '/db/content?limit=2000';
+const SATURATING_READ_PATH = '/db/content?limit=100';
+
+/**
+ * How far past the ceiling the load runs.
+ *
+ * Overshooting by a handful (ceiling + 64) exhausts the pool but only ~11% of
+ * arrivals are shed at steady state, so a SINGLE probe is admitted ~9 times out
+ * of 10 and the scenario reads "not saturated" against a node that is. Measured
+ * on the mesh 2026-08-22 at 3x the ceiling: 66% shed, the whole burst drains in
+ * ~2.7s, and /admin/self-healing answers in 2ms the moment the load stops — so
+ * this is both the RELIABLE construction and the gentle one. (3x of a
+ * `limit=100` read is far lighter on the peer than 1.1x of a `limit=2000` one,
+ * which took ~10s to drain and left the following scenario timing out on the
+ * diagnostic endpoint.)
+ */
+const SATURATION_OVERSHOOT = 3;
 
 interface SustainedLoad {
   stop: () => void;
@@ -849,7 +864,7 @@ function sustainedLoad(url: string, concurrency: number): SustainedLoad {
   let running = true;
   const workers = Array.from({ length: concurrency }, async () => {
     while (running) {
-      await getRaw(url, { timeoutMs: 25_000 }).catch(() => null);
+      await getRaw(url, { timeoutMs: 10_000 }).catch(() => null);
     }
   });
   return {
@@ -860,13 +875,33 @@ function sustainedLoad(url: string, concurrency: number): SustainedLoad {
   };
 }
 
-/** Probe until the node sheds (503) or the budget runs out; returns the last answer. */
+/**
+ * Probe until the node sheds (503) or the budget runs out; returns the last
+ * answer.
+ *
+ * A probe that THROWS is itself a verdict, not an accident: a node that queues
+ * instead of shedding leaves the caller hanging until the client timeout, which
+ * is exactly the "blocking accept loop" failure the shed exists to prevent. It
+ * is captured as status 0 carrying the transport error so the caller's assertion
+ * can name what actually happened rather than dying on an unhandled rejection.
+ */
 async function probeUntilShed(url: string, budgetMs: number): Promise<RawHttpResponse> {
   const deadline = Date.now() + budgetMs;
-  let last = await getRawWithHeaders(url, { timeoutMs: 10_000 });
+  const once = async (): Promise<RawHttpResponse> => {
+    try {
+      return await getRawWithHeaders(url, { timeoutMs: 10_000 });
+    } catch (error) {
+      return {
+        status: 0,
+        text: `probe never answered (queued, not shed): ${String(error)}`,
+        headers: {},
+      };
+    }
+  };
+  let last = await once();
   while (last.status !== 503 && Date.now() < deadline) {
     await sleep(100);
-    last = await getRawWithHeaders(url, { timeoutMs: 10_000 });
+    last = await once();
   }
   return last;
 }
@@ -882,7 +917,8 @@ async function saturateInboundAdmission(
   url: string
 ): Promise<InboundSaturationRig> {
   const concurrency = Number(
-    process.env['E2E_INBOUND_SATURATION_BURST'] ?? DOORWAY_MAX_INFLIGHT_READ + 64
+    process.env['E2E_INBOUND_SATURATION_BURST'] ??
+      DOORWAY_MAX_INFLIGHT_READ * SATURATION_OVERSHOOT
   );
   const load = sustainedLoad(`${url}${SATURATING_READ_PATH}`, concurrency);
   const rig: InboundSaturationRig = {
@@ -916,8 +952,8 @@ function inboundRig(world: E2EWorld): InboundSaturationRig {
 Given("the doorway's inbound permits are exhausted", async function (this: E2EWorld) {
   if (!DESTRUCTIVE) {
     return skipHeldDestructive(
-      `fires a real ${DOORWAY_MAX_INFLIGHT_READ + 64}-request concurrent burst at the live doorway ` +
-        'to saturate its read-admission pool.'
+      `holds ${DOORWAY_MAX_INFLIGHT_READ * SATURATION_OVERSHOOT} concurrent reads against the live ` +
+        'doorway to saturate its read-admission pool.'
     );
   }
   const url = doorwayUrl(this, 'alpha');
@@ -994,8 +1030,8 @@ Given(
   async function (this: E2EWorld) {
     if (!DESTRUCTIVE) {
       return skipHeldDestructive(
-        `fires a real ${DOORWAY_MAX_INFLIGHT_READ + 64}-request concurrent burst at the live doorway ` +
-          'to saturate its read-admission pool.'
+        `holds ${DOORWAY_MAX_INFLIGHT_READ * SATURATION_OVERSHOOT} concurrent reads against the live ` +
+          'doorway to saturate its read-admission pool.'
       );
     }
     const url = doorwayUrl(this, 'alpha');
@@ -1467,7 +1503,8 @@ async function saturateStorageInflight(
   storageUrl: string
 ): Promise<StorageSaturationRig> {
   const concurrency = Number(
-    process.env['E2E_STORAGE_SATURATION_BURST'] ?? STORAGE_MAX_CONCURRENT_READS + 32
+    process.env['E2E_STORAGE_SATURATION_BURST'] ??
+      STORAGE_MAX_CONCURRENT_READS * SATURATION_OVERSHOOT
   );
   const load = sustainedLoad(`${storageUrl}${SATURATING_READ_PATH}`, concurrency);
   const rig: StorageSaturationRig = {
@@ -1500,8 +1537,8 @@ function storageRig(world: E2EWorld): StorageSaturationRig {
 Given("elohim-storage's inflight permits are exhausted", async function (this: E2EWorld) {
   if (!DESTRUCTIVE) {
     return skipHeldDestructive(
-      `fires a real ${STORAGE_MAX_CONCURRENT_READS + 32}-request concurrent burst directly at a ` +
-        'live storage peer to saturate its read pool.'
+      `holds ${STORAGE_MAX_CONCURRENT_READS * SATURATION_OVERSHOOT} concurrent reads directly ` +
+        'against a live storage peer to saturate its read pool.'
     );
   }
   const rig = await saturateStorageInflight(this, primaryStorageUrl('alpha'));
@@ -1509,7 +1546,13 @@ Given("elohim-storage's inflight permits are exhausted", async function (this: E
     rig.probeStatus,
     503,
     `expected 503 after saturating storage's read pool (ceiling ${STORAGE_MAX_CONCURRENT_READS}), ` +
-      `got ${rig.probeStatus}: ${rig.probeBody}`
+      `got ${rig.probeStatus}: ${rig.probeBody}. MEASURED 2026-08-22 against this mesh: 2000 ` +
+      "concurrent heavy reads at a peer produced ZERO 'storage request admission at ceiling' log " +
+      'lines while elohim_http_requests_in_flight read 1 and /metrics itself went unanswered for ' +
+      '~6s — storage serves this load essentially serially, so its per-request semaphore is never ' +
+      'reached and the shed cannot fire. The caller queues instead, which is the very failure this ' +
+      'scenario names. The gap is in elohim-storage (src/http.rs handle_request admission gate), ' +
+      'not in this step.'
   );
 });
 
@@ -1569,12 +1612,20 @@ Given(
   async function (this: E2EWorld) {
     if (!DESTRUCTIVE) {
       return skipHeldDestructive(
-        `fires a real ${STORAGE_MAX_CONCURRENT_READS + 32}-request concurrent burst directly at a ` +
-          'live storage peer to saturate its read pool.'
+        `holds ${STORAGE_MAX_CONCURRENT_READS * SATURATION_OVERSHOOT} concurrent reads directly ` +
+          'against a live storage peer to saturate its read pool.'
       );
     }
     const rig = await saturateStorageInflight(this, primaryStorageUrl('alpha'));
-    assert.equal(rig.probeStatus, 503, `expected storage to shed (503), got ${rig.probeStatus}`);
+    assert.equal(
+      rig.probeStatus,
+      503,
+      `expected storage to shed (503), got ${rig.probeStatus}: ${rig.probeBody}. This scenario's ` +
+        'precondition is an upstream that sheds with its OWN Retry-After, so it is blocked by the ' +
+        'same measured elohim-storage gap as the sibling scenario above: under real concurrent ' +
+        'load the peer queues rather than reaching its read-admission ceiling, so it never emits ' +
+        'the 503 the doorway is supposed to surface.'
+    );
     assert.equal(
       rig.probeHeaders['retry-after'],
       String(STORAGE_SHED_RETRY_AFTER_SECS),
