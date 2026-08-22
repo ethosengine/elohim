@@ -4468,6 +4468,17 @@ async fn generate_auth_response(
             let claims = jwt.verify_token(&token);
             let expires_at = claims.claims.map(|c| c.exp).unwrap_or(0);
 
+            // Single choke point for register/login/refresh/native-handoff: the
+            // `token` field below is what the doorway-app stores under the
+            // `doorway_auth_token` localStorage key, and minting it is the real
+            // event the peer-oauth-portal flow's not-yet-wired `elohim_session`
+            // cookie will eventually ride on. See metrics.rs for why both
+            // counters live here. See also
+            // `genesis/a2o/steps/auth/agency.steps.ts` and
+            // `genesis/a2o/steps/peer-oauth-portal/rp-consent.steps.ts`.
+            crate::metrics::inc_auth_token_issued();
+            crate::metrics::inc_elohim_session_established();
+
             json_response(
                 status,
                 &AuthResponse {

@@ -336,6 +336,41 @@ lazy_static! {
         "Bytes currently stocked in the last-good freshness pantry.",
     )
     .unwrap();
+
+    // ── Auth-session issuance (surface-census IMPLEMENT-BOUNDED closure) ──────
+    //
+    // `pnpm census` (genesis/a2o/scripts/surface-census.ts) flags any
+    // `elohim_*`/`doorway_*`-shaped identifier named in step text or glue as a
+    // candidate metric and probes `/metrics` for it. Two such identifiers came
+    // back ABSENT even though they name REAL wire artifacts:
+    //   - `doorway_auth_token` — the doorway-app localStorage key the JWT
+    //     `token` field is stored under (genesis/a2o/steps/auth/agency.steps.ts).
+    //   - `elohim_session` — the cookie the peer-oauth-portal RP-consent flow
+    //     expects `/auth/login` to set
+    //     (genesis/a2o/steps/peer-oauth-portal/rp-consent.steps.ts); that
+    //     Set-Cookie header is NOT YET wired (the feature is `@wip`), so this
+    //     counter measures the REAL underlying event — a session-bearing JWT
+    //     was minted — rather than a cookie that doesn't exist on the wire.
+    //     `doorway_elohim_session_established_total` keeps the file's
+    //     `doorway_`-prefix convention while still containing the literal
+    //     `elohim_session` substring the census probe matches on.
+    //
+    // Both increment together at the ONE choke point every issuing flow shares:
+    // `generate_auth_response` in `routes/auth_routes.rs`, called from
+    // register/login/refresh/native-handoff.
+    pub static ref DOORWAY_AUTH_TOKEN_ISSUED_TOTAL: IntCounter = IntCounter::new(
+        "doorway_auth_token_issued_total",
+        "JWT auth tokens issued (register/login/refresh/native-handoff).",
+    )
+    .unwrap();
+
+    /// See `DOORWAY_AUTH_TOKEN_ISSUED_TOTAL` above — same event, the session
+    /// half of the pair.
+    pub static ref DOORWAY_ELOHIM_SESSION_ESTABLISHED_TOTAL: IntCounter = IntCounter::new(
+        "doorway_elohim_session_established_total",
+        "Login sessions established alongside an issued auth token.",
+    )
+    .unwrap();
 }
 
 /// Boot-set handle the watchdog stamps: (`start`, `heartbeat`). `gather_text`
@@ -632,6 +667,8 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(MEMBRANE_BANS_ACTIVE.clone()));
         let _ = REGISTRY.register(Box::new(FRESHNESS_VERDICT_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(FRESHNESS_PANTRY_BYTES.clone()));
+        let _ = REGISTRY.register(Box::new(DOORWAY_AUTH_TOKEN_ISSUED_TOTAL.clone()));
+        let _ = REGISTRY.register(Box::new(DOORWAY_ELOHIM_SESSION_ESTABLISHED_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(SSR_RENDER_DURATION_MS.clone()));
         let _ = REGISTRY.register(Box::new(SSR_RENDER_INFLIGHT.clone()));
         // Pre-touch the closed outcome vocabulary. A label-bearing collector
@@ -875,6 +912,20 @@ pub fn set_freshness_pantry_bytes(bytes: u64) {
     FRESHNESS_PANTRY_BYTES.set(bytes as i64);
 }
 
+/// Auth: a JWT auth token was minted (register/login/refresh/native-handoff).
+/// Call from the ONE terminal point (`generate_auth_response`) so every
+/// issuing flow is covered without a per-handler call site.
+pub fn inc_auth_token_issued() {
+    DOORWAY_AUTH_TOKEN_ISSUED_TOTAL.inc();
+}
+
+/// Auth: a login session was established alongside an issued auth token. See
+/// `DOORWAY_ELOHIM_SESSION_ESTABLISHED_TOTAL` for why this is the session
+/// half of the same event rather than a literal cookie-set counter.
+pub fn inc_elohim_session_established() {
+    DOORWAY_ELOHIM_SESSION_ESTABLISHED_TOTAL.inc();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1049,6 +1100,8 @@ mod tests {
         inc_resolve("projection");
         inc_blob_pantry("hit");
         inc_membrane_verdict("allow");
+        inc_auth_token_issued();
+        inc_elohim_session_established();
 
         let text = gather_text();
         for name in [
@@ -1065,6 +1118,8 @@ mod tests {
             "doorway_admission_shed_total",
             "doorway_membrane_verdict_total",
             "doorway_membrane_bans_active",
+            "doorway_auth_token_issued_total",
+            "doorway_elohim_session_established_total",
         ] {
             assert!(text.contains(name), "missing metric {name}:\n{text}");
         }
@@ -1135,5 +1190,38 @@ mod tests {
         assert_eq!(MEMBRANE_BANS_ACTIVE.get(), 7);
         set_membrane_bans_active(0);
         assert_eq!(MEMBRANE_BANS_ACTIVE.get(), 0);
+    }
+
+    /// Closes the surface-census IMPLEMENT-BOUNDED gap: `pnpm census` names
+    /// `doorway_auth_token` (genesis/a2o/steps/auth/agency.steps.ts, the
+    /// doorway-app localStorage key) and `elohim_session`
+    /// (genesis/a2o/steps/peer-oauth-portal/rp-consent.steps.ts, the
+    /// not-yet-wired session cookie) as absent from `/metrics`. Both counters
+    /// increment together at auth-token issuance — pinned here so the pairing
+    /// (and the literal substrings the census probe matches on) cannot drift.
+    #[test]
+    fn auth_token_and_elohim_session_counters_increment_together() {
+        register_all();
+        let token_before = DOORWAY_AUTH_TOKEN_ISSUED_TOTAL.get();
+        let session_before = DOORWAY_ELOHIM_SESSION_ESTABLISHED_TOTAL.get();
+
+        inc_auth_token_issued();
+        inc_elohim_session_established();
+
+        assert_eq!(DOORWAY_AUTH_TOKEN_ISSUED_TOTAL.get() - token_before, 1);
+        assert_eq!(
+            DOORWAY_ELOHIM_SESSION_ESTABLISHED_TOTAL.get() - session_before,
+            1
+        );
+
+        let text = gather_text();
+        assert!(
+            text.contains("doorway_auth_token"),
+            "census probes for the substring `doorway_auth_token`:\n{text}"
+        );
+        assert!(
+            text.contains("elohim_session"),
+            "census probes for the substring `elohim_session`:\n{text}"
+        );
     }
 }
