@@ -240,18 +240,50 @@ fn parse_projector_lag(body: &serde_json::Value) -> Option<i64> {
         .max()
 }
 
+/// How long the ONE upstream read in this read model may take.
+///
+/// Deliberately far below the shared storage-proxy client's own request timeout
+/// (STORAGE_PROXY_REQUEST_TIMEOUT_SECS, 12s): this endpoint is the surface an
+/// operator or an agent reads TO DIAGNOSE a struggling upstream, so it must
+/// never be held hostage by that upstream. Measured on the household mesh
+/// 2026-08-22 — with a storage peer saturated, GET /admin/self-healing blew a
+/// 10s client bound and the two scenarios reading it failed on the diagnostic,
+/// not on the thing being diagnosed.
+const PROJECTOR_FETCH_TIMEOUT_SECS: u64 = 2;
+
 /// Fetch storage's /api/v1/status/projector and return the max lagSeconds.
-/// Fault-tolerant: any error (storage down, parse fail, no URL) → None. NEVER
-/// fails the aggregate — the stability surface degrades a field, not the call.
+/// Fault-tolerant: any error (storage down, SLOW, parse fail, no URL) → None.
+/// NEVER fails or stalls the aggregate — the stability surface degrades a field,
+/// not the call.
 async fn fetch_projector_status(state: &Arc<crate::server::AppState>) -> Option<i64> {
     let base = state.args.storage_url.as_ref()?;
     let url = format!("{}/api/v1/status/projector", base.trim_end_matches('/'));
-    let resp = state.storage_proxy_client.get(&url).send().await.ok()?;
-    if !resp.status().is_success() {
-        return None;
+    let fetch = async {
+        let resp = state.storage_proxy_client.get(&url).send().await.ok()?;
+        if !resp.status().is_success() {
+            return None;
+        }
+        let body: serde_json::Value = resp.json().await.ok()?;
+        parse_projector_lag(&body)
+    };
+    match tokio::time::timeout(
+        std::time::Duration::from_secs(PROJECTOR_FETCH_TIMEOUT_SECS),
+        fetch,
+    )
+    .await
+    {
+        Ok(lag) => lag,
+        Err(_) => {
+            tracing::debug!(
+                target: "doorway::self_healing",
+                url = %url,
+                timeout_secs = PROJECTOR_FETCH_TIMEOUT_SECS,
+                "projector status read timed out — reporting lagSeconds null rather than \
+                 holding the self-healing read model open"
+            );
+            None
+        }
     }
-    let body: serde_json::Value = resp.json().await.ok()?;
-    parse_projector_lag(&body)
 }
 
 /// Handle `GET /admin/self-healing`. Composes the Cat-C node-local read model
