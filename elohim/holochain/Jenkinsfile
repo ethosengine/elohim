@@ -164,6 +164,36 @@ def fetchHappFromHarbor(String destPath, String version = null) {
  * Validation stage (@concern:federation-deploy). Top-level def = own CPS
  * method — the pipeline block sits against the JVM 64KB hard limit.
  */
+// Extracted from the deploy script{} block (its own CPS method — that block
+// sat at 11,139 B against the 11,000 hard method-size ceiling).
+def logAndWriteTopology(String strategy, List allHumans) {
+    echo "Resolved topology (${strategy}):"
+    allHumans.each { h ->
+        echo "  ${h.name} (${h.humanLabel}) -> ${h.env} (${h.namespace}/${h.resourcePrefix})"
+    }
+
+    // Write topology.json for downstream pipelines (genesis seeder)
+    def topologyJson = groovy.json.JsonOutput.prettyPrint(
+        groovy.json.JsonOutput.toJson([
+            strategy: strategy,
+            generatedAt: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'"),
+            generatedBy: "elohim-edge/${env.BUILD_NUMBER}",
+            humans: allHumans.collect { h -> [
+                name: h.name,
+                role: h.role,
+                humanId: h.humanId,
+                env: h.env,
+                namespace: h.namespace,
+                resourcePrefix: h.resourcePrefix,
+                storageUrl: "http://${h.resourcePrefix}.${h.namespace}.svc.cluster.local:8090",
+                genesisPeer: (h.genesisPeer == true),
+            ]}
+        ])
+    )
+    writeFile file: 'genesis/orchestrator/environments/topology.json', text: topologyJson
+    echo "Wrote topology.json"
+}
+
 def checkFederationPeerPublicHealth(boolean alphaDeployed) {
     if (!alphaDeployed) {
         return
@@ -2092,32 +2122,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             ═══════════════════════════════════════════════════════════
                             """
 
-                            // Log resolved topology
-                            echo "Resolved topology (${strategy}):"
-                            allHumans.each { h ->
-                                echo "  ${h.name} (${h.humanLabel}) -> ${h.env} (${h.namespace}/${h.resourcePrefix})"
-                            }
-
-                            // Write topology.json for downstream pipelines (genesis seeder)
-                            def topologyJson = groovy.json.JsonOutput.prettyPrint(
-                                groovy.json.JsonOutput.toJson([
-                                    strategy: strategy,
-                                    generatedAt: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'"),
-                                    generatedBy: "elohim-edge/${env.BUILD_NUMBER}",
-                                    humans: allHumans.collect { h -> [
-                                        name: h.name,
-                                        role: h.role,
-                                        humanId: h.humanId,
-                                        env: h.env,
-                                        namespace: h.namespace,
-                                        resourcePrefix: h.resourcePrefix,
-                                        storageUrl: "http://${h.resourcePrefix}.${h.namespace}.svc.cluster.local:8090",
-                                        genesisPeer: (h.genesisPeer == true),
-                                    ]}
-                                ])
-                            )
-                            writeFile file: 'genesis/orchestrator/environments/topology.json', text: topologyJson
-                            echo "Wrote topology.json"
+                            logAndWriteTopology(strategy, allHumans)
 
                             // Group humans by environment and deploy each active env
                             def humansByEnv = allHumans.groupBy { it.env }
