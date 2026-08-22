@@ -160,6 +160,7 @@ p2p_port()   { echo $((9701 + $1)); }
 # {main.rs,config.rs} 2026-08-16 — these are the exact env vars the storage
 # binary reads, not aliases:
 #   PROJECTION_RECONCILE_SECS            reconcile sweep cadence (prod default 300s)
+#   ACQUISITION_RECONCILE_SECS           acquisition/provide pin reconcile tick (prod default 60s)
 #   CONTEST_BACKOFF_SECONDS               contest-backoff ladder rung (prod default 3600s)
 #   HEAL_MISSING_BACKOFF_SECONDS          heal-missing backoff rung (prod default 600s)
 #   ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS   evidence-absent backoff rung (prod default 86400s)
@@ -182,6 +183,10 @@ p2p_port()   { echo $((9701 + $1)); }
 # levers, same as ELOHIM_NETWORK_STAKES=simulacra above — never a prod default.
 # ---------------------------------------------------------------------------
 PROJECTION_RECONCILE_SECS="${MESH_RECONCILE_SECS:-30}"
+# Acquisition/provide pin reconcile tick. Chapter 11's exhaustion scenario can
+# only WAIT for this loop (retry budget = max(3, peers) probes, one per tick,
+# then retire on the next): at the prod 60s that is ~5 min of a 5-min saga.
+ACQUISITION_RECONCILE_SECS="${MESH_ACQUISITION_RECONCILE_SECS:-10}"
 CONTEST_BACKOFF_SECONDS="${MESH_CONTEST_BACKOFF:-120}"
 HEAL_MISSING_BACKOFF_SECONDS="${MESH_HEAL_MISSING_BACKOFF:-60}"
 ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS="${MESH_EVIDENCE_ABSENT_BACKOFF:-600}"
@@ -569,12 +574,13 @@ restart_storage() {
   local workdir="${MESH_DIR}/storage-restart"
   mkdir -p "$workdir"
 
-  local name port pid envfile cwd bin key k
+  local name port pid envfile exefile cwd bin key k failed=""
   for name in "${targets[@]}"; do
     port=""; k=0
     for n2 in "${PEERS[@]}"; do [ "$n2" = "$name" ] && port="$(http_port $k)"; k=$((k+1)); done
     [ -n "$port" ] || { echo "  $name: not a mesh peer ($MESH_PEERS)" >&2; continue; }
     envfile="$workdir/$name.environ"
+    exefile="$workdir/$name.exe"
 
     # Exact pid: the storage binary's argv carries --http-port <port>, which no
     # other process has, and which never appears in this script's own argv.
@@ -589,8 +595,12 @@ restart_storage() {
       cwd="$(readlink "/proc/$pid/cwd")"
       if ! bin="$(resolve_exe "$pid" "$STORAGE_BIN")"; then
         echo "  $name: binary is gone (was '$bin'); rebuild it or set STORAGE_BIN" >&2
-        continue
+        failed+=" $name"; continue
       fi
+      # Record the binary beside the environ: a later dead-peer restore must not
+      # depend on STORAGE_BIN's default path existing (the mesh usually runs the
+      # doorway-family DEBUG slot, not the release default).
+      printf '%s\n' "$bin" > "$exefile"
       key="$(tr '\0' '\n' < "$envfile" | sed -n 's/^AGENT_PUBKEY=//p' | head -1)"
       echo "  $name :$port pid=$pid agent=${key:0:20}… bin=$bin (env captured live)"
       kill "$pid" 2>/dev/null
@@ -599,27 +609,45 @@ restart_storage() {
       kill -0 "$pid" 2>/dev/null && { kill -9 "$pid" 2>/dev/null; sleep 2; }
     elif [ -s "$envfile" ]; then
       cwd="$LOCAL_DEV_DIR"
-      bin="$STORAGE_BIN"
-      [ -x "$bin" ] || { echo "  $name: STORAGE_BIN is not executable: $bin" >&2; continue; }
+      # Binary, in order of trust: the capture's own exe record (written by this
+      # script's live branch and by the a2o drills' writeRestartCapture), the
+      # exe of any sibling peer still running (same build), then STORAGE_BIN.
+      bin="$(restore_binary_for "$exefile")"
+      if [ -z "$bin" ]; then
+        echo "  $name: no executable storage binary — $exefile absent, no sibling peer running, STORAGE_BIN=$STORAGE_BIN not executable" >&2
+        failed+=" $name"; continue
+      fi
       key="$(tr '\0' '\n' < "$envfile" | sed -n 's/^AGENT_PUBKEY=//p' | head -1)"
-      echo "  $name :$port not readable/not running — restoring the capture from $(date -r "$envfile" -u +%H:%M:%SZ), agent=${key:0:20}…"
+      echo "  $name :$port not readable/not running — restoring the capture from $(date -r "$envfile" -u +%H:%M:%SZ), agent=${key:0:20}… bin=$bin"
       [ -n "$pid" ] && { kill -9 "$pid" 2>/dev/null; sleep 1; }
     else
-      echo "  $name :$port not running and no captured environment — use ./hc-mesh.sh start"
-      continue
+      # An EMPTY envfile lands here too (-s): a capture taken with fs.copyFile on
+      # procfs is 0 bytes (2026-08-22). Say so — silently continuing is how a
+      # dead peer turned into 21 ECONNREFUSED reds downstream.
+      if [ -e "$envfile" ] && [ ! -s "$envfile" ]; then
+        echo "  $name :$port not running and its captured environment is EMPTY ($envfile) — use ./hc-mesh.sh start" >&2
+      else
+        echo "  $name :$port not running and no captured environment — use ./hc-mesh.sh start" >&2
+      fi
+      failed+=" $name"; continue
     fi
 
     # setsid: nohup ignores SIGHUP but not a SIGKILL to the process group, which
     # is how a calling shell reaps its background children when it exits.
+    # The captured environment is authoritative (AGENT_PUBKEY etc.); an overlay
+    # (restart_env_overlay) adds/replaces ONLY the named keys.
     setsid nohup python3 -c '
 import os, sys
-envfile, binpath, port, cwd = sys.argv[1:5]
+envfile, binpath, port, cwd, overlay = sys.argv[1:6]
 with open(envfile, "rb") as f:
     raw = f.read().decode("utf-8", "replace")
 env = dict(p.split("=", 1) for p in raw.split("\0") if "=" in p)
+for item in overlay.split("\n"):
+    if "=" in item:
+        k, v = item.split("=", 1); env[k] = v
 os.chdir(cwd)
 os.execve(binpath, [binpath, "--http-port", port], env)
-' "$envfile" "$bin" "$port" "$cwd" >> "$LOGDIR/$name.log" 2>&1 &
+' "$envfile" "$bin" "$port" "$cwd" "$(restart_env_overlay)" >> "$LOGDIR/$name.log" 2>&1 &
     disown 2>/dev/null || true
   done
 
@@ -634,17 +662,74 @@ os.execve(binpath, [binpath, "--http-port", port], env)
     printf "."; sleep 3
   done
   echo
+  # Every requested peer must answer, by PORT — a restart that leaves a target
+  # down is a failure the caller (a chaos drill, an operator) has to see.
+  k=0
+  for n2 in "${PEERS[@]}"; do
+    port="$(http_port $k)"; k=$((k+1))
+    case " ${targets[*]} " in *" $n2 "*) ;; *) continue ;; esac
+    case "$failed" in *" $n2"*) continue ;; esac
+    curl -s -m 2 "http://localhost:$port/health" >/dev/null || {
+      echo "  $n2 :$port did not come back within the wait" >&2; failed+=" $n2"; }
+  done
   refresh_fixture_pids
   # /health is not the question. "Serving" and "able to anchor" are different
   # claims and only one of them matters.
   probe_zome_paths
+  if [ -n "$failed" ]; then
+    echo "storage-restart FAILED for:$failed" >&2
+    return 1
+  fi
+}
+
+# Env keys layered over a restarted peer's captured environment, one K=V per
+# line. Empty by default — the capture is the truth. Two opt-ins:
+#   MESH_RESTART_APPLY_PROFILE=1   re-apply THIS script's dev-tier pacing profile
+#                                  (the same knobs `start` exports), so a knob
+#                                  added after boot reaches a running mesh
+#                                  without regenerating it. Never touches
+#                                  AGENT_PUBKEY or any non-profile key.
+#   MESH_RESTART_ENV_OVERLAY="K=V K=V"   ad-hoc keys for one experiment.
+restart_env_overlay() {
+  if [ "${MESH_RESTART_APPLY_PROFILE:-0}" = "1" ]; then
+    printf '%s\n' \
+      "PROJECTION_RECONCILE_SECS=$PROJECTION_RECONCILE_SECS" \
+      "ACQUISITION_RECONCILE_SECS=$ACQUISITION_RECONCILE_SECS" \
+      "CONTEST_BACKOFF_SECONDS=$CONTEST_BACKOFF_SECONDS" \
+      "HEAL_MISSING_BACKOFF_SECONDS=$HEAL_MISSING_BACKOFF_SECONDS" \
+      "ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS=$ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS" \
+      "ELOHIM_HEAD_CORPUS_DIGEST=$ELOHIM_HEAD_CORPUS_DIGEST" \
+      "ELOHIM_ADOPT_BEFORE_AUTHOR=$ELOHIM_ADOPT_BEFORE_AUTHOR" \
+      "ADOPT_CONTEST_FANOUT=$ADOPT_CONTEST_FANOUT" \
+      "ELOHIM_NETWORK_STAKES=$ELOHIM_NETWORK_STAKES"
+  fi
+  local kv
+  for kv in ${MESH_RESTART_ENV_OVERLAY:-}; do printf '%s\n' "$kv"; done
+}
+
+# The binary for a dead peer whose /proc is gone: its recorded exe, a running
+# sibling's exe (same build), then STORAGE_BIN. Prints nothing if none is executable.
+restore_binary_for() {
+  local exefile="$1" cand
+  if [ -s "$exefile" ]; then
+    cand="$(head -1 "$exefile")"
+    [ -x "$cand" ] && { echo "$cand"; return 0; }
+  fi
+  local spid
+  for spid in $(ps -eo pid=,args= | awk -v me="$$" 'index($0, "elohim-storage") && index($0, "--http-port") && $1 != me { print $1 }'); do
+    cand="$(readlink "/proc/$spid/exe" 2>/dev/null)"; cand="${cand% (deleted)}"
+    [ -n "$cand" ] && [ -x "$cand" ] && { echo "$cand"; return 0; }
+  done
+  [ -x "$STORAGE_BIN" ] && { echo "$STORAGE_BIN"; return 0; }
+  return 1
 }
 
 # The household fixture (written once by hc-mesh-prologue.sh) names each storage
 # peer's pid, and the a2o chaos drills kill/verify peers BY THAT PID. An in-place
 # restart mints new pids, so a fixture left behind turns every later drill into
 # `kill ESRCH` / "/proc/<pid> is gone" (2026-08-22: 3 chaos-peer-churn reds from
-# one storage-restart). Re-resolve every peer's pid from its listening port.
+# one storage-restart). Re-resolve every peer's pid from its listening port,
+# and stamp its AGENT_PUBKEY beside it.
 refresh_fixture_pids() {
   local fixture="$MESH_DIR/household-fixture.json"
   [ -s "$fixture" ] || return 0
@@ -658,9 +743,21 @@ for i, name in enumerate(peers):
     port = 8090 + i
     out = subprocess.run(['bash', '-c', f"ss -ltnp | grep ':{port} ' | sed -n 's/.*pid=\\([0-9]*\\).*/\\1/p' | head -1"],
                          capture_output=True, text=True).stdout.strip()
-    if out and name in sp and sp[name].get('pid') != int(out):
+    if not out or name not in sp:
+        continue
+    if sp[name].get('pid') != int(out):
         changed.append(f"{name}:{sp[name].get('pid')}->{out}")
         sp[name]['pid'] = int(out)
+    # The peer's agent key, in the namespace custody commitments name providers
+    # in (a2o drills match either this or the libp2p peerId).
+    try:
+        env = open(f'/proc/{out}/environ', 'rb').read().split(b'\0')
+        key = next((e.split(b'=', 1)[1].decode() for e in env if e.startswith(b'AGENT_PUBKEY=')), '')
+    except OSError:
+        key = ''
+    if key and sp[name].get('agentPubKey') != key:
+        changed.append(f"{name}:agentPubKey={key[:12]}…")
+        sp[name]['agentPubKey'] = key
 if changed:
     json.dump(d, open(fixture, 'w'), indent=2)
     print('fixture pids refreshed: ' + ' '.join(changed))
@@ -1251,6 +1348,7 @@ PYEOF
       DEVICE_ARCHETYPE=device-family-node-base \
       ELOHIM_STORAGE_PEER_POLICY_PATH="$MESH_DIR/peer-policy.toml" \
       PROJECTION_RECONCILE_SECS="$PROJECTION_RECONCILE_SECS" \
+      ACQUISITION_RECONCILE_SECS="$ACQUISITION_RECONCILE_SECS" \
       CONTEST_BACKOFF_SECONDS="$CONTEST_BACKOFF_SECONDS" \
       HEAL_MISSING_BACKOFF_SECONDS="$HEAL_MISSING_BACKOFF_SECONDS" \
       ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS="$ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS" \
@@ -1295,7 +1393,8 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     conductors-restart) restart_conductors ;;
     storage-restart) shift; restart_storage "$@" ;;
     zome-probe) probe_zome_paths ;;
+    fixture-refresh) refresh_fixture_pids ;;
     prologue) shift; exec bash "$SCRIPT_DIR/hc-mesh-prologue.sh" "$@" ;;
-    *) echo "usage: hc-mesh.sh [start|stop|status|probe|prologue|conductors-restart|storage-restart [peer...]|zome-probe]"; exit 2 ;;
+    *) echo "usage: hc-mesh.sh [start|stop|status|probe|prologue|conductors-restart|storage-restart [peer...]|zome-probe|fixture-refresh]"; exit 2 ;;
   esac
 fi
