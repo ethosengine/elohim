@@ -44,7 +44,10 @@ Feature: Doorway failover — two doorways, one name, one truth
   A person reaching for elohim.host should never inherit a single doorway's bad
   hour. The doorway pair must be honestly classifiable, someone must always be
   serving, the apex name must ride through a sibling's shed, and whoever serves
-  must serve the same declared truth.
+  must serve the same declared truth. A doorway's bad hour is not always its
+  own, either: it can be inherited from the storage peer it reads from, so the
+  same question — must this bad hour reach the person? — is asked twice, once
+  between the doorways and once behind one of them.
 
   THE PAIR. "alpha-A" and "elohim.host" are two doorways holding the same
   converged content, each reachable at its own address. "elohim.host" is also
@@ -52,10 +55,12 @@ Feature: Doorway failover — two doorways, one name, one truth
   own doorway, so that doorway's bad hour becomes the public name's bad hour
   unless failover holds. "alpha-A" is the sibling that keeps serving through it.
   The DECLARED HEAD both must agree on is the notarized identity of the current
-  version of a piece of content: same head, same answer. The content these
+  version of a piece of content: same head, same answer. The content most of these
   scenarios read, "elohim-host-landing", is the landing page itself — the first
   thing a stranger typing the apex name ever sees, and so the read whose failure
-  is most expensive.
+  is most expensive. One scenario reads "manifesto" instead, for a reason given
+  where the difference is introduced: it needs content that more than one peer
+  holds.
 
   HOW A DOORWAY IS CLASSIFIED. Serving = it answers GET / with 200. Shedding =
   it answers 503 carrying the specified catching-up contract — behind, and
@@ -96,9 +101,42 @@ Feature: Doorway failover — two doorways, one name, one truth
   suite) can read "am I actually ready?" and "am I actually refusing
   requests?" without guessing from outside.
 
+  WHERE A DOORWAY'S ANSWERS COME FROM, AND WHY IT MATTERS WHICH PEER GIVES
+  THEM. A doorway does not hold content; it reads from a POOL of storage peers,
+  and it declares one of them its PRIMARY — the peer it asks first for
+  everything. A peer ANSWERS or it STALLS — the peer-level counterpart of a
+  doorway serving or shedding. Stalling is the quiet one: still there, still
+  accepting the connection, answering nothing. Enough stalled answers and the doorway's breaker for that
+  peer opens, and from then on the doorway sheds every read it would have sent
+  there. That is how a doorway inherits a bad hour it did not have.
+
+  Whether it SHOULD inherit it depends on what is being read. A PROJECTION —
+  content, humans, a head-record — is one peer's own worked-out answer, so
+  asking a different peer is asking a different question and may get a
+  different answer; the primary owns it, stall or no stall. A BLOB is the
+  opposite: it is named by the hash of its own bytes, so every peer in the pool
+  that holds it — every HOLDER — holds the byte-identical thing, and any holder
+  answering is the same answer. Refusing a blob read because the primary
+  stalled tells a person "unavailable" about bytes the pool had all along.
+  So for blobs, and only for blobs, the doorway may choose a different single
+  peer to spend its one request on — one request, one peer, still; it just
+  stops spending it on a peer it already knows is refusing.
+
+  Which is why the blob-failover scenario reads "manifesto" rather than the
+  landing page: a blob only has somewhere to ride to if a SECOND holder exists,
+  and "manifesto" is the commons content this pool is known to replicate. It is
+  also the one scenario below that names a single doorway, because that is the
+  altitude it works at — everything before and after it asks the question
+  between the pair.
+
   BORN RED means a scenario specifies behaviour that does not exist yet: it
-  fails on purpose, its assertion is the specification for the cure, and it is
-  never weakened to make a run green.
+  fails on purpose, its assertion is the specification for the CURE — whatever
+  implementation would make it green — and it is never weakened to make a run
+  green. A `@requires:` tag says something else entirely: not that the cure is
+  missing, but that this lane lacks the substrate the scenario needs, so the
+  scenario is SKIPPED rather than failed. `@requires:owned-substrate` names the
+  strongest of those: control of a live peer — permission to stop one on
+  purpose and the standing to promise it comes back.
 
   Background:
     Given peer "alpha-A" at "alpha-A"
@@ -128,6 +166,17 @@ Feature: Doorway failover — two doorways, one name, one truth
     When I query "/" on peer "elohim.host" expecting raw text
     Then the raw response status is 200
     And the raw response body contains "app-root"
+
+  @requires:owned-substrate
+  Scenario: A blob rides through its primary's bad hour
+    # Nothing here is waiting for an organic stall — I induce one, so the last
+    # step is mine to undo, and I assert the undoing rather than assume it: a
+    # stopped peer left stopped breaks the substrate for every scenario after
+    # this one.
+    Given content "manifesto" has a blob that a holder behind doorway "alpha-A" other than its primary answers for
+    When doorway "alpha-A" loses its primary storage peer to a stall
+    Then the blob still arrives through doorway "alpha-A", from a holder that is not the stalled primary
+    And I restore doorway "alpha-A"'s primary storage peer, and it answers again
 
   Scenario: Whoever serves, serves the same declared truth
     # Failover that changes the answer is worse than an outage. Every doorway

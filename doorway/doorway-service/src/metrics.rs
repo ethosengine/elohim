@@ -252,6 +252,18 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Content-addressed blob reads whose target was re-selected at dispatch
+    /// time because the declared primary steward peer's upstream circuit was
+    /// shedding. ONE request still goes to ONE upstream — this counts how often
+    /// that one target was chosen from a sibling holder rather than the primary.
+    /// A rising count with a flat `doorway_upstream_breaker_open_total` means
+    /// the pool is absorbing a peer's bad hour instead of 503-ing the reader.
+    pub static ref BLOB_TARGET_FAILOVER_TOTAL: IntCounter = IntCounter::new(
+        "doorway_blob_target_failover_total",
+        "Blob reads whose upstream target was re-selected past a shedding primary.",
+    )
+    .unwrap();
+
     /// Requests shed because the per-upstream circuit breaker was OPEN (doorway
     /// refused the call before forwarding). Name matches the existing tracing
     /// `counter=` field. doorway-resident operational state.
@@ -654,6 +666,7 @@ pub fn register_all() {
         for outcome in ["hit", "miss", "stocked", "skipped"] {
             BLOB_PANTRY_TOTAL.with_label_values(&[outcome]).inc_by(0);
         }
+        let _ = REGISTRY.register(Box::new(BLOB_TARGET_FAILOVER_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(UPSTREAM_BREAKER_OPEN_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(UPSTREAM_BACKPRESSURE_HONORED_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(ADMISSION_SHED_TOTAL.clone()));
@@ -814,6 +827,12 @@ pub fn inc_resolve(tier: &str) {
 /// M4: a blob pantry outcome ∈ {hit, miss, stocked, skipped}.
 pub fn inc_blob_pantry(outcome: &str) {
     BLOB_PANTRY_TOTAL.with_label_values(&[outcome]).inc();
+}
+
+/// A blob read's upstream target was re-selected past a shedding primary onto a
+/// sibling steward peer holding the same content-addressed bytes.
+pub fn inc_blob_target_failover() {
+    BLOB_TARGET_FAILOVER_TOTAL.inc();
 }
 
 /// M4: a request was shed because the upstream circuit breaker was open.

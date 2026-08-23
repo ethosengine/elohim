@@ -12,7 +12,7 @@ crate: doorway
 crateRoot: doorway/doorway-service
 seamLocus: >
   Doorway HTTP dispatch classification (src/server/http.rs: classify_dispatch/Disposition,
-  epr_should_serve_ssr, SsrFallbackReason), the SSR-bundle-head reconcile decision
+  select_route, epr_should_serve_ssr, SsrFallbackReason), the SSR-bundle-head reconcile decision
   (src/render/registry.rs: decide_reconcile/ReconcileDecision), the EPR projection-pool
   primary/peer/empty/unreachable fallback classifier (src/projection/epr_router.rs:
   fetch_projections_with_fallback/FallbackOutcome), the kitsune2 bootstrap PUT outcome
@@ -147,6 +147,51 @@ decisionPoints:
       - path: doorway/doorway-service/src/server/http.rs
         testName: landing_routes_that_epr_router_also_serves_still_classify_ssr
         kind: unit
+
+  - name: select_route
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/server/http.rs
+      modulePath: server::http::select_route
+      line: 115
+    summary: >
+      Picks WHICH of the registry's matches serves this request — one target, never a fan-out. For
+      content-addressed `/blob/` paths ONLY, walks the declared steward-peer priority order and
+      takes the first endpoint that is not currently shedding; every other path keeps
+      `matches.first()`. When the whole pool sheds, the declared primary is kept so the caller
+      lands on the existing guarded-shed path. Availability is READ (`UpstreamBreakers::would_shed`),
+      never gated — a planner that gated would consume the one half-open trial with nothing to
+      record its outcome.
+    concernIds:
+      - id: C7
+        status: answered
+        justification: >
+          The registry ADVERTISES every steward peer that holds `/blob/:hash`; before this
+          predicate, dispatch SERVED a 503 for the primary's whole 30 s cooldown while advertised
+          siblings held the identical content-addressed bytes — advertise != serve at the
+          dispatch seam. blob_read_rides_past_a_shedding_primary_to_a_holder_that_serves pins the
+          symmetry, and projections_never_float_between_peers_even_when_the_primary_sheds pins its
+          limit: only content-addressed reads may float, because only they are the same answer
+          from any advertised holder.
+    contractTests:
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: blob_read_stays_on_the_primary_while_it_is_serving
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: blob_read_rides_past_a_shedding_primary_to_a_holder_that_serves
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: blob_read_falls_back_to_the_primary_when_the_whole_pool_sheds
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: projections_never_float_between_peers_even_when_the_primary_sheds
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: selection_never_consumes_the_half_open_trial
+        kind: unit
+      - path: genesis/a2o/features/dataplane/doorway-failover.feature
+        testName: A blob rides through its primary's bad hour
+        kind: integration
 
   - name: Disposition
     kind: boundary-answer-type

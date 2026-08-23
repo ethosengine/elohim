@@ -79,6 +79,91 @@ async fn classify_dispatch(
     method: &Method,
     path: &str,
 ) -> Disposition {
+    classify_dispatch_with_breakers(registry, method, path, None).await
+}
+
+/// Pick WHICH of the registry's matches serves this request.
+///
+/// The single-target gospel is unchanged: one request goes to exactly ONE
+/// upstream, and doorway never iterates peers per request (no blob fan-out —
+/// see `doorway/CLAUDE.md`). What this adds is a *selection-time* choice of
+/// which single target that is.
+///
+/// `/blob/<hash>` is content-addressed: every steward peer that installed a
+/// manifest with `blob_proxy` contributes its OWN `/blob/:hash` route, and the
+/// same hash names the same bytes on all of them. When the declared primary's
+/// upstream circuit is Open (peer paused, dead, or three timeouts deep) every
+/// blob read was shed with a 503 for the whole cooldown while siblings in the
+/// same registry held identical bytes. So for blob paths only, walk the matches
+/// in declared priority order and take the first whose endpoint is not
+/// currently shedding.
+///
+/// Everything else keeps `matches.first()` exactly. Projections (`/db/*`), SSR
+/// routes and the rest are PER-PEER views, not content-addressed — floating
+/// them between peers would serve a different peer's answer under the same URL,
+/// which is the drift `declare_peer_priority` exists to prevent.
+///
+/// Availability is read with [`UpstreamBreakers::would_shed`], never `is_open`
+/// / `begin`: this is a planner, and a planner that gates would consume the one
+/// half-open trial without a guard to record its outcome — the latch bug fixed
+/// in f5e22baa2 and reintroduced in f0b908660. Read the doc comment on
+/// `would_shed` before touching this.
+///
+/// If EVERY candidate would shed, fall back to the declared primary so the
+/// request lands on the existing shed path (with its guarded trial and its
+/// catching-up 503) rather than inventing a new failure.
+fn select_route<'a>(
+    matches: &'a [crate::services::route_registry::CompiledRoute],
+    path: &str,
+    breakers: Option<&crate::routes::UpstreamBreakers>,
+) -> Option<&'a crate::services::route_registry::CompiledRoute> {
+    let primary = matches.first()?;
+    if !path.starts_with("/blob/") || matches.len() < 2 {
+        return Some(primary);
+    }
+    let Some(breakers) = breakers else {
+        return Some(primary);
+    };
+    // A non-StorageProxy match on a blob path has no endpoint to compare —
+    // keep it, exactly as `matches.first()` would have.
+    let Some(primary_endpoint) = primary.storage_endpoint() else {
+        return Some(primary);
+    };
+    if !breakers.would_shed(primary_endpoint) {
+        return Some(primary);
+    }
+    let alternate = matches.iter().skip(1).find(|route| {
+        route
+            .storage_endpoint()
+            .is_some_and(|endpoint| endpoint != primary_endpoint && !breakers.would_shed(endpoint))
+    });
+    match alternate {
+        Some(route) => {
+            info!(
+                path = %path,
+                counter = "doorway_blob_target_failover_total",
+                skipped_endpoint = %primary_endpoint,
+                chosen_endpoint = %route.storage_endpoint().unwrap_or_default(),
+                "blob target re-selected: primary is shedding, a sibling holder serves"
+            );
+            crate::metrics::inc_blob_target_failover();
+            Some(route)
+        }
+        // Whole pool shedding: keep the declared primary so the caller takes
+        // today's shed path unchanged.
+        None => Some(primary),
+    }
+}
+
+/// `classify_dispatch` with the breaker map threaded in for selection.
+/// `breakers = None` reproduces the pre-failover behaviour exactly
+/// (`matches.first()`), which is what the EPR-router probe site wants.
+async fn classify_dispatch_with_breakers(
+    registry: &crate::services::RouteRegistry,
+    method: &Method,
+    path: &str,
+    breakers: Option<&crate::routes::UpstreamBreakers>,
+) -> Disposition {
     let http_method = match *method {
         Method::GET => doorway_client::HttpMethod::Get,
         Method::POST => doorway_client::HttpMethod::Post,
@@ -90,7 +175,7 @@ async fn classify_dispatch(
     };
 
     let matches = registry.match_request(http_method, path).await;
-    if let Some(route) = matches.first() {
+    if let Some(route) = select_route(&matches, path, breakers) {
         if let Some(endpoint) = route.storage_endpoint() {
             // SSR-eligible routes (manifest `render` field set) get their own
             // disposition so the caller can dispatch through the in-process
@@ -5865,10 +5950,15 @@ async fn handle_request(
         //       ROOT_APP_SLUG is gone — the projection whose url_path="/" is the root.)
         // ====================================================================
         (_, p) => {
-            let dispo = classify_dispatch(
+            // Breakers threaded in so a content-addressed `/blob/<hash>` read
+            // selects a steward peer that is actually serving instead of being
+            // shed for the primary's whole cooldown. Selection only — the
+            // forward below is still to ONE endpoint.
+            let dispo = classify_dispatch_with_breakers(
                 &state.route_registry,
                 req.method(),
                 p,
+                Some(state.upstream_breakers.as_ref()),
             )
             .await;
 
@@ -7478,10 +7568,188 @@ mod dispatch_classification_tests {
     //! `stream_proxy` / future manifest path families to elohim-storage's
     //! manifest must NOT require a doorway code change to make them routable.
 
-    use super::{classify_dispatch, epr_should_serve_ssr, render_output_is_empty, Disposition};
+    use super::{
+        classify_dispatch, classify_dispatch_with_breakers, epr_should_serve_ssr,
+        render_output_is_empty, Disposition,
+    };
+    use crate::routes::UpstreamBreakers;
     use crate::services::RouteRegistry;
     use doorway_client::HttpMethod;
     use hyper::Method;
+
+    const PRIMARY: &str = "http://matthew:8090";
+    const POOL_PEER: &str = "http://jessica:8090";
+
+    /// Two steward peers, both installing the same manifest — so both contribute
+    /// their own `/blob/:hash` route AND their own `/db/humans` route. Priority
+    /// is declared primary-first, mirroring boot on the household mesh.
+    async fn two_peer_registry() -> RouteRegistry {
+        use doorway_client::{BlobProxyConfig, DoorwayRoutes, Route};
+        let registry = RouteRegistry::with_defaults();
+        registry
+            .declare_peer_priority(&[PRIMARY.to_string(), POOL_PEER.to_string()])
+            .await;
+        let manifest = DoorwayRoutes {
+            routes: vec![Route::get("/db/humans").handler("list_humans").build()],
+            blob_proxy: Some(BlobProxyConfig {
+                base_path: "/blob".to_string(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        // Install in REVERSE declared order on purpose: priority, not arrival,
+        // must decide who the primary is.
+        registry.install_steward_routes(POOL_PEER, &manifest).await;
+        registry.install_steward_routes(PRIMARY, &manifest).await;
+        registry
+    }
+
+    fn endpoint_of(dispo: &Disposition) -> &str {
+        match dispo {
+            Disposition::StorageProxy { endpoint } => endpoint,
+            Disposition::SsrRoute { endpoint, .. } => endpoint,
+            other => panic!("expected a storage-bearing disposition, got {other:?}"),
+        }
+    }
+
+    /// Open `endpoint`'s circuit: one recorded failure on a threshold-1 breaker.
+    fn open_circuit(breakers: &UpstreamBreakers, endpoint: &str) {
+        breakers.record(endpoint, false);
+        assert!(
+            breakers.would_shed(endpoint),
+            "{endpoint} must read as shedding after the failure threshold"
+        );
+    }
+
+    #[tokio::test]
+    async fn blob_read_stays_on_the_primary_while_it_is_serving() {
+        // No failover when nothing is wrong: the declared primary wins, and the
+        // pool peer never sees the read.
+        let registry = two_peer_registry().await;
+        let breakers = UpstreamBreakers::new(1, 30);
+        let dispo = classify_dispatch_with_breakers(
+            &registry,
+            &Method::GET,
+            "/blob/sha256-abcdef",
+            Some(&breakers),
+        )
+        .await;
+        assert_eq!(
+            endpoint_of(&dispo),
+            PRIMARY,
+            "a healthy primary must keep every blob read"
+        );
+    }
+
+    #[tokio::test]
+    async fn blob_read_rides_past_a_shedding_primary_to_a_holder_that_serves() {
+        // THE DEFECT. Primary's circuit is Open (peer paused / three timeouts).
+        // The bytes are content-addressed and the pool peer holds them, so the
+        // ONE target this request forwards to must be the pool peer — not a 503
+        // for the whole cooldown.
+        let registry = two_peer_registry().await;
+        let breakers = UpstreamBreakers::new(1, 30);
+        open_circuit(&breakers, PRIMARY);
+
+        let before = crate::metrics::BLOB_TARGET_FAILOVER_TOTAL.get();
+        let dispo = classify_dispatch_with_breakers(
+            &registry,
+            &Method::GET,
+            "/blob/sha256-abcdef",
+            Some(&breakers),
+        )
+        .await;
+        assert_eq!(
+            endpoint_of(&dispo),
+            POOL_PEER,
+            "a shedding primary must hand the blob read to a sibling holder"
+        );
+        assert_eq!(
+            crate::metrics::BLOB_TARGET_FAILOVER_TOTAL.get(),
+            before + 1,
+            "a re-selection must be counted (doorway_blob_target_failover_total)"
+        );
+    }
+
+    #[tokio::test]
+    async fn blob_read_falls_back_to_the_primary_when_the_whole_pool_sheds() {
+        // No holder is serving: keep the declared primary so the caller takes
+        // today's shed path (guarded trial + catching-up 503). Never None, never
+        // a 404 — the failure must stay the failure we already handle.
+        let registry = two_peer_registry().await;
+        let breakers = UpstreamBreakers::new(1, 30);
+        open_circuit(&breakers, PRIMARY);
+        open_circuit(&breakers, POOL_PEER);
+
+        let dispo = classify_dispatch_with_breakers(
+            &registry,
+            &Method::GET,
+            "/blob/sha256-abcdef",
+            Some(&breakers),
+        )
+        .await;
+        assert_eq!(
+            endpoint_of(&dispo),
+            PRIMARY,
+            "an all-shedding pool falls back to the declared primary"
+        );
+    }
+
+    #[tokio::test]
+    async fn projections_never_float_between_peers_even_when_the_primary_sheds() {
+        // The single-target gospel, sharpened: `/db/*` is a PER-PEER view, not
+        // content-addressed. Floating it would serve jessica's 3-row projection
+        // under alpha-A's URL — the exact drift `declare_peer_priority` exists
+        // to stop. A shedding primary still owns the route.
+        let registry = two_peer_registry().await;
+        let breakers = UpstreamBreakers::new(1, 30);
+        open_circuit(&breakers, PRIMARY);
+
+        let dispo =
+            classify_dispatch_with_breakers(&registry, &Method::GET, "/db/humans", Some(&breakers))
+                .await;
+        assert_eq!(
+            endpoint_of(&dispo),
+            PRIMARY,
+            "non-content-addressed routes must NOT fail over between peers"
+        );
+    }
+
+    #[tokio::test]
+    async fn selection_never_consumes_the_half_open_trial() {
+        // Mirror of `would_shed_never_consumes_the_half_open_trial`: selection is
+        // a PLANNER. If it gated (is_open / begin) it would consume the one
+        // half-open trial with nothing to record the outcome, latching the
+        // breaker on every route of that peer. Fixed twice already; pinned here
+        // at the new call site.
+        let registry = two_peer_registry().await;
+        let breakers = UpstreamBreakers::new(1, 0); // trial available immediately
+        breakers.record(PRIMARY, false);
+
+        for _ in 0..25 {
+            let _ = classify_dispatch_with_breakers(
+                &registry,
+                &Method::GET,
+                "/blob/sha256-abcdef",
+                Some(&breakers),
+            )
+            .await;
+        }
+
+        assert!(
+            breakers.begin(PRIMARY).is_some(),
+            "selection must leave the half-open trial for the guarded caller"
+        );
+    }
+
+    #[tokio::test]
+    async fn classify_dispatch_without_breakers_keeps_first_match() {
+        // The `None` delegation is behaviour-preserving: the EPR-router probe
+        // site classifies exactly as it did before failover existed.
+        let registry = two_peer_registry().await;
+        let dispo = classify_dispatch(&registry, &Method::GET, "/blob/sha256-abcdef").await;
+        assert_eq!(endpoint_of(&dispo), PRIMARY);
+    }
 
     /// Inject a `StorageProxy` route at `path` into a fresh registry.
     /// Mimics what `register_steward_peer` does internally after fetching
