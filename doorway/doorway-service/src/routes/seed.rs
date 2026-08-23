@@ -245,6 +245,57 @@ pub async fn handle_seed_blob(
     )
 }
 
+/// Base seed-blob forward timeout in seconds, before size scaling.
+///
+/// A fixed 30s budget was observed insufficient for a large blob (2026-08-23
+/// local mesh: a 71,763,974-byte landing bundle exceeded it — storage shards
+/// a blob that size slower than 30s on a debug build — so the forward
+/// reported `forwarded_to_storage:false` for bytes that were, in fact, still
+/// landing). See [`compute_forward_timeout_secs`] for the scaling.
+const DEFAULT_SEED_FORWARD_TIMEOUT_BASE_SECS: u64 = 30;
+
+/// Additional forward/read-back budget per MiB of blob size.
+const DEFAULT_SEED_FORWARD_TIMEOUT_SECS_PER_MIB: u64 = 1;
+
+/// Read the forward-timeout base, honoring `SEED_FORWARD_TIMEOUT_BASE_SECS`
+/// the same way [`crate::services::zome_caller::zome_call_timeout`] reads
+/// `DOORWAY_ZOME_CALL_TIMEOUT_MS`.
+fn seed_forward_timeout_base_secs() -> u64 {
+    std::env::var("SEED_FORWARD_TIMEOUT_BASE_SECS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(DEFAULT_SEED_FORWARD_TIMEOUT_BASE_SECS)
+}
+
+/// Read the per-MiB forward-timeout increment, honoring
+/// `SEED_FORWARD_TIMEOUT_SECS_PER_MIB`.
+fn seed_forward_timeout_secs_per_mib() -> u64 {
+    std::env::var("SEED_FORWARD_TIMEOUT_SECS_PER_MIB")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(DEFAULT_SEED_FORWARD_TIMEOUT_SECS_PER_MIB)
+}
+
+/// Compute the size-scaled forward timeout budget: `base + per_mib *
+/// ceil(bytes / MiB)`. Pure arithmetic, kept separate from env/network so it
+/// is unit-testable on its own (see `tests::` below).
+fn compute_forward_timeout_secs(bytes: usize, base_secs: u64, secs_per_mib: u64) -> u64 {
+    const MIB: u64 = 1024 * 1024;
+    let mib = (bytes as u64).div_ceil(MIB);
+    base_secs + secs_per_mib * mib
+}
+
+/// The forward/read-back timeout budget (seconds) for a blob of `bytes` size,
+/// reading the env overrides described on [`seed_forward_timeout_base_secs`]
+/// and [`seed_forward_timeout_secs_per_mib`].
+fn seed_forward_timeout_secs(bytes: usize) -> u64 {
+    compute_forward_timeout_secs(
+        bytes,
+        seed_forward_timeout_base_secs(),
+        seed_forward_timeout_secs_per_mib(),
+    )
+}
+
 /// Forward a blob to elohim-storage
 ///
 /// If body is None, reads from local cache.
@@ -272,7 +323,13 @@ async fn forward_to_storage(state: &AppState, hash: &str, body: Option<&Bytes>) 
     // Build URL: PUT /blob/{hash}
     let url = format!("{}/blob/{}", storage_url.trim_end_matches('/'), hash);
 
-    debug!(url = %url, size = data.len(), "Forwarding blob to elohim-storage");
+    let timeout_secs = seed_forward_timeout_secs(data.len());
+    debug!(
+        url = %url,
+        size = data.len(),
+        timeout_secs,
+        "Forwarding blob to elohim-storage"
+    );
 
     // Use reqwest client from state or create one
     let client = reqwest::Client::new();
@@ -281,7 +338,7 @@ async fn forward_to_storage(state: &AppState, hash: &str, body: Option<&Bytes>) 
         .put(&url)
         .header("Content-Type", "application/octet-stream")
         .body(data)
-        .timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(timeout_secs))
         .send()
         .await
     {
@@ -297,7 +354,7 @@ async fn forward_to_storage(state: &AppState, hash: &str, body: Option<&Bytes>) 
                 let verify_url = format!("{}/blob/{}", storage_url.trim_end_matches('/'), hash);
                 match client
                     .get(&verify_url)
-                    .timeout(std::time::Duration::from_secs(30))
+                    .timeout(std::time::Duration::from_secs(timeout_secs))
                     .send()
                     .await
                 {
@@ -514,6 +571,131 @@ mod tests {
         assert!(
             require_seed_authority(&state, &req).is_ok(),
             "Admin API key must pass the seed gate"
+        );
+    }
+
+    // ── size-scaled forward timeout budget (2026-08-23 71MB local-mesh miss) ─
+
+    #[test]
+    fn compute_forward_timeout_secs_zero_bytes_is_base() {
+        assert_eq!(
+            compute_forward_timeout_secs(
+                0,
+                DEFAULT_SEED_FORWARD_TIMEOUT_BASE_SECS,
+                DEFAULT_SEED_FORWARD_TIMEOUT_SECS_PER_MIB
+            ),
+            30,
+            "an empty blob gets exactly the base budget"
+        );
+    }
+
+    #[test]
+    fn compute_forward_timeout_secs_64_mib() {
+        let sixty_four_mib = 64 * 1024 * 1024;
+        assert_eq!(
+            compute_forward_timeout_secs(
+                sixty_four_mib,
+                DEFAULT_SEED_FORWARD_TIMEOUT_BASE_SECS,
+                DEFAULT_SEED_FORWARD_TIMEOUT_SECS_PER_MIB
+            ),
+            94,
+            "64 MiB at 1s/MiB + 30s base == 94s"
+        );
+    }
+
+    #[test]
+    fn compute_forward_timeout_secs_rounds_partial_mib_up() {
+        // 1 byte over 1 MiB must still buy the second MiB's second, not be
+        // truncated away by integer division — a truncating budget is exactly
+        // the kind of size-blind gap that lost the 71,763,974-byte bundle.
+        let just_over_one_mib = 1024 * 1024 + 1;
+        assert_eq!(
+            compute_forward_timeout_secs(just_over_one_mib, 30, 1),
+            32,
+            "a byte past 1 MiB must round the budget up to 2 whole MiB-seconds"
+        );
+    }
+
+    #[test]
+    fn seed_forward_timeout_secs_env_override_is_honored() {
+        // Serialized via a process-local lock so the temporary set_var cannot
+        // bleed into a parallel test (the env-flake class; mirrors
+        // `zome_call_timeout`'s ENV_LOCK convention in services/zome_caller.rs).
+        use std::sync::Mutex;
+        static ENV_LOCK: Mutex<()> = Mutex::new(());
+        let _g = ENV_LOCK.lock().unwrap();
+
+        std::env::remove_var("SEED_FORWARD_TIMEOUT_BASE_SECS");
+        std::env::remove_var("SEED_FORWARD_TIMEOUT_SECS_PER_MIB");
+        assert_eq!(
+            seed_forward_timeout_secs(64 * 1024 * 1024),
+            94,
+            "unset env falls back to the 30s base + 1s/MiB default"
+        );
+
+        std::env::set_var("SEED_FORWARD_TIMEOUT_BASE_SECS", "60");
+        std::env::set_var("SEED_FORWARD_TIMEOUT_SECS_PER_MIB", "2");
+        assert_eq!(
+            seed_forward_timeout_secs(64 * 1024 * 1024),
+            60 + 2 * 64,
+            "a valid env override on both knobs is honored"
+        );
+
+        std::env::remove_var("SEED_FORWARD_TIMEOUT_BASE_SECS");
+        std::env::remove_var("SEED_FORWARD_TIMEOUT_SECS_PER_MIB");
+    }
+
+    // ── a cache hit re-attempts the forward instead of short-circuiting ──────
+
+    /// Locks the fix for the 2026-08-23 incident: a retry PUT that hits the
+    /// pantry (`already_cached:true`) must still call the real
+    /// `forward_to_storage` and report ITS result — never a hardcoded/assumed
+    /// `true` that leaves the blob missing from storage while the response
+    /// claims success. Exercised directly at `forward_to_storage` (the
+    /// established pattern here — see `fixture_only_gate` in admin_users.rs —
+    /// is to test the pure/testable helper rather than synthesize a hyper
+    /// `Request<Incoming>`, which `handle_seed_blob` cannot be constructed
+    /// with in a unit test).
+    #[tokio::test]
+    async fn cache_hit_forward_reads_cache_and_reports_real_result_not_hardcoded_true() {
+        let mut state = test_state(true);
+        // No reachable storage: any real attempt to forward MUST fail, so a
+        // `true` result here could only mean the cache-hit path short-circuited
+        // to a hardcoded success instead of actually forwarding.
+        state.args.storage_url = None;
+
+        let hash = "sha256-cachehit";
+        state.cache.set(
+            hash,
+            b"seed blob bytes already in the pantry".to_vec(),
+            "application/octet-stream",
+            std::time::Duration::from_secs(3600),
+        );
+        assert!(
+            state.cache.blob_size(hash).is_some(),
+            "precondition: blob must be cache-resident (already_cached:true path)"
+        );
+
+        // Mirrors the `already_cached` branch in `handle_seed_blob`: body=None
+        // forces forward_to_storage to read the bytes back out of the cache.
+        let forwarded = forward_to_storage(&state, hash, None).await;
+        assert!(
+            !forwarded,
+            "no storage_url is configured, so the real forward must fail — \
+             `already_cached:true` may never be paired with an unverified \
+             `forwarded_to_storage:true`"
+        );
+    }
+
+    #[tokio::test]
+    async fn forward_to_storage_returns_false_when_hash_absent_from_cache_and_no_body() {
+        let mut state = test_state(true);
+        state.args.storage_url = Some("http://127.0.0.1:1".to_string());
+
+        let forwarded = forward_to_storage(&state, "sha256-never-cached", None).await;
+        assert!(
+            !forwarded,
+            "a hash with no cache entry and no supplied body has nothing to forward"
         );
     }
 }
