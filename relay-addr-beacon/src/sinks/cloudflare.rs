@@ -12,7 +12,8 @@
 //!   re-asserts the record if an external writer clobbered or deleted it
 //!   (the apex-clobber incident: a forgotten ddclient reverted the record 25s
 //!   after publish and the drift stood undetected).
-//! - **Shared lane** (`--shared-record-name` / `--record-owner`) — the
+//! - **Shared lanes** (`--shared-record <name>=<owner>`, repeatable; legacy
+//!   `--shared-record-name` / `--record-owner` remains accepted) — the
 //!   protocol primitive "address-set contribution with ownership +
 //!   freshness": multiple beacon instances, one per WAN, each maintain their
 //!   OWN record under one shared hostname (a multi-A "logical anycast"
@@ -241,7 +242,7 @@ pub struct CloudflareSink {
     zone: String,
     record_name: String,
     enable_v6: bool,
-    shared: Option<SharedRecordConfig>,
+    shared: Vec<SharedRecordConfig>,
     api_base: String,
 }
 
@@ -252,7 +253,7 @@ impl CloudflareSink {
         zone: String,
         record_name: String,
         enable_v6: bool,
-        shared: Option<SharedRecordConfig>,
+        shared: Vec<SharedRecordConfig>,
     ) -> Self {
         Self {
             client,
@@ -336,7 +337,7 @@ impl CloudflareSink {
     fn exclusive_stamp(&self) -> String {
         let owner = self
             .shared
-            .as_ref()
+            .first()
             .map(|s| s.owner.as_str())
             .unwrap_or("relay-addr-beacon");
         format_owner_comment(owner, now_unix())
@@ -590,16 +591,18 @@ impl CloudflareSink {
     /// A true no-op (`Ok(())`, zero network calls) with no shared config.
     #[allow(dead_code)]
     pub async fn publish_shared_only(&self, update: &AddrUpdate) -> Result<()> {
-        let Some(shared) = &self.shared else {
+        if self.shared.is_empty() {
             return Ok(());
-        };
+        }
         let zone_id = self.zone_id().await?;
-        self.publish_shared_lane(&zone_id, shared, "A", &update.wan_v4.to_string())
-            .await?;
-        if self.enable_v6 {
-            if let Some(v6) = update.wan_v6 {
-                self.publish_shared_lane(&zone_id, shared, "AAAA", &v6.to_string())
-                    .await?;
+        for shared in &self.shared {
+            self.publish_shared_lane(&zone_id, shared, "A", &update.wan_v4.to_string())
+                .await?;
+            if self.enable_v6 {
+                if let Some(v6) = update.wan_v6 {
+                    self.publish_shared_lane(&zone_id, shared, "AAAA", &v6.to_string())
+                        .await?;
+                }
             }
         }
         Ok(())
@@ -684,7 +687,7 @@ impl CloudflareSink {
                     .await?;
             }
         }
-        if let Some(shared) = &self.shared {
+        for shared in &self.shared {
             self.publish_shared_lane(&zone_id, shared, "A", &update.wan_v4.to_string())
                 .await?;
             if self.enable_v6 {
@@ -713,7 +716,7 @@ impl Sink for CloudflareSink {
                 self.upsert(&zone_id, "AAAA", &v6.to_string()).await?;
             }
         }
-        if let Some(shared) = &self.shared {
+        for shared in &self.shared {
             self.publish_shared_lane(&zone_id, shared, "A", &update.wan_v4.to_string())
                 .await?;
             if self.enable_v6 {
@@ -821,6 +824,7 @@ mod shared_lane_tests {
     const ZONE: &str = "elohim.host";
     const ZONE_ID: &str = "zone-abc123";
     const SHARED_NAME: &str = "doorways.elohim.host";
+    const SECOND_SHARED_NAME: &str = "doorway-canary.elohim.host";
     const EXCLUSIVE_NAME: &str = "turn.elohim.host";
     const OWNER: &str = "operations";
 
@@ -854,10 +858,19 @@ mod shared_lane_tests {
         record_type: &str,
         records: serde_json::Value,
     ) {
+        mount_shared_list_named_typed(server, SHARED_NAME, record_type, records).await;
+    }
+
+    async fn mount_shared_list_named_typed(
+        server: &MockServer,
+        record_name: &str,
+        record_type: &str,
+        records: serde_json::Value,
+    ) {
         Mock::given(method("GET"))
             .and(path(format!("/zones/{ZONE_ID}/dns_records")))
             .and(query_param("type", record_type))
-            .and(query_param("name", SHARED_NAME))
+            .and(query_param("name", record_name))
             .respond_with(ResponseTemplate::new(200).set_body_json(envelope_ok(records)))
             .mount(server)
             .await;
@@ -908,7 +921,7 @@ mod shared_lane_tests {
             ZONE.to_string(),
             EXCLUSIVE_NAME.to_string(),
             enable_v6,
-            Some(shared),
+            vec![shared],
         )
         .with_api_base(server.uri())
     }
@@ -986,6 +999,62 @@ mod shared_lane_tests {
             count_requests(&server, "POST", &format!("/zones/{ZONE_ID}/dns_records")).await,
             1
         );
+    }
+
+    #[tokio::test]
+    async fn patches_each_shared_record_lane_in_order() {
+        let server = MockServer::start().await;
+        mount_zone_lookup(&server).await;
+        let now = now_unix();
+        mount_shared_list_named_typed(
+            &server,
+            SHARED_NAME,
+            "A",
+            json!([{ "id": "lane-one", "content": "203.0.113.1", "comment": format_owner_comment(OWNER, now) }]),
+        )
+        .await;
+        mount_shared_list_named_typed(
+            &server,
+            SECOND_SHARED_NAME,
+            "A",
+            json!([{ "id": "lane-two", "content": "203.0.113.2", "comment": format_owner_comment(OWNER, now) }]),
+        )
+        .await;
+        mount_patch(&server, "lane-one").await;
+        mount_patch(&server, "lane-two").await;
+
+        let second = SharedRecordConfig {
+            record_name: SECOND_SHARED_NAME.to_string(),
+            ..shared_cfg()
+        };
+        let s = CloudflareSink::new(
+            reqwest::Client::new(),
+            "test-token".to_string(),
+            ZONE.to_string(),
+            EXCLUSIVE_NAME.to_string(),
+            false,
+            vec![shared_cfg(), second],
+        )
+        .with_api_base(server.uri());
+
+        s.publish_shared_only(&update([203, 0, 113, 7]))
+            .await
+            .unwrap();
+
+        let patched_names = server
+            .received_requests()
+            .await
+            .unwrap()
+            .iter()
+            .filter(|request| request.method.as_str() == "PATCH")
+            .map(|request| {
+                request.body_json::<serde_json::Value>().unwrap()["name"]
+                    .as_str()
+                    .unwrap()
+                    .to_string()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(patched_names, vec![SHARED_NAME, SECOND_SHARED_NAME]);
     }
 
     // (b) patch only MY record among mine + fresh sibling + unowned.
@@ -1408,7 +1477,7 @@ mod shared_lane_tests {
             ZONE.to_string(),
             EXCLUSIVE_NAME.to_string(),
             false,
-            None,
+            Vec::new(),
         )
         .with_api_base(server.uri());
 
@@ -1450,7 +1519,7 @@ mod shared_lane_tests {
             ZONE.to_string(),
             EXCLUSIVE_NAME.to_string(),
             false,
-            None,
+            Vec::new(),
         )
         .with_api_base(server.uri())
     }

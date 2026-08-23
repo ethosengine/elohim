@@ -21,6 +21,51 @@ unless something actively republishes the WAN IP:
 2. **coturn** — coturn must advertise `external-ip=<wan>/<lan>` or it hands out
    the useless private candidate. coturn does **not** discover its own WAN IP.
 
+## Prerequisites and first successful run
+
+Builds require a current Rust toolchain and outbound access to the locked crate
+registry. Runtime needs outbound HTTPS to at least one configured egress echo
+endpoint plus the selected remote sink. The state file and any coturn output
+path must be writable by the beacon process.
+
+Sink-specific requirements:
+
+- Cloudflare: a token scoped to the target zone with Zone Read and DNS Edit.
+- pkarr: outbound HTTPS to the configured relay and a writable `PKARR_KEY_FILE`.
+- coturn: readable base config and writable output config. An
+  `--on-change-exec` restart additionally needs the process privileges described
+  in the coturn section below.
+
+From the repository root, build the native binary with the WASM-only flag
+cleared:
+
+```
+cd relay-addr-beacon
+RUSTFLAGS="" CARGO_TARGET_DIR=/tmp/relay-addr-beacon-target cargo build --release
+/tmp/relay-addr-beacon-target/release/relay-addr-beacon --help
+```
+
+For a first run that does not mutate DNS or contact pkarr, render a coturn file
+under `/tmp` once. It still contacts an egress echo endpoint to discover the
+public WAN address:
+
+```
+printf 'listening-port=3478\n' > /tmp/turnserver.base.conf
+/tmp/relay-addr-beacon-target/release/relay-addr-beacon \
+  --once --sink coturn --lan-ip 192.0.2.10 \
+  --state-file /tmp/relay-addr-beacon-state.json \
+  --coturn-base-conf /tmp/turnserver.base.conf \
+  --coturn-out-conf /tmp/turnserver.conf
+```
+
+Success exits zero and logs `detected address snapshot`, `sink publish ok`, and
+`persisted published snapshot`. Confirm `/tmp/turnserver.conf` contains one
+`external-ip=<detected-wan>/192.0.2.10` line and inspect the JSON state file.
+The next useful action is to configure the production sink you need, run once,
+and verify its projection: query DNS for Cloudflare, fetch the pkarr packet, or
+start coturn with the rendered config. The deployment examples below show the
+long-running composition.
+
 ## Interface
 
 ```
@@ -76,20 +121,21 @@ Flow: `GET /zones?name=<zone>` → zone id; `GET /zones/{zid}/dns_records?type=A
 
 ##### Shared doorway-set mode (sibling-safe multi-A "logical anycast")
 
-The exclusive lane above assumes ONE beacon owns `--record-name` outright. The
-shared lane lets **multiple beacon instances — one per WAN — each maintain
-their OWN A/AAAA record under one shared hostname**, so a doorway set (e.g.
+The exclusive lane above assumes ONE beacon owns `--record-name` outright.
+Shared lanes let **multiple beacon instances — one per WAN — each maintain
+their OWN A/AAAA record under a shared hostname**, so a doorway set (e.g.
 `doorways.elohim.host`) resolves to several relays without any instance ever
-clobbering a sibling's record. This is the protocol primitive "address-set
-contribution with ownership + freshness"; Cloudflare DNS is its current
-projection. It runs **alongside** the exclusive lane, not instead of it — the
-exclusive `--record-name` upsert is unaffected and stays byte-identical (no
-`comment` field on that wire body).
+clobbering a sibling's record. One beacon can contribute to several shared
+hostnames by repeating `--shared-record <name>=<owner>`; order is preserved.
+This is the protocol primitive "address-set contribution with ownership +
+freshness"; Cloudflare DNS is its current projection. Shared lanes run
+**alongside** the exclusive lane, not instead of it.
 
 | Flag | Env | Default | Meaning |
 |------|-----|---------|---------|
-| `--shared-record-name` | `BEACON_SHARED_RECORD_NAME` | — | The shared doorway-set hostname (e.g. `doorways.elohim.host`). Requires `--record-owner`. |
-| `--record-owner` | `BEACON_RECORD_OWNER` | — | This instance's owner slug (e.g. `operations`, `shem`). Required when `--shared-record-name` is set. |
+| `--shared-record <name>=<owner>` | `BEACON_SHARED_RECORDS` (comma-separated) | — | Preferred repeatable shared lane. Each value binds its hostname and owner atomically; duplicate hostnames are rejected. |
+| `--shared-record-name` | `BEACON_SHARED_RECORD_NAME` | — | Legacy single shared hostname. Still accepted unchanged; requires the legacy `--record-owner` pair. |
+| `--record-owner` | `BEACON_RECORD_OWNER` | — | Legacy owner paired with `--shared-record-name`. |
 | `--shared-refresh-secs` | `BEACON_SHARED_REFRESH_SECS` | `300` | Max age of our own freshness stamp before we re-PATCH even with an unchanged IP. |
 | `--shared-stale-secs` | `BEACON_SHARED_STALE_SECS` | `900` | Age beyond which a SIBLING's record is considered abandoned and reaped (DELETEd). Must be greater than `--shared-refresh-secs` (validated at startup). |
 
@@ -105,8 +151,8 @@ sibling's own `ts` would reap a live-but-behind-clock sibling every cycle
 (permanent flap) while never reaping an ahead-clock dead one; `modified_on`
 is a clock every instance agrees on.
 
-For each enabled record type (A, and AAAA with `--enable-v6`), every cycle
-`GET`s all records at the shared name and partitions them:
+For each configured shared lane and enabled record type (A, and AAAA with
+`--enable-v6`), every cycle `GET`s all records at that name and partitions them:
 
 - **mine** (comment parses with `owner == --record-owner`) — absent: `POST`
   create with a fresh stamp. Present: `PATCH` iff the content changed OR our
@@ -129,11 +175,10 @@ For each enabled record type (A, and AAAA with `--enable-v6`), every cycle
 
 **Main-loop interaction.** The address-detect loop normally skips every sink
 when the WAN address is unchanged. When shared mode is configured, an
-unchanged cycle instead runs *only* the Cloudflare sink's shared lane (not
-its exclusive lane, and not the other sinks) — enough to let the periodic
-freshness-stamp refresh and stale-sibling reap keep happening without
-reintroducing churn elsewhere (see the `cycle` doc comment in `src/main.rs`
-for why "just run every sink every cycle" was rejected).
+unchanged cycle runs the Cloudflare freshness pass, which verifies the
+exclusive lane and iterates every shared lane; other sinks remain untouched.
+That is enough to keep freshness stamps and stale-sibling reap active without
+reintroducing churn elsewhere (see the `cycle` doc comment in `src/main.rs`).
 
 #### `pkarr` (Tier-2 — published, not yet consumed) — OFF by default
 
@@ -225,21 +270,31 @@ their own exclusive record, without clobbering each other:
 # instance A
 relay-addr-beacon --sink cloudflare \
   --record-name turn.elohim.host --cf-zone elohim.host \
-  --shared-record-name doorways.elohim.host --record-owner operations
+  --shared-record doorways.elohim.host=operations
 
 # instance B (different WAN, different owner slug)
 relay-addr-beacon --sink cloudflare \
   --record-name turn-shem.elohim.host --cf-zone elohim.host \
-  --shared-record-name doorways.elohim.host --record-owner shem
+  --shared-record doorways.elohim.host=shem
 ```
 
-## Build & gate
+To contribute one beacon leg to two shared sets, repeat the atomic flag. This
+only configures mechanism; adding a production hostname remains an explicit
+operator-owned DNS decision:
+
+```
+relay-addr-beacon --sink cloudflare \
+  --record-name turn.elohim.host --cf-zone elohim.host \
+  --shared-record doorways.elohim.host=operations \
+  --shared-record doorway-canary.elohim.host=operations
+```
+
+## Development gate
 
 Native crate (no Holochain WASM flag). In constrained environments point the
 target dir at a writable `/tmp` slot:
 
 ```
-CARGO_TARGET_DIR=/tmp/relay-addr-beacon-target cargo build --release
 just gate    # cargo fmt --check && cargo clippy -D warnings && cargo test
 ```
 
@@ -248,7 +303,8 @@ just gate    # cargo fmt --check && cargo clippy -D warnings && cargo test
 - `cargo fmt --check`, `cargo clippy -- -D warnings`, and `cargo test` are the
   gate. See the slice hand-off for the actual recorded results of the run in
   this environment.
-- Unit tests cover: IP parse/validation, egress-endpoint resolution,
+- Unit tests cover: repeatable/legacy shared-lane parsing and validation, IP
+  parse/validation, egress-endpoint resolution,
   change-detection state (save/load/diff), Cloudflare request-body shape
   (`proxied=false`, `ttl=60`, and — shared lane — `comment`), the owner-comment
   parse/format round-trip (tolerant of unknown keys, reordering, and garbled
@@ -263,9 +319,9 @@ just gate    # cargo fmt --check && cargo clippy -D warnings && cargo test
   clock-skew regression proving an hours-stale comment `ts` with a FRESH
   `modified_on` is not reaped, a missing-`modified_on` sibling treated as
   fail-safe not-reapable, a same-owner duplicate record never reaped, an
-  AAAA-lane create proving the shared list call is type-scoped with a
-  correct AAAA body, and a regression proving the legacy exclusive-lane
-  request body carries no `comment` key at all.
+  AAAA-lane create proving the shared list call is type-scoped with a correct
+  AAAA body, ordered multi-lane PATCH fan-out, and exclusive-lane ownership
+  stamping.
 - The `Dockerfile` and live DNS/coturn integration are **not** exercised by the
   test gate; they are provided for the operator to build and deploy.
 

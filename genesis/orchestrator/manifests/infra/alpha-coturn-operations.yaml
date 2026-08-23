@@ -13,6 +13,9 @@
 # sibling alpha-coturn-shem.yaml — both listed in conductor ICE config so ICE fails
 # over between them. This is the minimal 2-node honest testbed for an
 # N-node federated relay commons.
+# The beacon's shared-record flag is repeatable; this manifest intentionally
+# keeps its existing doorway-set lane only. Any apex lane remains an explicit
+# operator-owned flip.
 #
 # THIS PHASE IS 3478-FIRST: no tls-listening-port, no turns:, no :443/:5349,
 # no cert-manager Certificate. IPv6 is scaffolded (commented) but dormant.

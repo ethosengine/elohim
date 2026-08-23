@@ -74,17 +74,19 @@ fn build_sinks(cfg: &Config, client: &reqwest::Client) -> Result<Vec<ActiveSink>
                 })?;
                 let token = resolve_cf_token(cfg)?;
                 // `Config::validate` (called before `build_sinks`) already
-                // guarantees shared_record_name.is_some() => record_owner.is_some();
-                // the match stays defensive rather than asserting/unwrapping.
-                let shared = match (&cfg.shared_record_name, &cfg.record_owner) {
-                    (Some(name), Some(owner)) => Some(cloudflare::SharedRecordConfig {
-                        record_name: name.clone(),
-                        owner: owner.clone(),
+                // guarantees each preferred or legacy lane has an owner and
+                // that record names are unique. Resolve again defensively so
+                // this constructor remains sound if called independently.
+                let shared = cfg
+                    .shared_record_lanes()?
+                    .into_iter()
+                    .map(|lane| cloudflare::SharedRecordConfig {
+                        record_name: lane.record_name,
+                        owner: lane.owner,
                         refresh_secs: cfg.shared_refresh_secs,
                         stale_secs: cfg.shared_stale_secs,
-                    }),
-                    _ => None,
-                };
+                    })
+                    .collect();
                 sinks.push(ActiveSink::Cloudflare(CloudflareSink::new(
                     client.clone(),
                     token,

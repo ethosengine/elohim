@@ -4,11 +4,19 @@
 //! behaviour: an explicit flag wins, otherwise the `env` fallback is consulted,
 //! otherwise the declared default is used.
 
+use std::collections::HashSet;
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
 use clap::{Parser, ValueEnum};
+
+/// One sibling-safe shared DNS record lane contributed by this beacon.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedRecordLane {
+    pub record_name: String,
+    pub owner: String,
+}
 
 /// The sinks a single beacon process can drive. `--sink` is repeatable and the
 /// enabled sinks compose (all run on every publish).
@@ -92,16 +100,26 @@ pub struct Config {
     #[arg(long, env = "CF_API_TOKEN_FILE")]
     pub cf_token_file: Option<PathBuf>,
 
-    /// Shared "logical anycast" DNS record name (e.g. `doorways.elohim.host`)
-    /// that multiple beacon instances — one per WAN — each contribute their OWN
-    /// A/AAAA record under, sibling-safe (address-set contribution with
-    /// ownership + freshness). Requires `--record-owner`. This runs ALONGSIDE
-    /// the exclusive `--record-name` lane, which is unaffected.
+    /// Shared "logical anycast" DNS lane as `<record-name>=<owner>`. Repeat the
+    /// flag to contribute this beacon's address to more than one shared name.
+    /// The environment form is comma-separated.
+    #[arg(
+        long = "shared-record",
+        env = "BEACON_SHARED_RECORDS",
+        value_delimiter = ',',
+        action = clap::ArgAction::Append,
+        value_name = "NAME=OWNER"
+    )]
+    pub shared_records: Vec<String>,
+
+    /// Legacy single shared-record name. Prefer repeatable `--shared-record
+    /// <name>=<owner>` for new configuration. Retained so deployed manifests
+    /// continue to parse unchanged.
     #[arg(long, env = "BEACON_SHARED_RECORD_NAME")]
     pub shared_record_name: Option<String>,
 
-    /// This instance's owner slug for the shared record set (e.g. `operations`,
-    /// `shem`). Required when `--shared-record-name` is set.
+    /// Legacy owner paired with `--shared-record-name`. Prefer the repeatable
+    /// `--shared-record <name>=<owner>` spelling for new configuration.
     #[arg(long, env = "BEACON_RECORD_OWNER")]
     pub record_owner: Option<String>,
 
@@ -151,15 +169,71 @@ pub struct Config {
 }
 
 impl Config {
+    /// Resolve the preferred repeatable spelling and the legacy single pair
+    /// into one ordered lane list. Parsing is deliberately deferred until
+    /// validation so a missing owner produces the same cross-field error class
+    /// as the legacy spelling.
+    pub fn shared_record_lanes(&self) -> Result<Vec<SharedRecordLane>> {
+        let mut lanes = Vec::with_capacity(
+            self.shared_records.len() + usize::from(self.shared_record_name.is_some()),
+        );
+
+        for raw in &self.shared_records {
+            let (record_name, owner) = raw.split_once('=').unwrap_or((raw.as_str(), ""));
+            let record_name = record_name.trim();
+            let owner = owner.trim();
+            if record_name.is_empty() {
+                return Err(anyhow!(
+                    "--shared-record requires a non-empty record name; expected <name>=<owner>"
+                ));
+            }
+            if owner.is_empty() {
+                return Err(anyhow!(
+                    "--shared-record {raw:?} requires an owner; expected <name>=<owner>"
+                ));
+            }
+            lanes.push(SharedRecordLane {
+                record_name: record_name.to_string(),
+                owner: owner.to_string(),
+            });
+        }
+
+        if let Some(record_name) = self.shared_record_name.as_deref() {
+            let owner = self.record_owner.as_deref().ok_or_else(|| {
+                anyhow!("--shared-record-name requires --record-owner / BEACON_RECORD_OWNER")
+            })?;
+            if record_name.trim().is_empty() || owner.trim().is_empty() {
+                return Err(anyhow!(
+                    "--shared-record-name and --record-owner must both be non-empty"
+                ));
+            }
+            lanes.push(SharedRecordLane {
+                record_name: record_name.trim().to_string(),
+                owner: owner.trim().to_string(),
+            });
+        }
+
+        let mut names = HashSet::with_capacity(lanes.len());
+        for lane in &lanes {
+            // DNS names are case-insensitive and a terminal dot is equivalent,
+            // so reject those aliases as duplicates too.
+            let key = lane.record_name.trim_end_matches('.').to_ascii_lowercase();
+            if !names.insert(key) {
+                return Err(anyhow!(
+                    "duplicate shared record lane name: {}",
+                    lane.record_name
+                ));
+            }
+        }
+
+        Ok(lanes)
+    }
+
     /// Cross-field validation clap's declarative attributes can't express.
     /// Called once at startup, independent of which sinks are enabled — these
     /// are shared-mode invariants, not per-sink construction concerns.
     pub fn validate(&self) -> Result<()> {
-        if self.shared_record_name.is_some() && self.record_owner.is_none() {
-            return Err(anyhow!(
-                "--shared-record-name requires --record-owner / BEACON_RECORD_OWNER"
-            ));
-        }
+        self.shared_record_lanes()?;
         if self.shared_stale_secs <= self.shared_refresh_secs {
             return Err(anyhow!(
                 "--shared-stale-secs ({}) must be greater than --shared-refresh-secs ({}) — \
@@ -191,6 +265,7 @@ impl std::fmt::Debug for Config {
             .field("cf_zone", &self.cf_zone)
             .field("cf_token", &redact(&self.cf_token))
             .field("cf_token_file", &redact(&self.cf_token_file))
+            .field("shared_records", &self.shared_records)
             .field("shared_record_name", &self.shared_record_name)
             .field("record_owner", &self.record_owner)
             .field("shared_refresh_secs", &self.shared_refresh_secs)
@@ -201,5 +276,85 @@ impl std::fmt::Debug for Config {
             .field("coturn_out_conf", &self.coturn_out_conf)
             .field("on_change_exec", &self.on_change_exec)
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(args: &[&str]) -> Config {
+        Config::try_parse_from(std::iter::once("relay-addr-beacon").chain(args.iter().copied()))
+            .expect("configuration should parse")
+    }
+
+    #[test]
+    fn repeatable_shared_records_preserve_order() {
+        let cfg = parse(&[
+            "--shared-record",
+            "doorways.elohim.host=operations",
+            "--shared-record",
+            "apex-canary.elohim.host=operations",
+        ]);
+
+        let lanes = cfg.shared_record_lanes().unwrap();
+        assert_eq!(
+            lanes,
+            vec![
+                SharedRecordLane {
+                    record_name: "doorways.elohim.host".to_string(),
+                    owner: "operations".to_string(),
+                },
+                SharedRecordLane {
+                    record_name: "apex-canary.elohim.host".to_string(),
+                    owner: "operations".to_string(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn legacy_shared_record_pair_resolves_to_one_lane() {
+        let cfg = parse(&[
+            "--shared-record-name",
+            "doorways.elohim.host",
+            "--record-owner",
+            "shem",
+        ]);
+
+        assert_eq!(
+            cfg.shared_record_lanes().unwrap(),
+            vec![SharedRecordLane {
+                record_name: "doorways.elohim.host".to_string(),
+                owner: "shem".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn shared_record_without_owner_fails_validation() {
+        let cfg = parse(&["--shared-record", "doorways.elohim.host"]);
+
+        let error = cfg.validate().unwrap_err().to_string();
+        assert!(
+            error.contains("requires an owner"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn duplicate_shared_record_names_fail_validation() {
+        let cfg = parse(&[
+            "--shared-record",
+            "doorways.elohim.host=operations",
+            "--shared-record",
+            "DOORWAYS.ELOHIM.HOST.=shem",
+        ]);
+
+        let error = cfg.validate().unwrap_err().to_string();
+        assert!(
+            error.contains("duplicate shared record lane name"),
+            "unexpected error: {error}"
+        );
     }
 }
