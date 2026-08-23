@@ -67,7 +67,8 @@ just mesh stop
 ```
 
 `MESH_TRANSPORT_BACKEND=libp2p|dual|iroh` selects the elohim-storage Track-2
-backend for the whole household run (default `libp2p`; the conductor kitsune2/tx5
+backend for the whole household run (default `dual` since 2026-08-23, matching the
+alpha fleet; the conductor kitsune2/tx5
 transport is a separate layer). For example:
 
 ```bash
