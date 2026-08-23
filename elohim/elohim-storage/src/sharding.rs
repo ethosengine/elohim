@@ -487,6 +487,51 @@ mod tests {
         assert_eq!(reconstructed, data);
     }
 
+    /// The invariant the ingest path now leans on: for an erasure-coded blob,
+    /// `create_shards` produces exactly the bytes `create_manifest` hashed —
+    /// including when the payload length is NOT a multiple of `data_shards`,
+    /// which is where the padded tail lives.
+    ///
+    /// The ingest path used to hand-slice the raw body as sequential chunks
+    /// instead, which for `rs-4-7` mis-hashes the unpadded tail data shard and
+    /// then indexes past the end of the body at the first parity shard.
+    #[test]
+    fn rs_create_shards_match_the_hashes_create_manifest_minted() {
+        let encoder = ShardEncoder::new(ShardConfig {
+            shard_size: 10,
+            rs_data_shards: 4,
+            rs_parity_shards: 3,
+            rs_threshold: 50,
+            single_shard_max: 10,
+        });
+
+        // 102 % 4 == 2 — the same non-multiple shape as the live 71,763,974-byte
+        // bundle that panicked the HTTP task.
+        let data: Vec<u8> = (0..102u32)
+            .map(|i| (i.wrapping_mul(37) % 251) as u8)
+            .collect();
+        let manifest = encoder
+            .create_manifest(&data, "application/octet-stream", "commons")
+            .unwrap();
+        assert_eq!(manifest.encoding, "rs-4-7");
+
+        let shards = encoder.create_shards(&data, &manifest.encoding).unwrap();
+        assert_eq!(shards.len(), manifest.shard_hashes.len());
+
+        for (i, (shard, named)) in shards.iter().zip(manifest.shard_hashes.iter()).enumerate() {
+            assert_eq!(
+                BlobStore::compute_hash(shard),
+                *named,
+                "shard {i} produced by create_shards must hash to the manifest's name for it"
+            );
+            assert_eq!(
+                shard.len(),
+                manifest.shard_size as usize,
+                "every RS shard, including the padded tail, is shard_size long"
+            );
+        }
+    }
+
     #[test]
     fn test_reconstruct_with_missing_shards() {
         let encoder = ShardEncoder::new(ShardConfig {

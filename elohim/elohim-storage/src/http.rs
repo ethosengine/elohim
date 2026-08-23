@@ -601,6 +601,78 @@ enum FinalizeFailure {
     Persist,
 }
 
+/// Why a blob write is refused before anything is persisted.
+///
+/// Both arms mean the same thing: the shard bytes about to be stored and the
+/// manifest hashes that name them disagree, so storing them would leave shards
+/// filed under addresses that do not describe their contents.
+#[derive(Debug, PartialEq, Eq)]
+enum ShardWriteRefusal {
+    /// The producer emitted a different number of shards than the manifest names.
+    CountMismatch { produced: usize, named: usize },
+    /// A shard's bytes do not hash to the address the manifest files it under.
+    HashMismatch {
+        index: usize,
+        named: String,
+        produced: String,
+    },
+}
+
+impl ShardWriteRefusal {
+    fn message(&self) -> String {
+        match self {
+            Self::CountMismatch { produced, named } => format!(
+                "shard count mismatch: producer emitted {produced}, manifest names {named} — nothing stored"
+            ),
+            Self::HashMismatch {
+                index,
+                named,
+                produced,
+            } => format!(
+                "shard hash mismatch at index {index}: manifest names {named}, produced {produced} — nothing stored"
+            ),
+        }
+    }
+}
+
+impl std::fmt::Display for ShardWriteRefusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message())
+    }
+}
+
+/// The write-time agreement check between produced shard bytes and the manifest
+/// that names them.
+///
+/// Pure and total by design: it consumes the whole shard set before returning,
+/// so `put_blob_bytes` can run it entirely above its store loop. That ordering
+/// — not a review convention — is what makes a refused write leave zero shards
+/// behind.
+fn verify_shards_against_manifest(
+    shards: &[Vec<u8>],
+    shard_hashes: &[String],
+) -> Result<(), ShardWriteRefusal> {
+    if shards.len() != shard_hashes.len() {
+        return Err(ShardWriteRefusal::CountMismatch {
+            produced: shards.len(),
+            named: shard_hashes.len(),
+        });
+    }
+
+    for (index, (shard_data, named)) in shards.iter().zip(shard_hashes.iter()).enumerate() {
+        let produced = BlobStore::compute_hash(shard_data);
+        if produced != *named {
+            return Err(ShardWriteRefusal::HashMismatch {
+                index,
+                named: named.clone(),
+                produced,
+            });
+        }
+    }
+
+    Ok(())
+}
+
 /// Extract the `elohim_session` cookie value from a request's `Cookie` header.
 ///
 /// The header is a `; `-separated list of `name=value` pairs. Returns the
@@ -2605,30 +2677,58 @@ impl HttpServer {
             }
         };
 
-        // Store each shard
-        for (i, shard_hash) in manifest.shard_hashes.iter().enumerate() {
-            // For "none" encoding, the whole blob is one shard
-            let shard_data = if manifest.encoding == "none" {
-                data.clone()
-            } else {
-                // For chunked encoding, split the data
-                let start = i * manifest.shard_size as usize;
-                let end = ((i + 1) * manifest.shard_size as usize).min(data.len());
-                data[start..end].to_vec()
-            };
-
-            // Verify shard hash matches
-            let actual_hash = BlobStore::compute_hash(&shard_data);
-            if actual_hash != *shard_hash {
-                warn!(
-                    expected = %shard_hash,
-                    actual = %actual_hash,
-                    index = i,
-                    "Shard hash mismatch during blob storage"
+        // Produce the shard bytes with the SAME producer that hashed them.
+        //
+        // Hand-slicing the raw body as sequential chunks is only correct for
+        // the `"chunked"` band. An `"rs-4-7"` manifest names 4 data + 3 parity
+        // shards computed over PADDED data, so `shard_size = ceil(len/4)` and
+        // the slice arithmetic runs off the end of the body at index 4 — a
+        // panic that killed the HTTP task mid-PUT (and mis-hashed the unpadded
+        // tail shard at index 3 on the way there). Every artifact above
+        // `RS_THRESHOLD` was therefore un-PUT-able. `create_shards` is the
+        // producer `create_manifest` hashes and the p2p push path already
+        // uses; there is exactly one shard producer.
+        let shards = match encoder.create_shards(&data, &manifest.encoding) {
+            Ok(s) => s,
+            Err(e) => {
+                error!(
+                    blob_hash = %manifest.blob_hash,
+                    encoding = %manifest.encoding,
+                    error = %e,
+                    "Shard production failed during blob storage"
                 );
+                return Ok(Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(Full::new(Bytes::from(format!(
+                        "shard production failed: {e}"
+                    ))))
+                    .unwrap());
             }
+        };
 
-            self.blob_store.store(&shard_data).await?;
+        // Every shard is checked BEFORE any of them is persisted. A mismatch
+        // means the bytes and the manifest that names them disagree; storing
+        // them anyway (the old `warn!`-and-continue) leaves silently-corrupt
+        // shards that a later read reassembles into garbage under a hash that
+        // promises otherwise. Refuse the whole write instead — the check is a
+        // total function that runs to completion above the store loop, which
+        // is what "no partial store" means structurally rather than by review.
+        if let Err(refusal) = verify_shards_against_manifest(&shards, &manifest.shard_hashes) {
+            error!(
+                blob_hash = %manifest.blob_hash,
+                encoding = %manifest.encoding,
+                refusal = %refusal.message(),
+                "Refusing blob write: produced shards disagree with the manifest naming them"
+            );
+            return Ok(Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(Full::new(Bytes::from(refusal.message())))
+                .unwrap());
+        }
+
+        // Store each shard
+        for (i, shard_data) in shards.iter().enumerate() {
+            self.blob_store.store(shard_data).await?;
 
             // Register with Node Registry if available
             if let Some(ref nr_api) = self.node_registry_api {
@@ -2924,10 +3024,25 @@ impl HttpServer {
     /// On a local miss returns the offending `(index, shard_hash)` so callers
     /// can name which shard is absent instead of reporting the composite as
     /// simply "not found".
+    ///
+    /// Two bands, matching the encoder's own dispatch:
+    ///
+    /// - `"none"` / `"chunked"` — sequential concatenation. Every shard must be
+    ///   present; the first gap is terminal (and feeds the `MissingShard` heal
+    ///   contract unchanged).
+    /// - erasure-coded (`"rs-*"`) — reconstruction through
+    ///   [`ShardEncoder::reconstruct`]. Concatenating all seven shards happens
+    ///   to produce the right bytes only when every one of them is present,
+    ///   which retires the entire point of carrying parity: an RS blob must
+    ///   still serve with up to `total_shards - data_shards` shards absent.
     async fn reassemble_from_local_shards(
         &self,
         manifest: &ShardManifest,
     ) -> Result<Vec<u8>, (usize, String)> {
+        if !matches!(manifest.encoding.as_str(), "none" | "chunked") {
+            return self.reconstruct_erasure_coded(manifest).await;
+        }
+
         let mut data = Vec::with_capacity(manifest.total_size as usize);
 
         for (index, shard_hash) in manifest.shard_hashes.iter().enumerate() {
@@ -2940,6 +3055,86 @@ impl HttpServer {
         // Truncate to actual size (last shard may be padded)
         data.truncate(manifest.total_size as usize);
         Ok(data)
+    }
+
+    /// Reconstruct an erasure-coded blob from whatever shards are held locally.
+    ///
+    /// Collects every named shard as `Option`, then hands the sparse set to
+    /// [`ShardEncoder::reconstruct`], which rebuilds the data shards from
+    /// parity when fewer than `data_shards` are missing. Only when too few
+    /// remain (or reconstruction itself fails, which means the bytes on disk
+    /// disagree with the manifest) is the first gap reported — that is the
+    /// point where a peer heal is genuinely required.
+    async fn reconstruct_erasure_coded(
+        &self,
+        manifest: &ShardManifest,
+    ) -> Result<Vec<u8>, (usize, String)> {
+        let mut shards: Vec<Option<Vec<u8>>> = Vec::with_capacity(manifest.shard_hashes.len());
+        let mut first_gap: Option<(usize, String)> = None;
+
+        for (index, shard_hash) in manifest.shard_hashes.iter().enumerate() {
+            match self.blob_store.get(shard_hash).await {
+                Ok(shard_data) => shards.push(Some(shard_data)),
+                Err(_) => {
+                    if first_gap.is_none() {
+                        first_gap = Some((index, shard_hash.clone()));
+                    }
+                    shards.push(None);
+                }
+            }
+        }
+
+        // A gap must be nameable on every failure leg. When every shard is
+        // present and reconstruction still fails, the bytes contradict the
+        // manifest — report shard 0 so the caller heals rather than serving
+        // garbage.
+        let gap = || {
+            first_gap.clone().unwrap_or_else(|| {
+                (
+                    0,
+                    manifest
+                        .shard_hashes
+                        .first()
+                        .cloned()
+                        .unwrap_or_else(|| manifest.blob_hash.clone()),
+                )
+            })
+        };
+
+        let present = shards.iter().filter(|s| s.is_some()).count();
+        if present < manifest.data_shards as usize {
+            debug!(
+                hash = %manifest.blob_hash,
+                present,
+                needed = manifest.data_shards,
+                "erasure-coded blob: too few shards held locally to reconstruct"
+            );
+            return Err(gap());
+        }
+
+        let encoder = ShardEncoder::new(crate::sharding::ShardConfig::default());
+        match encoder.reconstruct(manifest, &shards) {
+            Ok(data) => {
+                if present < manifest.shard_hashes.len() {
+                    debug!(
+                        hash = %manifest.blob_hash,
+                        present,
+                        total = manifest.shard_hashes.len(),
+                        "erasure-coded blob reconstructed through parity"
+                    );
+                }
+                Ok(data)
+            }
+            Err(e) => {
+                warn!(
+                    hash = %manifest.blob_hash,
+                    present,
+                    error = %e,
+                    "erasure-coded reconstruction failed"
+                );
+                Err(gap())
+            }
+        }
     }
 
     /// Read a blob from local storage, whatever shape it is held in.
@@ -3020,6 +3215,20 @@ impl HttpServer {
             Some(manifest) if manifest.encoding != "none" => {
                 if manifest.shard_hashes.is_empty() {
                     return false;
+                }
+                // Erasure-coded manifests are available once `data_shards` of
+                // them are held — that is what parity buys, and it is what
+                // `reassemble_from_local_shards` will actually serve. Requiring
+                // all seven here would make the presence twin disagree with the
+                // read it is supposed to predict.
+                if !matches!(manifest.encoding.as_str(), "chunked") {
+                    let mut present = 0usize;
+                    for shard_hash in &manifest.shard_hashes {
+                        if self.blob_store.exists(shard_hash).await {
+                            present += 1;
+                        }
+                    }
+                    return present >= manifest.data_shards as usize;
                 }
                 for shard_hash in &manifest.shard_hashes {
                     if !self.blob_store.exists(shard_hash).await {
@@ -16344,6 +16553,60 @@ mod apps_resolver_heal_tests {
         let (status, body) = body_string(resp).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert_eq!(body, "Blob not found");
+    }
+
+    /// A blob write is refused — not warned about — when a produced shard does
+    /// not hash to the address the manifest files it under.
+    ///
+    /// The old ingest path logged `warn!` and stored the shard anyway, so a
+    /// disagreement between bytes and manifest became silently-corrupt shards
+    /// that a later read reassembles into garbage. This pins the refusal.
+    #[test]
+    fn shard_hash_disagreement_refuses_the_write() {
+        let shards = vec![b"first shard".to_vec(), b"second shard".to_vec()];
+        let mut hashes: Vec<String> = shards.iter().map(|s| BlobStore::compute_hash(s)).collect();
+        hashes[1] = format!("sha256-{}", "0".repeat(64));
+
+        let refusal = verify_shards_against_manifest(&shards, &hashes)
+            .expect_err("a mis-named shard must refuse the whole write");
+
+        match refusal {
+            ShardWriteRefusal::HashMismatch { index, .. } => assert_eq!(index, 1),
+            other => panic!("expected a hash mismatch, got {other:?}"),
+        }
+        assert!(
+            refusal.message().contains("nothing stored"),
+            "the refusal must say no partial store happened — got {}",
+            refusal.message()
+        );
+    }
+
+    /// A producer/manifest count disagreement is likewise terminal. This is the
+    /// arm the erasure-coded band would have hit had the old hand-slicing loop
+    /// merely mis-counted instead of panicking off the end of the body.
+    #[test]
+    fn shard_count_disagreement_refuses_the_write() {
+        let shards = vec![b"only one".to_vec()];
+        let hashes = vec![
+            BlobStore::compute_hash(&shards[0]),
+            format!("sha256-{}", "1".repeat(64)),
+        ];
+
+        assert_eq!(
+            verify_shards_against_manifest(&shards, &hashes),
+            Err(ShardWriteRefusal::CountMismatch {
+                produced: 1,
+                named: 2
+            })
+        );
+    }
+
+    /// The agreeing case: shards produced by the encoder that hashed them pass.
+    #[test]
+    fn shards_matching_their_manifest_are_accepted() {
+        let shards = vec![b"alpha".to_vec(), b"beta".to_vec(), b"gamma".to_vec()];
+        let hashes: Vec<String> = shards.iter().map(|s| BlobStore::compute_hash(s)).collect();
+        assert_eq!(verify_shards_against_manifest(&shards, &hashes), Ok(()));
     }
 
     /// Pure decision logic: a local hit resolves to `Bytes { healed_from: None }`

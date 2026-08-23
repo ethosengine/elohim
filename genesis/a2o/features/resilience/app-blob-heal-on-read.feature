@@ -56,3 +56,24 @@ Feature: App ZIP blobs heal on read via peer race-fetch
     When I GET "/apps/orphan-target/index.html" from the doorway
     Then the doorway response status is 404
     And the doorway response body contains "App ZIP blob not found"
+
+  # ── Harvested 2026-08-23 (household mesh repro, all three storage peers) ──
+  # The landing SSR bundle crossed RS_THRESHOLD (64 MiB) once it started
+  # carrying source maps — 71,763,974 bytes. PUT panicked the storage HTTP task:
+  #   range start index 71763976 out of range for slice of length 71763974
+  # Ingest asked ShardEncoder::create_manifest for the manifest (which above the
+  # threshold mints "rs-4-7": 4 data + 3 parity shards over PADDED data) and then
+  # hand-sliced the RAW body as if every non-"none" encoding were sequential
+  # chunks. Shard 3 mis-hashed; shard 4 indexed past the end of the body. The
+  # client saw the connection drop after 100 Continue and the blob 404'd on every
+  # peer. Nothing in the suite had ever PUT a blob above the threshold, so the
+  # erasure-coded band had never worked through PUT at all — a durability hole
+  # for any artifact over 64 MiB, exactly the artifacts most worth holding.
+  # Operational parameter pinned here: 64 MiB is a real ingest boundary, not an
+  # internal detail — bundle growth crosses it silently.
+  @requires:owned-substrate @regression
+  Scenario: An artifact over the erasure-coding threshold is accepted whole and served whole
+    Given an artifact of 68 MiB, above the erasure-coding threshold
+    When I PUT the artifact to the storage peer under its own hash
+    Then the storage peer accepts the artifact
+    And GET "/blob" for that artifact from the same storage peer returns it byte-identical
