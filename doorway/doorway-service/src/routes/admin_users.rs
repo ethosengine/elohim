@@ -580,6 +580,10 @@ fn get_jwt_validator(state: &AppState) -> Result<JwtValidator, Response<FullBody
 /// and body-generic so sibling admin surfaces (e.g. `admin_conductors`) reuse
 /// this one gate rather than duplicating the auth logic, and can unit-test it
 /// with any body type. See conductor-visibility.feature:35.
+// Response<FullBody> is the crate-wide HTTP-error-as-Err convention (see the
+// sibling `#[allow]` on `get_jwt_validator` above); shrinking it here would
+// ripple into every caller's `Err(resp) => return resp` across the crate.
+#[allow(clippy::result_large_err)]
 pub(crate) async fn require_admin<B>(
     req: &Request<B>,
     state: &AppState,

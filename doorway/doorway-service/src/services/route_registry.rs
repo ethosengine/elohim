@@ -959,6 +959,42 @@ pub fn spawn_cleanup_task(
     })
 }
 
+/// Fetch ONE steward peer's route manifest, without installing it.
+///
+/// Split out of [`RouteRegistry::register_steward_peer`] so a caller can fetch
+/// every peer's manifest CONCURRENTLY (boot must not pay the sum of every dead
+/// peer's timeout) and still INSTALL in declared order. Order is load-bearing:
+/// `match_request` returns matches ordered by insertion and the router takes the
+/// first, so install order IS peer priority. Fetching and installing in one
+/// concurrent step would hand priority to whichever peer answered fastest.
+pub async fn fetch_steward_manifest(storage_url: &str) -> Result<DoorwayRoutes, String> {
+    let url = format!("{}/manifest", storage_url.trim_end_matches('/'));
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
+
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch manifest from {url}: {e}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "Manifest endpoint returned {}: {}",
+            response.status(),
+            url
+        ));
+    }
+
+    response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse manifest JSON: {e}"))
+}
+
 // =============================================================================
 // Tests
 // =============================================================================
@@ -1232,40 +1268,4 @@ mod tests {
             matches!(&matches[0].target, RouteTarget::StorageProxy { endpoint } if endpoint == &primary)
         );
     }
-}
-
-/// Fetch ONE steward peer's route manifest, without installing it.
-///
-/// Split out of [`RouteRegistry::register_steward_peer`] so a caller can fetch
-/// every peer's manifest CONCURRENTLY (boot must not pay the sum of every dead
-/// peer's timeout) and still INSTALL in declared order. Order is load-bearing:
-/// `match_request` returns matches ordered by insertion and the router takes the
-/// first, so install order IS peer priority. Fetching and installing in one
-/// concurrent step would hand priority to whichever peer answered fastest.
-pub async fn fetch_steward_manifest(storage_url: &str) -> Result<DoorwayRoutes, String> {
-    let url = format!("{}/manifest", storage_url.trim_end_matches('/'));
-
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
-
-    let response = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| format!("Failed to fetch manifest from {url}: {e}"))?;
-
-    if !response.status().is_success() {
-        return Err(format!(
-            "Manifest endpoint returned {}: {}",
-            response.status(),
-            url
-        ));
-    }
-
-    response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse manifest JSON: {e}"))
 }

@@ -750,6 +750,10 @@ fn unknown_conductor_response(
 /// The provisioner walks every current conductor looking for an existing
 /// app for this user (deterministic app_id) before installing a new one,
 /// so calling this for a stale mapping naturally re-binds the agent.
+// Response<Full<Bytes>> is the crate-wide HTTP-error-as-Err convention (see
+// e.g. the sibling `#[allow]` on `require_admin` in routes/admin_users.rs);
+// shrinking it here would ripple into every caller's `Err(resp) => return resp`.
+#[allow(clippy::result_large_err)]
 async fn auto_provision(
     state: &Arc<AppState>,
     registry: &Arc<crate::conductor::ConductorRegistry>,

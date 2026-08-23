@@ -239,6 +239,10 @@ pub async fn handle_journal_suggest(
 }
 
 // Helper to parse JSON body from hyper request
+// Response<Full<Bytes>> is the crate-wide HTTP-error-as-Err convention (see
+// e.g. the sibling `#[allow]` on `require_admin` in routes/admin_users.rs);
+// shrinking it here would ripple into every caller's `Err(resp) => return resp`.
+#[allow(clippy::result_large_err)]
 async fn parse_json_body<T: serde::de::DeserializeOwned>(
     req: Request<Incoming>,
 ) -> Result<T, Response<Full<Bytes>>> {
