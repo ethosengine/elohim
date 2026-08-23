@@ -115,6 +115,7 @@ just test app                 # focused test family
 just test mesh [scope]        # Act I a2o lane against the local mesh (scope = feature path or tag expr; scoped runs stay scoped)
 just dev start                # isolated conductor + storage + doorway
 just mesh status              # local multi-peer mesh
+MESH_TRANSPORT_BACKEND=dual just mesh start  # storage Track-2 mode: libp2p | dual | iroh
 just mesh prologue            # Act I Prologue: cast + seed + stage + fixture manifest (run after `just mesh start`)
 just seed validate            # non-writing schema validation
 just look page <url>          # eyes-first render

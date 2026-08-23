@@ -199,6 +199,7 @@ export function renderMarkdown(report: SprintReport): string {
   lines.push('');
   lines.push(`- **Run**: \`${report.runId}\``);
   lines.push(`- **Profile**: \`${report.profile}\``);
+  if (report.transport) lines.push(`- **Transport**: \`${report.transport}\``);
   if (report.doorway) lines.push(`- **Doorway**: ${report.doorway}`);
   lines.push(`- **Generated**: ${report.generatedAt}`);
   lines.push('');

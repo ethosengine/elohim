@@ -131,6 +131,8 @@ export interface SprintReport {
   generatedAt: string;
   runId: string;
   profile: string;
+  /** Storage Track-2 backend measured by this run. */
+  transport?: string;
   /** The commit this run measured; omitted when neither GIT_COMMIT nor git answered. */
   gitCommit?: string;
   doorway?: string;
@@ -158,6 +160,7 @@ interface AggregateInput {
   gaps: GapFinding[];
   runId: string;
   profile: string;
+  transport?: string;
   doorway?: string;
   gitCommit?: string;
   env?: RunEnv;
@@ -456,6 +459,7 @@ export function aggregate(input: AggregateInput): SprintReport {
     generatedAt: new Date().toISOString(),
     runId: input.runId,
     profile: input.profile,
+    transport: input.transport,
     gitCommit: input.gitCommit,
     doorway: input.doorway,
     env: input.env,

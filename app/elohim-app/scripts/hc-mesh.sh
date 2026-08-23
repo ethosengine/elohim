@@ -9,8 +9,8 @@
 #                proxies all N storage peers)
 #   N conductors (hc sandbox, holochain 0.6: --piped + -f pinned admin ports,
 #                -n N native multi-sandbox; discovery via the LOCAL doorway)
-#   N storages  (release binary, libp2p mesh via mDNS inside the container,
-#                each bound to its own conductor)
+#   N storages  (release binary, Track-2 backend selected independently as
+#                libp2p, dual, or iroh; each bound to its own conductor)
 #
 # Verified bring-up 2026-08-16: mesh/upload/propagation/delivery/projection
 # probes green via `substrate-verify.ts` against this fleet (same assertion
@@ -38,6 +38,11 @@
 # ENVIRONMENT:
 #   MESH_PEERS      Peer names, comma-separated (default: matthew,jessica,james)
 #   MESH_DIR        Data root (default: /tmp/elohim-local-mesh)
+#   MESH_TRANSPORT_BACKEND
+#                   elohim-storage Track-2 backend: libp2p (default), dual, or
+#                   iroh. This does NOT change the conductor's kitsune2/tx5
+#                   transport. dual/iroh require STORAGE_BIN built with
+#                   --features "p2p p2p-iroh"; start refuses otherwise.
 #   DOORWAY_PORT    Doorway HTTP port (default: 8888)
 #   DOORWAY_A_HEALTH_PORT / DOORWAY_B_HEALTH_PORT  health-watchdog listener ports (default 8079 / 8089;
 #                   alpha runs 8079 — spawn_health_listener serves /health,/ready,/health/serving from
@@ -116,6 +121,17 @@ set -u
 
 MESH_PEERS="${MESH_PEERS:-matthew,jessica,james}"
 MESH_DIR="${MESH_DIR:-/tmp/elohim-local-mesh}"
+MESH_TRANSPORT_BACKEND="${MESH_TRANSPORT_BACKEND:-libp2p}"
+case "$MESH_TRANSPORT_BACKEND" in
+  libp2p|dual|iroh) ;;
+  *)
+    echo "invalid MESH_TRANSPORT_BACKEND='$MESH_TRANSPORT_BACKEND' (expected libp2p, dual, or iroh)" >&2
+    if [ "${BASH_SOURCE[0]}" != "$0" ]; then return 2; else exit 2; fi ;;
+esac
+# `just test mesh` sources this file before invoking the report builder. Export
+# the normalized/defaulted mode so that run evidence records the same backend
+# the mesh launcher selects.
+export MESH_TRANSPORT_BACKEND
 DOORWAY_PORT="${DOORWAY_PORT:-8888}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -146,6 +162,64 @@ admin_port() { echo $((4444 + 10 * $1)); }
 app_port()   { echo $((4445 + 10 * $1)); }
 http_port()  { echo $((8090 + $1)); }
 p2p_port()   { echo $((9701 + $1)); }
+
+# The storage CLI has no --print-features surface. The p2p-iroh build does,
+# however, retain this exact tracing target literal from p2p_iroh/node.rs in
+# both debug and release binaries. A source-path-only `p2p_iroh` grep is not
+# sufficient: embedded migration comments contain that text even in the
+# default-feature binary.
+storage_has_iroh_feature() { # <binary>
+  strings "$1" 2>/dev/null | grep -Fq 'elohim_storage::p2p_iroh'
+}
+
+print_iroh_build_command() { # <binary>
+  local bin="$1" target_dir profile=""
+  case "$bin" in
+    */debug/elohim-storage) target_dir="${bin%/debug/elohim-storage}" ;;
+    */release/elohim-storage)
+      target_dir="${bin%/release/elohim-storage}"
+      profile=" --release" ;;
+    *) target_dir="$POOL/elohim__elohim-storage/dev" ;;
+  esac
+  echo "  cd '$REPO_ROOT/elohim/elohim-storage'"
+  echo "  CARGO_TARGET_DIR='$target_dir' RUSTFLAGS='--cfg getrandom_backend=\"custom\"' cargo build$profile --features \"p2p p2p-iroh\" --bin elohim-storage"
+}
+
+assert_storage_transport_capability() { # <binary> <mode>
+  local bin="$1" mode="$2"
+  case "$mode" in libp2p) return 0 ;; dual|iroh) ;; *)
+    echo "invalid storage transport '$mode'" >&2; return 1 ;; esac
+  if storage_has_iroh_feature "$bin"; then return 0; fi
+  echo "REFUSING TO START storage transport=$mode — binary lacks the compiled p2p-iroh marker:" >&2
+  echo "  $bin" >&2
+  echo "Build that pool slot with:" >&2
+  print_iroh_build_command "$bin" >&2
+  return 1
+}
+
+storage_pid_for_port() { # <http-port>
+  ps -eo pid=,args= | awk -v me="$$" -v pat="--http-port $1" \
+    '$1 != me && index($0, "elohim-storage") && index($0, pat) { print $1; exit }'
+}
+
+transport_from_environ() { # <nul-delimited environ file>
+  [ -r "$1" ] || return 0
+  tr '\0' '\n' < "$1" 2>/dev/null | sed -n 's/^ELOHIM_TRANSPORT_BACKEND=//p' | head -1
+}
+
+storage_transport_for() { # <peer-name> <http-port>
+  local name="$1" port="$2" pid mode=""
+  pid="$(storage_pid_for_port "$port")"
+  if [ -n "$pid" ] && [ -r "/proc/$pid/environ" ]; then
+    mode="$(transport_from_environ "/proc/$pid/environ")"
+  fi
+  if [ -z "$mode" ]; then
+    mode="$(transport_from_environ "$MESH_DIR/storage-restart/$name.environ")"
+  fi
+  # A peer launched before this knob landed has no captured declaration; the
+  # daemon's own default is libp2p, so name that fact instead of saying unknown.
+  echo "${mode:-libp2p(default)}"
+}
 
 # ---------------------------------------------------------------------------
 # dev-tier pacing profile (declared preproduction stakes — see minutes-quiesce
@@ -480,10 +554,16 @@ stop_all() {
 
 status_all() {
   echo "conductors:"; ss -tln 2>/dev/null | grep -E "127.0.0.1:44[0-9]{2} " || echo "  (none)"
-  local i=0
+  local i=0 port transport
   for name in "${PEERS[@]}"; do
+    port="$(http_port $i)"
+    transport="$(storage_transport_for "$name" "$port")"
     printf "  %-8s admin=%s app=%s  storage=" "$name" "$(admin_port $i)" "$(app_port $i)"
-    curl -s -m 2 "http://localhost:$(http_port $i)/health" >/dev/null && echo "UP :$(http_port $i)" || echo "down"
+    if curl -s -m 2 "http://localhost:$port/health" >/dev/null; then
+      echo "UP :$port transport=$transport"
+    else
+      echo "down transport=$transport"
+    fi
     i=$((i+1))
   done
   printf "doorway  :%s " "$DOORWAY_PORT"
@@ -594,10 +674,24 @@ restart_storage() {
     # /proc is unreadable (a process already exiting) is treated exactly like no
     # pid at all — fall through to the last good capture rather than give up,
     # which is the difference between a recoverable peer and a dead one.
-    if [ -n "$pid" ] && cp "/proc/$pid/environ" "$envfile" 2>/dev/null; then
+    if [ -n "$pid" ] && python3 - "$pid" "$envfile" <<'PY' 2>/dev/null
+import sys
+pid, destination = sys.argv[1:]
+with open(f"/proc/{pid}/environ", "rb") as source:
+    raw = source.read()
+with open(destination, "wb") as target:
+    target.write(raw)
+PY
+    then
       cwd="$(readlink "/proc/$pid/cwd")"
       if ! bin="$(resolve_exe "$pid" "$STORAGE_BIN")"; then
         echo "  $name: binary is gone (was '$bin'); rebuild it or set STORAGE_BIN" >&2
+        failed+=" $name"; continue
+      fi
+      local captured_transport
+      captured_transport="$(transport_from_environ "$envfile")"
+      captured_transport="${captured_transport:-$MESH_TRANSPORT_BACKEND}"
+      if ! assert_storage_transport_capability "$bin" "$captured_transport"; then
         failed+=" $name"; continue
       fi
       # Record the binary beside the environ: a later dead-peer restore must not
@@ -618,6 +712,12 @@ restart_storage() {
       bin="$(restore_binary_for "$exefile")"
       if [ -z "$bin" ]; then
         echo "  $name: no executable storage binary — $exefile absent, no sibling peer running, STORAGE_BIN=$STORAGE_BIN not executable" >&2
+        failed+=" $name"; continue
+      fi
+      local captured_transport
+      captured_transport="$(transport_from_environ "$envfile")"
+      captured_transport="${captured_transport:-$MESH_TRANSPORT_BACKEND}"
+      if ! assert_storage_transport_capability "$bin" "$captured_transport"; then
         failed+=" $name"; continue
       fi
       key="$(tr '\0' '\n' < "$envfile" | sed -n 's/^AGENT_PUBKEY=//p' | head -1)"
@@ -655,7 +755,7 @@ os.chdir(cwd)
 # three storage peers owned a2o.lock; every waiter stalled for 40 min).
 os.closerange(3, 65536)
 os.execve(binpath, [binpath, "--http-port", port], env)
-' "$envfile" "$bin" "$port" "$cwd" "$(restart_env_overlay)" >> "$LOGDIR/$name.log" 2>&1 &
+' "$envfile" "$bin" "$port" "$cwd" "$(restart_env_overlay "$envfile")" >> "$LOGDIR/$name.log" 2>&1 &
     disown 2>/dev/null || true
   done
 
@@ -698,7 +798,14 @@ os.execve(binpath, [binpath, "--http-port", port], env)
 #                                  without regenerating it. Never touches
 #                                  AGENT_PUBKEY or any non-profile key.
 #   MESH_RESTART_ENV_OVERLAY="K=V K=V"   ad-hoc keys for one experiment.
-restart_env_overlay() {
+restart_env_overlay() { # <captured-environ>
+  # Always re-state the captured backend. For peers launched before this knob
+  # existed, fill the daemon's libp2p default (or the caller's selected mode).
+  # MESH_RESTART_ENV_OVERLAY is printed last and remains the explicit way to
+  # switch a running peer deliberately.
+  local captured_transport
+  captured_transport="$(transport_from_environ "$1")"
+  printf '%s\n' "ELOHIM_TRANSPORT_BACKEND=${captured_transport:-$MESH_TRANSPORT_BACKEND}"
   if [ "${MESH_RESTART_APPLY_PROFILE:-0}" = "1" ]; then
     printf '%s\n' \
       "PROJECTION_RECONCILE_SECS=$PROJECTION_RECONCILE_SECS" \
@@ -1130,6 +1237,7 @@ EOF
   for bin in "$STORAGE_BIN" "$DOORWAY_BIN"; do
     [ -x "$bin" ] || { echo "missing binary: $bin (build it first — see CLAUDE.md pool-slot paths)"; exit 1; }
   done
+  assert_storage_transport_capability "$STORAGE_BIN" "$MESH_TRANSPORT_BACKEND" || exit 1
 
   # Repack the happ when any DNA is newer than the bundle (stale-bundle trap:
   # elohim.happ predated lamad.dna by 3 months on 2026-08-16).
@@ -1353,6 +1461,7 @@ PYEOF
       STORAGE_DIR="$MESH_DIR/$name" \
       ENABLE_CONTENT_DB=true ENABLE_IMPORT_API=true \
       ENABLE_P2P=true P2P_PORT="$(p2p_port $i)" \
+      ELOHIM_TRANSPORT_BACKEND="$MESH_TRANSPORT_BACKEND" \
       AGENT_PUBKEY="$agent" RELAY_MODE=server \
       GENESIS_SELF_HEAL_IDENTITY=1 SELF_HUMAN_ID="$(human_id "$name")" \
       HOUSEHOLD_ID=household-dowell \
@@ -1371,7 +1480,7 @@ PYEOF
       ALLOW_SEED_DELEGATES_COMPUTE=1 \
       ALLOW_SEED_SHARD_MANIFEST=1 \
       nohup "$STORAGE_BIN" --http-port "$(http_port $i)" > "$LOGDIR/$name.log" 2>&1 &
-      echo "storage $name: http=$(http_port $i) p2p=$(p2p_port $i) agent=${agent:0:16}..."
+      echo "storage $name: http=$(http_port $i) p2p=$(p2p_port $i) transport=$MESH_TRANSPORT_BACKEND agent=${agent:0:16}..."
     else
       echo "storage $name already up on :$(http_port $i)"
     fi

@@ -142,6 +142,7 @@ test target="changed" scope="":
           --out-md   "$reports_dir/sprint-report-household-$run_id.md" \
           --profile  mesh \
           --lane     household \
+          --transport "$MESH_TRANSPORT_BACKEND" \
           --run-id   "$run_id" \
           --doorway  "$E2E_DOORWAY_ALPHA" || report_rc=$?
         # Cucumber's code wins so a red run stays red; a GREEN run whose evidence could not

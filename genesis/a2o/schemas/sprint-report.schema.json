@@ -13,6 +13,11 @@
       "type": "string",
       "description": "cucumber profile (alpha, local, browser, delivery, ...)"
     },
+    "transport": {
+      "type": "string",
+      "enum": ["libp2p", "dual", "iroh", "unknown"],
+      "description": "elohim-storage Track-2 backend measured by this run. Optional so reports archived before the mesh transport knob still validate; build-sprint-report.ts always emits it."
+    },
     "doorway": { "type": "string", "description": "Doorway base URL the run targeted" },
     "gitCommit": {
       "type": "string",

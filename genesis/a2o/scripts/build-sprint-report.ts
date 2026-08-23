@@ -42,6 +42,7 @@ interface Args {
   outMd: string;
   runId: string;
   profile: string;
+  transport: string;
   doorway?: string;
   /**
    * Which lane produced this run — `household` (local mesh) or `alpha-fleet`.
@@ -66,6 +67,11 @@ function parseArgs(argv: string[]): Args {
     outMd: opts.get('--out-md') ?? join(reportsDir, 'sprint-report.md'),
     runId: opts.get('--run-id') ?? process.env.BUILD_TAG ?? new Date().toISOString(),
     profile: opts.get('--profile') ?? process.env.CUCUMBER_PROFILE ?? 'unknown',
+    transport:
+      opts.get('--transport') ??
+      process.env.MESH_TRANSPORT_BACKEND ??
+      process.env.ELOHIM_TRANSPORT_BACKEND ??
+      'unknown',
     doorway: opts.get('--doorway') ?? process.env.E2E_DOORWAY_ALPHA,
     lane: opts.get('--lane') ?? process.env.A2O_LANE,
   };
@@ -99,6 +105,7 @@ function main() {
     gaps,
     runId: args.runId,
     profile: args.profile,
+    transport: args.transport,
     doorway: args.doorway,
     gitCommit: resolveGitCommit(probe),
     env,
@@ -131,7 +138,8 @@ function main() {
     `Findings: ${report.summary.findings.total} (scenarios: ${report.summary.scenarios.total})`
   );
   console.log(
-    `Lane: ${env.lane} · peers ${env.peers} · processControl ${env.processControl} · ` +
+    `Lane: ${env.lane} · transport ${args.transport} · peers ${env.peers} · ` +
+      `processControl ${env.processControl} · ` +
       `stage ${env.networkStage} · sut ${env.sut}` +
       (env.unknown.length > 0 ? ` · unknown: ${env.unknown.join(', ')}` : '')
   );

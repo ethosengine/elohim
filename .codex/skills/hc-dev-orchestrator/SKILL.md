@@ -66,6 +66,23 @@ just mesh quiesce
 just mesh stop
 ```
 
+`MESH_TRANSPORT_BACKEND=libp2p|dual|iroh` selects the elohim-storage Track-2
+backend for the whole household run (default `libp2p`; the conductor kitsune2/tx5
+transport is a separate layer). For example:
+
+```bash
+MESH_TRANSPORT_BACKEND=dual just mesh start
+MESH_TRANSPORT_BACKEND=dual just mesh prologue
+MESH_TRANSPORT_BACKEND=dual just test mesh features/dataplane/content-sync.feature
+```
+
+`dual` and `iroh` require the selected `STORAGE_BIN` to be built with
+`--features "p2p p2p-iroh"`; `start` refuses a default-feature binary and prints
+the exact cargo-pool build command. `mesh status` prints `transport=<mode>` per
+peer from the live/captured process environment, `storage-restart` preserves that
+captured mode (including with `MESH_RESTART_APPLY_PROFILE=1`), and each household
+sprint report stamps the mode in JSON and its Markdown header so runs remain comparable.
+
 `mesh quiesce` measures an already-running mesh and records its bounded result
 (one line per run, including the wall-clock, verdict, knobs and an io_baseline
 write-throughput probe) under `${MESH_DIR:-/tmp/elohim-local-mesh}`. It never

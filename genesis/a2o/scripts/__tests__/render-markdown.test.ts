@@ -9,6 +9,7 @@ const report: SprintReport = {
   generatedAt: '2026-04-19T10:00:00Z',
   runId: 'build-123',
   profile: 'alpha',
+  transport: 'dual',
   doorway: 'https://doorway-alpha.elohim.host',
   summary: {
     scenarios: { total: 3, passed: 1, failed: 1, skipped: 0, pending: 1 },
@@ -38,11 +39,12 @@ const report: SprintReport = {
 };
 
 void describe('renderMarkdown', () => {
-  void it('includes the run id and profile in the header', () => {
+  void it('includes the run id, profile, and transport in the header', () => {
     const md = renderMarkdown(report);
     assert.match(md, /A2O Sprint Report/);
     assert.match(md, /build-123/);
     assert.match(md, /alpha/);
+    assert.match(md, /Transport.*dual/);
   });
 
   void it('renders summary counts', () => {
