@@ -69,3 +69,26 @@ dataplane only. Do not conflate them in the script comments.)
 Scripts + justfile only. The Rust work it unblocks (iroh peer blob-fetch in
 heal-on-read, custody push over iroh) is Opus-tier and tracked in the roadmap
 plan, not here.
+
+## Evidence (2026-08-23, orchestrator on the owned mesh)
+
+- `dual` BOOTS: clean-HEAD `p2p-iroh` binary (built from a detached worktree at 99c0433cf into the
+  mesh slot), all three peers re-exec'd with `ELOHIM_TRANSPORT_BACKEND=dual`; each log shows
+  `iroh node started (blob plane + gossip + extra ALPNs registered)`, `iroh gossip receive:
+  subscribing to inbound topics (Dual-plane receive lit) topics=8`, `Content-projection producer
+  spawned on iroh transport`; libp2p swarm still `connectedPeers: 2`; `just mesh status` prints
+  `transport=dual` per peer. `just test mesh features/dataplane/content-sync.feature` → 4/4 in dual.
+- Two defects, NOT yet fixed (status stays `refined`):
+  1. **Restart precedence.** `storage-restart` prefers the CAPTURED environ's mode over
+     `MESH_TRANSPORT_BACKEND` (hc-mesh.sh:691-693 / 717-719), so a plain
+     `MESH_TRANSPORT_BACKEND=dual … storage-restart` silently keeps `libp2p`. The override that
+     works today is `MESH_RESTART_ENV_OVERLAY="ELOHIM_TRANSPORT_BACKEND=dual"`. Decide and
+     document one rule: either the requested mode wins on restart (print the flip), or the script
+     refuses with the overlay command. Silent no-op is the one wrong answer.
+  2. **Report stamp lies.** The sprint report header read `transport libp2p` for the dual run
+     because `just test mesh` stamps the invoking shell's `MESH_TRANSPORT_BACKEND`, not the peers'
+     live mode. Read it from the peers (status already does, per environ) and refuse to stamp when
+     peers disagree.
+- `iroh`-only mode was deliberately NOT booted this pass: by construction it has no peer blob
+  fetch (roadmap Lane T2), so the lane's custody/heal drills would red for a reason already known;
+  boot it once T2 lands or as an explicit measurement run, never as the default.
