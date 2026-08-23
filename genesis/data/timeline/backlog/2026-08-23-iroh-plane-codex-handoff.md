@@ -106,7 +106,13 @@ with your agent name; do not start a cut whose write-set overlaps one already `w
 | T0′ | **pure-iroh bootstrap** — a node with no libp2p leg must still obtain a manifest set: doorway `GET /p2p/manifests` (signed announcements it has seen) and/or the pkarr station (Lane A5) | Opus | doorway `routes/`, `src/p2p_iroh/announcer.rs` (seed from resolver) | `ELOHIM_TRANSPORT_BACKEND=iroh` mesh reaches `peers_known=2` |
 | T5 | **per-mode CI** — the mesh stage runs `libp2p` and `dual`; `@transport:` tag reported per mode; `cargo test --test sync_iroh_convergence` beside the libp2p check in `dataplane-convergence` | Sonnet | `genesis/a2o/**` (coordinate with the transport-comparison-matrix work), CI scripts | all modes are stamped in the sprint report; retain T4's `iroh_inventory_fetch_parity` as the local inventory preflight because the live matrix measures Automerge sync, not inventory-triggered fetch. First live run `20260823T185926Z-b93bcb9d` is red in all modes |
 | T7 | **book eviction policy** — drop a peer after N consecutive `request_failed`, re-admit on next verified manifest; `remove()` exists, nothing calls it | Codex | `src/p2p_iroh/sync_driver.rs`, `src/p2p_iroh/peer_book.rs` (a failure counter) | unit test: N failures → removed; fresh manifest → back |
-| T8 | **blind-reader pass** on `transport-dual-plane.feature` (owed per `genesis/a2o/.epr-meta` rule `a2o-story-blind-reader-review`; the feature was committed without it) | any | the feature file only | verdict READY or named deferrals |
+| T8 | **DONE 2026-08-23 — blind-reader pass** on `transport-dual-plane.feature`: verdict READY with 4 named deferrals, all cured in-file same day (title softened to what one peer actually shows; temporal-precondition, household-size, direction=up, and transport-manifest comments) | Fable | the feature file only | verdict READY; deferral cures committed |
+
+
+Review residue from the 2026-08-23 adversarial pass (claimable, not yet rows above):
+- **iroh eager-announce port** — the libp2p doorbell (bounded `AnnounceChange` payload + pull-on-announce, commit `7d2db0a62`) has no iroh twin: `p2p_iroh/sync_backend.rs:147-177` bare-acks a `None` announce and no iroh-side sender exists; `bounded_announce_payload` / `MAX_ANNOUNCE_PAYLOAD_BYTES` are public in `sync_round` and port cleanly.
+- **announce debounce (pairs with T7)** — pull-on-announce lets a connected peer force a heads-lookup + one outbound `SyncChanges` per announce; bound it per (peer, doc) when T7's failure counter lands.
+- **doorway probe concurrency** — `probe_open_circuits` is sequential (N open circuits x 2 s inside the refresh tick); make it `join_all` if the pool grows.
 
 Not claimable yet: iroh 0.92 → 1.0 lift (campaign `2026-08-04-holochain-iroh-convergence-upgrade-campaign`);
 `KeyEnvelope` / blind custody (swarm-curve spec §9, design-gated).
