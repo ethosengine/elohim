@@ -169,6 +169,16 @@ pub struct RouteRegistry {
     pub(crate) compiled_routes: RwLock<Vec<CompiledRoute>>,
     /// When routes were last compiled
     last_compiled: RwLock<Option<Instant>>,
+    /// Declared steward-peer priority (`storage_url` → rank; 0 = the
+    /// doorway's primary). `match_request` returns matches in insertion order
+    /// and the router takes the first, so WHEN a peer installs would otherwise
+    /// decide WHICH peer serves a route. A primary whose manifest fetch fails at
+    /// boot (circuit open, peer restarting) registers late from the background
+    /// retry — 2026-08-22 household mesh: matthew registered 45 s after jessica
+    /// and doorway A served jessica's projection (3 human rows, no pins) as
+    /// "alpha-A" until its next boot. Install re-sorts steward routes by this
+    /// rank, so declared order wins regardless of arrival order.
+    peer_priority: RwLock<HashMap<String, usize>>,
 }
 
 /// Entry for DNA-discovered routes
@@ -195,6 +205,42 @@ impl RouteRegistry {
             agent_routes: RwLock::new(HashMap::new()),
             compiled_routes: RwLock::new(Vec::new()),
             last_compiled: RwLock::new(None),
+            peer_priority: RwLock::new(HashMap::new()),
+        }
+    }
+
+    /// Declare steward-peer priority: index in `urls` is the rank (0 = primary).
+    /// Call before the first install; later installs — including the
+    /// background retry for a peer that was unreachable at boot — keep every
+    /// declared peer's routes ahead of lower-ranked peers. Undeclared peers rank
+    /// after every declared one, in arrival order.
+    pub async fn declare_peer_priority(&self, urls: &[String]) {
+        let mut prio = self.peer_priority.write().await;
+        prio.clear();
+        for (rank, url) in urls.iter().enumerate() {
+            prio.insert(url.trim_end_matches('/').to_string(), rank);
+        }
+    }
+
+    /// Re-order ONLY the steward-peer routes by declared rank (stable, so a
+    /// peer's own routes and every non-steward route keep their relative order).
+    fn reorder_steward_routes(compiled: &mut [CompiledRoute], prio: &HashMap<String, usize>) {
+        let slots: Vec<usize> = compiled
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| matches!(r.source, RouteSource::StewardPeer { .. }))
+            .map(|(i, _)| i)
+            .collect();
+        let mut steward: Vec<CompiledRoute> = slots.iter().map(|&i| compiled[i].clone()).collect();
+        steward.sort_by_key(|r| match &r.source {
+            RouteSource::StewardPeer { storage_url } => prio
+                .get(storage_url.trim_end_matches('/'))
+                .copied()
+                .unwrap_or(usize::MAX),
+            _ => usize::MAX,
+        });
+        for (slot, route) in slots.into_iter().zip(steward) {
+            compiled[slot] = route;
         }
     }
 
@@ -727,6 +773,10 @@ impl RouteRegistry {
             !matches!(&r.source, RouteSource::StewardPeer { storage_url: s } if s == storage_url)
         });
         compiled.extend(new_routes);
+        let prio = self.peer_priority.read().await;
+        if !prio.is_empty() {
+            Self::reorder_steward_routes(&mut compiled, &prio);
+        }
 
         let mut last = self.last_compiled.write().await;
         *last = Some(Instant::now());
@@ -1146,6 +1196,41 @@ mod tests {
             })
             .count();
         assert_eq!(peer_b_count, 2, "peer B's routes survive peer A re-install");
+    }
+
+    /// A primary that registers LATE (boot fetch failed, background retry
+    /// succeeded) must still serve first: declared priority beats arrival order.
+    #[tokio::test]
+    async fn declared_peer_priority_beats_install_order() {
+        let registry = RouteRegistry::with_defaults();
+        let manifest: DoorwayRoutes = serde_json::from_value(serde_json::json!({
+            "routes": [{"method": "GET", "path": "/db/humans", "handler": "list_humans"}]
+        }))
+        .expect("manifest json");
+        let primary = "http://127.0.0.1:8090".to_string();
+        let pool = "http://127.0.0.1:8091".to_string();
+        registry
+            .declare_peer_priority(&[primary.clone(), pool.clone()])
+            .await;
+
+        // Arrival order inverted: the pool peer installs first, the primary late.
+        registry.install_steward_routes(&pool, &manifest).await;
+        registry.install_steward_routes(&primary, &manifest).await;
+
+        let matches = registry.match_request(HttpMethod::Get, "/db/humans").await;
+        assert_eq!(matches.len(), 2);
+        assert!(
+            matches!(&matches[0].target, RouteTarget::StorageProxy { endpoint } if endpoint == &primary),
+            "first match must be the declared primary, got {:?}",
+            matches[0].target
+        );
+
+        // Re-installing the pool peer (periodic refresh) does not promote it.
+        registry.install_steward_routes(&pool, &manifest).await;
+        let matches = registry.match_request(HttpMethod::Get, "/db/humans").await;
+        assert!(
+            matches!(&matches[0].target, RouteTarget::StorageProxy { endpoint } if endpoint == &primary)
+        );
     }
 }
 

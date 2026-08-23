@@ -648,6 +648,11 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         }
     }
 
+    // Declared order is peer PRIORITY in the registry, independent of arrival:
+    // a primary whose boot fetch fails registers late from the retry task and
+    // must still serve first (RouteRegistry::declare_peer_priority).
+    state.route_registry.declare_peer_priority(&peer_urls).await;
+
     // FETCH concurrently, INSTALL in declared order.
     //
     // Concurrent fetch: this runs BEFORE the listener binds and each manifest
