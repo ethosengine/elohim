@@ -3925,21 +3925,17 @@ async fn async_main(
                     // DocStore until each row is rewritten (same gap the libp2p arm's
                     // comment describes). Same env opt-out, same spawn-not-await shape.
                     //
-                    // PURE-IROH ONLY (`p2p_node.is_none()`), mirroring the
-                    // `with_sync_manager` hoist's guard below. In dual mode the libp2p
-                    // arm above already spawned this exact back-fill against this exact
-                    // `Arc<SyncManager>`; spawning a second one races it read-modify-
-                    // write per doc (`get_or_create_doc` → transact → save, with no
-                    // per-doc lock or CAS), so the later save silently discards the
-                    // earlier projection — including a live producer projection that
-                    // landed between a racer's load and its save, whose announce has
-                    // already gone out on the wire.
+                    // PURE-IROH ONLY: the enclosing `p2p_node.is_none()` guard is what
+                    // keeps dual mode out of this whole block — in dual the libp2p arm
+                    // above already spawned this exact back-fill against this exact
+                    // `Arc<SyncManager>`, and a second one races it read-modify-write
+                    // per doc (`get_or_create_doc` → transact → save, with no per-doc
+                    // lock or CAS), so the later save silently discards the earlier
+                    // projection — including a live producer projection that landed
+                    // between a racer's load and its save, whose announce has already
+                    // gone out on the wire. No mode check is needed (or possible) here.
                     let iroh_backfill_env = std::env::var("ELOHIM_DOCSTORE_BACKFILL").ok();
-                    if p2p_node.is_some() {
-                        info!(
-                        "Automerge DocStore corpus back-fill skipped on the iroh arm — dual mode, the libp2p arm owns the shared SyncManager"
-                    );
-                    } else if elohim_storage::sync::projector::backfill_enabled(
+                    if elohim_storage::sync::projector::backfill_enabled(
                         iroh_backfill_env.as_deref(),
                     ) {
                         let backfill_sync = iroh_sync.clone();
