@@ -34,6 +34,8 @@ pub fn spawn_iroh_sync_driver(
     tokio::spawn(async move {
         let mut ticker = tokio::time::interval(interval);
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        // bounded-work: one finite peer-book snapshot per interval tick;
+        // missed ticks collapse instead of accumulating catch-up rounds.
         loop {
             ticker.tick().await;
             run_iroh_sync_round(&endpoint, &peer_book, &sync_manager, db_pool.as_ref()).await;
