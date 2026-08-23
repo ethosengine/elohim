@@ -159,13 +159,17 @@ Then(
     const held = heldForOwnership(`read the oversized artifact back from ${route}`);
     if (held) return held;
     const art = artifact(this);
-    const response = await fetch(`${storageUrl()}${route}/${art.hash}`, {
+    // The scenario names the route the way the substrate exposes it —
+    // `/blob/{hash}` — so a reader sees the whole request, not a prefix plus
+    // an inference about how the address gets appended.
+    const path = route.replace('{hash}', art.hash);
+    const response = await fetch(`${storageUrl()}${path}`, {
       signal: AbortSignal.timeout(240_000),
     });
     assert.equal(
       response.status,
       200,
-      `GET ${route}/${art.hash} → ${response.status} — an accepted artifact must serve back`
+      `GET ${path} → ${response.status} — an accepted artifact must serve back`
     );
     const served = new Uint8Array(await response.arrayBuffer());
     assert.equal(

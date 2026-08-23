@@ -158,7 +158,31 @@ async function circuitFor(doorwayUrl: string, upstream: string): Promise<string 
   }
   const upstreams = body['upstreams'] as { upstream?: string; circuit?: string }[] | undefined;
   if (!Array.isArray(upstreams)) return undefined;
-  return upstreams.find(entry => entry.upstream === upstream)?.circuit;
+  return upstreams.find(entry => sameUpstream(entry.upstream, upstream))?.circuit;
+}
+
+/**
+ * One upstream, two spellings. The fixture names a peer `http://localhost:8090`;
+ * the doorway names the same peer by the argv it was launched with
+ * (`http://127.0.0.1:8090`) — measured 2026-08-23 on the household mesh, where
+ * the first run read circuit="unknown" for a primary whose breaker HAD opened.
+ * Loopback is one host; a port decides identity there. Anything else must
+ * match host-for-host.
+ */
+function sameUpstream(a: string | undefined, b: string | undefined): boolean {
+  if (!a || !b) return false;
+  let ua: URL;
+  let ub: URL;
+  try {
+    ua = new URL(a);
+    ub = new URL(b);
+  } catch {
+    return withoutTrailingSlashes(a) === withoutTrailingSlashes(b);
+  }
+  const loopback = (h: string) => h === 'localhost' || h === '127.0.0.1' || h === '[::1]';
+  const hostA = loopback(ua.hostname) ? '127.0.0.1' : ua.hostname;
+  const hostB = loopback(ub.hostname) ? '127.0.0.1' : ub.hostname;
+  return hostA === hostB && ua.port === ub.port;
 }
 
 // ---------------------------------------------------------------------------

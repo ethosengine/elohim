@@ -7,6 +7,13 @@ Feature: App ZIP blobs heal on read via peer race-fetch
   something an operator does at 2am — and the steward who served the
   bytes is recognized in the REA ledger for the mutual aid.
 
+  Durability has a second half, and it belongs to the same promise: a peer
+  can only heal bytes it was able to accept in the first place. So this
+  feature also holds the ingest floor — an artifact must be taken in whole
+  and given back whole, at every size the substrate claims to carry. An
+  artifact the substrate silently refuses at PUT is not a blob that heals
+  slowly; it is a blob no peer ever held.
+
   # Evidence anchor (2026-06-09 /deliver iter-0): matthew's storage lost the
   # landing + lamad ZIP bytes (ephemeral storage_dir, rows persisted) and the
   # apps-resolver 404'd "App ZIP blob not found" for days; a manual
@@ -76,4 +83,4 @@ Feature: App ZIP blobs heal on read via peer race-fetch
     Given an artifact of 68 MiB, above the erasure-coding threshold
     When I PUT the artifact to the storage peer under its own hash
     Then the storage peer accepts the artifact
-    And GET "/blob" for that artifact from the same storage peer returns it byte-identical
+    And GET "/blob/{hash}" for that artifact from the same storage peer returns it byte-identical
