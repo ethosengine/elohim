@@ -72,6 +72,7 @@ pub mod sync_gate;
 pub mod sync_protocol;
 pub mod sync_round;
 pub mod topics;
+pub mod transport_manifest_gossip;
 pub mod trust_cache;
 pub mod trust_protocol;
 pub mod view_federation;

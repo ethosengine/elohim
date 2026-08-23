@@ -1312,6 +1312,97 @@ lazy_static! {
     )
     .unwrap();
 
+    // -----------------------------------------------------------------------
+    // iroh plane (Track-2 substrate, dual/iroh modes). These are the counters
+    // that answer "did iroh carry anything" — every one of them read ZERO on
+    // every dual-mode node before 2026-08-23 because the plane had no peer
+    // discovery (see `p2p_iroh::peer_book`). A proof of the iroh leg is these
+    // moving, not the endpoint logging "started".
+    // -----------------------------------------------------------------------
+
+    /// Peers this node can currently dial over iroh (size of the
+    /// `IrohPeerBook`, self excluded).
+    pub static ref IROH_PEERS_KNOWN: IntGauge = IntGauge::new(
+        "elohim_iroh_peers_known",
+        "iroh peers with a dialable NodeAddr in the peer book (self excluded).",
+    )
+    .unwrap();
+
+    /// Transport-manifest announcements received. label: result = "accepted"
+    /// (signature verified, book updated) | "stale" (older than held) |
+    /// "bad_signature" | "decode_failed" | "self".
+    pub static ref IROH_MANIFEST_ANNOUNCEMENTS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_iroh_manifest_announcements_total",
+            "elohim/transport/manifest announcements received, by result.",
+        ),
+        &["result"],
+    )
+    .unwrap();
+
+    /// iroh-gossip membership transitions on inbound topics. label:
+    /// direction = "up" | "down". `up` staying at zero = the plane has no
+    /// neighbors and every iroh publish is a shout into a void.
+    pub static ref IROH_GOSSIP_NEIGHBOR_EVENTS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_iroh_gossip_neighbor_events_total",
+            "iroh-gossip NeighborUp/NeighborDown events on inbound topics.",
+        ),
+        &["direction"],
+    )
+    .unwrap();
+
+    /// Gossip messages RECEIVED over the iroh plane, by topic. The libp2p
+    /// twin is implicit in the per-topic handlers; this one exists so a
+    /// dual-mode node can show which leg actually delivered.
+    pub static ref IROH_GOSSIP_RECEIVED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_iroh_gossip_received_total",
+            "Gossip messages received over iroh, by topic.",
+        ),
+        &["topic"],
+    )
+    .unwrap();
+
+    /// iroh sync rounds initiated by the iroh round driver (twin of
+    /// `elohim_sync_rounds_total`, which is libp2p-only).
+    pub static ref IROH_SYNC_ROUNDS: IntCounter = IntCounter::new(
+        "elohim_iroh_sync_rounds_total",
+        "Sync rounds initiated over the iroh plane.",
+    )
+    .unwrap();
+
+    /// Outbound iroh sync requests. label: kind = "list_documents" |
+    /// "sync_changes"; result = "ok" | "dial_failed" | "request_failed" |
+    /// "error_response".
+    pub static ref IROH_SYNC_REQUESTS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_iroh_sync_requests_total",
+            "Outbound sync requests over iroh by verb and result.",
+        ),
+        &["kind", "result"],
+    )
+    .unwrap();
+
+    /// Automerge changes APPLIED from an iroh sync answer — the byte-level
+    /// proof that content moved over iroh.
+    pub static ref IROH_SYNC_CHANGES_APPLIED: IntCounter = IntCounter::new(
+        "elohim_iroh_sync_changes_applied_total",
+        "Automerge changes applied from iroh sync responses.",
+    )
+    .unwrap();
+
+    /// Blob fetches attempted over iroh-blobs. label: result = "ok" |
+    /// "dial_failed" | "not_found" | "verify_failed" | "error".
+    pub static ref IROH_BLOB_FETCHES: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_iroh_blob_fetches_total",
+            "Blob fetches over iroh-blobs by result.",
+        ),
+        &["result"],
+    )
+    .unwrap();
+
     /// Document entries received in `DocumentList` answers — the MAGNITUDE of the
     /// round's enumeration. This is the counter that makes a corpus-proportional
     /// round visible: on a converged mesh it should trend to zero, and today it
@@ -2185,6 +2276,14 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(IDENTITY_FILL_DISCOVERED_CIDS.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_FILL_COLLECTIVE_CID_STAMPED.clone()));
         let _ = REGISTRY.register(Box::new(CUSTODY_ANNOUNCE_TOTAL.clone()));
+        let _ = REGISTRY.register(Box::new(IROH_PEERS_KNOWN.clone()));
+        let _ = REGISTRY.register(Box::new(IROH_MANIFEST_ANNOUNCEMENTS.clone()));
+        let _ = REGISTRY.register(Box::new(IROH_GOSSIP_NEIGHBOR_EVENTS.clone()));
+        let _ = REGISTRY.register(Box::new(IROH_GOSSIP_RECEIVED.clone()));
+        let _ = REGISTRY.register(Box::new(IROH_SYNC_ROUNDS.clone()));
+        let _ = REGISTRY.register(Box::new(IROH_SYNC_REQUESTS.clone()));
+        let _ = REGISTRY.register(Box::new(IROH_SYNC_CHANGES_APPLIED.clone()));
+        let _ = REGISTRY.register(Box::new(IROH_BLOB_FETCHES.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_ROUNDS.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_REQUESTS.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_DOCS_ENUMERATED.clone()));
@@ -2763,6 +2862,56 @@ pub fn inc_content_head_record_degraded(cause: HeadRecordDegraded) {
     CONTENT_HEAD_RECORD_DEGRADED
         .with_label_values(&[cause.label()])
         .inc();
+}
+
+// ---------------------------------------------------------------------------
+// iroh plane helpers
+// ---------------------------------------------------------------------------
+
+/// Set the number of dialable iroh peers (self excluded).
+pub fn set_iroh_peers_known(n: usize) {
+    IROH_PEERS_KNOWN.set(n as i64);
+}
+
+/// Record one transport-manifest announcement by result ("accepted" |
+/// "stale" | "bad_signature" | "decode_failed" | "self").
+pub fn inc_iroh_manifest_announcement(result: &str) {
+    IROH_MANIFEST_ANNOUNCEMENTS
+        .with_label_values(&[result])
+        .inc();
+}
+
+/// Record an iroh-gossip neighbor transition ("up" | "down").
+pub fn inc_iroh_gossip_neighbor(direction: &str) {
+    IROH_GOSSIP_NEIGHBOR_EVENTS
+        .with_label_values(&[direction])
+        .inc();
+}
+
+/// Record one gossip message received over iroh on `topic`.
+pub fn inc_iroh_gossip_received(topic: &str) {
+    IROH_GOSSIP_RECEIVED.with_label_values(&[topic]).inc();
+}
+
+/// Record one iroh sync round.
+pub fn inc_iroh_sync_round() {
+    IROH_SYNC_ROUNDS.inc();
+}
+
+/// Record one outbound iroh sync request ("list_documents" | "sync_changes")
+/// with its result ("ok" | "dial_failed" | "request_failed" | "error_response").
+pub fn inc_iroh_sync_request(kind: &str, result: &str) {
+    IROH_SYNC_REQUESTS.with_label_values(&[kind, result]).inc();
+}
+
+/// Record Automerge changes applied from an iroh sync answer.
+pub fn add_iroh_sync_changes_applied(n: u64) {
+    IROH_SYNC_CHANGES_APPLIED.inc_by(n);
+}
+
+/// Record one iroh-blobs fetch by result.
+pub fn inc_iroh_blob_fetch(result: &str) {
+    IROH_BLOB_FETCHES.with_label_values(&[result]).inc();
 }
 
 /// Record one sync round initiated by the poll tick.
