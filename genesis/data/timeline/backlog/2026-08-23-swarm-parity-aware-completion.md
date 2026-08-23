@@ -7,7 +7,7 @@ title: "Shard swarm: an erasure-coded fetch is COMPLETE once data_shards have la
 slug: "swarm-parity-aware-completion"
 written: "2026-08-23"
 author: "fable-5 fork 2026-08-23 (operator-requested Codex queue — sharded blob distribution)"
-status: "refined"
+status: "wip"
 priority: "high"
 area: "dataplane/blob-swarm"
 domain: "protocol"
@@ -52,3 +52,15 @@ bandwidth the requester does not need — the opposite of the torrent curve the 
 ## Disjointness
 Do not touch `http.rs` `put_blob_bytes`/`reassemble_from_local_shards` (landed today), `sharding.rs`,
 `p2p/blob_fetch.rs`, or anything under `p2p_iroh/` (Lane T2, Opus).
+
+## Live evidence (2026-08-23, orchestrator on the owned 3-peer mesh)
+
+Codex landed the implementation as `4009362f0` (gate green, 2,968 lib tests) without a
+live mesh. Re-verified here: storage rebuilt at `4009362f0` with `p2p-iroh`, all three
+peers re-exec'd in `dual`; `features/resilience/app-blob-heal-on-read.feature` 2/2
+(first-request heal races peers for locally-missing bytes and serves; the >64 MiB RS
+artifact ingests and serves whole) and `features/dataplane/doorway-failover.feature`
+10/10 as the regression guard. Not yet measured: the curve itself (roadmap S3 — fetch
+one RS blob with 1/2/3 holders and assert wall-clock falls) and a parity-shard-missing
+heal through the doorway; those are the evidence that flips blob-durability, so this
+row moves to `wip`-verified, not `done`.

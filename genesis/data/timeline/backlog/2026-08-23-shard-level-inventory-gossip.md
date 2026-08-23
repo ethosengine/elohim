@@ -7,7 +7,7 @@ title: "Shard bitfield inventory: a peer advertises each composite ONCE with a b
 slug: "shard-level-inventory-gossip"
 written: "2026-08-23"
 author: "fable-5 fork 2026-08-23 (operator-requested Codex queue — sharded blob distribution)"
-status: "refined"
+status: "wip"
 priority: "high"
 area: "dataplane/blob-swarm"
 domain: "protocol"
@@ -79,3 +79,15 @@ salvage exclude from honored-replica counts.
 ## Disjointness
 `inventory.rs`, `gossip_dispatch.rs`, `db/peer_blob_inventory.rs`, tests. Do not touch
 `blob_swarm.rs` (sibling item `swarm-parity-aware-completion` owns it) or `p2p_iroh/` transport code.
+
+## Live evidence (2026-08-23, orchestrator on the owned 3-peer mesh)
+
+Codex landed the implementation as `4009362f0` (gate green, 2,968 lib tests) without a
+live mesh. Re-verified here: storage rebuilt at `4009362f0` with `p2p-iroh`, all three
+peers re-exec'd in `dual`; `features/resilience/app-blob-heal-on-read.feature` 2/2
+(first-request heal races peers for locally-missing bytes and serves; the >64 MiB RS
+artifact ingests and serves whole) and `features/dataplane/doorway-failover.feature`
+10/10 as the regression guard. Not yet measured: the curve itself (roadmap S3 — fetch
+one RS blob with 1/2/3 holders and assert wall-clock falls) and a parity-shard-missing
+heal through the doorway; those are the evidence that flips blob-durability, so this
+row moves to `wip`-verified, not `done`.

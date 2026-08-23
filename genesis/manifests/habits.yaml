@@ -263,6 +263,13 @@ habits:
     checks:
       - "a2o @concern:blob-durability — 8 scenarios across genesis/a2o/features/resilience/ (governed-distribution, salvage-placement, chaos-peer-churn, grandma-photos-survive-node-loss, app-blob-heal-on-read, observable-distribution, resilience-dimensions, household-diversity-dataplane)"
     evidence: >
+      DELTA 2026-08-23c (swarm rows landed by Codex, 4009362f0: parity-aware
+      completion, bounded snapshot+delta inventory, data-shard-first placement;
+      re-verified live on the mesh in DUAL transport on a p2p-iroh build:
+      app-blob-heal-on-read 2/2, doorway-failover 10/10). The curve number
+      itself (roadmap S3: 1/2/3 holders, wall-clock falls) is still unmeasured —
+      the spec's new scenarios land born-red and will red this habit until they
+      pass. Mesh left running in dual.
       DELTA 2026-08-23b (observed RED is real, status stays green pending the
       fleet lane): ANY blob over RS_THRESHOLD (64 MiB) panicked `PUT /blob` on
       every storage peer (http.rs:2617 — the rs-4-7 manifest was hand-sliced as

@@ -7,7 +7,7 @@ title: "Diversity-aware placement distinguishes data shards from parity shards (
 slug: "placement-keeps-data-shards-diverse"
 written: "2026-08-23"
 author: "fable-5 fork 2026-08-23 (operator-requested Codex queue — sharded blob distribution)"
-status: "refined"
+status: "wip"
 priority: "medium"
 area: "dataplane/custody-placement"
 domain: "protocol"
@@ -48,3 +48,15 @@ household that held 2 data shards hurts more than one that held 2 parity shards.
 ## Disjointness
 `sharding.rs` (helper + test only), `reconcile/placement.rs`, `reconcile/custody.rs` salvage call
 site. Do not touch `http.rs`, `blob_swarm.rs`, `inventory.rs`, `node_registry_api.rs`, or the DNAs.
+
+## Live evidence (2026-08-23, orchestrator on the owned 3-peer mesh)
+
+Codex landed the implementation as `4009362f0` (gate green, 2,968 lib tests) without a
+live mesh. Re-verified here: storage rebuilt at `4009362f0` with `p2p-iroh`, all three
+peers re-exec'd in `dual`; `features/resilience/app-blob-heal-on-read.feature` 2/2
+(first-request heal races peers for locally-missing bytes and serves; the >64 MiB RS
+artifact ingests and serves whole) and `features/dataplane/doorway-failover.feature`
+10/10 as the regression guard. Not yet measured: the curve itself (roadmap S3 — fetch
+one RS blob with 1/2/3 holders and assert wall-clock falls) and a parity-shard-missing
+heal through the doorway; those are the evidence that flips blob-durability, so this
+row moves to `wip`-verified, not `done`.
