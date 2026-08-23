@@ -39,6 +39,7 @@ pub mod shard;
 pub mod shard_backend;
 pub mod sync;
 pub mod sync_backend;
+pub mod sync_driver;
 pub mod view_fed;
 pub mod view_fed_backend;
 
@@ -66,6 +67,7 @@ pub use shard::{IrohShardClient, IrohShardProtocol, ShardBackend, SHARD_ALPN};
 pub use shard_backend::ShardServiceBackend;
 pub use sync::{IrohSyncClient, IrohSyncProtocol, SyncBackend, SYNC_ALPN};
 pub use sync_backend::SyncManagerBackend;
+pub use sync_driver::{run_iroh_sync_round, spawn_iroh_sync_driver};
 pub use view_fed::{
     IrohViewFederationClient, IrohViewFederationProtocol, ViewFederationBackend, VIEW_FED_ALPN,
 };
