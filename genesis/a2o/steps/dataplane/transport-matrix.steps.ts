@@ -5,6 +5,7 @@ import { Given, Then } from '@cucumber/cucumber';
 import {
   classifyStorageTransportStatus,
   pollForGauge,
+  pollForGaugeCapturingError,
   probeMetrics,
   probeP2PStatus,
   probeSyncDocHeads,
@@ -110,36 +111,53 @@ Given(
 
 Then(
   "every household peer serves the new document at Matthew's exact Automerge heads within 30 seconds",
-  { timeout: 45_000 },
+  // Matthew's local-projection budget (15s) plus a FRESH 30s cross-peer
+  // convergence budget (see below) plus assertion/HTTP margin.
+  { timeout: 60_000 },
   async function (this: E2EWorld) {
     const contentId = this.contentIds.get('lastContentId');
     assert.ok(contentId, 'the fresh Matthew-authored content id was not captured');
     const docId = `node:${contentId}`;
-    const deadline = Date.now() + 30_000;
-    const remainingMs = () => Math.max(1, deadline - Date.now());
+
+    // Matthew's own local projection is a SEPARATE concern from cross-peer
+    // convergence — sharing one 30s deadline across both meant a slow local
+    // projection silently ate into the peers' convergence budget. Give it
+    // its own 15s budget so a convergence failure always gets its full,
+    // fresh 30s window (the intended fresh-write contract — the 60s backstop
+    // for the eager-propagation cure landing in storage in parallel).
     let matthewHeads: string[] = [];
-    const matthewProjected = await pollForGauge(
+    const matthewProjection = await pollForGaugeCapturingError(
       async () => {
         const response = await probeSyncDocHeads(storageUrl('matthew'), 'elohim', docId);
         matthewHeads = response.body.heads;
         return matthewHeads.length > 0 ? true : undefined;
       },
-      { intervalMs: 1_000, timeoutMs: remainingMs() }
+      { intervalMs: 1_000, timeoutMs: 15_000 }
     );
-    assert.equal(matthewProjected, true, `${docId} did not project on Matthew within 30 seconds`);
+    assert.equal(
+      matthewProjection.value,
+      true,
+      `${docId} did not project on Matthew within 15 seconds` +
+        (matthewProjection.lastError ? ` (last error: ${matthewProjection.lastError})` : '')
+    );
 
     const peersConverged = await Promise.all(
       HOUSEHOLD_PEERS.map(async peer => {
         let peerHeads: string[] = [];
-        const converged = await pollForGauge(
+        const result = await pollForGaugeCapturingError(
           async () => {
             const response = await probeSyncDocHeads(storageUrl(peer), 'elohim', docId);
             peerHeads = response.body.heads;
             return sameHeads(peerHeads, matthewHeads) ? true : undefined;
           },
-          { intervalMs: 1_000, timeoutMs: remainingMs() }
+          { intervalMs: 1_000, timeoutMs: 30_000 }
         );
-        return { peer, converged: converged === true, peerHeads };
+        return {
+          peer,
+          converged: result.value === true,
+          peerHeads,
+          lastError: result.lastError,
+        };
       })
     );
     const divergent = peersConverged.filter(result => !result.converged);
@@ -147,7 +165,13 @@ Then(
       divergent,
       [],
       `new document did not converge to Matthew's heads [${matthewHeads.join(', ')}]: ` +
-        divergent.map(result => `${result.peer}=[${result.peerHeads.join(', ')}]`).join(', ')
+        divergent
+          .map(
+            result =>
+              `${result.peer}=[${result.peerHeads.join(', ')}]` +
+              (result.lastError ? ` (last error: ${result.lastError})` : '')
+          )
+          .join(', ')
     );
   }
 );

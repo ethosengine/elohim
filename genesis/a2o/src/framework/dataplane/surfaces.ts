@@ -1297,6 +1297,38 @@ export async function pollForGauge<T>(
   }
 }
 
+/**
+ * `pollForGauge` collapses every thrown probe error to `undefined` (see its
+ * doc comment) — the right contract for "still absent, keep polling", but it
+ * means a hard error (e.g. a 503 "Sync API not enabled") reads identically to
+ * a genuine not-yet-converged timeout. That ambiguity cost a real
+ * misdiagnosis on the transport matrix's first live run (2026-08-23): the
+ * failure read as a 30s convergence timeout when it was actually a hard
+ * error on every poll.
+ *
+ * This wraps `pollForGauge` WITHOUT changing its contract or touching its
+ * other callers: the probe is wrapped to capture the last thrown error's
+ * message before re-throwing (pollForGauge still swallows it exactly as
+ * before), and that message is returned alongside the poll result so a
+ * caller's failure message can say what actually went wrong on the last
+ * attempt instead of just "timed out".
+ */
+export async function pollForGaugeCapturingError<T>(
+  probe: () => Promise<T | undefined | null>,
+  opts: { intervalMs?: number; timeoutMs?: number } = {}
+): Promise<{ value: T | undefined; lastError?: string }> {
+  let lastError: string | undefined;
+  const value = await pollForGauge<T>(async () => {
+    try {
+      return await probe();
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+      throw error;
+    }
+  }, opts);
+  return { value, lastError };
+}
+
 // ---------------------------------------------------------------------------
 // Served-vs-declared projected-head probe (Track-4 T4-2)
 // ---------------------------------------------------------------------------
