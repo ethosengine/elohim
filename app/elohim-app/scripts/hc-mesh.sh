@@ -221,6 +221,36 @@ storage_transport_for() { # <peer-name> <http-port>
   echo "${mode:-libp2p(default)}"
 }
 
+# Transport stamp for evidence produced by `just test mesh`. The launcher knob
+# says what a future start/restart requests; it is not proof of what the running
+# peers mounted. `/p2p/status.irohNodeId` is emitted only by a peer whose iroh
+# plane is actually co-resident with libp2p. Read EVERY peer so a partially
+# restarted mesh is stamped unknown instead of confidently "dual".
+mesh_transport_backend_from_status() {
+  local i=0 status with_iroh=0 without_iroh=0 unreadable=0
+  for _name in "${PEERS[@]}"; do
+    if status="$(curl -fsS -m 3 "http://localhost:$(http_port "$i")/p2p/status" 2>/dev/null)"; then
+      if jq -e '.irohNodeId | type == "string" and length > 0' >/dev/null 2>&1 <<<"$status"; then
+        with_iroh=$((with_iroh + 1))
+      else
+        without_iroh=$((without_iroh + 1))
+      fi
+    else
+      unreadable=$((unreadable + 1))
+    fi
+    i=$((i + 1))
+  done
+  if [ "$unreadable" -gt 0 ]; then
+    echo unknown
+  elif [ "$with_iroh" -eq "${#PEERS[@]}" ]; then
+    echo dual
+  elif [ "$without_iroh" -eq "${#PEERS[@]}" ]; then
+    echo libp2p
+  else
+    echo unknown
+  fi
+}
+
 # ---------------------------------------------------------------------------
 # dev-tier pacing profile (declared preproduction stakes — see minutes-quiesce
 # plan W3: genesis/docs/superpowers/plans/2026-08-16-minutes-quiesce-fixture-
@@ -688,10 +718,7 @@ PY
         echo "  $name: binary is gone (was '$bin'); rebuild it or set STORAGE_BIN" >&2
         failed+=" $name"; continue
       fi
-      local captured_transport
-      captured_transport="$(transport_from_environ "$envfile")"
-      captured_transport="${captured_transport:-$MESH_TRANSPORT_BACKEND}"
-      if ! assert_storage_transport_capability "$bin" "$captured_transport"; then
+      if ! assert_storage_transport_capability "$bin" "$MESH_TRANSPORT_BACKEND"; then
         failed+=" $name"; continue
       fi
       # Record the binary beside the environ: a later dead-peer restore must not
@@ -714,10 +741,7 @@ PY
         echo "  $name: no executable storage binary — $exefile absent, no sibling peer running, STORAGE_BIN=$STORAGE_BIN not executable" >&2
         failed+=" $name"; continue
       fi
-      local captured_transport
-      captured_transport="$(transport_from_environ "$envfile")"
-      captured_transport="${captured_transport:-$MESH_TRANSPORT_BACKEND}"
-      if ! assert_storage_transport_capability "$bin" "$captured_transport"; then
+      if ! assert_storage_transport_capability "$bin" "$MESH_TRANSPORT_BACKEND"; then
         failed+=" $name"; continue
       fi
       key="$(tr '\0' '\n' < "$envfile" | sed -n 's/^AGENT_PUBKEY=//p' | head -1)"
@@ -791,7 +815,8 @@ os.execve(binpath, [binpath, "--http-port", port], env)
 }
 
 # Env keys layered over a restarted peer's captured environment, one K=V per
-# line. Empty by default — the capture is the truth. Two opt-ins:
+# line. Empty by default — the capture is the truth except for the explicit
+# MESH_TRANSPORT_BACKEND launch knob. Two further opt-ins:
 #   MESH_RESTART_APPLY_PROFILE=1   re-apply THIS script's dev-tier pacing profile
 #                                  (the same knobs `start` exports), so a knob
 #                                  added after boot reaches a running mesh
@@ -799,13 +824,11 @@ os.execve(binpath, [binpath, "--http-port", port], env)
 #                                  AGENT_PUBKEY or any non-profile key.
 #   MESH_RESTART_ENV_OVERLAY="K=V K=V"   ad-hoc keys for one experiment.
 restart_env_overlay() { # <captured-environ>
-  # Always re-state the captured backend. For peers launched before this knob
-  # existed, fill the daemon's libp2p default (or the caller's selected mode).
-  # MESH_RESTART_ENV_OVERLAY is printed last and remains the explicit way to
-  # switch a running peer deliberately.
-  local captured_transport
-  captured_transport="$(transport_from_environ "$1")"
-  printf '%s\n' "ELOHIM_TRANSPORT_BACKEND=${captured_transport:-$MESH_TRANSPORT_BACKEND}"
+  # The caller's mesh transport selection deliberately beats the captured
+  # daemon environment. This is how `MESH_TRANSPORT_BACKEND=dual ...
+  # storage-restart` upgrades an already-running libp2p mesh in place.
+  # MESH_RESTART_ENV_OVERLAY remains last for one-off experiments.
+  printf '%s\n' "ELOHIM_TRANSPORT_BACKEND=$MESH_TRANSPORT_BACKEND"
   if [ "${MESH_RESTART_APPLY_PROFILE:-0}" = "1" ]; then
     printf '%s\n' \
       "PROJECTION_RECONCILE_SECS=$PROJECTION_RECONCILE_SECS" \

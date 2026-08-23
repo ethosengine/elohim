@@ -134,6 +134,10 @@ test target="changed" scope="":
         # another run's. (The steps hardcode `reports/console`, so wiring the household lane's
         # own capture into this slot is a genesis/a2o/steps change, not a justfile one.)
         report_rc=0
+        # Stamp what every running peer proves, not the launcher selection. A
+        # partial dual restart resolves to unknown rather than forging a dual
+        # evidence key from MESH_TRANSPORT_BACKEND alone.
+        observed_transport="$(mesh_transport_backend_from_status)"
         pnpm exec tsx scripts/build-sprint-report.ts \
           --cucumber "$CUCUMBER_JSON_REPORT" \
           --console-dir  "$reports_dir/console-household" \
@@ -142,7 +146,7 @@ test target="changed" scope="":
           --out-md   "$reports_dir/sprint-report-household-$run_id.md" \
           --profile  mesh \
           --lane     household \
-          --transport "$MESH_TRANSPORT_BACKEND" \
+          --transport "$observed_transport" \
           --run-id   "$run_id" \
           --doorway  "$E2E_DOORWAY_ALPHA" || report_rc=$?
         # Cucumber's code wins so a red run stays red; a GREEN run whose evidence could not
