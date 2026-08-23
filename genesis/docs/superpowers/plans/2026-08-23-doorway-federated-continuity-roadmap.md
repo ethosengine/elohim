@@ -98,13 +98,24 @@ zero-sentinel ActionHash and the validator (`recovery_v2.rs:363`) needs an in-DN
 (`auth_routes.rs:2970,2984,3030`). `steward/node` and Tauri have no "home node offline → use replica" path.
 
 **Dual-plane transport.** `ELOHIM_TRANSPORT_BACKEND` = Libp2p | Iroh | Dual (`config.rs:36-41`); alpha runs
-`dual` (`alpha.yaml:290`); the household mesh sets neither the env nor the `p2p-iroh` feature — **it has
-never run iroh**. Sync, inventory gossip and view federation are genuinely DUAL (shared `SyncManager`,
-`DualGossipPublisher`, `gossip_receive.rs`, `view_fed.rs`). **Blob heal-on-read and custody push are
-libp2p-only**: `IrohNode::fetch_blob_from` (`p2p_iroh/node.rs:146`) has zero production callers;
-`IrohBlobStore::get_bytes` is a local read; `transport_resolve.rs:47-67` extracts only the libp2p id. In
-`Iroh` mode there is no peer blob fetch at all. Loopback benches say iroh wins p50 45-541× on small frames
-and 1.2-128× on blobs (`p2p_iroh/README.md`); no WAN measure exists.
+`dual` (`alpha.yaml:290`). **Correction (2026-08-23, evening):** the morning's "sync, inventory gossip
+and view federation are genuinely DUAL" was true of the RESPONDER side only. Until 972748a6d the iroh leg
+had no peer discovery (sovereign defaults register no discovery service; `gossip_receive.rs` subscribed
+with an empty bootstrap; no production `NodeAddr` exchange), no sync-round initiator (`main.rs` said so in
+a comment), and no production callers for any iroh request client — so on alpha and on the mesh every
+iroh counter read zero: dual was libp2p doing everything beside an idle listener. Cured by the
+**transport-manifest cut**: a signed `elohim/transport/manifest` announcement (ed25519 over the iroh key,
+`p2p/transport_manifest_gossip.rs`) published every 30 s through the dual publisher; receivers verify
+and feed the `IrohPeerBook` (`p2p_iroh/peer_book.rs`), each inbound topic `join_peers` from the book,
+and the iroh sync-round driver (`p2p_iroh/sync_driver.rs`, cbc8edda5) walks it. Live on the 3-peer mesh:
+peers_known=2 on every peer in 33 s, 18 neighbor-up, 39 Automerge changes applied over iroh in the first
+populated round, zero failures (`elohim_iroh_*` metrics; a2o `transport-dual-plane.feature` 7/7).
+**Still libp2p-only: blob heal-on-read and custody push** — `IrohNode::fetch_blob_from`
+(`p2p_iroh/node.rs:146`) has zero production callers; `transport_resolve.rs:47-67` extracts only the
+libp2p id; in `Iroh` mode there is no peer blob fetch at all, and no manifest ever reaches a pure-iroh
+node (the announcement rides libp2p gossipsub first — pure-iroh bootstrap needs the pkarr station or a
+doorway-served manifest set). Loopback benches say iroh wins p50 45-541× on small frames and 1.2-128× on
+blobs (`p2p_iroh/README.md`); no WAN measure exists.
 
 **pkarr.** Four stations built, none lit: doorway `/pkarr/{z32}` relay behind
 `DOORWAY_PKARR_RESOLVER_ENABLED` (`services/pkarr_resolver.rs`, gate #10 plan), beacon pkarr sink
@@ -186,7 +197,9 @@ pivots to the swarm. What flattens the curve today, and the rows that un-flatten
 ### Lane T — rock-solid on either transport
 | # | Task | Tier | Tree |
 |---|---|---|---|
-| T1 | Mesh transport knob (`MESH_TRANSPORT_BACKEND`, `p2p-iroh` mesh binary, mode in the report) — backlog `mesh-transport-backend-knob` | Codex | scripts + justfile |
+| T0 | **DONE 972748a6d + cbc8edda5** — iroh peer discovery (signed transport-manifest gossip → `IrohPeerBook` → `join_peers`) and the iroh sync-round driver; proof `transport-dual-plane.feature` | Fable + Codex | elohim-storage, a2o |
+| T0′ | Pure-iroh bootstrap: the manifest set a node needs before it has any libp2p peer — pkarr station (Lane A5) or a doorway-served `GET /p2p/manifests`; until this lands `iroh` mode (not `dual`) still has zero peers | Opus | elohim-storage + doorway |
+| T1 | **DONE 9a3357098 + 7a6cacc38** — Mesh transport knob (`MESH_TRANSPORT_BACKEND`, restart precedence, per-peer observed stamp) — backlog `mesh-transport-backend-knob` | Codex | scripts + justfile |
 | T2 | iroh peer blob-fetch in heal-on-read: candidates carry iroh NodeIds from `peer_transport_manifest`; `race_fetch_with_swarm` races both planes in `dual`, iroh alone in `iroh` | Opus | elohim-storage |
 | T3 | Custody push over iroh (`transport_resolve` returns the iroh id; `push_shard` via the mounted `IrohShardProtocol`) | Opus | elohim-storage |
 | T4 | `inventory_fetch` on the iroh receive path (`gossip_receive.rs:19-26`) | Sonnet / Codex | elohim-storage |

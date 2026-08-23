@@ -79,6 +79,19 @@ habits:
       - "cargo test --test sync_libp2p_convergence (elohim/elohim-storage)"
       - ".claude/scripts/latency-scoreboard.py --local (and --deployed) — bounded convergence, not merely eventual: a CONJUNCTION of speed AND this habit's trust invariant, never speed alone. A fast stale head is worse than a slow correct one, so this check can only ever narrow the habit, never carry it."
     evidence: >
+      DELTA 2026-08-23d (household lane, dual; NO status change — the habit's iroh leg
+      existed only on paper until tonight): the iroh plane had no peer discovery, no
+      sync initiator and no production request callers, so every elohim_iroh_* counter
+      read zero on alpha and on the mesh — "dual boots" was libp2p beside an idle
+      listener. Cured 972748a6d (signed elohim/transport/manifest gossip → IrohPeerBook →
+      per-topic join_peers) + cbc8edda5 (iroh sync-round driver). Mesh proof on the
+      18:02 binary: peers_known=2 on all three peers within 33 s, 18 neighbor-up,
+      39 Automerge changes applied OVER IROH in the first populated round, 0 failures;
+      a2o transport-dual-plane.feature 7/7 (the counters, not the listener, are the
+      claim). Regression guard held: content-sync 4/4, heal-on-read 2/2,
+      doorway-failover 10/10. Still open for this habit's iroh leg: pure-iroh bootstrap
+      (a node with no libp2p peer never receives a manifest) and blob/custody over iroh
+      (roadmap Lane T0′/T2/T3). Fleet evidence still required before any status flip.
       DELTA 2026-08-22 (household lane; NO status change — three reds classified, one
       cure landed unverified): (1) content-sync "authored node converges on a second
       peer within 30 s" FAILED inside the full-lane run (run 20260822T170136Z: 18
