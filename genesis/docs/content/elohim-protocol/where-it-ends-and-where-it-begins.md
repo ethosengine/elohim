@@ -1,10 +1,10 @@
 ---
 id: where-it-ends-and-where-it-begins
 cites:
-  - elohim-protocol-manifesto | The vision this doc hands over: where the manifesto's love-centered architecture is relinquished by its founder and enters the world least-first — the kenosis and rolling dawn the manifesto does not itself narrate. | sha256:5972ed90f0f8e0cc | path: genesis/docs/content/elohim-protocol/manifesto.md
-  - constitution | The law whose Constitution 1.0 this reads as a confession that 2.0 belongs to the body — the versioned draft the diffuse agents steward, council over, and amend at reach. | sha256:1eb96af782012fc6 | path: genesis/docs/content/elohim-protocol/constitution.md
-  - confession | The settled theology this extends into eschatology and genesis — the kenosis, the leap of faith, and the James 1:27 pure-religion floor stated here as the order of entry. | sha256:68d7d48b66a1af34 | path: genesis/docs/content/elohim-protocol/confession.md
-  - theology | The disputation whose 'this stands' edges this inherits — founder-relinquishment and least-first care pressed as earned claims, not sentiment. | sha256:021aedd2c45998ea | path: genesis/docs/content/elohim-protocol/theology.md
+  - "elohim-protocol-manifesto | The vision this doc hands over: where the manifesto's love-centered architecture is relinquished by its founder and enters the world least-first — the kenosis and rolling dawn the manifesto does not itself narrate. | sha256:cd62d3cc869bada5 | path: genesis/docs/content/elohim-protocol/manifesto.md"
+  - "constitution | The law whose Constitution 1.0 this reads as a confession that 2.0 belongs to the body — the versioned draft the diffuse agents steward, council over, and amend at reach. | sha256:1eb96af782012fc6 | path: genesis/docs/content/elohim-protocol/constitution.md"
+  - "confession | The settled theology this extends into eschatology and genesis — the kenosis, the leap of faith, and the James 1:27 pure-religion floor stated here as the order of entry. | sha256:bec001fd41230c67 | path: genesis/docs/content/elohim-protocol/confession.md"
+  - "theology | The disputation whose 'this stands' edges this inherits — founder-relinquishment and least-first care pressed as earned claims, not sentiment. | sha256:4daef6885e3cc420 | path: genesis/docs/content/elohim-protocol/theology.md"
 ---
 # Where It Ends and Where It Begins
 

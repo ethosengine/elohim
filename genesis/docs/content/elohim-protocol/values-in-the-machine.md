@@ -1,10 +1,10 @@
 ---
 id: elohim-protocol-values-in-the-machine
 cites:
-  - elohim-protocol-manifesto | The vision this piece bridges from — the crisis diagnosis and the love-centered alternative, stated as conviction before architecture. | sha256:5972ed90f0f8e0cc | path: genesis/docs/content/elohim-protocol/manifesto.md
-  - constitution | The law that operationalizes these values — the layered, graduated-immutability governance the 'rules as a constitution you live inside' choice points to. | sha256:1eb96af782012fc6 | path: genesis/docs/content/elohim-protocol/constitution.md
-  - elohim-protocol-specification | The technical substrate beneath the architectural choices described here — EPR content addressing and the Lamad/Shefa/Qahal pillars. | sha256:659b0d47078b298f | path: genesis/docs/content/elohim-protocol/protocol-specification.md
-  - confession | The theology beneath the vision — what the protocol is for and the honest edges it cannot resolve. | sha256:68d7d48b66a1af34 | path: genesis/docs/content/elohim-protocol/confession.md
+  - "elohim-protocol-manifesto | The vision this piece bridges from — the crisis diagnosis and the love-centered alternative, stated as conviction before architecture. | sha256:cd62d3cc869bada5 | path: genesis/docs/content/elohim-protocol/manifesto.md"
+  - "constitution | The law that operationalizes these values — the layered, graduated-immutability governance the 'rules as a constitution you live inside' choice points to. | sha256:1eb96af782012fc6 | path: genesis/docs/content/elohim-protocol/constitution.md"
+  - "elohim-protocol-specification | The technical substrate beneath the architectural choices described here — EPR content addressing and the Lamad/Shefa/Qahal pillars. | sha256:659b0d47078b298f | path: genesis/docs/content/elohim-protocol/protocol-specification.md"
+  - "confession | The theology beneath the vision — what the protocol is for and the honest edges it cannot resolve. | sha256:bec001fd41230c67 | path: genesis/docs/content/elohim-protocol/confession.md"
 ---
 # **The Values in the Machine: How a Different Architecture Enables a Different Way of Life**
 

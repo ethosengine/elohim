@@ -1,9 +1,9 @@
 ---
 id: constitution
 cites:
-  - elohim-protocol-manifesto | The vision this law operationalizes: the manifesto's crisis diagnosis (Part I) and love-centered alternative that the constitutional architecture exists to encode and enforce. | sha256:5972ed90f0f8e0cc | path: genesis/docs/content/elohim-protocol/manifesto.md
-  - confession | The settled theological warrant for the law: the constitution read as covenant under the Matthew 6:21 treasure-seal, where layer precedence and the universal gate bind even the lawgiver. | sha256:68d7d48b66a1af34 | path: genesis/docs/content/elohim-protocol/confession.md
-  - theology | The law's commitments pressed by disputation: reach gating vs. the prophet (Article 5), layer precedence vs. the seam (Article 8), the gate against its abuse — several answered 'this stands.' | sha256:021aedd2c45998ea | path: genesis/docs/content/elohim-protocol/theology.md
+  - "elohim-protocol-manifesto | The vision this law operationalizes: the manifesto's crisis diagnosis (Part I) and love-centered alternative that the constitutional architecture exists to encode and enforce. | sha256:cd62d3cc869bada5 | path: genesis/docs/content/elohim-protocol/manifesto.md"
+  - "confession | The settled theological warrant for the law: the constitution read as covenant under the Matthew 6:21 treasure-seal, where layer precedence and the universal gate bind even the lawgiver. | sha256:bec001fd41230c67 | path: genesis/docs/content/elohim-protocol/confession.md"
+  - "theology | The law's commitments pressed by disputation: reach gating vs. the prophet (Article 5), layer precedence vs. the seam (Article 8), the gate against its abuse — several answered 'this stands.' | sha256:4daef6885e3cc420 | path: genesis/docs/content/elohim-protocol/theology.md"
 ---
 # The Constitution as System Prompt
 ## Elohim Protocol Constitutional Architecture v0.1

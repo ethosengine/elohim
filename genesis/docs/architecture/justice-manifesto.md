@@ -5,18 +5,18 @@ created: 2026-06-23
 class: architecture
 artifact_kind: canon
 cites:
-  - stewardship-over-sovereignty | the foundational inversion this manifesto extends into justice — sovereignty subordinated to community governance, no self-sovereign apex | path: genesis/docs/architecture/stewardship-over-sovereignty.md
-  - cradle-to-grave-capability-gradient | graduated/mediated agency + the superadmin-decomposed-into-bounded-quorums shape the floor and ceiling inherit | path: genesis/docs/architecture/cradle-to-grave-capability-gradient.md
-  - theology | servants-not-gods; the serpent's-offer-refused; the reserved place — the non-divinity confession the ceiling keeps | path: genesis/docs/content/elohim-protocol/theology.md
-  - confession | El Roi limit (hold the score, not judge the heart); humility a confident system cannot perform; grace precedes the demand | path: genesis/docs/content/elohim-protocol/confession.md
-  - elohim-protocol-manifesto | put the fruit back on the tree; best-self judgment at machine speed; pause-and-verify-not-block | path: genesis/docs/content/elohim-protocol/manifesto.md
-  - constitution | existential floors as HARD-BLOCK; elohim as servant not authority; the slowness is the feature | path: genesis/docs/content/elohim-protocol/constitution.md
-  - governance-epic | cryptographic sortition; you-interpret-not-override; the appeal cascade — the human floor | path: genesis/docs/content/elohim-protocol/governance/epic.md
-  - governance-layers-architecture | sortition terms, no consecutive terms, commons-elohim co-steward; un-buyable and un-lobbyable | path: genesis/docs/content/elohim-protocol/governance-layers-architecture.md
-  - elohim-protocol-values-in-the-machine | the architecture keeps the promise when the humans get tired | path: genesis/docs/content/elohim-protocol/values-in-the-machine.md
-  - elohim-oracle | the Governor names whose line it honored (limit_owner); RefusalCode ReservedPlace | path: genesis/docs/content/elohim-protocol/ORACLE.md
-  - observer-protocol | witness not surveillance; no god-mode read | path: genesis/docs/content/elohim-protocol/observer-protocol.md
-  - elohim-ceiling-design | the mechanism doc this manifesto points down to (the why-to-how seam) | path: genesis/docs/superpowers/specs/2026-06-23-elohim-ceiling-design.md
+  - "stewardship-over-sovereignty | the foundational inversion this manifesto extends into justice — sovereignty subordinated to community governance, no self-sovereign apex | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
+  - "cradle-to-grave-capability-gradient | graduated/mediated agency + the superadmin-decomposed-into-bounded-quorums shape the floor and ceiling inherit | sha256:1a5b2f7e6433230f | path: genesis/docs/architecture/cradle-to-grave-capability-gradient.md"
+  - "theology | servants-not-gods; the serpent's-offer-refused; the reserved place — the non-divinity confession the ceiling keeps | sha256:4daef6885e3cc420 | path: genesis/docs/content/elohim-protocol/theology.md"
+  - "confession | El Roi limit (hold the score, not judge the heart); humility a confident system cannot perform; grace precedes the demand | sha256:bec001fd41230c67 | path: genesis/docs/content/elohim-protocol/confession.md"
+  - "elohim-protocol-manifesto | put the fruit back on the tree; best-self judgment at machine speed; pause-and-verify-not-block | sha256:cd62d3cc869bada5 | path: genesis/docs/content/elohim-protocol/manifesto.md"
+  - "constitution | existential floors as HARD-BLOCK; elohim as servant not authority; the slowness is the feature | sha256:1eb96af782012fc6 | path: genesis/docs/content/elohim-protocol/constitution.md"
+  - "governance-epic | cryptographic sortition; you-interpret-not-override; the appeal cascade — the human floor | sha256:be850529ab645a30 | path: genesis/docs/content/elohim-protocol/governance/epic.md"
+  - "governance-layers-architecture | sortition terms, no consecutive terms, commons-elohim co-steward; un-buyable and un-lobbyable | sha256:0332959e9fbec792 | path: genesis/docs/content/elohim-protocol/governance-layers-architecture.md"
+  - "elohim-protocol-values-in-the-machine | the architecture keeps the promise when the humans get tired | sha256:defdddc9f2b9a19e | path: genesis/docs/content/elohim-protocol/values-in-the-machine.md"
+  - "elohim-oracle | the Governor names whose line it honored (limit_owner); RefusalCode ReservedPlace | sha256:820d77e2dbde510a | path: genesis/docs/content/elohim-protocol/ORACLE.md"
+  - "observer-protocol | witness not surveillance; no god-mode read | sha256:19be3eea323ecd8b | path: genesis/docs/content/elohim-protocol/observer-protocol.md"
+  - "elohim-ceiling-design | the mechanism doc this manifesto points down to (the why-to-how seam) | sha256:24925a4c8e1d9420 | path: genesis/docs/superpowers/specs/2026-06-23-elohim-ceiling-design.md"
 ---
 
 # The Justice Manifesto — Mishpat: The Justice That Sees

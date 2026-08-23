@@ -5,12 +5,12 @@ created: 2026-06-14
 class: substrate
 artifact_kind: oracle-index
 cites:
-  - elohim-protocol-manifesto | Rung 0 (WHY): the crisis this substrate answers and the love-centered alternative every rung below serves. | sha256:5972ed90f0f8e0cc | path: genesis/docs/content/elohim-protocol/manifesto.md
-  - escalated-architecture-design | Rung 1 horizontal: the one Commitment + Governor + coverage + two-quilt primitive at a single node. | sha256:c4aa7dc9f9be30a8 | path: genesis/docs/superpowers/specs/2026-06-14-escalated-architecture-design.md
-  - recursive-architecture-design | Rung 1 vertical: how that one primitive recurses up the layers via CoverageRollup (aggregate-with-descent). | sha256:053f260af9989d4b | path: genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md
-  - elohim-sdk-design | Rung 2: the agency-gradient composition grammar, human-sovereign below and veil-holding above. | sha256:f8d76384f0a8095b | path: genesis/docs/superpowers/specs/2026-06-14-elohim-sdk-design.md
-  - platform-one-sdk-many-apis-design | Rung 3: one SDK over many APIs, the capability catalog and the corpus-of-software proof. | sha256:a15b10c68787a460 | path: genesis/docs/superpowers/specs/2026-06-14-platform-one-sdk-many-apis-design.md
-  - design-oracle-design | Rung 4: the escalation organ that keeps the platform cohesive as it develops itself. | sha256:3a6b31be932e2638 | path: genesis/docs/superpowers/specs/2026-06-14-design-oracle-design.md
+  - "elohim-protocol-manifesto | Rung 0 (WHY): the crisis this substrate answers and the love-centered alternative every rung below serves. | sha256:cd62d3cc869bada5 | path: genesis/docs/content/elohim-protocol/manifesto.md"
+  - "escalated-architecture-design | Rung 1 horizontal: the one Commitment + Governor + coverage + two-quilt primitive at a single node. | sha256:c4aa7dc9f9be30a8 | path: genesis/docs/superpowers/specs/2026-06-14-escalated-architecture-design.md"
+  - "recursive-architecture-design | Rung 1 vertical: how that one primitive recurses up the layers via CoverageRollup (aggregate-with-descent). | sha256:053f260af9989d4b | path: genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md"
+  - "elohim-sdk-design | Rung 2: the agency-gradient composition grammar, human-sovereign below and veil-holding above. | sha256:f8d76384f0a8095b | path: genesis/docs/superpowers/specs/2026-06-14-elohim-sdk-design.md"
+  - "platform-one-sdk-many-apis-design | Rung 3: one SDK over many APIs, the capability catalog and the corpus-of-software proof. | sha256:a15b10c68787a460 | path: genesis/docs/superpowers/specs/2026-06-14-platform-one-sdk-many-apis-design.md"
+  - "design-oracle-design | Rung 4: the escalation organ that keeps the platform cohesive as it develops itself. | sha256:3a6b31be932e2638 | path: genesis/docs/superpowers/specs/2026-06-14-design-oracle-design.md"
 ---
 
 # The Elohim Oracle — the design-process entry index
