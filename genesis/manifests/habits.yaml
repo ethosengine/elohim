@@ -263,6 +263,38 @@ habits:
     checks:
       - "a2o @concern:blob-durability — 8 scenarios across genesis/a2o/features/resilience/ (governed-distribution, salvage-placement, chaos-peer-churn, grandma-photos-survive-node-loss, app-blob-heal-on-read, observable-distribution, resilience-dimensions, household-diversity-dataplane)"
     evidence: >
+      DELTA 2026-08-23a (AGENT SPRINT on the 37 failed + 35 pending, household lane,
+      closing run 20260823T000551Z-32aff87a): 186 passed / 25 failed / 4 pending /
+      29 skipped in 30m06s (this morning 164 / 42 / 35 / 23); saga 22/22 in 46 s
+      (run 20260823T000501Z). Three agents, disjoint write-sets, one flock for the
+      mesh. Doorway (10/14 green, gate green): the 91 s pre-listen SSR boot stall
+      (render/registry.rs from_env materialised bundles before the listener bound;
+      now budgeted, boot ~4 s) was the one cause behind 5 reds; --conductor-url
+      fallback derived admin=4443 so the projection subscriber never connected on
+      the mesh (fixed by port range); connected/connected_workers coherence;
+      backoff-ladder attribution; x-ssr-skipped was the a2o measuring the response
+      cache, not the render queue. Storage (gate green): X-Content-Address always
+      CIDv1; delivery rows carry declared caps; failed ping closes the libp2p link;
+      web2 re-seed poison (fabricated blobHash, never restored) and 1200-way fan-out
+      fixed in steps. Pending: 6 → green, 19 → honest @browser/@requires/@wip holds,
+      5 named with the lane gap. Two defects the sprint itself surfaced and cured:
+      (1) the mesh lock fd leaked into re-exec'd storage peers (40 min deadlock;
+      closerange before exec); (2) 'install in declared order' plus a late-
+      registering primary (its circuit open mid-drill) made doorway A serve
+      JESSICA's projection as alpha-A — three saga chapters red on the 23:27 run —
+      cured by declared steward-peer priority in RouteRegistry (unit-tested). Still
+      red, classified: identity join 6 (chaos-peer-churn 3, household-formation 2,
+      identity-coherence 1 — design pass); self-healing-flow-control 5 (2 structural
+      warm-up arithmetic, 2 blocked on storage queue-not-shed at http.rs:1243, 1
+      half-open new); conductor-spin 3; delivery-diagnostics 3 (ready_content needs
+      gossip; fixture count); epr-cross-peer 2 (sync plane wins the race, p2p arm
+      unreachable); cross-doorway-content 2 + peer-mesh 1 (alpha degraded/caughtUp
+      false mid-lane — transient under load); content-sync 30 s under load; web2
+      cache 8/40; conductor-visibility (agents registered only at boot discovery).
+      Named RED with lines, refused as suggested: doorway blob forward has no pool
+      failover (storage_proxy.rs:743/971) — the single-target gospel forbids
+      per-request iteration; the cure is selection-time (skip an Open/Offline peer
+      when choosing the ONE target) and is a design decision for this habit.
       DELTA 2026-08-22d (SPRINT: saga performance + reliability + code quality,
       household lane, closing run 20260822T201747Z-3bd326d6): 170 passed / 37 failed /
       35 pending / 22 skipped in 20m58s, from 164 / 42 / 35 / 23. Saga 22/22 in 2m16s
