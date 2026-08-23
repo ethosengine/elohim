@@ -1945,3 +1945,126 @@ decisionPoints:
       - path: elohim/elohim-storage/src/db/sync_mode.rs
         testName: transition_history_prunes_to_cap
         kind: unit
+
+  - name: SwarmRaceOutcome
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/p2p/blob_swarm.rs
+      modulePath: p2p::blob_swarm::SwarmRaceOutcome
+      line: 345
+    summary: >
+      Manifest-aware blob-fetch boundary that distinguishes a direct/all-shards Hit,
+      Reed-Solomon Reconstructible (the data-shard floor landed, missing parity may be
+      salvaged later), honest below-floor ManifestPersistedIncomplete, Miss, and
+      NoCandidates. Reconstructible bytes are immediately servable and advertised.
+    concernIds:
+      - { id: C0, status: answered, justification: "Lives on the Track-2 peer-hoster blob dataplane; it creates no DHT, HTTP, or deployment-plane authority." }
+      - { id: C1, status: n-a, justification: "No peer elects or authors canonical authority; candidates only serve hash-verified bytes." }
+      - { id: C2, status: n-a, justification: "Fetching/filling shards never moves a declared content head." }
+      - { id: C3, status: answered, justification: "Reconstructible exits at data_shards instead of waiting forever for optional parity; incomplete remains retryable." }
+      - { id: C4, status: answered, justification: "Below-floor incomplete, no connected candidates, and actual misses remain distinct outcomes rather than collapsing unknown into absence." }
+      - { id: C5, status: answered, justification: "A manifest and holder inventory are routing evidence only; every landed shard is content-hash verified before it counts." }
+      - { id: C6a, status: answered, justification: "total_inflight bounds concurrency and the shared landed counter refuses new RS races once the floor is reached." }
+      - { id: C6b, status: answered, justification: "Content-addressed persistence/finalize is idempotent and already-landed local shards are never re-fetched or double-credited." }
+      - { id: C7, status: answered, justification: "The composite is advertised only after all required chunks or an RS reconstruction floor can actually serve it." }
+      - { id: C8, status: answered, justification: "hit/miss/no_candidates/parity_skipped metrics plus landed/missing logs expose every completion class." }
+      - { id: C9, status: n-a, justification: "No new identity join; existing libp2p source-peer attribution is preserved per successfully served shard." }
+      - { id: C10, status: answered, justification: "The enum is crate-internal and additive; no serialized wire discriminant changes." }
+      - { id: C11, status: answered, justification: "Per-shard parallelism, total-inflight, peer timeout, and threshold cancellation bound externally imposed work." }
+      - { id: C12, status: n-a, justification: "This read/fill path does not enroll a holder or author a custody promise." }
+      - { id: C13, status: n-a, justification: "No authority tier is granted by fetching bytes." }
+      - { id: C14, status: answered, justification: "landed and missing residuals survive in the Reconstructible/Incomplete outcomes and logs." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/p2p/blob_swarm.rs, testName: rs_4_7_stops_admitting_races_at_four_landed_shards, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/blob_swarm.rs, testName: rs_4_7_with_three_landed_remains_incomplete, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/blob_swarm.rs, testName: chunked_manifest_never_skips_a_missing_shard, kind: unit }
+
+  - name: build_bounded_inventory_publications
+    kind: verdict-fn
+    sourceLocation:
+      file: src/p2p/inventory_broadcaster.rs
+      modulePath: p2p::inventory_broadcaster::build_bounded_inventory_publications
+      line: 279
+    summary: >
+      Converts the local blob-store inventory (including individually held shards) into
+      one bounded replacement snapshot followed by contiguous bounded additive deltas,
+      below iroh-gossip's frame ceiling and byte-identical on both gossip transports.
+    concernIds:
+      - { id: C0, status: answered, justification: "Category-C inventory projection on the transport-neutral Track-2 gossip plane." }
+      - { id: C1, status: n-a, justification: "An inventory publication reports locally held bytes and elects no authority." }
+      - { id: C2, status: n-a, justification: "The snapshot/deltas replace a peer's own projection only and cannot move content authority." }
+      - { id: C3, status: answered, justification: "Oversized snapshots become deliverable bounded pages; sequence gaps request the next periodic replacement snapshot." }
+      - { id: C4, status: answered, justification: "A filesystem enumeration failure still skips the tick; it never publishes a false empty inventory." }
+      - { id: C5, status: answered, justification: "Inventory remains evidence for routing, not proof of authorship or canonical content." }
+      - { id: C6a, status: answered, justification: "One bounded pass over the finite local hash list; each address is retried at most once after closing a page." }
+      - { id: C6b, status: answered, justification: "Snapshot replacement plus sequenced delta upserts converge idempotently under periodic replay." }
+      - { id: C7, status: answered, justification: "Only non-empty local blob-store files are advertised; the shard-only contract test pins source specificity." }
+      - { id: C8, status: answered, justification: "Publish logs carry full count, page count, last sequence, and payload budget; failures name the page." }
+      - { id: C9, status: n-a, justification: "The existing broadcaster libp2p peer-id namespace is unchanged; no cross-namespace join is introduced." }
+      - { id: C10, status: answered, justification: "Uses the existing snapshot/delta wire types and sequence rules; no schema discriminator changes." }
+      - { id: C11, status: answered, justification: "Every serialized payload is tested at or below the 3500-byte budget, leaving iroh envelope headroom." }
+      - { id: C12, status: answered, justification: "Publishes only the node's own verified local inventory; it cannot volunteer another peer." }
+      - { id: C13, status: n-a, justification: "Inventory evidence confers no graduated authority." }
+      - { id: C14, status: answered, justification: "The receiver convergence test proves the snapshot-plus-delta residual reconstructs the complete advertised set." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/p2p/inventory_broadcaster.rs, testName: large_inventory_refresh_is_bounded_and_reassembles_via_snapshot_plus_deltas, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/inventory_broadcaster.rs, testName: shard_only_inventory_makes_that_peer_specific_to_the_matching_shard, kind: unit }
+
+  - name: shard_role
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/sharding.rs
+      modulePath: sharding::shard_role
+      line: 84
+    summary: >
+      Derives Data versus Parity solely from immutable manifest encoding and the
+      index<data_shards boundary; non-RS shards remain required Data.
+    concernIds:
+      - { id: C0, status: answered, justification: "Pure manifest math at the storage/sharding seam, not a registry or DNA fact." }
+      - { id: C1, status: n-a, justification: "No authority or holder election occurs." }
+      - { id: C2, status: n-a, justification: "The role cannot mutate manifest or head authority." }
+      - { id: C3, status: n-a, justification: "O(1) classification has no liveness state." }
+      - { id: C4, status: answered, justification: "Unknown/non-RS encodings fail conservatively to required Data rather than optional parity." }
+      - { id: C5, status: answered, justification: "The notarized/projected manifest is the only evidence; no parallel assignment field can disagree." }
+      - { id: C6a, status: answered, justification: "Constant-time predicate with no I/O, loop, or retry." }
+      - { id: C6b, status: answered, justification: "Pure deterministic output for the same manifest/index." }
+      - { id: C7, status: n-a, justification: "Classification neither advertises nor serves bytes." }
+      - { id: C8, status: answered, justification: "The placement caller logs derived data-household and parity counts once per RS pass." }
+      - { id: C9, status: n-a, justification: "No identity value is read or written." }
+      - { id: C10, status: answered, justification: "No field or wire value is added; role is derived at consumption time." }
+      - { id: C11, status: n-a, justification: "No external input can amplify constant work." }
+      - { id: C12, status: n-a, justification: "No custody enrollment occurs." }
+      - { id: C13, status: n-a, justification: "No authority graduation occurs." }
+      - { id: C14, status: n-a, justification: "The predicate leaves no asynchronous residual." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/sharding.rs, testName: rs_roles_are_derived_from_the_data_shard_boundary, kind: unit }
+
+  - name: plan_shard_placement_slots
+    kind: verdict-fn
+    sourceLocation:
+      file: src/sharding.rs
+      modulePath: sharding::plan_shard_placement_slots
+      line: 102
+    summary: >
+      Preserves manifest order while round-robining over the already household-diverse
+      holder ranking, so the RS data prefix consumes the strongest diversity before parity.
+    concernIds:
+      - { id: C0, status: answered, justification: "Pure placement projection at the peer-hoster storage seam." }
+      - { id: C1, status: answered, justification: "It consumes an upstream consent/commitment-ranked holder set and never self-elects a new holder." }
+      - { id: C2, status: n-a, justification: "Placement slots do not move content authority." }
+      - { id: C3, status: answered, justification: "Empty holders return no work; finite holders deterministically cover every manifest shard." }
+      - { id: C4, status: answered, justification: "Zero holders stays visibly empty instead of fabricating a placement." }
+      - { id: C5, status: answered, justification: "Role comes from the manifest and diversity order comes from the existing contract-aware selector." }
+      - { id: C6a, status: answered, justification: "One bounded pass over manifest.shard_hashes with no retry." }
+      - { id: C6b, status: answered, justification: "Pure deterministic slots make repeated passes byte-identical." }
+      - { id: C7, status: n-a, justification: "The plan itself neither advertises nor serves; push acknowledgement remains the evidence gate." }
+      - { id: C8, status: answered, justification: "The live caller logs data_shards_diverse_households and parity_shards once per RS distribution." }
+      - { id: C9, status: answered, justification: "Holder indices preserve the upstream agent_cid ranking; transport resolution remains downstream and separate." }
+      - { id: C10, status: answered, justification: "Chunked holder order is contract-tested byte-identical to the previous modulo loop." }
+      - { id: C11, status: answered, justification: "Work is capped by manifest shard count and the selected holder count." }
+      - { id: C12, status: answered, justification: "Only peers admitted by the existing REA commitment/accepting selector can appear in the input ranking." }
+      - { id: C13, status: n-a, justification: "No new authority tier is created." }
+      - { id: C14, status: answered, justification: "Per-shard push failures continue to materialize as placement_gaps downstream." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/sharding.rs, testName: rs_data_prefix_consumes_the_household_diverse_holder_prefix_first, kind: unit }
+      - { path: elohim/elohim-storage/src/sharding.rs, testName: chunked_placement_keeps_the_existing_round_robin_order, kind: unit }

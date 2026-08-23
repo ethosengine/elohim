@@ -33,8 +33,10 @@ use crate::db::peer_blob_inventory::lookup_hosts;
 use crate::p2p::blob_fetch::{finalize_fetch_success, race_fetch, FetchOutcome};
 use crate::sharding::ShardManifest;
 use diesel::SqliteConnection;
-use futures::stream::{self, StreamExt};
+use futures::stream::{FuturesUnordered, StreamExt};
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tracing::{info, warn};
@@ -107,8 +109,8 @@ pub struct SwarmFetchParams<'a> {
 /// Outcome of a full shard-swarm fetch for one composite manifest.
 #[derive(Debug)]
 pub struct SwarmFetchOutcome {
-    /// Reassembled composite bytes — `Some` only when every shard landed
-    /// (from disk or from a peer).
+    /// Reassembled composite bytes — `Some` when every required chunk landed,
+    /// or when an RS manifest reached its `data_shards` reconstruction floor.
     pub bytes: Option<Vec<u8>>,
     pub shards_fetched: usize,
     pub shards_failed: usize,
@@ -117,6 +119,33 @@ pub struct SwarmFetchOutcome {
     /// exponential-curve measure (plan W4.3) reads.
     pub distinct_source_peers: usize,
     pub elapsed: Duration,
+}
+
+/// The number of locally-landed shards that makes this manifest servable.
+/// Only a well-formed Reed-Solomon manifest has a threshold below its full
+/// shard count; `none`/`chunked` and malformed RS metadata remain
+/// all-or-nothing.
+fn reconstructible_threshold(manifest: &ShardManifest) -> Option<usize> {
+    let data_shards = manifest.data_shards as usize;
+    (manifest.encoding.starts_with("rs-")
+        && data_shards > 0
+        && data_shards <= manifest.shard_hashes.len())
+    .then_some(data_shards)
+}
+
+fn should_start_shard_race(landed: &AtomicUsize, threshold: Option<usize>) -> bool {
+    threshold.is_none_or(|needed| landed.load(Ordering::Acquire) < needed)
+}
+
+fn desired_network_inflight(
+    landed: usize,
+    threshold: Option<usize>,
+    total_inflight: usize,
+) -> usize {
+    let ceiling = total_inflight.max(1);
+    threshold
+        .map(|needed| needed.saturating_sub(landed).min(ceiling))
+        .unwrap_or(ceiling)
 }
 
 /// Fetch every shard named by `manifest`, spread across `composite_holders`
@@ -174,34 +203,65 @@ pub async fn fetch_shards_via_swarm(
         }
     }
 
-    let mut shards_failed = 0usize;
+    let mut completed_network_races = 0usize;
     let mut source_peers: HashSet<String> = HashSet::new();
+    let reconstructible_at = reconstructible_threshold(manifest);
+    let landed = Arc::new(AtomicUsize::new(fetched.len()));
+    let network_race_count = to_race.len();
 
-    let results: Vec<(usize, String, FetchOutcome)> = stream::iter(to_race)
-        .map(|(index, shard_hash, candidates)| async move {
+    let mut pending = to_race.into_iter();
+    let mut results = FuturesUnordered::new();
+    let cmd_tx = params.cmd_tx;
+    let connected = params.connected;
+    let per_shard_parallelism = params.per_shard_parallelism;
+    let per_peer_timeout = params.per_peer_timeout;
+    let make_race = |(index, shard_hash, candidates): (usize, String, Vec<String>)| {
+        let landed = Arc::clone(&landed);
+        async move {
+            if !should_start_shard_race(&landed, reconstructible_at) {
+                return None;
+            }
             // Q11 atomic timing budget: ONE shard's race, not the surrounding
-            // `buffer_unordered` fan-out.
+            // swarm fan-out.
             let shard_fetch_started = Instant::now();
             let outcome = race_fetch(
                 &shard_hash,
                 candidates,
-                params.cmd_tx,
-                |p: &str| params.connected.contains(p),
-                params.per_shard_parallelism,
-                params.per_peer_timeout,
+                cmd_tx,
+                |p: &str| connected.contains(p),
+                per_shard_parallelism,
+                per_peer_timeout,
             )
             .await;
             crate::metrics::observe_atom_duration(
                 crate::metrics::ConvergenceAtom::ShardFetch,
                 shard_fetch_started.elapsed(),
             );
-            (index, shard_hash, outcome)
-        })
-        .buffer_unordered(params.total_inflight.max(1))
-        .collect()
-        .await;
+            Some((index, shard_hash, outcome))
+        }
+    };
 
-    for (index, shard_hash, outcome) in results {
+    let initial_target = desired_network_inflight(
+        landed.load(Ordering::Acquire),
+        reconstructible_at,
+        params.total_inflight,
+    );
+    while results.len() < initial_target {
+        let Some(task) = pending.next() else {
+            break;
+        };
+        results.push(make_race(task));
+    }
+
+    // Process each completion before polling the fan-out again. A successful
+    // persistence advances `landed`, so the next pending future observes the
+    // RS threshold and declines to start. Breaking drops/cancels races already
+    // in flight; no new parity work is admitted after reconstructibility.
+    while let Some(result) = results.next().await {
+        let Some((index, shard_hash, outcome)) = result else {
+            continue;
+        };
+        completed_network_races += 1;
         match outcome {
             FetchOutcome::Hit { bytes, source_peer } => {
                 if let Err(e) = finalize_fetch_success(
@@ -220,12 +280,12 @@ pub async fn fetch_shards_via_swarm(
                         error = %e,
                         "Q4: swarm-fetched shard failed to persist"
                     );
-                    shards_failed += 1;
                     crate::metrics::inc_blob_swarm_shard_fetched("miss");
                     continue;
                 }
                 source_peers.insert(source_peer);
                 fetched.insert(index, bytes);
+                landed.fetch_add(1, Ordering::Release);
                 crate::metrics::inc_blob_swarm_shard_fetched("hit");
             }
             // A shard hash is never itself a composite — a Manifest reply
@@ -235,45 +295,64 @@ pub async fn fetch_shards_via_swarm(
             // already WARNed) — a corrupt manifest row, counted as failed so
             // the composite is never served truncated.
             FetchOutcome::Manifest { .. } | FetchOutcome::Miss | FetchOutcome::InvalidAddress => {
-                shards_failed += 1;
                 crate::metrics::inc_blob_swarm_shard_fetched("miss");
             }
             FetchOutcome::NoCandidates => {
-                shards_failed += 1;
                 crate::metrics::inc_blob_swarm_shard_fetched("no_candidates");
             }
         }
+
+        if reconstructible_at.is_some_and(|needed| fetched.len() >= needed) {
+            break;
+        }
+
+        // Refill only after incorporating this completion. For RS manifests,
+        // successful landings lower the desired in-flight count, so a slot
+        // vacated by a hit does not admit an unnecessary parity race. A miss
+        // leaves the target unchanged and admits one bounded replacement.
+        let refill_target = desired_network_inflight(
+            landed.load(Ordering::Acquire),
+            reconstructible_at,
+            params.total_inflight,
+        );
+        while results.len() < refill_target {
+            let Some(task) = pending.next() else {
+                break;
+            };
+            results.push(make_race(task));
+        }
     }
+    drop(results);
 
     let shards_fetched = fetched.len();
+    let shards_failed = manifest.shard_hashes.len().saturating_sub(shards_fetched);
+    let parity_skipped = network_race_count.saturating_sub(completed_network_races);
+    for _ in 0..parity_skipped {
+        crate::metrics::inc_blob_swarm_shard_fetched("parity_skipped");
+    }
     // bounded-work: manifest.shard_hashes.len() — reassembly walks the
     // already-completed `fetched` map exactly once; no I/O, no retry.
-    let bytes = if shards_failed == 0 && shards_fetched == manifest.shard_hashes.len() {
-        let mut data = Vec::with_capacity(manifest.total_size as usize);
+    let required = reconstructible_at.unwrap_or(manifest.shard_hashes.len());
+    let bytes = if shards_fetched >= required {
+        let mut shards = Vec::with_capacity(manifest.shard_hashes.len());
         for index in 0..manifest.shard_hashes.len() {
-            match fetched.remove(&index) {
-                Some(chunk) => data.extend_from_slice(&chunk),
-                // Unreachable given the count check above, but never silently
-                // truncate a composite on an internal bookkeeping slip.
-                None => {
-                    warn!(
-                        target: "elohim_storage::blob_swarm",
-                        blob_hash = %manifest.blob_hash,
-                        shard_index = index,
-                        "Q4: shard count matched but index missing — refusing to serve a possibly-corrupt composite"
-                    );
-                    return SwarmFetchOutcome {
-                        bytes: None,
-                        shards_fetched,
-                        shards_failed: shards_failed + 1,
-                        distinct_source_peers: source_peers.len(),
-                        elapsed: started.elapsed(),
-                    };
-                }
+            shards.push(fetched.remove(&index));
+        }
+        let encoder = crate::sharding::ShardEncoder::new(crate::sharding::ShardConfig::default());
+        match encoder.reconstruct(manifest, &shards) {
+            Ok(bytes) => Some(bytes),
+            Err(error) => {
+                warn!(
+                    target: "elohim_storage::blob_swarm",
+                    blob_hash = %manifest.blob_hash,
+                    shards_fetched,
+                    required,
+                    error = %error,
+                    "Q4: reconstructible shard count failed to reconstruct — refusing composite"
+                );
+                None
             }
         }
-        data.truncate(manifest.total_size as usize);
-        Some(data)
     } else {
         None
     };
@@ -301,15 +380,21 @@ pub async fn fetch_shards_via_swarm(
 
 /// Outcome of a manifest-aware race — a drop-in superset of `FetchOutcome`
 /// for callers that want Q3+Q4 wired end-to-end: a direct hit still resolves
-/// immediately; a manifest reply is persisted and, when every shard can be
-/// swarm-fetched this round, reassembled into the SAME `Hit` shape a direct
-/// fetch would have produced (`source_peer = "swarm"` names the composite
-/// path, since no single peer served the whole payload).
+/// immediately; a manifest reply is persisted and becomes either `Hit` when
+/// every shard lands or `Reconstructible` when an RS data-shard floor lands.
 #[derive(Debug)]
 pub enum SwarmRaceOutcome {
     Hit {
         bytes: Vec<u8>,
         source_peer: String,
+    },
+    /// An erasure-coded manifest reached its data-shard floor before every
+    /// parity shard landed. The bytes are servable now; ordinary background
+    /// salvage may fill the missing parity later.
+    Reconstructible {
+        bytes: Vec<u8>,
+        landed: usize,
+        missing: usize,
     },
     /// A manifest was received and persisted, but at least one shard could
     /// not be fetched from any connected holder this round. The manifest is
@@ -368,6 +453,13 @@ pub async fn race_fetch_with_swarm(
             let swarm_outcome =
                 fetch_shards_via_swarm(&manifest, &candidates, conn, fresh_after, params).await;
             match swarm_outcome.bytes {
+                Some(bytes) if swarm_outcome.shards_failed > 0 => {
+                    SwarmRaceOutcome::Reconstructible {
+                        bytes,
+                        landed: swarm_outcome.shards_fetched,
+                        missing: swarm_outcome.shards_failed,
+                    }
+                }
                 Some(bytes) => SwarmRaceOutcome::Hit {
                     bytes,
                     source_peer: "swarm".to_string(),
@@ -450,5 +542,89 @@ mod tests {
         let plan = plan_shard_holders(&shard_hashes, &[], &HashMap::new());
         assert_eq!(plan.len(), 1);
         assert!(plan[0].1.is_empty());
+    }
+
+    fn manifest(encoding: &str, data_shards: u8, total_shards: u8) -> ShardManifest {
+        ShardManifest {
+            blob_cid: "bafkrei-test".to_string(),
+            blob_hash: "sha256-test".to_string(),
+            total_size: 7,
+            mime_type: "application/octet-stream".to_string(),
+            encoding: encoding.to_string(),
+            data_shards,
+            total_shards,
+            shard_size: 1,
+            shard_hashes: (0..total_shards)
+                .map(|i| format!("sha256-shard-{i}"))
+                .collect(),
+            reach: "commons".to_string(),
+            author_id: None,
+            created_at: "2026-08-23T00:00:00Z".to_string(),
+            verified_at: None,
+        }
+    }
+
+    #[test]
+    fn rs_4_7_stops_admitting_races_at_four_landed_shards() {
+        let rs = manifest("rs-4-7", 4, 7);
+        let threshold = reconstructible_threshold(&rs);
+        let landed = AtomicUsize::new(3);
+        assert!(should_start_shard_race(&landed, threshold));
+        landed.fetch_add(1, Ordering::Release);
+        for _ in 0..4 {
+            assert!(!should_start_shard_race(&landed, threshold));
+        }
+    }
+
+    #[test]
+    fn rs_4_7_successes_reduce_inflight_before_refill() {
+        let threshold = Some(4);
+        let mut started = desired_network_inflight(0, threshold, 8);
+        let mut inflight = started;
+
+        for landed in 1..=4 {
+            inflight -= 1;
+            let target = desired_network_inflight(landed, threshold, 8);
+            if inflight < target {
+                started += target - inflight;
+                inflight = target;
+            }
+        }
+
+        assert_eq!(started, 4, "successful data races must not admit parity");
+        assert_eq!(inflight, 0);
+    }
+
+    #[test]
+    fn rs_4_7_miss_admits_one_bounded_replacement() {
+        let threshold = Some(4);
+        let mut started = desired_network_inflight(0, threshold, 8);
+        let mut inflight = started - 1; // one of the first four races missed
+        let target = desired_network_inflight(0, threshold, 8);
+        if inflight < target {
+            started += target - inflight;
+            inflight = target;
+        }
+
+        assert_eq!(started, 5);
+        assert_eq!(inflight, 4);
+    }
+
+    #[test]
+    fn rs_4_7_with_three_landed_remains_incomplete() {
+        let rs = manifest("rs-4-7", 4, 7);
+        let landed = AtomicUsize::new(3);
+        assert!(should_start_shard_race(
+            &landed,
+            reconstructible_threshold(&rs)
+        ));
+    }
+
+    #[test]
+    fn chunked_manifest_never_skips_a_missing_shard() {
+        let chunked = manifest("chunked", 3, 3);
+        let landed = AtomicUsize::new(2);
+        assert_eq!(reconstructible_threshold(&chunked), None);
+        assert!(should_start_shard_race(&landed, None));
     }
 }

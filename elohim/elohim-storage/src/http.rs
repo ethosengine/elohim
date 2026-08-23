@@ -3967,6 +3967,25 @@ impl HttpServer {
                                 healed_from: Some(source_peer),
                             }
                         }
+                        crate::p2p::blob_swarm::SwarmRaceOutcome::Reconstructible {
+                            bytes,
+                            landed,
+                            missing,
+                        } => {
+                            info!(
+                                hash_prefix = %hash_prefix_task,
+                                size = bytes.len(),
+                                landed,
+                                missing,
+                                candidate_count,
+                                source = candidate_source,
+                                "blob heal: parity-aware swarm reached the reconstructible floor"
+                            );
+                            BlobHealOutcome::Bytes {
+                                bytes,
+                                healed_from: Some("swarm".to_string()),
+                            }
+                        }
                         // Q3: a manifest was received and persisted, but at
                         // least one shard could not be swarm-fetched this
                         // round. The manifest is durable regardless — a

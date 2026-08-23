@@ -2109,12 +2109,35 @@ impl P2PHandle {
             None
         };
 
-        for (i, shard_data) in shards.iter().enumerate() {
+        let placement_plan = crate::sharding::plan_shard_placement_slots(&manifest, selected.len());
+        if manifest.encoding.starts_with("rs-") {
+            let data_households: std::collections::HashSet<String> = placement_plan
+                .iter()
+                .filter(|slot| slot.role == crate::sharding::ShardRole::Data)
+                .map(|slot| {
+                    let peer = &selected[slot.holder_index];
+                    peer.household_id
+                        .clone()
+                        .unwrap_or_else(|| format!("unknown:{}", peer.peer_id))
+                })
+                .collect();
+            let parity_shards = placement_plan
+                .iter()
+                .filter(|slot| slot.role == crate::sharding::ShardRole::Parity)
+                .count();
+            tracing::info!(
+                content_id,
+                data_shards_diverse_households = data_households.len(),
+                parity_shards,
+                "parity-aware shard placement planned"
+            );
+        }
+
+        for slot in placement_plan {
+            let i = slot.shard_index;
+            let shard_data = &shards[i];
             let hash = &manifest.shard_hashes[i];
-            if selected.is_empty() {
-                break;
-            }
-            let peer = &selected[i % selected.len()];
+            let peer = &selected[slot.holder_index];
 
             // SELF-selected: record what we can verify, never dial ourselves.
             if self_agent_cid.as_deref() == Some(peer.peer_id.as_str()) {
@@ -3685,7 +3708,10 @@ impl P2PNode {
     /// arrival — broadcasting empty during a transient I/O blip would
     /// corrupt every remote peer's projection of our custody.
     async fn broadcast_inventory_snapshot(&self) {
-        use crate::p2p::inventory_broadcaster::{build_snapshot, gather_hints, StaticInventory};
+        use crate::p2p::inventory_broadcaster::{
+            build_bounded_inventory_publications, gather_hints, LocalInventory as _,
+            StaticInventory, INVENTORY_GOSSIP_PAYLOAD_BUDGET,
+        };
         use crate::p2p::inventory_gossip::INVENTORY_TOPIC;
 
         // Fetch hashes directly so I/O failure can skip the tick. Must happen
@@ -3738,7 +3764,6 @@ impl P2PNode {
         // Wave 3: gather per-blob hints from the content projection. Failures
         // are non-fatal (gather_hints logs internally and returns empty vec).
         let hints = if let Some(pool) = self.db_pool.as_ref() {
-            use crate::p2p::inventory_broadcaster::LocalInventory as _;
             match pool.get() {
                 Ok(mut conn) => {
                     gather_hints(&mut conn, &inventory.current_hashes(), &local_peer_id)
@@ -3749,48 +3774,58 @@ impl P2PNode {
             vec![]
         };
 
-        let snapshot = build_snapshot(
+        let hashes_for_record: Vec<String> = inventory
+            .current_hashes()
+            .iter()
+            .map(|a| a.as_str().to_string())
+            .collect();
+        let count = hashes_for_record.len();
+        let publications = match build_bounded_inventory_publications(
             &local_peer_id,
             &inventory,
             &self.inventory_seq,
             now_micros,
             hints,
-        );
-        // Convert BlobAddress vec to String vec for the parity-diagnostic record.
-        // The last_gossiped field and set_last_gossiped_inventory use Vec<String>
-        // (a separate concern from the wire types); this is the single conversion site.
-        let hashes_for_record: Vec<String> = snapshot
-            .hashes
-            .iter()
-            .map(|a| a.as_str().to_string())
-            .collect();
-        let snapshot_sequence = snapshot.sequence;
-        // T22 review fix #2: capture count BEFORE the move so the success
-        // arm can move-not-clone hashes_for_record into the parity record.
-        let count = hashes_for_record.len();
-
-        let bytes = match snapshot.to_bytes() {
-            Ok(b) => b,
+            INVENTORY_GOSSIP_PAYLOAD_BUDGET,
+        ) {
+            Ok(publications) => publications,
             Err(e) => {
                 warn!(
                     target: "elohim_storage::inventory",
                     error = %e,
-                    "T22: failed to serialize inventory snapshot"
+                    "T22: failed to build bounded inventory publication"
                 );
                 return;
             }
         };
+        let page_count = publications.len();
+        let last_sequence = publications.last().map(|p| p.sequence()).unwrap_or(0);
 
-        // Plan 4: route through DualGossipPublisher (fans out to libp2p + iroh).
-        // LibP2PGossipPublisher sends GossipPublish to the swarm event loop which
-        // calls gossipsub.publish() — the libp2p code path is unchanged.
-        if let Err(e) = self.gossip_publisher.publish(INVENTORY_TOPIC, bytes) {
-            warn!(
-                target: "elohim_storage::inventory",
-                error = %e,
-                "T22: dual-publish failed (often: no subscribed peers yet)"
-            );
-            return;
+        // Plan 4: every bounded page routes through the same dual publisher, so
+        // libp2p and iroh receive byte-identical snapshot+delta sequences.
+        for (page_index, publication) in publications.into_iter().enumerate() {
+            let bytes = match publication.to_bytes() {
+                Ok(bytes) => bytes,
+                Err(e) => {
+                    warn!(
+                        target: "elohim_storage::inventory",
+                        error = %e,
+                        page_index,
+                        "T22: failed to serialize bounded inventory page"
+                    );
+                    return;
+                }
+            };
+            if let Err(e) = self.gossip_publisher.publish(INVENTORY_TOPIC, bytes) {
+                warn!(
+                    target: "elohim_storage::inventory",
+                    error = %e,
+                    page_index,
+                    page_count,
+                    "T22: bounded inventory dual-publish failed"
+                );
+                return;
+            }
         }
 
         // T22 review fix #3: delegate the parity-record write to the
@@ -3800,8 +3835,10 @@ impl P2PNode {
         info!(
             target: "elohim_storage::inventory",
             count,
-            sequence = snapshot_sequence,
-            "T22: published inventory snapshot via DualGossipPublisher"
+            page_count,
+            sequence = last_sequence,
+            payload_budget = INVENTORY_GOSSIP_PAYLOAD_BUDGET,
+            "T22: published bounded inventory refresh via DualGossipPublisher"
         );
     }
 
@@ -8086,6 +8123,50 @@ impl P2PNode {
                     total_shards = manifest.shard_hashes.len(), missing_shards,
                     "bytes-heal/Q3: manifest persisted but swarm shard-fetch incomplete (next sync round retries)"
                 ),
+                SwarmRaceOutcome::Reconstructible {
+                    landed, missing, ..
+                } => {
+                    info!(
+                        doc_id = %doc_id_owned, hash = %hash, landed, missing,
+                        "bytes-heal/Q4: parity-aware swarm reached the reconstructible floor (serve path warm)"
+                    );
+                    // The composite is now servable even though parity salvage
+                    // remains. Advertise that fact immediately, just like the
+                    // all-shards swarm completion arm above.
+                    match crate::p2p::inventory_gossip::BlobAddress::new(hash.clone()) {
+                        Ok(addr) => {
+                            let delta = crate::p2p::inventory_broadcaster::build_delta(
+                                &local_peer_id,
+                                vec![addr],
+                                vec![],
+                                &inventory_seq,
+                                chrono::Utc::now().timestamp_micros(),
+                                vec![],
+                            );
+                            match delta.to_bytes() {
+                                Ok(bytes) => {
+                                    if let Err(e) = gossip_publisher.publish(
+                                        crate::p2p::inventory_gossip::INVENTORY_TOPIC,
+                                        bytes,
+                                    ) {
+                                        warn!(
+                                            doc_id = %doc_id_owned, hash = %hash, error = %e,
+                                            "bytes-heal/Q4: reconstructible composite delta publish failed"
+                                        );
+                                    }
+                                }
+                                Err(e) => warn!(
+                                    doc_id = %doc_id_owned, hash = %hash, error = %e,
+                                    "bytes-heal/Q4: failed to serialize reconstructible composite delta"
+                                ),
+                            }
+                        }
+                        Err(e) => warn!(
+                            doc_id = %doc_id_owned, hash = %hash, error = ?e,
+                            "bytes-heal/Q4: reconstructible composite hash is not canonical wire-shaped"
+                        ),
+                    }
+                }
                 other => debug!(
                     doc_id = %doc_id_owned, hash = %hash, outcome = ?other,
                     "bytes-heal: no bytes pulled this round (next sync round retries)"

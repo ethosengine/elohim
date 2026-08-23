@@ -70,6 +70,54 @@ pub struct ShardManifest {
     pub verified_at: Option<String>,
 }
 
+/// Role derived from a manifest's Reed-Solomon boundary. This deliberately
+/// does not ride `ShardAssignment`: the role is immutable manifest math, not
+/// a second registry/DNA fact that can drift from it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShardRole {
+    Data,
+    Parity,
+}
+
+/// Derive the role of one shard. Non-RS encodings have no optional parity, so
+/// every shard is data/required.
+pub fn shard_role(manifest: &ShardManifest, index: usize) -> ShardRole {
+    if manifest.encoding.starts_with("rs-") && index >= manifest.data_shards as usize {
+        ShardRole::Parity
+    } else {
+        ShardRole::Data
+    }
+}
+
+/// One deterministic round-robin placement slot over an already diversity-
+/// ranked holder list. Manifest order is preserved, which means RS data shards
+/// consume the strongest household-diverse prefix before parity does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ShardPlacementSlot {
+    pub shard_index: usize,
+    pub holder_index: usize,
+    pub role: ShardRole,
+}
+
+pub fn plan_shard_placement_slots(
+    manifest: &ShardManifest,
+    holder_count: usize,
+) -> Vec<ShardPlacementSlot> {
+    if holder_count == 0 {
+        return Vec::new();
+    }
+    manifest
+        .shard_hashes
+        .iter()
+        .enumerate()
+        .map(|(shard_index, _)| ShardPlacementSlot {
+            shard_index,
+            holder_index: shard_index % holder_count,
+            role: shard_role(manifest, shard_index),
+        })
+        .collect()
+}
+
 /// Configuration for shard encoding
 #[derive(Debug, Clone)]
 pub struct ShardConfig {
@@ -433,6 +481,88 @@ mod tests {
         assert_eq!(manifest.blob_hash, manifest.shard_hashes[0]);
         // Verify CID is present and valid
         assert!(manifest.blob_cid.starts_with("bafkrei")); // CIDv1 with raw codec
+    }
+
+    #[test]
+    fn rs_roles_are_derived_from_the_data_shard_boundary() {
+        let encoder = ShardEncoder::new(ShardConfig {
+            rs_threshold: 50,
+            single_shard_max: 10,
+            ..Default::default()
+        });
+        let manifest = encoder
+            .create_manifest(&vec![7; 100], "application/octet-stream", "commons")
+            .unwrap();
+
+        assert_eq!(manifest.encoding, "rs-4-7");
+        assert!(
+            (0..4).all(|index| shard_role(&manifest, index) == ShardRole::Data),
+            "the data prefix is derived from data_shards"
+        );
+        assert!(
+            (4..7).all(|index| shard_role(&manifest, index) == ShardRole::Parity),
+            "the remaining RS shards are parity"
+        );
+    }
+
+    #[test]
+    fn rs_data_prefix_consumes_the_household_diverse_holder_prefix_first() {
+        let encoder = ShardEncoder::new(ShardConfig {
+            rs_threshold: 50,
+            single_shard_max: 10,
+            ..Default::default()
+        });
+        let manifest = encoder
+            .create_manifest(&vec![7; 100], "application/octet-stream", "commons")
+            .unwrap();
+        // The live peer selector orders one holder per household first. Three
+        // households with two peers each therefore arrive as A,B,C,A,B,C.
+        let households = ["A", "B", "C", "A", "B", "C"];
+        let plan = plan_shard_placement_slots(&manifest, households.len());
+        let data_households: std::collections::HashSet<_> = plan
+            .iter()
+            .filter(|slot| slot.role == ShardRole::Data)
+            .map(|slot| households[slot.holder_index])
+            .collect();
+
+        assert_eq!(data_households.len(), 3);
+        assert_eq!(
+            plan.iter()
+                .take(4)
+                .filter(|s| s.role == ShardRole::Data)
+                .count(),
+            4
+        );
+        assert_eq!(
+            plan.iter()
+                .skip(4)
+                .filter(|s| s.role == ShardRole::Parity)
+                .count(),
+            3
+        );
+    }
+
+    #[test]
+    fn chunked_placement_keeps_the_existing_round_robin_order() {
+        let encoder = ShardEncoder::new(ShardConfig {
+            shard_size: 10,
+            single_shard_max: 5,
+            rs_threshold: 500,
+            ..Default::default()
+        });
+        let manifest = encoder
+            .create_manifest(&vec![7; 73], "application/octet-stream", "commons")
+            .unwrap();
+        let plan = plan_shard_placement_slots(&manifest, 3);
+
+        assert_eq!(manifest.encoding, "chunked");
+        assert_eq!(
+            plan.iter()
+                .map(|slot| slot.holder_index)
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2, 0, 1, 2, 0, 1]
+        );
+        assert!(plan.iter().all(|slot| slot.role == ShardRole::Data));
     }
 
     #[test]

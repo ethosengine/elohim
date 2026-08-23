@@ -1800,7 +1800,8 @@ lazy_static! {
     .unwrap();
 
     /// Per-shard fetch outcomes during a Q4 swarm-spread composite
-    /// reassembly. label: outcome = "hit" | "miss" | "no_candidates".
+    /// reassembly. label: outcome = "hit" | "miss" | "no_candidates" |
+    /// "parity_skipped".
     pub static ref BLOB_SWARM_SHARDS_FETCHED: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_blob_swarm_shards_fetched_total",
@@ -2458,7 +2459,7 @@ pub fn inc_blob_swarm_manifest_received() {
 }
 
 /// Record one per-shard fetch outcome during a Q4 swarm-spread reassembly.
-/// `outcome`: "hit" | "miss" | "no_candidates".
+/// `outcome`: "hit" | "miss" | "no_candidates" | "parity_skipped".
 pub fn inc_blob_swarm_shard_fetched(outcome: &str) {
     BLOB_SWARM_SHARDS_FETCHED
         .with_label_values(&[outcome])
