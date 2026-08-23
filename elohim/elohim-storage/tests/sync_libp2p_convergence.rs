@@ -16,6 +16,7 @@
 //! handlers call — the CRDT/merge logic itself is reused, not reimplemented.
 
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -75,6 +76,10 @@ struct TestSyncNode {
     /// reverse projector to heal into); `None` for the DocStore-only B2 proof.
     pool: Option<DbPool>,
     cmd_tx: mpsc::Sender<Command>,
+    /// How many `SyncChanges` requests this node has SERVED. The announce tests
+    /// assert eager delivery, and "converged" alone cannot tell an applied push
+    /// from a pull that quietly did the work — this counter can.
+    sync_changes_served: Arc<AtomicUsize>,
     _temp: TempDir,
 }
 
@@ -132,7 +137,13 @@ impl TestSyncNode {
         };
 
         let (cmd_tx, cmd_rx) = mpsc::channel::<Command>(32);
-        tokio::spawn(run_driver(swarm, cmd_rx, sync.clone()));
+        let sync_changes_served = Arc::new(AtomicUsize::new(0));
+        tokio::spawn(run_driver(
+            swarm,
+            cmd_rx,
+            sync.clone(),
+            sync_changes_served.clone(),
+        ));
 
         TestSyncNode {
             peer_id: local_peer_id,
@@ -140,6 +151,7 @@ impl TestSyncNode {
             sync,
             pool: None,
             cmd_tx,
+            sync_changes_served,
             _temp: temp_dir,
         }
     }
@@ -231,6 +243,7 @@ async fn run_driver(
     mut swarm: libp2p::Swarm<SyncBehaviour>,
     mut cmd_rx: mpsc::Receiver<Command>,
     sync: Arc<SyncManager>,
+    sync_changes_served: Arc<AtomicUsize>,
 ) {
     let mut connected: HashSet<PeerId> = HashSet::new();
 
@@ -281,16 +294,24 @@ async fn run_driver(
                     if peers.is_empty() {
                         continue;
                     }
-                    // Same two production calls the command arm makes: the doc's
-                    // current change bytes, bounded, into the sole planner.
-                    let change_data = match sync.get_changes_since(SYNC_NS, &doc_id, &[]).await {
-                        Ok((changes, _heads)) => sync_round::bounded_announce_payload(changes),
-                        Err(_) => None,
-                    };
+                    // Mirrors the production command arm: the projector reports
+                    // the new head as the change hash, and the payload is THAT
+                    // ONE change (bounded), never the doc's whole history.
+                    let change_hash = sync
+                        .get_heads(SYNC_NS, &doc_id)
+                        .await
+                        .ok()
+                        .and_then(|h| h.first().cloned())
+                        .unwrap_or_default();
+                    let change_data =
+                        match sync.get_change_by_hash(SYNC_NS, &doc_id, &change_hash).await {
+                            Ok(Some(bytes)) => sync_round::bounded_announce_payload(vec![bytes]),
+                            _ => None,
+                        };
                     let announcements = sync_round::announcements_for_local_change_with_data(
                         SYNC_NS,
                         &doc_id,
-                        "test-change-hash",
+                        &change_hash,
                         &peers,
                         change_data,
                     );
@@ -310,7 +331,7 @@ async fn run_driver(
                         connected.remove(&peer_id);
                     }
                     SwarmEvent::Behaviour(SyncBehaviourEvent::SyncProtocol(rr)) => {
-                        handle_sync_rr(&mut swarm, &sync, rr).await;
+                        handle_sync_rr(&mut swarm, &sync, &sync_changes_served, rr).await;
                     }
                     _ => {}
                 }
@@ -322,6 +343,7 @@ async fn run_driver(
 async fn handle_sync_rr(
     swarm: &mut libp2p::Swarm<SyncBehaviour>,
     sync: &SyncManager,
+    sync_changes_served: &AtomicUsize,
     event: request_response::Event<SyncRequest, SyncResponse>,
 ) {
     if let request_response::Event::Message { peer, message } = event {
@@ -329,7 +351,8 @@ async fn handle_sync_rr(
             request_response::Message::Request {
                 request, channel, ..
             } => {
-                let response = handle_request(swarm, sync, peer, request).await;
+                let response =
+                    handle_request(swarm, sync, sync_changes_served, peer, request).await;
                 let _ = swarm
                     .behaviour_mut()
                     .sync_protocol
@@ -348,6 +371,7 @@ async fn handle_sync_rr(
 async fn handle_request(
     swarm: &mut libp2p::Swarm<SyncBehaviour>,
     sync: &SyncManager,
+    sync_changes_served: &AtomicUsize,
     peer: PeerId,
     request: SyncRequest,
 ) -> SyncResponse {
@@ -359,17 +383,44 @@ async fn handle_request(
         SyncRequest::AnnounceChange {
             h_app_id,
             doc_id,
+            change_hash,
             change_data,
-            ..
         } => {
             let data = change_data.filter(|d| d.len() <= sync_round::MAX_ANNOUNCE_PAYLOAD_BYTES);
             match data {
                 Some(data) => match sync.apply_changes(&h_app_id, &doc_id, vec![data]).await {
-                    Ok(_) => SyncResponse::ChangeAck {
-                        h_app_id,
-                        doc_id,
-                        was_new: true,
-                    },
+                    // Landing check, mirroring production: a change whose deps we
+                    // lack is QUEUED, not applied, and `apply_changes` still
+                    // returns Ok — so ask whether the doc actually holds it.
+                    Ok(_) => {
+                        let landed = sync
+                            .get_change_by_hash(&h_app_id, &doc_id, &change_hash)
+                            .await
+                            .unwrap_or(None)
+                            .is_some();
+                        if landed {
+                            SyncResponse::ChangeAck {
+                                h_app_id,
+                                doc_id,
+                                was_new: true,
+                            }
+                        } else {
+                            let have_heads =
+                                sync.get_heads(&h_app_id, &doc_id).await.unwrap_or_default();
+                            let req = SyncRequest::SyncChanges {
+                                h_app_id: h_app_id.clone(),
+                                doc_id: doc_id.clone(),
+                                have_heads,
+                                bloom_filter: None,
+                            };
+                            swarm.behaviour_mut().sync_protocol.send_request(&peer, req);
+                            SyncResponse::ChangeAck {
+                                h_app_id,
+                                doc_id,
+                                was_new: false,
+                            }
+                        }
+                    }
                     Err(e) => SyncResponse::Error {
                         message: format!("apply_changes: {e}"),
                     },
@@ -428,21 +479,24 @@ async fn handle_request(
             doc_id,
             have_heads,
             ..
-        } => match sync
-            .get_changes_since(&h_app_id, &doc_id, &have_heads)
-            .await
-        {
-            Ok((changes, new_heads)) => SyncResponse::Changes {
-                h_app_id,
-                doc_id,
-                changes,
-                has_more: false,
-                new_heads,
-            },
-            Err(e) => SyncResponse::Error {
-                message: format!("get_changes_since: {e}"),
-            },
-        },
+        } => {
+            sync_changes_served.fetch_add(1, Ordering::SeqCst);
+            let served = sync
+                .get_changes_since(&h_app_id, &doc_id, &have_heads)
+                .await;
+            match served {
+                Ok((changes, new_heads)) => SyncResponse::Changes {
+                    h_app_id,
+                    doc_id,
+                    changes,
+                    has_more: false,
+                    new_heads,
+                },
+                Err(e) => SyncResponse::Error {
+                    message: format!("get_changes_since: {e}"),
+                },
+            }
+        }
         // Mirrors P2PNode's ListDocumentsSince arm (p2p/mod.rs:6656): equal
         // digests answer InSync and enumerate nothing; divergent digests fall
         // through to exactly the ListDocuments behaviour above.
@@ -856,13 +910,17 @@ async fn connect_only(node_a: &TestSyncNode, node_b: &TestSyncNode) {
     );
 }
 
-/// The doorbell DELIVERS — a small locally-authored change reaches a connected
-/// peer on the announce alone, with no sync round anywhere in the test.
+/// The doorbell PROPAGATES at first contact — a locally-authored change reaches
+/// a peer that holds no history for the doc, on the announce alone, with no sync
+/// round anywhere in the test.
 ///
 /// RED before the cure: `announcements_for_local_change` sent `change_data: None`
 /// and the receiver answered a bare `ChangeAck`, so nothing moved until the next
 /// 60s round (measured cross-peer arrival on the live 3-peer mesh: ~24s). Node B
 /// here never calls `initiate_sync`, so a pass means the push path carried it.
+/// A doc's FIRST change has no dependencies, so B applies it holding no history
+/// at all; `announce_of_a_change_whose_deps_the_peer_lacks_falls_back_to_a_pull`
+/// covers the case where it cannot.
 #[tokio::test]
 async fn announce_carries_the_change_to_a_connected_peer() {
     let node_a = TestSyncNode::spawn("a").await;
@@ -885,15 +943,17 @@ async fn announce_carries_the_change_to_a_connected_peer() {
     );
 
     // The payload must actually ride the wire — a doorbell here would make the
-    // test pass only via the receiver's pull, which the next test covers.
-    let (changes, _) = node_a
+    // test pass only via the receiver's pull, which a later test covers.
+    let head = node_a.sync.get_heads(SYNC_NS, DOC_ID).await.unwrap()[0].clone();
+    let change = node_a
         .sync
-        .get_changes_since(SYNC_NS, DOC_ID, &[])
+        .get_change_by_hash(SYNC_NS, DOC_ID, &head)
         .await
-        .unwrap();
+        .unwrap()
+        .expect("A must hold the change it is announcing");
     assert!(
-        sync_round::bounded_announce_payload(changes).is_some(),
-        "a projected content doc must fit the announce bound"
+        sync_round::bounded_announce_payload(vec![change]).is_some(),
+        "a projected content doc's change must fit the announce bound"
     );
 
     node_a.announce(DOC_ID).await;
@@ -905,6 +965,14 @@ async fn announce_carries_the_change_to_a_connected_peer() {
     assert!(
         elapsed < Duration::from_secs(10),
         "announce propagation must be prompt, took {elapsed:?}"
+    );
+    // PURE PUSH, even at first contact: this doc has exactly one change, and a
+    // doc's first change has no dependencies, so B can apply it holding no
+    // history at all. Nothing was pulled.
+    assert_eq!(
+        node_a.sync_changes_served.load(Ordering::SeqCst),
+        0,
+        "the pushed bytes must have converged B on their own, with no pull"
     );
 
     let title = node_b
@@ -966,5 +1034,172 @@ async fn an_oversized_announce_degrades_to_a_pull_and_still_converges() {
     assert_eq!(title, "Oversized");
     let heads_a = node_a.sync.get_heads(SYNC_NS, BIG_DOC_ID).await.unwrap();
     let heads_b = node_b.sync.get_heads(SYNC_NS, BIG_DOC_ID).await.unwrap();
+    assert_eq!(heads_a, heads_b, "heads must converge between A and B");
+}
+
+/// The steady state the bound is FOR: a mature doc with real history announces
+/// only the NEW change, and a peer that already holds the history applies it
+/// eagerly — no pull, no round.
+///
+/// RED before this cure (payload was `get_changes_since(.., &[])` = every change
+/// since genesis): the payload grows with the doc, so a doc with history
+/// overflows `MAX_ANNOUNCE_PAYLOAD_BYTES` on every local edit and every announce
+/// silently degrades to pull-on-announce (+1 RTT, plus a full-doc serialization
+/// burned on the sender to discover it). This test pins both halves — the
+/// payload is a small delta, and no `SyncChanges` is served.
+#[tokio::test]
+async fn announce_of_a_mature_doc_lands_eagerly_without_a_pull() {
+    let node_a = TestSyncNode::spawn("a").await;
+    let node_b = TestSyncNode::spawn("b").await;
+
+    connect_only(&node_a, &node_b).await;
+
+    // Give the doc real history: several distinct authored versions, each a
+    // separate Automerge change with a sizeable body.
+    let filler = "y".repeat(8 * 1024);
+    for v in 1..=6 {
+        let mut content = sample_content("edit-prop-1", &format!("Version {v}"));
+        content.content_body = Some(format!("{filler}{v}"));
+        project_content_doc(&node_a.sync, &content)
+            .await
+            .expect("project version on A");
+    }
+
+    // Bring B up to that history the ordinary way (one round), then take the
+    // pull counter to zero: everything after this point must be push-only.
+    connect_and_converge(&node_a, &node_b, DOC_ID).await;
+    node_a.sync_changes_served.store(0, Ordering::SeqCst);
+
+    // One more locally-authored change on the now-mature doc.
+    let mut content = sample_content("edit-prop-1", "Version 7");
+    content.content_body = Some(format!("{filler}7"));
+    project_content_doc(&node_a.sync, &content)
+        .await
+        .expect("project version 7 on A");
+
+    // The announced payload is ONE change, not the doc. Pin the ratio, not just
+    // the bound: a full-history payload would be several times larger AND (with
+    // this fixture) over the bound entirely.
+    let head = node_a.sync.get_heads(SYNC_NS, DOC_ID).await.unwrap()[0].clone();
+    let one_change = node_a
+        .sync
+        .get_change_by_hash(SYNC_NS, DOC_ID, &head)
+        .await
+        .unwrap()
+        .expect("A holds the change it is announcing");
+    let (whole_doc, _) = node_a
+        .sync
+        .get_changes_since(SYNC_NS, DOC_ID, &[])
+        .await
+        .unwrap();
+    let whole_doc_len = whole_doc.iter().map(|c| c.len()).sum::<usize>();
+    assert!(
+        one_change.len() < whole_doc_len / 2,
+        "the announced payload must be a delta ({} bytes), not the doc ({whole_doc_len} bytes)",
+        one_change.len()
+    );
+    assert!(
+        sync_round::bounded_announce_payload(vec![one_change]).is_some(),
+        "a single change on a mature doc must still fit the announce bound"
+    );
+
+    node_a.announce(DOC_ID).await;
+
+    // B converges on the pushed bytes alone.
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        if node_b
+            .sync
+            .get_doc_field(SYNC_NS, DOC_ID, "title")
+            .await
+            .map(|t| t == "Version 7")
+            .unwrap_or(false)
+        {
+            break;
+        }
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "node B never received Version 7 from the announce"
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+
+    assert_eq!(
+        node_a.sync_changes_served.load(Ordering::SeqCst),
+        0,
+        "the eager push must have landed on its own — a pull here means the payload \
+         was not the announced change"
+    );
+    let heads_a = node_a.sync.get_heads(SYNC_NS, DOC_ID).await.unwrap();
+    let heads_b = node_b.sync.get_heads(SYNC_NS, DOC_ID).await.unwrap();
+    assert_eq!(heads_a, heads_b, "heads must converge between A and B");
+}
+
+/// The landing check earns its keep: an announced change whose DEPENDENCIES the
+/// receiver lacks is queued by Automerge, not applied — `apply_changes` still
+/// returns `Ok` and the doc is untouched. Treating that as converged is silent
+/// data loss; the receiver must notice and pull.
+///
+/// A authors six versions while B holds nothing, so the announced (sixth) change
+/// depends on five changes B has never seen. B never calls `initiate_sync`.
+#[tokio::test]
+async fn announce_of_a_change_whose_deps_the_peer_lacks_falls_back_to_a_pull() {
+    let node_a = TestSyncNode::spawn("a").await;
+    let node_b = TestSyncNode::spawn("b").await;
+
+    connect_only(&node_a, &node_b).await;
+
+    let mut early_head = String::new();
+    for v in 1..=6 {
+        let content = sample_content("edit-prop-1", &format!("Version {v}"));
+        project_content_doc(&node_a.sync, &content)
+            .await
+            .expect("project version on A");
+        if v == 1 {
+            early_head = node_a.sync.get_heads(SYNC_NS, DOC_ID).await.unwrap()[0].clone();
+        }
+    }
+
+    assert!(
+        node_b
+            .sync
+            .get_heads(SYNC_NS, DOC_ID)
+            .await
+            .unwrap()
+            .is_empty(),
+        "node B must hold no history for this doc"
+    );
+
+    node_a.announce(DOC_ID).await;
+
+    node_b
+        .wait_for_doc(DOC_ID, Duration::from_secs(15))
+        .await
+        .expect("node B never converged — a queued (unapplied) change was mistaken for a landing");
+
+    assert!(
+        node_a.sync_changes_served.load(Ordering::SeqCst) >= 1,
+        "B could not have applied a change whose deps it lacks — it must have pulled"
+    );
+    // The pull carried the DEPENDENCIES, not just the head: B holds the doc's
+    // first change too. A head without its history is the shape that would let a
+    // corpus digest match while the doc is quietly incomplete.
+    assert!(
+        node_b
+            .sync
+            .get_change_by_hash(SYNC_NS, DOC_ID, &early_head)
+            .await
+            .unwrap()
+            .is_some(),
+        "B must hold the doc's earliest change, not just the announced head"
+    );
+    let title = node_b
+        .sync
+        .get_doc_field(SYNC_NS, DOC_ID, "title")
+        .await
+        .unwrap();
+    assert_eq!(title, "Version 6");
+    let heads_a = node_a.sync.get_heads(SYNC_NS, DOC_ID).await.unwrap();
+    let heads_b = node_b.sync.get_heads(SYNC_NS, DOC_ID).await.unwrap();
     assert_eq!(heads_a, heads_b, "heads must converge between A and B");
 }

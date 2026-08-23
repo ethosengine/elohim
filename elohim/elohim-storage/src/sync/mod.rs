@@ -42,6 +42,17 @@ pub struct SyncManager {
     stream_tracker: Arc<StreamTracker>,
 }
 
+/// Parse a hex change hash into an Automerge `ChangeHash`.
+///
+/// `None` (never an error) for anything that is not 32 hex-encoded bytes: the
+/// hash arrives off the wire, and an unparseable one must degrade to "cannot
+/// serve this change", never to a failed sync round.
+fn parse_change_hash(hex_hash: &str) -> Option<automerge::ChangeHash> {
+    let bytes = hex::decode(hex_hash).ok()?;
+    let arr: [u8; 32] = bytes.try_into().ok()?;
+    Some(automerge::ChangeHash(arr))
+}
+
 impl SyncManager {
     /// Create a new sync manager
     pub fn new(doc_store: Arc<DocStore>, stream_tracker: Arc<StreamTracker>) -> Self {
@@ -141,6 +152,43 @@ impl SyncManager {
         Ok((changes, new_heads))
     }
 
+    /// Raw bytes of ONE change, addressed by its hex hash, if this doc holds it.
+    ///
+    /// The announce path's payload source. A doorbell names the change it is
+    /// announcing, so the eager push should carry THAT change — not
+    /// `get_changes_since(.., &[])`, which is every change since genesis and
+    /// therefore grows without bound as a doc accumulates history (a mature doc
+    /// would overflow the announce bound on every local edit and burn a full-doc
+    /// serialization to discover that).
+    ///
+    /// `Ok(None)` for an absent doc, an unparseable hash, or a change the doc
+    /// does not hold (evicted, compacted, or never seen) — all of which mean
+    /// "cannot push this eagerly", never an error, because the caller's fallback
+    /// (pull, then the 60s round) is always available.
+    ///
+    /// Also the receive-side landing check: a single change whose dependencies
+    /// the receiver lacks is QUEUED by Automerge rather than applied, silently
+    /// leaving the doc unchanged — so "did the announced change actually land?"
+    /// is exactly `get_change_by_hash(..).is_some()` after the apply.
+    pub async fn get_change_by_hash(
+        &self,
+        h_app_id: &str,
+        doc_id: &str,
+        change_hash: &str,
+    ) -> Result<Option<Vec<u8>>, StorageError> {
+        let Some(hash) = parse_change_hash(change_hash) else {
+            return Ok(None);
+        };
+        let Some(stored) = self.doc_store.get(h_app_id, doc_id).await? else {
+            return Ok(None);
+        };
+        let doc = Automerge::load(&stored.data)
+            .map_err(|e| StorageError::Sync(format!("Failed to load doc: {}", e)))?;
+        Ok(doc
+            .get_change_by_hash(&hash)
+            .map(|c| c.raw_bytes().to_vec()))
+    }
+
     /// Get current heads for a document
     pub async fn get_heads(
         &self,
@@ -232,5 +280,123 @@ impl SyncManager {
     /// Get document count for an app
     pub async fn count_documents(&self, h_app_id: &str) -> Result<u64, StorageError> {
         self.doc_store.count(h_app_id).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use automerge::transaction::Transactable;
+    use tempfile::TempDir;
+
+    async fn test_sync_manager() -> (SyncManager, TempDir) {
+        let temp_dir = TempDir::new().unwrap();
+        let doc_store = Arc::new(
+            DocStore::new(DocStoreConfig {
+                db_path: temp_dir.path().join("sync-mod.sled"),
+                ..Default::default()
+            })
+            .await
+            .unwrap(),
+        );
+        let stream_tracker = Arc::new(StreamTracker::new());
+        (SyncManager::new(doc_store, stream_tracker), temp_dir)
+    }
+
+    /// Author two changes, then ask for ONE by hash: the returned bytes must be
+    /// that change alone — materially smaller than the whole document — and must
+    /// apply into a peer that already holds the predecessor.
+    ///
+    /// This is the announce payload's contract. The reason it matters is scale:
+    /// the doorbell used to carry `get_changes_since(.., &[])`, which grows with
+    /// the doc, so a mature doc overflowed the announce bound on every edit.
+    #[tokio::test]
+    async fn one_change_by_hash_is_a_delta_that_applies_on_top_of_its_predecessor() {
+        let (sync, _tmp) = test_sync_manager().await;
+        let ns = "elohim";
+        let doc = "node:concept-1";
+
+        let mut first = Automerge::new();
+        first
+            .transact::<_, _, automerge::AutomergeError>(|tx| {
+                tx.put(automerge::ROOT, "title", "v1")?;
+                Ok(())
+            })
+            .unwrap();
+        sync.apply_changes(ns, doc, vec![first.save()])
+            .await
+            .unwrap();
+        let after_first = sync.get_heads(ns, doc).await.unwrap();
+
+        let mut second = sync.get_or_create_doc(ns, doc).await.unwrap();
+        second
+            .transact::<_, _, automerge::AutomergeError>(|tx| {
+                tx.put(automerge::ROOT, "title", "v2")?;
+                Ok(())
+            })
+            .unwrap();
+        sync.apply_changes(ns, doc, vec![second.save()])
+            .await
+            .unwrap();
+        let head = sync.get_heads(ns, doc).await.unwrap()[0].clone();
+        assert_ne!(head, after_first[0], "the second change must move the head");
+
+        let delta = sync
+            .get_change_by_hash(ns, doc, &head)
+            .await
+            .unwrap()
+            .expect("the doc holds its own head change");
+        let (whole, _) = sync.get_changes_since(ns, doc, &[]).await.unwrap();
+        let whole_len: usize = whole.iter().map(|c| c.len()).sum();
+        assert!(
+            delta.len() < whole_len,
+            "one change ({}) must be smaller than the whole doc ({whole_len})",
+            delta.len()
+        );
+
+        // A peer holding only the FIRST change applies the delta cleanly.
+        let (peer, _peer_tmp) = test_sync_manager().await;
+        peer.apply_changes(ns, doc, vec![first.save()])
+            .await
+            .unwrap();
+        peer.apply_changes(ns, doc, vec![delta]).await.unwrap();
+        assert_eq!(peer.get_doc_field(ns, doc, "title").await.unwrap(), "v2");
+        assert_eq!(peer.get_heads(ns, doc).await.unwrap(), vec![head]);
+    }
+
+    /// Every "cannot serve this change" case is `Ok(None)`, never an error: the
+    /// hash arrives off the wire, and the caller's fallback (pull, then the 60s
+    /// round) must not be turned into a failed sync round by a bad string.
+    #[tokio::test]
+    async fn unservable_change_hashes_are_none_not_errors() {
+        let (sync, _tmp) = test_sync_manager().await;
+        let ns = "elohim";
+        let doc = "node:concept-1";
+
+        // Absent doc.
+        assert!(sync
+            .get_change_by_hash(ns, doc, &"ab".repeat(32))
+            .await
+            .unwrap()
+            .is_none());
+
+        let mut d = Automerge::new();
+        d.transact::<_, _, automerge::AutomergeError>(|tx| {
+            tx.put(automerge::ROOT, "title", "v1")?;
+            Ok(())
+        })
+        .unwrap();
+        sync.apply_changes(ns, doc, vec![d.save()]).await.unwrap();
+
+        // Not hex, wrong length, and a well-formed hash the doc does not hold.
+        for bad in ["", "zzzz", "abcd", &"cd".repeat(32)] {
+            assert!(
+                sync.get_change_by_hash(ns, doc, bad)
+                    .await
+                    .unwrap()
+                    .is_none(),
+                "{bad} must be Ok(None)"
+            );
+        }
     }
 }

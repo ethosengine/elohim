@@ -4302,18 +4302,28 @@ impl P2PNode {
                 // green while nothing propagates.
                 let peers: Vec<PeerId> = swarm.connected_peers().cloned().collect();
                 let namespace = crate::sync::projector::PROJECTION_NAMESPACE;
-                // The doorbell DELIVERS when the change fits: load the doc's
-                // current change bytes once (the same producer the pull path
-                // answers `SyncChanges` with — `get_changes_since` against empty
-                // heads) and bound them before fanning out. Over the bound, or on
-                // any read error, `None` degrades to the metadata-only doorbell
-                // and the receiver pulls; the 60s round backstops both.
+                // The doorbell DELIVERS when the change fits — and it carries THE
+                // ANNOUNCED CHANGE, addressed by the hash the command already
+                // names, not the doc's whole history. `get_changes_since(.., &[])`
+                // is every change since genesis: on a doc with real history it
+                // overflows the bound on every local edit (so the eager path
+                // silently degrades to pull-on-announce, +1 RTT) after burning a
+                // full-doc serialization to find that out. One change is a
+                // roughly constant, tiny payload however mature the doc is.
+                //
+                // `None` (change evicted/compacted, or a read error) degrades to
+                // the metadata-only doorbell and the receiver pulls; the 60s round
+                // backstops both.
                 let change_data = match self
                     .sync_manager
-                    .get_changes_since(namespace, &doc_id, &[])
+                    .get_change_by_hash(namespace, &doc_id, &change_hash)
                     .await
                 {
-                    Ok((changes, _heads)) => sync_round::bounded_announce_payload(changes),
+                    Ok(Some(bytes)) => sync_round::bounded_announce_payload(vec![bytes]),
+                    Ok(None) => {
+                        debug!(doc_id = %doc_id, change_hash = %change_hash, "Announce: doc no longer holds the announced change, sending doorbell only");
+                        None
+                    }
                     Err(e) => {
                         debug!(doc_id = %doc_id, error = %e, "Announce: could not load change bytes, sending doorbell only");
                         None
@@ -7577,7 +7587,7 @@ impl P2PNode {
             SyncRequest::AnnounceChange {
                 h_app_id,
                 doc_id,
-                change_hash: _,
+                change_hash,
                 change_data,
             } => {
                 debug!(h_app_id = %h_app_id, doc_id = %doc_id, "Handling AnnounceChange request");
@@ -7605,6 +7615,32 @@ impl P2PNode {
                         .await
                     {
                         Ok(_) => {
+                            // DID IT LAND? A single change whose dependencies we
+                            // lack is QUEUED by Automerge, not applied — the doc
+                            // is untouched and `apply_changes` still returns Ok.
+                            // That is the first-contact case (we hold no history
+                            // for this doc), and treating it as converged is how
+                            // an eager push turns into silent data loss. Ask the
+                            // doc whether it now holds the announced change; if
+                            // not, fall back to the pull, which carries the deps.
+                            let landed = self
+                                .sync_manager
+                                .get_change_by_hash(&h_app_id, &doc_id, &change_hash)
+                                .await
+                                .unwrap_or(None)
+                                .is_some();
+                            if !landed {
+                                debug!(
+                                    peer = %peer, h_app_id = %h_app_id, doc_id = %doc_id,
+                                    "Announced change is missing its dependencies here — pulling the doc instead"
+                                );
+                                self.pull_announced_doc(peer, &h_app_id, &doc_id).await;
+                                return SyncResponse::ChangeAck {
+                                    h_app_id,
+                                    doc_id,
+                                    was_new: false,
+                                };
+                            }
                             info!(h_app_id = %h_app_id, doc_id = %doc_id, "Applied announced change");
                             // CRDT-heal: reverse-project a converged content doc into
                             // the local SQL row (amber tier). Before moving the strings
