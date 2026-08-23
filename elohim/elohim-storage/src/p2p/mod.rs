@@ -1275,6 +1275,15 @@ pub enum P2PCommand {
     /// as a libp2p request-response message. The next periodic snapshot from
     /// the source peer will close the gap naturally in the interim.
     SnapshotRequest { peer_id: libp2p::PeerId },
+    /// Transport-neutral inventory work queued by either gossip receive plane.
+    /// The event loop drains this bounded command channel and invokes the one
+    /// commitment scorer / libp2p byte-fetch path. The iroh receive task never
+    /// dials bytes itself.
+    InventoryAdvertisement {
+        source_peer_id: String,
+        hints: Vec<crate::p2p::inventory_gossip::BlobHint>,
+        hashes: Vec<String>,
+    },
     /// T17: fetch a blob from a specific peer. Used by the race-fetch helper
     /// (`p2p::blob_fetch::race_fetch`) for GET-time fallback and custody-driven kicks.
     ///
@@ -1531,6 +1540,7 @@ impl P2PHandle {
                         let _ = reply.send(None);
                     }
                     P2PCommand::SnapshotRequest { .. } => {} // T14 Stage-1 placeholder
+                    P2PCommand::InventoryAdvertisement { .. } => {} // fire-and-forget
                     P2PCommand::FetchBlob { reply, .. } => {
                         // T17 Stage-1 stub: no swarm in test.
                         let _ =
@@ -4633,6 +4643,33 @@ impl P2PNode {
                     peer_id = %peer_id,
                     "SnapshotRequest queued; Stage 1 placeholder — relying on next periodic snapshot"
                 );
+            }
+            P2PCommand::InventoryAdvertisement {
+                source_peer_id,
+                hints,
+                hashes,
+            } => {
+                let Some(pool) = self.db_pool.as_ref() else {
+                    warn!(
+                        target: "elohim_storage::inventory",
+                        peer_id = %source_peer_id,
+                        count = hashes.len(),
+                        "Queued inventory fetch work dropped: content DB unavailable"
+                    );
+                    return;
+                };
+                match pool.get() {
+                    Ok(mut conn) => {
+                        self.score_and_enqueue_snapshot(&mut conn, &source_peer_id, &hints, &hashes)
+                    }
+                    Err(error) => warn!(
+                        target: "elohim_storage::inventory",
+                        peer_id = %source_peer_id,
+                        count = hashes.len(),
+                        error = %error,
+                        "Queued inventory fetch work dropped: DB pool exhausted"
+                    ),
+                }
             }
             // T21: Stage-2 wiring — issue a real `/elohim/blob/1.0.0` request to
             // the explicit peer_id and stash the reply oneshot in
@@ -9607,25 +9644,37 @@ mod reach_gate_tests {
 
 // ---------------------------------------------------------------------------
 // InventoryFetch — libp2p-command-path inventory hook for the transport-neutral
-// gossip dispatch. Keeps the commitment-driven active fetch + delta-gap
-// snapshot-request byte-identical to the pre-refactor inline behavior while
-// letting the iroh receive loop pass `None` (documented Dual-mode asymmetry).
+// gossip dispatch. Both receive planes enter the same bounded command queue;
+// the event loop remains the sole owner of scoring and byte-fetch scheduling.
 // ---------------------------------------------------------------------------
 impl crate::p2p::gossip_dispatch::InventoryFetch for P2PNode {
     fn score_and_enqueue(
         &self,
-        conn: &mut diesel::SqliteConnection,
+        _conn: &mut diesel::SqliteConnection,
         source_peer_id: &str,
         hints: &[crate::p2p::inventory_gossip::BlobHint],
         hashes: &[String],
     ) {
-        self.score_and_enqueue_snapshot(conn, source_peer_id, hints, hashes);
+        let work = P2PCommand::InventoryAdvertisement {
+            source_peer_id: source_peer_id.to_string(),
+            hints: hints.to_vec(),
+            hashes: hashes.to_vec(),
+        };
+        if let Err(error) = self.command_tx.try_send(work) {
+            warn!(
+                target: "elohim_storage::inventory",
+                peer_id = %source_peer_id,
+                count = hashes.len(),
+                error = ?error,
+                "libp2p inventory fetch work could not enter the bounded command queue"
+            );
+        }
     }
 
     fn request_snapshot_for_gap(&self, peer_id: &str) {
         // Best-effort: parse the peer_id string into a libp2p::PeerId and send
-        // the snapshot-request command. An iroh NodeId will not parse (iroh
-        // never calls this — `inventory_fetch` is `None` on that plane).
+        // the snapshot-request command. A pure iroh NodeId will not parse;
+        // the bridge logs that explicit unsupported case.
         if let Ok(pid) = peer_id.parse::<libp2p::PeerId>() {
             let _ = self
                 .command_tx

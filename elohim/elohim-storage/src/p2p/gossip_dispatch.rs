@@ -11,7 +11,8 @@
 //!   node itself as the [`InventoryFetch`] hook, then calls [`handle_gossip`];
 //! - the **iroh** receive loop (`crate::p2p_iroh::gossip_receive`) subscribes
 //!   to the inbound topics, keeps the `GossipReceiver`, and calls the same
-//!   [`handle_gossip`] with `inventory_fetch = None`.
+//!   [`handle_gossip`] with an inventory hook that queues into the libp2p
+//!   event loop in dual mode.
 //!
 //! ## Dedup is cross-plane
 //!
@@ -20,15 +21,17 @@
 //! node's `Arc<DedupLru>`), so a revocation/announce arriving on both planes is
 //! processed once.
 //!
-//! ## Known Dual-mode asymmetry — inventory active-fetch
+//! ## Inventory active-fetch
 //!
 //! Inventory DB projection (the "did this peer's inventory land" consumer
 //! signal — `peer_blob_inventory`) is transport-neutral and runs on both
 //! planes. The commitment-driven active blob-FETCH and the delta-gap
 //! snapshot-request are libp2p-command-path operations, exposed here via the
-//! optional [`InventoryFetch`] hook. libp2p passes `Some(self)` (byte-identical
-//! behavior); the iroh receive loop passes `None`. Byte replication over iroh
-//! uses the iroh-blobs plane, not this command path — see
+//! optional [`InventoryFetch`] hook. Both receive planes enqueue the same
+//! [`crate::p2p::P2PCommand::InventoryAdvertisement`] work in dual mode; the
+//! event loop owns scoring and the existing libp2p byte-fetch race. Pure iroh
+//! mode has no byte-fetch consumer yet, so its bridge records and logs that
+//! explicit absence. Byte replication over iroh remains Lane T2 — see
 //! `project_inventory_exchange_not_byte_replication`.
 
 use tracing::{debug, info, warn};
@@ -61,9 +64,8 @@ impl std::fmt::Display for GossipSource {
     }
 }
 
-/// libp2p-command-path inventory operations, injected as an optional hook so
-/// the transport-neutral dispatch stays free of libp2p types. `None` on the
-/// iroh plane (documented Dual-mode asymmetry — see module docs).
+/// Inventory operations injected as a hook so transport-neutral dispatch stays
+/// free of a concrete event loop. Both planes queue the same work in dual mode.
 pub trait InventoryFetch {
     /// Score advertised blobs against active `replicates-dwelling` commitments
     /// and enqueue HIGH-priority fetches (libp2p blob-fetch machinery).
@@ -104,8 +106,7 @@ pub struct GossipDispatchCtx<'a> {
     pub agent_info_inbound_tx: Option<
         &'a tokio::sync::mpsc::Sender<crate::p2p::conductor_agent_info_gossip::ConductorAgentInfo>,
     >,
-    /// libp2p-command-path inventory hook. `Some` on the libp2p plane,
-    /// `None` on the iroh plane.
+    /// Inventory hook. `Some` on both receive planes when they are active.
     pub inventory_fetch: Option<&'a dyn InventoryFetch>,
     /// Verified transport-manifest announcements land here (the iroh peer
     /// book). `None` when this build has no iroh plane.
@@ -344,7 +345,7 @@ fn handle_revocation_message(
 
 /// Inventory snapshot/delta projection into `peer_blob_inventory`. The
 /// commitment-driven active fetch + delta-gap snapshot-request run only when
-/// `ctx.inventory_fetch` is `Some` (libp2p plane; see module docs).
+/// `ctx.inventory_fetch` is `Some` (both active receive planes; see module docs).
 fn handle_inventory(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSource) {
     use crate::p2p::inventory_gossip::{BlobInventoryDelta, BlobInventorySnapshot};
 

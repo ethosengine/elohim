@@ -57,7 +57,8 @@ doorway-failover 10/10.
 **What is still libp2p-only (do not claim otherwise in any doc):**
 - Blob heal-on-read (`race_fetch_with_swarm`) and custody push (`transport_resolve.rs:47-67`
   extracts only the libp2p id; `IrohNode::fetch_blob_from` has zero production callers).
-- The reactive inventory fetch on the iroh receive path (`inventory_fetch: None`).
+- Inventory learned over either receive plane now enters the same bounded scorer queue (T4), but
+  the queue's byte fetch remains libp2p-only until T2 lands.
 - **Pure `iroh` mode has zero peers**: the manifest rides libp2p gossipsub first, so a node with
   no libp2p leg never receives one. `dual` is proven; `iroh` alone is not bootable yet.
 
@@ -99,11 +100,11 @@ with your agent name; do not start a cut whose write-set overlaps one already `w
 
 | # | cut | tier | write-set | proof |
 |---|---|---|---|---|
-| T4 | **`inventory_fetch` on the iroh receive path** — row `iroh-receive-path-inventory-fetch` (unblocked now: `gossip_receive.rs` edit landed). Supply a real `InventoryFetch` impl for `IrohReceiveDeps` that enqueues the same gaps into the shared replication queue; no iroh dial for bytes here | Codex | `src/p2p_iroh/gossip_receive.rs`, a new `src/p2p_iroh/inventory_fetch.rs`, one test | inventory snapshot received over iroh leaves the same queued gaps as over libp2p (parity test) |
+| T4 | **DONE 2026-08-23 — `inventory_fetch` on the iroh receive path.** Both receive planes enqueue the same `InventoryAdvertisement`; pure iroh records/logs the absent byte consumer; no iroh byte dial was added | Codex | `src/p2p_iroh/{gossip_receive,inventory_fetch}.rs`, `src/p2p/{gossip_dispatch,mod}.rs`, `src/main.rs`, one test | `iroh_inventory_fetch_parity` 2/2; full `just test-iroh`, feature clippy, dual-stack build, and storage gate green. This is the lower-layer inventory preflight beside T5's live CRDT matrix, not a claim that the matrix stimulates inventory |
 | T2 | **iroh blob fetch in heal-on-read** — `race_fetch_with_swarm` candidates carry iroh NodeIds (book lookup by `libp2p_peer_id`/`agent_cid`); race both planes in `dual`; produce `elohim_iroh_blob_fetches_total` | Opus | `src/p2p/blob_swarm.rs`, `src/p2p/blob_fetch.rs`, `src/p2p_iroh/node.rs` (fetch wrapper) | heal-on-read 2/2 still green AND `elohim_iroh_blob_fetches_total{ok}` ≥ 1 on the mesh after a SIGSTOP of the libp2p-preferred holder |
 | T3 | **custody push over iroh** — `transport_resolve` returns the iroh id when the book has it; `push_shard` via `IrohShardClient` | Opus | `src/services/transport_resolve.rs`, `src/p2p/blob_swarm.rs` (push leg) | custody-announce rows appear with the push carried on iroh (log + a counter you add) |
 | T0′ | **pure-iroh bootstrap** — a node with no libp2p leg must still obtain a manifest set: doorway `GET /p2p/manifests` (signed announcements it has seen) and/or the pkarr station (Lane A5) | Opus | doorway `routes/`, `src/p2p_iroh/announcer.rs` (seed from resolver) | `ELOHIM_TRANSPORT_BACKEND=iroh` mesh reaches `peers_known=2` |
-| T5 | **per-mode CI** — the mesh stage runs `libp2p` and `dual`; `@transport:` tag reported per mode; `cargo test --test sync_iroh_convergence` beside the libp2p check in `dataplane-convergence` | Sonnet | `genesis/a2o/**` (coordinate with the in-flight `transport-comparison-matrix` work — uncommitted on the branch as of this row), CI scripts | both modes stamped in the sprint report |
+| T5 | **per-mode CI** — the mesh stage runs `libp2p` and `dual`; `@transport:` tag reported per mode; `cargo test --test sync_iroh_convergence` beside the libp2p check in `dataplane-convergence` | Sonnet | `genesis/a2o/**` (coordinate with the transport-comparison-matrix work), CI scripts | all modes are stamped in the sprint report; retain T4's `iroh_inventory_fetch_parity` as the local inventory preflight because the live matrix measures Automerge sync, not inventory-triggered fetch. First live run `20260823T185926Z-b93bcb9d` is red in all modes |
 | T7 | **book eviction policy** — drop a peer after N consecutive `request_failed`, re-admit on next verified manifest; `remove()` exists, nothing calls it | Codex | `src/p2p_iroh/sync_driver.rs`, `src/p2p_iroh/peer_book.rs` (a failure counter) | unit test: N failures → removed; fresh manifest → back |
 | T8 | **blind-reader pass** on `transport-dual-plane.feature` (owed per `genesis/a2o/.epr-meta` rule `a2o-story-blind-reader-review`; the feature was committed without it) | any | the feature file only | verdict READY or named deferrals |
 

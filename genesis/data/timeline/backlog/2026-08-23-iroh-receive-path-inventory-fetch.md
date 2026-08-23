@@ -7,7 +7,8 @@ title: "iroh gossip receive path: wire the reactive inventory_fetch so an invent
 slug: "iroh-receive-path-inventory-fetch"
 written: "2026-08-23"
 author: "fable-5 session 2026-08-23 (roadmap Lane T4; dual-plane grounding)"
-status: "refined"
+status: "done"
+claimedBy: "codex/root"
 priority: "medium"
 area: "dataplane/transport"
 domain: "protocol"
@@ -48,3 +49,23 @@ the libp2p leg; in `iroh` mode it is a silent convergence gap.
 ## Disjointness
 `p2p_iroh/gossip_receive.rs`, `gossip_dispatch.rs` (signature only), one test file. Do not touch
 `http.rs`, `sharding.rs`, `p2p/blob_fetch.rs`, `p2p/blob_swarm.rs` (Lane 0 / T2 write-sets).
+
+## Completion (2026-08-23)
+
+Both gossip receive planes now enqueue an identical `InventoryAdvertisement` command into the
+bounded P2P command queue. The event loop remains the sole owner of commitment scoring and the
+existing libp2p byte-fetch race; the iroh receive task does not dial blob bytes. In pure-iroh mode,
+where that consumer does not yet exist, the bridge records the unavailable outcome and warns
+instead of silently discarding learned inventory. The implementation needed narrow additions to
+`p2p/mod.rs` and `main.rs` because the previously described "shared replication queue" did not
+exist as a passive seam: scoring and fetch spawning still happened inline in the libp2p receive
+arm.
+
+Local evidence: `iroh_inventory_fetch_parity` 2/2; the complete `just test-iroh` recipe green
+(`IROH_EXIT=0`, 3,092 library tests plus every serialized `iroh_*` integration binary);
+feature-enabled `cargo clippy --features "p2p p2p-iroh" --all-targets -- -D warnings` green;
+dual-stack build `BUILD_EXIT=0`; and `just gate elohim-storage` green with `GATE_EXIT=0`. The
+concurrent transport matrix's first live run (`20260823T185926Z-b93bcb9d`) is complementary
+CRDT-sync evidence and is red across all three modes. It does not stimulate inventory gossip, so
+this parity test is its lower-layer inventory preflight, not a cure or counterclaim for those live
+convergence failures. This session did not restart the shared mesh.

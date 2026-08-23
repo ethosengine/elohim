@@ -22,8 +22,9 @@
 //! announce topics (`elohim/<pillar>/<reach>...`) are dynamic and NOT
 //! subscribed over iroh (they are dedup+log-only on the libp2p plane and
 //! Phase-3-deferred for projection) — a documented Dual-mode asymmetry.
-//! `inventory_fetch` is always `None` here: the commitment-driven active blob
-//! fetch is a libp2p-command-path operation (see `gossip_dispatch` module docs).
+//! Inventory work crosses into the same bounded command queue as libp2p via
+//! [`crate::p2p_iroh::inventory_fetch::IrohInventoryFetch`]. The receive task
+//! never dials blob bytes itself.
 
 use std::sync::Arc;
 
@@ -34,6 +35,7 @@ use crate::p2p::conductor_agent_info_gossip::ConductorAgentInfo;
 use crate::p2p::dedup::DedupLru;
 use crate::p2p::gossip_dispatch::{handle_gossip, GossipDispatchCtx, GossipSource};
 use crate::p2p_iroh::gossip::{GossipEvent, IrohGossip};
+use crate::p2p_iroh::inventory_fetch::IrohInventoryFetch;
 use crate::p2p_iroh::peer_book::IrohPeerBook;
 use iroh::{Endpoint, NodeId};
 use std::collections::HashSet;
@@ -65,6 +67,7 @@ pub struct IrohReceiveDeps {
     pub db_pool: Option<crate::db::DbPool>,
     pub dedup: Arc<DedupLru>,
     pub agent_info_tx: Option<tokio::sync::mpsc::Sender<ConductorAgentInfo>>,
+    pub inventory_fetch: IrohInventoryFetch,
 }
 
 /// Spawn one receive task per inbound topic. Each task subscribes to its topic
@@ -168,9 +171,7 @@ async fn run_topic_receive(deps: IrohReceiveDeps, topic: &'static str) {
                             db_pool: deps.db_pool.as_ref(),
                             dedup: &deps.dedup,
                             agent_info_inbound_tx: deps.agent_info_tx.as_ref(),
-                            // Always None on the iroh plane — active fetch is
-                            // libp2p-command-path (documented Dual-mode asymmetry).
-                            inventory_fetch: None,
+                            inventory_fetch: Some(&deps.inventory_fetch),
                             transport_manifest_sink: Some(&deps.book),
                             self_iroh_node_id: Some(self_node_id.as_str()),
                         };

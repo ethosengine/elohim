@@ -3416,6 +3416,9 @@ async fn async_main(
         let book = iroh_peer_book
             .clone()
             .expect("iroh node exists => peer book exists");
+        let inventory_fetch = elohim_storage::p2p_iroh::IrohInventoryFetch::new(
+            p2p_node.as_ref().map(|node| node.handle().command_sender()),
+        );
         elohim_storage::p2p_iroh::spawn_iroh_gossip_receive(
             elohim_storage::p2p_iroh::IrohReceiveDeps {
                 gossip: iroh_n.gossip().clone(),
@@ -3424,6 +3427,7 @@ async fn async_main(
                 db_pool: receive_pool.clone(),
                 dedup,
                 agent_info_tx,
+                inventory_fetch,
             },
         );
 
