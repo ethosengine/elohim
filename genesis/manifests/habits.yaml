@@ -60,7 +60,7 @@
 # read as visibly weaker rather than equivalent. First subject: measure-honesty-local.
 
 version: 1
-updated: 2026-08-18
+updated: 2026-08-23
 vision: >
   A p2p backplane for a socially resilient, reach-gated substrate — a human-scale,
   capture-resistant foundation for communication that can scale to global
@@ -263,6 +263,26 @@ habits:
     checks:
       - "a2o @concern:blob-durability — 8 scenarios across genesis/a2o/features/resilience/ (governed-distribution, salvage-placement, chaos-peer-churn, grandma-photos-survive-node-loss, app-blob-heal-on-read, observable-distribution, resilience-dimensions, household-diversity-dataplane)"
     evidence: >
+      DELTA 2026-08-23b (observed RED is real, status stays green pending the
+      fleet lane): ANY blob over RS_THRESHOLD (64 MiB) panicked `PUT /blob` on
+      every storage peer (http.rs:2617 — the rs-4-7 manifest was hand-sliced as
+      raw chunks; index 4 starts past the body), so the RS band had never worked
+      through ingest and every >64 MiB artifact was silently undurable (client
+      saw a dropped connection after 100 Continue; blob 404 everywhere). Found
+      when the landing SSR bundle (71,763,974 B) crossed the line. CURED
+      8854f6de5: shards from ShardEncoder::create_shards; hash/count mismatch is
+      a hard 500 with nothing stored; reassembly reconstructs through parity
+      (serves with up to 3 of 7 shards missing); blob_available_locally agrees.
+      4 red-first integration tests (tests/rs_blob_erasure_coded_put.rs) +
+      sharding unit test; gate green. Live: 201 on matthew/jessica/james,
+      byte-identical GET. New story "An artifact over the erasure-coding
+      threshold is accepted whole and served whole" (app-blob-heal-on-read.feature,
+      @requires:owned-substrate) — household lane 20260823T150653Z: PASS.
+      Seams named: ShardAssignment carries no data-vs-parity marker (placement
+      cannot keep the 4 data shards diverse on purpose); RS ingest peaks ~4x the
+      body in memory on an unbounded HTTP route. Remaining reds in this concern:
+      chaos-peer-churn 3 (custody precondition; backlog
+      seed-custody-coverage-for-drill-content, Codex-claimable).
       DELTA 2026-08-23a (AGENT SPRINT on the 37 failed + 35 pending, household lane,
       closing run 20260823T000551Z-32aff87a): 186 passed / 25 failed / 4 pending /
       29 skipped in 30m06s (this morning 164 / 42 / 35 / 23); saga 22/22 in 46 s
@@ -868,6 +888,54 @@ habits:
     checks:
       - "a2o @concern:doorway-failover (genesis/a2o/features/dataplane/doorway-failover.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
     evidence: >
+      DELTA 2026-08-23b (continuity session — selection-time blob failover + RS
+      ingest + roadmap; household lane closing run 20260823T150653Z-3a77a458):
+      189 passed / 25 failed / 4 pending / 28 skipped in 31m15s, from 186 / 25 /
+      4 / 29 this morning. @concern:doorway-failover 10/10 incl. the NEW story
+      "A blob rides through its primary's bad hour" (SIGSTOP the primary, trip
+      the breaker with a burst, Range-read past the pantry, bytes arrive from a
+      sibling; doorway_blob_target_failover_total 0->2 live). CURE: select_route
+      (server/http.rs:115) walks the declared priority order for /blob/ paths and
+      takes the first endpoint whose breaker would_shed()==false; all-shedding
+      falls back to the declared primary; non-blob routes keep matches.first()
+      (projections never float). 6 red-first unit tests; seam-registry row C7.
+      Gate green under rustc 1.98 after clearing result_large_err x3 +
+      items_after_test_module (toolchain drift, untouched files). TWO DEFECTS THE
+      PROOF SURFACED, both fixture-side and both cured: (1) the landing SSR
+      bundle (71,763,974 B, now carrying source maps) crossed RS_THRESHOLD and
+      PUT /blob panicked storage at http.rs:2617 (rs-4-7 manifest hand-sliced as
+      raw chunks; the RS band NEVER worked through PUT) — cured 8854f6de5:
+      shards come from create_shards, hash/count mismatch is a hard 500 with
+      nothing stored, reads reconstruct through parity (>=4 of 7), 4 red-first
+      integration tests; live: 201 on all three peers, byte-identical GET; a2o
+      ">64 MiB artifact accepted whole, served whole" added to blob-durability.
+      (2) hc-mesh.sh since 123cea498 severed DOORWAY_ID/DOORWAY_HEALTH_PORT from
+      doorway A's launch (a comment block ended the continued assignment list)
+      — A booted with a random doorway_id, matched ZERO project-epr rows, / 503
+      and /lamad 404; the 14:30Z lane showed it as 13 cascading reds (38 failed);
+      cured 3a77a458b with a rail comment. Also: seed-forward budget now scales
+      with size (596a1c928); beacon shared lanes repeatable (Codex, 906d7b159);
+      MESH_TRANSPORT_BACKEND knob (Codex, f86dd32d5; three-mode boot proof
+      pending). NAMED RED, lines, not yet cured: (a) routes/health.rs:377-378
+      computes serving.shedding/degrading with any() over ALL upstreams, so an
+      open circuit on a POOL peer (8091, errorStreak 3 after a drill) demotes
+      doorway A to degraded/shedding while its primary is closed — the two
+      cross-doorway-content "alpha degraded" reds and a sibling-classification
+      lie (the invariant says siblings are honestly classifiable); (b) nothing
+      ever trials a pool peer's open circuit (warm-up skips open, select_route
+      skips open, projection fallback fires only on a primary miss) so it stays
+      open until the next boot — needs a periodic guarded half-open probe.
+      Still red, classified: identity join 3 (household-formation 1,
+      conductor-spin 2) · self-healing-flow-control 5 · delivery-diagnostics 3 ·
+      epr-cross-peer 2 · chaos-peer-churn 3 (custody precondition — backlog
+      seed-custody-coverage-for-drill-content) · web2 cache 1 · conductor-visibility 1
+      · content-sync 1 + peer-mesh 1 (caughtUp under load) · stewardship-allocation 1
+      · "same truth" 2 (ch10 stewardingCollectives alpha-A=1 vs elohim.host=2;
+      footprint convergence) — green this morning, red in both runs today;
+      not localized (the storage rows themselves read None on all peers).
+      Status stays RED: flip authority is the fleet lane
+      ([build:edge] [edge:validate-only]). Roadmap:
+      genesis/docs/superpowers/plans/2026-08-23-doorway-federated-continuity-roadmap.md.
       DELTA 2026-08-22 (household lane, run 20260822T170136Z-519d4f6b, sut
       sha256:2c012553c2e79dfb, 3-peer mesh + two local doorways): @concern:doorway-failover
       passed=9 failed=0 — the first MEASURED green for this concern since the cures
