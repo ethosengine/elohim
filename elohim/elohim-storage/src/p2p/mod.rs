@@ -4296,17 +4296,36 @@ impl P2PNode {
                 doc_id,
                 change_hash,
             } => {
-                // The send site the standing red names. `announcements_for_local_change`
+                // The send site the standing red names. The `sync_round` planner
                 // stays the ONLY constructor of these requests — making it return
                 // requests without a caller that sends them would turn the test
                 // green while nothing propagates.
                 let peers: Vec<PeerId> = swarm.connected_peers().cloned().collect();
                 let namespace = crate::sync::projector::PROJECTION_NAMESPACE;
-                let announcements = sync_round::announcements_for_local_change(
+                // The doorbell DELIVERS when the change fits: load the doc's
+                // current change bytes once (the same producer the pull path
+                // answers `SyncChanges` with — `get_changes_since` against empty
+                // heads) and bound them before fanning out. Over the bound, or on
+                // any read error, `None` degrades to the metadata-only doorbell
+                // and the receiver pulls; the 60s round backstops both.
+                let change_data = match self
+                    .sync_manager
+                    .get_changes_since(namespace, &doc_id, &[])
+                    .await
+                {
+                    Ok((changes, _heads)) => sync_round::bounded_announce_payload(changes),
+                    Err(e) => {
+                        debug!(doc_id = %doc_id, error = %e, "Announce: could not load change bytes, sending doorbell only");
+                        None
+                    }
+                };
+                let eager_bytes = change_data.as_ref().map(|d| d.len()).unwrap_or(0);
+                let announcements = sync_round::announcements_for_local_change_with_data(
                     namespace,
                     &doc_id,
                     &change_hash,
                     &peers,
+                    change_data,
                 );
                 if announcements.is_empty() {
                     debug!(doc_id = %doc_id, "Announce: no connected peers, the round remains the propagation path");
@@ -4318,7 +4337,11 @@ impl P2PNode {
                         .send_request(&peer_id, request);
                     crate::metrics::inc_sync_request("announce_change");
                 }
-                debug!(doc_id = %doc_id, change_hash = %change_hash, peers = peers.len(), "Announced local change to connected peers");
+                debug!(
+                    doc_id = %doc_id, change_hash = %change_hash, peers = peers.len(),
+                    eager_bytes = eager_bytes,
+                    "Announced local change to connected peers"
+                );
             }
             P2PCommand::ListPeers { reply } => {
                 let peers: Vec<PeerInfoView> = swarm
@@ -6242,7 +6265,7 @@ impl P2PNode {
                     request, channel, ..
                 } => {
                     debug!(peer = %peer, request = ?request, "Received sync request");
-                    let response = self.handle_sync_request(request).await;
+                    let response = self.handle_sync_request(peer, request).await;
                     let mut swarm = self.swarm.write().await;
                     if let Err(e) = swarm
                         .behaviour_mut()
@@ -7447,8 +7470,12 @@ impl P2PNode {
         }
     }
 
-    /// Handle an incoming sync request
-    async fn handle_sync_request(&self, request: SyncRequest) -> SyncResponse {
+    /// Handle an incoming sync request.
+    ///
+    /// `peer` is the sender: the `AnnounceChange` arm needs to be able to answer
+    /// a metadata-only doorbell by opening a pull BACK to the announcer, which is
+    /// the only way an oversized change propagates eagerly.
+    async fn handle_sync_request(&self, peer: PeerId, request: SyncRequest) -> SyncResponse {
         match request {
             SyncRequest::GetHeads { h_app_id, doc_id } => {
                 debug!(h_app_id = %h_app_id, doc_id = %doc_id, "Handling GetHeads request");
@@ -7554,7 +7581,24 @@ impl P2PNode {
                 change_data,
             } => {
                 debug!(h_app_id = %h_app_id, doc_id = %doc_id, "Handling AnnounceChange request");
-                if let Some(data) = change_data {
+                // An oversized payload is refused WITHOUT applying it (the sender
+                // bounds its own fan-out; a peer that ignores the bound must not
+                // be able to make us allocate past it) and degrades to the same
+                // pull a metadata-only doorbell takes.
+                let data = change_data.filter(|d| {
+                    let ok = d.len() <= sync_round::MAX_ANNOUNCE_PAYLOAD_BYTES;
+                    if !ok {
+                        warn!(
+                            peer = %peer, h_app_id = %h_app_id, doc_id = %doc_id, bytes = d.len(),
+                            bound = sync_round::MAX_ANNOUNCE_PAYLOAD_BYTES,
+                            "Announced change exceeds the payload bound — refusing the push, pulling instead"
+                        );
+                    }
+                    ok
+                });
+                if let Some(data) = data {
+                    // Same apply path as a PULLED change (`SyncResponse::Changes`
+                    // below) — an eager push is never validated less than a pull.
                     match self
                         .sync_manager
                         .apply_changes(&h_app_id, &doc_id, vec![data])
@@ -7580,7 +7624,11 @@ impl P2PNode {
                         }
                     }
                 } else {
-                    // Just an announcement, we'd need to request the change
+                    // A doorbell with no bytes. Ring it for real: open the SAME
+                    // per-doc pull the round uses for a diverged document, at this
+                    // one doc, back at the announcer. Without this the ack was the
+                    // whole story and the change waited for the next 60s round.
+                    self.pull_announced_doc(peer, &h_app_id, &doc_id).await;
                     SyncResponse::ChangeAck {
                         h_app_id,
                         doc_id,
@@ -7891,6 +7939,24 @@ impl P2PNode {
                     }
                 }
             }
+            SyncResponse::ChangeAck {
+                h_app_id,
+                doc_id,
+                was_new,
+            } => {
+                // The doorbell's answer. `was_new: true` means the peer applied
+                // the bytes we pushed — propagation completed in one round-trip
+                // instead of waiting for its next 60s round. `false` means the
+                // peer already had it, or the announce carried no bytes and the
+                // peer is pulling instead; either way nothing is owed here. This
+                // arm exists so an eager push is TYPED-handled rather than
+                // reading as "Unhandled sync response type" in the catch-all,
+                // which is how an inert push path hides.
+                debug!(
+                    peer = %peer, h_app_id = %h_app_id, doc_id = %doc_id, was_new = was_new,
+                    "Announced change acknowledged by peer"
+                );
+            }
             SyncResponse::Error { message } => {
                 warn!(peer = %peer, request_id = ?request_id, error = %message, "Sync error from peer");
             }
@@ -7915,6 +7981,43 @@ impl P2PNode {
                 debug!(peer = %peer, request_id = ?request_id, "Unhandled sync response type");
             }
         }
+    }
+
+    /// Answer a metadata-only `AnnounceChange` by pulling that ONE doc from the
+    /// peer that announced it.
+    ///
+    /// Reuses the round's per-doc request verbatim — `SyncChanges` carrying our
+    /// current heads, exactly the shape `handle_sync_response` sends for a
+    /// diverged document — so the response lands in the existing
+    /// `SyncResponse::Changes` arm (apply + `heal_content_row`) with no new
+    /// protocol message and no second apply path.
+    ///
+    /// Bounded and lossy, deliberately: one request, no retry, no queue. If the
+    /// peer is gone or the request fails, the 60s round is still the backstop.
+    async fn pull_announced_doc(&self, peer: PeerId, h_app_id: &str, doc_id: &str) {
+        let have_heads = self
+            .sync_manager
+            .get_heads(h_app_id, doc_id)
+            .await
+            .unwrap_or_default();
+        let request = SyncRequest::SyncChanges {
+            h_app_id: h_app_id.to_string(),
+            doc_id: doc_id.to_string(),
+            have_heads,
+            bloom_filter: None,
+        };
+        let req_id = {
+            let mut swarm = self.swarm.write().await;
+            swarm
+                .behaviour_mut()
+                .sync_protocol
+                .send_request(&peer, request)
+        };
+        crate::metrics::inc_sync_request("sync_changes");
+        debug!(
+            peer = %peer, h_app_id = %h_app_id, doc_id = %doc_id, request_id = ?req_id,
+            "Announced change carried no bytes — pulling the doc from the announcer"
+        );
     }
 
     /// Production CRDT-heal leg: after a content-sync doc converges into our

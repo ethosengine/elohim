@@ -58,6 +58,12 @@ enum Command {
     /// legal construction site) to every connected peer, mirroring
     /// `P2PNode::initiate_sync_round`, p2p/mod.rs:6982.
     InitiateSync,
+    /// Ring the doorbell for a locally-authored change, mirroring the
+    /// `P2PCommand::AnnounceLocalChange` arm in p2p/mod.rs: load the doc's change
+    /// bytes, bound them with `sync_round::bounded_announce_payload`, and fan out
+    /// through `sync_round::announcements_for_local_change_with_data` (the sole
+    /// legal construction site for announce requests).
+    AnnounceLocalChange(String),
 }
 
 struct TestSyncNode {
@@ -186,6 +192,35 @@ impl TestSyncNode {
     async fn initiate_sync(&self) {
         let _ = self.cmd_tx.send(Command::InitiateSync).await;
     }
+
+    /// Announce a locally-authored change to every connected peer. Deliberately
+    /// NOT paired with `initiate_sync`: the announce tests assert that the
+    /// doorbell alone propagates, with the 60s round never driven.
+    async fn announce(&self, doc_id: &str) {
+        let _ = self
+            .cmd_tx
+            .send(Command::AnnounceLocalChange(doc_id.to_string()))
+            .await;
+    }
+
+    /// Poll this node's DocStore until `doc_id` has non-empty heads, or the
+    /// timeout expires. Returns how long convergence took.
+    async fn wait_for_doc(&self, doc_id: &str, timeout: Duration) -> Option<Duration> {
+        let start = tokio::time::Instant::now();
+        while start.elapsed() < timeout {
+            if self
+                .sync
+                .get_heads(SYNC_NS, doc_id)
+                .await
+                .map(|h| !h.is_empty())
+                .unwrap_or(false)
+            {
+                return Some(start.elapsed());
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        None
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -241,6 +276,28 @@ async fn run_driver(
                             .send_request(&peer, req.clone());
                     }
                 }
+                Command::AnnounceLocalChange(doc_id) => {
+                    let peers: Vec<PeerId> = swarm.connected_peers().cloned().collect();
+                    if peers.is_empty() {
+                        continue;
+                    }
+                    // Same two production calls the command arm makes: the doc's
+                    // current change bytes, bounded, into the sole planner.
+                    let change_data = match sync.get_changes_since(SYNC_NS, &doc_id, &[]).await {
+                        Ok((changes, _heads)) => sync_round::bounded_announce_payload(changes),
+                        Err(_) => None,
+                    };
+                    let announcements = sync_round::announcements_for_local_change_with_data(
+                        SYNC_NS,
+                        &doc_id,
+                        "test-change-hash",
+                        &peers,
+                        change_data,
+                    );
+                    for (peer, req) in announcements {
+                        swarm.behaviour_mut().sync_protocol.send_request(&peer, req);
+                    }
+                }
             },
 
             event = swarm.next() => {
@@ -272,7 +329,7 @@ async fn handle_sync_rr(
             request_response::Message::Request {
                 request, channel, ..
             } => {
-                let response = handle_request(sync, request).await;
+                let response = handle_request(swarm, sync, peer, request).await;
                 let _ = swarm
                     .behaviour_mut()
                     .sync_protocol
@@ -288,8 +345,52 @@ async fn handle_sync_rr(
 /// Mirrors `P2PNode::handle_sync_request` (p2p/mod.rs:6303) for the two variants
 /// the round uses; reuses the public `SyncManager` methods the production handler
 /// calls.
-async fn handle_request(sync: &SyncManager, request: SyncRequest) -> SyncResponse {
+async fn handle_request(
+    swarm: &mut libp2p::Swarm<SyncBehaviour>,
+    sync: &SyncManager,
+    peer: PeerId,
+    request: SyncRequest,
+) -> SyncResponse {
     match request {
+        // Mirrors P2PNode's AnnounceChange arm: bytes within the bound are
+        // applied through the SAME `apply_changes` a pulled change takes; an
+        // oversized or absent payload opens a `SyncChanges` pull back at the
+        // announcer (`P2PNode::pull_announced_doc`).
+        SyncRequest::AnnounceChange {
+            h_app_id,
+            doc_id,
+            change_data,
+            ..
+        } => {
+            let data = change_data.filter(|d| d.len() <= sync_round::MAX_ANNOUNCE_PAYLOAD_BYTES);
+            match data {
+                Some(data) => match sync.apply_changes(&h_app_id, &doc_id, vec![data]).await {
+                    Ok(_) => SyncResponse::ChangeAck {
+                        h_app_id,
+                        doc_id,
+                        was_new: true,
+                    },
+                    Err(e) => SyncResponse::Error {
+                        message: format!("apply_changes: {e}"),
+                    },
+                },
+                None => {
+                    let have_heads = sync.get_heads(&h_app_id, &doc_id).await.unwrap_or_default();
+                    let req = SyncRequest::SyncChanges {
+                        h_app_id: h_app_id.clone(),
+                        doc_id: doc_id.clone(),
+                        have_heads,
+                        bloom_filter: None,
+                    };
+                    swarm.behaviour_mut().sync_protocol.send_request(&peer, req);
+                    SyncResponse::ChangeAck {
+                        h_app_id,
+                        doc_id,
+                        was_new: false,
+                    }
+                }
+            }
+        }
         SyncRequest::ListDocuments {
             h_app_id,
             prefix,
@@ -729,4 +830,141 @@ async fn converges_and_serves_zero_notary() {
         row.dht_anchor_hash.is_none(),
         "heal must never notarize (zero notary)"
     );
+}
+
+/// Dial B→A and wait for the connection, WITHOUT driving a sync round. The
+/// announce tests must prove the doorbell propagates on its own — if the round
+/// runs, convergence proves nothing about the push path.
+async fn connect_only(node_a: &TestSyncNode, node_b: &TestSyncNode) {
+    node_b.dial(node_a.listen_addr()).await.expect("B dials A");
+    assert!(
+        node_b
+            .wait_for_connection(&node_a.peer_id(), Duration::from_secs(10))
+            .await,
+        "node B never connected to node A"
+    );
+    // BOTH directions: the announce fans out to A's `connected_peers()`, and A
+    // registers the inbound connection slightly after B registers the outbound
+    // one. Announcing on B's view alone races that gap — a single un-retried
+    // doorbell fired into an empty peer set is simply lost (bounded and lossy by
+    // design), and the test would fail for a reason that is not the cure.
+    assert!(
+        node_a
+            .wait_for_connection(&node_b.peer_id(), Duration::from_secs(10))
+            .await,
+        "node A never registered the inbound connection from B"
+    );
+}
+
+/// The doorbell DELIVERS — a small locally-authored change reaches a connected
+/// peer on the announce alone, with no sync round anywhere in the test.
+///
+/// RED before the cure: `announcements_for_local_change` sent `change_data: None`
+/// and the receiver answered a bare `ChangeAck`, so nothing moved until the next
+/// 60s round (measured cross-peer arrival on the live 3-peer mesh: ~24s). Node B
+/// here never calls `initiate_sync`, so a pass means the push path carried it.
+#[tokio::test]
+async fn announce_carries_the_change_to_a_connected_peer() {
+    let node_a = TestSyncNode::spawn("a").await;
+    let node_b = TestSyncNode::spawn("b").await;
+
+    connect_only(&node_a, &node_b).await;
+
+    let content = sample_content("edit-prop-1", "Announced v1");
+    project_content_doc(&node_a.sync, &content)
+        .await
+        .expect("project content doc on A");
+    assert!(
+        node_b
+            .sync
+            .get_heads(SYNC_NS, DOC_ID)
+            .await
+            .unwrap()
+            .is_empty(),
+        "node B must NOT hold the doc before the announce"
+    );
+
+    // The payload must actually ride the wire — a doorbell here would make the
+    // test pass only via the receiver's pull, which the next test covers.
+    let (changes, _) = node_a
+        .sync
+        .get_changes_since(SYNC_NS, DOC_ID, &[])
+        .await
+        .unwrap();
+    assert!(
+        sync_round::bounded_announce_payload(changes).is_some(),
+        "a projected content doc must fit the announce bound"
+    );
+
+    node_a.announce(DOC_ID).await;
+
+    let elapsed = node_b
+        .wait_for_doc(DOC_ID, Duration::from_secs(10))
+        .await
+        .expect("node B did not converge on the announce alone within 10s — the doorbell is inert");
+    assert!(
+        elapsed < Duration::from_secs(10),
+        "announce propagation must be prompt, took {elapsed:?}"
+    );
+
+    let title = node_b
+        .sync
+        .get_doc_field(SYNC_NS, DOC_ID, "title")
+        .await
+        .unwrap();
+    assert_eq!(title, "Announced v1", "the pushed value must be A's");
+    let heads_a = node_a.sync.get_heads(SYNC_NS, DOC_ID).await.unwrap();
+    let heads_b = node_b.sync.get_heads(SYNC_NS, DOC_ID).await.unwrap();
+    assert_eq!(heads_a, heads_b, "heads must converge between A and B");
+}
+
+/// An OVERSIZED change still propagates eagerly — as a doorbell the receiver
+/// answers with a pull, not as a fan-out of `bytes x peers`.
+///
+/// The bound exists so one large local edit cannot amplify across the mesh; the
+/// pull is what keeps propagation from silently regressing to the 60s round for
+/// exactly the changes that matter most. Node B never calls `initiate_sync`.
+#[tokio::test]
+async fn an_oversized_announce_degrades_to_a_pull_and_still_converges() {
+    const BIG_DOC_ID: &str = "node:big-doc-1";
+
+    let node_a = TestSyncNode::spawn("a").await;
+    let node_b = TestSyncNode::spawn("b").await;
+
+    connect_only(&node_a, &node_b).await;
+
+    let mut content = sample_content("big-doc-1", "Oversized");
+    content.content_body = Some("x".repeat(sync_round::MAX_ANNOUNCE_PAYLOAD_BYTES + 4096));
+    project_content_doc(&node_a.sync, &content)
+        .await
+        .expect("project oversized doc on A");
+
+    // Precondition: this change genuinely exceeds the bound, so the announce
+    // MUST be metadata-only and the receiver's pull is the only eager path.
+    let (changes, _) = node_a
+        .sync
+        .get_changes_since(SYNC_NS, BIG_DOC_ID, &[])
+        .await
+        .unwrap();
+    assert!(
+        sync_round::bounded_announce_payload(changes).is_none(),
+        "the fixture must exceed MAX_ANNOUNCE_PAYLOAD_BYTES for this test to mean anything"
+    );
+
+    node_a.announce(BIG_DOC_ID).await;
+
+    node_b
+        .wait_for_doc(BIG_DOC_ID, Duration::from_secs(15))
+        .await
+        .expect("node B did not converge — a metadata-only announce must trigger a pull");
+
+    let title = node_b
+        .sync
+        .get_doc_field(SYNC_NS, BIG_DOC_ID, "title")
+        .await
+        .unwrap();
+    assert_eq!(title, "Oversized");
+    let heads_a = node_a.sync.get_heads(SYNC_NS, BIG_DOC_ID).await.unwrap();
+    let heads_b = node_b.sync.get_heads(SYNC_NS, BIG_DOC_ID).await.unwrap();
+    assert_eq!(heads_a, heads_b, "heads must converge between A and B");
 }

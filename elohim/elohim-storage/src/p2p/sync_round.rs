@@ -17,8 +17,19 @@
 //!   peer-pair exchanges one hash (`InSync`) instead of the entire document list
 //!   every tick (`p2p/mod.rs`, hardcoded 60s). Divergent peers fall through to
 //!   exactly the previous `ListDocuments` enumeration path.
-//! - [`announcements_for_local_change`] is sent from `p2p/mod.rs:3612` on a local
-//!   change, so the poll is no longer the only propagation path.
+//! - [`announcements_for_local_change_with_data`] is sent from the
+//!   `AnnounceLocalChange` command arm in `p2p/mod.rs` on a local change, so the
+//!   poll is no longer the only propagation path.
+//!
+//! **The doorbell delivers (2026-08-23).** The announce used to be metadata-only
+//! on the send side AND a bare ack on the receive side, so nothing moved until
+//! the next 60s round (measured cross-peer arrival on the live 3-peer mesh:
+//! ~24s, a pull-round profile). Now the announce carries the change bytes when
+//! they fit ([`MAX_ANNOUNCE_PAYLOAD_BYTES`], via [`bounded_announce_payload`]),
+//! and a metadata-only announce makes the RECEIVER open a `SyncChanges` pull for
+//! that one doc. Both arms end in the same `SyncManager::apply_changes` the round
+//! uses. The doorbell stays bounded and lossy by design — no retries, no queues —
+//! and the 60s round remains the reconciliation backstop.
 //!
 //! **Binding requirement for whoever touches this next:** these functions must
 //! stay the ONLY place the round opener and the announce requests are
@@ -160,21 +171,75 @@ pub fn round_opener(h_app_id: &str, local: &LocalCorpusState) -> SyncRequest {
     }
 }
 
-/// The push notifications a locally-authored change owes each connected peer.
+/// The largest change payload an announce will carry inline, per peer.
 ///
-/// One `AnnounceChange` per connected peer, **metadata only** (`change_data:
-/// None`). The receiving peer pulls the bytes through the existing
-/// `SyncChanges`/`GetChanges` path, so a large change is never fanned out N
-/// times across the mesh — the announce is a doorbell, not a delivery.
+/// The doorbell fans out to EVERY connected peer, so the cost of an eager
+/// payload is `bytes x peers` — the bound is what keeps that fan-out from
+/// becoming a mesh-wide amplifier. 64 KiB comfortably covers a projected
+/// content doc (a flat field set plus a body), which is the shape the
+/// content-sync producer authors; anything larger degrades to the
+/// metadata-only doorbell and the receiver pulls the bytes itself through the
+/// existing `SyncChanges`/`Changes` path.
 ///
-/// This is the sole constructor of the announce requests, deliberately: the
-/// planner staying the only constructor is what keeps `tests/sync_scale_honesty`
-/// measuring the wire instead of a test-local mirror.
+/// Wire-visible in one direction only: a receiver never *requires* a payload,
+/// so lowering or raising this bound is compatible in both directions.
+pub const MAX_ANNOUNCE_PAYLOAD_BYTES: usize = 64 * 1024;
+
+/// Decide whether a freshly-encoded change rides the doorbell or stays behind it.
+///
+/// `changes` is exactly what `SyncManager::get_changes_since` produces (0 or 1
+/// blob today). `Some(bytes)` means the announce delivers; `None` means the
+/// announce is metadata-only and the receiver pulls. `None` is ALWAYS safe —
+/// the 60s round and the receive-side pull both still converge — so every
+/// uncertain case (empty, oversized, multi-chunk) resolves to `None`.
+pub fn bounded_announce_payload(changes: Vec<Vec<u8>>) -> Option<Vec<u8>> {
+    let mut it = changes.into_iter();
+    let first = it.next()?;
+    if it.next().is_some() {
+        // Multi-chunk: `change_data` is a single blob and the receiver applies
+        // it with one `load_incremental`. Never guess at concatenation here.
+        return None;
+    }
+    if first.is_empty() || first.len() > MAX_ANNOUNCE_PAYLOAD_BYTES {
+        return None;
+    }
+    Some(first)
+}
+
+/// The push notifications a locally-authored change owes each connected peer,
+/// **metadata only** (`change_data: None`).
+///
+/// The receiving peer pulls the bytes through the existing
+/// `SyncChanges`/`Changes` path. This is the shape an oversized change takes
+/// (see [`MAX_ANNOUNCE_PAYLOAD_BYTES`]), and the shape a caller with no bytes
+/// in hand takes.
 pub fn announcements_for_local_change(
     h_app_id: &str,
     doc_id: &str,
     change_hash: &str,
     peers: &[PeerId],
+) -> Vec<(PeerId, SyncRequest)> {
+    announcements_for_local_change_with_data(h_app_id, doc_id, change_hash, peers, None)
+}
+
+/// The same push notifications, carrying the change bytes when they fit.
+///
+/// `change_data: Some(bytes)` makes the doorbell a delivery: the receiver
+/// applies the bytes through the SAME `SyncManager::apply_changes` path a
+/// pulled change takes (no weaker validation), so a connected peer converges in
+/// one round-trip instead of waiting up to a full 60s round. `None` keeps the
+/// old metadata-only behaviour byte-for-byte, so an oversized change still
+/// propagates — just by pull rather than push.
+///
+/// This is the sole constructor of the announce requests, deliberately: the
+/// planner staying the only constructor is what keeps `tests/sync_scale_honesty`
+/// measuring the wire instead of a test-local mirror.
+pub fn announcements_for_local_change_with_data(
+    h_app_id: &str,
+    doc_id: &str,
+    change_hash: &str,
+    peers: &[PeerId],
+    change_data: Option<Vec<u8>>,
 ) -> Vec<(PeerId, SyncRequest)> {
     peers
         .iter()
@@ -185,7 +250,7 @@ pub fn announcements_for_local_change(
                     h_app_id: h_app_id.to_string(),
                     doc_id: doc_id.to_string(),
                     change_hash: change_hash.to_string(),
-                    change_data: None,
+                    change_data: change_data.clone(),
                 },
             )
         })
@@ -289,6 +354,80 @@ mod tests {
                 OUTBOUND_FAILURE_LABELS.contains(&label),
                 "{label} is not in the declared closed set"
             );
+        }
+    }
+
+    /// The doorbell must DELIVER when the change fits. An announce whose
+    /// `change_data` is `None` for a small change is the inert shape the cure
+    /// removed: the receiver acks it and nothing moves until the next 60s round.
+    #[test]
+    fn a_change_within_the_bound_rides_the_announce() {
+        let change = vec![7u8; 1024];
+        let payload = bounded_announce_payload(vec![change.clone()])
+            .expect("a 1 KiB change is well inside the bound");
+        assert_eq!(payload, change, "the payload must be the change verbatim");
+
+        let peers: Vec<PeerId> = vec![PeerId::random(), PeerId::random()];
+        let announcements = announcements_for_local_change_with_data(
+            "elohim",
+            "node:concept-1",
+            "change-hash-abc",
+            &peers,
+            Some(payload.clone()),
+        );
+        assert_eq!(announcements.len(), peers.len());
+        for (_peer, req) in &announcements {
+            match req {
+                SyncRequest::AnnounceChange { change_data, .. } => assert_eq!(
+                    change_data.as_ref(),
+                    Some(&payload),
+                    "every connected peer must receive the bytes, not just a doorbell"
+                ),
+                other => panic!("expected AnnounceChange, got {other:?}"),
+            }
+        }
+    }
+
+    /// Above the bound the announce degrades to a doorbell — the fan-out cost is
+    /// `bytes x peers`, so an unbounded payload is a mesh-wide amplifier. The
+    /// receiver pulls instead; propagation is preserved, amplification is not.
+    #[test]
+    fn a_change_over_the_bound_stays_a_doorbell() {
+        let too_big = vec![0u8; MAX_ANNOUNCE_PAYLOAD_BYTES + 1];
+        assert!(
+            bounded_announce_payload(vec![too_big]).is_none(),
+            "an oversized change must not be fanned out inline"
+        );
+        // Exactly at the bound is still a delivery (inclusive bound).
+        assert!(
+            bounded_announce_payload(vec![vec![0u8; MAX_ANNOUNCE_PAYLOAD_BYTES]]).is_some(),
+            "the bound is inclusive"
+        );
+    }
+
+    /// Every uncertain input resolves to the doorbell, never to a guess: nothing
+    /// to send, and a multi-chunk change (`change_data` is ONE blob applied with
+    /// one `load_incremental` — concatenation would be a guess about the wire).
+    #[test]
+    fn nothing_and_multi_chunk_resolve_to_the_doorbell() {
+        assert!(bounded_announce_payload(vec![]).is_none());
+        assert!(bounded_announce_payload(vec![vec![]]).is_none());
+        assert!(bounded_announce_payload(vec![vec![1u8; 8], vec![2u8; 8]]).is_none());
+    }
+
+    /// The metadata-only constructor stays byte-identical to the pre-cure wire —
+    /// an old peer that only acks a doorbell still sees exactly what it saw.
+    #[test]
+    fn the_metadata_only_constructor_is_unchanged() {
+        let peers: Vec<PeerId> = vec![PeerId::random()];
+        let announcements =
+            announcements_for_local_change("elohim", "node:concept-1", "change-hash-abc", &peers);
+        assert_eq!(announcements.len(), 1);
+        match &announcements[0].1 {
+            SyncRequest::AnnounceChange { change_data, .. } => {
+                assert!(change_data.is_none(), "the doorbell carries no bytes")
+            }
+            other => panic!("expected AnnounceChange, got {other:?}"),
         }
     }
 }
