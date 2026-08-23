@@ -80,6 +80,30 @@ habits:
       - "a2o @concern:transport-parity (genesis/a2o/features/dataplane/transport-comparison-matrix.feature; just mesh matrix) — identical fresh-document contract under libp2p, iroh, and dual; successful samples alone contribute timing percentiles"
       - ".claude/scripts/latency-scoreboard.py --local (and --deployed) — bounded convergence, not merely eventual: a CONJUNCTION of speed AND this habit's trust invariant, never speed alone. A fast stale head is worse than a slow correct one, so this check can only ever narrow the habit, never carry it."
     evidence: >
+      DELTA 2026-08-23g (doorbell + matrix green x2 of 3; NO status flip —
+      iroh mode still red on the T0' bootstrap boundary): root cause of the
+      2026-08-23e all-red matrix was NOT transport — the eager AnnounceChange
+      doorbell was inert (change_data always None, receiver acked without
+      pulling, sender had no ChangeAck arm; propagation was pull-only on the
+      60 s round). Cured 7d2db0a62 + d4b54537a: announce carries THE announced
+      change by hash (bounded 64 KiB), receiver verifies the change actually
+      landed (Automerge queues dep-missing changes while apply_changes returns
+      Ok — silent-loss trap) and falls back to a one-shot pull; 60 s round
+      stays the reconciliation backstop. Measured live on the 3-peer dual
+      mesh: fresh-write cross-peer convergence 24 s -> <=4 s. Matrix run
+      20260823T211809Z-ad5d8f49 (readiness-gated, split budgets, surfaced
+      poll errors, 9def5623e): libp2p 3/3, dual 3/3 (was 0/1 each), iroh 0/3
+      honest red — pure iroh forms no mesh (manifests bootstrap over libp2p;
+      Lane T0' owns it; remesh log iroh formed=no at 60 s deadline). Pure-iroh
+      /sync/v1 503 cured (29ed60c9c — with_sync_manager was libp2p-gated).
+      Adversarial review caught TWO dual-mode races on the shared
+      Arc<SyncManager> (back-fill x2 aed3bf4b2, projection listener x2
+      ad5d8f496 — the listener race predates this arc and shipped in every
+      dual deploy since Wave-2 E3); both guarded pure-iroh-only. Localdev
+      mesh default flipped to dual (b21bb6975, fleet parity). Full household
+      lane on the cured binaries: 197/18/4/31 vs 189/25/4/28 baseline — ZERO
+      novel reds, 7 cured (incl. the 30 s fresh-write story and both ch10
+      same-truth reds). Saga 11/11. Fleet confirm still owed: [build:edge].
       DELTA 2026-08-23f (local T4; NO status change and no fleet claim): inventory snapshots
       received over iroh and libp2p now enqueue identical work into the bounded shared scorer
       queue; pure iroh records and logs the absent byte consumer. Parity 2/2, full `just test-iroh`
@@ -928,6 +952,23 @@ habits:
     checks:
       - "a2o @concern:doorway-failover (genesis/a2o/features/dataplane/doorway-failover.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
     evidence: >
+      DELTA 2026-08-23h (both NAMED REDS cured; status stays red — flip
+      authority is the fleet lane): (a) health classification scoped to the
+      DECLARED PRIMARY (530431088) — ServingHealth::observe takes the primary
+      from the same declared order select_route ranks (one derivation,
+      config.rs declared_storage_peers); pool upstreams stay visible with an
+      additive role field; red-first proven by reverting the filter (2 tests
+      fail on the old any()). (b) periodic guarded half-open probe
+      (99df9f72c) — open pool circuits are trialed via the breaker's own
+      begin() RAII guard from the 30 s refresh loop (separate 2 s client, no
+      second admission path, trial-theft suite re-green; disable knob
+      DOORWAY_BREAKER_PROBE_DISABLED). 1086 doorway tests green. Independent
+      adversarial review: probe + scoping CLEAN (sequential probe N x 2 s
+      noted as follow-up); all five deployed doorway manifests declare a
+      primary so the None fallback never fires deployed. Local lane on the
+      cured binaries: @concern:doorway-failover 10/10 (run
+      20260823T212812Z-ad5d8f49, sut 9a94e137, transport dual). Confirm with
+      [build:edge] — this arc has real code to deploy, not measure-by-deploy.
       DELTA 2026-08-23b (continuity session — selection-time blob failover + RS
       ingest + roadmap; household lane closing run 20260823T150653Z-3a77a458):
       189 passed / 25 failed / 4 pending / 28 skipped in 31m15s, from 186 / 25 /
