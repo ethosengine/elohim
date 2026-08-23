@@ -277,6 +277,19 @@ pub struct ServingUpstream {
     pub error_streak: u32,
     /// True when this endpoint is shedding calls right now.
     pub shedding: bool,
+    /// This endpoint's place in THIS doorway's declared peer list:
+    ///
+    /// * `"primary"` — the declared rank-0 peer (`--storage-url`, else the
+    ///   first `--storage-urls` entry). Its breaker, and only its breaker,
+    ///   decides `shedding` / `degrading`.
+    /// * `"pool"` — any other endpoint the breaker map has ever seen: a
+    ///   lower-ranked steward peer, a failover target, a drill victim. Its
+    ///   circuit is reported in full but never demotes this doorway.
+    /// * `"undeclared"` — this doorway declares NO storage peer, so there is
+    ///   no basis to scope: every endpoint counts, exactly as before.
+    ///
+    /// ADDITIVE field — nothing that read this payload before loses a field.
+    pub role: &'static str,
 }
 
 /// Can this doorway actually SERVE?
@@ -362,20 +375,62 @@ pub struct ServingHealth {
 impl ServingHealth {
     /// Read the live breaker map. Uses `snapshot()`, which is non-mutating —
     /// observing health must never consume a half-open trial.
-    pub fn observe(breakers: &crate::routes::UpstreamBreakers) -> Self {
+    ///
+    /// `primary_endpoint` is this doorway's DECLARED rank-0 storage peer
+    /// (`Args::declared_primary_storage_peer` — the same list
+    /// `RouteRegistry::declare_peer_priority` is fed). It SCOPES the two
+    /// verdicts:
+    ///
+    /// WHY SCOPED. `shedding`/`degrading` used to be `any()` over the whole
+    /// breaker map, which is every endpoint this doorway has EVER called —
+    /// pool peers included. So an open circuit on a pool peer (`:8091` after a
+    /// failover drill) demoted the doorway to `degraded` and 503'd
+    /// `/health/serving` while its declared primary was closed and answering
+    /// every read. That is a sibling-classification LIE: the invariant is that
+    /// siblings are honestly classifiable as serving | shedding | dead, and a
+    /// doorway serving perfectly off its primary is *serving*.
+    ///
+    /// The full upstream list is unchanged — every pool circuit is still
+    /// reported, now with a `role`, so observability WIDENS while the verdict
+    /// narrows to the endpoint this doorway actually serves from.
+    ///
+    /// `None` (nothing declared) keeps the old pool-wide behaviour: with no
+    /// declaration there is no basis to pick a primary, and going blind would
+    /// be worse than over-reporting.
+    pub fn observe(
+        breakers: &crate::routes::UpstreamBreakers,
+        primary_endpoint: Option<&str>,
+    ) -> Self {
+        // Normalize BOTH sides the way every breaker call site keys the map
+        // (`trim_end_matches('/')`, as `http.rs` does before `would_shed`) and
+        // the way `declare_peer_priority` keys its rank map. A silent key
+        // mismatch here would classify EVERY endpoint as pool and the doorway
+        // would never report a shed again.
+        let primary = primary_endpoint.map(|p| p.trim_end_matches('/'));
         let upstreams: Vec<ServingUpstream> = breakers
             .snapshot()
             .into_iter()
-            .map(|s| ServingUpstream {
-                endpoint: s.endpoint,
-                circuit: s.circuit,
-                error_streak: s.error_streak,
-                shedding: s.skipped,
+            .map(|s| {
+                let role = match primary {
+                    None => "undeclared",
+                    Some(p) if s.endpoint.trim_end_matches('/') == p => "primary",
+                    Some(_) => "pool",
+                };
+                ServingUpstream {
+                    endpoint: s.endpoint,
+                    circuit: s.circuit,
+                    error_streak: s.error_streak,
+                    shedding: s.skipped,
+                    role,
+                }
             })
             .collect();
+        // An endpoint counts toward the verdict when it IS the declared
+        // primary, or when nothing is declared at all.
+        let counts = |u: &&ServingUpstream| u.role != "pool";
         Self {
-            shedding: upstreams.iter().any(|u| u.shedding),
-            degrading: upstreams.iter().any(|u| u.error_streak > 0),
+            shedding: upstreams.iter().filter(counts).any(|u| u.shedding),
+            degrading: upstreams.iter().filter(counts).any(|u| u.error_streak > 0),
             upstreams,
             freshness: None,
             warmup_empty: None,
@@ -391,7 +446,8 @@ impl ServingHealth {
     /// to callers that hold no AppState (and so the existing breaker tests keep
     /// their exact subject).
     pub fn observe_with_freshness(state: &AppState) -> Self {
-        let mut health = Self::observe(&state.upstream_breakers);
+        let primary = state.args.declared_primary_storage_peer();
+        let mut health = Self::observe(&state.upstream_breakers, primary.as_deref());
         health.freshness = Some(crate::routes::freshness::status_block(
             state.network_stage,
             state.stage_provenance,
@@ -563,8 +619,13 @@ fn build_health_response(state: &AppState) -> HealthResponse {
         signal_shared,
     };
 
-    // The serving path, read from the live breaker map (non-mutating).
-    let serving = ServingHealth::observe(&state.upstream_breakers);
+    // The serving path, read from the live breaker map (non-mutating), scoped
+    // to the DECLARED primary peer — a pool peer's open circuit is reported in
+    // `upstreams` but never demotes this doorway.
+    let serving = ServingHealth::observe(
+        &state.upstream_breakers,
+        args.declared_primary_storage_peer().as_deref(),
+    );
 
     HealthResponse {
         // `healthy` used to be a hardcoded `true` meaning "the process is up".
@@ -851,7 +912,10 @@ pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
     // The live serving answer, in the SAME shape /health and /health/serving
     // carry, from the SAME breaker map. A reader polling /health/startup during
     // recovery can now see the shed without cross-referencing another endpoint.
-    let serving = ServingHealth::observe(&state.upstream_breakers);
+    let serving = ServingHealth::observe(
+        &state.upstream_breakers,
+        args.declared_primary_storage_peer().as_deref(),
+    );
 
     // Served SSR bundle-head attestations (Track-4 T4-1). Each entry:
     // {slug, serverBlobHash, materializedAt (rfc3339), status (current|stale|
@@ -1087,8 +1151,10 @@ mod tests {
         let ep = "http://storage-a:8090";
         open_the_breaker(&state, ep);
 
-        // The authoritative answer.
-        let serving = ServingHealth::observe(&state.upstream_breakers);
+        // The authoritative answer. `test_state()` declares no storage peer, so
+        // the classification is UNDECLARED and stays pool-wide — this test's
+        // subject (one breaker, one view) is unchanged by the primary scoping.
+        let serving = ServingHealth::observe(&state.upstream_breakers, None);
         assert!(serving.shedding, "the breaker is open — this doorway sheds");
 
         let resp = startup_check(Arc::clone(&state)).await;
@@ -1443,5 +1509,163 @@ mod tests {
         let json = serde_json::to_value(&response).unwrap();
         assert_eq!(json["p2p"]["stale"], serde_json::json!(true));
         assert!(json["p2p"].get("observedAgeMs").is_none());
+    }
+
+    // ---------------------------------------------------------------------
+    // HONEST SIBLING CLASSIFICATION (habits: doorway-failover, red a).
+    //
+    // `shedding`/`degrading` were `any()` over the WHOLE breaker map — every
+    // endpoint this doorway had ever called. A failover drill that opened a
+    // POOL peer's circuit (`:8091`) therefore demoted a doorway whose declared
+    // primary was closed and answering: `/health` said `degraded`,
+    // `/health/serving` said 503, and a sibling reading that could not tell a
+    // shedding doorway from a serving one. These pin the scoping.
+    // ---------------------------------------------------------------------
+
+    const PRIMARY_EP: &str = "http://primary:8090";
+    const POOL_EP: &str = "http://pool:8091";
+
+    /// A state whose DECLARED primary is [`PRIMARY_EP`] (rank 0), with one
+    /// lower-ranked pool peer — the shape every alpha doorway runs in.
+    fn pooled_state() -> AppState {
+        let args = Args::parse_from([
+            "doorway",
+            "--listen",
+            "127.0.0.1:0",
+            "--dev-mode",
+            "--storage-url",
+            PRIMARY_EP,
+            "--storage-urls",
+            POOL_EP,
+        ]);
+        AppState::new(args)
+    }
+
+    fn upstream_of<'a>(serving: &'a ServingHealth, endpoint: &str) -> &'a ServingUpstream {
+        serving
+            .upstreams
+            .iter()
+            .find(|u| u.endpoint == endpoint)
+            .unwrap_or_else(|| panic!("{endpoint} must still be reported"))
+    }
+
+    #[test]
+    fn a_pool_peers_open_circuit_never_demotes_the_doorway() {
+        let state = pooled_state();
+        discover_role(&state, "imagodei");
+        open_the_breaker(&state, POOL_EP);
+        // The primary has answered — a closed circuit with a clean streak.
+        state.upstream_breakers.record(PRIMARY_EP, true);
+
+        let serving = ServingHealth::observe_with_freshness(&state);
+        assert!(
+            !serving.shedding,
+            "the DECLARED primary is closed — this doorway is serving, not shedding"
+        );
+        assert!(
+            !serving.degrading,
+            "a pool peer's error streak is not this doorway's serving regime"
+        );
+
+        // Observability WIDENS: the pool peer's open circuit is still reported,
+        // now labelled.
+        let pool = upstream_of(&serving, POOL_EP);
+        assert_eq!(pool.circuit, "open", "the pool circuit is reported in full");
+        assert!(
+            pool.shedding,
+            "that endpoint IS shedding — say so per-upstream"
+        );
+        assert_eq!(pool.role, "pool");
+        assert_eq!(upstream_of(&serving, PRIMARY_EP).role, "primary");
+
+        assert_eq!(
+            serving_check(Arc::new(state)).status(),
+            StatusCode::OK,
+            "a doorway serving off a healthy primary must not 503 for a pool drill"
+        );
+    }
+
+    #[test]
+    fn the_declared_primary_shedding_still_sheds_the_doorway() {
+        let state = pooled_state();
+        discover_role(&state, "imagodei");
+        open_the_breaker(&state, PRIMARY_EP);
+
+        let serving = ServingHealth::observe_with_freshness(&state);
+        assert!(
+            serving.shedding,
+            "the primary is open — this doorway cannot serve, and must say so"
+        );
+        assert_eq!(upstream_of(&serving, PRIMARY_EP).role, "primary");
+        assert_eq!(
+            serving_check(Arc::new(state)).status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+    }
+
+    #[test]
+    fn the_declared_primarys_error_streak_still_reads_degrading() {
+        let state = pooled_state();
+        discover_role(&state, "imagodei");
+        // ONE failure: below `UPSTREAM_CIRCUIT_FAIL_THRESHOLD`, so the circuit
+        // stays CLOSED — the blind, expensive regime `degrading` exists for.
+        state.upstream_breakers.record(PRIMARY_EP, false);
+
+        let serving = ServingHealth::observe_with_freshness(&state);
+        assert!(!serving.shedding, "still closed: not shedding");
+        assert!(
+            serving.degrading,
+            "a non-zero streak on the PRIMARY is the 20-second-page regime"
+        );
+        assert_eq!(
+            serving_check(Arc::new(state)).status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+    }
+
+    #[test]
+    fn an_unranked_endpoint_counts_as_pool_never_as_primary() {
+        let state = pooled_state();
+        discover_role(&state, "imagodei");
+        // A peer the registry discovered at runtime — in the breaker map, in
+        // NO declaration. Failing open, it must not speak for the doorway.
+        let stranger = "http://discovered-later:8090";
+        open_the_breaker(&state, stranger);
+
+        let serving = ServingHealth::observe_with_freshness(&state);
+        assert_eq!(upstream_of(&serving, stranger).role, "pool");
+        assert!(
+            !serving.shedding,
+            "an unranked endpoint is pool, not primary"
+        );
+        assert!(!serving.degrading);
+    }
+
+    #[test]
+    fn a_doorway_with_no_declared_peer_keeps_the_pool_wide_verdict() {
+        // No `--storage-url`, no `--storage-urls`: there is no basis to pick a
+        // primary, and going blind would be worse than over-reporting. This is
+        // the pre-scoping behaviour, kept deliberately.
+        let state = test_state();
+        open_the_breaker(&state, POOL_EP);
+
+        let serving = ServingHealth::observe_with_freshness(&state);
+        assert!(serving.shedding, "undeclared: every endpoint still counts");
+        assert_eq!(upstream_of(&serving, POOL_EP).role, "undeclared");
+    }
+
+    #[test]
+    fn the_primary_lookup_normalizes_the_trailing_slash() {
+        // The breaker map is keyed by the URL the proxy called with; the
+        // declaration may carry a trailing slash. A key mismatch here would
+        // silently classify EVERYTHING as pool and the doorway would never
+        // report a shed again.
+        let breakers = crate::routes::UpstreamBreakers::default();
+        for _ in 0..crate::routes::upstream_health::UPSTREAM_CIRCUIT_FAIL_THRESHOLD {
+            breakers.record(PRIMARY_EP, false);
+        }
+        let serving = ServingHealth::observe(&breakers, Some("http://primary:8090/"));
+        assert_eq!(upstream_of(&serving, PRIMARY_EP).role, "primary");
+        assert!(serving.shedding, "trailing slash must not lose the primary");
     }
 }

@@ -637,16 +637,11 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
     // mesh: "registered:0 failed:3", totalRoutes 0, every /db/* 404).
     // Registration is idempotent (install replaces that peer's routes), so the
     // retry can never duplicate.
-    let mut peer_urls: Vec<String> = Vec::new();
-    if let Some(ref storage_url) = state.args.storage_url {
-        peer_urls.push(storage_url.clone());
-    }
-    for url in &state.args.storage_urls {
-        let trimmed = url.trim().to_string();
-        if !trimmed.is_empty() && !peer_urls.contains(&trimmed) {
-            peer_urls.push(trimmed);
-        }
-    }
+    // ONE derivation of declared peer order (Args::declared_storage_peers) —
+    // the same list the EPR storage pool and `ServingHealth`'s primary lookup
+    // read, so the router, the pool and the health surface cannot disagree
+    // about which peer is primary.
+    let peer_urls: Vec<String> = state.args.declared_storage_peers();
 
     // Declared order is peer PRIORITY in the registry, independent of arrival:
     // a primary whose boot fetch fails registers late from the retry task and
@@ -1574,20 +1569,7 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
 /// that the route registry already trusts — primary first, peers as reach
 /// fallback. journal: `.claude/deliver/journal-resilient-dual-doorway.md` RC #2.
 fn epr_storage_pool(args: &Args) -> Vec<String> {
-    let mut pool: Vec<String> = Vec::new();
-    if let Some(ref primary) = args.storage_url {
-        let trimmed = primary.trim().to_string();
-        if !trimmed.is_empty() {
-            pool.push(trimmed);
-        }
-    }
-    for url in &args.storage_urls {
-        let trimmed = url.trim().to_string();
-        if !trimmed.is_empty() && !pool.contains(&trimmed) {
-            pool.push(trimmed);
-        }
-    }
-    pool
+    args.declared_storage_peers()
 }
 
 /// Resolve the operational EPR-fetch candidate list from notarized doorway

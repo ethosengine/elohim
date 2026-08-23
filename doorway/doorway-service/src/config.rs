@@ -337,6 +337,45 @@ fn url_port(url: &str) -> Option<u16> {
 }
 
 impl Args {
+    /// The DECLARED storage peers, in declared order: `--storage-url` first,
+    /// then `--storage-urls`, trimmed, de-duplicated, empties dropped.
+    ///
+    /// This is the ONE derivation of peer declaration order. It is what
+    /// `RouteRegistry::declare_peer_priority` is fed at boot (index = rank,
+    /// 0 = primary), what the EPR storage pool is built from, and what
+    /// `ServingHealth` reads to decide which upstream is this doorway's
+    /// PRIMARY. Those three used to derive the same order independently; a
+    /// drift between any two of them would make the health surface classify
+    /// against a different primary than the router routes to.
+    ///
+    /// Empty means "no storage peer declared" — a real third answer, not a
+    /// primary of `""`.
+    pub fn declared_storage_peers(&self) -> Vec<String> {
+        let mut peers: Vec<String> = Vec::new();
+        let declared = self
+            .storage_url
+            .iter()
+            .map(String::as_str)
+            .chain(self.storage_urls.iter().map(String::as_str));
+        for url in declared {
+            let trimmed = url.trim().to_string();
+            if !trimmed.is_empty() && !peers.contains(&trimmed) {
+                peers.push(trimmed);
+            }
+        }
+        peers
+    }
+
+    /// This doorway's DECLARED PRIMARY storage endpoint (rank 0), normalized
+    /// the way the breaker map and `declare_peer_priority` key endpoints
+    /// (trailing slash stripped). `None` when nothing is declared.
+    pub fn declared_primary_storage_peer(&self) -> Option<String> {
+        self.declared_storage_peers()
+            .into_iter()
+            .next()
+            .map(|url| url.trim_end_matches('/').to_string())
+    }
+
     /// Get effective admin URL (falls back to conductor_url if not set)
     pub fn admin_url(&self) -> &str {
         self.conductor_admin_url
