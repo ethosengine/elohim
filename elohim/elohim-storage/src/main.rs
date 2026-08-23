@@ -3902,6 +3902,43 @@ async fn async_main(
                     "Content-projection producer spawned on iroh transport — \
                      Automerge content-sync DocStore now filled (iroh)"
                 );
+
+                // Corpus back-fill, iroh-mode counterpart of the libp2p arm above.
+                // `backfill_content_docs` only needs the SyncManager + DB pool (no
+                // libp2p node), so pure-iroh mode gets the same reconciliation-
+                // controller back-fill the libp2p path has always had — without it
+                // a fresh iroh-only deploy's pre-existing corpus never enters the
+                // DocStore until each row is rewritten (same gap the libp2p arm's
+                // comment describes). Same env opt-out, same spawn-not-await shape.
+                let iroh_backfill_env = std::env::var("ELOHIM_DOCSTORE_BACKFILL").ok();
+                if elohim_storage::sync::projector::backfill_enabled(iroh_backfill_env.as_deref()) {
+                    let backfill_sync = iroh_sync.clone();
+                    let backfill_pool = pool.clone();
+                    tokio::spawn(async move {
+                        match elohim_storage::sync::projector::backfill_content_docs(
+                            &backfill_sync,
+                            &backfill_pool,
+                            200,
+                        )
+                        .await
+                        {
+                            Ok(stats) => info!(
+                                scanned = stats.scanned,
+                                projected = stats.projected,
+                                skipped = stats.skipped,
+                                failed = stats.failed,
+                                "Automerge DocStore corpus back-fill complete (iroh)"
+                            ),
+                            Err(e) => {
+                                error!(error = %e, "Automerge DocStore corpus back-fill failed (iroh)")
+                            }
+                        }
+                    });
+                } else {
+                    info!(
+                        "Automerge DocStore corpus back-fill DISABLED via ELOHIM_DOCSTORE_BACKFILL (iroh) — pre-existing rows will not enter the sync plane until rewritten"
+                    );
+                }
             }
             // Wire policy enforcement for content filtering
             let policy_cache = elohim_storage::db::policy_cache::PolicyCache::new(pool.clone());
@@ -3941,6 +3978,30 @@ async fn async_main(
         http_server = http_server.with_sync_manager(node.sync_manager().clone());
         http_server = http_server.with_p2p_handle(node.handle());
         info!("P2P node wired to HTTP server — Sync API and /p2p/status active");
+    }
+
+    // Pure-iroh mode: `p2p_node` is None (main.rs's `TransportBackend::Iroh`
+    // arm above never constructs a libp2p node), so the libp2p wiring block
+    // just above never fires and `/sync/v1/{hApp}/docs/{doc}/heads` 503s
+    // ("Sync API not enabled", server/http.rs) even though the iroh content
+    // projector spawned above is actively filling the Automerge DocStore.
+    // `with_sync_manager` had a single call site (the libp2p block above);
+    // this is the missing iroh-mode counterpart, mirroring the
+    // `with_node_transport` / `with_iroh_blob_store` hoists already done for
+    // iroh mode elsewhere in this function.
+    //
+    // In Dual mode this arm is inert: `iroh_sync_manager` there is the SAME
+    // Arc as the libp2p node's SyncManager (see `shared_sync_manager` reuse
+    // in the iroh co-scope above — dual mode never opens a second sync.sled
+    // lock), and `p2p_node` is Some, so the `is_none()` guard below skips this
+    // arm entirely and the libp2p block above remains the sole wiring site —
+    // Dual-mode behavior is unchanged.
+    #[cfg(feature = "p2p-iroh")]
+    if p2p_node.is_none() {
+        if let Some(ref iroh_sync) = iroh_sync_manager {
+            http_server = http_server.with_sync_manager(iroh_sync.clone());
+            info!("Iroh sync manager wired to HTTP server — Sync API active (iroh)");
+        }
     }
 
     // T22: Construct EprFanOutCtx and inject into HTTP layer.
