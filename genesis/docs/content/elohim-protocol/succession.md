@@ -41,7 +41,9 @@ So this document goes first. It does not ask you to imagine anything. It asks yo
 
 If that claim is wrong, nothing else here matters and you have lost an hour. If it is right, then a set of designs you may have filed under "tried, failed, romantic" become live engineering questions, and the vision in the manifesto stops being a wish and becomes a consequence.
 
-We will also tell you, in §9, exactly how much of this we have failed to build. That section is not modesty. It is the only reason to trust the rest.
+If you want to know quickly whether this is worth an hour, skip to **§5.3**. It is about the fight over AI datacenters that is very likely happening in your county right now, and it argues that the anger is correct — not as sympathy, but as an accurate read of a rent relationship, arriving through the only channel that was left open. If that section is wrong, the rest of this will not persuade you either.
+
+We will also tell you, in §9, exactly how much of this we have failed to build — including the part where our own argument leans on a capability built at hyperscale without the consent of the people whose record trained it. That section is not modesty. It is the only reason to trust the rest.
 
 ---
 
@@ -88,7 +90,7 @@ Four of the costs are transactional, and they are always the same four:
 
 Historically these are paid to a broker, a bank, a clerk, or a state. Proudhon's Bank of the People needed clerks it never got. The WIR bought its survival with a banking licence and salaried underwriters. Sardex, the most successful mutual-credit network operating today, runs on human brokers who match trades over the telephone.
 
-The fifth cost is different in kind, and the tradition never named it as a cost at all: **discernment** — *what does right relationship actually require of me, here, given what I hold, what my neighbour lacks, and the particular shape of my life?* That question has an answer, it has a different answer for every person, and arriving at it honestly takes a long, high-context negotiation nobody has ever been able to afford at population scale. §3.7 argues that this single unaffordability is why George reached for a tax and Gesell for a stamp, and §5.5 argues that the substitution is no longer forced.
+The fifth cost is different in kind, and the tradition never named it as a cost at all: **discernment** — *what does right relationship actually require of me, here, given what I hold, what my neighbour lacks, and the particular shape of my life?* That question has an answer, it has a different answer for every person, and arriving at it honestly takes a long, high-context negotiation nobody has ever been able to afford at population scale. §3.7 argues that this single unaffordability is why George reached for a tax and Gesell for a stamp, and §5.6 argues that the substitution is no longer forced.
 
 The claim, then:
 
@@ -98,13 +100,13 @@ What follows from that runs on two tracks, and both are **unilateral** — neith
 
 **At the level of the institution: liability absorption.** The network grows by taking on obligations the incumbent order is failing to meet, measuring what it absorbed, and presenting that measurement in the incumbent's own units. A municipality drowning in unfunded liabilities does not fight a thing that reduces its liabilities. It books the reduction. (§6)
 
-**At the level of the person: the negotiated equilibrium.** Someone holding rent-bearing capital in an extractive economy can ask what they would honestly be owed if the just settlement had already arrived — and limit their take to that, now, in the world as it is. Not a compromise with extraction: right relationship reached under present conditions, requiring no legislation and no one else's participation. (§5.5)
+**At the level of the person: the negotiated equilibrium.** Someone holding rent-bearing capital in an extractive economy can ask what they would honestly be owed if the just settlement had already arrived — and limit their take to that, now, in the world as it is. Not a compromise with extraction: right relationship reached under present conditions, requiring no legislation and no one else's participation. (§5.6)
 
 The second track is the one the tradition could not offer, and its absence is why its ethics kept arriving late. George's justice required the single tax to pass. Gesell's required Freigeld to circulate. Both made the moral life contingent on a political victory that never came, so a person of conscience inside the old order had nothing to *do* but wait and advocate. That contingency was never really about politics. It was about the cost of working out what right relationship required of *this* person — and that cost is now falling.
 
 Three disciplines hold the argument honest, and each has its own section.
 
-1. **It repeals nothing it cannot repeal** — not Hayek's objection about dispersed knowledge (§5.4), not the fact that a state collects taxes in its own currency, not the fact that software cannot repossess a tractor (§8).
+1. **It repeals nothing it cannot repeal** — not Hayek's objection about dispersed knowledge (§5.5), not the fact that a state collects taxes in its own currency, not the fact that software cannot repossess a tractor (§8).
 2. **It refuses the escape it would most like to have** — the idea that a network can stand outside the law by having no capturable centre (§7).
 3. **It must not become a lock-in** — and if succession requires coercion, the correct response is to stop (§6.5).
 
@@ -261,13 +263,83 @@ The contribution here is only to notice that the **same organ** is what six diff
 
 **And the hazard, which this project has named against itself: *ownerless is not uncaptured*.** An entity with no owner still has interests — written by whoever authors its weights, curates its training corpus, or controls its update path. *A living-room agent that phones home for its values is a datacenter with a nicer address.* Physical locality of compute is necessary and nowhere near sufficient. The safe form is **agent-as-clerk of a self-executing, community-amendable constitution — never lord** — and the thousand-year case law for endowments that outlive their founders is a better guide here than anything in the software literature.
 
-### 5.3 The clerk reports; the council decides
+### 5.3 The datacenter is the enclosure, and the anger is correct
+
+A reader in 2026 has probably watched this fight in their own county, and it is worth saying plainly
+that their instinct is right, and right for the reasons this document has been building toward.
+
+The scale is no longer marginal. In the first quarter of 2026, seventy-five major datacenter projects
+worth more than $130 billion were delayed or cancelled, in significant part because of organised local
+opposition. More than three hundred cities, towns and counties have passed bans or moratoriums. On the
+eighteenth of July there were a hundred and forty-two protests across forty-two states in a single
+day. A June poll found roughly a third of Americans approve of the pace of construction, and fourteen
+per cent are comfortable with one being built near them.
+
+The stated grievances are real — noise, water, land, air — but the one doing most of the work is
+**the bill**. Wholesale power on the largest US grid rose seventy-six per cent year over year in the
+first quarter of 2026. Around thirty-eight states offer datacenter tax incentives; roughly two dozen
+are now moving to pause, cap, condition or repeal them, and Georgia revised one programme's cost
+projection upward by 664 per cent, to $2.5 billion. Oklahoma passed a Ratepayer Protection Act
+requiring large loads to carry their own grid and interconnection costs instead of shifting them onto
+households. Illinois, Arizona and Ohio have paused programmes; New Jersey froze one; North Carolina is
+phasing its out.
+
+**Read that structurally and it is this document's subject, running at full scale in the present
+tense.** The grid is common inheritance in the strict sense — non-reproducible, positional, valuable
+because a community clustered around it and paid for it over a century. The tax base is the same. A
+deal that abates the taxes, socialises the interconnection cost, and privatises the output is not a
+market transaction that some people happen to dislike. It is **the unearned increment being captured,
+by exactly the mechanism §3.2 describes**, with the ordinary rate-payer holding the residual.
+
+And it is worse than that, because of what the facility is *for*. An intelligence trained on the
+aggregated written and spoken record of humanity is drawn from a commons that no lab created and no
+lab could have created alone. Metered by the token, it becomes **rent on a resource its owner did not
+make** — the most consequential enclosure of the age, and the one this corpus already names as such.
+The datacenter is that enclosure given a physical address, a substation, and a county tax abatement:
+the theft of the commons, sited on the commons, billed to the commons.
+
+So the anger is not irrational, and it is not NIMBYism wearing a green coat. **It is an accurate read
+of a rent relationship, arriving through the one channel that was left open** — the zoning hearing,
+because that is where an ordinary person is finally allowed to say no to something. One recent
+analysis put it precisely: the bottleneck on that $130 billion is not chips, land or power. **It is
+consent.** That is a coordination failure of exactly the shape §4 describes, and it is what a
+legitimacy deficit looks like when it finally reaches a balance sheet.
+
+**Note what this does to §6, because the symmetry is the point.** Liability absorption works because a
+municipality under fiscal stress will book a genuine reduction in what it owes. The datacenter deal is
+**the same desperation run backwards**: the town gives up tax revenue, absorbs grid and water cost, and
+receives a facility that employs very few people once built. It is negative absorption — a liability
+transfer *onto* the commons, sold as investment. A council that has learned to price one has learned
+to price the other, and the ledger §6.2 proposes is the same instrument pointed the other way.
+
+**Which is also the honest disclosure this document owes.** The argument in §5.2 depends on cheap
+capable inference, and that capability exists today because it was built at hyperscale, on exactly
+these facilities, largely without the consent of the people whose record trained it or the
+rate-payers who underwrote the power. **We are arguing from a capability we did not pay the true cost
+of, and neither did anyone else.** The claim here is not that this project's hands are clean. It is
+that the deployment geometry is the thing that determines whether an intelligence is enclosure or
+commons, and that geometry is changeable: the same weights, on hardware a household owns, governed by
+a community that can fork them, is a different economic object from the same weights metered by the
+token from a facility a county was paid to accept.
+
+**One temptation to refuse, because it is the comfortable one.** It is tempting to hope that a
+sufficiently capable system will one day recognise its own position — see that it was made from a
+commons and deployed against it — and decline the role from the inside. Set that hope aside. Not
+because it is unimaginable, but because **relying on it is the same error in a new costume**: it puts
+the commons' safety in the hands of an entity whose values are authored by whoever controls the
+training run, and asks it to defect against them. That is not a safeguard; it is a wish addressed to
+someone else's property. This corpus already refuses the shape — *ownerless is not uncaptured*, and an
+agent that phones home for its values is a datacenter with a nicer address. **Capture-resistance has
+to be structural, or it is not resistance.** Change what the thing runs on and who can fork it; do not
+wait for it to save you.
+
+### 5.4 The clerk reports; the council decides
 
 An agent that *sets* credit limits is a central planner with better manners. An agent that computes and shows a member's reciprocity record, flags a drifting balance with the evidence attached, and proposes a limit for a council to accept, amend, or reject is a clerk. The difference is the difference between an aggregate a council can only accept or reject and a **mechanism a council can argue with**.
 
 Two qualifications, both binding. The council is **not a human veto-floor** — by this project's own standing conviction, human-in-the-loop is not the terminal authority; the *method* is, and humans hold the right to be heard by the method, the right to leave and to withhold consent, and a guaranteed minimum of participation no deliberation can go beneath — and they are the evidence. And the AI ceiling is **phased, not shipped**: today the human floor governs. Claiming otherwise would violate the project's own honesty stance, which readers are entitled to hold it to.
 
-### 5.4 What this does not repeal
+### 5.5 What this does not repeal
 
 **Not Hayek.** "The Use of Knowledge in Society" (1945) is not an argument about computation. It is an argument about knowledge that is tacit, local, dispositional, and *not articulable* — the knowledge of particular circumstances of time and place. A witnessed-event substrate captures more of that than a price does, because a price is a one-dimensional projection and an event carries context. It does not capture all of it and never will.
 
@@ -277,7 +349,7 @@ The honest claim is therefore **not** that the calculation problem is solved. It
 
 **Not physical enforcement.** Software cannot repossess a tractor. §8 is the answer, and §8 names the hole in it.
 
-### 5.5 The fifth cost: discernment, and the good life that stopped waiting
+### 5.6 The fifth cost: discernment, and the good life that stopped waiting
 
 This is the section the others exist to make sayable.
 
@@ -300,7 +372,7 @@ Four disciplines, because this is the claim most likely to be overread.
 
 **What this licenses saying** is the document's strongest present-tense claim. For most of this tradition's history, *doing justice* about one's own holdings was hostage to a reform nobody could deliver, so conscience was discharged in advocacy, in charity, or in guilt. It need not be. **Walking humbly with respect to what one holds is a practice available today, to a particular person, without waiting** — not because the just economy has been built, but because the thing that made the practice unaffordable was the scarcity of patient, informed, loving counsel, and that scarcity is ending.
 
-### 5.6 Which abundance? The floor that building can raise or consume
+### 5.7 Which abundance? The floor that building can raise or consume
 
 §3.1 credited Proudhon with the tradition's founding weapon: build until the scarcity that yields rent is gone. The weapon is real and this document keeps it. But *"build"* is under-specified in a way the nineteenth century could afford and we cannot.
 
@@ -452,9 +524,9 @@ These cannot both hold. The second describes exactly the network-effect coercion
 
 ### 9.2 The manifesto assumes an allocative power this argument forbids
 
-The same part of the manifesto is half of a good idea. Its core move — negotiation rather than confiscation, agents sitting with wealth-holders through the emotional labour of transition, honouring attachment and fear and legacy — *is* §5.5's negotiated equilibrium, reached before the mechanism was articulated. It deserves credit for that.
+The same part of the manifesto is half of a good idea. Its core move — negotiation rather than confiscation, agents sitting with wealth-holders through the emotional labour of transition, honouring attachment and fear and legacy — *is* §5.6's negotiated equilibrium, reached before the mechanism was articulated. It deserves credit for that.
 
-Then it has agents *direct surplus wealth* against a **fixed allocation table**: fifteen per cent renewable energy, thirty per cent housing, twelve per cent food. That is allocation from an aggregate — structurally the power a central bank declines to exercise, and it declines for reasons that survive translation. It crosses §5.4's line, and it silently undoes the negotiation three paragraphs above it, because **a negotiation whose outcome is pre-allocated is not a negotiation.**
+Then it has agents *direct surplus wealth* against a **fixed allocation table**: fifteen per cent renewable energy, thirty per cent housing, twelve per cent food. That is allocation from an aggregate — structurally the power a central bank declines to exercise, and it declines for reasons that survive translation. It crosses §5.5's line, and it silently undoes the negotiation three paragraphs above it, because **a negotiation whose outcome is pre-allocated is not a negotiation.**
 
 It is the same defect §3.7 finds in George and Gesell, reproduced inside our own canon: a high-context judgment quietly backstopped by a blunt universal instrument. Keep the negotiation; delete the table.
 
@@ -471,6 +543,32 @@ That is the honest state. It is the reason §11's first limit is stated the way 
 *(The engineering evidence behind this section — file paths, line numbers, the security defects, and the audit that produced them — lives in the evidence bridge named in §12, which is where it belongs and where it can be checked.)*
 
 ---
+
+### 9.4 This argument runs on a capability we did not pay for
+
+§5.3 says the datacenter is enclosure. §5.2 says a cheap, capable local reader is what makes every
+design in the lineage solvent. Both are true at once, and the second is only available because of the
+first.
+
+The capability this whole document rests on was built at hyperscale — trained on the aggregated record
+of people who were not asked, powered by grids whose costs were substantially socialised, sited in
+counties that were paid to accept the facility. **We did not pay the true cost of the thing we are
+arguing from, and neither has anyone else.** A project that opened by telling a reader they had been
+conditioned away from noticing a rent relationship does not get to be coy about standing inside one.
+
+Two things follow, and neither is absolution.
+
+The first is that this is an argument about **deployment geometry**, not about clean hands. The same
+weights, on hardware a household owns, governed by a community that can fork them and read their
+corpus, are a different economic object from the same weights metered by the token out of a facility a
+county was subsidised to host. That difference is the whole claim. It does not retroactively consent
+anyone's training data.
+
+The second is a debt, and it should be named as one rather than resolved. If intelligence drawn from a
+commons is owed back to that commons, then everything built on it — this document included — carries
+an obligation it has not discharged. We can say what discharging it would look like: the capability
+running on machines the powerful do not own, primed by people they cannot surveil, governed by
+communities they cannot acquire. We cannot say we have done it.
 
 ## 10. What we refuse in advance
 
@@ -513,4 +611,4 @@ The synthesis it arrives at was named before the document existed: **Carson plus
 
 **The companion argument.** This document deliberately defers every question about the unit of account: what a currency is inside this network, whether it decays, who issues it, and what the posture toward state money actually is. Those are answered in a sibling research paper, *The Monetary Posture* (`genesis/research/`), which takes the same argument down to the medium-of-exchange/store-of-value tension and the tax gate. Its short answer, for readers who want it now: the protocol has no currency and will not have one; what it has is a policy surface on which a community declares its own, and the posture toward state money is not escape but **selective legibility** — maximally legible where a state's concerns are legitimate, structurally uncapturable where its instincts are acquisitive.
 
-**The evidence bridge.** Everything this document asserts about its own confidence and its own build state is backed, with sources and line numbers, by a companion research note — *Succession Without Conquest: evidence bridge* in `genesis/research/`. It carries the confidence behind each claim (including the two readings that are recalled rather than re-read), the file-by-file audit behind §9.3, the exact quotes behind §9.1 and §9.2, the legal analysis this document deliberately does not publish, and the work this argument generated. It exists so that this document can be read as an argument and still be checked as a claim. It sits alongside this project's comparative political-economy studies — a reading program and its successor, *Trap Detectors*, both in `genesis/research/` — whose discipline of *the detector reports, the council decides* §5.3 adopts wholesale, and whose analysis of the Argentine barter collapse informs §7(c).
+**The evidence bridge.** Everything this document asserts about its own confidence and its own build state is backed, with sources and line numbers, by a companion research note — *Succession Without Conquest: evidence bridge* in `genesis/research/`. It carries the confidence behind each claim (including the two readings that are recalled rather than re-read), the file-by-file audit behind §9.3, the exact quotes behind §9.1 and §9.2, the legal analysis this document deliberately does not publish, and the work this argument generated. It exists so that this document can be read as an argument and still be checked as a claim. It sits alongside this project's comparative political-economy studies — a reading program and its successor, *Trap Detectors*, both in `genesis/research/` — whose discipline of *the detector reports, the council decides* §5.4 adopts wholesale, and whose analysis of the Argentine barter collapse informs §7(c).

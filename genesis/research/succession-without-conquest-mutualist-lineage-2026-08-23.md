@@ -55,10 +55,11 @@ was moved here** — only apparatus and evidence, enumerated in §4.
 | Canon section | Backed here |
 |---|---|
 | §3 the lineage (Proudhon → Lietaer) | §1 grading, including the two ⚠ readings |
-| §3.7 the blunt-instrument claim, §5.5 discernment | §7.2 the operator steering notes that generated them |
+| §3.7 the blunt-instrument claim, §5.6 discernment | §7.2 the operator steering notes that generated them |
 | §7 the legal question | §3.3–§3.5 the EAE contradiction, the shield layers, the securities exposure |
 | §9.1 the coercion contradiction | §3.1 locators + recommendation |
 | §9.2 the allocation table | §3.2 locators + recommendation |
+| §5.3 the datacenter as enclosure | §1.2 grading of the 2026 figures (◐, verify before reuse) |
 | §9.3 the economic layer, so far mostly unbuilt | §2 in its entirety, with `file:line` |
 | §10 what we refuse | §5 Leave, with reasons |
 | §11 honest limits | §1.1 and §7.3 |
@@ -90,11 +91,28 @@ Wörgl's parameters and its 1933 injunction · the WIR's 1936 banking licence an
 Stodder's counter-cyclicality result · Chiemgauer's two decades of operation · Sardex's brokerage
 model and scale · Proudhon's Bank of the People subscriber count and 1849 liquidation · the Ooki
 DAO / *Sarcuni v. bZx* procedural posture · the four "Legal Shield Layers" read against FLSA and
-health-code doctrine · the generational-transfer argument canon §5.6 uses.
+health-code doctrine · the generational-transfer argument canon §5.7 uses.
 
 None of these is the load-bearing step in any argument. The WIR pair (licence + demurrage drop) is
 closest to it, because canon §3.3 calls the WIR "the control experiment"; if either fact is wrong,
 that section weakens.
+
+**The 2026 datacenter figures in canon §5.3 are ◐ — web-sourced 2026-08-23, single-pass, not
+cross-checked against primary filings.** Specifically: 75 projects / $130bn delayed or cancelled in
+Q1 2026 · 142 protests across 42 states on 18 July · 300+ local bans or moratoriums · a June poll at
+~⅓ approval and 14% comfort-with-nearby · PJM wholesale power +76% YoY to $136.53/MWh in Q1 · ~38
+states offering datacenter incentives with ~two dozen pausing, capping or repealing · Georgia's 664%
+upward revision to $2.5bn · Oklahoma HB 2992 (Ratepayer Protection Act, signed 11 May 2026, effective
+1 July) · pauses in Illinois, Arizona and Ohio, a freeze in New Jersey, a North Carolina phase-out by
+2032. **Verify against primary sources before any of these enter a further canon surface or an
+outreach artifact** — they are the most citation-exposed claims in the document, and the ones a
+hostile reader will check first. The *structural* argument built on them (grid and tax base are common
+inheritance; abatement-plus-cost-shift is unearned-increment capture; the bottleneck is consent) does
+not depend on any single figure.
+
+Sources consulted for those figures: TIME, Brookings, Forbes, Newsweek, *Governing*, Good Jobs First,
+MultiState, and the Wikipedia "Opposition to AI data centers" entry, via a single search pass on
+2026-08-23.
 
 *One note on the generational-transfer claim.* Canon states it as an argument rather than citing a
 source, deliberately. The original draft attributed it to a specific TED talk, which a blind reader
@@ -425,9 +443,14 @@ already implements the enforcement shape canon §8's invariant needs. What moved
 | The EAE legal analysis and securities exposure | §3.4 | Canon should not publish a legal critique of a sibling document at `reach: commons`. |
 | Exact security endpoint paths | §2.6 | Canon §9.3 says "one endpoint currently accepts unauthenticated writes" without the route. |
 
-**Added in canon, not present here:** an expanded orientation section defining the working vocabulary,
-and a new opening addressed to a reader arriving with a formed politics — both responses to
-blind-reader BLOCKERs (§7.4).
+**Added in canon, not present here:** an expanded orientation section defining the working vocabulary;
+a new opening addressed to a reader arriving with a formed politics (both responses to blind-reader
+BLOCKERs, §7.4); **§5.3 on the datacenter backlash as the live instance of the enclosure this document
+is about**, with the negative-absorption symmetry it forces onto §6; and **§9.4, the disclosure that
+the argument runs on a capability built at hyperscale without the consent of the people whose record
+trained it or the rate-payers who underwrote the power.** The last is the sharpest thing canon says
+against itself, and it belongs there rather than here — a self-indictment quarantined in a research
+note is not a self-indictment.
 
 ---
 
@@ -547,19 +570,27 @@ paper's §3 originate.
 
 ### 7.2 The operator steering notes (2026-08-23)
 
-Four, each recorded because the argument in it is the operator's.
+Five, each recorded because the argument in it is the operator's.
 
 1. **The personal equilibrium** — the counterfactual benchmark, the collapse of the negotiation's
    friction, and the present-tense reading of *walking humbly*, are the operator's. So is the framing
    that the floor/ceiling architecture is an argument brought **to** George and Gesell rather than
-   inherited from them. → canon §3.7, §5.5, the Orientation's floor/ceiling entry, and the revised
+   inherited from them. → canon §3.7, §5.6, the Orientation's floor/ceiling entry, and the revised
    §9.2.
 2. **Which abundance** — the extensive/intensive distinction and the claim that **most efforts toward
    abundance have ignored our social capacities to lift the natural floor** are the operator's, not
-   the lineage's. → canon §5.6.
+   the lineage's. → canon §5.7.
 3. **Many paths, and the incumbent path is itself a scarcity state** — the correction that reframes
-   the comparison. → canon §5.6's first and fourth moves.
-4. **The audience.** The document is the entry point for the reader who arrives *as a jaded adult*
+   the comparison. → canon §5.7's first and fourth moves.
+4. **The datacenter occasion** — that the hatred toward AI datacenters makes sense because the
+   relationship is broken; that AI is the ultimate theft of the commons and the datacenter is that
+   theft weaponised against the commons for rent extraction (monopoly over computation, wisdom and
+   intelligence); and that an emergent superintelligence in that form is enclosure *by its nature*.
+   → canon §5.3 and §9.4. The author's additions holding it inside canon discipline: the
+   negative-absorption symmetry with §6, and the refusal in §5.3's last paragraph to rely on a system
+   defecting against its own training — *capture-resistance has to be structural, or it is not
+   resistance.*
+5. **The audience.** The document is the entry point for the reader who arrives *as a jaded adult*
    rather than as a child — anarchists, socialists, capitalists, Georgists, libertarians, economists
    with a strong classical sense of the world, conditioned away from ever thinking about monetary
    policy or the forces of capital and labour, with "the struggle" filling their perspective before
@@ -607,7 +638,7 @@ unchanged.
 ### 7.5 Credit
 
 [The trap detectors](epr:comparative-political-economy-trap-detectors-2026-08-07) supply the
-detector-reports/council-decides discipline canon §5.3 adopts wholesale, convicted us in advance on
+detector-reports/council-decides discipline canon §5.4 adopts wholesale, convicted us in advance on
 the Scott point, had already refuted the illegibility position as trap **A6** (*ownerless is not
 uncaptured*, with waqf as the thousand-year case law) before either document restated it, and carry
 the §2.6 security findings and the accidental-numéraire result.
