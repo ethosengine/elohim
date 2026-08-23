@@ -224,16 +224,19 @@ storage_transport_for() { # <peer-name> <http-port>
 # Transport stamp for evidence produced by `just test mesh`. The launcher knob
 # says what a future start/restart requests; it is not proof of what the running
 # peers mounted. `/p2p/status.irohNodeId` is emitted only by a peer whose iroh
-# plane is actually co-resident with libp2p. Read EVERY peer so a partially
-# restarted mesh is stamped unknown instead of confidently "dual".
+# plane is actually co-resident with libp2p; an iroh-only peer instead reports
+# its 64-hex NodeId as `peerId`. Read EVERY peer so mixed or partially restarted
+# meshes are stamped unknown instead of confidently naming one backend.
 mesh_transport_backend_from_status() {
-  local i=0 status with_iroh=0 without_iroh=0 unreadable=0
+  local i=0 status dual=0 iroh=0 libp2p=0 unreadable=0
   for _name in "${PEERS[@]}"; do
     if status="$(curl -fsS -m 3 "http://localhost:$(http_port "$i")/p2p/status" 2>/dev/null)"; then
       if jq -e '.irohNodeId | type == "string" and length > 0' >/dev/null 2>&1 <<<"$status"; then
-        with_iroh=$((with_iroh + 1))
+        dual=$((dual + 1))
+      elif jq -e '.peerId | type == "string" and test("^[0-9a-fA-F]{64}$")' >/dev/null 2>&1 <<<"$status"; then
+        iroh=$((iroh + 1))
       else
-        without_iroh=$((without_iroh + 1))
+        libp2p=$((libp2p + 1))
       fi
     else
       unreadable=$((unreadable + 1))
@@ -242,9 +245,11 @@ mesh_transport_backend_from_status() {
   done
   if [ "$unreadable" -gt 0 ]; then
     echo unknown
-  elif [ "$with_iroh" -eq "${#PEERS[@]}" ]; then
+  elif [ "$dual" -eq "${#PEERS[@]}" ]; then
     echo dual
-  elif [ "$without_iroh" -eq "${#PEERS[@]}" ]; then
+  elif [ "$iroh" -eq "${#PEERS[@]}" ]; then
+    echo iroh
+  elif [ "$libp2p" -eq "${#PEERS[@]}" ]; then
     echo libp2p
   else
     echo unknown
