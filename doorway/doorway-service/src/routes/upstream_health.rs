@@ -430,8 +430,14 @@ impl BreakerTrial<'_> {
         self.breakers.record(&self.endpoint, ok);
     }
 
-    /// True when this guard holds the one half-open trial (test observability).
-    #[cfg(test)]
+    /// True when this guard holds the one half-open TRIAL (as opposed to
+    /// riding a closed circuit).
+    ///
+    /// Read by [`probe_open_circuits`]: a background probe must only write an
+    /// outcome onto a circuit it actually trialled. If the circuit closed
+    /// between the snapshot and the gate — real traffic healed it first — the
+    /// probe drops this guard without recording, which is a no-op (`Drop` only
+    /// acts on a consumed trial).
     pub fn consumed_trial(&self) -> bool {
         self.consumed_trial
     }
@@ -488,9 +494,97 @@ impl Default for UpstreamBreakers {
     }
 }
 
+/// Env knob: set `DOORWAY_BREAKER_PROBE_DISABLED=1` (or `true`) to turn the
+/// periodic half-open probe off. Defaults to ENABLED.
+///
+/// Read ONCE at boot by the caller (`main`), never per tick and never on a
+/// request path: an env read on a hot path plus a `set_var` in a test is a
+/// documented source of parallel-test flake, and [`probe_open_circuits`]
+/// itself takes no env at all so its tests are hermetic.
+pub fn breaker_probe_enabled() -> bool {
+    !matches!(
+        std::env::var("DOORWAY_BREAKER_PROBE_DISABLED")
+            .unwrap_or_default()
+            .trim()
+            .to_ascii_lowercase()
+            .as_str(),
+        "1" | "true" | "yes"
+    )
+}
+
+/// One guarded half-open probe pass over every OPEN circuit.
+///
+/// WHY THIS EXISTS. Nothing ever trialled a POOL peer's open circuit, so it
+/// stayed open until the process restarted. [`UpstreamBreakers::would_shed`] is
+/// a pure read by design ("a read that cannot steal" — f5e22baa2, regressed
+/// 2026-08-18, re-fixed); `select_route` skips an open endpoint rather than
+/// dialing it; the warm-up skips open; the projection fallback only fires on a
+/// PRIMARY miss. Every path that could have healed a pool circuit correctly
+/// declines to, and no path was left to close it. A doorway that has lost its
+/// failover targets to permanently-open circuits is one primary fault away from
+/// dead, silently.
+///
+/// This closes the loop WITHOUT adding a second admission path. It is the
+/// breaker's own gate, used as intended:
+///
+/// * only endpoints whose circuit reads `open` in a non-mutating
+///   [`UpstreamBreakers::snapshot`] are considered — a Closed circuit is
+///   healthy and a HalfOpen one already has its trial outstanding with some
+///   real caller, so both are skipped entirely;
+/// * admission is [`UpstreamBreakers::begin`], which enforces the single-trial
+///   semantics; if the cooldown has not elapsed it returns `None` and the probe
+///   simply does not run this tick;
+/// * the outcome is recorded through the RAII guard, so a success CLOSES the
+///   circuit and a failure re-opens it with a fresh cooldown — and a panicking
+///   or cancelled probe resolves via the guard's `Drop`, never latching.
+///
+/// The probe therefore competes for the same one trial real traffic competes
+/// for, on the same terms. It can delay a real caller's trial by one probe
+/// (bound the transport with a short timeout); it can never steal one the
+/// breaker would not have handed out.
+///
+/// `probe` is the transport — `async fn(endpoint) -> bool` (`true` = the
+/// upstream answered). Injected so the tests need no network.
+///
+/// Returns the endpoints probed and their outcomes, for logging.
+pub async fn probe_open_circuits<F, Fut>(
+    breakers: &UpstreamBreakers,
+    probe: F,
+) -> Vec<(String, bool)>
+where
+    F: Fn(String) -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
+    let mut outcomes = Vec::new();
+    for snap in breakers.snapshot() {
+        // Closed: nothing to heal. HalfOpen: a trial is already outstanding
+        // with a real caller — taking a second one is exactly the theft this
+        // must not do.
+        if snap.circuit != "open" {
+            continue;
+        }
+        let Some(trial) = breakers.begin(&snap.endpoint) else {
+            // Cooldown has not elapsed. The gate said shed; the probe obeys the
+            // gate like every other caller.
+            continue;
+        };
+        if !trial.consumed_trial() {
+            // Raced: the circuit closed between the snapshot and the gate. Drop
+            // without recording (a no-op for a non-trial guard) — a probe never
+            // writes an outcome onto a circuit it did not trial.
+            continue;
+        }
+        let ok = probe(snap.endpoint.clone()).await;
+        trial.record(ok);
+        outcomes.push((snap.endpoint, ok));
+    }
+    outcomes
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
 
     #[test]
     fn opens_after_threshold_then_sheds() {
@@ -1038,5 +1132,142 @@ mod tests {
         // snapshot() must NOT have advanced Open→HalfOpen (it used state(), not
         // should_skip): the breaker is still open on the next read.
         assert!(b.is_open_admitting_trial("http://x"));
+    }
+
+    // ---------------------------------------------------------------------
+    // PERIODIC GUARDED HALF-OPEN PROBE (habits: doorway-failover, red b).
+    //
+    // Nothing ever trialled a pool peer's open circuit, so it stayed open until
+    // reboot. These pin the three properties that make the cure safe: it heals,
+    // it obeys the cooldown, and it steals no trial.
+    // ---------------------------------------------------------------------
+
+    /// A transport stub that records what it was asked to probe.
+    fn stub(
+        answer: bool,
+    ) -> (
+        impl Fn(String) -> std::future::Ready<bool>,
+        Arc<Mutex<Vec<String>>>,
+    ) {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let sink = Arc::clone(&seen);
+        let f = move |ep: String| {
+            sink.lock().unwrap().push(ep);
+            std::future::ready(answer)
+        };
+        (f, seen)
+    }
+
+    #[tokio::test]
+    async fn a_successful_probe_closes_an_open_pool_circuit() {
+        // Zero cooldown so the trial is available immediately (the harness
+        // convention in this module — there is no wall-clock fast-forward).
+        let b = UpstreamBreakers::new(1, 0);
+        let ep = "http://pool-peer:8091";
+        b.record(ep, false);
+        assert_eq!(
+            circuit_of(&b, ep),
+            "open",
+            "nothing but a probe can heal this"
+        );
+
+        let (probe, seen) = stub(true);
+        let outcomes = probe_open_circuits(&b, probe).await;
+
+        assert_eq!(seen.lock().unwrap().as_slice(), [ep.to_string()]);
+        assert_eq!(outcomes, vec![(ep.to_string(), true)]);
+        assert_eq!(
+            circuit_of(&b, ep),
+            "closed",
+            "the recorded success closes the circuit — no real request traffic needed"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_failed_probe_reopens_the_circuit() {
+        let b = UpstreamBreakers::new(1, 0);
+        let ep = "http://pool-peer:8091";
+        b.record(ep, false);
+
+        let (probe, seen) = stub(false);
+        let outcomes = probe_open_circuits(&b, probe).await;
+
+        assert_eq!(seen.lock().unwrap().len(), 1);
+        assert_eq!(outcomes, vec![(ep.to_string(), false)]);
+        assert_eq!(
+            circuit_of(&b, ep),
+            "open",
+            "a failed TRIAL re-opens immediately — the probe is the evidence"
+        );
+        let snap = b.snapshot().into_iter().find(|s| s.endpoint == ep).unwrap();
+        assert_eq!(
+            snap.error_streak, 2,
+            "the probe's failure is recorded, not swallowed"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_probe_obeys_the_cooldown() {
+        // A real cooldown that has NOT elapsed: `begin` sheds, so the probe must
+        // not dial at all. This is the "never a second admission path" property.
+        let b = UpstreamBreakers::new(1, 1_000_000);
+        let ep = "http://pool-peer:8091";
+        b.record(ep, false);
+        assert_eq!(circuit_of(&b, ep), "open");
+
+        let (probe, seen) = stub(true);
+        let outcomes = probe_open_circuits(&b, probe).await;
+
+        assert!(
+            seen.lock().unwrap().is_empty(),
+            "cooldown not elapsed: no dial"
+        );
+        assert!(outcomes.is_empty());
+        assert_eq!(
+            circuit_of(&b, ep),
+            "open",
+            "the probe must never advance a circuit the gate would shed"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_probe_skips_closed_and_outstanding_half_open_endpoints() {
+        let b = UpstreamBreakers::new(1, 0);
+        let closed = "http://healthy:8090";
+        let half = "http://trialling:8091";
+        let open = "http://broken:8092";
+
+        b.record(closed, true); // Closed — nothing to heal.
+        b.record(half, false); // Open...
+        let outstanding = b.begin(half).expect("a real caller takes the one trial");
+        assert!(outstanding.consumed_trial());
+        assert_eq!(circuit_of(&b, half), "half-open");
+        b.record(open, false); // Open, trial unclaimed.
+
+        let (probe, seen) = stub(true);
+        probe_open_circuits(&b, probe).await;
+
+        assert_eq!(
+            seen.lock().unwrap().as_slice(),
+            [open.to_string()],
+            "only the OPEN endpoint is probed: a closed circuit is healthy, and a \
+             half-open one already has its trial out with a real caller"
+        );
+
+        // The real caller's trial survived the probe pass intact — this is the
+        // trial-theft rail (f5e22baa2 / f0b908660) applied to the probe.
+        outstanding.record(true);
+        assert_eq!(circuit_of(&b, half), "closed");
+        assert_eq!(circuit_of(&b, closed), "closed");
+    }
+
+    #[test]
+    fn the_probe_is_enabled_by_default_and_disablable() {
+        // The knob is read at boot by `main`, never per tick — asserted on the
+        // pure parse so no test ever has to `set_var` (parallel-test flake).
+        assert!(
+            breaker_probe_enabled() || std::env::var("DOORWAY_BREAKER_PROBE_DISABLED").is_ok(),
+            "enabled unless the operator set the knob"
+        );
     }
 }

@@ -1020,6 +1020,9 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             .unwrap_or(30);
         let refresh_epr_router = Arc::clone(&state.epr_router);
         let refresh_state = Arc::clone(&state);
+        // Read the knob ONCE, here — never per tick, never on a request path.
+        // `DOORWAY_BREAKER_PROBE_DISABLED=1` turns the half-open probe off.
+        let breaker_probe_enabled = doorway::routes::upstream_health::breaker_probe_enabled();
         let refresh_node_id = state.args.node_id.to_string();
         let refresh_doorway_id = state.args.doorway_id.clone().unwrap_or(refresh_node_id);
         let configured_pool_size = refresh_configured_urls.len();
@@ -1027,6 +1030,14 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         tokio::spawn(async move {
             let http = reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(10))
+                .build()
+                .unwrap_or_default();
+            // A SEPARATE, short-budget client for the half-open probe. The
+            // probe holds the endpoint's one trial while it runs, so a 10s
+            // budget would block a real caller's trial for 10s; 2s is the
+            // cheapest honest answer to "is this peer back?".
+            let probe_http = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(2))
                 .build()
                 .unwrap_or_default();
             let mut interval = tokio::time::interval(std::time::Duration::from_secs(refresh_secs));
@@ -1061,6 +1072,50 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
                 // Awaited inline: this loop already runs on its own
                 // `refresh_secs` cadence, not the request hot path.
                 doorway::server::http::prewarm_projected_shells(&refresh_state).await;
+
+                // Periodic guarded half-open probe (operator-free recovery for
+                // POOL peers).
+                //
+                // Nothing else ever trials a pool peer's open circuit:
+                // `would_shed` is a pure read by design, `select_route` SKIPS an
+                // open endpoint rather than dialing it, the warm-up skips open,
+                // and the projection fallback only fires on a PRIMARY miss. So
+                // an open pool circuit stayed open until the process restarted,
+                // and a doorway quietly lost its failover targets one by one.
+                //
+                // This rides the refresh cadence rather than a timer of its own,
+                // and takes NO second admission path: `probe_open_circuits` uses
+                // the breaker's own `begin()` gate (single-trial semantics, RAII
+                // outcome) and only ever considers endpoints a non-mutating
+                // snapshot already reports as `open`.
+                if breaker_probe_enabled {
+                    for (endpoint, ok) in doorway::routes::upstream_health::probe_open_circuits(
+                        &refresh_state.upstream_breakers,
+                        |endpoint: String| {
+                            let http = probe_http.clone();
+                            async move {
+                                let url =
+                                    format!("{}/health", endpoint.trim_end_matches('/'));
+                                matches!(http.get(&url).send().await, Ok(r) if r.status().is_success())
+                            }
+                        },
+                    )
+                    .await
+                    {
+                        if ok {
+                            info!(
+                                endpoint = %endpoint,
+                                counter = "doorway_upstream_probe_recovered_total",
+                                "half-open probe succeeded — circuit CLOSED without waiting for real traffic"
+                            );
+                        } else {
+                            debug!(
+                                endpoint = %endpoint,
+                                "half-open probe failed — circuit re-opened with a fresh cooldown"
+                            );
+                        }
+                    }
+                }
             }
         });
         info!(
