@@ -3894,74 +3894,81 @@ async fn async_main(
             // `IrohSyncClient` exists but is invoked only from tests/benches.
             // iroh content sync will not FLOW peer-to-peer until an iroh-side
             // round driver listing h_app_id="elohim" is added (bounded follow-up).
+            // PURE-IROH ONLY (`p2p_node.is_none()`): in dual mode the libp2p arm
+            // above already spawned this exact listener against this exact
+            // `Arc<SyncManager>` (shared_sync_manager reuse) — a second listener
+            // on the same EventBus races the projection read-modify-write on
+            // EVERY content write, same class as the back-fill race below.
             #[cfg(feature = "p2p-iroh")]
-            if let Some(ref iroh_sync) = iroh_sync_manager {
-                elohim_storage::sync::projector::spawn_content_projection_listener(
-                    services.events.clone(),
-                    iroh_sync.clone(),
-                    pool.clone(),
-                    // No announce on the iroh plane yet: it has no periodic
-                    // round driver either (see the note above), so wiring a
-                    // doorbell with no backstop behind it would be the worse
-                    // half of the pair. Follows the iroh round driver.
-                    None,
-                );
-                info!(
-                    "Content-projection producer spawned on iroh transport — \
-                     Automerge content-sync DocStore now filled (iroh)"
-                );
-
-                // Corpus back-fill, iroh-mode counterpart of the libp2p arm above.
-                // `backfill_content_docs` only needs the SyncManager + DB pool (no
-                // libp2p node), so pure-iroh mode gets the same reconciliation-
-                // controller back-fill the libp2p path has always had — without it
-                // a fresh iroh-only deploy's pre-existing corpus never enters the
-                // DocStore until each row is rewritten (same gap the libp2p arm's
-                // comment describes). Same env opt-out, same spawn-not-await shape.
-                //
-                // PURE-IROH ONLY (`p2p_node.is_none()`), mirroring the
-                // `with_sync_manager` hoist's guard below. In dual mode the libp2p
-                // arm above already spawned this exact back-fill against this exact
-                // `Arc<SyncManager>`; spawning a second one races it read-modify-
-                // write per doc (`get_or_create_doc` → transact → save, with no
-                // per-doc lock or CAS), so the later save silently discards the
-                // earlier projection — including a live producer projection that
-                // landed between a racer's load and its save, whose announce has
-                // already gone out on the wire.
-                let iroh_backfill_env = std::env::var("ELOHIM_DOCSTORE_BACKFILL").ok();
-                if p2p_node.is_some() {
+            if p2p_node.is_none() {
+                if let Some(ref iroh_sync) = iroh_sync_manager {
+                    elohim_storage::sync::projector::spawn_content_projection_listener(
+                        services.events.clone(),
+                        iroh_sync.clone(),
+                        pool.clone(),
+                        // No announce on the iroh plane yet: it has no periodic
+                        // round driver either (see the note above), so wiring a
+                        // doorbell with no backstop behind it would be the worse
+                        // half of the pair. Follows the iroh round driver.
+                        None,
+                    );
                     info!(
+                        "Content-projection producer spawned on iroh transport — \
+                     Automerge content-sync DocStore now filled (iroh)"
+                    );
+
+                    // Corpus back-fill, iroh-mode counterpart of the libp2p arm above.
+                    // `backfill_content_docs` only needs the SyncManager + DB pool (no
+                    // libp2p node), so pure-iroh mode gets the same reconciliation-
+                    // controller back-fill the libp2p path has always had — without it
+                    // a fresh iroh-only deploy's pre-existing corpus never enters the
+                    // DocStore until each row is rewritten (same gap the libp2p arm's
+                    // comment describes). Same env opt-out, same spawn-not-await shape.
+                    //
+                    // PURE-IROH ONLY (`p2p_node.is_none()`), mirroring the
+                    // `with_sync_manager` hoist's guard below. In dual mode the libp2p
+                    // arm above already spawned this exact back-fill against this exact
+                    // `Arc<SyncManager>`; spawning a second one races it read-modify-
+                    // write per doc (`get_or_create_doc` → transact → save, with no
+                    // per-doc lock or CAS), so the later save silently discards the
+                    // earlier projection — including a live producer projection that
+                    // landed between a racer's load and its save, whose announce has
+                    // already gone out on the wire.
+                    let iroh_backfill_env = std::env::var("ELOHIM_DOCSTORE_BACKFILL").ok();
+                    if p2p_node.is_some() {
+                        info!(
                         "Automerge DocStore corpus back-fill skipped on the iroh arm — dual mode, the libp2p arm owns the shared SyncManager"
                     );
-                } else if elohim_storage::sync::projector::backfill_enabled(
-                    iroh_backfill_env.as_deref(),
-                ) {
-                    let backfill_sync = iroh_sync.clone();
-                    let backfill_pool = pool.clone();
-                    tokio::spawn(async move {
-                        match elohim_storage::sync::projector::backfill_content_docs(
-                            &backfill_sync,
-                            &backfill_pool,
-                            200,
-                        )
-                        .await
-                        {
-                            Ok(stats) => info!(
-                                scanned = stats.scanned,
-                                projected = stats.projected,
-                                skipped = stats.skipped,
-                                failed = stats.failed,
-                                "Automerge DocStore corpus back-fill complete (iroh)"
-                            ),
-                            Err(e) => {
-                                error!(error = %e, "Automerge DocStore corpus back-fill failed (iroh)")
+                    } else if elohim_storage::sync::projector::backfill_enabled(
+                        iroh_backfill_env.as_deref(),
+                    ) {
+                        let backfill_sync = iroh_sync.clone();
+                        let backfill_pool = pool.clone();
+                        tokio::spawn(async move {
+                            match elohim_storage::sync::projector::backfill_content_docs(
+                                &backfill_sync,
+                                &backfill_pool,
+                                200,
+                            )
+                            .await
+                            {
+                                Ok(stats) => info!(
+                                    scanned = stats.scanned,
+                                    projected = stats.projected,
+                                    skipped = stats.skipped,
+                                    failed = stats.failed,
+                                    "Automerge DocStore corpus back-fill complete (iroh)"
+                                ),
+                                Err(e) => {
+                                    error!(error = %e, "Automerge DocStore corpus back-fill failed (iroh)")
+                                }
                             }
-                        }
-                    });
-                } else {
-                    info!(
+                        });
+                    } else {
+                        info!(
                         "Automerge DocStore corpus back-fill DISABLED via ELOHIM_DOCSTORE_BACKFILL (iroh) — pre-existing rows will not enter the sync plane until rewritten"
                     );
+                    }
                 }
             }
             // Wire policy enforcement for content filtering
