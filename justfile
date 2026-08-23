@@ -67,7 +67,12 @@ test target="changed" scope="":
           i=$((i+1))
         done
         export E2E_DOORWAY_POOL_STORAGE_URLS="$(peer_url_csv)"
-        export E2E_HOUSEHOLD_FIXTURE_PATH="$MESH_DIR/household-fixture.json"
+        household_fixture="$MESH_DIR/household-fixture.json"
+        if [[ -f "$household_fixture" ]]; then
+          export E2E_HOUSEHOLD_FIXTURE_PATH="$household_fixture"
+        else
+          unset E2E_HOUSEHOLD_FIXTURE_PATH
+        fi
         export ELOHIM_CLUSTER_STATE_PATH_OVERRIDE="{{ root }}/genesis/manifests/cluster-state.act1-household.yaml"
         export ELOHIM_REMOTE_COMPUTE_STATUS=unavailable
         # DURABLE TRACE. Reports live under the REPO (genesis/a2o/reports/, gitignored),
@@ -88,15 +93,19 @@ test target="changed" scope="":
         # recipe on purpose — the fixture declares processControl, and an undeclared
         # network stage / DNA hash is reported `unknown` by the builder rather than guessed.
         export A2O_PEER_COUNT="${#PEERS[@]}"
+        # The transport-parity story must name its mode inside Gherkin. A matrix
+        # caller pins the requested mode; an ordinary mesh run derives it from
+        # every peer's live status, so neither path trusts a launcher variable.
+        export E2E_EXPECTED_TRANSPORT="${E2E_EXPECTED_TRANSPORT:-$(mesh_transport_backend_from_status)}"
         # Run id: sortable UTC stamp + the commit measured. Lexicographic order IS
         # chronological order, and a mesh run takes minutes, so one second is collision-free.
-        run_id="$(date -u +%Y%m%dT%H%M%SZ)-$(git -C "{{ root }}" rev-parse --short=8 HEAD 2>/dev/null || echo nogit)"
+        run_id="${A2O_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)-$(git -C "{{ root }}" rev-parse --short=8 HEAD 2>/dev/null || echo nogit)}"
         cd "{{ a2o_dir }}"
         # NO `exec`: exec replaces the shell, so nothing after cucumber ever ran and a run
         # left no report. Capture the verdict instead and propagate it at the end.
         rc=0
         if [[ -z "{{ scope }}" ]]; then
-          pnpm exec cucumber-js --profile mesh || rc=$?
+          "{{ a2o_dir }}/node_modules/.bin/cucumber-js" --profile mesh || rc=$?
         else
           # SCOPING: cucumber MERGES a profile's `paths` with CLI positionals instead of replacing
           # them, so a bare `--profile mesh features/x.feature` runs the WHOLE tree plus that file.
@@ -116,9 +125,9 @@ test target="changed" scope="":
           cfg_rel="$(realpath --relative-to="{{ a2o_dir }}" "$cfg")"
           case "{{ scope }}" in
             @*|*" and "*|*" or "*|*"not "*)
-              pnpm exec cucumber-js --config "$cfg_rel" --profile mesh --tags "{{ scope }}" || rc=$? ;;
+              "{{ a2o_dir }}/node_modules/.bin/cucumber-js" --config "$cfg_rel" --profile mesh --tags "{{ scope }}" || rc=$? ;;
             *)
-              pnpm exec cucumber-js --config "$cfg_rel" --profile mesh "{{ scope }}" || rc=$? ;;
+              "{{ a2o_dir }}/node_modules/.bin/cucumber-js" --config "$cfg_rel" --profile mesh "{{ scope }}" || rc=$? ;;
           esac
         fi
         # Built REGARDLESS of the verdict: a red run that leaves no evidence is the exact
@@ -138,12 +147,12 @@ test target="changed" scope="":
         # partial dual restart resolves to unknown rather than forging a dual
         # evidence key from MESH_TRANSPORT_BACKEND alone.
         observed_transport="$(mesh_transport_backend_from_status)"
-        pnpm exec tsx scripts/build-sprint-report.ts \
+        node --import tsx scripts/build-sprint-report.ts \
           --cucumber "$CUCUMBER_JSON_REPORT" \
           --console-dir  "$reports_dir/console-household" \
           --coverage-gap "$reports_dir/coverage-gap-household.json" \
-          --out-json "$reports_dir/sprint-report-household-$run_id.json" \
-          --out-md   "$reports_dir/sprint-report-household-$run_id.md" \
+          --out-json "${A2O_SPRINT_REPORT_JSON:-$reports_dir/sprint-report-household-$run_id.json}" \
+          --out-md   "${A2O_SPRINT_REPORT_MD:-$reports_dir/sprint-report-household-$run_id.md}" \
           --profile  mesh \
           --lane     household \
           --transport "$observed_transport" \
@@ -198,7 +207,8 @@ mesh action="status":
       start|stop|status|probe|prologue) exec "{{ app_dir }}/scripts/hc-mesh.sh" "{{ action }}" ;;
       quiesce) exec "{{ app_dir }}/scripts/hc-mesh-quiesce.sh" ;;
       monitor) exec python3 "{{ app_dir }}/scripts/hc-mesh-monitor.py" ;;
-      *) echo "mesh action must be start|stop|status|probe|prologue|quiesce|monitor" >&2; exit 2 ;;
+      matrix) exec "{{ app_dir }}/scripts/hc-mesh-transport-matrix.sh" ;;
+      *) echo "mesh action must be start|stop|status|probe|prologue|quiesce|monitor|matrix" >&2; exit 2 ;;
     esac
 
 # Seed content or validate a corpus facet. False content dry-run modes are intentionally absent.

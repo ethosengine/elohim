@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   agentKeyMatchesDiagnosticAgent,
+  classifyStorageTransportStatus,
   describeCatchUpRide,
   getRaw,
   getRawRidingCatchUp,
@@ -11,6 +12,18 @@ import {
   CATCHUP_RIDE_MAX_INTERVAL_MS,
   CATCHUP_RIDE_TIMEOUT_MS,
 } from '../surfaces.js';
+
+void describe('classifyStorageTransportStatus', () => {
+  void it('distinguishes libp2p, iroh, dual, and unknown live status shapes', () => {
+    assert.equal(classifyStorageTransportStatus({ peerId: '12D3KooWpeer' }), 'libp2p');
+    assert.equal(classifyStorageTransportStatus({ peerId: 'a'.repeat(64) }), 'iroh');
+    assert.equal(
+      classifyStorageTransportStatus({ peerId: '12D3KooWpeer', irohNodeId: 'b'.repeat(64) }),
+      'dual'
+    );
+    assert.equal(classifyStorageTransportStatus({}), 'unknown');
+  });
+});
 
 void describe('parsePrometheusMetrics', () => {
   void it('parses a plain metric line', () => {

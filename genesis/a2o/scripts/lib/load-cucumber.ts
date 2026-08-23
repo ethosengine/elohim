@@ -4,6 +4,8 @@ export interface ScenarioResult {
   name: string;
   feature: string;
   status: ScenarioStatus;
+  /** Sum of cucumber-json step durations. Cucumber serializes these in nanoseconds. */
+  durationMs?: number;
   failureMessage?: string;
   tags: string[];
 }
@@ -53,6 +55,8 @@ export function loadCucumber(json: string): ScenarioResult[] {
         name: el.name,
         feature: feature.uri,
         status,
+        durationMs:
+          steps.reduce((total, step) => total + (step.result?.duration ?? 0), 0) / 1_000_000,
         failureMessage: failed?.result?.error_message,
         tags,
       });

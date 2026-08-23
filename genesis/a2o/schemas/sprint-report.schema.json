@@ -113,7 +113,12 @@
             "passed": { "type": "integer", "minimum": 0 },
             "failed": { "type": "integer", "minimum": 0 },
             "skipped": { "type": "integer", "minimum": 0 },
-            "pending": { "type": "integer", "minimum": 0 }
+            "pending": { "type": "integer", "minimum": 0 },
+            "durationMs": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Sum of cucumber step durations for all scenarios in this run. Used as a comparable timing sample; not a transport-only microbenchmark."
+            }
           }
         },
         "findings": {
@@ -164,7 +169,12 @@
                       "type": "string",
                       "enum": ["passed", "failed", "pending", "skipped"]
                     },
-                    "surface": { "type": "string", "description": "feature file path" }
+                    "surface": { "type": "string", "description": "feature file path" },
+                    "durationMs": {
+                      "type": "number",
+                      "minimum": 0,
+                      "description": "Cucumber-accounted scenario duration in milliseconds."
+                    }
                   }
                 }
               }

@@ -251,6 +251,8 @@ export interface P2PPullStatus {
  */
 export interface P2PStatusSurface {
   peerId: string;
+  /** Present only when the co-resident iroh plane is running. */
+  irohNodeId?: string;
   connectedPeers: number;
   syncDocuments: number;
   natStatus: string;
@@ -262,6 +264,24 @@ export interface P2PStatusSurface {
   pull?: P2PPullStatus;
   syncPaused: boolean;
   [key: string]: unknown;
+}
+
+export type StorageTransportMode = 'libp2p' | 'iroh' | 'dual' | 'unknown';
+
+/**
+ * Classify the transport a storage peer proves on its live `/p2p/status` surface.
+ *
+ * Dual peers expose the normal libp2p status plus `irohNodeId`. A pure-iroh
+ * peer exposes its 64-hex NodeId in `peerId`; a libp2p PeerId has a different
+ * wire shape. Missing evidence stays unknown.
+ */
+export function classifyStorageTransportStatus(
+  status: Partial<P2PStatusSurface>
+): StorageTransportMode {
+  if (typeof status.irohNodeId === 'string' && status.irohNodeId.length > 0) return 'dual';
+  if (typeof status.peerId !== 'string' || status.peerId.length === 0) return 'unknown';
+  if (/^[0-9a-f]{64}$/.test(status.peerId)) return 'iroh';
+  return 'libp2p';
 }
 
 // ---------------------------------------------------------------------------

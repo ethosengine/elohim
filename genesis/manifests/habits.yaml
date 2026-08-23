@@ -71,14 +71,27 @@ habits:
     invariant: >
       Serving-critical content state converges peer-to-peer; no per-host
       imperative write is load-bearing. A peer that missed a deploy heals.
-    status: green
+    status: red
     active: false
     checks:
       - "a2o @concern:federation-deploy (genesis/a2o/features/dataplane/federation-deploy.feature)"
       - "a2o @concern:content-sync, @concern:blob-replication, @concern:peer-mesh, @concern:epr-projection-fallback, @concern:reconcile-inventory (edge Dataplane Validation stage)"
       - "cargo test --test sync_libp2p_convergence (elohim/elohim-storage)"
+      - "a2o @concern:transport-parity (genesis/a2o/features/dataplane/transport-comparison-matrix.feature; just mesh matrix) — identical fresh-document contract under libp2p, iroh, and dual; successful samples alone contribute timing percentiles"
       - ".claude/scripts/latency-scoreboard.py --local (and --deployed) — bounded convergence, not merely eventual: a CONJUNCTION of speed AND this habit's trust invariant, never speed alone. A fast stale head is worse than a slow correct one, so this check can only ever narrow the habit, never carry it."
     evidence: >
+      DELTA 2026-08-23e (household transport matrix; GREEN -> RED): the first
+      comparable live run (20260823T185926Z-b93bcb9d, 3 same-host peers, one
+      sample per backend, networkStage unknown) failed all three 30-second
+      contracts. libp2p and dual projected Matthew's new Automerge document but
+      Jessica and James still served no heads; pure iroh accepted the content
+      write but never produced Matthew's local sync document. The ValueFlows
+      Process view reports failed witnesses and withholds p50/p95/p99 because
+      failed-fast duration is not performance. Mixed per-peer launch, LAN/NAT/
+      relay, and heterogeneous devices remain explicitly NOT MEASURED. This
+      flips the habit because a runnable transport-parity check now falsifies
+      serving-critical convergence; it does not erase the stronger historical
+      evidence below.
       DELTA 2026-08-23d (household lane, dual; NO status change — the habit's iroh leg
       existed only on paper until tonight): the iroh plane had no peer discovery, no
       sync initiator and no production request callers, so every elohim_iroh_* counter

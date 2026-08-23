@@ -17,7 +17,13 @@ void describe('loadCucumber', () => {
   void it('classifies passed scenario', () => {
     const [passed] = loadCucumber(fixture);
     assert.equal(passed.status, 'passed');
+    assert.equal(passed.durationMs, 0.0001);
     assert.equal(passed.failureMessage, undefined);
+  });
+
+  void it('sums step durations and converts cucumber nanoseconds to milliseconds', () => {
+    const failed = loadCucumber(fixture).find(r => r.status === 'failed')!;
+    assert.equal(failed.durationMs, 0.00025);
   });
 
   void it('extracts failure message from failed step', () => {

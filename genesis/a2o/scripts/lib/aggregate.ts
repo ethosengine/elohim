@@ -66,6 +66,8 @@ export interface ConcernScenario {
    */
   status: 'passed' | 'failed' | 'pending' | 'skipped';
   surface: string;
+  /** Wall time accounted by cucumber step results for this scenario. */
+  durationMs?: number;
 }
 
 export interface ConcernRollup {
@@ -141,7 +143,14 @@ export interface SprintReport {
   /** The externally-anchored denominator, and the concerns this run did not measure. */
   declared?: DeclaredRollup;
   summary: {
-    scenarios: { total: number; passed: number; failed: number; skipped: number; pending: number };
+    scenarios: {
+      total: number;
+      passed: number;
+      failed: number;
+      skipped: number;
+      pending: number;
+      durationMs?: number;
+    };
     findings: { total: number; bySource: Record<string, number>; byPillar: Record<string, number> };
     byConcern: Record<string, ConcernRollup>;
     visualValidation?: {
@@ -315,9 +324,17 @@ function groupIntoFindings(raws: RawFinding[]): Finding[] {
 }
 
 function computeSummary(scenarios: ScenarioResult[], findings: Finding[]): SprintReport['summary'] {
-  const scenarioCounts = { total: 0, passed: 0, failed: 0, skipped: 0, pending: 0 };
+  const scenarioCounts = {
+    total: 0,
+    passed: 0,
+    failed: 0,
+    skipped: 0,
+    pending: 0,
+    durationMs: 0,
+  };
   for (const s of scenarios) {
     scenarioCounts.total += 1;
+    scenarioCounts.durationMs += s.durationMs ?? 0;
     const status = (s.status === 'undefined' ? 'pending' : s.status) as keyof typeof scenarioCounts;
     if (status !== 'total') scenarioCounts[status] += 1;
   }
@@ -369,7 +386,12 @@ function computeByConcern(scenarios: ScenarioResult[]): Record<string, ConcernRo
     const rollup = result[concern];
     const status = concernStatusOf(s.status);
     tally(rollup, status);
-    rollup.scenarios.push({ name: s.name, status, surface: s.feature });
+    rollup.scenarios.push({
+      name: s.name,
+      status,
+      surface: s.feature,
+      durationMs: s.durationMs ?? 0,
+    });
   }
   return result;
 }
