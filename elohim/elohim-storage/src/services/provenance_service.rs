@@ -157,7 +157,7 @@ impl ProvenanceService {
                         level.push(last);
                     }
                     let mut next = Vec::with_capacity(level.len() / 2);
-                    for pair in level.chunks_exact(2) {
+                    for pair in level.as_chunks::<2>().0 {
                         let mut hasher = Sha256::new();
                         hasher.update(pair[0]);
                         hasher.update(pair[1]);
