@@ -16,8 +16,8 @@ relatedNodeIds:
   - "habit:blob-durability"
   - "habit:dataplane-convergence"
 cites:
-  - genesis/docs/superpowers/plans/2026-08-23-doorway-federated-continuity-roadmap.md
-  - genesis/docs/superpowers/specs/2026-08-23-swarm-curve-and-blind-custody-design.md
+  - "doorway-federated-continuity-roadmap | Doorway-federated continuity | sha256:4c661dbbb6927763 | path: genesis/docs/superpowers/plans/2026-08-23-doorway-federated-continuity-roadmap.md"
+  - "swarm-curve-and-blind-custody-design | The swarm curve and blind custody | sha256:ef23b30ec9b8145c | path: genesis/docs/superpowers/specs/2026-08-23-swarm-curve-and-blind-custody-design.md"
 tags: [dataplane, blob-swarm, inventory, gossip, bounded-feature, codex-claimable, agent-agnostic]
 ---
 
@@ -35,14 +35,28 @@ spec, §3.1 — this row is now its implementation row (S1′).
 **Why.** Bandwidth compounds with holders only if a requester can find the peer that holds *just*
 shard 3 and know it is shard 3 of manifest M — at a gossip cost that does not grow with shard count.
 
+**Red-team gate (2026-08-23, spec §3.1 / §12).** This row does NOT ship first. Prerequisites:
+S0-a (reassembled composite re-hashed against `blob_hash`), S0-b (push wire carries
+`manifest_cid` + `shard_index`; receiver persists a `shard_locations` membership row — without it a
+shard-only holder has nothing to fold), and the minimum gossip-auth fix (bind the applied
+`peer_id` to the propagation source, `gossip_dispatch.rs:327-352` — today the body-claimed id is
+trusted, so hints would be forgeable under a victim). The fold is a SUBSTITUTION (one composite
+entry replaces the shard addresses; the snapshot set stays stable — the composite is never on disk
+under its own name and a full-replace snapshot would otherwise erase it), the folded entry is
+non-droppable under the 3.5 KB page budget, the bitfield is merged by bit-OR `UPDATE` (the three
+`replace_into` writers in `db/peer_blob_inventory.rs` must not touch it), `content_fingerprint`
+covers it, and rows born from a bitfield claim carry `source='gossip-bitfield'` which custody /
+salvage exclude from honored-replica counts.
+
 ## Scope (elohim-storage only) — frozen wire shape, see spec §3.1
 1. `BlobHint` (`p2p/inventory_gossip.rs`) gains `shards_held: Option<Vec<u8>>` (LE bit i = shard
    index i of the manifest at `address`) and `encoding: Option<String>` — additive,
    `#[serde(default, skip_serializing_if = Option::is_none)]`; old peers ignore it.
 2. Broadcaster (`inventory_broadcaster.rs` `build_snapshot` / `build_delta` + `gather_hints`):
-   fold shard files under their manifest (via `shard_manifests` rows) before emitting — the
-   composite address carries the hint; shard addresses stop being emitted individually once the
-   fold is in. A holder with the composite bytes sets all bits.
+   a `LocalInventory` layer folds shard files under their manifest (via the S0-b membership rows
+   and `shard_manifests`) and emits ONE composite entry IN PLACE of them. A holder with the
+   composite bytes sets all bits. `build_bounded_inventory_publications` pages a folded entry,
+   never strips its hint.
 3. Receive side: `peer_blob_inventory` gains `shard_bitfield BLOB NULL` (one migration; source of
    truth: local/operational — rebuilt from the next snapshot). Both gossip legs dispatch through
    the same `handle_gossip`, so a payload change covers libp2p and iroh.
