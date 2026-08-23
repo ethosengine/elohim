@@ -1283,14 +1283,20 @@ EOF
     # substrate (serverBlobHash staged via scripts/ci/stage-spa-blob.sh); an
     # unstaged slug degrades to CSR with x-ssr-skipped. The landing browser
     # bundle carries only index.csr.html, so WITHOUT SSR the / mount 404s.
-    DOORWAY_ID="${DOORWAY_ID:-alpha-elohim-host}" \
-    DOORWAY_HEALTH_PORT="${DOORWAY_A_HEALTH_PORT:-8079}" \
     # Membrane thresholds (per client IP per 60s window; doorway membrane.rs defaults
     # 300/600/1200, ban 900s). Every a2o request on this mesh arrives from ONE loopback
     # address, and the destructive/load scenarios the owned lane runs (warm-up budgets,
     # reconnect churn, coalescing cold reads) exceed 1200/min — 2026-08-22 a re-exec'd
     # doorway A answered 403 {"error":"Forbidden"} x-membrane:deny to the rest of the lane.
     # Override per run; the fleet keeps the binary defaults.
+    #
+    # NO COMMENT LINES INSIDE THE ASSIGNMENT LIST BELOW: a comment ends the backslash
+    # continuation, so everything above it becomes a plain shell assignment that the
+    # nohup command never sees. 2026-08-22 (123cea498) that severed DOORWAY_ID and
+    # DOORWAY_HEALTH_PORT — doorway A booted with a random doorway_id, matched ZERO
+    # project-epr rows, and served / as 503 and /lamad as 404 for a whole lane.
+    DOORWAY_ID="${DOORWAY_ID:-alpha-elohim-host}" \
+    DOORWAY_HEALTH_PORT="${DOORWAY_A_HEALTH_PORT:-8079}" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-a" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
     API_KEY_ADMIN="${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}" \
