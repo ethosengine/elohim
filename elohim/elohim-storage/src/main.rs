@@ -3875,10 +3875,18 @@ async fn async_main(
             // iroh transport path: the iroh SyncManager (built at the iroh
             // co-scope above and moved into SyncManagerBackend) exposes a
             // clonable handle here. The producer is transport-neutral, so the
-            // same listener fills the iroh DocStore. Only ONE transport is active
-            // at runtime (transport_backend selects), so the libp2p block above
-            // and this block never both fire: in iroh mode `p2p_node` is None and
-            // `iroh_sync_manager` is Some.
+            // same listener fills the iroh DocStore.
+            //
+            // DUAL MODE FIRES BOTH BLOCKS. The older comment here claimed "only
+            // one transport is active at runtime, so the libp2p block above and
+            // this block never both fire" — that is FALSE for
+            // `TransportBackend::Dual`, where `p2p_node` is Some AND
+            // `iroh_sync_manager` is Some. Worse, in dual mode they are the SAME
+            // `Arc<SyncManager>`: the iroh co-scope REUSES the libp2p node's
+            // manager because `sync.sled` takes an exclusive sled lock and may be
+            // opened exactly once per process (`shared_sync_manager`, above).
+            // Anything spawned unguarded here therefore runs TWICE against ONE
+            // DocStore. Only pure-`Iroh` mode has `p2p_node` None.
             //
             // NOTE: this fills the iroh DocStore on each content write, but iroh
             // currently has no periodic sync-round DRIVER — the 60s
@@ -3910,8 +3918,24 @@ async fn async_main(
                 // a fresh iroh-only deploy's pre-existing corpus never enters the
                 // DocStore until each row is rewritten (same gap the libp2p arm's
                 // comment describes). Same env opt-out, same spawn-not-await shape.
+                //
+                // PURE-IROH ONLY (`p2p_node.is_none()`), mirroring the
+                // `with_sync_manager` hoist's guard below. In dual mode the libp2p
+                // arm above already spawned this exact back-fill against this exact
+                // `Arc<SyncManager>`; spawning a second one races it read-modify-
+                // write per doc (`get_or_create_doc` → transact → save, with no
+                // per-doc lock or CAS), so the later save silently discards the
+                // earlier projection — including a live producer projection that
+                // landed between a racer's load and its save, whose announce has
+                // already gone out on the wire.
                 let iroh_backfill_env = std::env::var("ELOHIM_DOCSTORE_BACKFILL").ok();
-                if elohim_storage::sync::projector::backfill_enabled(iroh_backfill_env.as_deref()) {
+                if p2p_node.is_some() {
+                    info!(
+                        "Automerge DocStore corpus back-fill skipped on the iroh arm — dual mode, the libp2p arm owns the shared SyncManager"
+                    );
+                } else if elohim_storage::sync::projector::backfill_enabled(
+                    iroh_backfill_env.as_deref(),
+                ) {
                     let backfill_sync = iroh_sync.clone();
                     let backfill_pool = pool.clone();
                     tokio::spawn(async move {
