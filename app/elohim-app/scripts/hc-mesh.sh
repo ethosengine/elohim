@@ -121,7 +121,9 @@ set -u
 
 MESH_PEERS="${MESH_PEERS:-matthew,jessica,james}"
 MESH_DIR="${MESH_DIR:-/tmp/elohim-local-mesh}"
-MESH_TRANSPORT_BACKEND="${MESH_TRANSPORT_BACKEND:-libp2p}"
+# Default flipped libp2p -> dual 2026-08-23: alpha has run dual since Wave-2 E3
+# (campaign decision 2026-08-04); localdev now boots at fleet parity. Rollback: libp2p.
+MESH_TRANSPORT_BACKEND="${MESH_TRANSPORT_BACKEND:-dual}"
 case "$MESH_TRANSPORT_BACKEND" in
   libp2p|dual|iroh) ;;
   *)
