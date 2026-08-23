@@ -166,7 +166,18 @@ doorway-set address list.
 | C3 | Socially-informed placement: `PlacementStrategy` input from affinity/standing (P3-8), diversity stays the floor | Opus design, Sonnet impl | elohim-storage |
 | C4 | **Write continuity (design gate session):** third-party `delegates-compute` scope (`author-for-household` / `serve-household-projection`), bounds + revocation, chaperone conductor as the delegate; answer the gate's 5 questions; spec before any route | Opus | mishpat zome (coordinator-only if the scope is data, integrity if validation changes → DNA hash moves) |
 | C5 | Recovery severance: in-DNA `HumanityWitness` path so `IntimateQuorum` rotation validates; doorway recovery routes off `501` | Opus | imagodei integrity+coordinator (**DNA-hash-moving**: alpha genesis pair both need `ALLOW_DNA_REINSTALL`) |
-| C6 | Private replica graduation (`KeyEnvelope`) | held | — |
+| C6 | **Blind custody graduation** (operator vision 2026-08-23: Adam replicates Matthew's whole household — love map included — and Matthew Adam's, neither able to read the other's private content): graduate `services/private_replica.rs` (encrypt → RS-4-7 → sealed-DEK envelope, single-host proof) onto the existing `custody-blob` action; ONE design-gate decision — `KeyEnvelope` as a per-reader sealed DEK (A2 link off the manifest, or a new entry if the gate says so); add a `blind` marker so the substrate can tell holds-and-serves from holds-and-reads. Inherits the swarm for free (it is encryption-agnostic). Recovery half depends on C5 | Opus (design gate) → Opus impl | elohim-storage + mishpat (+ imagodei if the reader-key resolver needs it) |
+
+### Lane S — the swarm curve (operator vision 2026-08-23: shards sync faster as more shards are replicated)
+The mechanism exists: `p2p/blob_swarm.rs` races each shard independently across a rotated holder list with
+per-shard `serve-blob` credit; a manifest-only holder answers `FetchOutcome::Manifest` so the requester
+pivots to the swarm. What flattens the curve today, and the rows that un-flatten it:
+| # | Task | Tier | Tree |
+|---|---|---|---|
+| S1 | Shard-level inventory gossip populated universally (today `blob_swarm.rs:46-49` falls back to the composite's holder set, so a peer holding only shard 3 is invisible); swarm candidates come from shard inventory first | Opus design, Sonnet impl | elohim-storage (inventory + blob_swarm) |
+| S2 | `ShardAssignment` gains a data-vs-parity marker (`node_registry_api.rs:28-38`) so `DiversityAwarePlacementStrategy` can keep the 4 data shards household-diverse on purpose | Sonnet | elohim-storage + node-registry zome (coordinator-only if additive metadata) |
+| S3 | Measure the curve: a2o scenario that fetches one RS blob with 1, 2, 3 holders and asserts wall-clock falls (parameter-bearing; household lane) | Sonnet | a2o |
+| S4 | iroh leg = T2 — on iroh use iroh-blobs' native multi-provider range streaming rather than re-implementing the race | Opus | elohim-storage |
 
 ### Lane T — rock-solid on either transport
 | # | Task | Tier | Tree |
