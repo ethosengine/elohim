@@ -14,7 +14,7 @@ Feature: Matthew's household actually exchanges data on its iroh plane
   that only reports an iroh NodeId.
 
   Background:
-    Given peer "matthew" at "matthew"
+    Given peer "matthew" at "E2E_STORAGE_MATTHEW"
 
   Scenario: Matthew's peer uses iroh to participate in the household mesh
     Then metric "elohim_sync_rounds_total" on peer "matthew" >= 1

@@ -16,6 +16,7 @@
 //! required. Cutover removes one transport, never two divergent message
 //! schemas.
 
+pub mod announcer;
 pub mod auth;
 pub mod auth_backends;
 mod blob_store;
@@ -43,6 +44,7 @@ pub mod sync_driver;
 pub mod view_fed;
 pub mod view_fed_backend;
 
+pub use announcer::{spawn_transport_manifest_announcer, AnnouncerInputs};
 pub use auth::{
     IdentityHandshakeBackend, IrohIdentityHandshakeClient, IrohIdentityHandshakeProtocol,
     IrohTrustClient, IrohTrustProtocol, TrustBackend, IDENTITY_HANDSHAKE_ALPN, TRUST_ALPN,
@@ -59,7 +61,7 @@ pub use epr::{
 pub use epr_atom_backend::EprAtomServiceBackend;
 pub use epr_backend::EprServiceBackend;
 pub use gossip::{GossipEvent, IrohGossip};
-pub use gossip_receive::spawn_iroh_gossip_receive;
+pub use gossip_receive::{spawn_iroh_gossip_receive, IrohReceiveDeps};
 pub use identity::load_or_generate as load_or_generate_secret_key;
 pub use node::{AlpnRegistration, IrohNode};
 pub use peer_book::{IrohPeerBook, IrohPeerEntry};

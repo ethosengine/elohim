@@ -26,6 +26,7 @@ use elohim_storage::services::gossip_flood::{GossipPublisher, PublishError};
 
 #[derive(Clone, Default)]
 struct CapturePublisher {
+    #[allow(clippy::type_complexity)]
     calls: Arc<Mutex<Vec<(String, Vec<u8>)>>>,
 }
 

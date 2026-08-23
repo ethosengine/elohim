@@ -3340,6 +3340,20 @@ async fn async_main(
     #[cfg(not(feature = "p2p-iroh"))]
     let (_iroh_node, _iroh_blob_store_for_http): (Option<()>, Option<()>) = (None, None);
 
+    // The iroh peer book — "who can I dial over iroh". Filled by verified
+    // `elohim/transport/manifest` announcements (received over EITHER plane),
+    // read by the gossip joiner, the iroh sync-round driver and blob/shard
+    // fetch. Created whenever an iroh node exists; handed to the libp2p node
+    // as the manifest sink so gossipsub-delivered manifests land in it too.
+    #[cfg(feature = "p2p-iroh")]
+    let iroh_peer_book: Option<elohim_storage::p2p_iroh::IrohPeerBook> = _iroh_node
+        .as_ref()
+        .map(|_| elohim_storage::p2p_iroh::IrohPeerBook::new());
+    #[cfg(all(feature = "p2p", feature = "p2p-iroh"))]
+    if let (Some(book), Some(libp2p_n)) = (iroh_peer_book.as_ref(), p2p_node.as_mut()) {
+        libp2p_n.set_transport_manifest_sink(std::sync::Arc::new(book.clone()));
+    }
+
     // Dual-stack gossip wiring — publish fan-out + RECEIVE loop.
     //
     // Must happen after iroh node creation, before `P2PNode::run()`. This is
@@ -3399,11 +3413,101 @@ async fn async_main(
         } else {
             None
         };
+        let book = iroh_peer_book
+            .clone()
+            .expect("iroh node exists => peer book exists");
         elohim_storage::p2p_iroh::spawn_iroh_gossip_receive(
-            iroh_n.gossip().clone(),
-            receive_pool,
-            dedup,
-            agent_info_tx,
+            elohim_storage::p2p_iroh::IrohReceiveDeps {
+                gossip: iroh_n.gossip().clone(),
+                endpoint: iroh_n.endpoint().clone(),
+                book: book.clone(),
+                db_pool: receive_pool.clone(),
+                dedup,
+                agent_info_tx,
+            },
+        );
+
+        // Announce this node's iroh NodeAddr on the gossip fan-out. Published
+        // through the DUAL publisher when libp2p is co-resident (that is the
+        // leg with peers at boot — it is how the first iroh dial ever happens);
+        // in pure-iroh mode it rides iroh-gossip only, which needs a seeded
+        // book (pkarr/doorway discovery — not wired yet) to reach anyone.
+        let announce_publisher: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> =
+            match p2p_node.as_ref() {
+                Some(libp2p_n) => {
+                    let libp2p_pub: Arc<
+                        dyn elohim_storage::services::gossip_flood::GossipPublisher,
+                    > = Arc::new(elohim_storage::p2p::adapters::LibP2PGossipPublisher::new(
+                        libp2p_n.handle().command_sender(),
+                    ));
+                    Arc::new(
+                        elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher::new(
+                            Some(libp2p_pub),
+                            Some(iroh_pub.clone()),
+                        ),
+                    )
+                }
+                None => iroh_pub.clone(),
+            };
+        // agent_cid = the DHT cell key when a conductor is attached (the
+        // manifest table is keyed by it); never a transport id.
+        let announce_agent_cid: Option<String> = hc_registry_for_http
+            .as_ref()
+            .and_then(|r| r.infrastructure_client())
+            .map(|hc| hc.agent_key_uhcak());
+        let announce_libp2p_peer_id = p2p_node.as_ref().map(|n| n.handle().local_peer_id());
+        // Same persisted key the endpoint was built from — the signature is
+        // what makes the announced NodeAddr self-certifying on the wire.
+        let announce_cfg =
+            elohim_storage::p2p_iroh::IrohConfig::from_storage_dir_and_env(&config.storage_dir);
+        let iroh_announce_secret: [u8; 32] =
+            elohim_storage::p2p_iroh::load_or_generate_secret_key(&announce_cfg.secret_key_path)
+                .map_err(|e| {
+                    error!(error = %e, "iroh: failed to load secret key for the announcer");
+                    e
+                })?
+                .to_bytes();
+        elohim_storage::p2p_iroh::spawn_transport_manifest_announcer(
+            elohim_storage::p2p_iroh::AnnouncerInputs {
+                endpoint: iroh_n.endpoint().clone(),
+                secret: iroh_announce_secret,
+                agent_cid: announce_agent_cid,
+                libp2p_peer_id: announce_libp2p_peer_id,
+                planes: [
+                    elohim_storage::p2p_iroh::peer_map::Plane::Blob,
+                    elohim_storage::p2p_iroh::peer_map::Plane::Gossip,
+                    elohim_storage::p2p_iroh::peer_map::Plane::Sync,
+                    elohim_storage::p2p_iroh::peer_map::Plane::Epr,
+                    elohim_storage::p2p_iroh::peer_map::Plane::EprAtom,
+                    elohim_storage::p2p_iroh::peer_map::Plane::Shard,
+                    elohim_storage::p2p_iroh::peer_map::Plane::ViewFed,
+                    elohim_storage::p2p_iroh::peer_map::Plane::IdentityHandshake,
+                    elohim_storage::p2p_iroh::peer_map::Plane::Trust,
+                ]
+                .iter()
+                .map(|p| p.as_str().to_string())
+                .collect(),
+                publisher: announce_publisher,
+            },
+            elohim_storage::p2p_iroh::announcer::announce_interval(),
+        );
+        // The iroh sync-round driver — the initiator the plane never had
+        // (`main.rs` used to say so in a comment). Same cadence as the libp2p
+        // round; walks the book, so it does nothing until a manifest lands.
+        if let Some(sync_mgr) = iroh_sync_manager.as_ref() {
+            elohim_storage::p2p_iroh::spawn_iroh_sync_driver(
+                iroh_n.endpoint().clone(),
+                book.clone(),
+                sync_mgr.clone(),
+                receive_pool.clone(),
+                elohim_storage::p2p::sync_round::round_interval(Some(config.sync_interval_secs)),
+            );
+        } else {
+            warn!("iroh: no sync manager — iroh sync-round driver NOT started");
+        }
+        info!(
+            peers_known = book.len(),
+            "iroh: transport-manifest announcer + gossip joiner + sync-round driver wired (the plane can now learn peers and sync)"
         );
 
         Some(iroh_pub)

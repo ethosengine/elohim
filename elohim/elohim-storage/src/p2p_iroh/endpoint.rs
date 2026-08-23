@@ -55,6 +55,9 @@ pub enum BuildEndpointError {
 /// is no longer hardcoded — it is one entry among many that operators choose.
 /// An empty list means "no discovery" (peer addresses must be exchanged
 /// out-of-band via `Endpoint::add_node_addr` — this is what tests do).
+// rustc 1.98 `result_large_err`: iroh's BindError is 160B; the error path is
+// startup-only, so boxing buys nothing — allow, as on the doorway crate.
+#[allow(clippy::result_large_err)]
 pub async fn build_endpoint(config: &IrohConfig) -> Result<Endpoint, BuildEndpointError> {
     let secret = identity::load_or_generate(&config.secret_key_path)?;
 

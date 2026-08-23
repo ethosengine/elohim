@@ -57,6 +57,7 @@ use tempfile::tempdir;
 #[derive(Debug, Clone)]
 struct StressResult {
     transport: &'static str,
+    #[allow(dead_code)]
     payload_size: usize,
     p50: Duration,
     p95: Duration,

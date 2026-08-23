@@ -895,6 +895,11 @@ pub struct P2PNode {
     /// `conductor_agent_info_gossip::spawn_agent_info_subscriber_worker`.
     agent_info_inbound_tx:
         Option<mpsc::Sender<crate::p2p::conductor_agent_info_gossip::ConductorAgentInfo>>,
+    /// Dual mode: where verified `elohim/transport/manifest` announcements go
+    /// (the iroh peer book). `None` on libp2p-only nodes — the durable row is
+    /// still projected, there is just no iroh plane to dial from.
+    transport_manifest_sink:
+        Option<Arc<dyn crate::p2p::gossip_dispatch::TransportManifestSink + Send + Sync>>,
     /// Wave 3: bounds the number of concurrently in-flight commitment-driven
     /// blob fetches spawned from the inventory gossip receive arm. Sized at
     /// `fetch_blob_parallelism * 4` (same as `RaceFetchKicker`). Drop-on-saturation
@@ -2859,6 +2864,7 @@ impl P2PNode {
             gossip_publisher: default_gossip_publisher,
             sealing_keys: None,
             agent_info_inbound_tx: None,
+            transport_manifest_sink: None,
             // Wave 3: commitment-driven fetch semaphore. Sized at parallelism * 4
             // matching RaceFetchKicker (12 with default parallelism=3). Built once at
             // node construction; cloned (Arc) into each spawned task in the receive arm.
@@ -3001,6 +3007,15 @@ impl P2PNode {
         tx: mpsc::Sender<crate::p2p::conductor_agent_info_gossip::ConductorAgentInfo>,
     ) {
         self.agent_info_inbound_tx = Some(tx);
+    }
+
+    /// Dual mode: route verified transport-manifest announcements received over
+    /// gossipsub into the iroh peer book, so the iroh plane learns who to dial.
+    pub fn set_transport_manifest_sink(
+        &mut self,
+        sink: Arc<dyn crate::p2p::gossip_dispatch::TransportManifestSink + Send + Sync>,
+    ) {
+        self.transport_manifest_sink = Some(sink);
     }
 
     /// Replace the gossip publisher in-place (non-consuming `&mut self` variant).
@@ -7297,11 +7312,16 @@ impl P2PNode {
                             peer: propagation_source.to_string(),
                             message_id: format!("{message_id:?}"),
                         };
+                        let self_iroh_node_id = self.status_tx.borrow().iroh_node_id.clone();
                         let ctx = crate::p2p::gossip_dispatch::GossipDispatchCtx {
                             db_pool: self.db_pool.as_ref(),
                             dedup: &self.dedup,
                             agent_info_inbound_tx: self.agent_info_inbound_tx.as_ref(),
                             inventory_fetch: Some(self),
+                            transport_manifest_sink: self.transport_manifest_sink.as_deref().map(
+                                |s| s as &dyn crate::p2p::gossip_dispatch::TransportManifestSink,
+                            ),
+                            self_iroh_node_id: self_iroh_node_id.as_deref(),
                         };
                         crate::p2p::gossip_dispatch::handle_gossip(
                             &ctx,

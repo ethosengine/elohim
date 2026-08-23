@@ -587,6 +587,15 @@ impl ElohimStorageBehaviour {
         gossipsub
             .subscribe(&custody_topic)
             .expect("subscribe to elohim/storage/custody");
+        // Transport-manifest topic: dual-stack peers announce their iroh
+        // NodeAddr here (signed by the iroh key). The receive arm feeds the
+        // iroh peer book — the only way the iroh plane learns who to dial
+        // under sovereign (no-discovery-service) defaults.
+        let transport_manifest_topic =
+            gossipsub::IdentTopic::new(super::transport_manifest_gossip::TRANSPORT_MANIFEST_TOPIC);
+        gossipsub
+            .subscribe(&transport_manifest_topic)
+            .expect("subscribe to elohim/transport/manifest");
         // Task 4.4: subscribe to all observation namespaces so peers receive
         // CursorAnnouncements.  Role-based subscription override is a follow-on
         // (see spec §5.3 + open question 4).

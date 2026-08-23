@@ -491,7 +491,7 @@ mod tests {
             ..Default::default()
         });
         let manifest = encoder
-            .create_manifest(&vec![7; 100], "application/octet-stream", "commons")
+            .create_manifest(&[7; 100], "application/octet-stream", "commons")
             .unwrap();
 
         assert_eq!(manifest.encoding, "rs-4-7");
@@ -513,7 +513,7 @@ mod tests {
             ..Default::default()
         });
         let manifest = encoder
-            .create_manifest(&vec![7; 100], "application/octet-stream", "commons")
+            .create_manifest(&[7; 100], "application/octet-stream", "commons")
             .unwrap();
         // The live peer selector orders one holder per household first. Three
         // households with two peers each therefore arrive as A,B,C,A,B,C.
@@ -551,7 +551,7 @@ mod tests {
             ..Default::default()
         });
         let manifest = encoder
-            .create_manifest(&vec![7; 73], "application/octet-stream", "commons")
+            .create_manifest(&[7; 73], "application/octet-stream", "commons")
             .unwrap();
         let plan = plan_shard_placement_slots(&manifest, 3);
 

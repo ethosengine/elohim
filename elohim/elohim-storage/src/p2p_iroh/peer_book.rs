@@ -153,10 +153,68 @@ impl IrohPeerBook {
     }
 }
 
+/// Convert a verified announcement into a dial target. `None` when the
+/// NodeId or relay URL does not parse (verification already checked the
+/// hex shape and the direct addresses, so this is belt-and-braces).
+pub fn entry_from_announcement(
+    ann: &crate::p2p::transport_manifest_gossip::TransportManifestAnnouncement,
+) -> Option<IrohPeerEntry> {
+    let node_id: NodeId = ann.iroh_node_id.parse().ok()?;
+    let mut addr = NodeAddr::new(node_id).with_direct_addresses(ann.direct_socket_addrs());
+    if let Some(relay) = ann.iroh_relay_url.as_deref() {
+        addr = addr.with_relay_url(relay.parse().ok()?);
+    }
+    Some(IrohPeerEntry {
+        addr,
+        agent_cid: ann.agent_cid.clone(),
+        libp2p_peer_id: ann.libp2p_peer_id.clone(),
+        announced_at_ms: ann.announced_at_ms,
+    })
+}
+
+impl crate::p2p::gossip_dispatch::TransportManifestSink for IrohPeerBook {
+    fn accept(
+        &self,
+        ann: &crate::p2p::transport_manifest_gossip::TransportManifestAnnouncement,
+    ) -> bool {
+        let Some(entry) = entry_from_announcement(ann) else {
+            return false;
+        };
+        let changed = self.upsert(entry);
+        crate::metrics::set_iroh_peers_known(self.len());
+        changed
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use iroh::SecretKey;
+
+    #[test]
+    fn announcement_becomes_a_dialable_entry() {
+        use crate::p2p::transport_manifest_gossip::TransportManifestAnnouncement;
+        let secret = [3u8; 32];
+        let ann = TransportManifestAnnouncement::sign(
+            &secret,
+            vec!["127.0.0.1:10702".into(), "[::1]:10702".into()],
+            None,
+            Some("agent-j".into()),
+            Some("12D3KooWj".into()),
+            vec!["sync".into()],
+            42,
+        );
+        assert_eq!(ann.verify(), Ok(()));
+        let entry = entry_from_announcement(&ann).expect("parses");
+        assert_eq!(entry.addr.node_id.to_string(), ann.iroh_node_id);
+        assert_eq!(entry.addr.direct_addresses.len(), 2);
+        assert_eq!(entry.agent_cid.as_deref(), Some("agent-j"));
+        let book = IrohPeerBook::new();
+        use crate::p2p::gossip_dispatch::TransportManifestSink;
+        assert!(book.accept(&ann));
+        assert!(!book.accept(&ann));
+        assert_eq!(book.len(), 1);
+    }
 
     fn entry(key: &SecretKey, at: i64, port: u16) -> IrohPeerEntry {
         IrohPeerEntry {

@@ -43,6 +43,7 @@ impl IrohNode {
     /// Build endpoint + store, mount `BlobsProtocol` under `iroh_blobs::ALPN`,
     /// and spawn the accept loop. Caller is responsible for shutting down
     /// via [`IrohNode::shutdown`] on graceful exit.
+    #[allow(clippy::result_large_err)]
     pub async fn start(config: IrohConfig) -> Result<Self, IrohNodeError> {
         Self::start_with_protocols(config, Vec::new()).await
     }
@@ -51,6 +52,7 @@ impl IrohNode {
     /// handler in `extra_protocols` on the shared `Router`. Phase 3+ uses
     /// this to layer sync / EPR / shard / view-fed / identity protocols
     /// alongside iroh-blobs without forking this aggregate.
+    #[allow(clippy::result_large_err)]
     pub async fn start_with_protocols(
         config: IrohConfig,
         extra_protocols: Vec<AlpnRegistration>,

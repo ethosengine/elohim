@@ -20,6 +20,7 @@ const RECOVERY_REVOCATION_TOPIC: &str = "recovery.revocation";
 
 #[derive(Clone, Default)]
 struct CaptureMock {
+    #[allow(clippy::type_complexity)]
     calls: Arc<Mutex<Vec<(String, Vec<u8>)>>>,
 }
 

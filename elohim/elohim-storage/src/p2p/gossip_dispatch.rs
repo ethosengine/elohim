@@ -79,6 +79,19 @@ pub trait InventoryFetch {
     fn request_snapshot_for_gap(&self, peer_id: &str);
 }
 
+/// Where a VERIFIED `elohim/transport/manifest` announcement goes so the
+/// iroh plane can dial the announcer. `None` on libp2p-only builds (the
+/// durable `peer_transport_manifest` row is still written). Implemented by
+/// `p2p_iroh::IrohPeerBook` under the `p2p-iroh` feature.
+pub trait TransportManifestSink {
+    /// Called only after `TransportManifestAnnouncement::verify` passed.
+    /// Returns `true` if the sink's state changed (new/fresher peer).
+    fn accept(
+        &self,
+        ann: &crate::p2p::transport_manifest_gossip::TransportManifestAnnouncement,
+    ) -> bool;
+}
+
 /// Borrowed context the transport-neutral gossip handler needs. Built per
 /// dispatch call by whichever transport is delivering the message.
 pub struct GossipDispatchCtx<'a> {
@@ -94,6 +107,12 @@ pub struct GossipDispatchCtx<'a> {
     /// libp2p-command-path inventory hook. `Some` on the libp2p plane,
     /// `None` on the iroh plane.
     pub inventory_fetch: Option<&'a dyn InventoryFetch>,
+    /// Verified transport-manifest announcements land here (the iroh peer
+    /// book). `None` when this build has no iroh plane.
+    pub transport_manifest_sink: Option<&'a dyn TransportManifestSink>,
+    /// This node's own iroh NodeId (hex), so its own announcement — which
+    /// gossip echoes back — is counted as `self` and never dialed.
+    pub self_iroh_node_id: Option<&'a str>,
 }
 
 /// Dispatch a single received gossip message by topic. Transport-neutral:
@@ -232,6 +251,8 @@ pub fn handle_gossip(ctx: &GossipDispatchCtx<'_>, topic: &str, data: &[u8], sour
         handle_salvage(ctx, data, source);
     } else if topic == crate::p2p::custody_announce::CUSTODY_ANNOUNCE_TOPIC {
         handle_custody_announce(ctx, data, source);
+    } else if topic == crate::p2p::transport_manifest_gossip::TRANSPORT_MANIFEST_TOPIC {
+        handle_transport_manifest(ctx, data, source);
     } else if topic.starts_with("elohim/") {
         // Per-pillar reach-scoped EPR announce topics carry a msgpack-encoded
         // CID string (announce-only). Stage 1: decode CID + dedup only.
@@ -554,6 +575,83 @@ fn handle_salvage(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSourc
 /// monotone-newer rule. A peer telling us about ourselves is dropped
 /// (`DroppedSelf`); a claim weaker than an existing row is dropped
 /// (`dropped_weaker`).
+/// `elohim/transport/manifest`: verify the announcer's signature against its
+/// iroh NodeId, then (a) feed the iroh peer book so the plane can dial it and
+/// (b) upsert the durable `peer_transport_manifest` row. Unsigned, stale, or
+/// malformed announcements are counted and dropped — never applied.
+fn handle_transport_manifest(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSource) {
+    use crate::p2p::transport_manifest_gossip::TransportManifestAnnouncement;
+
+    let ann = match TransportManifestAnnouncement::from_bytes(data) {
+        Ok(a) => a,
+        Err(e) => {
+            crate::metrics::inc_iroh_manifest_announcement("decode_failed");
+            debug!(from = %source, error = %e, "transport manifest decode failed — dropped");
+            return;
+        }
+    };
+    if let Err(e) = ann.verify() {
+        crate::metrics::inc_iroh_manifest_announcement("bad_signature");
+        warn!(
+            from = %source, node = %ann.iroh_node_id, reason = %e,
+            "transport manifest failed verification — dropped"
+        );
+        return;
+    }
+    if ctx.self_iroh_node_id == Some(ann.iroh_node_id.as_str()) {
+        crate::metrics::inc_iroh_manifest_announcement("self");
+        return;
+    }
+    // Dedup on the full identity incl. timestamp (exact replay dropped, a
+    // fresher re-announce rides through — same rule as custody announce).
+    let dedup_key = format!(
+        "TransportManifest:{}:{}",
+        ann.iroh_node_id, ann.announced_at_ms
+    );
+    if !ctx.dedup.insert(&dedup_key) {
+        crate::metrics::inc_iroh_manifest_announcement("stale");
+        return;
+    }
+
+    let book_changed = ctx
+        .transport_manifest_sink
+        .map(|sink| sink.accept(&ann))
+        .unwrap_or(false);
+    crate::metrics::inc_iroh_manifest_announcement(if book_changed { "accepted" } else { "stale" });
+    if book_changed {
+        info!(
+            from = %source, node = %ann.iroh_node_id,
+            addrs = ?ann.iroh_direct_addrs, relay = ?ann.iroh_relay_url,
+            agent = ?ann.agent_cid, libp2p = ?ann.libp2p_peer_id,
+            "iroh peer learned from transport manifest"
+        );
+    }
+
+    // Durable projection (requires an agent_cid — the manifest table is keyed
+    // by it; an announcer without one is dial-only until its binding lands).
+    #[cfg(feature = "p2p-iroh")]
+    if let (Some(pool), Some(agent_cid)) = (ctx.db_pool, ann.agent_cid.as_deref()) {
+        if let Ok(mut conn) = pool.get() {
+            let planes: Vec<crate::p2p_iroh::peer_map::Plane> = ann
+                .planes
+                .iter()
+                .filter_map(|p| crate::p2p_iroh::peer_map::Plane::parse(p))
+                .collect();
+            let relays: Vec<String> = ann.iroh_relay_url.iter().cloned().collect();
+            if let Err(e) = crate::p2p_iroh::peer_map::record_iroh_observation(
+                &mut conn,
+                agent_cid,
+                &ann.iroh_node_id,
+                &relays,
+                &planes,
+                ann.announced_at_ms / 1000,
+            ) {
+                debug!(error = %e, "peer_transport_manifest upsert from transport manifest failed");
+            }
+        }
+    }
+}
+
 fn handle_custody_announce(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSource) {
     use crate::p2p::custody_announce::CustodyAnnouncement;
 
@@ -678,6 +776,8 @@ mod tests {
             dedup: &dedup,
             agent_info_inbound_tx: None,
             inventory_fetch: None,
+            transport_manifest_sink: None,
+            self_iroh_node_id: None,
         };
         let src = GossipSource::Iroh {
             node: "test-node".to_string(),
@@ -707,6 +807,8 @@ mod tests {
             dedup: &dedup,
             agent_info_inbound_tx: None,
             inventory_fetch: None,
+            transport_manifest_sink: None,
+            self_iroh_node_id: None,
         };
         let src = GossipSource::Iroh {
             node: "n".to_string(),
@@ -721,6 +823,83 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "p2p-iroh")]
+    #[test]
+    fn transport_manifest_feeds_the_peer_book_and_the_manifest_row_only_when_verified() {
+        use crate::p2p::transport_manifest_gossip::{
+            TransportManifestAnnouncement, TRANSPORT_MANIFEST_TOPIC,
+        };
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let book = crate::p2p_iroh::IrohPeerBook::new();
+        let ctx = GossipDispatchCtx {
+            db_pool: Some(&pool),
+            dedup: &dedup,
+            agent_info_inbound_tx: None,
+            inventory_fetch: None,
+            transport_manifest_sink: Some(&book),
+            self_iroh_node_id: Some("00".repeat(32).leak()),
+        };
+        let src = GossipSource::Libp2p {
+            peer: "12D3KooWpeer".to_string(),
+            message_id: "m1".to_string(),
+        };
+        let secret = [5u8; 32];
+        let ann = TransportManifestAnnouncement::sign(
+            &secret,
+            vec!["127.0.0.1:10703".into()],
+            None,
+            Some("uhCAkJames".into()),
+            Some("12D3KooWjames".into()),
+            vec!["sync".into(), "blob".into()],
+            1_700_000_000_000,
+        );
+
+        // Verified announcement: book gains the peer, manifest row is written.
+        handle_gossip(
+            &ctx,
+            TRANSPORT_MANIFEST_TOPIC,
+            &ann.to_bytes().unwrap(),
+            &src,
+        );
+        assert_eq!(book.len(), 1);
+        let got = book
+            .get(&ann.iroh_node_id.parse().unwrap())
+            .expect("in book");
+        assert_eq!(got.agent_cid.as_deref(), Some("uhCAkJames"));
+        let mut conn = pool.get().unwrap();
+        let row = crate::p2p_iroh::peer_map::lookup_by_iroh_node_id(&mut conn, &ann.iroh_node_id)
+            .expect("query")
+            .expect("manifest row projected");
+        assert_eq!(row.agent_cid, "uhCAkJames");
+
+        // Exact replay: deduped, nothing changes.
+        handle_gossip(
+            &ctx,
+            TRANSPORT_MANIFEST_TOPIC,
+            &ann.to_bytes().unwrap(),
+            &src,
+        );
+        assert_eq!(book.len(), 1);
+
+        // Tampered (address swapped after signing): refused — book unchanged.
+        let mut forged = ann.clone();
+        forged.iroh_direct_addrs = vec!["10.9.9.9:1".into()];
+        forged.announced_at_ms += 1;
+        handle_gossip(
+            &ctx,
+            TRANSPORT_MANIFEST_TOPIC,
+            &forged.to_bytes().unwrap(),
+            &src,
+        );
+        let still = book.get(&ann.iroh_node_id.parse().unwrap()).unwrap();
+        assert!(still
+            .addr
+            .direct_addresses
+            .contains(&"127.0.0.1:10703".parse().unwrap()));
+        assert_eq!(still.addr.direct_addresses.len(), 1);
+    }
+
     #[test]
     fn custody_announce_projects_a_peer_announced_row_and_dedups_replay() {
         use crate::p2p::custody_announce::{CustodyAnnouncement, CUSTODY_ANNOUNCE_TOPIC};
@@ -731,6 +910,8 @@ mod tests {
             dedup: &dedup,
             agent_info_inbound_tx: None,
             inventory_fetch: None,
+            transport_manifest_sink: None,
+            self_iroh_node_id: None,
         };
         let src = GossipSource::Iroh {
             node: "peer-a".to_string(),
