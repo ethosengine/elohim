@@ -155,6 +155,12 @@ Survivor and recovering roles swap on alternate runs so neither slot is always t
 
 **Fleet confirmation, no redeploy.** Once the local proof exists: flip the flag in the alpha manifests, one deploy, then `[build:edge] [edge:validate-only]` measures without restarting the pods it measures. The fleet series and the local series are compared by the same reader.
 
+### 3.5 Backpressure — sync must not destabilise the peer it is healing from
+
+The operator's steering note, folded in as a constraint: matthew's conductor saturated (247 s receipt latency) during the 2026-08-24 catch-up and *did* sync out — but that it saturated at all says the sync legs (projection-reconcile heal, `reanchor_backfill` looping every ~2.5 min on `dead_candidates=199`, custody back-fill every 5 min, and now iroh rounds) push at their own cadence rather than at the rate the conductor can absorb. The protocol already represents conductor capacity (`conductor_admission`, habit `conductor-capacity-represented`, green) and names the trap (`conductor-call-is-uncancellable`: bound the WORK before the call, never bolt a timeout on). What is missing is the *reactive* half: the producers consuming that signal — demand-driven, pull-shaped sync where the conductor's admission state throttles the legs that feed it.
+
+This arc does two things about it, neither of which is the cure. First, the recovery harness **witnesses it**: every recovery record carries the max `recv_validation_receipt_received elapsed_s` on both conductors during the window, so "did this recovery destabilise the survivor" is a number per transport pair, not a log to tail. Second, `select_path`'s C11 answer (saturation hint lowers weight, never triggers retries) keeps transport selection from making it worse. The cure — the heal legs consuming `conductor_admission` as demand — is §7 row 11, a design pass of its own; the harness exists so that pass has a before/after number.
+
 ## 4. Data flow
 
 ```
@@ -210,5 +216,6 @@ Existing consumers (`race_fetch`, the iroh sync driver, heal-on-read) keep their
 | 8 | local emitter → shared `quiesce-timeline.py` reader (`source` field) | — | line grammar drift between emitters |
 | 9 | before/after `time_to_recover` runs, N=3, per scenario × shape, flag on/off | 3,4,7,8 | noise floor unknown until measured; roles swap on alternate runs |
 | 10 | flag flip in alpha manifests + `[edge:validate-only]` fleet confirmation | 9 | only if 9 shows a difference outside noise |
+| 11 | backpressure design pass: heal legs (projection-reconcile, reanchor_backfill, custody back-fill, iroh rounds) consume `conductor_admission` as demand — reactive, pull-shaped sync | 7 (needs the receipt-latency witness) | brainstorm-gated; measured by the survivor's conductor receipt max in the recovery record |
 
 **The risk worth seeing now:** row 9 may show no measurable difference on a two-peer loopback mesh, where both transports are sub-millisecond. If so, the local harness still proves *correctness* of self-awareness (right routes, honest `Unknown`, honest red on the split pair) and the *magnitude* question moves to the fleet, where relay vs direct paths differ by orders of magnitude. The arc reports which of the two it proved.
