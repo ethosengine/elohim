@@ -8,6 +8,8 @@
 //! Custom-ALPN handlers (Phase 5+) will register on the same Router
 //! alongside iroh-blobs.
 
+use std::sync::OnceLock;
+
 use anyhow::Result;
 use bytes::Bytes;
 use iroh::{
@@ -18,8 +20,15 @@ use iroh_blobs::{BlobsProtocol, Hash};
 use tracing::info;
 
 use super::{
-    blob_store::IrohBlobStore, config::IrohConfig, endpoint::BuildEndpointError, gossip::IrohGossip,
+    blob_store::IrohBlobStore,
+    codec::{read_frame_default, write_frame},
+    config::IrohConfig,
+    endpoint::BuildEndpointError,
+    gossip::IrohGossip,
+    peer_book::IrohPeerBook,
+    shard::SHARD_ALPN,
 };
+use crate::p2p::shard_protocol::{ShardRequest, ShardResponse};
 
 /// An ALPN bound to a protocol handler — the unit of registration on the
 /// shared iroh `Router`. Used by [`IrohNode::start_with_protocols`] so
@@ -151,6 +160,18 @@ impl IrohNode {
         self.store.get_bytes(hash).await
     }
 
+    /// Fetch a **SHA-256 content-addressed** blob or shard from `peer` over
+    /// the iroh shard ALPN ([`SHARD_ALPN`]). Thin delegation to
+    /// [`fetch_blob_over_iroh`] — see that function for why this plane, and
+    /// not iroh-blobs, is the one heal-on-read races.
+    pub async fn fetch_blob_by_content_address(
+        &self,
+        peer: NodeAddr,
+        content_address: &str,
+    ) -> Result<Vec<u8>, IrohBlobFetchError> {
+        fetch_blob_over_iroh(&self.endpoint, peer, content_address).await
+    }
+
     /// Shut down router (closes accept loop + endpoint) gracefully.
     pub async fn shutdown(self) -> Result<()> {
         info!(
@@ -164,6 +185,155 @@ impl IrohNode {
             .map_err(|e| anyhow::anyhow!("router shutdown failed: {e}"))?;
         Ok(())
     }
+}
+
+/// Typed failure of one iroh blob fetch. Variants map 1:1 onto the declared
+/// `elohim_iroh_blob_fetches_total{result}` label set via
+/// [`IrohBlobFetchError::metric_result`] — the counter's contract is the
+/// label set, so classification lives with the error, not at the call site.
+#[derive(Debug, thiserror::Error)]
+pub enum IrohBlobFetchError {
+    /// The QUIC connection (or its first stream) never came up.
+    #[error("iroh dial failed: {0}")]
+    Dial(String),
+    /// The peer answered, honestly, that it does not hold the address.
+    #[error("peer does not hold {0}")]
+    NotFound(String),
+    /// Framing, decode, or a peer-side error string — anything that is
+    /// neither a dial failure nor an honest miss.
+    #[error("iroh blob fetch failed: {0}")]
+    Transport(String),
+}
+
+impl IrohBlobFetchError {
+    /// The `result` label this failure contributes to
+    /// `elohim_iroh_blob_fetches_total`. (`ok` and `verify_failed` are
+    /// produced by the caller — only the caller has seen the bytes.)
+    pub fn metric_result(&self) -> &'static str {
+        match self {
+            IrohBlobFetchError::Dial(_) => "dial_failed",
+            IrohBlobFetchError::NotFound(_) => "not_found",
+            IrohBlobFetchError::Transport(_) => "error",
+        }
+    }
+}
+
+/// Fetch a SHA-256 content-addressed blob/shard from `peer` over
+/// [`SHARD_ALPN`], returning the raw bytes **unverified** — the caller
+/// verifies with the same `blob_fetch::verify_blob_hash` the libp2p leg uses,
+/// so both transports pass through one verification rule.
+///
+/// ## Why the shard ALPN and not iroh-blobs
+///
+/// The heal-on-read race is addressed by SHA-256 (`sha256-<hex>` / CID form);
+/// iroh-blobs is BLAKE3-addressed, so serving that race over
+/// [`IrohNode::fetch_blob_from`] would require a BLAKE3 alias
+/// (`peer_blob_inventory.blake3_hash`) that is NULL for every blob a peer did
+/// not itself ingest through the iroh store. The shard ALPN's responder
+/// ([`super::shard_backend::ShardServiceBackend`] → `ShardService::handle_get`)
+/// reads the SAME `BlobStore` the libp2p `/elohim/blob/1.0.0` responder reads,
+/// so the iroh leg has byte-for-byte availability parity with the libp2p leg
+/// for every address the race can name.
+///
+/// Dial and stream I/O are separated so a connection failure is classified
+/// `dial_failed` rather than collapsing into a generic `error` — the counter
+/// is only useful if its labels are honest. No retry: one dial, one request,
+/// one answer (the caller owns the timeout).
+pub async fn fetch_blob_over_iroh(
+    endpoint: &Endpoint,
+    peer: NodeAddr,
+    content_address: &str,
+) -> Result<Vec<u8>, IrohBlobFetchError> {
+    let conn = endpoint
+        .connect(peer, SHARD_ALPN)
+        .await
+        .map_err(|e| IrohBlobFetchError::Dial(e.to_string()))?;
+    let (mut send, mut recv) = conn
+        .open_bi()
+        .await
+        .map_err(|e| IrohBlobFetchError::Dial(e.to_string()))?;
+
+    let req = ShardRequest::Get {
+        hash: content_address.to_string(),
+    };
+    write_frame(&mut send, &req)
+        .await
+        .map_err(|e| IrohBlobFetchError::Transport(e.to_string()))?;
+    send.finish()
+        .map_err(|e| IrohBlobFetchError::Transport(e.to_string()))?;
+
+    let res: ShardResponse = read_frame_default(&mut recv)
+        .await
+        .map_err(|e| IrohBlobFetchError::Transport(e.to_string()))?;
+
+    match res {
+        ShardResponse::Data(bytes) => Ok(bytes),
+        ShardResponse::NotFound | ShardResponse::ContentNotFound => {
+            Err(IrohBlobFetchError::NotFound(content_address.to_string()))
+        }
+        ShardResponse::Error(msg) => Err(IrohBlobFetchError::Transport(msg)),
+        other => Err(IrohBlobFetchError::Transport(format!(
+            "unexpected shard response: {}",
+            other.summary()
+        ))),
+    }
+}
+
+/// The co-resident iroh transport leg, as the blob plane needs it: an
+/// `Endpoint` to dial from and the [`IrohPeerBook`] that says who is dialable.
+///
+/// Registered once at startup (see [`register_iroh_fetch_leg`]) because the
+/// heal-on-read entry points — `HttpServer::get_blob_or_heal` and the libp2p
+/// node's fetch task — build their `SwarmFetchParams` from a libp2p-only
+/// world and have no typed handle to the iroh stack. Both the endpoint and
+/// the book are already process singletons (one of each, created once in
+/// `main.rs`), so this registry names a fact rather than introducing one.
+#[derive(Debug, Clone)]
+pub struct IrohFetchLeg {
+    endpoint: Endpoint,
+    book: IrohPeerBook,
+}
+
+impl IrohFetchLeg {
+    pub fn endpoint(&self) -> &Endpoint {
+        &self.endpoint
+    }
+
+    /// The dialable-peer book. Its `libp2p_peer_id` / `agent_cid` fields are
+    /// ROUTING HINTS only — never attribution (storage CLAUDE.md, the
+    /// attribution cut).
+    pub fn book(&self) -> &IrohPeerBook {
+        &self.book
+    }
+
+    /// One-shot fetch of a SHA-256 content address from `peer`.
+    pub async fn fetch(
+        &self,
+        peer: NodeAddr,
+        content_address: &str,
+    ) -> Result<Vec<u8>, IrohBlobFetchError> {
+        fetch_blob_over_iroh(&self.endpoint, peer, content_address).await
+    }
+}
+
+static IROH_FETCH_LEG: OnceLock<IrohFetchLeg> = OnceLock::new();
+
+/// Publish the process's iroh fetch leg. Returns `false` if one was already
+/// registered (first registration wins — a second iroh stack in one process
+/// is not a shape this substrate has).
+///
+/// Called from `spawn_iroh_gossip_receive`, which is the single production
+/// site holding both the endpoint and the book, and which runs exactly once
+/// whenever an iroh node exists (`dual` and `iroh` backends). In `libp2p`
+/// mode it never runs, so [`iroh_fetch_leg`] stays `None` and no iroh leg is
+/// ever constructed on the fetch path.
+pub fn register_iroh_fetch_leg(endpoint: Endpoint, book: IrohPeerBook) -> bool {
+    IROH_FETCH_LEG.set(IrohFetchLeg { endpoint, book }).is_ok()
+}
+
+/// The registered iroh fetch leg, or `None` on a libp2p-only node.
+pub fn iroh_fetch_leg() -> Option<&'static IrohFetchLeg> {
+    IROH_FETCH_LEG.get()
 }
 
 /// Errors from `IrohNode::start`. Bind/identity failures, store load

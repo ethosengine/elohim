@@ -65,7 +65,10 @@ pub use gossip::{GossipEvent, IrohGossip};
 pub use gossip_receive::{spawn_iroh_gossip_receive, IrohReceiveDeps};
 pub use identity::load_or_generate as load_or_generate_secret_key;
 pub use inventory_fetch::{InventoryFetchBridgeStats, IrohInventoryFetch};
-pub use node::{AlpnRegistration, IrohNode};
+pub use node::{
+    fetch_blob_over_iroh, iroh_fetch_leg, register_iroh_fetch_leg, AlpnRegistration,
+    IrohBlobFetchError, IrohFetchLeg, IrohNode,
+};
 pub use peer_book::{IrohPeerBook, IrohPeerEntry};
 pub use shard::{IrohShardClient, IrohShardProtocol, ShardBackend, SHARD_ALPN};
 pub use shard_backend::ShardServiceBackend;

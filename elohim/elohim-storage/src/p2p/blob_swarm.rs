@@ -224,7 +224,7 @@ pub async fn fetch_shards_via_swarm(
             // Q11 atomic timing budget: ONE shard's race, not the surrounding
             // swarm fan-out.
             let shard_fetch_started = Instant::now();
-            let outcome = race_fetch(
+            let outcome = race_fetch_dual(
                 &shard_hash,
                 candidates,
                 cmd_tx,
@@ -422,7 +422,7 @@ pub async fn race_fetch_with_swarm(
     fresh_after: &str,
     params: &SwarmFetchParams<'_>,
 ) -> SwarmRaceOutcome {
-    let outcome = race_fetch(
+    let outcome = race_fetch_dual(
         blob_hash,
         candidates.clone(),
         params.cmd_tx,
@@ -476,6 +476,278 @@ pub async fn race_fetch_with_swarm(
         FetchOutcome::Miss | FetchOutcome::InvalidAddress => SwarmRaceOutcome::Miss,
         FetchOutcome::NoCandidates => SwarmRaceOutcome::NoCandidates,
     }
+}
+
+// ────────────────────────────────────────────────────────────────
+// T2 — dual-plane heal-on-read
+//
+// `race_fetch` (libp2p) is unchanged and still owns the wire, the address
+// hygiene, and the verify-then-serve rule. This section adds a SECOND leg
+// over iroh for the peers the iroh peer book can dial, races the two, and
+// returns the first VERIFIED bytes. Nothing here relaxes verification:
+// both legs terminate in `blob_fetch::verify_blob_hash` on the requested
+// address before any byte is handed back for persistence.
+// ────────────────────────────────────────────────────────────────
+
+/// Which transport legs a heal-on-read race should construct.
+///
+/// Derived from live facts rather than a config string, so the mapping is
+/// pure and testable:
+/// - **`libp2p` backend** — no iroh node exists, so nothing ever registers an
+///   `IrohFetchLeg`; `iroh_targets` is empty and this returns `Libp2pOnly`.
+///   No iroh future is constructed. Behavior byte-identical to before T2.
+/// - **`dual`** — the book knows iroh addresses for at least one candidate AND
+///   at least one candidate is libp2p-connected → `Both`.
+/// - **`iroh`** — there is no libp2p swarm, so no candidate passes the
+///   connected filter → `IrohOnly`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RaceLegs {
+    Libp2pOnly,
+    Both,
+    IrohOnly,
+}
+
+/// Pure leg selection. `iroh_targets` is the number of candidates the peer
+/// book could resolve to a dialable iroh address; `libp2p_candidates` is the
+/// number that survived the connected filter.
+pub fn plan_race_legs(iroh_targets: usize, libp2p_candidates: usize) -> RaceLegs {
+    match (iroh_targets > 0, libp2p_candidates > 0) {
+        (false, _) => RaceLegs::Libp2pOnly,
+        (true, true) => RaceLegs::Both,
+        (true, false) => RaceLegs::IrohOnly,
+    }
+}
+
+/// One fetch candidate, enriched with the iroh dial target when the peer
+/// book knows one for it.
+///
+/// `peer_id` stays the identifier the rest of the blob plane speaks — the
+/// `peer_blob_inventory.peer_id` string the candidate list was built from —
+/// so a hit over either transport books the SAME provider in
+/// `finalize_fetch_success`. The transport is a log field, never a different
+/// identity.
+#[cfg(feature = "p2p-iroh")]
+#[derive(Debug, Clone, PartialEq)]
+pub struct FetchCandidate {
+    pub peer_id: String,
+    pub iroh_addr: Option<iroh::NodeAddr>,
+}
+
+/// Attach an iroh dial target to each candidate the book can resolve.
+///
+/// Matching is by `libp2p_peer_id` OR `agent_cid` — both are ROUTING HINTS
+/// carried on a signature-verified transport manifest, never attribution
+/// (storage CLAUDE.md, the attribution cut). A candidate the book does not
+/// know keeps `iroh_addr: None` and is raced over libp2p alone.
+///
+/// Pure and synchronous — the book snapshot is taken by the caller so this
+/// is directly unit-testable without a live endpoint.
+#[cfg(feature = "p2p-iroh")]
+pub fn enrich_candidates(
+    candidates: &[String],
+    book: &[crate::p2p_iroh::IrohPeerEntry],
+) -> Vec<FetchCandidate> {
+    candidates
+        .iter()
+        .map(|peer_id| {
+            let iroh_addr = book
+                .iter()
+                .find(|entry| {
+                    entry.libp2p_peer_id.as_deref() == Some(peer_id.as_str())
+                        || entry.agent_cid.as_deref() == Some(peer_id.as_str())
+                })
+                .map(|entry| entry.addr.clone());
+            FetchCandidate {
+                peer_id: peer_id.clone(),
+                iroh_addr,
+            }
+        })
+        .collect()
+}
+
+/// `race_fetch`, raced against the iroh plane when one is registered.
+///
+/// Drop-in for `race_fetch` (identical signature and `FetchOutcome`), so the
+/// heal-on-read call sites change by one identifier. On a libp2p-only node it
+/// IS `race_fetch` — same call, no wrapper future, no allocation.
+///
+/// Bound: one shot. Each leg gets one dial per candidate, capped at the
+/// existing `parallelism` knob; no new retry loop, no queue, no second
+/// concurrency dial.
+pub async fn race_fetch_dual(
+    blob_hash: &str,
+    candidates: Vec<String>,
+    cmd_tx: &mpsc::Sender<crate::p2p::P2PCommand>,
+    // `Sync` (not just `Fn`) because the dual path boxes the libp2p leg into a
+    // `Send` future alongside the iroh legs; every call site's closure borrows
+    // an immutable `HashSet`, which already satisfies it.
+    is_connected: impl Fn(&str) -> bool + Sync,
+    parallelism: usize,
+    per_peer_timeout: Duration,
+) -> FetchOutcome {
+    #[cfg(feature = "p2p-iroh")]
+    if let Some(leg) = crate::p2p_iroh::iroh_fetch_leg() {
+        return race_both_planes(
+            leg,
+            blob_hash,
+            candidates,
+            cmd_tx,
+            &is_connected,
+            parallelism,
+            per_peer_timeout,
+        )
+        .await;
+    }
+
+    race_fetch(
+        blob_hash,
+        candidates,
+        cmd_tx,
+        &is_connected,
+        parallelism,
+        per_peer_timeout,
+    )
+    .await
+}
+
+/// The dual-plane race itself. Both legs run inside ONE `FuturesUnordered`,
+/// so the first leg to produce a terminal-good outcome (verified bytes, or a
+/// hash-matched manifest from the libp2p leg) returns and the losers are
+/// dropped — for the iroh futures, which are plain async blocks rather than
+/// `tokio::spawn`, drop IS cancellation.
+///
+/// Returning on the first `Manifest` as well as the first `Hit` preserves
+/// today's latency to the Q3/Q4 swarm pivot exactly: waiting for the iroh leg
+/// to settle before honoring a manifest would add up to `per_peer_timeout` to
+/// every sharded composite read.
+#[cfg(feature = "p2p-iroh")]
+#[allow(clippy::too_many_arguments)]
+async fn race_both_planes(
+    leg: &'static crate::p2p_iroh::IrohFetchLeg,
+    blob_hash: &str,
+    candidates: Vec<String>,
+    cmd_tx: &mpsc::Sender<crate::p2p::P2PCommand>,
+    is_connected: &(impl Fn(&str) -> bool + Sync),
+    parallelism: usize,
+    per_peer_timeout: Duration,
+) -> FetchOutcome {
+    use futures::future::FutureExt;
+
+    // Same address hygiene, same choke point, same terminal verdict as
+    // `race_fetch` — applied BEFORE either leg exists so a malformed address
+    // never reaches the iroh wire either.
+    let Ok(wire_addr) = crate::p2p::blob_fetch::normalize_fetch_address(blob_hash) else {
+        tracing::warn!(
+            target: "elohim_storage::blob_fetch",
+            hash = %blob_hash,
+            "T2: refusing to fetch a malformed content address on either plane"
+        );
+        return FetchOutcome::InvalidAddress;
+    };
+
+    // iroh reachability is INDEPENDENT of libp2p connectedness: a peer we are
+    // not libp2p-connected to may still be dialable over QUIC. So enrich over
+    // the full candidate list, not the connected subset.
+    let iroh_targets: Vec<(String, iroh::NodeAddr)> =
+        enrich_candidates(&candidates, &leg.book().snapshot(None))
+            .into_iter()
+            .filter_map(|c| c.iroh_addr.map(|addr| (c.peer_id, addr)))
+            .take(parallelism)
+            .collect();
+
+    let libp2p_candidates = candidates.iter().filter(|p| is_connected(p)).count();
+    let legs = plan_race_legs(iroh_targets.len(), libp2p_candidates);
+    if legs == RaceLegs::Libp2pOnly {
+        return race_fetch(
+            blob_hash,
+            candidates,
+            cmd_tx,
+            is_connected,
+            parallelism,
+            per_peer_timeout,
+        )
+        .await;
+    }
+
+    let mut in_flight: FuturesUnordered<futures::future::BoxFuture<'_, FetchOutcome>> =
+        FuturesUnordered::new();
+
+    if legs == RaceLegs::Both {
+        in_flight.push(
+            race_fetch(
+                blob_hash,
+                candidates.clone(),
+                cmd_tx,
+                is_connected,
+                parallelism,
+                per_peer_timeout,
+            )
+            .boxed(),
+        );
+    }
+
+    for (peer_id, addr) in iroh_targets.iter().cloned() {
+        let wire = wire_addr.clone();
+        in_flight.push(
+            async move {
+                match tokio::time::timeout(per_peer_timeout, leg.fetch(addr, &wire)).await {
+                    Err(_) => {
+                        // A timeout cannot distinguish a stalled dial from a
+                        // stalled transfer; "error" is the honest label.
+                        crate::metrics::inc_iroh_blob_fetch("error");
+                        FetchOutcome::Miss
+                    }
+                    Ok(Err(e)) => {
+                        crate::metrics::inc_iroh_blob_fetch(e.metric_result());
+                        FetchOutcome::Miss
+                    }
+                    Ok(Ok(bytes)) => {
+                        // Verify parity: the SAME predicate the libp2p leg
+                        // applies to its reply (`blob_fetch::verify_blob_hash`
+                        // on the requested address). Unverified iroh bytes are
+                        // discarded here and never reach persistence.
+                        if crate::p2p::blob_fetch::verify_blob_hash(&bytes, &wire) {
+                            crate::metrics::inc_iroh_blob_fetch("ok");
+                            tracing::debug!(
+                                target: "recovery::transport",
+                                blob_hash = %wire,
+                                source_peer = %peer_id,
+                                transport = "iroh",
+                                "share-blob received"
+                            );
+                            FetchOutcome::Hit {
+                                bytes,
+                                source_peer: peer_id,
+                            }
+                        } else {
+                            crate::metrics::inc_iroh_blob_fetch("verify_failed");
+                            warn!(
+                                target: "elohim_storage::blob_swarm",
+                                blob_hash = %wire,
+                                source_peer = %peer_id,
+                                "T2: iroh-served bytes failed hash verification — discarded"
+                            );
+                            FetchOutcome::Miss
+                        }
+                    }
+                }
+            }
+            .boxed(),
+        );
+    }
+
+    while let Some(outcome) = in_flight.next().await {
+        match outcome {
+            hit @ FetchOutcome::Hit { .. } => return hit,
+            manifest @ FetchOutcome::Manifest { .. } => return manifest,
+            // A leg that gave up is just a leg that gave up; keep polling.
+            FetchOutcome::Miss | FetchOutcome::NoCandidates | FetchOutcome::InvalidAddress => {}
+        }
+    }
+
+    // At least one iroh dial was attempted (legs != Libp2pOnly), so "no
+    // candidates" would be a lie — this is an honest miss.
+    FetchOutcome::Miss
 }
 
 #[cfg(test)]
@@ -626,5 +898,132 @@ mod tests {
         let landed = AtomicUsize::new(2);
         assert_eq!(reconstructible_threshold(&chunked), None);
         assert!(should_start_shard_race(&landed, None));
+    }
+
+    // ── T2: dual-plane heal-on-read ──────────────────────────────
+
+    /// `libp2p` backend: no iroh leg is ever registered, so leg planning
+    /// must never construct an iroh future no matter how many candidates
+    /// exist. This is the regression guard on "libp2p mode unchanged".
+    #[test]
+    fn plan_race_legs_libp2p_mode_never_constructs_an_iroh_leg() {
+        assert_eq!(plan_race_legs(0, 3), RaceLegs::Libp2pOnly);
+        assert_eq!(plan_race_legs(0, 0), RaceLegs::Libp2pOnly);
+    }
+
+    /// `dual`: book knows an iroh address AND a candidate is libp2p-connected
+    /// → both planes race.
+    #[test]
+    fn plan_race_legs_dual_races_both_planes() {
+        assert_eq!(plan_race_legs(2, 3), RaceLegs::Both);
+    }
+
+    /// `iroh`: no libp2p swarm means no candidate survives the connected
+    /// filter, so the iroh leg races alone rather than the whole read
+    /// collapsing to `NoCandidates`.
+    #[test]
+    fn plan_race_legs_iroh_only_when_no_libp2p_candidate_is_connected() {
+        assert_eq!(plan_race_legs(2, 0), RaceLegs::IrohOnly);
+    }
+
+    /// Address hygiene is applied BEFORE either leg exists: a malformed
+    /// content address is terminal on both planes and emits no wire request.
+    #[tokio::test]
+    async fn race_fetch_dual_refuses_a_malformed_address_on_both_planes() {
+        let (cmd_tx, mut cmd_rx) = mpsc::channel::<crate::p2p::P2PCommand>(4);
+        let outcome = race_fetch_dual(
+            "sha256-definitely-not-a-content-address",
+            vec!["peer-A".to_string()],
+            &cmd_tx,
+            |_| true,
+            1,
+            Duration::from_millis(50),
+        )
+        .await;
+        assert!(
+            matches!(outcome, FetchOutcome::InvalidAddress),
+            "expected InvalidAddress, got {outcome:?}"
+        );
+        assert!(
+            cmd_rx.try_recv().is_err(),
+            "no wire request may be issued for a malformed address"
+        );
+    }
+
+    #[cfg(feature = "p2p-iroh")]
+    mod iroh_leg {
+        use super::*;
+        use crate::p2p_iroh::IrohPeerEntry;
+        use iroh::{NodeAddr, SecretKey};
+
+        fn entry(
+            key: &SecretKey,
+            agent_cid: Option<&str>,
+            libp2p_peer_id: Option<&str>,
+        ) -> IrohPeerEntry {
+            IrohPeerEntry {
+                addr: NodeAddr::new(key.public()).with_direct_addresses([(
+                    [127, 0, 0, 1],
+                    4433u16,
+                )
+                    .into()]),
+                agent_cid: agent_cid.map(|s| s.to_string()),
+                libp2p_peer_id: libp2p_peer_id.map(|s| s.to_string()),
+                announced_at_ms: 1,
+            }
+        }
+
+        /// Book HAS the peer (by libp2p PeerId) → the candidate carries a
+        /// dialable iroh address. Book MISS → libp2p-only candidate.
+        #[test]
+        fn enrich_attaches_iroh_addr_only_for_peers_the_book_knows() {
+            let mut rng = rand::rngs::OsRng;
+            let key = SecretKey::generate(&mut rng);
+            let book = vec![entry(&key, Some("agent-a"), Some("12D3KooWpeerA"))];
+
+            let enriched = enrich_candidates(
+                &["12D3KooWpeerA".to_string(), "12D3KooWpeerB".to_string()],
+                &book,
+            );
+
+            assert_eq!(enriched.len(), 2);
+            assert_eq!(
+                enriched[0].iroh_addr.as_ref().map(|a| a.node_id),
+                Some(key.public()),
+                "book hit must carry the iroh dial target"
+            );
+            assert!(
+                enriched[1].iroh_addr.is_none(),
+                "book miss stays a libp2p-only candidate"
+            );
+            // The peer identity the blob plane books is unchanged by
+            // enrichment — the transport is not a different provider.
+            assert_eq!(enriched[0].peer_id, "12D3KooWpeerA");
+        }
+
+        /// The candidate list can carry an agent CID (inventory rows are not
+        /// uniformly keyed by libp2p PeerId); the book resolves either hint.
+        #[test]
+        fn enrich_matches_by_agent_cid_when_no_libp2p_hint_is_bound() {
+            let mut rng = rand::rngs::OsRng;
+            let key = SecretKey::generate(&mut rng);
+            let book = vec![entry(&key, Some("agent-jessica"), None)];
+
+            let enriched = enrich_candidates(&["agent-jessica".to_string()], &book);
+            assert_eq!(
+                enriched[0].iroh_addr.as_ref().map(|a| a.node_id),
+                Some(key.public())
+            );
+        }
+
+        /// An empty book yields no iroh targets, so planning falls back to
+        /// the libp2p leg alone even on a dual node.
+        #[test]
+        fn empty_book_degrades_to_libp2p_only() {
+            let enriched = enrich_candidates(&["12D3KooWpeerA".to_string()], &[]);
+            let targets = enriched.iter().filter(|c| c.iroh_addr.is_some()).count();
+            assert_eq!(targets, 0);
+            assert_eq!(plan_race_legs(targets, 1), RaceLegs::Libp2pOnly);
+        }
     }
 }

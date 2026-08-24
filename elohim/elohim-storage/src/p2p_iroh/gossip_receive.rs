@@ -77,6 +77,13 @@ pub struct IrohReceiveDeps {
 ///
 /// Non-blocking: returns immediately after spawning the tasks.
 pub fn spawn_iroh_gossip_receive(deps: IrohReceiveDeps) {
+    // T2: publish the blob plane's iroh leg. This is the single production
+    // site holding BOTH the endpoint and the peer book, and it runs exactly
+    // once whenever an iroh node exists — so `iroh_fetch_leg()` is `Some`
+    // in `dual`/`iroh` mode and `None` (no iroh leg ever constructed) in
+    // `libp2p` mode. Blob heal-on-read reads it from
+    // `p2p::blob_swarm::race_fetch_dual`.
+    super::register_iroh_fetch_leg(deps.endpoint.clone(), deps.book.clone());
     info!(
         topics = INBOUND_TOPICS.len(),
         "iroh gossip receive: subscribing to inbound topics (Dual-plane receive lit)"
