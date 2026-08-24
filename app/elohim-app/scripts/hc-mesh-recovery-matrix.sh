@@ -60,6 +60,84 @@ matrix_live_shape() { # -> "<peers-csv>/<0|1>" describing what's ACTUALLY runnin
   printf '%s/%s\n' "$live" "$doorways"
 }
 
+reshape_verify() { # <peers-csv> <doorways 0|1> -> rc 0 iff the mesh is actually
+  # SERVING (every peer /health + /db/stats contentCount>0, and — when
+  # doorways=1 — both doorways answer /db/content/elohim-host-landing).
+  # A reshape is judged by this, never by the prologue seeder's exit code
+  # (its post-flight probe is a known false red against SSR HTML).
+  local peers="$1" doorways="$2"
+  case "${MESH_RECOVERY_RESHAPE_VERIFY_STUB:-}" in
+    ok)
+      echo "matrix: reshape verified peers=$peers doorways=$doorways in 0s (stub)"
+      return 0
+      ;;
+    fail)
+      echo "matrix: reshape NOT serving after 0s (stub forced failure)"
+      return 1
+      ;;
+  esac
+  local max="${MESH_RECOVERY_RESHAPE_VERIFY_SECS:-180}" interval=5
+  local -a plist
+  IFS=',' read -ra plist <<< "$peers"
+  local start_ts elapsed which ok i name port stats cc remaining sleep_for
+  start_ts=$(date +%s)
+  while :; do
+    ok=1
+    which=""
+    i=0
+    for name in "${plist[@]}"; do
+      port=$((MESH_RECOVERY_PROBE_BASE + i))
+      if ! curl -sf -m 3 "http://localhost:$port/health" >/dev/null 2>&1; then
+        ok=0
+        which="$name/health"
+        break
+      fi
+      stats="$(curl -sf -m 3 "http://localhost:$port/db/stats" 2>/dev/null)"
+      if [ -z "$stats" ]; then
+        ok=0
+        which="$name/db/stats unreachable"
+        break
+      fi
+      cc="$(printf '%s' "$stats" | python3 -c '
+import json, sys
+try:
+    print(int(json.load(sys.stdin).get("contentCount", 0) or 0))
+except Exception:
+    print(0)
+' 2>/dev/null)"
+      [ -z "$cc" ] && cc=0
+      if [ "$cc" -le 0 ]; then
+        ok=0
+        which="$name/db/stats contentCount=$cc"
+        break
+      fi
+      i=$((i + 1))
+    done
+    if [ "$ok" -eq 1 ] && [ "$doorways" = "1" ]; then
+      if ! curl -sf -m 3 "http://localhost:${DOORWAY_PORT:-8888}/db/content/elohim-host-landing" >/dev/null 2>&1; then
+        ok=0
+        which="doorway-A /db/content/elohim-host-landing"
+      elif ! curl -sf -m 3 "http://localhost:${DOORWAY_B_PORT:-8889}/db/content/elohim-host-landing" >/dev/null 2>&1; then
+        ok=0
+        which="doorway-B /db/content/elohim-host-landing"
+      fi
+    fi
+    elapsed=$(( $(date +%s) - start_ts ))
+    if [ "$ok" -eq 1 ]; then
+      echo "matrix: reshape verified peers=$peers doorways=$doorways in ${elapsed}s"
+      return 0
+    fi
+    if [ "$elapsed" -ge "$max" ]; then
+      echo "matrix: reshape NOT serving after ${elapsed}s ($which)"
+      return 1
+    fi
+    remaining=$((max - elapsed))
+    sleep_for="$interval"
+    [ "$remaining" -lt "$interval" ] && sleep_for="$remaining"
+    sleep "$sleep_for"
+  done
+}
+
 if [ "${RECOVERY_MATRIX_SOURCE_ONLY:-0}" = "1" ]; then
   return 0 2>/dev/null || exit 0
 fi
@@ -85,6 +163,11 @@ fi
 
 rc=0
 rows=()
+# Per-distinct-shape (peers/doorways) reshape bookkeeping: bounded retries
+# instead of a regenerate loop when the mesh never comes up serving.
+declare -A reshape_fail_count=()
+declare -A reshape_given_up=()
+MESH_RECOVERY_RESHAPE_RETRIES="${MESH_RECOVERY_RESHAPE_RETRIES:-1}"
 # Seed shape_now from what's ACTUALLY running so the first scenario reshapes
 # only when the live mesh doesn't already match it — not unconditionally.
 shape_now="$(matrix_live_shape)"
@@ -140,8 +223,24 @@ reshape_mesh() { # <peers-csv> <doorways 0|1>; the only process-count change
   echo "=== reshaping mesh: peers=$peers doorways=$doorways ==="
   reshape_stop "$peers" "$doorways"
   reshape_wait_ports_free
-  MESH_PEERS="$peers" MESH_DOORWAYS="$doorways" "$SCRIPT_DIR/hc-mesh.sh" start &&
-    MESH_PEERS="$peers" MESH_DOORWAYS="$doorways" "$SCRIPT_DIR/hc-mesh.sh" prologue
+  MESH_PEERS="$peers" MESH_DOORWAYS="$doorways" "$SCRIPT_DIR/hc-mesh.sh" start || return 1
+  local prologue_rc
+  MESH_PEERS="$peers" MESH_DOORWAYS="$doorways" "$SCRIPT_DIR/hc-mesh.sh" prologue
+  prologue_rc=$?
+  echo "matrix: prologue exit $prologue_rc (advisory — the seeder post-flight is a known false red; the mesh is judged by reshape_verify)"
+  reshape_verify "$peers" "$doorways"
+}
+
+matrix_reshape_fail_rows() { # <name> — append FAIL(reshape) rows for every
+  # shape×run of this scenario so the table accounts for a scenario the
+  # matrix never ran (reshape verify red, or a shape already given up on).
+  local name="$1"
+  local fr_shape fr_run
+  for fr_shape in "${SHAPES[@]}"; do
+    for fr_run in $(seq 1 "$RUNS"); do
+      rows+=("$name"$'\t'"$fr_shape"$'\t'"$fr_run"$'\t'"-"$'\t'"-"$'\t'"-"$'\t'"reshape"$'\t'"FAIL(reshape)")
+    done
+  done
 }
 
 while IFS=$'\t' read -r name peers doorways t_surv t_rec expect; do
@@ -150,12 +249,29 @@ while IFS=$'\t' read -r name peers doorways t_surv t_rec expect; do
   case "$expect" in recover|no-shared-transport) ;; *) echo "invalid expectation for $name: $expect" >&2; rc=1; continue ;; esac
 
   if [ "$shape_now" != "$peers/$doorways" ]; then
-    reshape_mesh "$peers" "$doorways" || {
-      echo "reshape failed for $name" >&2
+    shape_key="$peers/$doorways"
+    if [ "${reshape_given_up[$shape_key]:-0}" = "1" ]; then
+      echo "matrix: shape $shape_key already given up on — skipping reshape, recording FAIL(reshape) for $name" >&2
+      matrix_reshape_fail_rows "$name"
       rc=1
       continue
-    }
-    shape_now="$peers/$doorways"
+    fi
+    if ! reshape_mesh "$peers" "$doorways"; then
+      attempt=$(( ${reshape_fail_count[$shape_key]:-0} + 1 ))
+      reshape_fail_count[$shape_key]="$attempt"
+      max_attempts=$(( MESH_RECOVERY_RESHAPE_RETRIES + 1 ))
+      if [ "$attempt" -ge "$max_attempts" ]; then
+        reshape_given_up[$shape_key]=1
+        echo "matrix: giving up on shape $shape_key after $attempt attempts" >&2
+      else
+        echo "matrix: reshape failed for $name (attempt $attempt/$max_attempts on shape $shape_key) — will retry when the next scenario needs it" >&2
+      fi
+      matrix_reshape_fail_rows "$name"
+      rc=1
+      continue
+    fi
+    reshape_fail_count[$shape_key]=0
+    shape_now="$shape_key"
   fi
 
   export MESH_PEERS="$peers" MESH_DOORWAYS="$doorways"

@@ -111,4 +111,33 @@ t() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fail=1; fi; }
   exit "$fail"
 ) || fail=1
 
+# reshape_verify: a reshape is judged by whether the mesh SERVES, never by the
+# prologue seeder's exit code (its post-flight probe is a known false red).
+# MESH_RECOVERY_RESHAPE_VERIFY_STUB bypasses probing entirely for unit tests.
+(
+  set +e
+  RECOVERY_MATRIX_SOURCE_ONLY=1 source "$here/../hc-mesh-recovery-matrix.sh"
+  out="$(MESH_RECOVERY_RESHAPE_VERIFY_STUB=ok reshape_verify x,y 1)"; rc=$?
+  t "reshape_verify STUB=ok passes (rc=$rc): $out" \
+    '[ "$rc" -eq 0 ] && [[ "$out" == *"reshape verified"* ]]'
+  out="$(MESH_RECOVERY_RESHAPE_VERIFY_STUB=fail reshape_verify x,y 1)"; rc=$?
+  t "reshape_verify STUB=fail fails (rc=$rc): $out" \
+    '[ "$rc" -ne 0 ] && [[ "$out" == *"NOT serving"* ]]'
+  exit "$fail"
+) || fail=1
+
+# reshape_verify: unstubbed against guaranteed-closed ports must be bounded by
+# MESH_RECOVERY_RESHAPE_VERIFY_SECS, not hang or loop forever.
+(
+  set +e
+  RECOVERY_MATRIX_SOURCE_ONLY=1 source "$here/../hc-mesh-recovery-matrix.sh"
+  unset MESH_RECOVERY_RESHAPE_VERIFY_STUB
+  start="$(date +%s)"
+  out="$(MESH_RECOVERY_PROBE_BASE=65000 MESH_RECOVERY_RESHAPE_VERIFY_SECS=6 reshape_verify x,y 1)"; rc=$?
+  elapsed=$(( $(date +%s) - start ))
+  t "reshape_verify bounded wait fails within ~6s on closed ports (rc=$rc, elapsed=${elapsed}s): $out" \
+    '[ "$rc" -ne 0 ] && [ "$elapsed" -le 15 ] && [[ "$out" == *"NOT serving"* ]]'
+  exit "$fail"
+) || fail=1
+
 exit "$fail"
