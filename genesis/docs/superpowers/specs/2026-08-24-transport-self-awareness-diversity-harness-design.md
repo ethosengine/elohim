@@ -27,6 +27,7 @@ cites:
   - elohim/elohim-storage/src/p2p_iroh/peer_book.rs
   - elohim/elohim-storage/src/p2p/blob_fetch.rs
   - elohim/elohim-storage/src/sync/doc_store.rs
+  - "swarm-curve-and-blind-custody-design | The swarm curve and blind custody | sha256:ef23b30ec9b8145c | path: genesis/docs/superpowers/specs/2026-08-23-swarm-curve-and-blind-custody-design.md"
   - "iroh-libp2p-complementarity | the canonical selector this spec composes INSIDE: peer_map::select_transport rules 1/3 become the eligible set, Track3/NoShared stay verbatim, rule-2 iroh preference survives as the Unknown prior; its anti-capture clause is answered by the exploration floor | sha256:29235aeb35aff128 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md"
   - genesis/docs/superpowers/plans/2026-06-14-dataplane-transport-plan.md
   - elohim/elohim-storage/src/p2p_iroh/peer_map.rs
@@ -145,6 +146,13 @@ The reconcile and back-fill paths already *know* why a document is not projected
 
 Survivor and recovering roles swap on alternate runs so neither slot is always the one measured. Each run is a restart of one slot, not a fresh mesh; conductors are untouched on warm return.
 
+**The fanout family — the torrent effect.** The swarm-curve design (`2026-08-23-swarm-curve-and-blind-custody-design.md`) claims sharded distribution speeds a catching-up peer with every added holder; `elohim_blob_swarm_composite_completed_total` is 0 on the local mesh, so the claim is unmeasured. The recovery primitive measures it directly: one recovering peer, **N survivors** that all hold the committed set, same content, same transport — `time_to_recover` as a function of N is the curve. Compute ceiling is the constraint (each conductor ≈2 GB), so fanout runs **without doorways** (`MESH_DOORWAYS=0`: no doorway A/B, no mongod; P4 is reported as skipped, not passed) and in `dual` or `libp2p` only (pure-iroh bootstraps from the doorway manifest board, which is absent). Sizes in this arc: `fanout-1` (2 peers) and `fanout-2` (3 peers — the cast the prologue can seed); `fanout-3` (4 peers) needs a fourth household fixture and is a declared later row.
+
+| scenario | peers | survivors | recovering | transport | expect |
+|---|---|---|---|---|---|
+| `fanout-1` | matthew,jessica | 1 | jessica | dual | recovers — baseline for the curve |
+| `fanout-2` | matthew,jessica,james | 2 | james | dual | recovers; `time_to_recover` ≤ fanout-1 is the swarm claim, `>` is a finding for the swarm spec |
+
 **Footprint line.** `hc-mesh.sh status` prints RSS and CPU per conductor/storage/doorway and a total, so the cost of any configuration is read from the same command that reports its health.
 
 ### 3.4 Cut 3 — the churn-injected quiescence measure
@@ -216,6 +224,7 @@ Existing consumers (`race_fetch`, the iroh sync driver, heal-on-read) keep their
 | 8 | local emitter → shared `quiesce-timeline.py` reader (`source` field) | — | line grammar drift between emitters |
 | 9 | before/after `time_to_recover` runs, N=3, per scenario × shape, flag on/off | 3,4,7,8 | noise floor unknown until measured; roles swap on alternate runs |
 | 10 | flag flip in alpha manifests + `[edge:validate-only]` fleet confirmation | 9 | only if 9 shows a difference outside noise |
+| 12 | fanout-3 (4 peers): a fourth household fixture the prologue can cast, then the same recovery run with 3 survivors | 7 | if fanout-2 shows no speedup, fanout-3 is moot until the swarm path lands |
 | 11 | backpressure design pass: heal legs (projection-reconcile, reanchor_backfill, custody back-fill, iroh rounds) consume `conductor_admission` as demand — reactive, pull-shaped sync | 7 (needs the receipt-latency witness) | brainstorm-gated; measured by the survivor's conductor receipt max in the recovery record |
 
 **The risk worth seeing now:** row 9 may show no measurable difference on a two-peer loopback mesh, where both transports are sub-millisecond. If so, the local harness still proves *correctness* of self-awareness (right routes, honest `Unknown`, honest red on the split pair) and the *magnitude* question moves to the fleet, where relay vs direct paths differ by orders of magnitude. The arc reports which of the two it proved.
