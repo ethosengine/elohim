@@ -60,7 +60,8 @@ just mesh start                # mongod → doorway A → doorway B → conducto
 just mesh status
 just mesh probe
 just mesh quiesce
-just mesh recovery-matrix      # cycle the recovery scenario library (Task 2 + Task 5 required)
+just mesh recovery <warm|cold> <peer> [--label k=v]  # single recovery run (hc-mesh-recovery.sh)
+just mesh recovery-matrix      # cycle the recovery scenario library (MESH_PEER_TRANSPORTS + hc-mesh-recovery.sh)
 just mesh stop
 ```
 
@@ -96,8 +97,11 @@ their pacing environment into new npm aliases.
 library across `MESH_RECOVERY_SHAPES` and `MESH_RECOVERY_RUNS`, alternates the
 two-peer recovering slot, and reshapes only when peers/doorways change. Narrow
 a run with `MESH_RECOVERY_SCENARIOS`; opt into per-run local quiesce records
-with `MESH_RECOVERY_QUIESCE=1`. It requires the per-peer transport interface
-(`MESH_PEER_TRANSPORTS`, Task 2) and `hc-mesh-recovery.sh` (Task 5).
+with `MESH_RECOVERY_QUIESCE=1`. It composes the per-peer transport interface
+(`MESH_PEER_TRANSPORTS` in `hc-mesh.sh`) with the single-peer recovery
+primitive (`hc-mesh-recovery.sh`). Drive one scenario/run directly with
+`just mesh recovery <warm|cold> <peer> [--label k=v]` before reaching for the
+full matrix.
 
 ### Act I Prologue cast (`hc-mesh-prologue.sh`)
 

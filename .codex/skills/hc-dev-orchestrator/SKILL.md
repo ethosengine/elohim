@@ -63,6 +63,8 @@ just mesh start                # mongod → doorway A → doorway B → conducto
 just mesh status
 just mesh probe
 just mesh quiesce
+just mesh recovery <warm|cold> <peer> [--label k=v]  # single recovery run (hc-mesh-recovery.sh)
+just mesh recovery-matrix      # cycle the recovery scenario library (MESH_PEER_TRANSPORTS + hc-mesh-recovery.sh)
 just mesh stop
 ```
 
@@ -83,6 +85,9 @@ the exact cargo-pool build command. `mesh status` prints `transport=<mode>` per
 peer from the live/captured process environment, `storage-restart` preserves that
 captured mode (including with `MESH_RESTART_APPLY_PROFILE=1`), and each household
 sprint report stamps the mode in JSON and its Markdown header so runs remain comparable.
+`mesh status` also prints one `footprint <role> <name> rss=<MB> cpu=<pct>` line per running
+conductor, storage, doorway, and mongod process, followed by `footprint total rss=<MB>`. The values
+come from `ps` and describe what is running, not the next-launch configuration.
 
 `mesh quiesce` measures an already-running mesh and records its bounded result
 (one line per run, including the wall-clock, verdict, knobs and an io_baseline
@@ -90,6 +95,16 @@ write-throughput probe) under `${MESH_DIR:-/tmp/elohim-local-mesh}`. It never
 starts or stops peers. The underlying maintained interfaces are
 `hc-mesh.sh start|stop|status|probe` and `hc-mesh-quiesce.sh`; do not copy
 their pacing environment into new npm aliases.
+
+`just mesh recovery-matrix` cycles the checked-in `mesh-recovery-scenarios.tsv`
+library across `MESH_RECOVERY_SHAPES` and `MESH_RECOVERY_RUNS`, alternates the
+two-peer recovering slot, and reshapes only when peers/doorways change. Narrow
+a run with `MESH_RECOVERY_SCENARIOS`; opt into per-run local quiesce records
+with `MESH_RECOVERY_QUIESCE=1`. It composes the per-peer transport interface
+(`MESH_PEER_TRANSPORTS` in `hc-mesh.sh`) with the single-peer recovery
+primitive (`hc-mesh-recovery.sh`). Drive one scenario/run directly with
+`just mesh recovery <warm|cold> <peer> [--label k=v]` before reaching for the
+full matrix.
 
 ### Act I Prologue cast (`hc-mesh-prologue.sh`)
 

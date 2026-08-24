@@ -177,15 +177,19 @@ print(",".join(record["failing_legs"]), record["time_to_recover_s"])
       # Doorway-less runs cannot take a quiesce measure: the gate needs both.
       [ "$doorways" = "0" ] && continue
       if [ "${MESH_RECOVERY_QUIESCE:-0}" = "1" ]; then
+        # Quiesce is a measurement side-channel, not a recovery expectation: the
+        # matrix's exit code is exit 0 iff every run matched its scenario's
+        # expect — a quiesce plumbing failure warns on stderr and records
+        # nothing, but never taints rc. The verdict column (and rc) stay
+        # exactly what the recovery run above decided.
         "$SCRIPT_DIR/hc-mesh-quiesce.sh" >/dev/null 2>&1
         quiesce_log="$(find "$MESH_DIR/quiesce-gate" -maxdepth 1 -type f -name '*.log' -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-)"
         if [ -z "$quiesce_log" ]; then
-          echo "quiesce produced no local gate log for $name/$shape/run-$run" >&2
-          rc=1
+          echo "quiesce produced no local gate log for $name/$shape/run-$run (measurement only, verdict unaffected)" >&2
         else
           python3 "$REPO_ROOT/genesis/scripts/quiesce-timeline.py" --local "$quiesce_log" \
             --label "scenario=$name" --label "shape=$shape" --label "run=$run" --record \
-            >/dev/null || rc=1
+            >/dev/null || echo "quiesce-timeline record failed for $name/$shape/run-$run (measurement only, verdict unaffected)" >&2
         fi
       fi
     done
