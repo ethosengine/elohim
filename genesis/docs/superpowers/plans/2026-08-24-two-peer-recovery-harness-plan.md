@@ -159,7 +159,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 2: Per-peer transport in `hc-mesh.sh` (`MESH_PEER_TRANSPORTS`)
 
 **Files:**
-- Modify: `app/elohim-app/scripts/hc-mesh.sh` — knob block (after line 136 `export MESH_TRANSPORT_BACKEND`), `assert_storage_transport_capability` call sites (two, inside `storage_restart` ~lines 725 and 750), `restart_env_overlay` (line 833; signature + its call at line 789), storage launch (line 1505), `status_all` (line 592 loop), `mesh_transport_backend_from_status` (line 231)
+- Modify: `app/elohim-app/scripts/hc-mesh.sh` — knob block (after line 136 `export MESH_TRANSPORT_BACKEND`), `assert_storage_transport_capability` call sites (two, inside `restart_storage` ~lines 725 and 750), `restart_env_overlay` (line 833; signature + its call at line 789), storage launch (line 1505), `status_all` (line 592 loop), `mesh_transport_backend_from_status` (line 231)
 - Create: `app/elohim-app/scripts/__tests__/hc-mesh-peer-transport.test.sh`
 
 **Interfaces:**
