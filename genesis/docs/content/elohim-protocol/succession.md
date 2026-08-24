@@ -41,7 +41,7 @@ So this document goes first. It does not ask you to imagine anything. It asks yo
 
 If that claim is wrong, nothing else here matters and you have lost an hour. If it is right, then a set of designs you may have filed under "tried, failed, romantic" become live engineering questions, and the vision in the manifesto stops being a wish and becomes a consequence.
 
-If you want to know quickly whether this is worth an hour, skip to **§5.3**. It is about the fight over AI datacenters that is very likely happening in your county right now, and it argues that the anger is correct — not as sympathy, but as an accurate read of a rent relationship, arriving through the only channel that was left open. If that section is wrong, the rest of this will not persuade you either.
+If you want to know quickly whether this is worth an hour, skip to **§5.7 and §5.8**. They are about the fight over AI datacenters that is very likely happening in your county right now, and it argues that the anger is correct — not as sympathy, but as an accurate read of a rent relationship, arriving through the only channel that was left open. If that section is wrong, the rest of this will not persuade you either.
 
 We will also tell you, in §9, exactly how much of this we have failed to build — including the part where our own argument leans on a capability built at hyperscale without the consent of the people whose record trained it. That section is not modesty. It is the only reason to trust the rest.
 
@@ -90,7 +90,7 @@ Four of the costs are transactional, and they are always the same four:
 
 Historically these are paid to a broker, a bank, a clerk, or a state. Proudhon's Bank of the People needed clerks it never got. The WIR bought its survival with a banking licence and salaried underwriters. Sardex, the most successful mutual-credit network operating today, runs on human brokers who match trades over the telephone.
 
-The fifth cost is different in kind, and the tradition never named it as a cost at all: **discernment** — *what does right relationship actually require of me, here, given what I hold, what my neighbour lacks, and the particular shape of my life?* That question has an answer, it has a different answer for every person, and arriving at it honestly takes a long, high-context negotiation nobody has ever been able to afford at population scale. §3.7 argues that this single unaffordability is why George reached for a tax and Gesell for a stamp, and §5.6 argues that the substitution is no longer forced.
+The fifth cost is different in kind, and the tradition never named it as a cost at all: **discernment** — *what does right relationship actually require of me, here, given what I hold, what my neighbour lacks, and the particular shape of my life?* That question has an answer, it has a different answer for every person, and arriving at it honestly takes a long, high-context negotiation nobody has ever been able to afford at population scale. §3.7 argues that this single unaffordability is why George reached for a tax and Gesell for a stamp, and §5.5 argues that the substitution is no longer forced.
 
 The claim, then:
 
@@ -100,13 +100,13 @@ What follows from that runs on two tracks, and both are **unilateral** — neith
 
 **At the level of the institution: liability absorption.** The network grows by taking on obligations the incumbent order is failing to meet, measuring what it absorbed, and presenting that measurement in the incumbent's own units. A municipality drowning in unfunded liabilities does not fight a thing that reduces its liabilities. It books the reduction. (§6)
 
-**At the level of the person: the negotiated equilibrium.** Someone holding rent-bearing capital in an extractive economy can ask what they would honestly be owed if the just settlement had already arrived — and limit their take to that, now, in the world as it is. Not a compromise with extraction: right relationship reached under present conditions, requiring no legislation and no one else's participation. (§5.6)
+**At the level of the person: the negotiated equilibrium.** Someone holding rent-bearing capital in an extractive economy can ask what they would honestly be owed if the just settlement had already arrived — and limit their take to that, now, in the world as it is. Not a compromise with extraction: right relationship reached under present conditions, requiring no legislation and no one else's participation. (§5.5)
 
 The second track is the one the tradition could not offer, and its absence is why its ethics kept arriving late. George's justice required the single tax to pass. Gesell's required Freigeld to circulate. Both made the moral life contingent on a political victory that never came, so a person of conscience inside the old order had nothing to *do* but wait and advocate. That contingency was never really about politics. It was about the cost of working out what right relationship required of *this* person — and that cost is now falling.
 
 Three disciplines hold the argument honest, and each has its own section.
 
-1. **It repeals nothing it cannot repeal** — not Hayek's objection about dispersed knowledge (§5.5), not the fact that a state collects taxes in its own currency, not the fact that software cannot repossess a tractor (§8).
+1. **It repeals nothing it cannot repeal** — not Hayek's objection about dispersed knowledge (§5.4), not the fact that a state collects taxes in its own currency, not the fact that software cannot repossess a tractor (§8).
 2. **It refuses the escape it would most like to have** — the idea that a network can stand outside the law by having no capturable centre (§7).
 3. **It must not become a lock-in** — and if succession requires coercion, the correct response is to stop (§6.5).
 
@@ -263,7 +263,82 @@ The contribution here is only to notice that the **same organ** is what six diff
 
 **And the hazard, which this project has named against itself: *ownerless is not uncaptured*.** An entity with no owner still has interests — written by whoever authors its weights, curates its training corpus, or controls its update path. *A living-room agent that phones home for its values is a datacenter with a nicer address.* Physical locality of compute is necessary and nowhere near sufficient. The safe form is **agent-as-clerk of a self-executing, community-amendable constitution — never lord** — and the thousand-year case law for endowments that outlive their founders is a better guide here than anything in the software literature.
 
-### 5.3 The datacenter is the enclosure, and the anger is correct
+### 5.3 The clerk reports; the council decides
+
+An agent that *sets* credit limits is a central planner with better manners. An agent that computes and shows a member's reciprocity record, flags a drifting balance with the evidence attached, and proposes a limit for a council to accept, amend, or reject is a clerk. The difference is the difference between an aggregate a council can only accept or reject and a **mechanism a council can argue with**.
+
+Two qualifications, both binding. The council is **not a human veto-floor** — by this project's own standing conviction, human-in-the-loop is not the terminal authority; the *method* is, and humans hold the right to be heard by the method, the right to leave and to withhold consent, and a guaranteed minimum of participation no deliberation can go beneath — and they are the evidence. And the AI ceiling is **phased, not shipped**: today the human floor governs. Claiming otherwise would violate the project's own honesty stance, which readers are entitled to hold it to.
+
+### 5.4 What this does not repeal
+
+**Not Hayek.** "The Use of Knowledge in Society" (1945) is not an argument about computation. It is an argument about knowledge that is tacit, local, dispositional, and *not articulable* — the knowledge of particular circumstances of time and place. A witnessed-event substrate captures more of that than a price does, because a price is a one-dimensional projection and an event carries context. It does not capture all of it and never will.
+
+The honest claim is therefore **not** that the calculation problem is solved. It is that **no calculation is being attempted**: computation stays local, aggregation is voluntary and anonymised, and the global layer holds no allocative authority. This is requisite variety and polycentric governance, not a planning board. Any design in this project that starts allocating from an aggregate has crossed that line and should be read as a defect — which §9.2 does, to our own manifesto.
+
+**Not the tax gate.** A state accepts taxes in its own currency, and that is what anchors demand for that currency. No protocol design removes it.
+
+**Not physical enforcement.** Software cannot repossess a tractor. §8 is the answer, and §8 names the hole in it.
+
+### 5.5 The fifth cost: discernment, and the good life that stopped waiting
+
+This is the section the others exist to make sayable.
+
+**The question.** A person holds rent-bearing capital inside an economy organised around extraction. They did not design it and cannot exit it. What does right relationship require of them — *now*, not after a reform? The tradition has a clean answer in principle: you are owed the produce of your labour, and the unearned increment is not yours. It has never had an answer in practice for a specific person on a specific Tuesday, because turning that principle into a number for *this* life requires knowing what they hold, how it was acquired, what their dependants need, what their community lacks, what capacities and incapacities they carry — and what they would have been owed had they been born into the just settlement instead of this one.
+
+**The counterfactual is the benchmark.** That last clause is the operative one, and it is answerable in form: *what would this person be owed by the common inheritance, honestly apportioned, in the settled end-state?* Whatever that is, they can limit their take from rent to it, voluntarily, inside the extractive economy as it stands. Doing so is not a compromise with extraction and not a down payment against a debt owed later. **It is the whole of right relationship, reached under present conditions.** The end-state is not a precondition for it. The end-state is what it looks like once enough people have chosen it.
+
+**Why nobody could do this before.** The benchmark is not computable by a rule and not negotiable at scale by humans. It is irreducibly high-context, and getting it wrong in either direction is a real harm — too low and you have laundered extraction as conscience; too high and you have made moral seriousness a luxury only the secure can afford. Reaching it honestly means a long, patient, well-informed negotiation with someone who knows both the principle and the person. Historically that has been available to almost nobody: a handful with a spiritual director, a trusted rabbi or pastor, or an unusually candid friend. **That scarcity — not the politics — is why this tradition's ethics arrived as legislation instead of as a practice.**
+
+**What changes.** When the marginal cost of applied wisdom tends toward zero, the patient well-informed interlocutor stops being scarce. The claim is narrow: not that a machine knows what you owe, but that **the conversation in which you work it out is no longer rationed.** We do not accept that a reasonable equilibrium — considered in loving context toward one's neighbour, in a specific life with its specific obligations — is beyond what our better angels can help someone reach.
+
+**The shape is the floor/ceiling split, and the rule that keeps it honest is meant literally: never a computed payout at the ceiling, never judgment at the floor.** An equilibrium arrived at in conversation is not a number the substrate calculates and applies. A dignity floor is not something a council deliberates its way beneath.
+
+Four disciplines, because this is the claim most likely to be overread.
+
+1. **The agent does not decide.** It reads, computes, shows its work, and proposes. The person decides about their own life; the council holds what a person cannot hold alone.
+2. **Humility is the one virtue a confident system structurally cannot perform.** *"I could be wrong"* is not something a confident system self-generates, which is why the human audit and the appeal are not decoration on a system that is usually right — they are where the humility the machine cannot produce actually lives. A discernment ceiling with no appeal is not a ceiling. It is a verdict.
+3. **Counsel is not authority.** What has become affordable is counsel. Conflating that with governance would be the project claiming a capability it has not earned.
+4. **Leaven, not the Kingdom.** The corpus closes this point itself, and it is worth quoting because it is the discipline on everything above: *"What does the LORD require? Not a substrate of wisdom at the intimate edge of every life. He requires **you** — to do justice, love mercy, walk humbly. The substrate, at its best, makes those three a little easier for more people to do with each other… It is leaven. It is not the Kingdom, and the difference between building leaven and believing you have built the Kingdom is the whole difference between the prophets and Babel."*
+
+**What this licenses saying** is the document's strongest present-tense claim. For most of this tradition's history, *doing justice* about one's own holdings was hostage to a reform nobody could deliver, so conscience was discharged in advocacy, in charity, or in guilt. It need not be. **Walking humbly with respect to what one holds is a practice available today, to a particular person, without waiting** — not because the just economy has been built, but because the thing that made the practice unaffordable was the scarcity of patient, informed, loving counsel, and that scarcity is ending.
+
+### 5.6 Which abundance? The floor that building can raise or consume
+
+§3.1 credited Proudhon with the tradition's founding weapon: build until the scarcity that yields rent is gone. The weapon is real and this document keeps it. But *"build"* is under-specified in a way the nineteenth century could afford and we cannot.
+
+**First, correct the comparison.** The choice is not between a regenerative path that asks for restraint and an incumbent path that delivers plenty. **The incumbent path is itself a scarcity state**, and it is failing precisely on the denominations that constitute a life. The argument that we have engineered a sustained transfer away from the young — visible in collapsed wealth share among the under-forties, in housing that no longer clears against wages, in a generation that is the first to do worse than its parents — is the plainest available statement of it.
+
+The advanced economy is abundant in calories, screens, consumer goods, and logistics. It is scarce in housing, in mobility that does not require owning a car, in time, in care, in proximity to grandparents, and in the ordinary conditions of forming a family. **A currency that carries no values cannot tell those two abundances apart** — which is the manifesto's opening complaint, arriving where it hurts most.
+
+**Second, notice that this is Proudhon's own mechanism, running today, in plain sight.** The building plague is not hypothetical: abundant housing would destroy the yield on housing. So supply is restrained — by zoning, by land banking, by treating dwellings as an asset class — and the restraint is defended as prudence. That is the money-strike of §3.1, executed on real assets rather than on cash. **Generational scarcity is not evidence that Proudhon was wrong. It is evidence that he was right and the counter-move worked.**
+
+**Third, the distinction the tradition never drew.** Two paths both register as abundance and are not the same kind of thing:
+
+| | **Extensive** | **Intensive / regenerative** |
+|---|---|---|
+| Food | land-hungry monoculture at scale | food forests, polyculture, controlled-environment growing |
+| Settlement | car-dependent single-family sprawl | medium-density walkable neighbourhoods, co-housing |
+| Mobility | a car per adult, and the road system that requires | street design where most trips need no car |
+| Its move | **consumes** more land and energy per unit of output | **raises the carrying capacity** of land already held |
+| What it needs | capital, fossil energy, permissive code | knowledge, relationship, negotiated agreement |
+
+The second column is not austerity. A Dutch city is not a poorer place than an American exurb; it is a place where a twelve-year-old can get to a friend's house alone and a household does not need two cars to function. That is *more* abundance in the denominations that were scarce, delivered by raising the capacity of the same ground.
+
+And the asymmetry is not a matter of preference. **Carrying capacity is erodible** — overshoot degrades the limit itself — so the extensive path does not merely approach a ceiling. It **lowers the floor while claiming to raise it.** The honest promise a protocol can make here is narrow: it cannot remove the delay between damage and perception, only collapse it, so what it can offer is that **overshoot becomes witnessed and priced**, not that it becomes impossible.
+
+**Fourth, there are *many* such paths.** Not one blueprint. Food forests differ by watershed; street design that works in Utrecht is not what works in Lagos or in a Texas county; what a bioregion can carry is a local fact. A single prescribed regenerative model would be the planning board wearing a garden.
+
+**Fifth — the point.** Ask what the intensive column actually costs, and the answer is not money. **It costs social capacity.** Sprawl, monoculture, and car dependence are the configurations that require the *least* coordination: they can be produced with capital, fossil energy, and a permissive code, by parties who never have to agree about anything. A food forest is a multi-decade knowledge practice. A Dutch street is the residue of decades of political and cultural work, not a procurement decision. Co-housing, a repair economy, shared tooling, a commons that survives — every one of them is negotiation-intensive, relationship-intensive, knowledge-intensive.
+
+> **Most efforts toward abundance have ignored our social capacities to lift the natural floor — and that is why the extensive path won. It was never more productive. It was cheaper in the one input nobody could mass-produce.**
+
+Which is where this meets §4. If the binding constraint on the regenerative path is coordination cost — and above all the **discernment** of what this particular place can carry and what its people will actually agree to — then a collapse in that cost does not merely make mutual credit solvent. **It makes the socially-intensive abundance solvent**, which is the only kind that kills rent without eating the floor it stands on.
+
+That completes Proudhon's weapon rather than replacing it. Build until the scarcity that yields rent is gone — *and* build the kind that raises what the ground can carry, which requires the coordination he never had and could not have costed.
+
+---
+
+### 5.7 The datacenter occasion: the enclosure, and why the anger is correct
 
 A reader in 2026 has probably watched this fight in their own county, and it is worth saying plainly
 that their instinct is right, and right for the reasons this document has been building toward.
@@ -333,80 +408,92 @@ agent that phones home for its values is a datacenter with a nicer address. **Ca
 to be structural, or it is not resistance.** Change what the thing runs on and who can fork it; do not
 wait for it to save you.
 
-### 5.4 The clerk reports; the council decides
+### 5.8 The judo: an enclosure racing its own abundance
 
-An agent that *sets* credit limits is a central planner with better manners. An agent that computes and shows a member's reciprocity record, flags a drifting balance with the evidence attached, and proposes a limit for a council to accept, amend, or reject is a clerk. The difference is the difference between an aggregate a council can only accept or reject and a **mechanism a council can argue with**.
+§5.7 leaves the reader where most accounts of the datacenter fight leave them — with an accurate
+grievance and no leverage. This section is why the grievance has more leverage than it looks, and it
+returns the document to Proudhon.
 
-Two qualifications, both binding. The council is **not a human veto-floor** — by this project's own standing conviction, human-in-the-loop is not the terminal authority; the *method* is, and humans hold the right to be heard by the method, the right to leave and to withhold consent, and a guaranteed minimum of participation no deliberation can go beneath — and they are the evidence. And the AI ceiling is **phased, not shipped**: today the human floor governs. Claiming otherwise would violate the project's own honesty stance, which readers are entitled to hold it to.
+**Recall the mechanism from §3.1.** Capital's power is a function of capital's *scarcity*. Build
+enough of a thing and owning one confers no leverage over anyone. The counter-move, when abundance
+threatens the yield, is to restrict supply.
 
-### 5.5 What this does not repeal
+Now apply it to inference. **A per-token business model is a bet that the capability stays scarce.**
+The capital expenditure only earns back if access can be metered, and access can only be metered while
+running the model requires something an ordinary person does not have. That is not a defensible moat
+against a supply curve; it is a race against one — and the racing party does not control the track,
+because open weights, quantisation, and commodity accelerators are supply-side forces no lab
+administers.
 
-**Not Hayek.** "The Use of Knowledge in Society" (1945) is not an argument about computation. It is an argument about knowledge that is tacit, local, dispositional, and *not articulable* — the knowledge of particular circumstances of time and place. A witnessed-event substrate captures more of that than a price does, because a price is a one-dimensional projection and an event carries context. It does not capture all of it and never will.
+**The precedent is exact, and it is not the one usually cited.** The instructive failure of the
+telecom era was not a website with no revenue. It was **Enron Broadband** — a serious attempt to build
+a *market in metered bandwidth*, complete with a twenty-year exclusive video-on-demand contract on
+which roughly a hundred and ten million dollars of future profit was booked before the service had
+meaningfully shipped, and which was cancelled within months. The venture died because the thing it
+proposed to meter was about to become abundant. Bandwidth scarcity was the entire premise, and the
+fiber glut dissolved it. *A business model premised on metering a resource whose marginal cost is
+falling toward zero does not get out-competed. It evaporates.*
 
-The honest claim is therefore **not** that the calculation problem is solved. It is that **no calculation is being attempted**: computation stays local, aggregation is voluntary and anonymised, and the global layer holds no allocative authority. This is requisite variety and polycentric governance, not a planning board. Any design in this project that starts allocating from an aggregate has crossed that line and should be read as a defect — which §9.2 does, to our own manifesto.
+The current figures rhyme uncomfortably. Global AI datacenter investment is running past six hundred
+billion dollars, with the largest hyperscalers alone targeting something in the region of six to seven
+hundred billion in a single year — an infrastructure commitment on the order of five per cent of US
+GDP, several times the fiber overbuild at its peak. Combined hyperscaler capital expenditure now
+consumes something close to the whole of operating cash flow after dividends and buybacks, which
+leaves very little cushion if revenue-grade demand grows more slowly than capacity. At the height of
+the fiber build, capacity grew at roughly twice the rate of traffic. Meanwhile capable open-weight
+models run today on consumer hardware at a substantial fraction of frontier quality, with the gap on
+most tasks measured in months rather than years, and the honest exception being complex reasoning.
 
-**Not the tax gate.** A state accepts taxes in its own currency, and that is what anchors demand for that currency. No protocol design removes it.
+**Say the disanalogies plainly, because they are load-bearing and they cut against this argument.**
+Rails and fiber were nearly permanent once laid; **GPUs depreciate hard**, on the order of tens of
+per cent a year, so the accelerator fleet is not an inheritance in the way the rails were. What
+actually survives a compute glut is the **unglamorous half**: the substations, the interconnect
+queue position, the water and cooling, the shells, the transmission upgrades — the electrical and
+civil infrastructure whose useful life is measured in decades. That is the part communities are
+currently being asked to subsidise, and it is the part that would remain. A bust would leave behind
+cheap power infrastructure and depreciated silicon, not a free supercomputer.
 
-**Not physical enforcement.** Software cannot repossess a tractor. §8 is the answer, and §8 names the hole in it.
+**And so the judo.** The Elohim Protocol's design wants inference to be *abundant*. Every claim in
+§4 gets stronger as the marginal cost of a capable local reader falls; nothing in it depends on
+anyone's ability to meter a token. **The event that would destroy the metered business model is the
+same event that makes this one solvent.** That is not a prediction that the bust arrives, and this
+document takes no position on when. It is a statement about which way each design faces.
 
-### 5.6 The fifth cost: discernment, and the good life that stopped waiting
+Which is also the answer to the reader — and there will be many — who dismisses this project because
+of *how the capability came to be*. That objection is correct about the origin and wrong about the
+inference. §9.4 concedes the debt without flinching: this argument runs on something built at
+hyperscale without the consent of the people whose record trained it. But **the intelligence is
+already leaking out of those buildings**, in open weights and commodity hardware, and the only live
+question is what catches it. A substrate that lets a household hold its own data, run its own reader,
+and coordinate with its neighbours without renting any of it is the form that capability takes when it
+stops being someone's rent. To refuse it *because* of its parentage is to leave the escape route
+unbuilt and the enclosure unopposed — and the enclosure is not waiting.
 
-This is the section the others exist to make sayable.
+**One more historical rhyme, offered with its own refutation attached.** The firms that inherited the
+telecom bust were the ones whose models *needed* bandwidth cheap rather than dear: the search company
+whose economics improved as connectivity commoditised, and the retailer that nearly died in the crash
+and later turned its own overbuilt infrastructure into a substrate other people could rent. The
+structural point is real — **what inherits a bust is whatever wanted the resource abundant.**
 
-**The question.** A person holds rent-bearing capital inside an economy organised around extraction. They did not design it and cannot exit it. What does right relationship require of them — *now*, not after a reform? The tradition has a clean answer in principle: you are owed the produce of your labour, and the unearned increment is not yours. It has never had an answer in practice for a specific person on a specific Tuesday, because turning that principle into a number for *this* life requires knowing what they hold, how it was acquired, what their dependants need, what their community lacks, what capacities and incapacities they carry — and what they would have been owed had they been born into the just settlement instead of this one.
+But the comparison flatters us in three ways that must be said out loud. **Survivorship bias**: for
+every firm that inherited, a hundred died, and reasoning from the two that lived is precisely the
+error this corpus's own trap discipline warns against. **Capitalisation**: those firms had staff,
+revenue, and investors; this project is one developer with a full-time job funding tooling out of
+pocket, and §9.3 says how little of the economic layer exists. **Agency**: neither firm *positioned*
+itself for a crash — one nearly died in it, the other was barely a business when it began — so the
+tidy story is written backwards from the outcome.
 
-**The counterfactual is the benchmark.** That last clause is the operative one, and it is answerable in form: *what would this person be owed by the common inheritance, honestly apportioned, in the settled end-state?* Whatever that is, they can limit their take from rent to it, voluntarily, inside the extractive economy as it stands. Doing so is not a compromise with extraction and not a down payment against a debt owed later. **It is the whole of right relationship, reached under present conditions.** The end-state is not a precondition for it. The end-state is what it looks like once enough people have chosen it.
+So the claim is deliberately weaker than the analogy invites, and it is a claim about a *design class*
+rather than about this project. **A substrate that becomes more viable as inference commoditises is
+positioned to inherit a compute glut; one that meters tokens is positioned to be destroyed by it.**
+That is true of anyone who builds this way, which is the only form of the claim consistent with a
+commons owned by no one. We would rather be one of many than the survivor.
 
-**Why nobody could do this before.** The benchmark is not computable by a rule and not negotiable at scale by humans. It is irreducibly high-context, and getting it wrong in either direction is a real harm — too low and you have laundered extraction as conscience; too high and you have made moral seriousness a luxury only the secure can afford. Reaching it honestly means a long, patient, well-informed negotiation with someone who knows both the principle and the person. Historically that has been available to almost nobody: a handful with a spiritual director, a trusted rabbi or pastor, or an unusually candid friend. **That scarcity — not the politics — is why this tradition's ethics arrived as legislation instead of as a practice.**
-
-**What changes.** When the marginal cost of applied wisdom tends toward zero, the patient well-informed interlocutor stops being scarce. The claim is narrow: not that a machine knows what you owe, but that **the conversation in which you work it out is no longer rationed.** We do not accept that a reasonable equilibrium — considered in loving context toward one's neighbour, in a specific life with its specific obligations — is beyond what our better angels can help someone reach.
-
-**The shape is the floor/ceiling split, and the rule that keeps it honest is meant literally: never a computed payout at the ceiling, never judgment at the floor.** An equilibrium arrived at in conversation is not a number the substrate calculates and applies. A dignity floor is not something a council deliberates its way beneath.
-
-Four disciplines, because this is the claim most likely to be overread.
-
-1. **The agent does not decide.** It reads, computes, shows its work, and proposes. The person decides about their own life; the council holds what a person cannot hold alone.
-2. **Humility is the one virtue a confident system structurally cannot perform.** *"I could be wrong"* is not something a confident system self-generates, which is why the human audit and the appeal are not decoration on a system that is usually right — they are where the humility the machine cannot produce actually lives. A discernment ceiling with no appeal is not a ceiling. It is a verdict.
-3. **Counsel is not authority.** What has become affordable is counsel. Conflating that with governance would be the project claiming a capability it has not earned.
-4. **Leaven, not the Kingdom.** The corpus closes this point itself, and it is worth quoting because it is the discipline on everything above: *"What does the LORD require? Not a substrate of wisdom at the intimate edge of every life. He requires **you** — to do justice, love mercy, walk humbly. The substrate, at its best, makes those three a little easier for more people to do with each other… It is leaven. It is not the Kingdom, and the difference between building leaven and believing you have built the Kingdom is the whole difference between the prophets and Babel."*
-
-**What this licenses saying** is the document's strongest present-tense claim. For most of this tradition's history, *doing justice* about one's own holdings was hostage to a reform nobody could deliver, so conscience was discharged in advocacy, in charity, or in guilt. It need not be. **Walking humbly with respect to what one holds is a practice available today, to a particular person, without waiting** — not because the just economy has been built, but because the thing that made the practice unaffordable was the scarcity of patient, informed, loving counsel, and that scarcity is ending.
-
-### 5.7 Which abundance? The floor that building can raise or consume
-
-§3.1 credited Proudhon with the tradition's founding weapon: build until the scarcity that yields rent is gone. The weapon is real and this document keeps it. But *"build"* is under-specified in a way the nineteenth century could afford and we cannot.
-
-**First, correct the comparison.** The choice is not between a regenerative path that asks for restraint and an incumbent path that delivers plenty. **The incumbent path is itself a scarcity state**, and it is failing precisely on the denominations that constitute a life. The argument that we have engineered a sustained transfer away from the young — visible in collapsed wealth share among the under-forties, in housing that no longer clears against wages, in a generation that is the first to do worse than its parents — is the plainest available statement of it.
-
-The advanced economy is abundant in calories, screens, consumer goods, and logistics. It is scarce in housing, in mobility that does not require owning a car, in time, in care, in proximity to grandparents, and in the ordinary conditions of forming a family. **A currency that carries no values cannot tell those two abundances apart** — which is the manifesto's opening complaint, arriving where it hurts most.
-
-**Second, notice that this is Proudhon's own mechanism, running today, in plain sight.** The building plague is not hypothetical: abundant housing would destroy the yield on housing. So supply is restrained — by zoning, by land banking, by treating dwellings as an asset class — and the restraint is defended as prudence. That is the money-strike of §3.1, executed on real assets rather than on cash. **Generational scarcity is not evidence that Proudhon was wrong. It is evidence that he was right and the counter-move worked.**
-
-**Third, the distinction the tradition never drew.** Two paths both register as abundance and are not the same kind of thing:
-
-| | **Extensive** | **Intensive / regenerative** |
-|---|---|---|
-| Food | land-hungry monoculture at scale | food forests, polyculture, controlled-environment growing |
-| Settlement | car-dependent single-family sprawl | medium-density walkable neighbourhoods, co-housing |
-| Mobility | a car per adult, and the road system that requires | street design where most trips need no car |
-| Its move | **consumes** more land and energy per unit of output | **raises the carrying capacity** of land already held |
-| What it needs | capital, fossil energy, permissive code | knowledge, relationship, negotiated agreement |
-
-The second column is not austerity. A Dutch city is not a poorer place than an American exurb; it is a place where a twelve-year-old can get to a friend's house alone and a household does not need two cars to function. That is *more* abundance in the denominations that were scarce, delivered by raising the capacity of the same ground.
-
-And the asymmetry is not a matter of preference. **Carrying capacity is erodible** — overshoot degrades the limit itself — so the extensive path does not merely approach a ceiling. It **lowers the floor while claiming to raise it.** The honest promise a protocol can make here is narrow: it cannot remove the delay between damage and perception, only collapse it, so what it can offer is that **overshoot becomes witnessed and priced**, not that it becomes impossible.
-
-**Fourth, there are *many* such paths.** Not one blueprint. Food forests differ by watershed; street design that works in Utrecht is not what works in Lagos or in a Texas county; what a bioregion can carry is a local fact. A single prescribed regenerative model would be the planning board wearing a garden.
-
-**Fifth — the point.** Ask what the intensive column actually costs, and the answer is not money. **It costs social capacity.** Sprawl, monoculture, and car dependence are the configurations that require the *least* coordination: they can be produced with capital, fossil energy, and a permissive code, by parties who never have to agree about anything. A food forest is a multi-decade knowledge practice. A Dutch street is the residue of decades of political and cultural work, not a procurement decision. Co-housing, a repair economy, shared tooling, a commons that survives — every one of them is negotiation-intensive, relationship-intensive, knowledge-intensive.
-
-> **Most efforts toward abundance have ignored our social capacities to lift the natural floor — and that is why the extensive path won. It was never more productive. It was cheaper in the one input nobody could mass-produce.**
-
-Which is where this meets §4. If the binding constraint on the regenerative path is coordination cost — and above all the **discernment** of what this particular place can carry and what its people will actually agree to — then a collapse in that cost does not merely make mutual credit solvent. **It makes the socially-intensive abundance solvent**, which is the only kind that kills rent without eating the floor it stands on.
-
-That completes Proudhon's weapon rather than replacing it. Build until the scarcity that yields rent is gone — *and* build the kind that raises what the ground can carry, which requires the coordination he never had and could not have costed.
-
----
+**What would falsify it.** If capable inference stays concentrated — if the frontier gap widens
+rather than narrows, if capability that matters proves inseparable from scale nobody can own, or if
+the metered model turns out to have a real moat in reasoning rather than a temporary lead — then this
+section is wrong, the rent relationship is durable, and §5.7's anger has no structural exit behind it.
+That is a checkable claim on a five-year horizon, and it should be checked rather than assumed.
 
 ## 6. Succession at institutional scale: liability absorption
 
@@ -524,9 +611,9 @@ These cannot both hold. The second describes exactly the network-effect coercion
 
 ### 9.2 The manifesto assumes an allocative power this argument forbids
 
-The same part of the manifesto is half of a good idea. Its core move — negotiation rather than confiscation, agents sitting with wealth-holders through the emotional labour of transition, honouring attachment and fear and legacy — *is* §5.6's negotiated equilibrium, reached before the mechanism was articulated. It deserves credit for that.
+The same part of the manifesto is half of a good idea. Its core move — negotiation rather than confiscation, agents sitting with wealth-holders through the emotional labour of transition, honouring attachment and fear and legacy — *is* §5.5's negotiated equilibrium, reached before the mechanism was articulated. It deserves credit for that.
 
-Then it has agents *direct surplus wealth* against a **fixed allocation table**: fifteen per cent renewable energy, thirty per cent housing, twelve per cent food. That is allocation from an aggregate — structurally the power a central bank declines to exercise, and it declines for reasons that survive translation. It crosses §5.5's line, and it silently undoes the negotiation three paragraphs above it, because **a negotiation whose outcome is pre-allocated is not a negotiation.**
+Then it has agents *direct surplus wealth* against a **fixed allocation table**: fifteen per cent renewable energy, thirty per cent housing, twelve per cent food. That is allocation from an aggregate — structurally the power a central bank declines to exercise, and it declines for reasons that survive translation. It crosses §5.4's line, and it silently undoes the negotiation three paragraphs above it, because **a negotiation whose outcome is pre-allocated is not a negotiation.**
 
 It is the same defect §3.7 finds in George and Gesell, reproduced inside our own canon: a high-context judgment quietly backstopped by a blunt universal instrument. Keep the negotiation; delete the table.
 
@@ -546,7 +633,7 @@ That is the honest state. It is the reason §11's first limit is stated the way 
 
 ### 9.4 This argument runs on a capability we did not pay for
 
-§5.3 says the datacenter is enclosure. §5.2 says a cheap, capable local reader is what makes every
+§5.7 says the datacenter is enclosure. §5.2 says a cheap, capable local reader is what makes every
 design in the lineage solvent. Both are true at once, and the second is only available because of the
 first.
 
@@ -564,7 +651,10 @@ corpus, are a different economic object from the same weights metered by the tok
 county was subsidised to host. That difference is the whole claim. It does not retroactively consent
 anyone's training data.
 
-The second is a debt, and it should be named as one rather than resolved. If intelligence drawn from a
+The second is a debt, and it should be named as one rather than resolved. §5.8 argues that the
+capability is leaking out of those buildings regardless, and that a substrate wanting inference
+abundant is what catches it — but *leaking out* is not the same as *paid for*, and the argument in
+§5.8 is a reason to build the escape route, never an absolution for the road that got us here. If intelligence drawn from a
 commons is owed back to that commons, then everything built on it — this document included — carries
 an obligation it has not discharged. We can say what discharging it would look like: the capability
 running on machines the powerful do not own, primed by people they cannot surveil, governed by
@@ -611,4 +701,4 @@ The synthesis it arrives at was named before the document existed: **Carson plus
 
 **The companion argument.** This document deliberately defers every question about the unit of account: what a currency is inside this network, whether it decays, who issues it, and what the posture toward state money actually is. Those are answered in a sibling research paper, *The Monetary Posture* (`genesis/research/`), which takes the same argument down to the medium-of-exchange/store-of-value tension and the tax gate. Its short answer, for readers who want it now: the protocol has no currency and will not have one; what it has is a policy surface on which a community declares its own, and the posture toward state money is not escape but **selective legibility** — maximally legible where a state's concerns are legitimate, structurally uncapturable where its instincts are acquisitive.
 
-**The evidence bridge.** Everything this document asserts about its own confidence and its own build state is backed, with sources and line numbers, by a companion research note — *Succession Without Conquest: evidence bridge* in `genesis/research/`. It carries the confidence behind each claim (including the two readings that are recalled rather than re-read), the file-by-file audit behind §9.3, the exact quotes behind §9.1 and §9.2, the legal analysis this document deliberately does not publish, and the work this argument generated. It exists so that this document can be read as an argument and still be checked as a claim. It sits alongside this project's comparative political-economy studies — a reading program and its successor, *Trap Detectors*, both in `genesis/research/` — whose discipline of *the detector reports, the council decides* §5.4 adopts wholesale, and whose analysis of the Argentine barter collapse informs §7(c).
+**The evidence bridge.** Everything this document asserts about its own confidence and its own build state is backed, with sources and line numbers, by a companion research note — *Succession Without Conquest: evidence bridge* in `genesis/research/`. It carries the confidence behind each claim (including the two readings that are recalled rather than re-read), the file-by-file audit behind §9.3, the exact quotes behind §9.1 and §9.2, the legal analysis this document deliberately does not publish, and the work this argument generated. It exists so that this document can be read as an argument and still be checked as a claim. It sits alongside this project's comparative political-economy studies — a reading program and its successor, *Trap Detectors*, both in `genesis/research/` — whose discipline of *the detector reports, the council decides* §5.3 adopts wholesale, and whose analysis of the Argentine barter collapse informs §7(c).

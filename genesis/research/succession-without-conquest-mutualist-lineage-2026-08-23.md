@@ -55,11 +55,11 @@ was moved here** — only apparatus and evidence, enumerated in §4.
 | Canon section | Backed here |
 |---|---|
 | §3 the lineage (Proudhon → Lietaer) | §1 grading, including the two ⚠ readings |
-| §3.7 the blunt-instrument claim, §5.6 discernment | §7.2 the operator steering notes that generated them |
+| §3.7 the blunt-instrument claim, §5.5 discernment | §7.2 the operator steering notes that generated them |
 | §7 the legal question | §3.3–§3.5 the EAE contradiction, the shield layers, the securities exposure |
 | §9.1 the coercion contradiction | §3.1 locators + recommendation |
 | §9.2 the allocation table | §3.2 locators + recommendation |
-| §5.3 the datacenter as enclosure | §1.2 grading of the 2026 figures (◐, verify before reuse) |
+| §5.7 the datacenter occasion · §5.8 the judo | §1.2 grading of the 2026 figures and the bust analogies (◐, verify before reuse) |
 | §9.3 the economic layer, so far mostly unbuilt | §2 in its entirety, with `file:line` |
 | §10 what we refuse | §5 Leave, with reasons |
 | §11 honest limits | §1.1 and §7.3 |
@@ -91,13 +91,13 @@ Wörgl's parameters and its 1933 injunction · the WIR's 1936 banking licence an
 Stodder's counter-cyclicality result · Chiemgauer's two decades of operation · Sardex's brokerage
 model and scale · Proudhon's Bank of the People subscriber count and 1849 liquidation · the Ooki
 DAO / *Sarcuni v. bZx* procedural posture · the four "Legal Shield Layers" read against FLSA and
-health-code doctrine · the generational-transfer argument canon §5.7 uses.
+health-code doctrine · the generational-transfer argument canon §5.6 uses.
 
 None of these is the load-bearing step in any argument. The WIR pair (licence + demurrage drop) is
 closest to it, because canon §3.3 calls the WIR "the control experiment"; if either fact is wrong,
 that section weakens.
 
-**The 2026 datacenter figures in canon §5.3 are ◐ — web-sourced 2026-08-23, single-pass, not
+**The 2026 datacenter and AI-capex figures in canon §5.7–§5.8 are ◐ — web-sourced 2026-08-23, single-pass, not
 cross-checked against primary filings.** Specifically: 75 projects / $130bn delayed or cancelled in
 Q1 2026 · 142 protests across 42 states on 18 July · 300+ local bans or moratoriums · a June poll at
 ~⅓ approval and 14% comfort-with-nearby · PJM wholesale power +76% YoY to $136.53/MWh in Q1 · ~38
@@ -113,6 +113,26 @@ not depend on any single figure.
 Sources consulted for those figures: TIME, Brookings, Forbes, Newsweek, *Governing*, Good Jobs First,
 MultiState, and the Wikipedia "Opposition to AI data centers" entry, via a single search pass on
 2026-08-23.
+
+**The §5.8 capex and local-inference figures are also ◐**, from a second search pass the same day:
+global AI datacenter investment past ~$600bn with the largest hyperscalers targeting ~$610–725bn in a
+year · AI infrastructure at ~5% of US GDP, described as several times the fiber overbuild at peak ·
+combined hyperscaler capex consuming ~94% of operating cash flow after dividends and buybacks · fiber
+capacity growing ~2× traffic at the 1990s peak · GPU depreciation at roughly 20–40% annually with
+~50% residual after three years · open-weight models at ~70–85% of frontier quality on consumer
+hardware, trailing by months on most tasks with complex reasoning the standing exception.
+**Verify before reuse**, and note that the *disanalogy* (GPUs depreciate; rails and fiber did not)
+came from the same sources and is stated in canon precisely because it cuts against our own argument.
+
+**The historical claims in §5.8 are ◐ and recalled rather than researched this pass** — Enron
+Broadband's bandwidth-trading venture and the Blockbuster video-on-demand contract (~$110m of future
+profit booked, cancelled within months, service never meaningfully shipped); Friedman's reading of the
+fiber overbuild as an accidental gift to the next economy; and the post-crash trajectories of the
+search and retail firms that inherited cheap bandwidth. **The Enron Broadband detail is the most
+load-bearing single historical claim in the document** — it is the precedent for *metering a resource
+about to become abundant* — and it should be checked at source before any outreach use. Operator
+provenance: the dot-com reading is the operator's, from Friedman's lecture on the subject and on
+Enron's bandwidth-metering collapse.
 
 *One note on the generational-transfer claim.* Canon states it as an argument rather than citing a
 source, deliberately. The original draft attributed it to a specific TED talk, which a blind reader
@@ -445,7 +465,7 @@ already implements the enforcement shape canon §8's invariant needs. What moved
 
 **Added in canon, not present here:** an expanded orientation section defining the working vocabulary;
 a new opening addressed to a reader arriving with a formed politics (both responses to blind-reader
-BLOCKERs, §7.4); **§5.3 on the datacenter backlash as the live instance of the enclosure this document
+BLOCKERs, §7.4); **§5.7 on the datacenter backlash as the live instance of the enclosure this document
 is about**, with the negative-absorption symmetry it forces onto §6; and **§9.4, the disclosure that
 the argument runs on a capability built at hyperscale without the consent of the people whose record
 trained it or the rate-payers who underwrote the power.** The last is the sharpest thing canon says
@@ -570,27 +590,42 @@ paper's §3 originate.
 
 ### 7.2 The operator steering notes (2026-08-23)
 
-Five, each recorded because the argument in it is the operator's.
+Six, each recorded because the argument in it is the operator's.
 
 1. **The personal equilibrium** — the counterfactual benchmark, the collapse of the negotiation's
    friction, and the present-tense reading of *walking humbly*, are the operator's. So is the framing
    that the floor/ceiling architecture is an argument brought **to** George and Gesell rather than
-   inherited from them. → canon §3.7, §5.6, the Orientation's floor/ceiling entry, and the revised
+   inherited from them. → canon §3.7, §5.5, the Orientation's floor/ceiling entry, and the revised
    §9.2.
 2. **Which abundance** — the extensive/intensive distinction and the claim that **most efforts toward
    abundance have ignored our social capacities to lift the natural floor** are the operator's, not
-   the lineage's. → canon §5.7.
+   the lineage's. → canon §5.6.
 3. **Many paths, and the incumbent path is itself a scarcity state** — the correction that reframes
-   the comparison. → canon §5.7's first and fourth moves.
+   the comparison. → canon §5.6's first and fourth moves.
 4. **The datacenter occasion** — that the hatred toward AI datacenters makes sense because the
    relationship is broken; that AI is the ultimate theft of the commons and the datacenter is that
    theft weaponised against the commons for rent extraction (monopoly over computation, wisdom and
    intelligence); and that an emergent superintelligence in that form is enclosure *by its nature*.
-   → canon §5.3 and §9.4. The author's additions holding it inside canon discipline: the
-   negative-absorption symmetry with §6, and the refusal in §5.3's last paragraph to rely on a system
+   → canon §5.7, §5.8 and §9.4. The author's additions holding it inside canon discipline: the
+   negative-absorption symmetry with §6, and the refusal in §5.7's last paragraph to rely on a system
    defecting against its own training — *capture-resistance has to be structural, or it is not
    resistance.*
-5. **The audience.** The document is the entry point for the reader who arrives *as a jaded adult*
+5. **The judo, the bust, and the positioning.** That the protocol is the *judo move* of the
+   enclosure — a graceful exit for grandma's data from surveillance capitalism, the datacenter, and
+   extractive attention-politics in one move; that it is being built from the intelligence already
+   leaking out of those datacenters, so the AI-opposed reader should weigh it on its form rather than
+   dismiss it for its parentage; that it is a **hedge on what happens to all that compute if the
+   bubble collapses** (the railroad depressions, and Friedman on the fiber overbuild); and — the
+   sharpest part — a **theory of how the bubble pops that is not merely financial speculation**: the
+   marginal cost of the metered resource falling toward zero, as bandwidth did (feat. Enron
+   Broadband), applied to good-enough inference on PC-scale hardware. Closing frame: *Google and
+   Amazon were to the dot-com bust what this protocol positions itself to be to an AI capex crash.*
+   → canon §5.8. The author's additions holding it inside canon discipline: the GPU-depreciation
+   disanalogy (what survives is the substations, not the silicon), the three ways the Google/Amazon
+   comparison flatters us (survivorship bias, capitalisation, agency), the reduction of the claim
+   from *this project* to a **design class** — anyone whose model wants inference abundant is
+   positioned to inherit — and an explicit falsification condition on a five-year horizon.
+6. **The audience.** The document is the entry point for the reader who arrives *as a jaded adult*
    rather than as a child — anarchists, socialists, capitalists, Georgists, libertarians, economists
    with a strong classical sense of the world, conditioned away from ever thinking about monetary
    policy or the forces of capital and labour, with "the struggle" filling their perspective before
@@ -638,7 +673,7 @@ unchanged.
 ### 7.5 Credit
 
 [The trap detectors](epr:comparative-political-economy-trap-detectors-2026-08-07) supply the
-detector-reports/council-decides discipline canon §5.4 adopts wholesale, convicted us in advance on
+detector-reports/council-decides discipline canon §5.3 adopts wholesale, convicted us in advance on
 the Scott point, had already refuted the illegibility position as trap **A6** (*ownerless is not
 uncaptured*, with waqf as the thousand-year case law) before either document restated it, and carry
 the §2.6 security findings and the accidental-numéraire result.
