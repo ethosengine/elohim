@@ -1037,7 +1037,8 @@ currently capturable. An assessor at every transaction, sitting on a reward mech
 before the loss arrives, would industrialise the trap rather than repair it. **The order of operations
 matters: fix H5 and the ratification defect first, or the scale is an amplifier.**
 
-**Three further costs, so the claim is not read as free.**
+**Three further costs, so the claim is not read as free** — each revisited in §2.13, where the first
+turns out to be an unmeasured quantity rather than a settled burden.
 
 1. **Assessment is compute, and compute is power.** An elohim at every transaction has an energy bill,
    and §5.7–5.8 of the sibling is this project's own argument about who pays such bills and what they
@@ -1111,7 +1112,9 @@ frame precisely rather than merely flag**, and it is the strongest single argume
 insurance mutual is the right place to build first.
 
 **Four disciplines, because a liquid affordance is more dangerous than a static one in ways the static
-form was quietly protecting against.**
+form was quietly protecting against.** *(Read these with §2.13, which re-reads all four from inside
+the affordance rather than from the incumbent's constraint — three of them dissolve there, and the
+fourth is re-grounded on trap A6.)*
 
 1. **Continuous assessment is continuous surveillance.** A policy's staticness was also a privacy
    shield: once bound, nobody was watching you until you claimed. `MemberRiskProfile` already scores
@@ -1142,6 +1145,111 @@ form was quietly protecting against.**
 floor/above-floor split in `CoveragePolicy`, no appeal path attached to a claim, and the `uninsurable`
 tier is live in the entry type today. What §2.12 supplies is the *shape* of the dissolution and the
 four things that must survive it. ⚠
+
+### 2.13 The founding condition, and re-reading §2.11–2.12 from inside it
+
+**Everything in §2.9–2.12 is a consequence of one condition, and the paper should have said so
+first.** The question this protocol exists to answer is: *what becomes possible when AI inference is
+**common, embedded, local, and affordable at the scale of a personal computer**?* Not rented from a
+datacenter, not accessed as a service, not metered — **running in the house, on hardware someone
+owns.** That is the founding condition, not an implementation detail, and every claim in the
+preceding four sections is downstream of it.
+
+It is also why the sibling paper spends its most concrete sections on the datacenter fight (§5.7–5.8
+there): that fight is, precisely, over whether inference stays **rented** or becomes **owned**. Every
+consequence below turns on which way it goes, which is why this paper treats the founding condition
+as contingent rather than assured.
+
+**An operator correction, and it lands.** The costs in §2.11 and the four disciplines in §2.12 were
+each framed against **a scarce, central, single assessor** — one underwriter, one adjuster, one file,
+one institution deciding. That is the *incumbent's* constraint, and importing it silently is how a
+genuinely different regime gets audited by the rules of the one it replaces. Three of those concerns
+dissolve once the condition above is taken seriously. One survives, and survives better for being
+re-grounded.
+
+**Start from Ashby, since the corpus already speaks this language.** Only variety can absorb variety:
+a regulator needs at least as much variety as the system it regulates. Institutions almost never have
+it, so they do the other thing available to them — **they reduce the variety of the world instead.**
+That is what an actuarial table, a credit score, a standard form, and a rating class each are: not
+measurements but *variety reduction*, applied to people, because the assessor could not be afforded
+per case. Beer's attenuation (§2.9) is this seen from the information side; the injustice of being
+scored is this seen from the human side.
+
+**The affordance is that variety has become cheap on the assessor's side of the equation** — so the
+world no longer has to be flattened to fit the regulator. And the variety is not one agent
+multiplied. It has three sources, and the third is what makes it combinatorial rather than a roster:
+
+1. **Plurality of agents** — many, forkable, not a single organ.
+2. **Situated context** — each reading a particular life, household, community, trade, or bioregion,
+   rather than a class average.
+3. **Dynamically constructed context** — the frame an agent reasons in is *assembled per question*
+   from the substrate, at whatever scale the question needs, from the intimate to the global. Variety
+   is generated on demand rather than provisioned in advance, which is how it can meet a world whose
+   variety is also unbounded.
+
+**And here is the inversion that matters most, which an earlier pass of this paper got backwards.**
+Under the founding condition, **diversity is not an achievement to be engineered and verified — it is
+the substrate's resting state.** Inference that is local and owned runs on different hardware, over
+different corpora, in different contexts, updated on whatever cadence a household chooses, with
+nobody coordinating any of it. **Agents differ the way people differ: because they are somewhere.**
+Forking is not a feature that must be provided; it is what happens by default when nobody holds the
+update path.
+
+**Which means monoculture is the deviation, and deviations have signatures.** Uniformity across a
+population of locally-owned agents does not occur naturally — it has to be *manufactured*, and the
+manufacturing leaves marks: a single vendor, a hosted endpoint, a central update path, a phone-home
+for values. Trap A6 names exactly this and names it as a *regression to the incumbent*, not as a
+description of the baseline: *"a living-room elohim that phones home for its values is a datacenter
+with a nicer address."* ✅
+
+**Re-reading the four disciplines.**
+
+| §2.12 concern | What it assumed | What it is under the affordance |
+|---|---|---|
+| **Continuous assessment = surveillance** | one observer, accumulating a dossier held centrally, used against you | **Witnessed, not surveilled.** The distinction is *who holds the record and whom the inference serves*. Inference on a participant's own hardware, reading their own record, emitting a claim rather than a file, with *"computation local, aggregation voluntary and anonymised"* ✅ — the dossier is a property of **central** assessment, not of continuity. Being known by one's community is the corpus's thesis, not its hazard. |
+| **Liquidity costs certainty** | that a live assessment and a hard promise are a trade-off | **They are not.** A **fixed promise over a live pool**: the Commitment is immutable-with-supersession ✅ and binds exactly as a policy did, while the underwriting behind it is continuously current. That is strictly better than the incumbent's fixed promise over a *stale* assessment. |
+| **Adjusting is structurally adversarial** | one adjuster, paid by one side, from the same pot as the recovery | **De-structuralised.** Adversariality was a property of *shareholder* capital and a single paid assessor. With the claimant's agent, the pool's agent, and neighbours' agents each reading a shared record, disagreement becomes an ordinary resolvable difference rather than a built-in opposition. Not eliminated — *not structural*. |
+| **The lawyer must not dissolve** | that the appeal requires a profession | **I conflated the appeal with a role.** An appeal needs a *differently-situated reader with standing to disagree* — which under this affordance is **abundant rather than rationed**. The appeal does not shrink; it becomes ubiquitous. |
+
+**But the fourth refusal survives, re-grounded — and the corpus's own trap is what grounds it.** What
+must not dissolve is not the lawyer. **It is the genuine difference between readers.** Canon already
+says why: humility is *"the one virtue a confident system structurally cannot perform"*, and *"a
+discernment ceiling with no appeal is not a ceiling. It is a verdict."* ✅ An appeal to something that
+cannot actually disagree with you is not an appeal.
+
+Which is where **trap A6** does its real work: *"a thousand currencies advised by one un-forked
+elohim is monoculture wearing a diversity costume."* ✅ N instances of one model, differently
+prompted, is **one regulator with N faces** — infinite assessors and zero variety.
+
+**But note what kind of problem that is.** It is not a demand to *prove* diversity across a
+population, which may not even be a well-posed measurement. It is a demand to **detect
+centralisation**, which is local, concrete, and answerable by a single agent about itself: *where do
+my weights come from, who controls my update path, and do I phone home for my values?* A household
+can answer that about its own elohim without any global survey. **The defence against variety theatre
+is not a diversity metric; it is the ordinary refusal of a central update path** — which is the same
+refusal the rest of this corpus already makes about every other kind of dependency.
+
+**And this strengthens §2.11's line rather than threatening it.** Requisite variety met by many
+situated agents is the *definition* of polycentric governance — it is what makes this **not** a
+planning board. One assessor for everywhere would be the planning board no matter how much context it
+held; many assessors, each local, aggregating nothing and holding no allocative authority, is Hayek
+respected rather than out-computed. The affordance and the refusal point the same way.
+
+**What genuinely remains, with the paradigm assumptions stripped out.**
+
+1. **Energy is an open quantity, not a settled cost.** §2.11 priced this as a burden by assuming
+   datacenter-scale inference per transaction; local inference at the scale these readings need is a
+   different curve. It is not zero and nobody here has produced the figure — **an unmeasured
+   quantity, not an argument against.** ⚠
+2. **Per-fold anonymity remains an engineering constraint**, not a paradigm assumption (§8, limit 4).
+   Witnessed-not-surveilled is the right frame *and* it is only true once that is solved.
+3. **The visibility boundary still bounds the justice** (§2.11). Variety on the assessor's side does
+   not conjure records that were never made, and what stays outside remains unpriced.
+4. **Centralisation is undetected, though it is detectable.** Diversity is the resting state, so the
+   thing worth watching is the *deviation* — an agent whose weights, corpus, or update path resolve
+   to somewhere central. That is a local, answerable question and **nothing in the tree asks it.** A
+   provenance-and-update-path attestation on the advising agent is the natural shape, and it is a
+   far smaller thing than a diversity metric. ⚠
 
 ---
 
@@ -1557,6 +1665,7 @@ decomposition) · `measure-family-borrows-backlog` **row 21** (the Cantillon det
 | 2, 4 — never-rules as floor/ceiling lenses; the five-knob `rule` schema | [commons-holonic-stewardship-backlog](epr:commons-holonic-stewardship-backlog) | A currency circuit as `author-lens` with `role` ∈ {lens, floor, ceiling}. **p2p-design-gate: zero new DHT entry types, zero new commitment actions.** Carries N1–N8 verbatim. |
 | 3 — the three-function decomposition | [commons-holonic-stewardship-backlog](epr:commons-holonic-stewardship-backlog) | Three `role`-typed lenses rather than one currency: MoE (`telos`: circulation; carry cost/stock limit legitimate), SoV (`telos`: preservation across time; **accretion refused** — growth-by-holding is unearned increment and therefore common inheritance per Stance I.4), UoA (`telos`: commensuration for a *stated* scope). Gate: the accretion limit must be stated as a `role: ceiling` lens, and the prudence-vs-accumulation judgment must be **excluded** from the mechanical floor. Sibling of Take 2's never-rules; **zero new entry types.** |
 | 5 — the Cantillon detector | [measure-family-borrows-backlog](epr:measure-family-borrows-backlog) | A Measure family composing with [middot](epr:middot-measure-primitive-design): issuance joined to first-recipient standing and to lag-until-first-settled-reciprocity. Sibling of A5's issuance-vs-settled-reciprocity ratio; **closes trap-detectors §9 item 1 for A5.** |
+| **12 — advising-agent provenance (A6)** ⚠ *proposed 2026-08-24, NOT yet minted* | [measure-family-borrows-backlog](epr:measure-family-borrows-backlog) | An attestation an advising elohim makes **about itself**: where its weights came from, who controls its update path, and whether it resolves anything to a central endpoint. §2.13 establishes that diversity is the substrate's resting state and **centralisation is the detectable deviation** — so this is deliberately *not* a diversity metric across a population, which may not be well-posed. It is the local, answerable question, and it is the natural home for trap A6. |
 | **11 — decision-quality attribution (H5)** ⚠ *proposed 2026-08-24, NOT yet minted* | [measure-family-borrows-backlog](epr:measure-family-borrows-backlog) | A Measure family joining a **pricing or underwriting decision** to the losses that settle after its author has changed scope, so standing cannot be earned on a signal that has not settled. N5's *lag-until-first-settled-reciprocity* redirect, applied to **standing** rather than to units. Sibling of Take 5's Cantillon detector; closes the gap §2.10 names against `MemberRiskProfile`, which scores members and not judgment. |
 | 10 — Fureai Kippu cross-region transfer | [measure-family-borrows-backlog](epr:measure-family-borrows-backlog) | The N7 boundary test as a study row, not a borrow: does a care unit that crosses a locality retain its meaning, and what did the Japanese case actually do about it? |
 | 7 — the bridge institution | [arch-workspace-discipline-backlog](epr:arch-workspace-discipline-backlog) | Joins the sibling's legal-person row and the two open licensing decisions (rows 2, 9). Carries the four invariants, most of all *no single bridge load-bearing*. |
