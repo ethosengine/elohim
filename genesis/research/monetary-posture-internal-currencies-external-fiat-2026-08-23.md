@@ -871,7 +871,8 @@ and still exclude them has reproduced the sorting it was built to answer, and it
 — *those who have been at the bottom of every system* — from the inside. Mishpat has no punishment
 category and justice is restored capability (§1); an uninsurable tier is neither. Whether that tier
 is a floor-layer responsibility (the pool prices, the commons covers) or a defect in the entry type
-is **an open canon question, and this paper does not settle it — it names it.** ⚠
+is a canon question — **and §2.12 now frames it precisely, using the corpus's own rule that belonging
+is never gated and only reach is.** ⚠
 
 **And the failure mode the hazard table misses comes from inside the industry.** An underwriter books
 a large policy — half a million dollars of annual premium, say — priced far beneath what the exposure
@@ -1055,6 +1056,92 @@ mutual credit has zero implementation, and the one genuinely-built instance — 
 behavioural risk profile — scores members rather than judgment and still carries an `uninsurable`
 tier. This section is the composition §2 points at, recorded so it can be argued with and so the line
 it must not cross is written down **before** anyone is tempted to cross it. ⚠
+
+### 2.12 Insurance dissolves: from a static policy to an affordance of participation
+
+§2.11 named three assessors. The insurance chain actually runs four, and completing the list is what
+exposes the deeper claim.
+
+| Role | What it assesses | When |
+|---|---|---|
+| **Underwriter** | what the risk is worth carrying | before |
+| **Appraiser** | what the thing is worth | at binding, and again at loss |
+| **Adjuster** | what actually happened, and what is owed | after |
+| **Lawyer** | what is true when the parties disagree about any of the above | in dispute |
+
+All four are expensive humans reading a particular situation. All four are therefore priced by the
+same constraint, and all four have been rationed the same way — by proxies, schedules, and standard
+forms substituted for knowledge nobody could afford per case.
+
+**Which explains the shape of a policy, and the shape is the point.** A policy is written in advance,
+for a fixed term, at a fixed price, over an enumerated set of perils, with fixed limits. **A policy is
+a cached assessment.** You cannot afford to re-assess continuously, so you assess once at binding and
+freeze the result for a year — and the entire surrounding apparatus (declarations, endorsements,
+exclusions, renewals, the claims process itself) exists to manage **the gap between the cache and
+reality**. Most of what people hate about insurance lives in that gap.
+
+**So if assessment becomes continuous, what dissolves is not the price. It is the artifact.** The
+replacement for a policy is not a better policy; it is **no policy** — coverage as a continuously
+current property of participation, always on, never purchased, and answerable to what is actually
+happening rather than to what was true at binding. In the operator's words: *insurance dissolves from
+a static policy into a liquid and ever-present reality — an afforded right of participating in the
+network.*
+
+**And in this corpus that stops being a financial product at all.** Mishpat is the justice pillar
+where **justice is restored capability and punishment is not a category** (§1). A claim payment *is*
+restored capability. Read that way, insurance here is not a market instrument bolted onto a commons —
+**it is Mishpat operating on misfortune**, which is why it belongs in the same pillar as the lens
+machinery and not in a separate financial layer.
+
+**This closes the canon question §2.10 left open, and the corpus answers it in its own words.** The
+rule is already written, twice: *"Belonging is never gated; only reach is."* ✅ Apply it to protection
+and the structure falls out immediately:
+
+- **The floor of coverage is a belonging property.** It is not earned, not priced, and not
+  refusable — the same status the corpus already gives dignity and provision. Nobody is outside it.
+- **Coverage above the floor is reach.** Its extent is earned and standing-gated, in exactly the way
+  §2.9 describes for any other policy whose scope grows.
+
+Which makes **`"uninsurable"` a defect rather than a tier** (`content_store_integrity/src/lib.rs:1538`).
+Not because every risk is equally cheap to carry — some are not — but because that tier gates
+*belonging* where the corpus permits gating only *reach*. The honest repair is not to delete the
+assessment; a pool that cannot say a risk is expensive is lying. It is to make the floor unconditional
+and let the assessment govern only what sits above it. ⚠ **That is a canon decision this paper can now
+frame precisely rather than merely flag**, and it is the strongest single argument in §2 for why the
+insurance mutual is the right place to build first.
+
+**Four disciplines, because a liquid affordance is more dangerous than a static one in ways the static
+form was quietly protecting against.**
+
+1. **Continuous assessment is continuous surveillance.** A policy's staticness was also a privacy
+   shield: once bound, nobody was watching you until you claimed. `MemberRiskProfile` already scores
+   `care_maintenance_score` and `community_connectedness_score` from Observer attestations ✅ — which
+   is behavioural monitoring wearing a benign name, and per-fold anonymity remains unsolved (§8,
+   limit 4). **An ever-present assessor is an ever-present observer, and the corpus has not paid for
+   that yet.** ⚠
+2. **Certainty is itself a good, and rigidity was a commitment device.** A policy is a *promise*: you
+   know now what you will be owed then. Coverage that is recomputed continuously can move under a
+   person at precisely the moment they need it, and *"your coverage was adjusted last Tuesday"* is a
+   worse failure than an imperfect fixed term. Whatever replaces the policy must be **as binding as a
+   policy was** — which means the liquid form still needs a hard commitment underneath it, and
+   Commitments are exactly the primitive for that (§2.1).
+3. **Adjusting is structurally adversarial, and that does not disappear.** The adjuster exists partly
+   because insurer and insured have opposed interests at claim time. An elohim advising the pool is
+   **not neutral**, and the arm's-length problem of §2.9 arrives here at its sharpest and most
+   personal: whoever the assessor serves at the moment of loss is the whole question.
+4. **The lawyer must not dissolve, and this is a refusal rather than a gap.** The other three roles
+   compress into continuous assessment; the fourth is not an inefficiency to optimise away, because
+   **the lawyer is the appeal**. Canon is unambiguous: *"the human audit and the appeal are not
+   decoration on a system that is usually right — they are where the humility the machine cannot
+   produce actually lives. A discernment ceiling with no appeal is not a ceiling. It is a verdict."* ✅
+   A protocol that dissolved underwriter, appraiser and adjuster into one ever-present agent and then
+   dissolved the appeal along with them would have built the most efficient unaccountable claims
+   department in history.
+
+**State of it.** Nothing here ships. There is no continuous re-assessment anywhere in the tree, no
+floor/above-floor split in `CoveragePolicy`, no appeal path attached to a claim, and the `uninsurable`
+tier is live in the entry type today. What §2.12 supplies is the *shape* of the dissolution and the
+four things that must survive it. ⚠
 
 ---
 
@@ -1482,11 +1569,14 @@ rather than to a cluster:
   `responsibility_demand_configs.rs:143`) — `approve >= 0` with `eligibility_predicate: None`. Gates
   every council claim in both papers.
 - **The accidental numéraire** (`concentration_service.rs:47`) — Take 6.
-- **The `"uninsurable"` risk tier** (`content_store_integrity/src/lib.rs:1538`) — §2.10. A shipped
-  entry type that can price anyone honestly and still exclude them, in a corpus whose justice is
-  restored capability and whose test is *those who have been at the bottom of every system*. Named,
-  not settled: it is either a floor-layer responsibility (the pool prices, the commons covers) or a
-  defect in the entry type, and that is a canon decision rather than a research take.
+- **The `"uninsurable"` risk tier** (`content_store_integrity/src/lib.rs:1538`) — §2.10, framed in
+  §2.12. A shipped entry type that can price anyone honestly and still exclude them, in a corpus
+  whose justice is restored capability and whose test is *those who have been at the bottom of every
+  system*. §2.12 now resolves the *shape* of the answer from canon — **belonging is never gated, only
+  reach is**, so an unconditional floor of coverage with earned extent above it — leaving the
+  operator a bounded decision rather than an open question. The accompanying design row (a
+  floor/above-floor split in `CoveragePolicy`, which today has no such field) is **proposed
+  2026-08-24, not yet minted.**
 
 **Not minted — held for the operator.** The disposition of `elohim/elohim-token` (crate README and
 settlement-bridge claims vs Stance I.2, §5) and the retirement of the stale token/blockchain sections
