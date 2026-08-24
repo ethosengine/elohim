@@ -3,19 +3,21 @@ id: "backlog-deprecation-storage-bulk-x-schema-version-header"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "elohim-storage bulk writes tolerate a missing X-Schema-Version header (deprecated client contract) — every in-repo client is now conformant; the terminal server-tolerance decision is an open operator wire-contract call"
+title: "elohim-storage bulk writes tolerate a missing X-Schema-Version header (deprecated client contract) — every in-repo client SENDS it, but the doorway hop dropped it until 2026-08-24 (own entry); the terminal server-tolerance decision remains an open operator wire-contract call"
 slug: "deprecation-storage-bulk-x-schema-version-header"
 written: "2026-08-07"
-updated: "2026-08-21"
+updated: "2026-08-24"
 author: "deprecation-triage"
 status: "backlog"
 priority: "low"
 deprecation_status: blocked
 severity: low
-fingerprints: ["3d8af5658223", "f47f0600b001", "cdb5ca58ee6c", "d7af212f42f2", "fef5d7190486", "ea88a05cc69f", "388edb6e4ce8", "b4f2961e0593", "61d2d6c7bc10", "4b6912d97c00", "f7398a2d0c88", "0ab7ff6b4673", "757534fab7b6", "2942cdb50eba", "a997ee70af19", "27ddce001d3a"]
+fingerprints: ["3d8af5658223", "f47f0600b001", "cdb5ca58ee6c", "d7af212f42f2", "fef5d7190486", "ea88a05cc69f", "388edb6e4ce8", "b4f2961e0593", "61d2d6c7bc10", "4b6912d97c00", "f7398a2d0c88", "0ab7ff6b4673", "757534fab7b6", "2942cdb50eba", "a997ee70af19", "27ddce001d3a", "0600dc451f96", "44e42a117254", "b287bec5896b", "c47af68aab94"]
 relatedNodeIds: []
 tags: [deprecation, elohim-storage, schema-negotiation, http-contract, bulk-endpoints]
 cites:
+  - genesis/data/timeline/backlog/deprecation-doorway-strips-schema-version-header.md
+  - doorway/doorway-service/src/routes/storage_proxy.rs
   - elohim/elohim-storage/src/http.rs
   - elohim/elohim-views/src/shared.rs
   - elohim/elohim-storage/src/services/response.rs
@@ -120,10 +122,25 @@ No upstream guide — the contract is ours. Two steps:
 **BLOCKED on an operator wire-contract decision. Step 1 is complete and
 runtime-verified; do not re-dispatch triage for this warning.**
 
-Every in-repo client of the six guarded bulk routes now sends the header. The
-warning can now only be emitted by an out-of-repo client, or by a stale binary
-or stale checkout predating this pass — if it reappears from an in-repo path,
-that is a genuine regression and the ledger will correctly re-fire.
+Every in-repo client of the six guarded bulk routes now sends the header.
+
+**2026-08-24 — the "only an out-of-repo client could emit this now" corollary
+was WRONG, and the ledger re-fired exactly as designed.** The warning reappeared
+in `matthew.log` at `20:35:35.470283Z` during the local-mesh prologue seed
+(fingerprint `db68b690b3cd`). The clients were innocent: the **doorway** was
+stripping `X-Schema-Version` from every proxied `/db/**` write, because
+`forward_to_storage` rebuilds the outbound request from a header allowlist that
+did not include it. A conformant client reached storage looking like a legacy
+one. That root cause has its own trajectory and its own entry —
+`genesis/data/timeline/backlog/deprecation-doorway-strips-schema-version-header.md` —
+and is not re-litigated here; this entry owns the server-tolerance contract only.
+
+Why two runtime A/Bs in a row missed it: **both probed storage directly**, and
+the defect lives in a hop that direct probes skip. The 2026-08-21 pass replaced a
+structural claim with a runtime measurement and was still blind, because the
+measurement did not traverse the path the reporting client (the seeder, via a
+doorway) actually takes. Prove it over the *reporting client's* topology, not the
+most convenient one.
 
 The one remaining action is step 2, and it needs a human call because it changes
 a public wire contract. Recommendation carried forward from the 2026-08-07 pass,
@@ -145,9 +162,19 @@ structural argument over an inventory is only as good as the inventory. This
 pass replaces it with a runtime A/B (below) rather than a second structural
 claim.
 
-**Note on the ledger fingerprints.** Sixteen fingerprints canonicalize here, and
+**Note on the ledger fingerprints.** Twenty fingerprints canonicalize here, and
 only two are distinct runtime observations (the `matthew.log` pair above,
-captured as `61d2d6c7bc10` / `4b6912d97c00`). The other fourteen are grep- and
+captured as `61d2d6c7bc10` / `4b6912d97c00`). The 2026-08-24 additions
+(`0600dc451f96`, `44e42a117254`) are two more of the same self-capture class:
+both were minted by the 2026-08-24 triage agent's OWN scoping commands — a
+repo-wide `grep -rn X-Schema-Version` and a `grep -n … matthew.log` — printing
+the warning text back to a hooked shell mid-triage. Neither is an observation of
+anything; they are the instrument photographing itself, and they are parked here
+rather than dispatched. Two 2026-08-22 strays of the same class
+(`b287bec5896b`, `c47af68aab94` — a `sed` and a `grep` over
+`genesis/a2o/src/framework/dataplane/surfaces.ts` that printed this warning's own
+doc-comment) had been left at `open` and were drained to `blocked` in the same
+pass. The other fourteen are grep- and
 diff-output self-captures of the same source line, re-hashed each time `http.rs`
 grew and the `warn!` moved (line 260 → 267 → 277 → 317 → 430), each time a
 different `grep` prefix was used, or — during this very triage run — each time

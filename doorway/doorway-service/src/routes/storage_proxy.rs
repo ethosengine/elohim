@@ -387,6 +387,23 @@ where
         }
     }
 
+    // Forward the schema-version negotiation header. Storage's
+    // `validate_schema_version_header` guards the six `/db/**/bulk` writes and is
+    // advisory-on-absence / strict-on-presence: with the header dropped here, a
+    // fully conformant client reads to storage as a legacy client and trips the
+    // "Bulk request missing X-Schema-Version header (deprecated…)" warning —
+    // and, worse, a client asking for an UNSUPPORTED version is silently served
+    // the default instead of the 400 it must get. Proven 2026-08-24 against the
+    // local mesh: `X-Schema-Version: 99` direct to storage → 400
+    // `Unsupported schema version: 99`; the identical request through this
+    // forwarder → 200. This is a NEGOTIATION header, so dropping it does not
+    // merely lose a log line, it silently defeats version negotiation.
+    if let Some(schema_version) = req.headers().get("x-schema-version") {
+        if let Ok(sv_str) = schema_version.to_str() {
+            builder = builder.header("X-Schema-Version", sv_str);
+        }
+    }
+
     // Inject X-Agent-Cid from doorway-resolved context. In the alpha substrate
     // this is sourced from `claims.human_id` upstream; storage's `extract_agent_cid`
     // helper reads this header for view-service identity resolution. When CIDv1

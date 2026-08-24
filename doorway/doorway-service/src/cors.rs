@@ -24,8 +24,18 @@ type BoxBody = http_body_util::combinators::BoxBody<Bytes, hyper::Error>;
 const ALLOWED_METHODS: &str = "GET, POST, PUT, DELETE, HEAD, OPTIONS";
 
 /// Request headers the browser may send.
+///
+/// `X-Schema-Version` is the schema-negotiation header storage's guarded
+/// `/db/**/bulk` writes read (`validate_schema_version_header`). It must be
+/// listed here or a CROSS-ORIGIN browser client that correctly sends it has the
+/// whole bulk write refused at preflight — a harder failure than the dropped-header
+/// case, because the request never leaves the browser. Latent until now only
+/// because the in-repo browser callers reach a doorway same-origin (served by the
+/// doorway in prod, Angular dev-server proxy locally); a Tauri or third-party
+/// origin would have hit it. Storage's own CORS already advertises it
+/// (`elohim/elohim-storage/src/http.rs`), so this closes a doorway-vs-storage skew.
 const ALLOWED_HEADERS: &str =
-    "Content-Type, Authorization, Accept, X-Op, X-Requested-With, X-Observation-Id";
+    "Content-Type, Authorization, Accept, X-Op, X-Requested-With, X-Observation-Id, X-Schema-Version";
 
 /// Response headers the browser may read from JavaScript.
 const EXPOSE_HEADERS: &str = "Content-Length, Content-Range, ETag";
@@ -253,6 +263,25 @@ mod tests {
         assert!(resp.headers().contains_key("access-control-allow-headers"));
         assert!(resp.headers().contains_key("access-control-max-age"));
         assert!(resp.headers().contains_key("access-control-expose-headers"));
+    }
+
+    /// Regression guard: a cross-origin browser client that correctly sends the
+    /// schema-negotiation header on a `/db/**/bulk` write must survive preflight.
+    /// Dropping `X-Schema-Version` from the allowlist refuses the write in the
+    /// browser, before any request reaches the doorway.
+    #[test]
+    fn preflight_allows_schema_version_header() {
+        let resp = preflight_response(&dev_config(), Some("https://elohim.host"));
+        let allowed = resp
+            .headers()
+            .get("access-control-allow-headers")
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(
+            allowed.contains("X-Schema-Version"),
+            "preflight must advertise X-Schema-Version, got: {allowed}"
+        );
     }
 
     #[test]
