@@ -3480,6 +3480,9 @@ async fn async_main(
                     e
                 })?
                 .to_bytes();
+        // One resolution, two consumers (the announcer's POST leg and the
+        // bootstrap joiner's GET leg) — they must agree on the same doorway.
+        let doorway_base_url = elohim_storage::p2p_iroh::doorway_base_url();
         elohim_storage::p2p_iroh::spawn_transport_manifest_announcer(
             elohim_storage::p2p_iroh::AnnouncerInputs {
                 endpoint: iroh_n.endpoint().clone(),
@@ -3501,10 +3504,41 @@ async fn async_main(
                 .map(|p| p.as_str().to_string())
                 .collect(),
                 publisher: announce_publisher,
+                doorway_url: doorway_base_url.clone(),
             },
             elohim_storage::p2p_iroh::announcer::announce_interval(),
         );
 
+        // T0' — pure-iroh bootstrap. Gossip cannot seed a book it needs a
+        // seeded book to reach; the doorway's bounded manifest board breaks
+        // that circle. Signatures are verified CLIENT-side (see
+        // `p2p_iroh::doorway_bootstrap`), so the book's "entries only from a
+        // manifest that signed for its own NodeId" invariant survives the web2
+        // concession — a lying doorway costs availability, never redirection.
+        //
+        // Spawned whenever a doorway is configured, with no mode flag: the
+        // joiner acts only while the book is EMPTY, so a dual-mode node (whose
+        // libp2p gossip fills the book in seconds) never issues a request, and
+        // a pure-iroh node — or one a partition emptied — re-bootstraps on its
+        // own. Inert entirely when no doorway URL resolves.
+        match doorway_base_url.clone() {
+            Some(base_url) => {
+                elohim_storage::p2p_iroh::spawn_doorway_bootstrap(
+                    elohim_storage::p2p_iroh::DoorwayBootstrapInputs {
+                        base_url,
+                        book: book.clone(),
+                        self_node_id: iroh_n.node_id().to_string(),
+                    },
+                    // Grace: gossip gets first refusal on filling the book.
+                    elohim_storage::p2p_iroh::announcer::announce_interval(),
+                    elohim_storage::p2p_iroh::announcer::announce_interval(),
+                );
+            }
+            None => info!(
+                "iroh: no doorway URL (set ELOHIM_DOORWAY_URL or DOORWAY_CAPABILITY_URL) — \
+                 pure-iroh bootstrap inert, the book fills from gossip only"
+            ),
+        }
         // The iroh sync-round driver — the initiator the plane never had
         // (`main.rs` used to say so in a comment). Same cadence as the libp2p
         // round; walks the book, so it does nothing until a manifest lands.

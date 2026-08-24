@@ -23,6 +23,7 @@ pub mod auth_backends;
 mod blob_store;
 pub mod codec;
 mod config;
+pub mod doorway_bootstrap;
 pub mod dual_publish;
 mod endpoint;
 pub mod epr;
@@ -55,6 +56,10 @@ pub use auth::{
 pub use auth_backends::{IdentityHandshakeServiceBackend, TrustServiceBackend};
 pub use blob_store::IrohBlobStore;
 pub use config::{DiscoveryResolverConfig, DiscoveryResolverKind, IrohConfig};
+pub use doorway_bootstrap::{
+    doorway_base_url, spawn_doorway_bootstrap, verify_and_upsert, BootstrapOutcome,
+    DoorwayBootstrapInputs,
+};
 pub use dual_publish::{classify_topic, DualGossipPublisher, IrohGossipPublisher, TopicTransports};
 pub use endpoint::{build_endpoint, BuildEndpointError};
 pub use epr::{

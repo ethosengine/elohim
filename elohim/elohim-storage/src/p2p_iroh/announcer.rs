@@ -35,6 +35,13 @@ pub struct AnnouncerInputs {
     /// the manifest rides libp2p gossipsub (the leg that HAS peers at boot)
     /// and iroh-gossip (useful once the plane has neighbors).
     pub publisher: Arc<dyn GossipPublisher>,
+    /// Doorway base URL, when this node has one
+    /// ([`super::doorway_bootstrap::doorway_base_url`]). The same signed
+    /// announcement is POSTed to the doorway's bounded bulletin board so a
+    /// PURE-IROH peer — which can reach no gossip topic until its book is
+    /// seeded, and cannot seed its book without gossip — is discoverable at
+    /// all. `None` leaves the announcer exactly as it was: gossip only.
+    pub doorway_url: Option<String>,
 }
 
 /// Cadence from env (`ELOHIM_TRANSPORT_MANIFEST_INTERVAL_SECS`) or default.
@@ -96,6 +103,15 @@ pub fn spawn_transport_manifest_announcer(
         // bounded-work: one signed announcement per `interval` tick (30s
         // default), one gossip publish per tick, no retry ladder — a failed
         // publish waits for the next tick.
+        // Built once: the doorway leg is best-effort and must not add a client
+        // build per tick. `None` (no doorway, or no client) keeps it inert.
+        let doorway = inputs
+            .doorway_url
+            .clone()
+            .and_then(|url| super::doorway_bootstrap::doorway_client().map(|c| (url, c)));
+        if let Some((url, _)) = doorway.as_ref() {
+            info!(doorway = %url, "transport manifest announcer: also posting to the doorway bulletin board");
+        }
         let mut ticker = tokio::time::interval(interval);
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         loop {
@@ -117,6 +133,12 @@ pub fn spawn_transport_manifest_announcer(
                     }
                 }
                 Err(e) => warn!(error = %e, "transport manifest announcer: encode failed"),
+            }
+            // Same announcement, same tick, second channel. Failures are logged
+            // at debug inside `post_manifest` and retried next tick — the
+            // doorway is a convenience, never a dependency.
+            if let Some((url, client)) = doorway.as_ref() {
+                super::doorway_bootstrap::post_manifest(client, url, &ann).await;
             }
         }
     })
@@ -154,6 +176,7 @@ mod tests {
             libp2p_peer_id: None,
             planes: vec!["sync".into()],
             publisher: publisher.clone(),
+            doorway_url: None,
         };
         let handle = spawn_transport_manifest_announcer(inputs, Duration::from_millis(200));
         let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
