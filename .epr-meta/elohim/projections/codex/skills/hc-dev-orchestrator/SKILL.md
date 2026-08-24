@@ -104,7 +104,27 @@ with `MESH_RECOVERY_QUIESCE=1`. It composes the per-peer transport interface
 (`MESH_PEER_TRANSPORTS` in `hc-mesh.sh`) with the single-peer recovery
 primitive (`hc-mesh-recovery.sh`). Drive one scenario/run directly with
 `just mesh recovery <warm|cold> <peer> [--label k=v]` before reaching for the
-full matrix.
+full matrix. The matrix seeds its notion of the current shape from the LIVE
+mesh (`matrix: live shape <peers>/<doorways>`) so it only reshapes
+(stop/start/prologue) when a scenario genuinely needs a different shape —
+override with `MESH_RECOVERY_LIVE_SHAPE="<peers-csv>/<0|1>"`, and point the
+probe base at `MESH_RECOVERY_PROBE_BASE` (default 8090). A reshape is judged
+by whether the mesh SERVES (every peer `/health` + `/db/stats.contentCount>0`,
+both doorways 200 on `/db/content/elohim-host-landing` when doorways=1),
+bounded by `MESH_RECOVERY_RESHAPE_VERIFY_SECS` (default 180s;
+`MESH_RECOVERY_RESHAPE_VERIFY_STUB=ok|fail` for tests) — the prologue's own
+exit code is logged only as advisory, since its seeder post-flight is a known
+false red. Reshape retries per shape are bounded by
+`MESH_RECOVERY_RESHAPE_RETRIES` (default 1); once exhausted, every scenario
+still needing that shape gets `FAIL(reshape)` rows instead of another
+regenerate attempt, and `DOORWAY_B_PORT` (default 8889) is honored alongside
+`DOORWAY_PORT` throughout. `hc-mesh-recovery.sh`'s backpressure witness reads
+the CONDUCTOR log (`$LOCAL_DEV_DIR/.sandbox_run_log[.<peer>]`) for
+`conductor_receipt_max_s` (JSON `null` when no receipt-latency line falls in
+the window) and records `conductor_receipt_scope` per peer (`per-peer` vs
+`mesh-wide`); it captures each peer's environ/exe BEFORE inflicting loss and
+refuses (exit 5) without one, and the resulting record carries `zome_path`
+(`alive`/`dead`/`inconclusive`/`unknown`) from the restart's zome probe.
 
 ### Act I Prologue cast (`hc-mesh-prologue.sh`)
 
