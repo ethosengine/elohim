@@ -589,6 +589,28 @@ stop_all() {
   echo "mesh stopped"
 }
 
+# What the mesh COSTS, read from ps — so "can we afford this locally" is a
+# number in the same command that reports health. Conductors are ~2 GB RSS
+# each (measured 2026-08-24: 3 conductors = 6.0 of a 6.9 GB mesh); that is why
+# the recovery harness runs two peers, not three.
+mesh_footprint() {
+  local total=0
+  while IFS= read -r line; do
+    set -- $line; local pid="$1" rss="$2" cpu="$3"; shift 3
+    local role="other" name="-"
+    case "$*" in
+      *holochain*--config-path*) role=conductor; name="$(sed -n 's#.*/local-dev/\([^/]*\)/.*#\1#p' <<<"$*")" ;;
+      *elohim-storage*--http-port*) role=storage; name="$(sed -n 's/.*--http-port \([0-9]*\).*/\1/p' <<<"$*")" ;;
+      *"/doorway "*--listen*) role=doorway; name="$(sed -n 's/.*--listen [^:]*:\([0-9]*\).*/\1/p' <<<"$*")" ;;
+      *mongod*"$MESH_DIR"*) role=mongod ;;
+      *) continue ;;
+    esac
+    printf 'footprint %-9s %-8s rss=%dMB cpu=%s%%\n' "$role" "$name" $((rss / 1024)) "$cpu"
+    total=$((total + rss / 1024))
+  done < <(ps -eo pid=,rss=,pcpu=,args= | grep -E "holochain --piped|elohim-storage.*--http-port|/doorway .*--listen|mongod --dbpath" | grep -v grep)
+  echo "footprint total rss=${total}MB"
+}
+
 status_all() {
   echo "conductors:"; ss -tln 2>/dev/null | grep -E "127.0.0.1:44[0-9]{2} " || echo "  (none)"
   local i=0 port transport
@@ -609,6 +631,8 @@ status_all() {
   curl -s -m 2 "http://localhost:${DOORWAY_B_PORT:-8889}/health" >/dev/null && echo UP || echo down
   printf "mongod   :%s " "$MONGO_PORT"
   if (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null; then echo "UP (archive-backed doorways)"; else echo "down (doorways run archive-less: inert warm shell)"; fi
+  echo
+  mesh_footprint
   echo
   # What is ACTUALLY RUNNING comes first, read from /proc — not what the next
   # launch would choose. Those differ whenever someone overrides HOLOCHAIN_BIN
