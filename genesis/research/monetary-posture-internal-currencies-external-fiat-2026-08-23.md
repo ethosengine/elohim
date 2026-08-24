@@ -57,6 +57,24 @@ are thirteen numbered positions in `values-forward.md` recording what this proje
 are cited here as binding. `epr:` links are content-addressed document IDs that resolve to sibling
 documents in this directory.
 
+**A few further terms recur from the wider corpus**, and are defined here rather than left to a
+sibling, because this paper leans on all of them. A **lens** is a named school's reading of a rule — a
+deterministic `rule` plus a declared `telos`, governing a scope, forkable and supersedable — and it is
+the mechanism on which a currency is declared (§2.1). The **deterministic floor** and the **elohim
+ceiling** are the two decision layers: the floor is mechanical, runs with no AI and no network, and is
+identical for everyone; the ceiling reads a particular situation in context and proposes — *never a
+computed payout at the ceiling, never judgment at the floor*. **Friction-gradient limitarianism** is
+the position that accumulation past a threshold should meet steadily rising friction rather than a
+hard cap, so a limit is a gradient a person negotiates rather than a wall that rewards evasion. A
+**Category-B projection** is data the substrate holds but does not notarize — a local view, not a
+DHT-anchored fact — and an **Operational-C shape** is a quantity recomputed on read from its
+underlying events rather than stored as an authoritative balance; both are borrowed from the
+[Hypha survey](epr:hypha-dao-autonomous-collectives-cross-pollination-2026-06-24), and both matter
+here because a stored balance is exactly the shape N4 refuses. The **Amplified set** is the corpus's
+class of detectors judged worth raising to standing attention rather than left as passive measures.
+An **EAE** is an *Elohim Autonomous Entity*, the protocol's model of a firm-like collective, and
+**middot** is the measure primitive its detectors compose with.
+
 **And for a reader arriving from the protocol side rather than the monetary side**, the historical
 and technical vocabulary this paper leans on, in one place:
 
@@ -72,6 +90,11 @@ and technical vocabulary this paper leans on, in one place:
 - **Chiemgauer** — a Bavarian regional currency (2003–) carrying demurrage at 2% per quarter.
 - **C3** — *Commercial Credit Circuit*, a mutual-credit design backed by insured invoices, deployed
   in Uruguay, Brazil and Honduras.
+- **LETS** — *Local Exchange Trading System*, the most numerous category of household-scale
+  mutual-credit experiments (UK/Canada/Australia, 1980s–). Structurally the closest analogue to what
+  §2 proposes, and the most instructive: LETS schemes rarely collapse dramatically, they **fade** —
+  through participant fatigue, thin supply on the offer side, and the administrative burden falling
+  on a few unpaid organisers. ◐
 - **demurrage** — a carrying cost on holding money, so that currency is not a costless store of
   value. Gesell's *Freigeld*; its land counterpart is *Freiland*.
 - **seigniorage** — the gain accruing to whoever issues money: the difference between a unit's
@@ -92,7 +115,7 @@ and technical vocabulary this paper leans on, in one place:
 
 ## 0. Both postures, stated first
 
-**Inward.** The protocol has no currency and will not have one. But the reason is not that a currency
+**Inward.** The protocol has no currency, and will issue no unit for anyone to hold. But the reason is not that a currency
 layer is missing — it is that **a currency is a configurable property of the substrate itself**, and
 the configuring belongs to a community rather than to the protocol. Every part a currency is made of
 already exists as machinery: an issuance trigger is an event creating a resource; a credit limit is
@@ -122,10 +145,20 @@ that forbids saying whose interest is being served this quarter. **We do not res
 decompose it**, giving each function its own lens, its own `telos`, and its own declared Mishpat limit,
 of which the sharpest is: **preservation is legitimate; accretion is not** (§2.2).
 
-**The two postures are one refusal seen from two sides.** Inward, no protocol-level unit, because a
-unit is an ownership surface and an ownership surface is a capture surface. Outward, no protocol-level
-counterparty, because a counterparty is a chokepoint. **The protocol is empty on purpose, and that
-emptiness is the whole of its monetary policy.**
+**The two postures are one refusal seen from two sides.** Inward, no protocol-level unit *that anyone
+holds*, because a holdable unit is an ownership surface and an ownership surface is a capture surface.
+Outward, no protocol-level counterparty, because a counterparty is a chokepoint.
+
+**But "empty" is the wrong word for it, and an earlier pass of this paper used it wrongly.** What the
+protocol ships is not an absence — it is an elaborate *grammar*: a lens mechanism with a validator, a
+bounds validator, supersession, decay over stocks, and REA accounting, with no unit, no issuer, no
+treasury, and no exchange rate. And beneath the grammar sits the record itself — un-denominated,
+recorded before anything has been priced, and outliving every denomination read over it. That record,
+not the absence of a unit, is where this paper locates capture resistance: a denomination here can
+always be re-read, and never becomes the only memory. **§2.9 makes that argument, states what it does
+*not* reach — one medium can still become the one everyone uses — and is where a plural-currency
+facilitator answers for itself.** **The protocol holds no unit and issues nothing
+today; it is not, and must not claim to be, permanently incapable of issuance.**
 
 **What this paper does *not* do, deliberately.** It does not propose a numéraire, and it does not
 resolve settlement semantics. The standing operator decision is that the substrate stays *agnostic to
@@ -228,7 +261,15 @@ institutions to get:
   Commitment to supersede"* ✅ — and lenses carry `version_parent`. A currency's rule change is a new
   lens citing its parent, so the circuit's monetary history is a readable chain rather than a mutable
   setting. The WIR dropped demurrage in 1948; under this shape that would be a superseding lens with
-  an author, a date, and a parent, not a silent parameter edit.
+  an author, a date, and a parent, not a silent parameter edit. **And the substance of that change
+  deserves more than an illustration, because it cuts against §2.2.** The WIR's most successful
+  decades came *after* it dropped the Gesellian carry cost, settling into a clearing network whose
+  discipline came from credit assessment rather than from decay — a real datum against treating
+  demurrage as the central instrument. Stodder's counter-cyclicality result, the strongest empirical
+  finding the WIR has produced, is a finding about a *post-demurrage* WIR. ◐ Read honestly, the WIR
+  supports **plural, declared, supersedable monetary rules** — which is this paper's claim — and is at
+  best neutral on demurrage itself, which is why §2.3 carries it as one knob among five rather than as
+  the answer.
 - **Revocation, not deletion.** `revoked_at` is a column; a withdrawn policy remains legible.
 - **Plurality without forking the network.** Multiple lenses may govern the same scope from different
   schools. That is the whole design of the lens market, and it is why "which currency does this
@@ -248,9 +289,12 @@ This is the section a monetary posture is obliged to write, and the one most suc
 **The tension.** Money classically does three jobs — **medium of exchange**, **store of value**, and
 **unit of account** — and the first two pull against each other structurally, not accidentally. A
 perfect store of value is a *defective* medium of exchange, because a thing that holds its value at
-no cost can wait indefinitely; and waiting is the strike (sibling §2.1). A perfect medium of exchange
+no cost can wait indefinitely — and that waiting is what the sibling paper calls **the strike**: the
+structural power of a costless store of value to withdraw from investment and simply hold, which
+manufactures the very scarcity that restores its own yield, with nobody needing to conspire (sibling
+§2.1). A perfect medium of exchange
 is a poor store of value, because everything that forces circulation — a carry cost, a stock limit,
-inflation — degrades holding. **Gesell's whole contribution is the observation that money's zero cost
+inflation — degrades holding. **Gesell's sharpest single observation is that money's zero cost
 of carry gives it an unearned advantage over every good it is exchanged against**, and demurrage is
 not an attack on thrift but the removal of that advantage. ◐
 
@@ -318,7 +362,7 @@ be the same number, and no rule distinguishes them.
 - **Elohim ceiling (discerning):** whether *this* holding, in *this* life, is prudence or accumulation
   is irreducibly contextual. **Never a computed payout at the ceiling, never judgment at the floor.** ✅
 
-**Why this is available to us and not to the Fed, stated without triumphalism.** Not because we are
+**Why this is available to us and not to the Fed.** Not because we are
 cleverer. Because we are not forced to fuse. A central bank administers one currency for one polity
 and must therefore resolve the tension with one instrument — a genuine structural constraint, not a
 failure of nerve. A plural-currency substrate can let a circulation instrument be a circulation
@@ -340,6 +384,17 @@ supersession path — the thing an apex institution structurally cannot do.
    cannot earn (the accretion limit) and cannot buy standing (N3), the flight to it is harmless.** It
    is just saving. Gesell needed Freiland because in his world the escape hatch *did* earn; ours is
    closed by the limit rather than by a second instrument.
+
+   **The obvious rebuttal deserves a direct answer: if the preservation instrument transfers, it *is*
+   a medium of exchange, and the decomposition collapses into one asset with two names.** The answer
+   is that under N6 it does not transfer as a rail. A preservation holding is a claim against the
+   circuit that issued it, and turning it back into purchasing power is a *settlement* — a redemption
+   against that circuit, or a bilateral agreement with another — not an endorsement to a third party
+   at a market price. That is the difference between a bank deposit and a banknote. It is also a
+   genuine cost to the holder, and this paper should not pretend otherwise: the instrument is **less
+   liquid on purpose**, and the illiquidity is precisely what keeps it from becoming the thing it was
+   decomposed away from. Whether households will accept that trade is an open empirical question, and
+   it is the sharpest one this posture faces. ⚠
 2. **A preservation instrument that cannot accrete still concentrates**, slowly, through inheritance
    and unequal capacity to save. That is a real residue, and it is where friction-gradient
    limitarianism and the negotiated equilibrium of §2.8 do the remaining work — not the monetary
@@ -374,9 +429,17 @@ These are the ones that arrive as lenses with `role: floor` / `role: ceiling`, a
 **prohibition**, not redirect. Per the corpus's own handling classes, prohibition is right only for
 substrate invariants — everything else is a context-relative policy that gets a redirect.
 
-**N1 — No protocol-level unit.** The protocol issues nothing. Every unit is a community's own
-liability under its own lens. *(Stance I.2; and structurally, a protocol-level unit would be a
-protocol-level counterparty, which is the chokepoint §3 refuses.)*
+**N1 — No protocol-level unit that is held as property.** The protocol issues no unit that any person
+or circuit holds, accumulates, transfers at a price, or pledges. Every *circulating* unit is a
+community's own liability under its own lens. *(Stance I.2; and structurally, a holdable
+protocol-level unit would be a protocol-level counterparty, which is the chokepoint §3 refuses.)*
+
+> **What N1 does not say.** It does not say the commons may never issue. Issuance *against the
+> commons, for the commons* — bounded, mandated, non-accumulable, reabsorbed on completion — is a
+> different object from a unit held as property, and refusing it permanently would forfeit the very
+> inheritance §1.1 says belongs to everyone. That capacity is held **unexercised and
+> precondition-gated**, not forbidden, and its form would be a **policy lane over a commons pool**
+> rather than a unit anyone carries. §2.9.
 
 **N2 — No protocol seigniorage, and no private seigniorage either.** Issuance gain is common
 inheritance (§1.1) and returns to the floor on a declared schedule. A circuit that retains its own
@@ -421,9 +484,12 @@ is harder to contest than one somebody did."* ✅ A shipped percentage table is 
 ### 2.5 Plurality is the capture resistance
 
 Lietaer's structural claim is that **monetary monoculture is the fragility** and a diverse monetary
-ecosystem is resilient (◐). Read as a security property rather than an economic one, it is this
-protocol's whole answer to monetary capture: *there is nothing to capture, because there is no unit
-everyone must hold.*
+ecosystem is resilient (◐). Read as a security property rather than an economic one, it is
+**half** of this protocol's answer to monetary capture: *there is no unit everyone must hold, so no
+single medium's capture would carry the network.* The other half — the half that keeps this from
+being an argument from mere absence — is §2.9's: beneath every denomination sits an un-denominated
+record that outlives it, so no medium ever becomes the only memory. **Plurality means no medium is
+load-bearing; the record beneath is what stops one from becoming so.**
 
 Three mechanisms carry it, all shipped or near-shipped:
 
@@ -443,8 +509,9 @@ controls its update path; *"a living-room elohim that phones home for its values
 a nicer address."* ✅ For a monetary posture this is the sharpest possible warning: **the capture
 surface for a plural-currency network is not the ledger, it is the model that advises every council
 about its rate.** A thousand currencies advised by one un-forked elohim is monoculture wearing a
-diversity costume. Waqf is the thousand-year case law, and the safe form is *elohim-as-clerk of a
-self-executing, community-amendable constitution — never lord.*
+diversity costume. Waqf — the Islamic endowment: property permanently dedicated to a purpose, with no
+owner, administered by a trustee — is the thousand-year case law, and the safe form is
+*elohim-as-clerk of a self-executing, community-amendable constitution — never lord.*
 
 ### 2.6 The Cantillon detector, pointed at ourselves
 
@@ -464,7 +531,10 @@ at us:
   issuance-vs-settled-reciprocity ratio wants.
 - **Council-facing output:** a standing panel — *"issuance in this circuit is concentrating at the
   top decile of prior standing; here is the distribution, here is the trend, here is the
-  evidence."* The council steers. The detector reports.
+  evidence."* The council steers. The detector reports. *(Standing caveat, stated here because it is
+  load-bearing for everything downstream: ratification is currently first-quorum-wins and therefore
+  single-write-capturable — §5. Every "the council decides" sentence in this paper is contingent on
+  that fix.)*
 
 This is the internal analogue of the thing the paper's external half asks a central bank to be honest
 about, and running it on ourselves is the price of asking.
@@ -526,6 +596,200 @@ other kind of authority. That is the **completed gift** the EAE survey was reach
 shape that both survives Stance II.4 (witnessed, appealable, revocable) and needs no untouchability
 to hold.
 
+### 2.9 The generational answer: a substrate already full of currency, held in abstract
+
+The posture so far answers *how* a community declares a currency. It has not answered the question a
+plural-currency facilitator is actually obliged to answer:
+
+> **How does a network that hosts many currencies avoid being captured by them?**
+
+The obvious answer — *there is nothing to capture, because there is no unit* — is too thin. It
+answers by absence, and an absence is not a design. It is also not quite true: the grammar ships
+(§2.1), and a grammar is a thing that can be captured. The real answer is not that the
+protocol holds no currency. It is that **it holds nothing else.**
+
+**Start from what a currency actually is.** The definition *Rethinking Money* works from — recalled
+here rather than re-verified at the page this pass — is not the token but the flow: a currency is
+**the information that moves between parties in an exchange**: who gave what to whom, when, under
+what agreement, and what was recognised in return. The unit is a
+carrier for that information, and a lossy one. ◐ Read that way, **REA is already currency, kept in
+abstract**: resource, event, agent — the same facts, recorded before anything has been priced.
+
+Beer's line, which this paper already takes as its frame, is the same observation from the other
+side: money *"attenuates the full state space of human contribution down to a few priced channels,
+and care is variety that falls outside the channels"* — our reading of *Designing Freedom*, not a
+verbatim Beer sentence. ✅ **A price is a denomination that has discarded almost everything it knew.**
+
+**And the discarding is not a defect — which is where Hayek has to be met, not waved past.** "The Use
+of Knowledge in Society" is precisely the argument that a price's compression *is* its power: a
+one-dimensional signal that lets strangers coordinate without any of them holding the whole picture,
+and no richer record can substitute for it. That argument is untouched here, and this paper does not
+claim otherwise. **The answer is that the record is not competing with the price at the price's own
+job.** Prices coordinate; records remember. The sibling paper states the same boundary as a refusal —
+*no calculation is being attempted*: computation stays local, aggregation is voluntary, and the
+global layer holds no allocative authority. What the un-denominated record is for is not
+out-computing the signal but keeping what the signal dropped **available for judgment** — which is a
+different function, on a different timescale, answering to a council rather than to a market.
+
+So the protocol is not empty of currency. **It is full of currency, held un-attenuated** — and that
+reframes the capture question rather than dodging it. But it reframes only half of it, and the half
+it does not reach must be said here rather than saved for the limits section.
+
+**Where capture actually happens.** A medium captures a network when it becomes *the only memory*.
+Once the priced channel is the sole surviving record, whatever the price ignored is not merely
+undervalued — it is **invisible**, and there is no remaining vantage from which anyone could notice.
+That is how enclosure works monetarily. Not by owning the ledger; by being the only thing the ledger
+remembers.
+
+**The answer, then, is a layering rather than a refusal.** The un-denominated record is primary and
+permanent. Every denomination over it is a lens — scoped, authored, dated, forkable, supersedable,
+revocable — and therefore a *reading* of a record that outlives it. Three properties follow, and they
+are the whole of the capture resistance:
+
+1. **No currency is ever the record.** It is a projection of one.
+2. **Any currency is re-readable.** The same events, under a different lens, yield a different
+   denomination — without rewriting a single fact.
+3. **What a currency ignored is still there.** Care that fell outside the priced channels remains in
+   the substrate as witnessed events, available to the next lens that has a use for it.
+
+The design constraint §0 already states — *record facts, defer valuation*, keeping provenance
+immutable so any future settlement story stays retroactively computable ✅ — **is this property
+written as an engineering rule.** The substrate never forgets what the currency abstracted away.
+
+**But that defeats only one of the two capture modes, and the distinction is the honest core of this
+section.**
+
+- **Memory capture** — a medium becomes the sole surviving record, so what it ignored becomes
+  unthinkable rather than merely unpriced. **The architecture does prevent this.** The record is
+  primary, the denominations are readings, and a reading cannot erase what it declined to read.
+- **Functional capture** — one denomination becomes the one everyone actually uses: the lens
+  merchants accept, the unit the bridge institution settles in, the rail a newcomer has no realistic
+  choice but to join. **The architecture does not prevent this**, and no property of the record
+  does. A railway track outlives any particular train; a railway monopoly is still a monopoly.
+
+Plurality of *possible readings* is not plurality of *live circuits*, and only the second is an
+answer to functional capture. What would actually bear on it is thinner and more demanding than the
+elegant claim: live alternative circuits with real volume, a merchant side that accepts more than
+one, exit that is affordable in practice rather than in principle, and a detector watching
+concentration of settlement — **which does not exist** (§8, limit 8). Until it does, this section's
+claim should be read at exactly its true strength: **the substrate makes capture reversible and
+visible; it does not make it impossible.**
+
+**What the elohim is for at this layer.** Not to pick the rate. Its work is to read the
+un-attenuated record and hold in view the thing a denomination structurally cannot carry — the deeper
+responsibility, and human flourishing as the actual object — while a council decides the monetary
+questions as the occasion presents them:
+
+- how value should **flow**, and at what velocity;
+- **when a store of value is appropriate**, and when it has become a strike in waiting (§2.2);
+- what **friction accumulation should meet**, at what threshold, and on whom it falls;
+- how **redistribution** happens, and on whose declared schedule;
+- how **issuance** is warranted, and against what evidence;
+- how much **liquidity** is enough, and what it costs to supply;
+- how the circuit **meets the legacy economy** at the ramps, and what it owes there (§3).
+
+*The council steers; the detector reports.* The elohim's advantage here is not judgment — it is
+**variety**: it can hold the whole state space at once, which is precisely the faculty a single
+priced channel gave up.
+
+**And the design is therefore occasional, not universal.** A settled community with thick reciprocity
+and a struggling one inside a polycrisis do not need the same monetary design, and forcing them onto
+one is the monoculture failure (§2.5) arriving as compassion. What the substrate supports instead is
+**policy lanes over commons pools**:
+
+- A **policy lane** is a scoped, declared monetary regime — a lens or a bound set of them — governing
+  one purpose for one scope, with a `telos` that says what it is for, a supersession path, and no
+  claim on anything outside its scope. Lanes coexist; they do not have to agree; a community may run
+  several at once for different purposes, and the unit-of-account limit (§2.2) is what keeps one from
+  silently becoming all of them.
+- A **commons pool** is the counterpart on the resource side: a stock held for a declared purpose,
+  governed by a lane, belonging to no participant, and answerable to the council that declared it —
+  the waqf shape, which is the thousand-year case law for exactly this (§2.5).
+
+**Which is where issuance stops being an exception and becomes an instance.** Some public goods are
+too large for any community to underwrite: a particle accelerator, a fusion programme, a deep-space
+mission, an orbital telescope, a vaccine platform, a continental grid. They share a shape — enormous
+coordinated commitment, sustained over decades, no near-term return to any contributor, and no
+possibility of the participants clearing it among themselves. **Mutual credit cannot fund them**,
+because mutual credit is settled reciprocity between parties who trade with each other, and nobody
+trades with a collider. **Philanthropy cannot fund them at scale**, because it is a claim on
+already-accumulated wealth and inherits the distribution it means to correct. What has built these
+things, everywhere they exist, is a **sovereign issuer mobilising real resources ahead of any
+return** — spending a unit into existence against a mandate and reclaiming it through taxation.
+
+That capacity is not a trick of fractional-reserve banking, and the two must not be confused.
+Fractional reserve is *private* credit creation against collateral, seeking yield — what this corpus
+refuses at every turn. Sovereign mobilisation is *public* issuance against a mandate, seeking a
+completed public good. And on this substrate the **warrant would be different in kind**: issuance
+justified by attested care and observed contribution — the un-attenuated record itself — rather than
+by a bank's balance-sheet capacity. Whether that is a *good* warrant is the open question. It is not
+the question N1 answers, and the never-rules as first written did not distinguish them.
+
+**So the honest statement is a deferral, not a refusal**, and three of this paper's own commitments
+make that the only consistent reading:
+
+1. **Canon socialises issuance; it does not abolish it.** Stance I.4's refusable-in-advance clause
+   names *"the **private** issuance of money"* as unearned increment that *"graduates to a commons
+   owned by no one"*, and the enumeration of what belongs to everyone names *"the issuance of
+   currency and credit"* directly (§1.1). ✅ The operative word is **private**. What canon strips is
+   an issuer's private claim on the gain; what it vests — explicitly, in the commons — is the
+   capacity. A permanent refusal to ever exercise a capacity canon deliberately vested is not
+   stewardship of the inheritance; it is forfeiture of it. The corpus cannot hold both that issuance
+   belongs to everyone and that it will never be exercised by anyone here.
+2. **§2.2's limit acquits the instrument.** *Preservation is legitimate; accretion is not.* A
+   mobilisation instrument spent into existence against a bounded mandate and reabsorbed on
+   completion has **no holder who accumulates** — it is not a store of value at all and never
+   accretes. It does not trip this paper's sharpest limit.
+3. **§2.4's own register rule forbids the prohibition.** Prohibition is right *only for substrate
+   invariants*; everything else is context-relative policy that gets a redirect. "The commons may
+   never issue" is not a substrate invariant — it is a policy about an unbuilt capacity under
+   governance that does not yet exist, which is exactly the class the corpus says must be a redirect.
+
+**And the strongest objection to the deferral deserves naming, because a skeptic will supply the
+cynical reading otherwise.** Some traditions hold that foreswearing a dangerous capacity *is* the
+mature form of stewardship — that a door kept open is itself a capture surface, and that "we reserve
+the right, under conditions" is what every institution says before it issues. That objection is not
+answered by the three points above, and it is not silly. The answer this paper gives is that the
+work is done by **P1–P6, not by the deferral**: an unexercised capacity with no named preconditions
+really would be a reservation dressed as principle, whereas preconditions that are public, checkable,
+and currently *failing* are a refusal with a receipt. If the corpus later decides that foreswearing
+is the better stewardship, that is a canon change made in the open — which is precisely what "never
+issues," asserted without argument, would have foreclosed.
+
+**N2 is not an obstacle here; it is the design.** *No protocol seigniorage, and no private seigniorage
+either* — issuance gain is common inheritance and returns to the floor. A mandate whose entire gain
+**is** the completed public good, retaining nothing, is the paradigm case of N2 compliance rather than
+an exception to it. What N2 forbids is a circuit keeping its own issuance gain, which is the inverse.
+
+**What the arm's length is for.** The danger is not issuance; it is *proximity*. An issuance power
+sitting inside the valueflows it funds is the Cantillon effect with extra steps (§2.6), and it is how
+commons of this kind have historically been enclosed. The answering design is separation: the body
+deliberating a mandate must be structurally distinct from the flows receiving it, so that **no
+beneficiary sits on the body that authorises**. Councils deliberate the mandate at arm's length from
+the human valueflows; the elohim advise and show their work; the flows stay in the ordinary REA plane
+where every other event lives. The arm's length is not ceremony — **it is the whole of the
+anti-enclosure argument**, and it is why such a capacity would belong to the commons rather than to
+any circuit within it.
+
+**The preconditions, stated so they can be checked.** The capacity stays unexercised until all of
+these hold, and none holds today:
+
+| # | Precondition | Current state |
+|---|---|---|
+| P1 | Council ratification is not single-write-capturable | **Open** — first-quorum-wins (§5; honest limit 2) |
+| P2 | Structural arm's length: no beneficiary of a mandate sits on the body authorising it, and the separation is enforced rather than conventional | **Not designed** |
+| P3 | Non-accretion by construction: spent against a bounded mandate, never a holdable balance, reabsorbed on completion | **Not designed** |
+| P4 | Plural, forkable elohim advising — trap A6 (§2.5) bites hardest here, because one un-forked model advising one issuance power is monoculture at the point of maximum leverage | **Open** |
+| P5 | A live public aggregate of everything outstanding, with per-mandate provenance verifiable at O(1) (N5's own redirect) | **Not shipped** |
+| P6 | Revocability: the mandate supersedes and revokes on the ordinary Commitment path | mechanism exists ✅ (§2.1); never applied to this |
+
+**And the limit on the deferral itself.** None of the above is a design, and this section must not be
+read as having produced one. It is the argument that the *question* stays open, plus the conditions
+under which it could be reopened honestly. A protocol that refuses to name a capacity it cannot yet
+hold ends up either pretending it never wanted it, or reaching for it the first time a council faces
+something big and finds no rule there. Naming it, gating it, and leaving it unexercised is the third
+option. ⚠
+
 ---
 
 ## 3. The external posture — toward state fiat
@@ -572,9 +836,17 @@ grounds.
    posture it is the precise inversion: a maximal negative externality onto non-participants, from a
    protocol whose measure of success is positive externality onto exactly those people.
 3. **It mistakes which institution is under pressure.** Municipal and national incentives run
-   opposite ways (sibling §5.3): a municipality's incentive is to shed liabilities, a treasury's is to
-   defend a base. Absorption is strong at the first and weak at the second, and a strategy that
-   assumes the second collapses is betting the project on the leg that does not bear weight.
+   opposite ways, and the mechanism is worth stating here rather than deferring to the sibling. A
+   municipality is a *cost centre carrying a mandate it cannot fund*: it must deliver water, roads,
+   policing, emergency response and pensions out of a base it does not control, and its budget
+   process rewards anything that removes a line item. A treasury is the inverse — its mandate **is**
+   the base, and anything that shrinks taxable activity attacks the instrument it exists to defend.
+   So absorption is strong at the municipal level and weak at the national one, not because
+   municipalities are braver but because shedding a liability scores as a win in one ledger and a
+   loss in the other. A strategy that assumes the treasury collapses is betting the project on the
+   leg that does not bear weight. **Neither paper has tested this on a real municipality** (§8, limit
+   3), and the sibling asserts the reception without precedent — so this is a reasoned incentive
+   claim, not an observed one. ◐
 
 ### 3.3 Take chartalism seriously: the tax gate is the bridge
 
@@ -945,6 +1217,15 @@ settlement-bridge claims vs Stance I.2, §5) and the retirement of the stale tok
 in `shefa.md` and `economic_coordination/epic.md`. These are content decisions on published or
 canonical surfaces, not research takes.
 
+**Deliberately not minted — §2.9.** The commons-issuance position mints **nothing**, and that is the
+point of it: §2.9 licenses keeping a question open, not building an instrument, and P1–P5 are all
+unmet. Minting a build row here would convert a refusal-to-foreclose into a roadmap item, which is
+the precise error the section exists to avoid. What it *does* carry into the operator's hands is a
+canon question — **whether the corpus's monetary framing should say "never issues" at all**, given
+that Stance I.4 makes issuance a common inheritance. That is an operator decision on a canonical
+surface, and it is recorded here rather than acted on. The one thing already actioned is editorial:
+this paper and its sibling no longer assert permanent incapacity.
+
 **One priority note that is not a row.** Per §5, economics has no habit and no `@concern` tag. Every
 row above is un-schedulable as first-class delivery until an economy habit exists with a runnable
 check. The natural first red, and the cheapest: **`binds-policy` enacts a lens** — a scenario that
@@ -1025,6 +1306,29 @@ thesis is ◐ and its efficiency–resilience coordinate is excluded entirely.
    outside the network. That same standard should be turned on rung 4: an absorption ledger changes a
    municipality's budget, and municipal budgets are how non-participants eat. The refusals in the
    sibling's §5.5 are load-bearing here, not decorative.
+6. **The precedents are business-to-business; the protocol is not.** WIR and Sardex — the two cases
+   this paper leans on hardest — are B2B networks where credit assessment is institutional, trade
+   relationships recur, and a defaulting member has a legal identity and attachable assets. This
+   protocol's vocabulary is households, elder care, and neighbours. Household-scale complementary
+   currencies have a markedly worse survival record than B2B ones, and nothing here closes that gap;
+   Chiemgauer is the household-scale case in the corpus and is far simpler than anything §2 proposes.
+   Whether B2B mutual-credit dynamics transfer to household scale is **open, and is the largest
+   unexamined assumption in §2**. ⚠ Worse, the household-scale literature carries failure modes the
+   five knobs (§2.3) do not model and the never-rules do not touch: **LETS fade rather than fail** —
+   participant fatigue, thin offer-side supply, administrative burden concentrating on a few unpaid
+   organisers — and **governance capture by the active minority**. Neither appears anywhere in §2's
+   design surface. A serious next pass on this paper is a LETS study row, not another B2B precedent.
+7. **The mobilisation capacity is an argument, not a design.** §2.9 establishes that a permanent
+   refusal to issue is inconsistent with this paper's own commitments, and states preconditions
+   P1–P6. It does not design the instrument, and P1–P5 are all unmet. Nothing in §2.9 licenses
+   building anything; it licenses keeping the question open and refusing to foreclose it by accident.
+8. **The capture answer is structural, not demonstrated.** §2.9 argues that an un-denominated record
+   under every denomination is what prevents a hosted medium from becoming the only memory. That
+   holds *if* the record stays richer than the lenses reading it — which is an empirical property of
+   a running network, not a theorem. A substrate whose events are, in practice, only ever recorded
+   because some circuit wanted to price them would have the attenuation back, one layer down, and
+   nothing here would detect it. **That detector does not exist**, and it is the most important thing
+   §2.9 leaves unbuilt. ⚠
 
 ### Works referred to
 

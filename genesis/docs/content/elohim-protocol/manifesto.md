@@ -4,7 +4,7 @@ cites:
   - "constitution | The law that operationalizes this vision: the constitution-as-system-prompt, layer precedence (more-immutable wins), and the Matthew 6:21 gate that binds even the lawgiver. | sha256:1eb96af782012fc6 | path: genesis/docs/content/elohim-protocol/constitution.md"
   - "confession | The theology beneath this vision said plainly — what the protocol is FOR (the upstream soil it tends), what it holds, and the honest edges it cannot resolve. | sha256:bec001fd41230c67 | path: genesis/docs/content/elohim-protocol/confession.md"
   - "theology | The same theology forged as a disputation: each commitment pressed by its strongest objection across thirteen Articles, several answered 'this stands.' | sha256:4daef6885e3cc420 | path: genesis/docs/content/elohim-protocol/theology.md"
-  - "succession | The argument that clears the ground for this vision — the mutualist lineage read for what it could not afford, and the mechanism by which a substrate carries public function without conquering anything. Written to be read BEFORE this document by anyone arriving with a formed politics. | sha256:ecdccbcab040fb0a | path: genesis/docs/content/elohim-protocol/succession.md"
+  - "succession | The argument that clears the ground for this vision — the mutualist lineage read for what it could not afford, and the mechanism by which a substrate carries public function without conquering anything. Written to be read BEFORE this document by anyone arriving with a formed politics. | sha256:b280a30cbf7d5415 | path: genesis/docs/content/elohim-protocol/succession.md"
 ---
 # **Elohim Protocol - Digital Infrastructure for Human Flourishing: A Manifesto for Love-Centered Technology**
 
