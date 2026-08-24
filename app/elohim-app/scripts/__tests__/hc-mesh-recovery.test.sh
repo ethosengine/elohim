@@ -27,10 +27,29 @@ t() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fail=1; fi; }
   RECOVERY_DOORWAY_A="http://localhost:$port" RECOVERY_DOORWAY_B="http://localhost:$port" RECOVERY_LANDING_PATH="/db/stats" \
     out="$(recovery_predicate "$tmp/snap.json" "$port")"; rc=$?
   t "all legs pass on a matching peer (rc=$rc): $out" '[ "$rc" -eq 0 ] && [ "$out" = "P0=1 P1=1 P2=1 P3=1 P4=1" ]'
+  # MESH_DOORWAYS=0 (no doorways to serve through, e.g. a single-doorway or
+  # doorway-less scenario): P4 is skipped ("-"), not failed, and does not
+  # block the overall pass/fail decision.
+  RECOVERY_DOORWAY_A="http://localhost:$port" RECOVERY_DOORWAY_B="http://localhost:$port" RECOVERY_LANDING_PATH="/db/stats" \
+    out="$(MESH_DOORWAYS=0 recovery_predicate "$tmp/snap.json" "$port")"; rc=$?
+  t "MESH_DOORWAYS=0 skips P4 without failing (rc=$rc): $out" '[ "$rc" -eq 0 ] && [ "$out" = "P0=1 P1=1 P2=1 P3=1 P4=-" ]'
   rm "$tmp/blob/sha256-aa"
   RECOVERY_DOORWAY_A="http://localhost:$port" RECOVERY_DOORWAY_B="http://localhost:$port" RECOVERY_LANDING_PATH="/db/stats" \
     out="$(recovery_predicate "$tmp/snap.json" "$port")"; rc=$?
   t "missing blob bytes fails ONLY P2 (rc=$rc): $out" '[ "$rc" -ne 0 ] && [ "$out" = "P0=1 P1=1 P2=0 P3=1 P4=1" ]'
+  # receipt_max: strip ANSI SGR escapes before matching, and honor the
+  # since-window — an older, larger-valued line outside the window must not
+  # win over a smaller in-window value. Mirrors the real tracing-formatter
+  # shape (`\x1b[3melapsed_s\x1b[0m=\x1b[0m<n> ... recv_validation_receipt_received`).
+  since_epoch=1755972000
+  old_epoch=$((since_epoch - 3600))
+  new_epoch=$((since_epoch + 60))
+  old_ts="$(date -u -d "@$old_epoch" +%Y-%m-%dT%H:%M:%S)"
+  new_ts="$(date -u -d "@$new_epoch" +%Y-%m-%dT%H:%M:%S)"
+  printf '%s.000000Z  INFO \033[2mconductor\033[0m: \033[3melapsed_s\033[0m=\033[0m99.0 \033[3ma\033[0m=\033[0m"recv_validation_receipt_received"\n' "$old_ts" > "$tmp/receipt.log"
+  printf '%s.123456Z  INFO \033[2mconductor\033[0m: \033[3melapsed_s\033[0m=\033[0m5.018487491 \033[3ma\033[0m=\033[0m"recv_validation_receipt_received"\n' "$new_ts" >> "$tmp/receipt.log"
+  rout="$(receipt_max "$tmp/receipt.log" "$since_epoch")"
+  t "receipt_max strips ANSI and honors the since-window (got $rout)" '[ "$rout" = "5.0" ]'
   exit "$fail"
 ) || fail=1
 

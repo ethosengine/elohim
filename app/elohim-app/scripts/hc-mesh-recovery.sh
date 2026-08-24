@@ -93,6 +93,30 @@ sys.exit(0 if p0 and p1 and p2 and p3 and p4 != 0 else 1)
 PY
 }
 
+# Backpressure witness: max conductor receipt latency logged by each peer since t0.
+# Defined here (above the RECOVERY_SOURCE_ONLY gate) so unit tests can source it
+# alongside recovery_snapshot/recovery_predicate.
+receipt_max() { # <peer-log> <since-epoch> -> max elapsed_s (0 if none)
+  python3 - "$1" "$2" <<'PY2'
+import re, sys, datetime
+log, since = sys.argv[1], int(sys.argv[2]); mx = 0.0
+# Strip ANSI SGR escapes BEFORE matching: the real tracing-formatter output
+# interleaves them between field name/`=`/value (e.g.
+# `\x1b[3melapsed_s\x1b[0m=\x1b[0m5.01...`), and an unstripped
+# `elapsed_s[^0-9]*([0-9.]+)` pattern latches onto the first digit it meets —
+# which can be the `0` inside a `\x1b[0m` reset code, not the real value.
+ansi = re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
+pat = re.compile(r'(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)[^\n]*elapsed_s=([0-9.]+)[^\n]*recv_validation_receipt_received')
+for raw in open(log, errors="replace"):
+    line = ansi.sub('', raw)
+    m = pat.search(line)
+    if not m: continue
+    ts = datetime.datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc).timestamp()
+    if ts >= since: mx = max(mx, float(m.group(2)))
+print(f"{mx:.1f}")
+PY2
+}
+
 if [ "${RECOVERY_SOURCE_ONLY:-0}" = "1" ]; then return 0 2>/dev/null || exit 0; fi
 
 # ---- main -------------------------------------------------------------------
@@ -108,6 +132,16 @@ set +e
 # shellcheck source=hc-mesh.sh
 source "$SCRIPT_DIR/hc-mesh.sh" >/dev/null 2>&1
 set -u
+# Refuse BEFORE any kill/wipe if the transport-identity lookup this script
+# depends on isn't landed yet. Under `set -u`, an undefined *command* inside
+# a `$(...)` substitution is not a `set -u` violation — it prints
+# "command not found" to stderr, the substitution captures empty output, and
+# execution CONTINUES with t_rec="". That would let the destructive step run
+# with a silently-empty transport-identity field instead of stopping.
+command -v peer_transport >/dev/null 2>&1 || {
+  echo "hc-mesh.sh has no peer_transport (per-peer transport not landed) — refusing to inflict loss" >&2
+  exit 5
+}
 idx=-1; i=0; for n in "${PEERS[@]}"; do [ "$n" = "$peer" ] && idx=$i; i=$((i+1)); done
 [ "$idx" -ge 0 ] || { echo "$peer is not in MESH_PEERS=$MESH_PEERS" >&2; exit 2; }
 [ "${#PEERS[@]}" -ge 2 ] || { echo "recovery harness needs at least two peers (MESH_PEERS=$MESH_PEERS)" >&2; exit 2; }
@@ -118,6 +152,7 @@ survivors=(); for n in "${PEERS[@]}"; do [ "$n" != "$peer" ] && survivors+=("$n"
 survivor="${survivors[0]}"; sidx=-1; i=0; for n in "${PEERS[@]}"; do [ "$n" = "$survivor" ] && sidx=$i; i=$((i+1)); done
 rport="$(http_port "$idx")"; sport="$(http_port "$sidx")"
 t_surv="$(storage_transport_for "$survivor" "$sport")"; t_rec="$(peer_transport "$peer")"
+[ -n "$t_rec" ] || { echo "empty transport for $peer — refusing" >&2; exit 5; }
 
 snap="$(mktemp)"; recovery_snapshot "$sport" > "$snap" || { echo "survivor $survivor:$sport unreadable" >&2; exit 3; }
 rlog "shape=$shape peer=$peer survivors=${#survivors[@]} survivor=$survivor rows=$(python3 -c 'import json,sys;print(len(json.load(open(sys.argv[1]))["rows"]))' "$snap") transports survivor=$t_surv recovering=$t_rec"
@@ -140,30 +175,22 @@ while :; do
 done
 failing="$(tr ' ' '\n' <<<"$legs" | grep '=0$' | cut -d= -f1 | paste -sd, -)"
 if [ "$recovered" -eq 1 ]; then echo "RECOVERED in ${el}s"; else echo "NOT-RECOVERED after ${el}s ($failing)"; fi
-# Backpressure witness: max conductor receipt latency logged by each peer since t0.
-receipt_max() { # <peer-log> <since-epoch> -> max elapsed_s (0 if none)
-  python3 - "$1" "$2" <<'PY2'
-import re, sys, datetime
-log, since = sys.argv[1], int(sys.argv[2]); mx = 0.0
-pat = re.compile(r'(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)[^\n]*elapsed_s[^0-9]*([0-9.]+)[^\n]*recv_validation_receipt_received')
-for line in open(log, errors="replace"):
-    m = pat.search(line)
-    if not m: continue
-    ts = datetime.datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc).timestamp()
-    if ts >= since: mx = max(mx, float(m.group(2)))
-print(f"{mx:.1f}")
-PY2
-}
 rcpt_rec="$(receipt_max "$LOGDIR/$peer.log" "$t0")"; rcpt_surv="$(receipt_max "$LOGDIR/$survivor.log" "$t0")"
 rlog "conductor receipt latency max during recovery: recovering=${rcpt_rec}s survivor=${rcpt_surv}s"
 RECOVERY_SURVIVORS="${#survivors[@]}" python3 - "$MESH_DIR/recovery-timeline.jsonl" "$shape" "$peer" "$survivor" "$t_surv" "$t_rec" "$recovered" "$el" "$polls" "$failing" "$labels" "$rcpt_rec" "$rcpt_surv" <<'PY'
 import json, sys, datetime, os
 p, shape, peer, surv, ts, tr, rec, el, polls, failing, labels, rr, rs = sys.argv[1:14]
-json.dump({"ts": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"), "shape": shape, "peer": peer, "survivor": surv, "survivors": int(os.environ.get("RECOVERY_SURVIVORS", "1")),
-           "transport_survivor": ts, "transport_recovering": tr, "recovered": rec == "1", "time_to_recover_s": int(el),
-           "polls": int(polls), "failing_legs": [x for x in failing.split(",") if x], "labels": json.loads(labels),
-           "conductor_receipt_max_s": {"recovering": float(rr), "survivor": float(rs)}}, open(p, "a"))
-open(p, "a").write("\n")
+record = {"ts": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"), "shape": shape, "peer": peer, "survivor": surv, "survivors": int(os.environ.get("RECOVERY_SURVIVORS", "1")),
+          "transport_survivor": ts, "transport_recovering": tr, "recovered": rec == "1", "time_to_recover_s": int(el),
+          "polls": int(polls), "failing_legs": [x for x in failing.split(",") if x], "labels": json.loads(labels),
+          "conductor_receipt_max_s": {"recovering": float(rr), "survivor": float(rs)}}
+# One open/write, not two separate appends: two calls each do their own
+# open()/close() against the same path, so a concurrent recovery run's
+# append (this loop is meant to run per-peer, potentially overlapping other
+# invocations against the same MESH_DIR) can interleave a record's JSON body
+# with its own trailing newline write. Single write == one atomic append.
+with open(p, "a") as fh:
+    fh.write(json.dumps(record) + "\n")
 PY
 rm -f "$snap"
 [ "$recovered" -eq 1 ]
