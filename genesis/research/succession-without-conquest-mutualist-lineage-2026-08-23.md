@@ -124,10 +124,30 @@ hardware, trailing by months on most tasks with complex reasoning the standing e
 **Verify before reuse**, and note that the *disanalogy* (GPUs depreciate; rails and fiber did not)
 came from the same sources and is stated in canon precisely because it cuts against our own argument.
 
+**A correction the operator supplied, recorded because it reversed a claim.** The first draft of
+§5.8 read GPU depreciation as a *disanalogy* to fibre — rails and fibre lasted, accelerators do not,
+so the inheritance is weaker. That was wrong, and the operator's correction inverts it. Fibre was
+"the gift that kept on giving" not because glass is durable but because a strand is a **passive
+medium**: capacity is set by the transponders at either end, and those endpoints are silicon on a
+Moore's-law clock. The same buried strand carried orders of magnitude more traffic for decades
+without re-trenching. **The transponders depreciated too — that was the engine, not a defect.** A
+datacenter has the identical two-part structure (durable permitted siting and power; fast-turning
+accelerators), so depreciation is the *same pattern in the same place*, and the right conclusion is
+the opposite of the tempting one: a buildout leaves the expensive permitted half behind, waiting for
+cheaper endpoints. It also unified the section on **one force rather than two** — the endpoint
+dynamic that makes the trench valuable is the dynamic that dissolves metering, which is why *Enron
+did not lose to a competitor; it lost to the transponder.* Canon §5.8 now carries three *genuine*
+disanalogies in its place (power as an operating cost fibre did not have; compute requiring recurring
+silicon capital rather than scaling on the same medium; rising density forcing re-upgrades of the
+durable half). Provenance: Friedman's lecture, via the operator.
+
 **The historical claims in §5.8 are ◐ and recalled rather than researched this pass** — Enron
 Broadband's bandwidth-trading venture and the Blockbuster video-on-demand contract (~$110m of future
 profit booked, cancelled within months, service never meaningfully shipped); Friedman's reading of the
-fiber overbuild as an accidental gift to the next economy; and the post-crash trajectories of the
+fibre overbuild as an accidental gift to the next economy, and the transponder/DWDM mechanism behind
+it (a late-1990s strand lit at single-digit gigabits now carrying many terabits on the same glass —
+directionally solid, exact figures unverified, and note there IS an eventual nonlinear ceiling in the
+fibre the industry is only now approaching); and the post-crash trajectories of the
 search and retail firms that inherited cheap bandwidth. **The Enron Broadband detail is the most
 load-bearing single historical claim in the document** — it is the precedent for *metering a resource
 about to become abundant* — and it should be checked at source before any outreach use. Operator

@@ -431,8 +431,25 @@ a *market in metered bandwidth*, complete with a twenty-year exclusive video-on-
 which roughly a hundred and ten million dollars of future profit was booked before the service had
 meaningfully shipped, and which was cancelled within months. The venture died because the thing it
 proposed to meter was about to become abundant. Bandwidth scarcity was the entire premise, and the
-fiber glut dissolved it. *A business model premised on metering a resource whose marginal cost is
-falling toward zero does not get out-competed. It evaporates.*
+glut dissolved it. *A business model premised on metering a resource whose marginal cost is falling
+toward zero does not get out-competed. It evaporates.*
+
+**And it is worth being precise about *why* bandwidth became abundant, because the mechanism is the
+whole of this section.** The glut was not simply that too much cable had been buried. It was that a
+strand of fiber is a **passive medium** — the capacity is set almost entirely by the transponders at
+either end, not by the glass in the ground. Those endpoints are silicon, and silicon halves in cost
+and doubles in capability on a clock nobody has to negotiate. So the same buried strand carried more
+and more traffic for decades without anyone re-opening a trench: a fibre lit at a couple of gigabits
+in the late nineties now carries many terabits, on the same glass, because the optics at the ends kept
+improving. Friedman's reading is the right one — the overbuild was *the gift that kept on giving*, and
+it kept giving precisely because the expensive immovable half was decoupled from the cheap, fast-
+improving half. (There is an eventual physical ceiling in the glass; the industry is only now
+approaching it, decades after the trenches were dug.)
+
+**That decoupling is the load-bearing structure, and it is why Enron's bet was doomed rather than
+merely early.** You cannot meter a resource whose supply is governed by the improvement rate of
+commodity endpoints. The endpoints will win, because they are cheap, because they are many, and
+because no one administers their improvement.
 
 The current figures rhyme uncomfortably. Global AI datacenter investment is running past six hundred
 billion dollars, with the largest hyperscalers alone targeting something in the region of six to seven
@@ -444,20 +461,49 @@ the fiber build, capacity grew at roughly twice the rate of traffic. Meanwhile c
 models run today on consumer hardware at a substantial fraction of frontier quality, with the gap on
 most tasks measured in months rather than years, and the honest exception being complex reasoning.
 
-**Say the disanalogies plainly, because they are load-bearing and they cut against this argument.**
-Rails and fiber were nearly permanent once laid; **GPUs depreciate hard**, on the order of tens of
-per cent a year, so the accelerator fleet is not an inheritance in the way the rails were. What
-actually survives a compute glut is the **unglamorous half**: the substations, the interconnect
-queue position, the water and cooling, the shells, the transmission upgrades — the electrical and
-civil infrastructure whose useful life is measured in decades. That is the part communities are
-currently being asked to subsidise, and it is the part that would remain. A bust would leave behind
-cheap power infrastructure and depreciated silicon, not a free supercomputer.
+**Now look at a datacenter with that structure in hand, because it has the same two halves.** The
+**durable half** is the substation, the interconnect queue position, the transmission upgrade, the
+water and cooling, the shell, the land, the fibre to the site — permitting-bound, decade-lived, and
+genuinely hard to replicate. The **fast-turning half** is the accelerators, which depreciate on the
+order of tens of per cent a year.
 
-**And so the judo.** The Elohim Protocol's design wants inference to be *abundant*. Every claim in
-§4 gets stronger as the marginal cost of a capable local reader falls; nothing in it depends on
-anyone's ability to meter a token. **The event that would destroy the metered business model is the
-same event that makes this one solvent.** That is not a prediction that the bust arrives, and this
-document takes no position on when. It is a statement about which way each design faces.
+It is tempting to read that depreciation as the disanalogy — rails and fibre lasted, GPUs do not — and
+the first draft of this document did. **That reading is wrong, and it inverts the argument.** The
+transponders depreciated too. That was not a defect in the fibre story; it was *the engine of it*.
+Endpoint silicon is supposed to turn over, and its turning over is exactly how the immovable half
+gains value. The right conclusion is the opposite of the tempting one: **a compute buildout leaves
+behind the expensive permitted half, paid for by someone else, waiting for a cheaper generation of
+endpoints — which is the fibre pattern precisely.**
+
+Note where that lands the current fight. What communities are being asked to subsidise — grid
+interconnect, substations, water — **is the trench.** What the capital is being burned on is the
+transponder.
+
+**Three real disanalogies remain, and they matter.** Fibre's durable half had almost no operating
+cost once lit; a datacenter's dominant ongoing cost is **power**, so the inheritance arrives with a
+bill attached, and that bill is the thing driving the ratepayer revolt. Fibre scaled on the *same*
+glass with new endpoints, whereas compute capacity requires *buying* new accelerators each cycle —
+the shell and the substation are reusable, the silicon is a recurring capital call. And rising
+accelerator density pushes *back* on the durable half, forcing electrical and cooling re-upgrades in a
+way better transponders never forced anyone to re-dig a trench. The inheritance is real; it is not
+free, and it is not automatic.
+
+**And so the judo — and notice it is one force, not two.** The endpoint dynamic that made the fibre
+overbuild a gift is the same dynamic that killed metered bandwidth. Cheap, fast-improving endpoints
+raise the value of the trench *and* dissolve the premise of charging by the bit. They are not
+opposing tendencies; they are one tendency seen from the owner's side and the commons' side.
+
+Run it forward. **The thing that would put capable inference on hardware an ordinary household owns is
+the same thing that would strand a metered business model** — better endpoint silicon, cheaper, in
+more hands, improving on a clock nobody administers. Enron did not lose to a competitor. It lost to
+the transponder.
+
+The Elohim Protocol's design wants inference *abundant*. Every claim in §4 gets stronger as the
+marginal cost of a capable local reader falls; nothing in it depends on anyone's ability to meter a
+token. **The event that would destroy the metered business model is the same event that makes this
+one solvent** — and it is the same event that would leave the substations behind. That is not a
+prediction that the bust arrives, and this document takes no position on when. It is a statement
+about which way each design faces when it does.
 
 Which is also the answer to the reader — and there will be many — who dismisses this project because
 of *how the capability came to be*. That objection is correct about the origin and wrong about the
