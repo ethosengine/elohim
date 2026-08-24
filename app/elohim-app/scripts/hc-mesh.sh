@@ -836,6 +836,9 @@ restart_env_overlay() { # <captured-environ>
   # storage-restart` upgrades an already-running libp2p mesh in place.
   # MESH_RESTART_ENV_OVERLAY remains last for one-off experiments.
   printf '%s\n' "ELOHIM_TRANSPORT_BACKEND=$MESH_TRANSPORT_BACKEND"
+  # T0' pure-iroh bootstrap: storage announces to / seeds its peer book from
+  # the doorway's /p2p/manifests projection; localdev doorway is :$DOORWAY_PORT.
+  printf '%s\n' "ELOHIM_DOORWAY_URL=http://localhost:$DOORWAY_PORT"
   if [ "${MESH_RESTART_APPLY_PROFILE:-0}" = "1" ]; then
     printf '%s\n' \
       "PROJECTION_RECONCILE_SECS=$PROJECTION_RECONCILE_SECS" \
@@ -1498,6 +1501,7 @@ PYEOF
       ENABLE_CONTENT_DB=true ENABLE_IMPORT_API=true \
       ENABLE_P2P=true P2P_PORT="$(p2p_port $i)" \
       ELOHIM_TRANSPORT_BACKEND="$MESH_TRANSPORT_BACKEND" \
+      ELOHIM_DOORWAY_URL="http://localhost:$DOORWAY_PORT" \
       AGENT_PUBKEY="$agent" RELAY_MODE=server \
       GENESIS_SELF_HEAL_IDENTITY=1 SELF_HUMAN_ID="$(human_id "$name")" \
       HOUSEHOLD_ID=household-dowell \
