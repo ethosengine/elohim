@@ -978,6 +978,84 @@ against provenance is not an *exit* tax — nobody is charged for leaving, and t
 about departure. But the failure mode it names, *coercion in the language of attraction*, is exactly
 the risk a priced membrane runs, which is why the second constraint below is not optional.
 
+### 2.11 What §2 composes into — and the line it must not cross
+
+Stated at full strength, because the claim is the operator's and deserves to be met rather than
+softened: **the protocol occupies, in effect, the role of a maximally honest and disciplined
+underwriting, banking, and investment system at scale** — because an assessor can sit at nearly every
+transaction, externality and risk, and price it against what is actually known rather than against a
+proxy. Wisdom available at the scale of everything the network can see.
+
+**The three institutions are one function, separated by an accident of cost.** Underwriting prices a
+claim about the future given a counterparty. So does lending; so does investing. They differ in tempo
+and instrument, not in kind — each is *an assessment of a future claim under incomplete information
+about a party.* They became separate professions because the **assessor was expensive**, and the way
+an expensive assessor is made affordable at volume is **standardisation**: actuarial tables, credit
+scores, ratings, covenants, sector betas. Every one of those is a proxy substituted for knowledge
+that could not be afforded per case — which is Beer's attenuation again (§2.9), and the reason a
+credit score can be simultaneously predictive in aggregate and unjust in the particular. The stated
+design of `MemberRiskProfile` — behavioural observation *"instead of proxies like credit scores"* ✅
+— is that substitution being refused in the one domain where the corpus has actually built something.
+
+**And the addition no incumbent can make is the externality.** Conventional underwriting prices risk
+*to the insurer*; it is structurally incapable of pricing harm to a third party, because there is no
+counterparty to bill and no channel in the instrument to carry it. This is precisely the fifth defect
+the manifesto named and never discharged — currencies *"are blind to externalities"* ✅ — and it is
+why this paper exists at all (§0). An assessor per externality is not a new financial product. **It is
+the discharge of that promissory note**, and it is available here for exactly one reason: the
+un-attenuated record holds the context an externality lives in, which a price had already thrown away.
+
+**Now the line, and it is the most important sentence in §2.** *This is not a global price, and it
+must never become one.* The sibling states the boundary in terms this section inherits without
+amendment: the calculation problem is not solved, **no calculation is being attempted** — *"computation
+stays local, aggregation is voluntary and anonymised, and the global layer holds no allocative
+authority… requisite variety and polycentric governance, not a planning board. Any design in this
+project that starts allocating from an aggregate has crossed that line and should be read as a
+defect."* ✅
+
+So the defensible claim is narrower than the words "at global scale" naturally suggest, and the
+difference is the whole of it:
+
+| | Refused | Held |
+|---|---|---|
+| **What is universal** | one assessment, computed centrally, applied everywhere | the *availability* of a local assessment, everywhere |
+| **What it produces** | a price the network asserts | a reading a party can act on, argue with, or ignore |
+| **Where it lives** | an aggregate with allocative authority | the scope that authored it, plural and forkable |
+| **Hayek** | answered by out-computing him | untouched — no calculation attempted (§2.9) |
+
+**An assessor everywhere is requisite variety. One assessor for everywhere is the planning board.**
+They are separated by a single property — whether the assessments aggregate into an authority — and
+nothing but discipline keeps them apart, because the machinery is identical either way.
+
+**And "maximally honest" is not a property of assessment at all.** This is what the underwriting trap
+(§2.10) actually taught. The underwriters who destroyed their books were not badly informed; the
+assessment was not the failure. **The failure was in what the assessment was rewarded for**, and
+cheapening the assessor does nothing about that. Honesty is a property of the **standing layer** —
+of whether reach can be earned on a signal that has not settled — and that layer is the one §5 says is
+currently capturable. An assessor at every transaction, sitting on a reward mechanism that pays out
+before the loss arrives, would industrialise the trap rather than repair it. **The order of operations
+matters: fix H5 and the ratification defect first, or the scale is an amplifier.**
+
+**Three further costs, so the claim is not read as free.**
+
+1. **Assessment is compute, and compute is power.** An elohim at every transaction has an energy bill,
+   and §5.7–5.8 of the sibling is this project's own argument about who pays such bills and what they
+   do to a community. "Nearly every transaction" is a quantity with a watt figure attached, and nobody
+   here has produced it. ⚠
+2. **The record becomes the prize** (H3). When everything is priced from the record, capturing the
+   record is the highest-return attack in the system, and it scales with the claim.
+3. **"Visible to the network" is doing enormous work.** Whatever is not visible is unpriced, so the
+   boundary of visibility becomes the boundary of justice — the selective-legibility cost of §3.4
+   turned inward, with per-fold anonymity still unsolved (§8, limit 4). A system that prices only
+   what it can see will systematically under-price whatever stays outside it, and the people outside
+   it are rarely the powerful.
+
+**State of it.** None of this ships. There is no underwriting of externalities anywhere in the tree,
+mutual credit has zero implementation, and the one genuinely-built instance — the insurance mutual's
+behavioural risk profile — scores members rather than judgment and still carries an `uninsurable`
+tier. This section is the composition §2 points at, recorded so it can be argued with and so the line
+it must not cross is written down **before** anyone is tempted to cross it. ⚠
+
 ---
 
 ## 3. The external posture — toward state fiat
@@ -1527,8 +1605,10 @@ thesis is ◐ and its efficiency–resilience coordinate is excluded entirely.
    organisers — and **governance capture by the active minority**. Neither appears anywhere in §2's
    design surface. A serious next pass on this paper is a LETS study row, not another B2B precedent.
 7. **The mobilisation capacity is an argument, not a design.** §2.9 establishes that a permanent
-   refusal to issue is inconsistent with this paper's own commitments, and states preconditions
-   P1–P6. It does not design the instrument, and P1–P5 are all unmet. Nothing in §2.9 licenses
+   refusal to issue is inconsistent with this paper's own commitments, and locates the question in
+   primitives the corpus already has — reach, standing, scope, and subsidiarity — rather than in a
+   bespoke gate. It does not design the instrument, and hazards **H1–H5 are all open**, H4 (no exit
+   at global reach) and H5 (deferred-loss attribution) most seriously. Nothing in §2.9 licenses
    building anything; it licenses keeping the question open and refusing to foreclose it by accident.
 8. **The capture answer is structural, not demonstrated.** §2.9 argues that an un-denominated record
    under every denomination is what prevents a hosted medium from becoming the only memory. That
@@ -1537,6 +1617,14 @@ thesis is ◐ and its efficiency–resilience coordinate is excluded entirely.
    because some circuit wanted to price them would have the attenuation back, one layer down, and
    nothing here would detect it. **That detector does not exist**, and it is the most important thing
    §2.9 leaves unbuilt. ⚠
+9. **§2.11's composition is the paper's largest claim and its least built.** That the protocol
+   occupies the role of underwriting, banking and investment at scale is a *composition* of things
+   argued in §2.9–2.10, not a thing anyone has stood up. Its central discipline — an assessment
+   available everywhere is not one assessment for everywhere — is protected by nothing but intent,
+   since the machinery is identical on both sides of that line. And its honesty depends entirely on
+   the standing layer (H5) and the ratification defect (§5), both open. **Scale applied before those
+   are fixed is an amplifier, not a repair**, and this paper would rather say so than be quoted as
+   having promised the composition. ⚠
 
 ### Works referred to
 
