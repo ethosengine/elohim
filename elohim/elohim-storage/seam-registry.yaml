@@ -2068,3 +2068,46 @@ decisionPoints:
     contractTests:
       - { path: elohim/elohim-storage/src/sharding.rs, testName: rs_data_prefix_consumes_the_household_diverse_holder_prefix_first, kind: unit }
       - { path: elohim/elohim-storage/src/sharding.rs, testName: chunked_placement_keeps_the_existing_round_robin_order, kind: unit }
+
+  - name: FetchWindow
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/p2p/sync_round.rs
+      modulePath: p2p::sync_round::FetchWindow
+      line: 239
+    summary: >
+      Decides how many SyncChanges requests one peer may have in flight during a sync
+      round and which document goes next, re-queueing a document at most once per round
+      when the transport refused to carry its request.
+    concernIds:
+      - { id: C0, status: answered, justification: "Category-C in-memory round scheduling on the transport-neutral sync plane; no DHT entry type and no persisted state." }
+      - { id: C1, status: n-a, justification: "Pacing decides only request order and concurrency; it elects no authority and reads no declaration." }
+      - { id: C2, status: n-a, justification: "The window never moves content authority — deferring or dropping a fetch leaves every head exactly where it was." }
+      - { id: C3, status: answered, justification: "Every issued slot frees on settle, from BOTH terminal paths (every response shape and every OutboundFailure), and the per-round map is dropped at round start, so a lost settle costs one round rather than closing the window forever." }
+      - { id: C4, status: answered, justification: "A configured zero window resolves to the default instead of issuing nothing forever, and every uncertain settle outcome (Ok, Other) frees the slot without a retry." }
+      - { id: C5, status: n-a, justification: "The scheduler consumes no evidence; divergence is decided upstream by the caller's local-heads comparison." }
+      - { id: C6a, status: answered, justification: "Work per round is bounded by the enumerated divergent set plus at most one re-queue per document; the io re-queue is capped by a per-round seen-set so a peer whose transport keeps refusing cannot create an unbounded round." }
+      - { id: C6b, status: answered, justification: "Re-issuing a SyncChanges request is idempotent — have_heads is re-read at issue time and apply_changes converges on replay — so a re-queued document cannot double-apply." }
+      - { id: C7, status: n-a, justification: "The window neither advertises nor serves bytes; it only paces requests this node makes." }
+      - { id: C8, status: answered, justification: "One debug line per peer per round reports window/enqueued/issued/requeued_io/unreached/in_flight, and elohim_sync_fetch_window_requeued_total publishes the io re-queues against the existing elohim_sync_request_outcomes_total{result=\"io\"} series." }
+      - { id: C9, status: n-a, justification: "Documents are keyed by doc_id inside one namespace already chosen by the caller; no identity namespace is joined or translated." }
+      - { id: C10, status: answered, justification: "No wire field or request shape changes — the same SyncChanges requests are sent, only fewer at a time; an unwindowed peer is unaffected in both directions." }
+      - { id: C11, status: partial, justification: "The window bounds outbound sub-stream pressure on one connection, but it is a STATIC bound: it does not consume conductor_admission or any live backpressure signal, so a peer under load is paced by the configured constant rather than by what it can actually absorb." }
+      - { id: C12, status: n-a, justification: "No custody enrollment occurs; the window volunteers no peer for anything." }
+      - { id: C13, status: n-a, justification: "No authority tier is created or graduated." }
+      - { id: C14, status: answered, justification: "Whatever a round does not reach stays visibly pending (logged as unreached) and is re-enumerated by the next round — the residual is the round itself, which is the plane's existing backstop." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/p2p/sync_round.rs, testName: the_window_never_hands_out_more_than_n_at_once, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/sync_round.rs, testName: an_io_settle_requeues_the_doc_exactly_once_per_round, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/sync_round.rs, testName: an_ok_settle_frees_exactly_one_slot, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/sync_round.rs, testName: an_other_settle_frees_the_slot_without_requeueing, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/sync_round.rs, testName: drained_is_true_only_when_nothing_is_pending_or_in_flight, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/sync_round.rs, testName: window_one_is_strictly_sequential, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/sync_round.rs, testName: a_zero_window_is_the_default_not_a_deadlock, kind: unit }
+    gapNote: >
+      C11 is the honest gap: the window is a static bound (default 32, ELOHIM_SYNC_FETCH_WINDOW)
+      and consumes no conductor_admission or live backpressure signal. Separately, the libp2p
+      CALL SITES (the DocumentList enqueue, the response settle, and the OutboundFailure settle
+      in src/p2p/mod.rs) have no unit harness — handle_sync_response requires a live swarm and
+      tests/sync_libp2p_convergence.rs only MIRRORS it — so the two-peer recovery harness on the
+      local mesh is the proof for the wiring, and these unit tests are the proof for the decision.

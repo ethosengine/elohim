@@ -144,6 +144,33 @@ pub(crate) fn kad_key_for_atom(cid: &str) -> String {
 type DocListCursorMap =
     Arc<tokio::sync::Mutex<std::collections::HashMap<request_response::OutboundRequestId, u32>>>;
 
+/// Per-peer bounded `SyncChanges` schedulers, one round each.
+///
+/// The `DocumentList` arm used to send EVERY divergent document's `SyncChanges`
+/// request in one pass; they all ride one connection, so yamux refused the
+/// overflow (`Io(max sub-streams reached)`) and nothing retried — measured
+/// 2026-08-24 as 196 -> 55 -> 0 failures across three 60s rounds while a wiped
+/// DocStore took 181s to refill (iroh, one request in flight, took 63s). The
+/// window is per-peer because the sub-stream budget is per-connection, and
+/// per-round because `initiate_sync_round` drops the map: whatever a round did
+/// not reach is simply re-enumerated by the next one.
+type SyncFetchWindowMap =
+    Arc<tokio::sync::Mutex<std::collections::HashMap<PeerId, sync_round::FetchWindow>>>;
+
+/// In-flight windowed `SyncChanges` requests: request ID → (peer, doc id, namespace).
+///
+/// The response and failure arms are keyed by request ID, not document, so the
+/// window can only free the right slot through this map. The namespace rides
+/// along because the failure arm carries no response body to read it from, and
+/// re-issuing the next queued document needs it. Entries are removed on
+/// response AND on `OutboundFailure`, and the map is dropped at round start, so
+/// it stays bounded by genuinely in-flight requests.
+type SyncFetchInflightMap = Arc<
+    tokio::sync::Mutex<
+        std::collections::HashMap<request_response::OutboundRequestId, (PeerId, String, String)>,
+    >,
+>;
+
 /// Page size for `ListDocuments` sync-round enumeration — shared by the round
 /// opener (`initiate_sync_round`, page 0) and the `DocumentList` follow-up
 /// (next pages), so the cursor arithmetic and the request size can't drift.
@@ -605,6 +632,11 @@ pub struct P2PConfig {
     /// in `run()` while `Config::sync_interval_secs` existed, was documented, and
     /// was read by nothing — the one cadence knob for the plane was inert.
     pub sync_interval_secs: Option<u64>,
+    /// Bounded `SyncChanges` fetch window per peer per round, threaded from
+    /// `Config::sync_fetch_window`. `None` (and `Some(0)`) fall back to
+    /// `sync_round::DEFAULT_FETCH_WINDOW` — a literal zero would issue nothing,
+    /// forever, with no error (same reasoning as `sync_interval_secs`).
+    pub sync_fetch_window: Option<usize>,
     /// Acquisition + provide reconcile cadence in seconds, threaded from
     /// `ACQUISITION_RECONCILE_SECS` (main.rs). `None`/`Some(0)` fall back to
     /// [`acquisition::DEFAULT_RECONCILE_SECS`] via [`acquisition::reconcile_cadence`].
@@ -662,6 +694,7 @@ impl Default for P2PConfig {
             salvage_target_replicas: 2,
             salvage_recheck_seconds: 300,
             sync_interval_secs: None,
+            sync_fetch_window: None,
             acquisition_reconcile_secs: None,
             http_port: DEFAULT_HTTP_PORT,
             serves_extracted: false,
@@ -750,6 +783,12 @@ pub struct P2PNode {
     /// Page cursors for in-flight ListDocuments sync-round requests — see
     /// `DocListCursorMap` for the silent-tail rationale.
     doc_list_cursors: DocListCursorMap,
+    /// Per-peer bounded `SyncChanges` fetch window for the current sync round —
+    /// see [`SyncFetchWindowMap`] for the measured unbounded-fan-out defect.
+    sync_fetch_windows: SyncFetchWindowMap,
+    /// Request ID → (peer, doc id, namespace) for windowed `SyncChanges`
+    /// requests — see [`SyncFetchInflightMap`].
+    sync_fetch_inflight: SyncFetchInflightMap,
     /// Identity-driven replication state
     replication_state: replication::ReplicationState,
     /// Per-peer `ListContent` scheduling: in-flight guard + exponential backoff.
@@ -2825,6 +2864,10 @@ impl P2PNode {
                 std::collections::HashMap::new(),
             )),
             doc_list_cursors: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
+            sync_fetch_windows: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
+            sync_fetch_inflight: Arc::new(
+                tokio::sync::Mutex::new(std::collections::HashMap::new()),
+            ),
             replication_state: replication::ReplicationState::new(),
             replication_scheduler: replication_schedule::ReplicationScheduler::new(),
             list_content_cursors: Arc::new(tokio::sync::Mutex::new(
@@ -6313,6 +6356,20 @@ impl P2PNode {
                 // Drop any page cursor for the failed request so the map stays
                 // bounded by genuinely in-flight requests.
                 self.doc_list_cursors.lock().await.remove(&request_id);
+                // Free the fetch-window slot. `Io` — the transport REFUSING to
+                // carry the request, which is what `max sub-streams reached`
+                // is — earns the doc one re-queue inside this round; every other
+                // failure is an answer of sorts and waits for the next round.
+                if let Some((fetch_peer, fetch_doc_id, fetch_h_app_id)) =
+                    self.sync_fetch_inflight.lock().await.remove(&request_id)
+                {
+                    let outcome = match &error {
+                        request_response::OutboundFailure::Io(_) => sync_round::SettleOutcome::Io,
+                        _ => sync_round::SettleOutcome::Other,
+                    };
+                    self.settle_sync_fetch(fetch_peer, &fetch_doc_id, &fetch_h_app_id, outcome)
+                        .await;
+                }
             }
             behaviour::ElohimStorageBehaviourEvent::SyncProtocol(
                 request_response::Event::InboundFailure {
@@ -7788,6 +7845,85 @@ impl P2PNode {
         }
     }
 
+    /// Issue queued `SyncChanges` requests for `peer` until its window is full.
+    ///
+    /// The ONLY place a windowed `SyncChanges` request is sent. `have_heads` is
+    /// read here, at issue time, rather than carried from enumeration: a
+    /// document that converged while it waited (the doorbell delivered it, an
+    /// earlier page's changes landed) asks from where it actually is instead of
+    /// re-fetching from a stale position.
+    ///
+    /// Never holds the window lock across an await — the swarm write and the
+    /// DocStore read both happen with it released.
+    async fn pump_sync_fetch_window(&self, peer: PeerId, h_app_id: &str) {
+        loop {
+            let next = {
+                let mut windows = self.sync_fetch_windows.lock().await;
+                match windows.get_mut(&peer) {
+                    Some(window) => window.next_doc(),
+                    None => None,
+                }
+            };
+            let Some(doc_id) = next else {
+                break;
+            };
+            // Err (document absent locally) opens with empty heads — a full
+            // sync, exactly the pre-window behaviour for a missing doc.
+            let have_heads = self
+                .sync_manager
+                .get_heads(h_app_id, &doc_id)
+                .await
+                .unwrap_or_default();
+            let sync_request = SyncRequest::SyncChanges {
+                h_app_id: h_app_id.to_string(),
+                doc_id: doc_id.clone(),
+                have_heads,
+                bloom_filter: None,
+            };
+            let req_id = {
+                let mut swarm = self.swarm.write().await;
+                swarm
+                    .behaviour_mut()
+                    .sync_protocol
+                    .send_request(&peer, sync_request)
+            };
+            self.sync_fetch_inflight
+                .lock()
+                .await
+                .insert(req_id, (peer, doc_id.clone(), h_app_id.to_string()));
+            crate::metrics::inc_sync_request("sync_changes");
+            debug!(
+                peer = %peer, doc_id = %doc_id, request_id = ?req_id,
+                "Requested changes for diverged document (windowed)"
+            );
+        }
+    }
+
+    /// Free the window slot an issued `SyncChanges` request held, then re-fill it.
+    ///
+    /// Called from BOTH terminal paths — every response shape and every
+    /// `OutboundFailure` — because a slot that is never freed is a window that
+    /// closes for the rest of the round, which would be strictly worse than the
+    /// unbounded fan-out it replaces.
+    async fn settle_sync_fetch(
+        &self,
+        peer: PeerId,
+        doc_id: &str,
+        h_app_id: &str,
+        outcome: sync_round::SettleOutcome,
+    ) {
+        {
+            let mut windows = self.sync_fetch_windows.lock().await;
+            if let Some(window) = windows.get_mut(&peer) {
+                window.settle(doc_id, outcome);
+            }
+        }
+        if outcome == sync_round::SettleOutcome::Io {
+            crate::metrics::inc_sync_fetch_window_requeued();
+        }
+        self.pump_sync_fetch_window(peer, h_app_id).await;
+    }
+
     /// Handle an outbound sync response from a peer.
     /// Called when we receive responses to our sync requests (e.g., from initiate_sync_round).
     async fn handle_sync_response(
@@ -7801,6 +7937,21 @@ impl P2PNode {
         // answering ListDocuments with an Error would strand entries in the
         // cursor map. (OutboundFailure has its own removal in the event arm.)
         let page_offset = self.doc_list_cursors.lock().await.remove(&request_id);
+        // Free this request's fetch-window slot BEFORE the match: several arms
+        // return early (an empty `Changes` page is the common one), and a slot
+        // leaked on an early return would close the window for the rest of the
+        // round. An `Error` body is a real answer, just not a useful one — it
+        // settles as `Other`, which frees the slot without a retry.
+        if let Some((fetch_peer, fetch_doc_id, fetch_h_app_id)) =
+            self.sync_fetch_inflight.lock().await.remove(&request_id)
+        {
+            let outcome = match &response {
+                SyncResponse::Error { .. } => sync_round::SettleOutcome::Other,
+                _ => sync_round::SettleOutcome::Ok,
+            };
+            self.settle_sync_fetch(fetch_peer, &fetch_doc_id, &fetch_h_app_id, outcome)
+                .await;
+        }
         match response {
             SyncResponse::DocumentList {
                 h_app_id,
@@ -7863,54 +8014,52 @@ impl P2PNode {
                     None => {}
                 }
 
-                // Compare with local documents and request changes for diverged ones
+                // Compare with local documents and QUEUE the diverged ones. This
+                // arm used to send every one of them here, in one pass: on the
+                // two-peer recovery harness (504 docs, one wiped DocStore) that
+                // was ~500 `SyncChanges` requests onto a single connection, of
+                // which yamux refused 196 with `Io(max sub-streams reached)` and
+                // nothing retried — three 60s rounds to refill (181s) against
+                // iroh's one (63s, one request in flight). The window issues at
+                // most `sync_fetch_window` at a time and re-fills as each
+                // settles (`handle_sync_response` / the `OutboundFailure` arm).
+                //
+                // A doc missing locally (`get_heads` Err) opens with empty
+                // `have_heads`, exactly as before — the heads are read at ISSUE
+                // time in `pump_sync_fetch_window`, so a doc that converged
+                // while it waited in the queue asks from where it actually is.
+                let mut divergent: Vec<String> = Vec::new();
                 for remote_doc in &documents {
-                    match self
+                    let diverged = match self
                         .sync_manager
                         .get_heads(&h_app_id, &remote_doc.doc_id)
                         .await
                     {
-                        Ok(local_heads) => {
-                            if local_heads != remote_doc.heads {
-                                // Heads differ — request changes from this peer
-                                let sync_request = SyncRequest::SyncChanges {
-                                    h_app_id: h_app_id.clone(),
-                                    doc_id: remote_doc.doc_id.clone(),
-                                    have_heads: local_heads,
-                                    bloom_filter: None,
-                                };
-                                let mut swarm = self.swarm.write().await;
-                                let req_id = swarm
-                                    .behaviour_mut()
-                                    .sync_protocol
-                                    .send_request(&peer, sync_request);
-                                crate::metrics::inc_sync_request("sync_changes");
-                                debug!(
-                                    peer = %peer, doc_id = %remote_doc.doc_id,
-                                    request_id = ?req_id, "Requested changes for diverged document"
-                                );
-                            }
-                        }
-                        Err(_) => {
-                            // Document doesn't exist locally — request full sync
-                            let sync_request = SyncRequest::SyncChanges {
-                                h_app_id: h_app_id.clone(),
-                                doc_id: remote_doc.doc_id.clone(),
-                                have_heads: vec![],
-                                bloom_filter: None,
-                            };
-                            let mut swarm = self.swarm.write().await;
-                            let req_id = swarm
-                                .behaviour_mut()
-                                .sync_protocol
-                                .send_request(&peer, sync_request);
-                            crate::metrics::inc_sync_request("sync_changes");
-                            debug!(
-                                peer = %peer, doc_id = %remote_doc.doc_id,
-                                request_id = ?req_id, "Requested full sync for new document"
-                            );
+                        Ok(local_heads) => local_heads != remote_doc.heads,
+                        // Document doesn't exist locally — request full sync.
+                        Err(_) => true,
+                    };
+                    if diverged {
+                        divergent.push(remote_doc.doc_id.clone());
+                    }
+                }
+                if !divergent.is_empty() {
+                    let window_size = sync_round::fetch_window(self.config.sync_fetch_window);
+                    {
+                        let mut windows = self.sync_fetch_windows.lock().await;
+                        let window = windows
+                            .entry(peer)
+                            .or_insert_with(|| sync_round::FetchWindow::new(window_size));
+                        for doc_id in &divergent {
+                            window.enqueue(doc_id.clone());
                         }
                     }
+                    let divergent = divergent.len();
+                    debug!(
+                        peer = %peer, h_app_id = %h_app_id, divergent = divergent,
+                        "Queued diverged documents into the bounded fetch window"
+                    );
+                    self.pump_sync_fetch_window(peer, &h_app_id).await;
                 }
             }
             SyncResponse::Changes {
@@ -8761,6 +8910,26 @@ impl P2PNode {
 
         info!(peer_count = peers.len(), "Initiating sync round");
         crate::metrics::inc_sync_round();
+
+        // Report, then retire, the previous round's fetch windows. A window is
+        // per-peer per-round: whatever it did not reach is re-enumerated by the
+        // round starting now, so carrying it forward would double-ask. The debug
+        // line is the round's honest cost — enqueued vs issued vs re-queued vs
+        // the tail it never got to.
+        {
+            let mut windows = self.sync_fetch_windows.lock().await;
+            for (window_peer, window) in windows.iter() {
+                debug!(
+                    peer = %window_peer, window = window.window(),
+                    enqueued = window.enqueued(), issued = window.issued(),
+                    requeued_io = window.requeued(), unreached = window.pending(),
+                    in_flight = window.in_flight(),
+                    "Sync fetch window: previous round"
+                );
+            }
+            windows.clear();
+        }
+        self.sync_fetch_inflight.lock().await.clear();
 
         // Single source of truth for the sync-partition namespace: the producer
         // (`sync::projector::project_content_doc`) writes docs under this same

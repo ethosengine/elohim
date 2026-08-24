@@ -14,7 +14,7 @@ use tracing::{debug, info, warn};
 use super::{IrohPeerBook, IrohSyncClient};
 use crate::db::DbPool;
 use crate::p2p::sync_protocol::{next_doc_list_offset, DocumentInfo, SyncRequest, SyncResponse};
-use crate::p2p::sync_round::SYNC_LIST_PAGE_LIMIT;
+use crate::p2p::sync_round::{FetchWindow, SettleOutcome, SYNC_LIST_PAGE_LIMIT};
 use crate::sync::{projector::PROJECTION_NAMESPACE, SyncManager};
 
 /// Hard ceiling for a future paginated `SyncChanges` backend. The current
@@ -107,9 +107,37 @@ async fn sync_peer(
         crate::metrics::inc_iroh_sync_request("list_documents", "ok");
 
         let page_len = documents.len();
+        // Same scheduler as the libp2p initiator, at window 1. This plane was
+        // ALREADY strictly sequential — that is why a wiped DocStore refilled in
+        // one round here (63s) while libp2p's unbounded fan-out took three
+        // (181s, `Io(max sub-streams reached)`) — so adopting the type is about
+        // having ONE mechanism, not about changing this plane's pacing. Every
+        // outcome settles as `Ok`/`Other`: `IrohSyncClient` erases
+        // connect-vs-stream errors into anyhow, so no failure here can be
+        // truthfully called a transport refusal, and none is re-queued. The
+        // round remains the backstop, exactly as before.
+        let mut by_doc: std::collections::HashMap<String, DocumentInfo> =
+            std::collections::HashMap::with_capacity(page_len);
+        let mut window = FetchWindow::new(1);
         for document in documents {
-            sync_document(client, peer.clone(), sync_manager, db_pool, document).await;
+            window.enqueue(document.doc_id.clone());
+            by_doc.insert(document.doc_id.clone(), document);
         }
+        while let Some(doc_id) = window.next_doc() {
+            let outcome = match by_doc.remove(&doc_id) {
+                Some(document) => {
+                    sync_document(client, peer.clone(), sync_manager, db_pool, document).await
+                }
+                // A duplicate doc_id in one page — the second copy has nothing
+                // left to sync; free the slot rather than stalling the window.
+                None => SettleOutcome::Other,
+            };
+            window.settle(&doc_id, outcome);
+        }
+        debug_assert!(
+            window.drained(),
+            "the iroh page window must drain before the next page is requested"
+        );
 
         match next_doc_list_offset(offset, page_len, has_more) {
             Some(next) => offset = next,
@@ -124,7 +152,7 @@ async fn sync_document(
     sync_manager: &SyncManager,
     db_pool: Option<&DbPool>,
     remote: DocumentInfo,
-) {
+) -> SettleOutcome {
     let mut local_heads = match sync_manager
         .get_heads(PROJECTION_NAMESPACE, &remote.doc_id)
         .await
@@ -136,7 +164,7 @@ async fn sync_document(
         }
     };
     if local_heads == remote.heads {
-        return;
+        return SettleOutcome::Ok;
     }
 
     for page in 0..MAX_CHANGE_PAGES_PER_DOCUMENT {
@@ -148,7 +176,7 @@ async fn sync_document(
         };
         let response = match request(client, peer.clone(), "sync_changes", &sync_request).await {
             Some(response) => response,
-            None => return,
+            None => return SettleOutcome::Other,
         };
 
         let (changes, has_more, new_heads) = match response {
@@ -164,12 +192,12 @@ async fn sync_document(
             SyncResponse::Error { message } => {
                 crate::metrics::inc_iroh_sync_request("sync_changes", "error_response");
                 warn!(peer = %peer.node_id, doc_id = %remote.doc_id, error = %message, "iroh sync changes rejected by peer");
-                return;
+                return SettleOutcome::Other;
             }
             other => {
                 crate::metrics::inc_iroh_sync_request("sync_changes", "error_response");
                 warn!(peer = %peer.node_id, doc_id = %remote.doc_id, response = ?other, "iroh sync changes returned an unexpected response");
-                return;
+                return SettleOutcome::Other;
             }
         };
         crate::metrics::inc_iroh_sync_request("sync_changes", "ok");
@@ -178,7 +206,7 @@ async fn sync_document(
             if has_more {
                 warn!(peer = %peer.node_id, doc_id = %remote.doc_id, "iroh sync peer claimed more changes after an empty page");
             }
-            return;
+            return SettleOutcome::Ok;
         }
 
         let change_count = changes.len() as u64;
@@ -194,17 +222,20 @@ async fn sync_document(
             }
             Err(error) => {
                 warn!(peer = %peer.node_id, doc_id = %remote.doc_id, error = %error, "iroh sync failed to apply changes");
-                return;
+                return SettleOutcome::Other;
             }
         }
 
         if !has_more || local_heads == new_heads {
-            return;
+            return SettleOutcome::Ok;
         }
         if page + 1 == MAX_CHANGE_PAGES_PER_DOCUMENT {
             warn!(peer = %peer.node_id, doc_id = %remote.doc_id, pages = MAX_CHANGE_PAGES_PER_DOCUMENT, "iroh sync change-page ceiling reached");
         }
     }
+    // Page ceiling reached without converging — the slot frees, the doc is not
+    // re-queued (a lying peer must not create an unbounded round).
+    SettleOutcome::Other
 }
 
 async fn request(

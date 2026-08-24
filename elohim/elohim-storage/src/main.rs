@@ -429,6 +429,19 @@ async fn async_main(
         );
     }
 
+    // Bounded sync-fetch window (default 32). A parse failure or a literal 0
+    // both keep the default rather than silently issuing nothing — see
+    // `p2p::sync_round::fetch_window`.
+    if let Ok(v) = std::env::var("ELOHIM_SYNC_FETCH_WINDOW") {
+        match v.trim().parse::<usize>() {
+            Ok(n) if n > 0 => config.sync_fetch_window = n,
+            _ => tracing::warn!(
+                value = %v,
+                "ELOHIM_SYNC_FETCH_WINDOW is not a positive integer — keeping the default"
+            ),
+        }
+    }
+
     // Adopt-before-author CONTEST arm (default ON; the supply side of the
     // canonical election). Env DISABLES it: 0/false/off/no — turning it off
     // restores the prior `Hold`, which is safe but cannot converge a two-way
@@ -2809,6 +2822,7 @@ async fn async_main(
             // Sync round cadence — Config::sync_interval_secs existed and was read
             // by nothing until now (the tick in P2PNode::run was hardcoded 60s).
             sync_interval_secs: Some(config.sync_interval_secs),
+            sync_fetch_window: Some(config.sync_fetch_window),
             // Acquisition/provide reconcile cadence — the mesh's dev-tier pacing
             // profile declares it (hc-mesh.sh); unset keeps the 60s default.
             acquisition_reconcile_secs: std::env::var("ACQUISITION_RECONCILE_SECS")

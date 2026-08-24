@@ -565,6 +565,17 @@ pub struct Config {
     #[serde(default = "default_sync_interval")]
     pub sync_interval_secs: u64,
 
+    /// How many `SyncChanges` requests one peer may have in flight at once
+    /// during a sync round (`ELOHIM_SYNC_FETCH_WINDOW`, default 32; 0 means
+    /// "use the default", never "issue nothing").
+    ///
+    /// Before this bound the libp2p initiator fired EVERY divergent document's
+    /// request in one pass and the multiplexer refused the overflow
+    /// (`Io(max sub-streams reached)`), so a wiped DocStore took three 60s
+    /// rounds to refill instead of one. See `p2p::sync_round::FetchWindow`.
+    #[serde(default = "default_sync_fetch_window")]
+    pub sync_fetch_window: usize,
+
     /// P2P port for direct blob transfers
     #[serde(default = "default_p2p_port")]
     pub p2p_port: u16,
@@ -1082,6 +1093,14 @@ fn default_sync_interval() -> u64 {
     60
 }
 
+/// Mirrors `p2p::sync_round::DEFAULT_FETCH_WINDOW`, restated as a literal
+/// because `p2p` is feature-gated and `Config` is not. The mirror is pinned by
+/// `sync_round::tests::the_config_default_mirrors_the_scheduler_default`, so it
+/// cannot drift silently.
+fn default_sync_fetch_window() -> usize {
+    32
+}
+
 fn default_p2p_port() -> u16 {
     9876
 }
@@ -1170,6 +1189,7 @@ impl Default for Config {
             enable_eviction: true,
             min_replicas_for_eviction: 2,
             sync_interval_secs: 60,
+            sync_fetch_window: default_sync_fetch_window(),
             p2p_port: 9876,
             http_port: 8090,
             p2p_bootstrap_nodes: Vec::new(),

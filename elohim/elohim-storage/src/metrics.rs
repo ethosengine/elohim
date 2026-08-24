@@ -1967,6 +1967,24 @@ lazy_static! {
         "HTTP requests currently being handled by the dispatch wrapper.",
     )
     .unwrap();
+
+    /// Documents the bounded sync-fetch window re-queued after the transport
+    /// REFUSED to carry their `SyncChanges` request (libp2p
+    /// `OutboundFailure::Io` — the measured `max sub-streams reached` shape).
+    ///
+    /// One counter, both planes (`p2p::sync_round::FetchWindow` is the shared
+    /// scheduler). Read it against
+    /// `elohim_sync_request_outcomes_total{result="io"}`: a non-zero `io` with a
+    /// zero re-queue count means the window is not settling failures at all,
+    /// and a re-queue count that keeps pace with `io` means the window is still
+    /// too wide for what the multiplexer will grant. On a healthy mesh both
+    /// trend to zero — before this window existed, the recovering peer logged
+    /// 196 -> 55 -> 0 io failures per round with nothing retrying any of them.
+    pub static ref SYNC_FETCH_WINDOW_REQUEUED: IntCounter = IntCounter::new(
+        "elohim_sync_fetch_window_requeued_total",
+        "SyncChanges requests re-queued by the bounded fetch window after a transport io refusal.",
+    )
+    .unwrap();
 }
 
 /// Register every toolkit collector into [`REGISTRY`]. Idempotent (guarded by a
@@ -2294,6 +2312,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(SYNC_REQUESTS.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_DOCS_ENUMERATED.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_REQUEST_OUTCOMES.clone()));
+        let _ = REGISTRY.register(Box::new(SYNC_FETCH_WINDOW_REQUEUED.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_OUTCOMES.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_RECONCILE_OUTCOMES.clone()));
         {
@@ -2944,6 +2963,12 @@ pub fn add_sync_docs_enumerated(n: u64) {
 /// label.
 pub fn inc_sync_request_outcome(result: &str) {
     SYNC_REQUEST_OUTCOMES.with_label_values(&[result]).inc();
+}
+
+/// Record one document re-queued by the bounded sync-fetch window after a
+/// transport io refusal. See [`SYNC_FETCH_WINDOW_REQUEUED`].
+pub fn inc_sync_fetch_window_requeued() {
+    SYNC_FETCH_WINDOW_REQUEUED.inc();
 }
 
 /// Counts sync rounds that short-circuited on a matching corpus digest —
@@ -4430,6 +4455,10 @@ mod tests {
             inc_sync_request(kind);
         }
         add_sync_docs_enumerated(1956);
+        // The bounded fetch window's own signal (2026-08-24): the io refusals
+        // it re-queues. Primed so the series is proven to REACH /metrics — an
+        // instrument that never renders cannot confirm or falsify the cure.
+        inc_sync_fetch_window_requeued();
         for result in [
             "ok",
             "timeout",
@@ -4588,6 +4617,11 @@ mod tests {
         assert!(
             text.contains("elohim_sync_request_outcomes_total"),
             "sync request-outcome counter missing:\n{text}"
+        );
+        assert!(
+            text.contains("elohim_sync_fetch_window_requeued_total"),
+            "fetch-window re-queue counter missing — without it an io-refusing \
+             transport looks the same before and after the bounded window:\n{text}"
         );
         assert!(text.contains("kind=\"list_documents\""), "{text}");
         assert!(text.contains("kind=\"announce_change\""), "{text}");

@@ -171,6 +171,168 @@ pub fn round_opener(h_app_id: &str, local: &LocalCorpusState) -> SyncRequest {
     }
 }
 
+/// Default number of `SyncChanges` requests one peer may have in flight at once.
+///
+/// **Measured 2026-08-24, two-peer local mesh, ~504 documents.** The libp2p
+/// initiator used to fire EVERY divergent-document `SyncChanges` request in one
+/// pass over a `DocumentList` page. They all ride one connection, so the yamux
+/// multiplexer refuses sub-streams past its window: the recovering peer logged
+/// 196 -> 55 -> 0 `Outbound sync request failed` /
+/// `Io(max sub-streams reached)` across three 60s rounds
+/// (`elohim_sync_request_outcomes_total{result="io"}`=316 vs `ok`=509), nothing
+/// retried, and the remainder was re-enumerated next round. A wiped DocStore
+/// took 181-182s to refill (4 runs, both directions) where the iroh driver —
+/// which keeps ONE request in flight — took 63s.
+///
+/// 32 is deliberately well under a default yamux sub-stream window and well
+/// above 1: it keeps the pipelining the libp2p plane needs without ever asking
+/// the multiplexer for more streams than it will grant.
+pub const DEFAULT_FETCH_WINDOW: usize = 32;
+
+/// Resolve the configured fetch window.
+///
+/// `None` (unset) and `Some(0)` both fall back to [`DEFAULT_FETCH_WINDOW`], for
+/// the same reason [`round_interval`] refuses a zero cadence: a literal zero
+/// window would issue nothing, forever, with no error — every peer stranded and
+/// nothing in the logs to say why. Zero is a typo here, never "disabled".
+pub fn fetch_window(configured: Option<usize>) -> usize {
+    match configured {
+        Some(n) if n > 0 => n,
+        _ => DEFAULT_FETCH_WINDOW,
+    }
+}
+
+/// How one issued `SyncChanges` request ended, from the scheduler's point of view.
+///
+/// Only [`SettleOutcome::Io`] earns a re-queue: it is the transport refusing to
+/// carry the request (the measured `max sub-streams reached` shape), so the doc
+/// was never asked for and asking again once — inside the same round — is the
+/// whole cure. `Ok` and `Other` are answers: the peer said something, and
+/// re-asking would either be pointless or a spin.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SettleOutcome {
+    /// A response arrived (changes, no-changes, heads — anything the peer said).
+    Ok,
+    /// The transport refused to carry the request (libp2p `OutboundFailure::Io`).
+    Io,
+    /// Any other terminal end: timeout, connection closed, dial failure,
+    /// unsupported protocol, or an `Error` response body.
+    Other,
+}
+
+/// A bounded, per-peer, per-round scheduler for `SyncChanges` requests.
+///
+/// The transport-agnostic half of the cure: it decides *how many* documents may
+/// be asked for at once and *which* one goes next, holding no swarm, no socket
+/// and no clock, so the plane's pacing is testable without a live mesh (the same
+/// reason the rest of this module exists — see the module header).
+///
+/// Lifetime is ONE round per peer: `initiate_sync_round` drops the map, so the
+/// next round starts from the peer's freshly enumerated `DocumentList`. Anything
+/// still pending when a round ends is simply re-enumerated — exactly the
+/// pre-cure behaviour for the tail, minus the failures.
+///
+/// **A doc is re-queued at most once per round.** Unbounded retry against a peer
+/// whose transport is genuinely broken would turn one round into an unbounded
+/// one (C6a); the 60s round is the backstop, as it is for every other leg here.
+#[derive(Debug, Clone)]
+pub struct FetchWindow {
+    window: usize,
+    pending: std::collections::VecDeque<String>,
+    in_flight: usize,
+    /// Docs already granted their one io re-queue this round.
+    requeued_once: std::collections::HashSet<String>,
+    enqueued_total: usize,
+    issued_total: usize,
+    requeued_total: usize,
+}
+
+impl FetchWindow {
+    /// A window admitting at most `window` in-flight requests. `0` resolves to
+    /// [`DEFAULT_FETCH_WINDOW`] via [`fetch_window`] rather than deadlocking.
+    pub fn new(window: usize) -> Self {
+        Self {
+            window: fetch_window(Some(window)),
+            pending: std::collections::VecDeque::new(),
+            in_flight: 0,
+            requeued_once: std::collections::HashSet::new(),
+            enqueued_total: 0,
+            issued_total: 0,
+            requeued_total: 0,
+        }
+    }
+
+    /// Queue one divergent document for this round. Order is preserved (FIFO),
+    /// so the enumeration order the peer answered with is the fetch order.
+    pub fn enqueue(&mut self, doc_id: impl Into<String>) {
+        self.pending.push_back(doc_id.into());
+        self.enqueued_total += 1;
+    }
+
+    /// The next document to ask for, or `None` when the window is full or the
+    /// queue is empty. Taking a doc occupies a slot until [`Self::settle`].
+    ///
+    /// Deliberately NOT named `next`/`Iterator`: `None` here means "not right
+    /// now" (the window is full), not "exhausted" — an `Iterator` contract would
+    /// invite a caller to stop asking, which is precisely the bug.
+    pub fn next_doc(&mut self) -> Option<String> {
+        if self.in_flight >= self.window {
+            return None;
+        }
+        let doc_id = self.pending.pop_front()?;
+        self.in_flight += 1;
+        self.issued_total += 1;
+        Some(doc_id)
+    }
+
+    /// Release the slot an issued request held, re-queueing the doc once if the
+    /// transport refused to carry it.
+    pub fn settle(&mut self, doc_id: &str, outcome: SettleOutcome) {
+        self.in_flight = self.in_flight.saturating_sub(1);
+        if outcome == SettleOutcome::Io && self.requeued_once.insert(doc_id.to_string()) {
+            self.pending.push_back(doc_id.to_string());
+            self.requeued_total += 1;
+        }
+    }
+
+    /// Requests currently occupying a window slot.
+    pub fn in_flight(&self) -> usize {
+        self.in_flight
+    }
+
+    /// Documents queued but not yet issued.
+    pub fn pending(&self) -> usize {
+        self.pending.len()
+    }
+
+    /// Nothing queued and nothing outstanding — the round's fetch work is done.
+    pub fn drained(&self) -> bool {
+        self.pending.is_empty() && self.in_flight == 0
+    }
+
+    /// The effective window size (post zero-resolution).
+    pub fn window(&self) -> usize {
+        self.window
+    }
+
+    /// Documents queued this round (the round's divergent-document count).
+    pub fn enqueued(&self) -> usize {
+        self.enqueued_total
+    }
+
+    /// Requests handed out this round (`enqueued` + io re-queues, minus any tail
+    /// the round ended before reaching).
+    pub fn issued(&self) -> usize {
+        self.issued_total
+    }
+
+    /// Documents re-queued after an io refusal this round — the counter that
+    /// says whether the transport is still refusing sub-streams at all.
+    pub fn requeued(&self) -> usize {
+        self.requeued_total
+    }
+}
+
 /// The largest change payload an announce will carry inline, per peer.
 ///
 /// The doorbell fans out to EVERY connected peer, so the cost of an eager
@@ -278,6 +440,154 @@ pub fn announce_request(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ---- FetchWindow (bounded sync-fetch window) ----
+
+    #[test]
+    fn the_window_never_hands_out_more_than_n_at_once() {
+        let mut w = FetchWindow::new(3);
+        for i in 0..10 {
+            w.enqueue(format!("doc-{i}"));
+        }
+        let mut issued = Vec::new();
+        while let Some(doc) = w.next_doc() {
+            issued.push(doc);
+        }
+        assert_eq!(issued.len(), 3, "the window must cap concurrent hand-outs");
+        assert_eq!(w.in_flight(), 3);
+        assert_eq!(w.pending(), 7);
+        assert!(
+            w.next_doc().is_none(),
+            "a full window hands out nothing more"
+        );
+    }
+
+    #[test]
+    fn an_ok_settle_frees_exactly_one_slot() {
+        let mut w = FetchWindow::new(2);
+        w.enqueue("a");
+        w.enqueue("b");
+        w.enqueue("c");
+        assert_eq!(w.next_doc().as_deref(), Some("a"));
+        assert_eq!(w.next_doc().as_deref(), Some("b"));
+        assert!(w.next_doc().is_none());
+        w.settle("a", SettleOutcome::Ok);
+        assert_eq!(w.in_flight(), 1);
+        assert_eq!(w.next_doc().as_deref(), Some("c"));
+        assert!(w.next_doc().is_none());
+    }
+
+    #[test]
+    fn an_other_settle_frees_the_slot_without_requeueing() {
+        let mut w = FetchWindow::new(1);
+        w.enqueue("a");
+        assert_eq!(w.next_doc().as_deref(), Some("a"));
+        w.settle("a", SettleOutcome::Other);
+        assert_eq!(w.in_flight(), 0);
+        assert_eq!(w.pending(), 0, "a non-io failure is not retried this round");
+        assert_eq!(w.requeued(), 0);
+        assert!(w.drained());
+    }
+
+    /// The measured defect: 196 `Io(max sub-streams reached)` failures in one
+    /// round and NOTHING retried them, so the remainder waited a whole 60s
+    /// round. One re-queue turns that into same-round progress; more than one
+    /// would let a genuinely broken peer spin the round forever.
+    #[test]
+    fn an_io_settle_requeues_the_doc_exactly_once_per_round() {
+        let mut w = FetchWindow::new(1);
+        w.enqueue("a");
+        assert_eq!(w.next_doc().as_deref(), Some("a"));
+
+        w.settle("a", SettleOutcome::Io);
+        assert_eq!(w.pending(), 1, "an io failure earns one retry");
+        assert_eq!(w.requeued(), 1);
+
+        assert_eq!(w.next_doc().as_deref(), Some("a"));
+        w.settle("a", SettleOutcome::Io);
+        assert_eq!(
+            w.pending(),
+            0,
+            "the second io failure drops the doc; the next round re-enumerates it"
+        );
+        assert_eq!(
+            w.requeued(),
+            1,
+            "the re-queue counter counts re-queues, not failures"
+        );
+        assert!(w.drained());
+    }
+
+    #[test]
+    fn drained_is_true_only_when_nothing_is_pending_or_in_flight() {
+        let mut w = FetchWindow::new(2);
+        assert!(w.drained(), "an empty window is drained");
+        w.enqueue("a");
+        assert!(!w.drained(), "a pending doc is not drained");
+        assert_eq!(w.next_doc().as_deref(), Some("a"));
+        assert!(!w.drained(), "an in-flight doc is not drained");
+        w.settle("a", SettleOutcome::Ok);
+        assert!(w.drained());
+    }
+
+    /// The iroh driver adopts this type at window 1; its behaviour must stay
+    /// strictly one-at-a-time or the adoption would silently change that plane.
+    #[test]
+    fn window_one_is_strictly_sequential() {
+        let mut w = FetchWindow::new(1);
+        w.enqueue("a");
+        w.enqueue("b");
+        assert_eq!(w.next_doc().as_deref(), Some("a"));
+        assert!(w.next_doc().is_none(), "window 1 never has two in flight");
+        w.settle("a", SettleOutcome::Ok);
+        assert_eq!(w.next_doc().as_deref(), Some("b"));
+        assert!(w.next_doc().is_none());
+    }
+
+    #[test]
+    fn a_zero_window_is_the_default_not_a_deadlock() {
+        // A configured 0 must never mean "issue nothing forever" — that would
+        // strand every peer with no error, the same reasoning `round_interval`
+        // applies to a zero cadence.
+        assert_eq!(fetch_window(Some(0)), DEFAULT_FETCH_WINDOW);
+        assert_eq!(fetch_window(None), DEFAULT_FETCH_WINDOW);
+        assert_eq!(fetch_window(Some(8)), 8);
+
+        let mut w = FetchWindow::new(0);
+        w.enqueue("a");
+        assert!(
+            w.next_doc().is_some(),
+            "a zero window must still hand out work, never deadlock the plane"
+        );
+    }
+
+    /// `Config::sync_fetch_window`'s default is a literal 32 (config.rs cannot
+    /// name the feature-gated `p2p` module), so pin the mirror here — a silent
+    /// divergence would make the shipped default disagree with the documented
+    /// one and nothing would say so.
+    #[test]
+    fn the_config_default_mirrors_the_scheduler_default() {
+        assert_eq!(
+            crate::config::Config::default().sync_fetch_window,
+            DEFAULT_FETCH_WINDOW,
+            "config.rs::default_sync_fetch_window drifted from DEFAULT_FETCH_WINDOW"
+        );
+    }
+
+    #[test]
+    fn the_window_counts_what_the_round_did() {
+        let mut w = FetchWindow::new(2);
+        for i in 0..4 {
+            w.enqueue(format!("doc-{i}"));
+        }
+        let a = w.next_doc().expect("first");
+        let _b = w.next_doc().expect("second");
+        w.settle(&a, SettleOutcome::Io);
+        assert_eq!(w.enqueued(), 4);
+        assert_eq!(w.issued(), 2);
+        assert_eq!(w.requeued(), 1);
+        assert_eq!(w.window(), 2);
+    }
 
     /// **Byte-pin, captured from the PRE-REFACTOR `corpus_digest` body**
     /// (inline `sha2::Sha256` fold, before `digest_of_entry_lines` was
