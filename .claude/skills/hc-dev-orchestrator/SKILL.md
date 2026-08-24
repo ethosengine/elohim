@@ -287,9 +287,12 @@ ONE `hc sandbox run` parent: a single-peer kill may drag the others down; the sc
 from their existing sandboxes (no regenerate, no re-key) and says so loudly, because it changes the
 measure. Scenario: `genesis/a2o/features/resilience/conductor-validation-spin.feature`.
 
-**Trap:** `just mesh stop` kills by `pgrep -f` patterns (`elohim-storag[e]`, `doorwa[y]`, `hc sandbox`) —
-a shell whose command line contains those strings (an env assignment, a `pgrep -af …` argument) is
-SIGTERM'd too (exit 144). Run `just mesh stop` alone in its own command.
+**Shutdown ownership:** mesh start/restart paths persist PID + process-start identity under
+`$MESH_DIR/pids/<role>-<name>`. `just mesh stop` validates those records, merges them with listeners on
+the configured mesh TCP/UDP ports, and terminates only that exact set. Service-name `pgrep -f` patterns
+remain only as a warned, `/proc/exe` plus mesh argv/cwd-validated compatibility fallback for pre-PID
+meshes; a shell whose argv merely mentions a service path is not a candidate. The recovery matrix calls
+stop synchronously — it no longer needs a separate-session workaround to survive shutdown.
 
 ## Running the Act I lane
 

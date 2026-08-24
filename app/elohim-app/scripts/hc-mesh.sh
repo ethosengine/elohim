@@ -121,6 +121,9 @@
 #     `danger_bind_addr` when a cross-pod topology ever needs more. Inside
 #     one container, loopback is correct.
 #   - elohim-storage ignores the HTTP_PORT env var: pass --http-port.
+#   - launches persist PID + process-start identity under $MESH_DIR/pids;
+#     stop merges those records with listeners on this mesh's declared ports.
+#     Service-name patterns are a warned, /proc-validated legacy fallback only.
 #
 set -u
 
@@ -170,6 +173,9 @@ export MESH_PEER_TRANSPORTS
 MESH_DOORWAYS="${MESH_DOORWAYS:-1}"
 MESH_DOORWAYS_EFFECTIVE="$MESH_DOORWAYS"
 DOORWAY_PORT="${DOORWAY_PORT:-8888}"
+DOORWAY_B_PORT="${DOORWAY_B_PORT:-8889}"
+DOORWAY_A_HEALTH_PORT="${DOORWAY_A_HEALTH_PORT:-8079}"
+DOORWAY_B_HEALTH_PORT="${DOORWAY_B_HEALTH_PORT:-8089}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
@@ -190,6 +196,7 @@ MONGOD_BIN="${MONGOD_BIN-$(command -v mongod 2>/dev/null || { [ -x "$HOME/bin/mo
 MONGO_PORT="${MONGO_PORT:-27017}"
 MONGO_DIR="$MESH_DIR/mongo"
 LOGDIR="$MESH_DIR/logs"
+PID_DIR="$MESH_DIR/pids"
 
 # Port scheme per peer index i (0-based): admin 4444+10i, app 4445+10i,
 # storage http 8090+i, libp2p 9701+i.
@@ -199,6 +206,62 @@ admin_port() { echo $((4444 + 10 * $1)); }
 app_port()   { echo $((4445 + 10 * $1)); }
 http_port()  { echo $((8090 + $1)); }
 p2p_port()   { echo $((9701 + $1)); }
+
+process_start_ticks() { # <pid> — guards a persisted pid against PID reuse
+  # stat field 2 (`comm`) may contain spaces; strip pid+comm through the final
+  # ')' first. starttime is field 20 of the remaining field-3.. sequence.
+  sed 's/^[^)]*) //' "/proc/$1/stat" 2>/dev/null | awk '{print $20}'
+}
+
+record_mesh_pid() { # <role> <name> <pid>
+  local role="$1" name="$2" pid="$3" started
+  [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+  started="$(process_start_ticks "$pid")"
+  [ -n "$started" ] || return 1
+  mkdir -p "$PID_DIR"
+  printf '%s %s\n' "$pid" "$started" > "$PID_DIR/$role-$name"
+}
+
+listener_pids_for_ports() { # <port>... — TCP and UDP listeners, unique pids
+  local port
+  for port in "$@"; do
+    {
+      ss -H -ltnp "sport = :$port" 2>/dev/null
+      ss -H -lunp "sport = :$port" 2>/dev/null
+    } | grep -o 'pid=[0-9]*' | cut -d= -f2
+  done | sort -un
+}
+
+record_listener_pid() { # <role> <name> <port>
+  local role="$1" name="$2" port="$3" pid
+  pid="$(listener_pids_for_ports "$port" | head -1)"
+  [ -n "$pid" ] && record_mesh_pid "$role" "$name" "$pid"
+}
+
+mesh_owned_ports() {
+  # Doorway/mongo ports remain owned even when the NEXT requested shape has
+  # MESH_DOORWAYS=0; stop must still reap a previously doorway-backed shape.
+  printf '%s\n' "$DOORWAY_PORT" "$DOORWAY_B_PORT" \
+    "$DOORWAY_A_HEALTH_PORT" "$DOORWAY_B_HEALTH_PORT" "$MONGO_PORT"
+  local i=0
+  for _ in "${PEERS[@]}"; do
+    printf '%s\n' "$(admin_port "$i")" "$(app_port "$i")" \
+      "$(http_port "$i")" "$(p2p_port "$i")"
+    i=$((i+1))
+  done
+}
+
+refresh_mesh_pidfiles() {
+  local i=0 name
+  record_listener_pid doorway a "$DOORWAY_PORT" || true
+  record_listener_pid doorway b "$DOORWAY_B_PORT" || true
+  record_listener_pid mongod mesh "$MONGO_PORT" || true
+  for name in "${PEERS[@]}"; do
+    record_listener_pid conductor "$name" "$(admin_port "$i")" || true
+    record_listener_pid storage "$name" "$(http_port "$i")" || true
+    i=$((i+1))
+  done
+}
 
 # The storage CLI has no --print-features surface. The p2p-iroh build does,
 # however, retain this exact tracing target literal from p2p_iroh/node.rs in
@@ -620,16 +683,121 @@ mesh_network_args() { # -> the `network …` tail for `hc sandbox generate`
   fi
 }
 
+recorded_mesh_pids() {
+  local file pid started current
+  [ -d "$PID_DIR" ] || return 0
+  while IFS= read -r file; do
+    pid=""; started=""
+    read -r pid started < "$file" || true
+    if [[ "$pid" =~ ^[0-9]+$ ]] && [ -n "${started:-}" ]; then
+      current="$(process_start_ticks "$pid")"
+      if [ -n "$current" ] && [ "$current" = "$started" ]; then
+        echo "$pid"
+        continue
+      fi
+    fi
+    # Dead or reused: it is no longer the process this mesh launched.
+    rm -f "$file"
+  done < <(find "$PID_DIR" -maxdepth 1 -type f -print 2>/dev/null)
+}
+
+terminate_mesh_pids() { # <pid>...
+  local unique=() pid alive deadline
+  for pid in "$@"; do
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    [ "$pid" = "$$" ] && continue
+    case " ${unique[*]} " in *" $pid "*) ;; *) unique+=("$pid") ;; esac
+  done
+  [ ${#unique[@]} -gt 0 ] || return 0
+
+  echo "stopping ${#unique[@]} mesh process(es) by recorded pid / owned port"
+  kill "${unique[@]}" 2>/dev/null || true
+  deadline=$((SECONDS + 10))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    alive=0
+    for pid in "${unique[@]}"; do kill -0 "$pid" 2>/dev/null && alive=$((alive+1)); done
+    [ "$alive" -eq 0 ] && return 0
+    sleep 1
+  done
+  for pid in "${unique[@]}"; do
+    kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null || true
+  done
+}
+
+fallback_pattern_pids() {
+  # Compatibility for meshes launched before PID files existed, or platforms
+  # where ss can see a listener but not its owner. The pgrep patterns only
+  # NOMINATE candidates; /proc/exe must prove each is an actual service binary,
+  # so a shell whose argv merely contains a binary path is never killed.
+  local pid exe args cwd port owned
+  while IFS= read -r pid; do
+    [ -n "$pid" ] || continue
+    exe="$(readlink "/proc/$pid/exe" 2>/dev/null)"
+    exe="${exe% (deleted)}"; exe="${exe##*/}"
+    args="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null)"
+    cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null)"
+    owned=0
+    case "$exe" in
+      holochain) [[ "$args" == *"$LOCAL_DEV_DIR/"*"/conductor-config.yaml"* ]] && owned=1 ;;
+      hc) [ "$cwd" = "$LOCAL_DEV_DIR" ] && [[ "$args" == *" sandbox "*" run"* ]] && owned=1 ;;
+      elohim-storage)
+        while IFS= read -r port; do
+          [[ "$args" == *"--http-port $port"* ]] && { owned=1; break; }
+        done < <(mesh_owned_ports) ;;
+      doorway)
+        [[ "$args" == *"--listen 0.0.0.0:$DOORWAY_PORT"* || \
+           "$args" == *"--listen 0.0.0.0:$DOORWAY_B_PORT"* ]] && owned=1 ;;
+      mongod) [[ "$args" == *"--dbpath $MONGO_DIR"* ]] && owned=1 ;;
+    esac
+    [ "$owned" -eq 1 ] && echo "$pid"
+  done < <({
+    pgrep -x holochain 2>/dev/null
+    pgrep -f "[h]c sandbox" 2>/dev/null
+    pgrep -f "elohim-storag[e]" 2>/dev/null
+    pgrep -f "(debug|release)/doorwa[y]" 2>/dev/null
+    pgrep -f "mongod --dbpath $MESH_DIR/mong[o]" 2>/dev/null
+  } | sort -un)
+}
+
+mesh_ports_busy() {
+  local port
+  while IFS= read -r port; do
+    ss -H -ltn "sport = :$port" 2>/dev/null | grep -q . && return 0
+    ss -H -lun "sport = :$port" 2>/dev/null | grep -q . && return 0
+  done < <(mesh_owned_ports)
+  return 1
+}
+
+clear_mesh_pidfiles() {
+  local file
+  [ -d "$PID_DIR" ] || return 0
+  while IFS= read -r file; do rm -f "$file"; done \
+    < <(find "$PID_DIR" -maxdepth 1 -type f -print 2>/dev/null)
+  rmdir "$PID_DIR" 2>/dev/null || true
+}
+
 stop_all() {
-  # Kill by exact binary identity, NEVER by a pattern that could match the
-  # caller's own command line (self-kill class, hit twice on 2026-08-16).
-  kill $(pgrep -x holochain) 2>/dev/null
-  kill $(pgrep -f "[h]c sandbox") 2>/dev/null
-  kill $(pgrep -f "elohim-storag[e]") 2>/dev/null
-  kill $(pgrep -f "(debug|release)/doorwa[y]") 2>/dev/null
-  # mongod: exact dbpath identity, never a bare "mongod" pattern.
-  kill $(pgrep -f "mongod --dbpath $MESH_DIR/mong[o]") 2>/dev/null
-  sleep 1
+  local pids=() fallback=() pid
+  while IFS= read -r pid; do pids+=("$pid"); done < <(recorded_mesh_pids)
+  while IFS= read -r pid; do pids+=("$pid"); done \
+    < <(listener_pids_for_ports $(mesh_owned_ports))
+  terminate_mesh_pids "${pids[@]}"
+
+  # Pattern matching is deliberately last. It runs only when the exact
+  # ownership paths found nothing or a declared mesh port remains occupied.
+  if [ ${#pids[@]} -eq 0 ] || mesh_ports_busy; then
+    while IFS= read -r pid; do fallback+=("$pid"); done < <(fallback_pattern_pids)
+    if [ ${#fallback[@]} -gt 0 ]; then
+      echo "WARN: PID/port shutdown was incomplete; using validated process-name fallback" >&2
+      terminate_mesh_pids "${fallback[@]}"
+    fi
+  fi
+
+  clear_mesh_pidfiles
+  if mesh_ports_busy; then
+    echo "WARN: mesh stopped, but one or more declared mesh ports remain occupied" >&2
+    return 1
+  fi
   echo "mesh stopped"
 }
 
@@ -858,6 +1026,7 @@ os.chdir(cwd)
 os.closerange(3, 65536)
 os.execve(binpath, [binpath, "--http-port", port], env)
 ' "$envfile" "$bin" "$port" "$cwd" "$(restart_env_overlay "$envfile" "$name")" >> "$LOGDIR/$name.log" 2>&1 &
+    record_mesh_pid storage "$name" "$!" || true
     disown 2>/dev/null || true
   done
 
@@ -1196,6 +1365,7 @@ CFGEOF
         cd "$LOCAL_DEV_DIR" || exit 1
         setsid nohup sh -c "echo test | '$hc_bin' --piped --structured=Log --config-path '$LOCAL_DEV_DIR/$name/conductor-config.yaml'" \
           >> "$LOCAL_DEV_DIR/.sandbox_run_log.$name" 2>&1 &
+        record_mesh_pid conductor "$name" "$!" || true
       )
     done
   else
@@ -1213,6 +1383,7 @@ CFGEOF
       local _pflag=""
       [ "${MESH_ATTACH_APP_PORTS:-0}" = "1" ] && _pflag=" -p=$aports"
       setsid nohup sh -c "echo test | hc sandbox --piped -f $fports run -a$_pflag" >> .sandbox_run_log 2>&1 &
+      record_mesh_pid conductor-supervisor mesh "$!" || true
     )
   fi
 
@@ -1227,6 +1398,7 @@ CFGEOF
     return 1
   fi
   echo "conductors up on $fports"
+  refresh_mesh_pidfiles
   # The app interfaces are persistent, so they should return WITHOUT -p. If they
   # do not, the storage peers have nothing to talk to and the mesh looks alive
   # while being useless — worth saying out loud rather than leaving to discovery.
@@ -1308,7 +1480,7 @@ start_all() {
   # The CLI writes the config the conductor must parse — refuse a mismatched
   # pair before anything is generated, not after three conductors panic.
   assert_toolchain_parity
-  mkdir -p "$MESH_DIR" "$LOGDIR" "$LOCAL_DEV_DIR"
+  mkdir -p "$MESH_DIR" "$LOGDIR" "$LOCAL_DEV_DIR" "$PID_DIR"
 
   # Peer policy: the storage binary loads ./config/peer-policy.toml relative to
   # ITS CWD; a missing file silently disables the whole heartbeat + signal-
@@ -1370,8 +1542,10 @@ EOF
       for _ in $(seq 1 20); do
         (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null && break; sleep 1
       done
+      record_listener_pid mongod mesh "$MONGO_PORT" || true
       echo "mongod up on :$MONGO_PORT (dbpath $MONGO_DIR)"
     else
+      record_listener_pid mongod mesh "$MONGO_PORT" || true
       echo "mongod already up on :$MONGO_PORT"
     fi
   else
@@ -1406,7 +1580,7 @@ EOF
     # DOORWAY_HEALTH_PORT — doorway A booted with a random doorway_id, matched ZERO
     # project-epr rows, and served / as 503 and /lamad as 404 for a whole lane.
     DOORWAY_ID="${DOORWAY_ID:-alpha-elohim-host}" \
-    DOORWAY_HEALTH_PORT="${DOORWAY_A_HEALTH_PORT:-8079}" \
+    DOORWAY_HEALTH_PORT="$DOORWAY_A_HEALTH_PORT" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-a" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
     API_KEY_ADMIN="${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}" \
@@ -1422,11 +1596,13 @@ EOF
       --app-port-min "$(app_port 0)" \
       --storage-url "$primary" ${extras:+--storage-urls "$extras"} \
       --bootstrap-enabled --signal-enabled > "$LOGDIR/doorway.log" 2>&1 &
+    record_mesh_pid doorway a "$!" || true
     for _ in $(seq 1 20); do
       curl -s -m 2 "http://localhost:$DOORWAY_PORT/health" >/dev/null && break; sleep 1
     done
     echo "doorway up on :$DOORWAY_PORT (bootstrap+signal enabled)"
   else
+    record_listener_pid doorway a "$DOORWAY_PORT" || true
     echo "doorway already up on :$DOORWAY_PORT"
   fi
 
@@ -1434,10 +1610,9 @@ EOF
   # signal (A owns discovery — two mem-bootstrap doorways would partition the
   # island DHT). Gives the saga's cross-doorway legs a LOCAL target instead of
   # bleeding to the live production doorway (E2E_DOORWAY_B).
-  DOORWAY_B_PORT="${DOORWAY_B_PORT:-8889}"
   if ! curl -s -m 2 "http://localhost:$DOORWAY_B_PORT/health" >/dev/null; then
     DOORWAY_ID="${DOORWAY_B_ID:-apex-elohim-host}" \
-    DOORWAY_HEALTH_PORT="${DOORWAY_B_HEALTH_PORT:-8089}" \
+    DOORWAY_HEALTH_PORT="$DOORWAY_B_HEALTH_PORT" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-b" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
     API_KEY_ADMIN="${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}" \
@@ -1454,11 +1629,13 @@ EOF
       --storage-url "http://127.0.0.1:$(http_port 1)" \
       --storage-urls "http://127.0.0.1:$(http_port 0),http://127.0.0.1:$(http_port 2)" \
       > "$LOGDIR/doorway-b.log" 2>&1 &
+    record_mesh_pid doorway b "$!" || true
     for _ in $(seq 1 20); do
       curl -s -m 2 "http://localhost:$DOORWAY_B_PORT/health" >/dev/null && break; sleep 1
     done
     echo "doorway B up on :$DOORWAY_B_PORT (apex stand-in, jessica-primary)"
   else
+    record_listener_pid doorway b "$DOORWAY_B_PORT" || true
     echo "doorway B already up on :$DOORWAY_B_PORT"
   fi
   fi
@@ -1555,6 +1732,7 @@ PYEOF
       export RUST_LOG="$MESH_RUST_LOG"
       holochain_bin_export
       setsid nohup sh -c "echo test | hc sandbox --piped -f $fports run -a -p=$rports" > .sandbox_run_log 2>&1 &
+      record_mesh_pid conductor-supervisor mesh "$!" || true
     )
     echo -n "waiting for ${#PEERS[@]} conductors to boot"
     for _ in $(seq 1 90); do
@@ -1563,7 +1741,9 @@ PYEOF
       printf "."; sleep 3
     done
     echo " up"
+    refresh_mesh_pidfiles
   else
+    refresh_mesh_pidfiles
     echo "conductors already up"
   fi
 
@@ -1604,8 +1784,10 @@ PYEOF
       ALLOW_SEED_DELEGATES_COMPUTE=1 \
       ALLOW_SEED_SHARD_MANIFEST=1 \
       nohup "$STORAGE_BIN" --http-port "$(http_port $i)" > "$LOGDIR/$name.log" 2>&1 &
+      record_mesh_pid storage "$name" "$!" || true
       echo "storage $name: http=$(http_port $i) p2p=$(p2p_port $i) transport=$(peer_transport "$name") agent=${agent:0:16}..."
     else
+      record_listener_pid storage "$name" "$(http_port "$i")" || true
       echo "storage $name already up on :$(http_port $i)"
     fi
     i=$((i+1))
@@ -1618,6 +1800,8 @@ PYEOF
     done
     [ "$ok" -ge ${#PEERS[@]} ] && break; sleep 2
   done
+
+  refresh_mesh_pidfiles
 
   echo
   status_all
