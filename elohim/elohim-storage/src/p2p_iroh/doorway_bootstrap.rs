@@ -35,6 +35,8 @@
 
 use std::time::Duration;
 
+use futures_util::StreamExt;
+
 use tracing::{debug, info, warn};
 
 use super::peer_book::IrohPeerBook;
@@ -46,6 +48,19 @@ pub const DOORWAY_URL_ENV: &str = "ELOHIM_DOORWAY_URL";
 
 /// The doorway's bounded manifest bulletin board.
 pub const MANIFESTS_PATH: &str = "/p2p/manifests";
+
+/// Hard cap on the GET body we will buffer from a doorway. The doorway serves
+/// at most `MAX_MANIFEST_ENTRIES` (64) × `MAX_MANIFEST_BODY_BYTES` (8 KiB)
+/// announcements plus JSON framing; 1 MiB is generous headroom over that. A
+/// doorway that lied, was compromised, or is malicious cannot make us buffer a
+/// multi-GB body into memory (OOM) before we ever verify a signature — we abort
+/// the read past this bound and treat it as an unreadable board (empty result).
+pub const MAX_MANIFEST_RESPONSE_BYTES: usize = 1024 * 1024;
+
+/// Hard cap on how many entries we process from one board read, mirroring the
+/// doorway's own `MAX_MANIFEST_ENTRIES`. Bounds the per-poll ed25519-verify CPU
+/// a doorway can spend on our behalf even within the byte cap.
+pub const MAX_BOOTSTRAP_ENTRIES: usize = 64;
 
 /// Timeout for one doorway round-trip. A doorway is a convenience, never a
 /// dependency — a slow one must not hold the announce tick or the joiner.
@@ -137,14 +152,62 @@ pub async fn fetch_manifests(client: &reqwest::Client, base_url: &str) -> Vec<se
         debug!(url = %url, status = %resp.status(), "doorway: manifest GET returned non-success");
         return Vec::new();
     }
-    let body: serde_json::Value = match resp.json().await {
+    // Reject an oversized body BEFORE buffering it — a Content-Length past the
+    // cap never gets read at all. `reqwest` does not bound `.json()`/`.bytes()`
+    // on its own, so an unbounded read here is a malicious-doorway OOM vector.
+    if let Some(len) = resp.content_length() {
+        if len > MAX_MANIFEST_RESPONSE_BYTES as u64 {
+            warn!(
+                url = %url, content_length = len, cap = MAX_MANIFEST_RESPONSE_BYTES,
+                "doorway: manifest GET body exceeds cap by Content-Length — refused unread"
+            );
+            return Vec::new();
+        }
+    }
+    // Stream the body with a running accumulator that aborts past the cap, so a
+    // chunked response (no Content-Length) cannot buffer past the bound either.
+    let mut buf: Vec<u8> = Vec::new();
+    let mut stream = resp.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        match chunk {
+            Ok(bytes) => {
+                if buf.len() + bytes.len() > MAX_MANIFEST_RESPONSE_BYTES {
+                    warn!(
+                        url = %url, cap = MAX_MANIFEST_RESPONSE_BYTES,
+                        "doorway: manifest GET body exceeded cap mid-stream — aborted"
+                    );
+                    return Vec::new();
+                }
+                buf.extend_from_slice(&bytes);
+            }
+            Err(e) => {
+                debug!(url = %url, error = %e, "doorway: manifest GET body read failed");
+                return Vec::new();
+            }
+        }
+    }
+    let body: serde_json::Value = match serde_json::from_slice(&buf) {
         Ok(v) => v,
         Err(e) => {
             debug!(url = %url, error = %e, "doorway: manifest GET body did not parse as JSON");
             return Vec::new();
         }
     };
-    entries_of(body)
+    cap_entries(entries_of(body), &url)
+}
+
+/// Cap entries processed per read — bounds per-poll verify CPU a doorway can
+/// spend on us even within the byte cap. Pure, so the bound is unit-testable
+/// without an HTTP round-trip.
+fn cap_entries(mut entries: Vec<serde_json::Value>, url: &str) -> Vec<serde_json::Value> {
+    if entries.len() > MAX_BOOTSTRAP_ENTRIES {
+        warn!(
+            url = %url, got = entries.len(), cap = MAX_BOOTSTRAP_ENTRIES,
+            "doorway: manifest GET returned more entries than the cap — truncated"
+        );
+        entries.truncate(MAX_BOOTSTRAP_ENTRIES);
+    }
+    entries
 }
 
 /// Pull the announcement list out of whichever envelope the doorway used.
@@ -425,6 +488,22 @@ mod tests {
         assert_eq!(entries_of(serde_json::json!({ "items": [ann] })).len(), 1);
         assert!(entries_of(serde_json::json!({ "other": 1 })).is_empty());
         assert!(entries_of(serde_json::json!(7)).is_empty());
+    }
+
+    #[test]
+    fn an_over_count_entry_list_is_truncated_to_the_cap() {
+        // A malicious doorway serving more entries than the cap cannot make us
+        // verify unbounded signatures per poll.
+        let flood: Vec<serde_json::Value> = (0..MAX_BOOTSTRAP_ENTRIES * 4)
+            .map(|_| serde_json::json!({}))
+            .collect();
+        assert_eq!(
+            cap_entries(flood, "http://test").len(),
+            MAX_BOOTSTRAP_ENTRIES
+        );
+        // A list within the cap is untouched.
+        let ok: Vec<serde_json::Value> = (0..3).map(|_| serde_json::json!({})).collect();
+        assert_eq!(cap_entries(ok, "http://test").len(), 3);
     }
 
     /// The origin reuse: storage already knows its doorway through
