@@ -251,7 +251,7 @@ restart_env_overlay() { # <captured-environ> <peer-name>
 and the call at line 789: `"$(restart_env_overlay "$envfile" "$name")"`.
 
 - [ ] **Step 5: Per-peer capability assert, launch, status, classification** — four edits:
-  - both `assert_storage_transport_capability "$bin" "$MESH_TRANSPORT_BACKEND"` inside `storage_restart` → `assert_storage_transport_capability "$bin" "$(peer_transport "$name")"`
+  - both `assert_storage_transport_capability "$bin" "$MESH_TRANSPORT_BACKEND"` inside `restart_storage` → `assert_storage_transport_capability "$bin" "$(peer_transport "$name")"`
   - launch (line 1505): `ELOHIM_TRANSPORT_BACKEND="$MESH_TRANSPORT_BACKEND" \` → `ELOHIM_TRANSPORT_BACKEND="$(peer_transport "$name")" \`, and the echo two lines below: `transport=$(peer_transport "$name")`
   - `mesh_transport_backend_from_status`: replace the final `else echo unknown` branch (the mixed case) with a per-peer listing so a deliberately mixed mesh is named, not shrugged at:
 
@@ -667,7 +667,7 @@ wipe=(sync.sled content.db content.db-shm content.db-wal graph.db blobs blobs_ir
 for f in "${wipe[@]}"; do rm -rf "${MESH_DIR:?}/$peer/$f"; done
 rlog "loss inflicted: $shape wipe of ${#wipe[@]} entries under $MESH_DIR/$peer"
 
-MESH_RESTART_APPLY_PROFILE=1 restart_storage "$peer" >/dev/null 2>&1 || rlog "storage_restart reported non-zero; polling anyway"
+MESH_RESTART_APPLY_PROFILE=1 restart_storage "$peer" >/dev/null 2>&1 || rlog "restart_storage reported non-zero; polling anyway"
 t0=$(date +%s); until curl -sf -m 2 "http://localhost:$rport/health" >/dev/null; do sleep 1; [ $(( $(date +%s) - t0 )) -gt 120 ] && { echo "$peer never served /health" >&2; exit 4; }; done
 t0=$(date +%s); polls=0; legs=""; recovered=0
 while :; do
