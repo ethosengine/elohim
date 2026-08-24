@@ -1206,7 +1206,7 @@ with a nicer address."* ✅
 
 | §2.12 concern | What it assumed | What it is under the affordance |
 |---|---|---|
-| **Continuous assessment = surveillance** | one observer, accumulating a dossier held centrally, used against you | **Witnessed, not surveilled.** The distinction is *who holds the record and whom the inference serves*. Inference on a participant's own hardware, reading their own record, emitting a claim rather than a file, with *"computation local, aggregation voluntary and anonymised"* ✅ — the dossier is a property of **central** assessment, not of continuity. Being known by one's community is the corpus's thesis, not its hazard. |
+| **Continuous assessment = surveillance** | one observer, accumulating a dossier held centrally, used against you | **Witnessed, not surveilled.** The distinction is *who holds the record and whom the inference serves*. Inference on a participant's own hardware, reading their own record, emitting a claim rather than a file, with *"computation local, aggregation voluntary and anonymised"* ✅ — the dossier is a property of **central** assessment, not of continuity. **But this answer is topological, and topology is necessary rather than sufficient — §2.14 is the real one.** |
 | **Liquidity costs certainty** | that a live assessment and a hard promise are a trade-off | **They are not.** A **fixed promise over a live pool**: the Commitment is immutable-with-supersession ✅ and binds exactly as a policy did, while the underwriting behind it is continuously current. That is strictly better than the incumbent's fixed promise over a *stale* assessment. |
 | **Adjusting is structurally adversarial** | one adjuster, paid by one side, from the same pot as the recovery | **De-structuralised.** Adversariality was a property of *shareholder* capital and a single paid assessor. With the claimant's agent, the pool's agent, and neighbours' agents each reading a shared record, disagreement becomes an ordinary resolvable difference rather than a built-in opposition. Not eliminated — *not structural*. |
 | **The lawyer must not dissolve** | that the appeal requires a profession | **I conflated the appeal with a role.** An appeal needs a *differently-situated reader with standing to disagree* — which under this affordance is **abundant rather than rationed**. The appeal does not shrink; it becomes ubiquitous. |
@@ -1250,6 +1250,82 @@ respected rather than out-computed. The affordance and the refusal point the sam
    to somewhere central. That is a local, answerable question and **nothing in the tree asks it.** A
    provenance-and-update-path attestation on the advising agent is the natural shape, and it is a
    far smaller thing than a diversity metric. ⚠
+
+### 2.14 The Observer: witness and surveillance are the same instrument
+
+§2.13 answered the surveillance objection **topologically** — local inference, own hardware, own
+record, aggregation voluntary. That answer is true and it is not the heart of it, because a
+sufficiently well-run panopticon is also decentralised. **The difference between surveillance and
+witness is not where the computation runs. It is what the watcher is for.**
+
+**The same act, twice.** A stranger records your habits so that a party you will never meet can price
+you more accurately. A neighbour notices you have not been out in three weeks, and comes over. Both
+are sustained attention to a particular life. Both involve memory. The information can be identical.
+**One is surveillance and one is love**, and nothing in the data distinguishes them — only the
+relationship the attention sits inside.
+
+**The corpus's own vocabulary already chose, and the choice was not decorative.** The measurement
+primitive is a **witnessed** event, never an observed one, and the definition carries its relational
+condition in plain sight: *"the attesters have something at stake in it being true."* ✅ That is not a
+data-quality clause. It is a **relationship** clause. A witness is someone the witnessed has a claim
+on. A surveillant is someone they do not.
+
+**So "faithful" and "faithless" are not moods, and this is the part that makes the distinction usable
+rather than pious. They are wiring, and wiring is checkable.**
+
+| Question | Faithful (witness) | Faithless (surveillance) |
+|---|---|---|
+| Whom does the Observer serve? | the one it observes | a party assessing them |
+| What does the observation produce? | **care** | **a price** |
+| Can the observed see, contest, and correct it? | yes, and appeal it | no, or only after harm |
+| Is it reciprocal? | they witness too | attention runs one way |
+| Can they leave? | yes, keeping the floor | leaving costs them their standing |
+
+**And the corpus fails this test today, in one specific and repairable place.**
+`community_connectedness_score` is documented as *"Support network quality"*, assembled from Observer
+attestations (`content_store_integrity/src/lib.rs:1513`). ✅ Trace what consumes it: it feeds
+`risk_score`, which feeds `risk_tier`. **Nothing else reads it.** There is no outreach trigger, no
+check-in, no isolation alert anywhere in the zome. ✅
+
+Which means that **as the tree stands, a person becoming isolated produces a worse risk tier and does
+not produce anyone showing up.** Same field, same attestations, same Observer — wired to a price
+instead of to care. That is the faithless application, and it is not hypothetical or future; it is
+what shipped.
+
+**The repair is not to delete the score.** Deleting it makes the isolation invisible, which is
+strictly worse and is exactly the attenuation §2.9 exists to refuse. **The repair is a second
+consumer** — an observation of thinning support that reaches the people who could do something about
+it, before and independently of anything it implies about premium. One wire, and the same instrument
+changes register entirely.
+
+**Which is Mishpat, precisely and not metaphorically.** Justice here is **restored capability**, and
+**punishment is not a category** (§1). An observation that produces only a price is a verdict rendered
+on a person; an observation that produces care is restoration. **The Observer is either a Mishpat
+instrument or a credit bureau, and what decides it is what it is wired to.**
+
+**And *imago dei* is why the faithful version is available at all.** Surveillance treats a person as
+an object to be predicted. Witness treats them as a subject to be known. That difference is only
+coherent if dignity is **conferred rather than earned or asserted** — the corpus's identity floor,
+and the reason the sibling refuses the self-proprietorship floor it otherwise inherits from Tucker
+and Carson. It is also why *"belonging is never gated; only reach is"* ✅ is load-bearing here: **a
+witness can never cost someone their place.** An observation that can cost you your standing has
+already become the other thing, whatever anyone intended.
+
+**The discipline that keeps all of this from becoming an excuse.** Naming the faithful application is
+not a claim to possess it. *"We do it with love"* is what every extractive institution says about its
+data practice, and this corpus has **no automatic immunity** — the wiring above is the proof, since
+the faithless version is the one that actually got built, by people who meant well and simply wired
+the obvious consumer first. **Faithfulness is a claim on us, not a property we have.** The reason to
+write the test as a table is so that betrayal is *detectable* rather than deniable, and the reason to
+state the failure with a line number is that a corpus which cannot convict itself here has already
+answered the question.
+
+**What happens in right-relationship changes everything — and it is a design question, not a
+sentiment.** Every instrument in §2.9–2.13 is dual-use in exactly this way: the un-attenuated record
+is either the thing that lets a community know its people or the richest dossier ever assembled; the
+ever-present assessor is either counsel or a permanent examiner; the priced membrane is either
+redistribution or a toll. **None of them is decided by the architecture.** They are decided by whom
+each one serves, and that is the one question this paper cannot settle in code. ⚠
 
 ---
 
@@ -1665,6 +1741,7 @@ decomposition) · `measure-family-borrows-backlog` **row 21** (the Cantillon det
 | 2, 4 — never-rules as floor/ceiling lenses; the five-knob `rule` schema | [commons-holonic-stewardship-backlog](epr:commons-holonic-stewardship-backlog) | A currency circuit as `author-lens` with `role` ∈ {lens, floor, ceiling}. **p2p-design-gate: zero new DHT entry types, zero new commitment actions.** Carries N1–N8 verbatim. |
 | 3 — the three-function decomposition | [commons-holonic-stewardship-backlog](epr:commons-holonic-stewardship-backlog) | Three `role`-typed lenses rather than one currency: MoE (`telos`: circulation; carry cost/stock limit legitimate), SoV (`telos`: preservation across time; **accretion refused** — growth-by-holding is unearned increment and therefore common inheritance per Stance I.4), UoA (`telos`: commensuration for a *stated* scope). Gate: the accretion limit must be stated as a `role: ceiling` lens, and the prudence-vs-accumulation judgment must be **excluded** from the mechanical floor. Sibling of Take 2's never-rules; **zero new entry types.** |
 | 5 — the Cantillon detector | [measure-family-borrows-backlog](epr:measure-family-borrows-backlog) | A Measure family composing with [middot](epr:middot-measure-primitive-design): issuance joined to first-recipient standing and to lag-until-first-settled-reciprocity. Sibling of A5's issuance-vs-settled-reciprocity ratio; **closes trap-detectors §9 item 1 for A5.** |
+| **13 — the second consumer (faithful Observer)** ⚠ *proposed 2026-08-24, NOT yet minted* | [commons-holonic-stewardship-backlog](epr:commons-holonic-stewardship-backlog) | A care-producing consumer of `community_connectedness_score`, so that thinning support reaches people who can act **before and independently of** anything it implies about premium (`content_store_integrity/src/lib.rs:1513`). Today the score feeds `risk_score` → `risk_tier` and nothing else, which is §2.14's faithless wiring, shipped. **Not a new entry type — a second reader of an existing field.** |
 | **12 — advising-agent provenance (A6)** ⚠ *proposed 2026-08-24, NOT yet minted* | [measure-family-borrows-backlog](epr:measure-family-borrows-backlog) | An attestation an advising elohim makes **about itself**: where its weights came from, who controls its update path, and whether it resolves anything to a central endpoint. §2.13 establishes that diversity is the substrate's resting state and **centralisation is the detectable deviation** — so this is deliberately *not* a diversity metric across a population, which may not be well-posed. It is the local, answerable question, and it is the natural home for trap A6. |
 | **11 — decision-quality attribution (H5)** ⚠ *proposed 2026-08-24, NOT yet minted* | [measure-family-borrows-backlog](epr:measure-family-borrows-backlog) | A Measure family joining a **pricing or underwriting decision** to the losses that settle after its author has changed scope, so standing cannot be earned on a signal that has not settled. N5's *lag-until-first-settled-reciprocity* redirect, applied to **standing** rather than to units. Sibling of Take 5's Cantillon detector; closes the gap §2.10 names against `MemberRiskProfile`, which scores members and not judgment. |
 | 10 — Fureai Kippu cross-region transfer | [measure-family-borrows-backlog](epr:measure-family-borrows-backlog) | The N7 boundary test as a study row, not a borrow: does a care unit that crosses a locality retain its meaning, and what did the Japanese case actually do about it? |
@@ -1678,6 +1755,13 @@ rather than to a cluster:
   `responsibility_demand_configs.rs:143`) — `approve >= 0` with `eligibility_predicate: None`. Gates
   every council claim in both papers.
 - **The accidental numéraire** (`concentration_service.rs:47`) — Take 6.
+- **The faithless Observer wiring** (`content_store_integrity/src/lib.rs:1513`) — §2.14.
+  `community_connectedness_score` ("Support network quality", from Observer attestations) feeds
+  `risk_score` → `risk_tier` and **nothing else**: no outreach, no check-in, no isolation alert
+  anywhere in the zome. A person becoming isolated produces a worse tier and does not produce anyone
+  showing up. Repair is a **second consumer**, not deletion — deleting the score makes the isolation
+  invisible, which is worse. Operator decision, because it is the corpus's own values test failing on
+  shipped code rather than a research take.
 - **The `"uninsurable"` risk tier** (`content_store_integrity/src/lib.rs:1538`) — §2.10, framed in
   §2.12. A shipped entry type that can price anyone honestly and still exclude them, in a corpus
   whose justice is restored capability and whose test is *those who have been at the bottom of every
