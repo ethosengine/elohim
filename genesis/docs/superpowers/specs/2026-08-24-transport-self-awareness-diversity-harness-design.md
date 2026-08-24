@@ -27,7 +27,7 @@ cites:
   - elohim/elohim-storage/src/p2p_iroh/peer_book.rs
   - elohim/elohim-storage/src/p2p/blob_fetch.rs
   - elohim/elohim-storage/src/sync/doc_store.rs
-  - "swarm-curve-and-blind-custody-design | The swarm curve and blind custody | sha256:ef23b30ec9b8145c | path: genesis/docs/superpowers/specs/2026-08-23-swarm-curve-and-blind-custody-design.md"
+  - "swarm-curve-and-blind-custody-design | the sharded-distribution speedup claim the fanout family (§3.3) measures directly — time_to_recover vs survivor count; a flat curve is a finding against that design | sha256:ef23b30ec9b8145c | path: genesis/docs/superpowers/specs/2026-08-23-swarm-curve-and-blind-custody-design.md"
   - "iroh-libp2p-complementarity | the canonical selector this spec composes INSIDE: peer_map::select_transport rules 1/3 become the eligible set, Track3/NoShared stay verbatim, rule-2 iroh preference survives as the Unknown prior; its anti-capture clause is answered by the exploration floor | sha256:29235aeb35aff128 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md"
   - genesis/docs/superpowers/plans/2026-06-14-dataplane-transport-plan.md
   - elohim/elohim-storage/src/p2p_iroh/peer_map.rs
