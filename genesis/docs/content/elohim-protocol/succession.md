@@ -162,7 +162,7 @@ The **Wirtschaftsring** was founded in Switzerland in 1934 by two businessmen wo
 
 Two facts about it are usually reported apart and belong together.
 
-**It is counter-cyclical.** Stodder's empirical work on Swiss data has found WIR turnover moving *against* GDP: when the franc economy contracts and commercial credit withdraws, WIR volume rises. That is the strongest evidence in existence for the claim that a second, differently-behaved medium of exchange is a stabiliser rather than a curiosity.
+**It is counter-cyclical.** James Stodder's empirical work on Swiss data has found WIR turnover moving *against* GDP: when the franc economy contracts and commercial credit withdraws, WIR volume rises. That is the strongest evidence in existence for the claim that a second, differently-behaved medium of exchange is a stabiliser rather than a curiosity.
 
 **And it paid for it.** WIR took a Swiss banking licence in 1936 and **dropped Gesell's demurrage in 1948**. It survived by becoming a regulated cooperative bank doing unglamorous work — assessing members, taking collateral, filing liens in Swiss courts when someone defaulted. The Gesellian mechanism turned out to be the part that could be discarded. The *institutional apparatus* was the part that could not.
 
@@ -235,7 +235,7 @@ Five of the six rows are **coordination costs on physical, relational, and care 
 
 That is the whole problem, and it is one problem, not six.
 
-**Sardex is the proof by construction.** Founded in Sardinia in 2009, thousands of member businesses, zero interest, assessed credit limits. What distinguishes it from the ledger-only imitations is that it employs **human brokers who actively match trades and vet members**, and practitioners describe the brokerage — not the ledger — as the product. Anyone can write the smart contract in an afternoon. Nobody can afford the brokers.
+**Sardex is the proof by construction.** Founded in Sardinia in 2009, thousands of member businesses, zero interest, assessed credit limits. What distinguishes it from the projects that built the ledger and could not fund the brokerage is that it employs **human brokers who actively match trades and vet members**, and practitioners describe the brokerage — not the ledger — as the product. Anyone can write the smart contract in an afternoon. Nobody can afford the brokers.
 
 **So the question of whether the mutualist tradition was wrong or merely early is a question about the price of coordination — and for the first time it is a live question.**
 
@@ -340,15 +340,9 @@ That completes Proudhon's weapon rather than replacing it. Build until the scarc
 
 ### 5.7 The datacenter occasion: the enclosure, and why the anger is correct
 
-A reader in 2026 has probably watched this fight in their own county, and it is worth saying plainly
-that their instinct is right, and right for the reasons this document has been building toward.
+A reader in 2026 has probably watched this fight in their own county, and it is worth saying plainly that their instinct is right, and right for the reasons this document has been building toward.
 
-The scale is no longer marginal. In the first quarter of 2026, seventy-five major datacenter projects
-worth more than $130 billion were delayed or cancelled, in significant part because of organised local
-opposition. More than three hundred cities, towns and counties have passed bans or moratoriums. On the
-eighteenth of July there were a hundred and forty-two protests across forty-two states in a single
-day. A June poll found roughly a third of Americans approve of the pace of construction, and fourteen
-per cent are comfortable with one being built near them.
+The scale is no longer marginal. In the first quarter of 2026, seventy-five major datacenter projects worth more than $130 billion were delayed or cancelled, in significant part because of organised local opposition. More than three hundred cities, towns and counties have passed bans or moratoriums. On the eighteenth of July there were a hundred and forty-two protests across forty-two states in a single day. A June poll found roughly a third of Americans approve of the pace of construction, and fourteen per cent are comfortable with one being built near them.
 
 The stated grievances are real — noise, water, land, air — but the one doing most of the work is
 **the bill**. Wholesale power on the largest US grid rose seventy-six per cent year over year in the
@@ -366,19 +360,9 @@ deal that abates the taxes, socialises the interconnection cost, and privatises 
 market transaction that some people happen to dislike. It is **the unearned increment being captured,
 by exactly the mechanism §3.2 describes**, with the ordinary rate-payer holding the residual.
 
-And it is worse than that, because of what the facility is *for*. An intelligence trained on the
-aggregated written and spoken record of humanity is drawn from a commons that no lab created and no
-lab could have created alone. Metered by the token, it becomes **rent on a resource its owner did not
-make** — the most consequential enclosure of the age, and the one this corpus already names as such.
-The datacenter is that enclosure given a physical address, a substation, and a county tax abatement:
-the theft of the commons, sited on the commons, billed to the commons.
+And it is worse than that, because of what the facility is *for*. An intelligence trained on the aggregated written and spoken record of humanity is drawn from a commons that no lab created and no lab could have created alone. Metered by the token, it becomes **rent on a resource its owner did not make** — the most consequential enclosure of the age, and the one this corpus already names as such. The datacenter is that enclosure given a physical address, a substation, and a county tax abatement: the theft of the commons, sited on the commons, billed to the commons.
 
-So the anger is not irrational, and it is not NIMBYism wearing a green coat. **It is an accurate read
-of a rent relationship, arriving through the one channel that was left open** — the zoning hearing,
-because that is where an ordinary person is finally allowed to say no to something. One recent
-analysis put it precisely: the bottleneck on that $130 billion is not chips, land or power. **It is
-consent.** That is a coordination failure of exactly the shape §4 describes, and it is what a
-legitimacy deficit looks like when it finally reaches a balance sheet.
+So the anger is not irrational, and it is not NIMBYism wearing a green coat. **It is an accurate read of a rent relationship, arriving through the one channel that was left open** — the zoning hearing, because that is where an ordinary person is finally allowed to say no to something. One recent analysis put it precisely: the bottleneck on that $130 billion is not chips, land or power. **It is consent.** That is a coordination failure of exactly the shape §4 describes, and it is what a legitimacy deficit looks like when it finally reaches a balance sheet.
 
 **Note what this does to §6, because the symmetry is the point.** Liability absorption works because a
 municipality under fiscal stress will book a genuine reduction in what it owes. The datacenter deal is
@@ -410,136 +394,33 @@ wait for it to save you.
 
 ### 5.8 The judo: an enclosure racing its own abundance
 
-§5.7 leaves the reader where most accounts of the datacenter fight leave them — with an accurate
-grievance and no leverage. This section is why the grievance has more leverage than it looks, and it
-returns the document to Proudhon.
+§5.7 ends by refusing a comfortable hope and insisting that capture-resistance be structural rather than wished for. This section is the structural answer, and it returns the document to Proudhon.
 
-**Recall the mechanism from §3.1.** Capital's power is a function of capital's *scarcity*. Build
-enough of a thing and owning one confers no leverage over anyone. The counter-move, when abundance
-threatens the yield, is to restrict supply.
+**Recall the mechanism from §3.1.** Capital's power is a function of capital's *scarcity*. Build enough of a thing and owning one confers no leverage over anyone. The counter-move, when abundance threatens the yield, is to restrict supply. Now apply it to inference. **A per-token business model is a bet that the capability stays scarce.** The capital expenditure only earns back if access can be metered, and access can only be metered while running the model requires something an ordinary person does not have. That is not a defensible moat against a supply curve; it is a race against one — and the racing party does not control the track.
 
-Now apply it to inference. **A per-token business model is a bet that the capability stays scarce.**
-The capital expenditure only earns back if access can be metered, and access can only be metered while
-running the model requires something an ordinary person does not have. That is not a defensible moat
-against a supply curve; it is a race against one — and the racing party does not control the track,
-because open weights, quantisation, and commodity accelerators are supply-side forces no lab
-administers.
+**The precedent is close, and it is not the one usually cited.** The instructive failure of the telecom era was not a website with no revenue. It was **Enron Broadband** — a serious attempt to build a *market in metered bandwidth*, complete with a twenty-year exclusive video-on-demand contract on which roughly a hundred and ten million dollars of future profit was booked before the service had meaningfully shipped, and which was cancelled within months. The venture died because the thing it proposed to meter was about to become abundant.
 
-**The precedent is exact, and it is not the one usually cited.** The instructive failure of the
-telecom era was not a website with no revenue. It was **Enron Broadband** — a serious attempt to build
-a *market in metered bandwidth*, complete with a twenty-year exclusive video-on-demand contract on
-which roughly a hundred and ten million dollars of future profit was booked before the service had
-meaningfully shipped, and which was cancelled within months. The venture died because the thing it
-proposed to meter was about to become abundant. Bandwidth scarcity was the entire premise, and the
-glut dissolved it. *A business model premised on metering a resource whose marginal cost is falling
-toward zero does not get out-competed. It evaporates.*
+**And it is worth being precise about *why* bandwidth became abundant, because the mechanism is the rest of this section.** The glut was not simply that too much cable had been buried. A strand of fibre is a **passive medium** — capacity is set almost entirely by the transponders at either end, not by the glass in the ground. Those endpoints are silicon, and silicon halves in cost and doubles in capability on a clock nobody has to negotiate. So the same buried strand carried more and more traffic for decades without anyone re-opening a trench: a fibre lit at a couple of gigabits in the late nineties now carries many terabits, on the same glass, because the optics at the ends kept improving. Thomas Friedman's reading is the right one — the overbuild was *the gift that kept on giving*, and it kept giving precisely because the expensive immovable half was decoupled from the cheap, fast-improving half. (There is an eventual physical ceiling in the glass; the industry is only now approaching it, decades after the trenches were dug.) That decoupling is why Enron's bet was doomed rather than merely early: you cannot meter a resource whose supply is governed by the improvement rate of commodity endpoints.
 
-**And it is worth being precise about *why* bandwidth became abundant, because the mechanism is the
-whole of this section.** The glut was not simply that too much cable had been buried. It was that a
-strand of fiber is a **passive medium** — the capacity is set almost entirely by the transponders at
-either end, not by the glass in the ground. Those endpoints are silicon, and silicon halves in cost
-and doubles in capability on a clock nobody has to negotiate. So the same buried strand carried more
-and more traffic for decades without anyone re-opening a trench: a fibre lit at a couple of gigabits
-in the late nineties now carries many terabits, on the same glass, because the optics at the ends kept
-improving. Friedman's reading is the right one — the overbuild was *the gift that kept on giving*, and
-it kept giving precisely because the expensive immovable half was decoupled from the cheap, fast-
-improving half. (There is an eventual physical ceiling in the glass; the industry is only now
-approaching it, decades after the trenches were dug.)
+**Now look at a datacenter with that structure in hand, because it has the same two halves.** The **durable half** is the substation, the interconnect queue position, the transmission upgrade, the water and cooling, the shell, the land, the fibre to the site — permitting-bound and genuinely hard to replicate. The **fast-turning half** is the accelerators, which depreciate on the order of tens of per cent a year.
 
-**That decoupling is the load-bearing structure, and it is why Enron's bet was doomed rather than
-merely early.** You cannot meter a resource whose supply is governed by the improvement rate of
-commodity endpoints. The endpoints will win, because they are cheap, because they are many, and
-because no one administers their improvement.
+It is tempting to read that depreciation as the disanalogy — rails and fibre lasted, GPUs do not. **That reading is wrong, and it inverts the argument.** The transponders depreciated too. That was not a defect in the fibre story; it was *the engine of it*. Endpoint silicon is supposed to turn over, and its turning over is exactly how the immovable half gains value. So the right conclusion is the opposite of the tempting one: **a compute buildout leaves behind the expensive permitted half, paid for by someone else, waiting for a cheaper generation of endpoints.** Note where that lands the current fight. What communities are being asked to subsidise — grid interconnect, substations, water — **is the trench.** What the capital is being burned on is the transponder.
 
-The current figures rhyme uncomfortably. Global AI datacenter investment is running past six hundred
-billion dollars, with the largest hyperscalers alone targeting something in the region of six to seven
-hundred billion in a single year — an infrastructure commitment on the order of five per cent of US
-GDP, several times the fiber overbuild at its peak. Combined hyperscaler capital expenditure now
-consumes something close to the whole of operating cash flow after dividends and buybacks, which
-leaves very little cushion if revenue-grade demand grows more slowly than capacity. At the height of
-the fiber build, capacity grew at roughly twice the rate of traffic. Meanwhile capable open-weight
-models run today on consumer hardware at a substantial fraction of frontier quality, with the gap on
-most tasks measured in months rather than years, and the honest exception being complex reasoning.
+**Three real differences remain, and they matter.** Fibre's durable half had almost no operating cost once lit; a datacenter's dominant ongoing cost is **power**, so the inheritance arrives with a bill attached, and that bill is the thing driving the ratepayer revolt. Accelerators are a far larger share of total project cost than transponders ever were of a fibre build, so the recurring silicon call bites harder against the durable half's value. And rising accelerator density pushes *back* on that durable half, forcing electrical and cooling re-upgrades in a way better optics never forced anyone to re-dig a trench. The inheritance is real; it is not free, and it is not automatic.
 
-**Now look at a datacenter with that structure in hand, because it has the same two halves.** The
-**durable half** is the substation, the interconnect queue position, the transmission upgrade, the
-water and cooling, the shell, the land, the fibre to the site — permitting-bound, decade-lived, and
-genuinely hard to replicate. The **fast-turning half** is the accelerators, which depreciate on the
-order of tens of per cent a year.
+**And so the judo — and notice it is one force, not two.** The endpoint dynamic that made the fibre overbuild a gift is the same dynamic that killed metered bandwidth. Cheap, fast-improving endpoints raise the value of the trench *and* dissolve the premise of charging by the bit. They are not opposing tendencies; they are one tendency seen from the owner's side and the commons' side. The Elohim Protocol's design wants inference *abundant*: every claim in §5 gets stronger as the marginal cost of a capable local reader falls, and nothing in it depends on anyone's ability to meter a token. **The event that would destroy the metered business model is the same event that makes this one solvent** — and the same event that would leave the substations behind. That is not a prediction that a bust arrives, and this document takes no position on when. It is a statement about which way each design faces when it does. Enron did not lose to a competitor. It lost to the transponder.
 
-It is tempting to read that depreciation as the disanalogy — rails and fibre lasted, GPUs do not — and
-the first draft of this document did. **That reading is wrong, and it inverts the argument.** The
-transponders depreciated too. That was not a defect in the fibre story; it was *the engine of it*.
-Endpoint silicon is supposed to turn over, and its turning over is exactly how the immovable half
-gains value. The right conclusion is the opposite of the tempting one: **a compute buildout leaves
-behind the expensive permitted half, paid for by someone else, waiting for a cheaper generation of
-endpoints — which is the fibre pattern precisely.**
+**Which is why the fibre material here is not, strictly, an analogy.** Fibre capacity, transistor density and the falling cost of inference are one family of exponentials — each a doubling in what a dollar buys of a switching operation, a bit moved or a gate flipped or a multiply performed. The precedent is therefore the same economics recurring in a new medium, which is a sturdier thing to reason from than a resemblance. Three seams keep that honest: density scaling proper slowed years ago and the exponential continued by other routes, so the engine has been replaced more than once; the fall in inference cost is at least as much *algorithmic* as hardware, arguably a faster curve riding the first; and fibre's own curve is bending as it nears the ceiling in the glass. Same family, not the same equation.
 
-Note where that lands the current fight. What communities are being asked to subsidise — grid
-interconnect, substations, water — **is the trench.** What the capital is being burned on is the
-transponder.
+**But here is why it belongs in a document about Proudhon.** His diagnosis needed a force that makes capital abundant *faster than money can withdraw from it* — and he had none. Every mutualist after him inherited the same hole: abundance was something you had to *build*, laboriously, against owners who could always stop financing it (§3.1). Other learning curves have cheapened whole classes of capital before, and a historian could name several. What distinguishes this one, for this argument, is the combination the tradition never had available: **it arrives on a schedule, without anyone's permission, and against the immediate interest of the people financing it — so it cannot be struck against.** That is the missing term, and it is the honest answer to *why now*, when the same designs failed for a century and a half.
 
-**Three real disanalogies remain, and they matter.** Fibre's durable half had almost no operating
-cost once lit; a datacenter's dominant ongoing cost is **power**, so the inheritance arrives with a
-bill attached, and that bill is the thing driving the ratepayer revolt. Fibre scaled on the *same*
-glass with new endpoints, whereas compute capacity requires *buying* new accelerators each cycle —
-the shell and the substation are reusable, the silicon is a recurring capital call. And rising
-accelerator density pushes *back* on the durable half, forcing electrical and cooling re-upgrades in a
-way better transponders never forced anyone to re-dig a trench. The inheritance is real; it is not
-free, and it is not automatic.
+A curve is not a promise. Every exponential in history was a sigmoid seen early, and the falsification below is the form that caution takes here rather than a hedge appended to a hope.
 
-**And so the judo — and notice it is one force, not two.** The endpoint dynamic that made the fibre
-overbuild a gift is the same dynamic that killed metered bandwidth. Cheap, fast-improving endpoints
-raise the value of the trench *and* dissolve the premise of charging by the bit. They are not
-opposing tendencies; they are one tendency seen from the owner's side and the commons' side.
+**One historical rhyme, with its refutation attached.** What inherited the telecom bust were the firms whose models *needed* bandwidth cheap rather than dear — the search company whose economics improved as connectivity commoditised, the retailer that nearly died in the crash and later turned its own overbuilt infrastructure into a substrate others could rent. The pattern is real: **what inherits a bust is whatever wanted the resource abundant.** The comparison also flatters us, and in three ways worth naming rather than eliding — survivorship bias (a hundred firms died for the two that lived, and reasoning from the survivors is the error this document's own discipline warns against), capitalisation (they had staff, revenue and investors; this is one developer with a full-time job funding tooling out of pocket, and §9.3 says how little exists), and agency (neither *positioned* itself for a crash; the tidy story is written backwards from the outcome).
 
-Run it forward. **The thing that would put capable inference on hardware an ordinary household owns is
-the same thing that would strand a metered business model** — better endpoint silicon, cheaper, in
-more hands, improving on a clock nobody administers. Enron did not lose to a competitor. It lost to
-the transponder.
+So the claim is deliberately weaker than the analogy invites, and it is about a *design class* rather than about this project. **A substrate that becomes more viable as inference commoditises is positioned to inherit a compute glut; one that meters tokens is positioned to be destroyed by it.** That is true of anyone who builds this way, which is the only form of the claim consistent with a commons owned by no one. We would rather be one of many than the survivor.
 
-The Elohim Protocol's design wants inference *abundant*. Every claim in §4 gets stronger as the
-marginal cost of a capable local reader falls; nothing in it depends on anyone's ability to meter a
-token. **The event that would destroy the metered business model is the same event that makes this
-one solvent** — and it is the same event that would leave the substations behind. That is not a
-prediction that the bust arrives, and this document takes no position on when. It is a statement
-about which way each design faces when it does.
-
-Which is also the answer to the reader — and there will be many — who dismisses this project because
-of *how the capability came to be*. That objection is correct about the origin and wrong about the
-inference. §9.4 concedes the debt without flinching: this argument runs on something built at
-hyperscale without the consent of the people whose record trained it. But **the intelligence is
-already leaking out of those buildings**, in open weights and commodity hardware, and the only live
-question is what catches it. A substrate that lets a household hold its own data, run its own reader,
-and coordinate with its neighbours without renting any of it is the form that capability takes when it
-stops being someone's rent. To refuse it *because* of its parentage is to leave the escape route
-unbuilt and the enclosure unopposed — and the enclosure is not waiting.
-
-**One more historical rhyme, offered with its own refutation attached.** The firms that inherited the
-telecom bust were the ones whose models *needed* bandwidth cheap rather than dear: the search company
-whose economics improved as connectivity commoditised, and the retailer that nearly died in the crash
-and later turned its own overbuilt infrastructure into a substrate other people could rent. The
-structural point is real — **what inherits a bust is whatever wanted the resource abundant.**
-
-But the comparison flatters us in three ways that must be said out loud. **Survivorship bias**: for
-every firm that inherited, a hundred died, and reasoning from the two that lived is precisely the
-error this corpus's own trap discipline warns against. **Capitalisation**: those firms had staff,
-revenue, and investors; this project is one developer with a full-time job funding tooling out of
-pocket, and §9.3 says how little of the economic layer exists. **Agency**: neither firm *positioned*
-itself for a crash — one nearly died in it, the other was barely a business when it began — so the
-tidy story is written backwards from the outcome.
-
-So the claim is deliberately weaker than the analogy invites, and it is a claim about a *design class*
-rather than about this project. **A substrate that becomes more viable as inference commoditises is
-positioned to inherit a compute glut; one that meters tokens is positioned to be destroyed by it.**
-That is true of anyone who builds this way, which is the only form of the claim consistent with a
-commons owned by no one. We would rather be one of many than the survivor.
-
-**What would falsify it.** If capable inference stays concentrated — if the frontier gap widens
-rather than narrows, if capability that matters proves inseparable from scale nobody can own, or if
-the metered model turns out to have a real moat in reasoning rather than a temporary lead — then this
-section is wrong, the rent relationship is durable, and §5.7's anger has no structural exit behind it.
-That is a checkable claim on a five-year horizon, and it should be checked rather than assumed.
+**What would falsify it.** If capable inference stays concentrated — if the frontier gap widens rather than narrows, if capability that matters proves inseparable from scale nobody can own, or if the metered model turns out to have a real moat in reasoning rather than a temporary lead — then this section is wrong, the rent relationship is durable, and §5.7's anger has no structural exit behind it. That is a checkable claim on a five-year horizon, and it should be checked rather than assumed.
 
 ## 6. Succession at institutional scale: liability absorption
 
@@ -667,7 +548,7 @@ It is the same defect §3.7 finds in George and Gesell, reproduced inside our ow
 
 Said plainly, because §1's claim is a hypothesis and the reader deserves to know how little stands behind it.
 
-There is no unit of account in this system, no issuance policy, and no settlement that has ever executed. Mutual credit has **zero implementation**. A recognition-token layer does exist in the codebase — balances, mints, decay — but it is never anchored to the shared tamper-evident layer, has no consumers anywhere, and contradicts Stance I.2's refusal of tokens in the crate's own documentation; its disposition is an open decision, and the audit behind §12 records unresolved defects in it. Interoperation with the wider commons-accounting ecosystem is a stub. The governance layer that would let a community's declared policy actually *bind* anything is designed and not shipped, which means a policy can be authored and read but not enacted. Worse, the path by which a council's approval would become binding is capturable by a single write — so **every "the council decides" sentence in this document is contingent on a fix we have not made.**
+There is no unit of account in this system, no issuance policy, and no settlement that has ever executed. Mutual credit has **zero implementation**. A recognition-token layer does exist in the codebase — balances, mints, decay — but it is never anchored to the shared tamper-evident layer, has no consumers anywhere, and contradicts Stance I.2's refusal of tokens in its own accompanying documentation; its disposition is an open decision, and the audit behind §12 records unresolved defects in it. Interoperation with the wider commons-accounting ecosystem exists in name only. The governance layer that would let a community's declared policy actually *bind* anything is designed and not shipped, which means a policy can be authored and read but not enacted. Worse, the path by which a council's approval would become binding can be seized by a single unchecked edit — so **every "the council decides" sentence in this document is contingent on a fix we have not made.**
 
 Most consequentially, under this project's own rule that work is what moves a measurable commitment from red to green with evidence: **there is no economic commitment in the register at all, and not one economics or governance scenario is bound to a check.** The layer this document theorises has, by construction, no proof.
 
@@ -675,36 +556,17 @@ That is the honest state. It is the reason §11's first limit is stated the way 
 
 *(The engineering evidence behind this section — file paths, line numbers, the security defects, and the audit that produced them — lives in the evidence bridge named in §12, which is where it belongs and where it can be checked.)*
 
----
-
 ### 9.4 This argument runs on a capability we did not pay for
 
-§5.7 says the datacenter is enclosure. §5.2 says a cheap, capable local reader is what makes every
-design in the lineage solvent. Both are true at once, and the second is only available because of the
-first.
+§5.7 says the datacenter is enclosure. §5.2 says a cheap, capable local reader is what makes every design in the lineage solvent. Both are true at once, and the second is only available because of the first.
 
-The capability this whole document rests on was built at hyperscale — trained on the aggregated record
-of people who were not asked, powered by grids whose costs were substantially socialised, sited in
-counties that were paid to accept the facility. **We did not pay the true cost of the thing we are
-arguing from, and neither has anyone else.** A project that opened by telling a reader they had been
-conditioned away from noticing a rent relationship does not get to be coy about standing inside one.
+The capability this whole document rests on was built at hyperscale — trained on the aggregated record of people who were not asked, powered by grids whose costs were substantially socialised, sited in counties that were paid to accept the facility. **We did not pay the true cost of the thing we are arguing from, and neither has anyone else.** A project that opened by telling a reader they had been conditioned away from noticing a rent relationship does not get to be coy about standing inside one.
 
 Two things follow, and neither is absolution.
 
-The first is that this is an argument about **deployment geometry**, not about clean hands. The same
-weights, on hardware a household owns, governed by a community that can fork them and read their
-corpus, are a different economic object from the same weights metered by the token out of a facility a
-county was subsidised to host. That difference is the whole claim. It does not retroactively consent
-anyone's training data.
+The first is that this is an argument about **deployment geometry**, not about clean hands. The same weights, on hardware a household owns, governed by a community that can fork them and read their corpus, are a different economic object from the same weights metered by the token out of a facility a county was subsidised to host. That difference is the whole claim. It does not retroactively consent anyone's training data.
 
-The second is a debt, and it should be named as one rather than resolved. §5.8 argues that the
-capability is leaking out of those buildings regardless, and that a substrate wanting inference
-abundant is what catches it — but *leaking out* is not the same as *paid for*, and the argument in
-§5.8 is a reason to build the escape route, never an absolution for the road that got us here. If intelligence drawn from a
-commons is owed back to that commons, then everything built on it — this document included — carries
-an obligation it has not discharged. We can say what discharging it would look like: the capability
-running on machines the powerful do not own, primed by people they cannot surveil, governed by
-communities they cannot acquire. We cannot say we have done it.
+The second is a debt, and it should be named as one rather than resolved. §5.8 argues that the capability is leaking out of those buildings regardless, and that a substrate wanting inference abundant is what catches it — but *leaking out* is not the same as *paid for*, and the argument in §5.8 is a reason to build the escape route, never an absolution for the road that got us here. If intelligence drawn from a commons is owed back to that commons, then everything built on it — this document included — carries an obligation it has not discharged. We can say what discharging it would look like: the capability running on machines the powerful do not own, primed by people they cannot surveil, governed by communities they cannot acquire. We cannot say we have done it.
 
 ## 10. What we refuse in advance
 
@@ -744,7 +606,9 @@ The synthesis it arrives at was named before the document existed: **Carson plus
 - [`./constitution.md`](./constitution.md) — the law that operationalizes the vision.
 - [`./confession.md`](./confession.md) and [`./theology.md`](./theology.md) — the theology beneath it, stated plainly and argued as disputation.
 - [`./glossary.md`](./glossary.md) — the recurring terms.
+- [`../../architecture/justice-manifesto.md`](../../architecture/justice-manifesto.md) — justice as restored capability, and why punishment is not a category here.
+- [`../../architecture/stewardship-over-sovereignty.md`](../../architecture/stewardship-over-sovereignty.md) — the foundational refusal §7 leans on: no apex that answers to nothing.
 
-**The companion argument.** This document deliberately defers every question about the unit of account: what a currency is inside this network, whether it decays, who issues it, and what the posture toward state money actually is. Those are answered in a sibling research paper, *The Monetary Posture* (`genesis/research/`), which takes the same argument down to the medium-of-exchange/store-of-value tension and the tax gate. Its short answer, for readers who want it now: the protocol has no currency and will not have one; what it has is a policy surface on which a community declares its own, and the posture toward state money is not escape but **selective legibility** — maximally legible where a state's concerns are legitimate, structurally uncapturable where its instincts are acquisitive.
+**The companion argument.** This document deliberately defers every question about the unit of account: what a currency is inside this network, whether it decays, who issues it, and what the posture toward state money actually is. Those are answered in a sibling research paper, *The Monetary Posture*, which takes the same argument down to the medium-of-exchange/store-of-value tension and the tax gate. Its short answer, for readers who want it now: the protocol has no currency and will not have one; what it has is a policy surface on which a community declares its own, and the posture toward state money is not escape but **selective legibility** — maximally legible where a state's concerns are legitimate, structurally uncapturable where its instincts are acquisitive.
 
-**The evidence bridge.** Everything this document asserts about its own confidence and its own build state is backed, with sources and line numbers, by a companion research note — *Succession Without Conquest: evidence bridge* in `genesis/research/`. It carries the confidence behind each claim (including the two readings that are recalled rather than re-read), the file-by-file audit behind §9.3, the exact quotes behind §9.1 and §9.2, the legal analysis this document deliberately does not publish, and the work this argument generated. It exists so that this document can be read as an argument and still be checked as a claim. It sits alongside this project's comparative political-economy studies — a reading program and its successor, *Trap Detectors*, both in `genesis/research/` — whose discipline of *the detector reports, the council decides* §5.3 adopts wholesale, and whose analysis of the Argentine barter collapse informs §7(c).
+**The evidence bridge.** Everything this document asserts about its own confidence and its own build state is backed, with sources and line numbers, by a companion research note, *Succession Without Conquest: evidence bridge*. It carries the confidence behind each claim (including the two readings that are recalled rather than re-read), the file-by-file audit behind §9.3, the exact quotes behind §9.1 and §9.2, the legal analysis this document deliberately does not publish, and the work this argument generated. It exists so that this document can be read as an argument and still be checked as a claim. It sits alongside this project's comparative political-economy studies — a reading program and its successor, *Trap Detectors* — whose discipline of *the detector reports, the council decides* §5.3 adopts wholesale, and whose analysis of the Argentine barter collapse informs §7(c).

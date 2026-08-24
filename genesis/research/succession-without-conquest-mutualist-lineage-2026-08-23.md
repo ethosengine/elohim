@@ -30,7 +30,7 @@ to week — §2.7 records where a prior audit has already gone stale.
 software vision. **This document is not a second copy of it.** It carries what a canon companion
 structurally cannot, and nothing else:
 
-- the **grading** behind each load-bearing claim, including the two that are ⚠ (§1);
+- the **grading** behind each load-bearing claim, including every ⚠ mark — of which §1.1's two lineage readings remain the most load-bearing (§1);
 - the **`file:line` adjudication against current build-state** that canon §9.3 compresses into one
   honest paragraph (§2);
 - the **internal-corpus findings** — the exact quotes, the contradictions, and the legal exposure —
@@ -54,12 +54,16 @@ was moved here** — only apparatus and evidence, enumerated in §4.
 
 | Canon section | Backed here |
 |---|---|
+| §2 the manifesto's open question | §2.2 the locator for canon's "elsewhere in the project" quote |
 | §3 the lineage (Proudhon → Lietaer) | §1 grading, including the two ⚠ readings |
+| §5.1 witnessed event · §5.2 the organ · §5.3 detector-reports | §7.5 credit (claim-attachment, Beer/VSM, the detector discipline) |
+| §5.6 which abundance | §1.2 the generational-transfer grading and Galloway provenance · §7.2 notes 2–3 |
+| §9.4 the hyperscale-capability debt | §4 the added-in-canon record · §7.2 note 4 |
 | §3.7 the blunt-instrument claim, §5.5 discernment | §7.2 the operator steering notes that generated them |
 | §7 the legal question | §3.3–§3.5 the EAE contradiction, the shield layers, the securities exposure |
 | §9.1 the coercion contradiction | §3.1 locators + recommendation |
 | §9.2 the allocation table | §3.2 locators + recommendation |
-| §5.7 the datacenter occasion · §5.8 the judo | §1.2 grading of the 2026 figures and the bust analogies (◐, verify before reuse) |
+| §5.7 the datacenter occasion · §5.8 the judo | §1.2 grading of the figures, the bust analogies and the same-curve claims (◐/⚠) · §4 the additions record · §7.2 notes 4–6 |
 | §9.3 the economic layer, so far mostly unbuilt | §2 in its entirety, with `file:line` |
 | §10 what we refuse | §5 Leave, with reasons |
 | §11 honest limits | §1.1 and §7.3 |
@@ -121,25 +125,19 @@ combined hyperscaler capex consuming ~94% of operating cash flow after dividends
 capacity growing ~2× traffic at the 1990s peak · GPU depreciation at roughly 20–40% annually with
 ~50% residual after three years · open-weight models at ~70–85% of frontier quality on consumer
 hardware, trailing by months on most tasks with complex reasoning the standing exception.
-**Verify before reuse**, and note that the *disanalogy* (GPUs depreciate; rails and fiber did not)
-came from the same sources and is stated in canon precisely because it cuts against our own argument.
+**Verify before reuse.** Note that these depreciation figures no longer support a disanalogy reading —
+the correction immediately below inverts it.
 
-**A correction the operator supplied, recorded because it reversed a claim.** The first draft of
-§5.8 read GPU depreciation as a *disanalogy* to fibre — rails and fibre lasted, accelerators do not,
-so the inheritance is weaker. That was wrong, and the operator's correction inverts it. Fibre was
-"the gift that kept on giving" not because glass is durable but because a strand is a **passive
-medium**: capacity is set by the transponders at either end, and those endpoints are silicon on a
-Moore's-law clock. The same buried strand carried orders of magnitude more traffic for decades
-without re-trenching. **The transponders depreciated too — that was the engine, not a defect.** A
-datacenter has the identical two-part structure (durable permitted siting and power; fast-turning
-accelerators), so depreciation is the *same pattern in the same place*, and the right conclusion is
-the opposite of the tempting one: a buildout leaves the expensive permitted half behind, waiting for
-cheaper endpoints. It also unified the section on **one force rather than two** — the endpoint
-dynamic that makes the trench valuable is the dynamic that dissolves metering, which is why *Enron
-did not lose to a competitor; it lost to the transponder.* Canon §5.8 now carries three *genuine*
-disanalogies in its place (power as an operating cost fibre did not have; compute requiring recurring
-silicon capital rather than scaling on the same medium; rising density forcing re-upgrades of the
-durable half). Provenance: Friedman's lecture, via the operator.
+**A correction the operator supplied, recorded because it reversed a claim.** The first draft of §5.8
+read GPU depreciation as a *disanalogy* to fibre — rails and fibre lasted, accelerators do not, so the
+inheritance is weaker. That was wrong. The operator's correction (Friedman's lecture) established the
+opposite: fibre's gift came from **decoupling**, not durability — a strand is a passive medium whose
+capacity is set by endpoint silicon — so **the transponders depreciating was the engine, not a
+defect**, and a datacenter's two halves are the same structure. Canon §5.8 carries the mechanism and
+the inverted conclusion, unifies the section on **one force rather than two**, and replaces the false
+disanalogy with three genuine ones (power as opex; accelerators a far larger share of project cost
+than transponders were of a fibre build; density forcing re-upgrades of the durable half). Those three
+are ◐ and carry the same verify-before-reuse gate as the figures above.
 
 **The historical claims in §5.8 are ◐ and recalled rather than researched this pass** — Enron
 Broadband's bandwidth-trading venture and the Blockbuster video-on-demand contract (~$110m of future
@@ -481,12 +479,14 @@ already implements the enforcement shape canon §8's invariant needs. What moved
 | Outputs / the mint pass | §6 | A research-close ritual with no meaning to a canon reader. |
 | Method note (eight readers, cluster names) | §7 | Canon §12 keeps provenance and drops workflow. |
 | The EAE legal analysis and securities exposure | §3.4 | Canon should not publish a legal critique of a sibling document at `reach: commons`. |
-| Exact security endpoint paths | §2.6 | Canon §9.3 says "one endpoint currently accepts unauthenticated writes" without the route. |
+| Exact security endpoint paths | §2.6 | Canon §9.3 says only that "the audit named in §12 records unresolved defects" in the token layer — no endpoint, no route, no defect class. |
 
 **Added in canon, not present here:** an expanded orientation section defining the working vocabulary;
 a new opening addressed to a reader arriving with a formed politics (both responses to blind-reader
 BLOCKERs, §7.4); **§5.7 on the datacenter backlash as the live instance of the enclosure this document
-is about**, with the negative-absorption symmetry it forces onto §6; and **§9.4, the disclosure that
+is about**, with the negative-absorption symmetry it forces onto §6; **§5.8, the largest single
+addition — the fibre/transponder recurrence (not analogy), the *why now* term Proudhon lacked, and a
+five-year falsification condition**; and **§9.4, the disclosure that
 the argument runs on a capability built at hyperscale without the consent of the people whose record
 trained it or the rate-payers who underwrote the power.** The last is the sharpest thing canon says
 against itself, and it belongs there rather than here — a self-indictment quarantined in a research
@@ -630,21 +630,23 @@ Six, each recorded because the argument in it is the operator's.
    negative-absorption symmetry with §6, and the refusal in §5.7's last paragraph to rely on a system
    defecting against its own training — *capture-resistance has to be structural, or it is not
    resistance.*
-5. **The judo, the bust, and the positioning.** That the protocol is the *judo move* of the
-   enclosure — a graceful exit for grandma's data from surveillance capitalism, the datacenter, and
-   extractive attention-politics in one move; that it is being built from the intelligence already
-   leaking out of those datacenters, so the AI-opposed reader should weigh it on its form rather than
-   dismiss it for its parentage; that it is a **hedge on what happens to all that compute if the
-   bubble collapses** (the railroad depressions, and Friedman on the fiber overbuild); and — the
-   sharpest part — a **theory of how the bubble pops that is not merely financial speculation**: the
-   marginal cost of the metered resource falling toward zero, as bandwidth did (feat. Enron
-   Broadband), applied to good-enough inference on PC-scale hardware. Closing frame: *Google and
-   Amazon were to the dot-com bust what this protocol positions itself to be to an AI capex crash.*
-   → canon §5.8. The author's additions holding it inside canon discipline: the GPU-depreciation
-   disanalogy (what survives is the substations, not the silicon), the three ways the Google/Amazon
-   comparison flatters us (survivorship bias, capitalisation, agency), the reduction of the claim
-   from *this project* to a **design class** — anyone whose model wants inference abundant is
-   positioned to inherit — and an explicit falsification condition on a five-year horizon.
+5. **The judo, the bust, and the positioning.** That the protocol is the *judo move* of the enclosure —
+   a graceful exit for grandma's data from surveillance capitalism, the datacenter, and extractive
+   attention-politics at once; that it is built from intelligence already leaking out of those
+   datacenters, so an AI-opposed reader should weigh its form rather than dismiss its parentage; that
+   it hedges what happens to the compute if the bubble collapses; and a **theory of how the bubble
+   pops that is not merely financial** — the marginal cost of the metered resource falling toward
+   zero, as bandwidth did (Enron Broadband), applied to good-enough local inference. Closing frame:
+   *Google and Amazon were to the dot-com bust what this protocol positions itself to be to an AI
+   capex crash.* → canon §5.8. Author's discipline additions: the three flatteries in that comparison
+   (survivorship, capitalisation, agency), the reduction from *this project* to a **design class**,
+   and the five-year falsification condition. **A later note the same day** added that fibre capacity,
+   inference and Moore's law are *poetically the same curve* — which demotes the fibre material from
+   analogy to **recurrence of one mechanism**, and supplies the *why now* the document had been
+   missing. Author's additions there: the three seams, the refusal to name or quantify optical laws
+   canon does not need, the sigmoid caution, and the downgrade of "first force in economic history"
+   to a claim about what *this tradition* lacked (§1.2 records why).
+
 6. **The audience.** The document is the entry point for the reader who arrives *as a jaded adult*
    rather than as a child — anarchists, socialists, capitalists, Georgists, libertarians, economists
    with a strong classical sense of the world, conditioned away from ever thinking about monetary
@@ -667,7 +669,10 @@ the served population and the Trueque dying because *nobody could see* how many 
 on its rule that *"local authorship is not a defense against legibility harm. It changes who
 administers it."* ✅
 
-**Limit 4 is §1.1**, and it is the one most likely to matter: two ⚠ readings are load-bearing.
+**Limit 4 is §1.1**, and it is the one most likely to matter: two ⚠ readings are load-bearing. **Canon
+now carries a fifth limit** covering §5.7–§5.8's dated figures as recalled-not-re-audited; the evidence
+for it is §1.2, which also adds two further ⚠ items — the same-curve claim as physics, and the *why
+now* synthesis.
 
 ### 7.4 The adversarial passes, and what they corrected
 
