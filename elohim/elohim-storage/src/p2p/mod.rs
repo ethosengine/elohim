@@ -9422,7 +9422,9 @@ impl P2PNode {
         let connected_peers = swarm.connected_peers().count();
         let listen_addresses: Vec<String> = swarm.listeners().map(|a| a.to_string()).collect();
         let bootstrap_nodes: Vec<String> = self.config.bootstrap_nodes.clone();
-        let sync_documents = self.sync_manager.count_documents("_all").await.unwrap_or(0) as usize;
+        // Whole-store count. `count_documents("_all")` scanned the literal
+        // "_all:" prefix and read 0 forever (2026-08-24, 5,356 docs on the fleet).
+        let sync_documents = self.sync_manager.count_all().await.unwrap_or(0) as usize;
         let nat_status = self.nat_status.read().await.clone();
         let relay_reservations = self
             .relay_reservations

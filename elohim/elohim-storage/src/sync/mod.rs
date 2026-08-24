@@ -281,6 +281,13 @@ impl SyncManager {
     pub async fn count_documents(&self, h_app_id: &str) -> Result<u64, StorageError> {
         self.doc_store.count(h_app_id).await
     }
+
+    /// Every document in the store, across all namespaces. This is what a
+    /// "how many sync documents does this peer hold" status field means;
+    /// `count_documents` answers the per-app question.
+    pub async fn count_all(&self) -> Result<u64, StorageError> {
+        self.doc_store.count_all().await
+    }
 }
 
 #[cfg(test)]
@@ -362,6 +369,36 @@ mod tests {
         peer.apply_changes(ns, doc, vec![delta]).await.unwrap();
         assert_eq!(peer.get_doc_field(ns, doc, "title").await.unwrap(), "v2");
         assert_eq!(peer.get_heads(ns, doc).await.unwrap(), vec![head]);
+    }
+
+    /// `/p2p/status.syncDocuments` read 0 on a store holding 5,356 docs
+    /// (fleet, 2026-08-24) because `count_documents("_all")` scanned the key
+    /// prefix `"_all:"` while every doc lives under `"elohim:"`. The status
+    /// projection must count the whole store, and a namespace count must
+    /// stay namespace-scoped — both pinned here so neither drifts again.
+    #[tokio::test]
+    async fn count_all_counts_every_namespace_and_count_documents_stays_scoped() {
+        let (sync, _tmp) = test_sync_manager().await;
+        for (ns, doc) in [
+            ("elohim", "node:a"),
+            ("elohim", "node:b"),
+            ("other", "node:c"),
+        ] {
+            let mut d = Automerge::new();
+            d.transact::<_, _, automerge::AutomergeError>(|tx| {
+                tx.put(automerge::ROOT, "title", doc)?;
+                Ok(())
+            })
+            .unwrap();
+            sync.apply_changes(ns, doc, vec![d.save()]).await.unwrap();
+        }
+        assert_eq!(sync.count_all().await.unwrap(), 3, "whole store");
+        assert_eq!(sync.count_documents("elohim").await.unwrap(), 2, "scoped");
+        assert_eq!(
+            sync.count_documents("_all").await.unwrap(),
+            0,
+            "\"_all\" is a namespace name, not a wildcard — this is the bug's shape"
+        );
     }
 
     /// Every "cannot serve this change" case is `Ok(None)`, never an error: the
