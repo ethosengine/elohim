@@ -84,7 +84,10 @@ class RecoveryTimeline(unittest.TestCase):
         self.assertIn("split-libp2p-iroh", rendered)
         self.assertIn("| 300 | — | alive | P0,P1,P2 |", rendered)
 
-    def test_before_after_exposes_reliability_performance_spread_and_leg_delta(self):
+    def test_before_after_exposes_reliability_performance_spread_and_leg_delta_per_shape(self):
+        # A warm-scenario improvement must render on its own row from the cold
+        # row for the same scenario, so a cold regression can never hide
+        # behind a warm gain (spec: one line per scenario x shape).
         before = [
             record("homo-dual", "warm", True, 10, legs=("P1",)),
             record("homo-dual", "cold", True, 30, legs=("P2",), run="2"),
@@ -98,7 +101,25 @@ class RecoveryTimeline(unittest.TestCase):
 
         rendered = timeline.render_comparison(before, after)
 
-        self.assertIn("| homo-dual | 2/3 | 3/3 | +33.3 | 20 | 10 | -10 | 20 | 4 | -16 | P1 | P3 |", rendered)
+        self.assertIn(
+            "| homo-dual | warm | 1/1 | 1/1 | 0 | 10 | 8 | -2 | 0 | 0 | 0 | P1 | P2 |",
+            rendered,
+        )
+        self.assertIn(
+            "| homo-dual | cold | 1/2 | 2/2 | +50 | 30 | 11 | -19 | 0 | 2 | +2 | P1,P2 | P3 |",
+            rendered,
+        )
+
+    def test_before_after_scenario_shape_only_on_after_side_renders_dashes(self):
+        before: list[dict] = []
+        after = [record("homo-iroh", "cold", True, 5)]
+
+        rendered = timeline.render_comparison(before, after)
+
+        self.assertIn(
+            "| homo-iroh | cold | — | 1/1 | — | — | 5 | — | — | 0 | — | — | — |",
+            rendered,
+        )
 
     def test_cli_table_reads_jsonl(self):
         with tempfile.TemporaryDirectory() as directory:

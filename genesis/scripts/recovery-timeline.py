@@ -207,13 +207,6 @@ def render_table(records: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def scenario_groups(records: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
-    groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for record in records:
-        groups[scenario_of(record)].append(record)
-    return groups
-
-
 def delta(after: float | int | None, before: float | int | None) -> float | int | None:
     if after is None or before is None:
         return None
@@ -227,15 +220,15 @@ def fmt_recovery(summary: dict[str, Any]) -> str:
 
 
 def render_comparison(before: list[dict[str, Any]], after: list[dict[str, Any]]) -> str:
-    before_groups = scenario_groups(before)
-    after_groups = scenario_groups(after)
+    before_groups = grouped(before)
+    after_groups = grouped(after)
     lines = [
-        "| scenario | recovered before | after | reliability Δ pp | median before s | after s | median Δ s | spread before s | after s | spread Δ s | failing legs removed | added |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|",
+        "| scenario | shape | recovered before | after | reliability Δ pp | median before s | after s | median Δ s | spread before s | after s | spread Δ s | failing legs removed | added |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|",
     ]
-    for scenario in sorted(set(before_groups) | set(after_groups)):
-        old = summarize(before_groups.get(scenario, []))
-        new = summarize(after_groups.get(scenario, []))
+    for scenario, shape in sorted(set(before_groups) | set(after_groups)):
+        old = summarize(before_groups.get((scenario, shape), []))
+        new = summarize(after_groups.get((scenario, shape), []))
         rate_delta = delta(new["recovery_rate"], old["recovery_rate"])
         rate_points = rate_delta * 100 if rate_delta is not None else None
         removed = old["failing_legs"] - new["failing_legs"]
@@ -246,6 +239,7 @@ def render_comparison(before: list[dict[str, Any]], after: list[dict[str, Any]])
                 cell(value)
                 for value in (
                     scenario,
+                    shape,
                     fmt_recovery(old),
                     fmt_recovery(new),
                     fmt_number(rate_points, signed=True),
