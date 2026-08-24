@@ -6360,9 +6360,18 @@ impl P2PNode {
                 // carry the request, which is what `max sub-streams reached`
                 // is — earns the doc one re-queue inside this round; every other
                 // failure is an answer of sorts and waits for the next round.
-                if let Some((fetch_peer, fetch_doc_id, fetch_h_app_id)) =
-                    self.sync_fetch_inflight.lock().await.remove(&request_id)
-                {
+                //
+                // BIND THE REMOVAL FIRST. A `self.…lock().await.remove(..)` used
+                // directly as an `if let` SCRUTINEE keeps its `MutexGuard` alive
+                // for the whole body (edition 2021 temporary scope), and the
+                // body's `settle_sync_fetch` -> `pump_sync_fetch_window` re-takes
+                // THIS mutex to record the next request — a non-reentrant
+                // `tokio::sync::Mutex`, so the swarm event loop would deadlock
+                // outright the moment a round has more divergent docs than the
+                // window, which is the only case this change exists for. Same
+                // bind-then-match idiom as the `doc_list_cursors` reclaim above.
+                let settled = self.sync_fetch_inflight.lock().await.remove(&request_id);
+                if let Some((fetch_peer, fetch_doc_id, fetch_h_app_id)) = settled {
                     let outcome = match &error {
                         request_response::OutboundFailure::Io(_) => sync_round::SettleOutcome::Io,
                         _ => sync_round::SettleOutcome::Other,
@@ -7912,13 +7921,19 @@ impl P2PNode {
         h_app_id: &str,
         outcome: sync_round::SettleOutcome,
     ) {
-        {
+        // Count what the metric NAMES: an actual re-queue. An `Io` settle does
+        // not always produce one — the doc may have spent its single per-round
+        // re-queue already, or the window may have been retired at a round
+        // boundary (no entry, nothing settled). Incrementing on the OUTCOME
+        // instead of on the effect published io-settles under a re-queue name.
+        let requeued = {
             let mut windows = self.sync_fetch_windows.lock().await;
-            if let Some(window) = windows.get_mut(&peer) {
-                window.settle(doc_id, outcome);
+            match windows.get_mut(&peer) {
+                Some(window) => window.settle(doc_id, outcome),
+                None => false,
             }
-        }
-        if outcome == sync_round::SettleOutcome::Io {
+        };
+        if requeued {
             crate::metrics::inc_sync_fetch_window_requeued();
         }
         self.pump_sync_fetch_window(peer, h_app_id).await;
@@ -7942,9 +7957,14 @@ impl P2PNode {
         // leaked on an early return would close the window for the rest of the
         // round. An `Error` body is a real answer, just not a useful one — it
         // settles as `Other`, which frees the slot without a retry.
-        if let Some((fetch_peer, fetch_doc_id, fetch_h_app_id)) =
-            self.sync_fetch_inflight.lock().await.remove(&request_id)
-        {
+        //
+        // The removal is BOUND, never used as the `if let` scrutinee directly:
+        // a scrutinee temporary holds its `MutexGuard` across the whole body,
+        // and the body re-takes this same non-reentrant mutex through
+        // `settle_sync_fetch` -> `pump_sync_fetch_window`. That is a swarm-loop
+        // self-deadlock, not a slow path. (Same idiom as `page_offset` above.)
+        let settled = self.sync_fetch_inflight.lock().await.remove(&request_id);
+        if let Some((fetch_peer, fetch_doc_id, fetch_h_app_id)) = settled {
             let outcome = match &response {
                 SyncResponse::Error { .. } => sync_round::SettleOutcome::Other,
                 _ => sync_round::SettleOutcome::Ok,
@@ -8903,19 +8923,15 @@ impl P2PNode {
         let peers: Vec<PeerId> = swarm.connected_peers().cloned().collect();
         drop(swarm);
 
-        if peers.is_empty() {
-            debug!("Sync round: no connected peers, skipping");
-            return;
-        }
-
-        info!(peer_count = peers.len(), "Initiating sync round");
-        crate::metrics::inc_sync_round();
-
-        // Report, then retire, the previous round's fetch windows. A window is
-        // per-peer per-round: whatever it did not reach is re-enumerated by the
-        // round starting now, so carrying it forward would double-ask. The debug
-        // line is the round's honest cost — enqueued vs issued vs re-queued vs
-        // the tail it never got to.
+        // Report, then retire, the previous round's fetch windows — BEFORE the
+        // no-peers early return. A window is per-peer per-round: whatever it did
+        // not reach is re-enumerated by the round starting now, so carrying it
+        // forward would double-ask. Retiring below the early return would leave
+        // a disconnected peer's stale window and its in-flight entries resident
+        // for as long as the mesh has no peers, so the round after a reconnect
+        // would open with `in_flight` already charged against a window whose
+        // requests can never settle. The debug line is the round's honest cost —
+        // enqueued vs issued vs re-queued vs the tail it never got to.
         {
             let mut windows = self.sync_fetch_windows.lock().await;
             for (window_peer, window) in windows.iter() {
@@ -8930,6 +8946,14 @@ impl P2PNode {
             windows.clear();
         }
         self.sync_fetch_inflight.lock().await.clear();
+
+        if peers.is_empty() {
+            debug!("Sync round: no connected peers, skipping");
+            return;
+        }
+
+        info!(peer_count = peers.len(), "Initiating sync round");
+        crate::metrics::inc_sync_round();
 
         // Single source of truth for the sync-partition namespace: the producer
         // (`sync::projector::project_content_doc`) writes docs under this same

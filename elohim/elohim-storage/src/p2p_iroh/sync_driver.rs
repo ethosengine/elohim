@@ -132,7 +132,9 @@ async fn sync_peer(
                 // left to sync; free the slot rather than stalling the window.
                 None => SettleOutcome::Other,
             };
-            window.settle(&doc_id, outcome);
+            // The re-queue effect is deliberately ignored here: this plane
+            // never settles `Io` (see above), so `settle` can only return false.
+            let _ = window.settle(&doc_id, outcome);
         }
         debug_assert!(
             window.drained(),

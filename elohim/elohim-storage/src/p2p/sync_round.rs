@@ -287,12 +287,22 @@ impl FetchWindow {
 
     /// Release the slot an issued request held, re-queueing the doc once if the
     /// transport refused to carry it.
-    pub fn settle(&mut self, doc_id: &str, outcome: SettleOutcome) {
+    ///
+    /// Returns `true` **only when a re-queue actually happened** — not merely
+    /// when the outcome was `Io`. A doc that has already spent its single
+    /// per-round re-queue settles `Io` again and returns `false`. Callers
+    /// publishing a re-queue metric must key off this return value, or the
+    /// series counts io-settles under a re-queue name.
+    #[must_use = "the return value says whether a re-queue actually happened; \
+                  a re-queue metric keyed off the OUTCOME instead over-counts"]
+    pub fn settle(&mut self, doc_id: &str, outcome: SettleOutcome) -> bool {
         self.in_flight = self.in_flight.saturating_sub(1);
         if outcome == SettleOutcome::Io && self.requeued_once.insert(doc_id.to_string()) {
             self.pending.push_back(doc_id.to_string());
             self.requeued_total += 1;
+            return true;
         }
+        false
     }
 
     /// Requests currently occupying a window slot.
@@ -471,7 +481,7 @@ mod tests {
         assert_eq!(w.next_doc().as_deref(), Some("a"));
         assert_eq!(w.next_doc().as_deref(), Some("b"));
         assert!(w.next_doc().is_none());
-        w.settle("a", SettleOutcome::Ok);
+        let _ = w.settle("a", SettleOutcome::Ok);
         assert_eq!(w.in_flight(), 1);
         assert_eq!(w.next_doc().as_deref(), Some("c"));
         assert!(w.next_doc().is_none());
@@ -482,7 +492,7 @@ mod tests {
         let mut w = FetchWindow::new(1);
         w.enqueue("a");
         assert_eq!(w.next_doc().as_deref(), Some("a"));
-        w.settle("a", SettleOutcome::Other);
+        let _ = w.settle("a", SettleOutcome::Other);
         assert_eq!(w.in_flight(), 0);
         assert_eq!(w.pending(), 0, "a non-io failure is not retried this round");
         assert_eq!(w.requeued(), 0);
@@ -499,12 +509,12 @@ mod tests {
         w.enqueue("a");
         assert_eq!(w.next_doc().as_deref(), Some("a"));
 
-        w.settle("a", SettleOutcome::Io);
+        let _ = w.settle("a", SettleOutcome::Io);
         assert_eq!(w.pending(), 1, "an io failure earns one retry");
         assert_eq!(w.requeued(), 1);
 
         assert_eq!(w.next_doc().as_deref(), Some("a"));
-        w.settle("a", SettleOutcome::Io);
+        let _ = w.settle("a", SettleOutcome::Io);
         assert_eq!(
             w.pending(),
             0,
@@ -526,7 +536,7 @@ mod tests {
         assert!(!w.drained(), "a pending doc is not drained");
         assert_eq!(w.next_doc().as_deref(), Some("a"));
         assert!(!w.drained(), "an in-flight doc is not drained");
-        w.settle("a", SettleOutcome::Ok);
+        let _ = w.settle("a", SettleOutcome::Ok);
         assert!(w.drained());
     }
 
@@ -539,7 +549,7 @@ mod tests {
         w.enqueue("b");
         assert_eq!(w.next_doc().as_deref(), Some("a"));
         assert!(w.next_doc().is_none(), "window 1 never has two in flight");
-        w.settle("a", SettleOutcome::Ok);
+        let _ = w.settle("a", SettleOutcome::Ok);
         assert_eq!(w.next_doc().as_deref(), Some("b"));
         assert!(w.next_doc().is_none());
     }
@@ -559,6 +569,77 @@ mod tests {
             w.next_doc().is_some(),
             "a zero window must still hand out work, never deadlock the plane"
         );
+    }
+
+    /// The path `P2PNode::pump_sync_fetch_window` takes after every settle: a
+    /// freed slot with work still queued MUST hand out the next doc. If this
+    /// ever returned `None` the round would stall at `window` documents and the
+    /// bound would be strictly worse than the unbounded fan-out it replaced.
+    #[test]
+    fn a_settle_with_pending_work_hands_out_the_next_doc() {
+        let mut w = FetchWindow::new(2);
+        for i in 0..5 {
+            w.enqueue(format!("doc-{i}"));
+        }
+        let first = w.next_doc().expect("first");
+        let _second = w.next_doc().expect("second");
+        assert!(w.next_doc().is_none(), "window full");
+
+        let requeued = w.settle(&first, SettleOutcome::Ok);
+        assert!(!requeued, "an Ok settle never re-queues");
+        assert_eq!(
+            w.next_doc().as_deref(),
+            Some("doc-2"),
+            "a freed slot with pending work must hand out the next doc"
+        );
+    }
+
+    /// A re-queued doc goes to the BACK of the queue, never the front: docs
+    /// already waiting were enumerated first and a refused doc must not
+    /// jump ahead of them (and must not be retried instantly against a
+    /// transport that just refused it).
+    #[test]
+    fn a_requeued_doc_returns_behind_the_docs_already_queued() {
+        let mut w = FetchWindow::new(2);
+        w.enqueue("a");
+        w.enqueue("b");
+        w.enqueue("c");
+        assert_eq!(w.next_doc().as_deref(), Some("a"));
+        assert_eq!(w.next_doc().as_deref(), Some("b"));
+
+        assert!(
+            w.settle("a", SettleOutcome::Io),
+            "the first io failure re-queues"
+        );
+        // "c" was queued before "a" came back, so "c" goes first.
+        assert_eq!(w.next_doc().as_deref(), Some("c"));
+        let _ = w.settle("b", SettleOutcome::Ok);
+        assert_eq!(
+            w.next_doc().as_deref(),
+            Some("a"),
+            "the re-queued doc is last"
+        );
+        assert!(w.next_doc().is_none());
+    }
+
+    /// The metric contract: `settle` reports the EFFECT, not the outcome. A
+    /// second io on the same doc frees the slot but re-queues nothing, so a
+    /// caller keyed off `SettleOutcome::Io` would over-count.
+    #[test]
+    fn settle_reports_the_requeue_effect_not_the_outcome() {
+        let mut w = FetchWindow::new(1);
+        w.enqueue("a");
+        assert_eq!(w.next_doc().as_deref(), Some("a"));
+        assert!(w.settle("a", SettleOutcome::Io), "first io re-queues");
+
+        assert_eq!(w.next_doc().as_deref(), Some("a"));
+        assert!(
+            !w.settle("a", SettleOutcome::Io),
+            "a second io on the same doc is still Io but re-queues NOTHING"
+        );
+        assert!(!w.settle("a", SettleOutcome::Ok));
+        assert!(!w.settle("a", SettleOutcome::Other));
+        assert_eq!(w.requeued(), 1);
     }
 
     /// `Config::sync_fetch_window`'s default is a literal 32 (config.rs cannot
@@ -582,7 +663,7 @@ mod tests {
         }
         let a = w.next_doc().expect("first");
         let _b = w.next_doc().expect("second");
-        w.settle(&a, SettleOutcome::Io);
+        let _ = w.settle(&a, SettleOutcome::Io);
         assert_eq!(w.enqueued(), 4);
         assert_eq!(w.issued(), 2);
         assert_eq!(w.requeued(), 1);
