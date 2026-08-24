@@ -502,7 +502,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Modify: `justfile` (`mesh` recipe, line 203–210: add `recovery`)
 
 **Interfaces:**
-- Consumes (sourced from `hc-mesh.sh`): `PEERS`, `http_port <idx>`, `storage_pid_for_port <port>`, `storage_restart <peer>` (the function behind `storage-restart`), `peer_transport <name>`, `MESH_DIR`, `DOORWAY_PORT`, `DOORWAY_B_PORT`.
+- Consumes (sourced from `hc-mesh.sh`): `PEERS`, `http_port <idx>`, `storage_pid_for_port <port>`, `restart_storage <peer>` (the function behind the `storage-restart` verb, hc-mesh.sh:678), `peer_transport <name>`, `MESH_DIR`, `DOORWAY_PORT`, `DOORWAY_B_PORT`.
 - Produces: `recovery_snapshot <survivor-port> > <file>` (JSON: `{"docs":N,"content":N,"rows":[{"id":..,"blobHash":..},…]}`); `recovery_predicate <snapshot-file> <recovering-port>` → prints `P0=<0|1> P1=<0|1> P2=<0|1> P3=<0|1> P4=<0|1>` and returns 0 iff all 1; `receipt_max <peer-log> <since-epoch>` → max `recv_validation_receipt_received elapsed_s` since the epoch; one line per poll `recovery[<ts>]: PASS|FAIL <legs> — elapsed Ns`; final `RECOVERED in Ns` or `NOT-RECOVERED after Ns (<failing legs>)`; one JSON record appended to `$MESH_DIR/recovery-timeline.jsonl` with keys `ts, shape, peer, survivor, transport_survivor, transport_recovering, recovered (bool), time_to_recover_s, polls, failing_legs, labels, conductor_receipt_max_s {recovering, survivor}`.
 
 - [ ] **Step 1: Write the failing test** — `app/elohim-app/scripts/__tests__/hc-mesh-recovery.test.sh` (tests the pure functions against a fake HTTP server; no mesh needed):
@@ -667,7 +667,7 @@ wipe=(sync.sled content.db content.db-shm content.db-wal graph.db blobs blobs_ir
 for f in "${wipe[@]}"; do rm -rf "${MESH_DIR:?}/$peer/$f"; done
 rlog "loss inflicted: $shape wipe of ${#wipe[@]} entries under $MESH_DIR/$peer"
 
-MESH_RESTART_APPLY_PROFILE=1 storage_restart "$peer" >/dev/null 2>&1 || rlog "storage_restart reported non-zero; polling anyway"
+MESH_RESTART_APPLY_PROFILE=1 restart_storage "$peer" >/dev/null 2>&1 || rlog "storage_restart reported non-zero; polling anyway"
 t0=$(date +%s); until curl -sf -m 2 "http://localhost:$rport/health" >/dev/null; do sleep 1; [ $(( $(date +%s) - t0 )) -gt 120 ] && { echo "$peer never served /health" >&2; exit 4; }; done
 t0=$(date +%s); polls=0; legs=""; recovered=0
 while :; do
