@@ -45,6 +45,7 @@ cache alongside genesis/a2o/reports/, not a source of truth.
     quiesce-timeline.py --build 1374
     quiesce-timeline.py --builds 1366-1374        # the series
     quiesce-timeline.py --build 1374 --record     # append to the local series
+    quiesce-timeline.py --local gate.log --label scenario=smoke
     quiesce-timeline.py --series                  # read back what's recorded
 
 Jenkins reads are anonymous (OIDC-protected instance allows GET on console text).
@@ -116,7 +117,14 @@ def age_phrase(stamp: str) -> str | None:
     return f"{mins // 1440}d ago"
 
 
-def parse_quiesce(build: int, text: str, build_result: str | None = None) -> dict | None:
+def parse_quiesce(
+    build: int | None,
+    text: str,
+    build_result: str | None = None,
+    *,
+    source: str = "fleet",
+    labels: dict | None = None,
+) -> dict | None:
     """THE shared parser. One console body -> one honest record, or None.
 
     Importable: `.claude/scripts/ci-harvest.py` calls this so the gate's log
@@ -178,6 +186,8 @@ def parse_quiesce(build: int, text: str, build_result: str | None = None) -> dic
 
     return {
         "build": build,
+        "source": source,
+        "labels": dict(labels or {}),
         "outcome": "interrupted" if interrupted else
                    ("measured" if measured else ("no_measure" if no_measure else "unknown")),
         "build_result": build_result,
@@ -227,8 +237,12 @@ def render(rs: list[dict]):
         legs = ", ".join(f"{k}×{n}" for k, n in list(r["blocking_legs"].items())[:3]) or "—"
         span = r.get("time_to_verdict_s")
         span_s = f"{span:>11}s" if span is not None else f"{'—':>12}"
-        print(f"{r['build']:>7}{v:>14}{r['polls']:>7}"
-              f"{span_s}{r['best_window_s']:>12}s{r['resets']:>8}  {legs}")
+        record_id = r.get("build") or r.get("source")
+        label_suffix = ""
+        if r.get("labels"):
+            label_suffix = " " + " ".join(f"{k}={v}" for k, v in r["labels"].items())
+        print(f"{record_id:>7}{v:>14}{r['polls']:>7}"
+              f"{span_s}{r['best_window_s']:>12}s{r['resets']:>8}  {legs}{label_suffix}")
 
     measured = [r for r in rs if r.get("outcome") == "measured"]
     missed = [r for r in rs if r.get("outcome") == "no_measure"]
@@ -252,7 +266,8 @@ def render(rs: list[dict]):
         near = [r for r in missed if r["best_window_s"] > 0]
         if near:
             worst = max(near, key=lambda r: r["best_window_s"])
-            print(f"NEAR MISS: build {worst['build']} reached {worst['best_window_s']}s of sustain "
+            worst_id = worst.get("build") or worst.get("source")
+            print(f"NEAR MISS: build {worst_id} reached {worst['best_window_s']}s of sustain "
                   f"and reset {worst['resets']}×. A pass/fail verdict cannot show this — it is the")
             print("  difference between 'the fleet is broken' and 'the gate is a few percent too strict'.")
         agg: dict[str, int] = {}
@@ -275,14 +290,39 @@ def render(rs: list[dict]):
               + " — point-in-time, not live status.")
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--build", type=int)
     ap.add_argument("--builds", help="inclusive range, e.g. 1366-1374")
+    ap.add_argument(
+        "--local",
+        help=("parse a local mesh gate log (hc-mesh-quiesce.sh writes "
+              "$MESH_DIR/quiesce-gate/<start>.log)"),
+    )
+    ap.add_argument(
+        "--label",
+        action="append",
+        default=[],
+        help="k=v label attached to a --local record (scenario=, shape=, run=)",
+    )
     ap.add_argument("--record", action="store_true", help="append results to the local series")
     ap.add_argument("--series", action="store_true", help="read back the recorded series")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
+
+    if args.local:
+        labels = dict(kv.split("=", 1) for kv in args.label if "=" in kv)
+        with open(args.local, encoding="utf-8", errors="replace") as fh:
+            rec = parse_quiesce(None, fh.read(), None, source="local", labels=labels)
+        if rec is None:
+            print(f"{args.local}: no fleet-quiesce lines found", file=sys.stderr)
+            return 2
+        render([rec])
+        if args.record:
+            SERIES.parent.mkdir(parents=True, exist_ok=True)
+            with SERIES.open("a") as out:
+                out.write(json.dumps(rec) + "\n")
+        return 0
 
     if args.series:
         if not SERIES.exists():
@@ -293,8 +333,9 @@ def main() -> int:
         # record — a build read while still running, or one re-read after its
         # result landed — so keeping the first occurrence would pin the series to
         # the least-informed reading of every build.
-        latest = {r["build"]: r for r in rows}  # dict insertion order = file order
-        render([latest[b] for b in sorted(latest)])
+        fleet_latest = {r["build"]: r for r in rows if r.get("build") is not None}
+        local = [r for r in rows if r.get("build") is None]
+        render([fleet_latest[b] for b in sorted(fleet_latest)] + local)
         return 0
 
     builds = []
@@ -304,7 +345,7 @@ def main() -> int:
     elif args.build:
         builds = [args.build]
     else:
-        ap.error("need --build, --builds or --series")
+        ap.error("need --build, --builds, --local or --series")
 
     results = []
     for b in builds:

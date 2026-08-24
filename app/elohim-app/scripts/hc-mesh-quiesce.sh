@@ -101,8 +101,11 @@ start_iso="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 start_epoch=$(date +%s)
 
 TIME_FILE="$(mktemp)"
-{ time bash "$GATE_SCRIPT" "$DOORWAY_A" "$DOORWAY_B" "$CONTENT_ID" "$STORAGE_A" "$STORAGE_B"; } 2> "$TIME_FILE"
-gate_exit=$?
+mkdir -p "$MESH_DIR/quiesce-gate"
+GATE_LOG="$MESH_DIR/quiesce-gate/${start_iso//:/-}.log"
+{ time bash "$GATE_SCRIPT" "$DOORWAY_A" "$DOORWAY_B" "$CONTENT_ID" "$STORAGE_A" "$STORAGE_B" | tee "$GATE_LOG"; } 2> "$TIME_FILE"
+gate_exit=${PIPESTATUS[0]}
+echo "gate-log: $GATE_LOG"
 cat "$TIME_FILE" >&2
 
 end_epoch=$(date +%s)
