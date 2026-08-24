@@ -771,6 +771,7 @@ and four hazards do not come for free with it:
 | H2 | **The ratchet** — a mandate that never completes and so never reabsorbs, becoming a permanent claim | Non-accretion depends on reabsorption actually happening | **Not designed** |
 | H3 | **Measurement capture** — whoever defines the need defines the issuance; the evidence base becomes the prize | The un-attenuated record is the defence, and it is also the target | **No detector** |
 | H4 | **No exit at global reach** — a policy at the top rung has no outside for those inside it, which is precisely the property that makes state taxation coercive rather than voluntary | Appeal and arm's length carry the entire load once exit is gone | **Unresolved** |
+| H5 | **Deferred-loss attribution** — the signal that triggers reward settles *before* the signal that reveals cost, so whoever authored an exposure is promoted out of its consequence and a successor inherits the loss | Standing granted on unsettled outcomes; the selection effect compounds each cycle | **No primitive** (§2.10) |
 
 **H4 is the one that should stop anybody claiming this is solved.** Every reassurance elsewhere in
 this paper leans somewhere on plurality and forkability — *if you dislike this circuit, author
@@ -871,6 +872,56 @@ and still exclude them has reproduced the sorting it was built to answer, and it
 category and justice is restored capability (§1); an uninsurable tier is neither. Whether that tier
 is a floor-layer responsibility (the pool prices, the commons covers) or a defect in the entry type
 is **an open canon question, and this paper does not settle it — it names it.** ⚠
+
+**And the failure mode the hazard table misses comes from inside the industry.** An underwriter books
+a large policy — half a million dollars of annual premium, say — priced far beneath what the exposure
+warrants. The premium is recognised *now*. The losses arrive later: a serious auto claim, a
+workers'-compensation claim that runs for years. By then the book has been handed on, and the person
+who wrote it has already been promoted on the only signal that had settled — **volume booked,
+business landed.** The successor inherits the million-dollar losses. ◐ *(operator account, first-hand,
+P&C underwriting.)*
+
+Three things follow, and the third is the one that matters.
+
+1. **The reward and the consequence have different addresses.** The gain attaches to the author at
+   the moment of writing; the loss attaches to whoever holds the book when it settles.
+2. **The mispricing is invisible precisely when it is being rewarded**, because the one channel being
+   read — premium written — is the one channel structurally incapable of showing it. That is Beer's
+   attenuation exactly (§2.9): a person priced on a few channels, with the variety that would have
+   contradicted the reading discarded as a matter of course.
+3. **So it is a selection effect, not a run of bad luck.** Each cycle promotes the people whose
+   success came from writing business the book could not carry. Over enough cycles the firm's
+   leadership is disproportionately composed of them, and the behaviour is not surviving *despite*
+   the mechanism — it is surviving *because of* it. **The trap is evolutionary, and the organisation
+   is its own selective pressure.**
+
+**The regulatory reading is the part this paper cannot afford to skip.** The entire state
+rate-regulation apparatus exists to prevent this specific failure: it obliges insurers to collect
+*enough* to cover expected losses, and in many jurisdictions legally mandates a minimum margin. It is
+the strongest available instance of *an apex institution with the correct mandate, the legal
+authority, and the actuarial data in hand.* **And insurers still destroy themselves on competitive
+cycles.** ◐ That is not an argument that regulation is worthless — it is evidence that **a rule at the
+apex cannot repair a measurement failure at the edge**, which is §2.2's decomposition argument
+arriving from the empirical side rather than the theoretical one.
+
+**In this corpus's own vocabulary the trap already has a name: it is N5.** *Issuance is a function of
+settled, verified reciprocity, never of account creation.* N5 was derived from the Trueque, where
+units were minted on account creation rather than on settled trade. The underwriting case is the
+identical defect in a non-monetary register: **standing issued on booking rather than on settlement,
+and the promotion is the mint.** Put in the reach vocabulary of §2.9 it is sharper still — reach was
+*granted* on a signal that had not yet settled, which is not earning at all. N5's own redirect already
+demands the repair in the monetary case: *lag-until-first-settled-reciprocity*, and a live public
+aggregate. Nothing applies it to standing.
+
+**The self-conviction, because the same trap is fully available to us.** `MemberRiskProfile` carries
+`historical_claims_rate`, a `risk_trend_direction`, and a `next_assessment_due` ✅ — every one of
+which scores the **member**. Nothing in the tree scores the **judgment of whoever set a price**, and
+nothing joins a pricing decision to the losses that settle after its author has moved to another
+scope. A protocol that priced risk on witnessed behaviour while granting standing on volume would
+have rebuilt the trap exactly, with better data and a cleaner conscience. **The un-attenuated record
+is what makes the repair possible — the join is permanent and the author is named — but no primitive
+performs it.** ⚠ This is the most concrete thing H3 and H5 point at, and it belongs in the
+Measure family as a row rather than sitting here as a paragraph.
 
 **Three constraints keep this from becoming something else.**
 
@@ -1325,6 +1376,10 @@ Both comparative political-economy documents deliberately minted zero rows, defe
 grounds; their §10 audit retired that precondition, so the successor was expected to close it. **This
 paper closes §9 graduation item 1** (the amplified set A1–A5 as Measure-family rows) **for A5**.
 
+*(Row 11 below is the exception: it is **proposed on 2026-08-24 and not yet written** into the
+cluster file. It is listed so the mint pass has a mechanical input, not so the table can be read as
+complete.)*
+
 **MINTED 2026-08-23** — live, not proposed: `commons-holonic-stewardship-backlog` **rows 21–23**
 (`binds-policy`, currency-as-Mishpat-lens with the eight never-rules, the three-function
 decomposition) · `measure-family-borrows-backlog` **row 21** (the Cantillon detector) ·
@@ -1337,6 +1392,7 @@ decomposition) · `measure-family-borrows-backlog` **row 21** (the Cantillon det
 | 2, 4 — never-rules as floor/ceiling lenses; the five-knob `rule` schema | [commons-holonic-stewardship-backlog](epr:commons-holonic-stewardship-backlog) | A currency circuit as `author-lens` with `role` ∈ {lens, floor, ceiling}. **p2p-design-gate: zero new DHT entry types, zero new commitment actions.** Carries N1–N8 verbatim. |
 | 3 — the three-function decomposition | [commons-holonic-stewardship-backlog](epr:commons-holonic-stewardship-backlog) | Three `role`-typed lenses rather than one currency: MoE (`telos`: circulation; carry cost/stock limit legitimate), SoV (`telos`: preservation across time; **accretion refused** — growth-by-holding is unearned increment and therefore common inheritance per Stance I.4), UoA (`telos`: commensuration for a *stated* scope). Gate: the accretion limit must be stated as a `role: ceiling` lens, and the prudence-vs-accumulation judgment must be **excluded** from the mechanical floor. Sibling of Take 2's never-rules; **zero new entry types.** |
 | 5 — the Cantillon detector | [measure-family-borrows-backlog](epr:measure-family-borrows-backlog) | A Measure family composing with [middot](epr:middot-measure-primitive-design): issuance joined to first-recipient standing and to lag-until-first-settled-reciprocity. Sibling of A5's issuance-vs-settled-reciprocity ratio; **closes trap-detectors §9 item 1 for A5.** |
+| **11 — decision-quality attribution (H5)** ⚠ *proposed 2026-08-24, NOT yet minted* | [measure-family-borrows-backlog](epr:measure-family-borrows-backlog) | A Measure family joining a **pricing or underwriting decision** to the losses that settle after its author has changed scope, so standing cannot be earned on a signal that has not settled. N5's *lag-until-first-settled-reciprocity* redirect, applied to **standing** rather than to units. Sibling of Take 5's Cantillon detector; closes the gap §2.10 names against `MemberRiskProfile`, which scores members and not judgment. |
 | 10 — Fureai Kippu cross-region transfer | [measure-family-borrows-backlog](epr:measure-family-borrows-backlog) | The N7 boundary test as a study row, not a borrow: does a care unit that crosses a locality retain its meaning, and what did the Japanese case actually do about it? |
 | 7 — the bridge institution | [arch-workspace-discipline-backlog](epr:arch-workspace-discipline-backlog) | Joins the sibling's legal-person row and the two open licensing decisions (rows 2, 9). Carries the four invariants, most of all *no single bridge load-bearing*. |
 
@@ -1388,8 +1444,8 @@ mutual banking, the WIR, Fed credit policy and moral suasion, master accounts, D
 is, and capture-resistant — versus its external posture toward state fiat?* §2 and §3 are that
 question answered in its own terms.
 
-**Three operator steering notes (2026-08-23)** shaped this paper, and each is recorded because the
-argument in it is the operator's.
+**Four operator steering notes (2026-08-23, and one 2026-08-24)** shaped this paper, and each is
+recorded because the argument in it is the operator's.
 
 1. **The personal equilibrium.** The Donut's floor/ceiling and friction-gradient limitarianism are
    *our arguments brought to George and Gesell*, not inheritance from them; a capitalist can live in
@@ -1412,6 +1468,16 @@ argument in it is the operator's.
    paper's §4.6; its monetary consequence here is §2.2's unit-of-account limit, because a unit that
    cannot distinguish abundance-in-calories from abundance-in-housing is precisely the flattening
    Stance I.2 refuses.
+
+4. **The underwriting trap (2026-08-24), from first-hand P&C practice.** That the scale discount is
+   only half the story: the deeper defect is *temporal*. Revenue settles before loss, so the
+   underwriter who prices a book into the ground is promoted on volume and a successor inherits the
+   claims — which makes systemic mispricing an **evolutionary trap** rather than a lapse, since each
+   cycle selects for it and staffs the executive from among its winners. Paired with the observation
+   that state rate regulation exists to prevent exactly this, mandates minimum adequacy, and *still*
+   fails on competitive cycles. §2.10's second half and hazard **H5** are that note worked out; the
+   identification of it as **N5 in a non-monetary register** — standing issued on booking rather than
+   settlement — is the author's addition.
 
 **Method.** Eight parallel context-isolated readers over the canon spine, the EAE tree, the mishpat
 DNA, shefa/REA, compute/trust/reach, the research corpus, the framing guards, and current build state,
