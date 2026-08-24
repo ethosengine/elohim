@@ -27,3 +27,22 @@ Secondary lead (same window, possibly compounding, possibly T4-provenance): inve
 (3738e611c, deployed in this same push) moved inventory scoring onto a command channel — compare
 pre-deploy rates for this pattern before attributing; if the rate jumped with #1378, the T4 cut
 owns it.
+
+## Post-restart confirmation (2026-08-24 08:28Z) — RESTART DID NOT CURE IT
+
+Edge #1379 (a5607e938) redeployed alpha at ~07:5xZ, restarting matthew's pod. The heal-leg
+counters reset (healedTotal 27→4) but the stuck pattern returned immediately:
+- 08:07Z (fresh pod): healedTotal 4, pending 866, divergentAnchor 907, sweeps 5
+- 08:28Z (+21min):     healedTotal 6, pending 928, divergentAnchor 1004, sweeps 7
+i.e. ~2 heals in 20 min while pending + divergentAnchor RISE. Identical to the pre-restart
+signature. CONFIRMS this is a standing runtime condition (conductor saturation), NOT
+post-restart transient churn — a pod restart resets the loop but does not fix the conductor.
+
+CEILING — operator-owned. The dev-side dataplane code is deployed and locally proven; the
+fleet Dataplane Validation gate reads matthew (storage-A) and cannot pass while this holds.
+Candidate operator interventions (not dev-loop work): (a) inspect matthew's conductor CPU
+throttle / resource limits (conductor-arc memory: sys-validation CPU spin starves reads —
+check throttle BEFORE assuming identity/DHT cause); (b) heal-leg batch-size/timeout adaptivity
+so a single batch fits under the 25s conductor-call ceiling (a real code cure, but speculative
+while the conductor itself reports 247s receipt latency — likely treats a symptom); (c) a
+deeper conductor-performance investigation (why is a 6-peer alpha conductor 247s-laggy).
