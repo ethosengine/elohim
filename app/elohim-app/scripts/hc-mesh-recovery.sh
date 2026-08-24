@@ -96,10 +96,28 @@ PY
 # Backpressure witness: max conductor receipt latency logged by each peer since t0.
 # Defined here (above the RECOVERY_SOURCE_ONLY gate) so unit tests can source it
 # alongside recovery_snapshot/recovery_predicate.
-receipt_max() { # <peer-log> <since-epoch> -> max elapsed_s (0 if none)
-  python3 - "$1" "$2" <<'PY2'
+#
+# Reads the CONDUCTOR's own log, never elohim-storage's: recv_validation_receipt_received
+# is emitted by holochain_p2p (elohim/holochain-conductor/crates/holochain_p2p/src/spawn/
+# actor.rs, warn! at elapsed_s>=5) — that output lands in
+# $LOCAL_DEV_DIR/.sandbox_run_log.<peer> (a peer restarted individually, e.g.
+# conductors-restart) or the shared $LOCAL_DEV_DIR/.sandbox_run_log (all conductors
+# launched together by `start`) — never $LOGDIR/<peer>.log, which is elohim-storage's
+# own log and never carries this line. LOCAL_DEV_DIR comes from hc-mesh.sh.
+receipt_log_for() { # <peer> -> the conductor log this peer's witness should read
+  local per="$LOCAL_DEV_DIR/.sandbox_run_log.$1"
+  if [ -f "$per" ]; then echo "$per"; else echo "$LOCAL_DEV_DIR/.sandbox_run_log"; fi
+}
+receipt_scope_for() { # <peer> -> "per-peer" | "mesh-wide" — which log receipt_log_for picked
+  if [ -f "$LOCAL_DEV_DIR/.sandbox_run_log.$1" ]; then echo "per-peer"; else echo "mesh-wide"; fi
+}
+receipt_max() { # <peer> <since-epoch> -> max elapsed_s, or the literal "null" if the
+  # log is missing/unreadable or has no in-window sample (rc 0 either way — never
+  # let a missing log destroy the caller's record).
+  local log; log="$(receipt_log_for "$1")"
+  python3 - "$log" "$2" <<'PY2'
 import re, sys, datetime
-log, since = sys.argv[1], int(sys.argv[2]); mx = 0.0
+log, since = sys.argv[1], int(sys.argv[2]); mx = None
 # Strip ANSI SGR escapes BEFORE matching: the real tracing-formatter output
 # interleaves them between field name/`=`/value (e.g.
 # `\x1b[3melapsed_s\x1b[0m=\x1b[0m5.01...`), and an unstripped
@@ -107,14 +125,85 @@ log, since = sys.argv[1], int(sys.argv[2]); mx = 0.0
 # which can be the `0` inside a `\x1b[0m` reset code, not the real value.
 ansi = re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
 pat = re.compile(r'(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)[^\n]*elapsed_s=([0-9.]+)[^\n]*recv_validation_receipt_received')
-for raw in open(log, errors="replace"):
-    line = ansi.sub('', raw)
-    m = pat.search(line)
-    if not m: continue
-    ts = datetime.datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc).timestamp()
-    if ts >= since: mx = max(mx, float(m.group(2)))
-print(f"{mx:.1f}")
+try:
+    fh = open(log, errors="replace")
+except OSError:
+    fh = None
+if fh is not None:
+    with fh:
+        for raw in fh:
+            line = ansi.sub('', raw)
+            m = pat.search(line)
+            if not m: continue
+            ts = datetime.datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc).timestamp()
+            if ts >= since:
+                v = float(m.group(2))
+                if mx is None or v > mx: mx = v
+print("null" if mx is None else f"{mx:.1f}")
 PY2
+}
+
+# Pre-kill capture (Critical-2): mirrors restart_storage's live branch in
+# hc-mesh.sh — read /proc/<pid>/environ to EOF with python (never cp/copyFile,
+# which yields 0 bytes on procfs) and readlink /proc/<pid>/exe (stripped of a
+# trailing " (deleted)") — BEFORE anything is killed or wiped. Without this,
+# restart_storage falls to its stale-capture branch once the pid is gone; after
+# a mesh reshape (`start` regenerates sandboxes and mints new agent keys) that
+# capture carries a STALE AGENT_PUBKEY, and with no capture at all the peer
+# cannot come back. Refuses (rc 5) rather than inflict loss with no way home.
+recovery_capture_peer() { # <peer> <pid-or-empty> -> writes $MESH_DIR/storage-restart/<peer>.{environ,exe}
+  local peer="$1" pid="${2:-}" workdir="$MESH_DIR/storage-restart" envfile exefile exe
+  mkdir -p "$workdir"
+  envfile="$workdir/$peer.environ"; exefile="$workdir/$peer.exe"
+  if [ -n "$pid" ] && [ -r "/proc/$pid/environ" ]; then
+    python3 - "$pid" "$envfile" <<'PY'
+import sys
+pid, destination = sys.argv[1:]
+with open(f"/proc/{pid}/environ", "rb") as source:
+    raw = source.read()
+with open(destination, "wb") as target:
+    target.write(raw)
+PY
+    exe="$(readlink "/proc/$pid/exe" 2>/dev/null | sed 's/ (deleted)$//')"
+    [ -n "$exe" ] && printf '%s\n' "$exe" > "$exefile"
+    return 0
+  fi
+  [ -s "$envfile" ] && return 0
+  echo "$peer: no live pid and no capture — refusing to inflict loss" >&2
+  return 5
+}
+
+# Record writer, factored out of main (Important-1) so a missing/unreadable
+# conductor log can never silently drop the whole JSONL line: both receipt
+# values tolerate "null"/empty instead of raising inside float(...).
+recovery_write_record() { # <path> <shape> <peer> <survivor> <t_surv> <t_rec> <recovered 0|1> <elapsed_s> <polls> <failing_csv> <labels_json> <rr> <rs> <receipt_scope_rec> <receipt_scope_surv> <zome_verdict>
+  python3 - "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" <<'PY'
+import json, sys, datetime, os
+p, shape, peer, surv, ts, tr, rec, el, polls, failing, labels, rr, rs, rscope_rec, rscope_surv, zome = sys.argv[1:17]
+def numeric_or_none(x):
+    xs = (x or "").strip()
+    if xs == "" or xs.lower() == "null": return None
+    return float(xs)
+record = {
+    "ts": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    "shape": shape, "peer": peer, "survivor": surv,
+    "survivors": int(os.environ.get("RECOVERY_SURVIVORS", "1")),
+    "transport_survivor": ts, "transport_recovering": tr,
+    "recovered": rec == "1", "time_to_recover_s": int(el),
+    "polls": int(polls), "failing_legs": [x for x in failing.split(",") if x],
+    "labels": json.loads(labels),
+    "conductor_receipt_max_s": {"recovering": numeric_or_none(rr), "survivor": numeric_or_none(rs)},
+    "conductor_receipt_scope": {"recovering": rscope_rec or "unknown", "survivor": rscope_surv or "unknown"},
+    "zome_path": zome or "unknown",
+}
+# One open/write, not two separate appends: two calls each do their own
+# open()/close() against the same path, so a concurrent recovery run's
+# append (this loop is meant to run per-peer, potentially overlapping other
+# invocations against the same MESH_DIR) can interleave a record's JSON body
+# with its own trailing newline write. Single write == one atomic append.
+with open(p, "a") as fh:
+    fh.write(json.dumps(record) + "\n")
+PY
 }
 
 if [ "${RECOVERY_SOURCE_ONLY:-0}" = "1" ]; then return 0 2>/dev/null || exit 0; fi
@@ -130,8 +219,17 @@ done
 
 set +e
 # shellcheck source=hc-mesh.sh
-source "$SCRIPT_DIR/hc-mesh.sh" >/dev/null 2>&1
+# stdout silenced, stderr preserved (Minor-2): _validate_peer_transports prints
+# a MESH_PEER_TRANSPORTS refusal to stderr and returns non-zero WITHOUT raising
+# under `set -u` (an undefined-command substitution inside $(...) is not a
+# nounset violation) — `2>&1 >/dev/null` would still swallow it (redirection
+# order matters: that form dups stdout to the CURRENT stderr target first,
+# then redirects stdout to /dev/null, leaving stderr untouched-but-unmerged is
+# fine, but the earlier `>/dev/null 2>&1` sent BOTH to /dev/null). The refusal
+# used to surface only much later as an unrelated "PEERS: unbound variable".
+source "$SCRIPT_DIR/hc-mesh.sh" >/dev/null
 set -u
+[ -n "${PEERS:-}" ] || { echo "hc-mesh.sh refused to source (see message above)" >&2; exit 2; }
 # Refuse BEFORE any kill/wipe if the transport-identity lookup this script
 # depends on isn't landed yet. Under `set -u`, an undefined *command* inside
 # a `$(...)` substitution is not a `set -u` violation — it prints
@@ -157,14 +255,36 @@ t_surv="$(storage_transport_for "$survivor" "$sport")"; t_rec="$(peer_transport 
 snap="$(mktemp)"; recovery_snapshot "$sport" > "$snap" || { echo "survivor $survivor:$sport unreadable" >&2; exit 3; }
 rlog "shape=$shape peer=$peer survivors=${#survivors[@]} survivor=$survivor rows=$(python3 -c 'import json,sys;print(len(json.load(open(sys.argv[1]))["rows"]))' "$snap") transports survivor=$t_surv recovering=$t_rec"
 
+# Capture BEFORE the kill (Critical-2), never after: restart_storage's live
+# branch — the one that trusts /proc/<pid>/environ over its own stale-capture
+# fallback — is only reachable while the pid is still alive. Refuses (rc 5)
+# rather than inflict loss the recovery step has no way to undo.
 pid="$(storage_pid_for_port "$rport")"
+recovery_capture_peer "$peer" "$pid" || exit 5
 [ -n "$pid" ] && { kill "$pid"; for _ in $(seq 1 15); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done; kill -0 "$pid" 2>/dev/null && kill -9 "$pid"; }
 wipe=(sync.sled content.db content.db-shm content.db-wal graph.db blobs blobs_iroh cache contest-backoff.json)
 [ "$shape" = cold ] && wipe+=(identity.key iroh.key)
 for f in "${wipe[@]}"; do rm -rf "${MESH_DIR:?}/$peer/$f"; done
 rlog "loss inflicted: $shape wipe of ${#wipe[@]} entries under $MESH_DIR/$peer"
 
-MESH_RESTART_APPLY_PROFILE=1 restart_storage "$peer" >/dev/null 2>&1 || rlog "restart_storage reported non-zero; polling anyway"
+# Restart diagnostics are not discarded (Critical-2): restart_storage's own
+# probe_zome_paths verdict ("zome path alive" / "ZOME CALLS ARE DEAD" /
+# "inconclusive") is the only signal that distinguishes "serving" from "able
+# to anchor" — swallowing it hid the exact failure class this harness exists
+# to surface.
+restart_log="$MESH_DIR/storage-restart/$peer.restart.log"
+MESH_RESTART_APPLY_PROFILE=1 restart_storage "$peer" > "$restart_log" 2>&1
+restart_rc=$?
+[ "$restart_rc" -ne 0 ] && rlog "restart_storage reported non-zero; polling anyway"
+while IFS= read -r rline; do rlog "restart: $rline"; done < <(tail -3 "$restart_log")
+zome_verdict="unknown"
+zome_line="$(grep -E "^  ${peer}[[:space:]]" "$restart_log" | tail -1)"
+case "$zome_line" in
+  *"zome path alive"*) zome_verdict="alive" ;;
+  *"ZOME CALLS ARE DEAD"*) zome_verdict="dead" ;;
+  *inconclusive*) zome_verdict="inconclusive" ;;
+esac
+
 t0=$(date +%s); until curl -sf -m 2 "http://localhost:$rport/health" >/dev/null; do sleep 1; [ $(( $(date +%s) - t0 )) -gt 120 ] && { echo "$peer never served /health" >&2; exit 4; }; done
 t0=$(date +%s); polls=0; legs=""; recovered=0
 while :; do
@@ -175,22 +295,10 @@ while :; do
 done
 failing="$(tr ' ' '\n' <<<"$legs" | grep '=0$' | cut -d= -f1 | paste -sd, -)"
 if [ "$recovered" -eq 1 ]; then echo "RECOVERED in ${el}s"; else echo "NOT-RECOVERED after ${el}s ($failing)"; fi
-rcpt_rec="$(receipt_max "$LOGDIR/$peer.log" "$t0")"; rcpt_surv="$(receipt_max "$LOGDIR/$survivor.log" "$t0")"
-rlog "conductor receipt latency max during recovery: recovering=${rcpt_rec}s survivor=${rcpt_surv}s"
-RECOVERY_SURVIVORS="${#survivors[@]}" python3 - "$MESH_DIR/recovery-timeline.jsonl" "$shape" "$peer" "$survivor" "$t_surv" "$t_rec" "$recovered" "$el" "$polls" "$failing" "$labels" "$rcpt_rec" "$rcpt_surv" <<'PY'
-import json, sys, datetime, os
-p, shape, peer, surv, ts, tr, rec, el, polls, failing, labels, rr, rs = sys.argv[1:14]
-record = {"ts": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"), "shape": shape, "peer": peer, "survivor": surv, "survivors": int(os.environ.get("RECOVERY_SURVIVORS", "1")),
-          "transport_survivor": ts, "transport_recovering": tr, "recovered": rec == "1", "time_to_recover_s": int(el),
-          "polls": int(polls), "failing_legs": [x for x in failing.split(",") if x], "labels": json.loads(labels),
-          "conductor_receipt_max_s": {"recovering": float(rr), "survivor": float(rs)}}
-# One open/write, not two separate appends: two calls each do their own
-# open()/close() against the same path, so a concurrent recovery run's
-# append (this loop is meant to run per-peer, potentially overlapping other
-# invocations against the same MESH_DIR) can interleave a record's JSON body
-# with its own trailing newline write. Single write == one atomic append.
-with open(p, "a") as fh:
-    fh.write(json.dumps(record) + "\n")
-PY
+rcpt_rec="$(receipt_max "$peer" "$t0")"; rcpt_surv="$(receipt_max "$survivor" "$t0")"
+rcpt_scope_rec="$(receipt_scope_for "$peer")"; rcpt_scope_surv="$(receipt_scope_for "$survivor")"
+fmt_receipt() { [ "$1" = "null" ] && echo "none" || echo "${1}s"; }
+rlog "conductor receipt latency max during recovery: recovering=$(fmt_receipt "$rcpt_rec") survivor=$(fmt_receipt "$rcpt_surv")"
+RECOVERY_SURVIVORS="${#survivors[@]}" recovery_write_record "$MESH_DIR/recovery-timeline.jsonl" "$shape" "$peer" "$survivor" "$t_surv" "$t_rec" "$recovered" "$el" "$polls" "$failing" "$labels" "$rcpt_rec" "$rcpt_surv" "$rcpt_scope_rec" "$rcpt_scope_surv" "$zome_verdict"
 rm -f "$snap"
 [ "$recovered" -eq 1 ]

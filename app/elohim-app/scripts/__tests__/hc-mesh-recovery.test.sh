@@ -37,19 +37,71 @@ t() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fail=1; fi; }
   RECOVERY_DOORWAY_A="http://localhost:$port" RECOVERY_DOORWAY_B="http://localhost:$port" RECOVERY_LANDING_PATH="/db/stats" \
     out="$(recovery_predicate "$tmp/snap.json" "$port")"; rc=$?
   t "missing blob bytes fails ONLY P2 (rc=$rc): $out" '[ "$rc" -ne 0 ] && [ "$out" = "P0=1 P1=1 P2=0 P3=1 P4=1" ]'
-  # receipt_max: strip ANSI SGR escapes before matching, and honor the
-  # since-window — an older, larger-valued line outside the window must not
-  # win over a smaller in-window value. Mirrors the real tracing-formatter
+  # receipt_max (Critical-1 fix): reads the CONDUCTOR's log via LOCAL_DEV_DIR —
+  # never elohim-storage's own log — preferring the per-peer
+  # $LOCAL_DEV_DIR/.sandbox_run_log.<peer> and falling back to the shared
+  # mesh-wide $LOCAL_DEV_DIR/.sandbox_run_log, printing the literal "null"
+  # (never 0.0) when neither carries an in-window sample. The per-peer
+  # assertion below also proves ANSI-stripping and since-window honoring in
+  # one shot (an older, larger-valued line outside the window must not win
+  # over a smaller in-window value) — mirrors the real tracing-formatter
   # shape (`\x1b[3melapsed_s\x1b[0m=\x1b[0m<n> ... recv_validation_receipt_received`).
+  export LOCAL_DEV_DIR="$tmp/local-dev"; mkdir -p "$LOCAL_DEV_DIR"
   since_epoch=1755972000
   old_epoch=$((since_epoch - 3600))
   new_epoch=$((since_epoch + 60))
   old_ts="$(date -u -d "@$old_epoch" +%Y-%m-%dT%H:%M:%S)"
   new_ts="$(date -u -d "@$new_epoch" +%Y-%m-%dT%H:%M:%S)"
-  printf '%s.000000Z  INFO \033[2mconductor\033[0m: \033[3melapsed_s\033[0m=\033[0m99.0 \033[3ma\033[0m=\033[0m"recv_validation_receipt_received"\n' "$old_ts" > "$tmp/receipt.log"
-  printf '%s.123456Z  INFO \033[2mconductor\033[0m: \033[3melapsed_s\033[0m=\033[0m5.018487491 \033[3ma\033[0m=\033[0m"recv_validation_receipt_received"\n' "$new_ts" >> "$tmp/receipt.log"
-  rout="$(receipt_max "$tmp/receipt.log" "$since_epoch")"
-  t "receipt_max strips ANSI and honors the since-window (got $rout)" '[ "$rout" = "5.0" ]'
+  printf '%s.000000Z  INFO \033[2mconductor\033[0m: \033[3melapsed_s\033[0m=\033[0m99.0 \033[3ma\033[0m=\033[0m"recv_validation_receipt_received"\n' "$old_ts" > "$LOCAL_DEV_DIR/.sandbox_run_log.jessica"
+  printf '%s.123456Z  INFO \033[2mconductor\033[0m: \033[3melapsed_s\033[0m=\033[0m5.018487491 \033[3ma\033[0m=\033[0m"recv_validation_receipt_received"\n' "$new_ts" >> "$LOCAL_DEV_DIR/.sandbox_run_log.jessica"
+  rout="$(receipt_max jessica "$since_epoch")"
+  t "receipt_max reads the per-peer conductor log, strips ANSI, honors the since-window (got $rout)" '[ "$rout" = "5.0" ]'
+  rm -f "$LOCAL_DEV_DIR/.sandbox_run_log.jessica"
+  printf '%s.123456Z  INFO \033[2mconductor\033[0m: \033[3melapsed_s\033[0m=\033[0m7.5 \033[3ma\033[0m=\033[0m"recv_validation_receipt_received"\n' "$new_ts" > "$LOCAL_DEV_DIR/.sandbox_run_log"
+  rout="$(receipt_max jessica "$since_epoch")"
+  t "receipt_max falls back to the shared mesh-wide log when no per-peer log exists (got $rout)" '[ "$rout" = "7.5" ]'
+  rm -f "$LOCAL_DEV_DIR/.sandbox_run_log"
+  rout="$(receipt_max jessica "$since_epoch")"; rrc=$?
+  t "receipt_max prints null (not 0.0), rc 0, when neither log exists (rc=$rrc, got $rout)" '[ "$rrc" -eq 0 ] && [ "$rout" = "null" ]'
+  exit "$fail"
+) || fail=1
+
+# Pre-kill capture (Critical-2): recovery_capture_peer mirrors restart_storage's
+# live branch in hc-mesh.sh — captures /proc/<pid>/environ + /proc/<pid>/exe
+# BEFORE anything is killed or wiped — and refuses (rc 5) rather than proceed
+# with no live pid and no prior capture to fall back on.
+(
+  tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+  export MESH_DIR="$tmp/mesh"
+  set +e; RECOVERY_SOURCE_ONLY=1 source "$here/../hc-mesh-recovery.sh"; set -e 2>/dev/null; set +e
+  recovery_capture_peer testpeer "$$"; cap_rc=$?
+  t "recovery_capture_peer captures a live pid's environ (rc=$cap_rc)" \
+    '[ "$cap_rc" -eq 0 ] && [ -s "$MESH_DIR/storage-restart/testpeer.environ" ]'
+  t "recovery_capture_peer captures a live pid's exe as an executable path" \
+    '[ -x "$(cat "$MESH_DIR/storage-restart/testpeer.exe" 2>/dev/null)" ]'
+  # Sentinel proves the refusal path touches nothing under MESH_DIR.
+  echo MARKER > "$MESH_DIR/sentinel"
+  recovery_capture_peer nopid-nocapture ""; ref_rc=$?
+  t "recovery_capture_peer refuses with no live pid and no capture (rc=$ref_rc)" \
+    '[ "$ref_rc" -eq 5 ] && [ ! -s "$MESH_DIR/storage-restart/nopid-nocapture.environ" ]'
+  t "refusal path leaves the rest of MESH_DIR untouched (sentinel intact)" \
+    '[ "$(cat "$MESH_DIR/sentinel")" = MARKER ]'
+  exit "$fail"
+) || fail=1
+
+# Record writer tolerates null receipt values (Important-1) instead of raising
+# inside float(...) and silently dropping the whole JSONL line, and yields
+# "unknown" for a missing zome verdict — factored out of main so this is
+# testable without a live recovery.
+(
+  tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+  set +e; RECOVERY_SOURCE_ONLY=1 source "$here/../hc-mesh-recovery.sh"; set -e 2>/dev/null; set +e
+  out="$tmp/recovery-timeline.jsonl"
+  recovery_write_record "$out" warm jessica matthew iroh libp2p 1 42 3 "" '{}' null null per-peer mesh-wide ""
+  t "recovery_write_record: null receipts serialize as JSON null (not a raised exception)" \
+    '[ "$(python3 -c "import json;d=json.load(open(\"$out\"));print(json.dumps(d[\"conductor_receipt_max_s\"]))")" = "{\"recovering\": null, \"survivor\": null}" ]'
+  t "recovery_write_record: a missing zome verdict yields zome_path=unknown" \
+    '[ "$(python3 -c "import json;print(json.load(open(\"$out\"))[\"zome_path\"])")" = "unknown" ]'
   exit "$fail"
 ) || fail=1
 
