@@ -543,6 +543,13 @@ pub fn breaker_probe_enabled() -> bool {
 /// (bound the transport with a short timeout); it can never steal one the
 /// breaker would not have handed out.
 ///
+/// CONCURRENT ACROSS ENDPOINTS, single-trial per endpoint. Admission runs first
+/// and synchronously (one gate call per open circuit), then every admitted
+/// endpoint is dialed at once. Sequential dialing cost N x the probe timeout
+/// inside one refresh tick, which is exactly backwards: the more pool peers are
+/// down, the longer the pass that heals them took. Concurrency changes only
+/// WHEN the dials overlap — never how many trials an endpoint gets.
+///
 /// `probe` is the transport — `async fn(endpoint) -> bool` (`true` = the
 /// upstream answered). Injected so the tests need no network.
 ///
@@ -555,7 +562,12 @@ where
     F: Fn(String) -> Fut,
     Fut: std::future::Future<Output = bool>,
 {
-    let mut outcomes = Vec::new();
+    // ── Phase 1: admission (synchronous, no await) ───────────────────────────
+    // Every endpoint still goes through the breaker's own gate exactly once.
+    // Admission is deliberately kept OFF the await path so the whole pass takes
+    // its trials against one consistent snapshot rather than interleaving
+    // admission with dialing.
+    let mut admitted: Vec<(String, BreakerTrial<'_>)> = Vec::new();
     for snap in breakers.snapshot() {
         // Closed: nothing to heal. HalfOpen: a trial is already outstanding
         // with a real caller — taking a second one is exactly the theft this
@@ -574,11 +586,31 @@ where
             // writes an outcome onto a circuit it did not trial.
             continue;
         }
-        let ok = probe(snap.endpoint.clone()).await;
-        trial.record(ok);
-        outcomes.push((snap.endpoint, ok));
+        admitted.push((snap.endpoint, trial));
     }
-    outcomes
+
+    // ── Phase 2: dial every admitted endpoint CONCURRENTLY ────────────────────
+    // Concurrency is ACROSS endpoints, never within one: each endpoint still
+    // holds exactly the one trial phase 1 took for it, and the futures below are
+    // one-per-endpoint. Sequentially awaiting these cost N x the probe timeout
+    // inside a single refresh tick, so a handful of dead pool peers could push
+    // the pass past the tick interval and starve the very healing it exists to
+    // do. `join_all` polls them on THIS task (no spawn, no Send bound added), so
+    // a cancelled pass still drops every trial guard and re-opens its circuit
+    // with a fresh cooldown — the RAII contract is unchanged.
+    let results =
+        futures::future::join_all(admitted.iter().map(|(endpoint, _)| probe(endpoint.clone())))
+            .await;
+
+    // ── Phase 3: record, in snapshot order ───────────────────────────────────
+    admitted
+        .into_iter()
+        .zip(results)
+        .map(|((endpoint, trial), ok)| {
+            trial.record(ok);
+            (endpoint, ok)
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -1259,6 +1291,96 @@ mod tests {
         outstanding.record(true);
         assert_eq!(circuit_of(&b, half), "closed");
         assert_eq!(circuit_of(&b, closed), "closed");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn open_endpoints_are_probed_concurrently_not_serially() {
+        // Three open pool circuits, each behind a probe that takes the full
+        // transport timeout. Sequentially this pass costs 3 x PROBE inside one
+        // refresh tick — the failure mode being fixed: the more peers are down,
+        // the longer the pass that heals them takes.
+        let b = UpstreamBreakers::new(1, 0);
+        let eps = [
+            "http://pool-a:8090",
+            "http://pool-b:8091",
+            "http://pool-c:8092",
+        ];
+        for ep in eps {
+            b.record(ep, false);
+            assert_eq!(circuit_of(&b, ep), "open");
+        }
+
+        const PROBE: std::time::Duration = std::time::Duration::from_secs(2);
+        let probe = |_endpoint: String| async move {
+            tokio::time::sleep(PROBE).await;
+            true
+        };
+
+        // Virtual clock (start_paused): the runtime auto-advances only when
+        // every task is parked on a timer, so overlapping sleeps advance ONCE.
+        let started = tokio::time::Instant::now();
+        let outcomes = probe_open_circuits(&b, probe).await;
+        let elapsed = started.elapsed();
+
+        assert_eq!(outcomes.len(), 3, "all three open circuits were probed");
+        assert!(
+            elapsed < PROBE * 2,
+            "three probes completed in ~one probe duration ({elapsed:?}); sequential \
+             would have cost {:?}",
+            PROBE * 3
+        );
+        assert!(
+            elapsed >= PROBE,
+            "the probes really did run (each took its full transport time)"
+        );
+        for ep in eps {
+            assert_eq!(
+                circuit_of(&b, ep),
+                "closed",
+                "every successful probe still records its own outcome"
+            );
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn concurrency_never_hands_one_endpoint_a_second_trial() {
+        // The trial-theft rail under concurrency: an endpoint whose one trial is
+        // already outstanding with a real caller is skipped entirely, and the
+        // concurrent pass leaves that caller's trial intact.
+        let b = UpstreamBreakers::new(1, 0);
+        let half = "http://trialling:8091";
+        let open_a = "http://broken-a:8092";
+        let open_b = "http://broken-b:8093";
+
+        b.record(half, false);
+        let outstanding = b.begin(half).expect("a real caller takes the one trial");
+        assert!(outstanding.consumed_trial());
+        b.record(open_a, false);
+        b.record(open_b, false);
+
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let sink = Arc::clone(&seen);
+        let probe = move |endpoint: String| {
+            let sink = Arc::clone(&sink);
+            async move {
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                sink.lock().unwrap().push(endpoint);
+                true
+            }
+        };
+        probe_open_circuits(&b, probe).await;
+
+        let mut dialed = seen.lock().unwrap().clone();
+        dialed.sort();
+        assert_eq!(
+            dialed,
+            vec![open_a.to_string(), open_b.to_string()],
+            "only the two unclaimed OPEN circuits were dialed — the half-open \
+             endpoint's single trial is still the real caller's"
+        );
+
+        outstanding.record(true);
+        assert_eq!(circuit_of(&b, half), "closed");
     }
 
     #[test]
