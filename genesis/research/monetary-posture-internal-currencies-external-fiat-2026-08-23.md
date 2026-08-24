@@ -1403,6 +1403,79 @@ project's actual failure mode. This corpus does not struggle to conceive the rig
 struggles to connect it**, and a first-class property that nothing reads is a property in name only.
 ⚠
 
+### 2.16 A trust-FULL architecture, the compute/trust gradient, and how a mandate is earned
+
+**The whole of §2 rests on an inversion that should be said outright, because the field this paper
+borrows vocabulary from says the opposite.** The dominant architectural boast in distributed systems
+is **trustlessness**: trust nobody, verify everything, treat trust as the vulnerability to be
+engineered out. This corpus takes the other position. **Trust is not the vulnerability. It is the
+resource** — the thing that makes the system efficient, humane, and in several respects possible at
+all. Canon states it as an efficiency property: *"Trustworthy peers reduce the load on every other
+peer in their reach; untrustworthy peers impose it."* ✅
+
+**Which is why a trustless architecture cannot do anything in §2.9–2.15, and not for want of
+cleverness.** Trustlessness *is* attenuation adopted as a design goal: context is precisely what you
+cannot use if you refuse to trust whoever supplied it. So a trustless system can have an **observer
+but never a witness** (witness requires a relationship the watched has a claim on, §2.14); a **rule
+but never a discernment** (§2.8); a **payout but never care** (§2.12); **consensus but never an
+appeal** (§2.15). It pays maximum verification cost forever, by design, and calls the bill a virtue.
+
+**The compute/trust gradient is that spectrum made a first-class axis**, and trustlessness is simply
+its degenerate endpoint — trust pinned at zero, verification cost pinned at maximum, permanently.
+Elohim does not sit at the opposite endpoint either; blind trust is not a design, it is an absence of
+one. It sits **on the gradient**, and moves along it as relationship accrues: verification amortises
+where standing has been earned, and stays expensive where it has not. Canon also fixes the direction
+of obligation, which is what keeps the gradient from being a privilege ladder — *"A trusted peer
+receives faster service, but also **owes** faster service in return… A design that lets a peer collect
+the efficiency benefit of trust without bearing its reciprocal obligation has leaked the asymmetry."* ✅
+
+**And now the claim that closes §2: the protocol's own mandate sits on that same gradient.** The
+Elohim Protocol is a new entrant with no standing in the world. Nobody owes it trust, and it cannot
+award itself any. So it begins where every unknown peer begins — **at maximum verification cost**,
+with everything it does witnessed, attributed, contestable and appealable — and it earns reduced
+friction only by accumulating a record of faithful operation that anyone can check. **The mandate is
+not claimed, granted, or designed. It is accrued, exactly as reach is.** The protocol is subject to
+the rule it applies to its participants, and cannot exempt itself from it: *reach is earned and
+standing-gated; belonging is never gated.* ✅ That answers, one level up, the question §2.9 left at
+the level of policies — a policy earns its reach the way the protocol earns its mandate, and by the
+same evidence.
+
+**Two mandates, and they are earned by different means.**
+
+- **The social mandate** comes from people and institutions, and is earned the way §2.9's soft power
+  works: by delivering a function others want, on terms they can read in advance, with a record of
+  having kept them. It is negotiated, and it is revocable.
+- **The natural mandate** is not negotiable at all. It is earned only by the thing **actually working
+  inside physical and ecological limits** — energy genuinely affordable at household scale, the
+  ecological accounting honest, the system not requiring extraction to run. Nature does not accept
+  arguments. If this protocol needs a datacenter's draw to keep its promises, it has **no natural
+  mandate however many people like it**, and §2.13's unmeasured energy quantity is precisely what
+  decides that. **The natural mandate is the one this paper is least entitled to claim**, because the
+  measurement has not been taken. ⚠
+
+**The hazard in the gradient, which must be named because it is the mechanism by which every
+incumbent became unaccountable.** A gradient that reduces scrutiny as trust accrues is, read
+uncharitably, **an accountability-decay function**. *"We have done this faithfully for a hundred
+years, do not audit us"* is the compute/trust gradient asserted by an institution that has stopped
+deserving it, and nothing in the arithmetic distinguishes that from legitimately earned amortisation.
+**So the gradient requires a floor that never attenuates, no matter how much standing accrues:** the
+appeal, and the algedonic channel that carries it (§2.15). Those must remain at full cost forever,
+because they are the only things that can report that the accrued trust is no longer warranted.
+
+**And that is where the arc closes, uncomfortably.** The one channel that must never be optimised
+away by accumulated trust is **the channel currently connected to nothing** (§2.15) — and the
+Observer that would carry the evidence of faithful operation is **wired to a price rather than to
+care** (§2.14), and the council that would hold the mandate is **single-write-capturable** (§5), and
+the insurance mutual that is the most-built instance of all of this still ships an **`uninsurable`
+tier** (§2.12).
+
+**So the honest closing position of §2 is not that the protocol has a mandate. It is that it has an
+argument, and a gradient it must climb like anyone else.** A protocol asking the world for a mandate
+while those four stand would be doing exactly what §2.10 refuses at the membrane and §2.14 refuses of
+the Observer: claiming a standing it has not earned. **The four are therefore not a punch-list. They
+are the first rungs of the mandate itself** — and this is the strongest argument the paper can make
+for why the wiring, not the architecture, is where the next work belongs. ⚠
+
 ---
 
 ## 3. The external posture — toward state fiat
@@ -1984,6 +2057,11 @@ thesis is ◐ and its efficiency–resilience coordinate is excluded entirely.
    the standing layer (H5) and the ratification defect (§5), both open. **Scale applied before those
    are fixed is an amplifier, not a repair**, and this paper would rather say so than be quoted as
    having promised the composition. ⚠
+10. **The natural mandate is claimed on an unmeasured quantity.** §2.16 argues the protocol earns a
+   natural mandate only by working inside physical and ecological limits — and the energy cost of
+   ubiquitous local inference (§2.13) has never been measured here. That is the one mandate argument
+   in this paper that cannot be advanced by reasoning at all, and it is currently advanced by
+   nothing. ⚠
 
 ### Works referred to
 
@@ -2022,6 +2100,9 @@ steering that keeps §2 from proposing a numéraire, and the closure property th
 conservation test should adopt. [Hypha](epr:hypha-dao-autonomous-collectives-cross-pollination-2026-06-24)
 supplies N3's capital→voice refusal, the lossy-bridge invariant, and the Operational-C shape that
 decides the token plane's disposition in §5.
+[Trust is an efficiency signal](epr:trust-as-efficiency-signal) supplies §2.16's gradient — the
+verification-amortisation asymmetry and the bidirectionality clause that keeps it from becoming a
+privilege ladder — and with it the trust-FULL framing the whole of §2 rests on.
 [The requisite-variety guidestar](epr:requisite-variety-guidestar-epr-family-composition-2026-08-12)
 supplies §2.15's VSM framing, the algedonic diagnosis re-verified here on 2026-08-24, and the
 correction that reshaped §2.14 — *fidelity has no direction; the telos does the work*, and the
