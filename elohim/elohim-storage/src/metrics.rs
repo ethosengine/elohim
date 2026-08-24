@@ -1373,8 +1373,14 @@ lazy_static! {
     .unwrap();
 
     /// Outbound iroh sync requests. label: kind = "list_documents" |
-    /// "sync_changes"; result = "ok" | "dial_failed" | "request_failed" |
-    /// "error_response".
+    /// "sync_changes" | "announce_change" | "announce_pull"; result = "ok" |
+    /// "dial_failed" | "request_failed" | "error_response".
+    ///
+    /// The two announce kinds are the doorbell's legs (`p2p_iroh::announce_change`
+    /// sends, `p2p_iroh::sync_backend` pulls back when a doorbell carried no
+    /// usable bytes) — they are OUTBOUND on both nodes, so a converging pair
+    /// shows `announce_change` on the author and `announce_pull` on the peer
+    /// that had to fetch the dependencies.
     pub static ref IROH_SYNC_REQUESTS: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_iroh_sync_requests_total",
@@ -2898,8 +2904,9 @@ pub fn inc_iroh_sync_round() {
     IROH_SYNC_ROUNDS.inc();
 }
 
-/// Record one outbound iroh sync request ("list_documents" | "sync_changes")
-/// with its result ("ok" | "dial_failed" | "request_failed" | "error_response").
+/// Record one outbound iroh sync request ("list_documents" | "sync_changes" |
+/// "announce_change" | "announce_pull") with its result ("ok" | "dial_failed" |
+/// "request_failed" | "error_response").
 pub fn inc_iroh_sync_request(kind: &str, result: &str) {
     IROH_SYNC_REQUESTS.with_label_values(&[kind, result]).inc();
 }

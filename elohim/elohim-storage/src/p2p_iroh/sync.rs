@@ -63,6 +63,23 @@ pub const SYNC_ALPN: &[u8] = b"/elohim/sync/2.0.0";
 #[async_trait::async_trait]
 pub trait SyncBackend: Send + Sync + 'static {
     async fn handle(&self, req: SyncRequest) -> SyncResponse;
+
+    /// The same dispatch, told WHO asked.
+    ///
+    /// `AnnounceChange` is the one request whose correct answer depends on the
+    /// sender: a doorbell that carries no bytes (or bytes whose dependencies we
+    /// lack) is answered by pulling that one doc back FROM THE ANNOUNCER, which
+    /// is impossible without its `NodeId`. Every other variant ignores it.
+    ///
+    /// Defaulted to [`SyncBackend::handle`] so stub backends (parity fixtures,
+    /// benches) stay one method — only the production
+    /// [`super::SyncManagerBackend`] overrides it. `None` means the connection
+    /// had no verifiable peer identity, which degrades to exactly the old
+    /// behaviour: ack, and let the round carry it.
+    async fn handle_from(&self, peer: Option<iroh::NodeId>, req: SyncRequest) -> SyncResponse {
+        let _ = peer;
+        self.handle(req).await
+    }
 }
 
 /// [`ProtocolHandler`] that decodes [`SyncRequest`], dispatches into a
@@ -87,6 +104,10 @@ impl std::fmt::Debug for IrohSyncProtocol {
 
 impl ProtocolHandler for IrohSyncProtocol {
     async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
+        // QUIC gives us the peer's node id from its self-signed certificate —
+        // the announce arm needs it to pull back at whoever rang the doorbell.
+        // Resolved once per connection, not per stream.
+        let peer = connection.remote_node_id().ok();
         loop {
             let (mut send, mut recv) = match connection.accept_bi().await {
                 Ok(streams) => streams,
@@ -94,7 +115,7 @@ impl ProtocolHandler for IrohSyncProtocol {
                 Err(_) => return Ok(()),
             };
             let req: SyncRequest = read_frame_default(&mut recv).await.map_err(io_to_accept)?;
-            let res = self.backend.handle(req).await;
+            let res = self.backend.handle_from(peer, req).await;
             write_frame(&mut send, &res).await.map_err(io_to_accept)?;
             send.finish()
                 .map_err(|e| AcceptError::from_err(io::Error::other(e.to_string())))?;

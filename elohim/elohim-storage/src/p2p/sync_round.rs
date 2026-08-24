@@ -246,15 +246,33 @@ pub fn announcements_for_local_change_with_data(
         .map(|p| {
             (
                 *p,
-                SyncRequest::AnnounceChange {
-                    h_app_id: h_app_id.to_string(),
-                    doc_id: doc_id.to_string(),
-                    change_hash: change_hash.to_string(),
-                    change_data: change_data.clone(),
-                },
+                announce_request(h_app_id, doc_id, change_hash, change_data.clone()),
             )
         })
         .collect()
+}
+
+/// ONE announce request, addressed to nobody in particular.
+///
+/// The transport-neutral half of [`announcements_for_local_change_with_data`]:
+/// that function pairs this request with libp2p `PeerId`s, and the iroh plane's
+/// sender (`p2p_iroh::announce_change`) pairs the SAME request with iroh
+/// `NodeId`s. Keeping the request itself constructed in exactly one place is
+/// what makes "wire bytes are the contract, transport is the variable" true for
+/// the doorbell — a second hand-rolled `AnnounceChange` literal on the iroh side
+/// is how the two planes would drift a field apart without any test noticing.
+pub fn announce_request(
+    h_app_id: &str,
+    doc_id: &str,
+    change_hash: &str,
+    change_data: Option<Vec<u8>>,
+) -> SyncRequest {
+    SyncRequest::AnnounceChange {
+        h_app_id: h_app_id.to_string(),
+        doc_id: doc_id.to_string(),
+        change_hash: change_hash.to_string(),
+        change_data,
+    }
 }
 
 #[cfg(test)]

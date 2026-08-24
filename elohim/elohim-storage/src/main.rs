@@ -3068,10 +3068,14 @@ async fn async_main(
     // sled DB the libp2p path would use; only one branch ever opens it.
     #[cfg(feature = "p2p-iroh")]
     #[allow(clippy::type_complexity)]
-    let (_iroh_node, iroh_blob_store_for_http, iroh_sync_manager): (
+    let (_iroh_node, iroh_blob_store_for_http, iroh_sync_manager, iroh_sync_backend): (
         Option<elohim_storage::p2p_iroh::IrohNode>,
         Option<Arc<elohim_storage::p2p_iroh::IrohBlobStore>>,
         Option<Arc<elohim_storage::sync::SyncManager>>,
+        // The CONCRETE sync backend, kept alongside the `dyn` handler copy so
+        // the announce arm can be given its pull-back wiring (endpoint + peer
+        // book) once those exist — see `set_pull_back` below.
+        Option<Arc<elohim_storage::p2p_iroh::SyncManagerBackend>>,
     ) = if args.enable_p2p
         && config.transport_backend != elohim_storage::config::TransportBackend::Libp2p
     {
@@ -3134,8 +3138,12 @@ async fn async_main(
         // is the iroh-mode equivalent of the libp2p `node.sync_manager()` handle;
         // the producer is transport-neutral and lights whichever DocStore is live.
         let sync_manager_for_projector = sync_manager.clone();
+        // Two handles to ONE backend: the `dyn` copy the ALPN handler dispatches
+        // into, and the concrete copy that outlives this block so the doorbell's
+        // receive arm can be handed its pull-back endpoint after the node starts.
+        let sync_backend_concrete = Arc::new(SyncManagerBackend::new(sync_manager));
         let sync_backend: Arc<dyn elohim_storage::p2p_iroh::SyncBackend> =
-            Arc::new(SyncManagerBackend::new(sync_manager));
+            sync_backend_concrete.clone();
         let sync_handler = IrohSyncProtocol::new(sync_backend);
 
         // EPR backend — transport-neutral service shared with the libp2p
@@ -3326,6 +3334,7 @@ async fn async_main(
                     Some(node),
                     Some(iroh_blob_store_for_http),
                     Some(sync_manager_for_projector),
+                    Some(sync_backend_concrete),
                 )
             }
             Err(e) => {
@@ -3334,7 +3343,7 @@ async fn async_main(
             }
         }
     } else {
-        (None, None, None)
+        (None, None, None, None)
     };
 
     #[cfg(not(feature = "p2p-iroh"))]
@@ -3495,6 +3504,7 @@ async fn async_main(
             },
             elohim_storage::p2p_iroh::announcer::announce_interval(),
         );
+
         // The iroh sync-round driver — the initiator the plane never had
         // (`main.rs` used to say so in a comment). Same cadence as the libp2p
         // round; walks the book, so it does nothing until a manifest lands.
@@ -3509,6 +3519,26 @@ async fn async_main(
         } else {
             warn!("iroh: no sync manager — iroh sync-round driver NOT started");
         }
+
+        // The doorbell's RECEIVE arm needs a way to ring back. An announce that
+        // carries no usable bytes (oversized, or a change whose dependencies we
+        // lack — Automerge QUEUES those and `apply_changes` still returns Ok)
+        // is answered by pulling that one doc FROM the announcer; without the
+        // endpoint + book the arm degrades to a bare ack and the change waits
+        // for the next round. Set once, here, because this is the first point
+        // where the backend, the endpoint and the book all exist.
+        if let Some(backend) = iroh_sync_backend.as_ref() {
+            if backend.set_pull_back(
+                iroh_n.endpoint().clone(),
+                book.clone(),
+                receive_pool.clone(),
+            ) {
+                info!("iroh: announce pull-back wired — a doorbell with missing deps now pulls");
+            } else {
+                warn!("iroh: announce pull-back already set — ignoring the second wiring");
+            }
+        }
+
         info!(
             peers_known = book.len(),
             "iroh: transport-manifest announcer + gossip joiner + sync-round driver wired (the plane can now learn peers and sync)"
@@ -3902,15 +3932,44 @@ async fn async_main(
             #[cfg(feature = "p2p-iroh")]
             if p2p_node.is_none() {
                 if let Some(ref iroh_sync) = iroh_sync_manager {
+                    // The doorbell rings on the iroh plane too. The round driver
+                    // landed (see the iroh co-scope above), so the eager announce
+                    // now has the backstop the older comment here was waiting for:
+                    // a push that fails, times out, or lands on a peer missing the
+                    // change's dependencies costs latency, never correctness.
+                    //
+                    // Wired in THIS arm only — `p2p_node.is_none()` is pure-iroh.
+                    // In Dual mode the libp2p arm above owns the one producer (and
+                    // both stacks share one `Arc<SyncManager>`), so exactly one
+                    // plane rings per change and there is no redundant fan-out to
+                    // bound. See `p2p_iroh::announce_change` for the full rationale
+                    // and the iroh-only-peer trade it names.
+                    let iroh_announce_tx = match (_iroh_node.as_ref(), iroh_peer_book.as_ref()) {
+                        (Some(iroh_n), Some(book)) => {
+                            let (tx, rx) = tokio::sync::mpsc::channel::<
+                                elohim_storage::sync::projector::LocalChange,
+                            >(256);
+                            elohim_storage::p2p_iroh::spawn_iroh_announce_bridge(
+                                elohim_storage::p2p_iroh::IrohAnnounceInputs {
+                                    endpoint: iroh_n.endpoint().clone(),
+                                    book: book.clone(),
+                                    sync_manager: iroh_sync.clone(),
+                                },
+                                rx,
+                            );
+                            info!("iroh announce bridge spawned — local changes now ring the doorbell on the iroh plane");
+                            Some(tx)
+                        }
+                        _ => {
+                            warn!("iroh: no endpoint or peer book — announce bridge NOT wired, the round is the only propagation path");
+                            None
+                        }
+                    };
                     elohim_storage::sync::projector::spawn_content_projection_listener(
                         services.events.clone(),
                         iroh_sync.clone(),
                         pool.clone(),
-                        // No announce on the iroh plane yet: it has no periodic
-                        // round driver either (see the note above), so wiring a
-                        // doorbell with no backstop behind it would be the worse
-                        // half of the pair. Follows the iroh round driver.
-                        None,
+                        iroh_announce_tx,
                     );
                     info!(
                         "Content-projection producer spawned on iroh transport — \

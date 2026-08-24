@@ -54,11 +54,22 @@ async fn fixture_with_real_provider_backend(
 /// Build a real Automerge change blob — same primitives the libp2p side
 /// emits, so the wire payload is genuinely runnable through Automerge.
 fn make_change_blob(key: &str, value: &str) -> Vec<u8> {
+    make_change(key, value).0
+}
+
+/// The same blob, plus the hash that ADDRESSES it.
+///
+/// The receive arm verifies that the announced change actually landed (Automerge
+/// QUEUES a change whose deps the receiver lacks and `apply_changes` still
+/// returns `Ok`), so an announce must name the real hash — a placeholder makes
+/// the landing unverifiable and correctly yields `was_new: false`.
+fn make_change(key: &str, value: &str) -> (Vec<u8>, String) {
     let mut doc = automerge::Automerge::new();
     let mut tx = doc.transaction();
     automerge::transaction::Transactable::put(&mut tx, automerge::ROOT, key, value).unwrap();
     tx.commit();
-    doc.save()
+    let head = hex::encode(doc.get_heads()[0].0);
+    (doc.save(), head)
 }
 
 /// Round-trip an AnnounceChange + GetHeads through the iroh ALPN against
@@ -76,7 +87,7 @@ async fn announce_then_get_heads_via_iroh_dispatches_to_real_backend() -> Result
     )
     .await?;
 
-    let change_blob = make_change_blob("k1", "v1");
+    let (change_blob, change_hash) = make_change("k1", "v1");
     let client = IrohSyncClient::new(fixture.fetcher.endpoint());
 
     // 1. Announce a change to the provider — must reach the real backend.
@@ -86,7 +97,7 @@ async fn announce_then_get_heads_via_iroh_dispatches_to_real_backend() -> Result
             &SyncRequest::AnnounceChange {
                 h_app_id: "lamad".into(),
                 doc_id: "doc-real".into(),
-                change_hash: "ignored".into(),
+                change_hash,
                 change_data: Some(change_blob),
             },
         )
@@ -161,7 +172,7 @@ async fn sync_changes_returns_real_bytes_via_iroh() -> Result<()> {
     )
     .await?;
 
-    let change_blob = make_change_blob("k2", "v2");
+    let (change_blob, change_hash) = make_change("k2", "v2");
     let client = IrohSyncClient::new(fixture.fetcher.endpoint());
 
     client
@@ -170,7 +181,7 @@ async fn sync_changes_returns_real_bytes_via_iroh() -> Result<()> {
             &SyncRequest::AnnounceChange {
                 h_app_id: "lamad".into(),
                 doc_id: "doc-bytes".into(),
-                change_hash: "ignored".into(),
+                change_hash,
                 change_data: Some(change_blob),
             },
         )
@@ -234,7 +245,7 @@ async fn list_documents_via_iroh_sees_announced_doc() -> Result<()> {
             &SyncRequest::AnnounceChange {
                 h_app_id: "lamad".into(),
                 doc_id: "doc-listed".into(),
-                change_hash: "ignored".into(),
+                change_hash: make_change("k3", "v3").1,
                 change_data: Some(make_change_blob("k3", "v3")),
             },
         )

@@ -16,6 +16,7 @@
 //! required. Cutover removes one transport, never two divergent message
 //! schemas.
 
+pub mod announce_change;
 pub mod announcer;
 pub mod auth;
 pub mod auth_backends;
@@ -45,6 +46,7 @@ pub mod sync_driver;
 pub mod view_fed;
 pub mod view_fed_backend;
 
+pub use announce_change::{announce_local_change, spawn_iroh_announce_bridge, IrohAnnounceInputs};
 pub use announcer::{spawn_transport_manifest_announcer, AnnouncerInputs};
 pub use auth::{
     IdentityHandshakeBackend, IrohIdentityHandshakeClient, IrohIdentityHandshakeProtocol,

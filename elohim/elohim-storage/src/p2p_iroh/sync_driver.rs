@@ -226,7 +226,15 @@ async fn request(
     }
 }
 
-async fn reverse_project(sync_manager: &SyncManager, db_pool: Option<&DbPool>, doc_id: &str) {
+/// CRDT-heal leg: re-derive a converged content doc into the local SQL serving
+/// row (amber tier). `pub(crate)` because the announce receive arm
+/// (`super::sync_backend`) owes the same heal a pulled change gets — a doorbell
+/// that converges the DocStore but leaves the serving row stale is half a cure.
+pub(crate) async fn reverse_project(
+    sync_manager: &SyncManager,
+    db_pool: Option<&DbPool>,
+    doc_id: &str,
+) {
     if !doc_id.starts_with("node:") {
         return;
     }
