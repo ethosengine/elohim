@@ -644,7 +644,7 @@ operator list above.** Per the cluster discipline.
 ### 7.1 Provenance
 
 Canon §12 states the provenance and the reading. The locator it omits: the source conversation is
-preserved at repo root as `Proudhon, Marx, and Capital's Threat.txt` (Gemini, August 2026), and it
+titled "Proudhon, Marx, and Capital's Threat" (Gemini, August 2026), **not retained in-repo**, and it
 covers three topics canon does not mention — Fed credit policy and moral suasion, Federal Reserve
 master accounts, and DAO liability — which are where §3.3's legal findings and the sibling monetary
 paper's §3 originate.
