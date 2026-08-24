@@ -1281,6 +1281,23 @@ rather than pious. They are wiring, and wiring is checkable.**
 | Is it reciprocal? | they witness too | attention runs one way |
 | Can they leave? | yes, keeping the floor | leaving costs them their standing |
 
+**And one correction the corpus has already made to this framing, which matters enough to state
+before going further: fidelity has no direction.** The requisite-variety guidestar puts it plainly —
+*"An agent can **faithfully** represent an extractive interest… Bound to a telos, the same
+representation becomes assessable as faithful-and-serving versus faithful-and-extractive."* ✅ So the
+axis is not faithful-versus-faithless. It is **faithful to what**, and the thing that supplies the
+direction is the **declared `telos`** — which is already a first-class field on every lens in this
+paper (§2.1, §2.3). That is why a currency here must say what it is *for* and not merely what it
+*does*.
+
+**The same source corrects what the table above is for.** *"The substrate's job is **not to prevent**
+the second — it cannot, and attempting it builds a censor. It is to make it **visible and
+attributed**."* ✅ The wiring test is therefore not a gate that stops surveillance from being built;
+no such gate exists that is not itself a censor. It is an **attribution surface** — it makes what an
+Observer is wired to legible, and legible *to the observed*. This is the "third horn" the corpus
+already named as its own: *make the consequence visible and attributed without making the resource
+ownable.*
+
 **And the corpus fails this test today, in one specific and repairable place.**
 `community_connectedness_score` is documented as *"Support network quality"*, assembled from Observer
 attestations (`content_store_integrity/src/lib.rs:1513`). ✅ Trace what consumes it: it feeds
@@ -1326,6 +1343,65 @@ is either the thing that lets a community know its people or the richest dossier
 ever-present assessor is either counsel or a permanent examiner; the priced membrane is either
 redistribution or a toll. **None of them is decided by the architecture.** They are decided by whom
 each one serves, and that is the one question this paper cannot settle in code. ⚠
+
+### 2.15 Why any of this is first-class: REA is to economics what VSM is to justice
+
+One architectural claim closes §2, and it is what makes the preceding six sections something other
+than aspiration.
+
+**REA makes economic explanation a first-class property of an economic system.** A balance in a
+conventional ledger is a number you must *reconstruct* an explanation for, and the reconstruction is
+where accounting becomes narrative. Under Resource–Event–Agent there is nothing to reconstruct: the
+balance **is** the fold of the events that constitute it, each naming its resource, its agents, and
+its moment. Explanation is not a report the system produces on request. It is a **property of the
+record**, always already there, and that is why §2.9 could say REA is currency held in abstract.
+
+**The claim is that the rest of the VSM ontology does exactly this for the properties economics
+cannot carry** — justice, indemnity, restoration, community, faithfulness. Not as policies layered
+over the architecture, and not as audits performed on it afterwards, but as **interpretable
+first-class properties of anything that touches it**. The corpus already reasons this way rather
+than borrowing it for this paper: the constitution is read as **System 5**, psephos as the
+instrumentation that lets S5 be exercised collectively, and the simulation gate as the corresponding
+**System 4** anticipatory model. ✅
+
+**And the tension the claim names is Beer's, precisely.** *Static artifacts* — a lens, a policy, a
+commitment, a schema, a rate as declared — are **System 3**: the inside-and-now, what is settled and
+operating. *Abstract explorations* — an elohim reasoning over the record in a context assembled for
+the question (§2.13) — are **System 4**: the outside-and-future. The relationship between them is
+the **S3–S4 homeostat**, which Beer identified as simultaneously the most important loop in any
+viable system and the one most reliably broken. It is not a conflict to be resolved. **A system where
+S3 wins becomes rigid and blind; one where S4 wins becomes untethered.** Holding the tension *is* the
+architecture, and it is the same tension §2.12 found between a policy and a live assessment, and
+§2.11 between a cached reading and a current one.
+
+**"Demanded in realtime" has a specific meaning here, and it is the load-bearing one.** In Beer's
+model the channel that carries a challenge which must not be filtered by intermediate layers is the
+**algedonic** signal — the one that bypasses the hierarchy and reaches S5 directly when something is
+badly wrong, precisely so that a failure at the edge cannot be averaged away by the layers between.
+**An appeal is an algedonic channel.** That is the same claim §2.14 makes about the Observer and
+canon makes about discernment — *"a ceiling with no appeal is not a ceiling. It is a verdict."* ✅ —
+arriving from the cybernetic side.
+
+**Build-state adjudication, because this paper does not get to assert an architecture it has not
+checked.** Re-verified on this branch, 2026-08-24:
+
+| Claim | State |
+|---|---|
+| The algedonic channel exists as designed, typed and tested | ✅ `elohim/epr/src/algedonic.rs`, ~36KB |
+| It has a production caller | ❌ **None.** `should_emit`'s only mention outside the module is a doc comment in `epr-rea/src/store.rs:157` |
+| The DHT knows about it | ❌ **Zero** files under `elohim/holochain/` mention algedonic at all |
+| Beer's five gaps, as measured by the guidestar | ◐ **0 of 5 substantively closed** at 2026-08-12; nothing since |
+
+**So the honest statement is this.** The architecture the claim describes is real, is the corpus's
+own, and is substantially *designed* — the ontology is there, the telos field is there, the algedonic
+module is there and is careful work. **What is missing is the wire.** The property that makes justice,
+restoration and faithfulness demandable *in realtime* rather than *on inspection* is exactly the
+channel that today is connected to nothing. §2.14 found the same shape one layer down: an Observer
+wired to a price and not to care. **Twice in one section, the instrument is built and the connection
+is not** — and that is a more useful finding than either instance alone, because it names the
+project's actual failure mode. This corpus does not struggle to conceive the right primitive. **It
+struggles to connect it**, and a first-class property that nothing reads is a property in name only.
+⚠
 
 ---
 
@@ -1946,6 +2022,11 @@ steering that keeps §2 from proposing a numéraire, and the closure property th
 conservation test should adopt. [Hypha](epr:hypha-dao-autonomous-collectives-cross-pollination-2026-06-24)
 supplies N3's capital→voice refusal, the lossy-bridge invariant, and the Operational-C shape that
 decides the token plane's disposition in §5.
+[The requisite-variety guidestar](epr:requisite-variety-guidestar-epr-family-composition-2026-08-12)
+supplies §2.15's VSM framing, the algedonic diagnosis re-verified here on 2026-08-24, and the
+correction that reshaped §2.14 — *fidelity has no direction; the telos does the work*, and the
+substrate's job is to make an extractive reading **visible and attributed** rather than to prevent it,
+since prevention builds a censor.
 [Beer](epr:beer-designing-freedom-elohim-critique-2026-06-04) supplies the frame beneath the whole
 paper: money *"attenuates the full state space of human contribution down to a few priced channels,
 and care is variety that falls outside the channels"* — the answer to which is *"not a better
