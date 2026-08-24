@@ -1429,6 +1429,56 @@ decisionPoints:
       type. signing_bytes() and verify() are byte-identical copies (verified mechanically at
       authoring time); a shared leaf crate would make that structural rather than asserted.
 
+  - name: TransportManifestStore::is_enabled
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/p2p_manifests.rs
+      modulePath: routes::p2p_manifests::TransportManifestStore::is_enabled
+      line: 231
+    summary: >
+      Admission gate for the whole public /p2p/manifests surface. Reads
+      DOORWAY_MANIFEST_BOARD_ENABLED ONCE at store construction (never on the request path);
+      when false BOTH handlers return 404 (indistinguishable from an unknown route). Default
+      OFF, because the board admits any self-signed announcement (the signature verifies
+      against the announcement's own NodeId — no identity COST), which makes it Sybil-floodable
+      on a public doorway: an attacker mints 64 keypairs and evicts every real peer. accept_at's
+      C6a bound only defends against STALE floods; a fresh-Sybil flood is a different threat
+      shape, and full resistance is the deferred design in
+      genesis/data/timeline/backlog/2026-08-24-manifest-board-sybil-resistance.md.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Names its plane: a runtime enablement flag on a Category-C projection, read once at
+          AppState construction, not a truth surface and not a per-request env read.
+      - id: C6a
+        status: partial
+        justification: >
+          The gate is the STOPGAP that keeps accept_at's C6a claim honest on a public doorway:
+          accept_at bounds the store size and refuses stale-flood eviction, but NOT fresh-Sybil
+          eviction, so until the Sybil-resistance design lands the surface stays 404 off the
+          fleet (which runs dual, not pure-iroh) and is enabled only in localdev where the peer
+          set is trusted. The residual (fresh-Sybil resistance when the board IS on) is the
+          named backlog design, not this predicate's job.
+      - id: C12
+        status: answered
+        justification: >
+          The 404 is byte-identical to an unknown route, so flipping the flag is not a
+          reconnaissance signal — a prober cannot tell the feature exists on a doorway that has
+          it disabled.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/p2p_manifests.rs
+        testName: the_board_is_disabled_by_default_and_the_flag_enables_it
+        kind: unit
+      - path: doorway/doorway-service/src/routes/p2p_manifests.rs
+        testName: a_disabled_board_answers_404_indistinguishable_from_an_unknown_route
+        kind: unit
+    gapNote: >
+      Enablement is a stopgap, not the fix: the CRITICAL it mitigates (Sybil-flood peer-directory
+      poisoning) is only truly closed by an identity-cost admission design (lead candidate:
+      accept only manifests whose agent_cid already resolves via the bootstrap/kitsune2 layer).
+      Tracked as needs-brainstorm in the backlog row above.
+
   - name: AcceptOutcome
     kind: reason-outcome-enum
     sourceLocation:
