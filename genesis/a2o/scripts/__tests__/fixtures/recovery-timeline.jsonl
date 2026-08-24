@@ -1,0 +1,8 @@
+{"shape":"warm","recovered":true,"time_to_recover_s":181,"failing_legs":[],"labels":{"scenario":"homo-libp2p"},"conductor_receipt_max_s":{"recovering":null,"survivor":4.2},"zome_path":"alive"}
+{"shape":"warm","recovered":true,"time_to_recover_s":190,"failing_legs":[],"labels":{"scenario":"homo-iroh"},"conductor_receipt_max_s":{"recovering":3.1,"survivor":null},"zome_path":"inconclusive"}
+{"shape":"warm","recovered":true,"time_to_recover_s":179,"failing_legs":[],"labels":{"scenario":"homo-dual"},"conductor_receipt_max_s":{"recovering":2.5,"survivor":2.7},"zome_path":"alive"}
+{"shape":"cold","recovered":true,"time_to_recover_s":205,"failing_legs":[],"labels":{"scenario":"mixed-dual-libp2p"},"conductor_receipt_max_s":{"recovering":null,"survivor":null},"zome_path":"unknown"}
+{"shape":"cold","recovered":true,"time_to_recover_s":198,"failing_legs":[],"labels":{"scenario":"mixed-dual-iroh"},"conductor_receipt_max_s":{"recovering":1.9,"survivor":2.1},"zome_path":"alive"}
+{"shape":"warm","recovered":false,"time_to_recover_s":300,"failing_legs":["P0","P1","P2","P3"],"labels":{"scenario":"split-libp2p-iroh"},"conductor_receipt_max_s":{"recovering":null,"survivor":null},"zome_path":"dead"}
+{"shape":"warm","recovered":true,"time_to_recover_s":188,"failing_legs":[],"labels":{"scenario":"fanout-1"},"conductor_receipt_max_s":{"recovering":2.2,"survivor":2.4},"zome_path":"alive"}
+{"shape":"warm","recovered":true,"time_to_recover_s":160,"failing_legs":[],"labels":{"scenario":"fanout-2"},"conductor_receipt_max_s":{"recovering":null,"survivor":3.0},"zome_path":"unknown"}

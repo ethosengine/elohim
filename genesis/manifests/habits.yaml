@@ -60,7 +60,7 @@
 # read as visibly weaker rather than equivalent. First subject: measure-honesty-local.
 
 version: 1
-updated: 2026-08-23
+updated: 2026-08-24
 vision: >
   A p2p backplane for a socially resilient, reach-gated substrate — a human-scale,
   capture-resistant foundation for communication that can scale to global
@@ -80,6 +80,14 @@ habits:
       - "a2o @concern:transport-parity (genesis/a2o/features/dataplane/transport-comparison-matrix.feature; just mesh matrix) — identical fresh-document contract under libp2p, iroh, and dual; successful samples alone contribute timing percentiles"
       - ".claude/scripts/latency-scoreboard.py --local (and --deployed) — bounded convergence, not merely eventual: a CONJUNCTION of speed AND this habit's trust invariant, never speed alone. A fast stale head is worse than a slow correct one, so this check can only ever narrow the habit, never carry it."
     evidence: >
+      DELTA 2026-08-24b (recovery measurement reader; NO status flip):
+      `genesis/scripts/recovery-timeline.py` now renders the raw local recovery
+      JSONL as a per-run series, scenario × shape aggregates, and per-scenario
+      before/after reliability · median · spread · failing-leg deltas; null
+      conductor receipts remain absent rather than becoming 0.0, and missing
+      scenario labels remain visible as `<unlabeled>`. Focused reader tests 6/6;
+      the live 13-row series rendered 13/13. Status stays red: this improves the
+      measurement surface but does not change dataplane convergence behavior.
       DELTA 2026-08-24a (overnight iroh build-out; iroh 3/3 for the first time;
       NO status flip — flip authority is the fleet lane): the iroh plane went
       from responder-only to full parity. Landed: iroh eager-announce doorbell

@@ -41,8 +41,9 @@
  */
 
 import { strict as assert } from 'node:assert';
+import { readFileSync } from 'node:fs';
 
-import { Given, When, Then } from '@cucumber/cucumber';
+import { DataTable, Given, When, Then } from '@cucumber/cucumber';
 
 import {
   resolvePeerUrl,
@@ -107,6 +108,183 @@ interface SurfaceCapture {
 }
 const lastCapture = new WeakMap<E2EWorld, SurfaceCapture>();
 
+interface RecoveryTimelineRecord {
+  shape?: unknown;
+  recovered?: unknown;
+  time_to_recover_s?: unknown;
+  failing_legs?: unknown;
+  labels?: unknown;
+  conductor_receipt_max_s?: unknown;
+  zome_path?: unknown;
+}
+
+function recoveryScenario(record: RecoveryTimelineRecord, lineNumber: number): string {
+  assert.ok(
+    record.labels !== null && typeof record.labels === 'object' && !Array.isArray(record.labels),
+    `recovery timeline line ${lineNumber}: labels must be an object`
+  );
+  const scenario = (record.labels as Record<string, unknown>)['scenario'];
+  assert.ok(
+    typeof scenario === 'string',
+    `recovery timeline line ${lineNumber}: labels.scenario must be a string`
+  );
+  assert.ok(scenario.length > 0, `recovery timeline line ${lineNumber}: labels.scenario is empty`);
+  return scenario;
+}
+
+function loadRecoveryTimeline(pathExpression: string): RecoveryTimelineRecord[] {
+  // eslint-disable-next-line sonarjs/publicly-writable-directories -- the local mesh owns this exact task-scoped directory; MESH_DIR remains overridable for fixtures and isolated runs
+  const meshDir = process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh';
+  const timelinePath = pathExpression
+    .replaceAll('${MESH_DIR}', meshDir)
+    .replaceAll('$MESH_DIR', meshDir);
+  let raw: string;
+  try {
+    raw = readFileSync(timelinePath, 'utf8');
+  } catch (error) {
+    assert.fail(`recovery timeline ${timelinePath} is not readable: ${String(error)}`);
+  }
+
+  const records = raw
+    .split('\n')
+    .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
+    .filter(({ line }) => line.length > 0)
+    .map(({ line, lineNumber }) => {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(line);
+      } catch (error) {
+        assert.fail(`recovery timeline line ${lineNumber} is not JSON: ${String(error)}`);
+      }
+      assert.ok(
+        parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed),
+        `recovery timeline line ${lineNumber}: expected a JSON object`
+      );
+      const record = parsed as RecoveryTimelineRecord;
+      recoveryScenario(record, lineNumber);
+      return record;
+    });
+
+  assert.ok(records.length > 0, `recovery timeline ${timelinePath} has no measurement rows`);
+  return records;
+}
+
+function matchingRecoveryRecords(
+  records: RecoveryTimelineRecord[],
+  scenario: string,
+  shape: string
+): RecoveryTimelineRecord[] {
+  return records.filter(
+    (record, index) =>
+      recoveryScenario(record, index + 1) === scenario &&
+      (shape === 'any' || record.shape === shape)
+  );
+}
+
+function assertReceiptMaxima(records: RecoveryTimelineRecord[]): void {
+  for (const [index, record] of records.entries()) {
+    const receipt = record.conductor_receipt_max_s;
+    assert.ok(
+      receipt !== null && typeof receipt === 'object' && !Array.isArray(receipt),
+      `recovery timeline line ${index + 1}: conductor_receipt_max_s must be an object`
+    );
+    const maxima = receipt as Record<string, unknown>;
+    for (const role of ['recovering', 'survivor']) {
+      assert.ok(
+        Object.hasOwn(maxima, role),
+        `recovery timeline line ${index + 1}: conductor_receipt_max_s.${role} is absent`
+      );
+      const value = maxima[role];
+      assert.ok(
+        value === null || (typeof value === 'number' && Number.isFinite(value)),
+        `recovery timeline line ${index + 1}: conductor_receipt_max_s.${role} ` +
+          `must be a finite number or null, got ${JSON.stringify(value)}`
+      );
+    }
+  }
+}
+
+function assertZomePaths(records: RecoveryTimelineRecord[], allowedCsv: string): void {
+  const allowed = new Set(allowedCsv.split(',').map(value => value.trim()));
+  assert.ok(allowed.size > 0, 'every-record-zome-path requires at least one allowed value');
+  for (const [index, record] of records.entries()) {
+    assert.ok(
+      typeof record.zome_path === 'string' && allowed.has(record.zome_path),
+      `recovery timeline line ${index + 1}: zome_path ${JSON.stringify(record.zome_path)} ` +
+        `is not one of ${[...allowed].join(', ')}`
+    );
+  }
+}
+
+function assertRecoveredUnder(
+  records: RecoveryTimelineRecord[],
+  scenario: string,
+  shape: string,
+  thresholdText: string
+): void {
+  const thresholdSeconds = Number(thresholdText);
+  assert.ok(
+    Number.isFinite(thresholdSeconds) && thresholdSeconds > 0,
+    `recovered-under-seconds requires a positive numeric value, got ${JSON.stringify(thresholdText)}`
+  );
+  const matches = matchingRecoveryRecords(records, scenario, shape);
+  assert.ok(
+    matches.length > 0,
+    `recovery timeline has no rows to measure for scenario=${scenario} shape=${shape}`
+  );
+  for (const record of matches) {
+    assert.equal(
+      record.recovered,
+      true,
+      `${scenario}/${shape} recorded recovered=${JSON.stringify(record.recovered)}`
+    );
+    assert.ok(
+      typeof record.time_to_recover_s === 'number' &&
+        Number.isFinite(record.time_to_recover_s) &&
+        record.time_to_recover_s < thresholdSeconds,
+      `${scenario}/${shape} time_to_recover_s=${JSON.stringify(record.time_to_recover_s)} ` +
+        `must be under ${thresholdSeconds}`
+    );
+  }
+}
+
+function assertExpectedRed(
+  records: RecoveryTimelineRecord[],
+  scenario: string,
+  shape: string,
+  legsCsv: string
+): void {
+  const requiredLegs = legsCsv
+    .split(',')
+    .map(leg => leg.trim())
+    .filter(Boolean);
+  assert.ok(requiredLegs.length > 0, 'expected-red-with-failing-legs needs leg names');
+  const matches = matchingRecoveryRecords(records, scenario, shape);
+  assert.ok(
+    matches.length > 0,
+    `recovery timeline has no expected-red rows for scenario=${scenario} shape=${shape}`
+  );
+  for (const record of matches) {
+    assert.equal(
+      record.recovered,
+      false,
+      `${scenario}/${shape} must remain an expected red, got recovered=${JSON.stringify(record.recovered)}`
+    );
+    assert.ok(
+      Array.isArray(record.failing_legs) &&
+        record.failing_legs.every(leg => typeof leg === 'string'),
+      `${scenario}/${shape} failing_legs must be a string array`
+    );
+    const actualLegs = new Set(record.failing_legs);
+    for (const leg of requiredLegs) {
+      assert.ok(
+        actualLegs.has(leg),
+        `${scenario}/${shape} failing_legs=${JSON.stringify([...actualLegs])} is missing ${leg}`
+      );
+    }
+  }
+}
+
 /** Helper: get or create the peer URL map for this world instance */
 function getPeerMap(world: E2EWorld): Map<string, string> {
   let m = peerUrls.get(world);
@@ -150,6 +328,58 @@ Given(
     getPeerMap(this).set(peerName, url);
     // Also register as a doorway so shared doorway-based steps work on the same peer
     this.addDoorway(peerName, url);
+  }
+);
+
+/**
+ * Read the recovery harness's append-only JSONL artifact and apply the
+ * feature's declarative measurement contract. This is deliberately one step:
+ * the matrix owns churn and record production; a2o is only the reader that
+ * joins those foreign measurements to @concern:transport-diversity.
+ */
+Then(
+  'the completed recovery timeline at {string} satisfies:',
+  function (this: E2EWorld, timelinePath: string, table: DataTable) {
+    const records = loadRecoveryTimeline(timelinePath);
+
+    for (const row of table.hashes()) {
+      const rule = (row['rule'] ?? '').trim();
+      const scenario = (row['scenario'] ?? 'any').trim();
+      const shape = (row['shape'] ?? 'any').trim();
+      const value = (row['value'] ?? '').trim();
+      assert.ok(rule, 'recovery timeline contract row is missing rule');
+
+      switch (rule) {
+        case 'scenario-present': {
+          assert.notEqual(scenario, 'any', 'scenario-present requires a named scenario');
+          const matches = matchingRecoveryRecords(records, scenario, shape);
+          assert.ok(
+            matches.length > 0,
+            `recovery timeline has no row for scenario=${scenario} shape=${shape}`
+          );
+          break;
+        }
+        case 'recovered-under-seconds':
+          assertRecoveredUnder(records, scenario, shape, value);
+          break;
+        case 'expected-red-with-failing-legs':
+          assertExpectedRed(records, scenario, shape, value);
+          break;
+        case 'every-record-receipt-max':
+          assert.equal(
+            value,
+            'number-or-null',
+            `every-record-receipt-max value must be number-or-null, got ${JSON.stringify(value)}`
+          );
+          assertReceiptMaxima(records);
+          break;
+        case 'every-record-zome-path':
+          assertZomePaths(records, value);
+          break;
+        default:
+          assert.fail(`unknown recovery timeline contract rule ${JSON.stringify(rule)}`);
+      }
+    }
   }
 );
 
