@@ -32,6 +32,7 @@ just dev start                # isolated conductor + storage + doorway
 just mesh status              # local multi-peer mesh
 MESH_TRANSPORT_BACKEND=dual just mesh start  # storage Track-2 mode: libp2p | dual | iroh
 just mesh prologue            # Act I Prologue: cast + seed + stage + fixture manifest (run after `just mesh start`)
+just mesh recovery-matrix     # recovery scenario library × warm/cold shapes × runs (Task 2 + Task 5 required)
 just seed validate            # non-writing schema validation
 just look page <url>          # eyes-first render
 just status habits

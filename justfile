@@ -200,7 +200,7 @@ dev action="status" profile="isolated" seed="false" build="false":
     esac
 
 # Manage or measure the local multi-peer mesh. Safe default: status.
-mesh action="status":
+mesh action="status" *args:
     #!/usr/bin/env bash
     set -euo pipefail
     case "{{ action }}" in
@@ -208,7 +208,9 @@ mesh action="status":
       quiesce) exec "{{ app_dir }}/scripts/hc-mesh-quiesce.sh" ;;
       monitor) exec python3 "{{ app_dir }}/scripts/hc-mesh-monitor.py" ;;
       matrix) exec "{{ app_dir }}/scripts/hc-mesh-transport-matrix.sh" ;;
-      *) echo "mesh action must be start|stop|status|probe|prologue|quiesce|monitor|matrix" >&2; exit 2 ;;
+      recovery) exec "{{ app_dir }}/scripts/hc-mesh-recovery.sh" {{ args }} ;;
+      recovery-matrix) exec "{{ app_dir }}/scripts/hc-mesh-recovery-matrix.sh" ;;
+      *) echo "mesh action must be start|stop|status|probe|prologue|quiesce|monitor|matrix|recovery|recovery-matrix" >&2; exit 2 ;;
     esac
 
 # Seed content or validate a corpus facet. False content dry-run modes are intentionally absent.

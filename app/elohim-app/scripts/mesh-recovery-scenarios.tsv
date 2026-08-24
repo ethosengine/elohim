@@ -1,0 +1,13 @@
+# scenario	peers	doorways	survivor	recovering	expect
+# The configurations are the library; the slots cycle through it. `peers`
+# names the mesh shape a scenario needs; the matrix reshapes the mesh only
+# when consecutive scenarios differ in peers/doorways (a full stop/start).
+homo-libp2p	matthew,jessica	1	libp2p	libp2p	recover
+homo-iroh	matthew,jessica	1	iroh	iroh	recover
+homo-dual	matthew,jessica	1	dual	dual	recover
+mixed-dual-libp2p	matthew,jessica	1	dual	libp2p	recover
+mixed-dual-iroh	matthew,jessica	1	dual	iroh	recover
+split-libp2p-iroh	matthew,jessica	1	libp2p	iroh	no-shared-transport
+# fanout family — the torrent effect (spec §3.3): 1 recoverer <- N survivors, doorway-less
+fanout-1	matthew,jessica	0	dual	dual	recover
+fanout-2	matthew,jessica,james	0	dual	dual	recover
