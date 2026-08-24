@@ -233,13 +233,12 @@ undifferentiated stretch.** It has four movements:
 |---|---|
 | **2.1 – 2.4** | The mechanism and its constitutional bounds — currency as a declared lens, the three-function decomposition, the five knobs, the eight never-rules |
 | **2.5 – 2.9** | Capture resistance, and the un-denominated record beneath every denomination |
-| **2.10 – 2.13** | The boundary and the founding condition — the membrane, the composition claim, insurance, and abundant local inference |
-| **2.14 – 2.16** | Where the wiring fails, and what a mandate would cost — the Observer, VSM as first-class properties, and the trust gradient |
+| **2.10 – 2.12** | The boundary and the founding condition — the membrane, the composition claim, and insurance under abundant local inference |
+| **2.13 – 2.15** | Where the wiring fails, and what a mandate would cost — the Observer, VSM as first-class properties, and the trust gradient |
 
-*A structural note this paper owes its reader: subsections 2.10–2.16 were written after §§3–8 and are*
-*being integrated into them, not the reverse. Two repairs a review identified remain open — merging*
-*2.12 into 2.13 (they are one movement split across a boundary) and inverting 2.11 so what is built*
-*precedes the full-strength claim. Both are deferred, not disagreed with.*
+*Provenance note: subsections 2.10–2.15 were written after §§3–8 and have since been integrated back*
+*into them — §5 collects their build-state findings, §7 carries their rows, §8 disciplines their*
+*claims.*
 
 ### 2.1 A currency is a configuration, declared as a lens — and the lens already ships
 
@@ -1020,11 +1019,27 @@ the risk a priced membrane runs, which is why the second constraint below is not
 
 ### 2.11 What §2 composes into — and the line it must not cross
 
-Stated at full strength, because the claim is the operator's and deserves to be met rather than
-softened: **the protocol occupies, in effect, the role of a maximally honest and disciplined
-underwriting, banking, and investment system at scale** — because an assessor can sit at nearly every
-transaction, externality and risk, and price it against what is actually known rather than against a
-proxy. Wisdom available at the scale of everything the network can see.
+**Ground first, ceiling second — because stating the maximal claim and then qualifying it toward
+zero is the shape of salesmanship, and an earlier pass of this section had that order backwards.**
+
+**What is actually built**, as of 2026-08-24: one insurance mutual's risk profile that prices on
+behavioural observation rather than credit-score proxies, over a five-rung governance ladder, with no
+exposure-base field for scale to attach to (§2.12). That is the whole of it.
+
+**What it could compose into**, given the argument of §2.9–2.10: assessment cheap enough to sit at a
+particular case rather than a class average, on a record that holds the context a price discards.
+
+**What would be required before any of that is real**: a standing layer that cannot be earned on
+unsettled signals (H5), ratification that is not single-write-capturable (§5), a funded pool with
+named loss-bearers (§2.12), and an energy figure nobody has produced (§2.15).
+
+**And only then, the ceiling this composes toward** — the claim as the operator states it, met rather
+than softened: **the protocol occupies, in effect, the role of a maximally honest and disciplined
+underwriting, banking, and investment system at scale**, because an assessor can sit at nearly every
+transaction, externality and risk, pricing it against what is actually known rather than against a
+proxy. Wisdom available at the scale of everything the network can see. **That is a ceiling, not a
+report** — and the distance between it and the first paragraph above is the honest measure of this
+paper.
 
 **The three institutions are one function, separated by an accident of cost.** Underwriting prices a
 claim about the future given a counterparty. So does lending; so does investing. They differ in tempo
@@ -1097,7 +1112,20 @@ behavioural risk profile — scores members rather than judgment and still carri
 tier. This section is the composition §2 points at, recorded so it can be argued with and so the line
 it must not cross is written down **before** anyone is tempted to cross it. ⚠
 
-### 2.12 Insurance dissolves: from a static policy to an affordance of participation
+### 2.12 The founding condition, insurance dissolved, and requisite variety
+
+**Everything in §2.9–2.11 is a consequence of one condition, and the paper should have said so
+first.** The question this protocol exists to answer is: *what becomes possible when AI inference is
+**common, embedded, local, and affordable at the scale of a personal computer**?* Not rented from a
+datacenter, not accessed as a service, not metered — **running in the house, on hardware someone
+owns.** That is the founding condition, not an implementation detail, and every claim in the
+preceding sections is downstream of it.
+
+It is also why the sibling paper spends its most concrete sections on the datacenter fight (§5.7–5.8
+there): that fight is, precisely, over whether inference stays **rented** or becomes **owned**. Every
+consequence below turns on which way it goes, which is why this paper treats the founding condition
+as contingent rather than assured.
+
 
 §2.11 named three assessors. The insurance chain actually runs four, and completing the list is what
 exposes the deeper claim.
@@ -1197,21 +1225,7 @@ floor/above-floor split in `CoveragePolicy`, no appeal path attached to a claim,
 tier is live in the entry type today. What §2.12 supplies is the *shape* of the dissolution and the
 four things that must survive it. ⚠
 
-### 2.13 The founding condition, and re-reading §2.11–2.12 from inside it
-
-**Everything in §2.9–2.12 is a consequence of one condition, and the paper should have said so
-first.** The question this protocol exists to answer is: *what becomes possible when AI inference is
-**common, embedded, local, and affordable at the scale of a personal computer**?* Not rented from a
-datacenter, not accessed as a service, not metered — **running in the house, on hardware someone
-owns.** That is the founding condition, not an implementation detail, and every claim in the
-preceding four sections is downstream of it.
-
-It is also why the sibling paper spends its most concrete sections on the datacenter fight (§5.7–5.8
-there): that fight is, precisely, over whether inference stays **rented** or becomes **owned**. Every
-consequence below turns on which way it goes, which is why this paper treats the founding condition
-as contingent rather than assured.
-
-**An operator correction, and it lands.** The costs in §2.11 and the four disciplines in §2.12 were
+**An operator correction, and it lands.** The costs in §2.11 and the four disciplines below were
 each framed against **a scarce, central, single assessor** — one underwriter, one adjuster, one file,
 one institution deciding. That is the *incumbent's* constraint, and importing it silently is how a
 genuinely different regime gets audited by the rules of the one it replaces. Three of those concerns
@@ -1267,7 +1281,7 @@ description of the baseline.
 
 | §2.12 concern | What it assumed | What it is under the affordance |
 |---|---|---|
-| **Continuous assessment = surveillance** | one observer, accumulating a dossier held centrally, used against you | **Witnessed, not surveilled.** The distinction is *who holds the record and whom the inference serves*. Inference on a participant's own hardware, reading their own record, emitting a claim rather than a file, with *"computation local, aggregation voluntary and anonymised"* ✅ — the dossier is a property of **central** assessment, not of continuity. **But this answer is topological, and topology is necessary rather than sufficient — §2.14 is the real one.** |
+| **Continuous assessment = surveillance** | one observer, accumulating a dossier held centrally, used against you | **Witnessed, not surveilled.** The distinction is *who holds the record and whom the inference serves*. Inference on a participant's own hardware, reading their own record, emitting a claim rather than a file, with *"computation local, aggregation voluntary and anonymised"* ✅ — the dossier is a property of **central** assessment, not of continuity. **But this answer is topological, and topology is necessary rather than sufficient — §2.13 is the real one.** |
 | **Liquidity costs certainty** | that a live assessment and a hard promise are a trade-off | **They are not.** A **fixed promise over a live pool**: the Commitment is immutable-with-supersession ✅ and binds exactly as a policy did, while the underwriting behind it is continuously current. That is strictly better than the incumbent's fixed promise over a *stale* assessment. |
 | **Adjusting is structurally adversarial** | one adjuster, paid by one side, from the same pot as the recovery | **De-structuralised.** Adversariality was a property of *shareholder* capital and a single paid assessor. With the claimant's agent, the pool's agent, and neighbours' agents each reading a shared record, disagreement becomes an ordinary resolvable difference rather than a built-in opposition. Not eliminated — *not structural*. |
 | **The lawyer must not dissolve** | that the appeal requires a profession | **I conflated the appeal with a role.** An appeal needs a *differently-situated reader with standing to disagree* — which under this affordance is **abundant rather than rationed**. The appeal does not shrink; it becomes ubiquitous. |
@@ -1312,7 +1326,7 @@ respected rather than out-computed. The affordance and the refusal point the sam
    provenance-and-update-path attestation on the advising agent is the natural shape, and it is a
    far smaller thing than a diversity metric. ⚠
 
-### 2.14 The Observer: witness and surveillance are the same instrument
+### 2.13 The Observer: witness and surveillance are the same instrument
 
 §2.13 answered the surveillance objection **topologically** — local inference, own hardware, own
 record, aggregation voluntary. That answer is true and it is not the heart of it, because a
@@ -1405,7 +1419,7 @@ ever-present assessor is either counsel or a permanent examiner; the priced memb
 redistribution or a toll. **None of them is decided by the architecture.** They are decided by whom
 each one serves, and that is the one question this paper cannot settle in code. ⚠
 
-### 2.15 Why any of this is first-class: REA is to economics what VSM is to justice
+### 2.14 Why any of this is first-class: REA is to economics what VSM is to justice
 
 One architectural claim closes §2, and it is what makes the preceding six sections something other
 than aspiration.
@@ -1439,7 +1453,7 @@ architecture, and it is the same tension §2.12 found between a policy and a liv
 model the channel that carries a challenge which must not be filtered by intermediate layers is the
 **algedonic** signal — the one that bypasses the hierarchy and reaches S5 directly when something is
 badly wrong, precisely so that a failure at the edge cannot be averaged away by the layers between.
-**An appeal is an algedonic channel.** That is the same claim §2.14 makes about the Observer and
+**An appeal is an algedonic channel.** That is the same claim §2.13 makes about the Observer and
 canon makes about discernment — *"a ceiling with no appeal is not a ceiling. It is a verdict."* ✅ —
 arriving from the cybernetic side.
 
@@ -1457,14 +1471,14 @@ checked.** Re-verified on this branch, 2026-08-24:
 own, and is substantially *designed* — the ontology is there, the telos field is there, the algedonic
 module is there and is careful work. **What is missing is the wire.** The property that makes justice,
 restoration and faithfulness demandable *in realtime* rather than *on inspection* is exactly the
-channel that today is connected to nothing. §2.14 found the same shape one layer down: an Observer
+channel that today is connected to nothing. §2.13 found the same shape one layer down: an Observer
 wired to a price and not to care. **Twice in one section, the instrument is built and the connection
 is not** — and that is a more useful finding than either instance alone, because it names the
 project's actual failure mode. This corpus does not struggle to conceive the right primitive. **It
 struggles to connect it**, and a first-class property that nothing reads is a property in name only.
 ⚠
 
-### 2.16 A trust-FULL architecture, the compute/trust gradient, and how a mandate is earned
+### 2.15 A trust-FULL architecture, the compute/trust gradient, and how a mandate is earned
 
 **The whole of §2 rests on an inversion that should be said outright, because the field this paper
 borrows vocabulary from says the opposite.** The dominant architectural boast in distributed systems
@@ -1477,9 +1491,9 @@ peer in their reach; untrustworthy peers impose it."* ✅
 **Which is why a trustless architecture cannot do anything in §2.9–2.15, and not for want of
 cleverness.** Trustlessness *is* attenuation adopted as a design goal: context is precisely what you
 cannot use if you refuse to trust whoever supplied it. So a trustless system can have an **observer
-but never a witness** (witness requires a relationship the watched has a claim on, §2.14); a **rule
+but never a witness** (witness requires a relationship the watched has a claim on, §2.13); a **rule
 but never a discernment** (§2.8); a **payout but never care** (§2.12); **consensus but never an
-appeal** (§2.15). It pays maximum verification cost forever, by design, and calls the bill a virtue.
+appeal** (§2.14). It pays maximum verification cost forever, by design, and calls the bill a virtue.
 
 **The compute/trust gradient is that spectrum made a first-class axis**, and trustlessness is simply
 its degenerate endpoint — trust pinned at zero, verification cost pinned at maximum, permanently.
@@ -1525,19 +1539,19 @@ uncharitably, **an accountability-decay function**. *"We have done this faithful
 years, do not audit us"* is the compute/trust gradient asserted by an institution that has stopped
 deserving it, and nothing in the arithmetic distinguishes that from legitimately earned amortisation.
 **So the gradient requires a floor that never attenuates, no matter how much standing accrues:** the
-appeal, and the algedonic channel that carries it (§2.15). Those must remain at full cost forever,
+appeal, and the algedonic channel that carries it (§2.14). Those must remain at full cost forever,
 because they are the only things that can report that the accrued trust is no longer warranted.
 
 **And that is where the arc closes, uncomfortably.** The one channel that must never be optimised
-away by accumulated trust is **the channel currently connected to nothing** (§2.15) — and the
+away by accumulated trust is **the channel currently connected to nothing** (§2.14) — and the
 Observer that would carry the evidence of faithful operation is **wired to a price rather than to
-care** (§2.14), and the council that would hold the mandate is **single-write-capturable** (§5), and
+care** (§2.13), and the council that would hold the mandate is **single-write-capturable** (§5), and
 the insurance mutual that is the most-built instance of all of this still ships an **`uninsurable`
 tier** (§2.12).
 
 **So the honest closing position of §2 is not that the protocol has a mandate. It is that it has an
 argument, and a gradient it must climb like anyone else.** A protocol asking the world for a mandate
-while those four stand would be doing exactly what §2.10 refuses at the membrane and §2.14 refuses of
+while those four stand would be doing exactly what §2.10 refuses at the membrane and §2.13 refuses of
 the Observer: claiming a standing it has not earned. **The four are therefore not a punch-list. They
 are the first rungs of the mandate itself** — and this is the strongest argument the paper can make
 for why the wiring, not the architecture, is where the next work belongs. ⚠
@@ -1869,7 +1883,7 @@ governance have no habit-bound proof by construction. All 21 shefa scenarios are
 repo's covenant, none of this paper's takes is schedulable as first-class delivery until a red habit
 exists with a runnable check. **The first deliverable is the red, not the spec.**
 
-**This audit is not exhaustive, and §§2.10–2.16 carry their own.** Those subsections were written
+**This audit is not exhaustive, and §§2.10–2.15 carry their own.** Those subsections were written
 after this section and adjudicate their own claims inline; collected here so there is one place to
 look: the **membrane** has no provenance field on a bridge payment and no dynamic pricing anywhere
 (§2.10); the **composition** of underwriting/banking/investment is argued, not built (§2.11); the
@@ -1880,7 +1894,7 @@ continuous re-assessment, no floor/above-floor split, no appeal path on a claim,
 `uninsurable` tier (`:1538`) ✅; the **Observer** feeds `community_connectedness_score` (`:1513`) into
 `risk_score` → `risk_tier` and **nothing else** ✅; and the **algedonic channel** exists as typed,
 tested code with **no production caller**, with zero files under `elohim/holochain/` referencing it
-(§2.15) ✅. Re-verified 2026-08-24. **The pattern across all five is the same one §2.15 names: the
+(§2.14) ✅. Re-verified 2026-08-24. **The pattern across all five is the same one §2.14 names: the
 instrument is built and the connection is not.**
 
 ---
@@ -1889,7 +1903,7 @@ instrument is built and the connection is not.**
 
 *(take / study / leave / watch. "Take" means re-implement properly in our architecture.)*
 
-*(These verdicts predate §§2.10–2.16. The actionable items from those subsections — the Observer's
+*(These verdicts predate §§2.10–2.15. The actionable items from those subsections — the Observer's
 second consumer, the algedonic wire, the `uninsurable` resolution, the advising-agent provenance
 attestation — are carried in §7 as proposed-not-minted rows and standalone findings rather than
 duplicated here. A later pass should fold them into this list.)*
@@ -1959,14 +1973,10 @@ Both comparative political-economy documents deliberately minted zero rows, defe
 grounds; their §10 audit retired that precondition, so the successor was expected to close it. **This
 paper closes §9 graduation item 1** (the amplified set A1–A5 as Measure-family rows) **for A5**.
 
-*(Row 11 below is the exception: it is **proposed on 2026-08-24 and not yet written** into the
-cluster file. It is listed so the mint pass has a mechanical input, not so the table can be read as
-complete.)*
-
-**MINTED 2026-08-23** — live, not proposed: `commons-holonic-stewardship-backlog` **rows 21–23**
+**MINTED 2026-08-23**, extended **2026-08-24** — all live, none proposed: `commons-holonic-stewardship-backlog` **rows 21–23**
 (`binds-policy`, currency-as-Mishpat-lens with the eight never-rules, the three-function
 decomposition) · `measure-family-borrows-backlog` **row 21** (the Cantillon detector) ·
-`arch-workspace-discipline-backlog` **row 14** (the legal-person / bridge-institution layer) · and
+`arch-workspace-discipline-backlog` **row 14** (the legal-person / bridge-institution layer) · `commons-holonic-stewardship-backlog` **rows 24–25** (the second consumer; the floor/above-floor split retiring `uninsurable`) · `measure-family-borrows-backlog` **rows 24–25** (decision-quality attribution H5; advising-agent provenance A6) · and
 `2026-08-23-concentration-mu-accidental-numeraire.md` standalone.
 
 | Status | Take | Destination | Row shape |
@@ -1975,9 +1985,9 @@ decomposition) · `measure-family-borrows-backlog` **row 21** (the Cantillon det
 | MINTED | 2, 4 — never-rules as floor/ceiling lenses; the five-knob `rule` schema | [commons-holonic-stewardship-backlog](epr:commons-holonic-stewardship-backlog) | A currency circuit as `author-lens` with `role` ∈ {lens, floor, ceiling}. **p2p-design-gate: zero new DHT entry types, zero new commitment actions.** Carries N1–N8 verbatim. |
 | MINTED | 3 — the three-function decomposition | [commons-holonic-stewardship-backlog](epr:commons-holonic-stewardship-backlog) | Three `role`-typed lenses rather than one currency: MoE (`telos`: circulation; carry cost/stock limit legitimate), SoV (`telos`: preservation across time; **accretion refused** — growth-by-holding is unearned increment and therefore common inheritance per Stance I.4), UoA (`telos`: commensuration for a *stated* scope). Gate: the accretion limit must be stated as a `role: ceiling` lens, and the prudence-vs-accumulation judgment must be **excluded** from the mechanical floor. Sibling of Take 2's never-rules; **zero new entry types.** |
 | MINTED | 5 — the Cantillon detector | [measure-family-borrows-backlog](epr:measure-family-borrows-backlog) | A Measure family composing with [middot](epr:middot-measure-primitive-design): issuance joined to first-recipient standing and to lag-until-first-settled-reciprocity. Sibling of A5's issuance-vs-settled-reciprocity ratio; **closes trap-detectors §9 item 1 for A5.** |
-| **PROPOSED** | **13 — the second consumer (faithful Observer)** | [commons-holonic-stewardship-backlog](epr:commons-holonic-stewardship-backlog) | A care-producing consumer of `community_connectedness_score`, so that thinning support reaches people who can act **before and independently of** anything it implies about premium (`content_store_integrity/src/lib.rs:1513`). Today the score feeds `risk_score` → `risk_tier` and nothing else, which is §2.14's faithless wiring, shipped. **Not a new entry type — a second reader of an existing field.** |
-| **PROPOSED** | **12 — advising-agent provenance (A6)** | [measure-family-borrows-backlog](epr:measure-family-borrows-backlog) | An attestation an advising elohim makes **about itself**: where its weights came from, who controls its update path, and whether it resolves anything to a central endpoint. §2.13 establishes that diversity is the substrate's resting state and **centralisation is the detectable deviation** — so this is deliberately *not* a diversity metric across a population, which may not be well-posed. It is the local, answerable question, and it is the natural home for trap A6. |
-| **PROPOSED** | **11 — decision-quality attribution (H5)** | [measure-family-borrows-backlog](epr:measure-family-borrows-backlog) | A Measure family joining a **pricing or underwriting decision** to the losses that settle after its author has changed scope, so standing cannot be earned on a signal that has not settled. N5's *lag-until-first-settled-reciprocity* redirect, applied to **standing** rather than to units. Sibling of Take 5's Cantillon detector; closes the gap §2.10 names against `MemberRiskProfile`, which scores members and not judgment. |
+| MINTED | 13 — the second consumer (faithful Observer) | [commons-holonic-stewardship-backlog](epr:commons-holonic-stewardship-backlog) | A care-producing consumer of `community_connectedness_score`, so that thinning support reaches people who can act **before and independently of** anything it implies about premium (`content_store_integrity/src/lib.rs:1513`). Today the score feeds `risk_score` → `risk_tier` and nothing else, which is §2.13's faithless wiring, shipped. **Not a new entry type — a second reader of an existing field.** |
+| MINTED | 12 — advising-agent provenance (A6) | [measure-family-borrows-backlog](epr:measure-family-borrows-backlog) | An attestation an advising elohim makes **about itself**: where its weights came from, who controls its update path, and whether it resolves anything to a central endpoint. §2.13 establishes that diversity is the substrate's resting state and **centralisation is the detectable deviation** — so this is deliberately *not* a diversity metric across a population, which may not be well-posed. It is the local, answerable question, and it is the natural home for trap A6. |
+| MINTED | 11 — decision-quality attribution (H5) | [measure-family-borrows-backlog](epr:measure-family-borrows-backlog) | A Measure family joining a **pricing or underwriting decision** to the losses that settle after its author has changed scope, so standing cannot be earned on a signal that has not settled. N5's *lag-until-first-settled-reciprocity* redirect, applied to **standing** rather than to units. Sibling of Take 5's Cantillon detector; closes the gap §2.10 names against `MemberRiskProfile`, which scores members and not judgment. |
 | MINTED | 10 — Fureai Kippu cross-region transfer | [measure-family-borrows-backlog](epr:measure-family-borrows-backlog) | The N7 boundary test as a study row, not a borrow: does a care unit that crosses a locality retain its meaning, and what did the Japanese case actually do about it? |
 | MINTED | 7 — the bridge institution | [arch-workspace-discipline-backlog](epr:arch-workspace-discipline-backlog) | Joins the sibling's legal-person row and the two open licensing decisions (rows 2, 9). Carries the four invariants, most of all *no single bridge load-bearing*. |
 
@@ -1989,7 +1999,7 @@ rather than to a cluster:
   `responsibility_demand_configs.rs:143`) — `approve >= 0` with `eligibility_predicate: None`. Gates
   every council claim in both papers.
 - **The accidental numéraire** (`concentration_service.rs:47`) — Take 6.
-- **The faithless Observer wiring** (`content_store_integrity/src/lib.rs:1513`) — §2.14.
+- **The faithless Observer wiring** (`content_store_integrity/src/lib.rs:1513`) — §2.13.
   `community_connectedness_score` ("Support network quality", from Observer attestations) feeds
   `risk_score` → `risk_tier` and **nothing else**: no outreach, no check-in, no isolation alert
   anywhere in the zome. A person becoming isolated produces a worse tier and does not produce anyone
@@ -2002,8 +2012,8 @@ rather than to a cluster:
   system*. §2.12 now resolves the *shape* of the answer from canon — **belonging is never gated, only
   reach is**, so an unconditional floor of coverage with earned extent above it — leaving the
   operator a bounded decision rather than an open question. The accompanying design row (a
-  floor/above-floor split in `CoveragePolicy`, which today has no such field) is **proposed
-  2026-08-24, not yet minted.**
+  floor/above-floor split in `CoveragePolicy`, which today has no such field) is minted as
+  `commons-holonic-stewardship-backlog` **row 25**.
 
 **Not minted — held for the operator.** The disposition of `elohim/elohim-token` (crate README and
 settlement-bridge claims vs Stance I.2, §5) and the retirement of the stale token/blockchain sections
@@ -2142,16 +2152,16 @@ thesis is ◐ and its efficiency–resilience coordinate is excluded entirely.
    the standing layer (H5) and the ratification defect (§5), both open. **Scale applied before those
    are fixed is an amplifier, not a repair**, and this paper would rather say so than be quoted as
    having promised the composition. ⚠
-10. **§§2.10–2.14's proposals are undisciplined by any limit above.** The membrane, the insurance
+10. **§§2.10–2.13's proposals are undisciplined by any limit above.** The membrane, the insurance
    dissolution, the witness/surveillance distinction and the VSM claim each carry inline "state of
    it" notes, but the limits in this section were written before them. Four gaps specifically: the
    **pool mechanics** of a dissolved insurance form are unaddressed (§2.12) and are the Trueque trap
    on the loss side; the **faithful/faithless distinction cannot be settled in code** — it depends on
-   whom each instrument serves, which is the paper's own admission (§2.14); the **algedonic channel
-   is connected to nothing**, so "demandable in realtime" is a property in name only (§2.15); and the
+   whom each instrument serves, which is the paper's own admission (§2.13); the **algedonic channel
+   is connected to nothing**, so "demandable in realtime" is a property in name only (§2.14); and the
    compute/trust gradient is, read uncharitably, an **accountability-decay function** whose only
-   defence is a floor that does not currently exist (§2.16). ⚠
-11. **The natural mandate is claimed on an unmeasured quantity.** §2.16 argues the protocol earns a
+   defence is a floor that does not currently exist (§2.15). ⚠
+11. **The natural mandate is claimed on an unmeasured quantity.** §2.15 argues the protocol earns a
    natural mandate only by working inside physical and ecological limits — and the energy cost of
    ubiquitous local inference (§2.13) has never been measured here. That is the one mandate argument
    in this paper that cannot be advanced by reasoning at all, and it is currently advanced by
@@ -2194,12 +2204,12 @@ steering that keeps §2 from proposing a numéraire, and the closure property th
 conservation test should adopt. [Hypha](epr:hypha-dao-autonomous-collectives-cross-pollination-2026-06-24)
 supplies N3's capital→voice refusal, the lossy-bridge invariant, and the Operational-C shape that
 decides the token plane's disposition in §5.
-[Trust is an efficiency signal](epr:trust-as-efficiency-signal) supplies §2.16's gradient — the
+[Trust is an efficiency signal](epr:trust-as-efficiency-signal) supplies §2.15's gradient — the
 verification-amortisation asymmetry and the bidirectionality clause that keeps it from becoming a
 privilege ladder — and with it the trust-FULL framing the whole of §2 rests on.
 [The requisite-variety guidestar](epr:requisite-variety-guidestar-epr-family-composition-2026-08-12)
-supplies §2.15's VSM framing, the algedonic diagnosis re-verified here on 2026-08-24, and the
-correction that reshaped §2.14 — *fidelity has no direction; the telos does the work*, and the
+supplies §2.14's VSM framing, the algedonic diagnosis re-verified here on 2026-08-24, and the
+correction that reshaped §2.13 — *fidelity has no direction; the telos does the work*, and the
 substrate's job is to make an extractive reading **visible and attributed** rather than to prevent it,
 since prevention builds a censor.
 [Beer](epr:beer-designing-freedom-elohim-critique-2026-06-04) supplies the frame beneath the whole
