@@ -56,6 +56,31 @@ print(json.dumps({
 PY
 }
 
+recovery_refuse_vacuous() { # <snapshot-file> [survivor-name] -> rc 0 iff the
+  # snapshot holds a measurable corpus (rows>0 AND docs>0 AND content>0); rc 6
+  # and a "vacuous" rlog line otherwise. A survivor emptied by a prior FAILED
+  # recovery (the loser stayed empty, then the matrix alternated roles onto
+  # it) yields 0 blob-bearing rows and docs=0 — P0/P1/P2 would then pass BY
+  # CONSTRUCTION against nothing, reporting a misleading "P3/P4-only" red.
+  # Called BEFORE any kill/wipe so a refusal touches nothing.
+  # RECOVERY_ALLOW_EMPTY_SURVIVOR=1 bypasses (tests/fanout debugging only).
+  local snap="$1" surv="${2:-unknown}" n_rows n_docs n_content
+  read -r n_rows n_docs n_content < <(python3 -c '
+import json, sys
+s = json.load(open(sys.argv[1]))
+print(len(s.get("rows", [])), s.get("docs", 0), s.get("content", 0))
+' "$snap")
+  if [ "$n_rows" -eq 0 ] || [ "$n_docs" -eq 0 ] || [ "$n_content" -eq 0 ]; then
+    if [ "${RECOVERY_ALLOW_EMPTY_SURVIVOR:-0}" = "1" ]; then
+      rlog "survivor $surv holds rows=$n_rows docs=$n_docs content=$n_content — vacuous, but RECOVERY_ALLOW_EMPTY_SURVIVOR=1 bypasses refusal"
+      return 0
+    fi
+    rlog "survivor $surv holds rows=$n_rows docs=$n_docs content=$n_content — a measurement against an empty survivor is vacuous; refusing"
+    return 6
+  fi
+  return 0
+}
+
 recovery_predicate() { # <snapshot-file> <recovering-http-port> -> "P0=.. P1=.. P2=.. P3=.. P4=.."; rc 0 iff all 1
   local snap="$1" port="$2"
   python3 - "$snap" "$port" "$RECOVERY_DOORWAY_A" "$RECOVERY_DOORWAY_B" "$RECOVERY_LANDING_PATH" <<'PY'
@@ -254,6 +279,11 @@ t_surv="$(storage_transport_for "$survivor" "$sport")"; t_rec="$(peer_transport 
 
 snap="$(mktemp)"; recovery_snapshot "$sport" > "$snap" || { echo "survivor $survivor:$sport unreadable" >&2; exit 3; }
 rlog "shape=$shape peer=$peer survivors=${#survivors[@]} survivor=$survivor rows=$(python3 -c 'import json,sys;print(len(json.load(open(sys.argv[1]))["rows"]))' "$snap") transports survivor=$t_surv recovering=$t_rec"
+
+# Refuse a vacuous measurement BEFORE any kill/wipe (empty survivor -> exit 6,
+# no JSONL record — nothing was measured). See recovery_refuse_vacuous above.
+recovery_refuse_vacuous "$snap" "$survivor"; vacuous_rc=$?
+[ "$vacuous_rc" -eq 0 ] || { rm -f "$snap"; exit "$vacuous_rc"; }
 
 # Capture BEFORE the kill (Critical-2), never after: restart_storage's live
 # branch — the one that trusts /proc/<pid>/environ over its own stale-capture

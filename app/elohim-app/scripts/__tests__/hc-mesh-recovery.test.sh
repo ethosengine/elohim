@@ -24,6 +24,19 @@ t() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fail=1; fi; }
   set +e; RECOVERY_SOURCE_ONLY=1 source "$here/../hc-mesh-recovery.sh"; set -e 2>/dev/null; set +e
   recovery_snapshot "$port" > "$tmp/snap.json"
   t "snapshot captured 1 blob-bearing row" '[ "$(python3 -c "import json;print(len(json.load(open(\"$tmp/snap.json\"))[\"rows\"]))")" = 1 ]'
+  # recovery_refuse_vacuous (Fix wave 3): a measurement against an empty
+  # survivor is refused (rc 6) BEFORE any kill/wipe; a blob-bearing survivor
+  # passes (rc 0). Factored out of main so it is testable without a live mesh.
+  echo '{"docs":0,"content":0,"rows":[]}' > "$tmp/vacuous-snap.json"
+  vout="$(recovery_refuse_vacuous "$tmp/vacuous-snap.json")"; vrc=$?
+  t "recovery_refuse_vacuous refuses an empty survivor (rc=$vrc): $vout" \
+    '[ "$vrc" -eq 6 ] && [[ "$vout" == *vacuous* ]]'
+  vout="$(recovery_refuse_vacuous "$tmp/snap.json")"; vrc=$?
+  t "recovery_refuse_vacuous passes a blob-bearing survivor (rc=$vrc): $vout" \
+    '[ "$vrc" -eq 0 ]'
+  vout="$(RECOVERY_ALLOW_EMPTY_SURVIVOR=1 recovery_refuse_vacuous "$tmp/vacuous-snap.json")"; vrc=$?
+  t "RECOVERY_ALLOW_EMPTY_SURVIVOR=1 bypasses the refusal (rc=$vrc): $vout" \
+    '[ "$vrc" -eq 0 ]'
   RECOVERY_DOORWAY_A="http://localhost:$port" RECOVERY_DOORWAY_B="http://localhost:$port" RECOVERY_LANDING_PATH="/db/stats" \
     out="$(recovery_predicate "$tmp/snap.json" "$port")"; rc=$?
   t "all legs pass on a matching peer (rc=$rc): $out" '[ "$rc" -eq 0 ] && [ "$out" = "P0=1 P1=1 P2=1 P3=1 P4=1" ]'
@@ -189,6 +202,26 @@ t() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fail=1; fi; }
   elapsed=$(( $(date +%s) - start ))
   t "reshape_verify bounded wait fails within ~6s on closed ports (rc=$rc, elapsed=${elapsed}s): $out" \
     '[ "$rc" -ne 0 ] && [ "$elapsed" -le 15 ] && [[ "$out" == *"NOT serving"* ]]'
+  exit "$fail"
+) || fail=1
+
+# matrix_survivor_healthy (Fix wave 3): a per-run gate against a corpus
+# reference, so the matrix never alternates roles onto an un-recovered loser.
+# MESH_RECOVERY_SURVIVOR_STUB short-circuits probing entirely for unit tests;
+# unstubbed against a guaranteed-closed port must fail bounded by curl's own
+# timeout, never hang.
+(
+  set +e
+  RECOVERY_MATRIX_SOURCE_ONLY=1 source "$here/../hc-mesh-recovery-matrix.sh"
+  out="$(MESH_RECOVERY_CORPUS_REF=500/504 MESH_RECOVERY_SURVIVOR_STUB=fail matrix_survivor_healthy x)"; rc=$?
+  t "matrix_survivor_healthy STUB=fail fails (rc=$rc): $out" '[ "$rc" -ne 0 ]'
+  out="$(MESH_RECOVERY_CORPUS_REF=500/504 MESH_RECOVERY_SURVIVOR_STUB=ok matrix_survivor_healthy x)"; rc=$?
+  t "matrix_survivor_healthy STUB=ok passes (rc=$rc): $out" '[ "$rc" -eq 0 ]'
+  start="$(date +%s)"
+  out="$(MESH_RECOVERY_PROBE_BASE=65000 matrix_survivor_healthy x)"; rc=$?
+  elapsed=$(( $(date +%s) - start ))
+  t "matrix_survivor_healthy unstubbed against a closed port is bounded and fails (rc=$rc, elapsed=${elapsed}s)" \
+    '[ "$rc" -ne 0 ] && [ "$elapsed" -le 15 ]'
   exit "$fail"
 ) || fail=1
 

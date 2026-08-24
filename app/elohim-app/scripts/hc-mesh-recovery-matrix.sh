@@ -60,6 +60,123 @@ matrix_live_shape() { # -> "<peers-csv>/<0|1>" describing what's ACTUALLY runnin
   printf '%s/%s\n' "$live" "$doorways"
 }
 
+matrix_capture_corpus_ref() { # -> sets CORPUS_ROWS/CORPUS_DOCS from the
+  # FIRST peer's /db/stats.contentCount and /sync/v1/elohim/docs?limit=1
+  # .total (or from MESH_RECOVERY_CORPUS_REF="<rows>/<docs>" in tests), and
+  # prints "matrix: corpus reference rows=<n> docs=<n>". This is the reference
+  # every survivor is judged against by matrix_survivor_healthy — a fresh
+  # capture belongs after any event that regenerates the mesh (initial live
+  # shape, or a reshape).
+  if [ -n "${MESH_RECOVERY_CORPUS_REF:-}" ]; then
+    CORPUS_ROWS="${MESH_RECOVERY_CORPUS_REF%/*}"
+    CORPUS_DOCS="${MESH_RECOVERY_CORPUS_REF#*/}"
+  else
+    local port=$MESH_RECOVERY_PROBE_BASE stats docs
+    stats="$(curl -sf -m 3 "http://localhost:$port/db/stats" 2>/dev/null)"
+    CORPUS_ROWS="$(printf '%s' "$stats" | python3 -c '
+import json, sys
+try:
+    print(int(json.load(sys.stdin).get("contentCount", 0) or 0))
+except Exception:
+    print(0)
+' 2>/dev/null)"
+    [ -z "$CORPUS_ROWS" ] && CORPUS_ROWS=0
+    docs="$(curl -sf -m 3 "http://localhost:$port/sync/v1/elohim/docs?limit=1" 2>/dev/null)"
+    CORPUS_DOCS="$(printf '%s' "$docs" | python3 -c '
+import json, sys
+try:
+    print(int(json.load(sys.stdin).get("total", 0) or 0))
+except Exception:
+    print(0)
+' 2>/dev/null)"
+    [ -z "$CORPUS_DOCS" ] && CORPUS_DOCS=0
+  fi
+  echo "matrix: corpus reference rows=$CORPUS_ROWS docs=$CORPUS_DOCS"
+}
+
+matrix_survivor_healthy() { # <survivor-csv> -> rc 0 iff EVERY named survivor is
+  # /health 200 AND contentCount >= corpus_rows*0.9 (integer math) AND
+  # docs.total >= corpus_docs*0.9. Ports resolve by the peer's position in
+  # MESH_PEERS (the http_port 8090+i scheme), never by position within the
+  # survivor-only csv — a lone non-first survivor must still probe ITS port,
+  # not the recovering peer's. MESH_RECOVERY_SURVIVOR_STUB=ok|fail bypasses
+  # probing entirely for unit tests; unstubbed, a closed port fails bounded
+  # by curl's own -m timeout (no retry loop here — the caller decides whether
+  # to regenerate and re-check).
+  case "${MESH_RECOVERY_SURVIVOR_STUB:-}" in
+    ok) echo "matrix: survivor health OK (stub)"; return 0 ;;
+    fail) echo "matrix: survivor health FAIL (stub)"; return 1 ;;
+  esac
+  local csv="$1"
+  local -a survs all
+  IFS=',' read -ra survs <<< "$csv"
+  IFS=',' read -ra all <<< "${MESH_PEERS:-matthew,jessica,james}"
+  local ref_rows ref_docs min_rows min_docs
+  if [ -n "${MESH_RECOVERY_CORPUS_REF:-}" ]; then
+    ref_rows="${MESH_RECOVERY_CORPUS_REF%/*}"
+    ref_docs="${MESH_RECOVERY_CORPUS_REF#*/}"
+  else
+    ref_rows="${CORPUS_ROWS:-0}"
+    ref_docs="${CORPUS_DOCS:-0}"
+  fi
+  min_rows=$(( ref_rows * 9 / 10 ))
+  min_docs=$(( ref_docs * 9 / 10 ))
+  local name idx i cand port stats cc docs dt
+  for name in "${survs[@]}"; do
+    idx=-1; i=0
+    for cand in "${all[@]}"; do [ "$cand" = "$name" ] && idx=$i; i=$((i + 1)); done
+    [ "$idx" -lt 0 ] && idx=0
+    port=$((MESH_RECOVERY_PROBE_BASE + idx))
+    if ! curl -sf -m 3 "http://localhost:$port/health" >/dev/null 2>&1; then
+      echo "matrix: survivor $name unhealthy ($port/health failed)"
+      return 1
+    fi
+    stats="$(curl -sf -m 3 "http://localhost:$port/db/stats" 2>/dev/null)"
+    cc="$(printf '%s' "$stats" | python3 -c '
+import json, sys
+try:
+    print(int(json.load(sys.stdin).get("contentCount", 0) or 0))
+except Exception:
+    print(0)
+' 2>/dev/null)"
+    [ -z "$cc" ] && cc=0
+    if [ "$cc" -lt "$min_rows" ]; then
+      echo "matrix: survivor $name unhealthy (contentCount=$cc < $min_rows)"
+      return 1
+    fi
+    docs="$(curl -sf -m 3 "http://localhost:$port/sync/v1/elohim/docs?limit=1" 2>/dev/null)"
+    dt="$(printf '%s' "$docs" | python3 -c '
+import json, sys
+try:
+    print(int(json.load(sys.stdin).get("total", 0) or 0))
+except Exception:
+    print(0)
+' 2>/dev/null)"
+    [ -z "$dt" ] && dt=0
+    if [ "$dt" -lt "$min_docs" ]; then
+      echo "matrix: survivor $name unhealthy (docs.total=$dt < $min_docs)"
+      return 1
+    fi
+  done
+  echo "matrix: survivor health OK ($csv)"
+  return 0
+}
+
+matrix_mark_remaining_fail() { # <name> <from-shape> <from-run> — appends
+  # FAIL(survivor-unhealthy) rows for every shape×run at/after
+  # <from-shape>,<from-run> (SHAPES order, 1..RUNS) for a scenario abandoned
+  # mid-flight because survivors never came back healthy after a regenerate.
+  local nm="$1" from_shape="$2" from_run="$3" started=0 sh rn
+  for sh in "${SHAPES[@]}"; do
+    [ "$sh" = "$from_shape" ] && started=1
+    [ "$started" -eq 1 ] || continue
+    for rn in $(seq 1 "$RUNS"); do
+      if [ "$sh" = "$from_shape" ] && [ "$rn" -lt "$from_run" ]; then continue; fi
+      rows+=("$nm"$'\t'"$sh"$'\t'"$rn"$'\t'"-"$'\t'"-"$'\t'"-"$'\t'"survivor-unhealthy"$'\t'"FAIL(survivor-unhealthy)")
+    done
+  done
+}
+
 reshape_verify() { # <peers-csv> <doorways 0|1> -> rc 0 iff the mesh is actually
   # SERVING (every peer /health + /db/stats contentCount>0, and — when
   # doorways=1 — both doorways answer /db/content/elohim-host-landing).
@@ -171,31 +288,32 @@ MESH_RECOVERY_RESHAPE_RETRIES="${MESH_RECOVERY_RESHAPE_RETRIES:-1}"
 # Seed shape_now from what's ACTUALLY running so the first scenario reshapes
 # only when the live mesh doesn't already match it — not unconditionally.
 shape_now="$(matrix_live_shape)"
+# Corpus reference (Fix wave 3): captured once the mesh is confirmed serving
+# — here if it's already live, or after the first scenario's reshape below
+# otherwise — and re-captured after every later reshape. matrix_survivor_healthy
+# judges every subsequent run against this reference so the matrix never
+# alternates onto a survivor that only LOOKS healthy because it's empty.
+CORPUS_ROWS=""
+CORPUS_DOCS=""
 if [ -n "$shape_now" ]; then
   echo "matrix: live shape $shape_now"
+  matrix_capture_corpus_ref
+  if [ "${CORPUS_ROWS:-0}" -eq 0 ] && [ "${CORPUS_DOCS:-0}" -eq 0 ]; then
+    echo "matrix: corpus reference is empty (0/0) — treating as no live mesh, first scenario will reshape"
+    shape_now=""
+    CORPUS_ROWS=""
+    CORPUS_DOCS=""
+  fi
 else
   echo "matrix: no live mesh — first scenario will reshape"
 fi
 
-reshape_stop() { # <peers-csv> <doorways 0|1> — stop in its OWN session so the
-  # matrix (this process's own process group) survives its own reshape.
-  # `hc-mesh.sh stop` kills its own process group; called as a plain child it
-  # takes the matrix down with it (documented: exit 144).
+reshape_stop() { # <peers-csv> <doorways 0|1>
   local peers="$1" doorways="$2"
-  if setsid --help 2>&1 | grep -q -- '-w'; then
-    MESH_PEERS="$peers" MESH_DOORWAYS="$doorways" \
-      setsid -w "$SCRIPT_DIR/hc-mesh.sh" stop >/dev/null 2>&1 || true
-  else
-    MESH_PEERS="$peers" MESH_DOORWAYS="$doorways" \
-      setsid "$SCRIPT_DIR/hc-mesh.sh" stop >/dev/null 2>&1 || true
-    # setsid without -w doesn't wait; poll for the processes it killed.
-    local waited=0
-    while pgrep -x holochain >/dev/null 2>&1 || pgrep -f "elohim-storag[e].*--http-port" >/dev/null 2>&1; do
-      sleep 2
-      waited=$((waited + 2))
-      [ "$waited" -ge 60 ] && break
-    done
-  fi
+  # Stop owns exact recorded PIDs and configured listener ports, so it is a
+  # normal synchronous child; no separate session/self-kill workaround needed.
+  MESH_PEERS="$peers" MESH_DOORWAYS="$doorways" \
+    "$SCRIPT_DIR/hc-mesh.sh" stop >/dev/null 2>&1 || true
 }
 
 reshape_wait_ports_free() { # bounded wait (60s) until no mesh port is bound
@@ -272,6 +390,7 @@ while IFS=$'\t' read -r name peers doorways t_surv t_rec expect; do
     fi
     reshape_fail_count[$shape_key]=0
     shape_now="$shape_key"
+    matrix_capture_corpus_ref
   fi
 
   export MESH_PEERS="$peers" MESH_DOORWAYS="$doorways"
@@ -319,12 +438,60 @@ while IFS=$'\t' read -r name peers doorways t_surv t_rec expect; do
       done
       sleep 10
 
+      # Survivor health gate (Fix wave 3): a FAILED recovery leaves the loser
+      # empty; the matrix alternates roles next run, so the empty loser would
+      # become this run's survivor and every leg would pass against nothing.
+      # Refuse that here — regenerate the current shape and re-check once
+      # (honouring the same retry bookkeeping the top-of-scenario reshape
+      # uses) rather than measure against an unhealthy survivor.
+      if ! matrix_survivor_healthy "$surv"; then
+        echo "matrix: survivor(s) $surv unhealthy before $name/$shape/run-$run" >&2
+        shape_key="$peers/$doorways"
+        reshaped_ok=0
+        if [ "${reshape_given_up[$shape_key]:-0}" = "1" ]; then
+          echo "matrix: shape $shape_key already given up on — skipping regenerate" >&2
+        elif reshape_mesh "$peers" "$doorways"; then
+          reshape_fail_count[$shape_key]=0
+          shape_now="$shape_key"
+          matrix_capture_corpus_ref
+          if matrix_survivor_healthy "$surv"; then
+            reshaped_ok=1
+          else
+            echo "matrix: survivor(s) $surv still unhealthy after regenerate" >&2
+          fi
+        else
+          attempt=$(( ${reshape_fail_count[$shape_key]:-0} + 1 ))
+          reshape_fail_count[$shape_key]="$attempt"
+          max_attempts=$(( MESH_RECOVERY_RESHAPE_RETRIES + 1 ))
+          if [ "$attempt" -ge "$max_attempts" ]; then
+            reshape_given_up[$shape_key]=1
+            echo "matrix: giving up on shape $shape_key after $attempt attempts" >&2
+          fi
+        fi
+        if [ "$reshaped_ok" -ne 1 ]; then
+          echo "matrix: marking remaining runs of $name FAIL(survivor-unhealthy)" >&2
+          matrix_mark_remaining_fail "$name" "$shape" "$run"
+          rc=1
+          break 2
+        fi
+      fi
+
       timeline="$MESH_DIR/recovery-timeline.jsonl"
       before_lines=0
       [ -f "$timeline" ] && before_lines="$(wc -l < "$timeline")"
       "$SCRIPT_DIR/hc-mesh-recovery.sh" "$shape" "$rec" \
         --label "scenario=$name" --label "shape=$shape" --label "run=$run" --label "expect=$expect"
       got=$?
+
+      if [ "$got" -eq 6 ]; then
+        # Should be unreachable behind the survivor-health gate above, but
+        # honour it: no timeline record was written (nothing was measured).
+        echo "recovery refused a vacuous measurement for $name/$shape/run-$run (rc=6)" >&2
+        rows+=("$name"$'\t'"$shape"$'\t'"$run"$'\t'"$surv=$t_surv"$'\t'"$rec=$t_rec"$'\t'"-"$'\t'"vacuous"$'\t'"FAIL(vacuous)")
+        rc=1
+        continue
+      fi
+
       after_lines=0
       [ -f "$timeline" ] && after_lines="$(wc -l < "$timeline")"
 
