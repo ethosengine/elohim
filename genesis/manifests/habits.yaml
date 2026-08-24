@@ -80,6 +80,29 @@ habits:
       - "a2o @concern:transport-parity (genesis/a2o/features/dataplane/transport-comparison-matrix.feature; just mesh matrix) — identical fresh-document contract under libp2p, iroh, and dual; successful samples alone contribute timing percentiles"
       - ".claude/scripts/latency-scoreboard.py --local (and --deployed) — bounded convergence, not merely eventual: a CONJUNCTION of speed AND this habit's trust invariant, never speed alone. A fast stale head is worse than a slow correct one, so this check can only ever narrow the habit, never carry it."
     evidence: >
+      DELTA 2026-08-24a (overnight iroh build-out; iroh 3/3 for the first time;
+      NO status flip — flip authority is the fleet lane): the iroh plane went
+      from responder-only to full parity. Landed: iroh eager-announce doorbell
+      (f21a71d9e — change-by-hash payload, landing check, pull fallback);
+      pure-iroh bootstrap via doorway manifest board (4cf96041e + aef9dc203 —
+      POST/GET /p2p/manifests, signed, bounded; storage announces + seeds its
+      book from it); T2 heal-on-read races the iroh plane (8346143f4 —
+      elohim_iroh_blob_fetches_total{ok} live, shard-ALPN not blake3, verify
+      parity proven). Matrix run 20260824T043035Z-a638f895: libp2p 3/3 · iroh
+      3/3 · dual 3/3 — pure iroh FORMED A MESH (52 s via the manifest board,
+      first ever). Local lanes on the built binaries: doorway-failover 10/10,
+      dual-plane 1/1, heal-on-read 2/2 (+ iroh blob counter moved), content-sync
+      4/4; full household lane 197/18/4 = ZERO genuine novel reds (one flake,
+      "disable the projection cache", failed 2x on 08-22 pre-dating this work);
+      saga 11/11. Adversarial review found a CRITICAL (manifest board Sybil-
+      floodable) + HIGH (client fetch OOM): board gated behind
+      DOORWAY_MANIFEST_BOARD_ENABLED (default OFF — dormant on the fleet which
+      runs dual, live in localdev), client fetch bounded (1 MiB + 64 entries);
+      Sybil-resistance design + 2 MEDIUMs captured to backlog
+      2026-08-24-manifest-board-sybil-resistance.md. Fleet confirm of BOTH
+      batches still owed (matthew conductor-saturation heal-leg loop blocks the
+      quiesce gate — backlog 2026-08-24-matthew-conductor-saturation...; the
+      batch-2 redeploy's pod restart is the pragmatic cure).
       DELTA 2026-08-23g (doorbell + matrix green x2 of 3; NO status flip —
       iroh mode still red on the T0' bootstrap boundary): root cause of the
       2026-08-23e all-red matrix was NOT transport — the eager AnnounceChange
