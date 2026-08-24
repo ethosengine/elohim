@@ -706,89 +706,226 @@ one is the monoculture failure (§2.5) arriving as compassion. What the substrat
   governed by a lane, belonging to no participant, and answerable to the council that declared it —
   the waqf shape, which is the thousand-year case law for exactly this (§2.5).
 
-**Which is where issuance stops being an exception and becomes an instance.** Some public goods are
-too large for any community to underwrite: a particle accelerator, a fusion programme, a deep-space
-mission, an orbital telescope, a vaccine platform, a continental grid. They share a shape — enormous
-coordinated commitment, sustained over decades, no near-term return to any contributor, and no
-possibility of the participants clearing it among themselves. **Mutual credit cannot fund them**,
-because mutual credit is settled reciprocity between parties who trade with each other, and nobody
-trades with a collider. **Philanthropy cannot fund them at scale**, because it is a claim on
-already-accumulated wealth and inherits the distribution it means to correct. What has built these
-things, everywhere they exist, is a **sovereign issuer mobilising real resources ahead of any
-return** — spending a unit into existence against a mandate and reclaiming it through taxation.
+**Which is where issuance stops being an exception and becomes an instance — of reach.** Some public
+goods are too large for any community to underwrite: a fusion or fission programme, industrial scaling
+for an experimental technology whose unit cost only falls at volume (solar is the worked historical
+case), universal provision such as healthcare infrastructure or a basic income, a continental grid.
+They share a shape — enormous coordinated commitment, sustained over decades, no near-term return to
+any contributor, and no possibility of the participants clearing it among themselves. **Mutual credit
+cannot fund them**, because mutual credit is settled reciprocity between parties who trade with each
+other, and nobody trades with a reactor. **Philanthropy cannot fund them at scale**, because it is a
+claim on already-accumulated wealth and inherits the distribution it means to correct.
 
-That capacity is not a trick of fractional-reserve banking, and the two must not be confused.
-Fractional reserve is *private* credit creation against collateral, seeking yield — what this corpus
-refuses at every turn. Sovereign mobilisation is *public* issuance against a mandate, seeking a
-completed public good. And on this substrate the **warrant would be different in kind**: issuance
-justified by attested care and observed contribution — the un-attenuated record itself — rather than
-by a bank's balance-sheet capacity. Whether that is a *good* warrant is the open question. It is not
-the question N1 answers, and the never-rules as first written did not distinguish them.
+**But "superproject" is the wrong noun, and it hid the actual structure.** These are not a special
+category of thing requiring a special new power. **They are ordinary Mishpat policies whose reach has
+grown** — and this corpus already has the primitives for reach. A currency *is* a lens (§2.1); a lens
+governs a declared scope; and how far a policy carries beyond the people who authored it is exactly
+what **reach** names. So the governing question is never "may the commons issue?" It is the question
+the protocol already asks continuously of everything else: **has this policy earned the reach it is
+claiming?**
 
-**So the honest statement is a deferral, not a refusal**, and three of this paper's own commitments
-make that the only consistent reading:
+Three existing primitives therefore do the work a bespoke gate would have done badly:
 
-1. **Canon socialises issuance; it does not abolish it.** Stance I.4's refusable-in-advance clause
-   names *"the **private** issuance of money"* as unearned increment that *"graduates to a commons
-   owned by no one"*, and the enumeration of what belongs to everyone names *"the issuance of
-   currency and credit"* directly (§1.1). ✅ The operative word is **private**. What canon strips is
-   an issuer's private claim on the gain; what it vests — explicitly, in the commons — is the
-   capacity. A permanent refusal to ever exercise a capacity canon deliberately vested is not
-   stewardship of the inheritance; it is forfeiture of it. The corpus cannot hold both that issuance
-   belongs to everyone and that it will never be exercised by anyone here.
-2. **§2.2's limit acquits the instrument.** *Preservation is legitimate; accretion is not.* A
-   mobilisation instrument spent into existence against a bounded mandate and reabsorbed on
-   completion has **no holder who accumulates** — it is not a store of value at all and never
-   accretes. It does not trip this paper's sharpest limit.
-3. **§2.4's own register rule forbids the prohibition.** Prohibition is right *only for substrate
-   invariants*; everything else is context-relative policy that gets a redirect. "The commons may
-   never issue" is not a substrate invariant — it is a policy about an unbuilt capacity under
-   governance that does not yet exist, which is exactly the class the corpus says must be a redirect.
+- **Reach is earned and standing-gated, and is never purchasable (N3).** A policy cannot buy its way
+  to the scope at which it could mobilise. That is the anti-plutocracy invariant already load-bearing
+  everywhere else in this paper, applied to monetary policy without modification.
+- **Scope is declared, not assumed.** `governs_epr` names what a policy governs; the unit-of-account
+  limit (§2.2) forbids it silently becoming universal. A policy that has outgrown its declared scope
+  is detectable as such.
+- **Supersession and revocation are the ordinary path** (§2.1). A mandate at any scale is amendable
+  and revocable by the mechanism every other Commitment uses. ✅
 
-**And the strongest objection to the deferral deserves naming, because a skeptic will supply the
-cynical reading otherwise.** Some traditions hold that foreswearing a dangerous capacity *is* the
-mature form of stewardship — that a door kept open is itself a capture surface, and that "we reserve
-the right, under conditions" is what every institution says before it issues. That objection is not
-answered by the three points above, and it is not silly. The answer this paper gives is that the
-work is done by **P1–P6, not by the deferral**: an unexercised capacity with no named preconditions
-really would be a reservation dressed as principle, whereas preconditions that are public, checkable,
-and currently *failing* are a refusal with a receipt. If the corpus later decides that foreswearing
-is the better stewardship, that is a canon change made in the open — which is precisely what "never
-issues," asserted without argument, would have foreclosed.
+**And at sufficient scale, such a policy is a tax. The corpus should say the word.** A Mishpat policy
+that has earned enough standing, scope and reach to mobilise resources across a whole layer is
+functionally a power of taxation, whatever else it is called. The connotation is bad and the evasion
+would be worse: declining to name it would be the identical move this paper convicts the apex of in
+§2.2 — a values choice carried in a technical register precisely so it need not be defended as a
+choice. Name it, and it becomes contestable.
 
-**N2 is not an obstacle here; it is the design.** *No protocol seigniorage, and no private seigniorage
-either* — issuance gain is common inheritance and returns to the floor. A mandate whose entire gain
-**is** the completed public good, retaining nothing, is the paradigm case of N2 compliance rather than
-an exception to it. What N2 forbids is a circuit keeping its own issuance gain, which is the inverse.
+**Subsidiarity is the gate, and it runs in the opposite direction from a state.** Canon is already
+explicit — *maximum local autonomy within constitutional bounds; decisions made at the lowest
+appropriate layer* ✅ — over an eleven-rung geographic ladder from **individual** through
+neighbourhood, community, district, municipality, county, province, nation and continental to
+**global**, with functional layers (workplace, educational, ecological/bioregional, cultural,
+**industry_sector**, affinity) running in parallel. ✅ A state taxes first and devolves reluctantly.
+Here the burden of proof runs **upward**: a tax-like policy is admissible at a given rung only where
+every lower rung is *demonstrably insufficient for the task* — not merely inconvenient, not merely
+slower. Subsidiarity is not a preference for smallness; it is an evidentiary standard that a policy
+must clear before its reach is legitimate.
+
+**The worked case, because the standard is meaningless without one.** Replacing the oil-burning
+engines of the global container fleet — the reactors, and the shipbuilding and refit supply chain to
+carry it — so that the carbon emissions of integrated global logistics end rather than relocate. No
+household, municipality, or single nation can do this, and the reason is structural rather than
+financial: **the emitting system is the supply chain itself**, which is why the policy sits on
+`industry_sector` crossed with `global`, and why no lower rung can be shown sufficient. That
+demonstration — not the size of the number — is what would earn the reach.
+
+**The failure modes of monetary policy at scale need their own weight, because the reach primitives
+were not designed for this.** Reach was built to govern *audience*; mobilisation is a different load,
+and four hazards do not come for free with it:
+
+| # | Hazard at scale | Where it bites | State today |
+|---|---|---|---|
+| H1 | **Seigniorage concentration** — whoever sits nearest issuance spends before anything adjusts (the Cantillon effect, §2.6) | The detector exists as a design; the council reading it is capturable | **Open** (§5) |
+| H2 | **The ratchet** — a mandate that never completes and so never reabsorbs, becoming a permanent claim | Non-accretion depends on reabsorption actually happening | **Not designed** |
+| H3 | **Measurement capture** — whoever defines the need defines the issuance; the evidence base becomes the prize | The un-attenuated record is the defence, and it is also the target | **No detector** |
+| H4 | **No exit at global reach** — a policy at the top rung has no outside for those inside it, which is precisely the property that makes state taxation coercive rather than voluntary | Appeal and arm's length carry the entire load once exit is gone | **Unresolved** |
+
+**H4 is the one that should stop anybody claiming this is solved.** Every reassurance elsewhere in
+this paper leans somewhere on plurality and forkability — *if you dislike this circuit, author
+another*. At global reach that consolation is gone by construction, and what remains is the appeal,
+the arm's length, and the council's own honesty. Which is exactly the set §5 says is currently
+capturable. **A tax power on capturable governance is the worst object in this paper**, and naming it
+is the only responsible thing this section can do about it today.
 
 **What the arm's length is for.** The danger is not issuance; it is *proximity*. An issuance power
-sitting inside the valueflows it funds is the Cantillon effect with extra steps (§2.6), and it is how
-commons of this kind have historically been enclosed. The answering design is separation: the body
+sitting inside the valueflows it funds is the Cantillon effect with extra steps, and it is how commons
+of this kind have historically been enclosed. The answering design is separation: the body
 deliberating a mandate must be structurally distinct from the flows receiving it, so that **no
-beneficiary sits on the body that authorises**. Councils deliberate the mandate at arm's length from
-the human valueflows; the elohim advise and show their work; the flows stay in the ordinary REA plane
-where every other event lives. The arm's length is not ceremony — **it is the whole of the
-anti-enclosure argument**, and it is why such a capacity would belong to the commons rather than to
-any circuit within it.
+beneficiary sits on the body that authorises**. Councils deliberate at arm's length from the human
+valueflows; the elohim advise and show their work; the flows stay in the ordinary REA plane where
+every other event lives. The arm's length is not ceremony — **it is the whole of the anti-enclosure
+argument.**
 
-**The preconditions, stated so they can be checked.** The capacity stays unexercised until all of
-these hold, and none holds today:
+**One observation about symmetry, since the objection will be reflexive.** The wealthy already author
+their own jurisdictions: offshore shelters are private constitutional design, purpose-built, and
+nobody asks whether they have earned the reach. A commons declaring a policy lane in the open, with a
+named author, a declared scope, a supersession path and a public aggregate, is not a stranger thing
+than what capital does routinely and quietly. That is an argument about **symmetry, not permission** —
+it establishes that the question is live, not that the answer is yes. And it is also a warning: the
+same evasion is the predictable response to any policy that reaches, which is §2.10's subject.
 
-| # | Precondition | Current state |
-|---|---|---|
-| P1 | Council ratification is not single-write-capturable | **Open** — first-quorum-wins (§5; honest limit 2) |
-| P2 | Structural arm's length: no beneficiary of a mandate sits on the body authorising it, and the separation is enforced rather than conventional | **Not designed** |
-| P3 | Non-accretion by construction: spent against a bounded mandate, never a holdable balance, reabsorbed on completion | **Not designed** |
-| P4 | Plural, forkable elohim advising — trap A6 (§2.5) bites hardest here, because one un-forked model advising one issuance power is monoculture at the point of maximum leverage | **Open** |
-| P5 | A live public aggregate of everything outstanding, with per-mandate provenance verifiable at O(1) (N5's own redirect) | **Not shipped** |
-| P6 | Revocability: the mandate supersedes and revokes on the ordinary Commitment path | mechanism exists ✅ (§2.1); never applied to this |
-
-**And the limit on the deferral itself.** None of the above is a design, and this section must not be
-read as having produced one. It is the argument that the *question* stays open, plus the conditions
-under which it could be reopened honestly. A protocol that refuses to name a capacity it cannot yet
+**And the limit on all of it.** None of the above is a design, and this section must not be read as
+having produced one. H1–H4 are unresolved, the governance the whole structure rests on is capturable
+(§5), and nothing here has been tried. It is the argument that the *question* stays open and that
+**reach, standing, scope and subsidiarity are the right instruments to hold it** — not a claim to
+have built any of them for this purpose. A protocol that refuses to name a capacity it cannot yet
 hold ends up either pretending it never wanted it, or reaching for it the first time a council faces
-something big and finds no rule there. Naming it, gating it, and leaving it unexercised is the third
-option. ⚠
+something big and finds no rule there. Naming it, locating it in primitives it already has, and
+leaving it unexercised is the third option. ⚠
+
+### 2.10 The membrane is a values surface: provenance and dynamic pricing at the bridge
+
+§3 concedes that the enforcement surface was never the issuer — **the ramps, the holders and the
+merchants are.** That is stated there as a vulnerability. It is also the opportunity, and the corpus
+should treat it as a foundational feature rather than a compliance afterthought.
+
+**Every payment crossing the bridge carries a provenance question, and the network is entitled to
+ask it.** A state asks a narrow version of this already, for narrow reasons: sanctions, laundering,
+tax. The network's version is wider and differently motivated — not *is this legal?* but **what was
+extracted, from whom, to produce this?** The un-attenuated record (§2.9) is what makes the wider
+question answerable at all, because provenance is exactly the kind of context a price discards. This
+is the **Values Scanner** applied at the membrane rather than to a household budget: the same organ,
+pointed at the boundary.
+
+**And the corollary is pricing.** If entry is priced dynamically against that provenance, then the
+burden of arbitrage at the edge — the gap between what an external actor can extract elsewhere and
+what they can realise here — **funds the commons instead of accruing to whoever is fastest at the
+boundary.** Wealth that exits an extractive position into the network pays for the exit, and the
+payment lands in the communities the network touches, in every corner of the globe that transacts
+with it. That is the redistributive counterpart to §2.9's mobilisation, and it is the more important
+of the two, because it needs no mandate and no issuance — only a boundary that declines to be neutral.
+
+**The worked case that makes the inversion legible — and it is already half-built.** In conventional
+property-and-casualty cover, the rate per unit of exposure *falls* as the exposure base grows, and two
+quite different things are bundled into that discount. One is a genuine efficiency: administering a
+single large policy costs less per insured dollar than administering a thousand small ones, and
+passing that saving on is honest. The other is **bargaining position** — a holder large enough to move
+an insurer's book can negotiate a rate below what its own liabilities would actuarially justify, and
+frequently does, sometimes below the level at which the policy is profitable to write. ◐ **The second
+is not a discount for being less risky. It is a discount for being large, and the pool's smaller
+members fund it.**
+
+That is the Cantillon effect wearing an actuary's coat (§2.6): whoever sits nearest the pricing power
+gets terms before the pool adjusts. It is the unearned increment in George's precise sense — a return
+to position rather than to produce. And in the monetary register it is what N3 forbids outright, since
+a negotiated below-actuarial rate is **the purchase of position by scale**, which is reach being
+bought.
+
+**The repair is this paper's own move, arriving in a second domain: decompose rather than fuse.**
+Conventional insurance prices with one instrument and therefore cannot separate the efficiency from
+the leverage — the identical forced fusion §2.2 identifies in money's three functions, in a different
+market. On an un-attenuated record the two come apart, because administrative cost and actual
+exposure are separate recorded facts rather than one negotiated number: the **administrative economy
+of scale is produce** and should be passed on in full; the **positional discount is rent** and should
+not exist.
+
+**And here the corpus is further along than anywhere else in this paper.** `MemberRiskProfile` ships
+in the elohim DNA's integrity zome and prices risk on *"actual behavioral observation instead of
+proxies like credit scores"* — care-maintenance, community-connectedness, and claims history, carried
+by Observer attestations with an evidence trail and a trend direction
+(`content_store_integrity/src/lib.rs:1501`). ✅ **That is the §2.9 thesis instantiated**: the
+un-attenuated record doing actuarial work a price could not, because the context is exactly what a
+premium discards. `CoveragePolicy` carries a `coverage_level` and a `governed_at` Qahal
+(`:1563`) over a five-rung `GOVERNANCE_LEVELS` ladder — individual, household, community, network,
+constitutional (`:2120`) ✅ — which is **subsidiarity shipped**, not merely argued. And decisively:
+there is **no exposure-base, portfolio-size, or total-insured field anywhere in the entry type.** ✅
+Scale is not an input, so the conventional discount has nothing to attach to. The inversion is
+structural rather than enforced.
+
+**The self-conviction this section owes, because the same read produces it.** `RISK_TIERS` ends in
+**`"uninsurable"` — *"Too risky for coverage"*** (`:1538`). ✅ A pool that can price anyone honestly
+and still exclude them has reproduced the sorting it was built to answer, and it fails Part IX's test
+— *those who have been at the bottom of every system* — from the inside. Mishpat has no punishment
+category and justice is restored capability (§1); an uninsurable tier is neither. Whether that tier
+is a floor-layer responsibility (the pool prices, the commons covers) or a defect in the entry type
+is **an open canon question, and this paper does not settle it — it names it.** ⚠
+
+**Three constraints keep this from becoming something else.**
+
+1. **It is a price, not a punishment.** Mishpat has no punishment category; justice is restored
+   capability (§1). A provenance-sensitive entry price is a term of trade a counterparty can read in
+   advance and decline, not a sanction imposed after the fact.
+2. **It must not become a border.** A membrane that prices entry so steeply that only the already-
+   compliant can cross has rebuilt the exclusion it was meant to answer, and would fail Part IX's
+   test — *those who have been at the bottom of every system* — from the wrong direction.
+3. **The scanner is capturable in exactly the way §2.5 warns.** Whoever authors the valuation
+   authors the toll. Trap A6 applies with full force: **a single un-forked elohim pricing the
+   world's entry is the monoculture failure at the point of maximum leverage.**
+
+**State of it: nothing here ships.** There is no provenance field on a bridge payment, no dynamic
+pricing anywhere in the tree, and the bridge institution itself (§4) is a design. This is a research
+position recorded so it can be argued with, and it is the strongest single candidate for the next
+pass on this paper. ⚠
+
+**What all of §2.9–2.10 is actually for: soft power, and the honest limit of it.** Neither section
+arms the network. They describe the instrument by which the sibling paper's *succession without
+conquest* actually operates — **the commons projecting soft power**: influence that works through
+what others want access to, and through the terms on which access is granted. A tax-like policy at
+earned reach and a provenance-priced membrane are both instruments of **negotiation**, not
+compulsion. The network cannot levy on anyone who has not joined, cannot seize, and — Stance IV.2,
+already binding on everything in this paper — *"owns no violence to impose."* ✅ What it has is a
+function worth having, and terms.
+
+That is how subsumption happens peacefully rather than by collapse. An external power — a
+municipality first, then an industry, eventually something larger — negotiates with the network
+because the network is *delivering a function it needs*, and the terms of that negotiation are where
+the values are actually enacted. The sibling's §6 is the municipal instance of exactly this move;
+§2.9 and §2.10 are its general monetary form. It is also why §3.2 refuses obsolescence-by-
+hyperinflation: a strategy whose end-state is the incumbent's collapse forfeits the negotiation that
+was the whole mechanism.
+
+**And the limit, which is not small.** Soft power is non-coercive exactly while joining remains
+optional — and **the more successful the network, the less optional it becomes.** That is functional
+capture (§2.9) arriving as *success* rather than as attack: "you can always not join" ages into "you
+can always not use the internet," and it ages faster the better the thing works. Nothing in this
+paper prevents that, and no monetary rule can, because the mechanism is adoption rather than
+compulsion. What stands between soft power and ordinary leverage is not architecture but the
+sibling's three refusals in §6.5, quoted rather than paraphrased because the wording is the
+commitment: **no dependency** (*"the network must be able to say so truthfully"*, whose named failure
+is *"the network discovers it can threaten to stop"*), **no conditionality** (*"no absorption is
+offered contingent on policy, forbearance, or recognition"*, whose failure is that *"the first use as
+leverage retro-taints every prior offer"*), and **no exit tax** (*"any person and any institution may
+walk away at no cost"*, whose failure is *"coercion in the language of attraction"*). ✅ Those are
+load-bearing commitments rather than decorative ones, and the sibling is explicit that if succession
+requires violating any of them, *"the correct response is to stop rather than to proceed with a
+better story."* ✅
+
+**No exit tax bears directly on §2.10, and the distinction is fine enough to state.** Pricing *entry*
+against provenance is not an *exit* tax — nobody is charged for leaving, and the third refusal is
+about departure. But the failure mode it names, *coercion in the language of attraction*, is exactly
+the risk a priced membrane runs, which is why the second constraint below is not optional.
 
 ---
 
@@ -1211,6 +1348,11 @@ rather than to a cluster:
   `responsibility_demand_configs.rs:143`) — `approve >= 0` with `eligibility_predicate: None`. Gates
   every council claim in both papers.
 - **The accidental numéraire** (`concentration_service.rs:47`) — Take 6.
+- **The `"uninsurable"` risk tier** (`content_store_integrity/src/lib.rs:1538`) — §2.10. A shipped
+  entry type that can price anyone honestly and still exclude them, in a corpus whose justice is
+  restored capability and whose test is *those who have been at the bottom of every system*. Named,
+  not settled: it is either a floor-layer responsibility (the pool prices, the commons covers) or a
+  defect in the entry type, and that is a canon decision rather than a research take.
 
 **Not minted — held for the operator.** The disposition of `elohim/elohim-token` (crate README and
 settlement-bridge claims vs Stance I.2, §5) and the retirement of the stale token/blockchain sections
