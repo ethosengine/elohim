@@ -222,14 +222,51 @@ pub enum AcceptOutcome {
 /// Category C: the whole store is reconstructable from the next announce
 /// round. Guarded by a std `RwLock` — no `.await` is ever taken while the lock
 /// is held, so it cannot park a tokio worker.
+///
+/// `enabled` gates the whole public `/p2p/manifests` surface. It defaults OFF:
+/// the board admits any self-signed announcement (the signature verifies against
+/// the announcement's own NodeId, so there is no identity COST), which makes it
+/// Sybil-floodable on a public doorway (mint 64 keypairs → evict every real
+/// peer). Until that Sybil resistance is designed
+/// (`genesis/data/timeline/backlog/2026-08-24-manifest-board-sybil-resistance.md`),
+/// the endpoint stays 404 unless `DOORWAY_MANIFEST_BOARD_ENABLED` is set —
+/// localdev turns it on to prove the pure-iroh bootstrap; the public fleet
+/// (which runs dual, not pure-iroh) leaves it off.
 #[derive(Default)]
 pub struct TransportManifestStore {
     entries: RwLock<HashMap<String, TransportManifestAnnouncement>>,
+    enabled: bool,
 }
 
 impl TransportManifestStore {
+    /// Production constructor: reads `DOORWAY_MANIFEST_BOARD_ENABLED` ONCE
+    /// (truthy = `1`/`true`/`yes`, case-insensitive). Env is read here, at
+    /// AppState construction, never on the request path.
     pub fn new() -> Self {
-        Self::default()
+        let enabled = std::env::var("DOORWAY_MANIFEST_BOARD_ENABLED")
+            .ok()
+            .map(|v| {
+                let v = v.trim().to_ascii_lowercase();
+                v == "1" || v == "true" || v == "yes"
+            })
+            .unwrap_or(false);
+        Self {
+            entries: RwLock::new(HashMap::new()),
+            enabled,
+        }
+    }
+
+    /// Test/explicit constructor — the flag is named, no env read.
+    pub fn with_enabled(enabled: bool) -> Self {
+        Self {
+            entries: RwLock::new(HashMap::new()),
+            enabled,
+        }
+    }
+
+    /// Whether the public `/p2p/manifests` surface is served at all.
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
     }
 
     /// Verify, then accept an announcement at an explicit clock reading.
@@ -338,6 +375,9 @@ pub async fn handle_post_manifest(
     req: Request<Incoming>,
     state: Arc<AppState>,
 ) -> Response<FullBody> {
+    if !state.transport_manifests.is_enabled() {
+        return manifest_board_disabled();
+    }
     let collected = Limited::new(req.into_body(), MAX_MANIFEST_BODY_BYTES)
         .collect()
         .await;
@@ -399,8 +439,18 @@ pub async fn handle_post_manifest(
     }
 }
 
+/// 404 for a disabled board — the same shape an unknown route gets, so a
+/// probe cannot tell the feature exists (defense in depth against the flag
+/// being flipped as a reconnaissance signal).
+fn manifest_board_disabled() -> Response<FullBody> {
+    error_response(StatusCode::NOT_FOUND, "not found", "NOT_FOUND")
+}
+
 /// `GET /p2p/manifests` — the current non-expired set, as a JSON array.
 pub async fn handle_get_manifests(state: Arc<AppState>) -> Response<FullBody> {
+    if !state.transport_manifests.is_enabled() {
+        return manifest_board_disabled();
+    }
     let manifests = state.transport_manifests.list_at(now_ms());
     let bytes = serde_json::to_vec(&manifests).unwrap_or_else(|_| b"[]".to_vec());
     Response::builder()
@@ -617,6 +667,26 @@ mod tests {
         assert!(ok.len() <= MAX_MANIFEST_BODY_BYTES);
         let limited = Limited::new(Full::new(Bytes::from(ok)), MAX_MANIFEST_BODY_BYTES);
         assert!(limited.collect().await.is_ok());
+    }
+
+    #[test]
+    fn the_board_is_disabled_by_default_and_the_flag_enables_it() {
+        // The default constructor path (env unset in the test env) is OFF —
+        // the Sybil-floodable surface is not served unless deliberately turned on.
+        assert!(
+            !TransportManifestStore::with_enabled(false).is_enabled(),
+            "board must default off"
+        );
+        assert!(
+            TransportManifestStore::with_enabled(true).is_enabled(),
+            "the flag turns the board on"
+        );
+    }
+
+    #[test]
+    fn a_disabled_board_answers_404_indistinguishable_from_an_unknown_route() {
+        let resp = manifest_board_disabled();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
     #[test]
