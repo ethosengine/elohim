@@ -52,18 +52,18 @@ was moved here** — only apparatus and evidence, enumerated in §4.
 
 **Map — which canon section each block below backs:**
 
-| Canon section | Backed here |
+| Canon section (all §-refs in this column are canon's) | Backed here |
 |---|---|
 | §2 the manifesto's open question | §2.2 the locator for canon's "elsewhere in the project" quote |
 | §3 the lineage (Proudhon → Lietaer) | §1 grading, including the two ⚠ readings |
 | §5.1 witnessed event · §5.2 the organ · §5.3 detector-reports | §7.5 credit (claim-attachment, Beer/VSM, the detector discipline) |
-| §5.6 which abundance | §1.2 the generational-transfer grading and Galloway provenance · §7.2 notes 2–3 |
+| §5.6 which abundance | §1.3 the generational-transfer grading and Galloway provenance · §7.2 notes 2–3 |
 | §9.4 the hyperscale-capability debt | §4 the added-in-canon record · §7.2 note 4 |
 | §3.7 the blunt-instrument claim, §5.5 discernment | §7.2 the operator steering notes that generated them |
 | §7 the legal question | §3.3–§3.5 the EAE contradiction, the shield layers, the securities exposure |
 | §9.1 the coercion contradiction | §3.1 locators + recommendation |
 | §9.2 the allocation table | §3.2 locators + recommendation |
-| §5.7 the datacenter occasion · §5.8 the judo | §1.2 grading of the figures, the bust analogies and the same-curve claims (◐/⚠) · §4 the additions record · §7.2 notes 4–6 |
+| §5.7 the datacenter occasion · §5.8 the judo | §1.3 grading of the figures, the bust analogies and the same-curve claims (◐/⚠) · §4 the additions record · §7.2 notes 4–6 |
 | §9.3 the economic layer, so far mostly unbuilt | §2 in its entirety, with `file:line` |
 | §10 what we refuse | §5 Leave, with reasons |
 | §11 honest limits | §1.1 and §7.3 |
@@ -74,7 +74,36 @@ was moved here** — only apparatus and evidence, enumerated in §4.
 
 Canon carries no grading marks — deliberately (§4). This is where its confidence is recorded.
 
-### 1.1 The two ⚠ readings, which are load-bearing
+### 1.1 The ⚠ readings, which are load-bearing — and the one that was missed
+
+**Correct the record first, because the omission is the more interesting finding.** The first version
+of this note graded **Carson** and **Bauwens** ⚠ as recalled-not-re-read, and left **Proudhon
+ungraded entirely** — while canon's opening, §3.1, and canon §5.8's payoff all rested on him. The most
+load-bearing figure in the document carried no confidence mark at all, and three verification passes
+did not catch it because every one of them checked *internal coherence* rather than *source
+grounding*. Operator-found, 2026-08-24.
+
+**Proudhon is ⚠, and at one remove.** The abundance-destroys-rent argument reaches this work through
+**Gesell's foreword**, not through *What Is Property?*, the *System of Economic Contradictions*, or
+the *General Idea of the Revolution*. None of those was read for this document. That is how the claim
+travelled historically — Gesell put it at the front of his own book precisely because he thought it
+had been buried — so the secondhand route is defensible and is now stated in canon (§3, §3.1, §11).
+It is not defensible to leave it unmarked. **Anything resting on what Proudhon specifically argued,
+as against what Gesell says he argued, needs the primary text.**
+
+**What is actually first-hand.** George's *Progress and Poverty* and Lietaer & Dunne's *Rethinking
+Money* were read; Gesell's *The Natural Economic Order* was in progress at the time of writing. That
+is the operator's reading, and it is the honest spine of the document — which also matches where this
+corpus already stands, since Stance I.4's commons boundary is Georgist by construction (*"what Henry
+George called land, widened to its modern kin"*). A companion that re-anchored the lineage on
+Proudhon would have drifted from canon's own anchor while claiming to serve it.
+
+**The generalisable lesson, worth more than the fix.** Confidence marks were applied to the
+*peripheral* figures and skipped on the *central* one, because the peripheral ones felt unfamiliar and
+the central one felt well-known. **Familiarity is not provenance.** A grading pass should start from
+what the argument leans on hardest, not from what feels least certain.
+
+### 1.2 The two ⚠ lineage readings
 
 **Kevin Carson** (canon §3.4) and **Michel Bauwens** (canon §3.5) are ⚠: recalled from reading, with
 no copy of either in this repository and no in-session re-read. Attributions are at the level of each
@@ -89,7 +118,7 @@ corrects; Bauwens supplies the partner state that makes that mechanism cooperati
 adversarial. **Verify both against the texts before either enters a further canon surface.** Canon
 §11 states this limit in prose and invites correction from readers who know the works better.
 
-### 1.2 ◐ — single-source or recalled-canonical
+### 1.3 ◐ — single-source or recalled-canonical
 
 Wörgl's parameters and its 1933 injunction · the WIR's 1936 banking licence and 1948 demurrage drop ·
 Stodder's counter-cyclicality result · Chiemgauer's two decades of operation · Sardex's brokerage
@@ -101,7 +130,7 @@ None of these is the load-bearing step in any argument. The WIR pair (licence + 
 closest to it, because canon §3.3 calls the WIR "the control experiment"; if either fact is wrong,
 that section weakens.
 
-**The 2026 datacenter and AI-capex figures in canon §5.7–§5.8 are ◐ — web-sourced 2026-08-23, single-pass, not
+**The 2026 datacenter and AI-capex figures in canon §5.7–canon §5.8 are ◐ — web-sourced 2026-08-23, single-pass, not
 cross-checked against primary filings.** Specifically: 75 projects / $130bn delayed or cancelled in
 Q1 2026 · 142 protests across 42 states on 18 July · 300+ local bans or moratoriums · a June poll at
 ~⅓ approval and 14% comfort-with-nearby · PJM wholesale power +76% YoY to $136.53/MWh in Q1 · ~38
@@ -118,7 +147,7 @@ Sources consulted for those figures: TIME, Brookings, Forbes, Newsweek, *Governi
 MultiState, and the Wikipedia "Opposition to AI data centers" entry, via a single search pass on
 2026-08-23.
 
-**The §5.8 capex and local-inference figures are also ◐**, from a second search pass the same day:
+**The canon §5.8 capex and local-inference figures are also ◐**, from a second search pass the same day:
 global AI datacenter investment past ~$600bn with the largest hyperscalers targeting ~$610–725bn in a
 year · AI infrastructure at ~5% of US GDP, described as several times the fiber overbuild at peak ·
 combined hyperscaler capex consuming ~94% of operating cash flow after dividends and buybacks · fiber
@@ -128,7 +157,7 @@ hardware, trailing by months on most tasks with complex reasoning the standing e
 **Verify before reuse.** Note that these depreciation figures no longer support a disanalogy reading —
 the correction immediately below inverts it.
 
-**A correction the operator supplied, recorded because it reversed a claim.** The first draft of §5.8
+**A correction the operator supplied, recorded because it reversed a claim.** The first draft of canon §5.8
 read GPU depreciation as a *disanalogy* to fibre — rails and fibre lasted, accelerators do not, so the
 inheritance is weaker. That was wrong. The operator's correction (Friedman's lecture) established the
 opposite: fibre's gift came from **decoupling**, not durability — a strand is a passive medium whose
@@ -139,7 +168,7 @@ disanalogy with three genuine ones (power as opex; accelerators a far larger sha
 than transponders were of a fibre build; density forcing re-upgrades of the durable half). Those three
 are ◐ and carry the same verify-before-reuse gate as the figures above.
 
-**The historical claims in §5.8 are ◐ and recalled rather than researched this pass** — Enron
+**The historical claims in canon §5.8 are ◐ and recalled rather than researched this pass** — Enron
 Broadband's bandwidth-trading venture and the Blockbuster video-on-demand contract (~$110m of future
 profit booked, cancelled within months, service never meaningfully shipped); Friedman's reading of the
 fibre overbuild as an accidental gift to the next economy, and the transponder/DWDM mechanism behind
@@ -158,7 +187,7 @@ flagged as *"a research-process note embedded in what is supposed to be a canon 
 claim is well-established enough not to rest on one talk. The reading behind it is Scott Galloway's,
 and it is recorded here rather than there.
 
-### 1.3 ✅ — verified in this pass
+### 1.4 ✅ — verified in this pass
 
 Everything attributed to this repository, on the branch and date in the legend. Plus, at the level of
 what the works argue (though not re-read in-session): **Ostrom** (*Governing the Commons*, 1990 — the
@@ -168,14 +197,14 @@ recognition of the right to organise), **Milgrom, North & Weingast** (1990, the 
 **Benkler** (2002, "Coase's Penguin"), **Hayek** (1945), and **Keynes on Gesell** (*General Theory*,
 ch. 23).
 
-### 1.4 Excluded entirely
+### 1.5 Excluded entirely
 
 **Lietaer's efficiency–resilience coordinate.** The specific figure usually quoted for the optimum on
 the Ulanowicz sustainability curve is ⚠ and is used nowhere — not in canon, not in any verdict. Only
 the *shape* of the claim (◐) survives, and §5's Study item 8 gates any detector on re-deriving the
 number from source.
 
-### 1.5 The register note, which is a rule rather than a courtesy
+### 1.6 The register note, which is a rule rather than a courtesy
 
 Canon §3 states the register note inline before the readings begin, which is the right placement.
 It is recorded here because it is a **rule**, not a sentiment: a peer
@@ -483,8 +512,8 @@ already implements the enforcement shape canon §8's invariant needs. What moved
 
 **Added in canon, not present here:** an expanded orientation section defining the working vocabulary;
 a new opening addressed to a reader arriving with a formed politics (both responses to blind-reader
-BLOCKERs, §7.4); **§5.7 on the datacenter backlash as the live instance of the enclosure this document
-is about**, with the negative-absorption symmetry it forces onto §6; **§5.8, the largest single
+BLOCKERs, §7.4); **canon §5.7 on the datacenter backlash as the live instance of the enclosure this document
+is about**, with the negative-absorption symmetry it forces onto §6; **canon §5.8, the largest single
 addition — the fibre/transponder recurrence (not analogy), the *why now* term Proudhon lacked, and a
 five-year falsification condition**; and **§9.4, the disclosure that
 the argument runs on a capability built at hyperscale without the consent of the people whose record
@@ -521,7 +550,7 @@ the code.)*
 **Study**
 
 8. **The efficiency–resilience window** as a candidate detector over a community's currency mix —
-   gated on re-deriving the Ulanowicz coordinate from source (§1.4).
+   gated on re-deriving the Ulanowicz coordinate from source (§1.5).
 9. **Contributive accounting** (Bauwens / Sensorica) against our REA fold — the nearest existing
    attempt at the same closure, and the thing to read before designing ours.
 10. **WIR counter-cyclicality** (Stodder) as the empirical target a community circuit is measured
@@ -615,7 +644,7 @@ Six, each recorded because the argument in it is the operator's.
 1. **The personal equilibrium** — the counterfactual benchmark, the collapse of the negotiation's
    friction, and the present-tense reading of *walking humbly*, are the operator's. So is the framing
    that the floor/ceiling architecture is an argument brought **to** George and Gesell rather than
-   inherited from them. → canon §3.7, §5.5, the Orientation's floor/ceiling entry, and the revised
+   inherited from them. → canon §3.7, canon §5.5, the Orientation's floor/ceiling entry, and the revised
    §9.2.
 2. **Which abundance** — the extensive/intensive distinction and the claim that **most efforts toward
    abundance have ignored our social capacities to lift the natural floor** are the operator's, not
@@ -626,8 +655,8 @@ Six, each recorded because the argument in it is the operator's.
    relationship is broken; that AI is the ultimate theft of the commons and the datacenter is that
    theft weaponised against the commons for rent extraction (monopoly over computation, wisdom and
    intelligence); and that an emergent superintelligence in that form is enclosure *by its nature*.
-   → canon §5.7, §5.8 and §9.4. The author's additions holding it inside canon discipline: the
-   negative-absorption symmetry with §6, and the refusal in §5.7's last paragraph to rely on a system
+   → canon §5.7, canon §5.8 and §9.4. The author's additions holding it inside canon discipline: the
+   negative-absorption symmetry with §6, and the refusal in canon §5.7's last paragraph to rely on a system
    defecting against its own training — *capture-resistance has to be structural, or it is not
    resistance.*
 5. **The judo, the bust, and the positioning.** That the protocol is the *judo move* of the enclosure —
@@ -645,7 +674,7 @@ Six, each recorded because the argument in it is the operator's.
    analogy to **recurrence of one mechanism**, and supplies the *why now* the document had been
    missing. Author's additions there: the three seams, the refusal to name or quantify optical laws
    canon does not need, the sigmoid caution, and the downgrade of "first force in economic history"
-   to a claim about what *this tradition* lacked (§1.2 records why).
+   to a claim about what *this tradition* lacked (§1.3 records why).
 
 6. **The audience.** The document is the entry point for the reader who arrives *as a jaded adult*
    rather than as a child — anarchists, socialists, capitalists, Georgists, libertarians, economists
@@ -670,8 +699,8 @@ on its rule that *"local authorship is not a defense against legibility harm. It
 administers it."* ✅
 
 **Limit 4 is §1.1**, and it is the one most likely to matter: two ⚠ readings are load-bearing. **Canon
-now carries a fifth limit** covering §5.7–§5.8's dated figures as recalled-not-re-audited; the evidence
-for it is §1.2, which also adds two further ⚠ items — the same-curve claim as physics, and the *why
+now carries a fifth limit** covering canon §5.7–canon §5.8's dated figures as recalled-not-re-audited; the evidence
+for it is §1.3, which also adds two further ⚠ items — the same-curve claim as physics, and the *why
 now* synthesis.
 
 ### 7.4 The adversarial passes, and what they corrected
@@ -690,7 +719,7 @@ orientation paragraph covered roughly a third of the vocabulary the argument lea
 load-bearing but never explained) and six MAJORs. Applied: the split this note completes; an expanded
 orientation section in canon; a restructured legal section leading with the freestanding argument
 rather than with internal corpus criticism; the grading apparatus removed from canon; a
-bibliography-shaped closing section; and the Galloway attribution reworked (§1.2). Its assessment of
+bibliography-shaped closing section; and the Galloway attribution reworked (§1.3). Its assessment of
 what already worked — the lineage survey, the blunt-instrument insight, the Sardex paragraph, the
 three refusals, "leaven, not the Kingdom," and the self-convicting §9.1 — is why those survive
 unchanged.
@@ -705,7 +734,7 @@ the §2.6 security findings and the accidental-numéraire result.
 [The reading program](epr:comparative-political-economy-reading-program-2026-08-07) supplies the
 claim-attachment relocation canon §5.1 uses and the Trueque analysis behind canon §7(c).
 [Playnet](epr:playnet-free-association-cross-pollination-2026-08-05) supplies the unit-agnostic
-discipline keeping §5's takes from smuggling a numéraire, and the register standard of §1.5.
+discipline keeping §5's takes from smuggling a numéraire, and the register standard of §1.6.
 [Beer](epr:beer-designing-freedom-elohim-critique-2026-06-04) and
 [the VSM reading](epr:elohim-as-viable-system-2026-06-04) supply canon §5.2's regulator argument.
 [Hypha](epr:hypha-dao-autonomous-collectives-cross-pollination-2026-06-24) supplies the
