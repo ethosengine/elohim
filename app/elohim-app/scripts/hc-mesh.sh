@@ -43,6 +43,11 @@
 #                   iroh. This does NOT change the conductor's kitsune2/tx5
 #                   transport. dual/iroh require STORAGE_BIN built with
 #                   --features "p2p p2p-iroh"; start refuses otherwise.
+#   MESH_PEER_TRANSPORTS
+#                   Per-peer overrides, e.g. matthew=libp2p,jessica=iroh.
+#                   Peers not named inherit MESH_TRANSPORT_BACKEND.
+#   MESH_DOORWAYS    0 skips mongod and both doorways; storage peers launch
+#                   without ELOHIM_DOORWAY_URL (default: 1).
 #   DOORWAY_PORT    Doorway HTTP port (default: 8888)
 #   DOORWAY_A_HEALTH_PORT / DOORWAY_B_HEALTH_PORT  health-watchdog listener ports (default 8079 / 8089;
 #                   alpha runs 8079 — spawn_health_listener serves /health,/ready,/health/serving from
@@ -134,6 +139,36 @@ esac
 # the normalized/defaulted mode so that run evidence records the same backend
 # the mesh launcher selects.
 export MESH_TRANSPORT_BACKEND
+MESH_TRANSPORT_BACKEND_EFFECTIVE="$MESH_TRANSPORT_BACKEND"
+# Per-peer transport, the diversity axis of the two-peer recovery harness:
+#   MESH_PEER_TRANSPORTS="matthew=libp2p,jessica=iroh"
+# Any peer not named inherits MESH_TRANSPORT_BACKEND. The configurations are
+# the library; the two slots cycle through it — a scenario never adds a peer.
+MESH_PEER_TRANSPORTS="${MESH_PEER_TRANSPORTS:-}"
+MESH_PEER_TRANSPORTS_EFFECTIVE="$MESH_PEER_TRANSPORTS"
+peer_transport() { # <peer-name> -> libp2p|dual|iroh
+  local kv
+  IFS=',' read -ra _pt <<< "$MESH_PEER_TRANSPORTS_EFFECTIVE"
+  for kv in "${_pt[@]}"; do
+    [ "${kv%%=*}" = "$1" ] && { echo "${kv#*=}"; return 0; }
+  done
+  echo "$MESH_TRANSPORT_BACKEND_EFFECTIVE"
+}
+_validate_peer_transports() {
+  local kv
+  IFS=',' read -ra _pt <<< "$MESH_PEER_TRANSPORTS_EFFECTIVE"
+  for kv in "${_pt[@]}"; do
+    [ -z "$kv" ] && continue
+    case "${kv#*=}" in libp2p|dual|iroh) ;; *)
+      echo "invalid MESH_PEER_TRANSPORTS entry '$kv' (expected <peer>=libp2p|dual|iroh)" >&2
+      return 2 ;;
+    esac
+  done
+}
+_validate_peer_transports || { if [ "${BASH_SOURCE[0]}" != "$0" ]; then return 2; else exit 2; fi; }
+export MESH_PEER_TRANSPORTS
+MESH_DOORWAYS="${MESH_DOORWAYS:-1}"
+MESH_DOORWAYS_EFFECTIVE="$MESH_DOORWAYS"
 DOORWAY_PORT="${DOORWAY_PORT:-8888}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -228,7 +263,7 @@ storage_transport_for() { # <peer-name> <http-port>
 # peers mounted. `/p2p/status.irohNodeId` is emitted only by a peer whose iroh
 # plane is actually co-resident with libp2p; an iroh-only peer instead reports
 # its 64-hex NodeId as `peerId`. Read EVERY peer so mixed or partially restarted
-# meshes are stamped unknown instead of confidently naming one backend.
+# meshes are named peer-by-peer; unreadable peers still make the stamp unknown.
 mesh_transport_backend_from_status() {
   local i=0 status dual=0 iroh=0 libp2p=0 unreadable=0
   for _name in "${PEERS[@]}"; do
@@ -254,7 +289,16 @@ mesh_transport_backend_from_status() {
   elif [ "$libp2p" -eq "${#PEERS[@]}" ]; then
     echo libp2p
   else
-    echo unknown
+    # Mixed by design (MESH_PEER_TRANSPORTS): name each peer's live plane.
+    local j=0 out="" st
+    for _name in "${PEERS[@]}"; do
+      st="$(curl -fsS -m 3 "http://localhost:$(http_port "$j")/p2p/status" 2>/dev/null)"
+      if jq -e '.irohNodeId | type == "string" and length > 0' >/dev/null 2>&1 <<<"$st"; then out+="${out:+,}$_name=dual"
+      elif jq -e '.peerId | type == "string" and test("^[0-9a-fA-F]{64}$")' >/dev/null 2>&1 <<<"$st"; then out+="${out:+,}$_name=iroh"
+      else out+="${out:+,}$_name=libp2p"; fi
+      j=$((j + 1))
+    done
+    echo "$out"
   fi
 }
 
@@ -625,13 +669,16 @@ status_all() {
     fi
     i=$((i+1))
   done
-  printf "doorway  :%s " "$DOORWAY_PORT"
-  curl -s -m 2 "http://localhost:$DOORWAY_PORT/health" >/dev/null && echo UP || echo down
-  printf "doorwayB :%s " "${DOORWAY_B_PORT:-8889}"
-  curl -s -m 2 "http://localhost:${DOORWAY_B_PORT:-8889}/health" >/dev/null && echo UP || echo down
+  if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
+    printf "doorway  :%s " "$DOORWAY_PORT"
+    curl -s -m 2 "http://localhost:$DOORWAY_PORT/health" >/dev/null && echo UP || echo down
+    printf "doorwayB :%s " "${DOORWAY_B_PORT:-8889}"
+    curl -s -m 2 "http://localhost:${DOORWAY_B_PORT:-8889}/health" >/dev/null && echo UP || echo down
+  else
+    echo "doorways: disabled (MESH_DOORWAYS=0)"
+  fi
   printf "mongod   :%s " "$MONGO_PORT"
   if (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null; then echo "UP (archive-backed doorways)"; else echo "down (doorways run archive-less: inert warm shell)"; fi
-  echo
   mesh_footprint
   echo
   # What is ACTUALLY RUNNING comes first, read from /proc — not what the next
@@ -749,7 +796,7 @@ PY
         echo "  $name: binary is gone (was '$bin'); rebuild it or set STORAGE_BIN" >&2
         failed+=" $name"; continue
       fi
-      if ! assert_storage_transport_capability "$bin" "$MESH_TRANSPORT_BACKEND"; then
+      if ! assert_storage_transport_capability "$bin" "$(peer_transport "$name")"; then
         failed+=" $name"; continue
       fi
       # Record the binary beside the environ: a later dead-peer restore must not
@@ -772,7 +819,7 @@ PY
         echo "  $name: no executable storage binary — $exefile absent, no sibling peer running, STORAGE_BIN=$STORAGE_BIN not executable" >&2
         failed+=" $name"; continue
       fi
-      if ! assert_storage_transport_capability "$bin" "$MESH_TRANSPORT_BACKEND"; then
+      if ! assert_storage_transport_capability "$bin" "$(peer_transport "$name")"; then
         failed+=" $name"; continue
       fi
       key="$(tr '\0' '\n' < "$envfile" | sed -n 's/^AGENT_PUBKEY=//p' | head -1)"
@@ -810,7 +857,7 @@ os.chdir(cwd)
 # three storage peers owned a2o.lock; every waiter stalled for 40 min).
 os.closerange(3, 65536)
 os.execve(binpath, [binpath, "--http-port", port], env)
-' "$envfile" "$bin" "$port" "$cwd" "$(restart_env_overlay "$envfile")" >> "$LOGDIR/$name.log" 2>&1 &
+' "$envfile" "$bin" "$port" "$cwd" "$(restart_env_overlay "$envfile" "$name")" >> "$LOGDIR/$name.log" 2>&1 &
     disown 2>/dev/null || true
   done
 
@@ -847,22 +894,23 @@ os.execve(binpath, [binpath, "--http-port", port], env)
 
 # Env keys layered over a restarted peer's captured environment, one K=V per
 # line. Empty by default — the capture is the truth except for the explicit
-# MESH_TRANSPORT_BACKEND launch knob. Two further opt-ins:
+# per-peer transport launch knob. Two further opt-ins:
 #   MESH_RESTART_APPLY_PROFILE=1   re-apply THIS script's dev-tier pacing profile
 #                                  (the same knobs `start` exports), so a knob
 #                                  added after boot reaches a running mesh
 #                                  without regenerating it. Never touches
 #                                  AGENT_PUBKEY or any non-profile key.
 #   MESH_RESTART_ENV_OVERLAY="K=V K=V"   ad-hoc keys for one experiment.
-restart_env_overlay() { # <captured-environ>
-  # The caller's mesh transport selection deliberately beats the captured
-  # daemon environment. This is how `MESH_TRANSPORT_BACKEND=dual ...
-  # storage-restart` upgrades an already-running libp2p mesh in place.
+restart_env_overlay() { # <captured-environ> <peer-name>
+  # The caller's PER-PEER transport selection deliberately beats the captured
+  # daemon environment. This is how one slot is cycled into a new transport.
   # MESH_RESTART_ENV_OVERLAY remains last for one-off experiments.
-  printf '%s\n' "ELOHIM_TRANSPORT_BACKEND=$MESH_TRANSPORT_BACKEND"
+  printf '%s\n' "ELOHIM_TRANSPORT_BACKEND=$(peer_transport "$2")"
   # T0' pure-iroh bootstrap: storage announces to / seeds its peer book from
   # the doorway's /p2p/manifests projection; localdev doorway is :$DOORWAY_PORT.
-  printf '%s\n' "ELOHIM_DOORWAY_URL=http://localhost:$DOORWAY_PORT"
+  if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
+    printf '%s\n' "ELOHIM_DOORWAY_URL=http://localhost:$DOORWAY_PORT"
+  fi
   if [ "${MESH_RESTART_APPLY_PROFILE:-0}" = "1" ]; then
     printf '%s\n' \
       "PROJECTION_RECONCILE_SECS=$PROJECTION_RECONCILE_SECS" \
@@ -1291,10 +1339,14 @@ conductor_admin_internal_port = 4444
 EOF
   fi
 
-  for bin in "$STORAGE_BIN" "$DOORWAY_BIN"; do
+  local required_bins=("$STORAGE_BIN")
+  if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then required_bins+=("$DOORWAY_BIN"); fi
+  for bin in "${required_bins[@]}"; do
     [ -x "$bin" ] || { echo "missing binary: $bin (build it first — see CLAUDE.md pool-slot paths)"; exit 1; }
   done
-  assert_storage_transport_capability "$STORAGE_BIN" "$MESH_TRANSPORT_BACKEND" || exit 1
+  for name in "${PEERS[@]}"; do
+    assert_storage_transport_capability "$STORAGE_BIN" "$(peer_transport "$name")" || exit 1
+  done
 
   # Repack the happ when any DNA is newer than the bundle (stale-bundle trap:
   # elohim.happ predated lamad.dna by 3 months on 2026-08-16).
@@ -1303,6 +1355,7 @@ EOF
     (cd "$HAPP_WORKDIR" && hc app pack . -o elohim.happ) || exit 1
   fi
 
+  if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
   # 0. mongod — the doorways' projection archive. Must be listening BEFORE a
   #    doorway boots: AppState::init_projection binds the archive at startup
   #    (bind_warm_shell_to_archive), and a doorway that boots archive-less
@@ -1407,6 +1460,7 @@ EOF
     echo "doorway B up on :$DOORWAY_B_PORT (apex stand-in, jessica-primary)"
   else
     echo "doorway B already up on :$DOORWAY_B_PORT"
+  fi
   fi
 
   # 2. Conductors: hc sandbox generate (installs the happ + writes each
@@ -1515,19 +1569,23 @@ PYEOF
 
   # 3. Storage peers: one per conductor, agent key read from its conductor.
   local i=0
+  local doorway_env=()
+  if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
+    doorway_env=("ELOHIM_DOORWAY_URL=http://localhost:$DOORWAY_PORT")
+  fi
   for name in "${PEERS[@]}"; do
     if ! curl -s -m 2 "http://localhost:$(http_port $i)/health" >/dev/null; then
       local agent
       agent=$(hc sandbox call --running "$(admin_port $i)" list-apps 2>/dev/null \
         | grep -o '"agent_pub_key":"[^"]*"' | head -1 | cut -d'"' -f4)
       mkdir -p "$MESH_DIR/$name"
+      env "${doorway_env[@]}" \
       HOLOCHAIN_ADMIN_URL="ws://localhost:$(admin_port $i)" \
       HOLOCHAIN_APP_URL="ws://localhost:$(app_port $i)" \
       STORAGE_DIR="$MESH_DIR/$name" \
       ENABLE_CONTENT_DB=true ENABLE_IMPORT_API=true \
       ENABLE_P2P=true P2P_PORT="$(p2p_port $i)" \
-      ELOHIM_TRANSPORT_BACKEND="$MESH_TRANSPORT_BACKEND" \
-      ELOHIM_DOORWAY_URL="http://localhost:$DOORWAY_PORT" \
+      ELOHIM_TRANSPORT_BACKEND="$(peer_transport "$name")" \
       AGENT_PUBKEY="$agent" RELAY_MODE=server \
       GENESIS_SELF_HEAL_IDENTITY=1 SELF_HUMAN_ID="$(human_id "$name")" \
       HOUSEHOLD_ID=household-dowell \
@@ -1546,7 +1604,7 @@ PYEOF
       ALLOW_SEED_DELEGATES_COMPUTE=1 \
       ALLOW_SEED_SHARD_MANIFEST=1 \
       nohup "$STORAGE_BIN" --http-port "$(http_port $i)" > "$LOGDIR/$name.log" 2>&1 &
-      echo "storage $name: http=$(http_port $i) p2p=$(p2p_port $i) transport=$MESH_TRANSPORT_BACKEND agent=${agent:0:16}..."
+      echo "storage $name: http=$(http_port $i) p2p=$(p2p_port $i) transport=$(peer_transport "$name") agent=${agent:0:16}..."
     else
       echo "storage $name already up on :$(http_port $i)"
     fi
