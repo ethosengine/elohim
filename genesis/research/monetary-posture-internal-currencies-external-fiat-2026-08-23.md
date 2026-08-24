@@ -92,9 +92,14 @@ and technical vocabulary this paper leans on, in one place:
 
 ## 0. Both postures, stated first
 
-**Inward.** The protocol has no currency and will not have one. What it has is a **policy surface on
-which a community declares its own** — and that surface already ships, as the `author-lens`
-Commitment (§2.1). A currency here is a *Mishpat lens*: a named school's reading, with a
+**Inward.** The protocol has no currency and will not have one. But the reason is not that a currency
+layer is missing — it is that **a currency is a configurable property of the substrate itself**, and
+the configuring belongs to a community rather than to the protocol. Every part a currency is made of
+already exists as machinery: an issuance trigger is an event creating a resource; a credit limit is
+the bounds validator that already meters what a commitment permits; a scope boundary is a scope; a
+carrying cost is a decay rule over a stock; clearing is a fold. What the protocol supplies is the
+**policy surface on which a community declares its own settings** — and that surface already ships,
+as the `author-lens` Commitment (§2.1). A currency here is a *Mishpat lens*: a named school's reading, with a
 deterministic `rule` and a declared `telos`, governing a scope, forkable, supersedable, and plural by
 construction. Constitutional bounds arrive as lenses with `role: floor` or `role: ceiling`. **Zero new
 DHT entry types; zero new commitment actions.** The protocol supplies the grammar and the detectors;
@@ -186,9 +191,9 @@ have a tax. It has a practice.
 
 ## 2. The internal posture — currencies as Mishpat policy
 
-### 2.1 A currency is a lens, and the lens already ships
+### 2.1 A currency is a configuration, declared as a lens — and the lens already ships
 
-The mechanism does not need inventing. The shipped, mechanical meaning of a "Mishpat policy" is a
+**You do not build a currency on this substrate; you set one.** The mechanism does not need inventing. The shipped, mechanical meaning of a "Mishpat policy" is a
 **lens**: a `Mishpat::Commitment` with `action: "author-lens"`, whose entire concept lives in
 `payload_json`. ✅ Adding one was DNA-hash-neutral — zero integrity-struct change, coordinator
 hot-swap via `update_coordinators`.

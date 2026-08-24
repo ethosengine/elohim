@@ -19,7 +19,7 @@ sovereignty-frame: adversary
 pass · ◐ single-source or recalled-canonical, not re-verified this pass · ⚠ verify at source before
 load-bearing. Repository `file:line` pointers verified on branch
 `fix/doorway-breaker-trial-theft-and-apps-extraction-herd`, **2026-08-23**. The token plane moves week
-to week — §2.7 records where a prior audit has already gone stale.
+to week — §2.8 records where a prior audit has already gone stale.
 
 # Evidence bridge — Succession Without Conquest
 
@@ -315,7 +315,19 @@ authority rather than value.
 `private(0) < self(1) < intimate(2) < trusted(3) < familiar(4) < community(5) < public(6) <
 commons(7)`. **`commons` is the most permissive, not the most restricted.** ✅)*
 
-### 2.5 What is simply not built
+### 2.5 A correction to canon §9.3, operator-found 2026-08-24
+
+Canon §9.3 originally read *"the economic layer is, so far, mostly unbuilt."* **That was wrong**, and it was wrong as a category error rather than a degree error. The operator's correction: the REA/ValueFlows layer ships, and more fundamentally **a currency is a configurable property of the substrate itself** — not a layer stacked above it.
+
+The evidence that settles it, verified 2026-08-24: the REA kernel is ten modules (`elohim/epr-rea/src/` — model, fold, stock, scope, walk, store, actor, epistemic); the elohim DNA exposes `create_rea_economic_event`, `create_rea_economic_event_from_intent`, `create_rea_commitment`, `update_rea_commitment_state`, `create_agreement` and a flow-planning family (`create_flow_{budget,goal,milestone,plan,projection,scenario}`), plus service offer/request/match and mutual-insurance externs; `economic_events` is a live diesel table with DHT anchoring on the signal path (`main.rs:1770`); HTTP surfaces exist at `api/economic_events.rs` and `api/rea_commitments.rs`; `services/rea_commitment_service.rs` and `services/custody_rotation.rs` call the DHT externs **from production paths, not tests**; `epr-rea/tests/` carries fabric, stock-dynamics and uncertainty-closure suites, and `epr-cli/tests/flow_*.rs` nine more; and `.eprfs/status/flows.jsonl` holds ~5,500 live records of the project's own development valueflow. ✅
+
+**Why the framing matters more than the fact.** Every component of a currency already exists as machinery — issuance trigger (an event creating a resource), credit limit (the seven-check bounds validator), scope boundary (a scope), carrying cost (a decay rule over a stock), clearing (a fold), and the declaration itself (an `author-lens` Commitment). The absence of a currency is therefore **a refusal to set knobs that belong to a community**, per Stance I.2, and *not* an unbuilt layer. Counting a deliberate refusal as debt understated the substrate and misrepresented a settled position as an unfinished one.
+
+**What survives as genuine debt** is much smaller and sharper: `binds-policy` (§2.3), which is the one arm that would let a declared configuration bind — plus mutual credit's zero implementation, the stub interop bridge, the never-executing share-routing path, and the ratification defect (§2.7.2). Canon §9.3 now carries that structure: built · refused · missing · unproven.
+
+**Method note on how this was missed.** Three verification passes and eight grounding readers all reported the *facts* correctly — the build-state reader's own findings list `economic_events` as "a live, populated table with real DHT-anchor plumbing (unlike tokens)." The error was in the author's synthesis, which read "no unit of account" as "no economic layer." **Absence of the thing you were looking for is not absence of the thing that is there.**
+
+### 2.6 What is simply not built
 
 - **Mutual credit.** A repo-wide grep for `mutual_credit`, `credit_limit`, `MutualCredit`,
   `creditLimit` returns **zero hits**, and canon says so plainly. ✅
@@ -341,7 +353,7 @@ commons(7)`. **`commons` is the most permissive, not the most restricted.** ✅)
   the client swallows it with `catchError(() => of(null))`. A working DHT primitive, a working UI
   caller, and a 501 between them. ✅
 
-### 2.6 Live defects a monetary posture inherits
+### 2.7 Live defects a monetary posture inherits
 
 1. **Unauthenticated mint.** `POST /api/v1/token/discernment-mint` accepts a caller-supplied
    `agent_id` and `amount` with **no authorization check** (`api/token.rs:346-367`). Found
@@ -361,14 +373,14 @@ commons(7)`. **`commons` is the most permissive, not the most restricted.** ✅)
    and **delete the `"algorithm"` source variant** — an algorithmically-derived exchange rate is
    precisely the authored-by-nobody default the corpus refuses.
 
-### 2.7 A prior audit that has gone stale
+### 2.8 A prior audit that has gone stale
 
 The 2026-08-07 red team found *"supply is monotone by wiring / decay has zero callers."* **No longer
 true.** `apply_decay` now has a live HTTP caller: `api/token.rs:112,122` → `handle_apply_decay (:374)`
 → `TokenDecayService::apply_decay (:381)`. ✅ The tree moved between audits, exactly as that document
 warned it would — which is why every pointer here carries a branch and a date.
 
-### 2.8 The structural finding that gates everything
+### 2.9 The structural finding that gates everything
 
 - `genesis/manifests/habits.yaml` declares 12 habits — 7 green, 5 red, 0 unwired. **Not one concerns
   economics, currency, settlement, or social governance.** ✅
@@ -508,7 +520,7 @@ already implements the enforcement shape canon §8's invariant needs. What moved
 | Outputs / the mint pass | §6 | A research-close ritual with no meaning to a canon reader. |
 | Method note (eight readers, cluster names) | §7 | Canon §12 keeps provenance and drops workflow. |
 | The EAE legal analysis and securities exposure | §3.4 | Canon should not publish a legal critique of a sibling document at `reach: commons`. |
-| Exact security endpoint paths | §2.6 | Canon §9.3 says only that "the audit named in §12 records unresolved defects" in the token layer — no endpoint, no route, no defect class. |
+| Exact security endpoint paths | §2.7 | Canon §9.3 says only that "the audit named in §12 records unresolved defects" in the token layer — no endpoint, no route, no defect class. |
 
 **Added in canon, not present here:** an expanded orientation section defining the working vocabulary;
 a new opening addressed to a reader arriving with a formed politics (both responses to blind-reader
@@ -605,9 +617,9 @@ three standalone entries (§6's security and numéraire items). `CLUSTERS.md` gr
 | §2.2 — the derivable-projection invariant | [commons-holonic-stewardship-backlog](epr:commons-holonic-stewardship-backlog) | **A projection is legitimate only while it is derivable; the moment it is authoritative for anything it *is* the ledger.** Sibling of Take 2's outward-only invariant, and the test that decides whether SQLite `token_balances` is the bank-like ledger the Hypha survey refused. Not a verdict item — a design invariant surfaced by §2.2's adjudication. |
 
 **Standalone, minted** (operationally-atomic per `CLUSTERS.md`) — all three written 2026-08-23:
-`2026-08-23-token-discernment-mint-unauthenticated.md` (§2.6.1) ·
-`2026-08-23-governance-ratification-single-write-capturable.md` (§2.6.2) ·
-`2026-08-23-concentration-mu-accidental-numeraire.md` (§2.6.3). The first two are security defects,
+`2026-08-23-token-discernment-mint-unauthenticated.md` (§2.7.1) ·
+`2026-08-23-governance-ratification-single-write-capturable.md` (§2.7.2) ·
+`2026-08-23-concentration-mu-accidental-numeraire.md` (§2.7.3). The first two are security defects,
 not design borrows.
 
 **Not minted — held for the operator.** Five content/canon actions, none a research take: §3.1 and
@@ -615,7 +627,7 @@ not design borrows.
 token/blockchain sections) · §3.3–§3.5 (**the EAE epic is published at `reach: commons`**; graduating
 it revises shipped public content and the seed JSON must move with it).
 
-**One priority note that is not a row.** Per §2.8, economics has no habit and no `@concern` tag. Every
+**One priority note that is not a row.** Per §2.9, economics has no habit and no `@concern` tag. Every
 row above is un-schedulable as first-class delivery until an economy habit exists with a runnable
 check. The cheapest first red: **`binds-policy` enacts a lens** — a scenario that authors a lens,
 binds it, and shows an economic event refused for violating its `rule`. That single check would bind
@@ -687,7 +699,7 @@ Six, each recorded because the argument in it is the operator's.
 
 Canon §11 states the four limits. Recorded here is what backs them, and only that.
 
-**The falsification instrument for limit 1.** Study item 9 and §2.8's absent habit are what would make
+**The falsification instrument for limit 1.** Study item 9 and §2.9's absent habit are what would make
 the central claim testable — per the corpus's standing instruction, *"Build the falsification
 instrument before the advocacy surface."* The measurement that would settle it: a community circuit's
 brokerage overhead, against Sardex's per-member cost.
@@ -730,7 +742,7 @@ unchanged.
 detector-reports/council-decides discipline canon §5.3 adopts wholesale, convicted us in advance on
 the Scott point, had already refuted the illegibility position as trap **A6** (*ownerless is not
 uncaptured*, with waqf as the thousand-year case law) before either document restated it, and carry
-the §2.6 security findings and the accidental-numéraire result.
+the §2.7 security findings and the accidental-numéraire result.
 [The reading program](epr:comparative-political-economy-reading-program-2026-08-07) supplies the
 claim-attachment relocation canon §5.1 uses and the Trueque analysis behind canon §7(c).
 [Playnet](epr:playnet-free-association-cross-pollination-2026-08-05) supplies the unit-agnostic
