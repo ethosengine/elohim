@@ -36,7 +36,7 @@ cites:
 
 > **Status:** Draft — design pass 2026-08-24, awaiting operator review before the plan.
 > **Shape:** one arc, four cuts, in dependency order: (0) an honesty fix, (1) an ephemeral path-quality observation + one selection predicate, (2) a heterogeneous two-peer local harness, (3) a churn-injected quiescence measure shared by the local mesh and the fleet.
-> **Theme:** a peer should know, from its own perspective, which path to another peer is fastest right now — and we should be able to prove that knowledge improves convergence on two local peers before any of it rides a deploy.
+> **Theme:** a peer should know, from its own perspective, which path to another peer is fastest right now — and we prove it with the one scenario the resiliency saga already demands: one peer holds the other's full recoverable state; take a peer down, bring it back (or bring a new one in), and time how long until it holds everything again. Two peers, two doorways, every transport pair — nothing more is needed.
 
 ## 1. What today's measurement actually showed
 
@@ -54,7 +54,7 @@ Consequence: the measurement instrument for this arc is **time-to-converge under
 
 - A peer holds a *local, per-pair, per-transport* view of path quality and exposes it (`/p2p/status`, Prometheus) — the self-awareness the operator asked for, readable by a human and, later, by the peer itself.
 - Latency-critical small operations race both live planes; bulk operations select one plane using the observations the races already produced; a fixed exploration fraction keeps the non-preferred plane sampled so recovery is detectable.
-- The local mesh can run **two peers in any transport configuration each** — the six pairwise cases — with **two doorways**, on the same two process slots, by restarting a slot into a new config rather than adding slots.
+- The local mesh runs **exactly two peers and two doorways**. Two peers is sufficient, not merely minimal: with replication factor 2 each peer holds the other's *entire* recoverable state, so **peer loss + recovery from the survivor** exercises every feature the architecture claims (household forms, heads converge, custody witnessed, pull queue retires) *and* measures its performance in one run. The six transport pairs are the axis that recovery is timed along, on the same two process slots.
 - The harness reports its own footprint (RSS/CPU per process) so "can we afford this locally" is a number, not a worry.
 - Quiescence under churn is measured with **one reader** (`quiesce-timeline.py`) from **two emitters** (the local mesh stage and the fleet gate), so the before/after claim has the same shape locally and on the fleet.
 - Sync-document verdicts are projected as *structured per-document reasons* in the peer's own status, so "no peer knows what to do with document X" becomes a readable genesis-pipeline signal — the lens the operator named.
@@ -119,22 +119,31 @@ The reconcile and back-fill paths already *know* why a document is not projected
 
 ### 3.3 Cut 2 — the two-peer diversity harness
 
-**Topology.** `MESH_PEERS=matthew,jessica` for this arc. Two peers is the *minimum* topology that expresses every pairwise transport case; a third peer adds only a redundant edge and ~2.2 GB (one conductor). Doorway A stays primary→peer 0 with peer 1 as extra; doorway B stays primary→peer 1 (the existing apex stand-in shape) — so doorway-projection diversity is exercised without a new doorway.
+**Topology.** `MESH_PEERS=matthew,jessica`. Two peers is *sufficient*: at replication factor 2 each peer is the other's complete recoverable state, so the survivor-recovers-the-loser scenario proves both the features and the performance of the architecture — which is exactly what the resiliency saga demands (chapters 1–2: a peer awakens and the household forms; 5–7: co-stewardship, heads converge, custody witnessed; 11: the pull queue can finish). A third peer would add ~2.2 GB (one conductor) and no new claim. Doorway A stays primary→peer 0 with peer 1 as extra; doorway B stays primary→peer 1 (the existing apex stand-in shape) — so doorway-projection diversity is exercised without a new doorway, and doorway failover (the top red) is the same two-doorway pair.
 
 **Per-peer transport.** `MESH_PEER_TRANSPORTS=matthew=libp2p,jessica=iroh` (falls back to `MESH_TRANSPORT_BACKEND` for any peer not named). `storage-restart <peer>` applies that peer's declared transport through the existing env-capture + overlay path; `assert_storage_transport_capability` checks the *per-peer* mode, not the global one; `mesh_transport_backend_from_status` reports the actual per-peer set (e.g. `matthew=dual,jessica=iroh`) instead of `unknown` on any mix.
 
-**The six scenarios** (`hc-mesh-transport-matrix.sh` grows from three homogeneous modes to named pair scenarios):
+**The churn primitive is recovery, not a config swap.** Every measured run is one of two recovery shapes, timed from the moment the recovering peer is up to the moment it holds everything the survivor holds:
 
-| scenario | matthew | jessica | expected |
+| shape | what happens | what it proves |
+|---|---|---|
+| **warm return** | stop peer B's storage; wipe its DocStore + blob store (conductor, keys, chain untouched); restart B in the scenario's transport | the survivor A holds B's full state and B re-acquires it — saga 6/7/11 on a known identity |
+| **cold join** | stop peer B entirely; regenerate B as a *new* identity (new sandbox, new agent key); start it in the scenario's transport | a new peer joining recovers the household's whole state from one survivor — saga 1/2 then 6/7/11 |
+
+**Recovered** is defined by the saga's own predicates, not a new one: blob inventory parity with the survivor (chapter 6, `heads converge`), custody manifests witnessed for every blob (chapter 7), `pull.caughtUp === true` with `pull.failed == 0` (chapter 11), and the same content ids served 200 through *both* doorways (chapter 4). `time_to_recover` is the wall-clock from B's `/health` 200 to the last of those four turning true.
+
+**The six transport pairs** are the axis each recovery shape is run along (`hc-mesh-transport-matrix.sh` grows from three homogeneous modes to these):
+
+| scenario | matthew (survivor) | jessica (recovering) | expected |
 |---|---|---|---|
-| `homo-libp2p` | libp2p | libp2p | converges |
-| `homo-iroh` | iroh | iroh | converges (pure-iroh bootstrap via the doorway manifest board — dormant on the fleet, enabled locally) |
-| `homo-dual` | dual | dual | converges; races active |
-| `mixed-dual-libp2p` | dual | libp2p | converges over libp2p; iroh `Unknown` on the libp2p peer, never selected |
-| `mixed-dual-iroh` | dual | iroh | converges over iroh |
+| `homo-libp2p` | libp2p | libp2p | recovers |
+| `homo-iroh` | iroh | iroh | recovers (pure-iroh bootstrap via the doorway manifest board — dormant on the fleet, enabled locally) |
+| `homo-dual` | dual | dual | recovers; races active — the pair the self-awareness claim is measured on |
+| `mixed-dual-libp2p` | dual | libp2p | recovers over libp2p; iroh `Unknown` on the libp2p peer, never selected |
+| `mixed-dual-iroh` | dual | iroh | recovers over iroh |
 | `split-libp2p-iroh` | libp2p | iroh | **must red with the reason** `NoSharedTransport` (canon rule 5, verbatim) — a true finding about bootstrap, not a harness bug |
 
-Each scenario is a *restart pair* on the same two slots (config swap = churn), not a fresh mesh; conductors are untouched, so agent keys and DHT survive.
+Survivor and recovering roles swap on alternate runs so neither slot is always the one measured. Each run is a restart of one slot, not a fresh mesh; conductors are untouched on warm return.
 
 **Footprint line.** `hc-mesh.sh status` prints RSS and CPU per conductor/storage/doorway and a total, so the cost of any configuration is read from the same command that reports its health.
 
@@ -142,7 +151,7 @@ Each scenario is a *restart pair* on the same two slots (config swap = churn), n
 
 **One reader, two emitters.** `run-mesh-quiesce-stage.sh` (local) emits the same `fleet-quiesce[<ts>]: PASS|FAIL … — sustained Ns …` line grammar the fleet gate emits, so `genesis/scripts/quiesce-timeline.py` parses both into one series with a `source: local|fleet` field. No second parser.
 
-**The proof shape.** For each diversity scenario, N runs (default 3) of: restart the pair into the scenario → wait for the local gate's sustained PASS → record `time_to_quiesce`, `best_window`, `sync_changes_applied{transport}` deltas, `transport_route_total` deltas. Then the same runs with racing/selection **disabled** (`ELOHIM_TRANSPORT_SELECTION=off`, the flag Cut 1 ships behind, default *on* locally, default *off* on the fleet until the local proof lands). The claim "transport self-awareness improves quiescence" is the before/after difference in `time_to_quiesce` on the local mesh, per scenario — and it is falsifiable: if the difference is inside run-to-run noise, the flag stays off on the fleet and the arc reports that honestly.
+**The proof shape.** For each diversity scenario × recovery shape, N runs (default 3) of: put the pair into the scenario → inflict the loss → start recovery → record `time_to_recover` (the four saga predicates above), then the local gate's `time_to_quiesce` and `best_window`, plus `sync_changes_applied{transport}` and `transport_route_total` deltas so the transport that actually carried the recovery is named, not assumed. Then the same runs with racing/selection **disabled** (`ELOHIM_TRANSPORT_SELECTION=off`, the flag Cut 1 ships behind, default *on* locally, default *off* on the fleet until the local proof lands). The claim "transport self-awareness improves recovery" is the before/after difference in `time_to_recover` (and `time_to_quiesce`) on the local mesh, per scenario × shape — and it is falsifiable: if the difference is inside run-to-run noise, the flag stays off on the fleet and the arc reports that honestly.
 
 **Fleet confirmation, no redeploy.** Once the local proof exists: flip the flag in the alpha manifests, one deploy, then `[build:edge] [edge:validate-only]` measures without restarting the pods it measures. The fleet series and the local series are compared by the same reader.
 
@@ -182,8 +191,8 @@ Existing consumers (`race_fetch`, the iroh sync driver, heal-on-read) keep their
 
 - **Cut 0:** regression test on the status projection count; `just gate elohim-storage` green.
 - **Cut 1:** contract tests for C4 and C3 named in the registry row; `placement-audit.py --epr-meta` census passes; `@concern:transport-diversity` scenarios in `genesis/a2o/features/dataplane/` assert `transportPaths` populated for every live pair and `Unknown` for the missing one.
-- **Cut 2:** all six scenarios run on the two-peer mesh; five converge, `split-libp2p-iroh` reds with `NoSharedTransport`; footprint line present.
-- **Cut 3:** the local quiesce series holds N×6×2 records; the before/after table is the arc's deliverable, one line per scenario.
+- **Cut 2:** both recovery shapes run across all six scenarios on the two-peer mesh; five recover to all four saga predicates, `split-libp2p-iroh` reds with `NoSharedTransport`; footprint line present.
+- **Cut 3:** the local series holds N × 6 scenarios × 2 shapes × 2 (flag on/off) records; the before/after table of `time_to_recover` is the arc's deliverable, one line per scenario × shape.
 - **Habit delta:** one line in `genesis/manifests/habits.yaml` under `dataplane-convergence` naming the local before/after result and, when it exists, the fleet confirmation build.
 
 ## 7. Sequence, risks, decomposition rows
@@ -197,9 +206,9 @@ Existing consumers (`race_fetch`, the iroh sync driver, heal-on-read) keep their
 | 4 | wire `Bulk` selection + exploration into large-blob / full-sync paths | 2 | exploration must never pick a `Degraded` plane for a large transfer twice in a row |
 | 5 | `syncVerdicts` structured reasons in `/p2p/status` + metric | — | keep bounded (top-N, counts) |
 | 6 | `MESH_PEER_TRANSPORTS` + per-peer restart/assert/status in `hc-mesh.sh` | — | `assert_storage_transport_capability` reads the global mode today |
-| 7 | six pair scenarios in `hc-mesh-transport-matrix.sh` + footprint line | 6 | `split-libp2p-iroh` must red with canon's `NoSharedTransport` |
+| 7 | recovery primitive (warm return / cold join) + six pair scenarios in `hc-mesh-transport-matrix.sh` + footprint line | 6 | cold join must mint a genuinely new identity (regenerate the sandbox), never reuse B's key |
 | 8 | local emitter → shared `quiesce-timeline.py` reader (`source` field) | — | line grammar drift between emitters |
-| 9 | before/after runs, N=3, per scenario, flag on/off | 3,4,7,8 | noise floor unknown until measured |
+| 9 | before/after `time_to_recover` runs, N=3, per scenario × shape, flag on/off | 3,4,7,8 | noise floor unknown until measured; roles swap on alternate runs |
 | 10 | flag flip in alpha manifests + `[edge:validate-only]` fleet confirmation | 9 | only if 9 shows a difference outside noise |
 
 **The risk worth seeing now:** row 9 may show no measurable difference on a two-peer loopback mesh, where both transports are sub-millisecond. If so, the local harness still proves *correctness* of self-awareness (right routes, honest `Unknown`, honest red on the split pair) and the *magnitude* question moves to the fleet, where relay vs direct paths differ by orders of magnitude. The arc reports which of the two it proved.
