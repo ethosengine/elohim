@@ -83,4 +83,32 @@ t() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fail=1; fi; }
   exit "$fail"
 ) || fail=1
 
+# matrix_live_shape: an explicit override bypasses probing entirely (tests use it).
+(
+  set +e
+  MESH_RECOVERY_LIVE_SHAPE="matthew,jessica/1" RECOVERY_MATRIX_SOURCE_ONLY=1 \
+    source "$here/../hc-mesh-recovery-matrix.sh"
+  out="$(matrix_live_shape)"; rc=$?
+  t "matrix_live_shape honors MESH_RECOVERY_LIVE_SHAPE override (rc=$rc): '$out'" \
+    '[ "$rc" -eq 0 ] && [ "$out" = "matthew,jessica/1" ]'
+  exit "$fail"
+) || fail=1
+
+# matrix_live_shape: real probing path against guaranteed-closed ports (no
+# override) reports no live mesh — this is the "first scenario reshapes"
+# fallback the brief requires, exercised without touching any real mesh port.
+(
+  set +e
+  unset MESH_RECOVERY_LIVE_SHAPE
+  # export (not just prefix the source command): matrix_live_shape is called
+  # AFTER source returns, and bash does not retain command-prefixed
+  # assignments once the prefixed command (source) completes.
+  export MESH_PEERS=nobody-a,nobody-b DOORWAY_PORT=1 MESH_RECOVERY_PROBE_BASE=65000
+  RECOVERY_MATRIX_SOURCE_ONLY=1 source "$here/../hc-mesh-recovery-matrix.sh"
+  out="$(matrix_live_shape)"; rc=$?
+  t "matrix_live_shape probes closed ports and reports no live mesh (rc=$rc): '$out'" \
+    '[ "$rc" -eq 0 ] && [ -z "$out" ]'
+  exit "$fail"
+) || fail=1
+
 exit "$fail"

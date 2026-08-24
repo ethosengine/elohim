@@ -15,6 +15,10 @@ LIB="${MESH_RECOVERY_LIBRARY:-$SCRIPT_DIR/mesh-recovery-scenarios.tsv}"
 RUNS="${MESH_RECOVERY_RUNS:-3}"
 IFS=',' read -ra SHAPES <<< "${MESH_RECOVERY_SHAPES:-warm,cold}"
 ONLY="${MESH_RECOVERY_SCENARIOS:-}"
+# Probe port base for matrix_live_shape's own health checks (mirrors
+# hc-mesh.sh's http_port() 8090+i scheme); overridable so tests can point the
+# probe at guaranteed-closed ports without touching the real mesh scheme.
+MESH_RECOVERY_PROBE_BASE="${MESH_RECOVERY_PROBE_BASE:-8090}"
 
 matrix_scenarios() {
   awk -F '\t' -v only="$ONLY" '
@@ -29,6 +33,31 @@ matrix_scenarios() {
 
 matrix_recovering_index() { # <run-number>; run 1 -> slot 1, run 2 -> slot 0, …
   echo $(( $1 % 2 ))
+}
+
+matrix_live_shape() { # -> "<peers-csv>/<0|1>" describing what's ACTUALLY running, or "" if nothing answers
+  # MESH_RECOVERY_LIVE_SHAPE bypasses probing entirely (tests use it).
+  if [ -n "${MESH_RECOVERY_LIVE_SHAPE:-}" ]; then
+    printf '%s\n' "$MESH_RECOVERY_LIVE_SHAPE"
+    return 0
+  fi
+  local -a candidates
+  IFS=',' read -ra candidates <<< "${MESH_PEERS:-matthew,jessica,james}"
+  local live="" i=0 name port
+  for name in "${candidates[@]}"; do
+    port=$((MESH_RECOVERY_PROBE_BASE + i))
+    if curl -sf -m 2 "http://localhost:$port/health" >/dev/null 2>&1; then
+      live+="${live:+,}$name"
+    fi
+    i=$((i + 1))
+  done
+  if [ -z "$live" ]; then
+    printf '\n'
+    return 0
+  fi
+  local doorways=0
+  curl -sf -m 2 "http://localhost:${DOORWAY_PORT:-8888}/health" >/dev/null 2>&1 && doorways=1
+  printf '%s/%s\n' "$live" "$doorways"
 }
 
 if [ "${RECOVERY_MATRIX_SOURCE_ONLY:-0}" = "1" ]; then
@@ -56,14 +85,61 @@ fi
 
 rc=0
 rows=()
-shape_now=""
+# Seed shape_now from what's ACTUALLY running so the first scenario reshapes
+# only when the live mesh doesn't already match it — not unconditionally.
+shape_now="$(matrix_live_shape)"
+if [ -n "$shape_now" ]; then
+  echo "matrix: live shape $shape_now"
+else
+  echo "matrix: no live mesh — first scenario will reshape"
+fi
+
+reshape_stop() { # <peers-csv> <doorways 0|1> — stop in its OWN session so the
+  # matrix (this process's own process group) survives its own reshape.
+  # `hc-mesh.sh stop` kills its own process group; called as a plain child it
+  # takes the matrix down with it (documented: exit 144).
+  local peers="$1" doorways="$2"
+  if setsid --help 2>&1 | grep -q -- '-w'; then
+    MESH_PEERS="$peers" MESH_DOORWAYS="$doorways" \
+      setsid -w "$SCRIPT_DIR/hc-mesh.sh" stop >/dev/null 2>&1 || true
+  else
+    MESH_PEERS="$peers" MESH_DOORWAYS="$doorways" \
+      setsid "$SCRIPT_DIR/hc-mesh.sh" stop >/dev/null 2>&1 || true
+    # setsid without -w doesn't wait; poll for the processes it killed.
+    local waited=0
+    while pgrep -x holochain >/dev/null 2>&1 || pgrep -f "elohim-storag[e].*--http-port" >/dev/null 2>&1; do
+      sleep 2
+      waited=$((waited + 2))
+      [ "$waited" -ge 60 ] && break
+    done
+  fi
+}
+
+reshape_wait_ports_free() { # bounded wait (60s) until no mesh port is bound
+  local waited=0 max=60 lines busy i
+  while :; do
+    lines="$(ss -tln 2>/dev/null)"
+    busy=0
+    for i in 0 1 2 3 4 5 6 7 8 9; do
+      echo "$lines" | grep -q ":$((4444 + 10 * i)) " && busy=1
+      echo "$lines" | grep -q ":$((8090 + i)) " && busy=1
+    done
+    echo "$lines" | grep -qE ':(8888|8889) ' && busy=1
+    [ "$busy" -eq 0 ] && return 0
+    [ "$waited" -ge "$max" ] && {
+      echo "reshape: mesh ports still busy after ${max}s; proceeding anyway" >&2
+      return 0
+    }
+    sleep 2
+    waited=$((waited + 2))
+  done
+}
 
 reshape_mesh() { # <peers-csv> <doorways 0|1>; the only process-count change
   local peers="$1" doorways="$2"
   echo "=== reshaping mesh: peers=$peers doorways=$doorways ==="
-  # stop may return 144 after killing its own process group; start/prologue
-  # are the authoritative reshape verdicts.
-  MESH_PEERS="$peers" MESH_DOORWAYS="$doorways" "$SCRIPT_DIR/hc-mesh.sh" stop || true
+  reshape_stop "$peers" "$doorways"
+  reshape_wait_ports_free
   MESH_PEERS="$peers" MESH_DOORWAYS="$doorways" "$SCRIPT_DIR/hc-mesh.sh" start &&
     MESH_PEERS="$peers" MESH_DOORWAYS="$doorways" "$SCRIPT_DIR/hc-mesh.sh" prologue
 }
