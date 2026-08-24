@@ -30,6 +30,7 @@ pub mod import;
 pub mod import_ws;
 pub mod journal;
 pub mod metrics;
+pub mod p2p_manifests;
 pub mod pkarr_resolver;
 pub mod seed;
 pub mod self_healing;
@@ -102,3 +103,7 @@ pub use elohim_agent::handle_elohim_agent_request;
 pub use epr::handle_epr_head_request;
 pub use journal::{handle_journal_analyze, handle_journal_suggest};
 pub use metrics::handle_metrics;
+pub use p2p_manifests::{
+    handle_get_manifests, handle_post_manifest, TransportManifestAnnouncement,
+    TransportManifestStore,
+};

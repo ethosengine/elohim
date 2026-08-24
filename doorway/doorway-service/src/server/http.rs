@@ -456,6 +456,17 @@ pub struct AppState {
     /// applied default.
     pub stage_provenance: crate::routes::freshness::StageProvenance,
 
+    /// EPHEMERAL bootstrap projection of signed storage transport manifests
+    /// (`POST/GET /p2p/manifests`). Cat C: no DHT entry, no table — every entry
+    /// is reconstructable from the next announce round, so a restart costs one
+    /// announce interval. Bounded at `MAX_MANIFEST_ENTRIES`, monotone per iroh
+    /// NodeId, entries pruned past `MANIFEST_TTL_MS`. Entries come ONLY from
+    /// announcements whose ed25519 signature verified (verify-locally-then-serve).
+    /// Exists so a PURE-IROH storage node — which never hears the libp2p
+    /// transport-manifest gossip — can still learn peers to dial.
+    /// See `crate::routes::p2p_manifests`.
+    pub transport_manifests: Arc<crate::routes::TransportManifestStore>,
+
     /// The bounded last-good DATA pantry the storage proxy answers AMBER from
     /// when the upstream cannot be reached. Cat C / Ephemeral: every entry is
     /// reconstructable by re-fetching the same path, so a restart that empties
@@ -751,6 +762,7 @@ impl AppState {
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
+            transport_manifests: Arc::new(crate::routes::TransportManifestStore::new()),
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
                 std::collections::HashMap::new(),
             )),
@@ -869,6 +881,7 @@ impl AppState {
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
+            transport_manifests: Arc::new(crate::routes::TransportManifestStore::new()),
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
                 std::collections::HashMap::new(),
             )),
@@ -1002,6 +1015,7 @@ impl AppState {
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
+            transport_manifests: Arc::new(crate::routes::TransportManifestStore::new()),
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
                 std::collections::HashMap::new(),
             )),
@@ -1150,6 +1164,7 @@ impl AppState {
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
+            transport_manifests: Arc::new(crate::routes::TransportManifestStore::new()),
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
                 std::collections::HashMap::new(),
             )),
@@ -2708,6 +2723,12 @@ mod shakeout_tests {
         // the SPA bundle — the /auth/portal incident shape (the lamad
         // SyncStatusService's JSON parse then fails on the HTML body).
         assert!(is_service_path("/p2p/status"));
+        // /p2p/manifests is DOORWAY-owned (explicit arms in handle_request, not
+        // a storage proxy): the two-gate partner of those arms. Without this the
+        // GET arm would be shadowed by the EPR router whenever a root projection
+        // is registered, and a pure-iroh peer would parse an SPA bundle as its
+        // peer list.
+        assert!(is_service_path("/p2p/manifests"));
         // Bare root is reserved too (pins it against projection-mount collision).
         assert!(is_service_path("/p2p"));
         assert!(is_reserved_url_path("/p2p"));
@@ -5609,6 +5630,21 @@ async fn handle_request(
                 .body(Full::new(Bytes::from("OK")))
                 .unwrap(),
         ),
+
+        // Transport-manifest bootstrap projection (T0'): the same web2
+        // bootstrap seam one layer down. A PURE-IROH storage node never hears
+        // the libp2p `elohim/transport/manifest` gossip, so it has no way to
+        // learn peers to dial; it announces here and reads the set back.
+        // Ephemeral (Cat C), signature-authenticated, no auth header — see
+        // `routes::p2p_manifests`. These arms sit ABOVE the route-registry
+        // fallthrough so `/p2p/manifests` is doorway-owned and never proxied
+        // to storage (unlike `/p2p/status`, which storage declares).
+        (Method::POST, "/p2p/manifests") => {
+            to_boxed(routes::handle_post_manifest(req, Arc::clone(&state)).await)
+        }
+        (Method::GET, "/p2p/manifests") => {
+            to_boxed(routes::handle_get_manifests(Arc::clone(&state)).await)
+        }
 
         // Signal service WebSocket (SBD protocol)
         (Method::GET, p) if p.starts_with("/signal/") => {

@@ -16,8 +16,10 @@ seamLocus: >
   (src/render/registry.rs: decide_reconcile/ReconcileDecision), the EPR projection-pool
   primary/peer/empty/unreachable fallback classifier (src/projection/epr_router.rs:
   fetch_projections_with_fallback/FallbackOutcome), the kitsune2 bootstrap PUT outcome
-  (src/bootstrap/k2.rs: K2Store::put_at/K2PutOutcome), and the reach-gated response-serving
-  predicate (src/cache/reach_aware_serving.rs: should_serve_response).
+  (src/bootstrap/k2.rs: K2Store::put_at/K2PutOutcome), the reach-gated response-serving
+  predicate (src/cache/reach_aware_serving.rs: should_serve_response), and the ephemeral
+  transport-manifest bootstrap projection (src/routes/p2p_manifests.rs:
+  TransportManifestStore::accept_at/AcceptOutcome/ManifestVerifyError).
 
 decisionPoints:
   - name: decide_reconcile
@@ -1319,3 +1321,178 @@ decisionPoints:
       assets, neither reach-marked) but it is an inherited assumption, not a proof — a future
       binary format that carries reach out-of-band would need the marker threaded from the
       response HEADERS rather than the body. Named here rather than discovered later.
+
+  # ── Transport-manifest bootstrap projection (T0' doorway side, 2026-08-24) ──
+  # Cat C ephemeral: no DHT entry, no table. The doorway is the web2 bootstrap
+  # seam one layer down from /bootstrap — a PURE-IROH storage node never hears
+  # the libp2p `elohim/transport/manifest` gossip, so it announces here and
+  # reads the set back.
+  - name: TransportManifestStore::accept_at
+    kind: verdict-fn
+    sourceLocation:
+      file: src/routes/p2p_manifests.rs
+      modulePath: routes::p2p_manifests::TransportManifestStore::accept_at
+      line: 238
+    summary: >
+      Verifies an announcement's ed25519 signature against its own iroh_node_id, then decides
+      Stored / Stale / Full / Expired against the bounded store — or refuses with a typed
+      ManifestVerifyError. Takes `now_ms` as a PARAMETER (never an ambient clock read inside the
+      store) so every test is hermetic and no env/clock read sits on the hot path.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Names its plane explicitly: transport-discovery PROJECTION, never truth. Every entry is
+          reconstructable from the next announce round (storage re-announces on a 30s cadence), so
+          a doorway restart costs one announce interval and nothing else. The module docs state
+          the Cat-C classification and the reason it is not a DHT entry type.
+      - id: C5
+        status: answered
+        justification: >
+          The receiving node RE-DERIVES the claim: the signature is verified over
+          signing_bytes() against the announcement's own iroh_node_id (which IS the ed25519
+          public key) BEFORE anything is stored, so the store's invariant is that entries come
+          only from announcements that verified. agent_cid / libp2p_peer_id are explicitly
+          routing hints, never authority — the same clause the storage-side receive arm carries.
+      - id: C6a
+        status: answered
+        justification: >
+          Declared budgets it provably respects: MAX_MANIFEST_ENTRIES (64) bounds the store, and
+          a full store is only displaced by a NEWER announcement, so a flood of ancient
+          announcements cannot evict live peers. MAX_MANIFEST_BODY_BYTES (8 KiB) bounds the
+          request body via `Limited` before serde sees it. MANIFEST_TTL_MS prunes lazily on both
+          read and write.
+      - id: C6b
+        status: answered
+        justification: >
+          Replay against settled state mints nothing: an announcement whose announced_at_ms is
+          not strictly newer than the held one for that NodeId returns Stale and the held entry
+          is untouched — monotone per NodeId, so a replayed old announcement can never walk a
+          peer's advertised addresses backwards.
+      - id: C4
+        status: partial
+        justification: >
+          The four accept outcomes are distinct from each other AND from a verify refusal (Err),
+          so "ignored as stale" never reads as "stored". What is NOT distinguished is the GET's
+          empty array: a cold store after a doorway restart and a mesh where no peer has
+          announced are the same `[]` on the wire.
+      - id: C8
+        status: partial
+        justification: >
+          Every outcome is logged through the TYPED AcceptOutcome (`outcome = ?outcome`) with the
+          node_id, and refusals warn beside acceptances — but no labeled Prometheus counter is
+          registered for this decision yet, so the accept/refuse RATIO is not scrapeable.
+      - id: C10
+        status: partial
+        justification: >
+          A missing field fails the parse (serde has no defaults on this struct) and any drift in
+          signing_bytes() fails LOUDLY as a 400 on every announcement, never silently. The gap is
+          the mirror itself: the struct is not `deny_unknown_fields`, so a field ADDED on the
+          storage side is silently ignored here until the mirror is updated. Deliberate — an
+          additive storage-side field must not 400 every announcement from a newer peer.
+      - id: C12
+        status: n-a
+        justification: >
+          The route delegates no authority and the store authorizes no action. An entry is a
+          routing HINT; a consumer must still complete its own iroh handshake against the NodeId
+          before anything is served. That is why the route needs no auth header — the signature
+          is the only claim being made and C5 covers it.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/p2p_manifests.rs
+        testName: post_then_get_round_trips_a_verified_announcement
+        kind: unit
+      - path: doorway/doorway-service/src/routes/p2p_manifests.rs
+        testName: an_announcement_that_does_not_verify_is_never_stored
+        kind: unit
+      - path: doorway/doorway-service/src/routes/p2p_manifests.rs
+        testName: a_stale_announcement_does_not_replace_a_newer_one
+        kind: unit
+      - path: doorway/doorway-service/src/routes/p2p_manifests.rs
+        testName: a_newer_announcement_replaces_the_held_one_in_place
+        kind: unit
+      - path: doorway/doorway-service/src/routes/p2p_manifests.rs
+        testName: the_store_is_bounded_and_evicts_the_oldest_at_capacity
+        kind: unit
+      - path: doorway/doorway-service/src/routes/p2p_manifests.rs
+        testName: a_full_store_is_not_displaced_by_an_older_announcement
+        kind: unit
+      - path: doorway/doorway-service/src/routes/p2p_manifests.rs
+        testName: entries_expire_after_the_ttl
+        kind: unit
+      - path: doorway/doorway-service/src/routes/p2p_manifests.rs
+        testName: an_unreachable_announcement_is_refused
+        kind: unit
+    gapNote: >
+      C4/C8 partials above. Also: the wire type MIRRORS
+      elohim/elohim-storage/src/p2p/transport_manifest_gossip.rs because doorway-service cannot
+      depend on elohim-storage and no crate both sides already share is a home for a p2p wire
+      type. signing_bytes() and verify() are byte-identical copies (verified mechanically at
+      authoring time); a shared leaf crate would make that structural rather than asserted.
+
+  - name: AcceptOutcome
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/routes/p2p_manifests.rs
+      modulePath: routes::p2p_manifests::AcceptOutcome
+      line: 206
+    summary: Stored / Stale / Full / Expired — what the bounded store did with a VERIFIED announcement.
+    notes: >
+      Deliberately four values, not a bool: "we already hold something newer", "we are at capacity
+      and you are not newer than the oldest", and "you arrived already older than the TTL" are
+      three different reasons an announcement is not held, and a peer debugging why it cannot be
+      dialled needs to tell them apart. Surfaced verbatim on the 202 body as `outcome`.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          The type IS the honest-outcome split: not-stored is never collapsed into stored, and
+          each not-stored reason is distinct. A verify refusal is a separate Err channel
+          (ManifestVerifyError), so "refused" is distinguishable from all four.
+      - id: C8
+        status: partial
+        justification: >
+          The enum gives the log a typed reason (`?outcome`) rather than a raw string, but no
+          labeled counter consumes it yet — same gap as accept_at's C8 row.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/p2p_manifests.rs
+        testName: a_stale_announcement_does_not_replace_a_newer_one
+        kind: unit
+      - path: doorway/doorway-service/src/routes/p2p_manifests.rs
+        testName: a_full_store_is_not_displaced_by_an_older_announcement
+        kind: unit
+      - path: doorway/doorway-service/src/routes/p2p_manifests.rs
+        testName: entries_expire_after_the_ttl
+        kind: unit
+
+  - name: ManifestVerifyError
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/routes/p2p_manifests.rs
+      modulePath: routes::p2p_manifests::ManifestVerifyError
+      line: 129
+    summary: >
+      BadNodeId / BadSignatureEncoding / SignatureMismatch / Unreachable / BadDirectAddr — why an
+      announcement confers nothing. Mirrors the storage-side enum variant-for-variant.
+    concernIds:
+      - id: C5
+        status: answered
+        justification: >
+          The refusal vocabulary of the re-derivation: a claim that cannot be evaluated
+          (BadNodeId, BadSignatureEncoding) is distinguished from one that evaluates to false
+          (SignatureMismatch) and from one that verifies but is useless (Unreachable,
+          BadDirectAddr). Unevaluable evidence confers nothing in either direction.
+      - id: C8
+        status: answered
+        justification: >
+          Every variant carries its own `#[error(...)]` string, and the refusal is warned beside
+          the accepted case with the node_id — a refusal is never a silent drop.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/p2p_manifests.rs
+        testName: an_announcement_that_does_not_verify_is_never_stored
+        kind: unit
+      - path: doorway/doorway-service/src/routes/p2p_manifests.rs
+        testName: an_unreachable_announcement_is_refused
+        kind: unit
+      - path: doorway/doorway-service/src/routes/p2p_manifests.rs
+        testName: the_signing_bytes_carry_the_versioned_domain_prefix
+        kind: unit
