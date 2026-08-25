@@ -3,7 +3,8 @@ id: doorway-service-gospel
 cites:
   - "resilience-protocol-spec | the resilience protocol + account-recovery canon (Parts V/VI) this gateway implements as the web2 projection — patron-CDN, social-recovery, creator-succession | sha256:2c832b517c7204cc | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/resilience/README.md"
   - "elohim-seam-map-concern-routing | the concern-routing atlas — this surface owns the Doorway projection seam (§3.9, Track 4); routes any where-does-this-go? question | sha256:7fd48274fae5e8c5 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
-  - "doorway-auth-posture-declared-stage | the auth-posture entrypoint for this crate — the declared-stage rule, why DEV_MODE is never a posture, the API_KEY_ADMIN vs API_KEY_SEED distinction, the chaperone exception, and the six questions to answer before adding any gate here | sha256:f97bebdf293b0dd9 | path: genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-posture-declared-stage.md"
+  - "doorway-auth-posture-declared-stage | the auth-posture entrypoint for this crate — the declared-stage rule, why DEV_MODE is never a posture, the API_KEY_ADMIN vs API_KEY_SEED distinction, the chaperone exception, and the six questions to answer before adding any gate here | sha256:31cda806d3207fd9 | path: genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-posture-declared-stage.md"
+  - "doorway-auth-refusal-runbook | the symptom-side companion for this crate — what to do when a doorway refusal actually happens, including the decision tree that stops a 403 on the write path being filed as a dataplane divergence | sha256:0929079216f0c37d | path: genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-refusal-runbook.md"
 ---
 
 # Doorway Service (Rust)
@@ -38,6 +39,11 @@ scoped to the seed/admin-cache routes and never to the permission ladder).
 The full rule, the stage-to-context ladder, the chaperone exception for hosted humans, the migration to
 p2p-derived authority, the open items, and the six questions to answer before adding a gate:
 `doorway-auth-posture-declared-stage`.
+
+Debugging a refusal rather than designing one — a red deploy seed leg, a host serving an old bundle at
+200, a local seed suddenly demanding a credential — go to `doorway-auth-refusal-runbook`: probes,
+per-refusal decision trees, and the test that separates an authorization refusal from a dataplane
+divergence (that confusion has cost this project two incidents).
 
 ## Build
 

@@ -14,9 +14,10 @@ informs:
   - The migration from standing keys to bounded, revocable authority (delegates-compute)
   - Red-team work on the doorway's auth surface
 cites:
-  - "trust-as-efficiency-signal | the canonical principle the NetworkStage ladder prices against — why declared stakes, not a mode flag, are what a verification-cost decision may key on; this doc applies that axis to the doorway auth surface for the first time | path: genesis/docs/content/elohim-protocol/architecture/trust-as-efficiency-signal.md"
-  - "doorway-access-tier-patterns | the sibling doorway pattern catalog (tiers A / B / Recovery) that names WHO may read through the projection; this doc answers the orthogonal question of WHAT authority a caller must carry to write, and shares its chaperone framing for hosted humans | path: genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md"
-  - "substrate-trust-contract-runbook | the operating runbook whose invariants a doorway refusal must not contradict — read it when a seed or cache refusal shows up as a dataplane red, since a 403 here and a divergence there have been mistaken for each other | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md"
+  - "doorway-auth-refusal-runbook | the operational companion to this canon — the probes, the per-refusal decision trees, and the test that separates an authorization refusal from a dataplane divergence; this doc is the rule, that one is what to do at 2am | sha256:0929079216f0c37d | path: genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-refusal-runbook.md"
+  - "trust-as-efficiency-signal | the canonical principle the NetworkStage ladder prices against — why declared stakes, not a mode flag, are what a verification-cost decision may key on; this doc applies that axis to the doorway auth surface for the first time | sha256:40b8e3d166c935a7 | path: genesis/docs/content/elohim-protocol/architecture/trust-as-efficiency-signal.md"
+  - "doorway-access-tier-patterns | the sibling doorway pattern catalog (tiers A / B / Recovery) that names WHO may read through the projection; this doc answers the orthogonal question of WHAT authority a caller must carry to write, and shares its chaperone framing for hosted humans | sha256:f862d55525b442c3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md"
+  - "substrate-trust-contract-runbook | the operating runbook whose invariants a doorway refusal must not contradict — read it when a seed or cache refusal shows up as a dataplane red, since a 403 here and a divergence there have been mistaken for each other | sha256:e47d962ca7259c79 | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md"
 ---
 
 # Doorway Auth Posture — Authority Derives From the Declared Stage
@@ -25,6 +26,12 @@ cites:
 
 This is the entrypoint. If you are about to write `if state.args.dev_mode` in an auth path, stop and read
 "The rule" — that expression is the defect this document exists to prevent recurring.
+
+**If you arrived here from a symptom** — a red deploy seed leg, a host serving an old bundle, a local
+seed suddenly demanding a credential — you want the companion instead:
+`doorway-auth-refusal-runbook` carries the probes and the per-refusal decision trees, including the
+one that separates an authorization refusal from a dataplane divergence. This doc is the rule; that
+one is what to do at 2am.
 
 ---
 
