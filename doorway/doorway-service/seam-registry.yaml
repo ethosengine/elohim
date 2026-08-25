@@ -1689,3 +1689,125 @@ decisionPoints:
       un-credentialed 200 is storage asserting public reach. Deliberately NOT a reach header —
       putting the audience decision on the wire would let a compromised upstream widen it;
       "did this caller present anything?" is answerable from the doorway's own state.
+
+  - name: require_seed_authority
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/seed.rs
+      modulePath: routes::seed::require_seed_authority
+      line: 56
+    summary: >
+      Gates PUT /admin/seed/blob and the four /admin/cache/* mutation routes. Admits a caller
+      three ways: an on-the-box (loopback socket peer) caller or the fleet's declared seed
+      authority (API_KEY_SEED) while the DECLARED stage is pre-coordination, or this doorway's
+      own operator identity (Admin JWT / API_KEY_ADMIN) at any stage. Refuses 401 when nothing
+      resolved above Public and 403 when a real identity resolved below Admin.
+    notes: >
+      Registered 2026-08-25 when the predicate stopped deriving from DEV_MODE. It now keys on
+      AppState::network_stage (ELOHIM_NETWORK_STAKES, resolved once at boot, fail-closed to
+      Bootstrap) — the same seam_contracts::freshness::NetworkStage elohim-storage declares in
+      trust/stage.rs, whose type doc names THIS crate's config.rs as a flag a stage must never
+      derive from. Canon home for the whole posture:
+      genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-posture-declared-stage.md.
+      The helper fleet_seed_authority_presented (same file) is deliberately NOT a separate
+      decision point: it is a credential comparison feeding this predicate's arm (2), with no
+      outcome of its own.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Plane named explicitly: this is the web2 projection plane (a deploy pipeline pushing
+          SPA bytes to a DNS-fronted host), NOT the notary or head plane. The distinction is
+          load-bearing here — the sibling canonical-head declare route is on the head plane and
+          is deliberately NOT gated by this predicate, which is filed as a gap rather than
+          silently unified.
+      - id: C1
+        status: answered
+        justification: >
+          The doorway no longer crowns its own authority. DEV_MODE was self-election in the
+          literal sense — a flag the deployment sets about itself, true on every deployed
+          manifest, granting the gate away. Both remaining pre-coordination affordances now
+          require something the doorway cannot assert about itself: a kernel-observed loopback
+          peer address (never X-Forwarded-For), or an operator-declared key.
+      - id: C4
+        status: answered
+        justification: >
+          Three absences stay distinct. 401 (nothing resolved above Public) is separated from
+          403 (a real identity resolved below Admin). An UNDECLARED seed key yields NO authority
+          rather than an empty one an empty header would match — pinned by
+          an_undeclared_fleet_seed_key_admits_nobody and
+          a_blank_fleet_seed_key_is_not_an_authority, the latter existing precisely because
+          Some("") is a different fact from None.
+      - id: C12
+        status: partial
+        justification: >
+          Authority IS verified structurally at the acting node — constant-time credential
+          comparison, socket-derived peer address, signed-JWT level — and
+          fleet_seed_key_never_grants_general_admin pins that the fleet key cannot climb the
+          permission ladder, so it is strictly narrower than the Admin identity it replaces on
+          this path. PARTIAL because a standing bearer secret is not a structurally verified
+          authority in the peer-native sense: it proves possession, not a bounded, revocable
+          grant. The successor that closes this is named in C13.
+      - id: C13
+        status: answered
+        justification: >
+          The scaffold names its successor AT THE GATE, and expires by itself rather than by
+          being remembered: both pre-coordination affordances switch off once a doorway declares
+          `coordinated` (pinned by
+          coordinated_stage_retires_both_pre_coordination_affordances, with
+          admin_identity_still_seeds_at_coordinated_stage pinning that identity is
+          stage-independent). The gate comment and the canon doc name the successors in reach
+          order — chaperoned seed actor (doorway-seed-ensure.sh already does this for genesis),
+          then the delegates-compute Mishpat::Commitment already shadow-running behind
+          DELEGATES_COMPUTE_OP_GATE, then self-authorizing bytes where a notarized head plus
+          content addressing IS the authority.
+      - id: C8
+        status: unbound
+        justification: >
+          No labeled counter is incremented per outcome. A refusal is observable only as an HTTP
+          status in a caller's log, which is exactly how the apex spent app #1672 and #1673
+          stale without anything on the doorway side naming the cause. The four arms
+          (loopback-admitted, fleet-key-admitted, identity-admitted, refused-with-reason) are
+          already typed by construction, so binding a counter is additive.
+    gapNote: >
+      C8 unbound — the four outcome arms are typed but uncounted; a refusal names its cause to
+      the caller and to nothing else. C12 partial until the delegates-compute successor named in
+      C13 replaces the standing key. Neither is a defect in this predicate's logic; both are
+      binding gaps, declared rather than papered over.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/seed.rs
+        testName: pre_coordination_loopback_no_auth_passes_gate
+        kind: unit
+      - path: doorway/doorway-service/src/routes/seed.rs
+        testName: pre_coordination_remote_caller_without_credential_is_refused
+        kind: unit
+      - path: doorway/doorway-service/src/routes/seed.rs
+        testName: fleet_seed_key_admits_the_remote_deploy_caller
+        kind: unit
+      - path: doorway/doorway-service/src/routes/seed.rs
+        testName: an_undeclared_fleet_seed_key_admits_nobody
+        kind: unit
+      - path: doorway/doorway-service/src/routes/seed.rs
+        testName: a_wrong_fleet_seed_key_is_refused
+        kind: unit
+      - path: doorway/doorway-service/src/routes/seed.rs
+        testName: a_blank_fleet_seed_key_is_not_an_authority
+        kind: unit
+      - path: doorway/doorway-service/src/routes/seed.rs
+        testName: fleet_seed_key_never_grants_general_admin
+        kind: unit
+      - path: doorway/doorway-service/src/routes/seed.rs
+        testName: coordinated_stage_retires_both_pre_coordination_affordances
+        kind: unit
+      - path: doorway/doorway-service/src/routes/seed.rs
+        testName: admin_identity_still_seeds_at_coordinated_stage
+        kind: unit
+      - path: doorway/doorway-service/src/routes/seed.rs
+        testName: non_dev_admin_jwt_passes_gate
+        kind: unit
+      - path: doorway/doorway-service/src/routes/seed.rs
+        testName: non_dev_authenticated_jwt_is_forbidden
+        kind: unit
+      - path: doorway/doorway-service/src/routes/seed.rs
+        testName: non_dev_no_bearer_is_unauthorized
+        kind: unit
