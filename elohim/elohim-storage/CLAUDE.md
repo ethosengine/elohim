@@ -1,9 +1,9 @@
 ---
 id: elohim-storage-gospel
 cites:
-  - tiered-quilt-stewardship-design | the protocol tiered storage substrate design (cold/warm/hot planes, RS sharding, reach enforcement) this crate implements as the operational data plane | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
-  - storage-dual-plane-design-arc | the April 2026 design-arc lineage (dual-plane bet, paths not taken, reach-vocabulary ghost) distilled when the P2P-ARCHITECTURE/EDGE-ARCHITECTURE/REACH island retired | sha256:2315c84345a2ef3c | path: genesis/docs/content/elohim-protocol/history/2026-06-11-storage-dual-plane-design-arc.md
-  - elohim-seam-map-concern-routing | the concern-routing atlas — this crate owns a compound stack (runtime §3.3, peer-hoster §3.10, aggregation §3.11, confidentiality/temporal/resource-governance §3.13–3.15); routes any where-does-this-go? question | sha256:7fd48274fae5e8c5 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
+  - "tiered-quilt-stewardship-design | the protocol tiered storage substrate design (cold/warm/hot planes, RS sharding, reach enforcement) this crate implements as the operational data plane | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
+  - "storage-dual-plane-design-arc | the April 2026 design-arc lineage (dual-plane bet, paths not taken, reach-vocabulary ghost) distilled when the P2P-ARCHITECTURE/EDGE-ARCHITECTURE/REACH island retired | sha256:2315c84345a2ef3c | path: genesis/docs/content/elohim-protocol/history/2026-06-11-storage-dual-plane-design-arc.md"
+  - "elohim-seam-map-concern-routing | the concern-routing atlas — this crate owns a compound stack (runtime §3.3, peer-hoster §3.10, aggregation §3.11, confidentiality/temporal/resource-governance §3.13–3.15); routes any where-does-this-go? question | sha256:7fd48274fae5e8c5 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
 ---
 
 # Elohim Storage - API Boundary Architecture

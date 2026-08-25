@@ -582,6 +582,53 @@ ECHO_JSDOC_DEPRECATED_TAG_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Guard T (2026-08-22, fp b287bec5896b) — BLOCK-COMMENT deprecation PROSE
+#   self-capture: the gap BETWEEN Guards M and O, and neither could see it.
+#   Guard M already knows the block-comment SHAPE (`/**`, `/*`, `*`) but
+#   requires the literal JSDoc TAG `@deprecated`. Guard O already knows
+#   deprecation PROSE in a comment, but ECHO_COMMENT_OPENER_RE's opener
+#   alternation is `//`-and-`#`-only, so it cannot see a block-comment
+#   CONTINUATION line. A JSDoc block that documents a deprecation in prose
+#   without tagging it therefore falls through both:
+#       /**
+#        * elohim-storage's `validate_schema_version_header` treats an absent
+#        * `X-Schema-Version` on a guarded `/db/**\/bulk` write as a DEPRECATED
+#        * client contract: it warns, then falls back to …
+#        */
+#   That is Class 7's disease ("the guard comment bills for the concern it
+#   guards") arriving through the one comment syntax Guard O never learned —
+#   and it is the DOMINANT documentation shape in a TypeScript repo, where the
+#   convention is a prose block comment above the constant rather than a `//`
+#   line. Measured live: 13 ledger rows newly dismissed, of which 7 were still
+#   `open` (each owed a dispatch), 0 `triaged` — the same zero-true-positive
+#   result every prior class recorded. The multiplication is visible in the
+#   ledger: ONE `self-sovereign` doc line is held as three fingerprints and the
+#   X-Schema-Version doc-comment as four, none of them a finding.
+#
+#   Kept as its own clause rather than folded into ECHO_COMMENT_OPENER_RE for
+#   two reasons. (1) That regex is shared with Guard H2 (security class), and
+#   widening it would silently change a second guard's behaviour — Class 8's
+#   lesson is to state the invariant per class, not to reuse a shape. (2) `*`
+#   is a far weaker comment signal than `//` or `#`: it collides with markdown
+#   bullets, bold and multiplication, so unlike Guard O this clause needs the
+#   Guard-P-step-3 residual below.
+#
+#   The `*` opener requires a following whitespace / `/` / EOL, so markdown
+#   bold (`**Goal:** …`) and italic (`*This document preserves deprecated…`)
+#   cannot match. That narrowing deliberately LOSES two dismissals already
+#   hand-marked `false-positive` in the ledger — per Guard O's rule, narrowing
+#   an echo guard can only ever lose a dismissal, never admit noise, so it errs
+#   toward capture. A markdown BULLET (`* … deprecated …`) does still match;
+#   in every live instance that is prose about a deprecation (a changelog entry
+#   or a research note), and the residual keeps any bullet that quotes a real
+#   warning token capturable.
+ECHO_BLOCK_COMMENT_OPENER_RE = re.compile(
+    r"^[+-]?\s*"  # optional diff marker
+    r"(?:[^\s:]+:\d+[:-])?\s*"  # optional grep `path:line:` prefix
+    r"(?:\d+[:-])?\s*"  # optional bare `-n` line-number prefix
+    r"(?:/\*\*?|\*(?=[\s/]|$))"  # /** or /* opener, or a `*` continuation/closer
+)
+
 # Command-level gates for echo classes B and C: if the command itself is a pure
 # git history read (git log / git show without a -p / --patch flag) or reads
 # directly from the history / planning / SDD prose trees, ALL lines from that
@@ -923,6 +970,20 @@ def _is_echo_line(
     # that opens with `#` (Docker BuildKit `#12 3.456 …`) is excluded in
     # ECHO_COMMENT_OPENER_RE; `#[deprecated…]` is an attribute and still captures.
     if cls == "deprecation" and ECHO_COMMENT_OPENER_RE.match(line):
+        return True
+
+    # Guard T — BLOCK-COMMENT deprecation prose: Guard O's clause for the one
+    # comment syntax its `//`/`#` opener cannot see, and the shape Guard M sees
+    # but only when the JSDoc `@deprecated` TAG is present. Carries the Guard-P
+    # step-3 residual (unlike Guard O) because `*` also opens markdown bullets:
+    # a bullet or continuation line quoting a REAL toolchain warning still
+    # captures, so this guard is structurally incapable of eating a finding.
+    if (
+        cls == "deprecation"
+        and ECHO_BLOCK_COMMENT_OPENER_RE.match(line)
+        and not _LIVE_TOOLCHAIN_CHANNEL_RE.search(line)
+        and not _LIVE_VITEST_BANNER_RE.search(line)
+    ):
         return True
 
     # Guard L — derived/generated artifact tree (node_modules, dist, .angular/

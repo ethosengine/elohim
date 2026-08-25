@@ -1,13 +1,13 @@
 ---
 id: steward-node-gospel
 cites:
-  - elohim-hub-boundaries-design | the orchestration epic ABOVE this crate — hub composition truth (Hub trait, crate-map L171-178, two-swarms); this gospel covers crate mechanics only | sha256:d7ffa707a34d126f | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md
-  - p2p-dataplane-sync-engine-design-arc | protocol lineage home — the /elohim/doc-sync vs /elohim/storage-sync two-dialect divergence and its recorded convergence open question; cite, never restate | sha256:d509030b5f00acd0 | path: genesis/docs/content/elohim-protocol/history/2026-06-11-p2p-dataplane-sync-engine-design-arc.md
+  - "elohim-hub-boundaries-design | the orchestration epic ABOVE this crate — hub composition truth (Hub trait, crate-map L171-178, two-swarms); this gospel covers crate mechanics only | sha256:d7ffa707a34d126f | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md"
+  - "p2p-dataplane-sync-engine-design-arc | protocol lineage home — the /elohim/doc-sync vs /elohim/storage-sync two-dialect divergence and its recorded convergence open question; cite, never restate | sha256:d509030b5f00acd0 | path: genesis/docs/content/elohim-protocol/history/2026-06-11-p2p-dataplane-sync-engine-design-arc.md"
   - genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md
   - .claude/skills/automerge-sync/SKILL.md
-  - steward-device-gospel | device-side Tauri shell gospel — the ephemeral spoke this always-on node serves; device concerns route there | sha256:1d7a9fb8f5da3e01 | path: steward/device/CLAUDE.md
+  - "steward-device-gospel | device-side Tauri shell gospel — the ephemeral spoke this always-on node serves; device concerns route there | sha256:1d7a9fb8f5da3e01 | status: stale — target content moved on; re-verify | path: steward/device/CLAUDE.md"
   - steward/node/simulation/P2P-COMPUTE-FOOTPRINT.md
-  - elohim-seam-map-concern-routing | the concern-routing atlas — this crate owns the hub cluster ops / hub-internal swarm seam (§3.12); routes any where-does-this-go? question | sha256:7fd48274fae5e8c5 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
+  - "elohim-seam-map-concern-routing | the concern-routing atlas — this crate owns the hub cluster ops / hub-internal swarm seam (§3.12); routes any where-does-this-go? question | sha256:7fd48274fae5e8c5 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
 ---
 
 # steward/node — elohim-node (always-on P2P runtime)

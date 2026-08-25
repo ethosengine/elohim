@@ -1,9 +1,9 @@
 ---
 id: elohim-library-pattern-gospel
 cites:
-  - elohim-elements-ui-substrate-gospel | blank-slate gospel + layer rails that this library's two-library discipline serves | sha256:84cff1a46650cf8f | path: app/elohim-elements/CLAUDE.md
+  - "elohim-elements-ui-substrate-gospel | blank-slate gospel + layer rails that this library's two-library discipline serves | sha256:84cff1a46650cf8f | status: stale — target content moved on; re-verify | path: app/elohim-elements/CLAUDE.md"
   - genesis/data/timeline/backlog/bundle-styling-token-contract.md
-  - elohim-seam-map-concern-routing | the concern-routing atlas — this surface owns the client surface seam (§3.8); routes any where-does-this-go? question | sha256:7fd48274fae5e8c5 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
+  - "elohim-seam-map-concern-routing | the concern-routing atlas — this surface owns the client surface seam (§3.8); routes any where-does-this-go? question | sha256:7fd48274fae5e8c5 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
 ---
 
 # elohim-library — Pattern Library Gospel

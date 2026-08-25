@@ -18,3 +18,11 @@ Folds the disk-pressure and cargo-target-pool discipline cluster. Members:
 - [[feedback_cargo_target_dir_for_native_builds]] — Native (non-WASM) cargo builds need CARGO_TARGET_DIR at the pool slot per workspace; forgotten legacy target/ dirs balloon to ~30G. WASM workspaces stay default.
 - [[project_container_cargo_environment_quirks]] — No nextest here (plain cargo test, unpiped exit codes); /projects target dirs ENOENT → use /tmp; WASM-warmed slot corrupts native builds; explicit cd per gate.
 - [[project_sweettest_native_build_env]] — Sweettest needs RUSTFLAGS="" (WASM getrandom flag breaks native link), BINDGEN_EXTRA_CLANG_ARGS for clang-21; `just pack` (not build) refreshes the .dna bundle.
+
+**2026-08-25 — one slot, two cargo invocations = E0460 doctest red (not a code failure).** `just gate
+elohim-storage` and a concurrent `cargo build --features "p2p p2p-iroh"` in the SAME pool slot serialize
+on the build-dir lock, but the gate's DOCTEST step then fails `error[E0460]: found possibly newer version
+of crate elohim_cache_core` because the feature-different build rewrote rlibs between the test build and
+rustdoc. Unit/integration suites had already passed. Re-run the gate alone on a quiet slot (it went green
+first try). Also: the gate's `cargo test` re-links `debug/elohim-storage` with DEFAULT features, so
+always re-run the feature-full build AFTER the gate before `just mesh start` (start refuses otherwise).

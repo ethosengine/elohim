@@ -2,14 +2,14 @@
   "schema_version": 1,
   "entries": {
     "project_local_stack_dht_anchor_gap": {
-      "hits": 130,
+      "hits": 132,
       "last_changed": "elohim/elohim-storage/src/db/content_diesel.rs",
-      "last_signal_at": "2026-08-16T15:50:09Z"
+      "last_signal_at": "2026-08-22T00:56:32Z"
     },
     "project_resilience_snapshot_humans_junction": {
-      "hits": 63,
-      "last_changed": "elohim/elohim-storage/src/api/rea_commitments.rs",
-      "last_signal_at": "2026-07-31T03:17:07Z"
+      "hits": 69,
+      "last_changed": "elohim/elohim-storage/src/services/household_resilience.rs",
+      "last_signal_at": "2026-08-22T02:44:42Z"
     },
     "project_sprint_branch_not_orchestrator_indexed": {
       "hits": 29,
@@ -42,14 +42,14 @@
       "last_signal_at": "2026-06-25T19:01:16Z"
     },
     "project_ci_storage_topology": {
-      "hits": 107,
+      "hits": 109,
       "last_changed": "elohim/holochain/Jenkinsfile",
-      "last_signal_at": "2026-08-18T03:07:32Z"
+      "last_signal_at": "2026-08-22T06:21:54Z"
     },
     "feedback_diesel_migration_timestamp_collision": {
-      "hits": 13,
+      "hits": 16,
       "last_changed": "elohim/elohim-storage/src/db/mod.rs",
-      "last_signal_at": "2026-07-31T03:58:12Z"
+      "last_signal_at": "2026-08-22T04:42:22Z"
     },
     "project_sweettest_native_build_env": {
       "hits": 45,
@@ -102,9 +102,9 @@
       "last_signal_at": "2026-07-30T03:13:47Z"
     },
     "feedback_deterministic_flag_agent_canon_stasis_pattern": {
-      "hits": 55,
+      "hits": 61,
       "last_changed": ".claude/hooks/deprecation-sentinel.py",
-      "last_signal_at": "2026-08-11T21:23:30Z"
+      "last_signal_at": "2026-08-22T01:19:44Z"
     }
   }
 }

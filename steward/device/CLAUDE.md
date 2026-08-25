@@ -1,8 +1,8 @@
 ---
 id: steward-device-gospel
 cites:
-  - iroh-libp2p-complementarity | the canon defining the steward device as a first-class Track 2 participant and the graduated-stewardship progression this desktop client realizes | sha256:29235aeb35aff128 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
-  - elohim-seam-map-concern-routing | the concern-routing atlas — this surface owns the OS/packaging (Tauri §3.2) + client surface (§3.8) seams; routes any where-does-this-go? question | sha256:7fd48274fae5e8c5 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
+  - "iroh-libp2p-complementarity | the canon defining the steward device as a first-class Track 2 participant and the graduated-stewardship progression this desktop client realizes | sha256:29235aeb35aff128 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md"
+  - "elohim-seam-map-concern-routing | the concern-routing atlas — this surface owns the OS/packaging (Tauri §3.2) + client surface (§3.8) seams; routes any where-does-this-go? question | sha256:7fd48274fae5e8c5 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
 ---
 
 # Elohim Steward - Desktop P2P Client

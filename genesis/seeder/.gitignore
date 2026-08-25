@@ -16,6 +16,7 @@ last-seed-report.json
 
 # Per-run seed artifact (canonical name in genesis/orchestrator/build-artifacts.json)
 stakes-declaration.json
+seed-results-*.json
 
 # OS files
 .DS_Store

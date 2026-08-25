@@ -1,9 +1,9 @@
 ---
 id: lamad-bundle-gospel
 cites:
-  - lamad-domain-gospel | the subject SOURCE OF TRUTH this bundle consumes — vocabulary, metadata/body schemas, three-leg coupling, renderer map, signal kinds (this dir renders them; never redefines) | sha256:0c7e351784c6df66 | path: elohim/sdk/domains/lamad/CLAUDE.md
-  - elohim-elements-ui-substrate-gospel | layer rails — element/token/binding ownership this bundle consumes (never defines) | sha256:84cff1a46650cf8f | path: app/elohim-elements/CLAUDE.md
-  - elohim-app-frontend-gospel | the shell twin of these rails — chrome composition + cross-bundle navigation rules | sha256:5e339d814c53974b | status: stale — target content moved on; re-verify | path: app/elohim-app/CLAUDE.md
+  - "lamad-domain-gospel | the subject SOURCE OF TRUTH this bundle consumes — vocabulary, metadata/body schemas, three-leg coupling, renderer map, signal kinds (this dir renders them; never redefines) | sha256:0c7e351784c6df66 | status: stale — target content moved on; re-verify | path: elohim/sdk/domains/lamad/CLAUDE.md"
+  - "elohim-elements-ui-substrate-gospel | layer rails — element/token/binding ownership this bundle consumes (never defines) | sha256:84cff1a46650cf8f | status: stale — target content moved on; re-verify | path: app/elohim-elements/CLAUDE.md"
+  - "elohim-app-frontend-gospel | the shell twin of these rails — chrome composition + cross-bundle navigation rules | sha256:5e339d814c53974b | status: stale — target content moved on; re-verify | path: app/elohim-app/CLAUDE.md"
   - genesis/data/timeline/backlog/bundle-styling-token-contract.md
 ---
 
