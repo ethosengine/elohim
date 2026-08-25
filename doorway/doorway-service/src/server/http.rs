@@ -5544,7 +5544,9 @@ async fn handle_request(
         // Admin seed routes for bulk upload
         // PUT /admin/seed/blob - Upload blob to projection cache
         (Method::PUT, "/admin/seed/blob") => {
-            to_boxed(routes::handle_seed_blob(req, Arc::clone(&state)).await)
+            to_boxed(
+                routes::handle_seed_blob(req, Arc::clone(&state), addr.ip().is_loopback()).await,
+            )
         }
         // HEAD /admin/seed/blob/{hash} - Check if blob exists
         (Method::HEAD, p) if p.starts_with("/admin/seed/blob/") => {
@@ -5557,19 +5559,19 @@ async fn handle_request(
             to_boxed(routes::admin_cache::cache_stats(Arc::clone(&state)).await)
         }
         (Method::POST, "/admin/cache/disable") => {
-            match routes::seed::require_seed_authority(&state, &req) {
+            match routes::seed::require_seed_authority(&state, &req, addr.ip().is_loopback()) {
                 Ok(()) => to_boxed(routes::admin_cache::cache_disable(Arc::clone(&state)).await),
                 Err(resp) => to_boxed(resp),
             }
         }
         (Method::POST, "/admin/cache/enable") => {
-            match routes::seed::require_seed_authority(&state, &req) {
+            match routes::seed::require_seed_authority(&state, &req, addr.ip().is_loopback()) {
                 Ok(()) => to_boxed(routes::admin_cache::cache_enable(Arc::clone(&state)).await),
                 Err(resp) => to_boxed(resp),
             }
         }
         (Method::POST, p) if p.starts_with("/admin/cache/clear/") => {
-            match routes::seed::require_seed_authority(&state, &req) {
+            match routes::seed::require_seed_authority(&state, &req, addr.ip().is_loopback()) {
                 Ok(()) => {
                     let slug = p.strip_prefix("/admin/cache/clear/").unwrap_or("");
                     to_boxed(routes::admin_cache::cache_clear_slug(Arc::clone(&state), slug).await)
@@ -5578,7 +5580,7 @@ async fn handle_request(
             }
         }
         (Method::POST, "/admin/cache/warm") => {
-            match routes::seed::require_seed_authority(&state, &req) {
+            match routes::seed::require_seed_authority(&state, &req, addr.ip().is_loopback()) {
                 Ok(()) => to_boxed(routes::admin_cache::cache_warm(Arc::clone(&state)).await),
                 Err(resp) => to_boxed(resp),
             }

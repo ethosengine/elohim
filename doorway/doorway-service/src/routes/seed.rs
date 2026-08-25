@@ -56,11 +56,33 @@ use crate::server::AppState;
 pub(crate) fn require_seed_authority<B>(
     state: &AppState,
     req: &Request<B>,
+    peer_is_loopback: bool,
 ) -> Result<(), Response<Full<Bytes>>> {
     // Local-stack safety: dev mode is the trusted single-operator context
-    // (`pnpm run hc:start:seed`). Pass before any auth resolution so seeding
-    // works with no credential locally.
-    if state.args.dev_mode {
+    // (`pnpm run hc:start:seed`), and it is trusted because the caller is ON
+    // the box — NOT because a flag is set.
+    //
+    // The loopback conjunct is the whole security property here. `dev_mode`
+    // alone used to pass, and every deployed doorway manifest sets
+    // `DEV_MODE: "true"` (alpha, alpha-b, prod, staging, staging-read —
+    // `genesis/orchestrator/manifests/doorway/*.yaml`), so this gate and the
+    // four `/admin/cache/*` mutation routes that share it were reachable with
+    // no credential from the open web. Verified 2026-08-24 against the local
+    // mesh: an anonymous `PUT /admin/seed/blob` carrying a deliberately wrong
+    // `X-Blob-Hash` answered `409 Hash mismatch` on both doorways — i.e. it
+    // passed this gate and was stopped only by content addressing.
+    //
+    // `peer_is_loopback` is derived from the ACCEPTED SOCKET's peer address,
+    // never from `X-Forwarded-For` — an attacker sets headers, not the kernel's
+    // notion of who connected. Behind a cluster ingress the peer is the ingress
+    // pod (not loopback), so the fleet now authenticates; on a developer's box
+    // the peer is 127.0.0.1, so `pnpm run hc:start:seed` and the local mesh keep
+    // working with no credential and nothing to configure.
+    //
+    // The CI path was already bearer-gated before this change and is unaffected:
+    // `genesis/scripts/ci/doorway-seed-ensure.sh` mints `SEED_DOORWAY_TOKEN` and
+    // `substrate-verify.sh` sends it as an Admin bearer.
+    if state.args.dev_mode && peer_is_loopback {
         return Ok(());
     }
 
@@ -133,10 +155,11 @@ struct StorageResponse {
 pub async fn handle_seed_blob(
     req: Request<Incoming>,
     state: Arc<AppState>,
+    peer_is_loopback: bool,
 ) -> Response<Full<Bytes>> {
     // Stage A authorization — gate BEFORE reading the body so a rejected
     // request never streams the blob to cache/storage. Headers-only check.
-    if let Err(resp) = require_seed_authority(&state, &req) {
+    if let Err(resp) = require_seed_authority(&state, &req, peer_is_loopback) {
         return resp;
     }
 
@@ -516,8 +539,35 @@ mod tests {
         let state = test_state(true);
         let req = seed_req(None);
         assert!(
-            require_seed_authority(&state, &req).is_ok(),
-            "dev_mode must pass the seed gate with no credential"
+            require_seed_authority(&state, &req, true).is_ok(),
+            "dev_mode ON LOOPBACK must pass the seed gate with no credential"
+        );
+    }
+
+    /// (a2) THE REGRESSION THIS GATE EXISTS FOR. `dev_mode` is true on EVERY
+    /// deployed doorway manifest (alpha, alpha-b, prod, staging, staging-read),
+    /// so before the loopback conjunct a remote, credential-free caller passed
+    /// this gate — proven 2026-08-24 against the local mesh, where an anonymous
+    /// `PUT /admin/seed/blob` with a wrong `X-Blob-Hash` answered `409 Hash
+    /// mismatch` (gate passed; only content addressing refused the write).
+    /// A NON-loopback peer must now be REFUSED even with `dev_mode` on.
+    ///
+    /// Status is asserted only as "a refusal" (4xx), deliberately not 401-vs-403:
+    /// `dev_mode` grants any caller `Authenticated` in `extract_http_permission`,
+    /// so a remote anonymous caller resolves to 403 (below Admin) rather than
+    /// 401. That anonymous→Authenticated grant is a SEPARATE `dev_mode` weakness
+    /// tracked with the JWT-forgery finding; this test pins only that the remote
+    /// caller does not SUCCEED, which is this gate's job.
+    #[test]
+    fn dev_mode_remote_caller_is_refused() {
+        let state = test_state(true);
+        let req = seed_req(None);
+        let err = require_seed_authority(&state, &req, false)
+            .expect_err("dev_mode must NOT admit a remote caller with no credential");
+        assert!(
+            err.status().is_client_error(),
+            "a remote no-credential seed must be refused, got {}",
+            err.status()
         );
     }
 
@@ -527,8 +577,8 @@ mod tests {
     fn non_dev_no_bearer_is_unauthorized() {
         let state = test_state(false);
         let req = seed_req(None);
-        let err =
-            require_seed_authority(&state, &req).expect_err("no bearer in prod must be rejected");
+        let err = require_seed_authority(&state, &req, false)
+            .expect_err("no bearer in prod must be rejected");
         assert_eq!(err.status(), StatusCode::UNAUTHORIZED);
     }
 
@@ -539,7 +589,7 @@ mod tests {
         let token = bearer_jwt(PermissionLevel::Admin);
         let req = seed_req(Some(&token));
         assert!(
-            require_seed_authority(&state, &req).is_ok(),
+            require_seed_authority(&state, &req, false).is_ok(),
             "Admin JWT must pass the seed gate"
         );
     }
@@ -551,7 +601,7 @@ mod tests {
         let state = test_state(false);
         let token = bearer_jwt(PermissionLevel::Authenticated);
         let req = seed_req(Some(&token));
-        let err = require_seed_authority(&state, &req)
+        let err = require_seed_authority(&state, &req, false)
             .expect_err("non-admin identity must be forbidden from seeding");
         assert_eq!(err.status(), StatusCode::FORBIDDEN);
     }
@@ -569,7 +619,7 @@ mod tests {
             .body(Empty::<Bytes>::new())
             .unwrap();
         assert!(
-            require_seed_authority(&state, &req).is_ok(),
+            require_seed_authority(&state, &req, false).is_ok(),
             "Admin API key must pass the seed gate"
         );
     }
