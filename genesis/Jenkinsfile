@@ -1132,14 +1132,23 @@ def resolveSeedDoorwayToken() {
             withEnv(["DOORWAY_URL=${loginUrl}"]) {
                 def status = sh(script: "bash '${env.WORKSPACE}/genesis/scripts/ci/doorway-seed-ensure.sh' > /tmp/seed-token.out", returnStatus: true)
                 if (status == 0) {
-                    token = readFile('/tmp/seed-token.out').trim()
+                    // `sh` above ran INSIDE the build container, so /tmp/seed-token.out
+                    // lives in that container's filesystem; `readFile` runs in the jnlp
+                    // agent container and threw NoSuchFile — which the catch below then
+                    // reported as "credential not visible" (genesis #1502/#1503: the
+                    // upload ran unauthenticated every build and only passed while the
+                    // doorway's dev_mode seed gate accepted anonymous callers). Read it
+                    // back through `sh` like the blob-hash exports below do.
+                    token = sh(script: 'cat /tmp/seed-token.out', returnStdout: true).trim()
                 } else {
                     echo "doorway-seed-ensure failed (admin key present but register/login rejected or doorway unreachable — see stderr) — upload runs unauthenticated (dev-mode accepts; non-dev alpha 401s)"
                 }
             }
         }
     } catch (e) {
-        echo "doorway-admin-bootstrap-key credential not visible — substrate upload runs unauthenticated (dev-mode doorway accepts; non-dev alpha will 401)"
+        // Name the exception: a missing credential and a failed token read-back
+        // must not share one message (that is how the readFile bug hid).
+        echo "doorway-admin-bootstrap-key credential not visible or token read-back failed (${e}) — substrate upload runs unauthenticated (non-dev / loopback-gated doorway will 401/403)"
     }
     return token
 }
