@@ -80,6 +80,26 @@ habits:
       - "a2o @concern:transport-parity (genesis/a2o/features/dataplane/transport-comparison-matrix.feature; just mesh matrix) — identical fresh-document contract under libp2p, iroh, and dual; successful samples alone contribute timing percentiles"
       - ".claude/scripts/latency-scoreboard.py --local (and --deployed) — bounded convergence, not merely eventual: a CONJUNCTION of speed AND this habit's trust invariant, never speed alone. A fast stale head is worse than a slow correct one, so this check can only ever narrow the habit, never carry it."
     evidence: >
+      DELTA 2026-08-25a (localdev push-verification of the iroh/dual plane; NO
+      status flip — flip authority is the fleet lane): the full tree re-verified
+      on the household mesh from the p2p+p2p-iroh binary (storage gate green
+      incl. doctests, doorway 1109/0, a2o lint + gherkin + unit 272/272). Matrix
+      run 20260825T014418Z-04235e21: libp2p 3/3 · iroh 3/3 · dual 3/3 (p50
+      56.6 / 58.6 / 56.7 s on the same-host contract; mixed per-peer is still
+      explicit absence). Lanes on the same binary: transport-dual-plane 1/1,
+      content-sync 4/4, heal-on-read 2/2, doorway-failover 10/10; warm recovery
+      jessica<-matthew (2 survivors, dual/dual) RECOVERED in 58 s with rows=11
+      after the survivor snapshot learned to page /db/content by the
+      stats-bounded offset (a single 500-row page hid every blob-bearing base
+      fixture behind a full import and read a healthy survivor as vacuous).
+      Two environment reds, neither transport: stage-landing-server-A OOMed on
+      a 1.1 GB zip (dist/server had accumulated 4.5 GB of dev-build chunks and
+      maps; a production ng build → 15 MB cured it) and the via-A stewardship
+      post-flight was the known read-after-write false red (all 3 rows 200 on
+      A, B and direct storage minutes later). The 13-row local recovery series
+      died with a container restart ($MESH_DIR is /tmp) — the recovery JSONL
+      needs the same in-repo home the a2o reports got. Fleet confirm still
+      owed: [build:edge].
       DELTA 2026-08-24b (recovery measurement reader; NO status flip):
       `genesis/scripts/recovery-timeline.py` now renders the raw local recovery
       JSONL as a per-run series, scenario × shape aggregates, and per-scenario
@@ -1211,7 +1231,7 @@ habits:
     status: red
     active: false
     checks:
-      - "a2o @concern:reach-enforced-http (genesis/a2o/features/dataplane/reach-enforced-http.feature — runs in the edge Dataplane Validation stage; 3 scenarios asserting an unverifiable bearer token, a self-asserted X-Agent-Cid, and a self-asserted X-Agent-Id each return exactly the anonymous listing). Names NO reach tier: it asserts a RELATION, so it holds under any vocabulary and does not wait on the drift."
+      - "a2o @concern:reach-enforced-http (genesis/a2o/features/dataplane/reach-enforced-http.feature — runs in the edge Dataplane Validation stage; 3 scenarios asserting an unverifiable bearer token, a self-asserted X-Agent-Cid, and a self-asserted X-Agent-Id each return exactly the anonymous listing). Names NO reach tier: it asserts a RELATION, so it holds under any vocabulary and does not wait on the drift. A 4th scenario (2026-08-25) probes the BYTE route — a restricted row's bytes refused on GET /blob/{hash} to an anonymous caller — and is @wip (A2O_RUN_WIP=1 locally) until a fleet build carries the storage-side blob reach gate."
     first_move: >
       HTTP egress is wired and cured (2026-08-20). Wire the remaining four planes
       the same way — one check per plane asserting a scoped-tier row does NOT
@@ -1222,6 +1242,7 @@ habits:
       reach-blind; the boundary is serving, so the check belongs on the serve
       path, not on custody).
     evidence:
+      - "2026-08-25: byte-route egress closed LOCALLY, stays RED (a flip needs a build number). GET /blob/{hash} now consults the referencing content rows (`blob_reach`: a blob serves to a caller iff some referencing row does; both address forms — `sha256-<hex>` and `bafkrei…` — resolve to one verdict after a red-team pass found the sha256 form walked straight through the first cut), the legacy x-agent-id fallback yields to the doorway-injected X-Agent-Cid, and the doorway pantry refuses to stock a credentialed answer under its bearer-blind hash key (+ nosniff on pantry hits). Measured on the household mesh from the built binary: reach-enforced-http 3/3 and the new byte-route scenario 1/1 (community bytes 403 anon, 200 with a resolved identity, public 200); the doorway seed/admin-cache authority now requires dev_mode AND a loopback socket peer (every deployed manifest sets DEV_MODE=true — an anonymous remote PUT /admin/seed/blob had reached the hash check). Residuals FILED, not closed: DEV_MODE JWT forgery passes as Admin and defeats every fleet reach gate (backlog security-doorway-devmode-auth-bypass, coupled to the operator posture decision); /head-record, /epr-head, /apps/{cid} and direct-to-storage /shard·/ipfs still serve community anon because reach_is_distribution_safe treats community as broadcast-safe — a reach-vs-replication plane conflation that is a vocabulary call, not canonized here."
       - "2026-08-20: flipped unwired -> RED on measured violation, which is stronger evidence than an absent check. Live on doorway-alpha, verified twice: anonymous GET /db/content?limit=1000&offset=1000 returned 90 rows (all commons); the identical request carrying the literal header 'Authorization: Bearer bogus' returned 1000 — familiar 906, commons 90, private 3, intimate 1 — every row with its contentBody. Cause: http.rs:5272 decided reach from header PRESENCE, never validation."
       - "2026-08-20: HTTP-plane cure committed (41f7780aa) — the listing now resolves the requester and authorizes per row via epr_service::authorize_reach_for_human_with_own_trust, deny-by-default when unresolvable; the same header-presence check on the single-item route's Layer 1 is cured too; and reach_level_index's `_ => 0` fail-open (an UNRECOGNIZED tier read as the most permissive, making the authorizer's own `_ => Err` unreachable) now fails closed to u8::MAX. Stays RED until the scenario runs green against a deploy carrying the fix — a flip needs a build number, not a commit."
       - "2026-08-20 scope, held honestly: the doorway strips client-supplied identity headers (probed: X-Agent-Cid/X-Agent-Id return the anonymous result), so the cure closes the bypass for doorway-fronted traffic. It does NOT make identity unforgeable — extract_agent_cid returns the header verbatim — so a caller reaching elohim-storage directly in-cluster can still assert an identity and receive that identity's authorized reach. That residual is identity-cross-signed's, not this habit's."
