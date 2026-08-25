@@ -4384,29 +4384,22 @@ async fn handle_exchange_session(
 
 #[allow(clippy::result_large_err)]
 fn get_jwt_validator(state: &AppState) -> Result<JwtValidator, Response<BoxBody>> {
-    if state.args.dev_mode {
-        Ok(JwtValidator::new_dev())
-    } else {
-        match &state.args.jwt_secret {
-            Some(secret) => JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds)
-                .map_err(|e| {
-                    json_response(
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        &ErrorResponse {
-                            error: format!("JWT configuration error: {e}"),
-                            code: Some("CONFIG_ERROR".into()),
-                        },
-                    )
-                }),
-            None => Err(json_response(
-                StatusCode::NOT_IMPLEMENTED,
-                &ErrorResponse {
-                    error: "Authentication not enabled (missing JWT_SECRET)".into(),
-                    code: Some("NOT_ENABLED".into()),
-                },
-            )),
-        }
-    }
+    // Keyed on JWT_SECRET presence, never dev_mode (JwtValidator::from_config).
+    // A configured-but-invalid secret is a config error; absence falls back to
+    // the dev validator (bare local dev / keyless mesh).
+    JwtValidator::from_config(
+        state.args.configured_jwt_secret(),
+        state.args.jwt_expiry_seconds,
+    )
+    .map_err(|e| {
+        json_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &ErrorResponse {
+                error: format!("JWT configuration error: {e}"),
+                code: Some("CONFIG_ERROR".into()),
+            },
+        )
+    })
 }
 
 /// Generate a successful auth response with JWT token.
@@ -4616,15 +4609,11 @@ pub async fn handle_auth_request(
 
 /// Validate a token and extract claims for WebSocket authentication
 pub fn validate_ws_token(state: &AppState, token: &str) -> Option<Claims> {
-    let jwt = if state.args.dev_mode {
-        JwtValidator::new_dev()
-    } else {
-        state
-            .args
-            .jwt_secret
-            .as_ref()
-            .and_then(|s| JwtValidator::new(s.clone(), state.args.jwt_expiry_seconds).ok())?
-    };
+    let jwt = JwtValidator::from_config(
+        state.args.configured_jwt_secret(),
+        state.args.jwt_expiry_seconds,
+    )
+    .ok()?;
 
     let result = jwt.verify_token(token);
     if result.valid {

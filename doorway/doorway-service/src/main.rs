@@ -133,6 +133,22 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         std::process::exit(1);
     }
 
+    // Auth crypto keys on JWT_SECRET *presence*, not dev_mode (see
+    // JwtValidator::from_config). With no configured secret the doorway verifies
+    // AND mints tokens with the publicly-known dev placeholder — correct for a
+    // local/dev box or the keyless local mesh, forgeable if it reaches the open
+    // web. We warn rather than hard-fail because the local mesh legitimately
+    // binds 0.0.0.0 keyless; any deployment reachable beyond localhost must set
+    // JWT_SECRET.
+    if args.configured_jwt_secret().is_none() {
+        tracing::warn!(
+            listen = %args.listen,
+            "JWT_SECRET is not configured — verifying and MINTING tokens with the PUBLIC \
+             dev placeholder. Safe only for a local/dev box; set JWT_SECRET on any \
+             deployment reachable beyond localhost, or tokens are forgeable."
+        );
+    }
+
     // Print startup banner
     info!("======================================");
     info!("  Doorway - Elohim Holochain Gateway");

@@ -199,17 +199,11 @@ fn extract_token(req: &Request<Incoming>) -> Option<String> {
 }
 
 fn verify_claims(token: &str, state: &AppState) -> Result<Claims, String> {
-    let jwt = if state.args.dev_mode {
-        JwtValidator::new_dev()
-    } else {
-        let secret = state
-            .args
-            .jwt_secret
-            .as_ref()
-            .ok_or_else(|| "jwt_secret unset".to_string())?;
-        JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds)
-            .map_err(|e| format!("jwt validator init failed: {:?}", e))?
-    };
+    let jwt = JwtValidator::from_config(
+        state.args.configured_jwt_secret(),
+        state.args.jwt_expiry_seconds,
+    )
+    .map_err(|e| format!("jwt validator init failed: {:?}", e))?;
 
     let result = jwt.verify_token(token);
     if !result.valid {

@@ -552,25 +552,18 @@ fn get_auth_header<B>(req: &Request<B>) -> Option<&str> {
 
 #[allow(clippy::result_large_err)]
 fn get_jwt_validator(state: &AppState) -> Result<JwtValidator, Response<FullBody>> {
-    if state.args.dev_mode {
-        Ok(JwtValidator::new_dev())
-    } else {
-        match &state.args.jwt_secret {
-            Some(secret) => JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds)
-                .map_err(|e| {
-                    error_response(
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        &format!("JWT config error: {e}"),
-                        Some("JWT_CONFIG_ERROR"),
-                    )
-                }),
-            None => Err(error_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "JWT secret not configured",
-                Some("JWT_CONFIG_ERROR"),
-            )),
-        }
-    }
+    // Keyed on JWT_SECRET presence, never dev_mode (JwtValidator::from_config).
+    JwtValidator::from_config(
+        state.args.configured_jwt_secret(),
+        state.args.jwt_expiry_seconds,
+    )
+    .map_err(|e| {
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("JWT config error: {e}"),
+            Some("JWT_CONFIG_ERROR"),
+        )
+    })
 }
 
 /// Validate admin access from request.
@@ -1781,7 +1774,6 @@ fn user_to_details(user: &UserDoc) -> UserDetailsResponse {
 pub fn try_extract_user_id_for_tracking<B>(
     req: &Request<B>,
     jwt_secret: Option<&str>,
-    dev_mode: bool,
 ) -> Option<String> {
     let auth_header = req
         .headers()
@@ -1790,11 +1782,9 @@ pub fn try_extract_user_id_for_tracking<B>(
 
     let token = extract_token_from_header(auth_header)?;
 
-    let jwt = if dev_mode {
-        JwtValidator::new_dev()
-    } else {
-        JwtValidator::new(jwt_secret?.to_string(), 86400).ok()?
-    };
+    // Keyed on JWT_SECRET presence, never dev_mode (JwtValidator::from_config).
+    let jwt = JwtValidator::from_config(jwt_secret.map(str::trim).filter(|s| !s.is_empty()), 86400)
+        .ok()?;
 
     let result = jwt.verify_token(token);
     if result.valid {

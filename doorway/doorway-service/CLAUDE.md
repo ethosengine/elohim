@@ -3,6 +3,7 @@ id: doorway-service-gospel
 cites:
   - "resilience-protocol-spec | the resilience protocol + account-recovery canon (Parts V/VI) this gateway implements as the web2 projection — patron-CDN, social-recovery, creator-succession | sha256:2c832b517c7204cc | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/resilience/README.md"
   - "elohim-seam-map-concern-routing | the concern-routing atlas — this surface owns the Doorway projection seam (§3.9, Track 4); routes any where-does-this-go? question | sha256:7fd48274fae5e8c5 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "doorway-auth-posture-declared-stage | the auth-posture entrypoint for this crate — the declared-stage rule, why DEV_MODE is never a posture, the API_KEY_ADMIN vs API_KEY_SEED distinction, the chaperone exception, and the six questions to answer before adding any gate here | sha256:f97bebdf293b0dd9 | path: genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-posture-declared-stage.md"
 ---
 
 # Doorway Service (Rust)
@@ -16,6 +17,27 @@ This surface owns the **Doorway projection** seam (atlas §3.9, Track 4 — make
 Any "where does this go?" concern routes through the concern-routing atlas: `elohim-seam-map-concern-routing`.
 
 Confusion-to-avoid: hub ≠ doorway — the doorway projects **outward** to web2 and is **not a P2P participant**; the hub projects inward to nearby peers (§3.12, `steward/node`).
+
+## Auth posture — read BEFORE touching any gate
+
+**A doorway's auth posture derives from the network's DECLARED operating stage, never from a mode flag.**
+The stage is `ELOHIM_NETWORK_STAKES`, resolved once at boot into `AppState::network_stage`
+(`routes/freshness.rs`) as the same `seam_contracts::freshness::NetworkStage` elohim-storage declares —
+fail-closed to `Bootstrap`, and `Simulacra` reachable only by explicit positive declaration.
+
+If you are about to write `if state.args.dev_mode` in an auth path, stop. `DEV_MODE: "true"` is set on
+EVERY deployed manifest, so a gate keyed on it is in practice ungated — that is how the seed and
+`/admin/cache/*` routes became reachable with no credential from the open web (closed by `62b658784`),
+and how the apex became undeployable when that bypass was correctly removed.
+
+Two credentials answer two DIFFERENT questions, and collapsing them is the recurring defect:
+`API_KEY_ADMIN` = *"is this caller MY admin?"* (this doorway's operator identity, deliberately distinct
+per doorway); `API_KEY_SEED` = *"may this caller seed?"* (the fleet's deploy authority, uniform by design,
+scoped to the seed/admin-cache routes and never to the permission ladder).
+
+The full rule, the stage-to-context ladder, the chaperone exception for hosted humans, the migration to
+p2p-derived authority, the open items, and the six questions to answer before adding a gate:
+`doorway-auth-posture-declared-stage`.
 
 ## Build
 

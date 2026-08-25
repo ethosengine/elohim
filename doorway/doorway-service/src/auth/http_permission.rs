@@ -64,13 +64,11 @@ pub(crate) fn extract_http_permission<B>(state: &AppState, req: &Request<B>) -> 
 /// its permission level. Returns `None` if the token is invalid or the
 /// validator cannot be constructed.
 fn validate_jwt_token(state: &AppState, token: &str) -> Option<PermissionLevel> {
-    let jwt = if state.args.dev_mode {
-        JwtValidator::new_dev()
-    } else {
-        state.args.jwt_secret.as_ref().and_then(|secret| {
-            JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds).ok()
-        })?
-    };
+    let jwt = JwtValidator::from_config(
+        state.args.configured_jwt_secret(),
+        state.args.jwt_expiry_seconds,
+    )
+    .ok()?;
     let result = jwt.verify_token(token);
     if result.valid {
         result.claims.map(|c| c.permission_level)

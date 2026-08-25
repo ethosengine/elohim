@@ -1083,18 +1083,12 @@ fn check_operator_auth(req: &Request<Incoming>, state: &AppState) -> bool {
         return false;
     };
 
-    let jwt = if state.args.dev_mode {
-        JwtValidator::new_dev()
-    } else {
-        match state.args.jwt_secret.as_ref() {
-            Some(secret) => {
-                match JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds) {
-                    Ok(v) => v,
-                    Err(_) => return false,
-                }
-            }
-            None => return false,
-        }
+    let jwt = match JwtValidator::from_config(
+        state.args.configured_jwt_secret(),
+        state.args.jwt_expiry_seconds,
+    ) {
+        Ok(v) => v,
+        Err(_) => return false,
     };
 
     let result = jwt.verify_token(&token);

@@ -80,6 +80,38 @@ habits:
       - "a2o @concern:transport-parity (genesis/a2o/features/dataplane/transport-comparison-matrix.feature; just mesh matrix) — identical fresh-document contract under libp2p, iroh, and dual; successful samples alone contribute timing percentiles"
       - ".claude/scripts/latency-scoreboard.py --local (and --deployed) — bounded convergence, not merely eventual: a CONJUNCTION of speed AND this habit's trust invariant, never speed alone. A fast stale head is worse than a slow correct one, so this check can only ever narrow the habit, never carry it."
     evidence: >
+      DELTA 2026-08-25d (NO status flip — cure landed in-tree, unmeasured on
+      the fleet): the habit's own first check could not have gone green for a
+      reason upstream of convergence. From app #1672 every `seed elohim.host`
+      leg answered 403, so the landing bytes never reached doorway-B at all —
+      blobHash propagation was never the binding constraint on the apex. Cause
+      was a conflation, not a credential: require_seed_authority asked "is this
+      caller MY admin?" while ONE deploy pipeline drives several doorways whose
+      admin identities are deliberately distinct. It was masked for months by
+      alpha-b.yaml's DEV_MODE:"true", set expressly to bypass this gate and
+      carrying its own TODO ("Remove when doorway-B federation auth hardens");
+      62b658784 correctly closed that bypass and left no seed path. Cured by
+      deriving seed authority from the DECLARED stage — the doorway already
+      resolved ELOHIM_NETWORK_STAKES into AppState::network_stage sharing
+      seam_contracts::freshness::NetworkStage with storage's trust/stage.rs,
+      with ZERO auth consumers until now — plus a fleet seed authority
+      (API_KEY_SEED) scoped to the seed/admin-cache routes and never to the
+      permission ladder. Behaviour-preserving on the fleet (every manifest sets
+      DEV_MODE:"true" and none declares a stage, so Bootstrap < Coordinated
+      holds exactly where dev_mode held) and self-retiring at Coordinated, where
+      LAYERS.md puts Act II. Local proof only: cargo clippy -D warnings clean,
+      1116/1116 doorway lib tests, 7 new gate tests incl.
+      fleet_seed_key_never_grants_general_admin and
+      coordinated_stage_retires_both_pre_coordination_affordances. NOT MEASURED
+      on the fleet — needs an edge deploy (image + manifests land together; both
+      half-states are safe) then an App run whose four `seed elohim.host` legs go
+      green. Two findings filed, not fixed: the DECLARE_ONLY fan-out
+      (Jenkinsfile:342-357) is NOT seed-gated, so through #1672-#1673 doorway-B
+      accepted a canonical head for bytes whose PUT it had just refused — a
+      declare outrunning its bytes, which is this habit's shape exactly; and the
+      fleet's api-key-admin/jwt-secret fixtures are committed in plaintext and
+      applied verbatim to internet-facing hosts.
+
       DELTA 2026-08-25b (FLEET CONFIRM of the 2026-08-23/24 arc; NO status
       flip): 608a1ceff landed on dev as 286089679 (+47fb60f58 genesis CI fix);
       edge #1380 SUCCESS deployed it to alpha; live: irohNodeId on doorway-A,
@@ -1773,7 +1805,7 @@ habits:
       - "survey §6.2 corrected in place 2026-08-11: its overshoot proof cited levels-against-ceilings as rate ratios — the same dimensional error it diagnoses in spatial_capacity.rs. Conclusion survived, proof replaced."
 
     deltas:
-      - "2026-08-25c: a measure that could not see a shipped regression, recorded rather than quietly fixed. elohim.host: every EPR-card click landed on /epr/manifesto stuck on Loading content... with the node already fetched — ContentViewerComponent (mounted cross-bundle by the shell at /epr/:id) was left implicit-OnPush by the Eager-removal wave, so its subscribe-callback mutations marked no view dirty (proof: ng.getComponent isLoading:false + forced applyChanges rendered instantly; edge of elohim/dev #1670). Three instruments were blind by construction: the app pipeline E2E stage is a Cypress relic (binary missing → catchError → prints ✅ alpha validation passed, publishes no report, #1670); the only scenario touching the card RESOLVED it but never FOLLOWED it, and its feature is @act:i — HELD on the fleet lane (elohim-genesis/dev: every act-i scenario skipped-not-failed, @browser-only excluded from the mesh stage), so the new regression scenario cannot run in CI until an act-i browser lane exists; and TestBed.overrideComponent on the component under test recompiles it CheckAlways (ɵcmp.onPush true→false), so every spec-level OnPush guard that overrides the CUT is a null measure. Cured locally: Eager stamp + a browser-mirroring spec that FAILS without it (Eager host, production def) + a2o @regression Following the card (fails against the deployed alpha, ELOHIM_CAP_OWNED_SUBSTRATE_STATUS=available); residuals filed in backlog-onpush-eager-debt-inventory. DEPLOY EVIDENCE (elohim/dev #1673, fresh trigger): alpha.elohim.host serves the fixed bundle — card click renders the Manifesto at /epr/manifesto, no economic-events 500, no governance 400 (b512fbf5f); elohim.host does NOT — doorway-B refuses the byte-seed with 403 since edge #1380 closed the dev-mode remote seed hole and B binds a different api-key-admin secret than the Jenkins credential (backlog ci-app-apex-seed-403-doorway-b-admin-key, operator credential decision). The strict a2o measure is still failed by the by-design signal/emit 503 the console-cleanliness hook counts (backlog console-noise-signal-emit-503-per-content-view). Also caught in flight: a step-definition edit dispatched edge #1383 — a full fleet redeploy — via the dataplane-validation glob genesis/a2o/steps/** (backlog ci-edge-a2o-steps-glob-redeploys-fleet). Flip still needs a build number on a green check."
+      - "2026-08-25c: a measure that could not see a shipped regression, recorded rather than quietly fixed. elohim.host: every EPR-card click landed on /epr/manifesto stuck on Loading content... with the node already fetched — ContentViewerComponent (mounted cross-bundle by the shell at /epr/:id) was left implicit-OnPush by the Eager-removal wave, so its subscribe-callback mutations marked no view dirty (proof: ng.getComponent isLoading:false + forced applyChanges rendered instantly; edge of elohim/dev #1670). Three instruments were blind by construction: the app pipeline E2E stage is a Cypress relic (binary missing → catchError → prints ✅ alpha validation passed, publishes no report, #1670); the only scenario touching the card RESOLVED it but never FOLLOWED it, and its feature is @act:i — HELD on the fleet lane (elohim-genesis/dev: every act-i scenario skipped-not-failed, @browser-only excluded from the mesh stage), so the new regression scenario cannot run in CI until an act-i browser lane exists; and TestBed.overrideComponent on the component under test recompiles it CheckAlways (ɵcmp.onPush true→false), so every spec-level OnPush guard that overrides the CUT is a null measure. Cured locally: Eager stamp + a browser-mirroring spec that FAILS without it (Eager host, production def) + a2o @regression Following the card (fails against the deployed alpha, ELOHIM_CAP_OWNED_SUBSTRATE_STATUS=available); residuals filed in backlog-onpush-eager-debt-inventory. DEPLOY EVIDENCE (elohim/dev #1673, fresh trigger): alpha.elohim.host serves the fixed bundle — card click renders the Manifesto at /epr/manifesto, no economic-events 500, no governance 400 (b512fbf5f); elohim.host does NOT — doorway-B refuses the byte-seed with 403 since edge #1380 closed the dev-mode remote seed hole and B binds a different api-key-admin secret than the Jenkins credential (backlog ci-app-apex-seed-403-doorway-b-admin-key). CORRECTED 2026-08-25d: this was recorded as an operator credential decision and is NOT one — every doorway api-key-admin is a plaintext fixture in the manifest's own stringData, applied verbatim, so it was always an in-tree fix; cured below. The strict a2o measure is still failed by the by-design signal/emit 503 the console-cleanliness hook counts (backlog console-noise-signal-emit-503-per-content-view). Also caught in flight: a step-definition edit dispatched edge #1383 — a full fleet redeploy — via the dataplane-validation glob genesis/a2o/steps/** (backlog ci-edge-a2o-steps-glob-redeploys-fleet). Flip still needs a build number on a green check."
   - id: conductor-capacity-represented
     invariant: >
       The conductor's DB read pool is a REPRESENTED resource, not one discovered

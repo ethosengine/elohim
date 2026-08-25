@@ -126,6 +126,32 @@ pub struct Args {
     #[arg(long, env = "API_KEY_ADMIN")]
     pub api_key_admin: Option<String>,
 
+    /// The FLEET's seed authority — the deploy pipeline's credential for
+    /// staging bytes and declaring heads on a doorway it operates.
+    ///
+    /// Deliberately NOT [`Args::api_key_admin`]. That one is THIS doorway's own
+    /// operator identity, and a fixture fleet deliberately runs several
+    /// doorways with DISTINCT identities (`alpha-b.yaml`: "distinct keys so
+    /// cross-doorway auth exercises real JWT-validation rather than
+    /// shared-secret fallthroughs") while having exactly ONE deploy pipeline.
+    /// Conflating the two is what made the apex undeployable: CI holds one key,
+    /// doorway-B has another, and `DEV_MODE: "true"` was set on alpha-b to
+    /// paper over it — carrying its own TODO, "Remove when doorway-B federation
+    /// auth hardens" — until the loopback conjunct (62b658784) correctly closed
+    /// that bypass and left the apex with no seed path at all.
+    ///
+    /// SCOPE: the seed + admin-cache routes ONLY. It never enters the
+    /// permission ladder (`auth/http_permission.rs`), so it is strictly
+    /// narrower than Admin — it cannot read a user, mint a token, promote an
+    /// account, or reach the conductor. That is the whole point of giving the
+    /// deploy pipeline its own credential instead of an admin identity.
+    ///
+    /// Presence-keyed, never flag-keyed — the same discriminator
+    /// [`Args::configured_jwt_secret`] uses. Unset ⇒ this doorway has no fleet
+    /// seed authority and only its own Admin identity can seed.
+    #[arg(long, env = "API_KEY_SEED")]
+    pub api_key_seed: Option<String>,
+
     /// Log level (trace, debug, info, warn, error)
     #[arg(long, env = "LOG_LEVEL", default_value = "info")]
     pub log_level: String,
@@ -383,17 +409,34 @@ impl Args {
             .unwrap_or(&self.conductor_url)
     }
 
-    /// Get effective JWT secret (uses default in dev mode)
-    pub fn jwt_secret(&self) -> String {
-        if self.dev_mode {
-            self.jwt_secret
-                .clone()
-                .unwrap_or_else(|| "dev-only-insecure-secret".to_string())
-        } else {
-            self.jwt_secret
-                .clone()
-                .expect("JWT_SECRET is required in production mode")
-        }
+    /// The effective JWT secret for BOTH verification and minting, or `None`
+    /// when none is configured (bare local dev / the local mesh, which runs
+    /// keyless on purpose). Trims and rejects blank/whitespace so `Some("")` /
+    /// `Some("   ")` never reach [`JwtValidator::from_config`].
+    ///
+    /// This is THE auth discriminator: keyed on secret **presence**, never on
+    /// `dev_mode` (which every deployed doorway sets to `true`). Mirrors the
+    /// fail-closed posture selection in elohim-storage `trust/stage.rs`.
+    pub fn configured_jwt_secret(&self) -> Option<&str> {
+        self.jwt_secret
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+    }
+
+    /// The effective FLEET seed-authority key, or `None` when none is
+    /// configured. Trims and rejects blank/whitespace so `Some("")` /
+    /// `Some("   ")` can never be presented as a credential — a doorway with a
+    /// blank `API_KEY_SEED` has NO fleet seed authority, it does not have an
+    /// empty one that an empty header would match.
+    ///
+    /// Same presence-keyed discriminator as [`Args::configured_jwt_secret`]:
+    /// authority comes from a declaration, never from a mode flag.
+    pub fn configured_seed_key(&self) -> Option<&str> {
+        self.api_key_seed
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
     }
 
     /// Get the list of conductor **app interface** URLs.

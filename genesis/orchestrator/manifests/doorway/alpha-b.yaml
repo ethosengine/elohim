@@ -61,6 +61,24 @@ stringData:
   # exercises real JWT-validation rather than shared-secret fallthroughs.
   api-key-authenticated: "dev-elohim-auth-b-2024"
   api-key-admin: "dev-elohim-admin-b-2024"
+  # The FLEET's seed authority — the deploy pipeline's credential for staging
+  # bytes and declaring heads on the doorways it operates. Deliberately a
+  # SEPARATE slot from api-key-admin: one App pipeline drives several doorways
+  # whose own operator identities are deliberately distinct, and it authorizes
+  # the seed + admin-cache routes ONLY (never the permission ladder), so it is
+  # strictly narrower than the admin key it replaces on that path.
+  #
+  # Same value on every doorway of this fixture fleet — that IS the point, and
+  # it is what makes the apex deployable with the ONE Jenkins credential that
+  # already exists (`storage-api-key-admin` / `doorway-admin-bootstrap-key`).
+  # It currently equals doorway-A's admin fixture, so no operator action is
+  # needed; giving the pipeline a value of its own is a one-line change here
+  # plus one new Jenkins credential.
+  #
+  # The doorway honours it only while its DECLARED stage is pre-coordination
+  # (ELOHIM_NETWORK_STAKES, fail-closed to bootstrap). prod.yaml declares no
+  # seed key at all, so this cannot become a production posture by accident.
+  api-key-seed: "dev-elohim-admin-2024"
   jwt-secret: "dev-jwt-secret-b-change-in-production-2024"
   anthropic-api-key: "REPLACE_WITH_REAL_KEY"
 ---
@@ -162,10 +180,23 @@ spec:
               protocol: TCP
           env:
             # DEV_MODE: A-to-B federation comms are in active dev scope
-            # (operator decision 2026-06-27). Opens the seed/admin gate
-            # like doorway-A (alpha-elohim-host) so the CI admin key
-            # lands the SPA blob without a per-host credential. Remove
-            # when doorway-B federation auth hardens. Sibling: alpha.yaml.
+            # (operator decision 2026-06-27). Sibling: alpha.yaml.
+            #
+            # ITS SEED JUSTIFICATION IS DISCHARGED. This flag was set to open
+            # the seed/admin gate "so the CI admin key lands the SPA blob
+            # without a per-host credential", carrying its own TODO to remove it
+            # "when doorway-B federation auth hardens". That bypass was closed
+            # by the loopback conjunct (62b658784) — which left the apex with no
+            # seed path at all and stranded elohim.host on a stale bundle from
+            # app #1672. The per-host credential it stood in for now exists as
+            # API_KEY_SEED above, and seed authority derives from the DECLARED
+            # stage rather than from this flag (doorway routes/seed.rs).
+            #
+            # What DEV_MODE still does here is unrelated to seeding: it grants
+            # every anonymous caller PermissionLevel::Authenticated in
+            # auth/http_permission.rs. That is a separate, live posture question
+            # tracked in security-doorway-devmode-auth-bypass.md — do not read
+            # this flag as load-bearing for deploys any more.
             - name: DEV_MODE
               value: "true"
             # delegates-compute op-gate — SHADOW mode (observe).
@@ -326,6 +357,14 @@ spec:
                 secretKeyRef:
                   name: elohim-doorway-alpha-b-secrets
                   key: api-key-admin
+            # Fleet seed authority — see the api-key-seed comment on the
+            # Secret above. Honoured only pre-coordination, seed/cache routes
+            # only, never the permission ladder.
+            - name: API_KEY_SEED
+              valueFrom:
+                secretKeyRef:
+                  name: elohim-doorway-alpha-b-secrets
+                  key: api-key-seed
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:

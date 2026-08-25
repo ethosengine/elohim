@@ -637,15 +637,17 @@ impl AppState {
     ///   `kid` fails closed to `UnknownIssuer` rather than falling through to
     ///   the HS256 secret.
     ///
-    /// Returns `None` when JWT is not configured at all (no dev mode, no
-    /// secret) so callers keep their existing "JWT not configured" branch.
+    /// Returns `None` only when a configured `JWT_SECRET` is invalid (too
+    /// short). With no secret configured it falls back to the dev validator
+    /// (bare local dev / keyless mesh); with a valid secret it uses that — the
+    /// selection is keyed on secret presence, never `dev_mode`
+    /// (`JwtValidator::from_config`).
     pub fn federation_jwt_validator(&self) -> Option<crate::auth::JwtValidator> {
-        let base = if self.args.dev_mode {
-            crate::auth::JwtValidator::new_dev()
-        } else {
-            let secret = self.args.jwt_secret.as_ref()?;
-            crate::auth::JwtValidator::new(secret.clone(), self.args.jwt_expiry_seconds).ok()?
-        };
+        let base = crate::auth::JwtValidator::from_config(
+            self.args.configured_jwt_secret(),
+            self.args.jwt_expiry_seconds,
+        )
+        .ok()?;
 
         let mut validator = base
             .with_sign_alg(crate::auth::jwt::JwtSignAlg::from_process_env())
@@ -1267,11 +1269,12 @@ impl AppState {
 ///
 /// Returns `Some(human_id)` when:
 /// - the request carries a `Bearer <token>` Authorization header AND
-/// - the token validates against the configured JWT validator (or the dev-mode
-///   validator when `args.dev_mode` is set)
+/// - the token validates against the JWT validator selected by `JwtValidator::from_config`
+///   (the configured `JWT_SECRET` when present, else the dev placeholder — keyed
+///   on secret presence, never `dev_mode`)
 ///
-/// Returns `None` for Session Visitors (no bearer), invalid/expired tokens, or
-/// when no JWT secret is configured in production mode. Storage handlers fall
+/// Returns `None` for Session Visitors (no bearer) or invalid/expired tokens.
+/// Storage handlers fall
 /// back to their `local_sessions`-based resolution when this header is absent.
 ///
 /// **Alpha-substrate equivalence:** `agent_cid` is sourced from `claims.human_id`
@@ -1411,12 +1414,11 @@ fn resolve_verified_claims_from_request<B>(
         .and_then(|v| v.to_str().ok());
     let token = extract_token_from_header(auth_header)?;
 
-    let validator = if state.args.dev_mode {
-        JwtValidator::new_dev()
-    } else {
-        let secret = state.args.jwt_secret.as_ref()?;
-        JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds).ok()?
-    };
+    let validator = JwtValidator::from_config(
+        state.args.configured_jwt_secret(),
+        state.args.jwt_expiry_seconds,
+    )
+    .ok()?;
 
     let result = validator.verify_token(token);
     if !result.valid {

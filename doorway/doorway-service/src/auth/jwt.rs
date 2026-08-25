@@ -345,6 +345,26 @@ impl JwtValidator {
         }
     }
 
+    /// Select the base validator from configuration, keyed on `JWT_SECRET`
+    /// **presence** — never on any `DEV_MODE` flag. A configured secret is used
+    /// for BOTH verification and minting; only its absence (bare local dev, and
+    /// the local mesh which runs keyless on purpose) falls back to the
+    /// publicly-known dev placeholder from [`new_dev`](Self::new_dev).
+    ///
+    /// This is the doorway analog of elohim-storage's `trust/stage.rs`
+    /// discipline: security posture must never derive from a `DEV_MODE` flag,
+    /// and an undeclared secret resolves to the *configured* key on any
+    /// deployment that sets one rather than silently to a weaker placeholder.
+    /// The `>= 32`-char / non-empty checks live in [`new`](Self::new); callers
+    /// pass the already-trimmed [`Args::configured_jwt_secret`] so `Some("")`
+    /// and `Some("   ")` can never reach here.
+    pub fn from_config(secret: Option<&str>, expiry_seconds: u64) -> Result<Self, DoorwayError> {
+        match secret {
+            Some(s) => Self::new(s.to_string(), expiry_seconds),
+            None => Ok(Self::new_dev()),
+        }
+    }
+
     /// Attaches this doorway's own id — enables self-vs-foreign `kid`
     /// comparison in `verify_token`. Without it, any `kid`-bearing token is
     /// treated as foreign.

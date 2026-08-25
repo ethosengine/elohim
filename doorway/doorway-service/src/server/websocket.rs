@@ -335,13 +335,11 @@ fn extract_claims(state: &AppState, req: &Request<Incoming>) -> Option<Claims> {
 
 /// Decode JWT token and return full claims (unlike validate_jwt which returns only permission).
 fn decode_jwt_claims(state: &AppState, token: &str) -> Option<Claims> {
-    let jwt = if state.args.dev_mode {
-        JwtValidator::new_dev()
-    } else {
-        state.args.jwt_secret.as_ref().and_then(|secret| {
-            JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds).ok()
-        })?
-    };
+    let jwt = JwtValidator::from_config(
+        state.args.configured_jwt_secret(),
+        state.args.jwt_expiry_seconds,
+    )
+    .ok()?;
 
     let result = jwt.verify_token(token);
     if result.valid {
@@ -449,13 +447,11 @@ fn extract_token_from_query(query: Option<&str>) -> Option<String> {
 
 /// Validate JWT token and return permission level
 fn validate_jwt(state: &AppState, token: &str) -> Option<PermissionLevel> {
-    let jwt = if state.args.dev_mode {
-        JwtValidator::new_dev()
-    } else {
-        state.args.jwt_secret.as_ref().and_then(|secret| {
-            JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds).ok()
-        })?
-    };
+    let jwt = JwtValidator::from_config(
+        state.args.configured_jwt_secret(),
+        state.args.jwt_expiry_seconds,
+    )
+    .ok()?;
 
     let result = jwt.verify_token(token);
     if result.valid {

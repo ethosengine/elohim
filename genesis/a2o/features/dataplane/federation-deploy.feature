@@ -50,3 +50,31 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
     # stage is no longer needed to keep elohim.host alive.
     Then resolving "/" on peer "elohim.host" does NOT return App-not-found
     And EPR "elohim-host-landing" blobHash is non-null on peer "elohim.host"
+
+  @wip @concern:federation-deploy
+  Scenario: the deploy authority can stage bytes on a NON-author federation doorway
+    # THE MISSING PRECONDITION NODE. The two scenarios above assert the END of the chain —
+    # elohim.host resolves the landing EPR. They are silent on the step immediately before it:
+    # whether the deploy pipeline is ALLOWED to put bytes on a doorway it did not author from.
+    # It was not. From app #1672 every `seed elohim.host` leg answered 403, so the two
+    # assertions above could not have gone green no matter how well blobHash propagated —
+    # the bytes never arrived.
+    #
+    # The cause was a conflation, not a credential: `require_seed_authority` asked "is this
+    # caller MY admin?" while one pipeline drives several doorways whose own admin identities
+    # are deliberately distinct. It was masked for months because alpha-b.yaml set
+    # DEV_MODE:"true" expressly to bypass this gate ("so the CI admin key lands the SPA blob
+    # without a per-host credential. Remove when doorway-B federation auth hardens"), until the
+    # loopback conjunct (62b658784) correctly closed that bypass and left no seed path at all.
+    #
+    # The fleet seed authority (API_KEY_SEED) answers the right question — "may this caller
+    # seed?" — and is scoped to the seed/admin-cache routes only, so it can never stand in for
+    # an operator identity. @wip until a fleet build carries the gate, matching the byte-route
+    # gate scenario's precedent (34ac23125).
+    Given peer "elohim.host" at "elohim.host"
+    When the deploy authority stages a blob on peer "elohim.host"
+    Then staging the blob on peer "elohim.host" is accepted
+    # ANTI-REGRESSION: this must NOT be satisfiable by reopening the hole the gate closed.
+    # A credential-free remote caller stays refused; a green here with this line failing means
+    # the fix was a bypass, not an authority.
+    And staging a blob on peer "elohim.host" with NO credential is refused

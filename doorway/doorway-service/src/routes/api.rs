@@ -135,13 +135,13 @@ fn parse_requester_identity(
         // JWT token - validate and extract agent_pub_key from claims
         let token = extract_token_from_header(Some(header))?;
 
-        // Build validator from state (mirrors get_jwt_validator in auth_routes.rs)
-        let validator = if state.args.dev_mode {
-            JwtValidator::new_dev()
-        } else {
-            let secret = state.args.jwt_secret.as_ref()?;
-            JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds).ok()?
-        };
+        // Build validator from state (mirrors get_jwt_validator in auth_routes.rs).
+        // Keyed on JWT_SECRET presence, never dev_mode (JwtValidator::from_config).
+        let validator = JwtValidator::from_config(
+            state.args.configured_jwt_secret(),
+            state.args.jwt_expiry_seconds,
+        )
+        .ok()?;
 
         let result = validator.verify_token(token);
         if result.valid {

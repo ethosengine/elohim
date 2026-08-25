@@ -5,8 +5,11 @@
 //!
 //! ## Security
 //!
-//! These endpoints require admin authentication (API key or JWT).
-//! In dev mode, authentication may be disabled.
+//! These endpoints require seed authority: this doorway's own admin identity
+//! (API key or JWT) at any stage, or — while the DECLARED network stage is
+//! still pre-coordination — an on-the-box (loopback) caller or the fleet's
+//! declared seed-authority key (`API_KEY_SEED`). Authority is never derived
+//! from `DEV_MODE`; see [`require_seed_authority`].
 //!
 //! ## Flow
 //!
@@ -27,7 +30,9 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
-use crate::auth::{extract_http_permission, PermissionLevel};
+use seam_contracts::freshness::NetworkStage;
+
+use crate::auth::{extract_http_permission, ApiKeyValidator, PermissionLevel};
 use crate::server::AppState;
 
 // =============================================================================
@@ -40,11 +45,15 @@ use crate::server::AppState;
 /// (`auth/operator.rs`); transition-window Admin check per `operator.rs`
 /// sanction. Until the capability-scoped resolver is wired for the seed path,
 /// this gate accepts any request that resolves to [`PermissionLevel::Admin`]
-/// (legacy Admin JWT or admin API key) and, in dev mode, the local-stack
-/// fallback (so `pnpm run hc:start:seed` keeps working with no credential).
+/// (legacy Admin JWT or admin API key) at ANY stage, plus two affordances that
+/// exist only while the DECLARED stage is pre-coordination: an on-the-box
+/// (loopback) caller, and the fleet's declared seed-authority key
+/// (`API_KEY_SEED`). Authority is derived from the declared stage, never from
+/// `DEV_MODE` — see the body for why that swap preserves deployed behaviour.
 ///
 /// Returns:
-/// - `Ok(())` if authorized (dev_mode, or resolved level >= Admin).
+/// - `Ok(())` if authorized (pre-coordination loopback, pre-coordination fleet
+///   seed key, or resolved level >= Admin).
 /// - `Err(401)` if no/invalid bearer resolved to [`PermissionLevel::Public`].
 /// - `Err(403)` if authenticated but below Admin.
 ///
@@ -58,33 +67,67 @@ pub(crate) fn require_seed_authority<B>(
     req: &Request<B>,
     peer_is_loopback: bool,
 ) -> Result<(), Response<Full<Bytes>>> {
-    // Local-stack safety: dev mode is the trusted single-operator context
-    // (`pnpm run hc:start:seed`), and it is trusted because the caller is ON
-    // the box — NOT because a flag is set.
+    // ── How seed authority is decided ───────────────────────────────────────
     //
-    // The loopback conjunct is the whole security property here. `dev_mode`
-    // alone used to pass, and every deployed doorway manifest sets
-    // `DEV_MODE: "true"` (alpha, alpha-b, prod, staging, staging-read —
-    // `genesis/orchestrator/manifests/doorway/*.yaml`), so this gate and the
-    // four `/admin/cache/*` mutation routes that share it were reachable with
-    // no credential from the open web. Verified 2026-08-24 against the local
-    // mesh: an anonymous `PUT /admin/seed/blob` carrying a deliberately wrong
-    // `X-Blob-Hash` answered `409 Hash mismatch` on both doorways — i.e. it
-    // passed this gate and was stopped only by content addressing.
+    // Seed authority is priced against the network's DECLARED operating stage
+    // (`ELOHIM_NETWORK_STAKES`, resolved once at boot into
+    // `AppState::network_stage`, fail-closed to `Bootstrap`) — NEVER against
+    // `DEV_MODE`. That is the discipline elohim-storage states in
+    // `trust/stage.rs`, naming this very file's neighbour: "`NetworkStage` must
+    // never derive from any `DEV_MODE` flag — neither elohim-storage's inert one
+    // nor doorway's live, auth-permissive one (`config.rs`)." This gate was the
+    // last place in the doorway still deriving a posture from that flag.
     //
-    // `peer_is_loopback` is derived from the ACCEPTED SOCKET's peer address,
-    // never from `X-Forwarded-For` — an attacker sets headers, not the kernel's
-    // notion of who connected. Behind a cluster ingress the peer is the ingress
-    // pod (not loopback), so the fleet now authenticates; on a developer's box
-    // the peer is 127.0.0.1, so `pnpm run hc:start:seed` and the local mesh keep
-    // working with no credential and nothing to configure.
+    // WHY THE SWAP IS NOT A WIDENING: every deployed doorway manifest sets
+    // `DEV_MODE: "true"` (alpha, alpha-b, prod, staging, staging-read) and NONE
+    // declares `ELOHIM_NETWORK_STAKES`, so every one of them resolves to
+    // `Bootstrap`. `Bootstrap < Coordinated` holds in exactly the places
+    // `dev_mode` held, so deployed behaviour is preserved — while a doorway that
+    // declares `coordinated`/`enforced` switches BOTH pre-coordination
+    // affordances off by itself. That expiry is designed, not accidental: past
+    // coordination the deploy pipeline is expected to carry a bounded, revocable
+    // authority (the REA compute-commitment path already shadow-running behind
+    // `DELEGATES_COMPUTE_OP_GATE`) instead of a standing key.
+    let pre_coordination = state.network_stage < NetworkStage::Coordinated;
+
+    // (1) THE CALLER IS ON THE BOX. `peer_is_loopback` is derived from the
+    // ACCEPTED SOCKET's peer address, never from `X-Forwarded-For` — an attacker
+    // sets headers, not the kernel's notion of who connected. Behind a cluster
+    // ingress the peer is the ingress pod (not loopback), so the fleet
+    // authenticates; on a developer's box the peer is 127.0.0.1, so
+    // `pnpm run hc:start:seed` and the local mesh keep working with no
+    // credential and nothing to configure.
     //
-    // The CI path was already bearer-gated before this change and is unaffected:
-    // `genesis/scripts/ci/doorway-seed-ensure.sh` mints `SEED_DOORWAY_TOKEN` and
-    // `substrate-verify.sh` sends it as an Admin bearer.
-    if state.args.dev_mode && peer_is_loopback {
+    // This is the conjunct commit 62b658784 added, and it carries the security
+    // property: the flag ALONE used to pass, and since every deployed manifest
+    // sets it, this gate and the four `/admin/cache/*` mutation routes were
+    // reachable with no credential from the open web (proven 2026-08-24 on the
+    // local mesh — an anonymous PUT with a deliberately wrong `X-Blob-Hash`
+    // answered `409 Hash mismatch`, i.e. it passed the gate and was stopped only
+    // by content addressing).
+    if pre_coordination && peer_is_loopback {
         return Ok(());
     }
+
+    // (2) THE FLEET'S DECLARED SEED AUTHORITY. One deploy pipeline operates
+    // several doorways whose own operator identities are DELIBERATELY distinct
+    // (`alpha-b.yaml`), so "may this caller seed?" is not the same question as
+    // "is this caller MY admin?" — `API_KEY_SEED` answers the first,
+    // `API_KEY_ADMIN` the second. Conflating them is what stranded the apex:
+    // CI holds one key, doorway-B has another, and `DEV_MODE: "true"` stood in
+    // for the missing per-host credential until (1) closed that bypass.
+    //
+    // Presence-keyed: a doorway declaring no seed key has NO fleet seed
+    // authority (prod declares none), so this cannot become a production posture
+    // by accident. Scoped to THIS gate — the key never enters
+    // `extract_http_permission`'s ladder, so it authorizes seeding and cache
+    // mutation and nothing else: it cannot read a user, mint a token, promote an
+    // account, or reach the conductor.
+    if pre_coordination && fleet_seed_authority_presented(state, req) {
+        return Ok(());
+    }
+
+    // (3) THIS DOORWAY'S OWN OPERATOR IDENTITY — valid at EVERY stage.
 
     let level = extract_http_permission(state, req);
     if level >= PermissionLevel::Admin {
@@ -101,6 +144,34 @@ pub(crate) fn require_seed_authority<B>(
             "Authentication required to seed content",
         ))
     }
+}
+
+/// Does this request carry the fleet's declared seed-authority key?
+///
+/// Header-only, like the gate that calls it, so a rejected request never has its
+/// blob body consumed.
+///
+/// Returns `false` when no seed key is configured, when the request carries no
+/// `X-API-Key`, or when the presented value does not match. The explicit
+/// `Some(presented)` guard is LOAD-BEARING, not defensive:
+/// [`ApiKeyValidator::validate`] answers `Some(PermissionLevel::Public)` for a
+/// MISSING key, so matching on the level alone without that guard would be a
+/// bug the moment the match arm widened.
+///
+/// `ApiKeyValidator` is used purely to reuse its constant-time comparison; the
+/// level it yields is local to this function and never reaches a caller, which
+/// is what keeps the fleet key strictly narrower than Admin.
+fn fleet_seed_authority_presented<B>(state: &AppState, req: &Request<B>) -> bool {
+    let Some(seed_key) = state.args.configured_seed_key() else {
+        return false;
+    };
+    let Some(presented) = req.headers().get("x-api-key").and_then(|v| v.to_str().ok()) else {
+        return false;
+    };
+    matches!(
+        ApiKeyValidator::new(None, Some(seed_key.to_string())).validate(Some(presented)),
+        Some(PermissionLevel::Admin)
+    )
 }
 
 // =============================================================================
@@ -532,15 +603,128 @@ mod tests {
         builder.body(Empty::<Bytes>::new()).unwrap()
     }
 
-    /// (a) PROVE FIRST: dev_mode passes the gate with NO auth header — the
-    /// local-stack seeding safety invariant (`pnpm run hc:start:seed`).
+    /// (a) PROVE FIRST: a pre-coordination LOOPBACK caller passes the gate with
+    /// NO auth header — the local-stack seeding safety invariant
+    /// (`pnpm run hc:start:seed`, the local mesh). Trusted because the caller is
+    /// ON THE BOX, not because a flag is set.
     #[test]
-    fn dev_mode_no_auth_passes_gate() {
+    fn pre_coordination_loopback_no_auth_passes_gate() {
         let state = test_state(true);
         let req = seed_req(None);
         assert!(
             require_seed_authority(&state, &req, true).is_ok(),
-            "dev_mode ON LOOPBACK must pass the seed gate with no credential"
+            "a pre-coordination LOOPBACK caller must pass the seed gate with no credential"
+        );
+    }
+
+    /// Build a seed request carrying an `X-API-Key`.
+    fn seed_req_with_api_key(key: &str) -> Request<Empty<Bytes>> {
+        Request::builder()
+            .method("PUT")
+            .uri("/admin/seed/blob")
+            .header("X-API-Key", key)
+            .body(Empty::<Bytes>::new())
+            .unwrap()
+    }
+
+    const FLEET_SEED_KEY: &str = "fleet-seed-authority-key";
+
+    /// THE APEX FIX. One deploy pipeline, several doorways with deliberately
+    /// distinct admin identities: a REMOTE caller (behind the cluster ingress,
+    /// so never loopback) presenting the fleet's declared seed key must be
+    /// admitted even though that key is NOT this doorway's `API_KEY_ADMIN`.
+    /// Before this, doorway-B answered 403 to every App-pipeline seed leg and
+    /// elohim.host served a stale bundle by construction.
+    #[test]
+    fn fleet_seed_key_admits_the_remote_deploy_caller() {
+        let mut state = test_state(true);
+        state.args.api_key_seed = Some(FLEET_SEED_KEY.to_string());
+        let req = seed_req_with_api_key(FLEET_SEED_KEY);
+        assert!(
+            require_seed_authority(&state, &req, false).is_ok(),
+            "the fleet's declared seed key must admit a remote deploy caller"
+        );
+    }
+
+    /// Presence-keyed, not flag-keyed: a doorway that declares NO seed key has
+    /// no fleet seed authority at all. This is what keeps the affordance out of
+    /// production posture by construction rather than by remembering.
+    #[test]
+    fn an_undeclared_fleet_seed_key_admits_nobody() {
+        let state = test_state(true);
+        assert!(state.args.configured_seed_key().is_none());
+        let req = seed_req_with_api_key(FLEET_SEED_KEY);
+        let err = require_seed_authority(&state, &req, false)
+            .expect_err("no declared seed key must mean no fleet seed authority");
+        assert!(err.status().is_client_error());
+    }
+
+    #[test]
+    fn a_wrong_fleet_seed_key_is_refused() {
+        let mut state = test_state(true);
+        state.args.api_key_seed = Some(FLEET_SEED_KEY.to_string());
+        let req = seed_req_with_api_key("not-the-fleet-key");
+        let err = require_seed_authority(&state, &req, false)
+            .expect_err("a mismatched fleet seed key must be refused");
+        assert!(err.status().is_client_error());
+    }
+
+    /// A blank declaration is NOT an empty credential that an empty header
+    /// matches — it is the absence of a declaration. Pins
+    /// `Args::configured_seed_key`'s trim/reject rule at the gate.
+    #[test]
+    fn a_blank_fleet_seed_key_is_not_an_authority() {
+        let mut state = test_state(true);
+        state.args.api_key_seed = Some("   ".to_string());
+        let req = seed_req_with_api_key("   ");
+        let err = require_seed_authority(&state, &req, false)
+            .expect_err("a blank seed-key declaration must not authorize anything");
+        assert!(err.status().is_client_error());
+    }
+
+    /// LEAST PRIVILEGE, PINNED. The fleet seed key authorizes seeding and cache
+    /// mutation and NOTHING else — it must never climb the permission ladder to
+    /// Admin, or it would silently become a second total-admin credential on
+    /// every doorway that declares it.
+    #[test]
+    fn fleet_seed_key_never_grants_general_admin() {
+        let mut state = test_state(false);
+        state.args.api_key_seed = Some(FLEET_SEED_KEY.to_string());
+        let req = seed_req_with_api_key(FLEET_SEED_KEY);
+        assert!(
+            extract_http_permission(&state, &req) < PermissionLevel::Admin,
+            "the fleet seed key must not resolve to Admin on the shared ladder"
+        );
+    }
+
+    /// THE DESIGNED EXPIRY. Both pre-coordination affordances switch off by
+    /// themselves once a doorway declares `coordinated` — no flag to remember to
+    /// unset. Past coordination the deploy pipeline must carry a bounded,
+    /// revocable authority instead of a standing key.
+    #[test]
+    fn coordinated_stage_retires_both_pre_coordination_affordances() {
+        let mut state = test_state(true);
+        state.args.api_key_seed = Some(FLEET_SEED_KEY.to_string());
+        state.network_stage = NetworkStage::Coordinated;
+
+        let err = require_seed_authority(&state, &seed_req(None), true)
+            .expect_err("loopback must not seed at Coordinated");
+        assert!(err.status().is_client_error());
+
+        let err = require_seed_authority(&state, &seed_req_with_api_key(FLEET_SEED_KEY), false)
+            .expect_err("the fleet seed key must not seed at Coordinated");
+        assert!(err.status().is_client_error());
+    }
+
+    /// ...but this doorway's own operator identity still seeds at ANY stage.
+    #[test]
+    fn admin_identity_still_seeds_at_coordinated_stage() {
+        let mut state = test_state(false);
+        state.network_stage = NetworkStage::Coordinated;
+        let token = bearer_jwt(PermissionLevel::Admin);
+        assert!(
+            require_seed_authority(&state, &seed_req(Some(&token)), false).is_ok(),
+            "an Admin identity is stage-independent"
         );
     }
 
@@ -559,7 +743,7 @@ mod tests {
     /// tracked with the JWT-forgery finding; this test pins only that the remote
     /// caller does not SUCCEED, which is this gate's job.
     #[test]
-    fn dev_mode_remote_caller_is_refused() {
+    fn pre_coordination_remote_caller_without_credential_is_refused() {
         let state = test_state(true);
         let req = seed_req(None);
         let err = require_seed_authority(&state, &req, false)

@@ -39,6 +39,24 @@ stringData:
   # IMPORTANT: Change these in production!
   api-key-authenticated: "dev-elohim-auth-2024"
   api-key-admin: "dev-elohim-admin-2024"
+  # The FLEET's seed authority — the deploy pipeline's credential for staging
+  # bytes and declaring heads on the doorways it operates. Deliberately a
+  # SEPARATE slot from api-key-admin: one App pipeline drives several doorways
+  # whose own operator identities are deliberately distinct, and it authorizes
+  # the seed + admin-cache routes ONLY (never the permission ladder), so it is
+  # strictly narrower than the admin key it replaces on that path.
+  #
+  # Same value on every doorway of this fixture fleet — that IS the point, and
+  # it is what makes the apex deployable with the ONE Jenkins credential that
+  # already exists (`storage-api-key-admin` / `doorway-admin-bootstrap-key`).
+  # It currently equals doorway-A's admin fixture, so no operator action is
+  # needed; giving the pipeline a value of its own is a one-line change here
+  # plus one new Jenkins credential.
+  #
+  # The doorway honours it only while its DECLARED stage is pre-coordination
+  # (ELOHIM_NETWORK_STAKES, fail-closed to bootstrap). prod.yaml declares no
+  # seed key at all, so this cannot become a production posture by accident.
+  api-key-seed: "dev-elohim-admin-2024"
   jwt-secret: "dev-jwt-secret-change-in-production-2024"
   # Anthropic API key for elohim-agent-sdk sidecar (set via sealed-secret in production)
   anthropic-api-key: "REPLACE_WITH_REAL_KEY"
@@ -300,6 +318,14 @@ spec:
                 secretKeyRef:
                   name: elohim-doorway-alpha-secrets
                   key: api-key-admin
+            # Fleet seed authority — see the api-key-seed comment on the
+            # Secret above. Honoured only pre-coordination, seed/cache routes
+            # only, never the permission ladder.
+            - name: API_KEY_SEED
+              valueFrom:
+                secretKeyRef:
+                  name: elohim-doorway-alpha-secrets
+                  key: api-key-seed
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
