@@ -13,8 +13,17 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
   peer-to-peer substrate. An EPR (Elohim Protocol Resource) is the addressable content record a
   doorway resolves in order to serve an application; its blobHash is the pointer from that record
   to the actual bytes, so a null blobHash means the doorway holds the record but cannot find what
-  it refers to. stageSpaBlob is the CI stage that uploads the app bundle to each doorway
-  individually — the crutch named below.
+  it refers to. The EprRouter is the component on each doorway that follows that pointer and
+  serves the bytes — it is what answers "App not found" when the pointer is null. stageSpaBlob is
+  the CI stage that uploads the app bundle to each doorway individually — the crutch named below.
+
+  The two peers: alpha-A is the author peer (the one the deploy pipeline authors from);
+  peer "elohim.host", also called alpha-b, is a second federation doorway serving the same content
+  from a different premises. Uniform deploy means a visitor cannot tell which one they reached.
+
+  Resolution has a PRECONDITION the first two scenarios do not cover: the deploy pipeline must be
+  permitted to place bytes on a doorway it did not author from at all. Scenario 3 covers that link
+  in the same chain — it is not a separate concern that happens to share a file.
 
   The landing EPR (elohim-host-landing) must resolve correctly on EVERY federation doorway,
   not just the deploy-time author peer. Two conditions must hold on each doorway: the root path
@@ -65,8 +74,8 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
     Then resolving "/" on peer "elohim.host" does NOT return App-not-found
     And EPR "elohim-host-landing" blobHash is non-null on peer "elohim.host"
 
-  @wip @concern:federation-deploy
-  Scenario: the deploy authority can stage bytes on a NON-author federation doorway
+  @wip
+  Scenario: the deploy authority can stage bytes on a NON-author doorway (precondition for uniform resolution)
     # THE MISSING PRECONDITION NODE. The two scenarios above assert the END of the chain —
     # elohim.host resolves the landing EPR. They are silent on the step immediately before it:
     # whether the deploy pipeline is ALLOWED to put bytes on a doorway it did not author from.
@@ -83,14 +92,14 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
     # are deliberately distinct. It was masked for months because alpha-b.yaml set
     # DEV_MODE:"true" expressly to bypass this gate ("so the CI admin key lands the SPA blob
     # without a per-host credential. Remove when doorway-B federation auth hardens"), until the
-    # loopback conjunct (62b658784 — which stopped a mode flag alone from opening the gate, so
-    # only an on-the-box caller passes uncredentialed) correctly closed that bypass, and left
-    # no seed path at all.
+    # a later fix correctly required that an uncredentialed caller be connecting from the machine
+    # itself. That closed the bypass — and, because the deploy pipeline calls in over the network
+    # like anyone else, left it with no way in at all.
     #
     # The fleet seed authority (API_KEY_SEED) answers the right question — "may this caller
     # seed?" — and is scoped to the seed/admin-cache routes only, so it can never stand in for
-    # an operator identity. @wip until a fleet build carries the gate, matching the precedent of
-    # the blob byte-route gate scenario (34ac23125), which also landed @wip ahead of its deploy.
+    # an operator identity. @wip until a deployed build carries the gate — the same way the blob
+    # byte-route gate scenario landed ahead of its own deploy.
     When the fleet deploy authority stages a blob on peer "elohim.host"
     Then staging the blob on peer "elohim.host" is accepted
     # ANTI-REGRESSION: this must NOT be satisfiable by reopening the hole the gate closed.
