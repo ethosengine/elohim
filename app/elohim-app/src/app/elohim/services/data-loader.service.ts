@@ -835,8 +835,14 @@ export class DataLoaderService {
    * Load progress from localStorage (fallback).
    */
   getLocalProgress(agentId: string, pathId: string): AgentProgress | null {
+    // SSR guard: ContentViewer's loadContent() reaches this via
+    // AgentService.markContentSeen → updateContentMastery → getProgressForPath
+    // on /epr/{id} and /resource/{id}, which the shell DOES server-render — an
+    // unguarded `localStorage` here threw ReferenceError and took the whole
+    // SSR process down (observed on `ng serve` for /epr/manifesto).
+    if (typeof localStorage === 'undefined') return null;
     const key = `lamad-progress-${agentId}-${pathId}`;
-    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: reached only via AgentService.getProgressForPath from profile/shefa/presence flows, never during SSR bootstrap of the SSR-rendered routes
+    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: guarded above by the typeof check
     const data = localStorage.getItem(key);
     if (data) {
       try {
