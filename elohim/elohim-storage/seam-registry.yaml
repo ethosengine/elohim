@@ -2116,3 +2116,153 @@ decisionPoints:
       local mesh is the proof for the wiring, and these unit tests are the proof for the decision.
       That absent harness has already cost once: code review, not a test, caught a call-site
       MutexGuard-across-await deadlock the scheduler's own tests could never have seen.
+
+  # ── Blob byte-route reach gate (2026-08-24 security fix) ──
+  # Reach is enforced on the content route (`/db/content/{id}`) but was NOT on
+  # the byte route (`GET /blob/{hash}`), so the same content leaked by hash.
+  # Measured 2026-08-24 (two-peer mesh, full corpus): 38 gated blob-bearing
+  # rows, all 38 leaking their CID via /epr-head, 36/38 bytes anonymously
+  # retrievable. This is the byte-route half of `http-reach-enforcement-gap`.
+  - name: blob_serve_verdict
+    kind: verdict-fn
+    sourceLocation:
+      file: src/blob_reach.rs
+      modulePath: blob_reach::blob_serve_verdict
+      line: 119
+    summary: >
+      Given every content row that references a blob and whether the caller resolved to an
+      identity, decides Serve / RequireIdentity{required_reach} / Authorize{candidates}. A blob
+      serves iff SOME referencing row serves to that caller: an unreferenced blob serves (honest
+      absence), any public/commons referencing row serves, otherwise identity is required, and
+      above-community rows defer to per-reader authorization. Pure; the wiring
+      (`HttpServer::blob_reach_refusal`) feeds it rows and renders 403.
+    concernIds:
+      - id: C7
+        status: answered
+        justification: >
+          THE class this fix exists for: advertise/serve symmetry between the content route and
+          the byte route. The content route (http.rs, `/db/content/{id}` Layer 1) refuses a
+          non-public row to an unresolved caller; before this gate the byte route served the same
+          bytes to anyone. `blob_serve_verdict` restores symmetry by deriving the byte's audience
+          from the SAME reach on the SAME content rows the content route reads, via the shared
+          `epr_service::reach_level_index`. Pinned by community_row_refuses_an_anonymous_caller
+          and a_shared_blob_serves_when_any_referencing_row_is_public.
+      - id: C12
+        status: answered
+        justification: >
+          The consent gate for the byte route. RequireIdentity is returned when every referencing
+          row is reach-gated and the caller resolved to no identity (community_row_refuses_an_
+          anonymous_caller); above-community rows return Authorize, which the wiring fails CLOSED
+          on until per-reader HTTP authz lands (same unblock as http-reach-enforcement-gap), so
+          no gated body is disclosed. Identity is the EXPLICIT X-Agent-Cid the doorway injects,
+          never header presence.
+      - id: C4
+        status: answered
+        justification: >
+          Honest absence is a decided branch, not a fallthrough: a blob with NO referencing
+          content row serves (unreferenced_blob_serves_honest_absence), because shard bytes, app
+          artifacts and blobs PUT before their content row have no audience to gate and failing
+          closed on them would dark every such path. The verdict answers "no row claims these
+          bytes" rather than guessing.
+      - id: C13
+        status: answered
+        justification: >
+          Graduated by declared reach: public/commons serve to anyone, community serves to any
+          resolved identity, above-community defers to per-reader authorization — the same
+          gradient the content route applies (index > community triggers Layer 1.5). Unknown
+          tiers fail closed via reach_level_index -> u8::MAX (an_unrecognized_reach_fails_closed).
+      - id: C10
+        status: answered
+        justification: >
+          Reads reach ONLY through `epr_service::reach_level_index`, the shared ordering the
+          content route uses, and canonizes no vocabulary of its own (elohim-storage/CLAUDE.md
+          forbids that while the reach vocabulary drift is open). A new tier is fail-closed here
+          exactly as it is there, so the two routes cannot diverge on what a tier means.
+      - id: C6a
+        status: answered
+        justification: >
+          One indexed SELECT over `content` per blob decision, capped at MAX_REFERENCES (1000) —
+          two orders of magnitude above the largest fan-out measured in the corpus (12). No
+          conductor call is made (the uncancellable-call hazard does not apply); the verdict
+          itself is pure over the loaded rows.
+      - id: C8
+        status: answered
+        justification: >
+          Every refusal is `warn!`ed with the hash and the required_reach at the wiring layer
+          (`blob_reach_refusal`), and the 403 body names `requiredReach`, so a refused caller and
+          an operator reading logs both learn WHY without a code trace.
+      - id: C14
+        status: answered
+        justification: >
+          Three named verdict variants with no error arm; the wiring's fail-open on a DB error is
+          the single explicitly-named residual (logged, and recorded in the backlog row), so
+          there is no unclassified outcome.
+      - id: C0
+        status: answered
+        justification: >
+          Places no new truth: reads the existing `content` projection (Cat A/A2 reach lives on
+          the content row) and decides serving. No DHT entry, no new table, no coordinator fn —
+          a pure gate over existing state on the serving path.
+      - id: C1
+        status: n-a
+        justification: No election; the inputs are content rows and a resolved-identity boolean.
+      - id: C2
+        status: n-a
+        justification: Nothing ordered or arbitrated — a read-time serving decision, not an authority move.
+      - id: C3
+        status: n-a
+        justification: A total pure function over its rows; no state machine, nothing to wedge.
+      - id: C5
+        status: answered
+        justification: >
+          The blob address is content-derived (the request hash IS the content address and the
+          bytes verify against it), so identity of the bytes needs no separate proof; the verdict
+          adds authority to serve, not a claim about what the bytes are.
+      - id: C6b
+        status: answered
+        justification: Pure and total; the same rows and identity bit always yield the same verdict.
+      - id: C9
+        status: n-a
+        justification: >
+          Consults no key or lineage; the caller-identity input is a single resolved agent_cid
+          string the doorway already validated, matched only for presence here.
+      - id: C11
+        status: n-a
+        justification: No backpressure or externally-imposed load signal participates in the reach decision.
+    contractTests:
+      - path: elohim/elohim-storage/src/blob_reach.rs
+        testName: community_row_refuses_an_anonymous_caller
+        kind: unit
+        mirrorRisk: false
+      - path: elohim/elohim-storage/src/blob_reach.rs
+        testName: community_row_serves_a_resolved_identity_without_authorization
+        kind: unit
+      - path: elohim/elohim-storage/src/blob_reach.rs
+        testName: a_shared_blob_serves_when_any_referencing_row_is_public
+        kind: unit
+        mirrorRisk: false
+      - path: elohim/elohim-storage/src/blob_reach.rs
+        testName: unreferenced_blob_serves_honest_absence
+        kind: unit
+      - path: elohim/elohim-storage/src/blob_reach.rs
+        testName: above_community_defers_to_the_authorizer
+        kind: unit
+      - path: elohim/elohim-storage/src/blob_reach.rs
+        testName: an_unrecognized_reach_fails_closed
+        kind: unit
+      - path: elohim/elohim-storage/src/blob_reach.rs
+        testName: all_gated_rows_report_the_least_restricted_tier
+        kind: unit
+    notes: >
+      The verdict is pure; the impure shell is `HttpServer::blob_reach_refusal` (http.rs), which
+      resolves the caller identity (X-Agent-Cid first, legacy x-agent-id fallback), builds the
+      hash candidate set across content.{blob_hash,blob_cid,server_blob_hash}, loads referencing
+      rows via `blob_reach::lookup_references`, and renders the 403. The gate runs BEFORE both the
+      iroh cutover and the legacy backend so an early return from either cannot bypass it.
+
+      RESIDUE, stated honestly: (1) fail-OPEN on a db-pool/query error — an unreadable projection
+      serves rather than darking every public blob; (2) the Authorize (above-community) path
+      fails CLOSED pending per-reader HTTP authz, which rides the same humans.agent_pub_key
+      unblock as http-reach-enforcement-gap — no above-community blob-bearing row exists in any
+      seeded corpus today, so it refuses nothing real. Both are named in the backlog row rather
+      than discovered later.

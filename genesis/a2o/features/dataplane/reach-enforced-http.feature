@@ -13,11 +13,17 @@
 # never measured. Every other habit here is bound to a probe that runs each
 # deploy. This one was not, so the register honestly counted it `unwired`.
 #
-# The assertions below name NO reach tier. `elohim-storage/CLAUDE.md` forbids
-# canonizing a single reach vocabulary while the multi-vocabulary drift is open,
-# so the property asserted is a RELATION that holds under every vocabulary:
+# The RELATIVE assertions below name no reach tier. `elohim-storage/CLAUDE.md`
+# forbids canonizing a single reach vocabulary while the multi-vocabulary drift
+# is open, so the core property is a RELATION that holds under every vocabulary:
 # a credential the substrate cannot verify grants nothing beyond no credential
 # at all. That is drift-proof, and it is precisely what the bypass violated.
+# ONE assertion is deliberately absolute and DOES name a tier — "the anonymous
+# listing contains only rows at or above public reach" — because a relation
+# alone passes vacuously if BOTH postures are elevated equally (see the ABSOLUTE
+# note in scenario one). "public" is the single floor name the codebase already
+# treats as stable, and even that floor is derived from the protocol enum in the
+# step, not hardcoded, so it tracks the vocabulary rather than pinning a list.
 @e2e @dataplane @concern:reach-enforced-http @act:i
 Feature: Reach is enforced at the HTTP egress, not inferred from a header
   "Reach" is the audience an EPR has earned — who may receive it. It is
@@ -84,3 +90,37 @@ Feature: Reach is enforced at the HTTP egress, not inferred from a header
     And the anonymous listing contains only rows at or above "public" reach
     And the presented credential returned no rows beyond the anonymous listing
     And the presented credential returned no fuller content than the anonymous listing
+
+  # The byte route is the other way out. A document leaves the substrate by two
+  # paths — the content row (`/db/content/{id}`) and the bytes it points at
+  # (`/blob/{hash}`) — and this suite tested only the first. On 2026-08-24 the
+  # content route refused a restricted row while the byte route served the same
+  # content verbatim to an anonymous caller: reach enforced on the row, ignored
+  # on the bytes. This scenario is that leak stated as its own regression — the
+  # gate is closed only when the same content is refused on BOTH routes.
+  #
+  # Unlike the three scenarios above, this one probes ANONYMOUS access, not a
+  # bogus credential. The header-presence elevation the others pin does not
+  # apply here: the blob route carries no listing/identity-header logic to
+  # subvert — a blob is refused by the reach of the content that references it,
+  # gated on a resolved identity, so "present a bogus header" and "present
+  # nothing" collapse to the same un-resolved caller. Anonymous is therefore the
+  # sharp case: if the bytes leak to no-credential-at-all, they leak to everyone.
+  #
+  # "Refused" here means a non-success status (the fix returns 403 with the same
+  # `requiredReach` shape the content route uses); the step asserts the weaker
+  # non-2xx so a later choice between 403 and 404-to-hide-existence does not
+  # silently make this scenario vacuous.
+  #
+  # @wip until a fleet build carries the storage-side blob reach gate
+  # (security-doorway-blob-pantry-ungated resolution); it passes today on a
+  # local mesh running that binary and reds against a fleet that predates it —
+  # someone removes @wip when the build lands, as the other dataplane @wip rows
+  # are handled. The control row is a blob-bearing restricted fixture (the same
+  # Given the Background uses), so it proves nothing on an all-commons corpus
+  # rather than passing emptily.
+  @wip @regression
+  Scenario: A restricted row's bytes are refused on the blob route, not only its listing row
+    Given peer "alpha-A" holds a restricted-reach fixture an anonymous caller is refused, named "community-garden-club"
+    When I fetch the blob of "community-garden-club" on peer "alpha-A" anonymously
+    Then the blob fetch of "community-garden-club" was refused with a non-success status

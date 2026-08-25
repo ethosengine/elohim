@@ -52,6 +52,7 @@ pub mod generated_enums;
 pub mod api;
 
 // Core modules (always available)
+pub mod blob_reach; // Reach enforcement for the blob BYTE route (GET /blob/{hash})
 pub mod blob_store;
 pub mod conductor; // Conductor process manager — spawns/monitors holochain binary
 pub mod conductor_admission; // Capacity contract over the conductor's DB read pool

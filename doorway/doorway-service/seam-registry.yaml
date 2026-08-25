@@ -1546,3 +1546,146 @@ decisionPoints:
       - path: doorway/doorway-service/src/routes/p2p_manifests.rs
         testName: the_signing_bytes_carry_the_versioned_domain_prefix
         kind: unit
+
+  # ── Blob-pantry credential-aware stocking (2026-08-24 security fix) ──
+  # The blob tier's sibling of `should_stock` above. `ContentCache` is keyed by
+  # blob hash ALONE, so anything stocked replays to every later caller — the
+  # same identity-blind hazard, one pantry over. Before this predicate the blob
+  # pantry stocked on status+size only.
+  - name: blob_should_stock
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/storage_proxy.rs
+      modulePath: routes::storage_proxy::blob_should_stock
+      line: 164
+    summary: >
+      Decides whether one upstream blob response may be kept in the bearer-blind blob pantry:
+      200 only, request NOT credentialed (no Authorization header AND no doorway-resolved
+      agent_cid), non-empty, within the per-entry ceiling. Every gate is a refusal; there is no
+      permissive branch.
+    concernIds:
+      - id: C12
+        status: answered
+        justification: >
+          This IS the blob-plane consent gate, sibling to freshness `should_stock`. The pantry is
+          keyed by blob hash with NO requester component, so anything stocked can be replayed to
+          any later caller including an anonymous one. The load-bearing refusal is
+          `request_was_credentialed` — a response fetched under an Authorization header OR a
+          doorway-resolved X-Agent-Cid is never stocked
+          (stock_predicate_refuses_a_credentialed_response, and end-to-end through the real
+          forwarder in credentialed_fetch_is_not_stocked). The soundness of stocking an
+          un-credentialed 200 rests on the storage-side `blob_reach` gate: storage refuses an
+          un-credentialed request for reach-gated bytes, so a 200 answered with no credential is
+          storage asserting the bytes are public. The two changes are one cure and ship together.
+      - id: C6a
+        status: answered
+        justification: >
+          Bounded by the same per-entry ceiling the pre-existing predicate used
+          (`blob_pantry_max_bytes()`), unchanged by this fix: an over-ceiling body is refused
+          (stock_predicate_refuses_empty_and_oversized). The predicate adds no new work — it is a
+          four-argument boolean evaluated once per fetched blob.
+      - id: C7
+        status: answered
+        justification: >
+          The advertise/serve-symmetry class this whole fix is about, on the doorway half. The
+          pantry now never holds bytes it could not have served to the caller who filled it under
+          an anonymous key, so a later anonymous draw cannot receive what a credentialed fetch
+          fetched. The storage-side `blob_reach` decision point carries the same class for the
+          byte route itself.
+      - id: C8
+        status: answered
+        justification: >
+          A credentialed 200 that is refused stocking increments
+          `doorway_blob_pantry_skipped_credentialed` (crate::metrics::inc_blob_pantry), so the
+          rate at which the pantry declines to stock a caller-shaped answer is observable rather
+          than silent.
+      - id: C4
+        status: answered
+        justification: >
+          Refusing to stock keeps the pantry honest about what it holds: a body it may not replay
+          is simply never held, and the empty-body refusal drops a zero-length 200 rather than
+          replaying it as an answer.
+      - id: C6b
+        status: answered
+        justification: >
+          Pure and total over its four arguments; the same inputs always yield the same decision.
+          `ContentCache::set` on a repeated key replaces rather than double-counts (existing
+          pantry behaviour, unchanged).
+      - id: C14
+        status: answered
+        justification: >
+          A boolean with no error arm and no panic path; every `false` is a NAMED refusal in
+          source order (non-200, credentialed, empty, oversize), so "why was this not stocked" is
+          answerable by the first gate that matched.
+      - id: C0
+        status: answered
+        justification: >
+          Cat C / Ephemeral: the blob pantry is a local cache, no DHT entry, no table, no source
+          of truth. A restart costs a re-fetch per hash. Passes the swap test — each doorway
+          stocks only what it witnessed.
+      - id: C1
+        status: n-a
+        justification: No election and no author identity in any input — a status, a bool, two lengths.
+      - id: C2
+        status: n-a
+        justification: Nothing ordered or arbitrated; a later stock replaces the earlier entry (cache semantics).
+      - id: C3
+        status: n-a
+        justification: A total pure predicate, no reachable non-terminal state.
+      - id: C5
+        status: n-a
+        justification: >
+          The blob address IS content-derived (the hash is the key and the bytes verify against
+          it by construction), so there is no separate claimed-address to re-derive at this gate.
+      - id: C9
+        status: n-a
+        justification: >
+          The pantry is identity-BLIND by design, which is exactly why the credentialed refusal
+          is absolute — the store cannot scope an entry to a person, so it must only hold bytes
+          that need no scoping.
+      - id: C10
+        status: answered
+        justification: >
+          Unlike freshness `should_stock`, this predicate matches NO reach vocabulary — it reads
+          only "was the request credentialed", a doorway-local fact independent of the reach enum
+          drift. So the C10 partial that row carries does not apply here.
+      - id: C11
+        status: n-a
+        justification: >
+          Backpressure (429/503) is handled on the forward path above this predicate and is never
+          a 200, so it never reaches the stock decision.
+      - id: C13
+        status: n-a
+        justification: >
+          No graduated-authority tiering in the stock decision itself; the reach grading lives on
+          the storage-side `blob_reach` gate that makes the un-credentialed-200-is-public
+          inference sound.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: stock_predicate_refuses_a_credentialed_response
+        kind: unit
+        mirrorRisk: false
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: stock_predicate_accepts_an_anonymous_public_200
+        kind: unit
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: stock_predicate_refuses_non_200
+        kind: unit
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: stock_predicate_refuses_empty_and_oversized
+        kind: unit
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: credentialed_fetch_is_not_stocked
+        kind: unit
+        mirrorRisk: false
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: pantry_hit_carries_nosniff
+        kind: unit
+    notes: >
+      WHY CREDENTIAL-PRESENCE, NOT A RESPONSE REACH HEADER. The blob response carries no reach
+      marker (reach lives on the content row; `PUT /blob` stamps manifests "commons"
+      unconditionally), so unlike freshness `should_stock` this gate cannot read reach from the
+      body. It does not need to: with the storage-side `blob_reach` gate in place, an
+      un-credentialed 200 is storage asserting public reach. Deliberately NOT a reach header —
+      putting the audience decision on the wire would let a compromised upstream widen it;
+      "did this caller present anything?" is answerable from the doorway's own state.

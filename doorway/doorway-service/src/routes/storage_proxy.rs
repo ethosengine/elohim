@@ -162,6 +162,49 @@ fn blob_pantry_max_bytes() -> u64 {
 /// [`handle_blob_request_with_storage_proxy`](super::blob::handle_blob_request_with_storage_proxy).
 const BLOB_PANTRY_TTL: Duration = Duration::from_secs(3_600); // 1 hour
 
+/// May this upstream blob answer be stocked in the bearer-blind pantry?
+///
+/// PURE. The pantry is keyed by **blob hash alone** (`ContentCache` is a
+/// `DashMap<String, CacheEntry>`), so anything stocked here is replayable to
+/// every later caller for that hash, including an anonymous one. The predicate
+/// therefore asks one question: *was this answer shaped for a particular
+/// caller?* If it was, it must not be stocked under a bearer-blind key — that
+/// is precisely how a cache serves one person's answer to another
+/// (`routes::freshness::should_stock` refuses the same shape on the data
+/// pantry; this is its blob-plane sibling).
+///
+/// **Why an un-credentialed 200 is proof of public reach.** The doorway cannot
+/// read a blob's reach — reach lives on the content row, and the blob response
+/// carries no reach header. It does not need to: `elohim-storage`'s
+/// `blob_reach` gate refuses an un-credentialed request for bytes that only a
+/// reach-gated content row references. So a 200 answered to a request carrying
+/// no credential is storage asserting these bytes serve to anyone. That
+/// inference is only sound WITH the storage-side gate — before it, storage
+/// answered 200 to everyone and this predicate would have been cosmetic. The
+/// two changes are one cure and must ship together.
+///
+/// Deliberately NOT a reach-header check: adding a reach header to the blob
+/// response would put the audience decision on the wire, where a compromised or
+/// buggy upstream could widen it. Asking "did this caller present anything?" is
+/// a question the doorway can answer from its own state.
+pub fn blob_should_stock(
+    status: u16,
+    request_was_credentialed: bool,
+    body_len: u64,
+    per_entry_max: u64,
+) -> bool {
+    if status != 200 {
+        return false;
+    }
+    if request_was_credentialed {
+        return false;
+    }
+    if body_len == 0 {
+        return false;
+    }
+    body_len <= per_entry_max
+}
+
 // ── Freshness wire contract ─────────────────────────────────────────────────
 //
 // The trust signal. Before this, a doorway answer carried no statement about
@@ -798,6 +841,13 @@ where
                 .header("Content-Type", &entry.content_type)
                 .header("Content-Length", entry.data.len())
                 .header("Cross-Origin-Resource-Policy", "cross-origin")
+                // The stored Content-Type is CALLER-SUPPLIED upstream:
+                // `PUT /blob/{hash}` takes the uploader's Content-Type verbatim
+                // into the shard manifest's mime type, and content addressing
+                // constrains the BYTES but says nothing about how a browser
+                // should interpret them. Without nosniff, bytes uploaded as
+                // `text/html` render as a document on the doorway's own origin.
+                .header("X-Content-Type-Options", "nosniff")
                 .header(
                     hyper::header::CACHE_CONTROL,
                     "public, max-age=31536000, immutable",
@@ -843,6 +893,15 @@ where
     debug!(hash = %hash, url = %full_url, "Blob cache miss — forwarding to elohim-storage");
 
     let builder = client.get(&full_url);
+
+    // Captured BEFORE `req` is consumed. A request is "credentialed" if it
+    // carried EITHER an `Authorization` header OR a doorway-resolved
+    // `agent_cid` — the two things that can make storage answer differently
+    // than it would for a stranger. Authorization alone is not the test:
+    // `X-Agent-Cid` is what storage's reach gate actually reads, so an
+    // Authorization-only check would miss the gated case entirely.
+    let request_was_credentialed =
+        req.headers().contains_key("authorization") || ctx.agent_cid.is_some();
 
     // Forward auth header if present
     let builder = if let Some(auth) = req.headers().get("authorization") {
@@ -926,9 +985,21 @@ where
                     // no-fanout) → ok, never opens; 5xx = failure.
                     trial.record(ProxyOutcome::classify(status_u16) != ProxyOutcome::Failure);
                     // --- Stock pantry on clean 200 -----------------------------------
-                    let should_cache = status == StatusCode::OK
-                        && status != StatusCode::PARTIAL_CONTENT
-                        && (body.len() as u64) <= blob_pantry_max_bytes();
+                    let should_cache = blob_should_stock(
+                        status.as_u16(),
+                        request_was_credentialed,
+                        body.len() as u64,
+                        blob_pantry_max_bytes(),
+                    );
+
+                    if !should_cache && request_was_credentialed && status == StatusCode::OK {
+                        crate::metrics::inc_blob_pantry("skipped_credentialed");
+                        debug!(
+                            hash = %hash,
+                            "credentialed request — not stocking pantry (the answer may have been \
+                             shaped for this caller; a bearer-blind hash key would replay it)"
+                        );
+                    }
 
                     if should_cache {
                         cache.set(&hash, body.to_vec(), &content_type, BLOB_PANTRY_TTL);
@@ -2529,6 +2600,129 @@ mod tests {
         assert_eq!(
             crate::routes::freshness::resolve_stage(None),
             (NetworkStage::Bootstrap, StageProvenance::BootstrapDefault)
+        );
+    }
+
+    // ========================================================================
+    // blob_should_stock — the credential-aware pantry predicate
+    // ========================================================================
+
+    #[test]
+    fn stock_predicate_accepts_an_anonymous_public_200() {
+        // The whole point of the pantry: an un-credentialed 200 is public-reach
+        // evidence (the storage reach gate would have refused it otherwise), so
+        // it is safe to replay to any later caller.
+        assert!(blob_should_stock(200, false, 42, 1024));
+    }
+
+    #[test]
+    fn stock_predicate_refuses_a_credentialed_response() {
+        // The response may have been shaped for THIS caller; the pantry key is
+        // the bare hash, so stocking it would replay one caller's answer to
+        // another. This is the hole the fix closes.
+        assert!(!blob_should_stock(200, true, 42, 1024));
+    }
+
+    #[test]
+    fn stock_predicate_refuses_non_200() {
+        assert!(!blob_should_stock(206, false, 42, 1024));
+        assert!(!blob_should_stock(404, false, 42, 1024));
+        assert!(!blob_should_stock(500, false, 42, 1024));
+    }
+
+    #[test]
+    fn stock_predicate_refuses_empty_and_oversized() {
+        assert!(!blob_should_stock(200, false, 0, 1024));
+        assert!(!blob_should_stock(200, false, 2048, 1024));
+        assert!(blob_should_stock(200, false, 1024, 1024));
+    }
+
+    /// Integration proof on the real forwarder: a request carrying an
+    /// Authorization header gets a 200 body but is NOT stocked, so a later
+    /// anonymous request for the same hash does not draw one caller's answer
+    /// from the pantry. This is the end-to-end shape of the finding's DoD.
+    #[tokio::test]
+    async fn credentialed_fetch_is_not_stocked() {
+        let _guard = BLOB_TEST_LOCK.lock().await;
+        let payload = b"a body that was fetched under a bearer".to_vec();
+        let (addr, _handle) =
+            spawn_mock_storage(200, payload.clone(), "application/octet-stream").await;
+        let storage_url = format!("http://{addr}");
+        let cache = make_cache();
+        let hash = "sha256-1111111111111111111111111111111111111111111111111111111111111111";
+        let path = format!("/blob/{hash}");
+
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri(format!("http://doorway{path}"))
+            .header("authorization", "Bearer some-token")
+            .body(Empty::<Bytes>::new())
+            .unwrap();
+        let resp = forward_blob_to_storage(
+            req,
+            &storage_url,
+            &path,
+            Arc::clone(&cache),
+            &reqwest::Client::new(),
+            &UpstreamBreakers::default(),
+            ForwardCtx::default(),
+        )
+        .await;
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "the caller still gets the bytes"
+        );
+        assert!(
+            cache.blob_size(hash).is_none(),
+            "a credentialed fetch must NOT be stocked in the bearer-blind pantry"
+        );
+    }
+
+    /// The pantry hit response carries `X-Content-Type-Options: nosniff` — the
+    /// stored Content-Type is caller-supplied upstream, so a browser must never
+    /// sniff the bytes into an active type on the doorway origin.
+    #[tokio::test]
+    async fn pantry_hit_carries_nosniff() {
+        let _guard = BLOB_TEST_LOCK.lock().await;
+        let payload = b"<html>not to be sniffed</html>".to_vec();
+        let (addr, _handle) = spawn_mock_storage(200, payload.clone(), "text/plain").await;
+        let storage_url = format!("http://{addr}");
+        let cache = make_cache();
+        let hash = "sha256-2222222222222222222222222222222222222222222222222222222222222222";
+        let path = format!("/blob/{hash}");
+
+        // Prime the pantry with an anonymous fetch.
+        let req = make_get_request(&format!("http://doorway{path}"));
+        let _ = forward_blob_to_storage(
+            req,
+            &storage_url,
+            &path,
+            Arc::clone(&cache),
+            &reqwest::Client::new(),
+            &UpstreamBreakers::default(),
+            ForwardCtx::default(),
+        )
+        .await;
+
+        // Second request hits the pantry.
+        let req2 = make_get_request(&format!("http://doorway{path}"));
+        let resp = forward_blob_to_storage(
+            req2,
+            &storage_url,
+            &path,
+            Arc::clone(&cache),
+            &reqwest::Client::new(),
+            &UpstreamBreakers::default(),
+            ForwardCtx::default(),
+        )
+        .await;
+        assert_eq!(
+            resp.headers()
+                .get("X-Content-Type-Options")
+                .map(|v| v.to_str().unwrap()),
+            Some("nosniff"),
+            "pantry hit must carry nosniff"
         );
     }
 }

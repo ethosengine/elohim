@@ -310,3 +310,71 @@ Then(
     );
   }
 );
+
+/**
+ * THE BYTE-ROUTE SYMMETRY. Reach-enforced-http proves the LIST route refuses a
+ * credential-blind caller — but a document's bytes leave the substrate by TWO
+ * routes: `/db/content/{id}` (the row) and `/blob/{hash}` (the bytes it points
+ * at). This suite historically probed only the first. The 2026-08-24 finding:
+ * for `community`-reach content the content route answered 403 while the byte
+ * route answered 200 with the same content verbatim — 36 of 38 gated
+ * blob-bearing rows anonymously retrievable. The gate is closed only when the
+ * SAME content is refused on BOTH routes to the SAME caller.
+ *
+ * The step resolves the blob address from the row's own head (`/epr-head/{id}`
+ * carries `content`, the blob CID) so the feature names a content id, not a
+ * hash — the hash is an implementation detail of where the bytes live.
+ */
+When(
+  'I fetch the blob of {string} on peer {string} anonymously',
+  async function (this: E2EWorld, contentId: string, peerName: string) {
+    const base = peerMap(this).get(peerName) ?? resolvePeerUrl(peerName);
+    peerMap(this).set(peerName, base);
+    const head = await getRaw(`${base}/epr-head/${contentId}`);
+    // The head is public metadata today (its own follow-on); we use it only to
+    // locate the bytes. If it is ever gated too, this step still works from a
+    // blob hash the scenario supplies directly.
+    let blobRef: string | undefined;
+    if (head.status === 200) {
+      try {
+        blobRef = (JSON.parse(head.text) as { content?: string }).content;
+      } catch {
+        blobRef = undefined;
+      }
+    }
+    assert.ok(
+      blobRef,
+      `Could not resolve a blob address for "${contentId}" from /epr-head (status ` +
+        `${head.status}). The scenario needs a blob-bearing row.`
+    );
+    const { status } = await getRaw(`${base}/blob/${blobRef}`);
+    byteProbe(this).set(contentId, status);
+  }
+);
+
+Then(
+  'the blob fetch of {string} was refused with a non-success status',
+  function (this: E2EWorld, contentId: string) {
+    const status = byteProbe(this).get(contentId);
+    assert.ok(
+      status !== undefined,
+      `No byte-route probe captured for "${contentId}" — the When step must run first.`
+    );
+    // Weaker than "== 403" ON PURPOSE: the fix returns 403 with a `requiredReach`
+    // body, but a later choice to 404-to-hide-existence must not silently make
+    // this scenario vacuous. Any non-2xx is a refusal; a 2xx is the leak.
+    assert.ok(
+      status < 200 || status >= 300,
+      `REACH BYPASS (byte route): the bytes of "${contentId}" were served to an anonymous ` +
+        `caller (status ${status}) even though the content route refuses the same row. The ` +
+        `byte route must honor the same reach the row declares.`
+    );
+  }
+);
+
+/** Per-scenario byte-route probe results, keyed by content id. */
+function byteProbe(world: E2EWorld): Map<string, number> {
+  const w = world as unknown as { __byteProbe?: Map<string, number> };
+  w.__byteProbe ??= new Map();
+  return w.__byteProbe;
+}

@@ -1434,7 +1434,16 @@ impl HttpServer {
             }
             (Method::GET, p) if p.starts_with("/blob/") => {
                 let hash = p.strip_prefix("/blob/").unwrap_or("");
-                let agent_id = Self::extract_agent_id(&req);
+                // `X-Agent-Cid` FIRST — that is the header the doorway injects
+                // from its own verified claims (`storage_proxy.rs`), and the
+                // one the content route gates on
+                // (`extract_agent_cid_explicit`). Reading only the legacy
+                // `x-agent-id` here meant the blob route could not see the
+                // caller the doorway had actually resolved, so it had no
+                // identity to gate on even when one was present. The legacy
+                // header stays as a fallback for direct/Tauri callers.
+                let agent_id = crate::api::account::extract_agent_cid_explicit(&req)
+                    .or_else(|| Self::extract_agent_id(&req));
                 self.handle_get_blob(hash, agent_id.as_deref()).await
             }
 
@@ -3241,6 +3250,130 @@ impl HttpServer {
         }
     }
 
+    /// Reach decision for `GET /blob/{hash}`: `Some(403)` to refuse, `None` to
+    /// serve. See `crate::blob_reach` for the rule ("a blob serves to a caller
+    /// iff some referencing content row does") and the measured defect it
+    /// closes.
+    ///
+    /// `agent_id` is the caller's resolved identity (X-Agent-Cid first, legacy
+    /// x-agent-id fallback); `agent_id.is_some()` is the identity-resolved bit
+    /// the pure verdict consumes — header presence alone is never identity.
+    async fn blob_reach_refusal(
+        &self,
+        hash: &str,
+        agent_id: Option<&str>,
+    ) -> Option<Response<Full<Bytes>>> {
+        use crate::blob_reach::{blob_serve_verdict, lookup_references, BlobServeVerdict};
+
+        let pool = self.db_pool.as_ref()?;
+        let mut conn = match pool.get() {
+            Ok(c) => c,
+            // Fail-open on pool unavailability: an unreadable projection must not
+            // dark every public blob. Named residual (backlog), not silent.
+            Err(e) => {
+                warn!(error = %e, hash = %hash, "blob reach: db pool unavailable; serving (fail-open residual)");
+                return None;
+            }
+        };
+
+        // The request hash and the stored columns disagree on FORM: a caller may
+        // ask by `bafkrei…` CID, `sha256-<hex>`, or bare hex, and a content row
+        // may record the SAME digest as a `bafkrei…` in `blob_cid` while another
+        // row records it as `sha256-<hex>` in `blob_hash`. Matching only the
+        // request's own form is an ADDRESS-FORM BYPASS: the community fixture
+        // stores its digest as a `bafkrei…` CID, so a request phrased as
+        // `sha256-<the-same-digest>` matched no row and served as "honest
+        // absence" (red-team finding, 2026-08-24). So: resolve the request to its
+        // canonical sha256 digest, then enumerate BOTH renderings of it —
+        // `sha256-<hex>` AND the raw-codec `bafkrei…` CID — plus blake3 aliases.
+        let mut candidates = vec![hash.to_string()];
+        if let Ok(h) = crate::blob_store::BlobStore::parse_content_address(hash) {
+            let sha = format!("sha256-{h}");
+            if !candidates.contains(&sha) {
+                candidates.push(sha);
+            }
+            // The reverse rendering: sha256 digest → raw-codec CIDv1 (`bafkrei…`),
+            // via the canonical `hash_to_cid` (round-trips `compute_addresses`).
+            // This is the leg whose absence was the bypass.
+            if let Ok(cid) = crate::blob_store::BlobStore::hash_to_cid(&h) {
+                let cid_str = cid.to_string();
+                if !candidates.contains(&cid_str) {
+                    candidates.push(cid_str);
+                }
+            }
+        }
+        if let Ok(Some(alias)) =
+            crate::db::peer_blob_inventory::lookup_blake3_for_sha256(&mut conn, hash)
+        {
+            candidates.push(alias);
+        }
+        if let Ok(Some(alias)) =
+            crate::db::peer_blob_inventory::lookup_sha256_for_blake3(&mut conn, hash)
+        {
+            candidates.push(alias);
+        }
+
+        let refs = match lookup_references(&mut conn, &candidates) {
+            Ok(r) => r,
+            Err(e) => {
+                warn!(error = %e, hash = %hash, "blob reach lookup failed; serving (fail-open residual)");
+                return None;
+            }
+        };
+
+        match blob_serve_verdict(&refs, agent_id.is_some()) {
+            BlobServeVerdict::Serve => None,
+            BlobServeVerdict::RequireIdentity { required_reach } => {
+                warn!(
+                    hash = %hash,
+                    required_reach = %required_reach,
+                    "blob refused: every referencing content row is reach-gated and the caller resolved to no identity"
+                );
+                Some(Self::blob_reach_forbidden(
+                    "Authentication required",
+                    &required_reach,
+                ))
+            }
+            // Above `community`: identity presence is not enough. Full per-reader
+            // authorization on the HTTP byte route rides the same unblock as the
+            // content route's Layer 1.5 (coupled to `humans.agent_pub_key`
+            // population; see `http-reach-enforcement-gap`). Until then this path
+            // fails CLOSED — no above-community blob-bearing row exists in any
+            // seeded corpus today, so this refuses nothing real while never
+            // leaking. The P2P resolve path remains the reach-authorized delivery
+            // channel for those readers.
+            BlobServeVerdict::Authorize { candidates } => {
+                let required_reach = candidates
+                    .first()
+                    .map(|r| r.reach.clone())
+                    .unwrap_or_else(|| "restricted".to_string());
+                warn!(
+                    hash = %hash,
+                    required_reach = %required_reach,
+                    "blob refused: above-community reach requires per-reader authorization not yet performed on the HTTP byte route (fail-closed)"
+                );
+                Some(Self::blob_reach_forbidden(
+                    "Reach authorization required",
+                    &required_reach,
+                ))
+            }
+        }
+    }
+
+    /// A 403 for the byte route, shaped like the content route's refusal
+    /// (`requiredReach` field) so both routes answer identically. `nosniff`
+    /// because the body is JSON and must never be interpreted as anything else.
+    fn blob_reach_forbidden(error: &str, required_reach: &str) -> Response<Full<Bytes>> {
+        Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .header(header::CONTENT_TYPE, "application/json")
+            .header("X-Content-Type-Options", "nosniff")
+            .body(Full::new(Bytes::from(format!(
+                r#"{{"error":"{error}","requiredReach":"{required_reach}"}}"#
+            ))))
+            .unwrap()
+    }
+
     /// GET /blob/{hash} - Reassemble blob from shards
     /// Checks policy enforcement if agent_id is provided
     async fn handle_get_blob(
@@ -3253,6 +3386,27 @@ impl HttpServer {
                 .status(StatusCode::BAD_REQUEST)
                 .body(Full::new(Bytes::from("Missing blob hash")))
                 .unwrap());
+        }
+
+        // ── Reach gate for the BYTE route (BEFORE any backend serves) ────────
+        // Reach lives on the CONTENT row, never on the blob: `PUT /blob/{hash}`
+        // stamps its manifest "commons" unconditionally. The content route
+        // enforces reach; this route did not, so the same bytes were gated by
+        // one route and open by the other (concern class C7 — advertise/serve
+        // symmetry). Measured 2026-08-24 on the two-peer mesh: of 38 gated
+        // blob-bearing rows, `/db/content/{id}` answered 403 for all 38 while
+        // `/blob/{cid}` served 36 of them in full to an anonymous caller.
+        //
+        // Placed before the iroh cutover AND the legacy path so BOTH backends
+        // are gated — an early `return` from either would otherwise bypass a
+        // gate placed after them. The decision is `blob_reach::blob_serve_verdict`
+        // (pure, unit-tested); this block only feeds it rows and renders refusal.
+        // Fail-OPEN on a DB error is deliberate and bounded: an unavailable pool
+        // must not dark every public blob, and the pre-existing posture for an
+        // unreadable projection is to serve. That residual is named in the
+        // backlog row rather than silently accepted.
+        if let Some(refusal) = self.blob_reach_refusal(hash, agent_id).await {
+            return Ok(refusal);
         }
 
         // Cutover gate #2 (Phase 11, Plan 2): try iroh-side blob backend first
