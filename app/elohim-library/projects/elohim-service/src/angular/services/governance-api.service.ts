@@ -85,10 +85,17 @@ export class GovernanceApiService implements IGovernance {
   }
 
   async queryChallenges(contentId: string): Promise<ChallengeView[]> {
+    // Wire contract (elohim-storage api/governance.rs): the list route takes
+    // `entityType` + `entityId` and 400s on anything else — `contentId` was
+    // never a parameter, so every content view logged a console 400 and the
+    // catchError below silently emptied the list. A content id is the
+    // `content` entity type; the empty-string "all challenges" call has no
+    // wire form on this route (the server rejects a missing entity), so it
+    // keeps returning [] via catchError as before.
     return firstValueFrom(
       this.http
         .get<ChallengeView[]>('/api/v1/governance/challenges', {
-          params: { contentId: encodeURIComponent(contentId) },
+          params: { entityType: 'content', entityId: encodeURIComponent(contentId) },
         })
         .pipe(catchError(() => of([])))
     );

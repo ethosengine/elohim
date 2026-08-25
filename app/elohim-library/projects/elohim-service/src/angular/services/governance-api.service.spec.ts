@@ -103,6 +103,22 @@ describe('GovernanceApiService', () => {
     expect(service).toBeTruthy();
   });
 
+  describe('queryChallenges', () => {
+    it('should GET /api/v1/governance/challenges with entityType=content and entityId (never contentId)', async () => {
+      const promise = service.queryChallenges('manifesto');
+      const req = httpMock.expectOne(
+        r =>
+          r.url === '/api/v1/governance/challenges' &&
+          r.params.get('entityType') === 'content' &&
+          r.params.get('entityId') === 'manifesto' &&
+          !r.params.has('contentId')
+      );
+      expect(req.request.method).toBe('GET');
+      req.flush([]);
+      expect(await promise).toEqual([]);
+    });
+  });
+
   describe('getProposalOptions', () => {
     it('should GET /api/v1/governance/proposals/{id}/options', async () => {
       const promise = service.getProposalOptions('prop-1');
