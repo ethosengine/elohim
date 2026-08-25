@@ -47,10 +47,20 @@ import json, sys, urllib.request
 port = sys.argv[1]
 def get(p):
     with urllib.request.urlopen(f"http://localhost:{port}{p}", timeout=20) as r: return json.load(r)
-items = get("/db/content?limit=500").get("items", [])
+stats = get("/db/stats")
+content = int(stats.get("contentCount", 0) or 0)
+# `/db/content` applies offset/limit before reach filtering and does not return a
+# total. Bound the scan by the unfiltered stats count so a restricted page (or
+# an old blob-bearing fixture pushed beyond page one by a full corpus import)
+# cannot make a healthy survivor look vacuous.
+page_size = 500
+items = []
+for offset in range(0, content, page_size):
+    page = get(f"/db/content?limit={page_size}&offset={offset}")
+    items.extend(page.get("items", []))
 print(json.dumps({
   "docs": get("/sync/v1/elohim/docs?limit=1").get("total", 0),
-  "content": get("/db/stats").get("contentCount", 0),
+  "content": content,
   "rows": [{"id": i["id"], "blobHash": i["blobHash"]} for i in items if i.get("blobHash")],
 }))
 PY

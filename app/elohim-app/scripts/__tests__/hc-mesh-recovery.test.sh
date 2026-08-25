@@ -79,6 +79,61 @@ t() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fail=1; fi; }
   exit "$fail"
 ) || fail=1
 
+# A full import pushes the original blob-bearing base fixtures beyond the first
+# 500 rows. The snapshot must scan to the stats-bounded second page rather than
+# declaring the survivor vacuous from page one alone.
+(
+  tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"; kill $srv 2>/dev/null' EXIT
+  port=$(python3 -c 'import socket;s=socket.socket();s.bind(("",0));print(s.getsockname()[1])')
+  python3 - "$port" "$tmp/offsets" <<'PY' &
+import json, sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlparse
+
+port, offsets_path = int(sys.argv[1]), sys.argv[2]
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        if parsed.path == "/db/stats":
+            body = {"contentCount": 501}
+        elif parsed.path == "/sync/v1/elohim/docs":
+            body = {"total": 501}
+        elif parsed.path == "/db/content":
+            offset = int(parse_qs(parsed.query).get("offset", ["0"])[0])
+            with open(offsets_path, "a") as offsets:
+                offsets.write(f"{offset}\n")
+            if offset == 0:
+                body = {"items": [{"id": f"plain-{i}"} for i in range(500)]}
+            elif offset == 500:
+                body = {"items": [{"id": "late-blob", "blobHash": "sha256-late"}]}
+            else:
+                body = {"items": []}
+        else:
+            self.send_error(404)
+            return
+        encoded = json.dumps(body).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
+    def log_message(self, *_args):
+        pass
+
+HTTPServer(("127.0.0.1", port), Handler).serve_forever()
+PY
+  srv=$!
+  sleep 1
+  set +e; RECOVERY_SOURCE_ONLY=1 source "$here/../hc-mesh-recovery.sh"; set -e 2>/dev/null; set +e
+  recovery_snapshot "$port" > "$tmp/snap.json"
+  t "snapshot finds a blob-bearing row beyond page one" \
+    '[ "$(python3 -c "import json;d=json.load(open(\"$tmp/snap.json\"));print(d[\"rows\"][0][\"id\"])")" = late-blob ]'
+  t "snapshot requested the second content page" '[ "$(tail -n 1 "$tmp/offsets")" = 500 ]'
+  exit "$fail"
+) || fail=1
+
 # Pre-kill capture (Critical-2): recovery_capture_peer mirrors restart_storage's
 # live branch in hc-mesh.sh — captures /proc/<pid>/environ + /proc/<pid>/exe
 # BEFORE anything is killed or wiped — and refuses (rc 5) rather than proceed
