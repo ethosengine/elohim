@@ -1,5 +1,15 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  NgZone,
+  Output,
+  type Provider,
+  provideZoneChangeDetection,
+  signal,
+} from '@angular/core';
 import 'elohim-imagodei/register'; // registers <elohim-contributor-card> so the section's cards upgrade + render in-test
 import { ContentViewerComponent } from './content-viewer.component';
 import { ExplorationSidebarComponent } from '../exploration-sidebar/exploration-sidebar.component';
@@ -76,6 +86,22 @@ class MockExplorationSidebarComponent {
   @Output() exploreInGraph = new EventEmitter<void>();
 }
 
+/**
+ * Eager host for the change-detection regression test below. Stands in for
+ * the production bundle root (app/elohim-app app.component.ts, stamped
+ * `ChangeDetectionStrategy.Eager`) so the viewer under test is a routed-style
+ * CHILD view: a global zone tick refreshes this host and then descends into the
+ * viewer only if the viewer is CheckAlways or has been marked dirty.
+ */
+@Component({
+  selector: 'app-eager-host-for-regression',
+  standalone: true,
+  imports: [ContentViewerComponent],
+  template: '<app-content-viewer></app-content-viewer>',
+  changeDetection: ChangeDetectionStrategy.Eager,
+})
+class EagerHostForRegression {}
+
 describe('ContentViewerComponent', () => {
   let component: ContentViewerComponent;
   let fixture: ComponentFixture<ContentViewerComponent>;
@@ -96,6 +122,8 @@ describe('ContentViewerComponent', () => {
   let storageApiSpy: any;
   let affinityChangesSubject: Subject<any>;
   let pathContextSubject: Subject<any>;
+  /** The provider set the regression test below re-installs under zone CD. */
+  let baseProviders: Provider[];
 
   const mockContentNode: ContentNode = {
     id: 'test-content-1',
@@ -297,9 +325,7 @@ describe('ContentViewerComponent', () => {
       getPresenceForContent: vi.fn().mockReturnValue(of([])),
     };
 
-    await TestBed.configureTestingModule({
-      imports: [ContentViewerComponent],
-      providers: [
+    baseProviders = [
         provideHttpClient(),
         provideRouter([]),
         {
@@ -363,7 +389,10 @@ describe('ContentViewerComponent', () => {
           provide: LAMAD_EPR_NAV,
           useValue: { navigate: vi.fn(), ownsPath: vi.fn(() => true), recordHandoff: vi.fn() },
         },
-      ],
+    ];
+    await TestBed.configureTestingModule({
+      imports: [ContentViewerComponent],
+      providers: baseProviders,
     })
       // Swap the real exploration sidebar for a mock (shallow render). The real
       // sidebar's data-fetching chain (RelatedConceptsService -> DataLoaderService
@@ -1532,5 +1561,86 @@ describe('ContentViewerComponent', () => {
 
       expect(fixture.nativeElement.querySelector(PILLAR_AFFORDANCE)).toBeFalsy();
     }));
+  });
+  // =========================================================================
+  // Content load — OnPush subscribe-mutation regression (@regression)
+  //
+  // Angular 22 made OnPush the implicit change-detection default. This viewer
+  // flips `isLoading` / `node` from a plain `.subscribe()` callback in
+  // loadContent(), which marks NO view dirty — so on an implicit-OnPush
+  // component the `*ngIf="isLoading"` gate never re-evaluates and the learner
+  // is stranded on "Loading content..." forever even though the doorway
+  // already returned the node. That is exactly what shipped to elohim.host on
+  // every EPR-card click (/epr/manifesto, edge of build elohim/dev #1670): the
+  // Eager-removal wave's post-review restore list covered nine lamad route
+  // components but not this one (backlog-onpush-eager-debt-inventory).
+  //
+  // This test deliberately does NOT call `fixture.detectChanges()` after the
+  // async emission — that would force an unconditional check and erase the
+  // very distinction OnPush enforces. It reproduces the browser instead: zone
+  // change detection provided as the app provides it, the emission driven
+  // inside `NgZone.run()` (the way a resolved fetch re-enters the zone), and
+  // the assertion taken after the zone-driven tick settles.
+  //
+  // Negative control (verified while writing this): with the component's
+  // `ChangeDetectionStrategy.Eager` stamp removed, this test fails with the
+  // DOM still showing "Loading content..." — i.e. it reproduces the live hang.
+  // =========================================================================
+
+  describe('content load renders without an external change-detection trigger', () => {
+    it('swaps "Loading content..." for the node when getContent emits asynchronously', async () => {
+      TestBed.resetTestingModule();
+      const content$ = new Subject<ContentNode>();
+
+      TestBed.configureTestingModule({
+        imports: [EagerHostForRegression],
+        // Mirror the real bundle (app.config.ts) — TestBed defaults to zoneless,
+        // which would mask a zone-driven change-detection regression entirely.
+        providers: [provideZoneChangeDetection(), ...baseProviders],
+      })
+        // Do NOT overrideComponent(ContentViewerComponent, …) here: TestBed's
+        // override recompiles the component under test with the JIT compiler,
+        // whose default for a missing `changeDetection` is CheckAlways — it
+        // silently discards the production (implicit-OnPush) strategy and makes
+        // the regression invisible (the suite's own beforeEach does exactly
+        // that, which is why this test re-installs the providers itself).
+        // Stub the sidebar's template instead so the viewer's compiled
+        // definition is the one that ships.
+        .overrideComponent(ExplorationSidebarComponent, { set: { template: '', imports: [] } })
+        .overrideProvider(DataLoaderService, {
+          useValue: {
+            getContent: vi.fn().mockReturnValue(content$.asObservable()),
+            getGovernanceState: vi.fn().mockReturnValue(of(null)),
+          },
+        });
+
+      // The viewer must be a CHILD of the fixture root, not the root itself: a
+      // ComponentFixture's auto-detect forces `detectChanges()` on its root view,
+      // which checks an OnPush root unconditionally and would mask the hang.
+      // In production the viewer is a routed child under the Eager shell root,
+      // so an Eager host here mirrors the real tree.
+      const asyncFixture = TestBed.createComponent(EagerHostForRegression);
+      asyncFixture.autoDetectChanges(true);
+
+      // Initial render: ngOnInit's params subscription called loadContent(),
+      // getContent() has not emitted yet.
+      const host = asyncFixture.nativeElement as HTMLElement;
+      expect(host.textContent).toContain('Loading content');
+      expect(host.querySelector('.content')).toBeNull();
+
+      // The node arrives out-of-band — in the browser this is the doorway
+      // fetch resolving back inside the Angular zone.
+      TestBed.inject(NgZone).run(() => {
+        content$.next(mockContentNode);
+        content$.complete();
+      });
+      await asyncFixture.whenStable();
+
+      expect(host.querySelector('.content')).not.toBeNull();
+      expect(host.textContent).toContain('Test Content');
+      expect(host.textContent).not.toContain('Loading content');
+
+      asyncFixture.destroy();
+    });
   });
 });

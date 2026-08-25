@@ -209,6 +209,38 @@ learner:
 | `app/lamad/src/app/components/attention-flow/attention-flow.component.ts` | `ngOnInit` subscribe mutation |
 | `app/lamad/src/app/content-io/components/default-code-editor/default-code-editor.component.ts` | debounced subscribe mutation + `setTimeout` |
 
+### Missed again (2026-08-25): the routed content viewer at `/epr/{id}`
+
+The nine-row table above was built by walking lamad's *own* routes. It missed the one lamad
+component the **shell** mounts cross-bundle: `app/elohim-app/src/app/app.routes.ts` lazy-loads
+`ContentViewerComponent` for `/epr/:resourceId` and `/resource/:resourceId`. The earlier note
+in this doc ("never Eager-stamped to begin with … consistent with the affinity-circle
+precedent") read the missing stamp as safe; it is the canonical failure shape — `loadContent()`
+flips `isLoading` / `node` from a `.subscribe()` callback and nothing marks the view dirty.
+Observed on elohim.host (edge of `elohim/dev` #1670): every EPR card click landed on
+`/epr/manifesto` stuck on "Loading content..." with the node already fetched (`ng.getComponent`
+showed `isLoading:false, node:'manifesto'`; a forced `ng.applyChanges` rendered it instantly).
+
+| Component | Failure mode |
+|---|---|
+| `app/lamad/src/app/components/content-viewer/content-viewer.component.ts` | `ngOnInit` params → `loadContent()` subscribe mutation (`isLoading`, `node`, every tab field); mounted by the SHELL at `/epr/:id` — the one lamad route the lamad-only walk didn't see |
+
+Guard: `content load renders without an external change-detection trigger` in
+`content-viewer.component.spec.ts` (Eager host + production viewer def, verified to FAIL with the
+stamp removed) and the a2o scenario `Following the card lands on the EPR's universal address with
+its content rendered` (`features/elohim-core/epr-link-hypercard.feature`, `@browser-only
+@regression`) — the first scenario that actually FOLLOWS a card instead of only resolving it.
+
+**Second structural lesson — `TestBed.overrideComponent` on the component under test erases the
+strategy.** Every `overrideComponent(X, {remove/add imports})` recompiles `X` with the JIT
+compiler, whose default for a missing `changeDetection` is CheckAlways — so the spec exercises an
+Eager copy of an implicit-OnPush production component (`X.ɵcmp.onPush` flips from `true` to
+`false` after the override). A regression spec for this class must (a) keep the production
+definition of the component under test — override its *children* instead — and (b) make it a
+CHILD of an explicitly Eager host, because a `ComponentFixture`'s auto-detect forces
+`detectChanges()` on its root view, which checks even an OnPush root unconditionally. Any spec
+that overrides the component under test is blind to this class by construction.
+
 Two regression specs now guard the class, both built so they FAIL without the stamp (verified by
 removing it): `app/lamad/src/app/app.component.spec.ts` (root-view propagation) and the
 `readiness gate renders without an external change-detection trigger` case in

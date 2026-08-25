@@ -26,7 +26,12 @@ import { strict as assert } from 'node:assert';
 import { Given, When, Then } from '@cucumber/cucumber';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
-import { CONTEXT_MENU, EPR_LINK } from '../../src/framework/pages/selectors.js';
+import {
+  CONTENT_VIEWER,
+  CONTEXT_MENU,
+  EPR_LINK,
+  MARKDOWN,
+} from '../../src/framework/pages/selectors.js';
 import { doorwayToAppUrl } from '../../src/framework/utils/url.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
@@ -195,6 +200,17 @@ When('the link resolves', async function (this: E2EWorld) {
   return undefined;
 });
 
+When('the user follows the card', async function (this: E2EWorld) {
+  const device = pwDevice(this);
+  if (!device) return 'pending';
+  urlBefore = device.page.url();
+  // Left-click the resolved anchor inside the host's shadow root: the Lit
+  // element emits `navigate`, the Angular wrapper resolves the EPR and routes
+  // to its universal /epr/{id} address (same bundle → router navigation).
+  await device.page.locator(`${EPR_LINK.HOST} ${EPR_LINK.ANCHOR}`).first().click();
+  return undefined;
+});
+
 When('the user right-clicks the link', async function (this: E2EWorld) {
   const device = pwDevice(this);
   if (!device) return 'pending';
@@ -231,6 +247,38 @@ Then('no browser navigation occurs', function (this: E2EWorld) {
   const device = pwDevice(this);
   if (!device) return 'pending';
   assert.equal(device.page.url(), urlBefore, 'Expected no browser navigation (HyperCard flip)');
+  return undefined;
+});
+
+Then('the universal address {string} is showing', async function (this: E2EWorld, path: string) {
+  const device = pwDevice(this);
+  if (!device) return 'pending';
+  await device.page.waitForURL(url => url.pathname === path, { timeout: 15_000 });
+  assert.equal(new URL(device.page.url()).pathname, path, `Expected to land on ${path}`);
+  return undefined;
+});
+
+Then("the resolved EPR's body is rendered, not a loading state", async function (this: E2EWorld) {
+  const device = pwDevice(this);
+  if (!device) return 'pending';
+  const viewer = device.page.locator(`[data-testid="${CONTENT_VIEWER.ROOT}"]`).first();
+  await viewer.waitFor({ state: 'attached', timeout: 15_000 });
+  // The loaded node's body (.content-body on the standalone /epr/{id} viewer).
+  // This is the assertion that catches the change-detection freeze: the node
+  // arrives, `isLoading` flips, and nothing re-renders — the body never mounts.
+  await device.page
+    .locator(MARKDOWN.CONTENT)
+    .first()
+    .waitFor({ state: 'visible', timeout: 15_000 });
+  // The viewer's own top-level loading gate must be gone (tab-level loading
+  // states inside the rendered content are a different, narrower gate).
+  const topLevelSpinners = await viewer.locator('> .loading-state').count();
+  assert.equal(topLevelSpinners, 0, 'Expected the content viewer to leave its loading state');
+  const text = (await viewer.textContent()) ?? '';
+  assert.ok(
+    !text.includes('Loading content...'),
+    'Expected the loading placeholder to be replaced by content'
+  );
   return undefined;
 });
 

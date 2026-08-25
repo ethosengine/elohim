@@ -2,6 +2,7 @@ import { CommonModule, DOCUMENT } from '@angular/common';
 import {
   AfterViewChecked,
   AfterViewInit,
+  ChangeDetectionStrategy,
   Component,
   ComponentRef,
   CUSTOM_ELEMENTS_SCHEMA,
@@ -124,6 +125,12 @@ import type {
 @Component({
   selector: 'app-content-viewer',
   standalone: true,
+  // OnPush-unsafe: loadContent() flips `isLoading` / `node` (and a dozen tab
+  // fields) from plain `.subscribe()` callbacks, which mark no view dirty under
+  // Angular 22's implicit-OnPush default — the learner is stranded on
+  // "Loading content..." at /epr/{id} (shipped to elohim.host, edge of
+  // elohim/dev #1670) — see backlog-onpush-eager-debt-inventory
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [
     CommonModule,
     RouterModule,
