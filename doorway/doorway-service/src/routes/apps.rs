@@ -154,22 +154,28 @@ pub async fn handle_app_request(state: Arc<AppState>, path: &str) -> Response<Fu
                             );
                         }
                         _ => {
-                            // Leader failed or channel closed — fall through to proxy
+                            // Leader failed or channel closed. The slug was already resolved,
+                            // so keep the fallback pinned to the same release rather than
+                            // re-resolving a moving slug in storage.
                             warn!(
                                 slug = %cache_slug,
                                 file_path = %file_path,
                                 "Coalesced fetch failed, falling through to proxy"
                             );
-                            return forward_app_request_with_header(&storage_url, path, "MISS")
-                                .await;
+                            let resolved_path = resolved_app_path(hash, file_path);
+                            return forward_app_request_with_header(
+                                &storage_url,
+                                &resolved_path,
+                                "MISS",
+                            )
+                            .await;
                         }
                     }
                 }
                 None => {
                     // We are the leader — fetch from storage, cache, broadcast
                     let response =
-                        fetch_and_cache(cache, &storage_url, path, cache_slug, file_path, hash)
-                            .await;
+                        fetch_and_cache(cache, &storage_url, cache_slug, file_path, hash).await;
                     return response;
                 }
             }
@@ -211,16 +217,26 @@ fn parse_app_path(path: &str) -> Option<(&str, &str)> {
     Some((slug, file_path))
 }
 
+/// Bind an app asset request to the release already selected by slug resolution.
+///
+/// A slug is a moving pointer. Once doorway has resolved it to a blob hash, a cache
+/// miss must not ask storage to resolve the slug again: the pointer may have moved
+/// between the two reads, producing an HTML shell from one release and assets from
+/// another.
+fn resolved_app_path(blob_hash: &str, file_path: &str) -> String {
+    format!("/apps/{blob_hash}/{file_path}")
+}
+
 /// Fetch a file from storage, cache it, broadcast to waiters, and return the response.
 async fn fetch_and_cache(
     cache: &crate::cache::AppFileCacheService,
     storage_url: &str,
-    full_path: &str,
     slug: &str,
     file_path: &str,
     blob_hash: &str,
 ) -> Response<Full<Bytes>> {
-    let storage_endpoint = format!("{}{}", storage_url.trim_end_matches('/'), full_path);
+    let resolved_path = resolved_app_path(blob_hash, file_path);
+    let storage_endpoint = format!("{}{}", storage_url.trim_end_matches('/'), resolved_path);
     let client = reqwest::Client::new();
 
     let result = client.get(&storage_endpoint).send().await;
@@ -267,6 +283,7 @@ async fn fetch_and_cache(
 
                         debug!(
                             slug = %slug,
+                            blob_hash = %blob_hash,
                             file_path = %file_path,
                             size = body.len(),
                             "App file cached (MISS)"
@@ -682,6 +699,17 @@ mod tests {
             parse_app_path("/apps/sha256-abc123def456789012/index.html").unwrap();
         assert_eq!(slug, "sha256-abc123def456789012");
         assert_eq!(file_path, "index.html");
+    }
+
+    #[test]
+    fn cache_miss_stays_pinned_to_the_resolved_release() {
+        let path = resolved_app_path("sha256-release-a", "assets/chunks/main-release-a.js");
+
+        assert_eq!(
+            path,
+            "/apps/sha256-release-a/assets/chunks/main-release-a.js"
+        );
+        assert!(!path.contains("elohim-host-landing"));
     }
 
     // =========================================================================
