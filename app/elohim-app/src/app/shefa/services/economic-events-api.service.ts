@@ -86,7 +86,20 @@ export class EconomicEventsApiService implements IEconomicEventFactory {
   }
 
   async createEconomicEvent(payload: CreateEconomicEventInput): Promise<EconomicEvent> {
-    return firstValueFrom(this.http.post<EconomicEvent>('/api/v1/economic-events', payload));
+    // The app-side input names the agents `providerId` / `receiverId`; the
+    // storage wire type (CreateEconomicEventInputView, camelCase) names them
+    // `provider` / `receiver` and rejects the body with
+    // `Invalid JSON: missing field \`provider\`` (500) otherwise. This is the
+    // legacy fallback the signal harness takes whenever /api/v1/signal/emit is
+    // 503 (write-through OFF), so every content view on alpha hit it.
+    const { providerId, receiverId, ...rest } = payload;
+    return firstValueFrom(
+      this.http.post<EconomicEvent>('/api/v1/economic-events', {
+        ...rest,
+        provider: providerId,
+        receiver: receiverId,
+      })
+    );
   }
 
   // ===========================================================================

@@ -101,7 +101,16 @@ describe('EconomicEventsApiService', () => {
     const promise = service.createEconomicEvent(payload);
     const req = httpMock.expectOne('/api/v1/economic-events');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual(payload);
+    // Wire shape is CreateEconomicEventInputView: `provider` / `receiver`, not
+    // the app-side `providerId` / `receiverId` (storage 500s on the latter).
+    expect(req.request.body).toEqual({
+      action: 'transfer',
+      provider: 'agent-a',
+      receiver: 'agent-b',
+      resourceQuantityValue: 10,
+      resourceQuantityUnit: 'credits',
+    });
+    expect(req.request.body).not.toHaveProperty('providerId');
     req.flush(stubEvent);
     expect(await promise).toEqual(stubEvent);
   });
