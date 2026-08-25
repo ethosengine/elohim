@@ -80,6 +80,32 @@ habits:
       - "a2o @concern:transport-parity (genesis/a2o/features/dataplane/transport-comparison-matrix.feature; just mesh matrix) — identical fresh-document contract under libp2p, iroh, and dual; successful samples alone contribute timing percentiles"
       - ".claude/scripts/latency-scoreboard.py --local (and --deployed) — bounded convergence, not merely eventual: a CONJUNCTION of speed AND this habit's trust invariant, never speed alone. A fast stale head is worse than a slow correct one, so this check can only ever narrow the habit, never carry it."
     evidence: >
+      DELTA 2026-08-25b (FLEET CONFIRM of the 2026-08-23/24 arc; NO status
+      flip): 608a1ceff landed on dev as 286089679 (+47fb60f58 genesis CI fix);
+      edge #1380 SUCCESS deployed it to alpha; live: irohNodeId on doorway-A,
+      connectedPeers 6, syncDocuments 5356 (the count fix — this field read 0
+      on every prior build), elohim_iroh_sync_rounds_total 159 / gossip
+      received 9,149 / manifests 4,243 fleet-sum within 30 min of restart,
+      increase(sync_rounds[30m]) 13–28 on every one of the 7 pods (iroh driver
+      live everywhere; sync_changes_applied 0 = converged corpus, as the
+      2026-08-24 lens predicts). matthew's actionable remainder healed
+      13 -> 3 -> 2 -> 0 across sweeps 1–23 on this build (the predecessor's
+      restart stalled at 2 heals/20 min) and the validate-only recording run
+      edge #1381 was the first Dataplane Validation ADMITTED by the quiesce
+      gate (A-QUIESCED sustained 06:54:51Z) — but it measured almost nothing:
+      81/87 scenarios HELD because every content-sync/transport-parity/
+      heal-on-read/failover scenario is @act:i and the fleet lane drops
+      owned-substrate by LAYERS.md design. The fleet red that IS this habit's:
+      inventory-convergence "alpha-A p2p.caughtUp true" FAILED (caughtUp flaps
+      false while the remainder oscillates 0–10) — matthew conductor
+      saturation class, filed. The act-i legs of this habit (household matrix
+      libp2p/iroh/dual 3/3 each, content-sync 4/4, heal-on-read 2/2) are green
+      on the household lane; the act-ii/fleet leg is red on caughtUp; the
+      latency-scoreboard --deployed conjunction is unmeasured. Stays red.
+      CI note: the doorway loopback seed gate exposed a latent genesis
+      Jenkinsfile bug (readFile of a container-side /tmp token) — fixed
+      47fb60f58, genesis #1504 Upload Blob-Backed Content HTTP 200 with the
+      bearer.
       DELTA 2026-08-25a (localdev push-verification of the iroh/dual plane; NO
       status flip — flip authority is the fleet lane): the full tree re-verified
       on the household mesh from the p2p+p2p-iroh binary (storage gate green
@@ -998,11 +1024,33 @@ habits:
       (serving | shedding | dead), at least one always serves, the name rides
       through a sibling's shed, and whichever serves resolves the same
       declared head. Federation failover, not per-host luck.
-    status: red
+    status: green
     active: true
     checks:
-      - "a2o @concern:doorway-failover (genesis/a2o/features/dataplane/doorway-failover.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
+      - "a2o @concern:doorway-failover (genesis/a2o/features/dataplane/doorway-failover.feature — @act:i, so its authority is the household lane: `just test mesh features/dataplane/doorway-failover.feature` against the built binaries, run-identified report under genesis/a2o/reports/. It is HELD on the edge Dataplane Validation stage by LAYERS.md design (Act II drops owned-substrate) — a fleet build number can never measure it; the fleet contributes only the deploy that carries the same commit.)"
     evidence: >
+      DELTA 2026-08-25b (RED -> GREEN on measured evidence; the flip authority
+      was mis-assigned): the fleet's first Dataplane Validation admitted by the
+      quiesce gate since the acts layering (edge #1381, validate-only on
+      286089679/47fb60f58, A-QUIESCED sustained 06:54:51Z) HELD 81/87
+      scenarios — `owned-substrate (act i baseline)` is unavailable on alpha by
+      LAYERS.md design, and doorway-failover.feature is @act:i. So "flip
+      authority is the fleet lane" (2026-08-23h) named an authority that
+      cannot exist for this check; the household lane is it. Evidence for
+      green: @concern:doorway-failover 10/10 (41 steps) on the household mesh
+      from the p2p+p2p-iroh binary built from 608a1ceff (run
+      2026-08-25 push-verify, report genesis/a2o/reports/push-verify/doorway-failover.json;
+      the same doorway + storage commit deployed to alpha by edge #1380
+      SUCCESS and confirmed live: irohNodeId, 6 peers, syncDocuments 5356),
+      after 10/10 on 2026-08-23h and 2026-08-23b. Both named reds stay cured
+      (primary-scoped health classification 530431088, guarded half-open
+      probe 99df9f72c). What the fleet DID measure: substrate seam-smoke OK on
+      both doorways and both relays; the one fleet red is inventory-convergence
+      (alpha-A p2p.caughtUp flap — matthew's heal-leg class), not a failover
+      property. Correction recorded: `epr flow note --kind correction` on the
+      feature. Re-red condition: any household run with a failing
+      @concern:doorway-failover scenario, or a fleet incident where the apex
+      name fails to ride a sibling's shed.
       DELTA 2026-08-23h (both NAMED REDS cured; status stays red — flip
       authority is the fleet lane): (a) health classification scoped to the
       DECLARED PRIMARY (530431088) — ServingHealth::observe takes the primary
@@ -1242,6 +1290,7 @@ habits:
       reach-blind; the boundary is serving, so the check belongs on the serve
       path, not on custody).
     evidence:
+      - "2026-08-25b: the storage blob byte-route gate and the doorway loopback seed gate are DEPLOYED to alpha (edge #1380 SUCCESS, 286089679). First observable effect on the fleet: genesis #1503 Upload Blob-Backed Content 403 — CI had been uploading seed blobs unauthenticated through the dev_mode hole every build (a latent Jenkinsfile readFile-vs-container bug hid the missing bearer behind a 'credential not visible' echo); fixed 47fb60f58, genesis #1504 uploads HTTP 200 with the Admin bearer — the gate now refuses anonymous remote writes and admits the authenticated CI actor. reach-enforced-http.feature is @act:i (HELD on the fleet by LAYERS design); its authority is the household lane: 3/3 + byte-route 1/1 on the deployed commit's binary. Stays RED on the invariant, not the check: /head-record · /epr-head · /apps/{cid} · direct /shard·/ipfs still serve community anon (plane conflation) and the DEV_MODE JWT forgery still passes as Admin on every deployed doorway — both filed, operator-owned."
       - "2026-08-25: byte-route egress closed LOCALLY, stays RED (a flip needs a build number). GET /blob/{hash} now consults the referencing content rows (`blob_reach`: a blob serves to a caller iff some referencing row does; both address forms — `sha256-<hex>` and `bafkrei…` — resolve to one verdict after a red-team pass found the sha256 form walked straight through the first cut), the legacy x-agent-id fallback yields to the doorway-injected X-Agent-Cid, and the doorway pantry refuses to stock a credentialed answer under its bearer-blind hash key (+ nosniff on pantry hits). Measured on the household mesh from the built binary: reach-enforced-http 3/3 and the new byte-route scenario 1/1 (community bytes 403 anon, 200 with a resolved identity, public 200); the doorway seed/admin-cache authority now requires dev_mode AND a loopback socket peer (every deployed manifest sets DEV_MODE=true — an anonymous remote PUT /admin/seed/blob had reached the hash check). Residuals FILED, not closed: DEV_MODE JWT forgery passes as Admin and defeats every fleet reach gate (backlog security-doorway-devmode-auth-bypass, coupled to the operator posture decision); /head-record, /epr-head, /apps/{cid} and direct-to-storage /shard·/ipfs still serve community anon because reach_is_distribution_safe treats community as broadcast-safe — a reach-vs-replication plane conflation that is a vocabulary call, not canonized here."
       - "2026-08-20: flipped unwired -> RED on measured violation, which is stronger evidence than an absent check. Live on doorway-alpha, verified twice: anonymous GET /db/content?limit=1000&offset=1000 returned 90 rows (all commons); the identical request carrying the literal header 'Authorization: Bearer bogus' returned 1000 — familiar 906, commons 90, private 3, intimate 1 — every row with its contentBody. Cause: http.rs:5272 decided reach from header PRESENCE, never validation."
       - "2026-08-20: HTTP-plane cure committed (41f7780aa) — the listing now resolves the requester and authorizes per row via epr_service::authorize_reach_for_human_with_own_trust, deny-by-default when unresolvable; the same header-presence check on the single-item route's Layer 1 is cured too; and reach_level_index's `_ => 0` fail-open (an UNRECOGNIZED tier read as the most permissive, making the authorizer's own `_ => Err` unreachable) now fails closed to u8::MAX. Stays RED until the scenario runs green against a deploy carrying the fix — a flip needs a build number, not a commit."

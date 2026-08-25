@@ -17,3 +17,11 @@ Folds the CI build-infrastructure cluster — images, cache volumes, registries,
 - [[feedback_ci_pull_policy_always_freshness]] — CI pods keep imagePullPolicy Always: IfNotPresent on :latest buries toolchain drift (#1218); outage mitigations revert at recovery; digest-pin for permanence.
 - [[project_brit_rakia_nexus_ci]] — rakia+brit crates publish to Nexus cargo-internal; hosted repo is auth-required so cargo needs a read token; committed paths override hard-errors in CI.
 - [[project_serde_wall_escapable_via_hsb_057]] — Dep-advisory remediation is gated by TWO separate things — Nexus can't fetch uncached artifacts, and holo_hash =0.6.0 pins serde =1.0.219; don't conflate them.
+
+**2026-08-25 — `readFile('/tmp/…')` after a container `sh` reads the WRONG filesystem.** In the kubernetes
+agent, `sh` inside `container('…')` runs in that container, but `readFile` runs in the jnlp container — an
+absolute `/tmp` path written by `sh` does not exist there (NoSuchFile → whatever `catch` wraps it). genesis
+`resolveSeedDoorwayToken()` hid this behind a "credential not visible" echo for weeks; the seed upload ran
+unauthenticated and only passed via the doorway dev_mode hole until 62b658784 closed it (genesis #1503 403 →
+fixed 47fb60f58 with `sh(returnStdout:true)`). Rule: read container-side files back with `sh 'cat …'`, or write
+them under `${WORKSPACE}` (shared volume) — never `readFile` an absolute `/tmp` path.

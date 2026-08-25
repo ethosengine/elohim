@@ -20,3 +20,11 @@ logs), the running background chain died silently (task notification `stopped`, 
 answered `fatal: detected dubious ownership` until `git config --global --add safe.directory '*'`.
 Everything under /projects (worktree edits, cargo-pool slot binaries) survived. Devfile postStart
 re-runs `cargo install --path elohim/eprfs` (load ~20 for the first minutes).
+- **Stale cargo sparse-index after restart (2026-08-25):** `CARGO_HOME=/opt/rust/cargo` is image-baked, so a
+  restart resets `registry/index/index.crates.io-*/.cache` to the bake (Aug 23). Any pin newer than the bake
+  (doorway `holochain_conductor_api =0.7.0-dev.23`) then fails `cargo fetch/clippy` with "failed to select a
+  version … candidates 0.3.0-beta-dev.32" even though "Updating crates.io index" prints and crates.io has it —
+  cargo trusts the stale per-crate cache files. Cure: `mv registry/index/index.crates.io-*/.cache
+  .cache.stale-<ts>` and re-run `cargo fetch --locked` (65 MB, rebuilt in a minute). Crates already in
+  `registry/cache` (storage's 0.6 family) are unaffected, which is why the storage gate passed and doorway's
+  did not.
