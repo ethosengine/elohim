@@ -2,6 +2,20 @@
 # resolution to kill the per-host stageSpaBlob crutch.
 @e2e @dataplane @concern:federation-deploy @requires:multi-node @act:i
 Feature: Federation deploy uniformity — landing EPR resolves on all federation doorways
+  A person who types elohim.host into a browser should arrive at the Elohim landing page. Today
+  some of them get "App not found" instead — not because the page is gone, but because the
+  doorway they happened to reach cannot find it. Which of two addresses a visitor uses decides
+  whether the protocol appears to exist at all, and nobody arriving at the front door can tell
+  that is what happened to them. That is the harm this feature exists to close.
+
+  Vocabulary, because every assertion below rests on it: a DOORWAY is a gateway node that serves
+  content to ordinary browsers on behalf of a federation of peers — the web2 front door to a
+  peer-to-peer substrate. An EPR (Elohim Protocol Resource) is the addressable content record a
+  doorway resolves in order to serve an application; its blobHash is the pointer from that record
+  to the actual bytes, so a null blobHash means the doorway holds the record but cannot find what
+  it refers to. stageSpaBlob is the CI stage that uploads the app bundle to each doorway
+  individually — the crutch named below.
+
   The landing EPR (elohim-host-landing) must resolve correctly on EVERY federation doorway,
   not just the deploy-time author peer. Two conditions must hold on each doorway: the root path
   returns HTTP 200 (not "App not found"), and the EPR content record carries a non-null blobHash.
@@ -60,19 +74,24 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
     # assertions above could not have gone green no matter how well blobHash propagated —
     # the bytes never arrived.
     #
+    # THE ACTOR: the "fleet deploy authority" is the CI pipeline's own seed credential
+    # (API_KEY_SEED) — one credential shared across every doorway in the fleet, and NOT any
+    # single doorway's admin identity, which is deliberately different on each one.
+    #
     # The cause was a conflation, not a credential: `require_seed_authority` asked "is this
     # caller MY admin?" while one pipeline drives several doorways whose own admin identities
     # are deliberately distinct. It was masked for months because alpha-b.yaml set
     # DEV_MODE:"true" expressly to bypass this gate ("so the CI admin key lands the SPA blob
     # without a per-host credential. Remove when doorway-B federation auth hardens"), until the
-    # loopback conjunct (62b658784) correctly closed that bypass and left no seed path at all.
+    # loopback conjunct (62b658784 — which stopped a mode flag alone from opening the gate, so
+    # only an on-the-box caller passes uncredentialed) correctly closed that bypass, and left
+    # no seed path at all.
     #
     # The fleet seed authority (API_KEY_SEED) answers the right question — "may this caller
     # seed?" — and is scoped to the seed/admin-cache routes only, so it can never stand in for
-    # an operator identity. @wip until a fleet build carries the gate, matching the byte-route
-    # gate scenario's precedent (34ac23125).
-    Given peer "elohim.host" at "elohim.host"
-    When the deploy authority stages a blob on peer "elohim.host"
+    # an operator identity. @wip until a fleet build carries the gate, matching the precedent of
+    # the blob byte-route gate scenario (34ac23125), which also landed @wip ahead of its deploy.
+    When the fleet deploy authority stages a blob on peer "elohim.host"
     Then staging the blob on peer "elohim.host" is accepted
     # ANTI-REGRESSION: this must NOT be satisfiable by reopening the hole the gate closed.
     # A credential-free remote caller stays refused; a green here with this line failing means
