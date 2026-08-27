@@ -1,0 +1,67 @@
+---
+epr-meta-version: 1
+id: a2o-stewardship-custodial
+covers: subtree
+purpose: >
+  The custodial account class — a PARTY acting on ANOTHER party's account under a witnessed,
+  revocable, expiring grant. Neither side is necessarily one person: the steward may be an
+  individual guardian, a household pair, a care home, a correctional institution, a court, or a
+  qahal acting by community consensus; the subject is a child, a legal ward, an adult with IDD,
+  a senior, or anyone under organizational device management. The substrate already models most
+  of it (imagodei `StewardshipGrant`/`StewardshipAppeal`/`DevicePolicy`, plus
+  `Collective`/`Membership`/`CollabAgreement` in the same zome); nothing above the DNA does, and
+  `steward_id` is still a single String while `authority_basis` already names institutional
+  bases. Stewardship is also PLURAL: many parties hold authority over one person at once, each over
+  a different dimension (parents day-to-day, a school in school hours, a physician for health data),
+  composing socially rather than by rank — no primary-steward slot, and restrictions composing as an
+  order-independent UNION because every layer may only ADD. These scenarios are where that model
+  gets exercised and validated, and they are the FIRST deliverable of the lane — the two-party carrier is designed against a passing scenario,
+  not ahead of one. Concern taxonomy, the collective two-hop path, and the pickup order live in
+  this directory's README.md; the parent genesis/a2o/.epr-meta carries the blind-reader review
+  obligation that every `.feature` write here inherits.
+rules:
+  - id: grant-scenario-must-exercise-the-appeal
+    class: inject
+    when: { write: "*.feature" }
+    dedupe-of: genesis/a2o/features/stewardship/README.md (concern taxonomy + the appeal path)
+    why: >
+      A stewardship scenario that shows only the steward acting has modeled a G Suite admin
+      console, not this protocol. `StewardshipGrant` carries `appeal_id` and
+      `StewardshipAppeal` carries four appeal types (`scope`, `excessive`, `invalid_evidence`,
+      `capability_request`) because the SUBJECT has standing to contest the grant — and the
+      subject here is frequently a person least able to assert it unaided. Two invariants the
+      zome enforces that a scenario must not quietly contradict: authority is RELATIONAL
+      (over this subject's named surfaces — never a rank, never a `PermissionLevel` tier), and
+      `DevicePolicy` composes ONE-WAY (a layer may only ADD restrictions, never remove a
+      parent's). Prefer a scenario where the grant is exercised AND contested; if a scenario
+      genuinely covers only the steward's side, say in a comment which sibling scenario
+      carries the appeal, so the omission is a decision rather than a drift.
+      WHEN THE STEWARD IS A COLLECTIVE (a household pair, a care home, a correctional
+      institution, a court, a qahal): the obligation intensifies rather than dilutes, because the
+      asymmetry is larger and the subject is least able to assert their own standing. Two extra
+      assertions belong in such a scenario — authority must reach the acting human over a
+      traversable path (`StewardshipGrant.steward_id` = Collective CID → `Membership{role:
+      Steward}` → the member), and the ACTING MEMBER must be identifiable afterwards. An
+      institution that can act on a person's account without naming the human who acted is the
+      failure mode this whole directory exists to prevent. Compose on `Collective`/`Membership`
+      (same integrity zome) and p2p-design-gate before proposing any new entry type — the honest
+      answer may be zero.
+    retire-when: >
+      when this directory has at least one green appeal-path scenario AND the two-subject
+      carrier exists above the DNA (a `StewardshipGrant`-aware doorway session) — at that
+      point the appeal is load-bearing in code and a scenario that drops it fails rather than
+      needing a reminder.
+cites:
+  - genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-posture-declared-stage.md
+  - genesis/data/timeline/backlog/commons-holonic-stewardship-backlog.md
+---
+# stewardship/ — the custodial account class
+
+`.feature` files here carry `@concern:custodial-stewardship-<nn>-<name>` (taxonomy table in
+`README.md`) and exercise the imagodei stewardship entry types across the steward↔subject seam.
+
+**One rule, narrowly scoped.** Following the `resiliency-saga/` precedent, authoring discipline
+(tags, RED-FIRST, step placement) stays prose convention in `README.md` and the parent
+`CLAUDE.md`. The single injected rule above exists because the drift it catches is *specific,
+already-observed at design time* (the admin-console framing drops the appeal path), and it is
+born with a retirement condition rather than as permanent furniture.

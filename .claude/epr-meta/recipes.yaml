@@ -65,6 +65,46 @@ recipes:
       - { from: plan, to: intent, meaningful: true, validators: [decompose] }
       - { from: spec, to: scenario, meaningful: true, validators: [a2o-parse] }
       - { from: scenario, to: validation, meaningful: true, validators: [a2o-run] }
+  - id: custodial-stewardship
+    version: 1
+    description: >
+      The custodial account class: a party acting on ANOTHER party's account under a
+      witnessed, revocable, dimension-bounded, appealable grant — children, legal wards,
+      adults with IDD, seniors, organizational device management. Neither side is
+      necessarily one person (a household pair, a care home, a correctional institution, a
+      court, a qahal), and stewardship is PLURAL — many parties hold authority over one
+      person at once, each over a different dimension, composed socially rather than ranked.
+      The substrate already carries the model (imagodei `StewardshipGrant`/`StewardshipAppeal`/
+      `DevicePolicy` + `Collective`/`Membership`); nothing above the DNA consumes it, and no
+      scenario exercises it. This lane exists to close that, scenario-first — and to keep the
+      model visibly load-bearing while `imagodei_integrity` is pruned on a caller-count
+      heuristic (see genesis/a2o/features/stewardship/README.md, "Lane status").
+      Concern taxonomy, the collective two-hop path, and the plural-composition gaps live in
+      that README; the authority-side foreclosures (question 8) live in the doorway
+      auth-posture canon. Shape mirrors `resiliency-saga` deliberately: a narrative
+      entrypoint, ordered chapters, one a2o verdict. Edges are declarative documentation
+      minted into the ProcessSpec atom; nothing enforces them in v1 (honest-about-inert).
+    stages:
+      - name: epic
+        artifactKind: "doc:lane-entrypoint"
+        paths:
+          - "genesis/a2o/features/stewardship/README.md"
+      - name: scenario
+        artifactKind: "a2o:feature"
+        paths:
+          - "genesis/a2o/features/stewardship/*.feature"
+      - name: validation
+        artifactKind: "a2o:verdict"
+        paths:
+          # Same note as resiliency-saga: `validation` is NOT in project.rs::RESOURCE_STAGES,
+          # so these globs mint no commitments/events/labels however many files they match.
+          # `paths:` are excluded from the hashed ProcessSpec atom, so widening them cannot
+          # move the recipe CID.
+          - "genesis/a2o/reports/sprint-report-*-*.json"
+    edges:
+      - { from: epic, to: scenario, meaningful: false, validators: [] }
+      - { from: scenario, to: validation, meaningful: true, validators: [a2o-run] }
+
   - id: resiliency-saga
     version: 1
     description: >
