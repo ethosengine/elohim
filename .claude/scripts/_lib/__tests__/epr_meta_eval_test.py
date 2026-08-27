@@ -152,4 +152,54 @@ with tempfile.TemporaryDirectory() as _wtd:
     check("witness() without actor= omits the actor key entirely",
           "actor" not in _without_actor)
 
+# ═══════════════════════════════════════════════════════════════
+# A CHILD inject is not swallowed by an ANCESTOR inject
+#
+# combine() returns ONE verdict (a write has one decision) and on a severity tie keeps the
+# earliest in cascade order — deliberate, and mirrored in the Rust twin. For deny/ask that is
+# right. For `inject` it silently DISCARDED the more specific advice: the child manifest exists
+# precisely because the ancestor's rule was not enough, and the child's guidance was the half
+# that vanished. Live proof was `genesis/a2o/features/stewardship`, whose whole reason for
+# existing never reached the author. The decision must stay the ancestor's; the ADVICE must be
+# whole.
+# ═══════════════════════════════════════════════════════════════
+
+with tempfile.TemporaryDirectory() as _std:
+    _sr = Path(_std)
+    (_sr / ".git").mkdir()          # anchor the cascade's upward walk at this temp root
+    (_sr / ".epr-meta").write_text(
+        "---\nepr-meta-version: 1\nid: root\nrules:\n"
+        "  - id: ancestor-advice\n    class: inject\n    when: { write: \"*.feature\" }\n"
+        "    dedupe-of: root/README.md\n    why: ANCESTOR_GUIDANCE\n---\n")
+    _child = _sr / "lane"
+    _child.mkdir()
+    (_child / ".epr-meta").write_text(
+        "---\nepr-meta-version: 1\nid: lane\nrules:\n"
+        "  - id: child-advice\n    class: inject\n    when: { write: \"*.feature\" }\n"
+        "    dedupe-of: lane/README.md\n    why: CHILD_GUIDANCE\n---\n")
+
+    _t = _child / "x.feature"
+    _res = epr_meta.resolve_write(
+        _t, {"path": "lane/x.feature", "file_path": str(_t), "new": True,
+             "content": "Feature: x\n"}, _sr)
+    _adv = " ".join(_res["advisories"])
+
+    check("both inject rules fire and the ANCESTOR still owns the decision (combine unchanged)",
+          _res["cls"] == "inject" and _res["rule_id"] == "ancestor-advice")
+    check("the ancestor's guidance is the decision reason",
+          "ANCESTOR_GUIDANCE" in (_res["reason"] or ""))
+    check("the CHILD's guidance survives as an advisory instead of being discarded",
+          "CHILD_GUIDANCE" in _adv)
+    check("the shadowed advisory names the rule that authored it",
+          "child-advice" in _adv)
+
+    # A lone inject must not grow a duplicate advisory of itself.
+    _t2 = _sr / "y.feature"
+    _res2 = epr_meta.resolve_write(
+        _t2, {"path": "y.feature", "file_path": str(_t2), "new": True,
+              "content": "Feature: y\n"}, _sr)
+    check("a SINGLE fired inject adds no shadowed advisory (no self-duplication)",
+          _res2["cls"] == "inject"
+          and not any("ANCESTOR_GUIDANCE" in a for a in _res2["advisories"]))
+
 print(f"\n{_passed} checks passed")

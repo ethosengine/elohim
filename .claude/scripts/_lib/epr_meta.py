@@ -1709,6 +1709,27 @@ def resolve_write(target: Path, write: dict, root: Path, *, verdict_filter=None)
         info = decision_for(combined)
         src = merged["sources"][-1] if merged.get("sources") else "?"
         info["reason"] = f"{combined.reason} [rule `{combined.rule_id}` from {src}]"
+        # EVERY OTHER FIRED INJECT IS ADVICE TOO, and it must not be lost to the decision.
+        #
+        # `combine` returns ONE verdict because a write has ONE decision, and on a severity tie it
+        # keeps the earliest in cascade order (the Rust twin does the same, deliberately — see the
+        # `max_by_key` index comment in eprfs-meta/src/evaluation.rs). For deny/ask that is
+        # exactly right. For `inject` it silently discarded advice: a CHILD manifest's rule is
+        # shadowed by an ANCESTOR's, so the more specific guidance — authored precisely because
+        # the general rule was not enough — is the half that vanishes. Measured on the live tree:
+        # 29 of 30 manifests carrying inject rules sit under an ancestor that also carries them,
+        # and `genesis/a2o/features/stewardship` proved the loss real (its whole reason for
+        # existing, that a stewardship scenario must exercise the subject's appeal, never reached
+        # the author; only the ancestor's blind-reader routing did).
+        #
+        # THE DECISION IS UNTOUCHED — class, rule_id, refer and reason still come from `combine`,
+        # so the two evaluators still derive the same decision and the golden-vector contract
+        # (which asserts on decision/cls/rule_id/refer/witnessed) is unchanged. Only the advice is
+        # made whole. Reads from `combine_input`, not `verdicts`, so a verdict the caller's
+        # debounce filtered out stays filtered — surfacing it here would reintroduce the nagging
+        # that filter exists to stop.
+        shadowed = [v for v in combine_input if v.cls == "inject" and v is not combined]
+        advisories += [f"[.epr-meta] {v.reason} [rule `{v.rule_id}`]" for v in shadowed]
         return {**info, "directive": None, "advisories": advisories, "measures": measures,
                 "dispatches": dispatches, "witnessed": True, "merged": merged}
 
