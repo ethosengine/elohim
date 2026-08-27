@@ -204,3 +204,106 @@ Landing Axis 1 in-tree does NOT log anyone out. The mass re-login happens only w
 DEPLOYS (every fleet token today is signed with the dev constant and becomes invalid under the real
 secret). Sequence the deploy with a one-time session-invalidation window. No dual-verify of the old
 dev secret on non-loopback — that would keep the forgery hole open. Storage sequencing is unaffected.
+
+---
+
+## AXIS 2 CLOSED + a MORE SEVERE hole found (2026-08-27)
+
+### Axis 2 — CLOSED in code, locally proven
+
+`extract_http_permission` no longer promotes anonymous callers on a mode flag. It now grants
+`Authenticated` only when `state.network_stage < NetworkStage::Coordinated && peer_is_loopback`,
+mirroring authority (1) of `require_seed_authority`; `peer_is_loopback` is threaded from the accepted
+socket (`addr.ip().is_loopback()`), never a header. Signature gained the flag; the two consumers
+(`routes/seed.rs:132`, `routes/elohim_agent.rs:33` via `server/http.rs:5893`) pass it.
+
+**The feared blast radius was measured, not assumed, and it is one route.** The crate has exactly ONE
+`Authenticated` gate — the elohim-agent invocation proxy — whose own comment already states the intent
+the grant was defeating ("compute is shared commons, but only for real people in the network, not
+anonymous traffic"). Content/blob/apps/cache routes are registry `StorageProxy` paths with NO
+permission gate, so ordinary browsing never consults this ladder; `can_serve_at_reach` reads a
+different source and has no live caller; the WS ladder is a separate function. A signed-in browser
+sends a bearer token, and `/health` short-circuits above the gate. The one a2o reference is `@wip`
+with no steps. Second-order: a remote anonymous seed refusal flips 403 → 401, which the existing test
+tolerates (it asserts `is_client_error`).
+
+**PROVEN LIVE** (real binary, `--dev-mode`, bound `0.0.0.0:8899`): `POST /api/v1/elohim/invoke`
+anonymously → from `10.1.19.183` (non-loopback) **401 "Authentication required for elohim agent
+invocation"**; from `127.0.0.1` **502** (passed the gate, failed only at the absent sidecar);
+`/health` **502 on both** (still public). 4 new unit tests, incl. the designed expiry
+(`coordinated_stage_retires_the_loopback_grant`). Registered as a decision point in
+`doorway/doorway-service/seam-registry.yaml` (birth rule), census 31 pts · 31 cited · 0 uncited.
+
+### A MongoDB outage was an authentication downgrade — CLOSED
+
+Four auth paths branch on `dev_mode && state.mongo.is_none()` (`auth_routes.rs:1354, 1626, 2106,
+3623`), and `:1626` accepted **any credentials** and minted `PermissionLevel::Admin`. `main.rs`
+continued past a failed Mongo connection whenever `dev_mode` — true on every deployed manifest. So a
+transient MongoDB outage silently converted the fleet into "any password logs in as Admin."
+
+Fixed at the source, mirroring the fail-loud bootstrap-store precedent immediately below it: a
+**configured** `MONGODB_URI` that cannot be reached is now fatal, so `mongo.is_none()` can only mean
+"none configured" (a genuine local-dev shape). Defense in depth: that branch's ceiling dropped
+`Admin → Authenticated`. **PROVEN LIVE:** `MONGODB_URI=mongodb://127.0.0.1:59999` → `EXIT_CODE=1`
+with "refusing to start credential-free rather than degrade authentication".
+
+### OPEN — most severe of the whole arc: anonymous UNFILTERED conductor admin
+
+Not closed here, and deliberately so. The chain, each link verified in code:
+
+1. `server/http.rs:5220` gates `/hc/admin` on `dev_mode` with the message "Admin WebSocket disabled in
+   production" — but `DEV_MODE: "true"` is set on all five deployed manifests, so the 403 arm is dead
+   on the fleet and the upgrade proceeds. `:5261` is a second entrance via the legacy `/` upgrade.
+2. `server/websocket.rs:426` returns `Ok(PermissionLevel::Public)` instead of `Err` for a caller with
+   no JWT and no `X-API-Key`. (Note the app sends `apiKey` as a QUERY param while this reads the
+   `X-API-Key` HEADER, which browsers cannot set on a WebSocket — so browser callers are anonymous.)
+3. `proxy/admin.rs:81` — `if dev_mode { passthrough }` — sends every binary frame straight to the
+   conductor, so `filter_message`/`is_operation_allowed` never runs and `permission_level` is never
+   consulted. Same shape in `proxy/pool.rs:42` and `proxy/nats.rs:44`. The closed-world default is
+   removed too: unknown and unparseable operations also pass.
+4. The ingress is a catch-all `path: /` (`alpha.yaml`, `prod.yaml`), so this is internet-reachable.
+
+Net: an anonymous internet client can reach `install_app`, `enable_app`, `disable_app`,
+`uninstall_app`, `update_coordinators`, `delete_clone_cell`, `add_agent_info`, `revoke_agent_key` on
+the production conductor.
+
+**Why it is NOT fixed in this pass.** The deployed app's ANONYMOUS visitors use this exact socket:
+`connect()` picks the chaperone only when `!isCheEnvironment() && !!config.doorwayToken`, so a visitor
+with no session falls back to `connectViaAdminWs`, which calls `generateAgentPubKey` (Authenticated
+tier) and, when the app is absent, `installApp`/`enableApp` (Admin tier). Turning filtering on alone
+would refuse anonymous visitors at `generate_agent_pub_key` and break onboarding on a live site. The
+hole and the onboarding path are the same mechanism, so closing it is coupled to migrating anonymous
+visitors onto the chaperone (hosted-user provisioning) — an app-side change that must land with, or
+before, the doorway change. That sequencing is the operator's, which is why this is reported rather
+than shipped.
+
+**Recommended sequence:** (1) make the chaperone reachable for a session-less visitor (or provision a
+visitor session before conductor connect); (2) then, in the doorway, drop the `dev_mode` passthrough
+so `filter_message` always runs, replace the WS `Ok(Public)` fallback with loopback-only, and gate the
+`/hc/admin` upgrade on loopback; (3) verify an anonymous visitor still onboards, and that
+`uninstall_app` from a remote anonymous socket is refused.
+
+### Also OPEN, with the reason each was NOT shipped blind
+
+**`fixture_only_gate` opens two write routes on the fleet** (`admin_users.rs:1019` → `PUT
+/admin/users/{id}/steward`, which sets `is_steward` with the key-proof skipped; `admin_dev.rs:70` →
+`PUT /admin/dev/portal-health`). Both are `if dev_mode { None }` — i.e. open on every deployed
+doorway, with no `require_admin` anywhere on the portal-health handler.
+
+NOT loopback-gated, because the a2o suite calls both against the DEPLOYED doorway:
+`genesis/a2o/steps/auth/agency.steps.ts:208` and `genesis/a2o/steps/ui/account-m5.steps.ts:248`. A
+loopback conjunct would have gone green in unit tests and broken the E2E suite on the fleet.
+
+The canon's question 1 gives the right shape: *"may this caller drive fixtures?"* is a DIFFERENT
+question from *"is this caller my admin?"*, so it wants its own narrow credential — a dedicated
+fixture key on the `API_KEY_SEED` pattern (presence-keyed, scoped to these routes, never entering the
+permission ladder, retiring at `Coordinated`), held by CI. That is a small, self-contained follow-up:
+add the key, gate both routes on it, and set it in the a2o runner's env.
+
+**CORS reflects any Origin under `dev_mode`** (`cors.rs:91`). NOT changed: `CORS_ORIGINS` is declared
+and parsed (`config.rs:288`) but set in NO manifest, so dropping the `dev_mode` branch today would
+leave an EMPTY allowlist and break every browser cross-origin call. The real defect is the dead
+config, not the branch — the fix is to populate `CORS_ORIGINS` in the five manifests FIRST, then
+remove the reflect-any branch. Severity is bounded meanwhile: `Access-Control-Allow-Credentials`
+appears nowhere in the crate (verified by grep), so reflect-any cannot be used for credentialed
+cross-origin reads.

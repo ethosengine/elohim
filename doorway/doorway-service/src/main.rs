@@ -192,14 +192,35 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             Some(client)
         }
         Err(e) => {
-            if args.dev_mode {
+            // Fail-loud when the deployment EXPLICITLY configured a MongoDB and
+            // cannot reach it — the same discriminator, and the same reasoning,
+            // as the bootstrap-store check directly below: `dev_mode`'s general
+            // "continue without mongo" leniency is correct only when nobody
+            // asked for a MongoDB (local dev on the default URI). `mongodb_is_declared`
+            // counts an env var OR a --mongodb-uri flag, so neither route can
+            // silently fall back to credential-free mode.
+            //
+            // WHY THIS IS A SECURITY BOUNDARY, not just tidiness: four auth
+            // paths in `routes/auth_routes.rs` (:1354, :1626, :2106, :3623)
+            // branch on `dev_mode && state.mongo.is_none()`, and :1626 accepts
+            // ANY credentials. `dev_mode` is `"true"` on every deployed
+            // manifest, so before this check a transient MongoDB outage
+            // silently converted the whole fleet into "any password logs in".
+            // An outage must never be an authentication downgrade. With this,
+            // `mongo.is_none()` can only mean "no MongoDB was configured",
+            // which is a genuine local-dev shape rather than a failure.
+            if args.dev_mode && !args.mongodb_is_declared() {
                 warn!(
-                    "MongoDB connection failed (dev mode, continuing without): {}",
+                    "MongoDB connection failed (dev mode, none configured, continuing without): {}",
                     e
                 );
                 None
             } else {
-                error!("MongoDB connection failed: {}", e);
+                error!(
+                    "MongoDB connection failed (a MongoDB was declared; refusing to start \
+                     credential-free rather than degrade authentication): {}",
+                    e
+                );
                 std::process::exit(1);
             }
         }

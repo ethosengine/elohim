@@ -6,12 +6,14 @@
 //! seed/cache-mutation routes (Admin gate via [`require_seed_authority`]).
 //!
 //! The ladder checks (in order): JWT `Authorization: Bearer …` → `X-API-Key`
-//! header → dev-mode fallback → Public. It returns [`PermissionLevel::Public`]
+//! header → on-the-box caller while the DECLARED stage is pre-coordination →
+//! Public. It returns [`PermissionLevel::Public`]
 //! (never `Err`) when no auth is found — the *caller* decides whether Public is
 //! sufficient. The function only reads request headers; it never touches the
 //! body, so it is generic over the body type `B`.
 
 use hyper::Request;
+use seam_contracts::freshness::NetworkStage;
 use tracing::info;
 
 use crate::auth::{extract_token_from_header, ApiKeyValidator, JwtValidator, PermissionLevel};
@@ -19,14 +21,22 @@ use crate::server::AppState;
 
 /// Extract permission level from HTTP request headers.
 ///
-/// Checks (in order): Authorization header (JWT), X-API-Key header, dev-mode
-/// fallback. This is the HTTP equivalent of websocket.rs `extract_permission`,
-/// but returns [`PermissionLevel::Public`] instead of `Err` when no auth is
-/// found (caller decides whether Public is sufficient).
+/// Checks (in order): Authorization header (JWT), X-API-Key header, then the
+/// pre-coordination on-the-box affordance. This is the HTTP equivalent of
+/// websocket.rs `extract_permission`, but returns [`PermissionLevel::Public`]
+/// instead of `Err` when no auth is found (caller decides whether Public is
+/// sufficient).
+///
+/// `peer_is_loopback` MUST come from the accepted socket's peer address
+/// (`addr.ip().is_loopback()`), never from a header — see the body.
 ///
 /// Generic over the body type `B` because only headers are inspected — a
 /// rejected request must never have its body consumed.
-pub(crate) fn extract_http_permission<B>(state: &AppState, req: &Request<B>) -> PermissionLevel {
+pub(crate) fn extract_http_permission<B>(
+    state: &AppState,
+    req: &Request<B>,
+    peer_is_loopback: bool,
+) -> PermissionLevel {
     // Try JWT from Authorization header
     let auth_header = req
         .headers()
@@ -51,9 +61,35 @@ pub(crate) fn extract_http_permission<B>(state: &AppState, req: &Request<B>) -> 
         }
     }
 
-    // Dev mode: allow authenticated-level access for local development
-    if state.args.dev_mode {
-        info!("Dev mode: granting authenticated access for HTTP request");
+    // THE CALLER IS ON THE BOX, while the DECLARED stage is pre-coordination.
+    //
+    // Mirrors authority (1) of `require_seed_authority` (routes/seed.rs): the
+    // affordance is priced against `ELOHIM_NETWORK_STAKES` (resolved once at
+    // boot into `AppState::network_stage`, fail-closed to `Bootstrap`) and
+    // conjoined with a peer address taken from the ACCEPTED SOCKET — never
+    // `X-Forwarded-For`. An attacker sets headers; they do not set the kernel's
+    // notion of who connected.
+    //
+    // WHY NOT `dev_mode`: that flag is `"true"` on every deployed manifest
+    // (alpha, alpha-b, prod, staging, staging-read), so a gate keyed on it is
+    // ungated in practice — it promoted every anonymous caller on the open web
+    // to `Authenticated`. The canon states the rule:
+    // `2026-08-25-doorway-auth-posture-declared-stage.md`.
+    //
+    // WHAT THIS CHANGES: behind a cluster ingress the peer is the ingress pod,
+    // so the fleet now resolves anonymous callers to `Public`. The only route
+    // that consumes an `Authenticated` verdict is the elohim-agent invocation
+    // proxy, whose own contract says it should refuse exactly these callers —
+    // "compute is shared commons, but only for real people in the network, not
+    // anonymous traffic" (routes/elohim_agent.rs). `/health` stays public
+    // (bypassed before this gate) and a signed-in browser still sends a bearer
+    // token, so the graduated user is unaffected. On a developer's box the peer
+    // is 127.0.0.1, so local dev and the mesh are unchanged.
+    //
+    // THE EXPIRY IS DESIGNED: declaring `coordinated` retires this affordance by
+    // itself, with no flag to remember to unset.
+    if state.network_stage < NetworkStage::Coordinated && peer_is_loopback {
+        info!("Pre-coordination loopback caller: granting authenticated access");
         return PermissionLevel::Authenticated;
     }
 
@@ -134,20 +170,61 @@ mod tests {
         let state = test_state(false);
         let req = req_with_bearer(None);
         assert_eq!(
-            extract_http_permission(&state, &req),
+            extract_http_permission(&state, &req, false),
             PermissionLevel::Public
         );
     }
 
+    /// THE SECURITY PROPERTY. `dev_mode` is `"true"` on every deployed manifest,
+    /// so before the stage derivation this returned `Authenticated` to any
+    /// anonymous caller on the open web. Behind an ingress the peer is the
+    /// ingress pod, never loopback — so the fleet now resolves `Public`.
     #[test]
-    fn no_auth_dev_is_authenticated() {
+    fn remote_anonymous_is_public_even_with_dev_mode() {
         let state = test_state(true);
         let req = req_with_bearer(None);
-        // Behavior byte-identical to the old elohim_agent helper: dev-mode
-        // fallback yields Authenticated, never Admin.
         assert_eq!(
-            extract_http_permission(&state, &req),
+            extract_http_permission(&state, &req, false),
+            PermissionLevel::Public,
+            "a remote anonymous caller must not be promoted by a mode flag"
+        );
+    }
+
+    /// The developer's box keeps working with no credential: pre-coordination
+    /// stage (the fail-closed `Bootstrap` default) plus an on-the-box peer.
+    /// Yields `Authenticated`, never `Admin`.
+    #[test]
+    fn loopback_anonymous_pre_coordination_is_authenticated() {
+        let state = test_state(true);
+        let req = req_with_bearer(None);
+        assert_eq!(
+            extract_http_permission(&state, &req, true),
             PermissionLevel::Authenticated
+        );
+    }
+
+    /// The affordance is not keyed on `dev_mode` at all: an on-the-box caller
+    /// pre-coordination is admitted even with the flag off.
+    #[test]
+    fn loopback_grant_does_not_depend_on_dev_mode() {
+        let state = test_state(false);
+        let req = req_with_bearer(None);
+        assert_eq!(
+            extract_http_permission(&state, &req, true),
+            PermissionLevel::Authenticated
+        );
+    }
+
+    /// THE DESIGNED EXPIRY. Declaring `coordinated` retires the on-the-box
+    /// affordance by itself — no flag to remember to unset.
+    #[test]
+    fn coordinated_stage_retires_the_loopback_grant() {
+        let mut state = test_state(true);
+        state.network_stage = NetworkStage::Coordinated;
+        let req = req_with_bearer(None);
+        assert_eq!(
+            extract_http_permission(&state, &req, true),
+            PermissionLevel::Public
         );
     }
 
@@ -157,7 +234,7 @@ mod tests {
         let token = bearer_jwt(PermissionLevel::Admin);
         let req = req_with_bearer(Some(&token));
         assert_eq!(
-            extract_http_permission(&state, &req),
+            extract_http_permission(&state, &req, false),
             PermissionLevel::Admin
         );
     }
@@ -168,7 +245,7 @@ mod tests {
         let token = bearer_jwt(PermissionLevel::Authenticated);
         let req = req_with_bearer(Some(&token));
         assert_eq!(
-            extract_http_permission(&state, &req),
+            extract_http_permission(&state, &req, false),
             PermissionLevel::Authenticated
         );
     }
@@ -178,7 +255,7 @@ mod tests {
         let state = test_state(false);
         let req = req_with_bearer(Some("not-a-real-jwt"));
         assert_eq!(
-            extract_http_permission(&state, &req),
+            extract_http_permission(&state, &req, false),
             PermissionLevel::Public
         );
     }

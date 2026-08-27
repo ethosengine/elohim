@@ -129,7 +129,7 @@ pub(crate) fn require_seed_authority<B>(
 
     // (3) THIS DOORWAY'S OWN OPERATOR IDENTITY — valid at EVERY stage.
 
-    let level = extract_http_permission(state, req);
+    let level = extract_http_permission(state, req, peer_is_loopback);
     if level >= PermissionLevel::Admin {
         Ok(())
     } else if level >= PermissionLevel::Authenticated {
@@ -692,7 +692,7 @@ mod tests {
         state.args.api_key_seed = Some(FLEET_SEED_KEY.to_string());
         let req = seed_req_with_api_key(FLEET_SEED_KEY);
         assert!(
-            extract_http_permission(&state, &req) < PermissionLevel::Admin,
+            extract_http_permission(&state, &req, false) < PermissionLevel::Admin,
             "the fleet seed key must not resolve to Admin on the shared ladder"
         );
     }
@@ -736,12 +736,15 @@ mod tests {
     /// mismatch` (gate passed; only content addressing refused the write).
     /// A NON-loopback peer must now be REFUSED even with `dev_mode` on.
     ///
-    /// Status is asserted only as "a refusal" (4xx), deliberately not 401-vs-403:
-    /// `dev_mode` grants any caller `Authenticated` in `extract_http_permission`,
-    /// so a remote anonymous caller resolves to 403 (below Admin) rather than
-    /// 401. That anonymous→Authenticated grant is a SEPARATE `dev_mode` weakness
-    /// tracked with the JWT-forgery finding; this test pins only that the remote
-    /// caller does not SUCCEED, which is this gate's job.
+    /// Status is asserted only as "a refusal" (4xx), deliberately not 401-vs-403,
+    /// and that tolerance has now earned its keep. When this test was written,
+    /// `extract_http_permission` granted any caller `Authenticated` under
+    /// `dev_mode`, so a remote anonymous caller resolved to 403 (below Admin).
+    /// That grant was CLOSED on 2026-08-27 — the ladder now derives from
+    /// `network_stage < Coordinated && peer_is_loopback` — so the same caller
+    /// resolves to `Public` and this gate answers 401 instead. The assertion did
+    /// not need to change, because it pins the property that is this gate's job:
+    /// the remote caller does not SUCCEED.
     #[test]
     fn pre_coordination_remote_caller_without_credential_is_refused() {
         let state = test_state(true);

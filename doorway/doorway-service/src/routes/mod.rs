@@ -58,7 +58,6 @@ pub use admin_users::{
     track_bandwidth_if_user,
     track_query_if_user,
     // Usage tracking helpers for integration with other routes
-    try_extract_user_id_for_tracking,
     MongoQuotaEnforcer,
     MongoUsageTracker,
     QuotaEnforcer,

@@ -2,7 +2,7 @@
 title: Doorway Auth Posture — Authority Derives From the Declared Stage
 id: doorway-auth-posture-declared-stage
 tier: architecture
-status: accepted — Axis 1 landed in-tree (stage-derived seed authority + fleet seed authority), locally verified, NOT yet measured on the fleet; Axis 2 items named and open
+status: accepted — Axis 1 (stage-derived seed authority + fleet seed authority) and Axis 2 (the permission ladder's fallthrough + the MongoDB-outage auth downgrade) landed in-tree and locally verified, NOT yet measured on the fleet; the conductor-admin passthrough remains open and is named in Known open items
 created: 2026-08-25
 pillar coupling: doorway (web2 projection + chaperone), elohim (peer-native substrate boundary), imagodei (identity)
 informed-by:
@@ -169,7 +169,9 @@ Named here so they are not rediscovered as surprises. None is fixed by the stage
 
 | Item | Where | Status |
 |---|---|---|
-| Anonymous callers resolve to `Authenticated` under `DEV_MODE` | `auth/http_permission.rs` | **Open.** Live on the whole fleet. Removing it changes what browsers can reach, so it is a posture decision with real blast radius. Tracked in `security-doorway-devmode-auth-bypass.md`. |
+| Anonymous callers resolve to `Authenticated` under `DEV_MODE` | `auth/http_permission.rs` | **CLOSED 2026-08-27.** Now derives from `network_stage < Coordinated && peer_is_loopback`, mirroring seed authority (1). The feared blast radius was measured and is one route: the crate has exactly ONE `Authenticated` gate (the elohim-agent invocation proxy), whose own contract already says it should refuse anonymous traffic. Content/blob/apps/cache routes carry no permission gate at all, so browsing is untouched. Proven live: remote anon → 401, loopback anon → passes, `/health` public on both. |
+| Anonymous remote callers get an UNFILTERED conductor admin socket | `proxy/{admin,pool,nats}.rs`, `server/http.rs:5220`/`:5261`, `server/websocket.rs:426` | **OPEN — most severe.** `if dev_mode { passthrough }` skips `filter_message` entirely, so `permission_level` is never consulted; the WS ladder returns `Ok(Public)` rather than `Err` for an anonymous caller; and the ingress is a catch-all `path: /`. Net: an anonymous internet client can reach `install_app`/`uninstall_app`/`revoke_agent_key`. NOT closed here because the deployed app's ANONYMOUS visitors use this exact socket to self-provision (`connectViaAdminWs` runs whenever no `doorwayToken` exists), so closing it alone breaks anonymous onboarding — it is coupled to migrating anonymous visitors onto the chaperone. |
+| A MongoDB outage was an authentication downgrade | `main.rs`, `routes/auth_routes.rs:1626` | **CLOSED 2026-08-27.** Four auth paths branch on `dev_mode && mongo.is_none()`, and the login one accepted ANY credentials and minted **Admin**. A configured-but-unreachable `MONGODB_URI` is now fatal at startup (mirroring the bootstrap-store fail-loud precedent directly above it), so `mongo.is_none()` can only mean "none configured"; and that branch's ceiling dropped to `Authenticated`. Proven live: `EXIT_CODE=1`. |
 | The canonical-head declare is not seed-gated | `POST /db/content/{slug}/canonical-head` | **Open.** Through #1672–#1673 doorway-B accepted a canonical head for bytes whose `PUT` it had just refused — a declare outrunning its bytes. |
 | Fleet credentials are committed in plaintext | `genesis/orchestrator/manifests/doorway/*.yaml` | **Open.** `stringData` is applied verbatim; no sealed-secret controller or injection machinery exists in the repo. |
 | `/apps/{id}` bypasses the `/blob` reach gate | `routes/` | **Open.** Correct gating needs slug-vs-CID reach resolution. Tracked in `security-doorway-blob-pantry-ungated.md`. |

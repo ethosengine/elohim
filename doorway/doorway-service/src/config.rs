@@ -50,6 +50,13 @@ impl std::fmt::Display for OpGateMode {
     }
 }
 
+/// The MongoDB URI used when no deployment declared one — a local-dev shape.
+/// Named so [`Args::mongodb_is_declared`] can tell "nobody asked for a MongoDB"
+/// apart from "a MongoDB was asked for and is unreachable". Those two must never
+/// be conflated: the second is an outage, and an outage must never be allowed to
+/// become an authentication downgrade (see `main.rs`).
+pub const DEFAULT_MONGODB_URI: &str = "mongodb://localhost:27017";
+
 /// Doorway - WebSocket gateway for Elohim Holochain
 ///
 /// "Knock and it shall be opened" - Matthew 7:7-8
@@ -85,7 +92,21 @@ pub struct Args {
     #[arg(long, env = "APP_PORT_MAX", default_value = "65535")]
     pub app_port_max: u16,
 
-    /// Enable development mode (disables auth, enables passthrough)
+    /// Enable development mode.
+    ///
+    /// NOT an auth posture, and never a discriminator for one — a doorway's auth
+    /// posture derives from the DECLARED network stage (`ELOHIM_NETWORK_STAKES`
+    /// -> `AppState::network_stage`). This flag is `"true"` on EVERY deployed
+    /// manifest, so anything keyed on it is in practice ungated; that is how the
+    /// seed routes, the permission ladder, and JWT signing each became open in
+    /// turn. See `2026-08-25-doorway-auth-posture-declared-stage.md`, and answer
+    /// its six questions before keying anything new on this flag.
+    ///
+    /// What it still legitimately controls: startup leniency for absent optional
+    /// services, fixture/provisioning shortcuts, and reporting verbosity. What it
+    /// still controls but SHOULD NOT: the conductor admin passthrough in
+    /// `proxy/{admin,pool,nats}.rs` and the `/hc/admin` upgrade — tracked in
+    /// `security-doorway-devmode-auth-bypass.md` as the arc's last open item.
     #[arg(long, env = "DEV_MODE", default_value = "false")]
     pub dev_mode: bool,
 
@@ -103,7 +124,7 @@ pub struct Args {
     pub nats: NatsArgs,
 
     /// MongoDB connection URI
-    #[arg(long, env = "MONGODB_URI", default_value = "mongodb://localhost:27017")]
+    #[arg(long, env = "MONGODB_URI", default_value = DEFAULT_MONGODB_URI)]
     pub mongodb_uri: String,
 
     /// MongoDB database name
@@ -417,6 +438,17 @@ impl Args {
     /// This is THE auth discriminator: keyed on secret **presence**, never on
     /// `dev_mode` (which every deployed doorway sets to `true`). Mirrors the
     /// fail-closed posture selection in elohim-storage `trust/stage.rs`.
+    /// Did the deployment DECLARE a MongoDB, by env var or CLI flag?
+    ///
+    /// True when `MONGODB_URI` is set in the environment OR the parsed value
+    /// differs from [`DEFAULT_MONGODB_URI`] — so a `--mongodb-uri` flag counts,
+    /// not just the env var. Used by `main.rs` to decide whether an unreachable
+    /// MongoDB is a fatal misconfiguration (declared) or an ordinary local-dev
+    /// absence (undeclared).
+    pub fn mongodb_is_declared(&self) -> bool {
+        std::env::var("MONGODB_URI").is_ok() || self.mongodb_uri != DEFAULT_MONGODB_URI
+    }
+
     pub fn configured_jwt_secret(&self) -> Option<&str> {
         self.jwt_secret
             .as_deref()
@@ -586,6 +618,35 @@ mod conductor_url_convention_tests {
             args.conductor_url_list(),
             vec!["ws://a:4445", "ws://b:8445"]
         );
+    }
+
+    /// An outage must never become an authentication downgrade. `main.rs` uses
+    /// this to decide whether an unreachable MongoDB is fatal, and four auth
+    /// paths in auth_routes.rs branch on `mongo.is_none()` — one of which
+    /// accepts ANY credentials. So "nobody declared a MongoDB" and "the declared
+    /// MongoDB is down" must stay distinguishable, and a `--mongodb-uri` FLAG
+    /// must count as declaring one just as the env var does.
+    #[test]
+    fn a_mongodb_declared_by_flag_counts_as_declared() {
+        let args = args_with(&["--mongodb-uri", "mongodb://declared-host:27017"]);
+        assert!(
+            args.mongodb_is_declared(),
+            "a --mongodb-uri flag declares a MongoDB; treating it as absent would let an \
+             outage fall back to credential-free mode"
+        );
+    }
+
+    /// The undeclared shape: the parsed value is the default and nothing in the
+    /// environment asked for one. Only here may a failed connection be survivable.
+    #[test]
+    fn the_default_uri_alone_is_not_a_declaration() {
+        let args = args_with(&[]);
+        assert_eq!(args.mongodb_uri, DEFAULT_MONGODB_URI);
+        // Guarded: a MONGODB_URI in this process's environment would legitimately
+        // flip the answer, so only assert the negative when the env is clean.
+        if std::env::var("MONGODB_URI").is_err() {
+            assert!(!args.mongodb_is_declared());
+        }
     }
 
     #[test]

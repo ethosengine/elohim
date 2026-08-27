@@ -1635,7 +1635,18 @@ async fn handle_login(
             Some(dev_session_id),
             StatusCode::OK,
             None,
-            PermissionLevel::Admin, // Dev mode gets admin access
+            // NEVER `Admin`. This branch accepts ANY credentials, so the level
+            // it mints is the ceiling on what a credential-free caller can
+            // reach. `Authenticated` matches the register path and is the same
+            // ceiling `extract_http_permission` applies to an on-the-box
+            // caller; minting `Admin` here handed operator authority to anyone
+            // who could reach a doorway running without MongoDB.
+            //
+            // Defense in depth: `main.rs` now refuses to start when a
+            // CONFIGURED MongoDB is unreachable, so this branch can no longer
+            // be reached by an outage on the fleet — only by a local dev box
+            // that never configured one. Both halves are load-bearing.
+            PermissionLevel::Authenticated,
             None,
             None,  // No conductor_id in dev mode
             false, // Dev mode: not a steward

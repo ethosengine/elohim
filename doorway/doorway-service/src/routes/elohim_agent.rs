@@ -19,6 +19,7 @@ pub async fn handle_elohim_agent_request(
     req: Request<Incoming>,
     state: Arc<AppState>,
     path: &str,
+    peer_is_loopback: bool,
 ) -> Response<Full<Bytes>> {
     let sidecar_path = path.strip_prefix("/api/v1/elohim").unwrap_or(path);
 
@@ -30,7 +31,7 @@ pub async fn handle_elohim_agent_request(
 
     // Invocation requires authentication — compute is shared commons,
     // but only for real people in the network, not anonymous traffic.
-    let permission = extract_http_permission(&state, &req);
+    let permission = extract_http_permission(&state, &req, peer_is_loopback);
     if permission < PermissionLevel::Authenticated {
         return Response::builder()
             .status(StatusCode::UNAUTHORIZED)

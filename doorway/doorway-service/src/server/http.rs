@@ -5890,7 +5890,8 @@ async fn handle_request(
         // Elohim Agent invocation
         (_, p) if p.starts_with("/api/v1/elohim") => {
             return Ok(to_boxed(
-                routes::handle_elohim_agent_request(req, Arc::clone(&state), p).await,
+                routes::handle_elohim_agent_request(req, Arc::clone(&state), p, addr.ip().is_loopback())
+                    .await,
             ));
         }
 

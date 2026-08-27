@@ -1767,33 +1767,6 @@ fn user_to_details(user: &UserDoc) -> UserDetailsResponse {
 // Usage Tracking Integration Helpers
 // =============================================================================
 
-/// Try to extract user ID from request JWT for usage tracking.
-/// Returns None if no valid JWT is present (anonymous request).
-///
-/// Use this in routes where tracking is optional (blob/projection routes).
-pub fn try_extract_user_id_for_tracking<B>(
-    req: &Request<B>,
-    jwt_secret: Option<&str>,
-) -> Option<String> {
-    let auth_header = req
-        .headers()
-        .get(hyper::header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok());
-
-    let token = extract_token_from_header(auth_header)?;
-
-    // Keyed on JWT_SECRET presence, never dev_mode (JwtValidator::from_config).
-    let jwt = JwtValidator::from_config(jwt_secret.map(str::trim).filter(|s| !s.is_empty()), 86400)
-        .ok()?;
-
-    let result = jwt.verify_token(token);
-    if result.valid {
-        result.claims.map(|c| c.human_id)
-    } else {
-        None
-    }
-}
-
 /// Track bandwidth usage for a request.
 /// Call this after serving content to a user.
 ///

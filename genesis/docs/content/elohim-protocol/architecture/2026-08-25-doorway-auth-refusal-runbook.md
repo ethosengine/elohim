@@ -11,7 +11,7 @@ informed-by:
 informs:
   - Any operator or agent reading a doorway refusal, a stale-but-200 host, or a red deploy seed leg
 cites:
-  - "doorway-auth-posture-declared-stage | the canon half of this pair — the rule this runbook operationalizes; read it for WHY a refusal is shaped this way, come back here for what to do about one | sha256:31cda806d3207fd9 | path: genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-posture-declared-stage.md"
+  - "doorway-auth-posture-declared-stage | the canon half of this pair — the rule this runbook operationalizes; read it for WHY a refusal is shaped this way, come back here for what to do about one | sha256:e606f68bf1dbfa13 | path: genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-posture-declared-stage.md"
   - "substrate-trust-contract-runbook | the sibling runbook whose shape this follows, and the doc you are probably in by mistake if your symptom is a doorway refusal — that one owns dataplane divergence, this one owns write-path authorization; section 3d is the boundary between them | sha256:e47d962ca7259c79 | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md"
   - "doorway-access-tier-patterns | the read-side tier catalog — consult it when the refusal is a reader being denied content rather than a writer being denied a seed, which is a different gate with a different cure | sha256:f862d55525b442c3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md"
 ---

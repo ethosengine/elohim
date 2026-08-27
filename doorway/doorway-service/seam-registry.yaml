@@ -1811,3 +1811,108 @@ decisionPoints:
       - path: doorway/doorway-service/src/routes/seed.rs
         testName: non_dev_no_bearer_is_unauthorized
         kind: unit
+
+  - name: extract_http_permission
+    kind: verdict-fn
+    sourceLocation:
+      file: src/auth/http_permission.rs
+      modulePath: auth::http_permission::extract_http_permission
+      line: 30
+    summary: >
+      The shared HTTP permission ladder: resolves what level a request carries, in order — a
+      valid bearer JWT, an X-API-Key, then an on-the-box (loopback socket peer) caller while the
+      DECLARED stage is pre-coordination — falling through to Public. Returns a level, never an
+      Err; the caller decides whether Public suffices. Its two consumers are the elohim-agent
+      invocation gate (the crate's ONLY Authenticated gate) and require_seed_authority's arm (3).
+    notes: >
+      Registered 2026-08-25 when the final fallthrough stopped deriving from DEV_MODE — the same
+      birth-rule reason require_seed_authority was registered: the predicate changed what it
+      decides on. DEV_MODE is "true" on every deployed manifest, so the old arm promoted EVERY
+      anonymous caller on the open web to Authenticated. It now keys on AppState::network_stage
+      conjoined with a kernel-observed loopback peer, mirroring authority (1) of
+      require_seed_authority. Canon:
+      genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-posture-declared-stage.md.
+      validate_jwt_token (same file) is deliberately NOT a separate decision point: it is a
+      signature check feeding this function's first arm, with no outcome of its own.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Web2 projection plane only. This ladder answers what a BROWSER-shaped caller carries;
+          it is not the notary or head plane, and it is not the WebSocket ladder
+          (server/websocket.rs::extract_permission), which is a separate function with its own
+          fallthrough and is deliberately left untouched here rather than silently unified.
+      - id: C1
+        status: answered
+        justification: >
+          No self-election. The removed arm was a flag the deployment set about itself, true
+          everywhere, granting a permission level away. The replacement requires a peer address
+          taken from the ACCEPTED SOCKET — a fact the caller cannot assert and the doorway
+          cannot fake on its own behalf — never X-Forwarded-For.
+      - id: C4
+        status: answered
+        justification: >
+          Absence stays absence: an unresolved caller yields Public, the floor, rather than a
+          borrowed identity. An invalid or unparseable bearer token falls THROUGH rather than
+          erroring, so a forged credential is worth exactly what no credential is worth —
+          pinned by invalid_bearer_non_dev_is_public.
+      - id: C2
+        status: answered
+        justification: >
+          The ladder is monotonic in the authority it will honour: a stronger credential is
+          checked first and short-circuits, and the pre-coordination arm can only ever yield
+          Authenticated, never Admin. PermissionLevel derives Ord over explicit discriminants
+          (Public=0 < Authenticated=1 < Admin=2), so Public is STRICTLY refused at an
+          Authenticated gate rather than silently passing.
+      - id: C13
+        status: answered
+        justification: >
+          The affordance expires by itself: declaring `coordinated` retires the on-the-box arm
+          with no flag to unset, pinned by coordinated_stage_retires_the_loopback_grant. Its
+          successor is the same one require_seed_authority names — a real identity (chaperoned
+          actor, then a delegates-compute Mishpat::Commitment) rather than a positional
+          affordance.
+      - id: C12
+        status: partial
+        justification: >
+          A bearer JWT and an API key are verified structurally (signature / constant-time
+          compare) at the acting node, and the loopback arm is verified by the kernel. PARTIAL
+          for the same reason as require_seed_authority: possession of a standing secret is not
+          a bounded, revocable grant in the peer-native sense.
+      - id: C8
+        status: unbound
+        justification: >
+          No labeled counter per outcome arm. A promotion to Authenticated logs at info; a
+          fallthrough to Public is silent, so "how often does a remote anonymous caller get
+          refused downstream" is answerable only from a consumer's HTTP status. The arms are
+          typed by construction, so binding a counter is additive.
+    gapNote: >
+      C8 unbound — the arms are typed but uncounted. C12 partial until the delegates-compute
+      successor replaces standing secrets. Neither is a defect in this function's logic; both
+      are binding gaps, declared rather than papered over.
+    contractTests:
+      - path: doorway/doorway-service/src/auth/http_permission.rs
+        testName: remote_anonymous_is_public_even_with_dev_mode
+        kind: unit
+        mirrorRisk: false
+      - path: doorway/doorway-service/src/auth/http_permission.rs
+        testName: loopback_anonymous_pre_coordination_is_authenticated
+        kind: unit
+      - path: doorway/doorway-service/src/auth/http_permission.rs
+        testName: loopback_grant_does_not_depend_on_dev_mode
+        kind: unit
+      - path: doorway/doorway-service/src/auth/http_permission.rs
+        testName: coordinated_stage_retires_the_loopback_grant
+        kind: unit
+      - path: doorway/doorway-service/src/auth/http_permission.rs
+        testName: no_auth_non_dev_is_public
+        kind: unit
+      - path: doorway/doorway-service/src/auth/http_permission.rs
+        testName: invalid_bearer_non_dev_is_public
+        kind: unit
+      - path: doorway/doorway-service/src/auth/http_permission.rs
+        testName: admin_jwt_resolves_admin
+        kind: unit
+      - path: doorway/doorway-service/src/auth/http_permission.rs
+        testName: authenticated_jwt_resolves_authenticated
+        kind: unit
