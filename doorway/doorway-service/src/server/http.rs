@@ -5215,20 +5215,19 @@ async fn handle_request(
         }
 
         // WebSocket upgrade for admin interface (NEW: /hc/admin)
-        // Gated to dev-mode only — production clients use POST /hc/connect (Chaperone)
+        //
+        // NO route-level posture gate. Authorization is decided in exactly one
+        // place — `websocket::extract_permission` — which refuses with 401
+        // unless the caller presents a credential or is the native local-first
+        // operator (loopback + pre-coordination + no declared JWT_SECRET).
+        //
+        // This arm used to read `if !state.args.dev_mode { 403 }`. Since
+        // `DEV_MODE: "true"` is set on all five deployed manifests, the intended
+        // production 403 never fired anywhere it mattered, and the "disabled in
+        // production" message described a state the fleet was never in.
         (Method::GET, "/hc/admin") => {
-            if !state.args.dev_mode {
-                to_boxed(
-                    Response::builder()
-                        .status(StatusCode::FORBIDDEN)
-                        .header("Content-Type", "application/json")
-                        .body(Full::new(Bytes::from(
-                            r#"{"error":"Admin WebSocket disabled in production. Use POST /hc/connect."}"#,
-                        )))
-                        .unwrap(),
-                )
-            } else if hyper_tungstenite::is_upgrade_request(&req) {
-                to_boxed(websocket::handle_admin_upgrade(state, req).await)
+            if hyper_tungstenite::is_upgrade_request(&req) {
+                to_boxed(websocket::handle_admin_upgrade(state, req, addr.ip().is_loopback()).await)
             } else {
                 to_boxed(bad_request_response(
                     "WebSocket upgrade required for /hc/admin",
@@ -5258,20 +5257,9 @@ async fn handle_request(
         // Preserve WebSocket upgrade for admin in dev mode (legacy path).
         (Method::GET, "/") => {
             if hyper_tungstenite::is_upgrade_request(&req) {
-                if state.args.dev_mode {
-                    debug!("Legacy WebSocket path used - consider migrating to /hc/admin");
-                    to_boxed(websocket::handle_admin_upgrade(state, req).await)
-                } else {
-                    to_boxed(
-                        Response::builder()
-                            .status(StatusCode::FORBIDDEN)
-                            .header("Content-Type", "application/json")
-                            .body(Full::new(Bytes::from(
-                                r#"{"error":"Admin WebSocket disabled in production. Use POST /hc/connect."}"#,
-                            )))
-                            .unwrap(),
-                    )
-                }
+                // Same single authorization decision as /hc/admin — see that arm.
+                debug!("Legacy WebSocket path used - consider migrating to /hc/admin");
+                to_boxed(websocket::handle_admin_upgrade(state, req, addr.ip().is_loopback()).await)
             } else {
                 // Post-B14: ROOT_APP_SLUG is gone. The EPR router (consulted earlier in
                 // handle_request) serves "/" when a projection exists for url_path="/".

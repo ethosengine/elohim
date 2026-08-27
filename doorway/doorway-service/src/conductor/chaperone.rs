@@ -155,9 +155,25 @@ pub async fn handle_hc_connect(
         }
     };
 
-    // Decode base64 inputs
+    // Decode base64 inputs.
+    //
+    // The LENGTH check is not optional: `AgentPubKey::from_raw_39` (reached via
+    // `TypedAdminClient::grant_zome_call_capability`) `unwrap()`s a `BadSize`
+    // error, so a wrong-length key from ANY authenticated caller panicked a
+    // doorway tokio worker mid-request instead of answering 400. `cap_secret`
+    // immediately below was already length-checked downstream; this one was not.
+    const AGENT_PUB_KEY_RAW_LEN: usize = 39; // 3-byte prefix + 32-byte hash + 4-byte loc
     let signing_key = match BASE64.decode(&body.signing_key) {
-        Ok(k) => k,
+        Ok(k) if k.len() == AGENT_PUB_KEY_RAW_LEN => k,
+        Ok(k) => {
+            return json_error(
+                StatusCode::BAD_REQUEST,
+                &format!(
+                    "Invalid signing_key length: expected {AGENT_PUB_KEY_RAW_LEN}, got {}",
+                    k.len()
+                ),
+            )
+        }
         Err(_) => return json_error(StatusCode::BAD_REQUEST, "Invalid base64 signing_key"),
     };
     let cap_secret = match BASE64.decode(&body.cap_secret) {
@@ -1012,6 +1028,34 @@ mod tests {
     /// no live conductor to actually connect to) would eventually surface as
     /// 503, never 409. Getting 409 proves the guard short-circuited before
     /// the provisioner was ever invoked.
+    /// A wrong-length `signingKey` must be a 400, not a panicked tokio worker.
+    ///
+    /// `AgentPubKey::from_raw_39` (reached from `grant_zome_call_capability`)
+    /// `unwrap()`s a `BadSize`, so before the boundary check ANY authenticated
+    /// caller could kill a doorway worker mid-request with a short key. Found by
+    /// running the real chaperone against the local stack with a 32-byte key.
+    #[test]
+    fn signing_key_length_is_validated_at_the_boundary() {
+        use base64::Engine as _;
+        const AGENT_PUB_KEY_RAW_LEN: usize = 39;
+
+        // What the browser actually sends: a 39-byte raw AgentPubKey.
+        let valid = BASE64.encode(vec![0u8; AGENT_PUB_KEY_RAW_LEN]);
+        let decoded = BASE64.decode(&valid).expect("valid base64");
+        assert_eq!(decoded.len(), AGENT_PUB_KEY_RAW_LEN);
+
+        // The shapes that used to panic downstream instead of answering 400.
+        for bad_len in [0usize, 1, 32, 38, 40, 64] {
+            let encoded = BASE64.encode(vec![0u8; bad_len]);
+            let decoded = BASE64.decode(&encoded).expect("valid base64");
+            assert_ne!(
+                decoded.len(),
+                AGENT_PUB_KEY_RAW_LEN,
+                "a {bad_len}-byte key must be rejected before from_raw_39 sees it"
+            );
+        }
+    }
+
     #[tokio::test]
     async fn auto_provision_refuses_foreign_doorway_claim() {
         let registry = ConductorRegistry::new(None).await;

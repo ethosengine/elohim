@@ -1812,6 +1812,108 @@ decisionPoints:
         testName: non_dev_no_bearer_is_unauthorized
         kind: unit
 
+  - name: websocket::extract_permission
+    kind: verdict-fn
+    sourceLocation:
+      file: src/server/websocket.rs
+      modulePath: server::websocket::extract_permission
+      line: 424
+    summary: >
+      The conductor-socket permission ladder, and now the SINGLE authorization decision for the
+      Holochain admin WebSocket: a valid bearer JWT (query ?token= or Authorization), then a
+      presented X-API-Key, then the native-local-first grant (native_local_first_operator) —
+      otherwise Err, which handle_admin_upgrade renders as 401 naming POST /hc/connect. Unlike
+      the HTTP ladder it REFUSES rather than falling through to Public, because the conductor
+      admin interface has no meaningful anonymous surface.
+    notes: >
+      Registered 2026-08-27 when it stopped deriving from DEV_MODE. Two credential-free arms had
+      to close together: the `dev_mode` fallthrough, and a `|| !api_validator.is_configured()`
+      disjunct that returned Ok(Public) to a caller presenting nothing whenever no API keys were
+      configured — the devspace/mesh shape, and live even with dev_mode off. Because DEV_MODE is
+      "true" on all five deployed manifests, the route gate (http.rs /hc/admin), this ladder, and
+      proxy/{admin,pool,nats}.rs message filtering were ALL ungated, so an anonymous caller from
+      the open internet reached an UNFILTERED conductor admin socket. The route gate and the
+      proxy passthrough were deleted; this function is now the only decision point, and proxy
+      filtering is unconditional defence in depth. Canon:
+      genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-posture-declared-stage.md.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Conductor-socket plane only — the substrate admin interface, distinct from the web2
+          HTTP ladder (auth::http_permission::extract_http_permission). The two are deliberately
+          NOT unified: this one refuses on absence, that one floors to Public, because their
+          downstream surfaces differ. The JWT here is a browser SESSION carrier over a
+          DHT-authoritative agent key, never the identity itself.
+      - id: C1
+        status: answered
+        justification: >
+          No self-election. native_local_first_operator requires a kernel-observed loopback peer
+          (never X-Forwarded-For) AND a pre-coordination declared stage AND the ABSENCE of a
+          configured JWT_SECRET. The last conjunct is what a deployment cannot fake: all five
+          deployed manifests populate JWT_SECRET from a secretKeyRef, so none can claim to be a
+          developer's box. The replaced arm was a self-asserted flag, true everywhere.
+      - id: C2
+        status: answered
+        justification: >
+          Monotonic: stronger credentials short-circuit first. The grant is Admin, which is
+          higher than the HTTP ladder's Authenticated and deliberately so — on your own box,
+          with no identity system, you ARE that conductor's operator — but it is unreachable
+          off-box, and every frame is still filtered by is_operation_allowed downstream.
+      - id: C4
+        status: answered
+        justification: >
+          Absence is refusal, not a floor. An invalid or forged token falls THROUGH to the
+          refusal rather than erroring differently, so a forged credential is worth exactly what
+          no credential is worth. An unparseable admin frame is likewise never forwarded
+          (FilterResult::PassThrough denies): an operation we cannot name is one we cannot
+          authorize.
+      - id: C13
+        status: answered
+        justification: >
+          The affordance expires by itself in two independent ways, neither needing a flag
+          unset: declaring `coordinated`, or configuring a JWT_SECRET. Giving the workspace its
+          own doorway identity is therefore the same act as retiring its local-first grant.
+          Successor is the chaperone (POST /hc/connect), already built.
+      - id: C12
+        status: partial
+        justification: >
+          Same standing-secret limit as the HTTP ladder: a bearer JWT and an API key are
+          verified structurally at the acting node, and the loopback conjunct by the kernel, but
+          possession of a standing secret is not a bounded, revocable grant. The delegates-compute
+          Mishpat::Commitment is the named successor.
+      - id: C8
+        status: unbound
+        justification: >
+          No labeled counter per outcome arm. The local-first grant logs at info and refusals at
+          warn, so "how often is an anonymous conductor-socket attempt refused" is answerable
+          only from logs. Arms are typed by construction, so binding a counter is additive.
+    gapNote: >
+      C8 unbound — arms typed but uncounted. C12 partial until delegates-compute replaces
+      standing secrets. Separately declared: handle_app_upgrade (/hc/app/{port}) performs NO
+      doorway-side permission check at all, relying on the conductor's own app-interface
+      authentication; that is a different surface from this one and is NOT closed by this row.
+    contractTests:
+      - path: doorway/doorway-service/src/server/websocket.rs
+        testName: native_local_first_requires_all_three_conjuncts
+        kind: unit
+        mirrorRisk: false
+      - path: doorway/doorway-service/src/server/websocket.rs
+        testName: the_grant_does_not_depend_on_dev_mode
+        kind: unit
+      - path: doorway/doorway-service/src/server/websocket.rs
+        testName: anonymous_remote_caller_is_refused_even_with_dev_mode
+        kind: unit
+      - path: doorway/doorway-service/src/server/websocket.rs
+        testName: anonymous_loopback_on_a_declared_doorway_is_refused
+        kind: unit
+      - path: doorway/doorway-service/src/server/websocket.rs
+        testName: anonymous_loopback_on_a_bare_dev_box_is_the_conductor_operator
+        kind: unit
+      - path: doorway/doorway-service/src/server/websocket.rs
+        testName: a_keyless_doorway_no_longer_grants_public_to_a_remote_anonymous_caller
+        kind: unit
+
   - name: extract_http_permission
     kind: verdict-fn
     sourceLocation:

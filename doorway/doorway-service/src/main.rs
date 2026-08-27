@@ -209,9 +209,16 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             // An outage must never be an authentication downgrade. With this,
             // `mongo.is_none()` can only mean "no MongoDB was configured",
             // which is a genuine local-dev shape rather than a failure.
-            if args.dev_mode && !args.mongodb_is_declared() {
+            // Keyed on DECLARATION alone, never on `dev_mode` — the same
+            // presence-keyed discriminator as `configured_jwt_secret` and
+            // `configured_seed_key`. The `dev_mode &&` conjunct that used to be
+            // here made an UNdeclared MongoDB fatal for any doorway running
+            // without the flag, and then said "a MongoDB was declared" in the
+            // error, which was simply untrue. That shape is now reachable on
+            // purpose: the secure workspace posture runs with no `--dev-mode`.
+            if !args.mongodb_is_declared() {
                 warn!(
-                    "MongoDB connection failed (dev mode, none configured, continuing without): {}",
+                    "MongoDB connection failed (none was configured, continuing without): {}",
                     e
                 );
                 None
@@ -261,14 +268,19 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             Some(client)
         }
         Err(e) => {
-            if args.dev_mode {
+            // Declaration-keyed, not `dev_mode`-keyed — see `nats_is_declared`.
+            if !args.nats_is_declared() {
                 warn!(
-                    "NATS connection failed (dev mode, continuing without): {}",
+                    "NATS connection failed (none was configured, continuing without): {}",
                     e
                 );
                 None
             } else {
-                error!("NATS connection failed: {}", e);
+                error!(
+                    "NATS connection failed (a NATS server was declared; refusing to start \
+                     rather than silently fall back to direct conductor routing): {}",
+                    e
+                );
                 std::process::exit(1);
             }
         }
@@ -448,8 +460,9 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
     // Register all conductors from config
     for (i, url) in conductor_urls.iter().enumerate() {
         let conductor_id = format!("conductor-{i}");
-        // Derive admin URL: same host, port - 1 (socat convention: 8444=admin, 8445=app)
-        let admin_url = derive_admin_url_from_app(url);
+        // Admin URL: an explicit --conductor-admin-url wins in the single-conductor
+        // case, else port - 1 (socat convention: 8444=admin, 8445=app).
+        let admin_url = args.admin_url_for(i, url, conductor_urls.len());
         registry.register_conductor(ConductorInfo {
             conductor_id,
             conductor_url: url.clone(),
@@ -511,7 +524,7 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             // derive_app_url would replace the port with app_port_min (4445), which breaks
             // headless k8s services where the socat proxy listens on a different port (e.g. 8445).
             let app_url = url.clone();
-            let admin_url_for_pool = derive_admin_url_from_app(&app_url);
+            let admin_url_for_pool = args.admin_url_for(i, &app_url, conductor_urls.len());
             // Do NOT mint the initial token synchronously here. The per-conductor
             // pool loop iterates the FULL alpha conductor list (CONDUCTOR_URLS =
             // every env human), and a synchronous mint_app_auth_token retries up
@@ -1239,7 +1252,7 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             let peer_health = Arc::clone(&state.peer_health);
 
             for (i, conductor_app_url) in conductor_urls.iter().enumerate() {
-                let admin_url = derive_admin_url_from_app(conductor_app_url);
+                let admin_url = args.admin_url_for(i, conductor_app_url, conductor_urls.len());
                 let conductor_id = format!("conductor-{i}");
 
                 let subscriber_config = SubscriberConfig {

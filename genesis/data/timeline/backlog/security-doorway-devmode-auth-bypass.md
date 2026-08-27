@@ -307,3 +307,118 @@ config, not the branch — the fix is to populate `CORS_ORIGINS` in the five man
 remove the reflect-any branch. Severity is bounded meanwhile: `Access-Control-Allow-Credentials`
 appears nowhere in the crate (verified by grep), so reflect-any cannot be used for credentialed
 cross-origin reads.
+
+---
+
+## CONDUCTOR-ADMIN PASSTHROUGH CLOSED (2026-08-27) — with the client coupling that blocked it
+
+The arc's last open item. It was blocked not by difficulty but by a **coupling**: the deployed app's
+anonymous visitors reach the conductor through `connectViaAdminWs` whenever no `doorwayToken` exists, so
+closing the socket alone would have broken onboarding. That coupling was resolved on the CLIENT side,
+which is why the doorway change is now unconditional.
+
+### The chain, as measured
+
+Three independent gates, each keyed on `dev_mode`, which is `"true"` on all five deployed manifests:
+
+1. `server/http.rs` `/hc/admin` — `if !dev_mode { 403 }`. The intended production 403 never fired
+   anywhere it mattered, and its message ("disabled in production") described a state the fleet was
+   never in.
+2. `server/websocket.rs::extract_permission` — no credential ⇒ `Ok(PermissionLevel::Public)`.
+   **A second credential-free arm existed and did not need `dev_mode` at all:**
+   `if api_key.is_some() || !api_validator.is_configured()` returned `Ok(Public)` to a caller presenting
+   nothing whenever no API keys were configured — precisely the workspace/mesh shape. Closing only the
+   `dev_mode` arm would have left the ladder open through this one.
+3. `proxy/{admin,pool,nats}.rs` — `if dev_mode { passthrough }` skipped `filter_message` ENTIRELY, so
+   `permission_level` was never consulted even when correctly computed.
+
+Net: an anonymous caller from the open internet reached an unfiltered Holochain admin interface —
+`install_app`, `uninstall_app`, `revoke_agent_key`.
+
+### What replaced it
+
+One predicate, `native_local_first_operator`, requiring three conjuncts: kernel-observed loopback peer
+**and** pre-coordination declared stage **and** **no declared `JWT_SECRET`**. The third is the one a
+deployment cannot fake — all five manifests populate `JWT_SECRET` from a `secretKeyRef`, and all five sit
+at the fail-closed `Bootstrap` stage, so **stage alone would not have saved them**. Route gate deleted;
+proxy filtering unconditional (an unparseable frame is never forwarded).
+
+Client: `useChaperone` is now `!!config.doorwayToken` — the workspace is no longer excluded. Both
+workspace URL branches now carry credentials; previously the workspace branch sent no query string, so the
+developer's JWT (already in `localStorage` as `elohim-auth-token`) never reached the socket.
+
+Workspace: `hc-start.sh` resolves a posture from what the box has (`DOORWAY_AUTH`, default `auto`) —
+**secure** (mongod present: per-workspace `JWT_SECRET` + `API_KEY_ADMIN` persisted, `HAPP_BUNDLE_PATH`, no
+`--dev-mode`) or **keyless** (native local-first). A per-workspace secret is load-bearing, not cosmetic: a
+keyless doorway signs with the publicly-known dev placeholder (`JwtValidator::new_dev`), so enabling the
+chaperone without one would have been security theatre.
+
+### Two adjacent fail-fasts de-coupled from `dev_mode` in the same pass
+
+The secure workspace posture is the first non-`dev_mode` doorway that legitimately declares neither
+MongoDB nor NATS, which exposed both as mode-keyed:
+
+- MongoDB: was `dev_mode && !declared` ⇒ continue, else fatal — so an UNdeclared Mongo was fatal for any
+  non-`dev_mode` doorway, and the error said *"a MongoDB was declared"* when none was. Now
+  declaration-keyed only.
+- NATS: was `dev_mode` ⇒ continue, else fatal. Now `nats_is_declared()`, same presence-keyed shape.
+
+### Verified live, both postures (loopback, anonymous unless noted)
+
+| Posture | `/hc/admin` | `/health` | `POST /hc/connect` |
+|---|---|---|---|
+| keyless | `101` Switching Protocols | `200` | `401` |
+| secure | `401` "Authentication required. Use POST /hc/connect." | `200` | `401` |
+| secure + valid `X-API-Key` | `101` | — | — |
+| secure + wrong key | `401` | — | — |
+
+Gate: 1128 doorway tests, clippy `-D warnings`, fmt clean, seam census registry errors 0.
+Registered as `websocket::extract_permission` (`kind: verdict-fn`) in `seam-registry.yaml`.
+
+### STILL OPEN, found while closing this
+
+`handle_app_upgrade` (`/hc/app/{port}` and legacy `/app/{port}`) performs **no doorway-side permission
+check at all** — the only gate is the numeric port range. It relies entirely on the conductor's own
+app-interface authentication. A different surface from the admin socket; not closed blind.
+
+### Three defects the live run surfaced that no test had (2026-08-27)
+
+Running the real stack in the SECURE posture exercised code paths that had never
+executed anywhere: with no account store there was no registration, and with the
+browser driving the admin socket directly the doorway's own admin client was never used.
+
+1. **Admin-port mis-derivation.** `hc sandbox` picks a RANDOM admin port and pins the app
+   interface with `-r=4445`, so the doorway's "admin = app port − 1" derivation cannot find
+   it (measured: it dialled `41236` for an admin socket on `41237`). `--conductor-admin-url`
+   existed as a flag with **zero consumers** — `Args::admin_url` was defined and never
+   called — so setting it did nothing and the registry guessed anyway. Now honoured via
+   `Args::admin_url_for` in all three derivation sites, single-conductor only (one admin URL
+   cannot describe a pool). `hc-start.sh` passes both URLs explicitly.
+
+2. **`ProvisionedAgent` re-derived the admin URL** in `call_create_human_on_conductor` and
+   in the registration recovery path, so hosted registration dialled the same dead port.
+   It now carries `admin_url` from the registry rather than guessing.
+
+3. **Client input panicked a tokio worker on an authenticated endpoint.** `POST /hc/connect`
+   with a malformed `signingKey` reached `HoloHash::from_raw_39`, which is documented to
+   panic and `unwrap()`s `try_from_raw_39`. It killed a doorway worker mid-request — twice
+   over, and a length-only guard fixes only the first:
+   - 32 bytes → `BadSize`
+   - 39 bytes with a wrong 3-byte type prefix → `BadPrefix`
+
+   Fixed at both levels: a boundary length check in the chaperone (clear 400), and
+   `typed_admin::checked_hash` delegating to the library's own checked constructor for all
+   four raw-byte conversions (`agent_key`, cell dna hash, cell agent key, `signing_key`).
+   Verified live: 32 bytes → `400`, 39 wrong-prefix bytes → `502` (sanitized), **0 panics**,
+   doorway still `200` on `/health`.
+
+   Nuance worth knowing: the wrong-prefix case answers `502` rather than `400` because it
+   fails inside the cap-grant call and goes through `sanitize_client_error`. That is a
+   misleading status for what is client input, but it is a sanitized error rather than a
+   panic; left as-is rather than churn the error mapping in a security change.
+
+**Not proven here:** the chaperone HAPPY path. A genuine `signingKey` is an Ed25519 public
+key with a valid Holochain prefix, which the browser generates; synthetic bytes can only
+prove the refusal paths. What IS proven live: registration provisions an agent on the
+conductor, login mints an `AUTHENTICATED` JWT, and the chaperone resolves the right
+conductor and app for that human before reaching the cap grant.

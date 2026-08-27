@@ -103,11 +103,10 @@ pub async fn call_get_my_human(state: &AppState) -> Result<Option<HumanOutput>> 
 /// default ZomeCaller target.
 pub async fn call_create_human_on_conductor(
     conductor_url: &str,
+    admin_url: &str,
     installed_app_id: &str,
     input: CreateHumanInput,
 ) -> crate::types::Result<HumanOutput> {
-    let admin_url = crate::derive_admin_url_from_app(conductor_url);
-
     debug!(
         conductor_url = %conductor_url,
         admin_url = %admin_url,
@@ -116,7 +115,7 @@ pub async fn call_create_human_on_conductor(
         "Creating temporary ZomeCaller for hosted registration"
     );
 
-    let caller = crate::services::ZomeCaller::new(&admin_url, conductor_url, installed_app_id);
+    let caller = crate::services::ZomeCaller::new(admin_url, conductor_url, installed_app_id);
 
     // Same chase pattern as call_create_human — see that helper for rationale.
     let action_hash: ActionHash = caller

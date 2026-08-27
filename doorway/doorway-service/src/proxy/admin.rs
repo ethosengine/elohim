@@ -1,8 +1,16 @@
 //! Admin interface proxy
 //!
-//! Bidirectional WebSocket proxy between client and Holochain conductor admin interface.
-//! In dev mode: passthrough all messages
-//! In production: filter messages based on permission level
+//! Bidirectional WebSocket proxy between client and Holochain conductor admin
+//! interface. EVERY client frame is filtered against the caller's permission
+//! level — there is no passthrough mode.
+//!
+//! There used to be one, keyed on `dev_mode`. Because `DEV_MODE: "true"` is set
+//! on every deployed manifest, that made this proxy forward raw, unfiltered
+//! frames to the conductor admin interface for every caller on the fleet — and
+//! the caller did not need a credential to get here, so `install_app`,
+//! `uninstall_app` and `revoke_agent_key` were reachable anonymously from the
+//! open internet. Filtering is now unconditional and defends in depth even if a
+//! caller reaches this proxy with a level it should not have.
 
 use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
@@ -25,14 +33,11 @@ pub async fn run_proxy(
     client_ws: HyperWebSocket,
     conductor_url: &str,
     _origin: Option<String>,
-    dev_mode: bool,
     permission_level: PermissionLevel,
 ) -> Result<()> {
     info!(
-        "Creating {} admin proxy to {} (permission: {})",
-        if dev_mode { "passthrough" } else { "filtered" },
-        conductor_url,
-        permission_level
+        "Creating filtered admin proxy to {} (permission: {})",
+        conductor_url, permission_level
     );
 
     // Connect to conductor with proper headers
@@ -77,42 +82,34 @@ pub async fn run_proxy(
         while let Some(msg) = client_stream.next().await {
             match msg {
                 Ok(Message::Binary(data)) => {
-                    // In dev mode, passthrough without filtering
-                    if dev_mode {
-                        let mut sink = conductor_sink_for_client.lock().await;
-                        if let Err(e) = sink.send(Message::Binary(data)).await {
-                            error!("Failed to send to conductor: {}", e);
-                            break;
+                    // Parse message and check permissions
+                    match filter_message(&data, permission_level) {
+                        FilterResult::Allow => {
+                            let mut sink = conductor_sink_for_client.lock().await;
+                            if let Err(e) = sink.send(Message::Binary(data)).await {
+                                error!("Failed to send to conductor: {}", e);
+                                break;
+                            }
                         }
-                    } else {
-                        // Parse message and check permissions
-                        match filter_message(&data, permission_level) {
-                            FilterResult::Allow => {
-                                let mut sink = conductor_sink_for_client.lock().await;
-                                if let Err(e) = sink.send(Message::Binary(data)).await {
-                                    error!("Failed to send to conductor: {}", e);
-                                    break;
-                                }
+                        FilterResult::Deny(error_msg) => {
+                            warn!("Blocked operation: {}", error_msg);
+                            // Send error response back to client
+                            let error_response = encode_error(&error_msg);
+                            let mut sink = client_sink_for_client.lock().await;
+                            if let Err(e) = sink.send(Message::Binary(error_response)).await {
+                                error!("Failed to send error to client: {}", e);
+                                break;
                             }
-                            FilterResult::Deny(error_msg) => {
-                                warn!("Blocked operation: {}", error_msg);
-                                // Send error response back to client
-                                let error_response = encode_error(&error_msg);
-                                let mut sink = client_sink_for_client.lock().await;
-                                if let Err(e) = sink.send(Message::Binary(error_response)).await {
-                                    error!("Failed to send error to client: {}", e);
-                                    break;
-                                }
-                            }
-                            FilterResult::PassThrough => {
-                                // Couldn't parse message, block in production
-                                warn!("Blocking unparseable message in production mode");
-                                let error_response = encode_error("Invalid message format");
-                                let mut sink = client_sink_for_client.lock().await;
-                                if let Err(e) = sink.send(Message::Binary(error_response)).await {
-                                    error!("Failed to send error to client: {}", e);
-                                    break;
-                                }
+                        }
+                        FilterResult::PassThrough => {
+                            // Unparseable frame. Never forwarded: an operation we
+                            // cannot name is an operation we cannot authorize.
+                            warn!("Blocking unparseable admin frame");
+                            let error_response = encode_error("Invalid message format");
+                            let mut sink = client_sink_for_client.lock().await;
+                            if let Err(e) = sink.send(Message::Binary(error_response)).await {
+                                error!("Failed to send error to client: {}", e);
+                                break;
                             }
                         }
                     }

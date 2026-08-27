@@ -28,8 +28,14 @@ pub struct ProvisionedAgent {
     pub agent_pub_key: String,
     /// Conductor identifier (e.g., "conductor-0").
     pub conductor_id: String,
-    /// Conductor WebSocket URL.
+    /// Conductor WebSocket URL (app interface).
     pub conductor_url: String,
+    /// Conductor ADMIN WebSocket URL, taken from the registry rather than
+    /// derived from `conductor_url`. The `app_port - 1` derivation is a socat
+    /// convention that does not hold for `hc sandbox`, which picks a random
+    /// admin port and pins the app interface separately — so callers that
+    /// re-derived it were dialling a port nothing listens on.
+    pub admin_url: String,
     /// Installed app ID on the conductor.
     pub installed_app_id: String,
 }
@@ -260,6 +266,7 @@ impl AgentProvisioner {
             agent_pub_key: agent_pub_key_b64,
             conductor_id: conductor.conductor_id,
             conductor_url: conductor.conductor_url,
+            admin_url: conductor.admin_url,
             installed_app_id,
         })
     }
@@ -306,6 +313,7 @@ impl AgentProvisioner {
                         agent_pub_key: agent_pub_key_b64,
                         conductor_id: conductor.conductor_id.clone(),
                         conductor_url: conductor.conductor_url.clone(),
+                        admin_url: conductor.admin_url.clone(),
                         installed_app_id: app_id,
                     });
                 }

@@ -24,7 +24,6 @@ pub async fn run_admin_proxy(
     client_ws: HyperWebSocket,
     pool: Arc<WorkerPool>,
     origin: Option<String>,
-    dev_mode: bool,
     permission_level: PermissionLevel,
 ) -> Result<()> {
     info!(
@@ -38,8 +37,8 @@ pub async fn run_admin_proxy(
         match msg_result {
             Ok(Message::Binary(data)) => {
                 info!("Admin proxy received binary message ({} bytes)", data.len());
-                // Check permissions in production mode
-                if !dev_mode {
+                // Permission check is unconditional: see proxy/admin.rs.
+                {
                     match parse_message(&data) {
                         Ok(parsed) => {
                             if !is_operation_allowed(&parsed.operation, permission_level) {

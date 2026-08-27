@@ -50,6 +50,29 @@ pub struct AppInfoDetailed {
 /// Typed Holochain admin API client backed by `holochain_client::AdminWebsocket`.
 ///
 /// Maintains a persistent WebSocket connection to the conductor's admin interface.
+/// Checked construction for the holo_hash types this client builds from raw bytes.
+///
+/// `HoloHash::from_raw_39` is documented to "panic if hash_type does not match
+/// or hash is incorrect length" — it `unwrap()`s `try_from_raw_39`, which
+/// rejects BOTH a wrong length (`BadSize`) and a wrong 3-byte type prefix
+/// (`BadPrefix`). Every input here originates outside this process: a
+/// browser-supplied signing key, or a cell id round-tripped through the
+/// registry. An unchecked conversion therefore turns malformed input into a
+/// panicked tokio worker mid-request rather than an error the caller can see.
+///
+/// Measured 2026-08-27 against the local stack: `POST /hc/connect` killed a
+/// doorway worker twice over — first with a 32-byte key (`BadSize`), then with
+/// 39 well-sized bytes carrying the wrong prefix (`BadPrefix`). A length-only
+/// guard fixes the first and not the second, which is why this delegates to
+/// the library's own checked constructor rather than pre-validating the size.
+fn checked_hash<T: holo_hash::HashType>(
+    label: &str,
+    bytes: &[u8],
+) -> Result<holo_hash::HoloHash<T>, String> {
+    holo_hash::HoloHash::<T>::try_from_raw_39(bytes.to_vec())
+        .map_err(|e| format!("Invalid {label} ({} bytes): {e:?}", bytes.len()))
+}
+
 /// Methods convert between Holochain typed structs and doorway's domain types.
 pub struct TypedAdminClient {
     admin_ws: AdminWebsocket,
@@ -101,7 +124,7 @@ impl TypedAdminClient {
         agent_key: &[u8],
         bundle_path: &str,
     ) -> Result<(), String> {
-        let agent = AgentPubKey::from_raw_39(agent_key.to_vec());
+        let agent: AgentPubKey = checked_hash("agent_key", agent_key)?;
 
         let payload = InstallAppPayload {
             source: AppBundleSource::Path(std::path::PathBuf::from(bundle_path)),
@@ -203,11 +226,11 @@ impl TypedAdminClient {
     ) -> Result<(), String> {
         use holochain_client::CellId as HcCellId;
 
-        let dna = DnaHash::from_raw_39(cell_id.0.to_vec());
-        let agent = AgentPubKey::from_raw_39(cell_id.1.to_vec());
+        let dna: DnaHash = checked_hash("cell dna hash", cell_id.0)?;
+        let agent: AgentPubKey = checked_hash("cell agent key", cell_id.1)?;
         let hc_cell_id = HcCellId::new(dna, agent);
 
-        let signer = AgentPubKey::from_raw_39(signing_key.to_vec());
+        let signer: AgentPubKey = checked_hash("signing_key", signing_key)?;
 
         // Build CapSecret from raw bytes (64 bytes expected)
         let secret: CapSecret = cap_secret.try_into().map_err(|_| {

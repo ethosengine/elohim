@@ -3,7 +3,7 @@ title: Architecture — Index
 tier: architecture
 status: Living document
 created: 2026-05-24
-last-verified: 2026-07-30
+last-verified: 2026-08-26
 maintainers: Matthew Dowell + Opus 4.7
 ---
 
@@ -108,6 +108,7 @@ The records-lifecycle spec rests on these substrate-defining architecture specs 
 | [`2026-06-02-doorway-ssr-runtime.md`](./2026-06-02-doorway-ssr-runtime.md) | Doorway server-render as an honest compute capability (Angular-19 SSR build-glue) |
 | [`2026-05-02-blob-custody-reconciliation-design.md`](./2026-05-02-blob-custody-reconciliation-design.md) | Blob custody reconciliation — placement/salvage as a reconciled substrate primitive (placement signals are economic inputs to shefa) |
 | [`2026-06-11-doorway-two-axis-scaling.md`](./2026-06-11-doorway-two-axis-scaling.md) | Doorway's two independent scaling axes — the projection read path vs the conductor/identity-hosting pool — and the graduation flywheel between them (graduation is accounting-only as-implemented; no source-chain export exists) |
+| [`2026-08-25-doorway-auth-posture-declared-stage.md`](./2026-08-25-doorway-auth-posture-declared-stage.md) | Doorway write authority derived from the declared network stage, with seed authority distinct from per-doorway admin identity |
 | [`2026-08-05-wave2-relay-sovereignty-design.md`](./2026-08-05-wave2-relay-sovereignty-design.md) | Relay custody on the conductor transport plane — self-hosted iroh-relay, the tx5 retirement, and the never-n0 boundary (kitsune2 relay plane, distinct from the elohim-storage iroh dataplane) |
 
 Most of this table arrived in a **migration from `genesis/docs/superpowers/specs/` dated 2026-05-24**; seeds authored in this directory afterwards were never part of that migration. Frontmatter normalization of the migrated set (to the architecture contract — `tier: architecture` + `realizes:` / `informed-by:` / `informs:`) is a follow-up pass; their content remains canonical as-is.
@@ -132,6 +133,7 @@ Routers and runbooks rather than subject seeds. Two of these are what the root `
 |---|---|
 | [`2026-06-21-elohim-seam-map-concern-routing.md`](./2026-06-21-elohim-seam-map-concern-routing.md) | The concern-routing atlas — the device spectrum × composition stack, the three extension seams (SDK / bridge / mod), and the four participation tracks. Answers "**where does this live?**" on the *layer* axis, upstream of MAP's domain lattice |
 | [`2026-07-12-substrate-trust-contract-runbook.md`](./2026-07-12-substrate-trust-contract-runbook.md) | The dataplane's trust contract — the invariants you may assume, the probe watching each one, and the per-red decision tree. The **operate-time** door; where it and a design doc disagree, the probes are the authority |
+| [`2026-08-25-doorway-auth-refusal-runbook.md`](./2026-08-25-doorway-auth-refusal-runbook.md) | The write-path authorization runbook — refusal probes and decision trees that keep doorway auth failures distinct from dataplane divergence |
 | [`cluster-topology.md`](./cluster-topology.md) | The live P2P modeling canvas — the multi-node topology the test environment actually runs, as distinct from the protocol architecture it hosts |
 
 ### Governance, upgrade, and agent authority

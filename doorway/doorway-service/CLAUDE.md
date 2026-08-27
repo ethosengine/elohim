@@ -3,7 +3,7 @@ id: doorway-service-gospel
 cites:
   - "resilience-protocol-spec | the resilience protocol + account-recovery canon (Parts V/VI) this gateway implements as the web2 projection — patron-CDN, social-recovery, creator-succession | sha256:147140028ad65820 | path: genesis/docs/content/elohim-protocol/resilience/README.md"
   - "elohim-seam-map-concern-routing | the concern-routing atlas — this surface owns the Doorway projection seam (§3.9, Track 4); routes any where-does-this-go? question | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
-  - "doorway-auth-posture-declared-stage | the auth-posture entrypoint for this crate — the declared-stage rule, why DEV_MODE is never a posture, the API_KEY_ADMIN vs API_KEY_SEED distinction, the chaperone exception, and the six questions to answer before adding any gate here | sha256:472d98d90d8ea8e8 | path: genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-posture-declared-stage.md"
+  - "doorway-auth-posture-declared-stage | the auth-posture entrypoint for this crate — the declared-stage rule, why DEV_MODE is never a posture, the API_KEY_ADMIN vs API_KEY_SEED distinction, the chaperone exception, the three developer modes, and the eight questions to answer before adding any gate here | sha256:ba3b216fd5998473 | path: genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-posture-declared-stage.md"
   - "doorway-auth-refusal-runbook | the symptom-side companion for this crate — what to do when a doorway refusal actually happens, including the decision tree that stops a 403 on the write path being filed as a dataplane divergence | sha256:0929079216f0c37d | path: genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-refusal-runbook.md"
 ---
 
@@ -29,15 +29,37 @@ fail-closed to `Bootstrap`, and `Simulacra` reachable only by explicit positive 
 If you are about to write `if state.args.dev_mode` in an auth path, stop. `DEV_MODE: "true"` is set on
 EVERY deployed manifest, so a gate keyed on it is in practice ungated — that is how the seed and
 `/admin/cache/*` routes became reachable with no credential from the open web (closed by `62b658784`),
-and how the apex became undeployable when that bypass was correctly removed.
+and how the apex became undeployable when that bypass was correctly removed. The same flag left an
+UNFILTERED Holochain conductor admin socket reachable anonymously from the internet across three
+independent gates at once (closed 2026-08-27; `server/websocket.rs::native_local_first_operator` is
+now the single predicate, and `proxy/{admin,pool,nats}.rs` filter every frame unconditionally).
+
+`dev_mode` survives in exactly one honest role: a startup-time DECLARATION that this is a developer's
+box, which the config validator requires before letting a doorway run with no signing secret at all.
+That is fail-closed. It must never again decide a per-request grant.
+
+**Three developer modes, one predicate.** A native local-first developer (own box, own conductor, no
+identity system) reaches the conductor admin socket because they are loopback + pre-coordination + have
+no declared `JWT_SECRET`. Everyone else — the web workspace and the deployed fleet alike — goes through
+`POST /hc/connect` (the chaperone), which needs only a valid JWT and provisions server-side. The JWT is a
+browser SESSION carrier over a DHT-authoritative agent key, never the identity itself; doorway JWT/JWKS
+federation is the web2 projection, not the trust layer.
 
 Two credentials answer two DIFFERENT questions, and collapsing them is the recurring defect:
 `API_KEY_ADMIN` = *"is this caller MY admin?"* (this doorway's operator identity, deliberately distinct
 per doorway); `API_KEY_SEED` = *"may this caller seed?"* (the fleet's deploy authority, uniform by design,
 scoped to the seed/admin-cache routes and never to the permission ladder).
 
+Every gate in this crate silently assumes the caller acts on **their own** account. The substrate does
+not: the imagodei integrity zome carries `StewardshipGrant` (steward_id + subject_id, a closed
+`authority_basis` set covering guardianship / court order / medical necessity, per-surface capability
+scope, mandatory expiry + review, revocation, and subject appeal rights). Do NOT model that authority as
+a new `PermissionLevel` rank — it is relational, not scalar — and do not overload `is_steward`, which
+here means the OPPOSITE thing (self-custodial: the human proved they hold their own key). Answer
+question 8 before writing any predicate.
+
 The full rule, the stage-to-context ladder, the chaperone exception for hosted humans, the migration to
-p2p-derived authority, the open items, and the six questions to answer before adding a gate:
+p2p-derived authority, the open items, and the eight questions to answer before adding a gate:
 `doorway-auth-posture-declared-stage`.
 
 Debugging a refusal rather than designing one — a red deploy seed leg, a host serving an old bundle at

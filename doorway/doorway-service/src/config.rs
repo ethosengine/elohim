@@ -57,6 +57,9 @@ impl std::fmt::Display for OpGateMode {
 /// become an authentication downgrade (see `main.rs`).
 pub const DEFAULT_MONGODB_URI: &str = "mongodb://localhost:27017";
 
+/// Default NATS URL — the sentinel [`Args::nats_is_declared`] compares against.
+pub const DEFAULT_NATS_URL: &str = "nats://127.0.0.1:4222";
+
 /// Doorway - WebSocket gateway for Elohim Holochain
 ///
 /// "Knock and it shall be opened" - Matthew 7:7-8
@@ -363,7 +366,7 @@ pub struct Args {
 #[derive(Parser, Debug, Clone)]
 pub struct NatsArgs {
     /// NATS server URL
-    #[arg(long, env = "NATS_URL", default_value = "nats://127.0.0.1:4222")]
+    #[arg(long, env = "NATS_URL", default_value = DEFAULT_NATS_URL)]
     pub nats_url: String,
 
     /// NATS username (optional)
@@ -423,7 +426,32 @@ impl Args {
             .map(|url| url.trim_end_matches('/').to_string())
     }
 
+    /// The admin URL for conductor index `i`, honouring an explicit
+    /// `--conductor-admin-url` / `CONDUCTOR_ADMIN_URL` override.
+    ///
+    /// The default derivation is `app_port - 1` (the socat convention:
+    /// 4444=admin, 4445=app). That convention does not hold everywhere:
+    /// `hc sandbox` picks a RANDOM admin port and pins the app interface with
+    /// `-r=4445`, so admin and app are not adjacent at all — the derived port
+    /// is simply someone else's, or nobody's. Before this, `--conductor-admin-url`
+    /// existed as a flag with ZERO consumers: `Args::admin_url` was defined and
+    /// never called, so setting it did nothing and the registry guessed anyway.
+    ///
+    /// The override applies only in the SINGLE-conductor case. With a pool
+    /// (`CONDUCTOR_URLS`), one admin URL cannot describe N conductors, so each
+    /// keeps its derivation — which is correct there, because the pooled
+    /// deployments are exactly the socat topologies the convention was written for.
+    pub fn admin_url_for(&self, index: usize, app_url: &str, conductor_count: usize) -> String {
+        match self.conductor_admin_url.as_deref().map(str::trim) {
+            Some(explicit) if !explicit.is_empty() && conductor_count == 1 && index == 0 => {
+                explicit.to_string()
+            }
+            _ => crate::derive_admin_url_from_app(app_url),
+        }
+    }
+
     /// Get effective admin URL (falls back to conductor_url if not set)
+    #[allow(dead_code)]
     pub fn admin_url(&self) -> &str {
         self.conductor_admin_url
             .as_deref()
@@ -447,6 +475,20 @@ impl Args {
     /// absence (undeclared).
     pub fn mongodb_is_declared(&self) -> bool {
         std::env::var("MONGODB_URI").is_ok() || self.mongodb_uri != DEFAULT_MONGODB_URI
+    }
+
+    /// Did the deployment DECLARE a NATS server, by env var or CLI flag?
+    ///
+    /// Same presence-keyed shape as [`Args::mongodb_is_declared`]. Used by
+    /// `main.rs` to decide whether an unreachable NATS is a fatal
+    /// misconfiguration (declared) or an ordinary absence (undeclared).
+    ///
+    /// Replaces a `dev_mode` conjunct. NATS is genuinely optional — the doorway
+    /// falls back to a direct conductor connection — so a doorway that never
+    /// asked for NATS must not die because none is listening. That was only
+    /// invisible while every non-`dev_mode` doorway also declared one.
+    pub fn nats_is_declared(&self) -> bool {
+        std::env::var("NATS_URL").is_ok() || self.nats.nats_url != DEFAULT_NATS_URL
     }
 
     pub fn configured_jwt_secret(&self) -> Option<&str> {

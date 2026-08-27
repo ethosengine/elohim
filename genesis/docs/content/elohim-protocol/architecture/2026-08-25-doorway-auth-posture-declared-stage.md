@@ -2,7 +2,7 @@
 title: Doorway Auth Posture — Authority Derives From the Declared Stage
 id: doorway-auth-posture-declared-stage
 tier: architecture
-status: accepted — Axis 1 (stage-derived seed authority + fleet seed authority) and Axis 2 (the permission ladder's fallthrough + the MongoDB-outage auth downgrade) landed in-tree and locally verified, NOT yet measured on the fleet; the conductor-admin passthrough remains open and is named in Known open items
+status: accepted — Axis 1 (stage-derived seed authority + fleet seed authority), Axis 2 (the permission ladder's fallthrough + the MongoDB-outage auth downgrade) and the conductor-admin passthrough have all landed in-tree and been verified live in both postures; NOT yet measured on the fleet. The remaining named gap on this surface is handle_app_upgrade, which has no doorway-side permission check at all
 created: 2026-08-25
 pillar coupling: doorway (web2 projection + chaperone), elohim (peer-native substrate boundary), imagodei (identity)
 informed-by:
@@ -72,8 +72,13 @@ practice, ungated. Two live consequences have been observed:
   open web** (proven 2026-08-24 on the local mesh: an anonymous `PUT /admin/seed/blob` with a deliberately
   wrong `X-Blob-Hash` answered `409 Hash mismatch` — it passed the gate and was stopped only by content
   addressing). Closed by `62b658784`.
-- `extract_http_permission` still grants every anonymous caller `PermissionLevel::Authenticated` when the
-  flag is set. **Open** — see "Known open items".
+- `extract_http_permission` granted every anonymous caller `PermissionLevel::Authenticated` when the flag
+  was set. Closed 2026-08-27.
+- The conductor admin socket was reachable **unauthenticated AND unfiltered** from the open internet on
+  the whole fleet: three independent `dev_mode` gates (the `/hc/admin` route, the WebSocket permission
+  ladder, and the proxy's message filter) were each ungated by the same always-true flag, so an anonymous
+  caller could drive `install_app` / `uninstall_app` / `revoke_agent_key`. Closed 2026-08-27 — see "What
+  landed".
 
 ---
 
@@ -100,47 +105,102 @@ same `AmberOk` arm in `seam-contracts/src/freshness.rs`.
 The ladder above maps DEPLOY targets. The orthogonal question — *how does a **developer** prove
 authority to drive a conductor?* — has three answers, and conflating them is what left a hole open.
 
-| Mode | Where the developer's key lives | Admission authority today | Native answer |
+| Mode | Where the developer's key lives | Admission authority | Conductor path |
 |---|---|---|---|
-| **Native local-first** (Tauri + local conductor sidecar) | on the box, own conductor | on-the-box: loopback peer, self-operator | already native — the developer IS a peer |
-| **Web devspace** (Eclipse Che today, `elohim/lvi` intended) | nowhere: the browser holds no key, and the admin socket is a SEPARATE Che endpoint (`wss://<workspace>-hc-dev…`), so the doorway never sees loopback | **none of the three** — which is exactly why `dev_mode` was reached for | **the chaperone** — the devspace developer is a hosted human by this doc's own definition |
-| **e2e / CI** (a2o against a deployed doorway) | nowhere: remote by construction | `jenkins-ci@…` self-provisions an Admin account from `API_KEY_ADMIN` (`doorway-seed-ensure.sh`) | a bounded, revocable `delegates-compute` commitment |
+| **Native local-first** (own box, own conductor; Tauri, CLI, bare `hc-start.sh`) | on the box — and often nowhere at all, because no identity system is configured | `native_local_first_operator`: loopback peer **and** pre-coordination stage **and** no declared `JWT_SECRET` | admin WebSocket, granted `Admin` |
+| **Web workspace** (Eclipse Che today, `elohim/lvi` intended) | the browser, as a session JWT minted by *this workspace's own doorway* | a valid JWT — no permission level required | `POST /hc/connect` (chaperone) |
+| **e2e / CI** (a2o against a deployed doorway) | nowhere: remote by construction | `jenkins-ci@…` self-provisions an Admin account from `API_KEY_ADMIN` (`doorway-seed-ensure.sh`) | `POST /hc/connect`, or an explicit admin credential |
 
-### The web-devspace mode had no cheap arm — and that is the whole story
+The three are one predicate with three carriers, not three postures. `DEV_MODE` is a carrier of none of
+them.
 
-The conductor admin passthrough (`proxy/{admin,pool,nats}.rs` `if dev_mode { passthrough }`, plus the
-`/hc/admin` upgrade gated on the same flag) is **not an oversight**. It is a scaffold standing in for
-a capability the protocol had not grown: there was no way to drive Holochain dev over the web,
-because a devspace browser can present no credential the doorway would accept and — the operator's
-constraint — no reproducible OAuth redirect URL is possible against `127.0.0.1`.
+### The web-workspace mode had no cheap arm — and that was the whole story
 
-**The redirect constraint no longer binds, and probably never had to.** It is the problem of being an
-OAuth *client*. This doorway is itself an authorization server (`/auth/register`, `/auth/login`,
-`/auth/refresh`, and `/auth/authorize` with its own registered-client table). A devspace developer
-logs into *their own workspace doorway*. There is no third party in the loop, so there is no redirect
-URI to reproduce.
+The conductor admin passthrough was **not an oversight**. It was a scaffold standing in for a capability
+the protocol had not grown: there was no way to drive Holochain dev over the web, because a workspace
+browser could present no credential the doorway would accept and — the operator's constraint — no
+reproducible OAuth redirect URL is possible against `127.0.0.1`.
 
-**And the developer never needs `Admin`.** The reason the admin socket looked necessary is the
-11-step `connectViaAdminWs` flow, which calls `generate_agent_pub_key` (Authenticated) and
-`install_app`/`enable_app` (Admin). The chaperone already removes that requirement: `handle_hc_connect`
-gates on a VALID JWT with **no permission-level check**, then performs cap grants, app-token issuance,
-and `auto_provision` — which installs and enables the happ **server-side, under the doorway's own
-admin connection**. An `Authenticated` developer gets a fully provisioned app and never opens an admin
-socket at all.
+**The redirect constraint never bound.** It is the problem of being an OAuth *client*. This doorway is
+itself an authorization server (`/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/authorize` with
+its own registered-client table). A workspace developer logs into *their own workspace doorway*. There is
+no third party in the loop, so there is no redirect URI to reproduce.
 
-What keeps the devspace on the old path is one clause: `useChaperone = !isCheEnvironment() &&
-!!doorwayToken` (`doorway-connection-strategy.ts`). Che is explicitly EXCLUDED from the chaperone. The
-Che branch of `resolveAdminUrl` also sends no query string, so the developer's JWT — which
-`PasswordAuthProvider.getCheAuthUrl()` already obtains from the workspace doorway and stores at
-`elohim-auth-token` — never reaches the socket. The credential exists; it is simply not attached.
+**And the developer never needed `Admin`.** What made the admin socket look necessary is the 11-step
+`connectViaAdminWs` flow, which calls `generate_agent_pub_key` (Authenticated) and
+`install_app`/`enable_app` (Admin). The chaperone removes that requirement: `handle_hc_connect` gates on a
+VALID JWT with **no permission-level check**, then performs cap grants, app-token issuance, and
+`auto_provision` — which installs and enables the happ **server-side, under the doorway's own admin
+connection**. An `Authenticated` developer gets a fully provisioned app and never opens an admin socket.
 
-So the passthrough's replacement is not new machinery. In order: give the devspace doorway a posture
-(its own `JWT_SECRET`, an account store, `HAPP_BUNDLE_PATH`, and a self-provisioned developer account
-via the same `doorway-seed-ensure.sh` recipe CI already runs); let Che use the chaperone; then delete
-the passthrough so `filter_message` always runs. Two fallbacks must be closed together, not one: the
-`dev_mode` arm AND `websocket.rs`'s `|| !api_validator.is_configured()` arm, which returns
-`Ok(Public)` to a credential-free caller even with `dev_mode` off whenever no API keys are configured
-— which is precisely the devspace/mesh shape.
+What held the workspace on the old path was one clause — `useChaperone = !isCheEnvironment() &&
+!!doorwayToken` — which EXCLUDED the workspace from the chaperone, while the workspace branch of
+`resolveAdminUrl` sent no query string at all. The developer's JWT already existed in the browser
+(`elohim-auth-token`, minted by the workspace doorway); it simply was never attached.
+
+### What landed (2026-08-27)
+
+**Doorway.** Three `dev_mode` decision points collapsed to one predicate:
+
+- `server/websocket.rs::extract_permission` — the two credential-free arms closed **together**: the
+  `dev_mode` fallthrough, and the `|| !api_validator.is_configured()` disjunct that returned `Ok(Public)`
+  to a caller presenting nothing whenever no API keys were configured (live even with `dev_mode` off, and
+  precisely the workspace/mesh shape). Absence is now refusal, naming the chaperone in the 401.
+- `server/http.rs` `/hc/admin` and the legacy `/` upgrade — route-level posture gate **deleted**. It read
+  `if !dev_mode { 403 }`, so on all five deployed manifests the intended production 403 never fired and
+  the message "disabled in production" described a state the fleet was never in.
+- `proxy/{admin,pool,nats}.rs` — the `dev_mode` passthrough **deleted**; `filter_message` is now
+  unconditional, defence in depth even for a caller who reaches the proxy with a level they should not
+  have. An unparseable frame is never forwarded: an operation we cannot name is one we cannot authorize.
+
+The replacement grant, `native_local_first_operator`, needs three conjuncts: loopback peer (kernel-observed,
+never `X-Forwarded-For`) **and** pre-coordination stage **and** **no declared `JWT_SECRET`**. That last one
+is what a deployment cannot fake — all five deployed manifests populate `JWT_SECRET` from a `secretKeyRef`,
+and all five sit at the fail-closed `Bootstrap` stage, so **stage alone would not have saved them**.
+
+Two adjacent fail-fasts stopped keying on `dev_mode` in the same pass, because the secure workspace posture
+is the first non-`dev_mode` doorway that legitimately declares neither: MongoDB and NATS are now fatal iff
+**declared** (`mongodb_is_declared` / `nats_is_declared`). The old MongoDB arm additionally claimed "a
+MongoDB was declared" in an error raised when none was.
+
+**Client.** `useChaperone` is now just `!!config.doorwayToken` — every environment with a session token
+takes the chaperone. The admin WebSocket remains only for native local-first. Both workspace URL branches
+now carry credentials.
+
+**Workspace.** `hc-start.sh` resolves an auth posture from what the box actually has (`DOORWAY_AUTH`,
+default `auto`):
+
+- **secure** — mongod present: starts it, generates and persists a per-workspace `JWT_SECRET` and
+  `API_KEY_ADMIN` under `elohim/holochain/local-dev/doorway/`, passes `HAPP_BUNDLE_PATH`, and does **not**
+  pass `--dev-mode`. The developer registers once in the app and reaches the conductor through the
+  chaperone, exactly as a hosted human does on the fleet.
+- **keyless** — no mongod: native local-first, `--dev-mode` retained.
+
+`--dev-mode` survives in exactly one honest role: a startup-time *declaration* that this is a developer's
+box, which the config validator requires before letting a doorway run with **no signing secret at all**
+(`!dev_mode && jwt_secret.is_none()` ⇒ refuse to start). That is fail-closed and stays. What it must never
+again do is decide a per-request grant.
+
+A per-workspace secret is not cosmetic: a doorway with no `JWT_SECRET` signs with the publicly-known dev
+placeholder (`JwtValidator::new_dev`), so **turning on the chaperone without one would have been security
+theatre** — anyone could forge a token and be provisioned. Giving the workspace its own identity and
+retiring its local-first grant are therefore the *same act*, which is why the grant needs no flag to unset.
+
+**Measured live, both postures** (loopback, anonymous unless noted):
+
+| Posture | `/hc/admin` | `/health` | `POST /hc/connect` |
+|---|---|---|---|
+| keyless | `101` (conductor operator) | `200` | `401` |
+| secure | `401` "Use POST /hc/connect." | `200` | `401` |
+| secure + valid `X-API-Key` | `101` | — | — |
+| secure + wrong key | `401` | — | — |
+
+### Still open on this surface
+
+`handle_app_upgrade` (`/hc/app/{port}` and legacy `/app/{port}`) performs **no doorway-side permission
+check at all** — the only gate is the numeric port range; it relies entirely on the conductor's own
+app-interface authentication. That is a different surface from the admin socket and is **not** closed by
+the above. Declared here rather than left to be rediscovered.
 
 Past that, the standing credential is itself the scaffold: the successor for all three modes is one
 `delegates-compute` commitment — bounded, revocable, auditable, identity-bound, and verified by a
@@ -225,7 +285,8 @@ Named here so they are not rediscovered as surprises. None is fixed by the stage
 | Item | Where | Status |
 |---|---|---|
 | Anonymous callers resolve to `Authenticated` under `DEV_MODE` | `auth/http_permission.rs` | **CLOSED 2026-08-27.** Now derives from `network_stage < Coordinated && peer_is_loopback`, mirroring seed authority (1). The feared blast radius was measured and is one route: the crate has exactly ONE `Authenticated` gate (the elohim-agent invocation proxy), whose own contract already says it should refuse anonymous traffic. Content/blob/apps/cache routes carry no permission gate at all, so browsing is untouched. Proven live: remote anon → 401, loopback anon → passes, `/health` public on both. |
-| Anonymous remote callers get an UNFILTERED conductor admin socket | `proxy/{admin,pool,nats}.rs`, `server/http.rs:5220`/`:5261`, `server/websocket.rs:426` | **OPEN — most severe.** `if dev_mode { passthrough }` skips `filter_message` entirely, so `permission_level` is never consulted; the WS ladder returns `Ok(Public)` rather than `Err` for an anonymous caller; and the ingress is a catch-all `path: /`. Net: an anonymous internet client can reach `install_app`/`uninstall_app`/`revoke_agent_key`. NOT closed here because the deployed app's ANONYMOUS visitors use this exact socket to self-provision (`connectViaAdminWs` runs whenever no `doorwayToken` exists), so closing it alone breaks anonymous onboarding — it is coupled to migrating anonymous visitors onto the chaperone. |
+| Anonymous remote callers get an UNFILTERED conductor admin socket | `proxy/{admin,pool,nats}.rs`, `server/http.rs` `/hc/admin` + legacy `/`, `server/websocket.rs::extract_permission` | **CLOSED 2026-08-27.** Three independent `dev_mode` gates collapsed to one predicate (`native_local_first_operator`): the route gate deleted, the ladder's two credential-free arms closed together, proxy filtering made unconditional. The coupling that blocked this — anonymous visitors self-provisioning via `connectViaAdminWs` — was resolved on the client side instead: `useChaperone` no longer excludes the workspace, so every environment holding a session token takes `POST /hc/connect`. A caller with NO token still falls to the admin socket and is now refused unless it is a native local-first box. Proven live in both postures. |
+| `handle_app_upgrade` has no doorway-side permission check | `server/websocket.rs`, `/hc/app/{port}` + legacy `/app/{port}` | **Open.** The only gate is the numeric port range; there is no `extract_permission` call on this path at all. It relies entirely on the conductor's own app-interface authentication, which is a real control but not this doorway's. Found while closing the admin socket; a different surface, deliberately not closed blind. **Sharpens under question 8:** a ward's app socket is exactly the surface that needs RELATIONAL gating, so whatever closes this must take `StewardshipGrant` into account rather than assume the caller acts on their own account. |
 | A MongoDB outage was an authentication downgrade | `main.rs`, `routes/auth_routes.rs:1626` | **CLOSED 2026-08-27.** Four auth paths branch on `dev_mode && mongo.is_none()`, and the login one accepted ANY credentials and minted **Admin**. A configured-but-unreachable `MONGODB_URI` is now fatal at startup (mirroring the bootstrap-store fail-loud precedent directly above it), so `mongo.is_none()` can only mean "none configured"; and that branch's ceiling dropped to `Authenticated`. Proven live: `EXIT_CODE=1`. |
 | The canonical-head declare is not seed-gated | `POST /db/content/{slug}/canonical-head` | **Open.** Through #1672–#1673 doorway-B accepted a canonical head for bytes whose `PUT` it had just refused — a declare outrunning its bytes. |
 | Fleet credentials are committed in plaintext | `genesis/orchestrator/manifests/doorway/*.yaml` | **Open.** `stringData` is applied verbatim; no sealed-secret controller or injection machinery exists in the repo. |
@@ -253,6 +314,64 @@ outage:
 7. **Which developer mode is this affordance for?** Native local-first, web devspace, and e2e/CI have
    different carriers for the same authority. An affordance that only the web devspace needs must not
    be granted to the open web to reach it — that is the shape of every hole in "Known open items".
+8. **Whose account is this caller acting on — their own, or someone else's?** Every gate in this crate
+   currently answers *"their own"*, silently and by omission. That is an assumption, not a fact, and the
+   substrate already disagrees with it (see below). Write the answer down even when it is "their own".
+
+### Question 8 is not hypothetical — the substrate already models the other answer
+
+The imagodei integrity zome carries a **`StewardshipGrant`** entry type (with `StewardshipAppeal`,
+`DevicePolicy`, `ActivityLog`, `RelationshipRenewal`, `HumanRelationship`), and it is a far more careful
+model than the "admin console over a managed account" framing suggests:
+
+- `steward_id` + `subject_id` — **two subjects**, explicitly separated.
+- `authority_basis` drawn from a closed set: `minor_guardianship`, `court_order`, `medical_necessity`,
+  `community_consensus`, `organizational_role`, `mutual_consent` — with `evidence_hash` and `verified_by`.
+- Capability scope as separate booleans (`content_filtering`, `time_limits`, `feature_restrictions`,
+  `activity_monitoring`, `policy_delegation`) — relational authority over named surfaces, never a rank.
+- **Mandatory `expires_at` AND `review_at`**, a `status` lifecycle including `revoked`, bounded
+  `delegation_depth`, and an `appeal_id`: the subject has standing to contest the grant
+  (`StewardshipAppeal` types: `scope`, `excessive`, `invalid_evidence`, `capability_request`).
+- `DevicePolicy` composes one-way — each layer may **only ADD** restrictions, never remove a parent's.
+
+Its own module header states the framing that must survive contact with this crate: *"This is NOT
+external control — it's about identity and self-knowledge… Power scales with responsibility, not role
+assignment."* A steward is accountable to the subject, not merely over them.
+
+**The doorway knows none of this.** There is no reference to `StewardshipGrant` anywhere in
+`doorway-service`. So three foreclosures are worth naming before they harden:
+
+- **`Claims` is single-subject.** `human_id` / `agent_pub_key` / `identifier` describe one person, and
+  `auto_provision` keys on `claims.identifier`. A custodial session has two subjects. Every consumer
+  downstream is baking in the one-subject assumption invisibly; that is the cheapest thing to record
+  now and the most expensive to retrofit later.
+- **`PermissionLevel` is a total order** (`Public < Authenticated < Admin`, derived `Ord`). Steward
+  authority is *relational* — authority over **this** subject's named surfaces. Adding `Steward = 3`
+  would make a steward globally more powerful rather than powerful over one relationship, which is the
+  same category error this document exists to unwind. **Never put custodial authority on this axis.**
+- **`is_steward` is already a homonym, and the two meanings are opposites.** In `Claims` and
+  `admin_users.rs` it means *self-custodial* — the human proved they hold their own key, so the doorway
+  stops holding it and the pool may deprovision their hosted cell. In the imagodei zome, a steward is
+  someone holding authority over **another** person. One word, two meanings, one of which is
+  "maximally independent" and the other "responsible for a dependent". Do not overload it further; a
+  custodial session needs its own field, not this flag.
+
+Beware a **third** homonym pulling the same way: `Claims.session_id` is documented *"(custodial mode)"*
+and `src/custodial_keys/` is "Custodial Key Management for Hosted Humans" — but both mean the doorway
+holds **your own** key on your behalf until you graduate to self-custody. That is not custody *of a
+person*; it is the same becoming-a-self-steward axis as `is_steward`, and it is **not** a foothold
+for guardianship. Two of this crate's most natural words for the custodial-account concept are already
+taken by its opposite, so a custodial-session field must be named for the relationship
+(`acting_on_behalf_of` / `subject_id`), not for custody.
+
+Ward → **self-steward** is structurally a **graduation event**, the same unbuilt
+source-chain migration `admin_conductors.rs` already tracks as MongoDB flag-state for hosted users; it
+is not a second system. The bounded-authority primitive is `Mishpat::Commitment` / delegates-compute,
+and the constraint that has to give for custodial delegation is `performer == recipient`.
+
+**No stub belongs in the doorway.** A steward relationship is a witnessed, revocable, DHT-notarized
+fact; a placeholder here would land it in the wrong layer and invite exactly the rank-based shortcut
+above. What belongs here is question 8, answered out loud in every new gate.
 
 ---
 

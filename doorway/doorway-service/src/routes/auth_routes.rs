@@ -1046,6 +1046,7 @@ async fn handle_register(
             let zome_result = if let Some(ref p) = provisioner_result {
                 call_create_human_on_conductor(
                     &p.conductor_url,
+                    &p.admin_url,
                     &p.installed_app_id,
                     CreateHumanInput {
                         id: generated_human_id.clone(),
@@ -1125,9 +1126,8 @@ async fn handle_register(
                         );
                         // Use a temporary ZomeCaller on the provisioned conductor if available
                         let recovery_result = if let Some(ref p) = provisioner_result {
-                            let admin_url = crate::derive_admin_url_from_app(&p.conductor_url);
                             let caller = crate::services::ZomeCaller::new(
-                                &admin_url,
+                                &p.admin_url,
                                 &p.conductor_url,
                                 &p.installed_app_id,
                             );
