@@ -1,6 +1,6 @@
 ---
 version: 1
-updated: 2026-08-24
+updated: 2026-08-27
 vision: >
   A p2p backplane for a socially resilient, reach-gated substrate — a human-scale,
   capture-resistant foundation for communication that can scale to global

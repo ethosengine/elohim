@@ -55,7 +55,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 from pathlib import Path
 
 from _lib import epr_meta as _em
@@ -74,28 +73,35 @@ CASCADE_LEDGER_REL = ".claude/data/cascade-findings.jsonl"
 # next scaffold->successor landing, not only for a class we happened to name today.
 GRADUATION_FIELDS = ("scaffold", "successor", "successor_criterion", "graduation_trigger")
 
-_SKIP_DIR_NAMES = {".git", "node_modules", "target", "dist", "build", "__pycache__",
-                   ".venv", "venv", ".cargo-target-pool"}
-
 MANIFEST_FILENAME = ".epr-meta"
 
 
 # ───────────────────────────── binding discovery ─────────────────────────────
 
 def discover_manifest_paths(repo_root: Path) -> list[Path]:
-    """Every `.epr-meta` FILE under repo_root (the flat manifest form). Heavy/vendor dirs are
-    pruned before descending. The directory form (`.epr-meta/manifest.md`) is deliberately NOT
-    walked: `_lib.epr_meta` itself resolves only the flat form in its ancestor cascade, so a
-    cascade that read the directory form would report bindings the resolver never enforces."""
-    root = Path(repo_root)
-    out: list[Path] = []
-    for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIR_NAMES and d != "held"]
-        if MANIFEST_FILENAME in filenames:
-            p = Path(dirpath) / MANIFEST_FILENAME
-            if p.is_file():
-                out.append(p)
-    return sorted(out)
+    """Every authored governance manifest under repo_root, in BOTH forms.
+
+    NEITHER HALF OF THIS IS RE-IMPLEMENTED HERE, on purpose. The bounded walk is
+    `seam_census.iter_dirs` — one exclusion vocabulary, including `.claude/worktrees` for the
+    correctness reason documented at its definition. WHICH file in a directory *is* the
+    manifest is answered by `epr_meta.manifest_for_dir` — the resolver's own rule, so this
+    cascade can never watch a form the resolver does not enforce, nor miss one it does.
+
+    Both halves were previously restated here, and both restatements had gone stale:
+
+      - The walk carried a private skip set that never received `.claude/worktrees`, so 80 of
+        the 125 discovered manifests were stale copies inside two agent worktrees, reporting
+        phantom stale pins against policy versions no resolver in this tree enforces.
+      - The form was pinned to the flat `.epr-meta` FILE on the stated ground that the resolver
+        "resolves only the flat form". That ceased to be true when the directory form landed:
+        `epr_meta.manifest_path` now documents "Directory form wins" and `manifest_for_dir`
+        tries it FIRST. The cost was that the REPO-ROOT CHARTER — `.epr-meta/manifest.md`,
+        where the constitutional policies bind — was invisible to the stale-pin watch. An
+        instrument blind to the charter while reading 24 phantom bindings is not measuring
+        the tree.
+    """
+    return sorted(m for m in (_em.manifest_for_dir(d) for d in _sc.iter_dirs(repo_root))
+                  if m is not None)
 
 
 def bindings_in(path: Path) -> tuple[list[dict], list[str]]:

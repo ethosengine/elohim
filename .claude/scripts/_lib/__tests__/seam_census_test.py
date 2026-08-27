@@ -493,4 +493,31 @@ concerns:
     check("load_concerns: keeps the good row, flags duplicate + invalid concern id",
           set(c_ok) == {"dup@1", "good-one@1"} and len(e_ok) == 2)
 
+# ═══════════════════════════════════════════════════════════════
+# LIVE — the registry vocabulary has ONE home (the schema), not two
+#
+# `_VOCAB_FALLBACK` is the no-jsonschema/no-schema-file last resort. It is allowed to LAG the
+# schema (a newly-added kind simply is not in it yet), but it must never CONTRADICT it — a literal
+# the schema rejects would make the degraded path accept a row the real validator refuses, which
+# is the direction that corrupts. This pins the mirror that already drifted: it sat at four kinds
+# for the entire life of the fifth.
+# ═══════════════════════════════════════════════════════════════
+
+_schema, _serr = sc.load_schema(REPO)
+check("LIVE: the seam-registry schema loads", _schema is not None and _serr is None)
+_ct = _schema["$defs"]["contractTest"]["properties"]
+_dp = _schema["$defs"]["decisionPoint"]["properties"]
+_v = sc._vocab()
+
+check("LIVE: the decision-point kinds are READ FROM the schema, not mirrored",
+      _v["kind"] == set(_dp["kind"]["enum"]))
+check("LIVE: the contract-test kinds are read from the schema",
+      _v["test_kind"] == set(_ct["kind"]["enum"]))
+check("LIVE: the testName and path patterns are read from the schema",
+      _v["testName"] == _ct["testName"]["pattern"] and _v["path"] == _ct["path"]["pattern"])
+check("LIVE: the last-resort fallback never CONTRADICTS the schema — it may lag by an addition, "
+      "but every literal it carries is still a value the schema accepts",
+      sc._VOCAB_FALLBACK["kind"] <= set(_dp["kind"]["enum"])
+      and sc._VOCAB_FALLBACK["test_kind"] <= set(_ct["kind"]["enum"]))
+
 print(f"\n  {_passed} assertions passed ✅")

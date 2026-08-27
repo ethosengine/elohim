@@ -277,6 +277,16 @@ _ledger_lines_before = len(fl.read_rows(REPO / sc.CASCADE_LEDGER_REL))
 live = sc.cascade_data(REPO)
 check("LIVE: every .epr-meta policy binding in the repo is at its lineage tip (zero stale pins)",
       live["stale_pins"] == [])
+
+_live_manifests = sc.discover_manifest_paths(REPO)
+check("LIVE: discovery reads the TREE, never a scratch copy of it — zero manifests under "
+      "`.claude/worktrees` (stale agent worktrees once supplied 80 of 125, every one of them "
+      "reporting phantom stale pins against versions no resolver in this tree enforces)",
+      [p for p in _live_manifests if ".claude/worktrees" in str(p)] == [])
+check("LIVE: the REPO-ROOT CHARTER is under the stale-pin watch — `.epr-meta/manifest.md`, the "
+      "directory form, is where the constitutional policies bind; an instrument blind to it "
+      "while reading phantom bindings is not measuring the tree",
+      (REPO / ".epr-meta" / "manifest.md") in set(_live_manifests))
 check("LIVE: the cascade found the repo's real bindings (>= 9) and no registry errors",
       live["n_bindings"] >= 9 and live["errors"] == [])
 check("LIVE: computing the cascade writes NOTHING to the ledger (read-only by construction)",

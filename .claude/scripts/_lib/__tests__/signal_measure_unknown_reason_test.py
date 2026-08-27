@@ -12,15 +12,22 @@ uncertainty decomposed into "which edge, if measured better, most tightens this?
 If the two vocabularies drift, that exclusion silently stops working and the queue starts
 recommending that someone go measure a preference ordering more carefully.
 
-Run: python3 -m pytest .claude/scripts/_lib/__tests__/signal_measure_unknown_reason_test.py -v
+Run: python3 .claude/scripts/_lib/__tests__/signal_measure_unknown_reason_test.py
+
+PLAIN SCRIPT, NOT pytest — deliberately, and the reason is this file's own subject. It was
+authored against pytest, which this repo declares NOWHERE and which is not installed in the
+devcontainer, so it had never executed here: a drift guard for a vocabulary whose docstring
+says it 'has drifted here before', itself silently not running. That is the `#[ignore]`-is-a-
+CI-no-op trap one layer up. Its 45 sibling harnesses are plain scripts; conforming costs a
+12-line shim and buys execution everywhere, with no dependency to install.
 """
 from __future__ import annotations
 
 import re
 import sys
+import traceback
+from contextlib import contextmanager
 from pathlib import Path
-
-import pytest
 
 here = Path(__file__).resolve()
 REPO = None
@@ -38,6 +45,27 @@ from _lib import signal_measure as sm  # noqa: E402
 MEASURE_RS = REPO / "elohim" / "epr" / "src" / "measure.rs"
 
 
+@contextmanager
+def _raises(exc, match: str | None = None):
+    """_raises, minus pytest. Same two failure modes: nothing raised, or the message does
+    not match — both AssertionError so the runner reports them like any other."""
+    try:
+        yield
+    except exc as e:  # noqa: BLE001 — the caller names the type it wants
+        if match is not None and not re.search(match, str(e)):
+            raise AssertionError(f"{exc.__name__} raised but {match!r} not in {str(e)!r}") from None
+        return
+    raise AssertionError(f"expected {exc.__name__}, nothing raised")
+
+
+def needs_rust(fn):
+    """Marks a test that reads `measure.rs`. The runner SKIPS it LOUDLY when the Rust source is
+    absent — a skip that prints nothing is the failure this file exists to catch."""
+    fn._needs_rust = True
+    return fn
+
+
+
 def _rust_unknown_reasons() -> list[str]:
     """Variant names from the `UnknownReason` enum body, in kebab-case (its serde rename)."""
     src = MEASURE_RS.read_text()
@@ -53,7 +81,7 @@ def _rust_fn_body(name: str) -> str:
     return after.split("\n    pub fn ", 1)[0]
 
 
-@pytest.mark.skipif(not MEASURE_RS.is_file(), reason="Rust source not present in this checkout")
+@needs_rust
 def test_the_python_vocabulary_is_the_rust_enum_and_not_a_copy_of_it():
     # Read from the source of truth, not asserted against a second literal — a hand-maintained
     # duplicate would pass this test on the day it drifted.
@@ -67,7 +95,7 @@ def test_the_python_vocabulary_is_the_rust_enum_and_not_a_copy_of_it():
     assert set(sm.TIGHTENABLE) == set(sm.UNKNOWN_REASONS)
 
 
-@pytest.mark.skipif(not MEASURE_RS.is_file(), reason="Rust source not present in this checkout")
+@needs_rust
 def test_the_tie_break_index_matches_the_rust_one_position_for_position():
     # `stable_index` is written out in Rust rather than derived precisely so it can be read back
     # here. Its numbers ARE the declaration order; this asserts Python's list agrees.
@@ -84,7 +112,7 @@ def test_the_three_responses_stay_distinguishable():
     assert sm.tightenable("not-yet-instrumented") == "by-measurement"
     assert sm.tightenable("undefined-division") == "by-structure"
     assert sm.tightenable("incommensurable") == "never"
-    with pytest.raises(ValueError):
+    with _raises(ValueError):
         sm.tightenable("made-up")
 
 
@@ -99,9 +127,9 @@ def test_a_measure_without_a_reason_emits_exactly_what_it_always_did():
 
 
 def test_a_reason_is_refused_on_a_bounded_interval_and_on_a_word_we_do_not_know():
-    with pytest.raises(ValueError, match="ABSENCE"):
+    with _raises(ValueError, match="ABSENCE"):
         sm.measure(1.0, "ratio", basis="fixture", unknown_reason="no-observations")
-    with pytest.raises(ValueError, match="not in"):
+    with _raises(ValueError, match="not in"):
         sm.measure(None, "ratio", basis="fixture", unknown_reason="probably-fine")
 
 
@@ -138,7 +166,7 @@ def test_the_reduction_is_least_tightenable_wins_and_order_independent():
         for b in sm.UNKNOWN_REASONS[i:]:
             assert sm.reduce_reasons([a, b]) == sm.reduce_reasons([b, a]), f"{a} vs {b}"
 
-    with pytest.raises(ValueError):
+    with _raises(ValueError):
         sm.reduce_reasons(["made-up"])
 
 
@@ -202,7 +230,7 @@ def test_an_operands_declared_reason_is_threaded_and_reduced_against_the_guard()
     assert refined["confidence"]["unknownReason"] == "not-yet-instrumented"
 
 
-@pytest.mark.skipif(not MEASURE_RS.is_file(), reason="Rust source not present in this checkout")
+@needs_rust
 def test_the_zero_denominator_mint_names_the_same_variant_as_the_rust_guard():
     # Cheapest possible cross-boundary pin: read the Rust guard's own variant rather than
     # trusting the docstring above `ratio_of_rates`. A rename or a reclassification on the Rust
@@ -221,3 +249,29 @@ def test_the_zero_denominator_mint_names_the_same_variant_as_the_rust_guard():
     # Every reason the Rust arithmetic can mint must exist in the Python vocabulary.
     for v in set(minted):
         assert re.sub(r"(?<!^)(?=[A-Z])", "-", v).lower() in sm.UNKNOWN_REASONS
+
+
+# ───────────────────────────── runner ─────────────────────────────
+
+if __name__ == "__main__":
+    _tests = [(n, f) for n, f in sorted(globals().items())
+              if n.startswith("test_") and callable(f)]
+    _passed = _skipped = 0
+    _failed: list[str] = []
+    for _name, _fn in _tests:
+        if getattr(_fn, "_needs_rust", False) and not MEASURE_RS.is_file():
+            print(f"  SKIP {_name} — {MEASURE_RS.relative_to(REPO)} absent from this checkout")
+            _skipped += 1
+            continue
+        try:
+            _fn()
+        except Exception:  # noqa: BLE001 — a harness reports, it does not propagate
+            print(f"  FAIL {_name}")
+            print("".join("       " + l for l in traceback.format_exc().splitlines(True)))
+            _failed.append(_name)
+        else:
+            print(f"  ok   {_name}")
+            _passed += 1
+    _tail = f", {_skipped} skipped" if _skipped else ""
+    print(f"\n{_passed}/{len(_tests) - _skipped} passed{_tail}")
+    sys.exit(1 if _failed else 0)

@@ -78,6 +78,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 from pathlib import Path
 
 from _lib import epr_meta as _em  # reuse the YAML size/depth guards + policies.yaml loader —
@@ -107,20 +108,66 @@ REGISTRY_FILENAME = "seam-registry.yaml"
 # the catalog routes really has a seam-registry.yaml" assertion green for two days: the crate
 # name was supplied by `.claude/worktrees/agent-af23065e7900363e0/`. A census that reads its own
 # scratch copies cannot measure the tree.
+# STRUCTURAL floor — names that are never repo content anywhere, pruned unconditionally because
+# they are also cheap to prune and git will NOT report most of them: `.git` is not "ignored", it
+# is git's own store, and a tracked `dist`/`build` is not ignored either. Dropping this floor in
+# favour of git alone was measured at 2.5x the directories walked (24,458 vs 9,813) for identical
+# output — the walk descended into `.git/objects`. It is a floor, not the authority: `_ignored_dirs()`
+# is layered ON TOP so a newly-ignored tree is honoured with nobody editing this set.
 _SKIP_DIR_NAMES = {".git", "node_modules", "target", "dist", "build", "__pycache__",
                    ".venv", "venv", ".cargo-target-pool"}
 
-# Path-specific exclusions (matched on the repo-relative path, never on a bare directory name —
-# `worktrees` is too common a word to prune globally).
+# POLICY exclusions — real, TRACKED files that governance deliberately does not scan, so git can
+# never supply them: `genesis/research` (34 tracked files) and any `held/` tree (docs held for an
+# unavailable capability are out of the planner/runner scan path, per the substrate-scope
+# convention). Matched on the repo-relative path, never on a bare directory name — `worktrees` is
+# too common a word to prune globally. `.claude/worktrees` is listed here too, redundantly with
+# what git reports, so the fallback path above stays correct without it.
 _SKIP_REL_DIRS = {"genesis/research", ".claude/worktrees"}
 
 ALL_CONCERN_IDS = ("C0", "C1", "C2", "C3", "C4", "C5", "C6a", "C6b",
                    "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14")
 _CONCERN_ID_SET = set(ALL_CONCERN_IDS)
 _STATUS_VALUES = {"answered", "partial", "unbound", "n-a"}
-_KIND_VALUES = {"pure-decision-predicate", "verdict-fn", "boundary-answer-type", "reason-outcome-enum"}
-_TEST_KIND_VALUES = {"unit", "sweettest", "integration"}
-_TESTNAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# LAST-RESORT literals for the no-jsonschema AND no-schema-file path. NOT the authority: `_vocab()`
+# reads these off `seam-registry.schema.json` itself, because a hand-kept mirror of a schema enum
+# is a second home for one truth and drifts exactly the way this one already did — it sat at four
+# kinds for the whole life of the fifth (`state-transition`), so the degraded path would have
+# rejected a row the real validator accepts. The parity test pins the two together.
+_VOCAB_FALLBACK = {
+    "kind": {"pure-decision-predicate", "verdict-fn", "boundary-answer-type", "reason-outcome-enum"},
+    "test_kind": {"unit", "sweettest", "integration"},
+    "testName": r"^[A-Za-z_][A-Za-z0-9_]*$",
+    "path": r"^[^/].*\.rs$",
+}
+_VOCAB_CACHE: dict | None = None
+
+
+def _vocab() -> dict:
+    """The registry vocabulary, DERIVED from the schema and cached. Degrades to `_VOCAB_FALLBACK`
+    only when the schema file itself cannot be read — at which point being approximately right is
+    better than refusing to validate at all."""
+    global _VOCAB_CACHE
+    if _VOCAB_CACHE is not None:
+        return _VOCAB_CACHE
+    v = dict(_VOCAB_FALLBACK)
+    try:
+        schema, _err = load_schema(_em.find_repo_root(Path(__file__).resolve()))
+        defs = (schema or {}).get("$defs", {})
+        dp = defs.get("decisionPoint", {}).get("properties", {})
+        ct = defs.get("contractTest", {}).get("properties", {})
+        if isinstance(dp.get("kind", {}).get("enum"), list):
+            v["kind"] = set(dp["kind"]["enum"])
+        if isinstance(ct.get("kind", {}).get("enum"), list):
+            v["test_kind"] = set(ct["kind"]["enum"])
+        for field in ("testName", "path"):
+            pat = ct.get(field, {}).get("pattern")
+            if isinstance(pat, str):
+                v[field] = pat
+    except Exception:  # noqa: BLE001 — an unreadable schema degrades, never raises
+        pass
+    _VOCAB_CACHE = v
+    return v
 _CLEAN_SYMBOL_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*)(?:\s*\(.*\))?$")
 
 _MAX_SOURCE_SCAN_BYTES = 2 * 1024 * 1024  # 2MB — generous for a Rust source file; a guard, not a wall
@@ -145,29 +192,77 @@ _MAX_REGISTRY_BYTES = 1024 * 1024
 
 # ───────────────────────────── discovery ─────────────────────────────
 
-def discover_registry_paths(repo_root: Path) -> list[Path]:
-    """Bounded walk for every `seam-registry.yaml` under repo_root. Heavy/vendor dirs are
-    PRUNED before descending (os.walk's in-place dirnames mutation — never rglob-then-filter,
-    which would still pay the cost of descending into node_modules first). Excludes any
-    directory literally named `held` (per the substrate-scope convention: docs/specs held
-    for an unavailable capability are out of the planner/runner scan path), plus the
-    repo-relative trees in `_SKIP_REL_DIRS` (`genesis/research`, and `.claude/worktrees` —
-    stale agent copies of the repo must never stand in for the tree). Sorted for
-    determinism."""
+def _ignored_dirs(repo_root: Path) -> set[str] | None:
+    """Repo-relative directories git ALREADY KNOWS are not part of the tree (~49ms, one call).
+
+    The exclusion vocabulary splits in two, and only one half is anyone's to maintain:
+    directories that are not real repo content (`target/`, `node_modules/`, `.claude/worktrees/`)
+    are exactly what `.gitignore` already declares, so restating them by NAME is a second home for
+    knowledge git holds — the failure mode this repo has paid for repeatedly. Every drift bug this
+    walk has had lived in this half. The other half — TRACKED trees governance chooses not to scan
+    — git cannot supply, and stays declared in `_SKIP_REL_DIRS`.
+
+    Name-keying was also merely approximate: this returns `doorway/target`,
+    `elohim/eprfs/target`, … at their real locations rather than pruning every directory that
+    happens to be spelled `target`.
+
+    This is layered ON TOP of the structural `_SKIP_DIR_NAMES` floor, never in place of it: git
+    does not report `.git` (its own store) or a TRACKED `build/`, and walking those cost 2.5x the
+    directories for identical output when measured. Returns None when git cannot answer, in which
+    case the floor alone applies and the walk is merely as correct as it was before this existed."""
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(repo_root), "ls-files", "--others", "--ignored",
+             "--exclude-standard", "--directory"],
+            capture_output=True, text=True, timeout=30)
+        if out.returncode != 0:
+            return None
+        return {line.rstrip("/") for line in out.stdout.splitlines() if line.endswith("/")}
+    except Exception:  # noqa: BLE001 — no git, no index, or a hostile environment
+        return None
+
+
+def iter_dirs(repo_root: Path):
+    """THE bounded walk — one discovery primitive for every governance artifact in this tree.
+
+    Yields each directory under repo_root that governance instruments are allowed to see.
+    Heavy/vendor dirs are PRUNED before descending (os.walk's in-place `dirnames` mutation —
+    never rglob-then-filter, which would still pay the cost of descending into node_modules
+    first). Excludes any directory literally named `held` (per the substrate-scope convention:
+    docs/specs held for an unavailable capability are out of the planner/runner scan path),
+    plus the repo-relative trees in `_SKIP_REL_DIRS` (`genesis/research`, and
+    `.claude/worktrees` — stale agent copies of the repo must never stand in for the tree).
+
+    IT IS A PRIMITIVE BECAUSE THE EXCLUSION IS KNOWLEDGE, NOT CONFIGURATION. The
+    `.claude/worktrees` entry was paid for by the incident recorded at `_SKIP_REL_DIRS`, and a
+    sibling instrument that keeps its own copy of the walk does not inherit the lesson — which
+    is exactly what happened to `seam_cascade.discover_manifest_paths`, whose duplicate skip
+    set never received it, so 80 of the 125 manifests it discovered were worktree copies.
+    A consumer supplies WHICH artifact it wants from a directory; it never re-derives WHICH
+    DIRECTORIES ARE REAL."""
     root = Path(repo_root)
-    out: list[Path] = []
-    for dirpath, dirnames, filenames in os.walk(root):
+    ignored = _ignored_dirs(root)
+    for dirpath, dirnames, _filenames in os.walk(root):
         rel_dir = Path(dirpath).relative_to(root).as_posix()
         pruned = []
         for d in dirnames:
             rel_child = d if rel_dir == "." else f"{rel_dir}/{d}"
-            if d in _SKIP_DIR_NAMES or d == "held" or rel_child in _SKIP_REL_DIRS:
-                continue
+            if d == "held" or rel_child in _SKIP_REL_DIRS:
+                continue                      # policy: real files, deliberately out of scan scope
+            if d in _SKIP_DIR_NAMES:
+                continue                      # not-real files: the cheap structural floor
+            if ignored is not None and rel_child in ignored:
+                continue                      # not-real files: whatever .gitignore declares today
             pruned.append(d)
         dirnames[:] = pruned
-        if REGISTRY_FILENAME in filenames:
-            out.append(Path(dirpath) / REGISTRY_FILENAME)
-    return sorted(out)
+        yield Path(dirpath)
+
+
+def discover_registry_paths(repo_root: Path) -> list[Path]:
+    """Every `seam-registry.yaml` in the tree, over the shared bounded walk. Sorted for
+    determinism."""
+    return sorted(d / REGISTRY_FILENAME for d in iter_dirs(repo_root)
+                  if (d / REGISTRY_FILENAME).is_file())
 
 
 # ───────────────────────────── schema ─────────────────────────────
@@ -242,8 +337,9 @@ def _manual_decision_point(item) -> list[str]:
     errs = []
     if not isinstance(item.get("name"), str) or not item["name"].strip():
         errs.append("`name` must be a non-empty string")
-    if item.get("kind") not in _KIND_VALUES:
-        errs.append(f"`kind` must be one of {sorted(_KIND_VALUES)}")
+    _kinds = _vocab()["kind"]
+    if item.get("kind") not in _kinds:
+        errs.append(f"`kind` must be one of {sorted(_kinds)}")
     sl = item.get("sourceLocation")
     if not isinstance(sl, dict) or not isinstance(sl.get("file"), str) or not sl.get("file", "").endswith(".rs"):
         errs.append("`sourceLocation.file` must be a string ending in .rs")
@@ -269,12 +365,18 @@ def _manual_decision_point(item) -> list[str]:
         if not tests:
             errs.append("`contractTests` array must be non-empty (use null, never [])")
         for j, ct in enumerate(tests):
+            _tk = _vocab()["test_kind"]
             if (not isinstance(ct, dict) or not ct.get("path") or not ct.get("testName")
-                    or ct.get("kind") not in _TEST_KIND_VALUES):
+                    or ct.get("kind") not in _tk):
                 errs.append(f"contractTests[{j}] needs path/testName/kind "
-                            f"(kind in {sorted(_TEST_KIND_VALUES)})")
-            elif not _TESTNAME_RE.match(ct["testName"]):
+                            f"(kind in {sorted(_tk)})")
+            elif not re.match(_vocab()["testName"], ct["testName"]):
                 errs.append(f"contractTests[{j}].testName `{ct['testName']}` is not a valid identifier")
+            elif not re.match(_vocab()["path"], ct["path"]):
+                # The schema constrains `path` too; the fallback used not to, so a non-Rust
+                # citation passed here and then failed the census's fn-resolution with a far
+                # less legible message.
+                errs.append(f"contractTests[{j}].path `{ct['path']}` must be a repo-relative .rs file")
     else:
         errs.append("`contractTests` must be an array or null")
     return errs

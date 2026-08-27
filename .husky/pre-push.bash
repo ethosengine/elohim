@@ -201,6 +201,87 @@ if echo "$CHANGED" | grep -qE "^\.claude/hooks/"; then
   fi
 fi
 
+# ── habit register freshness (projected from the .epr-meta habit atoms) ──
+#
+# A habit is declared in the .epr-meta governance package of the directory whose behaviour it
+# describes; genesis/manifests/habits.yaml is the GENERATED projection of that walk. This leg is
+# why the projection can never become a second hand-written home — the failure mode this repo has
+# already paid for twice (cluster-state.yaml vs ELOHIM_REMOTE_COMPUTE_STATUS; the deployments.json
+# suspended flags that drifted until they were made derived). --check also refuses an INVALID
+# census: a duplicate id, a concern claimed by two habits, or the max-2-active WIP fence breached.
+#
+# ABOVE THE .ci-ignore FILTER, for the reason the two legs above it state: .ci-ignore drops the
+# broad `.claude/` prefix, so a push touching only the PROJECTOR or the census library would exit
+# at "All changes are .ci-ignore'd" before this ran — and a projector change is exactly what can
+# make the committed projection stale. (The habit ATOMS and habits.yaml survive the filter, so
+# this leg did fire for atom edits from below; the hole was the tooling that generates them.)
+# Those two paths are in the trigger for the same reason.
+#
+# Pure-python (~ms) so it is PVC-EXEMPT BY OMISSION. Fail-open if python3 or the projector is
+# absent (a branch predating the register must never be blocked).
+if echo "$CHANGED" | grep -qE "\.habit\.md$|(^|/)\.epr-meta(/|$)|^genesis/manifests/habits\.yaml$|^\.claude/scripts/habits-project\.py$|^\.claude/scripts/_lib/epr_habits\.py$"; then
+  if command -v python3 >/dev/null 2>&1 && [ -f .claude/scripts/habits-project.py ]; then
+    echo "[pre-push] Verifying the habit register projection is fresh..."
+    if ! python3 .claude/scripts/habits-project.py --check; then
+      echo "[pre-push] ERROR: genesis/manifests/habits.yaml is stale, or the habit census is invalid."
+      echo "  Run: python3 .claude/scripts/habits-project.py && git add genesis/manifests/habits.yaml"
+      exit 1
+    fi
+    echo "[pre-push] habit register freshness ✓"
+  fi
+fi
+
+# ── agentic-library harnesses (the governance instruments' own tests) ──
+#
+# Sibling of the hook-boundary leg above, and it exists for the reason that leg names in its own
+# comment: a verification that never runs. NOTHING ran `.claude/scripts/_lib/__tests__` — not
+# pre-push, not the justfile, not package.json, not CI — so 46 harnesses guarding the resolver,
+# the cascade, the census, the habit register and the measure vocabulary executed only when a
+# human remembered to. The empty-glob guard below is copied from that leg deliberately: a renamed
+# or deleted suite must not read as "gate passed" forever.
+#
+# MUST run on the raw (pre-.ci-ignore-filter) $CHANGED — `.claude/` is dropped by the filter, so
+# below it this leg would never fire at all.
+#
+# Pure python (~28s, no cargo) — PVC-EXEMPT BY OMISSION: never in HEAVY_GATES, never deferrable.
+# Fail-open if python3 is absent (degraded shell), same posture as the legs above.
+if echo "$CHANGED" | grep -qE "^\.claude/scripts/"; then
+  if command -v python3 >/dev/null 2>&1 && [ -d .claude/scripts/_lib/__tests__ ]; then
+    lib_tests_ran=0
+    lib_failed=""
+    echo "[pre-push] Running agentic-library harnesses (.claude/scripts/_lib/__tests__)..."
+    for lib_test in .claude/scripts/_lib/__tests__/*_test.py .claude/scripts/_lib/__tests__/test_*.py; do
+      [ -f "$lib_test" ] || continue
+      lib_tests_ran=$((lib_tests_ran + 1))
+      if ! python3 "$lib_test" >/dev/null 2>&1; then
+        lib_failed="$lib_failed $lib_test"
+      fi
+    done
+    if [ -n "$lib_failed" ]; then
+      echo ""
+      echo "!!============================================================!!"
+      echo "!! AGENTIC-LIBRARY HARNESS FAILED:"
+      for lib_t in $lib_failed; do
+        echo "!!   $lib_t"
+      done
+      echo "!! These guard the governance instruments themselves — the resolver"
+      echo "!! cascade, the seam census, the habit register, the measure vocabulary."
+      echo "!! Re-run one for its output:  python3 <path>"
+      echo "!!============================================================!!"
+      echo ""
+      exit 1
+    fi
+    # A glob that matches nothing must not print a success line — same guard, same reason as the
+    # hook-boundary leg above.
+    if [ "$lib_tests_ran" -eq 0 ]; then
+      echo "[pre-push] ERROR: .claude/scripts changed but no library harnesses were found."
+      echo "  Expected at least one .claude/scripts/_lib/__tests__/*_test.py"
+      exit 1
+    fi
+    echo "[pre-push] agentic-library harnesses ✓ ($lib_tests_ran green)"
+  fi
+fi
+
 # ── .ci-ignore filter ─────────────────────────────────────────────
 #
 # Drop files that are listed in repo-root .ci-ignore (CLAUDE.md, .claude/,
@@ -325,28 +406,6 @@ if echo "$CHANGED" | grep -qE "(^|/)\.epr-meta(/|$)|^\.ci-ignore$"; then
       exit 1
     fi
     echo "[pre-push] .ci-ignore freshness ✓"
-  fi
-fi
-
-# ── habit register freshness (projected from the .epr-meta habit atoms) ──
-#
-# A habit is declared in the .epr-meta governance package of the directory whose behaviour it
-# describes; genesis/manifests/habits.yaml is the GENERATED projection of that walk. This leg is
-# why the projection can never become a second hand-written home — the failure mode this repo has
-# already paid for twice (cluster-state.yaml vs ELOHIM_REMOTE_COMPUTE_STATUS; the deployments.json
-# suspended flags that drifted until they were made derived). --check also refuses an INVALID
-# census: a duplicate id, a concern claimed by two habits, or the max-2-active WIP fence breached.
-# Pure-python (~ms) so it is PVC-EXEMPT BY OMISSION. Fail-open if python3 or the projector is
-# absent (a branch predating the register must never be blocked).
-if echo "$CHANGED" | grep -qE "\.habit\.md$|(^|/)\.epr-meta(/|$)|^genesis/manifests/habits\.yaml$"; then
-  if command -v python3 >/dev/null 2>&1 && [ -f .claude/scripts/habits-project.py ]; then
-    echo "[pre-push] Verifying the habit register projection is fresh..."
-    if ! python3 .claude/scripts/habits-project.py --check; then
-      echo "[pre-push] ERROR: genesis/manifests/habits.yaml is stale, or the habit census is invalid."
-      echo "  Run: python3 .claude/scripts/habits-project.py && git add genesis/manifests/habits.yaml"
-      exit 1
-    fi
-    echo "[pre-push] habit register freshness ✓"
   fi
 fi
 
