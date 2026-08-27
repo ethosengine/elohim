@@ -449,9 +449,20 @@ decisionPoints:
       - path: elohim/eprfs/epr-cli/src/flow/note.rs
         testName: the_author_arm_carries_no_steward_and_the_agent_arms_always_do
         kind: unit
+      # The three ARMS end-to-end. This slot previously cited `note_event_cid_is_stable` against
+      # `tests/flow_note.rs` — a copy-paste from the row above (f00c7f235): that test is real but
+      # lives in `src/flow/note.rs`, and it pins CID stability, not attribution. It never resolved
+      # here, and it went unnoticed because this crate was routed to no seam column, so nothing
+      # ever checked its citations.
       - path: elohim/eprfs/epr-cli/tests/flow_note.rs
-        testName: note_event_cid_is_stable
-        kind: unit
+        testName: a_named_identity_provides_the_note_and_keeps_the_steward_in_the_last_slot
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_note.rs
+        testName: a_registered_session_claim_provides_the_note_without_naming_it
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_note.rs
+        testName: a_session_that_claimed_nothing_falls_through_to_the_author_arm_without_failing
+        kind: integration
 
   - name: govern::actor_stamp
     kind: boundary-answer-type
