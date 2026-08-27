@@ -53,3 +53,5 @@ intentional` comment. Verify the App lint stage returns to green.
   (clean); the surrounding ~45 errors are pre-existing and were NOT introduced by it.
 - Shift journal: `.claude/shifts/2026-06-27T03-overnight-doorway-deploy-genesis-fanout.journal.md` (iter-4).
 - Memory: `feedback_pvc_deferral_hides_gate_debt`.
+
+**Measured 2026-08-27** (`just gate` on dev at `00b21f834`): `pnpm run lint` in app/elohim-app reports **607 errors / 190 warnings across 156 files** (top: `data-loader.service.ts` 64, `insurance-mutual.service.ts` 43, `app.config.ts` 42). The root app pipeline does not run `pnpm lint`, so CI is NOT a backstop for this class — the pre-push hook is the only gate, and it now fails on every push that touches `app/elohim-app`, which is why integration pushes keep landing `--no-verify`. The `@workspace/runtime` fence (2026-08-27) added zero new errors (`import/internal-regex` + a pathGroup). Ratchet candidate: an eslint baseline file like `lint-workspace-imports` uses, so NEW errors block while the tail drains.
