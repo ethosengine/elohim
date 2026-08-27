@@ -51,7 +51,12 @@ module.exports = tseslint.config(
         typescript: {
           project: "./tsconfig.json"
         }
-      }
+      },
+      // `@workspace/runtime` (app/workspace-runtime — the dev-workspace vendor fence)
+      // resolves OUTSIDE this package, so without this it is classified as an
+      // external dep of the root package and flagged as extraneous. It is dev
+      // tooling composed into the app, not a dependency.
+      "import/internal-regex": "^@workspace/"
     },
     rules: {
       // ============================================================
@@ -150,7 +155,8 @@ module.exports = tseslint.config(
           { pattern: "@angular/**", group: "external", position: "before" },
           { pattern: "rxjs/**", group: "external", position: "before" },
           { pattern: "@app/**", group: "internal", position: "before" },
-          { pattern: "@elohim/**", group: "internal", position: "after" }
+          { pattern: "@elohim/**", group: "internal", position: "after" },
+          { pattern: "@workspace/**", group: "internal", position: "after" }
         ],
         pathGroupsExcludedImportTypes: ["type"],
         "newlines-between": "always",

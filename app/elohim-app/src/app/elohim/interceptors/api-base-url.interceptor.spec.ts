@@ -154,21 +154,21 @@ describe('apiBaseUrlInterceptor', () => {
     });
   });
 
-  describe('Eclipse Che environment', () => {
-    // resolveBaseUrl() still returns '' for Che (dodging the cross-origin
+  describe('development workspace runtime (per-endpoint hostnames)', () => {
+    // resolveBaseUrl() still returns '' for a workspace host (dodging the cross-origin
     // doorwayUrl), but effectivePrimary now falls back to the browser's own
     // origin so the failover ladder can engage — a same-origin absolute URL
     // behaves identically to a relative one (no CORS boundary crossed), so
     // this is a legitimate ladder-change adaptation of the prior "untouched"
     // expectation, not a functional regression.
-    it('rewrites to its own origin (still same-origin, no doorwayUrl) in Che (.devspaces.)', () => {
+    it('rewrites to its own origin (still same-origin, no doorwayUrl) on a .devspaces. workspace host', () => {
       setOrigin('https://workspace-angular-dev.devspaces.example.com');
       const { handler, received } = captureUrl();
       apiBaseUrlInterceptor(new HttpRequest('POST', '/api/v1/mastery', {}), handler).subscribe();
       expect(received()).toBe('https://workspace-angular-dev.devspaces.example.com/api/v1/mastery');
     });
 
-    it('rewrites to its own origin (still same-origin, no doorwayUrl) in Che (.code.ethosengine.com)', () => {
+    it('rewrites to its own origin (still same-origin, no doorwayUrl) on a .code.ethosengine.com workspace host', () => {
       setOrigin('https://workspace-angular-dev.code.ethosengine.com');
       const { handler, received } = captureUrl();
       apiBaseUrlInterceptor(new HttpRequest('POST', '/api/v1/mastery', {}), handler).subscribe();

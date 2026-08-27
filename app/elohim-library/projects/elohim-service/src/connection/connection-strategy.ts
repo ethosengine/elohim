@@ -71,6 +71,18 @@ export interface ConnectionConfig {
   /** API key for Doorway authentication */
   proxyApiKey?: string;
 
+  /**
+   * Absolute origin of the doorway when it is NOT reachable at this page's
+   * origin — e.g. a development workspace runtime that publishes each service
+   * port at its own hostname, so a WebSocket upgrade cannot go through the
+   * dev server's same-origin proxy.
+   *
+   * Supplied BY THE HOST APPLICATION (`app/workspace-runtime/`); this library
+   * never derives it and knows no workspace vendor. Either scheme is accepted
+   * (`https`/`wss`) and normalized per surface. Unset ⇒ `adminUrl` is used.
+   */
+  doorwayOrigin?: string;
+
   /** elohim-storage sidecar URL (Direct mode: http://localhost:8090) */
   storageUrl?: string;
 
@@ -83,7 +95,13 @@ export interface ConnectionConfig {
   /** Origin header for WebSocket connections */
   origin?: string;
 
-  /** Use local dev-proxy in Eclipse Che (auto-detected if true) */
+  /**
+   * HTTP surfaces (`/db/*`, `/blob/*`, `/apps/*`) are reverse-proxied at SAME
+   * origin by a dev server. Set by the dev environment file only.
+   *
+   * Distinct from `doorwayOrigin`, which is a DIFFERENT origin — both are live
+   * at once in a development workspace.
+   */
   useLocalProxy?: boolean;
 
   /** Doorway JWT token for conductor affinity routing (multi-conductor) */
@@ -209,7 +227,7 @@ export interface IConnectionStrategy {
    *
    * - Doorway: wss://doorway-alpha.elohim.host?apiKey=...
    * - Direct: ws://localhost:4444
-   * - Che: wss://{workspace}-hc-dev/admin
+   * - Supplied doorway origin: wss://{doorwayOrigin}/hc/admin
    */
   resolveAdminUrl(config: ConnectionConfig): string;
 
@@ -218,7 +236,7 @@ export interface IConnectionStrategy {
    *
    * - Doorway: wss://doorway-alpha.elohim.host/app/{port}?apiKey=...
    * - Direct: ws://localhost:{port}
-   * - Che: wss://{workspace}-hc-dev/app/{port}
+   * - Supplied doorway origin: wss://{doorwayOrigin}/hc/app/{port}
    */
   resolveAppUrl(config: ConnectionConfig, port: number): string;
 

@@ -5,6 +5,10 @@
   "compilerOptions": {
     "typeRoots": ["node_modules/@types", "src/types"],
     "paths": {
+      // Development-workspace vendor fence (app/workspace-runtime/.epr-meta).
+      // Deliberately NOT an @app/* alias: it is dev tooling, not a domain or
+      // bundle seam, and must stay outside the cross-workspace import ratchet.
+      "@workspace/runtime": ["../workspace-runtime/workspace-doorway.ts"],
       "@app/elohim": ["./src/app/elohim/index.ts"],
       "@app/elohim/*": ["./src/app/elohim/*"],
       "@app/imagodei": ["./src/app/imagodei/index.ts"],

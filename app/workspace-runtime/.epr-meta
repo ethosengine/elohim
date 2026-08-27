@@ -1,0 +1,73 @@
+---
+epr-meta-version: 1
+id: app-workspace-runtime-vendor-fence
+purpose: >
+  The ONE place in the client tree that may know a development workspace
+  vendor's hostname convention. Eclipse Che is the runtime we develop inside
+  today; it is tooling we happen to use, not part of the elohim protocol, and
+  the protocol core must never learn its name. This directory turns a vendor
+  convention into ordinary configuration (`doorwayOrigin` / `doorwayUrl`) that
+  `@elohim/service` consumes without knowing where it came from. Swapping the
+  workspace runtime — for the elohim-native peer runtime this project intends to
+  replace it with — should be an edit to `workspace-doorway.ts` and nothing else.
+rules:
+  - id: vendor-fence-stays-here
+    class: inject
+    when:
+      write: "*.ts"
+      contains-any: ["devspaces", "code.ethosengine.com", "-angular-dev",
+                     "-hc-dev", "-hc-storage", "Eclipse Che", "isEclipseChe"]
+    dedupe-of: app/workspace-runtime/.epr-meta (body — "The boundary" table)
+    why: >
+      You are editing the vendor fence itself, which is the right place for these
+      strings — this is a reminder of the contract, not a complaint. Keep the
+      vendor facts as DATA (the `WORKSPACE_HOSTS` list and the `ENDPOINTS` map),
+      never as branching logic, and never export a symbol whose NAME carries the
+      vendor ("che", "eclipse"). Consumers must only ever see
+      `isWorkspaceRuntime()` / `workspaceEndpointOrigin()` /
+      `workspaceDoorwayUrl()`. If you are adding a second workspace runtime, add
+      entries to the two data tables; if you are adding a NEW endpoint, add it to
+      `ENDPOINTS` rather than writing another `.replace()` at a call site — four
+      hand-rolled copies of that replace is the drift this directory was created
+      to end (2026-08-27).
+cites:
+  - doorway-auth-posture-declared-stage
+---
+
+# app/workspace-runtime — the workspace-vendor fence
+
+The client is served from one origin and the doorway from another whenever we
+develop inside a workspace runtime that publishes each declared service port at
+its own hostname. Only the browser can work out that sibling origin, and only
+from a vendor-specific naming convention. This directory owns that convention.
+
+## The boundary
+
+| Layer | May know | Example |
+|---|---|---|
+| `app/workspace-runtime/` (here) | the vendor's hostname convention | `-angular-dev.` → `-hc-dev.` |
+| `@elohim/service`, `elohim-elements`, `doorway-service` | **nothing** — they take an origin as config | `config.doorwayOrigin` |
+
+The protocol core resolving its own origin by sniffing hostnames is the drift
+this fence exists to prevent. It had already happened four times in parallel —
+`doorway-connection-strategy.ts`, `angular-provider.ts`,
+`holochain-client.service.ts` and `password-auth.provider.ts` each carried its
+own copy of the same detector and the same `.replace()`, so the convention could
+not be changed in one place and two of the copies had already drifted apart in
+their SSR guards.
+
+## Not a "proxy"
+
+`useLocalProxy` means the opposite topology — same-origin, reverse-proxied by the
+dev server, which is how `/db/*`, `/blob/*` and `/apps/*` are reached. This
+module resolves a *different* origin, because a WebSocket upgrade does not
+survive that reverse proxy. Both topologies are live simultaneously in a
+workspace; calling both "the proxy" is how they get confused.
+
+## Known remaining violation
+
+`app/elohim-library/projects/elohim-service/src/client/angular-provider.ts`
+still carries a vendor branch inside `detectClientMode()`. It is reached from
+BOTH `app/elohim-app` and `app/lamad`, so removing it means both callers must
+pass a resolved `doorwayUrl` from here. Tracked so it is not mistaken for a
+place the convention is allowed to live.

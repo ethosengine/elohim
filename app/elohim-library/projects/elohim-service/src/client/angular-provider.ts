@@ -109,48 +109,12 @@ export function provideAnonymousBrowserClient(doorwayUrl: string): Provider[] {
 // `window` type comes from src/types/browser-globals.d.ts
 
 /**
- * Detect if running in Eclipse Che environment
- */
-function isEclipseChe(): boolean {
-  if (globalThis.window === undefined) return false;
-  const hostname = globalThis.window.location.hostname;
-  return hostname.includes('.code.ethosengine.com') || hostname.includes('.devspaces.');
-}
-
-/**
- * Get the Che hc-dev endpoint URL for doorway access
- *
- * In Eclipse Che, the browser runs on the user's machine but services
- * run in the remote workspace. The dev-proxy routes requests through
- * Che's infrastructure.
- *
- * Example:
- * - Angular: mbd06b-gmail-com-elohim-devspace-angular-dev.code.ethosengine.com
- * - hc-dev:  mbd06b-gmail-com-elohim-devspace-hc-dev.code.ethosengine.com
- */
-function getCheHcDevUrl(): string {
-  if (globalThis.window === undefined) return '';
-  const hostname = globalThis.window.location.hostname.replace(/-angular-dev\./, '-hc-dev.');
-  return `https://${hostname}`;
-}
-
-/**
- * Get the Che hc-storage endpoint URL for direct storage access
- *
- * Example:
- * - Angular:     mbd06b-gmail-com-elohim-devspace-angular-dev.code.ethosengine.com
- * - hc-storage:  mbd06b-gmail-com-elohim-devspace-hc-storage.code.ethosengine.com
- */
-function _getCheStorageUrl(): string {
-  if (globalThis.window === undefined) return '';
-  const hostname = globalThis.window.location.hostname.replace(/-angular-dev\./, '-hc-storage.');
-  return `https://${hostname}`;
-}
-
-/**
  * Helper to detect client mode from environment
  *
- * Automatically detects Eclipse Che and routes through the hc-dev endpoint.
+ * Environment-agnostic: when the doorway lives at a different origin than the
+ * page (a development workspace runtime publishing per-endpoint hostnames), the
+ * CALLER resolves that origin and passes it as `doorwayUrl`. See
+ * `app/workspace-runtime/` — the library must not know any workspace vendor.
  *
  * @example
  * ```typescript
@@ -199,27 +163,11 @@ export function detectClientMode(environment: {
     };
   }
 
-  // Eclipse Che: Use hc-dev endpoint for doorway access
-  // The browser runs on user's machine, services run in remote workspace
-  // Doorway proxies /db/* to storage internally, so we don't need a separate storageUrl
-  if (isEclipseChe()) {
-    const cheUrl = getCheHcDevUrl();
-    console.log('[ElohimClient] Detected Eclipse Che, using hc-dev endpoint:', cheUrl);
-    console.log('[ElohimClient] Doorway will proxy /db/* routes to storage internally');
-    return {
-      type: 'browser',
-      doorway: {
-        identity: environment.doorwayIdentity,
-        url: cheUrl,
-        fallbacks: environment.doorwayFallbacks,
-        apiKey: environment.apiKey,
-      },
-      // Don't set storageUrl - doorway proxies /db/* to storage
-      // The hc-storage endpoint has SSL issues that may block browser requests
-    };
-  }
-
-  // Default: Browser mode (doorway-dependent)
+  // Browser mode (doorway-dependent).
+  //
+  // A caller that wants /db/* proxied THROUGH the doorway simply passes no
+  // storageUrl — that is the choice the removed vendor branch used to make on
+  // the caller's behalf, and it is the caller's to make.
   return {
     type: 'browser',
     doorway: {

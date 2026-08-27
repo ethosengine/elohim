@@ -39,20 +39,28 @@ The app runs in three deployment modes with different content loading paths:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Eclipse Che Specifics
+### Development-workspace specifics
 
-The Che dev-proxy **strips CORS headers** from responses, causing issues with cross-origin requests. Solution:
+Two topologies are live at once inside a workspace runtime (Eclipse Che today), and they must
+not be confused:
 
-1. Route all API requests through Angular's dev server proxy (same-origin)
-2. `app/elohim-library/projects/elohim-service/src/connection/doorway-connection-strategy.ts` returns `window.location.origin` for Che environment
-3. All `/api/*`, `/db/*`, `/blob/*`, `/apps/*` routes proxy to doorway
+1. **HTTP surfaces are same-origin.** The workspace proxy **strips CORS headers**, so `/api/*`,
+   `/db/*`, `/blob/*`, `/apps/*` go through Angular's dev-server proxy (`proxy.conf.mjs`) and
+   `getStorageBaseUrl()` returns the page's own origin. This is what `useLocalProxy: true` in
+   `environment.ts` MEANS — nothing else — and it is set only by the dev environment file.
+2. **The doorway itself is a sibling origin** (the `-hc-dev.` endpoint hostname), because a
+   WebSocket upgrade does not survive the reverse proxy. Only the browser can derive that origin,
+   and only from the vendor's naming convention — so that knowledge lives in exactly one place,
+   `app/workspace-runtime/workspace-doorway.ts` (guarded by its `.epr-meta`, aliased
+   `@workspace/runtime`). It hands the origin to the library as `ConnectionConfig.doorwayOrigin`
+   and to the auth services as the workspace's own doorway URL. The library and the pillars never
+   sniff hostnames; `@elohim/service` knows no workspace vendor.
 
-```typescript
-// In doorway-connection-strategy.ts
-if (this.isCheEnvironment() && config.useLocalProxy) {
-  return window.location.origin;  // Same-origin avoids CORS
-}
-```
+The local doorway's auth posture is chosen by `hc-start.sh` from what the box has
+(`DOORWAY_AUTH=auto|secure|keyless`): with a `mongod` it runs SECURE (per-workspace generated
+`JWT_SECRET`, chaperone provisions via `POST /hc/connect`, conductor admin socket requires a
+credential — exactly the fleet shape); without one it runs KEYLESS (native local-first: loopback
+callers are the conductor's operator). See `doorway/doorway-service/CLAUDE.md` for the predicate.
 
 ---
 

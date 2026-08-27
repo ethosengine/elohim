@@ -44,7 +44,8 @@ import type {
  * Doorway Connection Strategy Implementation
  *
  * Connects to Holochain conductor through a Doorway proxy gateway.
- * Handles both Eclipse Che dev-proxy and deployed admin-proxy environments.
+ * Handles both a host-supplied doorway origin (development workspace
+ * runtimes) and deployed admin-proxy environments.
  */
 export class DoorwayConnectionStrategy implements IConnectionStrategy {
   readonly name = 'doorway';
@@ -127,51 +128,43 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
   }
 
   /**
-   * Detect if running in Eclipse Che environment.
-   * Checks for known Che URL patterns.
+   * Is the doorway served from a DIFFERENT origin than this page, with the
+   * host application telling us where?
+   *
+   * The library never sniffs hostnames and never knows the name of any
+   * particular workspace product. A development workspace runtime publishes
+   * each service port at its own hostname, so the doorway is a sibling origin
+   * that cannot be reached through the dev server's same-origin proxy (a
+   * WebSocket upgrade will not survive it). Only the host application knows
+   * that convention, so the host application supplies the origin as
+   * `ConnectionConfig.doorwayOrigin` and this file simply uses it.
    */
-  private isCheEnvironment(): boolean {
-    if (globalThis.window === undefined || !globalThis.location) return false;
-    return (
-      globalThis.location.hostname.includes('.devspaces.') ||
-      globalThis.location.hostname.includes('.code.ethosengine.com')
-    );
+  private hasSuppliedDoorwayOrigin(config: ConnectionConfig): boolean {
+    return !!config.doorwayOrigin;
   }
 
   /**
-   * Detect plain-localhost dev serving (ng serve on :4200 with the local
-   * doorway proxied at same-origin). Same proxy topology as Che — without
-   * this, /db/* and /blob/* requests fall through to the REMOTE doorway
-   * (environment.holochain.adminUrl) while relative-URL services hit the
-   * local proxy, splitting one page's reads across two substrates.
-   */
-  private isLocalDevHost(): boolean {
-    if (globalThis.window === undefined || !globalThis.location) return false;
-    const host = globalThis.location.hostname;
-    return host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
-  }
-
-  /**
-   * Get the dev proxy base URL in Che environment.
-   * Converts angular-dev endpoint to hc-dev endpoint.
+   * The supplied doorway origin expressed for WebSocket use, or `null`.
+   *
+   * Accepts either scheme from the host application and normalizes: `https` →
+   * `wss`, `http` → `ws`.
    */
   // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain
-  private getCheDevProxyUrl(): string | null {
-    if (!this.isCheEnvironment()) return null;
+  private doorwayWsOrigin(config: ConnectionConfig): string | null {
+    const origin = config.doorwayOrigin;
+    if (!origin) return null;
 
-    // In Che, each endpoint gets a unique URL like:
-    // https://<workspace>-<endpoint>.code.ethosengine.com
-    // We need to replace the endpoint suffix (angular-dev) with (hc-dev)
-    const currentUrl = new URL(globalThis.location.href);
-    const hostname = currentUrl.hostname.replace(/-angular-dev\./, '-hc-dev.');
+    const ws = origin
+      .replace(/^https:/, 'wss:')
+      .replace(/^http:/, 'ws:')
+      .replace(/\/$/, '');
 
-    this.logger.debug('Che URL resolution', {
-      currentHostname: currentUrl.hostname,
-      resolvedHostname: hostname,
-      devProxyUrl: `wss://${hostname}`,
+    this.logger.debug('Doorway origin (supplied by host application)', {
+      supplied: origin,
+      websocket: ws,
     });
 
-    return `wss://${hostname}`;
+    return ws;
   }
 
   // ==========================================================================
@@ -179,12 +172,17 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
   // ==========================================================================
 
   resolveAdminUrl(config: ConnectionConfig): string {
-    const cheProxy = this.getCheDevProxyUrl();
+    const supplied = this.doorwayWsOrigin(config);
 
-    if (cheProxy && config.useLocalProxy) {
-      // Che environment: use path-based routing through dev-proxy
-      const url = `${cheProxy}/hc/admin`;
-      this.logger.debug('Admin URL (Che dev-proxy)', { url });
+    if (supplied && config.useLocalProxy) {
+      // The host application told us where the doorway lives (a sibling origin
+      // in a workspace runtime). Carry the same credentials as the deployed
+      // branch: this branch used to build a bare URL, so the workspace
+      // presented NOTHING on the admin socket and depended on the doorway's
+      // dev-mode passthrough to be let through.
+      const params = this.buildQueryParams(config);
+      const url = params ? `${supplied}/hc/admin?${params}` : `${supplied}/hc/admin`;
+      this.logger.debug('Admin URL (supplied doorway origin)', { url });
       return url;
     }
 
@@ -197,12 +195,15 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
   }
 
   resolveAppUrl(config: ConnectionConfig, port: number): string {
-    const cheProxy = this.getCheDevProxyUrl();
+    const supplied = this.doorwayWsOrigin(config);
 
-    if (cheProxy && config.useLocalProxy) {
-      // Che environment: use path-based routing with port through dev-proxy
-      const url = `${cheProxy}/hc/app/${port}`;
-      this.logger.debug('App URL (Che dev-proxy)', { url });
+    if (supplied && config.useLocalProxy) {
+      // The token is what the doorway reads for conductor AFFINITY
+      // (`resolve_conductor_for_app`), so a workspace that omits it lands on
+      // the default conductor rather than the one hosting this agent.
+      const params = this.buildQueryParams(config);
+      const url = params ? `${supplied}/hc/app/${port}?${params}` : `${supplied}/hc/app/${port}`;
+      this.logger.debug('App URL (supplied doorway origin)', { url });
       return url;
     }
 
@@ -238,10 +239,14 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
   }
 
   getStorageBaseUrl(config: ConnectionConfig): string {
-    // Check for Eclipse Che environment first
-    if ((this.isCheEnvironment() || this.isLocalDevHost()) && config.useLocalProxy) {
-      // In Che, return the Angular dev server's origin so URLs are absolute
-      // but still same-origin. This allows:
+    // `useLocalProxy` MEANS "HTTP surfaces are reverse-proxied at same origin"
+    // — that is the dev-server proxy topology, and it is set only by the dev
+    // environment file. It used to be conjoined with a hostname sniff for two
+    // specific dev hosts, which made the library carry knowledge of particular
+    // workspace products for no added safety.
+    if (config.useLocalProxy) {
+      // Return the dev server's origin so URLs are absolute but still
+      // same-origin. This allows:
       // 1. <img src="..."> tags to work (browser requests same origin)
       // 2. Angular proxy to intercept /api/* and /blob/* routes
       // 3. CORS issues to be avoided (same-origin requests)
@@ -249,7 +254,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       // Note: Empty string doesn't work because Angular's proxy only intercepts
       // HttpClient requests, not browser resource loads like <img> tags.
       if (globalThis.window !== undefined && globalThis.location?.origin) {
-        this.logger.debug('Storage base URL (Che via Angular proxy)', {
+        this.logger.debug('Storage base URL (same-origin via dev-server proxy)', {
           url: globalThis.location.origin,
         });
         return globalThis.location.origin;
@@ -308,19 +313,33 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
   /**
    * Connect to Holochain conductor.
    *
-   * Uses the Chaperone pattern (POST /hc/connect) in production when a
-   * doorwayToken is present. Falls back to the admin WebSocket flow for
-   * dev mode (Eclipse Che) or when no token is available.
+   * The Chaperone pattern (POST /hc/connect) is the path for EVERY environment
+   * that has a session token — deployed, development workspace, and plain
+   * local dev alike. The doorway holds the session and provisions the agent
+   * server-side; the browser never needs, and never gets, an admin socket.
+   *
+   * The development workspace used to be excluded from this by a hostname
+   * conjunct, which forced it down `connectViaAdminWs` — the flow
+   * that drives `install_app` / `enable_app` from the browser. That is the only
+   * reason the doorway had to keep an unauthenticated conductor admin
+   * passthrough open at all, and the passthrough could not be closed while the
+   * workspace depended on it. It does not: `handle_hc_connect` requires only a
+   * valid JWT (no permission level), and `auto_provision` installs and enables
+   * the hApp under the doorway's own admin connection.
+   *
+   * The admin WebSocket remains the fallback for the native local-first mode —
+   * a developer on their own box with no identity system configured, where the
+   * doorway grants the conductor-operator level to loopback callers.
    */
   async connect(config: ConnectionConfig): Promise<ConnectionResult> {
     this.resolveLogger(config);
-    const useChaperone = !this.isCheEnvironment() && !!config.doorwayToken;
+    const useChaperone = !!config.doorwayToken;
 
     if (useChaperone) {
       return this.connectViaChaperone(config);
     }
 
-    // Dev mode / Eclipse Che: use admin WebSocket flow
+    // No session token: native local-first mode (own box, own conductor).
     return this.connectViaAdminWs(config);
   }
 
@@ -483,13 +502,13 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
   }
 
   // ==========================================================================
-  // Admin WebSocket Connection (Dev / Eclipse Che)
+  // Admin WebSocket Connection (native local-first)
   // ==========================================================================
 
   /**
    * Connect via the full admin WebSocket flow.
    *
-   * This is the legacy 11-step connection used in dev mode and Eclipse Che
+   * This is the legacy 11-step connection used in native local-first mode
    * where the admin WS proxy is available.
    */
   private async connectViaAdminWs(config: ConnectionConfig): Promise<ConnectionResult> {

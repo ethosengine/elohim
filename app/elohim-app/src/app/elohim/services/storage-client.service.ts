@@ -13,7 +13,8 @@
  * via storage's manifest registration in the RouteRegistry, which proxies
  * to storage's /blob/{hash}.
  *
- * In Eclipse Che, doorway is accessed via the hc-dev endpoint URL.
+ * In a development workspace, doorway is a sibling origin resolved by
+ * `app/workspace-runtime/` — never sniffed here.
  */
 
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
@@ -22,7 +23,6 @@ import { Injectable, inject } from '@angular/core';
 // @coverage: 90.5% (2026-02-24)
 
 import { Observable, catchError, map, of, throwError, timeout } from 'rxjs';
-import type { ContentEngagementStatsView } from '@elohim/storage-client';
 
 import { environment } from '../../../environments/environment';
 import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
@@ -30,6 +30,7 @@ import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
 import type { ListResponse, BulkCreateResult } from '../models/storage-response.model';
 import type { ContentType, ContentFormat, Reach } from '@app/generated/schema-enums';
 import type { ConnectionConfig } from '@elohim/service/connection';
+import type { ContentEngagementStatsView } from '@elohim/storage-client';
 
 /**
  * Schema-negotiation header sent on every guarded `/db/**\/bulk` write.

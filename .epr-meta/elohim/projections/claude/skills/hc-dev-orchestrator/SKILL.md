@@ -372,6 +372,17 @@ just status saga
 
 - `app/elohim-app/scripts/hc-start.sh` is the single-peer owner. Its native
   builds are pool-aware; its DNA builds intentionally are not redirected.
+- The single-peer doorway's auth posture is chosen from what the box HAS, never
+  a mode flag (`DOORWAY_AUTH=auto|secure|keyless`, default `auto`): with a
+  `mongod` (`MONGOD_BIN`, `MONGO_PORT` default 27017; dbpath
+  `.local-dev/mongo`) it runs SECURE — per-workspace `JWT_SECRET` +
+  `API_KEY_ADMIN` generated once under `.local-dev/doorway/`, chaperone
+  provisions, no `--dev-mode`; without one it runs KEYLESS (native local-first;
+  `--dev-mode` passed only as the startup declaration the config validator
+  requires). `DOORWAY_AUTH=secure` fails fast when no mongod is found. Both
+  `--conductor-url` (app :4445) and `--conductor-admin-url` (hc sandbox's
+  random admin port) are passed explicitly — the `app_port-1` derivation does
+  not hold for `hc sandbox`.
 - `hc sandbox --piped` reads the lair passphrase from stdin. `-f` pins admin
   ports, `-r` pins app ports, and `-n/-d` create named sandboxes.
 - A sandbox with no network section reaches the public Holochain dev network;

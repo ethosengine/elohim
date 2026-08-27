@@ -27,6 +27,8 @@ import { catchError, of, timeout, firstValueFrom } from 'rxjs';
 import { FederationRegistryAnchor } from '@app/elohim/integrity';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
+import { isWorkspaceRuntime, workspaceDoorwayUrl } from '@workspace/runtime';
+
 import {
   type DoorwayInfo,
   type DoorwayStatus,
@@ -52,41 +54,20 @@ const CACHE_TTL_MS = 60 * 60 * 1000;
 /** Maximum concurrent health checks */
 const MAX_CONCURRENT_HEALTH_CHECKS = 5;
 
-// =============================================================================
-// Che Environment Detection
-// =============================================================================
-
 /**
- * Detect if running in Eclipse Che environment
+ * This development workspace's OWN doorway, as a selectable identity provider.
+ *
+ * The workspace developer registers and logs in against it, and its chaperone
+ * provisions their agent — so it is a real doorway in the registry, not a
+ * special case. The vendor's hostname convention is resolved by the fence
+ * (`app/workspace-runtime/`), never here.
  */
-function isEclipseChe(): boolean {
-  // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof globalThis guard; only called from restoreSelection() after its typeof localStorage SSR guard
-  if (typeof globalThis === 'undefined' || !globalThis.location) return false;
-  // eslint-disable-next-line no-restricted-syntax -- SSR-safe: reached only after the truthy globalThis.location check above
-  const hostname = globalThis.location.hostname;
-  return hostname.includes('.code.ethosengine.com') || hostname.includes('.devspaces.');
-}
-
-/**
- * Get the Che hc-dev endpoint URL for doorway access
- */
-function getCheHcDevUrl(): string {
-  // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof globalThis guard; only called from restoreSelection() after its typeof localStorage SSR guard
-  if (typeof globalThis === 'undefined' || !globalThis.location) return '';
-  // eslint-disable-next-line no-restricted-syntax -- SSR-safe: reached only after the truthy globalThis.location check above
-  const hostname = globalThis.location.hostname.replace(/-angular-dev\./, '-hc-dev.');
-  return `https://${hostname}`;
-}
-
-/**
- * Create a doorway info for the Che local environment
- */
-function createCheDoorway(): DoorwayInfo {
+function createWorkspaceDoorway(): DoorwayInfo {
   return {
-    id: 'che-local-hc-dev',
-    name: 'Local Dev (Che)',
-    url: getCheHcDevUrl(),
-    description: 'Local development doorway via Eclipse Che hc-dev endpoint',
+    id: 'workspace-local-doorway',
+    name: 'Local Dev (workspace)',
+    url: workspaceDoorwayUrl() ?? '',
+    description: "This development workspace's own doorway",
     region: 'global', // Use 'global' as catch-all for dev
     operator: 'Local Development',
     features: [], // No special features for local dev
@@ -512,17 +493,17 @@ export class DoorwayRegistryService {
   }
 
   /**
-   * Restore selection from localStorage, or auto-select Che doorway in dev.
+   * Restore selection from localStorage, or auto-select this workspace's own
+   * doorway in dev.
    */
   private restoreSelection(): void {
     // SSR-safe: no browser storage during server-side rendering
     if (typeof localStorage === 'undefined') return;
 
-    // In Eclipse Che, always use the local hc-dev endpoint
-    if (isEclipseChe()) {
-      const cheDoorway = createCheDoorway();
+    // In a development workspace, always use this workspace's own doorway
+    if (isWorkspaceRuntime()) {
       this.selectedSignal.set({
-        doorway: cheDoorway,
+        doorway: createWorkspaceDoorway(),
         selectedAt: new Date().toISOString(),
         isExplicit: false,
       });

@@ -40,6 +40,8 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 
 import { DoorwaySessionClient, DoorwaySessionError } from '@elohim/identity';
 
+import { workspaceDoorwayUrl } from '@workspace/runtime';
+
 import { environment } from '../../../environments/environment';
 import {
   type AuthState,
@@ -513,7 +515,7 @@ export class AuthService {
    * Doorway base URL for session walking. The service owns this derivation —
    * the client receives a plain origin (no strategy logic in the client).
    * Mirrors PasswordAuthProvider.getAuthBaseUrl() priority:
-   * selected doorway > Che hc-dev endpoint > environment authUrl > adminUrl.
+   * selected doorway > this workspace's doorway > environment authUrl > adminUrl.
    *
    * @returns Base URL, or null when no configuration is available
    */
@@ -524,11 +526,11 @@ export class AuthService {
       return doorwayUrl;
     }
 
-    // Eclipse Che: the admin-proxy is exposed via the hc-dev endpoint
-    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof-equivalent guard, optional chaining short-circuits to undefined when globalThis.location is absent server-side (falls back to '' via ?? ''), and the sole caller restoreSession() also wraps it in try/catch
-    const hostname = globalThis.location?.hostname ?? '';
-    if (hostname.includes('.devspaces.') || hostname.includes('.code.ethosengine.com')) {
-      return `https://${hostname.replace(/-angular-dev\./, '-hc-dev.')}`;
+    // A development workspace serves the doorway at a sibling origin, resolved
+    // by the vendor fence (`app/workspace-runtime/`). Returns null off-workspace.
+    const workspaceDoorway = workspaceDoorwayUrl();
+    if (workspaceDoorway) {
+      return workspaceDoorway;
     }
 
     // Explicit authUrl (local dev or production)

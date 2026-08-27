@@ -31,6 +31,8 @@ import {
 } from '@holochain/client';
 import { firstValueFrom } from 'rxjs';
 
+import { isWorkspaceRuntime, workspaceDoorwayUrl } from '@workspace/runtime';
+
 import {
   type HolochainConnection,
   type HolochainConfig,
@@ -160,48 +162,13 @@ export class HolochainClientService {
       happPath: this.config.happPath,
       origin: this.config.origin,
       useLocalProxy: this.config.useLocalProxy,
+      // Where the doorway lives when it is NOT this page's origin. Resolved by
+      // the workspace-vendor fence; `null` everywhere else (deployed, plain
+      // localhost, Tauri, SSR), in which case the library uses adminUrl.
+      doorwayOrigin: workspaceDoorwayUrl() ?? undefined,
       doorwayToken,
       logger: strategyLogger,
     };
-  }
-
-  /**
-   * Detect if running in Eclipse Che environment.
-   * Checks for known Che URL patterns.
-   */
-  private isCheEnvironment(): boolean {
-    return (
-      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only surface — only reached via testAdminConnection(), invoked exclusively from shefa-home's user-initiated testConnection() button handler, never during SSR bootstrap
-      globalThis.location.hostname.includes('.devspaces.') ||
-      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only surface — only reached via testAdminConnection(), invoked exclusively from shefa-home's user-initiated testConnection() button handler, never during SSR bootstrap
-      globalThis.location.hostname.includes('.code.ethosengine.com')
-    );
-  }
-
-  /**
-   * Get the dev proxy base URL in Che environment.
-   * Looks for the hc-dev endpoint URL.
-   */
-  private getCheDevProxyUrl(): string | null {
-    if (!this.isCheEnvironment()) return null;
-
-    // In Che, each endpoint gets a unique URL like:
-    // https://<workspace>-<endpoint>.code.ethosengine.com
-    // Example: mbd06b-gmail-com-elohim-devspace-angular-dev.code.ethosengine.com
-    // We need to replace the endpoint suffix (angular-dev) with (hc-dev)
-    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only surface — getCheDevProxyUrl() is gated by isCheEnvironment(), reached only via user-initiated testAdminConnection(), never during SSR bootstrap
-    const currentUrl = new URL(globalThis.location.href);
-
-    // Replace '-angular-dev' suffix with '-hc-dev' in the hostname
-    const hostname = currentUrl.hostname.replace(/-angular-dev\./, '-hc-dev.');
-
-    this.logger.debug('Che URL resolution', {
-      currentHostname: currentUrl.hostname,
-      resolvedHostname: hostname,
-      devProxyUrl: `wss://${hostname}`,
-    });
-
-    return `wss://${hostname}`;
   }
 
   /**
@@ -227,8 +194,8 @@ export class HolochainClientService {
       this.config = { ...DEFAULT_HOLOCHAIN_CONFIG, ...config };
     }
 
-    const isChe = this.isCheEnvironment();
-    const mode = isChe && this.config.useLocalProxy ? 'Che dev-proxy' : 'direct';
+    const viaWorkspaceDoorway = isWorkspaceRuntime() && this.config.useLocalProxy;
+    const mode = viaWorkspaceDoorway ? 'workspace doorway endpoint' : 'direct';
     this.logger.info('Testing admin connection', { mode });
 
     this.updateState({ state: 'connecting' });

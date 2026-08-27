@@ -19,6 +19,8 @@ import {
   gatewayCandidates,
 } from '@elohim/service';
 
+import { isWorkspaceOrigin } from '@workspace/runtime';
+
 import { environment } from '../../../environments/environment';
 
 const DOORWAY_PATH_PREFIXES = ['/api/', '/db/', '/blob/', '/apps/', '/health'];
@@ -61,10 +63,6 @@ function isTauri(): boolean {
   return typeof globalThis !== 'undefined' && '__TAURI__' in globalThis;
 }
 
-function isCheOrigin(origin: string): boolean {
-  return origin.includes('.devspaces.') || origin.includes('.code.ethosengine.com');
-}
-
 function isLocalDevOrigin(origin: string): boolean {
   return origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:');
 }
@@ -80,7 +78,7 @@ function safeOrigin(url: string): string | null {
 /**
  * Resolves the "preferred" absolute base for non-browser-origin cases
  * (Tauri sidecar) or the cross-origin doorway host. Returns '' whenever the
- * caller should fall back to the browser's own origin instead — Che/local-dev
+ * caller should fall back to the browser's own origin instead — workspace/local-dev
  * (dev-proxy same-origin routing, avoids CORS-header stripping) and the
  * same-origin-as-doorway topology (there is no separate doorway origin to
  * route to). '' is not "no base" here — see effectivePrimary in the
@@ -94,7 +92,7 @@ function resolveBaseUrl(): string {
   // eslint-disable-next-line no-restricted-syntax -- SSR-safe: inside typeof-equivalent guard, optional chaining short-circuits to undefined when globalThis.location is absent server-side, falling back to '' via ?? ''
   const origin = globalThis.location?.origin ?? '';
   if (!origin) return '';
-  if (isCheOrigin(origin) || isLocalDevOrigin(origin)) return '';
+  if (isWorkspaceOrigin(origin) || isLocalDevOrigin(origin)) return '';
 
   const doorwayUrl = environment.client?.doorwayUrl ?? '';
   if (!doorwayUrl) return '';

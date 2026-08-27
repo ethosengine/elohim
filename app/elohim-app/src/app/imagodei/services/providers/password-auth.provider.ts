@@ -19,6 +19,8 @@ import { Injectable, inject } from '@angular/core';
 
 import { firstValueFrom } from 'rxjs';
 
+import { workspaceDoorwayUrl } from '@workspace/runtime';
+
 import { environment } from '../../../../environments/environment';
 import {
   type AuthProvider,
@@ -46,37 +48,11 @@ export class PasswordAuthProvider implements AuthProvider {
   private readonly doorwayRegistry = inject(DoorwayRegistryService);
 
   /**
-   * Detect if running in Eclipse Che environment.
-   */
-  private isCheEnvironment(): boolean {
-    return (
-      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only login surface, only reached via user-triggered login/register/refresh calls, never SSR-rendered
-      globalThis.location.hostname.includes('.devspaces.') ||
-      // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only login surface, only reached via user-triggered login/register/refresh calls, never SSR-rendered
-      globalThis.location.hostname.includes('.code.ethosengine.com')
-    );
-  }
-
-  /**
-   * Get the Che hc-dev endpoint URL for auth.
-   * The admin-proxy is exposed via the hc-dev endpoint on port 8888.
-   */
-  private getCheAuthUrl(): string | null {
-    if (!this.isCheEnvironment()) return null;
-
-    // Replace current endpoint suffix with hc-dev
-    // e.g., ...-angular-dev.code.ethosengine.com -> ...-hc-dev.code.ethosengine.com
-    // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only login surface, only reached via user-triggered login/register/refresh calls, never SSR-rendered
-    const hostname = globalThis.location.hostname.replace(/-angular-dev\./, '-hc-dev.');
-    return `https://${hostname}`;
-  }
-
-  /**
    * Get the base URL for auth endpoints.
    *
    * Priority:
    * 1. Selected doorway URL (user's chosen identity provider)
-   * 2. Eclipse Che: Use hc-dev endpoint (admin-proxy exposed via Che)
+   * 2. Development workspace: this workspace's own doorway endpoint
    * 3. Explicit authUrl from environment
    * 4. Derive from adminUrl by converting WS to HTTP
    */
@@ -87,10 +63,13 @@ export class PasswordAuthProvider implements AuthProvider {
       return doorwayUrl;
     }
 
-    // Check for Eclipse Che environment
-    const cheAuthUrl = this.getCheAuthUrl();
-    if (cheAuthUrl) {
-      return cheAuthUrl;
+    // A development workspace serves the doorway at a sibling origin. This is
+    // the workspace developer's OWN doorway — the identity provider they
+    // register and log in against, and the one whose chaperone provisions
+    // their agent. Resolved by the vendor fence, never sniffed here.
+    const workspaceDoorway = workspaceDoorwayUrl();
+    if (workspaceDoorway) {
+      return workspaceDoorway;
     }
 
     // Use explicit authUrl if provided (for local dev or production)

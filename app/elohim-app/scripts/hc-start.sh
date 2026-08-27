@@ -31,6 +31,12 @@
 #                            risk if DNA hashes differ — warning printed)
 #   DEPLOYED_HAPP_TAG/DEPLOYED_HAPP_BRANCH  Pin the deployed-bundle fetch
 #                            (defaults: dev-latest / dev — see fetch-deployed-dna.sh)
+#   DOORWAY_AUTH     Doorway auth posture (default: auto)
+#                      auto   - secure when mongod is available, else keyless
+#                      secure - REQUIRE the secure posture; fail if mongod is absent
+#                      keyless- native local-first; no account store, no JWT secret
+#   MONGOD_BIN/MONGO_PORT    Account + projection store for the secure posture
+#                            (defaults: first mongod on PATH / 27017)
 #
 # COMPONENTS:
 #   1. Holochain Conductor - Cryptographic provenance & agent identity
@@ -77,6 +83,13 @@ mkdir -p "$(readlink -m "$STORAGE_TARGET_DIR")" "$(readlink -m "$DOORWAY_TARGET_
 : "${STORAGE_PORT:=8090}"
 : "${SEED_LIMIT:=200}"
 : "${NETWORK_PROFILE:=isolated}"
+: "${DOORWAY_AUTH:=auto}"
+: "${MONGO_PORT:=27017}"
+MONGOD_BIN="${MONGOD_BIN-$(command -v mongod 2>/dev/null || { [ -x "$HOME/bin/mongod" ] && echo "$HOME/bin/mongod"; })}"
+MONGO_DIR="$LOCAL_DEV_DIR/mongo"
+DOORWAY_STATE_DIR="$LOCAL_DEV_DIR/doorway"
+JWT_SECRET_FILE="$DOORWAY_STATE_DIR/jwt-secret"
+ADMIN_KEY_FILE="$DOORWAY_STATE_DIR/api-key-admin"
 
 # Options
 RUN_SEED=false
@@ -500,11 +513,106 @@ else
     fuser -k 8888/tcp 2>/dev/null || true
     sleep 1
 
+    # ------------------------------------------------------------------
+    # Auth posture. Two honest shapes, chosen by what this box actually has
+    # — never by a mode flag. See doorway `native_local_first_operator`.
+    #
+    #   secure  — this workspace has its OWN doorway identity: a persistent
+    #             per-workspace JWT_SECRET, an account store, and the hApp
+    #             bundle the chaperone provisions from. The browser logs in
+    #             and reaches the conductor through POST /hc/connect. The
+    #             conductor admin socket requires a credential, exactly as on
+    #             the deployed fleet. This is the mode that makes the devspace
+    #             a protocol-compliant peer rather than a hole.
+    #
+    #   keyless — native local-first: no account store, no doorway identity.
+    #             The doorway grants the conductor-operator level to loopback
+    #             callers (and ONLY loopback, and only pre-coordination), so
+    #             the admin-WS flow still works with nothing configured.
+    #
+    # `--dev-mode` is passed ONLY in the keyless posture, and it no longer
+    # decides anything about authorization. It survives as one honest thing:
+    # a startup-time DECLARATION that this is a developer's box, which the
+    # config validator requires before it will let a doorway run with no
+    # signing secret at all (`!dev_mode && jwt_secret.is_none()` => refuse to
+    # start). That is fail-closed and stays. What it must never again do is
+    # decide a per-request grant — that is why the secure posture below does
+    # not pass it, and why the fleet's `DEV_MODE: "true"` is now inert for
+    # the conductor socket.
+    # ------------------------------------------------------------------
+    mkdir -p "$DOORWAY_STATE_DIR"
+    DOORWAY_POSTURE=keyless
+    if [ "$DOORWAY_AUTH" != "keyless" ]; then
+        if [ -n "$MONGOD_BIN" ] && [ -x "$MONGOD_BIN" ]; then
+            DOORWAY_POSTURE=secure
+        elif [ "$DOORWAY_AUTH" = "secure" ]; then
+            echo "   ❌ DOORWAY_AUTH=secure but no mongod found (set MONGOD_BIN)." >&2
+            echo "      The secure posture needs an account store to log in against." >&2
+            exit 1
+        else
+            echo "   ℹ️  No mongod found — starting keyless (native local-first)."
+            echo "      Install mongod or set MONGOD_BIN for the secure posture."
+        fi
+    fi
+
+    DOORWAY_ENV=()
+    if [ "$DOORWAY_POSTURE" = "secure" ]; then
+        # mongod must be listening BEFORE the doorway boots: the projection
+        # archive is bound at startup and a doorway that boots archive-less
+        # stays inert for its whole life.
+        if ! (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null; then
+            mkdir -p "$MONGO_DIR"
+            "$MONGOD_BIN" --dbpath "$MONGO_DIR" --bind_ip 127.0.0.1 --port "$MONGO_PORT" \
+                --fork --logpath "$LOCAL_DEV_DIR/mongod.log" >/dev/null 2>&1 \
+                || { echo "   ❌ mongod failed to start (see $LOCAL_DEV_DIR/mongod.log)" >&2; exit 1; }
+            for _ in $(seq 1 20); do
+                (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null && break; sleep 1
+            done
+            echo "   ✅ mongod up on :$MONGO_PORT"
+        else
+            echo "   ✅ mongod already up on :$MONGO_PORT"
+        fi
+
+        # Per-workspace secrets, generated once and persisted. NOT shared with
+        # any other workspace: a doorway that signs with the publicly-known dev
+        # placeholder (JwtValidator::new_dev) can have its tokens forged by
+        # anyone, which would make the chaperone security theatre.
+        if [ ! -s "$JWT_SECRET_FILE" ]; then
+            head -c 48 /dev/urandom | base64 | tr -d '\n' > "$JWT_SECRET_FILE"
+            chmod 600 "$JWT_SECRET_FILE"
+            echo "   🔑 Generated this workspace's doorway JWT secret"
+        fi
+        if [ ! -s "$ADMIN_KEY_FILE" ]; then
+            head -c 32 /dev/urandom | base64 | tr -d '\n' > "$ADMIN_KEY_FILE"
+            chmod 600 "$ADMIN_KEY_FILE"
+        fi
+
+        DOORWAY_ENV+=(
+            "MONGODB_URI=mongodb://127.0.0.1:$MONGO_PORT"
+            "MONGODB_DB=doorway-dev"
+            "JWT_SECRET=$(cat "$JWT_SECRET_FILE")"
+            "API_KEY_ADMIN=$(cat "$ADMIN_KEY_FILE")"
+            "HAPP_BUNDLE_PATH=$HAPP_PATH"
+            "DOORWAY_ID=${DOORWAY_ID:-workspace-local}"
+        )
+    fi
+
+    # Keyless declares itself with --dev-mode (see above); secure never does.
+    DOORWAY_FLAGS=()
+    [ "$DOORWAY_POSTURE" = "keyless" ] && DOORWAY_FLAGS+=(--dev-mode)
+
     # Start with storage URL
-    "$DOORWAY_BIN" \
-        --dev-mode \
+    # `hc sandbox` picks a RANDOM admin port and pins the app interface with
+    # `-r=4445`, so the doorway's default "admin = app port - 1" derivation
+    # cannot find it. Pass BOTH explicitly rather than let it guess: the app
+    # interface as --conductor-url, the real admin socket as
+    # --conductor-admin-url. Before the secure posture existed nothing here
+    # exercised the admin path from the doorway side (the browser drove the
+    # admin socket itself), so the mis-derivation was invisible.
+    env "${DOORWAY_ENV[@]}" "$DOORWAY_BIN" "${DOORWAY_FLAGS[@]}" \
         --listen 0.0.0.0:8888 \
-        --conductor-url "ws://localhost:$ADMIN_PORT" \
+        --conductor-url "ws://localhost:4445" \
+        --conductor-admin-url "ws://localhost:$ADMIN_PORT" \
         --storage-url "http://localhost:$STORAGE_PORT" &
 
     echo -n "   ⏳ Waiting for doorway"
@@ -556,6 +664,24 @@ echo "│ Agent SDK   │ (skipped — no ANTHROPIC_API_KEY)              │"
 fi
 echo "│ Doorway     │ http://localhost:8888 (unified API)           │"
 echo "└─────────────┴────────────────────────────────────────────────┘"
+echo ""
+case "${DOORWAY_POSTURE:-unknown}" in
+  secure)
+    echo "🔐 Doorway auth: SECURE (this workspace has its own doorway identity)"
+    echo "   • Register/log in in the app — the doorway is its own identity provider."
+    echo "   • The browser then reaches the conductor via POST /hc/connect (chaperone);"
+    echo "     the conductor admin socket requires a credential, as on the fleet."
+    echo "   • Secrets: $DOORWAY_STATE_DIR (per-workspace, generated once)"
+    ;;
+  keyless)
+    echo "🔓 Doorway auth: KEYLESS (native local-first — no account store)"
+    echo "   • Loopback callers are this conductor's operator; off-box callers get nothing."
+    echo "   • Install mongod (or set MONGOD_BIN) for the secure posture."
+    ;;
+  *)
+    echo "ℹ️  Doorway auth: unchanged (doorway was already running)"
+    ;;
+esac
 echo ""
 echo "📋 Quick Commands:"
 echo ""

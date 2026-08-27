@@ -3,6 +3,10 @@
   "compilerOptions": {
     "typeRoots": ["node_modules/@types"],
     "paths": {
+      // Development-workspace vendor fence (app/workspace-runtime/.epr-meta).
+      // Deliberately NOT an @app/* alias: it is dev tooling, not a domain or
+      // bundle seam, and must stay outside the cross-workspace import ratchet.
+      "@workspace/runtime": ["../workspace-runtime/workspace-doorway.ts"],
       "@app/lamad/*": ["./src/app/*"],
       // Cross-pillar aliases reach BACK into app/elohim-app's private source
       // tree. This is a live cycle, not a clean composition-root seam — do not

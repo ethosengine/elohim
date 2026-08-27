@@ -8,7 +8,8 @@ export const environment: Environment = {
   environment: 'development',
   gitHash: 'local-dev',
   // Holochain Edge Node configuration
-  // In Eclipse Che: auto-detects and uses local dev-proxy with path-based routing
+  // In a development workspace: HTTP surfaces route same-origin through the
+  // dev-server proxy; the doorway's own origin comes from app/workspace-runtime/
   // In deployed mode: uses remote admin-proxy with API key authentication
   holochain: {
     adminUrl: 'wss://doorway-alpha.elohim.host',
@@ -17,7 +18,7 @@ export const environment: Environment = {
     // In production, this should point to the admin-proxy HTTP endpoint
     authUrl: 'http://localhost:8888',
     proxyApiKey: 'dev-elohim-auth-2024', // Authenticated access (not admin)
-    useLocalProxy: true, // Auto-detect Che and use local dev-proxy
+    useLocalProxy: true, // HTTP surfaces are reverse-proxied at same origin
     // Connection mode: 'auto' detects Tauri→direct, browser→doorway
     connectionMode: 'auto',
     // elohim-storage sidecar URL (for direct mode blob storage)
