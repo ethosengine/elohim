@@ -76,12 +76,6 @@ components:
         # so no ~/.codex symlink is needed (unlike CLAUDE_CONFIG_DIR).
         - name: CODEX_HOME
           value: /projects/.codex-config
-        # Gemini CLI (and any tool honoring the convention): the container has no
-        # browser and no xdg-open, so an OAuth flow that tries to spawn one dies
-        # with ENOENT. NO_BROWSER=true makes such tools print the auth URL for
-        # the operator to open outside the workspace instead.
-        - name: NO_BROWSER
-          value: 'true'
         - name: USER
           value: user
         - name: RUST_BACKTRACE
@@ -255,14 +249,19 @@ commands:
         ln -sf "$CLAUDE_CONFIG_DIR" /home/user/.claude
         mkdir -p /home/user/.claude/ide
 
-        # Link ~/.gemini to the persistent /projects PVC so Gemini CLI sign-in
-        # (oauth_creds.json), settings, and extensions survive restarts.
-        # Gemini has no CODEX_HOME-style override — its global dir is
-        # hardcoded to homedir()/.gemini — so it needs the Claude-style
-        # symlink, not an env var.
-        mkdir -p /projects/.gemini-config
+        # Antigravity CLI stores settings and its headless credential fallback
+        # below ~/.gemini/antigravity-cli with no relocation override. Retain
+        # the persistent parent so first launch can offer Google's supported
+        # one-time migration of legacy Gemini rules, skills, and session state.
+        mkdir -p /projects/.gemini-config/antigravity-cli
         rm -rf /home/user/.gemini 2>/dev/null || true
         ln -sf /projects/.gemini-config /home/user/.gemini
+
+        # Default to subscription quota only. Users may opt in later, but a new
+        # workspace must never consume separately billed AI credits implicitly.
+        if [ ! -f /home/user/.gemini/antigravity-cli/settings.json ]; then
+          echo '{"useG1Credits":false}' > /home/user/.gemini/antigravity-cli/settings.json
+        fi
 
   - id: setup-claude-mcp
     exec:
