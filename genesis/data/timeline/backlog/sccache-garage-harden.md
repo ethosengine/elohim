@@ -10,7 +10,7 @@ author: "cartographer"
 status: "proposed"
 priority: "high"
 area: "cargo"
-recurrence: 2
+recurrence: 3
 source_shifts:
   - "2026-05-17"
   - "2026-05-18"
@@ -63,3 +63,13 @@ cache-miss/fallback plus a documented heal removes both costs.
 
 A poisoned cache key produces a clean cache-miss/fallback rather than a spurious rustc error;
 a runbook documents the heal.
+
+## Recurrence 3 — 2026-08-27, a NEW shape: dead Garage key (elohim-holochain #1403)
+
+Not corruption this time — the credential. `sccache: error: Server startup failed: cache storage failed to read: PermissionDenied (permanent) … S3Error { code: "AccessDenied", message: "Forbidden: No such key: GK4e34b68f3f9bcca5ce769366", resource: "/sccache-elohim/.sccache_check" }` — the Garage access key mounted from the `jenkins`-ns `sccache-credentials` Secret no longer exists on the Garage server. The server refuses to start, `sccache rustc -vV` exits 2, `cargo metadata` exits 101, `DNA BUILD FAILED` 85 s after dispatch — before any compile. #1402 (2026-08-19) was green, so the key died in that window.
+
+**Why it costs more than one red:** the DNA job sits at orchestrator level 0 and `elohim-edge` at level 1, so the `levelFailed` guard withheld edge AND genesis for orchestrator #1733 — a push carrying a doorway security closure (`13ed1721e`) did not reach the fleet because a `.epr-meta/*.habit.md` atom under `elohim/holochain/` had pulled the DNA job into the plan. Retriggered with an empty `[build:edge]` commit (edge has no sccache wrapper and is unaffected).
+
+**Two fixes, two owners:**
+1. *Operator:* re-provision the Garage key and refresh `sccache-credentials` in the `jenkins` namespace (runbook: `genesis/manifests/RUNBOOK-minio-sccache-2026-05-09.md` predates the Garage move — update it while there).
+2. *Repo (this backlog, front 2 above, made concrete):* `elohim/holochain/dna/elohim/flake.nix` `shellHook` sets `RUSTC_WRAPPER=sccache` on binary presence alone. Probe the server (`sccache --start-server` / `--show-stats` with a short timeout) and leave `RUSTC_WRAPPER` unset with a loud stderr line when it fails — a dead cache becomes a cold compile, never a level-0 red. Ship it in a batch that already churns the fleet (it dispatches the DNA job and, by cascade, edge).
