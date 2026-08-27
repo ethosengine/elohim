@@ -755,3 +755,40 @@ policies:
       and the cascade is a strict ancestor walk, so a manifest placed anywhere other than the repo
       root can only ever govern writes BENEATH itself — it cannot reach out to unrelated
       directories. A repo-wide charter needs the repo-root anchor.
+
+  - id: habit-declaration-at-birth
+    version: 1
+    contentHash: sha256:528917b7b386fe63209d385c1d194b6f366c617b65e4125201db39589cb789c2
+    title: A habit is born observable and born retirable
+    binding: constitutional
+    class: deny
+    scope: { write: "*.habit.md", new: true }
+    require-frontmatter: [epr-habit-version, id, invariant, status, retire-when]
+    status: active
+    retire-when: >
+      never: this is the admission control for the delivery register itself. A habit with no
+      invariant states nothing; one with no status cannot disagree with its evidence; one with
+      no retire-when can only accrete. The register survived seven months on a prose covenant
+      that no script enforced (`Max 12 habits`, `Max 2 active` — neither was ever checked), and
+      the observable cost was `unwired` going to zero: with no free slots you never spend one on
+      a commitment you cannot yet observe, so the register's own valve for honest uncertainty
+      welded shut. A floor whose absence is that expensive does not retire.
+    established_by: operator-2026-08-27
+    why: >
+      You are declaring a HABIT — what this system reliably does — in the .epr-meta governance
+      package of the directory whose behaviour it describes. Five fields are required at birth,
+      and each one is load-bearing: `epr-habit-version: 1`; an `id` that MATCHES the filename
+      (the filename is the address the cascade resolves, and the id is the join across register,
+      CI and Gherkin — concern ids stay globally unique even though declaration is local);
+      an `invariant` (a habit with no stated invariant is a mood); a `status` of green | red |
+      unwired (`unwired` = committed to, with no runnable check yet — declared and counted on
+      purpose, and the state a headcount cap makes unaffordable); and a `retire-when` exit
+      CONDITION, never a date — `never: <why this is a floor>` is a legitimate answer and the
+      whole point of admitting it is that it becomes countable rather than silent.
+      `checks:` is not required here because an `unwired` habit legitimately has none; the
+      census (`.claude/scripts/_lib/epr_habits.py`) enforces the conditional — checks required
+      unless unwired, and refused when unwired — along with the two roll-ups no single manifest
+      can make: globally-unique concern ownership, and `max 2 active` (the WIP fence bounds
+      ATTENTION, and attention does not compose). Run
+      `.claude/scripts/habits-project.py --check` after; the flat register at
+      genesis/manifests/habits.yaml is a GENERATED projection of these atoms.

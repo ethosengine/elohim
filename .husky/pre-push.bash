@@ -328,6 +328,28 @@ if echo "$CHANGED" | grep -qE "(^|/)\.epr-meta(/|$)|^\.ci-ignore$"; then
   fi
 fi
 
+# ── habit register freshness (projected from the .epr-meta habit atoms) ──
+#
+# A habit is declared in the .epr-meta governance package of the directory whose behaviour it
+# describes; genesis/manifests/habits.yaml is the GENERATED projection of that walk. This leg is
+# why the projection can never become a second hand-written home — the failure mode this repo has
+# already paid for twice (cluster-state.yaml vs ELOHIM_REMOTE_COMPUTE_STATUS; the deployments.json
+# suspended flags that drifted until they were made derived). --check also refuses an INVALID
+# census: a duplicate id, a concern claimed by two habits, or the max-2-active WIP fence breached.
+# Pure-python (~ms) so it is PVC-EXEMPT BY OMISSION. Fail-open if python3 or the projector is
+# absent (a branch predating the register must never be blocked).
+if echo "$CHANGED" | grep -qE "\.habit\.md$|(^|/)\.epr-meta(/|$)|^genesis/manifests/habits\.yaml$"; then
+  if command -v python3 >/dev/null 2>&1 && [ -f .claude/scripts/habits-project.py ]; then
+    echo "[pre-push] Verifying the habit register projection is fresh..."
+    if ! python3 .claude/scripts/habits-project.py --check; then
+      echo "[pre-push] ERROR: genesis/manifests/habits.yaml is stale, or the habit census is invalid."
+      echo "  Run: python3 .claude/scripts/habits-project.py && git add genesis/manifests/habits.yaml"
+      exit 1
+    fi
+    echo "[pre-push] habit register freshness ✓"
+  fi
+fi
+
 # ── .epr-meta compose-gate (author-time rule evaluation over the push range) ──
 #
 # The commit-time gate (.husky/pre-commit) is the primary; this is the backstop for commits made

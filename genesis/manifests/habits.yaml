@@ -1,5 +1,16 @@
-# habits.yaml — the delivery habits: what this system RELIABLY DOES, each bound to a
-# runnable check that proves it.
+# GENERATED — DO NOT EDIT. Projected from the habit atoms in the .epr-meta governance
+# packages by .claude/scripts/habits-project.py. Edit a habit where it is DECLARED:
+#   <dir>/.epr-meta/<id>.habit.md   (frontmatter = declaration, body = evidence ledger)
+# The covenant, the vision and the priority order live in .epr-meta/habits-covenant.md.
+# `habits-project.py --check` fails when this file drifts from the tree.
+#
+# The delivery habits: what this system RELIABLY DOES, each bound to a runnable check
+# that proves it. This file is the register's CROSS-CUTTING leg — the vision, the priority
+# `order:`, and the covenant below. Each habit itself is DECLARED where its concern lives:
+# `<dir>/.epr-meta/<id>.habit.md`, in the governance package of the directory whose
+# behaviour it describes. `genesis/manifests/habits.yaml` is the GENERATED projection of
+# that walk (`.claude/scripts/habits-project.py`), kept so every reader that knows it by
+# path still works; it is nobody's home.
 #
 # THE NAME IS THE MANIFESTO'S OWN. genesis/docs/content/elohim-protocol/manifesto.md
 # quotes James Clear: "You don't rise to the level of your goals, you fall to the level
@@ -37,16 +48,30 @@
 #     counted. That is the most valuable state in this file.
 #
 # THE COVENANT (anti-pile admission control):
-#   1. Max 12 habits. A candidate must displace one or wait.
+#   1. A habit is declared in the `.epr-meta` of the directory whose BEHAVIOUR it
+#      describes — one authority (`.epr-meta`), scope derived from placement, everything
+#      else a projection of it. There is NO headcount cap: it bounded declaration, and
+#      12-in-one-directory is a smell where 60-across-8-lanes is not. Every habit is born
+#      with `retire-when:` instead — an exit CONDITION, never a date. A headcount only ever
+#      refuses the next habit; an exit condition retires the ones that are done. (Amended
+#      2026-08-27. The cap's real cost was rule 2's valve: at 12/12 a slot was never spent
+#      on a commitment we could not yet observe, so `unwired` sat at zero for the life of
+#      the flat file while several lanes had exactly that to declare.)
 #   2. status: green | red | unwired.
 #      - red     = a runnable check EXISTS and fails -> this is schedulable work.
 #      - unwired = no runnable check yet -> NOT schedulable; its ONLY legal first move is
 #        writing the red (see first_move). Prose specs do not advance it.
-#   3. Max 2 habits flagged active: true (the WIP fence). Finishing beats starting.
+#   3. Max 2 habits flagged active: true (the WIP fence). Finishing beats starting. This
+#      bound stays GLOBAL and is the one thing composition does not distribute — it bounds
+#      ATTENTION (one operator, one day job), and attention does not compose. Enforced as a
+#      roll-up over the resolved tree since 2026-08-27; it was prose no script read before.
 #   4. Status flips require evidence (build #, live probe, test run) — never edit status
 #      from memory or intention.
 #   5. New specs/plans should cite the habit they serve; a plan that serves no habit is a
 #      candidate for held/, not for writing.
+#   6a. A habit's `checks:` string carries the `@concern:` tag that is the `check_id` in a
+#      sprint report — the single join across register, CI and Gherkin. Declaration is
+#      local; that namespace stays GLOBALLY unique, enforced by the census.
 #   6. Session contract: (a) move reds toward green with proof, (b) file new reds as
 #      runnable checks, (c) one-line delta here. Nothing else is a deliverable.
 #
@@ -80,6 +105,8 @@ habits:
       - "a2o @concern:transport-parity (genesis/a2o/features/dataplane/transport-comparison-matrix.feature; just mesh matrix) — identical fresh-document contract under libp2p, iroh, and dual; successful samples alone contribute timing percentiles"
       - ".claude/scripts/latency-scoreboard.py --local (and --deployed) — bounded convergence, not merely eventual: a CONJUNCTION of speed AND this habit's trust invariant, never speed alone. A fast stale head is worse than a slow correct one, so this check can only ever narrow the habit, never carry it."
     evidence: >
+      DELTA 2026-08-27b (NO status flip — local cure + live-local proof in BOTH postures, unmeasured on the fleet): the conductor admin plane named as OPEN in 2026-08-27 is now CLOSED, and the coupling that blocked it turned out to be on the CLIENT side, not the doorway's. Three independent gates were each keyed on `dev_mode` (`"true"` on all five deployed manifests): the /hc/admin route arm, the WS permission ladder, and the proxy message filter — so an anonymous internet caller reached an UNFILTERED Holochain admin interface (install_app / uninstall_app / revoke_agent_key). A SECOND credential-free arm in the ladder did not need dev_mode at all: `|| !api_validator.is_configured()` returned Ok(Public) to a caller presenting nothing whenever no API keys were configured — exactly the workspace/mesh shape — so closing only the dev_mode arm would have left the ladder open through it; they closed together. All three collapse to ONE predicate, native_local_first_operator: kernel-observed loopback peer AND pre-coordination stage AND no declared JWT_SECRET. That third conjunct is the one a deployment cannot fake — every deployed manifest populates JWT_SECRET from a secretKeyRef, and all five sit at the fail-closed Bootstrap stage, so STAGE ALONE WOULD NOT HAVE SAVED THEM. Proxy filtering is now unconditional (an unparseable frame is never forwarded: an operation we cannot name is one we cannot authorize). The onboarding coupling was resolved by deleting `!isCheEnvironment() &&` from useChaperone: every environment holding a session token now takes POST /hc/connect, whose handler requires only a valid JWT (no permission level) and provisions server-side via auto_provision — so the browser never needs Admin and never opens an admin socket. hc-start.sh now resolves a posture from what the box HAS (DOORWAY_AUTH, default auto): secure (mongod present → per-workspace JWT_SECRET + API_KEY_ADMIN persisted, HAPP_BUNDLE_PATH, no --dev-mode) or keyless (native local-first). The per-workspace secret is load-bearing: a keyless doorway signs with the publicly-known dev placeholder (JwtValidator::new_dev), so enabling the chaperone without one would have been security theatre. Two adjacent fail-fasts stopped keying on dev_mode in the same pass, because the secure posture is the first non-dev_mode doorway that legitimately declares neither: MongoDB (whose error text claimed "a MongoDB was declared" when none was) and NATS are now fatal iff DECLARED. PROVEN LIVE on the real binary, both postures, loopback+anonymous: keyless /hc/admin → 101 Switching Protocols (conductor operator), secure /hc/admin → 401 "Use POST /hc/connect.", secure + valid X-API-Key → 101, secure + wrong key → 401, /health 200 on both, POST /hc/connect without a token → 401 on both. Verified: 1128/1128 doorway tests (6 new), clippy -D warnings clean, fmt clean, seam census registry errors 0, decision point registered as websocket::extract_permission (kind: verdict-fn). Both Angular apps build (elohim-app incl. SSR, lamad) and 252 touched-spec tests pass. STILL OPEN and named rather than half-fixed: handle_app_upgrade (/hc/app/{port} and legacy /app/{port}) has NO doorway-side permission check at all — the only gate is the numeric port range — relying entirely on the conductor's own app-interface authentication. Flip still needs a fleet build number.
+
       DELTA 2026-08-27 (NO status flip — local cure + live-local proof, unmeasured on the fleet): the auth arc's remaining DEV_MODE derivations closed, and one of them was a bigger hole than the seed gate it followed. `extract_http_permission` promoted EVERY anonymous caller on the open web to Authenticated (DEV_MODE is "true" on all five deployed manifests); it now derives from `network_stage < Coordinated && peer_is_loopback`, mirroring seed authority (1). The feared blast radius was MEASURED, not assumed: the crate holds exactly ONE Authenticated gate (the elohim-agent invocation proxy, whose own comment already says it should refuse anonymous traffic) — content/blob/apps/cache are registry StorageProxy paths with no permission gate, so browsing never consults this ladder. PROVEN LIVE on the real binary: anonymous POST /api/v1/elohim/invoke from a non-loopback address → 401, from 127.0.0.1 → 502 (gate passed, sidecar absent), /health 502 on both (still public). Separately, a MongoDB OUTAGE was an authentication downgrade: four auth paths branch on `dev_mode && mongo.is_none()` and auth_routes.rs:1626 accepted ANY credentials and minted Admin, while main.rs continued past a failed connection under dev_mode — so a Mongo blip turned the fleet into "any password logs in as Admin". A DECLARED-but-unreachable MongoDB is now fatal (mirroring the fail-loud bootstrap-store precedent beside it; declaration counts env var OR --mongodb-uri flag), and that branch's ceiling dropped to Authenticated. PROVEN LIVE: EXIT_CODE=1 both routes. NOT closed, and named rather than half-fixed: the conductor admin plane is the most severe finding of the arc — `if dev_mode { passthrough }` in proxy/{admin,pool,nats}.rs skips filter_message entirely, the WS ladder answers Ok(Public) instead of Err, /hc/admin's "disabled in production" arm is dead on the fleet, and the ingress is a catch-all `path: /`, so an anonymous internet client reaches install_app/uninstall_app/revoke_agent_key. It is NOT closed because the deployed app's ANONYMOUS visitors use that same socket to self-provision (connectViaAdminWs runs whenever no doorwayToken exists), so closing it alone breaks onboarding on a live site — it is coupled to migrating anonymous visitors onto the chaperone, which is the operator's sequencing. Likewise fixture_only_gate stayed open on purpose: a2o calls both its routes against the DEPLOYED doorway (agency.steps.ts:208, account-m5.steps.ts:248), so a loopback conjunct would pass unit tests and break E2E; it wants its own narrow fixture credential on the API_KEY_SEED pattern. Verified: `just gate doorway` green, clippy -D warnings clean, fmt clean, 1122/1122 lib tests (6 new), decision point registered (census 31 pts · 31 cited · 0 uncited). Flip still needs a fleet build number.
 
       DELTA 2026-08-25e (NO status flip — local cure, awaiting edge deploy): `pnpm look` showed elohim.host's SSR shell naming main-M2EFD2IP.js while that mutable-slug asset request returned 404; the exact browser archive sha256-255fdcfa… was locally present, valid, and served the same asset by `/apps/{hash}/…` with HTTP 200. Doorway had resolved the slug to that exact hash for its cache key, then discarded the resolution on a MISS and asked storage through the moving slug, which had advanced to a different release. The miss leader and coalesced-failure paths now remain pinned to `/apps/{resolved-hash}/{file}`. Local proof: app-route tests 25/25; owning doorway gate format + clippy + 1119 runnable tests green (2 Mongo-only ignored). Fleet proof remains an edge deploy followed by a fresh `pnpm look https://elohim.host/` with no missing main chunk; the DHT trust state may still be amber while locally verified bytes serve, so this cure adds no wait-for-green gate.
@@ -423,6 +450,10 @@ habits:
       per commit; resolveStorageImage repointed; deadline flat 2700 on both
       dataplane paths. Awaiting an edge build number — the flip to measured stays
       red until a deploy shows blocked_by present on alpha.
+    retire-when: >
+      never: convergence is the protocol's constitutive promise. A p2p substrate that stops
+      converging is not a degraded version of this system, it is a different one — so this is
+      watched permanently rather than until a milestone.
 
   - id: blob-durability
     invariant: >
@@ -632,6 +663,10 @@ habits:
     refs:
       - "genesis/data/timeline/backlog/dataplane-peer-fallback-and-blob-replication.md"
       - "memory: project_dataplane_next_lens_diversity_placement (1a+1b landed; prod join dormant)"
+    retire-when: >
+      never: custody of bytes a household entrusted to peers is a floor. The failure mode is
+      silent and irreversible — nobody reports the blob they can no longer fetch — which is
+      exactly the class that must not depend on someone remembering to look.
 
   - id: notary-authority
     invariant: >
@@ -639,12 +674,6 @@ habits:
       (HEAD-DAG declare_content_head, reach re-certified at republish, author
       signatures). Authority answers come from the notary, never from LWW order.
     status: green
-    # Stood down from active 2026-08-18: it went GREEN on edge #1362 (3p/0f on
-    # the deployed fleet) and a green habit holding a WIP slot is exactly what
-    # the max-2 fence exists to prevent. Its named watch items (doorway-failover
-    # regression, the A-converged gauge reading 0.0 through a passing
-    # convergence scenario) live on as evidence below and as their own habits —
-    # not as a reason to keep this one in flight.
     active: false
     checks:
       - "a2o @concern:notary-authority (genesis/a2o/features/dataplane/notary-authority.feature — runs in the edge Dataplane Validation tag set, no filter change needed)"
@@ -1049,9 +1078,19 @@ habits:
       declare_content_head (Plan C1/C3) unwired, so nothing can refuse a
       non-author HEAD move. Both pass unchanged when Phase C lands. The node is
       now schedulable: implement C1-C5 against these reds.
+    # Stood down from active 2026-08-18: it went GREEN on edge #1362 (3p/0f on
+    # the deployed fleet) and a green habit holding a WIP slot is exactly what
+    # the max-2 fence exists to prevent. Its named watch items (doorway-failover
+    # regression, the A-converged gauge reading 0.0 through a passing
+    # convergence scenario) live on as evidence below and as their own habits —
+    # not as a reason to keep this one in flight.
     refs:
       - "genesis/docs/superpowers/specs/2026-07-01-crdt-authoritative-content-state-dht-notary-decouple-design.md"
       - "genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md"
+    retire-when: >
+      when notarization is a PRECONDITION of serving rather than a tier above it — content
+      that cannot be notarized cannot be served — at which point "green tier is reachable"
+      stops being a separate question anyone can answer wrongly.
 
   - id: doorway-failover
     invariant: >
@@ -1302,6 +1341,10 @@ habits:
       - "genesis/data/timeline/backlog/self-heal-adam-projection-catchup-exhaustion-full-arc.md"
       - "2026-08-06: one layer below this invariant, doorway ZomeCaller grew multi-conductor failover for agent-agnostic DHT reads (reviewed ship, gates green — backlog conductor-source-chain-unwrap-panic-db-timeout.md), so a doorway's DHT routes no longer die with its pinned conductor; the apex-name born-red and its WS3 cure surface are unchanged"
       - "2026-08-07: live evidence toward the invariant — through the Wave-2 iroh transport flip (edge #1313, full 7-conductor restart) BOTH hostnames served the federation route with no visible outage window (measure 0->2 in minutes, vs the ~2.5-3h tx5 pre-fix churn the same night); attribution failover+fixed-binary+fresh-peer-stores, not decomposed; the a2o @concern:doorway-failover scenario remains the flip-to-green authority"
+    retire-when: >
+      when the apex no longer depends on a doorway pair: a person's client resolves the
+      declared head from the mesh directly. At that point "either doorway can die" is a
+      statement about a component that no longer sits in the path.
 
   - id: reach-enforced-everywhere
     invariant: >
@@ -1316,6 +1359,12 @@ habits:
     active: false
     checks:
       - "a2o @concern:reach-enforced-http (genesis/a2o/features/dataplane/reach-enforced-http.feature — runs in the edge Dataplane Validation stage; 3 scenarios asserting an unverifiable bearer token, a self-asserted X-Agent-Cid, and a self-asserted X-Agent-Id each return exactly the anonymous listing). Names NO reach tier: it asserts a RELATION, so it holds under any vocabulary and does not wait on the drift. A 4th scenario (2026-08-25) probes the BYTE route — a restricted row's bytes refused on GET /blob/{hash} to an anonymous caller — and is @wip (A2O_RUN_WIP=1 locally) until a fleet build carries the storage-side blob reach gate."
+    evidence:
+      - "2026-08-25b: the storage blob byte-route gate and the doorway loopback seed gate are DEPLOYED to alpha (edge #1380 SUCCESS, 286089679). First observable effect on the fleet: genesis #1503 Upload Blob-Backed Content 403 — CI had been uploading seed blobs unauthenticated through the dev_mode hole every build (a latent Jenkinsfile readFile-vs-container bug hid the missing bearer behind a 'credential not visible' echo); fixed 47fb60f58, genesis #1504 uploads HTTP 200 with the Admin bearer — the gate now refuses anonymous remote writes and admits the authenticated CI actor. reach-enforced-http.feature is @act:i (HELD on the fleet by LAYERS design); its authority is the household lane: 3/3 + byte-route 1/1 on the deployed commit's binary. Stays RED on the invariant, not the check: /head-record · /epr-head · /apps/{cid} · direct /shard·/ipfs still serve community anon (plane conflation) and the DEV_MODE JWT forgery still passes as Admin on every deployed doorway — both filed, operator-owned."
+      - "2026-08-25: byte-route egress closed LOCALLY, stays RED (a flip needs a build number). GET /blob/{hash} now consults the referencing content rows (`blob_reach`: a blob serves to a caller iff some referencing row does; both address forms — `sha256-<hex>` and `bafkrei…` — resolve to one verdict after a red-team pass found the sha256 form walked straight through the first cut), the legacy x-agent-id fallback yields to the doorway-injected X-Agent-Cid, and the doorway pantry refuses to stock a credentialed answer under its bearer-blind hash key (+ nosniff on pantry hits). Measured on the household mesh from the built binary: reach-enforced-http 3/3 and the new byte-route scenario 1/1 (community bytes 403 anon, 200 with a resolved identity, public 200); the doorway seed/admin-cache authority now requires dev_mode AND a loopback socket peer (every deployed manifest sets DEV_MODE=true — an anonymous remote PUT /admin/seed/blob had reached the hash check). Residuals FILED, not closed: DEV_MODE JWT forgery passes as Admin and defeats every fleet reach gate (backlog security-doorway-devmode-auth-bypass, coupled to the operator posture decision); /head-record, /epr-head, /apps/{cid} and direct-to-storage /shard·/ipfs still serve community anon because reach_is_distribution_safe treats community as broadcast-safe — a reach-vs-replication plane conflation that is a vocabulary call, not canonized here."
+      - "2026-08-20: flipped unwired -> RED on measured violation, which is stronger evidence than an absent check. Live on doorway-alpha, verified twice: anonymous GET /db/content?limit=1000&offset=1000 returned 90 rows (all commons); the identical request carrying the literal header 'Authorization: Bearer bogus' returned 1000 — familiar 906, commons 90, private 3, intimate 1 — every row with its contentBody. Cause: http.rs:5272 decided reach from header PRESENCE, never validation."
+      - "2026-08-20: HTTP-plane cure committed (41f7780aa) — the listing now resolves the requester and authorizes per row via epr_service::authorize_reach_for_human_with_own_trust, deny-by-default when unresolvable; the same header-presence check on the single-item route's Layer 1 is cured too; and reach_level_index's `_ => 0` fail-open (an UNRECOGNIZED tier read as the most permissive, making the authorizer's own `_ => Err` unreachable) now fails closed to u8::MAX. Stays RED until the scenario runs green against a deploy carrying the fix — a flip needs a build number, not a commit."
+      - "2026-08-20 scope, held honestly: the doorway strips client-supplied identity headers (probed: X-Agent-Cid/X-Agent-Id return the anonymous result), so the cure closes the bypass for doorway-fronted traffic. It does NOT make identity unforgeable — extract_agent_cid returns the header verbatim — so a caller reaching elohim-storage directly in-cluster can still assert an identity and receive that identity's authorized reach. That residual is identity-cross-signed's, not this habit's."
     first_move: >
       HTTP egress is wired and cured (2026-08-20). Wire the remaining four planes
       the same way — one check per plane asserting a scoped-tier row does NOT
@@ -1325,17 +1374,15 @@ habits:
       the responder does no reach check at all BY DESIGN (custody is deliberately
       reach-blind; the boundary is serving, so the check belongs on the serve
       path, not on custody).
-    evidence:
-      - "2026-08-25b: the storage blob byte-route gate and the doorway loopback seed gate are DEPLOYED to alpha (edge #1380 SUCCESS, 286089679). First observable effect on the fleet: genesis #1503 Upload Blob-Backed Content 403 — CI had been uploading seed blobs unauthenticated through the dev_mode hole every build (a latent Jenkinsfile readFile-vs-container bug hid the missing bearer behind a 'credential not visible' echo); fixed 47fb60f58, genesis #1504 uploads HTTP 200 with the Admin bearer — the gate now refuses anonymous remote writes and admits the authenticated CI actor. reach-enforced-http.feature is @act:i (HELD on the fleet by LAYERS design); its authority is the household lane: 3/3 + byte-route 1/1 on the deployed commit's binary. Stays RED on the invariant, not the check: /head-record · /epr-head · /apps/{cid} · direct /shard·/ipfs still serve community anon (plane conflation) and the DEV_MODE JWT forgery still passes as Admin on every deployed doorway — both filed, operator-owned."
-      - "2026-08-25: byte-route egress closed LOCALLY, stays RED (a flip needs a build number). GET /blob/{hash} now consults the referencing content rows (`blob_reach`: a blob serves to a caller iff some referencing row does; both address forms — `sha256-<hex>` and `bafkrei…` — resolve to one verdict after a red-team pass found the sha256 form walked straight through the first cut), the legacy x-agent-id fallback yields to the doorway-injected X-Agent-Cid, and the doorway pantry refuses to stock a credentialed answer under its bearer-blind hash key (+ nosniff on pantry hits). Measured on the household mesh from the built binary: reach-enforced-http 3/3 and the new byte-route scenario 1/1 (community bytes 403 anon, 200 with a resolved identity, public 200); the doorway seed/admin-cache authority now requires dev_mode AND a loopback socket peer (every deployed manifest sets DEV_MODE=true — an anonymous remote PUT /admin/seed/blob had reached the hash check). Residuals FILED, not closed: DEV_MODE JWT forgery passes as Admin and defeats every fleet reach gate (backlog security-doorway-devmode-auth-bypass, coupled to the operator posture decision); /head-record, /epr-head, /apps/{cid} and direct-to-storage /shard·/ipfs still serve community anon because reach_is_distribution_safe treats community as broadcast-safe — a reach-vs-replication plane conflation that is a vocabulary call, not canonized here."
-      - "2026-08-20: flipped unwired -> RED on measured violation, which is stronger evidence than an absent check. Live on doorway-alpha, verified twice: anonymous GET /db/content?limit=1000&offset=1000 returned 90 rows (all commons); the identical request carrying the literal header 'Authorization: Bearer bogus' returned 1000 — familiar 906, commons 90, private 3, intimate 1 — every row with its contentBody. Cause: http.rs:5272 decided reach from header PRESENCE, never validation."
-      - "2026-08-20: HTTP-plane cure committed (41f7780aa) — the listing now resolves the requester and authorizes per row via epr_service::authorize_reach_for_human_with_own_trust, deny-by-default when unresolvable; the same header-presence check on the single-item route's Layer 1 is cured too; and reach_level_index's `_ => 0` fail-open (an UNRECOGNIZED tier read as the most permissive, making the authorizer's own `_ => Err` unreachable) now fails closed to u8::MAX. Stays RED until the scenario runs green against a deploy carrying the fix — a flip needs a build number, not a commit."
-      - "2026-08-20 scope, held honestly: the doorway strips client-supplied identity headers (probed: X-Agent-Cid/X-Agent-Id return the anonymous result), so the cure closes the bypass for doorway-fronted traffic. It does NOT make identity unforgeable — extract_agent_cid returns the header verbatim — so a caller reaching elohim-storage directly in-cluster can still assert an identity and receive that identity's authorized reach. That residual is identity-cross-signed's, not this habit's."
     notes:
       - "The invariant's original first clause ('One reach vocabulary') was moved out of the checkable statement 2026-08-20 and is tracked in refs below. It is a RECONCILIATION goal, not an enforcement property, and elohim-storage/CLAUDE.md forbids canonizing a single vocabulary while the drift is open — so a check honoring it could not be written without violating a standing rule. That clause is why this habit sat unwired. The wired check asserts a relation instead and names no tier."
     refs:
       - "genesis/data/timeline/backlog/http-reach-enforcement-gap.md"
       - "memory: project_reach_enum_drift_reconciliation (3 vocabularies — unify, but not as a precondition for enforcement)"
+    retire-when: >
+      when every egress plane derives authorization from one shared verifier it cannot bypass
+      by construction — so a NEW plane is enforced the moment it exists, rather than after
+      someone remembers to gate it. The per-plane gate is what this habit is really watching.
 
   - id: identity-cross-signed
     invariant: >
@@ -1424,6 +1471,10 @@ habits:
       - "genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md"
       - "elohim/elohim-storage/CLAUDE.md — Identity & Transport-Identity Coherence"
       - "NOT in this slice, still open: durable PLACEMENT is not yet on the cross_signed cut — services/transport_resolve.rs's source-2 fallback (the load-bearing path in prod) can still redirect shard PUSH bytes to a spoofed peer while shard_locations keeps recording the victim. Named + file-anchored in agent-peer-binding-signing.md; it needs C2-S2 first, because gating it today would stop shard distribution outright."
+    retire-when: >
+      when an unverified binding is unrepresentable rather than merely refused — the binding
+      type itself carries the cross-signature — so no economic attribution can be constructed
+      from a self-asserted one even by a caller trying to.
 
   - id: operator-runtime-surface
     invariant: >
@@ -1568,6 +1619,10 @@ habits:
       - "storage POST /admin/arc-policy/actuate — the pre-existing commitment-gated peer-local mutation precedent (sets-authority-arc; conductor restart) this verb family generalizes"
       - "memory: project_rea_compute_commitment_primitive (delegates-compute displaces X-API-Key)"
       - "task #7 (adam has zero Loki streams — the symmetry gap, live)"
+    retire-when: >
+      when a peer operator completes inspect / restart / reseed / reconcile from the peer's own
+      settings surface on a released steward build, with no developer-shaped tool in the path.
+      The habit then describes a product, not a practice.
 
   - id: dev-system-equilibrium
     invariant: >
@@ -1654,6 +1709,10 @@ habits:
       - "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md"
       - "genesis/data/timeline/backlog/agentic-harness-borrows-backlog.md — row 7"
       - "displaced: declarative-desired-state → genesis/data/timeline/backlog/declarative-desired-state-parked-habit.md (2026-08-13, operator-directed; returns when its brit/eprfs precondition greens)"
+    retire-when: >
+      when every declared stock's drain>=inflow assertion runs inside the pre-push gate and has
+      held a full quarter with no operator override. A system actually in equilibrium does not
+      need a weekly reader.
 
   - id: sync-scale-honesty
     invariant: >
@@ -1693,6 +1752,9 @@ habits:
     refs:
       - "task #9 (sync-timeout peers: 12D3KooWNguL…/GPmV…/Rnj3…) — still unwritten as a health scenario; needs a /health sync-outcome field that does not exist yet, and adding a failing scenario to the edge Dataplane Validation tag set changes what a CI-gated measure counts (operator call, per the blob-durability precedent)"
       - "memory: project_weave_epic_arc (CoverageRollup built, unconsumed)"
+    retire-when: >
+      when sync cost is bounded by a declared measure in the protocol itself — a peer refuses a
+      plane whose cost class it cannot afford — rather than by our measuring it after the fact.
 
   - id: measure-honesty-local
     invariant: >
@@ -1716,34 +1778,6 @@ habits:
       - "python3 -m pytest .claude/scripts/_lib/__tests__/intervenor_retire_when_test.py (retire-when on both gates + the census, incl. the two-implementation hash-exclusion invariant with eprfs-meta/src/canonical.rs)"
       - "cargo test (elohim/epr-rea) — model.rs: a limit declares WHICH SIDE is safe (Sense::{Ceiling,Floor}) with the band edge mirrored around it, and whether its number was claimed at the container or rolled up from the parts (LimitSource::{Declared,Folded{rule}}); Composition::{Min,Harmonic,Sum} refuses an empty part set rather than returning a capacity of zero"
       - "cargo test (elohim/epr-rea) — scope.rs + stock_dynamics.rs: a fold can say WHERE. Scopes::contains is transitive and reflexive over containment the DHT already notarizes, refuses cycles rather than depth-capping, and Within::{Anywhere,Scope,Under} makes the selection the fourth term of a stock's identity instead of a silent 'everywhere'"
-    gate_honesty: >
-      CORRECTION, 2026-08-12 — read this before trusting any green above dated
-      earlier. Two of this habit's checks (`uncertainty_closure.rs`,
-      `stock_dynamics.rs`) live in `elohim/epr-rea`, which until 2026-08-12 had
-      NO build-manifest entry, NO pipeline, and NO pre-push case: an epr-rea-only
-      change matched no source glob, so the graph-walker emitted no project and
-      no gate ran. Those two legs were hand-run only, and an epr-only change
-      never compiled its one consumer. Every green this habit recorded before
-      2026-08-12 therefore rests on two checks that CI never executed. The gate
-      is wired now (elohim-epr widened to `-p elohim-epr -p elohim-epr-rea`
-      across manifest, pre-push, and Jenkinsfile), so greens from here carry
-      what earlier ones only claimed. Recorded rather than quietly fixed: this
-      is the same eroding-goal channel `best_observed` exists to expose — a
-      green that means less than it appears to.
-    best_observed: >
-      HIGH-WATER MARK, slice 2 (2026-08-11) — the ratchet Meadows prescribes for
-      *Drift to Low Performance*: "let standards be enhanced by the BEST actual
-      performances instead of being discouraged by the worst." `evidence:` records
-      LAST-observed, which cannot distinguish a genuinely green run from a
-      deferred-gate green (the documented PVC-deferral channel). This field
-      records the strongest run this habit has ever had, so a later weaker green
-      reads as visibly weaker rather than equivalent.
-      Best to date: 25 cargo test binaries green across elohim-epr + elohim-epr-rea
-      (0 failed), clippy -D warnings exit 0 and fmt --check exit 0 on both crates;
-      elohim-epr-cli + eprfs-meta full suites green with clippy 0 / fmt 0; 14
-      doc_dynamics + 14 intervenor + 10 epr_meta_measure_ontology python tests
-      passed. ALL GATES RUN, NONE DEFERRED — that last clause is the part the
-      ratchet exists to preserve.
     evidence: >
       GREEN 2026-08-11, verified on the merge tree (not an earlier run):
       cargo test (elohim/epr) 19 suites ok / 0 failed, clippy -D warnings and
@@ -1780,6 +1814,34 @@ habits:
       absorption, which is a strictly stronger claim than the survey §6.2 rows
       it replaces (those were levels against ceilings, and §6.2 is now
       corrected in place).
+    gate_honesty: >
+      CORRECTION, 2026-08-12 — read this before trusting any green above dated
+      earlier. Two of this habit's checks (`uncertainty_closure.rs`,
+      `stock_dynamics.rs`) live in `elohim/epr-rea`, which until 2026-08-12 had
+      NO build-manifest entry, NO pipeline, and NO pre-push case: an epr-rea-only
+      change matched no source glob, so the graph-walker emitted no project and
+      no gate ran. Those two legs were hand-run only, and an epr-only change
+      never compiled its one consumer. Every green this habit recorded before
+      2026-08-12 therefore rests on two checks that CI never executed. The gate
+      is wired now (elohim-epr widened to `-p elohim-epr -p elohim-epr-rea`
+      across manifest, pre-push, and Jenkinsfile), so greens from here carry
+      what earlier ones only claimed. Recorded rather than quietly fixed: this
+      is the same eroding-goal channel `best_observed` exists to expose — a
+      green that means less than it appears to.
+    best_observed: >
+      HIGH-WATER MARK, slice 2 (2026-08-11) — the ratchet Meadows prescribes for
+      *Drift to Low Performance*: "let standards be enhanced by the BEST actual
+      performances instead of being discouraged by the worst." `evidence:` records
+      LAST-observed, which cannot distinguish a genuinely green run from a
+      deferred-gate green (the documented PVC-deferral channel). This field
+      records the strongest run this habit has ever had, so a later weaker green
+      reads as visibly weaker rather than equivalent.
+      Best to date: 25 cargo test binaries green across elohim-epr + elohim-epr-rea
+      (0 failed), clippy -D warnings exit 0 and fmt --check exit 0 on both crates;
+      elohim-epr-cli + eprfs-meta full suites green with clippy 0 / fmt 0; 14
+      doc_dynamics + 14 intervenor + 10 epr_meta_measure_ontology python tests
+      passed. ALL GATES RUN, NONE DEFERRED — that last clause is the part the
+      ratchet exists to preserve.
     guard: >
       Regression risk = a future fold or index that special-cases its own
       zero denominator instead of reaching for the Interval::unknown() shape
@@ -1810,6 +1872,10 @@ habits:
 
     deltas:
       - "2026-08-25c: a measure that could not see a shipped regression, recorded rather than quietly fixed. elohim.host: every EPR-card click landed on /epr/manifesto stuck on Loading content... with the node already fetched — ContentViewerComponent (mounted cross-bundle by the shell at /epr/:id) was left implicit-OnPush by the Eager-removal wave, so its subscribe-callback mutations marked no view dirty (proof: ng.getComponent isLoading:false + forced applyChanges rendered instantly; edge of elohim/dev #1670). Three instruments were blind by construction: the app pipeline E2E stage is a Cypress relic (binary missing → catchError → prints ✅ alpha validation passed, publishes no report, #1670); the only scenario touching the card RESOLVED it but never FOLLOWED it, and its feature is @act:i — HELD on the fleet lane (elohim-genesis/dev: every act-i scenario skipped-not-failed, @browser-only excluded from the mesh stage), so the new regression scenario cannot run in CI until an act-i browser lane exists; and TestBed.overrideComponent on the component under test recompiles it CheckAlways (ɵcmp.onPush true→false), so every spec-level OnPush guard that overrides the CUT is a null measure. Cured locally: Eager stamp + a browser-mirroring spec that FAILS without it (Eager host, production def) + a2o @regression Following the card (fails against the deployed alpha, ELOHIM_CAP_OWNED_SUBSTRATE_STATUS=available); residuals filed in backlog-onpush-eager-debt-inventory. DEPLOY EVIDENCE (elohim/dev #1673, fresh trigger): alpha.elohim.host serves the fixed bundle — card click renders the Manifesto at /epr/manifesto, no economic-events 500, no governance 400 (b512fbf5f); elohim.host does NOT — doorway-B refuses the byte-seed with 403 since edge #1380 closed the dev-mode remote seed hole and B binds a different api-key-admin secret than the Jenkins credential (backlog ci-app-apex-seed-403-doorway-b-admin-key). CORRECTED 2026-08-25d: this was recorded as an operator credential decision and is NOT one — every doorway api-key-admin is a plaintext fixture in the manifest's own stringData, applied verbatim, so it was always an in-tree fix; cured below. The strict a2o measure is still failed by the by-design signal/emit 503 the console-cleanliness hook counts (backlog console-noise-signal-emit-503-per-content-view). Also caught in flight: a step-definition edit dispatched edge #1383 — a full fleet redeploy — via the dataplane-validation glob genesis/a2o/steps/** (backlog ci-edge-a2o-steps-glob-redeploys-fleet). Flip still needs a build number on a green check."
+    retire-when: >
+      when the measure ontology is enforced at the type level in every producer (a rate that
+      forgot its period cannot be constructed), leaving the governance gate nothing to refuse.
+
   - id: conductor-capacity-represented
     invariant: >
       The conductor's DB read pool is a REPRESENTED resource, not one discovered
@@ -1957,6 +2023,10 @@ habits:
       - "spike: genesis/docs/superpowers/specs/2026-08-08-conductor-call-deadline-capability-spike.md §2 — the cancellable/uncancellable table, and the naming of the gap this closes ('no equivalent ceiling for app-interface zome calls')"
       - "elohim/elohim-storage/src/conductor_admission.rs — the gate; the module doc carries the sizing derivation and the admission-vs-timeout distinction"
       - "NOT covered — the AdoptCandidate provenance collapse (an observed Ok(None) mislabelled Unreachable) and the non-batch background callers still classed Interactive; both named in review, neither addressed here"
+    retire-when: >
+      when the conductor exports its own admission state and elohim-storage CONSUMES it rather
+      than modelling it — the resource represented by the thing that owns it. This habit's
+      local gate is then a compatibility shim, and shims retire.
 
   - id: governance-plane-single-evaluator
     invariant: >
@@ -2123,3 +2193,44 @@ habits:
       - ".claude/scripts/_lib/epr_meta.py REFERENCE_VALIDATORS (the LIVE registry) vs elohim/eprfs/epr-cli/src/repository_validators.rs (the twin)"
       - "elohim/sdk/schemas/v1/registries/governance-parity-vectors.json — the 9 vectors; their coverage gap is failure (2) of the check"
       - "NOT covered here — the standing/proxy-declarer primitive (§5 rank 2), deliberately deferred; and .claude/data/governance-findings.jsonl, 4.3MB written with zero readers, which needs a read path or a stop-write"
+    retire-when: >
+      when the Python and Rust evaluators are ONE artifact both hosts call, rather than two
+      implementations held in correspondence by parity vectors. "Exactly one evaluator" is
+      then a fact about the build, not a property under watch.
+
+  - id: custodial-authority-answerable
+    invariant: >
+      A party acting on another party's account is answerable for it: the authority reaches the
+      ACTING HUMAN over a traversable path even when the steward is an institution, the act names
+      that human afterwards, and the subject can contest the grant while it is in force. Authority
+      here is relational — over this subject's named surfaces — never a rank; and layered policy
+      composes one-way, so every additional steward may only ADD restrictions.
+    status: unwired
+    active: false
+    evidence: >
+      2026-08-27: DECLARED `unwired` — committed to, with no runnable check. This is the first habit
+      declared under the composed register, and it is the state the old register could not afford: at
+      12/12 with a headcount cap, a slot was never spent on a commitment that could not yet be
+      observed, so `unwired` sat at zero for the whole life of the file while the honest answer for
+      this lane was exactly that. The lane exists (`genesis/a2o/features/stewardship/`, README +
+      `.epr-meta` with the appeal-path rule), the substrate exists (imagodei `StewardshipGrant` /
+      `StewardshipAppeal` / `DevicePolicy`, plus `Collective` / `Membership` / `CollabAgreement` in the
+      same integrity zome), and nothing above the DNA carries either — `steward_id` is still a single
+      String while `authority_basis` already names institutional bases. No `.feature` file exists yet,
+      so there is nothing to run and nothing to claim.
+    first_move: >
+      write the red: the first `.feature` in genesis/a2o/features/stewardship/ that exercises a
+      collective steward — grant held by a Collective CID, traversed via Membership{role: Steward}
+      to a named member, the act attributed to that member, and the subject's appeal answered. The
+      scenario is the specification; the two-party carrier above the DNA is designed against it, not
+      ahead of it. Prose about the philosophy does not advance this habit (covenant rule 2).
+    retire-when: >
+      when an institutional act that cannot name the acting human is UNREPRESENTABLE rather than
+      merely discouraged — `steward_id` resolves to a member path by construction and an
+      unattributed act has nowhere to be recorded. At that point answerability is a property of the
+      entry types, not a practice under watch.
+    refs:
+      - "genesis/a2o/features/stewardship/README.md (concern taxonomy, pickup order)"
+      - "genesis/a2o/features/stewardship/.epr-meta (the authoring rule: a grant scenario must exercise the appeal)"
+      - "genesis/data/timeline/backlog/commons-holonic-stewardship-backlog.md row 26"
+      - "elohim/holochain/dna/imagodei/STEWARDSHIP_PHILOSOPHY.md"

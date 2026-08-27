@@ -233,6 +233,90 @@ before investing.
     fake content dry-run/validate modes removed; gospel/skills/READMEs synchronized and
     governed. The census doc carries the retained-script decisions and green evidence.
 
+21. **The habits register is the last global singleton — composition, and the welded-shut pressure valve.**
+    Surfaced 2026-08-27 while opening `genesis/a2o/features/stewardship/`: the lane had a real
+    habit to declare and no slot to declare it in. **Three facts, all verified against the tree,
+    not inferred:** (a) the caps are **prose-only** — `habits.yaml` says *"Max 12 habits"* and
+    *"Max 2 active"*, and **no script enforces either**; (b) `habits-status.py:57` is
+    `HABITS = _ROOT / "genesis" / "manifests" / "habits.yaml"` — one hardcoded path, and its only
+    two `glob` calls are for *report/evidence* discovery, not manifest discovery, so there is no
+    cascade to cap; (c) **zero habits are `unwired`** (8 green, 4 red, 2 active, 12 total) even
+    though gospel calls that state *"declared and counted on purpose"*.
+    (c) is the load-bearing one and it is independent of today's lane: with no free slots you
+    never spend one on a commitment you cannot yet observe, so **the register's own valve for
+    honest uncertainty is welded shut** — it has stopped being able to represent "we committed
+    to this and cannot yet watch it."
+    **The design conflates two different bounds.** `max 2 active` bounds ATTENTION (one operator,
+    one day job) and should stay global — it survives composition as a roll-up assertion over a
+    tree. `max 12` bounds DECLARATION — what exists — and 12-in-one-directory is a smell where
+    60-across-8-lanes is not.
+    **Why flat-12 was right when written** (stated in the register's own header): cohesion used to
+    live in prose across 240+ specs/plans, and *"the selection problem, not the work, is what
+    sessions fail at."* A flat 12 is maximally legible — you can hold it in your head.
+    **What dissolves the objection to composing:** `.epr-meta` never asks anyone to read every
+    manifest — the resolver walks only the path of the file being touched, so scope is DERIVED
+    FROM WHERE YOU ARE. "The top red" becomes "the top red in scope", which avoids the
+    meaningless cross-domain comparison flat-12 forces (*is `dataplane-convergence` more
+    important than the stewardship appeal path?*). The precedent is already shipped here:
+    `seam-registry.yaml` is per-crate with a documented birth rule plus census/cascade/matrix
+    roll-up, and `.epr-meta` already has `covers: subtree` to terminate a walk.
+    **Direction — OPERATOR-DECIDED 2026-08-27, still unimplemented (gospel-tier change):**
+    *"everything should be coupled to the `.epr-meta` because it carries that context/scope
+    that's authoritative."* So this is explicitly **NOT** "give habits their own cascade mirroring
+    seam-registry" — that would mint a SECOND scope authority alongside `.epr-meta`, and two
+    hand-written homes for one truth is a failure mode this repo has already paid for twice
+    (`cluster-state.yaml` vs `ELOHIM_REMOTE_COMPUTE_STATUS`, and the `deployments.json`
+    `suspended` flags that drifted until they were made **derived, never hand-written**). One
+    scope authority; everything else is a projection of it.
+    Concretely: a habit is declared in a **`habits:` block inside the `.epr-meta`** of the
+    directory whose behaviour it describes, inheriting the resolver, the cascade, `covers:
+    subtree` termination, `cites:`, and `retire-when:` for free — no new resolver, no new
+    manifest kind, no second birth rule. `habits-status.py` stops reading a hardcoded path and
+    resolves through the SAME `.epr-meta` walk the PreToolUse gate uses. `genesis/manifests/
+    habits.yaml` becomes either the root `.epr-meta`'s own block (cross-cutting habits, which is
+    where most of today's 12 legitimately belong) or a **generated roll-up projection** — the move
+    `MEMORY.md` already made in this same review (see the intro), and for the same reason.
+    Keep `max 2 active` global as a roll-up assertion over the resolved tree. Drop the headcount
+    cap; the discipline that actually prevents accumulation is the one `.epr-meta` already
+    enforces — every habit bound to a runnable check (already required) **and born with a
+    `retire-when:`**, which is item 16's mechanism applied to habits. Headcount is the wrong
+    instrument; **exit conditions are the right one.**
+    Two things to get right at implementation: a habit's `checks:` string IS its `@concern:` tag
+    IS the `check_id` in a sprint report (the single join across register/CI/Gherkin), so
+    composition must not fragment that namespace — concern ids stay globally unique even when
+    declaration is local. And the a2o `.epr-meta` `new-feature-subdir-needs-meta` rule already
+    guarantees new subtrees are born with a manifest, so habit declaration would land in a place
+    that provably exists rather than needing its own birth rule.
+    **The honest caveat, and the cheap test:** one data point is not a trend. Leave the
+    stewardship habit undeclared and see whether the next two or three lanes also hit the wall.
+    If they do, the cap is binding and composition earns itself; if not, flat-12 really is more
+    legible and this is over-engineering. What tips toward "binding" is the zero-`unwired` count,
+    which is the register failing to represent honest uncertainty regardless of today's lane.
+    **LANDED 2026-08-27** — the operator directed implementation rather than waiting on the cheap
+    test, and the wall the test was measuring is gone, so the test is moot. What shipped:
+    `<dir>/.epr-meta/<id>.habit.md` is the declaration (frontmatter) plus its evidence ledger
+    (body), discovered by `.claude/scripts/_lib/epr_habits.py` — `in_scope()` walks UP for "the
+    top red in scope", `census()` walks DOWN for the register. `habits-status.py` no longer reads
+    a hardcoded path; `genesis/manifests/habits.yaml` is now GENERATED by
+    `.claude/scripts/habits-project.py` (pre-push runs `--check`), so all twelve existing readers
+    keep their path and shape. All 12 habits migrated to the crate/lane whose behaviour they
+    describe — six to `elohim/elohim-storage`, which is a measurement rather than a placement
+    accident. The round-trip was proven exact against HEAD (the sole diff being the uncommitted
+    `DELTA 2026-08-27b` block already in the working tree), because the split is a text operation
+    over source lines, never a YAML re-emit. Headcount cap dropped; `retire-when:` required and
+    authored for all 12; `max 2 active`, globally-unique `@concern:` ownership, one-habit-per-id,
+    and a stale covenant rank are now ENFORCED roll-ups (all four were prose no script read).
+    Priority moved to `.epr-meta/habits-covenant.md` `order:` — declaration is local, but "the
+    top red" is a cross-domain operator judgment, the same reason `max 2 active` stays global.
+    Birth is gated by the `habit-declaration-at-birth@1` registry policy bound at the repo root
+    (`deny`, ratified as operator-2026-08-27), proven firing and clearing against a synthesized
+    write. 11 new assertions in `_lib/__tests__/epr_habits_test.py`, all green, plus the 1155
+    package-projection checks after folding the gospel and skill edits back to their packages.
+    **First fruit:** `custodial-authority-answerable` declared `unwired` in
+    `elohim/holochain/dna/imagodei/.epr-meta` — the stewardship lane's habit, and the first
+    `unwired` the register has ever carried. That count going 0 → 1 is the valve reopening.
+
+
 ## Exit criteria
 
 Each item lands as its own bounded change (or an explicit won't-fix note here), with the

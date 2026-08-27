@@ -260,6 +260,42 @@ for minimal code must itself be minimal.** `inject`/`ask`, never a reflexive `de
 signal that converges (§the stasis test) governing the lightest code that works. A heavy gate demanding
 lean code is its own anti-pattern.
 
+## Habits — the other atom in the package (2026-08-27)
+
+An `.epr-meta` directory holds more than `manifest.md`. A **habit** — what this system reliably
+does, bound to a runnable check — is declared as its own atom beside it:
+
+    <dir>/.epr-meta/<id>.habit.md      frontmatter = declaration, body = evidence ledger
+
+Placement is the whole point: the habit lives in the governance package of the directory whose
+**behaviour** it describes, so its scope is the scope you already resolve. It is NOT a second
+scope authority mirroring `seam-registry.yaml` — that would be two hand-written homes for one
+truth, a failure mode this repo has paid for twice (`cluster-state.yaml` vs
+`ELOHIM_REMOTE_COMPUTE_STATUS`; the `deployments.json` `suspended` flags that drifted until they
+were made derived). `genesis/manifests/habits.yaml` is the **generated projection** of the walk.
+
+Required frontmatter (`deny` at birth, via the `habit-declaration-at-birth@1` policy bound at the
+repo root): `epr-habit-version: 1` · `id` (MUST equal the filename stem — the filename is the
+address the cascade resolves) · `invariant` · `status: green | red | unwired` · `retire-when:`
+(an exit CONDITION, never a date; `never: <why this is a floor>` is legitimate and the point is
+that it becomes countable). `checks:` is required unless `status: unwired`, and refused when it
+is — that conditional, plus the roll-ups no single manifest can make (one habit per id, one habit
+per `@concern:`, `max 2 active`), is enforced by the census in
+`.claude/scripts/_lib/epr_habits.py`, not by the write-gate.
+
+| You want to… | Do this |
+|---|---|
+| declare a habit for a lane | write `<dir>/.epr-meta/<id>.habit.md`, then `.claude/scripts/habits-project.py` |
+| see the register | `.claude/scripts/habits-status.py [--full]`, or `habits-project.py --census` |
+| know which habits govern a file | `epr_habits.in_scope(path, root)` — the upward walk, nearest first |
+| rank a new habit | `.epr-meta/habits-covenant.md` `order:` — declaration is local, PRIORITY is not |
+
+Two things carry the same discipline as `retire-when:` on a rule, for the same reason. `unwired`
+is a habit we have committed to with **no way to observe whether we keep it** — declared and
+counted on purpose, exactly as a reasoned `never:` is. And a habit's `checks:` string carries the
+`@concern:` tag that is the `check_id` in a sprint report: composing declaration must never
+fragment that namespace, so concern ids stay globally unique even though declaration is local.
+
 ## The cascade (governance composes up the tree)
 
 Resolution walks **up** from the target — `.gitignore`/`.editorconfig`-style — collecting `.epr-meta`

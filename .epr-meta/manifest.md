@@ -17,6 +17,8 @@ rules:
     policy: governance-escalation-ladder@1
   - id: brand-vocabulary-boundary
     policy: brand-vocabulary-boundary@1
+  - id: habit-declaration-at-birth
+    policy: habit-declaration-at-birth@1
   - id: dev-lifecycle-context-sync-npm
     class: inject
     when: { write: "package.json" }

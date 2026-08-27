@@ -54,7 +54,13 @@ except ImportError:
     sys.exit(0)  # never break session start over a dependency
 
 _ROOT = Path(__file__).resolve().parents[2]
-HABITS = _ROOT / "genesis" / "manifests" / "habits.yaml"
+# The register is RESOLVED, never read from one path. A habit is declared in the `.epr-meta`
+# governance package of the directory whose behaviour it describes, so its scope is the same
+# scope the compose-gate already resolves — one authority, discovered by walking the tree.
+# `genesis/manifests/habits.yaml` is the GENERATED projection of that walk (habits-project.py),
+# kept for the readers that know it by path; it is never this tool's source.
+HABITS = _ROOT / "genesis" / "manifests" / "habits.yaml"   # the projection, named in the headline
+COVENANT = _ROOT / ".epr-meta" / "habits-covenant.md"      # vision · priority order · the covenant
 
 # The three concern-addressed findings ledgers a habit's pain can live in:
 # CI (ci-harvest), runtime self-heal-exhaustion (runtime-harvest), and the
@@ -430,6 +436,26 @@ def not_measured_lines(view: dict) -> list:
 
 
 def load():
+    """Resolve the register from the tree: every `.epr-meta/<id>.habit.md` plus the covenant's
+    cross-cutting leg (vision, and the priority `order:` that makes "the top red" an operator
+    judgment rather than an alphabetical accident).
+
+    A census error — a duplicate id, a concern claimed twice, the WIP fence breached — is
+    SURFACED, never swallowed: a register that quietly drops a declared commitment is worse than
+    no register. Falls back to the projected file only when the walk is impossible (no PyYAML in
+    the resolver's reach), so a broken import never blanks the session headline."""
+    sys.path.insert(0, str(_ROOT / ".claude" / "scripts"))
+    try:
+        from _lib import epr_habits as eh
+    except Exception:  # noqa: BLE001 — degrade to the projection rather than to nothing
+        eh = None
+    if eh is not None:
+        habits, errs = eh.census(_ROOT)
+        if habits:
+            covenant, _, _ = eh.load_covenant(_ROOT)
+            for err in errs:
+                print(f"HABITS  ⚠ {err}", file=sys.stdout)
+            return {**covenant, "habits": habits}
     if not HABITS.exists():
         return None
     try:
@@ -481,7 +507,7 @@ def headline(habits: dict) -> str:
         nm_lines = []
     body = ("\n".join(nm_lines) + "\n") if nm_lines else ""
     return (
-        f"HABITS ({HABITS.name})  {counts} · active: {fence}\n"
+        f"HABITS ({len(arts)} declared in .epr-meta)  {counts} · active: {fence}\n"
         f"{body}"
         f"  {nxt}\n"
         f"  RULE: sessions serve the habits — move reds green (with evidence), file new reds runnable, "
@@ -490,7 +516,8 @@ def headline(habits: dict) -> str:
 
 
 def full(habits: dict) -> str:
-    lines = [f"Delivery habits — {HABITS} (updated {habits.get('updated')})", ""]
+    lines = [f"Delivery habits — resolved from .epr-meta habit atoms "
+             f"(projection: {HABITS.relative_to(_ROOT)}; updated {habits.get('updated')})", ""]
     pain = open_pain()
     try:
         view = not_measured_view(habits)
