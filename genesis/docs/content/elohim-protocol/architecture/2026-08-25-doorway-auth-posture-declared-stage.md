@@ -95,6 +95,61 @@ same `AmberOk` arm in `seam-contracts/src/freshness.rs`.
 
 ---
 
+## The three developer modes
+
+The ladder above maps DEPLOY targets. The orthogonal question — *how does a **developer** prove
+authority to drive a conductor?* — has three answers, and conflating them is what left a hole open.
+
+| Mode | Where the developer's key lives | Admission authority today | Native answer |
+|---|---|---|---|
+| **Native local-first** (Tauri + local conductor sidecar) | on the box, own conductor | on-the-box: loopback peer, self-operator | already native — the developer IS a peer |
+| **Web devspace** (Eclipse Che today, `elohim/lvi` intended) | nowhere: the browser holds no key, and the admin socket is a SEPARATE Che endpoint (`wss://<workspace>-hc-dev…`), so the doorway never sees loopback | **none of the three** — which is exactly why `dev_mode` was reached for | **the chaperone** — the devspace developer is a hosted human by this doc's own definition |
+| **e2e / CI** (a2o against a deployed doorway) | nowhere: remote by construction | `jenkins-ci@…` self-provisions an Admin account from `API_KEY_ADMIN` (`doorway-seed-ensure.sh`) | a bounded, revocable `delegates-compute` commitment |
+
+### The web-devspace mode had no cheap arm — and that is the whole story
+
+The conductor admin passthrough (`proxy/{admin,pool,nats}.rs` `if dev_mode { passthrough }`, plus the
+`/hc/admin` upgrade gated on the same flag) is **not an oversight**. It is a scaffold standing in for
+a capability the protocol had not grown: there was no way to drive Holochain dev over the web,
+because a devspace browser can present no credential the doorway would accept and — the operator's
+constraint — no reproducible OAuth redirect URL is possible against `127.0.0.1`.
+
+**The redirect constraint no longer binds, and probably never had to.** It is the problem of being an
+OAuth *client*. This doorway is itself an authorization server (`/auth/register`, `/auth/login`,
+`/auth/refresh`, and `/auth/authorize` with its own registered-client table). A devspace developer
+logs into *their own workspace doorway*. There is no third party in the loop, so there is no redirect
+URI to reproduce.
+
+**And the developer never needs `Admin`.** The reason the admin socket looked necessary is the
+11-step `connectViaAdminWs` flow, which calls `generate_agent_pub_key` (Authenticated) and
+`install_app`/`enable_app` (Admin). The chaperone already removes that requirement: `handle_hc_connect`
+gates on a VALID JWT with **no permission-level check**, then performs cap grants, app-token issuance,
+and `auto_provision` — which installs and enables the happ **server-side, under the doorway's own
+admin connection**. An `Authenticated` developer gets a fully provisioned app and never opens an admin
+socket at all.
+
+What keeps the devspace on the old path is one clause: `useChaperone = !isCheEnvironment() &&
+!!doorwayToken` (`doorway-connection-strategy.ts`). Che is explicitly EXCLUDED from the chaperone. The
+Che branch of `resolveAdminUrl` also sends no query string, so the developer's JWT — which
+`PasswordAuthProvider.getCheAuthUrl()` already obtains from the workspace doorway and stores at
+`elohim-auth-token` — never reaches the socket. The credential exists; it is simply not attached.
+
+So the passthrough's replacement is not new machinery. In order: give the devspace doorway a posture
+(its own `JWT_SECRET`, an account store, `HAPP_BUNDLE_PATH`, and a self-provisioned developer account
+via the same `doorway-seed-ensure.sh` recipe CI already runs); let Che use the chaperone; then delete
+the passthrough so `filter_message` always runs. Two fallbacks must be closed together, not one: the
+`dev_mode` arm AND `websocket.rs`'s `|| !api_validator.is_configured()` arm, which returns
+`Ok(Public)` to a credential-free caller even with `dev_mode` off whenever no API keys are configured
+— which is precisely the devspace/mesh shape.
+
+Past that, the standing credential is itself the scaffold: the successor for all three modes is one
+`delegates-compute` commitment — bounded, revocable, auditable, identity-bound, and verified by a
+local indexed read over a projection the DHT signal already filled (no per-request DHT round-trip).
+Tauri carries it as node-local self-operator, the devspace as its session JWT, CI as its actor bearer:
+one predicate, three carriers.
+
+---
+
 ## The worked example: the seed gate
 
 `require_seed_authority` (`doorway-service/src/routes/seed.rs`) guards `PUT /admin/seed/blob` and the four
@@ -195,6 +250,9 @@ outage:
    removes itself instead of waiting to be remembered.
 6. **Could the p2p plane answer this instead?** Prefer reusing the authoritative layer over growing the
    doorway. The chaperone pattern for hosted humans is the exception, not the precedent.
+7. **Which developer mode is this affordance for?** Native local-first, web devspace, and e2e/CI have
+   different carriers for the same authority. An affordance that only the web devspace needs must not
+   be granted to the open web to reach it — that is the shape of every hole in "Known open items".
 
 ---
 
