@@ -204,11 +204,24 @@ with tempfile.TemporaryDirectory() as td:
 live_rows, live_errs = sf.load_forecast(REPO)
 check("LIVE: the seeded forecast loads with ZERO fingerprint mismatches",
       live_errs == [])
-check("LIVE: the plan's eight ranked rows + two runners-up are all present",
-      len(live_rows) == 10
-      and len([r for r in live_rows if r.get("runner_up")]) == 2)
-check("LIVE: rows 7 and 8 are transcribed as confirmed-live",
-      sorted(r["seeded_rank"] for r in live_rows if r.get("status") == "confirmed-live") == [7, 8])
+# The plan (P4.4) seeded eight ranked rows + two runners-up, and THAT SEED is what must stay
+# intact. The total is deliberately NOT pinned: rows above rank 10 are later registrations (row 11
+# arrived 2026-08-03), and a forecast whose worklist could never grow would be a transcript. So
+# the constraints are: the seed's ten ranks are all still present, the two runners-up are the
+# plan's two, growth is dense and never renumbers a seeded row, and the seed's two confirmed-live
+# rows still read confirmed-live.
+_live_ranks = sorted(r["seeded_rank"] for r in live_rows)
+check("LIVE: the plan's eight ranked rows + two runners-up are all still present",
+      set(range(1, 11)) <= set(_live_ranks))
+check("LIVE: the two runners-up are the plan's own — ranks 9 and 10, and no others",
+      sorted(r["seeded_rank"] for r in live_rows if r.get("runner_up")) == [9, 10])
+check("LIVE: seeded_rank is dense 1..N with no duplicates — a later row takes the NEXT rank and "
+      "never renumbers a seeded one (the seeded ordering is what the ledger measures)",
+      _live_ranks == list(range(1, len(live_rows) + 1)))
+check("LIVE: the plan's rows 7 and 8 are transcribed as confirmed-live",
+      {7, 8} <= {r["seeded_rank"] for r in live_rows if r.get("status") == "confirmed-live"})
+check("LIVE: every row's status is a declared value (`predicted` or `confirmed-live`)",
+      all(r.get("status") in ("predicted", "confirmed-live") for r in live_rows))
 check("LIVE: every row's seam id is a real column in the seam catalog",
       {r["seam"] for r in live_rows}
       <= {s["id"] for s in sm.load_catalog(REPO)[0]["seams"]})

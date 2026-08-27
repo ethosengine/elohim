@@ -191,9 +191,16 @@ decisionPoints:
       - path: doorway/doorway-service/src/server/http.rs
         testName: selection_never_consumes_the_half_open_trial
         kind: unit
-      - path: genesis/a2o/features/dataplane/doorway-failover.feature
-        testName: A blob rides through its primary's bad hour
-        kind: integration
+    notes: >
+      End-to-end proof of this predicate lives in the a2o story, not in this row: the scenario
+      "A blob rides through its primary's bad hour" in
+      genesis/a2o/features/dataplane/doorway-failover.feature. It was briefly cited as a
+      contractTest and could never resolve — the census verifies a citation by grepping
+      `fn <testName>(` in the cited file, so a .feature path reads as a missing test, and a
+      feature-level `@concern:` tag names a whole ten-scenario story rather than this one row.
+      The join it belongs to already exists at the right altitude: `@concern:doorway-failover`
+      -> the `doorway-failover` habit's `checks:` in genesis/manifests/habits.yaml -> seam S3.9's
+      `habits:` in the seam catalog. This pointer is context; the five unit tests above are the pin.
 
   - name: Disposition
     kind: boundary-answer-type

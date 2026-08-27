@@ -199,10 +199,20 @@ seams:
       destination is the control plane — the declarative-desired-state rung has peers reconciling
       SIGNED desired state the way coordinators hot-swap. Assigned to its destination, with the
       today-state recorded here so the assignment is not read as a claim about the present.
+      NO HABIT WATCHES THIS SEAM TODAY. `declarative-desired-state` was displaced from the
+      register on 2026-08-13 (operator-directed) and is parked at
+      `genesis/data/timeline/backlog/declarative-desired-state-parked-habit.md`; its stated return
+      condition is a substrate precondition (the brit metadata plane / eprfs FUSE projection
+      direction becoming testable), not a register slot. The link is removed rather than left
+      dangling because a habits entry that resolves to nothing is a claim of observation where
+      there is none — this seam's rung-proximity has been scoring at the "no linked habits
+      article" floor the whole time regardless, so removing it changes no rank, only the honesty
+      of the render. Re-link on the commit that returns the habit to `habits.yaml`.
     tracks: []
     reach_tier: community
     registry_crates: []
-    habits: [declarative-desired-state]
+    # habits: [declarative-desired-state] — parked 2026-08-13, see plane_note above.
+    habits: []
     n_a_concerns: []
 
   - id: S3.3
@@ -214,10 +224,15 @@ seams:
       orthogonal to network role. Same destination logic as §3.2: which composition a peer runs is
       desired state. Footprint tuning is native-binary-only — never per-device WASM/DNA (that
       moves the DNA hash and partitions the fleet).
+      NO HABIT WATCHES THIS SEAM TODAY, for the same reason and on the same evidence as §3.2:
+      `declarative-desired-state` is parked at
+      `genesis/data/timeline/backlog/declarative-desired-state-parked-habit.md` since 2026-08-13.
+      Re-link both seams on the commit that returns it to `habits.yaml`.
     tracks: [T2, T3]
     reach_tier: community
     registry_crates: []
-    habits: [declarative-desired-state]
+    # habits: [declarative-desired-state] — parked 2026-08-13, see plane_note above.
+    habits: []
     n_a_concerns: []
 
   # ── data ───────────────────────────────────────────────────────────────────────────────────
@@ -364,6 +379,25 @@ seams:
     # that dependency, not a design intention, is the event that makes the destination the
     # present tense. Same discipline as S3.2/S3.3's destination-vs-today note, applied to a
     # crate-to-column mapping rather than a seam-to-plane one.
-    registry_crates: [elohim-seam-contracts, elohim-epr-rea]
+    #
+    # `elohim-epr-cli` (elohim/eprfs/epr-cli) is the "epr-cli/REA developer valueflow sidecar"
+    # this plane_note has named since the column was drawn — routed here (added 2026-08-27; it
+    # had been an UNROUTED registry contributing zero cells since the registry was minted
+    # 2026-08-13) on the evidence of its own decision points, not on name similarity:
+    #   - `note::resolve_target` locates its own plane in its C0 row: "a note is a REPO-PLANE
+    #     append to the offline floor (`.eprfs/status/flows.jsonl`) — not a DHT entity, not a
+    #     projection table. Nothing is published, gossiped, or head-elected." A decision point
+    #     that declares zero head-plane cost cannot be answering a control-truth or data-plane
+    #     cell.
+    #   - `stocks::equilibrium_verdict` decides whether the DEVELOPMENT SYSTEM is draining — its
+    #     subject is this repo's own valueflow, and its red is an `epr flow stocks --check` exit
+    #     code, i.e. a governance verdict over the tree, never over a peer.
+    #   - `project::event_key` / `normalize_co_author` dedupe REA acts DERIVED FROM GIT HISTORY;
+    #     the artifact they guard is the repo's commitment ledger, which is what this column is.
+    # It is also the crate that makes `elohim-epr-rea`'s routing above coherent: elohim-epr-rea
+    # sits here because epr-cli is its one and only dependent in the tree. Routing the dependent
+    # to a runtime column while its dependency stays governing/meta would have split one sidecar
+    # across two planes.
+    registry_crates: [elohim-seam-contracts, elohim-epr-rea, elohim-epr-cli]
     habits: []
     n_a_concerns: []

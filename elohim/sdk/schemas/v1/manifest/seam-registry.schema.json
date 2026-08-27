@@ -109,13 +109,14 @@
         "path": {
           "type": "string",
           "minLength": 1,
-          "description": "Repo-relative path (from the repo root, NOT crateRoot, since sweettests commonly live outside the crate) to the file containing the test."
+          "pattern": "^[^/].*\\.rs$",
+          "description": "Repo-relative path (from the repo root, NOT crateRoot, since sweettests commonly live outside the crate) to the file containing the test. MUST be a Rust source file: the census resolves a citation by grepping `fn <testName>(` in this file, so a non-`.rs` path can only ever resolve to 'test not found' — a citation that reads as a gap while looking like proof. This is the pattern's whole job; see `testName` for where a2o/Gherkin evidence goes instead."
         },
         "testName": {
           "type": "string",
           "minLength": 1,
           "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-          "description": "The exact `fn` name of the test (or, for a table/property test asserting many cases, the one enclosing `#[test]`/`#[tokio::test]` fn). Must be a REAL, currently-passing test — cite only tests that exist; a name that does not resolve at census time is exactly the phantom-validator failure mode this plan exists to stop (C7)."
+          "description": "The exact `fn` name of the test (or, for a table/property test asserting many cases, the one enclosing `#[test]`/`#[tokio::test]` fn). Must be a REAL, currently-passing test — cite only tests that exist; a name that does not resolve at census time is exactly the phantom-validator failure mode this plan exists to stop (C7). The identifier pattern is deliberate and is NOT a placeholder for prose: this field is a symbol the census resolves, never a description of what is proved (that is `summary`/`notes`). AN A2O SCENARIO IS NOT CITED HERE. Gherkin evidence joins a decision surface through the habit register — the scenario's `@concern:<tag>`, the habit's `checks:` in `genesis/manifests/habits.yaml`, and the seam's `habits:` in the seam catalog — which is the granularity a feature-level `@concern:` tag actually has (a seam column, not one row). Citing it here would be a second, weaker home for a join that already exists, and would resolve to nothing. Put the pointer in the row's `notes` if a reader needs it."
         },
         "kind": {
           "type": "string",
@@ -144,9 +145,10 @@
             "pure-decision-predicate",
             "verdict-fn",
             "boundary-answer-type",
-            "reason-outcome-enum"
+            "reason-outcome-enum",
+            "state-transition"
           ],
-          "description": "pure-decision-predicate = a side-effect-free fn mapping inputs to a decision (testable with no conductor/pool/network/peer). verdict-fn = a fn that additionally carries authority semantics over a proposed move/claim (may still be pure; the label marks its role, e.g. canonical_move_verdict, an authorization gate). boundary-answer-type = an enum/struct that IS the decision outcome returned across a boundary (a decide fn's return type, an extern's Option<T>, an HTTP-facing outcome type). reason-outcome-enum = a typed reason/label vocabulary consumed by metrics or callers to explain WHY a boundary-answer-type landed where it did (e.g. StaleReason, DeferReason, SsrFallbackReason)."
+          "description": "pure-decision-predicate = a side-effect-free fn mapping inputs to a decision (testable with no conductor/pool/network/peer). verdict-fn = a fn that additionally carries authority semantics over a proposed move/claim (may still be pure; the label marks its role, e.g. canonical_move_verdict, an authorization gate). boundary-answer-type = an enum/struct that IS the decision outcome returned across a boundary (a decide fn's return type, an extern's Option<T>, an HTTP-facing outcome type). reason-outcome-enum = a typed reason/label vocabulary consumed by metrics or callers to explain WHY a boundary-answer-type landed where it did (e.g. StaleReason, DeferReason, SsrFallbackReason). state-transition = a fn whose registrable claim is the SHAPE OF ITS EFFECT on longer-lived shared state — replace-not-append, upsert-not-insert, converge-not-accrete — rather than any value it returns (it typically returns a count or unit, and never a verdict). The other four kinds are all decision shapes; this one exists because C6a/C6b declare `probe_home: seam-registry` and name effectful surfaces ('boot re-projection', '(id,target) keyed work') that no decision shape can host — an instrument blind to the class it is the declared probe home for. ADMISSION IS NARROW, and the narrowness is the point: register a fn here only when re-application is a DESIGNED property (a retry-until-registered boot loop, a periodic manifest refresh, a reconcile tick) AND a contract test pins the invariant across REPEATED or CONCURRENT application rather than a single call's return. That repeat-application pin is what makes this a kind instead of 'any fn that writes'; a fn whose only claim is that it wrote the row is not a decision surface and does not belong in this registry at all. A write whose registrable claim is a verdict ABOUT the write (admit/reject — K2Store::put_at -> K2PutOutcome, TransportManifestStore::accept_at -> AcceptOutcome) stays a verdict-fn; this kind is for the write whose claim is about the write itself."
         },
         "sourceLocation": { "$ref": "#/$defs/sourceLocation" },
         "concernIds": {

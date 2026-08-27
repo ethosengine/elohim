@@ -24,9 +24,21 @@
 # fingerprint — that is correct, not a bug. `_lib/seam_forecast.py` recomputes every fp at load
 # and reports a mismatch LOUD (a hand-edited fingerprint is a silently-broken calibration link).
 #
-# `rung: none` means the row is not tied to a spine node (the two bridges rows and the
-# steward/node runner-up). It is a real value, not a placeholder — such a row can never be scored
-# by a spine flip, so its calibration trigger must be a new red or a mining pass.
+# `rung: none` means the row is not tied to a spine node (the two bridges rows, the steward/node
+# runner-up, the obey-path row, and any row whose habit is PARKED). It is a real value, not a
+# placeholder — such a row can never be scored by a spine flip, so its calibration trigger must be
+# a new red or a mining pass. A row naming a habit that has left the register is NOT a licence to
+# invent a rung id: the rung becomes `none` (re-minted per the fingerprint rule) and the parked
+# pointer is recorded in prose beside it, so the row returns to its original fingerprint when the
+# habit returns to the register.
+#
+# THE SEED IS A FLOOR, NOT A CEILING. `seeded_rank` 1-10 are the plan's own eight ranked rows plus
+# its two runners-up, transcribed at seeding. Rows ABOVE 10 are legitimate later registrations —
+# an instrument whose worklist could never grow would be a transcript, not a forecast. A new row
+# takes the next free `seeded_rank` and never renumbers a seeded one, because the seeded ordering
+# is the human judgment the calibration ledger is measuring. (Row 11 arrived 2026-08-03 as a
+# confirmed-live registration of the obey-path wall, and was itself re-minted the same shift when
+# its class set was disproven — that re-mint IS the fingerprint rule working.)
 #
 # WHY THIS HOME. Sibling of seam-catalog.yaml (the matrix's other authored axis input) and of the
 # two canon homes; read by the same tooling. No contentHash pin, for the same reason the catalog
@@ -95,9 +107,20 @@ rows:
       yet, so there is no stable SUBJECT for monotonicity to be about — C9 is a precondition of C2
       here, not a peer of it.
 
-  - fp: 167433895e0d
+  # RUNG PARKED 2026-08-13 (operator-directed). The `declarative-desired-state` habit was displaced
+  # from the register to admit `dev-system-equilibrium`; it is parked, not retired, at
+  # genesis/data/timeline/backlog/declarative-desired-state-parked-habit.md, and returns to the
+  # register when its brit-metadata-plane / eprfs-FUSE precondition greens. The FORECAST is
+  # untouched by that — the collision is still predicted at S3.2 — so the row stays and its rung
+  # becomes the explicit `none`: there is no spine node to flip, so its calibration trigger is a
+  # new red or a mining pass until the habit returns. Re-minted per the fingerprint rule
+  # (167433895e0d -> 989446b80520); when the habit returns, the rung goes back and the row is
+  # re-minted again to 167433895e0d, recovering its original identity.
+  - fp: 989446b80520
     seeded_rank: 5
-    rung: declarative-desired-state
+    rung: none
+    parked_rung: declarative-desired-state
+    parked_pointer: genesis/data/timeline/backlog/declarative-desired-state-parked-habit.md
     seam: S3.2
     classes: [C1, C6a]
     status: predicted
@@ -105,7 +128,11 @@ rows:
     prediction: >
       A peer that authors the signed desired-state manifest it then obeys is self-election at the
       config surface (C1); and an unbudgeted desired-state reconcile replays the heal-throughput
-      smell at config scale (C6a).
+      smell at config scale (C6a). RUNG PARKED 2026-08-13: the `declarative-desired-state` habit
+      was displaced from the register (operator-directed) and is parked at
+      `genesis/data/timeline/backlog/declarative-desired-state-parked-habit.md`, returning when its
+      brit/eprfs precondition greens — so this row carries `rung: none` meanwhile, and the
+      prediction itself is unchanged.
 
   - fp: 9c8dda8caebe
     seeded_rank: 6
