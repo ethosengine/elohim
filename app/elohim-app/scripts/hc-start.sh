@@ -140,11 +140,11 @@ done
 # isolated   (default) - island DHT; the generate command is byte-identical to
 #                        the historical behavior. No external peers.
 # join-alpha           - the local conductor joins the alpha DHT via the deployed
-#                        doorway's bootstrap + signal endpoints. Holochain appends
-#                        /{pubkey} to the signal URL client-side; path-based
-#                        routing on the main host handles this. (The deployed
-#                        edgenode reference uses the subdomain form
-#                        wss://signal.doorway-alpha.elohim.host as an alternative.)
+#                        doorway's bootstrap endpoint and the fleet's signal
+#                        subdomain. The signal URL MUST be pathless (tx5 refuses
+#                        a path: "parsing tx5 sig url" panic at boot) — so it is
+#                        wss://signal.alpha.elohim.host, the same value the alpha
+#                        conductors are generated with, never /signal on the doorway.
 # NOTE: doorway's own BOOTSTRAP_URL/SIGNAL_URL env vars are a different concern
 # (Tauri native-handoff channel) — these CONDUCTOR_* vars are conductor-only.
 
@@ -153,7 +153,13 @@ case "$NETWORK_PROFILE" in
         ;;
     join-alpha)
         : "${CONDUCTOR_BOOTSTRAP_URL:=https://doorway-alpha.elohim.host/bootstrap}"
-        : "${CONDUCTOR_SIGNAL_URL:=wss://doorway-alpha.elohim.host/signal}"
+        # PATHLESS, subdomain form — the same URL the alpha fleet's own conductors
+        # are generated with (elohim/holochain/Jenkinsfile: signalUrl). tx5 (HC 0.6)
+        # rejects a path on the signal URL at conductor boot:
+        #   K2Error "parsing tx5 sig url" InvalidLastSymbol → FATAL PANIC, no conductor.
+        # The old default `wss://doorway-alpha.elohim.host/signal` did exactly that
+        # (2026-08-28 sovereign-peer spike); it is gone, not kept as a fallback.
+        : "${CONDUCTOR_SIGNAL_URL:=wss://signal.alpha.elohim.host}"
         ;;
     *)
         echo "Unknown NETWORK_PROFILE: '$NETWORK_PROFILE' (expected: isolated | join-alpha)"

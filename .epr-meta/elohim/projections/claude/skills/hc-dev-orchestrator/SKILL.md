@@ -387,7 +387,10 @@ just status saga
   ports, `-r` pins app ports, and `-n/-d` create named sandboxes.
 - A sandbox with no network section reaches the public Holochain dev network;
   isolation requires the local doorway bootstrap and signal endpoints.
-- tx5 signal URLs must be pathless (`ws://signal.localhost:8888`).
+- tx5 signal URLs must be pathless (`ws://signal.localhost:8888`). This includes
+  join-alpha: `CONDUCTOR_SIGNAL_URL` defaults to `wss://signal.alpha.elohim.host`
+  (the fleet's own value); `wss://doorway-alpha.elohim.host/signal` panics the
+  conductor at boot (`parsing tx5 sig url` InvalidLastSymbol) — proven 2026-08-28.
 - Storage ignores `HTTP_PORT`; pass `--http-port`.
 - Storage p2p needs `ENABLE_P2P=true`, `P2P_PORT`, and the conductor agent key.
 - Doorway accepts one `--storage-url` plus comma-separated `--storage-urls`.

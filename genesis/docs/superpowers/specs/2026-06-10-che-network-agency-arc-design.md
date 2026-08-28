@@ -76,8 +76,8 @@ hub-optional floor (any device is a full participant).
 - **Custody boundary**: Stage B's peer is a NEW agent. Making the Che conductor *Matthew's device*
   (steward key-bundle handoff) imports real key custody into a cloud workspace — explicitly OUT of
   this arc; that path belongs to the recovery/device-pairing canon.
-- [ ] Spike: fetch deployed DNA artifacts; conductor network config → alpha bootstrap/signal;
-      prove join (peer visible in gossip / agent-info at the doorway)
+- [x] Spike: fetch deployed DNA artifacts; conductor network config → alpha bootstrap/signal;
+      prove join (peer visible in gossip / agent-info at the doorway) — **PROVEN 2026-08-28T03:27Z** from a Che pod: `NETWORK_PROFILE=join-alpha hc-start.sh --conductor` (deployed bundle from the Jenkins artifact, `hc sandbox generate … network --bootstrap https://doorway-alpha.elohim.host/bootstrap webrtc wss://signal.alpha.elohim.host`); all 5 local cell DNA hashes ∈ alpha's diagnostics spaces (no partition); conductor held a peer URL via the signal relay at boot; doorway-alpha `/db/p2p/conductor-diagnostics` listed the workspace agent on all 5 spaces within ~4 min (agentCount 20→25). One rail learned: the tx5 signal URL must be PATHLESS (`/signal` on the doorway panics the conductor at boot); the fleet's `wss://signal.alpha.elohim.host` is the value. Story: `genesis/a2o/features/deployment/sovereign-peer-join.feature` (@wip).
 - [ ] Prove agency: the Che peer authors one DHT entry as itself and a household peer reads it
 - [ ] Document workspace-peer lifecycle (PVC key continuity, teardown etiquette, one-peer-per-workspace)
 
