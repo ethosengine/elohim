@@ -151,3 +151,63 @@ Then('the doorway refuses it as not found', function (this: E2EWorld) {
       `client a parse error instead of an absence signal: ${s.body.slice(0, 120)}`
   );
 });
+
+/**
+ * The advertise/serve symmetry guard (concern C7 on this route's seam-registry row).
+ *
+ * The document's endpoint list and `AUTH_OWNED_PATHS` in the doorway are two
+ * hand-maintained lists that must agree. When they diverge, the advertised path
+ * is not owned, falls through to the EPR router, and answers 200 text/html — so
+ * a client following the document receives a web page where it expected an
+ * endpoint. Status codes are deliberately NOT asserted (405/401/400 are all
+ * healthy answers from an owned route); the content type is what separates
+ * "the doorway answered" from "the app shell answered".
+ */
+Then(
+  'every advertised endpoint answers as an auth route, not the app shell',
+  async function (this: E2EWorld) {
+    const s = state(this);
+    const endpoints = (s.doc?.['endpoints'] ?? {}) as Record<string, unknown>;
+    const paths = Object.entries(endpoints).filter(
+      (e): e is [string, string] => typeof e[1] === 'string'
+    );
+    assert.ok(paths.length > 0, 'the document advertised no endpoints to check');
+
+    const base = doorwayBase(this, 'alpha');
+    const shells: string[] = [];
+    for (const [name, path] of paths) {
+      const res = await request(`${base}${path}`, { method: 'GET' });
+      const contentType = String(res.headers['content-type'] ?? '');
+      await res.body.text();
+      if (contentType.includes('text/html')) {
+        shells.push(`${name} (${path}) -> ${res.statusCode} ${contentType}`);
+      }
+    }
+    assert.deepEqual(
+      shells,
+      [],
+      'the document advertises endpoints the doorway does not own — these answered with the ' +
+        `app shell instead of the auth layer: ${shells.join(', ')}`
+    );
+  }
+);
+
+Then('the advertised portal answers as a page', async function (this: E2EWorld) {
+  const s = state(this);
+  const portal = s.doc?.['portal'];
+  assert.equal(typeof portal, 'string', 'the document advertised no portal');
+
+  const res = await request(`${doorwayBase(this, 'alpha')}${String(portal)}`, { method: 'GET' });
+  const contentType = String(res.headers['content-type'] ?? '');
+  await res.body.text();
+  assert.equal(
+    res.statusCode,
+    200,
+    `the advertised portal did not serve: ${res.statusCode} — a human sent there sees nothing`
+  );
+  assert.ok(
+    contentType.includes('text/html'),
+    `the portal answered ${contentType}, not a page — it is where a human is SENT, so unlike ` +
+      'the endpoints it is supposed to be HTML'
+  );
+});

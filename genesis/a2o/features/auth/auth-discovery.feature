@@ -11,7 +11,7 @@ Feature: A doorway tells an app how to sign a human in
   endpoints an app talks to afterwards, including the pair that hands an existing session to a
   sibling app, which is the part no client could invent for itself.
 
-  Two properties make this safe to trust, and both are asserted here rather than assumed.
+  Three properties make this safe to trust, and all three are asserted here rather than assumed.
 
   First, EVERY value is an origin-relative path. A discovery document that could name another
   origin would be an open-redirect primitive: whoever answered it could aim a Login button at
@@ -23,6 +23,12 @@ Feature: A doorway tells an app how to sign a human in
   worst way: `/auth/*` paths the doorway does not own fall through to the app shell and answer
   200 with HTML, so a client probing `/auth/config` gets a JSON parse error instead of a
   branchable "no such thing" — the failure is misdiagnosed rather than handled.
+
+  Third, the document does not lie about what it offers. Every path it advertises is one the
+  doorway genuinely owns — a path it did NOT own would fall through to the app shell and answer
+  200 with HTML, so a client following the document would be handed a web page where it expected
+  an endpoint. That is the same misdiagnosis as the second property, arriving through the front
+  door instead of the back, and the two lists that have to agree are maintained by hand.
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
@@ -42,3 +48,9 @@ Feature: A doorway tells an app how to sign a human in
   Scenario: An unknown well-known path is refused rather than answered with the app shell
     When "/.well-known/not-a-real-document" is fetched from doorway "alpha"
     Then the doorway refuses it as not found
+
+  @act:i
+  Scenario: Everything the document advertises is really served by the doorway
+    When the auth discovery document is fetched from doorway "alpha"
+    Then every advertised endpoint answers as an auth route, not the app shell
+    And the advertised portal answers as a page
