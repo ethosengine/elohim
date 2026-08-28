@@ -120,6 +120,14 @@ resources:
     note: No bench harness is wired into the edge pipeline. Declared so the 5 bench scenarios hold with a
           reason rather than passing vacuously.
 
+  local-conductor:
+    role: a conductor THIS workspace runs and joins to the lane's network (`just dev conductor alpha`) — the evidence ladder's T3 hybrid rung
+    available: false
+    note: Declared so `@requires:local-conductor` is a real gate instead of an undeclared no-op
+          (sovereign-peer-join.feature). Never flipped here — the workspace conductor is per-run:
+          the T3 runner sets ELOHIM_CAP_LOCAL_CONDUCTOR_STATUS=available after hc-start.sh --conductor
+          reports its admin port (elohim/holochain/local-dev/.hc_ports).
+
   shem:
     role: the multi-tenant live P2P canvas — Act III's stage
     available: false

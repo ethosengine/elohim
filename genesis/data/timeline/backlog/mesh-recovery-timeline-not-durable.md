@@ -7,7 +7,7 @@ title: "Local recovery-timeline JSONL lives under $MESH_DIR (/tmp) and dies with
 slug: "mesh-recovery-timeline-not-durable"
 written: "2026-08-25"
 author: "agentic-developer (shift 2026-08-25T0210-land-608a1ceff-iroh-dual-fleet)"
-status: "open"
+status: "done"
 priority: "medium"
 area: "mesh"
 domain: "code"
@@ -34,3 +34,11 @@ under `genesis/a2o/reports/recovery/` (gitignored like the sprint reports, but o
 volume), keep `$MESH_DIR` as a symlink or secondary copy for the scripts that read it by that path,
 and have `recovery-timeline.py` default to the in-repo location. `just mesh recovery-matrix` and
 the transport self-awareness spec's before/after comparison then survive a restart.
+
+## Cured (2026-08-28, M0 shift)
+
+`hc-mesh-recovery.sh` writes `genesis/a2o/reports/recovery/recovery-timeline.jsonl` (gitignored, persistent
+volume) and leaves `$MESH_DIR/recovery-timeline.jsonl` as a symlink to it (a legacy `/tmp` file is migrated
+once); `hc-mesh-recovery-matrix.sh` reads the same path; `hc-mesh-quiesce.sh` does the same for
+`quiesce-log.txt`; `recovery-timeline.py` defaults to the durable file (`RECOVERY_TIMELINE` overrides).
+First durable record: warm jessica←matthew, libp2p, 62 s. Lane R rung R3.

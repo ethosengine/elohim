@@ -105,6 +105,16 @@ habits:
       - "a2o @concern:transport-parity (genesis/a2o/features/dataplane/transport-comparison-matrix.feature; just mesh matrix) — identical fresh-document contract under libp2p, iroh, and dual; successful samples alone contribute timing percentiles"
       - ".claude/scripts/latency-scoreboard.py --local (and --deployed) — bounded convergence, not merely eventual: a CONJUNCTION of speed AND this habit's trust invariant, never speed alone. A fast stale head is worse than a slow correct one, so this check can only ever narrow the habit, never carry it."
     evidence: >
+      DELTA 2026-08-28e (M0 pawls, NO status flip). Lane R rung R3: the recovery
+      timeline is durable (genesis/a2o/reports/recovery/, /tmp symlink; first record
+      warm jessica<-matthew 62 s libp2p). Lane D rung D2: pre-push T2-receipt leg
+      (warn-only) fires on dataplane paths without a fresh household report. Lane P
+      rung P5: sovereign-peer-join sc1 GREEN x4 on the fork iroh pair (a stock tx5
+      join is listed-but-unconnected; hc-start.sh now refuses it); sc5 RED in both
+      arc modes because every live alpha agent-info advertises storageArc: null —
+      backlog sovereign-peer-network-read-no-authorities, a conductor-fork/kitsune2
+      ceiling. Mesh hygiene found: workdir elohim.happ 12 days behind the storage
+      binary -> head-record WasmError Deserialize (MESH_HAPP_PATH + probe label).
       DELTA 2026-08-28d (ACTIVE; NO status flip). Swapped into the WIP fence in
       place of doorway-failover (green, run-identified 2026-08-25b). Campaign
       spec ratchet-to-delivery-dataplane-sdk-lanes lays five ratchet lanes

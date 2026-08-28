@@ -451,6 +451,20 @@ fi
 # Trim leading space
 PROJECTS=$(echo "$PROJECTS" | sed 's/^ //')
 
+# ── T2 receipt (warn-only; ratchet lane D rung D2) ──────────────────
+# A dataplane change (storage p2p/sync/reconcile, doorway) is pushed only after the household
+# mesh has witnessed it: the leg looks for a sprint-report-household-*.json newer than the
+# changed files and prints a NO-T2-RECEIPT banner naming `just test mesh` otherwise. Warn-only
+# so a push is never deadlocked on a rung this container cannot run; T2_RECEIPT=strict refuses.
+T2_LIST=$(mktemp)
+printf '%s\n' "$CHANGED" > "$T2_LIST"
+if [ "${T2_RECEIPT-}" = "strict" ]; then
+  bash genesis/orchestrator/scripts/t2-receipt.sh --changed "$T2_LIST" --strict || { rm -f "$T2_LIST"; exit 1; }
+else
+  bash genesis/orchestrator/scripts/t2-receipt.sh --changed "$T2_LIST" || true
+fi
+rm -f "$T2_LIST"
+
 # ── Project filter ────────────────────────────────────────────────
 # Projects are stable manifest keys; the shared runner resolves directories.
 drop_project() {

@@ -37,6 +37,24 @@ RECOVERY_DOORWAY_A="${RECOVERY_DOORWAY_A:-http://localhost:${DOORWAY_PORT:-8888}
 RECOVERY_DOORWAY_B="${RECOVERY_DOORWAY_B:-http://localhost:${DOORWAY_B_PORT:-8889}}"
 RECOVERY_LANDING_PATH="${RECOVERY_LANDING_PATH:-/db/content/elohim-host-landing}"
 MESH_DIR="${MESH_DIR:-/tmp/elohim-local-mesh}"
+# Durable evidence (backlog mesh-recovery-timeline-not-durable, 2026-08-25): $MESH_DIR is /tmp and
+# dies with the devspace container — the 13-row 2026-08-24 series vanished that way. The timeline
+# now lives under the repo (gitignored like the sprint reports, on the persistent volume) and
+# $MESH_DIR/recovery-timeline.jsonl becomes a symlink so every reader that still uses that path
+# (recovery-timeline.py --table, the matrix's before/after line count) sees the same file.
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+RECOVERY_REPORTS_DIR="${RECOVERY_REPORTS_DIR:-$REPO_ROOT/genesis/a2o/reports/recovery}"
+RECOVERY_TIMELINE="${RECOVERY_TIMELINE:-$RECOVERY_REPORTS_DIR/recovery-timeline.jsonl}"
+
+recovery_timeline_path() { # -> the durable timeline path; migrates a legacy /tmp file once, then symlinks
+  mkdir -p "$RECOVERY_REPORTS_DIR" "$MESH_DIR"
+  local legacy="$MESH_DIR/recovery-timeline.jsonl"
+  if [ -e "$legacy" ] && [ ! -L "$legacy" ]; then
+    cat "$legacy" >> "$RECOVERY_TIMELINE" && rm -f "$legacy"
+  fi
+  [ -L "$legacy" ] || ln -sfn "$RECOVERY_TIMELINE" "$legacy"
+  printf '%s\n' "$RECOVERY_TIMELINE"
+}
 
 rlog() { printf 'recovery[%s]: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1"; }
 
@@ -339,6 +357,6 @@ rcpt_rec="$(receipt_max "$peer" "$t0")"; rcpt_surv="$(receipt_max "$survivor" "$
 rcpt_scope_rec="$(receipt_scope_for "$peer")"; rcpt_scope_surv="$(receipt_scope_for "$survivor")"
 fmt_receipt() { [ "$1" = "null" ] && echo "none" || echo "${1}s"; }
 rlog "conductor receipt latency max during recovery: recovering=$(fmt_receipt "$rcpt_rec") survivor=$(fmt_receipt "$rcpt_surv")"
-RECOVERY_SURVIVORS="${#survivors[@]}" recovery_write_record "$MESH_DIR/recovery-timeline.jsonl" "$shape" "$peer" "$survivor" "$t_surv" "$t_rec" "$recovered" "$el" "$polls" "$failing" "$labels" "$rcpt_rec" "$rcpt_surv" "$rcpt_scope_rec" "$rcpt_scope_surv" "$zome_verdict"
+RECOVERY_SURVIVORS="${#survivors[@]}" recovery_write_record "$(recovery_timeline_path)" "$shape" "$peer" "$survivor" "$t_surv" "$t_rec" "$recovered" "$el" "$polls" "$failing" "$labels" "$rcpt_rec" "$rcpt_surv" "$rcpt_scope_rec" "$rcpt_scope_surv" "$zome_verdict"
 rm -f "$snap"
 [ "$recovered" -eq 1 ]

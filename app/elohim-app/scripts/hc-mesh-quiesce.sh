@@ -51,7 +51,16 @@ GATE_SCRIPT="$REPO_ROOT/scripts/ci/fleet-quiesce-gate.sh"
 
 MESH_DIR="${MESH_DIR:-/tmp/elohim-local-mesh}"
 mkdir -p "$MESH_DIR"
-LOG_FILE="$MESH_DIR/quiesce-log.txt"
+# Durable home for the quiesce record (same defect + cure as recovery-timeline.jsonl — see
+# hc-mesh-recovery.sh): the log lives under the repo's gitignored reports tree; $MESH_DIR keeps a
+# symlink so the historical path still reads.
+RECOVERY_REPORTS_DIR="${RECOVERY_REPORTS_DIR:-$(cd "$SCRIPT_DIR/../../.." && pwd)/genesis/a2o/reports/recovery}"
+mkdir -p "$RECOVERY_REPORTS_DIR"
+LOG_FILE="$RECOVERY_REPORTS_DIR/quiesce-log.txt"
+if [ -e "$MESH_DIR/quiesce-log.txt" ] && [ ! -L "$MESH_DIR/quiesce-log.txt" ]; then
+  cat "$MESH_DIR/quiesce-log.txt" >> "$LOG_FILE" && rm -f "$MESH_DIR/quiesce-log.txt"
+fi
+[ -L "$MESH_DIR/quiesce-log.txt" ] || ln -sfn "$LOG_FILE" "$MESH_DIR/quiesce-log.txt"
 
 DOORWAY_PORT="${DOORWAY_PORT:-8888}"
 DOORWAY_B_PORT="${DOORWAY_B_PORT:-8889}"

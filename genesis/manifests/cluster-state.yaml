@@ -25,6 +25,14 @@ resources:
       undeclared cap fails OPEN in substrate-scope.ts — without this line `@requires:owned-substrate` gated
       nothing on the default lane and the un-parked destructive scenarios would have run against alpha.
 
+  local-conductor:
+    role: a conductor THIS workspace runs and joins to the lane's network (`just dev conductor alpha`) — the evidence ladder's T3 hybrid rung
+    available: false
+    note: Declared so `@requires:local-conductor` is a real gate instead of an undeclared no-op
+          (sovereign-peer-join.feature). Never flipped here — the workspace conductor is per-run:
+          the T3 runner sets ELOHIM_CAP_LOCAL_CONDUCTOR_STATUS=available after hc-start.sh --conductor
+          reports its admin port (elohim/holochain/local-dev/.hc_ports).
+
   shem:
     role: multi-tenant live P2P canvas — the cross-node proving ground   # project_shem_is_p2p_live_canvas
     available: true

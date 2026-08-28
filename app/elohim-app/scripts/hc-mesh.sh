@@ -181,7 +181,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 LOCAL_DEV_DIR="$REPO_ROOT/elohim/holochain/local-dev"
 HAPP_WORKDIR="$REPO_ROOT/elohim/holochain/dna/elohim/workdir"
-HAPP_PATH="$HAPP_WORKDIR/elohim.happ"
+# MESH_HAPP_PATH overrides the bundle the sandboxes install. Default = the locally packed
+# workdir bundle. Point it at elohim/holochain/local-dev/deployed-bundles/elohim.happ
+# (app/elohim-app/scripts/fetch-deployed-dna.sh) for DNA parity with the fleet AND with a
+# storage binary built from today's tree: measured 2026-08-28, a workdir bundle 12 days
+# older than the storage binary turned every head-record zome call into a WasmError
+# Deserialize (get_record_for_action input shape moved) that the probe below mislabelled
+# as a stale token.
+HAPP_PATH="${MESH_HAPP_PATH:-$HAPP_WORKDIR/elohim.happ}"
 POOL="/projects/.cargo-target-pool/family/dev"
 STORAGE_BIN="${STORAGE_BIN:-$POOL/elohim__elohim-storage/release/release/elohim-storage}"
 DOORWAY_BIN="${DOORWAY_BIN:-$POOL/doorway__doorway-service/dev/debug/doorway}"
@@ -1182,6 +1189,9 @@ print(next((i["id"] for i in items if i.get("dhtAnchorHash")), ""))
         body="$(curl -s -m 15 -H "Authorization: Bearer ${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}" \
           "http://localhost:$port/db/content/$probe_id/head-record" 2>/dev/null)"
         case "$body" in
+          *"WasmError"*|*"Deserialize"*)
+            echo "serving, but ZOME INPUT SHAPE MISMATCH (storage binary vs installed DNA) <-- rebuild the DNA or MESH_HAPP_PATH=<deployed bundle>, then mesh stop/start"
+            needs_restart+="${needs_restart:+ }$name" ;;
           *"Zome call failed"*|*"Websocket closed"*|*"No connection"*)
             echo "serving, but ZOME CALLS ARE DEAD (stale app-interface token) <-- restart this peer"
             needs_restart+="${needs_restart:+ }$name" ;;
@@ -1457,6 +1467,9 @@ print(next((i["id"] for i in items if i.get("dhtAnchorHash")), ""))
         body="$(curl -s -m 15 -H "Authorization: Bearer ${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}" \
           "http://localhost:$port/db/content/$probe_id/head-record" 2>/dev/null)"
         case "$body" in
+          *"WasmError"*|*"Deserialize"*)
+            echo "serving, but ZOME INPUT SHAPE MISMATCH (storage binary vs installed DNA) <-- rebuild the DNA or MESH_HAPP_PATH=<deployed bundle>, then mesh stop/start"
+            needs_restart+="${needs_restart:+ }$name" ;;
           *"Zome call failed"*|*"Websocket closed"*|*"No connection"*)
             echo "serving, but ZOME CALLS ARE DEAD (stale app-interface token) <-- restart this peer"
             needs_restart+="${needs_restart:+ }$name" ;;

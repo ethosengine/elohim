@@ -70,6 +70,16 @@ retire-when: >
   converging is not a degraded version of this system, it is a different one — so this is
   watched permanently rather than until a milestone.
 ---
+DELTA 2026-08-28e (M0 pawls, NO status flip). Lane R rung R3: the recovery
+timeline is durable (genesis/a2o/reports/recovery/, /tmp symlink; first record
+warm jessica<-matthew 62 s libp2p). Lane D rung D2: pre-push T2-receipt leg
+(warn-only) fires on dataplane paths without a fresh household report. Lane P
+rung P5: sovereign-peer-join sc1 GREEN x4 on the fork iroh pair (a stock tx5
+join is listed-but-unconnected; hc-start.sh now refuses it); sc5 RED in both
+arc modes because every live alpha agent-info advertises storageArc: null —
+backlog sovereign-peer-network-read-no-authorities, a conductor-fork/kitsune2
+ceiling. Mesh hygiene found: workdir elohim.happ 12 days behind the storage
+binary -> head-record WasmError Deserialize (MESH_HAPP_PATH + probe label).
 DELTA 2026-08-28d (ACTIVE; NO status flip). Swapped into the WIP fence in
 place of doorway-failover (green, run-identified 2026-08-25b). Campaign
 spec ratchet-to-delivery-dataplane-sdk-lanes lays five ratchet lanes

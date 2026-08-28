@@ -49,3 +49,21 @@ adopts it. It is also the same shape a future device peer (Tauri, no sidecar) wo
    vector without a reach check first.
 3. The a2o story carrying the promise: `features/deployment/sovereign-peer-join.feature`
    scenario 3 "(RED — the gap)"; the spike script is `genesis/seeder/scripts/spikes/sovereign-peer-author.ts`.
+
+## Correction (2026-08-28, M0 shift — the spike's conductor was never connected)
+
+The 2026-08-28T03:27Z spike ran the **stock holochain 0.6.0 (tx5)** conductor. Alpha's conductors run
+the ethosengine fork on the **iroh** transport (agent URLs `https://relay.alpha.elohim.host/…`,
+`relay_url` in conductor-config). A tx5 conductor publishes itself to alpha's bootstrap and IS listed by
+doorway-alpha's `/db/p2p/conductor-diagnostics` — and then holds `dumpNetworkStats.connections: []`
+for ever (measured 35 min): tx5 and iroh never dial each other. So "listed live within ~4 min" was
+true and "joined" was not; the authored node could not have been gossiped to any fleet conductor,
+which means the 404 measured above is over-determined — the storage-discovery gap is still real
+(storage never DHT-walks ids), but the spike could not have exercised it. Re-measured on the fork
+pair (`/projects/.cargo-target-pool/family/dev/crates/dev/release`, holochain 0.6.3, iroh): 4–5
+connections within a minute (one direct), peer store 30 entries, gossip rounds initiated.
+`hc-start.sh` now uses the fork pair when present and refuses a stock join-alpha unless
+`ALLOW_STOCK_JOIN=1`; `features/deployment/sovereign-peer-join.feature` scenario 1 is wired and
+green on the fork. Scenario 3 (this gap) is still RED and should be re-run on the fork before the
+cure decision — the read-miss fallback (candidate 2) only helps if the fleet conductors can fetch
+the workspace's entry, which now they can.

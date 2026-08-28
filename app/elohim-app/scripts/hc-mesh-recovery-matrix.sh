@@ -476,7 +476,7 @@ while IFS=$'\t' read -r name peers doorways t_surv t_rec expect; do
         fi
       fi
 
-      timeline="$MESH_DIR/recovery-timeline.jsonl"
+      timeline="${RECOVERY_TIMELINE:-$(cd "$SCRIPT_DIR/../../.." && pwd)/genesis/a2o/reports/recovery/recovery-timeline.jsonl}"  # durable home (see hc-mesh-recovery.sh)
       before_lines=0
       [ -f "$timeline" ] && before_lines="$(wc -l < "$timeline")"
       "$SCRIPT_DIR/hc-mesh-recovery.sh" "$shape" "$rec" \

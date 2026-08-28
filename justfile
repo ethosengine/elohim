@@ -187,7 +187,17 @@ dev action="status" profile="isolated" seed="false" build="false":
         esac
         exec "{{ app_dir }}/scripts/hc-start.sh" "${args[@]}"
         ;;
-      conductor) exec "{{ app_dir }}/scripts/hc-start.sh" --conductor ;;
+      conductor)
+        # The T3 hybrid rung: `just dev conductor profile=alpha` = a workspace conductor joined to
+        # alpha's network (sovereign peer). The profile mapping is the same as `start` — before
+        # 2026-08-28 this arm ignored `profile`, so profile=alpha silently started an isolated node.
+        case "{{ profile }}" in
+          isolated) export NETWORK_PROFILE=isolated ;;
+          alpha) export NETWORK_PROFILE=join-alpha ;;
+          *) echo "dev profile must be isolated|alpha" >&2; exit 2 ;;
+        esac
+        exec "{{ app_dir }}/scripts/hc-start.sh" --conductor
+        ;;
       app) cd "{{ app_dir }}"; exec pnpm start ;;
       stop)
         pkill -x holochain 2>/dev/null || true
@@ -210,10 +220,14 @@ mesh action="status" *args:
       matrix) exec "{{ app_dir }}/scripts/hc-mesh-transport-matrix.sh" ;;
       recovery) exec "{{ app_dir }}/scripts/hc-mesh-recovery.sh" {{ args }} ;;
       recovery-matrix) exec "{{ app_dir }}/scripts/hc-mesh-recovery-matrix.sh" ;;
-      *) echo "mesh action must be start|stop|status|probe|prologue|quiesce|monitor|matrix|recovery|recovery-matrix" >&2; exit 2 ;;
+      # Restart arms (ratchet lane D, rung D2 pawls — 2026-08-28): the same hc-mesh.sh actions the
+      # recovery harness drives, reachable through the verb so a shift never has to know the script.
+      conductors-restart) exec "{{ app_dir }}/scripts/hc-mesh.sh" conductors-restart ;;
+      storage-restart) exec "{{ app_dir }}/scripts/hc-mesh.sh" storage-restart {{ args }} ;;
+      *) echo "mesh action must be start|stop|status|probe|prologue|quiesce|monitor|matrix|recovery|recovery-matrix|conductors-restart|storage-restart [peer...]" >&2; exit 2 ;;
     esac
 
-# Seed content or validate a corpus facet. False content dry-run modes are intentionally absent.
+# Seed content or validate a corpus facet (profile: local|alpha|mesh). False content dry-run modes are intentionally absent.
 seed action="validate" profile="local" scope="content" limit="":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -228,7 +242,20 @@ seed action="validate" profile="local" scope="content" limit="":
         export HOLOCHAIN_ADMIN_URL='wss://doorway-alpha.elohim.host?apiKey=dev-elohim-auth-2024'
         export ADMIN_PROXY_URL=https://doorway-alpha.elohim.host
         ;;
-      *) echo "seed profile must be local|alpha" >&2; exit 2 ;;
+      mesh)
+        # The household mesh THIS host owns (`just mesh start`): the seed-chain env comes from
+        # hc-mesh.sh's `mesh_seed_env` — the one source of truth `just test mesh` and the CI mesh
+        # stage already read (DOORWAY_URL/STORAGE_URL/DOORWAY_API_KEY/ADMIN_PROXY_URL + the cast's
+        # CONDUCTOR_URLS). `set +e` around the source: hc-mesh.sh is `set -u` only and its
+        # optional-binary probes exit non-zero at load.
+        set +e
+        # shellcheck source=/dev/null
+        source "{{ app_dir }}/scripts/hc-mesh.sh"
+        set -e
+        mesh_seed_env
+        export ADMIN_PROXY_URL="${ADMIN_PROXY_URL:-$DOORWAY_URL}"
+        ;;
+      *) echo "seed profile must be local|alpha|mesh" >&2; exit 2 ;;
     esac
     case "{{ action }}" in
       validate)

@@ -167,6 +167,57 @@ case "$NETWORK_PROFILE" in
         ;;
 esac
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Conductor parity (2026-08-28, sovereign-peer T3 rung). Alpha's conductors run
+# the ethosengine FORK on the iroh transport (agent URLs are
+# https://relay.alpha.elohim.host/…, conductor-config carries relay_url). The
+# stock 0.6.0 tx5 conductor CAN publish itself to alpha's bootstrap and be listed
+# by doorway-alpha's conductor-diagnostics — and then holds connections: [] for
+# ever, because tx5 and iroh never dial each other. That is a false join: reads
+# through it are local-only misses. So, like hc-mesh.sh, a fork pair (holochain +
+# the MATCHING hc — the CLI writes conductor-config.yaml in its own schema) is
+# used when one is present, and join-alpha REFUSES a stock conductor unless
+# ALLOW_STOCK_JOIN=1 says the skew is deliberate.
+#   HOLOCHAIN_BIN=/dir/holding/both        explicit pair
+#   MESH_FORK_BIN_DIRS=a:b:c               search list (hc-mesh.sh's convention)
+# Default search adds the cargo-pool release slot the fork is built into.
+# ──────────────────────────────────────────────────────────────────────────────
+: "${CONDUCTOR_RELAY_URL:=https://relay.alpha.elohim.host}"   # pairs with signal.alpha (D2/D7)
+# App-interface port. The household mesh owns 4445/4455/4465 (matthew/jessica/james, hc-mesh.sh
+# `app_port()`), and a join-alpha workspace conductor is meant to run BESIDE that mesh (T2 and T3
+# rungs together), so join-alpha defaults to 4485 — out of the mesh's range. Isolated keeps 4445
+# (the app dev proxy's assumption). Consumers read app_port from .hc_ports, never a constant.
+if [ "$NETWORK_PROFILE" = "join-alpha" ]; then : "${CONDUCTOR_APP_PORT:=4485}"; else : "${CONDUCTOR_APP_PORT:=4445}"; fi
+# Arc factor (fork hc only). 1 = a full peer (parity with the fleet's humans; reads are answered
+# LOCALLY because a full-arc node is its own authority, so a fresh joiner sees the fleet's data only
+# as gossip fills its rings). 0 = a zero-arc "leecher" whose reads go to the network at once and
+# who contributes nothing to gossip. Measured 2026-08-28: the difference between the two is the
+# whole of "can the workspace read elohim-host-landing within 3 minutes".
+: "${CONDUCTOR_ARC_FACTOR:=1}"
+FORK_BIN_DIR=""
+_fork_candidates="${HOLOCHAIN_BIN:-}:${MESH_FORK_BIN_DIRS:-}:$REPO_ROOT/.fork-bin:/opt/elohim/fork-bin"
+for _d in /projects/.cargo-target-pool/family/*/crates/*/release; do _fork_candidates="$_fork_candidates:$_d"; done
+IFS=':' read -ra _fork_dirs <<< "$_fork_candidates"
+for _d in "${_fork_dirs[@]}"; do
+    [ -n "$_d" ] || continue
+    [ -f "$_d" ] && _d="$(dirname "$_d")"
+    if [ -x "$_d/holochain" ] && [ -x "$_d/hc" ]; then FORK_BIN_DIR="$_d"; break; fi
+done
+if [ -n "$FORK_BIN_DIR" ]; then
+    export HC_HOLOCHAIN_PATH="$FORK_BIN_DIR/holochain"
+    export PATH="$FORK_BIN_DIR:$PATH"
+    echo "   🔧 conductor: FORK pair $FORK_BIN_DIR ($("$FORK_BIN_DIR/holochain" --version 2>/dev/null | head -1))"
+elif [ "$NETWORK_PROFILE" = "join-alpha" ] && [ "${ALLOW_STOCK_JOIN:-0}" != "1" ]; then
+    echo ""
+    echo "   ❌ join-alpha refused: no fork conductor pair found (holochain + hc in one dir)."
+    echo "      Alpha's conductors run the iroh transport; the stock $(holochain --version 2>/dev/null | head -1) on PATH"
+    echo "      would publish itself, be listed, and never connect (connections: [] — measured"
+    echo "      2026-08-28). Point HOLOCHAIN_BIN at a dir holding BOTH binaries, e.g."
+    echo "      HOLOCHAIN_BIN=/projects/.cargo-target-pool/family/dev/crates/dev/release"
+    echo "      or set ALLOW_STOCK_JOIN=1 to accept a listed-but-unconnected peer on purpose."
+    exit 1
+fi
+
 # ============================================================================
 # Functions
 # ============================================================================
@@ -290,6 +341,8 @@ if [ "$CONDUCTOR_RUNNING" = false ]; then
         echo "   ╚══════════════════════════════════════════════════════════════╝"
         echo "   Bootstrap: $CONDUCTOR_BOOTSTRAP_URL"
         echo "   Signal:    $CONDUCTOR_SIGNAL_URL"
+        echo "   Relay:     $CONDUCTOR_RELAY_URL  (iroh fork only)"
+        echo "   Arc:       target_arc_factor=$CONDUCTOR_ARC_FACTOR  (1 = full peer, 0 = zero-arc reader; fork only)"
         echo ""
         # DNA-hash parity: install the DEPLOYED bundle (what alpha actually
         # runs), not the locally-built one — mismatched DNA hashes land this
@@ -318,14 +371,23 @@ if [ "$CONDUCTOR_RUNNING" = false ]; then
             echo "      risk explicitly with FORCE_LOCAL_HAPP=1."
             exit 1
         fi
+        # Grammar follows the hc on PATH: the fork's 0.6.3 `hc` replaced tx5's
+        # `webrtc <SIGNAL_URL>` with `quic <RELAY_URL>` (iroh); stock keeps webrtc.
+        if hc sandbox generate network --help 2>&1 | grep -qE '^\s+quic\b'; then
+            NETWORK_TAIL="network --bootstrap \"$CONDUCTOR_BOOTSTRAP_URL\" --target-arc-factor $CONDUCTOR_ARC_FACTOR quic \"$CONDUCTOR_RELAY_URL\""
+        else
+            NETWORK_TAIL="network --bootstrap \"$CONDUCTOR_BOOTSTRAP_URL\" webrtc \"$CONDUCTOR_SIGNAL_URL\""
+        fi
         cat > "$HC_WRAPPER" << EOF
 #!/bin/bash
-exec hc sandbox generate --app-id elohim --in-process-lair -r=4445 "$JOIN_HAPP_PATH" network --bootstrap "$CONDUCTOR_BOOTSTRAP_URL" webrtc "$CONDUCTOR_SIGNAL_URL"
+export PATH="$PATH"
+${HC_HOLOCHAIN_PATH:+export HC_HOLOCHAIN_PATH="$HC_HOLOCHAIN_PATH"}
+exec hc sandbox generate --app-id elohim --in-process-lair -r=$CONDUCTOR_APP_PORT "$JOIN_HAPP_PATH" $NETWORK_TAIL
 EOF
     else
         cat > "$HC_WRAPPER" << EOF
 #!/bin/bash
-exec hc sandbox generate --app-id elohim --in-process-lair -r=4445 "$HAPP_PATH"
+exec hc sandbox generate --app-id elohim --in-process-lair -r=$CONDUCTOR_APP_PORT "$HAPP_PATH"
 EOF
     fi
     chmod +x "$HC_WRAPPER"
@@ -349,9 +411,9 @@ EOF
             ADMIN_PORT=$(grep -ao '"admin_port":[0-9]*' "$SANDBOX_LOG" | grep -o '[0-9]*' | head -1)
             if [ -n "$ADMIN_PORT" ]; then
                 echo "admin_port=$ADMIN_PORT" > "$HC_PORTS_FILE"
-                echo "app_port=4445" >> "$HC_PORTS_FILE"
+                echo "app_port=$CONDUCTOR_APP_PORT" >> "$HC_PORTS_FILE"
                 echo ""
-                echo "   ✅ Conductor ready (admin: $ADMIN_PORT, app: 4445)"
+                echo "   ✅ Conductor ready (admin: $ADMIN_PORT, app: $CONDUCTOR_APP_PORT)"
                 break
             fi
         fi
@@ -380,7 +442,7 @@ if [ "$CONDUCTOR_ONLY" = true ]; then
     echo ""
     echo "════════════════════════════════════════════════════════════════"
     echo "   Conductor running on admin port $ADMIN_PORT"
-    echo "   App interface on port 4445"
+    echo "   App interface on port $CONDUCTOR_APP_PORT"
     echo ""
     echo "   To start full stack: npm run hc:start"
     echo "════════════════════════════════════════════════════════════════"
@@ -617,7 +679,7 @@ else
     # admin socket itself), so the mis-derivation was invisible.
     env "${DOORWAY_ENV[@]}" "$DOORWAY_BIN" "${DOORWAY_FLAGS[@]}" \
         --listen 0.0.0.0:8888 \
-        --conductor-url "ws://localhost:4445" \
+        --conductor-url "ws://localhost:$CONDUCTOR_APP_PORT" \
         --conductor-admin-url "ws://localhost:$ADMIN_PORT" \
         --storage-url "http://localhost:$STORAGE_PORT" &
 
@@ -661,7 +723,7 @@ echo "┌─────────────┬─────────�
 echo "│ Component   │ Endpoint                                       │"
 echo "├─────────────┼────────────────────────────────────────────────┤"
 printf "│ Conductor   │ ws://localhost:%-5s (admin)                   │\n" "$ADMIN_PORT"
-echo "│             │ ws://localhost:4445  (app)                     │"
+echo "│             │ ws://localhost:$CONDUCTOR_APP_PORT  (app)                     │"
 printf "│ Storage     │ http://localhost:%-4s (content DB + blobs)    │\n" "$STORAGE_PORT"
 if [ -n "$ANTHROPIC_API_KEY" ]; then
 printf "│ Agent SDK   │ http://localhost:%-4s (inference sidecar)     │\n" "${ELOHIM_AGENT_PORT:-8095}"

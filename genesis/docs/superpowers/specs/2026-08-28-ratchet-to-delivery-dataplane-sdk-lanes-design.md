@@ -40,7 +40,7 @@ Grounded facts the lanes rest on (file:line in the lane tables):
 ## The ratchet — how a lane works
 
 - A **rung** = one check: a command, an `@concern`, or a habit conjunction. It has a **reading** (evidence with a build/run id) and a **target**.
-- A rung is **locked** when green AND its check sits in a **pawl** that runs without anyone remembering: T0/T1 `just gate` (pre-push), T2 `just test mesh` (+ the T2 receipt banner), T3 `just dev conductor profile=alpha` + `@concern:sovereign-peer-join`, T4 `[edge:validate-only]` byConcern report. A green rung with no pawl is *unlocked* and counts as open.
+- A rung is **locked** when green AND its check sits in a **pawl** that runs without anyone remembering: T0/T1 `just gate` (pre-push), T2 `just test mesh` (+ the T2 receipt banner), T3 `just dev conductor alpha` + `@concern:sovereign-peer-join`, T4 `[edge:validate-only]` byConcern report. A green rung with no pawl is *unlocked* and counts as open.
 - Only the **lowest open rung** of a lane is in flight; a regression on a locked rung is the top red and pre-empts. Habits flip only with evidence (covenant rule 4); `latency-scoreboard`'s `best_observed` ratchets numbers.
 - The **top rung of every lane is a delivery reading**: something a person or an app developer sees through a doorway.
 - Progress = open rungs per lane, re-counted at every shift close (`just status habits`, `just status saga`, the lane tables' commands).
@@ -53,7 +53,7 @@ Legend: 🟢 locked · 🟡 green-unlocked (no pawl) or partial · 🔴 red · �
 |---|---|---|---|---|
 | R1 | `cargo test --test sync_libp2p_convergence`, `--test household_resilience` (elohim-storage) | T1 `just gate` | 🟢 storage gate green (08-28, lib 3,009/3,009) | hold |
 | R2 | saga 11/11 — `just test mesh` `--profile saga` → `just status saga` | T2 | 🟢 11/11, run `20260828T044708Z-6e4fa438` | hold; re-prove per transport pair (P2) |
-| R3 | warm/cold recovery `time_to_recover` durable — `just mesh recovery <shape> <peer>` → `recovery-timeline.jsonl` | T2 (needs durable path) | 🟡 dual/dual warm 58 s (08-25 journal); series lost to `/tmp` wipe | timeline under `genesis/a2o/reports/`, N=3 per shape |
+| R3 | warm/cold recovery `time_to_recover` durable — `just mesh recovery <shape> <peer>` → `genesis/a2o/reports/recovery/recovery-timeline.jsonl` (`/tmp` path is a symlink) | T2 | 🟡 DURABLE since M0 (2026-08-28): warm jessica←matthew 62 s on libp2p, 1 record; dual rows need a storage binary built with `p2p-iroh` | N=3 per shape × transport |
 | R4 | local quiesce sustained on the seeded corpus — `just mesh quiesce` (io_baseline within 2×) | T2 | 🔴 FAIL(deadline) sweep 21 actionable 65 (W4, 08-28) | PASS N=3 |
 | R5 | plateau rows have names — `/p2p/status.syncVerdicts`, `elohim_sync_verdict_total{reason}` | T1 test + T2 read | ⚪ does not exist (`sync_gate.verdict()` is the pause verdict) | reason counts recorded at the plateau |
 | R6 | heal under injected admission pressure — `healed`/sweep > 0 every sweep | T2 (pressure profile) | ⚪ never exercised locally | > 0 N=3 |
@@ -63,7 +63,7 @@ Legend: 🟢 locked · 🟡 green-unlocked (no pawl) or partial · 🔴 red · �
 | R10 | shem exit-139 legible — faulting thread in Loki | T1 (`kill -SEGV` test) → operator | 🔴 no signal captured | handler proven locally; first fleet capture |
 | R11 | **delivery**: `relay-capacity` + reconnect-storm on an operator-attached fleet roll | T4 (operator) | ⚪ `@wip` / needs process control | one attached run |
 
-Open: 9 of 11 (R1, R2 locked).
+Open: 8 of 11 (R1, R2 locked; R3 durable since M0, 1 of N=3).
 
 ## Lane P — Peer diversity (habits: `dataplane-convergence` transport-parity, `identity-cross-signed`)
 
@@ -73,7 +73,7 @@ Open: 9 of 11 (R1, R2 locked).
 | P2 | all 8 recovery scenarios present and truthful — `transport-recovery-measurements.feature` | T2 (after R3) | 🔴 feature `@wip`; series lost | un-`@wip`, N=3 |
 | P3 | `homo-iroh` warm/cold P0–P4 green | T2 matrix | 🔴 P3/P4 fail (pull queue libp2p-only) | green |
 | P4 | `PathObservation`/`select_path` live — `elohim_transport_route_total{reason}` on both planes | T1 contract tests + T2 | ⚪ spec-only (rows 1–4) | non-zero both planes; C4 honest-absence test green |
-| P5 | sovereign peer joins alpha and is visible — `@concern:sovereign-peer-join` sc1+5 | T3 | 🟡 proven by hand 08-28; scenarios `@wip` | scenarios pass |
+| P5 | sovereign peer joins alpha and is visible — `@concern:sovereign-peer-join` sc1 (join) · sc5 (hosted read == peer read) | T3 (`just dev conductor alpha`, fork iroh pair, `ELOHIM_CAP_LOCAL_CONDUCTOR_STATUS=available`) | 🟡 sc1 GREEN ×4 (M0, fork pair; a stock tx5 join is listed-but-unconnected and now refused) · sc5 RED in both arc modes — every live alpha agent-info advertises `storageArc: null`, so a remote read has no authority (backlog `sovereign-peer-network-read-no-authorities`) | sc5 green once the fleet advertises arcs |
 | P6 | sovereign peer's authored node served by the fleet — sc3 | T3 | 🔴 404 for 4 min (P1 gap) | 200 through doorway-alpha |
 | P7 | `peer_class` ≥ 2 classes on the mesh — `elohim_sync_request_outcomes_total{peer_class}` | T2 | 🔴 all `public` (handshake stub) | household `trusted+`, stranger `public`, unbound `unverified` |
 | P8 | cross-signed bindings examined on the fleet — `bindings_examined{enforce} > 0 ∧ unverified{enforce} == 0` | T4 | 🔴 reads zero (joins absent vs bindings absent — undecided) | conjunction true |
@@ -104,14 +104,14 @@ Open: 7 of 10.
 | # | Rung — check | Pawl | Reading | Target |
 |---|---|---|---|---|
 | D1 | genesis E2E failures ≤ 3, both owned | T4 | 🟢 2 (#1515, #1516) | hold |
-| D2 | every push touching `src/{p2p,sync,reconcile}` carries a fresh household report — T2 receipt banner | pre-push | ⚪ no such leg | banner live (warn → strict) |
+| D2 | every push touching `src/{p2p,sync,reconcile,p2p_iroh}` or `doorway-service/src` carries a fresh household report — `genesis/orchestrator/scripts/t2-receipt.sh` (pre-push, warn-only; `T2_RECEIPT=strict` refuses) | pre-push | 🟢 banner fires (M0, 2026-08-28) | strict once the mesh lane is routine |
 | D3 | a browser regression on elohim.host is seen by SOME lane — replace the Cypress ghost | App Jenkinsfile | 🔴 ghost prints ✅, never ran a2o | stage runs `@act:ii @browser`-safe a2o or is deleted and routed to genesis |
 | D4 | apex seed accepted by doorway-B — `PUT /admin/seed/blob` 200 | T4 (operator credential) | 🔴 403 since 08-25 | 200; App build stops going UNSTABLE |
 | D5 | `/deliver` verdict `delivered` ×2 (one fresh trigger) for "landing + one lesson through both doorways" | `/deliver` | ⚪ no recent verdict | 2 consecutive |
 | D6 | `just status habits` shows 0 `not-measured` for green habits | `habits-status.py` | 🔴 8 habits not measured | 0 |
 | D7 | **delivery**: a person opens elohim.host and alpha.elohim.host, sees the same landing and completes one lesson; the resilience card tells the same truth on both | `/deliver` + saga ch.10 | 🟡 saga 10 green household; fleet skipped | delivered ×2 |
 
-Open: 6 of 7.
+Open: 5 of 7 (D2 locked since M0).
 
 ## Lane S — SDK surface (persistence · sync · REA · projection; the ambient promise)
 
@@ -141,7 +141,7 @@ The SDK's promise decomposes into four planes; a developer can stop thinking abo
 | **REA** (every value-touching act is a bounded, witnessed event) | declare a coupling, the event appears | S5 partial (app-side harness); `bounded_by` commitments live; `bridges/valueflows` live | S5 substrate-side conformance, S6 (CLAIM/BECOME/RENEW), P7/P8 (attribution rides a cross-signed binding), F6 (adopt-before-author fed) |
 | **Projection** (doorways make truth legible; never own it) | serve through any doorway, identical answer | F2/F3 locked; SSR trust-scoped cache | F4/F5 (uniform deploy without the per-host crutch; seed ≠ admin), F8–F10 (reach on every egress; fleet measures it), S7 (app-declared views), D3–D5 (a lane that sees a browser) |
 
-**Counts (open rungs):** R 9/11 · P 9/10 · F 7/10 · D 6/7 · S 8/10 → **39 open of 48**, 9 locked. The three rungs that unlock the most downstream: **R5** (names the plateau — gates R4, R6, R7, F6), **S3** (first honest developer round-trip — gates S9, S10), **F9/D3** (a fleet lane that measures anything — gates F10, D5, D7).
+**Counts (open rungs):** R 8/11 · P 9/10 · F 7/10 · D 5/7 · S 8/10 → **37 open of 48**, 11 locked (M0 2026-08-28: R3 durable, D2 locked; P5 half — sc1 green, sc5 at the no-authorities ceiling). The three rungs that unlock the most downstream: **R5** (names the plateau — gates R4, R6, R7, F6), **S3** (first honest developer round-trip — gates S9, S10), **F9/D3** (a fleet lane that measures anything — gates F10, D5, D7).
 
 ## The moves (what advances which rungs)
 
@@ -173,7 +173,7 @@ M0 → M1 → M2 → {M3 ∥ M4} → M5 → M6 → M7. Lanes advance concurrentl
 
 - T0/T1: `just gate elohim-storage` / `just gate doorway`; new tests red-on-old-code via `cargo test` (`EXIT=$?` on its own line).
 - T2: `just mesh start` (dual) → `just seed apply mesh content` → `just test mesh '<scope>'` → `just mesh quiesce` → `just mesh recovery-matrix` → `just status saga` / `just status habits`.
-- T3: `just dev conductor profile=alpha` → `just test mesh '@concern:sovereign-peer-join'`; `just test sdk --target alpha`.
+- T3: `just dev conductor alpha` → `just test mesh '@concern:sovereign-peer-join'`; `just test sdk --target alpha`.
 - T4: one `[build:edge] [edge:validate-only]` per move after the quiesce preflight; read via Jenkins MCP, never trigger via MCP.
 - Lane close: `/deliver` for D7 and S10.
 

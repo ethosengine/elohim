@@ -26,10 +26,19 @@ from pathlib import Path
 from typing import Any
 
 
-DEFAULT_SERIES = (
-    Path(os.environ.get("MESH_DIR", "/tmp/elohim-local-mesh"))
-    / "recovery-timeline.jsonl"
-)
+def _default_series() -> Path:
+    """The durable home first (genesis/a2o/reports/recovery — survives a container restart, see
+    backlog mesh-recovery-timeline-not-durable); RECOVERY_TIMELINE overrides; the legacy $MESH_DIR
+    path is honoured only when the durable file does not exist yet (it is normally a symlink to it)."""
+    env = os.environ.get("RECOVERY_TIMELINE")
+    if env:
+        return Path(env)
+    durable = Path(__file__).resolve().parent.parent / "a2o" / "reports" / "recovery" / "recovery-timeline.jsonl"
+    legacy = Path(os.environ.get("MESH_DIR", "/tmp/elohim-local-mesh")) / "recovery-timeline.jsonl"
+    return durable if durable.exists() or not legacy.exists() else legacy
+
+
+DEFAULT_SERIES = _default_series()
 UNLABELED = "<unlabeled>"
 UNKNOWN = "<unknown>"
 

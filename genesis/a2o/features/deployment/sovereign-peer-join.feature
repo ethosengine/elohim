@@ -1,4 +1,4 @@
-@e2e @deployment @sovereign-peer @requires:doorway @requires:local-conductor @act:ii @wip
+@e2e @deployment @sovereign-peer @concern:sovereign-peer-join @requires:doorway @requires:local-conductor @act:ii
 Feature: A developer's own conductor joins the alpha network as a real peer
   As a developer working in a workspace that runs my own conductor
   I want that conductor to join the same network the alpha fleet runs
@@ -52,8 +52,11 @@ Feature: A developer's own conductor joins the alpha network as a real peer
     measured time for a peer to refill from the network. The one longer bound
     ("within 10 minutes") is the fleet's own agent-announcement interval, which
     is slower than propagation and outside the workspace's control.
-  - Status vocabulary: the feature is tagged @wip because its steps are not yet
-    wired to the test harness. Independently of that, a scenario title ending
+  - Status vocabulary: a scenario tagged @wip has steps not yet wired to the
+    test harness (the join and same-read scenarios were wired 2026-08-28 and
+    run on the T3 hybrid rung: `just dev conductor alpha`, then the
+    a2o run with ELOHIM_CAP_LOCAL_CONDUCTOR_STATUS=available). Independently
+    of that, a scenario title ending
     "(RED — the gap)" is one whose behaviour is KNOWN not to hold today — it is
     written to fail until a named capability lands. Scenarios without that
     marker describe behaviour that has been observed to hold (the join scenario
@@ -73,6 +76,7 @@ Feature: A developer's own conductor joins the alpha network as a real peer
     And within 3 minutes the workspace conductor's peer store holds at least one fleet agent — proof it discovered a peer, not merely the bootstrap address it was given
     And within 10 minutes doorway "alpha"'s conductor diagnostics list the workspace agent's key as a live agent
 
+  @wip
   Scenario: A locally built bundle with a different fingerprint is refused before it can join
     Given a workspace conductor that has NOT installed any bundle yet
     And a locally built application bundle whose fingerprint differs from the one doorway "alpha" runs
@@ -80,12 +84,14 @@ Feature: A developer's own conductor joins the alpha network as a real peer
     Then the start-up stops before installing the local bundle
     And the developer sees a message naming the deployed bundle as the one to install and the two fingerprints that differ
 
+  @wip
   Scenario: The workspace agent authors a content node that the fleet serves (RED — the gap)
     Given the workspace conductor has joined the alpha network
     When the workspace agent authors a content node under its own key
     Then within 3 minutes the node resolves by its id through doorway "alpha"
     And doorway "alpha" reports the node's author as the workspace agent's key, not any fixture human's
 
+  @wip
   Scenario: A workspace doorway session cannot be provisioned on the fleet
     Given the workspace conductor has joined the alpha network
     And the workspace doorway runs beside it in its secure posture, the only posture this story concerns itself with
@@ -96,8 +102,8 @@ Feature: A developer's own conductor joins the alpha network as a real peer
 
   Scenario: A hosted login on alpha and the workspace peer read the same node the same way
     Given the workspace conductor has joined the alpha network
-    And the developer is logged in on doorway "alpha" as fixture human "Terrance" through the normal hosted login
-    When the developer reads "elohim-host-landing" through doorway "alpha" as Terrance
+    And the developer is logged in on doorway "alpha" as fixture human "Jessica" through the normal hosted login
+    When the developer reads "elohim-host-landing" through doorway "alpha" as Jessica
     And the workspace agent reads "elohim-host-landing" through the workspace conductor
     Then both reads return the same content hash for the node
     And the workspace agent's read carried no hosted-session token
