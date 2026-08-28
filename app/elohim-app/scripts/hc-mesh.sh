@@ -190,7 +190,16 @@ HAPP_WORKDIR="$REPO_ROOT/elohim/holochain/dna/elohim/workdir"
 # as a stale token.
 HAPP_PATH="${MESH_HAPP_PATH:-$HAPP_WORKDIR/elohim.happ}"
 POOL="/projects/.cargo-target-pool/family/dev"
-STORAGE_BIN="${STORAGE_BIN:-$POOL/elohim__elohim-storage/release/release/elohim-storage}"
+# Storage binary: the release pool slot when it exists, else the dev (debug) slot — the one
+# `just gate elohim-storage` and the iroh build command below actually fill. Before 2026-08-28
+# the default named only the release slot, which is usually absent, so every `just mesh start`
+# needed STORAGE_BIN by hand and a dual run silently fell to whatever was passed.
+_storage_release="$POOL/elohim__elohim-storage/release/release/elohim-storage"
+_storage_debug="$POOL/elohim__elohim-storage/dev/debug/elohim-storage"
+if [ -z "${STORAGE_BIN:-}" ] && [ ! -x "$_storage_release" ] && [ -x "$_storage_debug" ]; then
+  STORAGE_BIN="$_storage_debug"
+fi
+STORAGE_BIN="${STORAGE_BIN:-$_storage_release}"
 DOORWAY_BIN="${DOORWAY_BIN:-$POOL/doorway__doorway-service/dev/debug/doorway}"
 # mongod backs the doorways' Mongo-side projection archive (app_file_cache /
 # warm-shell ShellArchive / DoorwayResolver store). Without it every doorway
