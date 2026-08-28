@@ -170,6 +170,89 @@ pub fn validate_redirect_uri(client: &OAuthClient, redirect_uri: &str) -> bool {
 }
 
 /// Simple wildcard pattern matching for URIs.
+/// Scheme / authority / path split of an absolute URI or URI pattern.
+struct UriParts<'a> {
+    scheme: &'a str,
+    host: &'a str,
+    port: Option<&'a str>,
+    path: &'a str,
+}
+
+/// Split `scheme://host[:port][/path...]`. Returns `None` for anything that is
+/// not an absolute URI, which the caller treats as "no match" rather than
+/// falling back to substring comparison.
+fn split_uri(raw: &str) -> Option<UriParts<'_>> {
+    let (scheme, rest) = raw.split_once("://")?;
+    if scheme.is_empty() || rest.is_empty() {
+        return None;
+    }
+    // The authority ends at the first '/', '?' or '#'. Anything after is path.
+    let auth_end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let (authority, path) = rest.split_at(auth_end);
+    if authority.is_empty() {
+        return None;
+    }
+    // Reject userinfo: `https://elohim.host@evil.tld/` must never read as the
+    // elohim.host authority.
+    if authority.contains('@') {
+        return None;
+    }
+    let (host, port) = match authority.rsplit_once(':') {
+        Some((h, p)) => (h, Some(p)),
+        None => (authority, None),
+    };
+    if host.is_empty() {
+        return None;
+    }
+    Some(UriParts {
+        scheme,
+        host,
+        port,
+        path,
+    })
+}
+
+/// Glob match where `*` may span any character, anchored at both ends.
+///
+/// Used for the PATH component only. Every literal between wildcards must be
+/// present, in order — the defect this replaces compared only the text before
+/// the first `*` and after the last one.
+fn glob_match(pattern: &str, value: &str) -> bool {
+    let parts: Vec<&str> = pattern.split('*').collect();
+    if parts.len() == 1 {
+        return pattern == value;
+    }
+    let mut rest = value;
+    // First literal is anchored at the start.
+    match rest.strip_prefix(parts[0]) {
+        Some(r) => rest = r,
+        None => return false,
+    }
+    // Last literal is anchored at the end (empty when the pattern ends in `*`).
+    let last = parts[parts.len() - 1];
+    if !last.is_empty() {
+        if rest.len() < last.len() || !rest.ends_with(last) {
+            return false;
+        }
+        rest = &rest[..rest.len() - last.len()];
+    }
+    // Interior literals must appear in order, consuming left to right.
+    for lit in &parts[1..parts.len() - 1] {
+        match rest.find(lit) {
+            Some(i) => rest = &rest[i + lit.len()..],
+            None => return false,
+        }
+    }
+    true
+}
+
+/// Match a registered `redirect_uri` pattern against a requested `redirect_uri`.
+///
+/// Redirect-URI safety is a property of scheme + host + port, not of string
+/// shape, so the authority is compared structurally and only the path is
+/// glob-matched. A host wildcard is a single leading `*.` label wildcard and can
+/// never span a `/` — an attacker cannot park the expected authority in their
+/// own path (`https://evil.tld/.elohim.host/cb`).
 fn matches_uri_pattern(pattern: &str, uri: &str) -> bool {
     // Handle exact match
     if pattern == uri {
@@ -192,29 +275,47 @@ fn matches_uri_pattern(pattern: &str, uri: &str) -> bool {
         return pattern_parts.len() == uri_parts.len();
     }
 
-    // Handle URL patterns with wildcards
-    // Convert pattern to regex-like matching
-    let pattern_parts: Vec<&str> = pattern.split('*').collect();
+    // A relative pattern never admits an absolute URI, and vice versa.
+    let (pat, req) = match (split_uri(pattern), split_uri(uri)) {
+        (Some(p), Some(u)) => (p, u),
+        _ => return false,
+    };
 
-    if pattern_parts.len() == 1 {
-        // No wildcard, exact match only
-        return pattern == uri;
-    }
-
-    // Check prefix
-    if !uri.starts_with(pattern_parts[0]) {
+    // Scheme: exact, case-insensitive. No wildcards — an attacker must not be
+    // able to downgrade https to http.
+    if !pat.scheme.eq_ignore_ascii_case(req.scheme) {
         return false;
     }
 
-    // Check suffix if present
-    if pattern_parts.len() > 1 {
-        let suffix = pattern_parts.last().unwrap();
-        if !suffix.is_empty() && !uri.ends_with(suffix) {
-            return false;
-        }
+    // Host: either a literal (exact, case-insensitive) or a single leading
+    // `*.` label wildcard. The wildcard part is taken from the parsed host, so
+    // it cannot contain `/`, `:`, `@` or a path.
+    let host_ok = if let Some(suffix) = pat.host.strip_prefix('*') {
+        // `*.elohim.host` -> the request host must END WITH `.elohim.host` and
+        // carry at least one label in front of it.
+        !suffix.is_empty()
+            && req.host.len() > suffix.len()
+            && req.host[req.host.len() - suffix.len()..].eq_ignore_ascii_case(suffix)
+    } else {
+        pat.host.eq_ignore_ascii_case(req.host)
+    };
+    if !host_ok {
+        return false;
     }
 
-    true
+    // Port: `*` admits any port; otherwise it must match exactly, and an absent
+    // pattern port requires an absent request port.
+    let port_ok = match (pat.port, req.port) {
+        (Some("*"), _) => true,
+        (a, b) => a == b,
+    };
+    if !port_ok {
+        return false;
+    }
+
+    // Path: an empty pattern path admits any path (the registered
+    // `http://localhost:*` shape); otherwise glob-match it.
+    pat.path.is_empty() || glob_match(pat.path, req.path)
 }
 
 impl IntoIndexes for OAuthSessionDoc {
@@ -281,6 +382,69 @@ mod tests {
         assert!(!matches_uri_pattern(
             "http://localhost:*",
             "http://example.com:4200"
+        ));
+    }
+
+    /// A wildcard-suffixed pattern must not degenerate into "any URI sharing the
+    /// scheme".
+    ///
+    /// Regression for the authorization-code interception proved on the local mesh
+    /// 2026-08-28: `matches_uri_pattern` compared only `pattern_parts[0]` (the text
+    /// before the FIRST `*`) as a prefix and `pattern_parts.last()` as a suffix. For
+    /// `https://*.elohim.host/*` the last part is empty, so the suffix check was
+    /// skipped and the literal `.elohim.host/` in the middle was never compared at
+    /// all — the pattern accepted every `https://` URI. `GET /auth/authorize` then
+    /// issued a real authorization code to an attacker-controlled `redirect_uri`,
+    /// which exchanges at `POST /auth/token` for a full access token.
+    #[test]
+    fn wildcard_pattern_does_not_accept_a_foreign_host() {
+        for hostile in [
+            "https://attacker.tld/steal",
+            "https://a.b.c.evil.co.uk/x?q=1",
+            "https://elohim.host.evil.tld/cb",
+            "https://evil.tld/?next=.elohim.host/",
+        ] {
+            assert!(
+                !matches_uri_pattern("https://*.elohim.host/*", hostile),
+                "hostile redirect_uri accepted by wildcard pattern: {hostile}"
+            );
+        }
+    }
+
+    /// The middle literal of a multi-wildcard pattern is load-bearing: a `*` in the
+    /// ORIGIN must never match across a `/`, or an attacker parks the expected
+    /// authority in their own path.
+    #[test]
+    fn origin_wildcard_does_not_span_a_path_separator() {
+        assert!(!matches_uri_pattern(
+            "https://*.elohim.host/*",
+            "https://evil.tld/.elohim.host/cb"
+        ));
+    }
+
+    /// The legitimate shapes these patterns exist to admit must keep matching.
+    #[test]
+    fn legitimate_redirect_uris_still_match() {
+        assert!(matches_uri_pattern(
+            "https://*.elohim.host/*",
+            "https://app.elohim.host/callback"
+        ));
+        // a wildcard in the PATH may span separators
+        assert!(matches_uri_pattern(
+            "https://*.elohim.host/*",
+            "https://doorway-alpha.elohim.host/auth/cb?state=x"
+        ));
+        assert!(matches_uri_pattern(
+            "https://elohim.host/*",
+            "https://elohim.host/cb"
+        ));
+        assert!(matches_uri_pattern(
+            "http://localhost:*",
+            "http://localhost:4200/callback"
+        ));
+        assert!(matches_uri_pattern(
+            "https://*.ethosengine.com/*",
+            "https://ws-7f2.ethosengine.com/oauth/cb"
         ));
     }
 
