@@ -192,22 +192,36 @@ Then(
   }
 );
 
-Then('the advertised portal answers as a page', async function (this: E2EWorld) {
-  const s = state(this);
-  const portal = s.doc?.['portal'];
-  assert.equal(typeof portal, 'string', 'the document advertised no portal');
+Then(
+  'the advertised portal is the page built for that path, not the app shell',
+  async function (this: E2EWorld) {
+    const s = state(this);
+    const portal = s.doc?.['portal'];
+    assert.equal(typeof portal, 'string', 'the document advertised no portal');
+    const portalPath = String(portal);
 
-  const res = await request(`${doorwayBase(this, 'alpha')}${String(portal)}`, { method: 'GET' });
-  const contentType = String(res.headers['content-type'] ?? '');
-  await res.body.text();
-  assert.equal(
-    res.statusCode,
-    200,
-    `the advertised portal did not serve: ${res.statusCode} — a human sent there sees nothing`
-  );
-  assert.ok(
-    contentType.includes('text/html'),
-    `the portal answered ${contentType}, not a page — it is where a human is SENT, so unlike ` +
-      'the endpoints it is supposed to be HTML'
-  );
-});
+    const res = await request(`${doorwayBase(this, 'alpha')}${portalPath}`, { method: 'GET' });
+    const html = await res.body.text();
+    assert.equal(
+      res.statusCode,
+      200,
+      `the advertised portal did not serve: ${res.statusCode} — a human sent there sees nothing`
+    );
+
+    // "It answered with HTML" proves nothing here: the app-shell catch-all also
+    // answers 200 HTML, and unlike the JSON endpoints the portal is SUPPOSED to
+    // be a page — so content type cannot separate the real portal from the
+    // fallback. What can: a bundle built to be served under a path declares that
+    // path as its <base href>. The app shell's is "/". Deriving the expected
+    // value from the ADVERTISED path also means this cannot drift apart from the
+    // document it is checking.
+    const baseHref = `${portalPath.replace(/[^/]*$/, '')}`;
+    const declared = /<base\s+href="([^"]*)"/i.exec(html)?.[1];
+    assert.equal(
+      declared,
+      baseHref,
+      `the portal path served a bundle whose <base href> is ${declared ?? '(absent)'}, not ` +
+        `"${baseHref}" — that is the app shell answering for an unclaimed path, not the portal`
+    );
+  }
+);

@@ -9,7 +9,8 @@ Feature: A doorway tells an app how to sign a human in
   app carries no login path, no endpoint list, and no doorway address of its own. It names two
   things: the SIGN-IN PORTAL — the page a human is sent to in order to authenticate — and the
   endpoints an app talks to afterwards, including the pair that hands an existing session to a
-  sibling app, which is the part no client could invent for itself.
+  sibling app — another application served from the same doorway — which is the part no client
+  could invent for itself.
 
   Three properties make this safe to trust, and all three are asserted here rather than assumed.
 
@@ -29,6 +30,10 @@ Feature: A doorway tells an app how to sign a human in
   200 with HTML, so a client following the document would be handed a web page where it expected
   an endpoint. That is the same misdiagnosis as the second property, arriving through the front
   door instead of the back, and the two lists that have to agree are maintained by hand.
+
+  ("The app shell" is the single-page application's catch-all: it answers 200 with HTML for any
+  path nothing else claimed. That catch-all is the adversary throughout — the danger is never a
+  crash or a 404, it is a 200 that looks like success while being the wrong thing.)
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
@@ -53,4 +58,4 @@ Feature: A doorway tells an app how to sign a human in
   Scenario: Everything the document advertises is really served by the doorway
     When the auth discovery document is fetched from doorway "alpha"
     Then every advertised endpoint answers as an auth route, not the app shell
-    And the advertised portal answers as a page
+    And the advertised portal is the page built for that path, not the app shell
