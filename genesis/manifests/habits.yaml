@@ -105,6 +105,9 @@ habits:
       - "a2o @concern:transport-parity (genesis/a2o/features/dataplane/transport-comparison-matrix.feature; just mesh matrix) — identical fresh-document contract under libp2p, iroh, and dual; successful samples alone contribute timing percentiles"
       - ".claude/scripts/latency-scoreboard.py --local (and --deployed) — bounded convergence, not merely eventual: a CONJUNCTION of speed AND this habit's trust invariant, never speed alone. A fast stale head is worse than a slow correct one, so this check can only ever narrow the habit, never carry it."
     evidence: >
+      DELTA 2026-08-28c (measurement hygiene cure fleet-PROVEN; NO status flip): genesis #1515 and #1516 both measured 2 failed / 274 (from 6) once the pipeline stopped bouncing doorway-alpha before its own E2E — ad90163c7 replaced the pod-delete with a two-tick wait + `x-epr-router: dispatched` proof (the router has self-healed every 30 s since 379668123); #1516's log: "EprRouter populated without a restart … zero pod churn". The 6-vs-2 swing on identical code (#1514 vs #1513/#1515) was fleet churn: the shem edgenode containers exit 139 several times an hour (backlog runtime-shem-edgenode-container-exit-139-chronic) and docs-only pushes had been dispatching seed storms (genesis manifest `genesis/data/**` narrowed, 4f4785e03). The habit's own fleet red is unchanged and honest: inventory-convergence `alpha-A p2p.caughtUp` false on every run. Stays red.
+
+      ---
       DELTA 2026-08-28b (FLEET CONFIRM of the overnight batch; NO status flip): edge #1388 (orchestrator #1736, from the 10:53Z push of 6e4fa4389) deployed `elohim-storage-iroh:1.0.0-dev-6e4fa438` to all 7 pods and doorway 6e4fa438 to both doorways — the `peer_class` label, the relationship-vocabulary fix and the admin-socket closure are all live. First fleet read of the sync edge by trust class: `elohim_sync_request_outcomes_total` {public,ok} 1,959 · {public,timeout} 38 (1.9 %) · {unverified,ok} 558 · {unverified,timeout} 13 (2.3 %) — no edge above `public`, exactly as the handshake-stub finding predicts; the trust-gradient question is now askable on the fleet and today answers "no trusted edges exist". Quiesce gate on #1388: no_measure — 45 polls / 44.6 min A-not-quiesced (actionable 1, count 14) after the rolling restart, so no Dataplane report; seam-smoke all OK. genesis #1512 (the shift's measure) UNSTABLE at 6 failed: the #1511 ECONNREFUSED / catching-up set cleared and what remains is three doorway-alpha-unavailability fingerprints (/health 503 <html>, DoorwaySessionError, shem-by-design) — genesis restarts doorway-alpha itself (`seedProjectionsStage`, 13:12Z) about two minutes before its E2E stage, so the pipeline measures the doorway it just bounced. Stays red.
 
       ---
@@ -2243,3 +2246,36 @@ habits:
       - "genesis/a2o/features/stewardship/.epr-meta (the authoring rule: a grant scenario must exercise the appeal)"
       - "genesis/data/timeline/backlog/commons-holonic-stewardship-backlog.md row 26"
       - "elohim/holochain/dna/imagodei/STEWARDSHIP_PHILOSOPHY.md"
+
+  - id: antigravity-skill-projection
+    invariant: >
+      Every Elohim SkillPackage materializes as a discoverable Antigravity workspace skill from the
+      same package-authoritative body used by Claude and Codex; every relative asset follows it
+      byte-identically and receives provenance; unsupported Antigravity surfaces are never claimed.
+    status: green
+    active: false
+    checks:
+      - "node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs selftest — synthetic package-master proof for Antigravity frontmatter, .agents pathing, and relative asset placement"
+      - "node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs verify — schema + package + fixture + live-runtime freshness for all 41 SkillPackages and their assets"
+      - "RUSTFLAGS='' CARGO_TARGET_DIR=/tmp/elohim-agent-antigravity-target cargo test --manifest-path elohim/sdk/domains/elohim-agent/adapter/Cargo.toml -p elohim-agent-adapter — one package produces three skill entrypoint edges plus one edge per runtime asset"
+      - "a2o @concern:agent-runtime-projection (genesis/a2o/features/devflow/antigravity-skill-projection.feature — story is @wip until devflow step definitions execute the local projector)"
+    evidence: >
+      RED WRITTEN 2026-08-28: Antigravity discovers .agents/skills, but only three skills were present,
+      their provenance called the target codexProject, and packaged assets were not projected or
+      addressed. The projector's green therefore described entrypoints, not usable capabilities.
+
+      GREEN 2026-08-28: projector selftest 43/43, package verify 1697/1697, adapter tests 6/6,
+      and the live compose graph records 123 skill entrypoints plus 9 asset edges across Claude,
+      Codex, and Antigravity; 41 Antigravity skills and all 3 packaged assets are present, and the
+      context-blind a2o review returned READY.
+    guard: >
+      A SKILL.md-only green is false when its relative references or scripts are absent. A shared
+      .agents path is also not evidence that Antigravity supports Codex agent, command, hook, or MCP
+      dialects. Add a runtime target only after its documented ABI and adapter both exist.
+    refs:
+      - "elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs"
+      - "elohim/sdk/domains/elohim-agent/adapter/src/lib.rs"
+      - "/home/user/.gemini/antigravity-cli/builtin/skills/agy-customizations/docs/skills.md (local installed Antigravity 1.1.x contract used during implementation)"
+    retire-when: >
+      when Antigravity resolves Elohim capability packages and their eprfs derivation graph natively,
+      making the checked-in .agents materialization an unnecessary compatibility projection.
