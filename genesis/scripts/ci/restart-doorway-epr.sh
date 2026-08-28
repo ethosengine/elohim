@@ -1,10 +1,42 @@
 #!/usr/bin/env bash
 # restart-doorway-epr.sh <namespace> <deployment> <doorwayHost>
 #
-# Force a doorway pod restart so the EprRouter's boot-time fetch picks up
-# freshly seeded project-epr commitments, then wait at the PUBLIC boundary
-# until the doorway serves stable 200s with the conductor connected.
-# Extracted verbatim from genesis/Jenkinsfile seedProjectionsStage()
+# Make the doorway's EprRouter pick up freshly seeded project-epr commitments,
+# then wait at the PUBLIC boundary until the doorway serves stable 200s with
+# the conductor connected.
+#
+# TWO PATHS, cheapest first:
+#
+#   1. REFRESH-WAIT (default) — no pod churn. The doorway already re-fetches
+#      the whole projection set every DOORWAY_EPR_REFRESH_SECS (default 30) and
+#      atomically replaces the routing table: `main.rs` "Periodic EPR-router
+#      self-heal refresh (operator-free recovery)" runs
+#      `resolve_epr_storage_pool` → `fetch_projections_with_fallback` →
+#      `apply_epr_fallback_outcome` → `prewarm_projected_shells`, i.e. the
+#      byte-for-byte SAME sequence the boot fetch runs, on a 30s cadence, with
+#      last-good preservation on failure. Its own comment says it: "the router
+#      self-populates once storage recovers — no kubectl restart needed."
+#      So all this stage has to do is wait out two refresh ticks and VERIFY.
+#
+#   2. POD-DELETE (fallback only) — the original 2026-06 behaviour, kept
+#      verbatim below and taken only when path 1 does not converge (or when
+#      EPR_FORCE_POD_RESTART=1). It is preserved because it is the stronger
+#      hammer, not because it is free: deleting the pod resets the doorway's
+#      p2p snapshot cache and its upstream breakers, and genesis then measures
+#      that recovering pod minutes later in the E2E stage. That is a
+#      self-inflicted measurement-by-restart floor of ~2 fingerprints per run
+#      (`p2p.caughtUp is undefined/false`, `status=degraded`) — the same
+#      anti-pattern the root CLAUDE.md documents for a bare `[build:edge]`
+#      fired "just to measure".
+#
+# Why the change is safe: the pod-delete's stated premise — "the router only
+# refreshes at boot OR via SSE projection.registered events" (genesis/Jenkinsfile
+# seedProjectionsStage) — was already stale when it was written. The periodic
+# refresh landed in 379668123 (2026-05-30); this script was extracted from the
+# Jenkinsfile on 2026-06-10, eleven days later, carrying the pre-refresh
+# rationale forward unexamined.
+#
+# Extracted from genesis/Jenkinsfile seedProjectionsStage()
 # (2026-06-10: CPS method-size hard limit) — full rationale lives at the
 # call site. ee-jenkins can delete pods but not `get deployments` (RBAC),
 # hence the pods API + label/grep hedge.
@@ -14,6 +46,72 @@ NAMESPACE="$1"
 DEPLOYMENT="$2"
 DOORWAY_HOST="$3"
 
+# Two refresh ticks + slack. Must exceed 2 * DOORWAY_EPR_REFRESH_SECS so the
+# wait cannot straddle a single tick that started before seeding finished.
+EPR_REFRESH_WAIT_SECS="${EPR_REFRESH_WAIT_SECS:-70}"
+# Post-wait verification budget (5s cadence).
+EPR_VERIFY_POLLS="${EPR_VERIFY_POLLS:-12}"
+# Operator escape hatch: skip path 1 entirely.
+EPR_FORCE_POD_RESTART="${EPR_FORCE_POD_RESTART:-0}"
+
+# ── Path 1: refresh-wait ───────────────────────────────────────
+# Ready ⟺ /health is 200 with the conductor connected AND a projected route
+# answers 200 carrying `x-epr-router: dispatched` (server/http.rs — the header
+# is set only on an EPR-dispatched response, so its presence IS proof the
+# routing table is populated). Two consecutive OK polls, same as path 2.
+epr_route_dispatched() {
+    local path="$1" hdrs
+    hdrs=$(curl -s -o /dev/null -D - --max-time 5 "${DOORWAY_HOST}${path}" 2>/dev/null) || return 1
+    printf '%s' "$hdrs" | head -n1 | grep -q ' 200' || return 1
+    printf '%s' "$hdrs" | grep -qi '^x-epr-router:[[:space:]]*dispatched' || return 1
+    return 0
+}
+
+if [ "$EPR_FORCE_POD_RESTART" != "1" ]; then
+    echo "═══════════════════════════════════════════════════════════"
+    echo "REFRESH EprRouter post-seed — NO pod churn (path 1)"
+    echo "═══════════════════════════════════════════════════════════"
+    echo "Target:  ${DOORWAY_HOST}"
+    echo "Waiting ${EPR_REFRESH_WAIT_SECS}s for >=2 periodic EPR refresh ticks"
+    echo "  (doorway main.rs: DOORWAY_EPR_REFRESH_SECS, default 30)"
+    # Chunked with a line per chunk: the Jenkins call site bounds this step on
+    # ACTIVITY (timeout activity: true), so a silent sleep would make a real
+    # controller stall indistinguishable from a healthy wait.
+    WAITED=0
+    while [ "$WAITED" -lt "$EPR_REFRESH_WAIT_SECS" ]; do
+        sleep 10
+        WAITED=$((WAITED + 10))
+        echo "  … ${WAITED}s / ${EPR_REFRESH_WAIT_SECS}s"
+    done
+
+    OK_COUNT=0
+    for i in $(seq 1 "$EPR_VERIFY_POLLS"); do
+        BODY=$(curl -s --max-time 5 -w '\n%{http_code}' "${DOORWAY_HOST}/health" || printf '\n000')
+        CODE=$(printf '%s' "$BODY" | tail -n1)
+        if [ "$CODE" = "200" ] && printf '%s' "$BODY" | grep -q '"connected":true' \
+            && { epr_route_dispatched "/" || epr_route_dispatched "/lamad"; }; then
+            OK_COUNT=$((OK_COUNT + 1))
+        else
+            OK_COUNT=0
+        fi
+        if [ "$OK_COUNT" -ge 2 ]; then
+            echo "✅ EprRouter populated without a restart — /health 200 + conductor-connected"
+            echo "   and a projected route answered with x-epr-router: dispatched"
+            echo "   (stable ×2 after ~$((EPR_REFRESH_WAIT_SECS + i * 5))s, zero pod churn)"
+            exit 0
+        fi
+        sleep 5
+    done
+
+    echo ""
+    echo "⚠️  refresh-wait did NOT converge in $((EPR_REFRESH_WAIT_SECS + EPR_VERIFY_POLLS * 5))s"
+    echo "   (no 200 + conductor-connected + x-epr-router:dispatched pair)."
+    echo "   Falling back to the pod-delete path — note this resets the doorway's"
+    echo "   p2p snapshot cache and upstream breakers, so a later E2E measure of"
+    echo "   this doorway is measuring a recovering pod."
+    echo ""
+fi
+
 # DEPLOYMENT is interpolated into an ERE below — require a literal DNS-1123
 # name so regex metacharacters can never widen the match.
 if ! [[ "$DEPLOYMENT" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]; then
@@ -22,7 +120,7 @@ if ! [[ "$DEPLOYMENT" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]; then
 fi
 
 echo "═══════════════════════════════════════════════════════════"
-echo "RESTART DOORWAY POD — refresh EprRouter post-seed"
+echo "RESTART DOORWAY POD — refresh EprRouter post-seed (path 2, FALLBACK)"
 echo "═══════════════════════════════════════════════════════════"
 echo "Namespace: ${NAMESPACE}"
 echo "Target:    pods matching '${DEPLOYMENT}'"

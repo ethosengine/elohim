@@ -1040,13 +1040,23 @@ def seedProjectionsStage() {
     }
 
     // Force a doorway pod restart so the EprRouter's boot-time fetch
-    // (main.rs:567 — fetch_projections_from_storage) picks up the freshly
-    // seeded project-epr commitments. The router only refreshes at boot
-    // OR via SSE 'projection.registered' events (storage_events_subscriber.rs:238),
-    // and the SSE path is currently flaky in alpha (warmup.lastError to
-    // emma-alpha visible on /health/startup). A pod-delete is the
-    // deterministic refresh — the Deployment controller recreates the
-    // pod immediately, and its boot loads the now-populated commitments.
+    // picks up the freshly seeded project-epr commitments.
+    //
+    // CORRECTION 2026-08-28 (ci-failure-triage): the claim that used to stand
+    // here — "the router only refreshes at boot OR via SSE
+    // 'projection.registered' events, so a pod-delete is the deterministic
+    // refresh" — was ALREADY STALE when it was written. `main.rs` runs a
+    // periodic EPR-router self-heal refresh every DOORWAY_EPR_REFRESH_SECS
+    // (default 30) whose sequence is byte-for-byte the boot fetch
+    // (resolve_epr_storage_pool -> fetch_projections_with_fallback ->
+    // apply_epr_fallback_outcome -> prewarm_projected_shells). It landed in
+    // 379668123 on 2026-05-30; this comment was written on 2026-06-10.
+    // The script below therefore waits out two refresh ticks and VERIFIES
+    // (x-epr-router: dispatched at the public boundary) FIRST, and only
+    // pod-deletes as a fallback: deleting the pod resets the doorway's p2p
+    // snapshot cache and upstream breakers, and the E2E stage a few minutes
+    // later then measures a recovering pod (genesis #1512/#1513/#1514 —
+    // backlog/ci-genesis-doorway-503-seed-phase-wedge.md).
     //
     // RBAC note: `ee-jenkins` service account cannot `get deployments`
     // in elohim-alpha (RBAC-forbidden error observed in build #1041 when
@@ -1058,9 +1068,10 @@ def seedProjectionsStage() {
     //
     // Empirically observed in build #1039 that Seed Projections created
     // 6 commitments but doorway-alpha's running pod (commit b45ad43,
-    // pre-seed) never picked them up — proving the pod restart is the
-    // missing handoff. Wrapped in catchError so an RBAC issue doesn't
-    // mask the seed itself succeeding.
+    // pre-seed) never picked them up. That observation dates from an image
+    // WITHOUT the periodic refresh — it establishes that a handoff is
+    // needed, not that a pod-delete is the only one available. Wrapped in
+    // catchError so an RBAC issue doesn't mask the seed itself succeeding.
     catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
         def deployment = ''
         def namespace = ''

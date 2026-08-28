@@ -29,7 +29,7 @@ memory_anchors:
 # CI / orchestrator recurring anti-patterns — the museum face
 
 > **Hot-context pointer (the one sentence to remember):**
-> These thirteen failure modes recurred across **≥3 distinct agentic shifts each** (the starred rows are
+> These sixteen failure modes recurred across **≥3 distinct agentic shifts each** (the starred rows are
 > sub-threshold but earned their place — see the footnote) — recurrence is the signal
 > that an anti-pattern earned canonical placement, not just narration. The mechanism of each lives in a
 > linked memory entry; this record is the **single frequency-ranked index** a future CI planner meets
@@ -67,6 +67,8 @@ bodies themselves retire to git; the durable mechanism of each pattern lives in 
 
 | 15 | **A Jenkins CONTROLLER RESTART orphans the whole dispatched wave — and trap #1's advice is exactly backwards for it** — the controller goes down mid-wave; on resume every in-flight agent pod is gone (`Waiting for reconnection of <pod> before proceeding with build`, `Could not connect to … to send interrupt signal to process`). Three symptoms, one cause, and they look unrelated: the downstream child ends **ABORTED**, a sibling ends **FAILURE**, and the orchestrator ends FAILURE with a **fabricated Groovy syntax error** — `MultipleCompilationErrorsException` naming a line that is valid and that the job's very next build compiles clean, because `FlowExecutionList.resume → loadProgramAsync → parseScript` reparsed a CPS script the hard restart never flushed (tell: the echoed source line **stops mid-token**). Compounding: a declarative `timeout` counts **through the outage**, so a 2h budget is spent entirely on an idle build and fires the instant it resumes — work destroyed by a timer that measured downtime. **Discriminator vs #1: `Resuming build … after Jenkins restart` in the log = restart-orphaned → RETRIGGER (the work was never done); an `abortPrevious` preemption by a newer build number = superseded → IGNORE.** Same ABORTED symptom, opposite remedy. Never edit a Jenkinsfile in response — check whether the job's NEXT build compiles the same file first. | 1* | `backlog/ci-jenkins-controller-restart-orphans-wave.md` (#1669/#1343/#1664, fp `2ec906730fe7`); sibling agent-pod-channel class `backlog/ci-jenkins-k8s-pod-exec-websocket-transient.md` |
 
+| 16 | **Measurement-by-restart — a stage bounces the very surface it is about to measure, and the scaffold that justified the bounce was self-healed away months ago** — `seedProjectionsStage()` pod-deletes doorway-alpha on EVERY genesis run to force an EprRouter refresh, then the E2E stage measures that pod ~6 minutes later. The delete resets the doorway's p2p snapshot cache and its upstream circuit breakers, so E2E reads **recovery, not truth**: `p2p.caughtUp` absent (no snapshot yet — a *different* JSON shape from `caughtUp: false`, which means a snapshot exists and reports behind) and `status=degraded` (the `serving.shedding \|\| serving.degrading` override on the declared primary). The scaffold's stated premise — "the router only refreshes at boot OR via SSE" — was already false when written: `doorway-service` `main.rs` has run a periodic EPR-router self-heal refresh every `DOORWAY_EPR_REFRESH_SECS` (default 30) since `379668123` (2026-05-30), executing the byte-for-byte boot sequence and saying so in its own comment ("no kubectl restart needed"); the Jenkinsfile comment dates from 2026-06-10. **Diagnostic tell: the failing assertion reads a freshness/liveness field of a surface THIS pipeline restarted earlier in the same run.** Before writing or keeping any restart-to-refresh step, grep the runtime for a periodic refresh loop; if one exists, the step's job is to *wait out two ticks and verify*, not to delete a pod. Same family as the root `CLAUDE.md` "measurement-by-deploy" note for a bare `[build:edge]` fired just to measure — that one is operator-facing, this one is in-tree and fires every run. | 1* | `backlog/ci-genesis-doorway-503-seed-phase-wedge.md` (#1512–#1514, fps `a672ee4586c6` / `193b7597a4cb` / `4b6fe47bfdb3`); `genesis/scripts/ci/restart-doorway-epr.sh`; root `CLAUDE.md` §Force dispatch |
+
 \* #6 recurred in 2 shifts but is a full-cycle-cost no-op silencer worth the museum row.
 #12 is likewise 2 occurrences, but of an *identical mechanism against the identical config list*, where
 the second instance ran three weeks intermittently and its GREEN builds were the mis-provenanced ones —
@@ -95,6 +97,18 @@ apparatus an agent uses to see CI at all, and its harm is not additive but *disp
 per-build cap spent on benign chatter hides the real cause in the same log tail, which is how #1291's
 actual RBAC-drift `unstable()` went unfiled while four healthy rollouts got fingerprinted. When a
 findings entry looks strange, read the three lines BELOW the captured line before believing it.
+#16 is a first-occurrence earning its row on the same ground #11 and #15 did — a *new structural
+class*, recorded before a second instance because the class is self-concealing in a specific way: the
+pipeline that inflicts the damage is also the one that reports it, so every red it produces looks like
+a substrate red and gets triaged as one. Three builds (#1512, #1513, #1514) each had their
+`caughtUp` / `degraded` fingerprints read as alpha-cluster degradation before anyone checked what the
+pipeline had done to the doorway minutes earlier. Its second hazard is the more general one and is why
+the row is worded around *scaffolds*, not doorways: a workaround written against a real runtime gap
+does not expire when the gap is closed. The runtime here fixed itself in May and said so in a code
+comment; the pipeline kept paying for a cure it no longer needed, and the payment was denominated in
+exactly the measure the pipeline exists to produce. When a pipeline step's comment asserts a runtime
+limitation, date the assertion against the runtime — a stale premise in a comment is
+indistinguishable from a live one at read time.
 
 ## The load-bearing reading (so you feel the pull and resist it)
 
@@ -140,3 +154,4 @@ all`). Host-green ≠ CI-green; the gap is the environment, not your code.
 - **This record → canonical:** the [orchestrator README](../../../../orchestrator/README.md) (the canonical orchestrator doc — dispatch, NOT_BUILT, baseline, trigger semantics).
 - **Sibling record:** [deploy-is-not-a-graph-node](2026-06-02-deploy-is-not-a-graph-node.md) (the baseline-drift / deploy-dispatch incident that anchors patterns #1/#2).
 - **Mechanism (live memory entries):** linked per-pattern in the table above and in `memory_anchors`.
+- **Pattern #16 → live concern:** `genesis/data/timeline/backlog/ci-genesis-doorway-503-seed-phase-wedge.md` (the genesis measurement-by-restart entry, where the cure and the remaining substrate leg are tracked).
